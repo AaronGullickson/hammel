@@ -1,3 +1,41 @@
+#' Calculate the living population at time points
+#'
+#' Count persons with `birth_time <= time` and missing `death_time` or
+#' `death_time > time`. Counts include births at the requested time and exclude
+#' deaths at that time, representing the population after recorded events there.
+#' Results preserve the order of the requested times, including repeated times.
+#'
+#' @param population A `hammel_population` or persons data frame representing
+#'   one independent history. For bare tables, ensure follow-up is complete
+#'   through every requested time.
+#' @param times A numeric vector of finite time points in years. A population
+#'   object cannot be queried beyond its known `end_time`.
+#' @return A data frame with `time` and `population` columns.
+#' @export
+#' @examples
+#' population <- create_baseline_population(100, end_time = 0)
+#' calculate_population_size(population, times = c(-10, -5, 0))
+calculate_population_size <- function(population, times) {
+  if (!is.numeric(times) || !is.null(dim(times)) || any(!is.finite(times)))
+    stop("`times` must be a numeric vector of finite times in years.", call. = FALSE)
+  if (inherits(population, "hammel_population")) {
+    validate_population(population)
+    if (is.null(population$end_time) || any(times > population$end_time))
+      stop("Observation requires a known endpoint and cannot extend beyond it.", call. = FALSE)
+    persons <- population$persons
+  } else {
+    if (!is.data.frame(population))
+      stop("`population` must be a hammel_population or persons data frame.", call. = FALSE)
+    persons <- population
+    hammel_population(persons)
+  }
+  # Sorted event dates let us count each time without scanning every person.
+  born <- sort(persons$birth_time)
+  died <- sort(persons$death_time[!is.na(persons$death_time)])
+  counts <- findInterval(times, born) - findInterval(times, died)
+  data.frame(time = times, population = counts)
+}
+
 #' Summarize demographic exposure and rates
 #'
 #' Calculate person-years, deaths, births, ASMR, and ASFR for each time period,
@@ -78,16 +116,28 @@ summary_rows <- function(table, by_sex = FALSE) {
 
 #' Calculate total fertility rates
 #'
-#' Sum age-specific fertility rates times their actual interval widths. The
+#' Sum age-specific fertility rates times their actual interval widths.
 #' Open-ended age bands are omitted. The remaining finite, contiguous age range
 #' defines the TFR reported. Missing ASFRs are omitted from the sum.
-#' @param rates A table returned by [calculate_lexis_counts()], or a data frame
-#'   with `age_start`, `age_end`, and `asfr` in births per woman-year.
+#' @param rates A table returned by [calculate_lexis_counts()], a fertility
+#'   process object, or a data frame with `age_start`, `age_end`, and `asfr`
+#'   or `rate` in births per woman-year. Bare `rate` tables are interpreted as
+#'   fertility rates; mortality processes are not valid inputs.
 #' @return A data frame with period columns, `age_start`, `age_end`, and `tfr`.
 #'   If `sex` is present, only female rows are used.
 #' @export
 calculate_tfr <- function(rates) {
-  check_columns(rates, c("age_start", "age_end", "asfr"), "rates")
+  if (inherits(rates, "hammel_process")) {
+    if (!identical(rates$name, "fertility") ||
+        !identical(rates$rate_unit, "person_year"))
+      stop("TFR requires a fertility process with person-year rates.", call. = FALSE)
+    rates <- rates$rates
+  }
+  check_columns(rates, c("age_start", "age_end"), "rates")
+  if (!"asfr" %in% names(rates)) {
+    if (!"rate" %in% names(rates)) stop("Supply `asfr` or fertility `rate`.", call. = FALSE)
+    rates$asfr <- rates$rate
+  }
   unknown <- attr(rates, "unassigned_births")
   if ("sex" %in% names(rates)) rates <- rates[rates$sex == "f", , drop = FALSE]
   check_numeric_column(rates$age_start, "rates$age_start")
@@ -124,8 +174,9 @@ calculate_tfr <- function(rates) {
 #' survivorship is positive. Require a final explicit open age interval.
 #' Tables are constructed separately for each period and sex present.
 #'
-#' @param rates A table returned by [calculate_lexis_counts()], or a data frame
-#'   with `age_start`, `age_end`, and `asmr`, `mx`, or `rate` per person-year.
+#' @param rates A table returned by [calculate_lexis_counts()], a mortality
+#'   process object, or a data frame with `age_start`, `age_end`, and `asmr`,
+#'   `mx`, or `rate` per person-year.
 #' @param radix Initial life-table survivors, a positive finite number.
 #' @return A data frame with period and sex identifiers (when supplied),
 #'   `age_start`, `age_end`, `mx`, `n`, `ax`, `qx`, `lx`, `lx_end`, `dx`,
@@ -136,6 +187,12 @@ calculate_tfr <- function(rates) {
 #' calculate_life_table(data.frame(age_start = c(0, 1, 5),
 #'   age_end = c(1, 5, Inf), mx = 0.1))
 calculate_life_table <- function(rates, radix = 1) {
+  if (inherits(rates, "hammel_process")) {
+    if (!identical(rates$name, "mortality") ||
+        !identical(rates$rate_unit, "person_year"))
+      stop("Life tables require a mortality process with person-year rates.", call. = FALSE)
+    rates <- rates$rates
+  }
   check_columns(rates, c("age_start", "age_end"), "rates")
   if (!"mx" %in% names(rates)) {
     if ("asmr" %in% names(rates)) rates$mx <- rates$asmr

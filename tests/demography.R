@@ -104,3 +104,30 @@ stopifnot(identical(calculate_tfr(summary),
 # A finite final breakpoint starts an automatically appended open age band.
 stopifnot(identical(calculate_lexis_counts(population, c(0, 1), c(0, 1)),
                     calculate_lexis_counts(population, c(0, 1), c(0, 1, Inf))))
+
+# Input rate tables and typed processes use the same summary calculations.
+input_fertility <- data.frame(age_start = c(15, 20, 30),
+  age_end = c(20, 30, 50), rate = c(0.1, 0.2, 0.05))
+expected <- input_fertility; expected$asfr <- expected$rate; expected$rate <- NULL
+stopifnot(identical(calculate_tfr(input_fertility), calculate_tfr(expected)),
+          identical(calculate_tfr(fertility(input_fertility)), calculate_tfr(expected)))
+input_mortality <- data.frame(sex = c("m", "f"), age_start = 0,
+                              age_end = Inf, rate = c(0.1, 0.2))
+stopifnot(identical(calculate_life_table(mortality(input_mortality)),
+                    calculate_life_table(input_mortality)))
+expect_error(calculate_tfr(mortality(input_mortality)))
+expect_error(calculate_life_table(fertility(input_fertility)))
+
+# Population counts include births and exclude deaths at the requested instant.
+counts <- calculate_population_size(population, c(0, 0.25, 0.5, 0.75, 1))
+stopifnot(identical(counts$population, c(1L, 2L, 3L, 2L, 2L)),
+          identical(calculate_population_size(population, c(1, 0, 1))$population,
+                    c(2L, 1L, 2L)),
+          calculate_population_size(population, -1)$population == 0L,
+          identical(calculate_population_size(persons, c(0, 1)),
+                    calculate_population_size(population, c(0, 1))),
+          calculate_population_size(empty, 1)$population == 0L,
+          nrow(calculate_population_size(population, numeric())) == 0L)
+expect_error(calculate_population_size(population, 2))
+expect_error(calculate_population_size(population, NA_real_))
+expect_error(calculate_population_size(population, Inf))

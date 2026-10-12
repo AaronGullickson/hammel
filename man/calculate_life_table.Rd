@@ -7,8 +7,9 @@
 calculate_life_table(rates, radix = 1)
 }
 \arguments{
-\item{rates}{A table returned by \code{\link[=calculate_lexis_counts]{calculate_lexis_counts()}}, or a data frame
-with \code{age_start}, \code{age_end}, and \code{asmr}, \code{mx}, or \code{rate} per person-year.}
+\item{rates}{A table returned by \code{\link[=calculate_lexis_counts]{calculate_lexis_counts()}}, a mortality
+process object, or a data frame with \code{age_start}, \code{age_end}, and \code{asmr},
+\code{mx}, or \code{rate} per person-year.}
 
 \item{radix}{Initial life-table survivors, a positive finite number.}
 }

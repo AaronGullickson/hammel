@@ -2,6 +2,7 @@
 
 export(calculate_lexis_counts)
 export(calculate_life_table)
+export(calculate_population_size)
 export(calculate_tfr)
 export(create_baseline_population)
 export(fertility)

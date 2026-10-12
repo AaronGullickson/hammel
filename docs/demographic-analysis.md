@@ -29,11 +29,31 @@ Life tables are constructed separately for each period and sex. The age schedule
 Input-derived reference tables are also supported:
 
 ```r
-input_life_tables <- model$processes$mortality$rates |>
+input_tfr <- model$processes$fertility |> calculate_tfr()
+input_life_tables <- model$processes$mortality |>
   calculate_life_table()
 ```
 
+Both functions also accept their process's `$rates` table. TFR uses `asfr` from
+Lexis counts or `rate` from a fertility input table; life tables use `asmr`,
+`mx`, or mortality `rate`. Typed mortality processes are rejected by TFR,
+and typed fertility processes are rejected by the life-table function. A bare
+table's `rate` column must represent the corresponding demographic process.
+
 ## Observation rules
+
+Calculate total living population at selected time points:
+
+```r
+population_sizes <- result |>
+  calculate_population_size(times = seq(2000, 2100, by = 10))
+```
+
+The result has `time` and `population` columns. Births at a requested time are
+included and deaths at that time are excluded. Requested order and repeated
+times are preserved. The function also accepts a persons table for one history;
+as with Lexis counts, the caller must ensure complete follow-up when supplying
+a bare table.
 
 Intervals are half-open. Exposure is recorded lifespan overlap, split directly at age and time boundaries, supporting fractional periods and unequal age bands. A population's known endpoint limits observation. For a bare persons table, ensure complete follow-up through the requested endpoint yourself.
 
