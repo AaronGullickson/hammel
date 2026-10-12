@@ -20,18 +20,32 @@ The user owns demographic requirements and scientific interpretation. Agents sup
 
 Legacy SOCSIM file compatibility is optional and must not govern the new design. A universal simulation framework is not a project requirement. The implementation language, dependencies, precise API, and demographic algorithms remain undecided.
 
+## First milestone
+
+Accepted October 12, 2026: simulate a population with demographic rates that remain constant over calendar time, then inspect results and test demographic accuracy. Fertility and mortality are the focus. Include a basic marriage or partnership mechanism to assign parents; a realistic partnership market is outside this milestone.
+
+Validate fertility and mortality against the supplied inputs, including total fertility rate (TFR) and life-table measures. Constant over calendar time does not imply constant across ages; the age pattern and rate representation still need specification. Random pairing after a minimum age is a candidate mechanism, not yet an accepted algorithm.
+
 ## Proposed development sequence
 
 These milestones are planning suggestions, not implementation authorization:
 
 1. Establish reference source versions and licensing; audit relevant SOCSIM behavior.
 2. Resolve enough of the design and scientific contract to specify a minimal simulator.
-3. Implement supplied-population initialization and mortality through the intended R interface.
-4. Add births and parent–child relationships, exercising the process extension contract.
-5. Validate that foundation before adding partnerships and richer transitions.
+3. Build the first milestone incrementally: supplied-population initialization and mortality, then fertility, births, parent–child relationships, and basic partnerships.
+4. Validate output fertility and life-table measures against the inputs, alongside accounting and relationship checks.
+5. Extend the validated foundation with richer partnership behavior and transitions.
 
 Keep specifications, worked examples, decisions, audit evidence, and validation results in this repository so subsequent agents can resume from durable evidence.
 
 ## Provenance
 
 This brief and the initial companion documents were distilled from `/home/aarong/Work/Hammel-project-notes.md`, saved October 11, 2026. That file summarizes a planning conversation; it does not contain a detailed source audit. These repository documents are the working guidance going forward. The decision log records later changes.
+
+## Monthly time decision
+
+The first milestone uses a fixed monthly simulation time unit, following SOCSIM's convention. Configurable units are a longer-term goal. Age and event-date conventions, exposure accounting, within-month ordering, and conversion of input rates to monthly event probabilities or schedules still require specification. A monthly time unit does not imply simply dividing annual probabilities by twelve.
+
+## User-facing rate units
+
+Users can supply age-specific fertility and mortality rates in events per person-year. The monthly engine converts these to events per person-month internally by dividing by twelve. This removes the need for users to prepare monthly rates while preserving explicit rate interpretation and denominators.

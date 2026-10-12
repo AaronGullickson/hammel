@@ -24,7 +24,20 @@ Use this structure for each proposed mechanism:
 
 ## Foundation requiring specification
 
-The proposed first milestone is supplied-population initialization and mortality. Before implementation, resolve input requirements, time semantics, mortality input interpretation, competing events, observation timing, and RNG behavior. Fertility then requires explicit eligibility, heterogeneity, newborn initialization, and parenthood rules. Partnerships require matching and market behavior specifications.
+The accepted first milestone is a population simulation with fertility and mortality rates constant over calendar time, basic partnerships for assigning parents, and demographic validation of the outputs. Rates may vary with age; their exact representation remains open. Implementing mortality first is a possible incremental step, not the full milestone.
+
+Before implementation, resolve input requirements, time semantics, rate interpretation, competing events, observation timing, and RNG behavior. Fertility requires explicit eligibility, newborn initialization, and parenthood rules. Specify a minimal partnership mechanism, including age eligibility, pairing constraints, what happens when no partner is available, and consequences of a partner's death. Random pairing after a minimum age is a candidate, not a settled rule.
+
+## First milestone demographic checks
+
+These are validation requirements; the estimators, reference cases, run sizes, and numerical acceptance thresholds still need specification.
+
+- **Fertility:** record births and exposure by the age of the person giving birth. Estimate age-specific fertility rates using the same denominator and age intervals as the target inputs. Calculate TFR by summing age-specific fertility rates times their interval widths, with consistent units.
+- **Fertility eligibility:** distinguish population-based fertility rates from rates conditional on partnership or another eligibility criterion. Applying population-based rates only to partnered people generally changes the resulting population TFR. Resolve this explicitly before implementing the partnership–fertility interaction.
+- **Mortality:** record deaths and person-time exposure by age, estimate the corresponding age-specific death rates, and construct life tables using a documented method consistent with the input interpretation. Compare survival and life expectancy with reference quantities derived from those inputs. Do not equate a central death rate, hazard, and interval death probability without the required assumptions.
+- **Population structure:** constant input rates do not imply an immediately stationary or stable population. Distinguish period measures from cohort measures and specify initialization, observation windows, and any burn-in. Raw birth or death counts depend on population composition and are not sufficient rate checks.
+- **Sampling uncertainty:** predefine replication strategy and statistical criteria. Simulated TFR and life-table estimates fluctuate; deterministic equality to inputs is not an appropriate general acceptance rule. Specify treatment of sparse ages, zero exposure, incomplete cohorts, and the oldest age interval.
+- **Mechanism checks:** verify birth and death accounting, parent identities, partnership consistency, and eligibility at event time. Include known-answer mortality and fertility cases alongside combined population simulations so failures can be localized.
 
 ## Validation principles
 
@@ -37,3 +50,46 @@ The proposed first milestone is supplied-population initialization and mortality
 - Require exact fixed-seed comparisons only when algorithms and random-number consumption are intentionally preserved. For changed algorithms, use statistical comparisons with justified uncertainty and tolerances.
 
 Passing software checks does not establish research readiness. Before research use, seek targeted review of scheduling, RNG handling, and the R/native boundary by an experienced simulation developer, alongside demographic review.
+
+## Monthly time decision
+
+The first milestone uses a fixed monthly simulation time unit, following SOCSIM's convention. Configurable units are a longer-term goal. Age and event-date conventions, exposure accounting, within-month ordering, and conversion of input rates to monthly event probabilities or schedules still require specification. A monthly time unit does not imply simply dividing annual probabilities by twelve.
+
+## Person-year input convention
+
+Accepted inputs include age-specific fertility and mortality rates expressed as events per person-year. Convert their exposure units internally: a rate of 0.12 events per person-year is 0.01 events per person-month. This is a unit conversion, not a statement that the monthly event probability is 0.01.
+
+For example, if the input represents a constant mortality hazard of 0.12 per year, the one-month death probability is `1 - exp(-0.12 / 12)`, approximately 0.00995. A central death rate requires a stated relationship to the underlying mortality model; an annual death probability requires a different conversion. These interpretations must be specified before implementation.
+
+For fertility, define whether the denominator is all women or an eligible subset, and how birth events are generated from the converted rate. Validate rates by dividing event counts by exposure in the corresponding units. Include a unit-consistency check: annualized monthly rates equal the original person-year rates, and equivalent exposure units produce equivalent estimates.
+
+## Accepted rate-to-probability direction
+
+Derive a single-process event probability as `1 - exp(-rate * dt)`, with time units matching the rate denominator. Person-year rates use `dt = 1/12` for a month. This assumes a constant hazard over the span; the numerically stable implementation is `-expm1(-rate * dt)`.
+
+The intended mortality model interprets supplied rates as piecewise constant hazards. When users supply empirical central death rates (`nmx`), interpreting them as hazards is an explicit modeling assumption, not a universal life-table identity. Derive validation expectations consistently with this assumption and identify any differences from conventional life-table conversions. Boundary-crossing rules remain open.
+
+This decision resolves the earlier open single-process conversion direction. It does not specify competition between processes, fertility eligibility or birth spacing, or within-month event ordering. For repeatable events, the probability of at least one event and the expected event count are distinct quantities; fertility event generation still needs its own specification.
+
+## Accepted hazard-scale waiting-time direction
+
+Sample candidate event times directly using cumulative hazard under piecewise constant hazards:
+
+1. Draw `U` uniformly on `(0, 1)` and set the positive threshold `E = -log(U)`.
+2. For the remaining duration `d` in the current age band, calculate `h = rate * d`, using matching rate and time units.
+3. If `E > h`, subtract `h` from `E` and continue into the next band with its rate.
+4. Otherwise, for a positive rate, the event lies `E / rate` time units into the current band.
+
+A zero-rate band contributes no hazard and is crossed without dividing by zero. If the specified future schedule never accumulates enough hazard, no event occurs within that schedule; do not invent a terminal event. Exact boundary assignment and terminal-age policy still require specification.
+
+For person-year rates, durations are in years and a month contributes `rate / 12`. Survival across bands is `exp(-sum(rate * duration))`. This is equivalent to accumulating `log(1 - p)` when `p = 1 - exp(-rate * duration)`, without a probability conversion round trip. The known future age schedule is incorporated at sampling time, so crossing an age band alone does not require a new random draw.
+
+Worked example: the current rate is 0.12 per year for two remaining months, then 0.24 per year. With threshold `E = 0.05`, the first band contributes `0.12 * 2/12 = 0.02`. The remaining threshold is 0.03, reached after `0.03 / 0.24 = 0.125` years (1.5 months) in the next band. The candidate continuous waiting time is 3.5 months. Under D008, truncate 3.5 months to an offset of 3 simulation months.
+
+Validate constant-hazard survival analytically and test piecewise schedules against `exp(-sum(rate * duration))`, including zero-rate bands and events on either side of an age boundary. D008 specifies monthly truncation and candidate tie priority; their boundary cases need worked examples and validation. Other competing-event behavior remains open.
+
+## Accepted monthly truncation and candidate ties
+
+Under D008, truncate nonnegative waiting times in months to integer offsets, with offset zero indicating the current month. Retain one next event per person. Equal-month candidates are prioritized as death, birth, partnership formation, then partnership dissolution. Compare the truncated dates, not fractional times. This is a per-person selection rule; execution order across people and resampling after events remain open.
+
+Worked example: birth at offset 2.1 months and death at offset 2.9 months both map to offset 2; death wins. Birth at 1.9 months and death at 2.1 months map to offsets 1 and 2; birth wins. Candidate offsets below one month map to the current month. Test exact integer boundaries and age-band boundaries explicitly, along with these tie cases. Document differences from continuous-time event competition in demographic validation.

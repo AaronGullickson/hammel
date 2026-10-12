@@ -17,7 +17,7 @@ Persons, demographic time, and kinship are candidate core concepts. Demographic 
 
 | Question | What the specification must establish |
 | --- | --- |
-| Time model | Monthly or continuous time; calendar representation; age calculation; boundary rules |
+| Time model | Monthly time accepted for the first milestone; calendar representation, age calculation, and boundary rules remain open; configurable units are a longer-term goal |
 | Scheduling | Competing events, simultaneous events, ordering, and invalidation after changes |
 | Rate representation | Hazards, probabilities, central rates, units, intervals, conversions, interpolation |
 | Population state | Required person fields, custom attributes, identity, and dead or departed persons |
@@ -35,3 +35,27 @@ Do not infer answers from SOCSIM's implementation: document reference behavior a
 Model construction should support R pipes, with simulation execution as a separate operation. Concrete function names and object classes have not been chosen. The illustrative API in the conversation is not a public API commitment.
 
 Before implementing the first simulator, specify a minimal end-to-end example with input schemas, time and rate units, observation requests, returned objects, and reproducibility behavior.
+
+## First milestone scope
+
+The accepted first milestone combines calendar-time-constant fertility and mortality inputs with basic partnerships and parent assignment. Build it incrementally, but evaluate completion against the combined demographic validation targets in the scientific contract. Rich partnership matching is deferred.
+
+The minimum observation design must support age-specific births, deaths, and the corresponding person-time exposures, as well as accounting and relationship checks. Specify these observations before deciding the result schema. Basic partnership rules must be compatible with the intended fertility denominators and target rates.
+
+## Time unit
+
+Use a fixed monthly time unit for the first milestone. Keep unit assumptions explicit and conversions in defined operations to support future configurable units. This does not decide whether the engine scans the population monthly or schedules events ahead, or how events within a month are ordered.
+
+## Rate input interface
+
+Accept age-specific fertility and mortality rates expressed as events per person-year. Convert to events per person-month internally by dividing by twelve, keeping the input units and denominator explicit. Users should not need to construct monthly rate files. Output rate estimates used for validation should be available in the corresponding person-year units.
+
+Keep exposure-unit conversion separate from the mapping of rates to event probabilities or schedules. The latter depends on the rate interpretation and the accepted demographic algorithm.
+
+## Rate-to-probability direction
+
+Use `1 - exp(-rate * dt)` for a single-process event probability under a constant hazard within the time span, with `dt = 1/12` for person-year rates and monthly time. This resolves the previously open conversion direction; rate boundaries, process competition, and fertility event generation remain to be specified. See D006 and the scientific contract for the mortality interpretation and validation assumptions.
+
+## Candidate waiting-time sampling
+
+Sample directly on the hazard scale: draw `E = -log(U)` and consume that threshold through successive age bands using `rate * duration`. In the band containing the event, divide the remaining threshold by its rate to obtain the remaining waiting time. Known age-specific rate changes are thus included in the original sample. See D007 and the scientific contract for units, a worked example, and validation requirements. D008 resolves monthly event assignment and candidate ties: truncate waiting times to integer months and prioritize death, birth, formation, then dissolution for equal-month candidates. Execution order across people and resampling remain open.

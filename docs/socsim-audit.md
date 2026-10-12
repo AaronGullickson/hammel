@@ -1,8 +1,10 @@
 # SOCSIM reference audit plan
 
-Status: planned. No detailed source audit has been performed. References below are starting points recorded in the earlier conversation, not verified findings in this repository.
+Status: broader audit planned. An initial narrow source trace of rate conversion is recorded in [SOCSIM rate conversion](socsim-rate-audit.md); no executable reference validation or complete scheduling audit has been performed. References below are starting points recorded in the earlier conversation.
 
 ## Establish the reference
+
+An initial static trace of candidate selection, within-month execution, and rescheduling is recorded in [competing events](socsim-competing-events-audit.md).
 
 Record repository URL, commit or release, retrieval date, relevant files, and applicable licenses for each source examined. Distinguish SOCSIM engine code from rsocsim integration. Before copying or adapting code, establish applicable licensing obligations and document provenance. Package licensing remains undecided.
 
