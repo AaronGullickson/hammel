@@ -120,3 +120,17 @@ The design specification lists open choices. In particular, C++, simulation exec
 ## Implementation update: population validation and year metadata
 
 Both `set_population()` and `hammel_results()` now apply the shared structural checks documented in `population-schema.md`. Public metadata uses `start_time` and `end_time` in years; the earlier month arguments are removed, not reinterpreted. D011–D013 statements describing migration or validation as pending are historical and superseded by this implementation update. Demographic eligibility and time-boundary policies remain open.
+
+## D014: Store the population as a result object
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** `hammel_model` stores one `population` component of class `hammel_results`, alongside `processes`. Do not duplicate `persons`, `unions`, or the starting time at the model's top level.
+- **Behavior:** table inputs construct and retain a result object; existing result inputs are validated and retained intact. The population's `end_time` is the next run's starting time. `set_population(..., start_time = ...)` remains the table-input interface and sets that reference time.
+- **Rationale:** use the same population representation for initial setup and restarts, preserving additional result components and avoiding duplicate state.
+
+## D015: Population class and single population setter input
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** rename the class and constructor from `hammel_results` to `hammel_population`. Simplify the setter to `set_population(model, population)`, accepting only that class.
+- **Behavior:** create and normalize tables through `hammel_population(persons, unions = NULL, end_time = NULL)`; the setter validates and stores the object unchanged. Initial and simulated populations share this representation. `end_time` remains the population reference time in years and supplies the next run's starting time.
+- **Supersedes:** earlier class names and table-input setter signatures in D009–D014. Direct table inputs, `unions`, and `start_time` arguments are removed from `set_population()`.

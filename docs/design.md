@@ -32,13 +32,13 @@ Do not infer answers from SOCSIM's implementation: document reference behavior a
 
 ## Interface direction
 
-The accepted initial table schema is in [population schema](population-schema.md) (D012). Person and union dates are exposed in numeric years with fractional years; the first engine retains integer monthly scheduling internally. `persons` has no marital-status column. Relationship state is derived from union histories and may be cached internally for performance. Metadata now uses `start_time` and `end_time` in years.
+The accepted initial table schema is in [population schema](population-schema.md) (D012). Person and union dates are exposed in numeric years with fractional years; the first engine retains integer monthly scheduling internally. `persons` has no marital-status column. Relationship state is derived from union histories and may be cached internally for performance. Population metadata uses `end_time` in years; `set_population()` accepts only a population object and retains its reference time.
 
-Simulation outputs must also be usable as inputs to further simulation (D010). The pipeable workflow should support initializing a subsequent model or run from a `hammel_results`, retaining person and union identities and histories. The result must provide enough endpoint information to establish the new starting time and current population. Subsequent runs can configure demographic mechanisms; the syntax and configuration carryover rules remain open.
+Simulation outputs must also be usable as inputs to further simulation (D010). The pipeable workflow should support initializing a subsequent model or run from a `hammel_population`, retaining person and union identities and histories. The result must provide enough endpoint information to establish the new starting time and current population. Subsequent runs can configure demographic mechanisms; the syntax and configuration carryover rules remain open.
 
 Distinguish reuse of demographic output from exact checkpoint continuation. Reusing output must not inherently depend on retaining a live compiled engine. Whether pending events and RNG state are saved, and whether split runs reproduce an uninterrupted run, requires a separate decision.
 
-Simulation results use a named-list object of class `hammel_results`. The core tables are `persons` (one row per person, including deceased persons) and `unions` (one row per union episode, linked by person IDs). Access them as `result$persons` and `result$unions`. Column schemas, data-frame implementation, optional observations and exposure summaries, metadata, and methods remain to be specified. See D009.
+Simulation results use a named-list object of class `hammel_population`. The core tables are `persons` (one row per person, including deceased persons) and `unions` (one row per union episode, linked by person IDs). Access them as `result$persons` and `result$unions`. Column schemas, data-frame implementation, optional observations and exposure summaries, metadata, and methods remain to be specified. See D009.
 
 Model construction should support R pipes, with simulation execution as a separate operation. D011 establishes the basic configuration API below. Simulation execution and observation function names remain proposals.
 
@@ -70,24 +70,16 @@ Sample directly on the hazard scale: draw `E = -log(U)` and consume that thresho
 
 ## Basic configuration API
 
-For a person-table input, `set_population(model, persons)` and explicit
-`unions = NULL` both initialize an unmarried population. The model stores an
-empty union data frame. This does not infer or alter person attributes;
-demographic schema consistency checks remain to be specified.
-
-Implemented under D011:
+Implemented under D015:
 
 ```r
+population <- hammel_population(persons, unions, end_time = 0)
 model <- hammel_model() |>
-  set_population(persons, unions, start_time = 0) |>
+  set_population(population) |>
   set_mortality(mortality_rates) |>
   set_fertility(fertility_rates)
-
-restarted_model <- hammel_model() |>
-  set_population(results) |>
-  set_mortality(mortality_rates)
 ```
 
-`results` is a `hammel_results` object. Its `end_time` becomes the model's `start_time`. These optional times in years do not yet establish calendar or exposure boundary conventions. Unknown times remain `NULL`; setters do not infer time from the latest event.
+`hammel_population()` normalizes absent unions and validates the tables. `set_population(model, population)` accepts only a `hammel_population`, validates it, and stores it intact as `model$population`. Its `end_time` supplies the next run's starting time. No separate model starting-time field is stored. Additional components are preserved. Unknown reference times remain `NULL`.
 
-The common operation is `set_process(model, name, process)`. The demographic shortcuts use names `mortality` and `fertility`. Setting the same name replaces its specification and retains other processes. Specifications are stored unchanged, including their person-year input units. Rate schemas and the executable process contract are deferred.
+The common process operation is `set_process(model, name, process)`. Mortality and fertility shortcuts use the corresponding names; setting a name replaces its specification while retaining others. Specifications are stored unchanged in person-year units. The executable process contract remains open.

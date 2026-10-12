@@ -4,41 +4,28 @@
 \alias{set_population}
 \title{Set the starting population of a Hammel model}
 \usage{
-set_population(model, persons, unions = NULL, start_time = NULL)
+set_population(model, population)
 }
 \arguments{
 \item{model}{A \code{hammel_model} object.}
 
-\item{persons}{A person data frame, or a \code{hammel_results} object.}
-
-\item{unions}{A union data frame, or \code{NULL} (the default) for an unmarried
-initial population when \code{persons} is a data frame. Omit this argument when
-supplying results.}
-
-\item{start_time}{Optional finite starting time in years for
-table inputs. Omit this argument when supplying results: their \code{end_time}
-is used. \code{NULL} means unknown; no starting time is inferred from dates.}
+\item{population}{A \code{hammel_population} object. Construct it from tables with
+\code{\link[=hammel_population]{hammel_population()}}. Its \code{end_time} supplies the model's starting time.}
 }
 \value{
 An updated \code{hammel_model}.
 }
 \description{
-Supply a person data frame with optional unions, or a \code{hammel_results} object.
-Omitted or \code{NULL} unions represent no initial unions and are stored as an
-empty data frame. Results supply
-both histories and their endpoint time. Existing process configuration is
-retained. The input model is not modified.
+Supply a validated population containing person and union histories and
+their reference time. The population is retained unchanged, including any
+additional components. Existing process configuration is retained.
+The input model is not modified.
 }
 \examples{
 persons <- data.frame(person_id = 1:2, sex = c(0L, 1L),
   birth_time = c(-25, -23), death_time = NA_real_,
   mother_id = NA_integer_, father_id = NA_integer_)
-unions <- NULL
+population <- hammel_population(persons, end_time = 0)
 model <- hammel_model() |>
-  set_population(persons, unions, start_time = 0)
-unmarried <- hammel_model() |>
-  set_population(persons, start_time = 0)
-results <- hammel_results(persons, unions, end_time = 120)
-restarted <- hammel_model() |>
-  set_population(results)
+  set_population(population)
 }

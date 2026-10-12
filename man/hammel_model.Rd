@@ -7,18 +7,19 @@
 hammel_model()
 }
 \value{
-A named list of class \code{hammel_model} containing \code{persons}, \code{unions},
-\code{start_time}, and a named list of \code{processes}. Population and starting
-time are initially \code{NULL}.
+A named list of class \code{hammel_model} containing \code{population}
+(initially \code{NULL}) and a named list of \code{processes}. Once set, \code{population}
+is a \code{hammel_population} object whose \code{end_time} is the model's starting time.
 }
 \description{
 Set the starting population and demographic processes using pipeable setters.
 Construction and configuration do not execute a simulation.
 }
 \examples{
+persons <- data.frame(person_id = 1:2, sex = c(0L, 1L),
+  birth_time = c(-25, -23), death_time = NA_real_,
+  mother_id = NA_integer_, father_id = NA_integer_)
 model <- hammel_model() |>
-  set_population(data.frame(person_id = 1:2, sex = c(0L, 1L),
-    birth_time = c(-25, -23), death_time = NA_real_,
-    mother_id = NA_integer_, father_id = NA_integer_)) |>
+  set_population(hammel_population(persons, end_time = 0)) |>
   set_mortality(data.frame(age = 0, rate = 0.01))
 }

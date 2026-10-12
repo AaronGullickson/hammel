@@ -40,10 +40,12 @@ Year-based storage does not change D004 or D008: the first engine still uses mon
 
 Exposure must be recorded in person-years, but year-based dates alone do not define exposure accounting. Event placement within a month, observation boundaries, partial intervals, and age-band splitting require their own rules.
 
-Endpoint and starting-time metadata use `end_time` and `start_time` in years. The former month-named arguments have been removed rather than reinterpreted. NULL continues to represent an unknown reference time.
+Population reference-time metadata uses `end_time` in years; the model takes its starting time from that value. The former month-named arguments have been removed rather than reinterpreted. NULL continues to represent an unknown reference time.
 
 ## Implemented validation scope
 
 Require the listed columns and their types, finite dates (except allowed NA), unique positive whole-number IDs, sex codes, and references to existing persons. Parents cannot reference themselves. Union partners must be distinct. Death cannot precede birth; union ending cannot precede formation, and formation cannot precede a partner's birth. End reasons must match whether a union has ended. When a reference time is supplied, recorded events cannot lie after it. Equal event dates are permitted; monthly alignment is not required by table validation.
 
 This is structural validation, not a full demographic eligibility contract. Parent-age and sex constraints, ancestry cycles, overlapping unions, death-related union consistency, and process-specific eligibility still require scientific specification. No missing core fields are silently filled in. Unknown parents use NA, not SOCSIM's zero sentinel.
+
+Normalization and validation are separate operations. `hammel_population()` normalizes absent unions before checking the constructed object. `validate_population()` verifies a `hammel_population` without mutation and returns it invisibly. `set_population()` accepts only a population object, validates it, and stores it unchanged as `model$population`. These functions and helpers live in `R/hammel_population.R`.
