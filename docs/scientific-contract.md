@@ -1,5 +1,13 @@
 # Scientific contract
 
+## Database rate helpers
+
+Download one population and explicitly selected year for a constant schedule; do not silently select the latest year or average rates. HMD uses `Mx_1x1`, retaining male and female central rates per person-year under the accepted hazard interpretation. Preserve raw age labels using `fixup = FALSE`; closed single-year ages map to `[age, age + 1)` and an upper open HMD age maps to `[age, Inf)`. Do not drop missing rates or fill gaps. Retain database, population code, year, product, retrieval timestamp, and reader version, without credentials.
+
+HMDHFDplus is optional and required only for download helpers. Verify conversions with synthetic data and the package's local readers; authenticated web requests require user credentials and are not part of ordinary tests. Source interfaces were checked against HMDHFDplus 2.0.8. HFD uses `asfrRR`, retaining total ASFR in births per woman-year without scaling. At the user's direction, omit open-age rows (`12-`, `55+`) and map closed ages to one-year bands. The retained-age TFR excludes endpoint contributions; do not claim full HFD TFR agreement. No fertility rates are inferred outside the retained age range. An optional HFD revision date is passed to the reader and recorded as requested; NULL means the current revision was requested, not that a specific revision has been pinned.
+
+References: [HMDHFDplus source](https://github.com/timriffe/HMDHFDplus), [HFD FAQ](https://www.humanfertility.org/Project/FAQ), and [HFD basic indicator methods](https://www.demogr.mpg.de/papers/technicalreports/tr-2011-001.pdf).
+
 ## Baseline population generator
 
 `create_baseline_population(size, max_age = 70, end_time = 0, female_probability = 0.5)` creates a simple starter population inspired by the user's SOCSIM initialization example. All persons are alive at `end_time`, have IDs `1` through `size`, unknown parents, and no unions. Sex is independently sampled with probability `female_probability` of label `"f"` (female), otherwise `"m"` (male); this does not enforce an exact sex balance.

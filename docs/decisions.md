@@ -149,3 +149,11 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 - **Rate schema:** `age_start`, `age_end`, and `rate`, with years and person-year units. Mortality also requires `sex` with separate `m` and `f` schedules. Intervals are half-open and must not overlap within a schedule.
 - **Implementation scope:** validate structure and rates; retain supplied schedules. No simulation behavior, interpolation, missing-coverage default, or time-varying rates are implemented. Calendar interval columns are rejected until supported.
 - **Supersedes:** D011's explicit-name setter signature and raw process payloads for mortality/fertility.
+
+## D018: HMD and HFD download helpers
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** use HMDHFDplus download functions to configure mortality and fertility from a population code and one explicitly selected year, producing constant-over-time schedules for the first milestone.
+- **Inputs:** HMD `Mx_1x1` for both sexes; HFD total `asfrRR`. Preserve person-year units and interpret mortality central rates under the accepted hazard model.
+- **Fertility endpoints:** at the user's direction, omit HFD open-age rows and retain only closed single-year bands. Compare TFR for that retained age range, not full HFD TFR.
+- **Implementation:** optional HMDHFDplus dependency; preserve source metadata and never credentials. Missing retained rates are rejected, not imputed. Authenticated USA/2000 downloads passed the opt-in online test on October 12, 2026; see `testing.md`.
