@@ -1,5 +1,11 @@
 # Scientific contract
 
+## Output reused as input
+
+D010 requires that a result can initialize further simulation. The eventual contract must specify endpoint time, the living population at that endpoint, retention of dead persons and past unions, unique ID allocation, and continuity of dates and relationships. Validate that subsequent births and unions refer to valid persons and do not reuse existing IDs, and that deceased persons do not become eligible for future events.
+
+Exact fixed-seed equality between split and uninterrupted runs is not yet a requirement. Define restart RNG and pending-event behavior before making such a claim. Existing demographic histories must remain available for initialization even if a particular output observation window is restricted.
+
 Status: requirements for specifying and validating behavior. No mortality, fertility, partnership, or scheduling algorithm has yet been accepted.
 
 ## General requirements

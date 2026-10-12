@@ -32,7 +32,13 @@ Do not infer answers from SOCSIM's implementation: document reference behavior a
 
 ## Interface direction
 
-Model construction should support R pipes, with simulation execution as a separate operation. Concrete function names and object classes have not been chosen. The illustrative API in the conversation is not a public API commitment.
+Simulation outputs must also be usable as inputs to further simulation (D010). The pipeable workflow should support initializing a subsequent model or run from a `hammel_results`, retaining person and union identities and histories. The result must provide enough endpoint information to establish the new starting time and current population. Subsequent runs can configure demographic mechanisms; the syntax and configuration carryover rules remain open.
+
+Distinguish reuse of demographic output from exact checkpoint continuation. Reusing output must not inherently depend on retaining a live compiled engine. Whether pending events and RNG state are saved, and whether split runs reproduce an uninterrupted run, requires a separate decision.
+
+Simulation results use a named-list object of class `hammel_results`. The core tables are `persons` (one row per person, including deceased persons) and `unions` (one row per union episode, linked by person IDs). Access them as `result$persons` and `result$unions`. Column schemas, data-frame implementation, optional observations and exposure summaries, metadata, and methods remain to be specified. See D009.
+
+Model construction should support R pipes, with simulation execution as a separate operation. D011 establishes the basic configuration API below. Simulation execution and observation function names remain proposals.
 
 Before implementing the first simulator, specify a minimal end-to-end example with input schemas, time and rate units, observation requests, returned objects, and reproducibility behavior.
 
@@ -59,3 +65,22 @@ Use `1 - exp(-rate * dt)` for a single-process event probability under a constan
 ## Candidate waiting-time sampling
 
 Sample directly on the hazard scale: draw `E = -log(U)` and consume that threshold through successive age bands using `rate * duration`. In the band containing the event, divide the remaining threshold by its rate to obtain the remaining waiting time. Known age-specific rate changes are thus included in the original sample. See D007 and the scientific contract for units, a worked example, and validation requirements. D008 resolves monthly event assignment and candidate ties: truncate waiting times to integer months and prioritize death, birth, formation, then dissolution for equal-month candidates. Execution order across people and resampling remain open.
+
+## Basic configuration API
+
+Implemented under D011:
+
+```r
+model <- hammel_model() |>
+  set_population(persons, unions, start_month = 0) |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates)
+
+restarted_model <- hammel_model() |>
+  set_population(results) |>
+  set_mortality(mortality_rates)
+```
+
+`results` is a `hammel_results` object. Its `end_month` becomes the model's `start_month`. These optional whole-number indices do not yet establish calendar or exposure boundary conventions. Unknown times remain `NULL`; setters do not infer time from the latest event.
+
+The common operation is `set_process(model, name, process)`. The demographic shortcuts use names `mortality` and `fertility`. Setting the same name replaces its specification and retains other processes. Specifications are stored unchanged, including their person-year input units. Rate schemas and the executable process contract are deferred.

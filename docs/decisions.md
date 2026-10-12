@@ -27,7 +27,7 @@ Keep accepted choices separate from proposals. Only record user agreement as acc
 
 ## Pending choices
 
-The design specification lists open choices. In particular, C++, any example function names, and the four-part candidate architecture are not accepted decisions.
+The design specification lists open choices. In particular, C++, simulation execution function names, and the four-part candidate architecture are not accepted decisions.
 
 ## D004: Monthly time for the first milestone
 
@@ -72,3 +72,29 @@ The design specification lists open choices. In particular, C++, any example fun
 - **Implications:** an earlier fractional birth time does not beat a later fractional death time if both truncate to the same month. Validate and document this deliberate discretization effect.
 - **Still open:** execution order across people, resampling and same-month follow-up events, checkpoint behavior, and terminal age handling. This decision does not automatically adopt all SOCSIM scheduling behavior.
 - **Reference:** the SOCSIM rate and competing-event audits at rsocsim commit `125450cff968bb3ff762fa99d4c926a8136062a2`.
+
+## D009: Simulation result class and core tables
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** expose simulation results as a named list with class `hammel_results`. Its two core datasets are `persons` and `unions`, accessed as `result$persons` and `result$unions`.
+- **Structure:** `persons` has one row per person who entered the simulation, including those who died, with unique person IDs. `unions` has one row per union episode, with references to the participating person IDs; repeated unions are separate episodes.
+- **Rationale:** retain distinct person and relationship histories in inspectable, related tables without duplicating person records or nesting histories inside each person.
+- **Still open:** exact columns, base data frames versus tibbles, observation and exposure-summary components, metadata, and result methods. No requirement to add a tibble dependency follows from this decision.
+
+## D010: Reuse simulation output as input
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** simulation output must be reusable as input for further simulation, preserving the useful SOCSIM workflow. A `hammel_results` supplies the person and union histories and population state needed to initialize a subsequent run.
+- **Implications:** preserve unique person and union IDs, deceased persons and completed union histories, and enough endpoint information to identify the starting time and living population. Further runs must allocate new IDs without collisions and maintain consistent event dates and relationship references.
+- **Interface direction:** support a pipeable route from a result into further simulation, with demographic processes configurable for the subsequent run. Function names and whether this uses a model constructor or direct result dispatch remain open.
+- **Boundary:** reusable demographic output does not by itself promise an exact stochastic checkpoint. Retention of pending event times, RNG state, or compiled engine state, and equality between split and uninterrupted runs remain separate open decisions. Do not require a live engine merely to reuse demographic output.
+- **Still open:** endpoint metadata schema, how histories are retained in subsequent results, process configuration carryover, restart RNG semantics, and serialization requirements.
+
+## D011: Basic model configuration API and result rename
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** rename the result class and constructor to `hammel_results`. Use `hammel_model()` for an empty specification and pipeable `set_population()`, `set_process()`, `set_mortality()`, and `set_fertility()` functions.
+- **Population inputs:** accept person and union tables or a `hammel_results` object. Results supply their tables and endpoint time; existing model process settings are retained.
+- **Process interface:** mortality and fertility setters are shortcuts to the same `set_process()` operation. These constructors and setters do not execute simulations.
+- **Current implementation choices:** `set_process(model, name, process)` stores a non-NULL specification unchanged and replaces an existing process of the same name. Results carry optional `end_month`; models carry optional `start_month`, both whole-number indices with an unspecified user-supplied calendar origin. Unknown times remain `NULL`.
+- **Scope:** this updates D009's class name and resolves D010's population configuration route. Table schemas, executable process contracts, calendar conventions, and simulation execution remain open. No demographic default or rate conversion is implemented by these setters.
