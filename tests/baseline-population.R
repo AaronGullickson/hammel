@@ -15,14 +15,14 @@ stopifnot(
   identical(set_population(hammel_model(), population)$population, population)
 )
 # Broad six-standard-error checks against the specified distributions.
-stopifnot(abs(mean(p$sex) - 0.5) < 6 * sqrt(0.25 / nrow(p)),
+stopifnot(abs(mean(p$sex == "f") - 0.5) < 6 * sqrt(0.25 / nrow(p)),
           abs(mean(ages) - 35) < 6 * sqrt(70^2 / (12 * nrow(p))))
 
 newborns <- create_baseline_population(3, max_age = 0, end_time = 2000,
                                 female_probability = 1)
-stopifnot(identical(newborns$persons$sex, rep(1L, 3)),
+stopifnot(identical(newborns$persons$sex, rep("f", 3)),
           identical(newborns$persons$birth_time, rep(2000, 3)),
-          all(create_baseline_population(3, female_probability = 0)$persons$sex == 0L))
+          all(create_baseline_population(3, female_probability = 0)$persons$sex == "m"))
 empty <- create_baseline_population(0)
 validate_population(empty)
 stopifnot(nrow(empty$persons) == 0L, nrow(empty$unions) == 0L)

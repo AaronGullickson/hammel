@@ -134,3 +134,10 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 - **Decision:** rename the class and constructor from `hammel_results` to `hammel_population`. Simplify the setter to `set_population(model, population)`, accepting only that class.
 - **Behavior:** create and normalize tables through `hammel_population(persons, unions = NULL, end_time = NULL)`; the setter validates and stores the object unchanged. Initial and simulated populations share this representation. `end_time` remains the population reference time in years and supplies the next run's starting time.
 - **Supersedes:** earlier class names and table-input setter signatures in D009–D014. Direct table inputs, `unions`, and `start_time` arguments are removed from `set_population()`.
+
+## D016: Character sex labels
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** record sex as character values `"m"` (male) and `"f"` (female), replacing SOCSIM's numeric codes in Hammel's public interface. Population validation requires these nonmissing labels and baseline generation produces them.
+- **Process direction:** mortality schedules must use the same labels and provide separate age-specific schedules for males and females from the first milestone. Rate table validation remains to be implemented.
+- **Supersedes:** D012's initial numeric sex encoding and the baseline generator's numeric labels. Numeric codes are not silently converted.

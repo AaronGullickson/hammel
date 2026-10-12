@@ -17,7 +17,7 @@
 #'
 #' @examples
 #' sim <- hammel_population(
-#'   persons = data.frame(person_id = 1:2, sex = c(0L, 1L),
+#'   persons = data.frame(person_id = 1:2, sex = c("m", "f"),
 #'     birth_time = c(-25, -23), death_time = NA_real_,
 #'     mother_id = NA_integer_, father_id = NA_integer_),
 #'   end_time = 0
@@ -43,7 +43,7 @@ hammel_population <- function(persons, unions = NULL, end_time = NULL) {
 #' @return The supplied object, invisibly and unchanged.
 #' @export
 #' @examples
-#' persons <- data.frame(person_id = 1L, sex = 1L, birth_time = -20,
+#' persons <- data.frame(person_id = 1L, sex = "f", birth_time = -20,
 #'   death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
 #' results <- hammel_population(persons, end_time = 0)
 #' validate_population(results)
@@ -65,9 +65,9 @@ validate_population <- function(results) {
   if (anyDuplicated(persons$person_id)) {
     stop("`persons$person_id` must be unique.", call. = FALSE)
   }
-  check_numeric_column(persons$sex, "persons$sex")
-  if (any(!persons$sex %in% c(0, 1))) {
-    stop("`persons$sex` must be 0 (male) or 1 (female).", call. = FALSE)
+  if (!is.character(persons$sex) || !is.null(dim(persons$sex)) ||
+      anyNA(persons$sex) || any(!persons$sex %in% c("m", "f"))) {
+    stop('`persons$sex` must contain "m" (male) or "f" (female).', call. = FALSE)
   }
   for (field in c("birth_time", "death_time")) {
     check_numeric_column(persons[[field]], paste0("persons$", field),
@@ -185,8 +185,8 @@ check_numeric_column <- function(x, name, missing = FALSE, id = FALSE) {
 #' @param max_age Maximum initial age in years, finite and nonnegative.
 #' @param end_time Reference time in years, finite. Birth times are this value
 #'   minus the sampled ages. Defaults to a relative time origin of zero.
-#' @param female_probability Probability of assigning sex code 1 (female).
-#'   The other sex code is 0 (male). This does not enforce exact proportions.
+#' @param female_probability Probability of assigning sex "f" (female).
+#'   The other sex value is "m" (male). This does not enforce exact proportions.
 #'
 #' @return A validated `hammel_population` object.
 #' @export
@@ -218,7 +218,8 @@ create_baseline_population <- function(size, max_age = 70, end_time = 0,
 
   persons <- data.frame(
     person_id = seq_len(size),
-    sex = as.integer(stats::rbinom(size, size = 1, prob = female_probability)),
+    sex = as.character(ifelse(stats::rbinom(size, size = 1, prob = female_probability) == 1,
+                 "f", "m")),
     birth_time = end_time - stats::runif(size, min = 0, max = max_age),
     death_time = rep(NA_real_, size),
     mother_id = rep(NA_integer_, size),

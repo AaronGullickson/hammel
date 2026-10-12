@@ -19,8 +19,8 @@ create_baseline_population(
 \item{end_time}{Reference time in years, finite. Birth times are this value
 minus the sampled ages. Defaults to a relative time origin of zero.}
 
-\item{female_probability}{Probability of assigning sex code 1 (female).
-The other sex code is 0 (male). This does not enforce exact proportions.}
+\item{female_probability}{Probability of assigning sex "f" (female).
+The other sex value is "m" (male). This does not enforce exact proportions.}
 }
 \value{
 A validated \code{hammel_population} object.

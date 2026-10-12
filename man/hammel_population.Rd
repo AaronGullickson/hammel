@@ -27,7 +27,7 @@ consistent tables against the population schema. Custom columns are retained.
 }
 \examples{
 sim <- hammel_population(
-  persons = data.frame(person_id = 1:2, sex = c(0L, 1L),
+  persons = data.frame(person_id = 1:2, sex = c("m", "f"),
     birth_time = c(-25, -23), death_time = NA_real_,
     mother_id = NA_integer_, father_id = NA_integer_),
   end_time = 0

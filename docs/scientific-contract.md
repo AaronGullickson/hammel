@@ -2,13 +2,13 @@
 
 ## Baseline population generator
 
-`create_baseline_population(size, max_age = 70, end_time = 0, female_probability = 0.5)` creates a simple starter population inspired by the user's SOCSIM initialization example. All persons are alive at `end_time`, have IDs `1` through `size`, unknown parents, and no unions. Sex is independently sampled with probability `female_probability` of code 1 (female), otherwise code 0 (male); this does not enforce an exact sex balance.
+`create_baseline_population(size, max_age = 70, end_time = 0, female_probability = 0.5)` creates a simple starter population inspired by the user's SOCSIM initialization example. All persons are alive at `end_time`, have IDs `1` through `size`, unknown parents, and no unions. Sex is independently sampled with probability `female_probability` of label `"f"` (female), otherwise `"m"` (male); this does not enforce an exact sex balance.
 
 Ages are independently uniform on `[0, max_age]` years and birth times are `end_time - age`. Unlike the example's integer-month birth dates, the generator uses continuous year-valued ages, with no hard-coded increment or rounding. `max_age = 0` produces persons born at the reference time. An empty population is permitted with `size = 0`. Size must be a nonnegative whole number representable as an R integer, maximum age must be finite and nonnegative, the reference time must be finite, and the sex probability must lie in `[0, 1]`.
 
 The generator uses R's current RNG state. `set.seed()` makes generation reproducible; generation advances that state normally. It does not set or restore the user's seed itself.
 
-For example, `size = 3`, `max_age = 0`, `end_time = 2000`, and `female_probability = 1` gives IDs 1–3, sex code 1, birth times 2000, missing death and parent fields, and an empty union table. Validation includes this known-answer case, reproducibility, empty populations, bounds, schema consistency, and distribution checks on a fixed-seed sample.
+For example, `size = 3`, `max_age = 0`, `end_time = 2000`, and `female_probability = 1` gives IDs 1–3, sex label `"f"`, birth times 2000, missing death and parent fields, and an empty union table. Validation includes this known-answer case, reproducibility, empty populations, bounds, schema consistency, and distribution checks on a fixed-seed sample.
 
 This population is not claimed to be stable, stationary, or representative of a real population. Burn-in and realistic initial age or kinship structures require separate specifications. Parameter defaults follow the user's example (maximum age around 70 and equal-probability sexes); the continuous-year sampling is an explicit simplification for this helper.
 

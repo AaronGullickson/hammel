@@ -16,7 +16,7 @@ Set the starting population and demographic processes using pipeable setters.
 Construction and configuration do not execute a simulation.
 }
 \examples{
-persons <- data.frame(person_id = 1:2, sex = c(0L, 1L),
+persons <- data.frame(person_id = 1:2, sex = c("m", "f"),
   birth_time = c(-25, -23), death_time = NA_real_,
   mother_id = NA_integer_, father_id = NA_integer_)
 model <- hammel_model() |>

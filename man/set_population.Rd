@@ -22,7 +22,7 @@ additional components. Existing process configuration is retained.
 The input model is not modified.
 }
 \examples{
-persons <- data.frame(person_id = 1:2, sex = c(0L, 1L),
+persons <- data.frame(person_id = 1:2, sex = c("m", "f"),
   birth_time = c(-25, -23), death_time = NA_real_,
   mother_id = NA_integer_, father_id = NA_integer_)
 population <- hammel_population(persons, end_time = 0)

@@ -9,7 +9,7 @@ One row per person, including deceased persons.
 | Column | Meaning |
 | --- | --- |
 | `person_id` | Unique positive whole-number person ID |
-| `sex` | SOCSIM coding: 0 = male, 1 = female |
+| `sex` | Character labels: `"m"` = male, `"f"` = female |
 | `birth_time` | Birth time in years |
 | `death_time` | Death time in years; `NA` for a living person at the result endpoint |
 | `mother_id` | Mother's person ID; `NA` if unknown |
@@ -44,7 +44,7 @@ Population reference-time metadata uses `end_time` in years; the model takes its
 
 ## Implemented validation scope
 
-Require the listed columns and their types, finite dates (except allowed NA), unique positive whole-number IDs, sex codes, and references to existing persons. Parents cannot reference themselves. Union partners must be distinct. Death cannot precede birth; union ending cannot precede formation, and formation cannot precede a partner's birth. End reasons must match whether a union has ended. When a reference time is supplied, recorded events cannot lie after it. Equal event dates are permitted; monthly alignment is not required by table validation.
+Require the listed columns and their types, finite dates (except allowed NA), unique positive whole-number IDs, sex labels, and references to existing persons. Parents cannot reference themselves. Union partners must be distinct. Death cannot precede birth; union ending cannot precede formation, and formation cannot precede a partner's birth. End reasons must match whether a union has ended. When a reference time is supplied, recorded events cannot lie after it. Equal event dates are permitted; monthly alignment is not required by table validation.
 
 This is structural validation, not a full demographic eligibility contract. Parent-age and sex constraints, ancestry cycles, overlapping unions, death-related union consistency, and process-specific eligibility still require scientific specification. No missing core fields are silently filled in. Unknown parents use NA, not SOCSIM's zero sentinel.
 

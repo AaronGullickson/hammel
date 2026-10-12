@@ -1,6 +1,6 @@
 library(hammel)
 
-persons <- data.frame(person_id = c(1L, 2L), sex = c(0L, 1L),
+persons <- data.frame(person_id = c(1L, 2L), sex = c("m", "f"),
                       birth_time = c(-25, -23), death_time = NA_real_,
                       mother_id = NA_integer_, father_id = NA_integer_)
 unions <- hammel_population(persons)$unions
@@ -143,3 +143,8 @@ stopifnot(identical(stored$population, annotated),
                     results))
 
 expect_error(set_population(empty, persons))
+
+# Sex uses explicit character labels; numeric codes and missing labels fail.
+for (sex in list(c(0L, 1L), c("m", NA_character_), c("male", "female"))) {
+  p <- persons; p$sex <- sex; check_rejected(p)
+}
