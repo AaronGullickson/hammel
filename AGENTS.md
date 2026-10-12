@@ -20,6 +20,8 @@ Suggestions, illustrative APIs, and proposed milestones are not accepted decisio
 
 ## Engineering expectations
 
+- Prefer verb-based names for user-facing action functions, such as `create_baseline_population()` and `set_population()`.
+
 - Keep model construction separate from simulation execution. Aim for composable R workflows and R-native, inspectable results at the user-facing boundary. This does not require an R-only implementation: performance-critical computation and internal state may use compiled code, such as C++, with results exposed as ordinary R objects for inspection and analysis.
 - Each simulation must own independent state. Avoid hidden process-wide population state and undocumented effects on later runs.
 - Make time, rate units, random-number behavior, and observation semantics explicit. Record public times and durations in years, exposure in person-years, and input rates per person-year. The first milestone uses a monthly increment (`dt = 1/12` years), but do not hard-code month assumptions in demographic algorithms, table schemas, or analysis. Obtain interval duration from explicit time configuration and centralize any conversion to internal integer steps.

@@ -170,3 +170,59 @@ check_numeric_column <- function(x, name, missing = FALSE, id = FALSE) {
          call. = FALSE)
   }
 }
+
+#' Generate a simple baseline population
+#'
+#' Create a starter population with independent uniformly distributed ages,
+#' randomly assigned sex, unknown parents, and no unions. Everyone is alive
+#' at the reference time. This is not a stable or stationary population.
+#'
+#' Ages are sampled in continuous years without rounding to simulation steps.
+#' Generation uses and advances R's current random-number state; use
+#' [set.seed()] for reproducibility.
+#'
+#' @param size Number of persons, a nonnegative whole number.
+#' @param max_age Maximum initial age in years, finite and nonnegative.
+#' @param end_time Reference time in years, finite. Birth times are this value
+#'   minus the sampled ages. Defaults to a relative time origin of zero.
+#' @param female_probability Probability of assigning sex code 1 (female).
+#'   The other sex code is 0 (male). This does not enforce exact proportions.
+#'
+#' @return A validated `hammel_population` object.
+#' @export
+#' @examples
+#' set.seed(42)
+#' population <- create_baseline_population(size = 50000, max_age = 70)
+#' model <- hammel_model() |>
+#'   set_population(population)
+create_baseline_population <- function(size, max_age = 70, end_time = 0,
+                                female_probability = 0.5) {
+  if (!is.numeric(size) || length(size) != 1L || !is.finite(size) ||
+      size < 0 || size != trunc(size) || size > .Machine$integer.max) {
+    stop("`size` must be a nonnegative whole number no larger than R's integer limit.",
+         call. = FALSE)
+  }
+  if (!is.numeric(max_age) || length(max_age) != 1L ||
+      !is.finite(max_age) || max_age < 0) {
+    stop("`max_age` must be finite and nonnegative, in years.", call. = FALSE)
+  }
+  check_time(end_time, "end_time")
+  if (is.null(end_time)) {
+    stop("`end_time` must be a finite time in years.", call. = FALSE)
+  }
+  if (!is.numeric(female_probability) || length(female_probability) != 1L ||
+      !is.finite(female_probability) || female_probability < 0 ||
+      female_probability > 1) {
+    stop("`female_probability` must be a number between 0 and 1.", call. = FALSE)
+  }
+
+  persons <- data.frame(
+    person_id = seq_len(size),
+    sex = as.integer(stats::rbinom(size, size = 1, prob = female_probability)),
+    birth_time = end_time - stats::runif(size, min = 0, max = max_age),
+    death_time = rep(NA_real_, size),
+    mother_id = rep(NA_integer_, size),
+    father_id = rep(NA_integer_, size)
+  )
+  hammel_population(persons, end_time = end_time)
+}
