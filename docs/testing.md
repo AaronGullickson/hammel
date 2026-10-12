@@ -4,6 +4,10 @@ The scripts in `tests/` use base R and an installed Hammel package. Run them wit
 
 ## Simulation foundation
 
+`demography.R` checks exact fractional-year exposure, event boundary rules, maternal-age birth assignment, rejection of duplicated IDs in stacked histories, unequal-width TFR, empty cells, and analytical constant-hazard life tables, including missing and zero terminal rates. It also checks stable small- and high-rate calculations. These test extraction and estimation algorithms, separately from whether the simulator reproduces its configured demographic rates.
+
+Verified October 12, 2026: all offline test scripts and documentation examples passed after adding extraction. A synthetic 50,000-person, 50-year simulation also completed both rate-extraction paths, TFR, and period- and sex-specific life tables in approximately 0.14 seconds of analysis. Period death totals matched the records in the observation window. This is a workflow and accounting check, not a formal demographic validation over replications.
+
 `hazard-sampler.R` checks known cumulative-hazard thresholds and analytical survival across age bands. `simulation.R` checks constant-hazard survival, minimum spacing, adjusted fertility renewal behavior after burn-in, same-step death priority, accounting, ID and history preservation, unknown fathers, union closure, reproducibility, and restart behavior. These are initial foundation checks, not a completed assessment of age-specific rates, TFR, or full life tables.
 
 The live example `inst/examples/milestone1.R` downloads USA/2000 schedules and runs a population of 50,000 for 100 years. It prints aggregate counts and elapsed simulation time; it does not write credentials or downloaded tables into the repository.

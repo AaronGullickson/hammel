@@ -13,6 +13,25 @@ print(result$simulation)
 cat("Living persons:", sum(is.na(result$persons$death_time)), "\n")
 cat("Simulation elapsed seconds:", timing[["elapsed"]], "\n")
 
+library(dplyr)
+library(ggplot2)
+p <- result$persons |> 
+  mutate(
+    living = is.na(death_time),
+    age = if_else(
+      living, 
+      result$end_time - birth_time,
+      death_time - birth_time
+    )
+  ) |>
+  as_tibble() |>
+  arrange(age)
+
+p |>
+  filter(living) |>
+  ggplot(aes(x = age)) +
+  geom_histogram(breaks = seq(from = 0, to = 100, by = 5), col = "grey20", fill = "grey80")
+
 # Results can initialize a subsequent model with the same or new processes:
 continued_model <- hammel_model() |>
   set_population(result) |>

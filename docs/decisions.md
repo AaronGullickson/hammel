@@ -2,6 +2,10 @@
 
 Keep accepted choices separate from proposals. Only record user agreement as acceptance of a demographic or major architectural decision. Each new entry should include status, date, rationale, alternatives, implications, and supporting evidence where available. Update superseded entries with a pointer to their replacement.
 
+## Demographic extraction implementation
+
+At the user's request, add person-year exposure, mortality/fertility rate, TFR, and period life-table functions based on the supplied SOCSIM analysis workflow. Support stacked person histories with explicit group columns. Implement exact recorded-lifetime overlaps in C++, with R tables and summaries. Life tables use the already accepted piecewise constant hazard assumption, with consistent exponential person-years and `ex = Tx/lx`; this corrects the supplied code's omission of division by survivorship. See `demographic-analysis.md` and the scientific contract for interfaces, missing-cell behavior, and validation scope.
+
 ## D001: Standalone rewrite
 
 - **Status:** accepted in the October 11, 2026 conversation.
@@ -166,3 +170,22 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 - **Coverage:** fertility outside supplied bands is zero; mortality schedules must cover all ages and end in an open interval.
 - **Milestone update:** basic parent assignment replaces partnership formation for this first executable version. Richer matching and union formation are deferred.
 - **Implementation choices:** generic step duration, random sequential execution within steps, birth rescheduling, half-open run boundaries, call-local seed behavior, preserved histories, and missing newborn custom attributes are documented in the scientific contract. Full model diagnostics and scientific accuracy assessment are subsequent work.
+
+## D020: Unified demographic summary
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** expose one verb-named `summarize_demography()` function returning person-years, counts, ASMR, and ASFR by period, age, and sex. Male births and ASFR are NA. Remove the three separate exposure/mortality/fertility extraction functions and the user-supplied `groups` interface.
+- **Use:** feed that same summary into `calculate_tfr()` and `calculate_life_table()`. TFR selects female rows and accepts an optional finite age range matching complete summary bands; life tables separate built-in periods and sexes.
+- **Scope:** summarize one independent population history per call; custom strata and simulation-group support are deferred. This supersedes the grouping and separate-extractor portions of the earlier demographic extraction implementation note.
+
+## D021: Automatic open-age handling in demographic summaries
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** append Inf to summary age breaks when absent. For TFR, omit open-ended age rows and use all remaining finite age bands; remove the age_range argument.
+- **Implications:** report the finite age range used and preserve missing-rate behavior. Users can subset the summary explicitly when desired. This supersedes D020's optional TFR age-range argument.
+
+## D022: Lexis counts function name
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** rename `summarize_demography()` to `calculate_lexis_counts()`.
+- **Scope:** retain existing exposure, counts, ASMR/ASFR, and interval behavior. Life-table missing-rate handling remains unchanged. This supersedes the function name in D020.

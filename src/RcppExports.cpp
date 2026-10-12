@@ -10,6 +10,19 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// demographic_counts_cpp
+List demographic_counts_cpp(DataFrame persons, NumericVector time_breaks, NumericVector age_breaks);
+RcppExport SEXP _hammel_demographic_counts_cpp(SEXP personsSEXP, SEXP time_breaksSEXP, SEXP age_breaksSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< DataFrame >::type persons(personsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type time_breaks(time_breaksSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type age_breaks(age_breaksSEXP);
+    rcpp_result_gen = Rcpp::wrap(demographic_counts_cpp(persons, time_breaks, age_breaks));
+    return rcpp_result_gen;
+END_RCPP
+}
 // hazard_wait_cpp
 NumericVector hazard_wait_cpp(DataFrame rates, NumericVector ages, NumericVector thresholds);
 RcppExport SEXP _hammel_hazard_wait_cpp(SEXP ratesSEXP, SEXP agesSEXP, SEXP thresholdsSEXP) {
@@ -42,6 +55,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_hammel_demographic_counts_cpp", (DL_FUNC) &_hammel_demographic_counts_cpp, 3},
     {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
     {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 7},
     {NULL, NULL, 0}
