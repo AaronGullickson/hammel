@@ -6,36 +6,35 @@
 \alias{set_fertility}
 \title{Set a demographic process specification}
 \usage{
-set_process(model, name, process)
+set_process(model, process)
 
-set_mortality(model, process)
+set_mortality(model, rates)
 
-set_fertility(model, process)
+set_fertility(model, rates)
 }
 \arguments{
 \item{model}{A \code{hammel_model} object.}
 
-\item{name}{A single nonempty process name.}
+\item{process}{A \code{hammel_process} specification.}
 
-\item{process}{A non-NULL process specification. For the demographic
-shortcuts, this can be a supplied rate table in person-year units.}
+\item{rates}{An age-specific rate table passed to \code{\link[=mortality]{mortality()}} or \code{\link[=fertility]{fertility()}}.}
 }
 \value{
 An updated \code{hammel_model}. The input model is not modified.
 }
 \description{
-Store a process specification under a name, replacing an existing process
-with the same name. Other processes are retained. Specifications are stored
-unchanged: rate schemas and the executable process contract are not yet
-defined. No rates are converted and no simulation is executed.
+Store a process specification under its name, replacing an existing process
+with the same name. Other processes are retained. Built-in rate schedules
+are validated again when attached. No simulation is executed.
 }
 \details{
-\code{set_mortality()} and \code{set_fertility()} delegate to \code{set_process()} using
-the names \code{"mortality"} and \code{"fertility"}, respectively.
+\code{set_mortality()} and \code{set_fertility()} construct the corresponding process
+and delegate to \code{set_process()}.
 }
 \examples{
-mortality_rates <- data.frame(age = 0, rate = 0.01)
-fertility_rates <- data.frame(age = 20, rate = 0.1)
+mortality_rates <- data.frame(sex = c("m", "f"), age_start = 0,
+  age_end = Inf, rate = c(0.01, 0.008))
+fertility_rates <- data.frame(age_start = 15, age_end = 50, rate = 0.1)
 model <- hammel_model() |>
   set_mortality(mortality_rates) |>
   set_fertility(fertility_rates)

@@ -4,8 +4,8 @@ persons <- data.frame(person_id = c(1L, 2L), sex = c("m", "f"),
                       birth_time = c(-25, -23), death_time = NA_real_,
                       mother_id = NA_integer_, father_id = NA_integer_)
 unions <- hammel_population(persons)$unions
-mortality <- data.frame(age = 0, rate = 0.01)
-fertility <- data.frame(age = 20, rate = 0.1)
+mortality <- data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
+fertility <- data.frame(age_start = 15, age_end = 50, rate = 0.1)
 
 empty <- hammel_model()
 configured <- empty |>
@@ -19,20 +19,20 @@ stopifnot(
   identical(configured$population$persons, persons),
   identical(configured$population$unions, unions),
   identical(configured$population$end_time, 0),
-  identical(configured$processes$mortality, mortality),
-  identical(configured$processes$fertility, fertility),
+  identical(configured$processes$mortality$rates, mortality),
+  identical(configured$processes$fertility$rates, fertility),
   identical(set_mortality(empty, mortality),
-            set_process(empty, "mortality", mortality)),
+            set_process(empty, hammel::mortality(mortality))),
   identical(set_fertility(empty, fertility),
-            set_process(empty, "fertility", fertility))
+            set_process(empty, hammel::fertility(fertility)))
 )
 
-replacement <- data.frame(age = 0, rate = 0.02)
+replacement <- mortality; replacement$rate <- 0.02
 updated <- set_mortality(configured, replacement)
 stopifnot(
-  identical(configured$processes$mortality, mortality),
-  identical(updated$processes$mortality, replacement),
-  identical(updated$processes$fertility, fertility),
+  identical(configured$processes$mortality$rates, mortality),
+  identical(updated$processes$mortality$rates, replacement),
+  identical(updated$processes$fertility$rates, fertility),
   length(updated$processes) == 2L
 )
 
@@ -64,10 +64,9 @@ expect_error(hammel_population(persons, list()))
 expect_error(set_population(empty, persons, list()))
 expect_error(set_population(empty, results, unions))
 expect_error(set_population(empty, results, start_time = 0))
-expect_error(set_process(list(), "mortality", mortality))
-expect_error(set_process(empty, "", mortality))
-expect_error(set_process(empty, NA_character_, mortality))
-expect_error(set_process(empty, "mortality", NULL))
+expect_error(set_process(list(), hammel::mortality(mortality)))
+expect_error(set_process(empty, mortality))
+expect_error(set_process(empty, NULL))
 for (month in list(NA_real_, Inf, c(0, 1), "120")) {
   expect_error(hammel_population(persons, unions, end_time = month))
   expect_error(set_population(empty, persons, unions, start_time = month))

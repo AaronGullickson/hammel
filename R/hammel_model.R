@@ -13,7 +13,8 @@
 #'   mother_id = NA_integer_, father_id = NA_integer_)
 #' model <- hammel_model() |>
 #'   set_population(hammel_population(persons, end_time = 0)) |>
-#'   set_mortality(data.frame(age = 0, rate = 0.01))
+#'   set_mortality(data.frame(sex = c("m", "f"), age_start = 0,
+#'     age_end = Inf, rate = c(0.01, 0.008)))
 hammel_model <- function() {
   structure(
     list(population = NULL, processes = list()),

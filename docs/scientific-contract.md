@@ -119,3 +119,13 @@ Canonical public time and duration units are years; exposure is recorded in pers
 D008's truncation is expressed generally as `step_offset = floor(waiting_time_years / dt)`; its corresponding public duration is `step_offset * dt` years. This preserves the accepted monthly behavior when `dt = 1/12`, without encoding months throughout the engine. Equal-step candidates follow the accepted tie priority. Numerical boundary policy remains to be specified.
 
 Age boundaries and exposure accumulation must use elapsed years. Observation frequency must be explicitly expressed or converted in the time-handling layer. Validate unit consistency and review for scattered month constants; support for additional increments need not be implemented in the first milestone.
+
+## Initial process specification objects
+
+`mortality(rates)` and `fertility(rates)` construct inspectable `hammel_process` specifications without executing events. Both require nonempty data frames with `age_start`, `age_end`, and `rate`. Ages use years and half-open intervals `[age_start, age_end)`; starts must be finite and nonnegative, ends must be greater than starts and may be positive infinity. Rates must be finite and nonnegative, per person-year. Mortality also requires character `sex` labels and separate schedules for both `m` and `f`.
+
+Reject overlapping intervals within each schedule, including duplicate and nested bands; adjacent bands are valid. Preserve input order and custom columns. Do not infer rates outside supplied intervals or fill gaps; coverage must be resolved before simulation. Reject `time_start` or `time_end` columns in this initial implementation to avoid pretending to support calendar-varying rates. The schedule interface is intended to gain that dimension later.
+
+`set_process(model, process)` stores a process under its own name, replacing an existing process with that name and preserving others. `set_mortality(model, rates)` and `set_fertility(model, rates)` construct the appropriate object and delegate to that setter. Objects contain `name`, `rates`, and `rate_unit = "person_year"`, with a process-specific subclass and `hammel_process` as their common class. Validate built-in schedules again when attaching objects so edited invalid specifications cannot bypass checks.
+
+Known structural cases include adjacent age bands (accepted), overlapping bands (rejected), identical age bands across different sexes (accepted), and rates of zero or greater than one (accepted: these are rates, not probabilities). These constructors do not resolve fertility eligibility, population versus eligible-person denominators, competing-event execution, or state transitions.

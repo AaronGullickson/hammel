@@ -141,3 +141,11 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 - **Decision:** record sex as character values `"m"` (male) and `"f"` (female), replacing SOCSIM's numeric codes in Hammel's public interface. Population validation requires these nonmissing labels and baseline generation produces them.
 - **Process direction:** mortality schedules must use the same labels and provide separate age-specific schedules for males and females from the first milestone. Rate table validation remains to be implemented.
 - **Supersedes:** D012's initial numeric sex encoding and the baseline generator's numeric labels. Numeric codes are not silently converted.
+
+## D017: Mortality and fertility process constructors
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** add `mortality(rates)` and `fertility(rates)` constructors inheriting from `hammel_process`; use `set_process(model, process)` and make demographic setters constructor-plus-setter shortcuts.
+- **Rate schema:** `age_start`, `age_end`, and `rate`, with years and person-year units. Mortality also requires `sex` with separate `m` and `f` schedules. Intervals are half-open and must not overlap within a schedule.
+- **Implementation scope:** validate structure and rates; retain supplied schedules. No simulation behavior, interpolation, missing-coverage default, or time-varying rates are implemented. Calendar interval columns are rejected until supported.
+- **Supersedes:** D011's explicit-name setter signature and raw process payloads for mortality/fertility.
