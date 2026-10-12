@@ -1,6 +1,6 @@
 # Hammel project brief
 
-Status: project direction recorded from the October 11, 2026 planning conversation. The initial package skeleton exists; simulation behavior has not been implemented or audited.
+Status: project direction recorded from the October 11, 2026 planning conversation and subsequent decisions. The first C++ mortality/fertility simulator is implemented and has completed a live-rate example. Scientific validation is in progress; the milestone's full demographic accuracy targets are not yet established.
 
 ## Accepted direction
 
@@ -21,6 +21,8 @@ The user owns demographic requirements and scientific interpretation. Agents sup
 Legacy SOCSIM file compatibility is optional and must not govern the new design. A universal simulation framework is not a project requirement. The implementation language, dependencies, precise API, and demographic algorithms remain undecided.
 
 ## First milestone
+
+First executable version (D019): mortality and female fertility with minimum birth spacing and SOCSIM-style rate adjustment; uniformly select a currently living male parent for each birth, without creating unions. Keep unknown fathers if no males are living. This supersedes partnership formation as a requirement for the very first run, while retaining the demographic validation milestone.
 
 Accepted October 12, 2026: simulate a population with demographic rates that remain constant over calendar time, then inspect results and test demographic accuracy. Fertility and mortality are the focus. Include a basic marriage or partnership mechanism to assign parents; a realistic partnership market is outside this milestone.
 

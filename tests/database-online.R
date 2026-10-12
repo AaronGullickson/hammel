@@ -23,6 +23,8 @@ if (identical(Sys.getenv("HAMMEL_RUN_ONLINE_TESTS"), "true")) {
     identical(deaths$rate_unit, "person_year"),
     identical(births$rate_unit, "person_year"),
     setequal(deaths$rates$sex, c("m", "f")),
+    any(is.infinite(deaths$rates$age_end[deaths$rates$sex == "m"])),
+    any(is.infinite(deaths$rates$age_end[deaths$rates$sex == "f"])),
     all(is.finite(deaths$rates$rate)), all(deaths$rates$rate >= 0),
     all(is.finite(births$rates$rate)), all(births$rates$rate >= 0),
     any(deaths$rates$rate > 0), any(births$rates$rate > 0),

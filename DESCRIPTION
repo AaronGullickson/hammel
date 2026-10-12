@@ -7,6 +7,11 @@ Description: What the package does (one paragraph).
 License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
     license
 Encoding: UTF-8
+Imports:
+    Rcpp
+LinkingTo:
+    Rcpp
+SystemRequirements: C++17
 Suggests:
     HMDHFDplus (>= 2.0.8)
 Roxygen: list(markdown = TRUE)

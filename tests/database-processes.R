@@ -27,6 +27,8 @@ if (requireNamespace("HMDHFDplus", quietly = TRUE)) {
                "2000 0 0.01 0.02 0.015", "2000 110+ 0.6 0.7 0.65"), path)
   read <- HMDHFDplus::readHMD(path, fixup = FALSE)
   stopifnot(identical(hammel:::mortality_from_hmd(read, 2000), process))
+  parsed <- HMDHFDplus::readHMD(path, fixup = TRUE)
+  stopifnot(identical(hammel:::mortality_from_hmd(parsed, 2000), process))
   unlink(path)
 }
 

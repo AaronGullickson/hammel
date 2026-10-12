@@ -27,7 +27,7 @@ Keep accepted choices separate from proposals. Only record user agreement as acc
 
 ## Pending choices
 
-The design specification lists open choices. In particular, C++, simulation execution function names, and the four-part candidate architecture are not accepted decisions.
+The design specification lists open choices. The four-part candidate architecture is not fully accepted. D019 selects C++ for the first engine; the scientific contract specifies its initial execution interface and rules.
 
 ## D004: Monthly time for the first milestone
 
@@ -157,3 +157,12 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 - **Inputs:** HMD `Mx_1x1` for both sexes; HFD total `asfrRR`. Preserve person-year units and interpret mortality central rates under the accepted hazard model.
 - **Fertility endpoints:** at the user's direction, omit HFD open-age rows and retain only closed single-year bands. Compare TFR for that retained age range, not full HFD TFR.
 - **Implementation:** optional HMDHFDplus dependency; preserve source metadata and never credentials. Missing retained rates are rejected, not imputed. Authenticated USA/2000 downloads passed the opt-in online test on October 12, 2026; see `testing.md`.
+
+## D019: First executable simulator scope
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** implement the initial simulator in C++ with R interfaces. All living females face population age-specific fertility risk; assign a uniformly sampled currently living male parent at each birth, without forming unions. If no males are living, retain the birth with unknown father.
+- **Birth spacing:** include SOCSIM-style minimum spacing and its fertility-rate adjustment. The initial default follows SOCSIM's nine months, expressed as 0.75 years. Details and approximation limits are recorded in the scientific contract.
+- **Coverage:** fertility outside supplied bands is zero; mortality schedules must cover all ages and end in an open interval.
+- **Milestone update:** basic parent assignment replaces partnership formation for this first executable version. Richer matching and union formation are deferred.
+- **Implementation choices:** generic step duration, random sequential execution within steps, birth rescheduling, half-open run boundaries, call-local seed behavior, preserved histories, and missing newborn custom attributes are documented in the scientific contract. Full model diagnostics and scientific accuracy assessment are subsequent work.

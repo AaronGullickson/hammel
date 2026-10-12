@@ -88,7 +88,16 @@ mortality_from_hmd <- function(data, year) {
          call. = FALSE)
   }
   starts <- as.numeric(sub("[+]$", "", ages))
-  ends <- ifelse(grepl("[+]$", ages), Inf, starts + 1)
+  open <- grepl("[+]$", ages)
+  # HMDHFDplus 2.0.8 readHMDweb always parses ages, even with fixup = FALSE.
+  # Preserve its explicit upper-open indicator as well as raw '+' labels.
+  if ("OpenInterval" %in% names(data)) {
+    if (!is.logical(data$OpenInterval) || anyNA(data$OpenInterval)) {
+      stop("HMD OpenInterval must be a nonmissing logical indicator.", call. = FALSE)
+    }
+    open <- open | data$OpenInterval
+  }
+  ends <- ifelse(open, Inf, starts + 1)
   mortality(rbind(
     data.frame(sex = "m", age_start = starts, age_end = ends, rate = data$Male),
     data.frame(sex = "f", age_start = starts, age_end = ends, rate = data$Female)

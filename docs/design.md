@@ -7,7 +7,7 @@ Status: initial proposal. The project direction in the brief is accepted; the ar
 Separate four responsibilities:
 
 1. **R model specification:** explicit objects for populations, relationships, processes, parameters, and observation requests. Constructors compose without executing a simulation.
-2. **Simulation engine:** owns population state, relationships, scheduling, and random-number generation independently for each run. A compiled engine is proposed; its language is undecided.
+2. **Simulation engine:** owns population state, relationships, scheduling, and random-number generation independently for each run. The first mortality/fertility engine uses C++17 and Rcpp with R's RNG.
 3. **Process extension contract:** built-in and custom mechanisms declare eligibility, rates or schedules, permitted state changes, dependencies, and invalidation or rescheduling behavior.
 4. **Observation system:** selects event histories, snapshots, and summaries to retain so large simulations need not record everything.
 
@@ -46,13 +46,13 @@ Before implementing the first simulator, specify a minimal end-to-end example wi
 
 ## First milestone scope
 
-The accepted first milestone combines calendar-time-constant fertility and mortality inputs with basic partnerships and parent assignment. Build it incrementally, but evaluate completion against the combined demographic validation targets in the scientific contract. Rich partnership matching is deferred.
+The accepted first milestone combines calendar-time-constant fertility and mortality inputs with parent assignment. For the first executable version (D019), sample a living male at each birth without forming unions; include minimum birth spacing with SOCSIM-style rate compensation. Build it incrementally, but evaluate milestone completion against the combined demographic validation targets in the scientific contract. Partnership formation and richer matching are deferred.
 
 The minimum observation design must support age-specific births, deaths, and the corresponding person-time exposures, as well as accounting and relationship checks. Specify these observations before deciding the result schema. Basic partnership rules must be compatible with the intended fertility denominators and target rates.
 
 ## Time unit
 
-Use a monthly increment for the first milestone, represented by an explicit step duration `dt = 1/12` years. Record public times and durations in years and exposure in person-years. Do not hard-code month assumptions: demographic algorithms use configured durations, and any integer step indexing and conversion belong in centralized time-handling operations. Supporting other increments can come later, but the initial implementation must preserve this separation. This does not decide whether the engine scans the population monthly or schedules events ahead, or how events within a month are ordered.
+Use a monthly increment for the first milestone, represented by an explicit step duration `dt = 1/12` years. Record public times and durations in years and exposure in person-years. Do not hard-code month assumptions: demographic algorithms use configured durations, and any integer step indexing and conversion belong in centralized time-handling operations. Supporting other increments can come later, but the initial implementation must preserve this separation. The first engine schedules events ahead in a sparse queue and randomly executes pending events within each step (D019).
 
 ## Rate input interface
 
@@ -66,7 +66,7 @@ Use `1 - exp(-rate * dt)` for a single-process event probability under a constan
 
 ## Candidate waiting-time sampling
 
-Sample directly on the hazard scale: draw `E = -log(U)` and consume that threshold through successive age bands using `rate * duration`. In the band containing the event, divide the remaining threshold by its rate to obtain the remaining waiting time. Known age-specific rate changes are thus included in the original sample. See D007 and the scientific contract for units, a worked example, and validation requirements. D008 resolves monthly event assignment and candidate ties: truncate waiting times to integer months and prioritize death, birth, formation, then dissolution for equal-month candidates. Execution order across people and resampling remain open.
+Sample directly on the hazard scale: draw `E = -log(U)` and consume that threshold through successive age bands using `rate * duration`. In the band containing the event, divide the remaining threshold by its rate to obtain the remaining waiting time. Known age-specific rate changes are thus included in the original sample. See D007 and the scientific contract for units, a worked example, and validation requirements. D008 resolves monthly event assignment and candidate ties: truncate waiting times to integer months and prioritize death, birth, formation, then dissolution for equal-month candidates. D019 specifies random sequential execution and post-birth resampling for the first engine.
 
 ## Basic configuration API
 
@@ -82,4 +82,10 @@ model <- hammel_model() |>
 
 `hammel_population()` normalizes absent unions and validates the tables. `set_population(model, population)` accepts only a `hammel_population`, validates it, and stores it intact as `model$population`. Its `end_time` supplies the next run's starting time. No separate model starting-time field is stored. Additional components are preserved. Unknown reference times remain `NULL`.
 
-The common operation is `set_process(model, process)`, using the name carried by a `hammel_process` object. `mortality(rates)` and `fertility(rates)` validate age intervals and construct those objects. `set_mortality()` and `set_fertility()` are constructor-plus-setter shortcuts. Setting the same process name replaces its specification while retaining others. Rates remain per person-year. Mortality requires separate `m` and `f` schedules. Calendar-time intervals and executable process behavior remain open; see the scientific contract for implemented rate checks and coverage limits.
+The common operation is `set_process(model, process)`, using the name carried by a `hammel_process` object. `mortality(rates)` and `fertility(rates)` validate age intervals and construct those objects. `set_mortality()` and `set_fertility()` are constructor-plus-setter shortcuts. Setting the same process name replaces its specification while retaining others. Rates remain per person-year. Mortality requires separate `m` and `f` schedules. Calendar-time intervals and richer process behavior remain open; see the scientific contract for implemented rate checks and coverage limits.
+
+## First execution interface
+
+`simulate(model, years, seed = NULL, step_duration = 1/12, birth_interval = 0.75)` returns an updated `hammel_population`. Required model components are population, mortality, and fertility. The population's `end_time` supplies the starting time. C++ handles cumulative-hazard sampling, adjusted fertility schedules, a sparse event queue, and constant-time random selection from currently living males. R handles configuration, optional seed isolation, custom-column preservation, and result assembly. Engine state is local to each call.
+
+Public units remain years and person-year rates; only explicit defaults express the initial monthly increment and nine-month birth spacing. See the scientific contract for boundary, competition, coverage, and adjustment details. The example in `inst/examples/milestone1.R` runs 50,000 initial persons for 100 years with downloaded constant USA/2000 rates. Scientific accuracy beyond the initial analytical checks remains to be assessed.
