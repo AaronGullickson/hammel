@@ -1,11 +1,11 @@
 library(hammel)
 
-persons <- data.frame(person_id = c(1L, 2L), sex = c("m", "f"),
+persons <- tibble::tibble(person_id = c(1L, 2L), sex = c("m", "f"),
                       birth_time = c(-25, -23), death_time = NA_real_,
                       mother_id = NA_integer_, father_id = NA_integer_)
 unions <- hammel_population(persons)$unions
-mortality <- data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
-fertility <- data.frame(age_start = 15, age_end = 50, rate = 0.1)
+mortality <- tibble::tibble(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
+fertility <- tibble::tibble(age_start = 15, age_end = 50, rate = 0.1)
 
 empty <- hammel_model()
 configured <- empty |>
@@ -50,10 +50,10 @@ stopifnot(
 unknown <- set_population(restarted, hammel_population(persons, unions))
 stopifnot("end_time" %in% names(unknown$population), is.null(unknown$population$end_time))
 
-# Data-frame subclasses and custom columns survive construction unchanged.
+# Input subclasses are normalized to tibbles while retaining column contents.
 custom_persons <- structure(persons, class = c("custom_persons", "data.frame"))
 stopifnot(identical(
-  set_population(empty, hammel_population(custom_persons, unions))$population$persons, custom_persons
+  set_population(empty, hammel_population(custom_persons, unions))$population$persons, tibble::as_tibble(custom_persons)
 ))
 
 expect_error <- function(expr) {
@@ -104,7 +104,7 @@ p <- persons; p$mother_id[1] <- 999L; check_rejected(p)
 p <- persons; p$father_id[1] <- 1L; check_rejected(p)
 u <- data.frame(union_id = 1L, partner1_id = 1L, partner2_id = 2L,
                 start_time = -1, end_time = NA_real_, end_reason = NA_character_)
-stopifnot(identical(hammel_population(persons, u, end_time = 0)$unions, u))
+stopifnot(identical(hammel_population(persons, u, end_time = 0)$unions, tibble::as_tibble(u)))
 v <- u; v$partner2_id <- 999L; check_rejected(u = v)
 v <- u; v$partner2_id <- 1L; check_rejected(u = v)
 v <- u; v$end_time <- -2; v$end_reason <- "dissolution"; check_rejected(u = v)
@@ -147,3 +147,7 @@ expect_error(set_population(empty, persons))
 for (sex in list(c(0L, 1L), c("m", NA_character_), c("male", "female"))) {
   p <- persons; p$sex <- sex; check_rejected(p)
 }
+
+stopifnot(tibble::is_tibble(results$persons), tibble::is_tibble(results$unions),
+          tibble::is_tibble(hammel_population(as.data.frame(persons))$persons),
+          tibble::is_tibble(hammel_population(persons[FALSE, ])$persons))

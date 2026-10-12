@@ -23,7 +23,8 @@ from \code{hammel_mortality} or \code{hammel_fertility} and \code{hammel_process
 Construct a process specification without running a simulation. Rates are
 piecewise constant over age intervals \verb{[age_start, age_end)}, in years,
 and expressed per person-year. Overlapping intervals are rejected; adjacent
-intervals are allowed. Input order and custom columns are preserved.
+intervals are allowed. Input order and custom columns are preserved; rate
+schedules are returned as tibbles.
 }
 \details{
 Mortality requires separate schedules for both sexes. Gaps and uncovered

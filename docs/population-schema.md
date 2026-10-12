@@ -1,5 +1,9 @@
 # Person and union tables
 
+All public tables are returned as tibbles. Base data frames remain valid input;
+constructors normalize the table class while preserving column contents and
+order. Both empty and populated `persons` and `unions` tables follow this rule.
+
 Status: initial schema direction accepted October 12, 2026 (D012). Shared structural validation and empty-union normalization are implemented in both population entry points. Based on SOCSIM's person and marriage histories, with engine pointers and group omitted.
 
 ## Persons

@@ -2,6 +2,12 @@
 
 Keep accepted choices separate from proposals. Only record user agreement as acceptance of a demographic or major architectural decision. Each new entry should include status, date, rationale, alternatives, implications, and supporting evidence where available. Update superseded entries with a pointer to their replacement.
 
+## D023: Tibble table outputs
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** return all public tables as tibbles, including person/union histories, process schedules, demographic summaries, and empty or auxiliary tables. Continue accepting base data frames as inputs.
+- **Implications:** add tibble as a package dependency and normalize table classes while preserving column contents and order. This supersedes earlier promises to preserve arbitrary input data-frame subclasses unchanged.
+
 ## Demographic extraction implementation
 
 At the user's request, add person-year exposure, mortality/fertility rate, TFR, and period life-table functions based on the supplied SOCSIM analysis workflow. Support stacked person histories with explicit group columns. Implement exact recorded-lifetime overlaps in C++, with R tables and summaries. Life tables use the already accepted piecewise constant hazard assumption, with consistent exponential person-years and `ex = Tx/lx`; this corrects the supplied code's omission of division by survivorship. See `demographic-analysis.md` and the scientific contract for interfaces, missing-cell behavior, and validation scope.

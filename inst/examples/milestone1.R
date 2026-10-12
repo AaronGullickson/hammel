@@ -1,8 +1,11 @@
 # Requires HMDHFDplus and HMD/HFD credentials in the R environment.
-library(hammel)
+#library(hammel)
+devtools::load_all()
+library(ggplot2)
+library(dplyr)
 
 set.seed(42)
-population <- create_baseline_population(50000, max_age = 70, end_time = 2000)
+population <- create_baseline_population(100000, max_age = 70, end_time = 2000)
 model <- hammel_model() |>
   set_population(population) |>
   set_mortality_hmd("USA", year = 2000) |>
@@ -13,24 +16,28 @@ print(result$simulation)
 cat("Living persons:", sum(is.na(result$persons$death_time)), "\n")
 cat("Simulation elapsed seconds:", timing[["elapsed"]], "\n")
 
-library(dplyr)
-library(ggplot2)
-p <- result$persons |> 
-  mutate(
-    living = is.na(death_time),
-    age = if_else(
-      living, 
-      result$end_time - birth_time,
-      death_time - birth_time
-    )
-  ) |>
-  as_tibble() |>
-  arrange(age)
+# get lexis diagram counts in 5 year time intervals and one year age intervals
+lexis_counts <- result |> calculate_lexis_counts(seq(2000, 2100, 10), seq(0, 100, 1))
 
-p |>
-  filter(living) |>
-  ggplot(aes(x = age)) +
-  geom_histogram(breaks = seq(from = 0, to = 100, by = 5), col = "grey20", fill = "grey80")
+ggplot(lexis_counts, aes(x = age_start, y = asmr))+
+  geom_line(aes(group = factor(time_start), color = factor(time_start)))+
+  geom_line(data = model$processes$mortality$rates, aes(y = rate), linewidth = 2, alpha = 0.5)+
+  facet_wrap(~sex)+
+  scale_y_log10()+
+  theme_bw()
+
+model$processes$fertility |> calculate_tfr()
+lexis_counts |> calculate_tfr()
+
+model$processes$mortality |> 
+  calculate_life_table() |>
+  filter(age_start == 0) |>
+  select(age_start, sex, ex)
+
+lexis_counts |> 
+  calculate_life_table() |>
+  filter(age_start == 0) |>
+  select(time_start, time_end, age_start, sex, ex)
 
 # Results can initialize a subsequent model with the same or new processes:
 continued_model <- hammel_model() |>

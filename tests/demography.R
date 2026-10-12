@@ -131,3 +131,15 @@ stopifnot(identical(counts$population, c(1L, 2L, 3L, 2L, 2L)),
 expect_error(calculate_population_size(population, 2))
 expect_error(calculate_population_size(population, NA_real_))
 expect_error(calculate_population_size(population, Inf))
+
+# Public tables, including empty outputs and auxiliary counts, are tibbles.
+stopifnot(
+  tibble::is_tibble(counts),
+  tibble::is_tibble(summary),
+  tibble::is_tibble(attr(summary, "unassigned_births")),
+  tibble::is_tibble(calculate_tfr(summary)),
+  tibble::is_tibble(calculate_life_table(summary)),
+  tibble::is_tibble(calculate_population_size(empty, numeric())),
+  tibble::is_tibble(calculate_tfr(summary[FALSE, ])),
+  tibble::is_tibble(calculate_life_table(summary[FALSE, ]))
+)

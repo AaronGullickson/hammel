@@ -10,7 +10,7 @@
 #'   through every requested time.
 #' @param times A numeric vector of finite time points in years. A population
 #'   object cannot be queried beyond its known `end_time`.
-#' @return A data frame with `time` and `population` columns.
+#' @return A tibble with `time` and `population` columns.
 #' @export
 #' @examples
 #' population <- create_baseline_population(100, end_time = 0)
@@ -33,7 +33,7 @@ calculate_population_size <- function(population, times) {
   born <- sort(persons$birth_time)
   died <- sort(persons$death_time[!is.na(persons$death_time)])
   counts <- findInterval(times, born) - findInterval(times, died)
-  data.frame(time = times, population = counts)
+  tibble::tibble(time = times, population = counts)
 }
 
 #' Summarize demographic exposure and rates
@@ -57,7 +57,7 @@ calculate_population_size <- function(population, times) {
 #' @param age_breaks Strictly increasing nonnegative age boundaries in years.
 #'   If the final boundary is finite, Inf is appended to create an open-ended
 #'   final age band starting at that boundary.
-#' @return A data frame with time_start, time_end, sex, age_start, age_end,
+#' @return A tibble with time_start, time_end, sex, age_start, age_end,
 #'   person_years, deaths, births, asmr, and asfr.
 #' @export
 #' @examples
@@ -82,7 +82,7 @@ calculate_lexis_counts <- function(population, time_breaks, age_breaks) {
   na <- length(age_breaks) - 1L
   grid <- expand.grid(t = seq_len(nt), a = seq_len(na), sex = c("m", "f"),
                       KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
-  table <- data.frame(time_start = time_breaks[grid$t], time_end = time_breaks[grid$t + 1L],
+  table <- tibble::tibble(time_start = time_breaks[grid$t], time_end = time_breaks[grid$t + 1L],
     sex = grid$sex, age_start = age_breaks[grid$a], age_end = age_breaks[grid$a + 1L])
   counts <- demographic_counts_cpp(persons, time_breaks, age_breaks)
   for (column in c("person_years", "deaths", "births")) table[[column]] <- counts[[column]]
@@ -91,7 +91,7 @@ calculate_lexis_counts <- function(population, time_breaks, age_breaks) {
                                 table$deaths / table$person_years, NA_real_))
   table$asfr <- as.numeric(ifelse(table$person_years > 0,
                                 table$births / table$person_years, NA_real_))
-  attr(table, "unassigned_births") <- data.frame(time_start = head(time_breaks, -1),
+  attr(table, "unassigned_births") <- tibble::tibble(time_start = head(time_breaks, -1),
     time_end = tail(time_breaks, -1), births = counts$unassigned_births)
   table
 }
@@ -123,7 +123,7 @@ summary_rows <- function(table, by_sex = FALSE) {
 #'   process object, or a data frame with `age_start`, `age_end`, and `asfr`
 #'   or `rate` in births per woman-year. Bare `rate` tables are interpreted as
 #'   fertility rates; mortality processes are not valid inputs.
-#' @return A data frame with period columns, `age_start`, `age_end`, and `tfr`.
+#' @return A tibble with period columns, `age_start`, `age_end`, and `tfr`.
 #'   If `sex` is present, only female rows are used.
 #' @export
 calculate_tfr <- function(rates) {
@@ -150,7 +150,7 @@ calculate_tfr <- function(rates) {
   if (!nrow(rates)) {
     result <- rates[FALSE, c(periods, "age_start", "age_end"), drop = FALSE]
     result$tfr <- numeric()
-    return(result)
+    return(tibble::as_tibble(result))
   }
   tables <- lapply(summary_rows(rates), function(rows) {
     r <- rates[rows, , drop = FALSE]
@@ -160,7 +160,7 @@ calculate_tfr <- function(rates) {
                          tfr = sum(r$asfr * (r$age_end - r$age_start), na.rm = TRUE)))
   })
   result <- do.call(rbind, tables)
-  rownames(result) <- NULL
+  result <- tibble::as_tibble(result)
   attr(result, "unassigned_births") <- unknown
   result
 }
@@ -178,7 +178,7 @@ calculate_tfr <- function(rates) {
 #'   process object, or a data frame with `age_start`, `age_end`, and `asmr`,
 #'   `mx`, or `rate` per person-year.
 #' @param radix Initial life-table survivors, a positive finite number.
-#' @return A data frame with period and sex identifiers (when supplied),
+#' @return A tibble with period and sex identifiers (when supplied),
 #'   `age_start`, `age_end`, `mx`, `n`, `ax`, `qx`, `lx`, `lx_end`, `dx`,
 #'   `Lx`, `Tx`, and `ex`. Summary counts and exposure columns are omitted.
 #'   Life expectancy is `Tx / lx` in years.
@@ -208,7 +208,7 @@ calculate_life_table <- function(rates, radix = 1) {
   if (!nrow(rates)) {
     for (column in c("n", "ax", "qx", "lx", "lx_end", "dx", "Lx", "Tx", "ex"))
       rates[[column]] <- numeric()
-    return(rates)
+    return(tibble::as_tibble(rates))
   }
   tables <- lapply(summary_rows(rates, by_sex = TRUE), function(rows) {
     r <- rates[rows, , drop = FALSE]
@@ -246,8 +246,7 @@ calculate_life_table <- function(rates, radix = 1) {
     r
   })
   result <- do.call(rbind, tables)
-  rownames(result) <- NULL
-  result
+  tibble::as_tibble(result)
 }
 
 check_summary_intervals <- function(rates, open) {

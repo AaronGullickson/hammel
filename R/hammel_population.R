@@ -5,7 +5,7 @@
 #' consistent tables against the population schema. Custom columns are retained.
 #'
 #' @param persons A data frame with one row per person, including deceased
-#'   persons. Data frame subclasses, such as tibbles, are preserved.
+#'   persons. Columns are preserved and the table is returned as a tibble.
 #' @param unions A data frame with one row per union episode, or `NULL`
 #'   for no unions. An empty data frame is normalized to the union schema.
 #' @param end_time Optional finite simulation endpoint in years. Its calendar origin is supplied by the user. `NULL` means
@@ -30,6 +30,8 @@ hammel_population <- function(persons, unions = NULL, end_time = NULL) {
     class = "hammel_population"
   )
   validate_population(results)
+  results$persons <- tibble::as_tibble(results$persons)
+  results$unions <- tibble::as_tibble(results$unions)
   results
 }
 
@@ -131,7 +133,7 @@ normalize_unions <- function(unions) {
 }
 
 empty_unions <- function() {
-  data.frame(
+  tibble::tibble(
     union_id = integer(), partner1_id = integer(), partner2_id = integer(),
     start_time = numeric(), end_time = numeric(), end_reason = character()
   )

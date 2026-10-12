@@ -112,3 +112,5 @@ stopifnot(nrow(result$unions) == 1L, result$unions$end_time == 0,
 # Step duration is supplied in years rather than embedded in native code.
 result <- simulate(make_model(), 1, seed = 42, step_duration = 0.25)
 stopifnot(result$end_time == 1, result$simulation$step_duration == 0.25)
+stopifnot(tibble::is_tibble(result$persons), tibble::is_tibble(result$unions),
+          tibble::is_tibble(simulate(make_model(0), 1)$persons))

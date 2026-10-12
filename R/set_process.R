@@ -36,6 +36,7 @@ set_process <- function(model, process) {
       stop("Built-in process rates must use person-year units.", call. = FALSE)
     }
     validate_rates(process$rates, mortality = name == "mortality")
+    process$rates <- tibble::as_tibble(process$rates)
   }
   model$processes[name] <- list(process)
   model
@@ -58,7 +59,8 @@ set_fertility <- function(model, rates) {
 #' Construct a process specification without running a simulation. Rates are
 #' piecewise constant over age intervals `[age_start, age_end)`, in years,
 #' and expressed per person-year. Overlapping intervals are rejected; adjacent
-#' intervals are allowed. Input order and custom columns are preserved.
+#' intervals are allowed. Input order and custom columns are preserved; rate
+#' schedules are returned as tibbles.
 #'
 #' Mortality requires separate schedules for both sexes. Gaps and uncovered
 #' ages are not filled or interpreted as zero rates. Coverage and fertility
@@ -92,7 +94,7 @@ fertility <- function(rates) {
 }
 
 new_rate_process <- function(name, rates) {
-  structure(list(name = name, rates = rates, rate_unit = "person_year"),
+  structure(list(name = name, rates = tibble::as_tibble(rates), rate_unit = "person_year"),
             class = c(paste0("hammel_", name), "hammel_process"))
 }
 

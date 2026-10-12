@@ -13,7 +13,7 @@ or \code{rate} in births per woman-year. Bare \code{rate} tables are interpreted
 fertility rates; mortality processes are not valid inputs.}
 }
 \value{
-A data frame with period columns, \code{age_start}, \code{age_end}, and \code{tfr}.
+A tibble with period columns, \code{age_start}, \code{age_end}, and \code{tfr}.
 If \code{sex} is present, only female rows are used.
 }
 \description{

@@ -8,7 +8,7 @@ hammel_population(persons, unions = NULL, end_time = NULL)
 }
 \arguments{
 \item{persons}{A data frame with one row per person, including deceased
-persons. Data frame subclasses, such as tibbles, are preserved.}
+persons. Columns are preserved and the table is returned as a tibble.}
 
 \item{unions}{A data frame with one row per union episode, or \code{NULL}
 for no unions. An empty data frame is normalized to the union schema.}

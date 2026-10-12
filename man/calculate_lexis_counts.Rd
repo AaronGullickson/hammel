@@ -16,7 +16,7 @@ If the final boundary is finite, Inf is appended to create an open-ended
 final age band starting at that boundary.}
 }
 \value{
-A data frame with time_start, time_end, sex, age_start, age_end,
+A tibble with time_start, time_end, sex, age_start, age_end,
 person_years, deaths, births, asmr, and asfr.
 }
 \description{

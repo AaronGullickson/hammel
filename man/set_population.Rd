@@ -17,8 +17,8 @@ An updated \code{hammel_model}.
 }
 \description{
 Supply a validated population containing person and union histories and
-their reference time. The population is retained unchanged, including any
-additional components. Existing process configuration is retained.
+their reference time. Tables are normalized to tibbles; column contents and
+additional components are retained. Existing process configuration is retained.
 The input model is not modified.
 }
 \examples{

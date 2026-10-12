@@ -15,7 +15,7 @@ through every requested time.}
 object cannot be queried beyond its known \code{end_time}.}
 }
 \value{
-A data frame with \code{time} and \code{population} columns.
+A tibble with \code{time} and \code{population} columns.
 }
 \description{
 Count persons with \code{birth_time <= time} and missing \code{death_time} or

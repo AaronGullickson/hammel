@@ -2,6 +2,10 @@
 
 Load the development package with `devtools::load_all()`. `calculate_lexis_counts()` accepts a `hammel_population` such as `result`, or a persons data frame representing one independent population history. Dates and age boundaries are in years; exposure is in person-years.
 
+All table outputs are tibbles, including population sizes, Lexis counts, TFR,
+life tables, and auxiliary unassigned-birth counts. Population histories and
+process rate tables are also tibbles; base data frames are accepted as input.
+
 ## One summary for fertility and mortality
 
 For the USA/2000 example simulated from 2000 to 2100:

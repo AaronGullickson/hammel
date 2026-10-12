@@ -101,8 +101,7 @@ simulate <- function(model, years, seed = NULL, step_duration = 1/12,
       persons <- rbind(persons, persons[rep(NA_integer_, added), , drop = FALSE])
     }
     for (column in names(native$persons)) persons[[column]] <- native$persons[[column]]
-    rownames(persons) <- NULL
-    result$persons <- persons
+    result$persons <- tibble::as_tibble(persons)
     unions <- result$unions
     if (nrow(unions)) {
       death1 <- persons$death_time[match(unions$partner1_id, persons$person_id)]
@@ -120,6 +119,8 @@ simulate <- function(model, years, seed = NULL, step_duration = 1/12,
   result$simulation <- list(start_time = start, end_time = result$end_time,
     step_duration = step_duration, birth_interval = birth_interval,
     births = births, deaths = deaths)
+  result$persons <- tibble::as_tibble(result$persons)
+  result$unions <- tibble::as_tibble(result$unions)
   validate_population(result)
   result
 }

@@ -9,7 +9,7 @@ birth_process <- fertility(births)
 stopifnot(inherits(death_process, "hammel_process"),
           inherits(death_process, "hammel_mortality"),
           inherits(birth_process, "hammel_fertility"),
-          identical(death_process$rates, rates),
+          identical(death_process$rates, tibble::as_tibble(rates)),
           identical(birth_process$rate_unit, "person_year"))
 model <- hammel_model() |> set_process(death_process) |> set_process(birth_process)
 stopifnot(identical(model, hammel_model() |> set_mortality(rates) |> set_fertility(births)))
@@ -17,12 +17,12 @@ replacement <- rates; replacement$rate <- 0.03
 updated <- set_mortality(model, replacement)
 stopifnot(identical(model$processes$mortality, death_process),
           identical(updated$processes$fertility, birth_process),
-          identical(updated$processes$mortality$rates, replacement))
+          identical(updated$processes$mortality$rates, tibble::as_tibble(replacement)))
 
 # Validation does not reorder or strip custom attributes.
 custom <- rates[c(4, 2, 1, 3), ]; custom$source <- "example"
 class(custom) <- c("custom_rates", "data.frame")
-stopifnot(identical(mortality(custom)$rates, custom))
+stopifnot(identical(mortality(custom)$rates, tibble::as_tibble(custom)))
 
 expect_error <- function(expr) {
   stopifnot(inherits(tryCatch(force(expr), error = identity), "error"))
@@ -52,4 +52,9 @@ expect_error(set_process(model, rates))
 
 # Constructors do not invent gap behavior or require full lifetime coverage.
 gap <- births; gap$age_start[2] <- 25
-stopifnot(identical(fertility(gap)$rates, gap))
+stopifnot(identical(fertility(gap)$rates, tibble::as_tibble(gap)))
+
+stopifnot(tibble::is_tibble(death_process$rates),
+          tibble::is_tibble(birth_process$rates))
+edited <- death_process; edited$rates <- as.data.frame(edited$rates)
+stopifnot(tibble::is_tibble(set_process(model, edited)$processes$mortality$rates))

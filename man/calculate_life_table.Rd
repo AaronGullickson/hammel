@@ -14,7 +14,7 @@ process object, or a data frame with \code{age_start}, \code{age_end}, and \code
 \item{radix}{Initial life-table survivors, a positive finite number.}
 }
 \value{
-A data frame with period and sex identifiers (when supplied),
+A tibble with period and sex identifiers (when supplied),
 \code{age_start}, \code{age_end}, \code{mx}, \code{n}, \code{ax}, \code{qx}, \code{lx}, \code{lx_end}, \code{dx},
 \code{Lx}, \code{Tx}, and \code{ex}. Summary counts and exposure columns are omitted.
 Life expectancy is \code{Tx / lx} in years.
