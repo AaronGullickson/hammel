@@ -4,7 +4,7 @@
 \alias{set_population}
 \title{Set the starting population of a Hammel model}
 \usage{
-set_population(model, persons, unions = NULL, start_month = NULL)
+set_population(model, persons, unions = NULL, start_time = NULL)
 }
 \arguments{
 \item{model}{A \code{hammel_model} object.}
@@ -15,9 +15,9 @@ set_population(model, persons, unions = NULL, start_month = NULL)
 initial population when \code{persons} is a data frame. Omit this argument when
 supplying results.}
 
-\item{start_month}{Optional finite, whole-number starting month index for
-table inputs. Omit this argument when supplying results: their \code{end_month}
-is used. \code{NULL} means unknown; no starting month is inferred from dates.}
+\item{start_time}{Optional finite starting time in years for
+table inputs. Omit this argument when supplying results: their \code{end_time}
+is used. \code{NULL} means unknown; no starting time is inferred from dates.}
 }
 \value{
 An updated \code{hammel_model}.
@@ -26,17 +26,19 @@ An updated \code{hammel_model}.
 Supply a person data frame with optional unions, or a \code{hammel_results} object.
 Omitted or \code{NULL} unions represent no initial unions and are stored as an
 empty data frame. Results supply
-both histories and their endpoint month. Existing process configuration is
+both histories and their endpoint time. Existing process configuration is
 retained. The input model is not modified.
 }
 \examples{
-persons <- data.frame(person_id = 1:2)
-unions <- data.frame()
+persons <- data.frame(person_id = 1:2, sex = c(0L, 1L),
+  birth_time = c(-25, -23), death_time = NA_real_,
+  mother_id = NA_integer_, father_id = NA_integer_)
+unions <- NULL
 model <- hammel_model() |>
-  set_population(persons, unions, start_month = 0)
+  set_population(persons, unions, start_time = 0)
 unmarried <- hammel_model() |>
-  set_population(persons, start_month = 0)
-results <- hammel_results(persons, unions, end_month = 120)
+  set_population(persons, start_time = 0)
+results <- hammel_results(persons, unions, end_time = 120)
 restarted <- hammel_model() |>
   set_population(results)
 }

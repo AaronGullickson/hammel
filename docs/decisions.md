@@ -99,3 +99,24 @@ The design specification lists open choices. In particular, C++, simulation exec
 - **Process interface:** mortality and fertility setters are shortcuts to the same `set_process()` operation. These constructors and setters do not execute simulations.
 - **Current implementation choices:** `set_process(model, name, process)` stores a non-NULL specification unchanged and replaces an existing process of the same name. Results carry optional `end_month`; models carry optional `start_month`, both whole-number indices with an unspecified user-supplied calendar origin. Unknown times remain `NULL`.
 - **Scope:** this updates D009's class name and resolves D010's population configuration route. Table schemas, executable process contracts, calendar conventions, and simulation execution remain open. No demographic default or rate conversion is implemented by these setters.
+
+## D012: Initial table schema and year-based dates
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** use the initial person and union history schema in `population-schema.md`, leaving marital status off `persons`. Expose times as numeric years with fractional years rather than month indices.
+- **Rationale:** year-based dates are convenient for exposure estimates and support future simulation increments other than months. Relationship state can be derived from union histories; caching it internally remains possible.
+- **Scope:** table columns use `birth_time`, `death_time`, `start_time`, and `end_time`; these names are implementation choices reflecting the year-based convention. Group and engine linkage pointers are omitted for now.
+- **Relationship to earlier decisions:** D004's monthly engine and D008's integer-month truncation remain in effect. D011's current month metadata API requires a future explicit migration to year-based endpoint and starting times.
+- **Still open:** calendar origin convention, input time alignment, floating-point tolerances, exposure boundary semantics, and detailed schema validation. The agreed direction is documented; the existing constructors have not yet been migrated or given column validation.
+
+## D013: Canonical year units and explicit step duration
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** record public times and durations in years, exposure in person-years, and inputs as rates per person-year. Use monthly increments for the initial milestone but do not hard-code month assumptions throughout the implementation.
+- **Implementation direction:** obtain step duration `dt` in years from explicit time configuration; the initial setting is `1/12`. Work directly with rates times durations. Centralize conversions to generic internal step indices if needed.
+- **Clarification of D004–D008:** months are the first milestone's configured increment, not the canonical public time unit. D005's division by twelve is the monthly instance of multiplication by interval duration. D008's truncation is `floor(waiting_time_years / dt)` and candidate ties compare step indices; its priority is unchanged.
+- **Scope:** supporting other step durations remains future work, but avoiding embedded month assumptions is required from the initial implementation. Existing month-based constructor arguments still need explicit migration; this documentation change does not reinterpret them.
+
+## Implementation update: population validation and year metadata
+
+Both `set_population()` and `hammel_results()` now apply the shared structural checks documented in `population-schema.md`. Public metadata uses `start_time` and `end_time` in years; the earlier month arguments are removed, not reinterpreted. D011–D013 statements describing migration or validation as pending are historical and superseded by this implementation update. Demographic eligibility and time-boundary policies remain open.

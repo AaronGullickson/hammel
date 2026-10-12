@@ -59,7 +59,7 @@ Passing software checks does not establish research readiness. Before research u
 
 ## Monthly time decision
 
-The first milestone uses a fixed monthly simulation time unit, following SOCSIM's convention. Configurable units are a longer-term goal. Age and event-date conventions, exposure accounting, within-month ordering, and conversion of input rates to monthly event probabilities or schedules still require specification. A monthly time unit does not imply simply dividing annual probabilities by twelve.
+The first milestone uses a monthly simulation increment, following SOCSIM's convention, with its duration explicitly configured as `dt = 1/12` years. Record times and durations in years and exposure in person-years. Do not hard-code month assumptions in demographic algorithms or output schemas. Other increments are a longer-term feature, but time handling must be isolated from the outset. Age and event-date conventions, exposure accounting, within-month ordering, and conversion of input rates to monthly event probabilities or schedules still require specification. A monthly time unit does not imply simply dividing annual probabilities by twelve.
 
 ## Person-year input convention
 
@@ -99,3 +99,11 @@ Validate constant-hazard survival analytically and test piecewise schedules agai
 Under D008, truncate nonnegative waiting times in months to integer offsets, with offset zero indicating the current month. Retain one next event per person. Equal-month candidates are prioritized as death, birth, partnership formation, then partnership dissolution. Compare the truncated dates, not fractional times. This is a per-person selection rule; execution order across people and resampling after events remain open.
 
 Worked example: birth at offset 2.1 months and death at offset 2.9 months both map to offset 2; death wins. Birth at 1.9 months and death at 2.1 months map to offsets 1 and 2; birth wins. Candidate offsets below one month map to the current month. Test exact integer boundaries and age-band boundaries explicitly, along with these tie cases. Document differences from continuous-time event competition in demographic validation.
+
+## Time-unit independence requirement
+
+Canonical public time and duration units are years; exposure is recorded in person-years and rate inputs are per person-year. The first milestone's step duration is `dt = 1/12` years. Algorithms must consume the configured step duration rather than assume twelve steps per year. Integer scheduling indices, if used, are generic step indices.
+
+D008's truncation is expressed generally as `step_offset = floor(waiting_time_years / dt)`; its corresponding public duration is `step_offset * dt` years. This preserves the accepted monthly behavior when `dt = 1/12`, without encoding months throughout the engine. Equal-step candidates follow the accepted tie priority. Numerical boundary policy remains to be specified.
+
+Age boundaries and exposure accumulation must use elapsed years. Observation frequency must be explicitly expressed or converted in the time-handling layer. Validate unit consistency and review for scattered month constants; support for additional increments need not be implemented in the first milestone.

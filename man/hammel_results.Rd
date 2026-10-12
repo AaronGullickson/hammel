@@ -4,35 +4,33 @@
 \alias{hammel_results}
 \title{Create a Hammel simulation result}
 \usage{
-hammel_results(persons, unions, end_month = NULL)
+hammel_results(persons, unions = NULL, end_time = NULL)
 }
 \arguments{
 \item{persons}{A data frame with one row per person, including deceased
 persons. Data frame subclasses, such as tibbles, are preserved.}
 
-\item{unions}{A data frame with one row per union episode.}
+\item{unions}{A data frame with one row per union episode, or \code{NULL}
+for no unions. An empty data frame is normalized to the union schema.}
 
-\item{end_month}{Optional simulation endpoint as a finite, whole-number
-month index. Its calendar origin is supplied by the user. \code{NULL} means
+\item{end_time}{Optional finite simulation endpoint in years. Its calendar origin is supplied by the user. \code{NULL} means
 that the endpoint is unknown.}
 }
 \value{
 A named list of class \code{hammel_results} with components \code{persons},
-\code{unions}, and \code{end_month}.
+\code{unions}, and \code{end_time}.
 }
 \description{
 Collect person and union histories in an inspectable simulation result.
-This constructor does not run a simulation. It checks that both inputs are
-data frames but does not yet validate their columns or demographic content.
+This constructor does not run a simulation. It validates
+consistent tables against the population schema. Custom columns are retained.
 }
 \examples{
 sim <- hammel_results(
-  persons = data.frame(person_id = c(1L, 2L)),
-  unions = data.frame(
-    union_id = 1L,
-    person_id_1 = 1L,
-    person_id_2 = 2L
-  )
+  persons = data.frame(person_id = 1:2, sex = c(0L, 1L),
+    birth_time = c(-25, -23), death_time = NA_real_,
+    mother_id = NA_integer_, father_id = NA_integer_),
+  end_time = 0
 )
 sim$persons
 sim$unions

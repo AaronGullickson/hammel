@@ -32,6 +32,8 @@ Do not infer answers from SOCSIM's implementation: document reference behavior a
 
 ## Interface direction
 
+The accepted initial table schema is in [population schema](population-schema.md) (D012). Person and union dates are exposed in numeric years with fractional years; the first engine retains integer monthly scheduling internally. `persons` has no marital-status column. Relationship state is derived from union histories and may be cached internally for performance. Metadata now uses `start_time` and `end_time` in years.
+
 Simulation outputs must also be usable as inputs to further simulation (D010). The pipeable workflow should support initializing a subsequent model or run from a `hammel_results`, retaining person and union identities and histories. The result must provide enough endpoint information to establish the new starting time and current population. Subsequent runs can configure demographic mechanisms; the syntax and configuration carryover rules remain open.
 
 Distinguish reuse of demographic output from exact checkpoint continuation. Reusing output must not inherently depend on retaining a live compiled engine. Whether pending events and RNG state are saved, and whether split runs reproduce an uninterrupted run, requires a separate decision.
@@ -50,17 +52,17 @@ The minimum observation design must support age-specific births, deaths, and the
 
 ## Time unit
 
-Use a fixed monthly time unit for the first milestone. Keep unit assumptions explicit and conversions in defined operations to support future configurable units. This does not decide whether the engine scans the population monthly or schedules events ahead, or how events within a month are ordered.
+Use a monthly increment for the first milestone, represented by an explicit step duration `dt = 1/12` years. Record public times and durations in years and exposure in person-years. Do not hard-code month assumptions: demographic algorithms use configured durations, and any integer step indexing and conversion belong in centralized time-handling operations. Supporting other increments can come later, but the initial implementation must preserve this separation. This does not decide whether the engine scans the population monthly or schedules events ahead, or how events within a month are ordered.
 
 ## Rate input interface
 
-Accept age-specific fertility and mortality rates expressed as events per person-year. Convert to events per person-month internally by dividing by twelve, keeping the input units and denominator explicit. Users should not need to construct monthly rate files. Output rate estimates used for validation should be available in the corresponding person-year units.
+Accept age-specific fertility and mortality rates expressed as events per person-year. Keep rates per person-year and multiply by the relevant duration in years when computing cumulative hazard or interval probabilities. For the initial monthly setting this is equivalent to division by twelve; do not scatter that conversion through the implementation. Users should not need to construct monthly rate files. Output rate estimates used for validation should be available in the corresponding person-year units.
 
 Keep exposure-unit conversion separate from the mapping of rates to event probabilities or schedules. The latter depends on the rate interpretation and the accepted demographic algorithm.
 
 ## Rate-to-probability direction
 
-Use `1 - exp(-rate * dt)` for a single-process event probability under a constant hazard within the time span, with `dt = 1/12` for person-year rates and monthly time. This resolves the previously open conversion direction; rate boundaries, process competition, and fertility event generation remain to be specified. See D006 and the scientific contract for the mortality interpretation and validation assumptions.
+Use `1 - exp(-rate * dt)` for a single-process event probability under a constant hazard within the time span, with `dt` obtained from time configuration (`1/12` years for the initial monthly setting). This resolves the previously open conversion direction; rate boundaries, process competition, and fertility event generation remain to be specified. See D006 and the scientific contract for the mortality interpretation and validation assumptions.
 
 ## Candidate waiting-time sampling
 
@@ -77,7 +79,7 @@ Implemented under D011:
 
 ```r
 model <- hammel_model() |>
-  set_population(persons, unions, start_month = 0) |>
+  set_population(persons, unions, start_time = 0) |>
   set_mortality(mortality_rates) |>
   set_fertility(fertility_rates)
 
@@ -86,6 +88,6 @@ restarted_model <- hammel_model() |>
   set_mortality(mortality_rates)
 ```
 
-`results` is a `hammel_results` object. Its `end_month` becomes the model's `start_month`. These optional whole-number indices do not yet establish calendar or exposure boundary conventions. Unknown times remain `NULL`; setters do not infer time from the latest event.
+`results` is a `hammel_results` object. Its `end_time` becomes the model's `start_time`. These optional times in years do not yet establish calendar or exposure boundary conventions. Unknown times remain `NULL`; setters do not infer time from the latest event.
 
 The common operation is `set_process(model, name, process)`. The demographic shortcuts use names `mortality` and `fertility`. Setting the same name replaces its specification and retains other processes. Specifications are stored unchanged, including their person-year input units. Rate schemas and the executable process contract are deferred.

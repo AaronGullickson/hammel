@@ -44,8 +44,8 @@ This brief and the initial companion documents were distilled from `/home/aarong
 
 ## Monthly time decision
 
-The first milestone uses a fixed monthly simulation time unit, following SOCSIM's convention. Configurable units are a longer-term goal. Age and event-date conventions, exposure accounting, within-month ordering, and conversion of input rates to monthly event probabilities or schedules still require specification. A monthly time unit does not imply simply dividing annual probabilities by twelve.
+The first milestone uses a monthly simulation increment, following SOCSIM's convention, with its duration explicitly configured as `dt = 1/12` years. Record times and durations in years and exposure in person-years. Do not hard-code month assumptions in demographic algorithms or output schemas. Other increments are a longer-term feature, but time handling must be isolated from the outset. Age and event-date conventions, exposure accounting, within-month ordering, and conversion of input rates to monthly event probabilities or schedules still require specification. A monthly time unit does not imply simply dividing annual probabilities by twelve.
 
 ## User-facing rate units
 
-Users can supply age-specific fertility and mortality rates in events per person-year. The monthly engine converts these to events per person-month internally by dividing by twelve. This removes the need for users to prepare monthly rates while preserving explicit rate interpretation and denominators.
+Users can supply age-specific fertility and mortality rates in events per person-year. The engine uses rates with durations in years; for a monthly interval, multiplying by its configured duration of `1/12` is equivalent to division by twelve. This removes the need for users to prepare monthly rates while preserving explicit rate interpretation and denominators.
