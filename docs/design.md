@@ -68,6 +68,11 @@ Sample directly on the hazard scale: draw `E = -log(U)` and consume that thresho
 
 ## Basic configuration API
 
+For a person-table input, `set_population(model, persons)` and explicit
+`unions = NULL` both initialize an unmarried population. The model stores an
+empty union data frame. This does not infer or alter person attributes;
+demographic schema consistency checks remain to be specified.
+
 Implemented under D011:
 
 ```r

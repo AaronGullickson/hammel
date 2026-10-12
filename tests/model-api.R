@@ -59,7 +59,7 @@ expect_error <- function(expr) {
 }
 expect_error(hammel_results(NULL, unions))
 expect_error(hammel_results(persons, list()))
-expect_error(set_population(empty, persons))
+expect_error(set_population(empty, persons, list()))
 expect_error(set_population(empty, results, unions))
 expect_error(set_population(empty, results, start_month = 0))
 expect_error(set_process(list(), "mortality", mortality))
@@ -70,3 +70,14 @@ for (month in list(NA_real_, Inf, 1.5, c(0, 1), "120")) {
   expect_error(hammel_results(persons, unions, end_month = month))
   expect_error(set_population(empty, persons, unions, start_month = month))
 }
+
+# An unmarried population can omit unions or supply NULL, clearing old unions.
+unmarried <- set_population(configured, persons)
+stopifnot(
+  identical(unmarried, set_population(configured, persons, unions = NULL)),
+  identical(unmarried$persons, persons),
+  is.data.frame(unmarried$unions),
+  nrow(unmarried$unions) == 0L,
+  identical(unmarried$processes, configured$processes),
+  identical(configured$unions, unions)
+)

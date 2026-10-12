@@ -95,6 +95,7 @@ The design specification lists open choices. In particular, C++, simulation exec
 - **Status:** accepted October 12, 2026.
 - **Decision:** rename the result class and constructor to `hammel_results`. Use `hammel_model()` for an empty specification and pipeable `set_population()`, `set_process()`, `set_mortality()`, and `set_fertility()` functions.
 - **Population inputs:** accept person and union tables or a `hammel_results` object. Results supply their tables and endpoint time; existing model process settings are retained.
+- **Unmarried initialization:** accepted clarification: with a person-table input, omitted or `NULL` unions represent no initial unions and are normalized to an empty data frame.
 - **Process interface:** mortality and fertility setters are shortcuts to the same `set_process()` operation. These constructors and setters do not execute simulations.
 - **Current implementation choices:** `set_process(model, name, process)` stores a non-NULL specification unchanged and replaces an existing process of the same name. Results carry optional `end_month`; models carry optional `start_month`, both whole-number indices with an unspecified user-supplied calendar origin. Unknown times remain `NULL`.
 - **Scope:** this updates D009's class name and resolves D010's population configuration route. Table schemas, executable process contracts, calendar conventions, and simulation execution remain open. No demographic default or rate conversion is implemented by these setters.

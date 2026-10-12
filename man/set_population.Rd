@@ -11,8 +11,9 @@ set_population(model, persons, unions = NULL, start_month = NULL)
 
 \item{persons}{A person data frame, or a \code{hammel_results} object.}
 
-\item{unions}{A union data frame, required when \code{persons} is a data frame.
-Omit this argument when supplying results.}
+\item{unions}{A union data frame, or \code{NULL} (the default) for an unmarried
+initial population when \code{persons} is a data frame. Omit this argument when
+supplying results.}
 
 \item{start_month}{Optional finite, whole-number starting month index for
 table inputs. Omit this argument when supplying results: their \code{end_month}
@@ -22,7 +23,9 @@ is used. \code{NULL} means unknown; no starting month is inferred from dates.}
 An updated \code{hammel_model}.
 }
 \description{
-Supply either two data frames or a \code{hammel_results} object. Results supply
+Supply a person data frame with optional unions, or a \code{hammel_results} object.
+Omitted or \code{NULL} unions represent no initial unions and are stored as an
+empty data frame. Results supply
 both histories and their endpoint month. Existing process configuration is
 retained. The input model is not modified.
 }
@@ -31,6 +34,8 @@ persons <- data.frame(person_id = 1:2)
 unions <- data.frame()
 model <- hammel_model() |>
   set_population(persons, unions, start_month = 0)
+unmarried <- hammel_model() |>
+  set_population(persons, start_month = 0)
 results <- hammel_results(persons, unions, end_month = 120)
 restarted <- hammel_model() |>
   set_population(results)
