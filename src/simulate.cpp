@@ -13,9 +13,9 @@ struct Band {
   double start, end, rate;
 };
 
+// Copy the R rate table into a growable C++ collection. Mortality selects
+// one sex; fertility uses all rows. Sort the copy without changing R inputs.
 std::vector<Band> read_bands(DataFrame rates, const std::string& sex = "") {
-  // Copy the R rate table into a growable C++ collection. Mortality selects
-  // one sex; fertility uses all rows. Sort the copy without changing R inputs.
   NumericVector starts = rates["age_start"], ends = rates["age_end"];
   NumericVector values = rates["rate"];
   CharacterVector sexes;
@@ -31,24 +31,32 @@ std::vector<Band> read_bands(DataFrame rates, const std::string& sex = "") {
   return bands;
 }
 
-// Invert cumulative hazard through the known age schedule. A zero-rate band
-// consumes time but no threshold. Absence of further hazard gives infinity.
+// Calculate waiting time until the next event. The threshold is drawn
+// from Exp(1), equivalent in distribution to -log(U), with U uniform
+// on (0, 1). Subtract rate * duration across successive age bands.
+// In the band where the remaining threshold is reached, divide it
+// by the rate to obtain the remaining waiting time.
 double waiting_time(const std::vector<Band>& bands, double age, double threshold) {
-  // threshold has an Exp(1) distribution, equivalent to -log(U). Consume it
-  // using rate * elapsed years until the event lies within an age band.
   const double origin = age;
   for (const Band& band : bands) {
+    // if we are older than the end of this band, skip it
     if (band.end <= age) continue;
-    age = std::max(age, band.start); // Skip uncovered ages without adding hazard.
+    // if we are entering a band higher than current age, then age up
+    age = std::max(age, band.start);
+    // determine how long we will spend in this band
     const double duration = band.end - age;
+    // A zero-rate band consumes time but no threshold.
     if (band.rate > 0) {
       if (threshold <= band.rate * duration)
+        // The event will occur within this band. Return the total waiting time.
         // Include time crossed in previous bands, then the remaining time here.
         return age - origin + threshold / band.rate;
+      //if the event doesn't happen consume hazard from this band
       threshold -= band.rate * duration;
     }
     age = band.end;
   }
+  // if we got here, we are out of bands so the event never happens, return infinity
   return std::numeric_limits<double>::infinity();
 }
 
@@ -90,6 +98,7 @@ double rate_integral(const std::vector<Band>& bands, double lo, double hi) {
   return total;
 }
 
+// Increase eligible fertility hazards to approximately compensate for birth spacing.
 std::vector<Band> adjusted_fertility(const std::vector<Band>& raw, double dt,
                                     int spacing, double max_age) {
   // With no spacing there is no eligibility correction. Otherwise build a
@@ -200,6 +209,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   }
   double birth_count = 0, death_count = 0;
   unsigned long long processed = 0;
+  // Process events in chronological order until no scheduled events remain.
   while (!queue.empty()) {
     if (++processed % 1024 == 0) checkUserInterrupt();
     auto next = queue.begin();
