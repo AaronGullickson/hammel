@@ -10,6 +10,9 @@
 #' @param model A `hammel_model` object.
 #' @param process A `hammel_process` specification.
 #' @param rates An age-specific rate table passed to [mortality()] or [fertility()].
+#' @param birth_interval Minimum maternal birth-to-birth interval in years,
+#'   defaulting to `0.75`. Must be finite, nonnegative, and a whole number of
+#'   months for the retained fertility compensation grid.
 #'
 #' @return An updated `hammel_model`. The input model is not modified.
 #' @export
@@ -36,6 +39,7 @@ set_process <- function(model, process) {
       stop("Built-in process rates must use person-year units.", call. = FALSE)
     }
     validate_rates(process$rates, mortality = name == "mortality")
+    if (name == "fertility") compensation_intervals(process$birth_interval)
     process$rates <- tibble::as_tibble(process$rates)
   }
   model$processes[name] <- list(process)
@@ -50,8 +54,8 @@ set_mortality <- function(model, rates) {
 
 #' @rdname set_process
 #' @export
-set_fertility <- function(model, rates) {
-  set_process(model, fertility(rates))
+set_fertility <- function(model, rates, birth_interval = 0.75) {
+  set_process(model, fertility(rates, birth_interval = birth_interval))
 }
 
 #' Specify age-specific demographic rates
@@ -72,7 +76,12 @@ set_fertility <- function(model, rates) {
 #'   and `rate`. Starts must be finite and nonnegative; ends must exceed starts
 #'   and may be `Inf`. Rates must be finite and nonnegative. Mortality additionally
 #'   requires character `sex` values `"m"` and `"f"`, with both represented.
-#' @return A named list containing `name`, `rates`, and `rate_unit`, inheriting
+#' @param birth_interval Minimum maternal birth-to-birth interval in years,
+#'   defaulting to `0.75`. Must be finite, nonnegative, and a whole number of
+#'   months for the retained fertility compensation grid. Applies to fertility
+#'   only; eligible hazards are adjusted approximately to compensate for spacing.
+#' @return A named list containing `name`, `rates`, and `rate_unit`, plus
+#'   `birth_interval` for fertility, inheriting
 #'   from `hammel_mortality` or `hammel_fertility` and `hammel_process`.
 #' @export
 #' @examples
@@ -89,9 +98,12 @@ mortality <- function(rates) {
 
 #' @rdname mortality
 #' @export
-fertility <- function(rates) {
+fertility <- function(rates, birth_interval = 0.75) {
   validate_rates(rates, mortality = FALSE)
-  new_rate_process("fertility", rates)
+  compensation_intervals(birth_interval)
+  process <- new_rate_process("fertility", rates)
+  process$birth_interval <- birth_interval
+  process
 }
 
 new_rate_process <- function(name, rates) {

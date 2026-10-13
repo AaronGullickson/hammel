@@ -1,7 +1,7 @@
 library(hammel)
 
 make_model <- function(n = 1000, sex = "m", age = 20, death_rate = 0,
-                       birth_rate = 0) {
+                       birth_rate = 0, birth_interval = 0.75) {
   persons <- data.frame(person_id = seq_len(n), sex = rep(sex, n),
     birth_time = rep(-age, n), death_time = rep(NA_real_, n),
     mother_id = rep(NA_integer_, n), father_id = rep(NA_integer_, n))
@@ -9,14 +9,15 @@ make_model <- function(n = 1000, sex = "m", age = 20, death_rate = 0,
     set_population(hammel_population(persons, end_time = 0)) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0,
                              age_end = Inf, rate = death_rate)) |>
-    set_fertility(data.frame(age_start = 15, age_end = 50, rate = birth_rate))
+    set_fertility(data.frame(age_start = 15, age_end = 50, rate = birth_rate),
+                  birth_interval = birth_interval)
 }
 expect_error <- function(expr) {
   stopifnot(inherits(tryCatch(force(expr), error = identity), "error"))
 }
 expect_error(simulate(hammel_model(), 1))
 stopifnot(simulate(make_model(), 0.1)$end_time == 0.1)
-expect_error(simulate(make_model(), 1, birth_interval = 0.1))
+expect_error(make_model(birth_interval = 0.1))
 model <- make_model()
 zero <- simulate(model, 1, seed = 42)
 stopifnot(zero$simulation$births == 0, zero$simulation$deaths == 0,
@@ -61,8 +62,8 @@ stopifnot(is.na(simulate(make_model(1, death_rate = 1), endpoint,
 set.seed(42)
 draws <- rexp(2)
 ordered <- simulate(make_model(1, sex = "f", death_rate = draws[1]/0.06,
-                               birth_rate = draws[2]/0.02),
-                    0.03, seed = 42, birth_interval = 0)
+                               birth_rate = draws[2]/0.02, birth_interval = 0),
+                    0.03, seed = 42)
 stopifnot(ordered$simulation$births == 1,
           abs(ordered$persons$birth_time[2] - 0.02) < 1e-14)
 
@@ -136,3 +137,19 @@ expect_error(simulate(make_model(), -1))
 expect_error(simulate(make_model(), 1, step_duration = 1))
 stopifnot(tibble::is_tibble(result$persons), tibble::is_tibble(result$unions),
           tibble::is_tibble(simulate(make_model(0), 1)$persons))
+
+# Nondefault process spacing is enforced through execution and restart.
+model <- make_model(500, sex = "f", birth_rate = 0.3, birth_interval = 1.5)
+result <- simulate(model, 5, seed = 42)
+continued <- simulate(set_population(model, result), 3, seed = 43)
+stopifnot(result$simulation$birth_interval == 1.5,
+          continued$simulation$birth_interval == 1.5,
+          continued$simulation$births > 0)
+children <- continued$persons[!is.na(continued$persons$mother_id), ]
+intervals <- unlist(lapply(split(children$birth_time, children$mother_id),
+                          function(times) diff(sort(times))))
+stopifnot(length(intervals) > 0, all(intervals >= 1.5 - 1e-9))
+edited <- model; edited$processes$fertility$birth_interval <- NULL
+expect_error(simulate(edited, 0))
+edited$processes$fertility$birth_interval <- -1
+expect_error(simulate(edited, 1))

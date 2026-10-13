@@ -4,7 +4,7 @@
 \alias{simulate}
 \title{Run a fertility and mortality simulation}
 \usage{
-simulate(model, years, seed = NULL, birth_interval = 0.75)
+simulate(model, years, seed = NULL)
 }
 \arguments{
 \item{model}{A \code{hammel_model} containing a population and both demographic
@@ -14,9 +14,6 @@ processes. The population must have a finite \code{end_time}.}
 
 \item{seed}{Optional integer seed. With a seed, the caller's RNG state is
 restored afterward. With \code{NULL}, the simulation advances the current RNG.}
-
-\item{birth_interval}{Nonnegative minimum time between maternal births in
-years, initially \code{0.75}. Must be a whole number of monthly compensation intervals.}
 }
 \value{
 A \code{hammel_population} with updated histories and endpoint, plus a
@@ -31,7 +28,8 @@ fertility schedule; each birth samples a father uniformly from living males,
 or records an unknown father if none are available. No new unions are formed.
 }
 \details{
-Minimum birth spacing uses recorded maternal births, including on restart.
+Minimum birth spacing is configured in \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}
+and uses recorded maternal births, including on restart.
 SOCSIM-style eligible-risk adjustment compensates approximately for spacing;
 its monthly age grid is independent of continuous event execution.
 This is not a guarantee of exact ASFR matching. Fertility outside supplied

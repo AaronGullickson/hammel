@@ -209,3 +209,13 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 - **Decision:** separate HMD/HFD downloading and preparation from model configuration. Replace database process constructors and setters with `get_mortality_hmd()` and `get_fertility_hfd()`, returning validated rate tibbles accepted by ordinary process constructors and setters.
 - **Reuse:** users explicitly save/load tables with RDS; model configuration and repeated simulations need no database requests. Preserve source metadata as a `source` attribute on the table and carry it into constructed processes. Credentials are never retained.
 - **Scope:** retain D018's single-year selection, products, units, and age handling. Automatic caching and calendar-varying schedules are outside this change.
+
+## D026: Birth interval belongs to the fertility process
+
+- **Status:** accepted October 13, 2026.
+- **Decision:** move `birth_interval` from `simulate()` to `fertility()` and
+  `set_fertility()`. Store it in the fertility process and read it at execution.
+- **Scope:** retain the 0.75-year default, monthly compensation restrictions,
+  continuous execution, and existing spacing and rate-adjustment semantics.
+  Run metadata continues to record the configured interval.
+- **Supersedes:** earlier execution signatures exposing `birth_interval`.

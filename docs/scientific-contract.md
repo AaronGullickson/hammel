@@ -191,3 +191,25 @@ Retain the SOCSIM-style fertility compensation on its existing monthly age grid 
 Examples: a birth candidate at 0.02 years precedes a death candidate at 0.06 years, even though both lie in the first month. A birth at 1.03 with spacing 0.75 makes fertility eligible at 1.78, without rounding; mortality may occur before then. A candidate exactly at the endpoint is excluded. Constant adjusted hazard `h` with spacing `b` has long-run renewal rate `1 / (b + 1/h)`, unlike the previous truncated-wait expectation.
 
 Validation: exact sampled mortality dates against R exponential draws, chronological competing events within a former monthly bin, continuous birth spacing and restart spacing, half-open boundaries, constant-hazard survival, renewal expectation, accounting, reproducibility, and father availability at recorded birth times. Full age-specific demographic validation remains outstanding.
+
+## Fertility process birth spacing (D026)
+
+`fertility(rates, birth_interval = 0.75)` stores minimum maternal birth-to-birth
+spacing in years as part of the process. `set_fertility(model, rates,
+birth_interval = 0.75)` provides the same configuration. `simulate(model, years,
+seed = NULL)` reads this setting from the attached fertility process; it has
+no birth-spacing argument. Validate spacing at construction, attachment, and
+execution, including edited specifications. Missing settings are rejected.
+
+The existing demographic behavior is retained: one nonnegative finite scalar,
+a whole number of monthly compensation intervals, shared across mothers.
+Zero disables spacing and compensation. Recorded maternal histories enforce
+spacing on restart; compensation remains approximate and execution continuous.
+For example, a process with `birth_interval = 1.5` and a recorded birth at
+1.03 permits the next birth no earlier than 2.53. Default spacing remains
+0.75 years. Run metadata records the value actually used. Replacing the
+fertility process replaces its spacing along with its rates.
+
+Validation covers constructor and setter equivalence, invalid and edited
+settings, nondefault spacing through execution and restart, zero-spacing
+chronological sampling, and the existing default renewal expectation.

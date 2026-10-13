@@ -58,3 +58,16 @@ stopifnot(tibble::is_tibble(death_process$rates),
           tibble::is_tibble(birth_process$rates))
 edited <- death_process; edited$rates <- as.data.frame(edited$rates)
 stopifnot(tibble::is_tibble(set_process(model, edited)$processes$mortality$rates))
+
+# Spacing is part of the fertility specification and revalidated on attachment.
+stopifnot(birth_process$birth_interval == 0.75)
+spaced <- fertility(births, birth_interval = 1.5)
+stopifnot(identical(set_process(model, spaced),
+                   set_fertility(model, births, birth_interval = 1.5)),
+          fertility(births, birth_interval = 0)$birth_interval == 0)
+for (value in list(NULL, NA_real_, Inf, -1, 0.1, "1", c(1, 2))) {
+  expect_error(fertility(births, birth_interval = value))
+  expect_error(set_fertility(model, births, birth_interval = value))
+  edited <- spaced; edited$birth_interval <- value
+  expect_error(set_process(model, edited))
+}

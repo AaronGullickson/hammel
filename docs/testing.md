@@ -46,3 +46,9 @@ model <- hammel_model() |>
 ```
 
 RDS retains provenance; CSV does not preserve the `source` attribute. The former `mortality_hmd()`, `fertility_hfd()`, and database setters have been replaced by the download helpers.
+
+D026 verified October 13, 2026: package installation, all seven offline test
+scripts, and generated documentation examples passed. The online test skipped
+without opt-in. Added checks cover fertility process spacing validation and
+18-month spacing through simulation and restart. Default renewal and zero-spacing
+chronological checks still pass. No live database requests were made.

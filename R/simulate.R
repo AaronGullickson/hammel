@@ -7,7 +7,8 @@
 #' fertility schedule; each birth samples a father uniformly from living males,
 #' or records an unknown father if none are available. No new unions are formed.
 #'
-#' Minimum birth spacing uses recorded maternal births, including on restart.
+#' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
+#' and uses recorded maternal births, including on restart.
 #' SOCSIM-style eligible-risk adjustment compensates approximately for spacing;
 #' its monthly age grid is independent of continuous event execution.
 #' This is not a guarantee of exact ASFR matching. Fertility outside supplied
@@ -23,8 +24,6 @@
 #' @param years Nonnegative simulation duration in years.
 #' @param seed Optional integer seed. With a seed, the caller's RNG state is
 #'   restored afterward. With `NULL`, the simulation advances the current RNG.
-#' @param birth_interval Nonnegative minimum time between maternal births in
-#'   years, initially `0.75`. Must be a whole number of monthly compensation intervals.
 #' @return A `hammel_population` with updated histories and endpoint, plus a
 #'   `simulation` component recording run settings and birth/death counts.
 #' @export
@@ -37,7 +36,7 @@
 #'   set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0.1))
 #' result <- simulate(model, years = 2, seed = 42)
 #' result$simulation
-simulate <- function(model, years, seed = NULL, birth_interval = 0.75) {
+simulate <- function(model, years, seed = NULL) {
   check_model(model)
   if (is.null(model$population) || is.null(model$processes$mortality) ||
       is.null(model$processes$fertility)) {
@@ -51,7 +50,6 @@ simulate <- function(model, years, seed = NULL, birth_interval = 0.75) {
   if (!is.numeric(years) || length(years) != 1L || !is.finite(years) || years < 0) {
     stop("`years` must be finite and nonnegative.", call. = FALSE)
   }
-  spacing <- compensation_intervals(birth_interval)
   if (!is.finite(start + years) || (years > 0 && start + years == start)) {
     stop("Simulation times cannot be represented at this scale.", call. = FALSE)
   }
@@ -60,6 +58,8 @@ simulate <- function(model, years, seed = NULL, birth_interval = 0.75) {
   set_process(model, model$processes$fertility)
   death_rates <- model$processes$mortality$rates
   birth_rates <- model$processes$fertility$rates
+  birth_interval <- model$processes$fertility$birth_interval
+  spacing <- compensation_intervals(birth_interval)
   for (sex in c("m", "f")) {
     schedule <- death_rates[death_rates$sex == sex, , drop = FALSE]
     schedule <- schedule[order(schedule$age_start), , drop = FALSE]

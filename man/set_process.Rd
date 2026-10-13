@@ -10,7 +10,7 @@ set_process(model, process)
 
 set_mortality(model, rates)
 
-set_fertility(model, rates)
+set_fertility(model, rates, birth_interval = 0.75)
 }
 \arguments{
 \item{model}{A \code{hammel_model} object.}
@@ -18,6 +18,10 @@ set_fertility(model, rates)
 \item{process}{A \code{hammel_process} specification.}
 
 \item{rates}{An age-specific rate table passed to \code{\link[=mortality]{mortality()}} or \code{\link[=fertility]{fertility()}}.}
+
+\item{birth_interval}{Minimum maternal birth-to-birth interval in years,
+defaulting to \code{0.75}. Must be finite, nonnegative, and a whole number of
+months for the retained fertility compensation grid.}
 }
 \value{
 An updated \code{hammel_model}. The input model is not modified.

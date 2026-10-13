@@ -7,16 +7,22 @@
 \usage{
 mortality(rates)
 
-fertility(rates)
+fertility(rates, birth_interval = 0.75)
 }
 \arguments{
 \item{rates}{A nonempty data frame containing numeric \code{age_start}, \code{age_end},
 and \code{rate}. Starts must be finite and nonnegative; ends must exceed starts
 and may be \code{Inf}. Rates must be finite and nonnegative. Mortality additionally
 requires character \code{sex} values \code{"m"} and \code{"f"}, with both represented.}
+
+\item{birth_interval}{Minimum maternal birth-to-birth interval in years,
+defaulting to \code{0.75}. Must be finite, nonnegative, and a whole number of
+months for the retained fertility compensation grid. Applies to fertility
+only; eligible hazards are adjusted approximately to compensate for spacing.}
 }
 \value{
-A named list containing \code{name}, \code{rates}, and \code{rate_unit}, inheriting
+A named list containing \code{name}, \code{rates}, and \code{rate_unit}, plus
+\code{birth_interval} for fertility, inheriting
 from \code{hammel_mortality} or \code{hammel_fertility} and \code{hammel_process}.
 }
 \description{
