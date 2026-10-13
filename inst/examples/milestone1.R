@@ -43,7 +43,18 @@ lexis_counts |>
   filter(age_start == 0) |>
   select(time_start, time_end, age_start, sex, ex)
 
+result |> calculate_population_size(seq(from = 2000, to = 2100, by = 10)) |>
+  ggplot(aes(x = time, y = population))+
+  geom_point()+
+  geom_line()
+
 # Results can initialize a subsequent model with the same or new processes:
 result2 <- model |>
   set_population(result) |>
   simulate(100, seed = 13)
+
+result2 |> calculate_population_size(seq(from = 2000, to = 2200, by = 10)) |>
+  ggplot(aes(x = time, y = population))+
+  geom_point()+
+  geom_line()
+
