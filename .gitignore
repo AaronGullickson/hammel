@@ -7,3 +7,8 @@
 src/*.o
 src/*.so
 src/*.dll
+validation/data/
+validation/*_files/
+validation/*.html
+validation/.cache/
+validation/.quarto/

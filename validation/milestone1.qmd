@@ -1,0 +1,259 @@
+---
+title: "Hammel: milestone 1 validation"
+author: "Aaron Gullickson"
+format:
+  html:
+    toc: true
+    number-sections: true
+    code-fold: true
+    code-tools: true
+execute:
+  eval: false
+  echo: true
+  warning: true
+  error: false
+---
+
+This is a working template. Code execution is disabled above so the document
+can be rendered while it is being drafted. Enable execution when the saved
+inputs and analysis are ready. Paths in the chunks are relative to this
+document's `validation/` directory.
+
+Render from the repository root with:
+
+```bash
+quarto render validation/milestone1.qmd
+```
+
+## Purpose and completion criteria
+
+Assess whether the constant-rate mortality and fertility simulator reproduces
+the supplied demographic schedules adequately for milestone 1.
+
+**To complete:** specify the comparisons and acceptable differences before
+interpreting results. Distinguish systematic bias, variability between runs,
+and uncertainty in the estimated mean. Record any exploratory analyses.
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| ASFR | Output births / female exposure versus input rates | To specify |
+| TFR | Output versus input TFR over matched ages | To specify |
+| ASMR | Output deaths / exposure versus input rates, by sex | To specify |
+| Life expectancy | Output versus input-derived life table | To specify |
+| Birth spacing and accounting | Existing tests and checks on simulated histories | To specify |
+
+## Inputs and simulation design
+
+The starter settings below follow `inst/examples/milestone1_bootstrap.R`.
+They are editable analysis settings, not accepted accuracy thresholds.
+
+```{r}
+#| label: setup
+devtools::load_all("..", quiet = TRUE)
+library(dplyr)
+library(purrr)
+library(ggplot2)
+
+country <- "USA"
+rate_year <- 2000
+start_time <- 2000
+years <- 100
+end_time <- start_time + years
+population_size <- 100000
+max_age <- 100
+birth_interval <- 0.75
+population_seed <- 42
+replication_seeds <- seq_len(100)
+
+mortality_path <- file.path("data", "mortality-USA-2000.rds")
+fertility_path <- file.path("data", "fertility-USA-2000.rds")
+```
+
+### Prepare and preserve inputs
+
+Run this chunk manually once if needed. It remains disabled during rendering,
+even when execution is enabled for the rest of the report. Downloads require
+HMDHFDplus and configured HMD/HFD credentials. Save rate tables, not credentials.
+
+```{r}
+#| label: prepare-inputs
+#| eval: false
+dir.create("data", showWarnings = FALSE)
+saveRDS(get_mortality_hmd(country, rate_year), mortality_path)
+saveRDS(get_fertility_hfd(country, rate_year), fertility_path)
+```
+
+```{r}
+#| label: input-schedules
+mortality_rates <- readRDS(mortality_path)
+fertility_rates <- readRDS(fertility_path)
+
+attr(mortality_rates, "source")
+attr(fertility_rates, "source")
+tools::md5sum(c(mortality_path, fertility_path))
+
+input_tfr <- calculate_tfr(fertility_rates)
+input_life_table <- calculate_life_table(mortality_rates)
+input_life_expectancy <- input_life_table |>
+  filter(age_start == 0) |>
+  select(sex, ex)
+
+input_tfr
+input_life_expectancy
+```
+
+**To complete:** describe the source revision and retained fertility ages.
+HFD open-ended fertility rows are omitted, so the reference TFR excludes their
+contributions. Mortality central rates are interpreted as piecewise constant
+hazards; the reference life table uses that same interpretation.
+
+### Initialization and observation windows
+
+All replications below share one baseline population. They measure simulation
+variability conditional on that population. Baseline-generation variability
+would require a separate design.
+
+**To complete:** choose the burn-in/observation policy and explain treatment of
+the initial fertility transient. The baseline is not claimed to be stable or
+historically representative. Midpoint fertility compensation does not calibrate
+initial reproductive histories.
+
+```{r}
+#| label: construct-model
+set.seed(population_seed)
+population <- create_baseline_population(
+  population_size, max_age = max_age, end_time = start_time
+)
+model <- hammel_model() |>
+  set_population(population) |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates, birth_interval = birth_interval)
+
+fertility_time_breaks <- c(
+  seq(start_time, start_time + 9, 1),
+  seq(start_time + 10, end_time, 10)
+)
+mortality_time_breaks <- seq(start_time, end_time, 20)
+# Finite last breakpoints automatically gain an open interval.
+life_table_age_breaks <- 0:100
+mortality_age_breaks <- 0:110
+fertility_age_breaks <- sort(unique(c(
+  0, fertility_rates$age_start, fertility_rates$age_end
+)))
+```
+
+## Replications and demographic extraction
+
+```{r}
+#| label: run-replications
+results <- map(replication_seeds, function(seed) {
+  simulate(model, years = years, seed = seed)
+})
+names(results) <- as.character(replication_seeds)
+
+fertility_counts <- map(results, calculate_lexis_counts,
+  time_breaks = fertility_time_breaks,
+  age_breaks = fertility_age_breaks)
+mortality_counts <- map(results, calculate_lexis_counts,
+  time_breaks = mortality_time_breaks,
+  age_breaks = mortality_age_breaks)
+life_table_counts <- map(results, calculate_lexis_counts,
+  time_breaks = fertility_time_breaks,
+  age_breaks = life_table_age_breaks)
+
+tfr <- map(fertility_counts, calculate_tfr) |>
+  bind_rows(.id = "replication")
+asfr <- bind_rows(fertility_counts, .id = "replication") |>
+  filter(sex == "f")
+asmr <- bind_rows(mortality_counts, .id = "replication")
+life_expectancy <- map(life_table_counts, calculate_life_table) |>
+  bind_rows(.id = "replication") |>
+  filter(age_start == 0)
+```
+
+## Fertility results
+
+### Total fertility rate
+
+```{r}
+#| label: tfr-comparison
+# Add summaries and the TFR plot from the bootstrap script.
+# Report bias against input_tfr as well as variability across replications.
+```
+
+### Age-specific fertility rates
+
+```{r}
+#| label: asfr-comparison
+# Match input/output age_start and age_end before comparing rates.
+# Retain births and person_years for assessing sparse cells.
+```
+
+**Interpretation:** to complete. Identify persistent age-specific differences
+and any change after the initial observation period.
+
+## Mortality results
+
+### Age-specific mortality rates
+
+```{r}
+#| label: asmr-comparison
+# Add sex-specific ASMR summaries and plots against mortality_rates.
+# Report how many replications contribute to each age-period estimate.
+# Zero exposure gives NA; positive exposure with zero deaths gives zero.
+# Zero rates cannot be displayed on a logarithmic axis.
+```
+
+### Life expectancy
+
+```{r}
+#| label: life-expectancy-comparison
+# Add life-expectancy summaries and plots against input_life_expectancy.
+# Count missing, infinite, and finite estimates explicitly before summarizing.
+```
+
+**Interpretation:** to complete. The empirical life tables above use
+`[100, Inf)`, whereas the input schedule retains its original oldest-age bands.
+Document that difference; this comparison is descriptive until terminal-age
+handling is made comparable. Do not silently fill missing mortality rates.
+
+## Population growth and mechanism checks
+
+```{r}
+#| label: population-growth
+population_counts <- map(results, calculate_population_size,
+  times = seq(start_time, end_time, 10)) |>
+  bind_rows(.id = "replication")
+# Add the population-growth plot and any accounting/spacing checks.
+```
+
+**To complete:** reference the relevant testthat checks and their results.
+Population growth is a supporting diagnostic, not a substitute for rate checks.
+
+## Sensitivity cases
+
+| Case | Inputs/settings | Reason | Result |
+|---|---|---|---|
+| USA/2000 | Starter case above | Initial benchmark | To complete |
+| Higher fertility | To choose | Assess spacing compensation | To complete |
+| Five-year fertility bands | To specify | Assess midpoint approximation | To complete |
+| Alternative birth interval | To choose | Assess spacing sensitivity | To complete |
+
+## Conclusions and unresolved limitations
+
+**To complete:** state which criteria were met, which remain unresolved, and
+whether the evidence is sufficient for milestone 1. Separate measured findings
+from assumptions and proposed follow-up work.
+
+## Reproducibility record
+
+```{r}
+#| label: reproducibility
+system2("git", c("-C", "..", "rev-parse", "HEAD"), stdout = TRUE)
+system2("git", c("-C", "..", "status", "--short"), stdout = TRUE)
+sessionInfo()
+```
+
+Record the commit together with any uncommitted code changes used in the runs.
+For a completed report, preserve the input RDS files and seed/settings record
+alongside the rendered results or in a documented archive.
