@@ -1,3 +1,5 @@
+> Current timing update (D024): event execution is continuous, with no truncation or execution step. The monthly SOCSIM-style fertility compensation is retained separately. Earlier monthly-engine descriptions below are superseded where they concern execution. See the continuous-time scientific contract.
+
 # Hammel project brief
 
 Status: project direction recorded from the October 11, 2026 planning conversation and subsequent decisions. The first C++ mortality/fertility simulator is implemented and has completed a live-rate example. Scientific validation is in progress; the milestone's full demographic accuracy targets are not yet established.

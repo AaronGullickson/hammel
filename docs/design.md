@@ -1,3 +1,5 @@
+> Current timing update (D024): event execution is continuous, with no truncation or execution step. The monthly SOCSIM-style fertility compensation is retained separately. Earlier monthly-engine descriptions below are superseded where they concern execution. See the continuous-time scientific contract.
+
 # Design specification
 
 Status: initial proposal. The project direction in the brief is accepted; the architecture and API below are candidates requiring further specification.
@@ -86,6 +88,6 @@ The common operation is `set_process(model, process)`, using the name carried by
 
 ## First execution interface
 
-`simulate(model, years, seed = NULL, step_duration = 1/12, birth_interval = 0.75)` returns an updated `hammel_population`. Required model components are population, mortality, and fertility. The population's `end_time` supplies the starting time. C++ handles cumulative-hazard sampling, adjusted fertility schedules, a sparse event queue, and constant-time random selection from currently living males. R handles configuration, optional seed isolation, custom-column preservation, and result assembly. Engine state is local to each call.
+`simulate(model, years, seed = NULL, birth_interval = 0.75)` returns an updated `hammel_population`. Required model components are population, mortality, and fertility. The population's `end_time` supplies the starting time. C++ handles cumulative-hazard sampling, adjusted fertility schedules, a sparse event queue, and constant-time random selection from currently living males. R handles configuration, optional seed isolation, custom-column preservation, and result assembly. Engine state is local to each call.
 
 Public units remain years and person-year rates; only explicit defaults express the initial monthly increment and nine-month birth spacing. See the scientific contract for boundary, competition, coverage, and adjustment details. The example in `inst/examples/milestone1.R` runs 50,000 initial persons for 100 years with downloaded constant USA/2000 rates. Scientific accuracy beyond the initial analytical checks remains to be assessed.
