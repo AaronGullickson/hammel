@@ -1,341 +1,270 @@
-> Current timing and fertility update (D024/D028): events execute continuously. Fertility compensation evaluates the input-rate integral at each original age band's midpoint, then uses the shared constant-hazard sampler. Earlier monthly and exact age-varying compensation descriptions are historical and superseded.
-
 # Scientific contract
 
-## Database rate helpers
-
-Under D025, `get_mortality_hmd()` and `get_fertility_hfd()` download and prepare validated rate tibbles, without constructing a model or attaching a process. Mortality columns are `sex`, `age_start`, `age_end`, and `rate`; fertility columns are `age_start`, `age_end`, and `rate`. Store provenance in the `source` attribute, preserved by RDS and copied into processes by the ordinary constructors. For example, HMD male rate 0.02 at age 0 becomes `sex = "m", age_start = 0, age_end = 1, rate = 0.02`; HFD ASFR 0.01 at age 13 becomes `[13, 14)` with rate 0.01. Saving and reloading the returned table must reproduce rates and metadata exactly; attaching the reloaded rates to multiple models must perform no downloads. No implicit disk writes or automatic cache refresh occurs. Existing missing-rate, year-selection, age, and unit checks remain in force.
-
-Download one population and explicitly selected year for a constant schedule; do not silently select the latest year or average rates. HMD uses `Mx_1x1`, retaining male and female central rates per person-year under the accepted hazard interpretation. Request raw age labels using `fixup = FALSE`, while respecting HMD OpenInterval flags because HMDHFDplus 2.0.8 still parses its web output; closed single-year ages map to `[age, age + 1)` and an upper open HMD age maps to `[age, Inf)`. Do not drop missing rates or fill gaps. Retain database, population code, year, product, retrieval timestamp, and reader version, without credentials.
-
-HMDHFDplus is optional and required only for download helpers. Verify conversions with synthetic data and the package's local readers; authenticated web requests require user credentials and are not part of ordinary tests. Source interfaces were checked against HMDHFDplus 2.0.8. HFD uses `asfrRR`, retaining total ASFR in births per woman-year without scaling. At the user's direction, omit open-age rows (`12-`, `55+`) and map closed ages to one-year bands. The retained-age TFR excludes endpoint contributions; do not claim full HFD TFR agreement. No fertility rates are inferred outside the retained age range. An optional HFD revision date is passed to the reader and recorded as requested; NULL means the current revision was requested, not that a specific revision has been pinned.
-
-References: [HMDHFDplus source](https://github.com/timriffe/HMDHFDplus), [HFD FAQ](https://www.humanfertility.org/Project/FAQ), and [HFD basic indicator methods](https://www.demogr.mpg.de/papers/technicalreports/tr-2011-001.pdf).
-
-## Baseline population generator
-
-`create_baseline_population(size, max_age = 70, end_time = 0, female_probability = 0.5)` creates a simple starter population inspired by the user's SOCSIM initialization example. All persons are alive at `end_time`, have IDs `1` through `size`, unknown parents, and no unions. Sex is independently sampled with probability `female_probability` of label `"f"` (female), otherwise `"m"` (male); this does not enforce an exact sex balance.
-
-Ages are independently uniform on `[0, max_age]` years and birth times are `end_time - age`. Unlike the example's integer-month birth dates, the generator uses continuous year-valued ages, with no hard-coded increment or rounding. `max_age = 0` produces persons born at the reference time. An empty population is permitted with `size = 0`. Size must be a nonnegative whole number representable as an R integer, maximum age must be finite and nonnegative, the reference time must be finite, and the sex probability must lie in `[0, 1]`.
-
-The generator uses R's current RNG state. `set.seed()` makes generation reproducible; generation advances that state normally. It does not set or restore the user's seed itself.
-
-For example, `size = 3`, `max_age = 0`, `end_time = 2000`, and `female_probability = 1` gives IDs 1–3, sex label `"f"`, birth times 2000, missing death and parent fields, and an empty union table. Validation includes this known-answer case, reproducibility, empty populations, bounds, schema consistency, and distribution checks on a fixed-seed sample.
-
-This population is not claimed to be stable, stationary, or representative of a real population. Burn-in and realistic initial age or kinship structures require separate specifications. Parameter defaults follow the user's example (maximum age around 70 and equal-probability sexes); the continuous-year sampling is an explicit simplification for this helper.
-
-## Output reused as input
-
-D010 requires that a result can initialize further simulation. The eventual contract must specify endpoint time, the living population at that endpoint, retention of dead persons and past unions, unique ID allocation, and continuity of dates and relationships. Validate that subsequent births and unions refer to valid persons and do not reuse existing IDs, and that deceased persons do not become eligible for future events.
-
-Exact fixed-seed equality between split and uninterrupted runs is not yet a requirement. Define restart RNG and pending-event behavior before making such a claim. Existing demographic histories must remain available for initialization even if a particular output observation window is restricted.
-
-Status: the first mortality/fertility engine is specified below; richer mechanisms and full demographic validation remain to be developed.
-
-## General requirements
-
-Every consequential mechanism needs a plain-language definition and worked examples before implementation. Explicitly distinguish hazards, probabilities, and central rates. State units, interval definitions, conversions, and interpolation assumptions. Do not apply a conversion merely because it is conventional: identify the assumptions that make it valid.
-
-Specifications must define eligibility, event timing, competing-event semantics, state transitions, and consequences for other pending events. Record intentional differences from SOCSIM and their scientific implications.
-
-## Mechanism specification template
-
-Use this structure for each proposed mechanism:
-
-1. **Status and scope:** proposed or accepted; behavior covered and excluded.
-2. **Inputs:** schema, units, valid ranges, missing-value policy, and provenance.
-3. **Eligibility:** population at risk and dependence on age, history, relationships, or attributes.
-4. **Timing:** rate or probability interpretation, scheduling, interval boundaries, ties, and competition.
-5. **Transition:** person and relationship changes; dependent events invalidated or rescheduled.
-6. **Observations:** emitted events, recorded attributes, and snapshot consequences.
-7. **Worked examples:** ordinary cases and boundary cases with expected outcomes.
-8. **Validation:** analytical expectations, accounting and relationship invariants, and reference comparisons.
-9. **Open questions:** decisions needed from the user before dependent implementation.
-
-## Foundation requiring specification
-
-The accepted first milestone is a population simulation with fertility and mortality rates constant over calendar time, basic partnerships for assigning parents, and demographic validation of the outputs. Rates may vary with age; their exact representation remains open. Implementing mortality first is a possible incremental step, not the full milestone.
-
-Before implementation, resolve input requirements, time semantics, rate interpretation, competing events, observation timing, and RNG behavior. Fertility requires explicit eligibility, newborn initialization, and parenthood rules. Specify a minimal partnership mechanism, including age eligibility, pairing constraints, what happens when no partner is available, and consequences of a partner's death. Random pairing after a minimum age is a candidate, not a settled rule.
-
-## First milestone demographic checks
-
-These are validation requirements; the estimators, reference cases, run sizes, and numerical acceptance thresholds still need specification.
-
-- **Fertility:** record births and exposure by the age of the person giving birth. Estimate age-specific fertility rates using the same denominator and age intervals as the target inputs. Calculate TFR by summing age-specific fertility rates times their interval widths, with consistent units.
-- **Fertility eligibility:** distinguish population-based fertility rates from rates conditional on partnership or another eligibility criterion. Applying population-based rates only to partnered people generally changes the resulting population TFR. Resolve this explicitly before implementing the partnership–fertility interaction.
-- **Mortality:** record deaths and person-time exposure by age, estimate the corresponding age-specific death rates, and construct life tables using a documented method consistent with the input interpretation. Compare survival and life expectancy with reference quantities derived from those inputs. Do not equate a central death rate, hazard, and interval death probability without the required assumptions.
-- **Population structure:** constant input rates do not imply an immediately stationary or stable population. Distinguish period measures from cohort measures and specify initialization, observation windows, and any burn-in. Raw birth or death counts depend on population composition and are not sufficient rate checks.
-- **Sampling uncertainty:** predefine replication strategy and statistical criteria. Simulated TFR and life-table estimates fluctuate; deterministic equality to inputs is not an appropriate general acceptance rule. Specify treatment of sparse ages, zero exposure, incomplete cohorts, and the oldest age interval.
-- **Mechanism checks:** verify birth and death accounting, parent identities, partnership consistency, and eligibility at event time. Include known-answer mortality and fertility cases alongside combined population simulations so failures can be localized.
-
-## Validation principles
-
-- Derive checks from the scientific specification, rather than reproducing implementation logic.
-- Use analytical cases with known answers, including deterministic boundary cases where applicable.
-- Check population accounting: for a closed population, living population changes equal births minus deaths. Extend the identity explicitly when migration or other entry and exit mechanisms are introduced.
-- Check valid event dates, person identities, and relationship consistency under the chosen model.
-- Verify reproducibility under the declared seed contract and independence between simulations.
-- Compare demographic outcomes against a pinned SOCSIM reference over multiple replications when relevant. Define comparison measures and acceptance criteria before interpreting results.
-- Require exact fixed-seed comparisons only when algorithms and random-number consumption are intentionally preserved. For changed algorithms, use statistical comparisons with justified uncertainty and tolerances.
-
-Passing software checks does not establish research readiness. Before research use, seek targeted review of scheduling, RNG handling, and the R/native boundary by an experienced simulation developer, alongside demographic review.
-
-## Monthly time decision
-
-The first milestone uses a monthly simulation increment, following SOCSIM's convention, with its duration explicitly configured as `dt = 1/12` years. Record times and durations in years and exposure in person-years. Do not hard-code month assumptions in demographic algorithms or output schemas. Other increments are a longer-term feature, but time handling must be isolated from the outset. Age and event-date conventions, exposure accounting, within-month ordering, and conversion of input rates to monthly event probabilities or schedules still require specification. A monthly time unit does not imply simply dividing annual probabilities by twelve.
-
-## Person-year input convention
-
-Accepted inputs include age-specific fertility and mortality rates expressed as events per person-year. Convert their exposure units internally: a rate of 0.12 events per person-year is 0.01 events per person-month. This is a unit conversion, not a statement that the monthly event probability is 0.01.
-
-For example, if the input represents a constant mortality hazard of 0.12 per year, the one-month death probability is `1 - exp(-0.12 / 12)`, approximately 0.00995. A central death rate requires a stated relationship to the underlying mortality model; an annual death probability requires a different conversion. These interpretations must be specified before implementation.
-
-For fertility, define whether the denominator is all women or an eligible subset, and how birth events are generated from the converted rate. Validate rates by dividing event counts by exposure in the corresponding units. Include a unit-consistency check: annualized monthly rates equal the original person-year rates, and equivalent exposure units produce equivalent estimates.
-
-## Accepted rate-to-probability direction
-
-Derive a single-process event probability as `1 - exp(-rate * dt)`, with time units matching the rate denominator. Person-year rates use `dt = 1/12` for a month. This assumes a constant hazard over the span; the numerically stable implementation is `-expm1(-rate * dt)`.
-
-The intended mortality model interprets supplied rates as piecewise constant hazards. When users supply empirical central death rates (`nmx`), interpreting them as hazards is an explicit modeling assumption, not a universal life-table identity. Derive validation expectations consistently with this assumption and identify any differences from conventional life-table conversions. Boundary-crossing rules remain open.
-
-This decision resolves the earlier open single-process conversion direction. It does not specify competition between processes, fertility eligibility or birth spacing, or within-month event ordering. For repeatable events, the probability of at least one event and the expected event count are distinct quantities; fertility event generation still needs its own specification.
-
-## Accepted hazard-scale waiting-time direction
-
-See [how waiting-time sampling works](waiting-time-sampling.md) for a plain-language explanation, a worked example, and the mathematical connection to SOCSIM.
-
-Sample candidate event times directly using cumulative hazard under piecewise constant hazards:
-
-1. Draw `U` uniformly on `(0, 1)` and set the positive threshold `E = -log(U)`.
-2. For the remaining duration `d` in the current age band, calculate `h = rate * d`, using matching rate and time units.
-3. If `E > h`, subtract `h` from `E` and continue into the next band with its rate.
-4. Otherwise, for a positive rate, the event lies `E / rate` time units into the current band.
-
-A zero-rate band contributes no hazard and is crossed without dividing by zero. If the specified future schedule never accumulates enough hazard, no event occurs within that schedule; do not invent a terminal event. Exact boundary assignment and terminal-age policy still require specification.
-
-For person-year rates, durations are in years and a month contributes `rate / 12`. Survival across bands is `exp(-sum(rate * duration))`. This is equivalent to accumulating `log(1 - p)` when `p = 1 - exp(-rate * duration)`, without a probability conversion round trip. The known future age schedule is incorporated at sampling time, so crossing an age band alone does not require a new random draw.
-
-Worked example: the current rate is 0.12 per year for two remaining months, then 0.24 per year. With threshold `E = 0.05`, the first band contributes `0.12 * 2/12 = 0.02`. The remaining threshold is 0.03, reached after `0.03 / 0.24 = 0.125` years (1.5 months) in the next band. The candidate continuous waiting time is 3.5 months. Under D008, truncate 3.5 months to an offset of 3 simulation months.
-
-Validate constant-hazard survival analytically and test piecewise schedules against `exp(-sum(rate * duration))`, including zero-rate bands and events on either side of an age boundary. D008 specifies monthly truncation and candidate tie priority; their boundary cases need worked examples and validation. Other competing-event behavior remains open.
-
-## Accepted monthly truncation and candidate ties
-
-Under D008, truncate nonnegative waiting times in months to integer offsets, with offset zero indicating the current month. Retain one next event per person. Equal-month candidates are prioritized as death, birth, partnership formation, then partnership dissolution. Compare the truncated dates, not fractional times. This is a per-person selection rule; execution order across people and resampling after events remain open.
-
-Worked example: birth at offset 2.1 months and death at offset 2.9 months both map to offset 2; death wins. Birth at 1.9 months and death at 2.1 months map to offsets 1 and 2; birth wins. Candidate offsets below one month map to the current month. Test exact integer boundaries and age-band boundaries explicitly, along with these tie cases. Document differences from continuous-time event competition in demographic validation.
-
-## Time-unit independence requirement
-
-Canonical public time and duration units are years; exposure is recorded in person-years and rate inputs are per person-year. The first milestone's step duration is `dt = 1/12` years. Algorithms must consume the configured step duration rather than assume twelve steps per year. Integer scheduling indices, if used, are generic step indices.
-
-D008's truncation is expressed generally as `step_offset = floor(waiting_time_years / dt)`; its corresponding public duration is `step_offset * dt` years. This preserves the accepted monthly behavior when `dt = 1/12`, without encoding months throughout the engine. Equal-step candidates follow the accepted tie priority. Numerical boundary policy remains to be specified.
-
-Age boundaries and exposure accumulation must use elapsed years. Observation frequency must be explicitly expressed or converted in the time-handling layer. Validate unit consistency and review for scattered month constants; support for additional increments need not be implemented in the first milestone.
-
-## Initial process specification objects
-
-`mortality(rates)` and `fertility(rates)` construct inspectable `hammel_process` specifications without executing events. Both require nonempty data frames with `age_start`, `age_end`, and `rate`. Ages use years and half-open intervals `[age_start, age_end)`; starts must be finite and nonnegative, ends must be greater than starts. Ends may be positive infinity for mortality; fertility ends must be finite under D028. Rates must be finite and nonnegative, per person-year. Mortality also requires character `sex` labels and separate schedules for both `m` and `f`.
-
-Reject overlapping intervals within each schedule, including duplicate and nested bands; adjacent bands are valid. Preserve input order and custom columns. Do not infer rates outside supplied intervals or fill gaps; coverage must be resolved before simulation. Reject `time_start` or `time_end` columns in this initial implementation to avoid pretending to support calendar-varying rates. The schedule interface is intended to gain that dimension later.
-
-`set_process(model, process)` stores a process under its own name, replacing an existing process with that name and preserving others. `set_mortality(model, rates)` and `set_fertility(model, rates)` construct the appropriate object and delegate to that setter. Objects contain `name`, `rates`, and `rate_unit = "person_year"`, with a process-specific subclass and `hammel_process` as their common class. Validate built-in schedules again when attaching objects so edited invalid specifications cannot bypass checks.
-
-Known structural cases include adjacent age bands (accepted), overlapping bands (rejected), identical age bands across different sexes (accepted), and rates of zero or greater than one (accepted: these are rates, not probabilities). These constructors do not resolve fertility eligibility, population versus eligible-person denominators, competing-event execution, or state transitions.
-
-## Historical first executable simulator contract (superseded by D024/D026/D027)
-
-Current user-authorized scope: mortality and fertility with all living females at risk under the age-specific population fertility schedule, random male parentage at each birth, and no new unions. Use C++ for scheduling and event execution with R setup and inspectable population output. The initial setup check requires a population plus mortality and fertility processes. Additional custom process execution is not supported yet.
-
-`simulate(model, years, seed = NULL, step_duration = 1/12, birth_interval = 0.75)` advances from the population's finite `end_time`. Public units are years. Duration and minimum birth interval must be whole multiples of the explicitly configured step duration. Process a half-open run interval `[start, start + years)`; events are assigned to step starts by flooring candidate waiting times in step units. Equal-step death and birth candidates select death. Within a step, select pending persons randomly and execute sequentially, resampling a mother and newborn after birth. Minimum spacing prevents repeated maternal births within the same step when positive. Known age-specific changes are included at scheduling time.
-
-Mortality covers `[0, Inf)` separately for each sex, without gaps. Fertility outside supplied bands is zero. No maximum age forces death. A zero hazard can yield no future event. Histories supply the last recorded maternal birth for spacing on restart. New IDs exceed all supplied IDs; dead persons remain dead. Every birth chooses uniformly from all currently living males, with no minimum age or kinship exclusions in this deliberately basic version; if none exist, father ID is NA and birth still occurs. Newborn sex has equal probabilities. No unions are formed; existing ongoing unions close when a partner dies.
-
-Birth-spacing adjustment follows the audited SOCSIM method, generalized to configured steps. For age step `k`, average the supplied annual rate over that age interval to obtain `f_k`, then form `q_k = 1 - exp(-f_k * dt)`. With spacing of `B` steps, estimate eligibility as `e_k = 1 - sum(q_j)` over the preceding `B` age steps. The eligible annual hazard is `f_k / e_k`. Reject nonpositive eligibility estimates instead of clamping them. Zero spacing leaves rates unchanged. Construct this schedule once to cover ages reachable during the run, not using a fixed maximum age or a month constant.
-
-This is SOCSIM's approximate population-rate compensation, not an exact guarantee of observed ASFRs. Averaging into step-sized age bands is explicit, while mortality retains its supplied bands. Initially unknown maternal histories mean everyone with no recorded birth is treated as eligible; initialization transients and age-structured validation require burn-in. Integer truncation, tie priority, birth spacing, and approximate adjustment can cause departures from input rates, which must be quantified before research use. Fertility event dates can precede the underlying continuous candidate by less than one step, including near age boundaries.
-
-An explicit seed controls R's RNG for this call and restores the caller's RNG state afterward; without a seed, use and advance the current RNG. Each run owns its state; restarting resamples pending candidates and is not an exact checkpoint. Preserve original custom columns for existing persons; newborn custom attributes are missing, pending a user-defined initialization interface.
-
-Validation: analytical constant and piecewise mortality survival, known threshold waiting times, death-before-birth ties, spacing between every mother's recorded births, father availability, unique IDs, population accounting, restart and input immutability, fixed-seed reproducibility, zero-risk and empty-population runs. Test constant fertility after burn-in against the renewal expectation induced by adjusted hazards and integer truncation, separately from eventual full ASFR/TFR and life-table accuracy checks.
-
-## Demographic extraction contract
-
-Accept a `hammel_population` or a persons data frame for one independent history. IDs must be unique within that history; analyze stacked simulations separately. No user-supplied grouping interface is implemented. For populations, require a known endpoint and do not allow observation beyond it. For bare data frames, the caller must ensure complete history through the requested finite observation endpoint; missing death is treated as censored there. Do not pool replicated person IDs implicitly.
-
-`calculate_lexis_counts()` uses explicit increasing `time_breaks` and `age_breaks`, returning person-years, deaths, births, ASMR, and ASFR for each period, sex, and age band. Births and ASFR are NA for males. Calendar intervals and age intervals are half-open. Exposures are exact overlaps of `[birth_time, death_time)` with each period and each person's age band, censored at the observation endpoint. No monthly assumptions, integer-year loops, or birthday rounding are used. Zero-duration lives contribute zero exposure, although recorded deaths remain events. Retain zero-count/zero-exposure cells; rates with zero exposure are NA, not zero or infinity. Exposures use recorded event times; the engine's step-start truncation can therefore affect estimated central rates.
-
-Mortality counts deaths by period, age at death, and sex, then divides by person-years. Fertility counts each child's birth once using the mother's age at that birth, then divides by all female person-years in that band, including postpartum exposure. Unknown maternal IDs cannot yield age-specific birth counts; report their counts in an `unassigned_births` attribute by period. Do not substitute father's age or discard female exposure during birth spacing.
-
-`calculate_tfr()` takes the fertility-rate table and sums `asfr * (age_end - age_start)` within each period, automatically selecting female rows when sex is present. An optional `age_range` selects complete bands from a summary that also contains an open mortality interval. Require finite contiguous age bands. Missing rates yield missing TFR rather than omitting bands. The selected age range is explicit; it is not necessarily full HFD TFR. No factor of five is assumed.
-
-`calculate_life_table()` takes a mortality-rate table (or a standard rate schedule with `rate`) and constructs a period life table independently by sex and period. Require contiguous age bands starting at zero and a final explicitly open interval (`age_end = Inf`); do not silently turn a finite final age into an open band. Interpret central rates as piecewise constant hazards, consistent with the engine; this differs from conventional HMD infant adjustments. For finite width n and rate m, q = 1 - exp(-m*n), survival propagates from the selected radix, and L = l*(1-exp(-m*n))/m. At m=0 use L=l*n. Compute T as reverse cumulative L, and e=T/l, not simply T. Include ax derived consistently from the same hazard model.
-
-For a positive terminal rate, q=1, L=l/m, and ax=1/m. A zero terminal rate represents immortality: q=0, and L and remaining life expectancy are infinite if survival to that band is positive. Missing rates propagate uncertainty rather than being filled with zero; zero survivorship has undefined e (NA). Use stable small-rate calculations. These are period synthetic-cohort tables, not empirical cohort follow-up estimates.
-
-Validation uses known fractional overlaps, birthdays inside periods, event/boundary inclusion, unknown mothers, zero exposure and empty populations, rejection of duplicate IDs, unequal-width TFR, and constant-hazard life tables with e=1/m at every age. Test zero and missing rates and explicit open-interval requirements. The user's SOCSIM analysis code informs the workflow, but interval arithmetic and life-table computation are implemented for Hammel's year-based schema.
-
-Age-break clarification: `calculate_lexis_counts()` appends Inf when age breaks end at a finite value, creating an open band starting at that last breakpoint. Existing explicit Inf breaks are unchanged. This includes exposures and deaths above that age rather than discarding them. Life tables from manually supplied rates must still identify an actual open interval; no terminal rate is fabricated.
-
-TFR clarification: `calculate_tfr()` no longer takes `age_range`. Select female rows when sex is present, omit rows with infinite `age_end`, and sum ASFR times width across the remaining finite contiguous age bands for each period. Missing ASFRs in retained bands still produce NA. Report the actual finite range used.
-
-TFR missing-value clarification: at the user's direction, sum ASFR times interval width with `na.rm = TRUE`, omitting missing ASFR contributions. An all-missing set of retained bands therefore sums to zero, following R's sum semantics. Missing mortality-rate handling in life tables is unchanged.
-
-## Continuous-time execution (D024)
-
-Supersedes step-start truncation and random within-step execution above. Public times remain years. Sample continuous mortality and fertility candidates by cumulative-hazard inversion and execute the earliest candidate chronologically, without flooring or rounding. Keep one next event per person; exact equal-time candidates for a person select death. Across persons, exact ties execute in insertion order (initial population row order, then newborn before mother when rescheduling). This deterministic fallback consumes no additional random draws. No execution step or annual batching exists.
-
-Run boundaries remain half-open `[start, start + years)`; any finite nonnegative duration is allowed. After a birth at time `t`, maternal fertility sampling starts at `max(now, t + birth_interval)`, while mortality remains active throughout spacing. Newborns enter risk immediately. Events update father availability immediately. Restart behavior remains resampling rather than exact checkpoint continuation.
-
-D028 now uses midpoint fertility compensation and the shared constant-hazard sampler, superseding D027's exact age-varying hazard. Birth spacing accepts any finite nonnegative duration in years. See the midpoint specification below.
-
-Examples: a birth candidate at 0.02 years precedes a death candidate at 0.06 years, even though both lie in the first month. A birth at 1.03 with spacing 0.75 makes fertility eligible at 1.78, without rounding; mortality may occur before then. A candidate exactly at the endpoint is excluded. Constant adjusted hazard `h` with spacing `b` has long-run renewal rate `1 / (b + 1/h)`, unlike the previous truncated-wait expectation.
-
-Validation: exact sampled mortality dates against R exponential draws, chronological competing events within a former monthly bin, continuous birth spacing and restart spacing, half-open boundaries, constant-hazard survival, renewal expectation, accounting, reproducibility, and father availability at recorded birth times. Full age-specific demographic validation remains outstanding.
-
-## Fertility process birth spacing (D026)
-
-`fertility(rates, birth_interval = 0.75)` stores minimum maternal birth-to-birth
-spacing in years as part of the process. `set_fertility(model, rates,
-birth_interval = 0.75)` provides the same configuration. `simulate(model, years,
-seed = NULL)` reads this setting from the attached fertility process; it has
-no birth-spacing argument. Validate spacing at construction, attachment, and
-execution, including edited specifications. Missing settings are rejected.
-
-Birth spacing is one nonnegative finite scalar in years, shared across mothers.
-D027 removes the earlier whole-month restriction.
-Zero disables spacing and compensation. Recorded maternal histories enforce
-spacing on restart; D028 specifies midpoint compensation with continuous execution.
-For example, a process with `birth_interval = 1.5` and a recorded birth at
-1.03 permits the next birth no earlier than 2.53. Default spacing remains
-0.75 years. Run metadata records the value actually used. Replacing the
-fertility process replaces its spacing along with its rates.
-
-Validation covers constructor and setter equivalence, invalid and edited
-settings, nondefault spacing through execution and restart, zero-spacing
-chronological sampling, and the existing default renewal expectation.
-
-
-## Historical exact continuous fertility compensation (D027, superseded by D028)
-
-Accepted October 13, 2026: replace the monthly SOCSIM-style compensation with
-continuous birth-spacing compensation. Let f(a) be the supplied population
-ASFR in births per woman-year, zero outside supplied bands, and b the minimum
-birth-to-birth interval in years. Define
-
-    e(a) = 1 - integral from max(0, a-b) to a of f(u) du
-    h(a) = f(a) / e(a).
-
-This is a fixed age-specific eligible birth hazard, computed once per run from
-the input schedule. It does not estimate eligibility from simulated women or
-adjust for initialization. Unknown maternal histories still imply eligibility;
-recorded histories still determine each mother's next eligible time. Users
-choose burn-in/observation windows; no automatic burn-in or history fabrication.
-Any finite nonnegative birth interval is allowed, with default 0.75 years.
-Zero spacing gives the original hazard. Reject a schedule whose window integral
-reaches or exceeds one anywhere, rather than clipping eligibility. Validate
-feasibility when building the execution schedule, across its full age domain.
-
-The eligibility identity assumes cohorts have experienced the target schedule
-through the preceding window. With age-only mortality shared by eligible and
-excluded women, survival cancels between recent births and living female
-exposure. Fertility-dependent mortality, heterogeneity, unions, and
-calendar-varying rates require a separate treatment. This formula does not
-promise immediate ASFR agreement from arbitrary initial histories.
-
-For piecewise constant input rates, eligibility is piecewise linear, with
-breaks at input boundaries and those boundaries shifted by b. Within a segment
-starting at age A, let r=f(A), e0=e(A), and s=f(A-b)-f(A). Then
-
-    e(A+x) = e0 + s*x
-    H(x) = r*x/e0                        if s=0
-    H(x) = (r/s)*log1p(s*x/e0)            otherwise.
-
-Consume an Exp(1) threshold across segments. Within the event segment invert
-H analytically: x=E*e0/r for s=0, otherwise
-x=(e0/s)*expm1(s*E/r). Zero-rate gaps consume no threshold. Use half-open
-input bands and stable log1p/expm1 evaluation; no age grid, averaging into
-months, or numerical time step remains. This is an intentional departure
-from audited SOCSIM compensation; no source code is copied.
-
-Worked cases and validation:
-
-- Constant f=0.2, b=0.75 after the entry window: e=0.85, h=0.2/0.85;
-  mean birth interval b+1/h=5 years, giving long-run rate exactly 0.2.
-- Fertility begins at age 15 with f=0.2: for 15 <= a < 15.75,
-  e(a)=1-0.2*(a-15); thereafter e=0.85 until the next input boundary.
-  From age 15 a threshold E=0.1 is reached after
-  (1-exp(-0.1))/0.2 years, without monthly rounding.
-- A rate change 0.2 to 0.4 at age 16 has e(16)=0.85 and slope -0.2
-  for the next 0.75 years. Boundary and partial-window integrals must agree
-  with independent numerical integration, including gaps and open tails.
-- A zero schedule gives no births. f*b >= 1 on a sufficiently long constant
-  band is rejected; b=0 permits an otherwise high finite hazard.
-- Check arbitrary fractional spacing, restart spacing, reproducibility, exact
-  deterministic waiting times, near-constant segments, and constant-rate
-  recovery after burn-in with and without independent mortality.
-
-Supersedes the monthly compensation and whole-month spacing restrictions in
-D019/D024/D026 and earlier sections. Event competition and output semantics
-are unchanged. General age-specific demographic validation remains ongoing.
-
-## Midpoint fertility compensation (D028)
-
-Accepted October 13, 2026: preserve each original finite fertility age band and
-replace its rate by one constant eligible hazard calculated at its midpoint.
-For band [L,U), midpoint m=L+(U-L)/2, input ASFR f, and spacing b (years), use
-
-    e_mid = 1 - integral from max(0,m-b) to m of input ASFR(u) du
-    adjusted_rate = f / e_mid.
-
-The integral uses the unadjusted input schedule and exact duration overlaps,
-including portions of earlier bands; uncovered ages contribute zero. No shifted
-boundaries, monthly grid, FertilityBand type, or fertility-specific waiting-time
-sampler is needed. Mortality and adjusted fertility share Band and waiting_time.
-The adjustment is computed once per simulate() call. Original band endpoints,
-continuous event execution, the 0.75-year default, arbitrary finite nonnegative
-spacing, and recorded-history spacing/restarts remain unchanged. Zero spacing
-returns the original schedule. Nonpositive midpoint eligibility is rejected,
-not clipped. This checks the midpoint approximation, rather than checking the
-full age-varying eligibility curve used in D027.
-
-Initialization is unchanged and no transient correction is introduced. This
-is an approximation to D027: it need not reproduce input ASFR/TFR exactly,
-even after burn-in. Error depends on rate changes and band width. Empirical
-accuracy must be assessed separately from algorithmic correctness.
-
-Worked examples: with b=0.75, midpoint 25.5, ASFR 0.1 on [24,25) and 0.2 on
-[25,26), excluded fraction = 0.25*0.1 + 0.5*0.2 = 0.125; eligible fraction
-=0.875, and the adjusted rate for [25,26) is 0.2/0.875. If the preceding
-window lies wholly in a constant-rate band, adjustment is f/(1-b*f), with
-long-run renewal rate f away from age boundaries. A longer window may cross
-multiple bands and gaps; all overlaps must be included without using already
-adjusted rates. At the user's direction, all open-ended fertility input bands are rejected,
-including zero rates and zero-spacing schedules. Mortality retains its
-open-ended terminal band.
-
-Validation: exact weighted-overlap examples on annual and five-year bands,
-multiple-band/gap windows, preserved boundaries, shared waiting-time sampling,
-nonpositive midpoint eligibility, constant-rate recovery after burn-in,
-independent mortality, and fractional spacing/restarts. Remove D027 tests that
-assert exact age-varying hazard behavior. Supersedes D027's exact integration
-and inversion requirements, while retaining its year units and initialization.
-
-## Deferred issue: fertility compensation when rates change between runs
-
-Noted October 13, 2026; the user requested documentation only and deferred
-a correction. Users can reuse a population in successive runs and replace
-fertility rates at the boundaries. Recorded maternal births continue to enforce
-spacing, but each run's midpoint compensation is calculated solely from its
-current input schedule. It does not account for the previous schedule's role
-in producing women still within their exclusion interval. Realized fertility
-can therefore temporarily differ from the new target ASFR. Magnitude and
-duration have not been quantified; no convergence deadline is guaranteed.
-
-A possible future treatment would retain recent schedules and their effective
-dates, integrating fertility along age and calendar time through the preceding
-birth interval. This would require a transition adjustment that varies with
-time, or an explicit approximation compatible with the shared sampler. This
-is a proposal, not an accepted algorithm or authorization to implement it.
-For now, no schedule history or transient correction is added.
+Updated October 13, 2026. This is the current mortality/fertility contract,
+reflecting D019, D024, D025, D026, and D028. Earlier monthly and exact
+age-varying compensation specifications are available in Git history; the
+[decision log](decisions.md) records their replacement. Acceptance
+of a model assumption is distinct from evidence of demographic accuracy.
+
+## Units and inputs
+
+Public dates, ages, and durations are numeric years; rates are events per
+person-year and exposure is person-years. The user supplies the time origin.
+Execution is continuous: there is no month index, configurable execution step,
+time truncation, or rounding to birthdays.
+
+Rate tables contain `age_start`, `age_end`, and `rate`. Mortality also contains
+`sex`, with separate `"m"` and `"f"` schedules. Intervals are half-open
+`[age_start, age_end)`. Starts must be finite and nonnegative; ends must exceed
+starts. Rates must be finite and nonnegative, and may exceed one because they
+are rates rather than probabilities. Overlapping bands, duplicate bands, and
+calendar columns `time_start`/`time_end` are rejected. Constructors preserve
+input order and extra columns; native scheduling sorts its own copy.
+
+| Rule | Mortality | Fertility |
+| --- | --- | --- |
+| Input interpretation | Piecewise constant age/sex hazard | Population ASFR, births per woman-year |
+| Denominator for output rates | Living person-years by age/sex | All female person-years, including excluded time |
+| Open-ended input band | Allowed; required at execution | Rejected, even with zero rates/spacing |
+| Coverage at execution | `[0, Inf)` for each sex, with no gaps | Zero outside supplied finite bands, including gaps |
+| Additional setting | None | `birth_interval`, finite nonnegative scalar years; default 0.75 |
+
+Mortality constructors validate structure without requiring full coverage;
+`simulate()` checks complete schedules. Specifying and attaching processes does
+not execute a simulation. Edited built-in specifications are revalidated at
+attachment and execution. Feasibility of fertility compensation is checked
+when building the native execution schedule for a positive-duration run.
+
+Treating empirical mortality central rates `mx` as hazards is an explicit
+assumption. It is not a universal identity, particularly for infant mortality.
+For a constant hazard `h` and elapsed years `d`, the event probability is
+`1 - exp(-h*d)`; multiplying a rate by duration gives cumulative hazard,
+not a probability. There is no requirement to convert to monthly units.
+
+## Initialization and population history
+
+The [population schema](population-schema.md) specifies required fields and
+structural validation. `end_time` is the population reference time and supplies
+the next simulation start. Persons born by that time with missing `death_time`
+are alive; deceased persons remain in the history and never re-enter risk.
+
+`create_baseline_population(size, max_age = 70, end_time = 0,
+female_probability = 0.5)` generates independent uniform ages in continuous
+years and independent sex assignments. Everyone is alive, parents are unknown,
+and unions are empty. IDs are `1:size`; size zero is permitted. Size must be a
+nonnegative integer within R's integer range; maximum age is finite and
+nonnegative; the sex probability is in `[0,1]`. The generator advances R's
+current RNG state; use `set.seed()` for reproducibility.
+
+This baseline is not claimed to be historically representative, stable, or
+stationary. A mother with no recorded birth starts eligible for fertility;
+that does not establish that she truly had no previous children. For supplied
+histories and restarts, recover the latest recorded maternal birth, including
+children who have died. No initial histories are fabricated.
+
+## Shared waiting-time sampling
+
+The engine draws a positive threshold `E` from R's `Exp(1)` generator,
+equivalent in distribution to `-log(U)` for a uniform `U` in `(0,1)`.
+It consumes `rate * duration` across age bands. If a band reaches the remaining
+threshold, the additional within-band wait is `remaining_threshold / rate`.
+Zero-rate bands and uncovered fertility gaps consume time without consuming
+threshold. If the schedule never reaches the threshold, no future event is
+scheduled; no maximum age forces death.
+
+Mortality and adjusted fertility both use the same piecewise constant `Band`
+and `waiting_time()` implementation. Crossing a known age boundary does not
+require a new random draw. See [the sampling explanation](waiting-time-sampling.md)
+for the derivation.
+
+Worked example: two months remain at hazard 0.12/year, followed by 0.24/year.
+For threshold 0.05, the first band consumes 0.02; the remaining 0.03 needs
+0.125 years. Total wait is 3.5 months, preserved as a fractional number of years.
+Months here are explanatory durations, not an execution grid.
+
+## Fertility and birth spacing
+
+All living females face the supplied population fertility schedule, regardless
+of union status. After a recorded birth at time `t`, fertility sampling starts
+at `max(now, t + birth_interval)`. Mortality remains active throughout spacing.
+A birth at 1.03 with spacing 0.75 permits the next birth no earlier than 1.78.
+Zero spacing disables both the exclusion and compensation. Arbitrary finite
+nonnegative intervals are allowed; there is no whole-month restriction.
+
+### Midpoint compensation (D028)
+
+Calculate one adjusted hazard per original finite input band. For band `[L,U)`,
+midpoint `m = L + (U-L)/2`, input rate `f`, and spacing `b`:
+
+    eligibility_mid = 1 - integral from max(0, m-b) to m of input_ASFR(a) da
+    adjusted_rate = f / eligibility_mid
+
+Evaluate the integral using exact duration overlaps with the unadjusted input
+bands. Gaps and ages outside the schedule contribute zero. Preserve the
+original boundaries and use the resulting constant rates in the shared sampler.
+Compute this schedule once per simulation call, not from the actual fraction
+eligible in the simulated population. Reject nonpositive midpoint eligibility
+and unrepresentable adjusted rates rather than clipping or imputing them.
+This checks the evaluated midpoints, not the entire age-varying eligibility curve.
+
+At midpoint 25.5, with spacing 0.75, input 0.1 on `[24,25)` and 0.2 on
+`[25,26)`, the excluded fraction is `0.25*0.1 + 0.5*0.2 = 0.125`.
+Eligibility is 0.875 and the adjusted rate for `[25,26)` is `0.2/0.875`.
+A longer spacing window may cross several bands and gaps; all overlaps count.
+
+When the window lies wholly in a constant-rate region, adjustment is
+`h = f/(1-b*f)`. With `f=0.2` and `b=0.75`, eligibility is 0.85;
+mean interval `b + 1/h` is five years, so the long-run renewal rate is 0.2
+away from rate boundaries. A constant region with `b*f >= 1` at its midpoint
+is infeasible and rejected. For zero spacing, the original schedule is used.
+
+The underlying eligibility identity assumes cohorts experienced the target
+schedule during the preceding window. With age-only mortality shared by
+eligible and excluded women, survival cancels between recent births and living
+female exposure. Fertility-dependent mortality or heterogeneity would require
+another specification. Midpoint evaluation approximates the age-varying
+adjustment and does not guarantee exact ASFR or TFR recovery after burn-in.
+
+### Birth transition and parent assignment
+
+Each birth creates one child with a new unique ID above all supplied IDs,
+records the mother, and assigns newborn sex with equal probabilities. Sample
+the father uniformly from currently living males. There is no minimum paternal
+age, kinship exclusion, or union requirement in this deliberately basic model;
+if no males are living, retain the birth with unknown father.
+
+Update the mother's latest birth and resample both newborn and mother. Newborns
+enter mortality risk immediately; their fertility depends on the supplied ages.
+Existing custom person columns are retained; newborn custom values are missing.
+No new unions are formed. The R wrapper closes supplied ongoing unions when a
+partner dies, using the earliest partner death and `end_reason = "death"`.
+
+## Execution, competition, and random numbers
+
+`simulate(model, years, seed = NULL)` processes `[start, start + years)`.
+Duration is finite and nonnegative; zero duration returns the population with
+updated run metadata. Times that cannot be represented at the chosen numeric
+scale are rejected. Candidates exactly at the run endpoint are excluded.
+
+Each person retains one selected next event. Death wins an exact same-person
+death/birth tie. Across people, exact ties follow queue insertion order:
+initial row order; after birth, newborn before mother. Otherwise execute the
+earliest continuous candidate. Father availability changes immediately when
+births/deaths execute. For example, a birth at 0.02 precedes death at 0.06 even
+though both occur within the same nominal month.
+
+All engine state belongs to the call. An explicit integer seed isolates the
+call and restores the caller's RNG state afterward, including on error.
+Without a seed, use and advance the current RNG. Baseline generation has its
+own ordinary RNG consumption. The seed contract does not promise fixed-seed
+agreement with SOCSIM or older Hammel algorithms.
+
+The output is a `hammel_population` containing all person/union histories,
+`end_time`, retained extra components, and latest-run `simulation` metadata.
+Restarts recover birth spacing from those histories and resample pending events.
+They are not exact checkpoints, and split runs need not reproduce uninterrupted
+runs. Reattach processes explicitly in a new model, or reuse the original model
+with `set_population(result)` to retain its process specifications.
+
+## Observations and derived measures
+
+See [demographic analysis](demographic-analysis.md) for worked workflows.
+Analyze one independent history per call; duplicated IDs from stacked
+replications are invalid. There are no custom strata/group arguments yet.
+
+- `calculate_lexis_counts()` splits recorded lifetimes at half-open period/age
+  boundaries and reports exposure, deaths, births, ASMR, and ASFR. A finite last
+  age breakpoint automatically gains `Inf`; for example `0:110` ends with
+  `[110, Inf)`. Zero exposure yields `NA` rates; zero events with positive
+  exposure yields zero. Male birth counts/ASFR are `NA`.
+- Births use maternal age and all female exposure, including time excluded by
+  spacing. Unknown mothers are counted by period in the tibble attribute
+  `unassigned_births`; their births cannot be assigned an age-specific rate.
+- `calculate_tfr()` selects female rows, omits open age bands, and sums
+  `asfr * band_width` over the remaining contiguous finite bands by period.
+  Missing ASFR contributions are omitted with `na.rm = TRUE`; an all-missing
+  set sums to zero. The returned finite age range does not indicate complete
+  exposure, so inspect missing cells separately. There is no `age_range` argument.
+- `calculate_life_table()` requires contiguous bands from zero through an
+  explicit open interval and separates periods/sexes. For finite width `n`
+  and hazard `m`, `q = 1-exp(-m*n)`, survival propagates exponentially, and
+  `L = l*(1-exp(-m*n))/m`, with `L=l*n` at zero hazard. In the positive-rate
+  open interval, `q=1` and `L=l/m`. `T` is remaining integrated person-years
+  and `ex=T/l`. Missing rates propagate uncertainty; positive survivorship
+  with zero terminal hazard gives infinite life expectancy; `ex` is undefined
+  at zero survivorship. This is a synthetic period table, not cohort follow-up.
+- `calculate_population_size()` includes births and excludes deaths at each
+  requested instant. It preserves requested order and repeated times.
+
+Population objects require known endpoints for observation; do not observe
+beyond them. Bare persons tables require the caller to ensure complete
+follow-up. Missing death means censored at the observation endpoint. Zero-duration lives
+contribute zero exposure, while recorded events still count in their applicable
+age/period cells.
+
+## Database preparation and provenance
+
+`get_mortality_hmd()` and `get_fertility_hfd()` return prepared rate tibbles,
+without configuring a model or writing files. Select one population and one
+explicit year; no latest-year selection, interpolation, averaging, or automatic
+cache refresh occurs. Save/load with RDS to preserve tables and their `source`
+attributes. Constructors copy provenance into the process. Credentials are
+never retained. HMDHFDplus is optional and needed only for downloads.
+
+HMD uses `Mx_1x1` for both sexes and the accepted hazard interpretation. Closed
+single-year ages become `[age,age+1)` and the open age becomes `[age,Inf)`.
+Respect both raw `+` labels and parsed `OpenInterval` indicators, including
+HMDHFDplus 2.0.8 behavior. Missing retained rates are rejected, not filled.
+
+HFD uses total `asfrRR` in births per woman-year without scaling. Omit open-age
+rows such as `12-` and `55+`; map retained closed ages to one-year intervals.
+No fertility is inferred outside them. Input-derived TFR excludes endpoint
+contributions and need not equal HFD's full published TFR. Open endpoint rates
+are aggregate categories, not evidence for an individual hazard at arbitrarily
+young or old ages.
+
+Record database, population, year, product, retrieval timestamp, and reader
+version. HFD records requested revision date and endpoint omission. A null
+revision requests the current release; it does not pin a historical revision.
+Synthetic/local-reader tests establish conversions; live requests are opt-in.
+Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDplus),
+[HFD FAQ](https://www.humanfertility.org/Project/FAQ), and
+[HFD basic indicator methods](https://www.demogr.mpg.de/papers/technicalreports/tr-2011-001.pdf).
+
+## Known limitations and deferred issues
+
+| Issue | Current treatment |
+| --- | --- |
+| Initialization transient | No correction or automatic burn-in; users choose observation windows |
+| Midpoint approximation | Validate bias against supplied age schedules; no accuracy guarantee |
+| Rate changes between runs | Histories retain spacing, but compensation uses only the new schedule |
+| Sparse oldest ages | Missing cells remain missing; no automatic imputation or smoothing |
+| Union formation/dissolution | No new events; planning notes remain proposals |
+| Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
+| Exact continuation | No saved queue/RNG checkpoint |
+
+For changed fertility rates, recently excluded women may reflect the previous
+schedule, so realized fertility can temporarily differ from the new target.
+Magnitude and duration have not been quantified; there is no guaranteed
+nine-month convergence deadline. A recent-schedule history and time-dependent
+adjustment were discussed as possible future treatments; the user explicitly
+deferred correction. Do not implement them as an assumed requirement.
+
+## Validation requirements and future mechanism specifications
+
+Current checks cover analytical survival and waiting times, midpoint overlap
+examples, constant-rate fertility after burn-in, spacing through restarts,
+accounting, identities, father availability, seed behavior, and empty/zero-risk
+runs. [Testing](testing.md) separates these from broader demographic assessment.
+
+Before marking milestone 1 complete, agree on rate/age alignment, observation
+windows, replications, acceptance thresholds, and sparse-cell treatment. Compare
+ASFR/ASMR as well as aggregate TFR/life-table measures. Report uncertainty and
+systematic departures separately. Compare with pinned SOCSIM over replications
+when appropriate; changed algorithms do not warrant exact seed matching.
+
+Every new consequential mechanism needs its own plain-language specification:
+status/scope, inputs/units, eligibility, timing/competition, state transitions
+and invalidation, observations, worked examples, validation, and unresolved
+choices. The user decides demographic assumptions. Passing software tests is
+not sufficient evidence of research readiness.

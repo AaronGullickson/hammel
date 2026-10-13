@@ -1,29 +1,65 @@
-# Session handoff: October 12, 2026
+# Current project handoff
 
-The user is stopping for the day. Do not begin the next tasks automatically.
+Updated October 13, 2026. This is a concise status record, not a stop instruction
+or authorization for additional features. Follow the user's current request.
+Start with the [documentation index](README.md).
 
-## Current foundation
+## Implemented foundation
 
-The package builds pipeable models from `hammel_population` objects and mortality/fertility processes. C++ executes the initial simulation with year-based inputs and outputs, continuous event times, death priority on exact competing-event ties, minimum birth spacing with midpoint integral-based compensation (D028), and random living male parentage without creating unions. Outputs can initialize subsequent runs. Public tables are tibbles.
+- R model/population/process construction; all public tables are tibbles.
+- Continuous C++17/Rcpp mortality/fertility scheduling with R RNG and call-local
+  state; midpoint compensation uses ordinary Band and shared waiting_time (D028).
+- Fertility-process `birth_interval`, default 0.75 years, accepting fractional
+  durations. Recorded histories enforce spacing on restart.
+- Finite fertility inputs only; HFD open endpoints are omitted. Mortality
+  requires complete age/sex coverage ending in an open interval.
+- Random living-male parent assignment; unknown father if none exists. No
+  new unions, minimum paternal age, or kinship restrictions.
+- Output reuse with resampled candidates, not exact checkpoints.
+- Lexis exposure/counts, TFR, life tables, and population sizes; testthat suite
+  and offline analytical checks pass.
 
-Analysis functions are `calculate_lexis_counts()`, `calculate_tfr()`, `calculate_life_table()`, and `calculate_population_size()`. Lexis counts include exposure and age-specific rates; male births and ASFR are NA. Age breaks automatically gain an open interval if needed. TFR omits open age bands and sums with `na.rm = TRUE`. Life-table missing rates still propagate; that behavior is intentionally left unchanged for now. TFR and life tables also accept their corresponding input process objects or rate tables.
+See [design](design.md), [scientific contract](scientific-contract.md), and
+[testing](testing.md) for details and evidence.
 
-## User's first inspection
+## Active validation work
 
-Using 10-year periods from 2000 to 2100 and single-year ages through 100 with an appended open interval, the user reported:
+The user is developing [milestone1.qmd](../validation/milestone1.qmd) from the
+[replication example](../inst/examples/milestone1_bootstrap.R). The template
+renders successfully with execution disabled; it is not a completed analysis.
+The example remains USA/2000, with 100,000 initial persons and 100 runs.
+No alternative data source/country is currently selected.
 
-- Input fertility TFR: approximately 2.05 across ages 13–55.
-- Simulated period TFR: approximately 2.03–2.08.
-- Input-derived life expectancy at birth: approximately 74.1 years for males and 79.4 for females.
-- Estimable simulated life expectancy from 2030 onward: approximately 73.7–74.2 for males and 79.2–79.7 for females.
-- Early life tables returned NA, consistent with missing old-age exposure; the exact missing cells were not independently audited in this inspection.
+The user reported decadal TFR means around 2.05–2.06 in 100 runs, and first-year
+TFR around 2.12 settling to roughly 2.05–2.06 in later years. Those reported
+summaries preceded the final midpoint rewrite and are not current-version
+verification. More recently, the user reported close ASFR/ASMR agreement with
+input curves, with smoother ASMRs under 20-year pooling. The plots and
+replication outputs were not independently rerun or archived by the agent.
 
-These are encouraging descriptive comparisons, not formal evidence of demographic accuracy. The slightly higher TFR in some periods needs replication-based assessment rather than an assumed explanation.
+Life-expectancy summaries use 100+ pooling to avoid sparse older cells. Direct
+ASMR comparisons use single-year bands through 110 with an appended open tail.
+These are distinct comparisons; the input life table retains its original
+older-age bands. Missing ASMR cells and zero terminal estimates can cause NA
+or infinite life expectancy. Report coverage rather than silently ignoring it.
 
-## Next work, in the user's preferred order
+## Next work and ownership
 
-1. The user will add more human-facing code comments to improve their understanding before further complexity. Preserve those edits; do not replace them with dense agent-oriented commentary.
-2. Develop formal uncertainty and accuracy checks across a range of fertility and mortality inputs. The user described this as bootstrapping; settle the experimental design before implementation. Independent simulation replications with distinct seeds are the natural starting point for measuring simulator variation. If resampling outputs is also desired, account for dependence among related persons rather than automatically treating person rows as independent.
-3. Compare outputs with input-derived expectations for matched age ranges, periods, rate interpretations, and units. Address burn-in, missing exposure, sample size, birth-spacing adjustment, and initialization assumptions explicitly. Use analytical cases alongside realistic schedules, and distinguish sampling uncertainty from systematic departures.
+The remaining milestone work is to quantify agreement and uncertainty, broaden
+rate/spacing cases, agree on acceptance criteria, and complete the reproducible
+report. The user will write its analysis and interpretation; do not fill in
+scientific conclusions or start a new replication study without a request.
+Preserve the user's edits and explanatory code comments.
 
-See `scientific-contract.md`, `testing.md`, and `demographic-analysis.md` for the existing rules and checks. No new diagnostic suite or resampling study has been authorized to start in this handoff.
+## Deferred work
+
+- Initial fertility calibration: retain simple initialization and assess burn-in.
+- Fertility transition adjustment after replacing rates between runs: document
+  the mismatch, with no correction implemented.
+- African historical benchmark/new rate-source preparation: postponed.
+- Union formation and matching: [planning notes](union-formation-models.md),
+  with no algorithm accepted and no implementation authorization.
+- Calendar-varying schedules, arbitrary custom processes, and exact checkpoints.
+
+Earlier inspection/run records are available in Git history. Do not use a historical
+pause request, deprecated API, or superseded timing rule to govern current work.

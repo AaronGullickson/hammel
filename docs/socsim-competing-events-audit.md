@@ -24,12 +24,18 @@ Because candidate scheduling can return the current month and the monthly loop d
 
 For example, equal-month death and birth candidates for a mother select death. However, a birth followed by a newly sampled death in the same month is possible. A spouse's death or marriage can also invalidate and replace another person's pending candidate before it executes.
 
-## Remaining work
-
 ## Monthly steps versus continuation boundaries
 
 Within a segment, the loop in `events.cpp` (around lines 590–611) generates events once, then advances month by month while retaining future queue entries. At segment boundaries, it calls `initialize_segment_vars()` (around lines 791–798), which clears event queues (around lines 2285–2295); the next segment calls `new_events_for_all()` again. Thus scheduled dates are retained across ordinary month steps but regenerated across segments, even if a segment is only one month long.
 
 `io.c`, `write_person()` (around lines 944–960), writes the selected next-event type but not its scheduled future date or the event queue. A file-based restart therefore does not restore that scheduling state; startup generates fresh candidates. This is not an exact checkpoint of the stochastic simulation.
+
+## Consequences and remaining work
+
+Hammel now uses continuous event times (D024): within-month ordering and
+integer-month ties above describe SOCSIM, not current Hammel. Only exact
+same-person death/birth ties prioritize death. Current Hammel restart behavior
+also resamples candidates, but that does not establish algorithm/RNG equivalence.
+Union-event invalidation remains future work because Hammel forms no new unions.
 
 Verify these behaviors with controlled executable cases. Audit all handlers, eligibility and matching rules, segment changes, numerical floors, and birth-spacing adjustments before asserting a complete scientific contract. In particular, do not equate integer-month tie priority with continuous-time competing-hazard semantics.

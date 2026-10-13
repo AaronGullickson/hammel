@@ -4,7 +4,10 @@ All public tables are returned as tibbles. Base data frames remain valid input;
 constructors normalize the table class while preserving column contents and
 order. Both empty and populated `persons` and `unions` tables follow this rule.
 
-Status: initial schema direction accepted October 12, 2026 (D012). Shared structural validation and empty-union normalization are implemented in both population entry points. Based on SOCSIM's person and marriage histories, with engine pointers and group omitted.
+Updated October 13, 2026. The schema is implemented under D012/D015/D016/D023.
+Normalization and structural validation are shared by population construction
+and attachment. See the [scientific contract](scientific-contract.md) for
+event and restart semantics.
 
 ## Persons
 
@@ -38,13 +41,20 @@ Partner columns do not encode wife/husband roles. `unions = NULL` on person-tabl
 
 ## Time representation
 
-User-facing table dates are numeric years, including fractional years, using a common origin. For example, monthly dates relative to year 2000 can be represented as `2000 + month_index / 12`. Relative years are also possible; the calendar origin convention and metadata still need specification. Times before the origin may be negative.
+Dates are numeric years, including fractions, with a user-supplied common
+origin. Calendar years such as 2000 and relative time such as zero are both
+valid; dates before the origin may be negative. Do not round dates to integer
+months or birthdays. Execution is continuous under D024, and midpoint fertility
+compensation under D028 has no monthly grid.
 
-Year-based storage does not change D004 or D008: the first engine still uses monthly time and truncates candidate waiting times to integer months. Use generic integer step indices if needed: an event at index `k` is exposed as `origin + k * dt` years, with configured `dt = 1/12` for the initial milestone. Month assumptions must be confined to explicit time configuration, not table schemas or demographic algorithms. Do not round to a fixed number of decimal places: one month is generally not exactly representable as a finite decimal, and ordinary floating-point arithmetic also introduces small errors. Boundary comparisons and input alignment need a documented numerical policy before implementation.
+`end_time` is a finite reference time or `NULL` when unknown. Simulation and
+observation require a known endpoint; the next simulation starts there. Tables
+must not contain recorded events later than a supplied reference time.
 
-Exposure must be recorded in person-years, but year-based dates alone do not define exposure accounting. Event placement within a month, observation boundaries, partial intervals, and age-band splitting require their own rules.
-
-Population reference-time metadata uses `end_time` in years; the model takes its starting time from that value. The former month-named arguments have been removed rather than reinterpreted. NULL continues to represent an unknown reference time.
+Recorded lifetimes and analysis periods are half-open. Exposure is exact overlap
+in person-years, split by age and period boundaries. Population counts include
+births at an instant and exclude deaths at that instant. See
+[demographic analysis](demographic-analysis.md) for observation details.
 
 ## Implemented validation scope
 

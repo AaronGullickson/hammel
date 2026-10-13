@@ -1,5 +1,10 @@
 # How waiting-time sampling works
 
+Updated October 13, 2026. This explains the current shared `Band` and
+`waiting_time()` sampler in `src/simulate.cpp`. Mortality uses its input hazards;
+fertility first obtains one adjusted constant hazard per original band from
+[midpoint compensation](scientific-contract.md#midpoint-compensation-d028).
+
 The engine draws a random amount of accumulated risk needed before an event occurs. Time consumes that amount faster when the event hazard is high. The explanation below uses mortality; the same sampling principle applies to the fertility hazard while a woman is eligible.
 
 ## Draw a risk threshold
@@ -48,6 +53,18 @@ P(T > t) = P(E > H(t)) = \exp(-H(t)).
 \]
 
 For a constant hazard `mx`, `H(t) = mx * t`, giving survival `exp(-mx * t)`. For successive age bands, accumulated hazard is the sum of each band's hazard times the time spent in it. Inverting that sum yields the waiting time under the specified piecewise-constant hazard model.
+
+## Eligibility, boundaries, and restarts
+
+After a birth, the mother's next fertility sample begins at the end of her
+configured exclusion interval, while mortality remains active. The threshold
+is consumed through future age bands from that eligible age. A current-age rate
+is not held indefinitely across later input bands.
+
+Candidate dates are continuous; run intervals are half-open. Zero future hazard
+can yield no event. Restarts preserve recorded maternal spacing, but sample new
+thresholds rather than restore a queue checkpoint. See the scientific contract
+for event competition and RNG isolation.
 
 ## Connection to SOCSIM
 

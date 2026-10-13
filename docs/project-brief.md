@@ -1,55 +1,76 @@
-> Current timing and fertility update (D024/D028): events execute continuously. Fertility compensation evaluates the input-rate integral at each original age band's midpoint, then uses the shared constant-hazard sampler. Earlier monthly and exact age-varying compensation descriptions are historical and superseded.
-
 # Hammel project brief
 
-Status: project direction recorded from the October 11, 2026 planning conversation and subsequent decisions. The first C++ mortality/fertility simulator is implemented and has completed a live-rate example. Scientific validation is in progress; the milestone's full demographic accuracy targets are not yet established.
+Updated October 13, 2026. The first mortality/fertility simulator is implemented.
+Milestone 1 remains in demographic validation; scientific acceptance thresholds
+and the completed validation report are not yet established.
 
-## Accepted direction
+## Purpose
 
-Hammel, named in honor of one of SOCSIM's creators, will be a standalone demographic microsimulator in an R package. SOCSIM provides a reference implementation and scientific experience to investigate and adapt. Hammel is a substantial rewrite, not a wrapper or companion package for rsocsim.
+Hammel is a standalone demographic microsimulator with a modern R package
+interface, informed by SOCSIM's approach and experience. It is a substantial
+rewrite, not a SOCSIM wrapper, rsocsim companion package, or upstream contribution.
+Legacy file compatibility must not determine its architecture.
 
-The intended user experience includes:
+The intended workflow combines pipeable model construction, inspectable R
+populations and rate tables, separate simulation execution, and eventual
+customizable demographic mechanisms. The user owns demographic requirements
+and scientific interpretation; agents investigate, implement, document, and
+validate software.
 
-- R functions to construct populations, demographic inputs, and processes.
-- Pipeable model construction and simulation workflows.
-- R-native results that users can inspect and analyze.
-- Custom demographic mechanisms and opportunities for methodological innovation.
-- A maintainable implementation whose demographic assumptions can be examined and validated.
+## Milestone 1 scope and status
 
-The user owns demographic requirements and scientific interpretation. Agents support source investigation, implementation, documentation, and validation. Research use requires evidence beyond successful execution or plausible populations.
+The accepted initial scope is fertility and mortality schedules constant over
+calendar time, but potentially varying by age (D003/D019).
 
-## Boundaries
+| Component | Current state |
+| --- | --- |
+| Population/model construction | Implemented; public tables are tibbles |
+| Mortality | Piecewise constant age/sex hazards; continuous sampling |
+| Fertility | Population ASFR inputs; midpoint spacing compensation (D028) |
+| Birth spacing | Fertility-process setting, default 0.75 years |
+| Parent assignment | Uniformly sampled living male; unknown father if none exists |
+| Relationships | Parent histories retained; no new unions formed |
+| Analysis | Exposure/counts, ASFR/ASMR, TFR, life tables, population sizes |
+| Restarts | Output can initialize another run; not an exact checkpoint |
+| Validation | Software/analytical checks pass; broader demographic assessment ongoing |
 
-Legacy SOCSIM file compatibility is optional and must not govern the new design. A universal simulation framework is not a project requirement. The implementation language, dependencies, precise API, and demographic algorithms remain undecided.
+D019 replaced the original basic-partnership requirement with random male
+parent assignment for the first executable milestone. D024 replaced monthly
+execution with continuous event times. D028 replaced monthly and exact
+age-varying fertility compensation with one adjusted rate per original age
+band, evaluated at its midpoint. Those older descriptions are historical.
 
-## First milestone
+## Remaining milestone work
 
-First executable version (D019): mortality and female fertility with minimum birth spacing and SOCSIM-style rate adjustment; uniformly select a currently living male parent for each birth, without creating unions. Keep unknown fathers if no males are living. This supersedes partnership formation as a requirement for the very first run, while retaining the demographic validation milestone.
+1. Complete the [Quarto validation report](../validation/milestone1.qmd), using
+   saved inputs, recorded seeds/settings, and identifiable code versions.
+2. Quantify replicated ASFR, ASMR, TFR, and life-expectancy agreement, with
+   sampling uncertainty, exposure coverage, and comparable age bands.
+3. Assess higher-fertility inputs, five-year fertility bands, and alternative
+   birth intervals; define acceptable approximation errors with the user.
+4. Record which criteria are met and which limitations remain.
 
-Accepted October 12, 2026: simulate a population with demographic rates that remain constant over calendar time, then inspect results and test demographic accuracy. Fertility and mortality are the focus. Include a basic marriage or partnership mechanism to assign parents; a realistic partnership market is outside this milestone.
+Reported visual agreement in USA/2000 replications is encouraging evidence,
+not a completed scientific assessment. Union formation, calendar-varying rate
+support, and initialization correction are not requirements for closing this
+current milestone.
 
-Validate fertility and mortality against the supplied inputs, including total fertility rate (TFR) and life-table measures. Constant over calendar time does not imply constant across ages; the age pattern and rate representation still need specification. Random pairing after a minimum age is a candidate mechanism, not yet an accepted algorithm.
+## Boundaries and future work
 
-## Proposed development sequence
+C++17/Rcpp is selected and implemented for the first engine (D019); tibble is
+used at the R boundary (D023). Package metadata and licensing are not yet ready
+for release. A universal simulation framework and legacy compatibility are not
+requirements. Custom process execution, union formation/dissolution, realistic
+matching, and richer initialization remain future work, not automatically
+authorized features.
 
-These milestones are planning suggestions, not implementation authorization:
+The user has postponed finding an African historical alternative to USA/2000.
+No replacement case or new rate-source integration is currently selected.
 
-1. Establish reference source versions and licensing; audit relevant SOCSIM behavior.
-2. Resolve enough of the design and scientific contract to specify a minimal simulator.
-3. Build the first milestone incrementally: supplied-population initialization and mortality, then fertility, births, parent–child relationships, and basic partnerships.
-4. Validate output fertility and life-table measures against the inputs, alongside accounting and relationship checks.
-5. Extend the validated foundation with richer partnership behavior and transitions.
+## Provenance and related documents
 
-Keep specifications, worked examples, decisions, audit evidence, and validation results in this repository so subsequent agents can resume from durable evidence.
-
-## Provenance
-
-This brief and the initial companion documents were distilled from `/home/aarong/Work/Hammel-project-notes.md`, saved October 11, 2026. That file summarizes a planning conversation; it does not contain a detailed source audit. These repository documents are the working guidance going forward. The decision log records later changes.
-
-## Monthly time decision
-
-The first milestone uses a monthly simulation increment, following SOCSIM's convention, with its duration explicitly configured as `dt = 1/12` years. Record times and durations in years and exposure in person-years. Do not hard-code month assumptions in demographic algorithms or output schemas. Other increments are a longer-term feature, but time handling must be isolated from the outset. Age and event-date conventions, exposure accounting, within-month ordering, and conversion of input rates to monthly event probabilities or schedules still require specification. A monthly time unit does not imply simply dividing annual probabilities by twelve.
-
-## User-facing rate units
-
-Users can supply age-specific fertility and mortality rates in events per person-year. The engine uses rates with durations in years; for a monthly interval, multiplying by its configured duration of `1/12` is equivalent to division by twelve. This removes the need for users to prepare monthly rates while preserving explicit rate interpretation and denominators.
+The project direction originated in the October 11, 2026 conversation,
+summarized in `/home/aarong/Work/Hammel-project-notes.md`. Current decisions are
+recorded in the [decision log](decisions.md). See [design](design.md) for the
+implemented workflow and [scientific contract](scientific-contract.md) for
+units, timing, rate interpretation, and limitations.

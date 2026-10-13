@@ -1,18 +1,33 @@
 # Decision log
 
-Keep accepted choices separate from proposals. Only record user agreement as acceptance of a demographic or major architectural decision. Each new entry should include status, date, rationale, alternatives, implications, and supporting evidence where available. Update superseded entries with a pointer to their replacement.
+Updated October 13, 2026. Entries retain the choices made at their original
+dates; each numbered entry now states whether and how it remains current.
+Read [the scientific contract](scientific-contract.md) for implemented behavior,
+not a superseded API or timing statement buried in a historical entry.
 
-## D023: Tibble table outputs
+Only user agreement establishes acceptance of demographic or major architectural
+choices. New entries should record status, date, rationale, implications,
+alternatives, and evidence. Proposals and deferred concerns are not authorization.
 
-- **Status:** accepted October 12, 2026.
-- **Decision:** return all public tables as tibbles, including person/union histories, process schedules, demographic summaries, and empty or auxiliary tables. Continue accepting base data frames as inputs.
-- **Implications:** add tibble as a package dependency and normalize table classes while preserving column contents and order. This supersedes earlier promises to preserve arbitrary input data-frame subclasses unchanged.
+## Current decision map
 
-## Demographic extraction implementation
+| Topic | Governing decisions |
+| --- | --- |
+| Standalone project and scientific ownership | D001–D002 |
+| Initial engine scope | D003 as narrowed by D019 |
+| Person-year inputs and hazard sampling | D005–D007, D013, D024 |
+| Population representation, sex labels, public tibbles | D012, D015, D016, D023 |
+| Process constructors/setters | D017, D026 |
+| Database rate products and reusable downloads | D018, D025 |
+| Demographic extraction and function names | D020–D022 and missing-ASFR clarification |
+| Continuous execution | D024 |
+| Fertility spacing/compensation and finite age bands | D026, D028 (superseding D027's exact sampler) |
 
-At the user's request, add person-year exposure, mortality/fertility rate, TFR, and period life-table functions based on the supplied SOCSIM analysis workflow. Support stacked person histories with explicit group columns. Implement exact recorded-lifetime overlaps in C++, with R tables and summaries. Life tables use the already accepted piecewise constant hazard assumption, with consistent exponential person-years and `ex = Tx/lx`; this corrects the supplied code's omission of division by survivorship. See `demographic-analysis.md` and the scientific contract for interfaces, missing-cell behavior, and validation scope.
+## Recorded decisions
 
 ## D001: Standalone rewrite
+
+**Current status:** Current project direction.
 
 - **Status:** accepted in the October 11, 2026 conversation.
 - **Decision:** build a standalone R package named Hammel, informed by SOCSIM; do not build a SOCSIM wrapper or rsocsim companion package.
@@ -22,11 +37,15 @@ At the user's request, add person-year exposure, mortality/fertility rate, TFR, 
 
 ## D002: Scientific ownership
 
+**Current status:** Current scientific ownership rule.
+
 - **Status:** accepted in the October 11, 2026 conversation.
 - **Decision:** the user guides demographic requirements and scientific interpretation; agents support software investigation, implementation, documentation, and validation.
 - **Implications:** expose unresolved demographic assumptions and obtain decisions before implementing dependent behavior.
 
 ## D003: First demographic validation milestone
+
+**Current status:** Demographic validation remains current; D019 replaces initial partnership formation with random male parent assignment.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** the first major milestone simulates a population with demographic rates constant over calendar time, including fertility, mortality, and a basic partnership mechanism to assign parents.
@@ -35,11 +54,9 @@ At the user's request, add person-year exposure, mortality/fertility rate, TFR, 
 - **Scope:** a simple partnership model is sufficient. Random marriage after a minimum age was offered as an example; the pairing algorithm and eligibility rules remain open.
 - **Implications:** specify rate denominators, partnership effects on fertility eligibility, observation exposure, initialization, and statistical acceptance criteria before implementing dependent behavior.
 
-## Pending choices
-
-The design specification lists open choices. The four-part candidate architecture is not fully accepted. D019 selects C++ for the first engine; the scientific contract specifies its initial execution interface and rules.
-
 ## D004: Monthly time for the first milestone
+
+**Current status:** Superseded for execution by D024. There is no monthly engine or configurable execution increment.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** use a fixed month as the simulation time unit for the first milestone, following SOCSIM's monthly convention.
@@ -49,6 +66,8 @@ The design specification lists open choices. The four-part candidate architectur
 
 ## D005: Person-year rate inputs
 
+**Current status:** Person-year input units remain current; D024/D028 remove internal monthly execution/compensation conversions.
+
 - **Status:** accepted October 12, 2026.
 - **Decision:** users can supply age-specific fertility and mortality rates as events per person-year. For the monthly engine, convert these internally to events per person-month by dividing by twelve; users need not prepare monthly rate files.
 - **Rationale:** support familiar demographic inputs and remove unnecessary input preparation.
@@ -56,6 +75,8 @@ The design specification lists open choices. The four-part candidate architectur
 - **Boundary:** division by twelve converts exposure units, not rates into probabilities. The mapping from fertility intensities or mortality central rates/hazards to simulation events still requires specification. Annual death probabilities are a different input type and cannot use this conversion as probabilities.
 
 ## D006: Rate-based event probability conversion
+
+**Current status:** The constant-hazard identity and mortality interpretation remain current; current execution rules are in the scientific contract.
 - **Status:** accepted October 12, 2026.
 - **Decision:** use rates as the input convention and derive an event probability over a time span `dt` using `1 - exp(-rate * dt)`. For person-year rates and a month, `dt = 1/12`.
 - **Assumption:** this expression is exact for a hazard constant over the relevant span. Rates may vary between age bands; handling spans that cross rate boundaries still requires specification.
@@ -65,6 +86,8 @@ The design specification lists open choices. The four-part candidate architectur
 
 ## D007: Sample waiting times directly on the hazard scale
 
+**Current status:** Cumulative-hazard sampling remains current. D024 resolves continuous dates and ties; the implementation draws Exp(1) thresholds.
+
 - **Status:** accepted October 12, 2026.
 - **Decision:** use the mathematical equivalence between log survival and cumulative hazard to sample candidate waiting times directly from rates, without converting to probabilities and back to logarithms.
 - **Method:** draw `E = -log(U)` for `U` uniform on `(0, 1)`. Accumulate `rate * duration` across successive age bands until the cumulative hazard reaches `E`. Carry the remaining threshold into each subsequent band; within the final positive-rate band, the remaining waiting time is `remaining_threshold / rate`.
@@ -73,6 +96,8 @@ The design specification lists open choices. The four-part candidate architectur
 - **Resolved subsequently:** D008 adopts SOCSIM-style integer truncation and candidate tie priority. Rescheduling after state changes, terminal age handling, and fertility eligibility and repeat-event semantics remain open.
 
 ## D008: Integer-month candidate dates and competing-event ties
+
+**Current status:** Integer truncation and equal-month competition are superseded by D024's continuous chronology and exact ties.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** adopt SOCSIM-style integer truncation of nonnegative candidate waiting times to months and its priority for competing candidate events in the same month.
@@ -85,6 +110,8 @@ The design specification lists open choices. The four-part candidate architectur
 
 ## D009: Simulation result class and core tables
 
+**Current status:** Core person/union tables remain current; the class is now hammel_population (D015), with tibble outputs (D023).
+
 - **Status:** accepted October 12, 2026.
 - **Decision:** expose simulation results as a named list with class `hammel_results`. Its two core datasets are `persons` and `unions`, accessed as `result$persons` and `result$unions`.
 - **Structure:** `persons` has one row per person who entered the simulation, including those who died, with unique person IDs. `unions` has one row per union episode, with references to the participating person IDs; repeated unions are separate episodes.
@@ -92,6 +119,8 @@ The design specification lists open choices. The four-part candidate architectur
 - **Still open:** exact columns, base data frames versus tibbles, observation and exposure-summary components, metadata, and result methods. No requirement to add a tibble dependency follows from this decision.
 
 ## D010: Reuse simulation output as input
+
+**Current status:** Output reuse is implemented. D019/D024 specify history retention, resampling, and seed behavior; exact checkpointing remains unsupported.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** simulation output must be reusable as input for further simulation, preserving the useful SOCSIM workflow. A `hammel_results` supplies the person and union histories and population state needed to initialize a subsequent run.
@@ -101,6 +130,8 @@ The design specification lists open choices. The four-part candidate architectur
 - **Still open:** endpoint metadata schema, how histories are retained in subsequent results, process configuration carryover, restart RNG semantics, and serialization requirements.
 
 ## D011: Basic model configuration API and result rename
+
+**Current status:** Historical API stage. D015 replaces population inputs/class; D017 replaces process setter signatures; public metadata is in years.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** rename the result class and constructor to `hammel_results`. Use `hammel_model()` for an empty specification and pipeable `set_population()`, `set_process()`, `set_mortality()`, and `set_fertility()` functions.
@@ -112,6 +143,8 @@ The design specification lists open choices. The four-part candidate architectur
 
 ## D012: Initial table schema and year-based dates
 
+**Current status:** Table structure and year-valued dates remain current. Migration/validation are implemented; monthly timing references are superseded by D024.
+
 - **Status:** accepted October 12, 2026.
 - **Decision:** use the initial person and union history schema in `population-schema.md`, leaving marital status off `persons`. Expose times as numeric years with fractional years rather than month indices.
 - **Rationale:** year-based dates are convenient for exposure estimates and support future simulation increments other than months. Relationship state can be derived from union histories; caching it internally remains possible.
@@ -121,17 +154,17 @@ The design specification lists open choices. The four-part candidate architectur
 
 ## D013: Canonical year units and explicit step duration
 
+**Current status:** Canonical year units remain current. Explicit monthly steps and integer execution indices are superseded by D024.
+
 - **Status:** accepted October 12, 2026.
 - **Decision:** record public times and durations in years, exposure in person-years, and inputs as rates per person-year. Use monthly increments for the initial milestone but do not hard-code month assumptions throughout the implementation.
 - **Implementation direction:** obtain step duration `dt` in years from explicit time configuration; the initial setting is `1/12`. Work directly with rates times durations. Centralize conversions to generic internal step indices if needed.
 - **Clarification of D004–D008:** months are the first milestone's configured increment, not the canonical public time unit. D005's division by twelve is the monthly instance of multiplication by interval duration. D008's truncation is `floor(waiting_time_years / dt)` and candidate ties compare step indices; its priority is unchanged.
 - **Scope:** supporting other step durations remains future work, but avoiding embedded month assumptions is required from the initial implementation. Existing month-based constructor arguments still need explicit migration; this documentation change does not reinterpret them.
 
-## Implementation update: population validation and year metadata
-
-Both `set_population()` and `hammel_results()` now apply the shared structural checks documented in `population-schema.md`. Public metadata uses `start_time` and `end_time` in years; the earlier month arguments are removed, not reinterpreted. D011–D013 statements describing migration or validation as pending are historical and superseded by this implementation update. Demographic eligibility and time-boundary policies remain open.
-
 ## D014: Store the population as a result object
+
+**Current status:** Single stored population remains current; its class/setter are replaced by D015.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** `hammel_model` stores one `population` component of class `hammel_results`, alongside `processes`. Do not duplicate `persons`, `unions`, or the starting time at the model's top level.
@@ -140,6 +173,8 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 
 ## D015: Population class and single population setter input
 
+**Current status:** Current population class and setter. D023 normalizes tables to tibbles while preserving contents and extra components.
+
 - **Status:** accepted October 12, 2026.
 - **Decision:** rename the class and constructor from `hammel_results` to `hammel_population`. Simplify the setter to `set_population(model, population)`, accepting only that class.
 - **Behavior:** create and normalize tables through `hammel_population(persons, unions = NULL, end_time = NULL)`; the setter validates and stores the object unchanged. Initial and simulated populations share this representation. `end_time` remains the population reference time in years and supplies the next run's starting time.
@@ -147,12 +182,16 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 
 ## D016: Character sex labels
 
+**Current status:** Current sex labels.
+
 - **Status:** accepted October 12, 2026.
 - **Decision:** record sex as character values `"m"` (male) and `"f"` (female), replacing SOCSIM's numeric codes in Hammel's public interface. Population validation requires these nonmissing labels and baseline generation produces them.
 - **Process direction:** mortality schedules must use the same labels and provide separate age-specific schedules for males and females from the first milestone. Rate table validation remains to be implemented.
 - **Supersedes:** D012's initial numeric sex encoding and the baseline generator's numeric labels. Numeric codes are not silently converted.
 
 ## D017: Mortality and fertility process constructors
+
+**Current status:** Current constructors and setter names. D028 subsequently prohibits open-ended fertility inputs; execution resolves coverage and eligibility.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** add `mortality(rates)` and `fertility(rates)` constructors inheriting from `hammel_process`; use `set_process(model, process)` and make demographic setters constructor-plus-setter shortcuts.
@@ -162,6 +201,8 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 
 ## D018: HMD and HFD download helpers
 
+**Current status:** Data products and endpoint omission remain current. D025 replaces database-specific process/setter interfaces with reusable rate downloads.
+
 - **Status:** accepted October 12, 2026.
 - **Decision:** use HMDHFDplus download functions to configure mortality and fertility from a population code and one explicitly selected year, producing constant-over-time schedules for the first milestone.
 - **Inputs:** HMD `Mx_1x1` for both sexes; HFD total `asfrRR`. Preserve person-year units and interpret mortality central rates under the accepted hazard model.
@@ -169,6 +210,8 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 - **Implementation:** optional HMDHFDplus dependency; preserve source metadata and never credentials. Missing retained rates are rejected, not imputed. Authenticated USA/2000 downloads passed the opt-in online test on October 12, 2026; see `testing.md`.
 
 ## D019: First executable simulator scope
+
+**Current status:** C++/R implementation, fertility scope, and parent assignment remain current. D024 replaces discrete scheduling; D026 moves spacing to the process; D028 replaces compensation.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** implement the initial simulator in C++ with R interfaces. All living females face population age-specific fertility risk; assign a uniformly sampled currently living male parent at each birth, without forming unions. If no males are living, retain the birth with unknown father.
@@ -179,6 +222,8 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 
 ## D020: Unified demographic summary
 
+**Current status:** Shared analysis and built-in period/sex grouping remain current. D021 changes age-range handling; D022 renames the function calculate_lexis_counts(). Missing-ASFR handling was clarified subsequently.
+
 - **Status:** accepted October 12, 2026.
 - **Decision:** expose one verb-named `summarize_demography()` function returning person-years, counts, ASMR, and ASFR by period, age, and sex. Male births and ASFR are NA. Remove the three separate exposure/mortality/fertility extraction functions and the user-supplied `groups` interface.
 - **Use:** feed that same summary into `calculate_tfr()` and `calculate_life_table()`. TFR selects female rows and accepts an optional finite age range matching complete summary bands; life tables separate built-in periods and sexes.
@@ -186,17 +231,31 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 
 ## D021: Automatic open-age handling in demographic summaries
 
+**Current status:** Open-age summary/TFR behavior remains current. Missing ASFR contributions are now omitted, as recorded in the scientific-contract clarification.
+
 - **Status:** accepted October 12, 2026.
 - **Decision:** append Inf to summary age breaks when absent. For TFR, omit open-ended age rows and use all remaining finite age bands; remove the age_range argument.
 - **Implications:** report the finite age range used and preserve missing-rate behavior. Users can subset the summary explicitly when desired. This supersedes D020's optional TFR age-range argument.
 
 ## D022: Lexis counts function name
 
+**Current status:** Current summary function name.
+
 - **Status:** accepted October 12, 2026.
 - **Decision:** rename `summarize_demography()` to `calculate_lexis_counts()`.
 - **Scope:** retain existing exposure, counts, ASMR/ASFR, and interval behavior. Life-table missing-rate handling remains unchanged. This supersedes the function name in D020.
 
+## D023: Tibble table outputs
+
+**Current status:** Current public table convention and dependency.
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** return all public tables as tibbles, including person/union histories, process schedules, demographic summaries, and empty or auxiliary tables. Continue accepting base data frames as inputs.
+- **Implications:** add tibble as a package dependency and normalize table classes while preserving column contents and order. This supersedes earlier promises to preserve arbitrary input data-frame subclasses unchanged.
+
 ## D024: Continuous-time event execution
+
+**Current status:** Continuous event execution remains current. Its retained monthly compensation is superseded by D027/D028.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** on a branch from master, remove event-time truncation and the execution step; execute continuous candidates chronologically. Retain existing monthly SOCSIM-style fertility compensation separately.
@@ -205,12 +264,16 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 
 ## D025: Reusable database rate downloads
 
+**Current status:** Current reusable database download interface.
+
 - **Status:** accepted October 12, 2026.
 - **Decision:** separate HMD/HFD downloading and preparation from model configuration. Replace database process constructors and setters with `get_mortality_hmd()` and `get_fertility_hfd()`, returning validated rate tibbles accepted by ordinary process constructors and setters.
 - **Reuse:** users explicitly save/load tables with RDS; model configuration and repeated simulations need no database requests. Preserve source metadata as a `source` attribute on the table and carry it into constructed processes. Credentials are never retained.
 - **Scope:** retain D018's single-year selection, products, units, and age handling. Automatic caching and calendar-varying schedules are outside this change.
 
 ## D026: Birth interval belongs to the fertility process
+
+**Current status:** Spacing belongs to fertility. D027/D028 remove its earlier whole-month restriction.
 
 - **Status:** accepted October 13, 2026.
 - **Decision:** move `birth_interval` from `simulate()` to `fertility()` and
@@ -221,6 +284,8 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 - **Supersedes:** earlier execution signatures exposing `birth_interval`.
 
 ## D027: Continuous birth-spacing compensation
+
+**Current status:** Exact age-varying compensation/specialized sampler superseded by D028. Year-valued fractional spacing remains current.
 
 - **Status:** accepted October 13, 2026.
 - **Decision:** use `h(a) = f(a) / (1 - integral_{a-b}^{a} f(u) du)` with
@@ -235,6 +300,8 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 
 ## D028: Midpoint approximation using the shared hazard sampler
 
+**Current status:** Current midpoint compensation, shared sampler, and finite fertility inputs.
+
 - **Status:** accepted October 13, 2026.
 - **Decision:** calculate one adjusted rate at each original fertility band's
   midpoint, using exact overlaps of the preceding birth interval with the
@@ -248,7 +315,17 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
   open-ended fertility input bands, including zero rates/zero spacing.
 - **Supersedes:** D027's age-varying hazard representation and exact sampler.
 
-## Deferred concern: fertility compensation across rate changes
+## Additional clarifications and deferred concerns
+
+### Demographic extraction implementation
+
+The original request adapted the user's SOCSIM analysis workflow to exact
+recorded-lifetime exposure and R-native summaries. Life tables follow the
+accepted hazard interpretation and use ex=Tx/lx. The earlier stacked-history
+interface was removed by D020; current functions analyze one independent
+history per call. See [demographic analysis](demographic-analysis.md).
+
+### Deferred concern: fertility compensation across rate changes
 
 - **Status:** noted and deferred October 13, 2026, at the user's request.
 - **Issue:** sequential runs retain actual maternal birth histories, while
@@ -260,3 +337,12 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
   support a history-aware compensation calculation. No algorithm is accepted.
 - **Boundary:** this deferral does not adopt built-in calendar-varying rates
   or establish a new scientific guarantee for incremental runs.
+
+### Missing-ASFR clarification
+
+At the user's direction, `calculate_tfr()` sums with `na.rm = TRUE`, omitting
+missing contributions; an all-missing retained age range therefore sums to zero.
+This supersedes the earlier missing-TFR statements in D020/D021 and the
+earlier scientific contract (available in Git history).
+It does not change life-table missing-rate propagation. This restates an
+existing accepted clarification; it is not a new decision from the doc audit.

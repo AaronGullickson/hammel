@@ -1,12 +1,31 @@
 # SOCSIM reference audit plan
 
-Status: broader audit planned. An initial narrow source trace of rate conversion is recorded in [SOCSIM rate conversion](socsim-rate-audit.md); no executable reference validation or complete scheduling audit has been performed. References below are starting points recorded in the earlier conversation.
+Updated October 13, 2026. Status: broader audit planned. An initial narrow source trace of rate conversion is recorded in [SOCSIM rate conversion](socsim-rate-audit.md); no executable reference validation or complete scheduling audit has been performed. References below are starting points recorded in the earlier conversation.
 
 ## Establish the reference
 
 An initial static trace of candidate selection, within-month execution, and rescheduling is recorded in [competing events](socsim-competing-events-audit.md).
 
 Record repository URL, commit or release, retrieval date, relevant files, and applicable licenses for each source examined. Distinguish SOCSIM engine code from rsocsim integration. Before copying or adapting code, establish applicable licensing obligations and document provenance. Package licensing remains undecided.
+
+## Reference version and current departures
+
+The existing traces use MPIDR/rsocsim commit
+`125450cff968bb3ff762fa99d4c926a8136062a2`. The local checkout was confirmed
+at `../rsocsim` relative to the Hammel root during this documentation review;
+that location is a convenience, not a portable project dependency.
+Source functions and approximate line locations are recorded in the individual
+audits. License obligations must be established before copying/adapting code;
+Hammel's package license remains undecided and no audited source was copied.
+
+Current Hammel intentionally departs from SOCSIM's monthly timing and input
+conventions: continuous chronology, person-year hazards, midpoint fertility
+compensation, and no union-formation events. Source findings do not imply fixed-
+seed equivalence or demographic accuracy. Match assumptions/units and use
+replicated statistical comparisons when a reference experiment is appropriate.
+Union matching, queue modes, and scoring have not been comprehensively audited.
+
+## Reference links
 
 Starting references:
 

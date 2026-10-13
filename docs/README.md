@@ -1,0 +1,55 @@
+# Hammel documentation
+
+Updated October 13, 2026. The mortality/fertility engine is implemented;
+milestone 1 demographic validation is in progress. Current behavior uses
+continuous event times and midpoint fertility compensation, with no monthly
+time grid. Union formation remains a proposal.
+
+## Reading order
+
+| Document | Purpose |
+| --- | --- |
+| [Project brief](project-brief.md) | Purpose, current scope, and milestone status |
+| [Design](design.md) | Implemented architecture, API, and source locations |
+| [Scientific contract](scientific-contract.md) | Current demographic assumptions and event rules |
+| [Population schema](population-schema.md) | Person/union tables and structural validation |
+| [Demographic analysis](demographic-analysis.md) | Exposure, ASFR/ASMR, TFR, and life-table workflows |
+| [Testing and validation](testing.md) | Test commands, evidence, and remaining validation |
+| [Current handoff](session-handoff.md) | Recent findings, active work, and deferred issues |
+
+Read the brief, design, and scientific contract before consequential changes.
+[AGENTS.md](../AGENTS.md) contains the working rules. Model choices require the
+user's agreement; proposed APIs and research notes do not authorize implementation.
+
+## Explanations, proposals, and provenance
+
+| Document | Status |
+| --- | --- |
+| [Waiting-time sampling](waiting-time-sampling.md) | Explanation of the current shared hazard sampler |
+| [Union-formation models](union-formation-models.md) | Planning notes; no union algorithm accepted |
+| [Decision log](decisions.md) | Accepted choices and supersession history |
+| [SOCSIM audit plan](socsim-audit.md) | Scope and remaining reference investigation |
+| [SOCSIM rates](socsim-rate-audit.md) | Pinned static source findings |
+| [SOCSIM competing events](socsim-competing-events-audit.md) | Pinned static scheduling findings |
+
+Git retains earlier specifications and verification records; do not keep
+snapshot copies in the docs tree. The decision log records rationale and
+supersession. Current contracts take precedence over earlier monthly timing,
+class names, and fertility compensation descriptions.
+
+To inspect prior versions, use `git log -- docs` and
+`git show <commit>:docs/scientific-contract.md`.
+
+## Validation artifacts and examples
+
+- [Milestone 1 report template](../validation/milestone1.qmd): development
+  validation report; execution is disabled by default while the user drafts it.
+- [Replication example](../inst/examples/milestone1_bootstrap.R): USA/2000
+  replications, demographic comparisons, and population growth.
+- [Single-run example](../inst/examples/milestone1.R): initial simulation and
+  reuse of its output.
+
+`inst/examples/` ships with the installed R package. `validation/` and `docs/`
+are development material excluded from package builds. Local validation data
+and rendered output are Git-ignored; completed evidence needs a documented
+archive or sharing location.

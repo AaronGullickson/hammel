@@ -1,6 +1,6 @@
 # SOCSIM rate conversion: initial source trace
 
-Inspected October 12, 2026. Reference: https://github.com/MPIDR/rsocsim at commit `125450cff968bb3ff762fa99d4c926a8136062a2`, full repository cloned into `/home/aarong/Projects/rsocsim`. This is a narrow static source trace, not an executable validation or a complete scheduling audit. No source code was copied into Hammel.
+Inspected October 12, 2026. Reference: https://github.com/MPIDR/rsocsim at commit `125450cff968bb3ff762fa99d4c926a8136062a2`, local checkout currently at `../rsocsim` relative to the Hammel root. This is a narrow static source trace, not an executable validation or a complete scheduling audit. No source code was copied into Hammel.
 
 ## Ordinary rate-file inputs
 
@@ -17,17 +17,25 @@ For a constant block without modifiers, boundaries, or competing events, the imp
 - Fertility input `r` implies `1 - exp(-r)`.
 - Ordinary mortality input `p` recovers `p`, since `1 - exp(log(1 - p)) = p`.
 
-These statements concern candidate-event timing. Eligibility, birth spacing, rate adjustments, competing events, and rescheduling can change realized demographic outcomes; they remain to be audited.
+These statements concern candidate-event timing. Birth spacing is partly traced
+below; broader eligibility, parity adjustments, competing events, and
+rescheduling can change realized outcomes and are not fully audited.
 
 ## Separate Lee–Carter mortality path
 
 `lc_datev()` in `src/src/events.cpp` (around lines 1747–1752) calculates `exp(ax + bx * kt + ext)`, then uses `log(1 - temp_rate) / 12` (with a numerical floor). Algebraically, away from that floor, this corresponds to a monthly probability `1 - (1 - temp_rate)^(1/12)`. This differs from treating the calculated value as a hazard and dividing it by twelve. The intended interpretation of the Lee–Carter inputs needs further investigation.
 
-## Implication for Hammel
-
 ## Birth-spacing adjustment source trace
 
-Additional inspection October 12, 2026: `events.cpp` initializes `bint = 9` (around line 221) and sets the first possible next birth to the latest child's birth month plus `bint` in `date_and_event()` (around lines 1868–1906). `load.cpp`, `adjust_birth_for_bint()` (around lines 2743–2788), computes an eligibility estimate by subtracting the sum of preceding interval birth probabilities from one, then divides the fertility hazard by that estimate. The non-parity-specific first Hammel implementation independently implements this mathematical adjustment in generic step units; it does not copy SOCSIM source code or adopt parity-specific behavior. The compensation remains approximate and requires demographic validation.
+Additional inspection October 12, 2026: `events.cpp` initializes `bint = 9` (around line 221) and sets the first possible next birth to the latest child's birth month plus `bint` in `date_and_event()` (around lines 1868–1906). `load.cpp`, `adjust_birth_for_bint()` (around lines 2659–2788), computes an eligibility estimate by subtracting the sum of preceding interval birth probabilities from one, then divides the fertility hazard by that estimate. The first Hammel implementation independently used this mathematical adjustment in generic step units, without copying source or adopting parity-specific behavior. That compensation is historical; D028 now uses input-rate window integrals evaluated at original band midpoints.
+
+The supervisory-file `bint` setting overrides the default minimum interval in
+months (`load.cpp`, parser around line 1056). The corresponding scheduling rule
+uses the most recent recorded child's birth date. Separate postpartum amenorrhea
+or abstinence parameters were not found in the previously inspected version;
+that absence finding is not a comprehensive extension audit.
+
+## Consequences for current Hammel
 
 SOCSIM does not apply one universal rate-to-probability conversion. Hammel's accepted person-year rate interface should distinguish exposure-unit conversion (`r / 12`) from event-generation semantics. Under a constant hazard interpretation, the monthly event probability is `1 - exp(-r / 12)`. Central mortality rates need a specified relationship to hazards; annual probabilities require different treatment. This source finding does not settle Hammel's algorithm.
 

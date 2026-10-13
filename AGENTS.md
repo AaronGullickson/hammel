@@ -1,12 +1,22 @@
 # Working on Hammel
 
-Read [the project brief](docs/project-brief.md), [the design specification](docs/design.md), and [the scientific contract](docs/scientific-contract.md) before consequential implementation. Consult [the decision log](docs/decisions.md) for the status and rationale of choices and [the audit plan](docs/socsim-audit.md) when investigating SOCSIM.
+Start with the [documentation index](docs/README.md). Read [the project
+brief](docs/project-brief.md), [the design specification](docs/design.md), and [the
+scientific contract](docs/scientific-contract.md) before consequential implementation.
+Consult [the decision log](docs/decisions.md) for the status and rationale of choices
+and [the audit plan](docs/socsim-audit.md) when investigating SOCSIM.
 
 ## Purpose and scope
 
-Hammel is a new, standalone demographic microsimulator with a modern R package interface, informed by SOCSIM's approach and features, but offering more flexibility to users to create customizable model parameters. It is a substantial rewrite, not a SOCSIM wrapper, rsocsim companion package, or upstream contribution. Legacy file compatibility must not determine its architecture.
+Hammel is a new, standalone demographic microsimulator with a modern R package
+interface, informed by SOCSIM's approach and features, but offering more flexibility to
+users to create customizable model parameters. It is a substantial rewrite, not a SOCSIM
+wrapper, rsocsim companion package, or upstream contribution. Legacy file compatibility
+must not determine its architecture.
 
-The user guides demographic requirements and scientific interpretation. Agents investigate, implement, document, and validate software. Do not silently resolve questions that change the demographic model.
+The user guides demographic requirements and scientific interpretation. Agents
+investigate, implement, document, and validate software. Do not silently resolve
+questions that change the demographic model.
 
 ## Before implementing a feature
 
@@ -16,25 +26,61 @@ The user guides demographic requirements and scientific interpretation. Agents i
 4. Define validation from the specification, including analytical cases or invariants where applicable.
 5. Implement a narrow, reviewable change and keep the documents consistent with the resulting behavior.
 
-Suggestions, illustrative APIs, and proposed milestones are not accepted decisions or authorization to implement them. Routine software choices within an authorized task can be made autonomously; record choices with substantial architectural consequences.
+Suggestions, illustrative APIs, and proposed milestones are not accepted decisions or
+authorization to implement them. Routine software choices within an authorized task can
+be made autonomously; record choices with substantial architectural consequences.
 
 ## Engineering expectations
 
 - Prefer verb-based names for user-facing action functions, such as `create_baseline_population()` and `set_population()`.
 - Return all public tables as tibbles, including empty tables, population histories,
   process schedules, and demographic summaries. Accept base data frames as inputs.
-
 - Keep model construction separate from simulation execution. Aim for composable R workflows and R-native, inspectable results at the user-facing boundary. This does not require an R-only implementation: performance-critical computation and internal state may use compiled code, such as C++, with results exposed as ordinary R objects for inspection and analysis.
 - Each simulation must own independent state. Avoid hidden process-wide population state and undocumented effects on later runs.
-- Make time, rate units, random-number behavior, and observation semantics explicit. Record public times and durations in years, exposure in person-years, and input rates per person-year. The first milestone uses a monthly increment (`dt = 1/12` years), but do not hard-code month assumptions in demographic algorithms, table schemas, or analysis. Obtain interval duration from explicit time configuration and centralize any conversion to internal integer steps.
+- Make time, rate units, random-number behavior, and observation semantics explicit.
+  Public times/durations are years, exposure is person-years, and input rates are
+  per person-year. The current engine executes continuously (D024), with no
+  monthly increment or execution-step parameter. Fertility uses midpoint
+  compensation on the original finite input age bands (D028), not a monthly grid.
+  Mortality and adjusted fertility share `Band` and `waiting_time()`. Do not
+  reintroduce superseded monthly timing or the specialized exact fertility sampler
+  without an explicit modeling decision.
 - Design built-in and custom demographic mechanisms around a documented contract; arbitrary callbacks must not bypass state consistency or event invalidation rules.
 - Preserve scientifically relevant provenance. Before copying or adapting source, establish its version, license, and applicable obligations.
-- Do not select a compiled implementation language or add major dependencies merely because the notes mention a candidate.
+- C++17/Rcpp is selected for the first engine (D019); tibble is the public table
+  convention (D023). Do not replace the engine language or add major dependencies
+  merely because future notes mention a candidate.
 - Do not invent demographic defaults, fabricate audit findings, or claim scientific validity from plausible-looking output.
 - Do not start sub-agents solely because the project notes describe possible agent roles. Use delegation when the current task authorizes it.
 
 ## Validation and reporting
 
-Use tests appropriate to the behavior: analytical cases, accounting identities, valid dates and relationships, reproducibility, and independence between runs. Compare with SOCSIM over multiple replications when a reference comparison is appropriate. Exact fixed-seed agreement is meaningful only when algorithms and random-number consumption are preserved; otherwise use justified statistical comparisons.
+Use tests appropriate to the behavior: analytical cases, accounting identities, valid
+dates and relationships, reproducibility, and independence between runs. Compare with
+SOCSIM over multiple replications when a reference comparison is appropriate. Exact
+fixed-seed agreement is meaningful only when algorithms and random-number consumption
+are preserved; otherwise use justified statistical comparisons.
 
-Report what changed, what was checked, and remaining limitations. Distinguish implemented behavior, verified findings, proposals, and unresolved assumptions. Document intentional departures from SOCSIM. Never mark a scientific decision accepted without the user's agreement.
+Report what changed, what was checked, and remaining limitations. Distinguish
+implemented behavior, verified findings, proposals, and unresolved assumptions. Document
+intentional departures from SOCSIM. Never mark a scientific decision accepted without
+the user's agreement.
+
+## Documentation and current priorities
+
+- Current specifications describe implemented behavior. Use Git history for
+  superseded specifications and verification records; do not maintain snapshot
+  archives in `docs/`. Keep rationale and supersession in `docs/decisions.md`.
+  Do not make readers reconcile contradictory current rules with appended
+  corrections.
+- Mark union-formation notes and other future work as proposals. Milestone 1 is
+  in demographic validation; union formation is deferred from its initial scope.
+- `validation/milestone1.qmd` is a development report template. The user is
+  writing its analysis and interpretation; do not fabricate results, set
+  scientific acceptance thresholds, or mark the milestone complete.
+- Use `devtools::test()` for the testthat suite. Live database tests require
+  explicit opt-in; ordinary verification must not download rates or expose
+  credentials. See `docs/testing.md` for commands and evidence.
+- Treat session handoffs as dated status records, not standing pause instructions.
+  The current user request controls work. Preserve the user's edits, including
+  explanatory source comments and the report under development.

@@ -1,70 +1,134 @@
-# Extracting demographic measures
+# Demographic analysis
 
-Load the development package with `devtools::load_all()`. `calculate_lexis_counts()` accepts a `hammel_population` such as `result`, or a persons data frame representing one independent population history. Dates and age boundaries are in years; exposure is in person-years.
+Updated October 13, 2026. All outputs are tibbles; base data frames are valid
+inputs. Dates and age boundaries use years, and exposure uses person-years.
+See the [scientific contract](scientific-contract.md) for model assumptions.
 
-All table outputs are tibbles, including population sizes, Lexis counts, TFR,
-life tables, and auxiliary unassigned-birth counts. Population histories and
-process rate tables are also tibbles; base data frames are accepted as input.
+## Exposure, counts, and rates
 
-## One summary for fertility and mortality
-
-For the USA/2000 example simulated from 2000 to 2100:
+For a population simulated from 2000 through 2100:
 
 ```r
 summary <- result |>
   calculate_lexis_counts(
-    time_breaks = seq(2025, 2100, by = 25),
-    age_breaks = c(0, 1, 5, 10, 13:55, seq(60, 100, by = 5))
+    time_breaks = seq(2020, 2100, by = 20),
+    age_breaks = 0:100
   )
-
-tfr <- summary |> calculate_tfr()
-life_tables <- summary |> calculate_life_table()
-
-life_tables[life_tables$age_start == 0,
-            c("time_start", "time_end", "sex", "ex")]
 ```
 
-The summary contains `time_start`, `time_end`, `sex`, `age_start`, `age_end`, `person_years`, `deaths`, `births`, `asmr`, and `asfr`. ASMR is deaths divided by person-years. Births are classified by maternal age and ASFR uses all female exposure, including time temporarily excluded by birth spacing. Births and ASFR are NA for men.
+The function appends `Inf` to finite final age breaks. Thus `0:100` ends with
+`[100, Inf)` and `0:110` ends with `[110, Inf)`; those ages are pooled, not
+removed. Existing `Inf` breaks are retained.
 
-TFR automatically selects female rows, omits open-ended age bands, and sums ASFR times each remaining finite age-band width separately for each period. No age-range argument is needed. The finite age range reported in the output tells you which bands contributed. Missing ASFRs are omitted from the TFR sum using `na.rm = TRUE`. You can subset the summary first if you want a particular finite age range. HFD open endpoint rows remain omitted by our rate adapter.
+| Column | Meaning |
+| --- | --- |
+| `time_start`, `time_end` | Half-open observation period |
+| `sex`, `age_start`, `age_end` | Sex and half-open age band |
+| `person_years` | Exact recorded-lifetime exposure in the cell |
+| `deaths`, `asmr` | Deaths and deaths/person-years |
+| `births`, `asfr` | Maternal births and births/all female person-years |
 
-Life tables are constructed separately for each period and sex. The age schedule must begin at zero, be contiguous, and end at Inf. `calculate_lexis_counts()` automatically appends Inf if the supplied age breaks end at a finite value: breaks ending at 100 create a final `[100, Inf)` band. Manually supplied rate tables must still specify their actual open-ended interval. Columns include `n`, `ax`, `mx`, `qx`, `lx`, `lx_end`, `dx`, `Lx`, `Tx`, and `ex`. Life expectancy is Tx/lx. The method uses piecewise constant hazards and corresponding integrated life-table person-years; it does not apply conventional HMD infant adjustments. See the [HMD Methods Protocol](https://www.mortality.org/File/GetDocument/Public/Docs/MethodsProtocolV6.pdf) for that database's methodology.
+Birth counts and ASFR are `NA` for males. Female exposure includes the time
+excluded by birth spacing. Zero events with positive exposure give a zero rate;
+zero exposure gives `NA`. Keep those situations distinct.
 
-Input-derived reference tables are also supported:
+Births with unknown mothers cannot be assigned maternal age. Their period
+counts are in `attr(summary, "unassigned_births")`, also a tibble. Initial
+persons born within the observation window can appear there if parents are
+unknown; a baseline is not complete historical birth follow-up.
+
+## Total fertility rate
 
 ```r
 input_tfr <- model$processes$fertility |> calculate_tfr()
-input_life_tables <- model$processes$mortality |>
-  calculate_life_table()
+output_tfr <- summary |> calculate_tfr()
 ```
 
-Both functions also accept their process's `$rates` table. TFR uses `asfr` from
-Lexis counts or `rate` from a fertility input table; life tables use `asmr`,
-`mx`, or mortality `rate`. Typed mortality processes are rejected by TFR,
-and typed fertility processes are rejected by the life-table function. A bare
-table's `rate` column must represent the corresponding demographic process.
+`calculate_tfr()` selects female rows when sex is present, omits open age bands,
+and sums ASFR times each finite band's actual width by period. There is no
+`age_range` argument; subset the summary to the desired age range first.
+Remaining bands must be contiguous. The output reports the finite range used.
 
-## Observation rules
+Missing ASFR contributions are omitted with `na.rm = TRUE`; an all-missing set
+sums to zero. That is the accepted calculation rule, not evidence of zero
+fertility in unobserved ages. Inspect exposure and missing rates alongside TFR.
+HFD input TFR excludes the omitted open endpoint rows, so do not compare it
+uncritically with the full published HFD TFR.
 
-Calculate total living population at selected time points:
+## Life tables
+
+```r
+input_life_table <- model$processes$mortality |> calculate_life_table()
+output_life_table <- summary |> calculate_life_table()
+
+output_life_table |>
+  dplyr::filter(age_start == 0) |>
+  dplyr::select(time_start, time_end, sex, ex)
+```
+
+Each period/sex needs contiguous age bands from zero through an explicit open
+interval. Lexis counts add that interval automatically; manually supplied rate
+tables must define it themselves. The function treats mortality as piecewise
+constant hazards, integrates exponential survival/person-years, and calculates
+`ex = Tx/lx`. It does not apply conventional HMD infant adjustments.
+
+The output includes input identifiers and `mx`, `n`, `ax`, `qx`, `lx`, `lx_end`,
+`dx`, `Lx`, `Tx`, and `ex`. Missing mortality rates propagate into life expectancy.
+A positive-exposure terminal cell with zero deaths has estimated rate zero;
+under the open-interval model this gives infinite remaining life expectancy
+if life-table survivorship there is positive. `na.rm = TRUE` does not remove
+infinity. Report finite, missing, and infinite estimates separately rather than
+silently excluding difficult replications.
+
+Sparse older ages can make a 110+ life table unestimable. Pooling at 100+ may
+make the summary usable, but a reference retaining detailed ages through 110
+has different bands. Label that life-expectancy comparison descriptive unless
+the terminal treatment is aligned. A pooled target ASMR requires exposure
+weights within the pooled band, not an unweighted average of input rates.
+
+TFR and life-table functions also accept their corresponding `$rates` tables.
+TFR uses `asfr` or fertility `rate`; life tables use `mx`, `asmr`, or mortality
+`rate`. Typed processes prevent passing mortality to TFR or fertility to a life
+table. A bare `rate` column has no such type protection.
+
+## Population size and observation boundaries
 
 ```r
 population_sizes <- result |>
   calculate_population_size(times = seq(2000, 2100, by = 10))
 ```
 
-The result has `time` and `population` columns. Births at a requested time are
-included and deaths at that time are excluded. Requested order and repeated
-times are preserved. The function also accepts a persons table for one history;
-as with Lexis counts, the caller must ensure complete follow-up when supplying
-a bare table.
+This returns `time` and `population`. Counts include births and exclude deaths
+at the requested instant, preserving input order and repeated times.
 
-Intervals are half-open. Exposure is recorded lifespan overlap, split directly at age and time boundaries, supporting fractional periods and unequal age bands. A population's known endpoint limits observation. For a bare persons table, ensure complete follow-up through the requested endpoint yourself.
+Lexis exposure splits `[birth_time, death_time)` directly at period/age
+boundaries; fractional years and unequal bands are supported. Population
+objects must have a known endpoint and cannot be queried beyond it. With bare
+persons tables, the caller must ensure follow-up through the requested endpoint.
+Missing death times are censored there.
 
-Births with unknown mothers cannot be classified by maternal age; inspect `attr(summary, "unassigned_births")` for period counts. Initial persons with unknown parents may appear there if their birth dates lie inside the observation window. Use periods with complete birth histories for fertility estimates.
+## Replications and interpretation
 
-Empty cells remain in the summary. Zero exposure gives NA rates. TFR omits missing ASFRs from its sum; missing mortality rates still propagate into life tables. A zero terminal mortality rate implies infinite remaining life expectancy under the hazard model. Wider bands or longer periods can help with sparse data, but missing estimates should not silently become zero.
+Analyze each independent history before combining summaries. There is no
+`groups` argument or automatic custom stratification. Stacking person tables
+with repeated IDs would make parent references ambiguous and is rejected.
+Retain a replication ID when binding derived tables:
 
-Analyze each independent simulation separately. There is no `groups` parameter at this stage. Stacked histories with duplicated IDs must be split before calling the summary function so parent references remain unambiguous. Extra person attributes are not automatically treated as analysis strata.
+```r
+population_sizes <- purrr::map(
+  results, calculate_population_size, times = seq(2000, 2100, 10)
+) |>
+  dplyr::bind_rows(.id = "replication")
+```
 
-These functions support formal validation rather than establish it. Birth-spacing compensation assumptions, initialization, and sampling uncertainty still affect comparisons with inputs. Execution is continuous under D024; compensation uses an age-band midpoint approximation under D028.
+For unnamed lists, `.id` uses character positions; named lists use their names.
+Quantiles across runs describe replication variability, not confidence intervals
+for the mean. For sparse cells, show the number of contributing replications and
+exposure/events. Zero ASMRs cannot appear on a log scale. Longer periods can
+improve precision for calendar-constant inputs, but do not establish absence
+of age-specific bias.
+
+Use aligned ASFR/ASMR alongside aggregate TFR/life expectancy. Distinguish
+sampling variability from persistent differences due to midpoint compensation,
+initialization, or grouped ages. See [testing and validation](testing.md) and
+[the report template](../validation/milestone1.qmd).

@@ -1,107 +1,110 @@
-# Running tests
+# Testing and milestone validation
 
-The suite uses testthat edition 3. Tests live in `tests/testthat/test-*.R`,
-with shared helpers in `tests/testthat/helper-*.R` and the standard package
-runner in `tests/testthat.R`. Run all tests from the project root with:
+Updated October 13, 2026. Software/analytical tests pass for midpoint fertility
+compensation. Broader demographic validation is ongoing; acceptance criteria
+and a completed milestone report are still needed. Earlier implementation-specific
+runs and counts are available in Git history; they do not verify a later engine.
+
+## Run the suite
+
+The package uses testthat edition 3 with testthat >= 3.2.0 for scoped mocks.
+Tests live in `tests/testthat/`, with the standard runner `tests/testthat.R`.
+From the repository root:
 
 ```r
 devtools::test()
+devtools::test(filter = "simulation")
 ```
 
-Run a subset with, for example, `devtools::test(filter = "simulation")`.
-Package checks run the suite through the standard testthat runner. Analytical
-thresholds, seeds, and demographic expectations are retained from the original
-base-R scripts. Each named test case has local fixtures; reader replacements
-use testthat's scoped mocks and restore the original bindings on exit.
-Optional HMDHFDplus reader tests explicitly skip when it is unavailable.
+Package checks use the standard runner. Tests isolate their case fixtures;
+optional HMDHFDplus reader checks skip if it is unavailable, and mocked reader
+bindings restore on exit. The live database test skips unless explicitly enabled.
+The old top-level base-R test scripts have been converted and removed.
 
-## Simulation foundation
+| Test file | Main evidence |
+| --- | --- |
+| `test-model-api.R` | Construction, replacement, schemas, history and metadata retention |
+| `test-baseline-population.R` | Reproducibility, bounds, known cases, distributions, empty populations |
+| `test-processes.R` | Rate validation, typed specifications, units, spacing, edited objects |
+| `test-hazard-sampler.R` | Deterministic hazard inversion and analytical survival |
+| `test-fertility-adjustment.R` | Annual/five-year midpoint overlaps, gaps, shared sampler, feasibility, open-age rejection, independent mortality |
+| `test-simulation.R` | Chronology, spacing, renewal rate, accounting, parent availability, seed isolation, restarts, unions closing on death |
+| `test-demography.R` | Exact exposure, event boundaries, missing/zero cells, TFR widths, analytical life tables, population counts, tibbles |
+| `test-database-processes.R` | Synthetic/local conversions, metadata, RDS reuse without downloads |
+| `test-database-online.R` | Opt-in authenticated download contracts |
 
-`test-demography.R` checks exact fractional-year exposure, event boundary rules, maternal-age birth assignment, rejection of duplicated IDs in stacked histories, unequal-width TFR, empty cells, and analytical constant-hazard life tables, including missing and zero terminal rates. It also checks stable small- and high-rate calculations. These test extraction and estimation algorithms, separately from whether the simulator reproduces its configured demographic rates.
+Minimum-spacing checks group births by mother, sort dates, and check successive
+intervals against the configured spacing with a small numerical tolerance.
+They include default 0.75 years and nondefault 1.13 years across restarts.
 
-Verified October 12, 2026: all offline test scripts and documentation examples passed after adding extraction. A synthetic 50,000-person, 50-year simulation also completed both rate-extraction paths, TFR, and period- and sex-specific life tables in approximately 0.14 seconds of analysis. Period death totals matched the records in the observation window. This is a workflow and accounting check, not a formal demographic validation over replications.
+Most recent recorded implementation verification: the development suite,
+optimized package installation, installed-package runner, and documentation
+examples passed for D028. The installed suite recorded 1,832 expectations,
+zero failures/warnings, and one opt-in live-test skip. Those expectation counts
+are an execution record, not a scientific acceptance criterion. R's timezone
+service was unavailable in the sandbox, so verification set
+`TZ=America/Los_Angeles` explicitly.
 
-`test-hazard-sampler.R` checks known cumulative-hazard thresholds and analytical survival across age bands. `test-simulation.R` checks constant-hazard survival, minimum spacing, adjusted fertility renewal behavior after burn-in, exact continuous mortality dates, within-month chronological competition, half-open endpoints, accounting, ID and history preservation, unknown fathers, union closure, reproducibility, and restart behavior. These are initial foundation checks, not a completed assessment of age-specific rates, TFR, or full life tables.
+The development suite was rerun during this documentation audit and passed,
+with the opt-in live test skipped. Synthetic construction, simulation, analysis,
+and restart examples also ran successfully; no data downloads were made.
 
-The live example `inst/examples/milestone1.R` downloads USA/2000 schedules and runs a population of 50,000 for 100 years. It prints aggregate counts and elapsed simulation time; it does not write credentials or downloaded tables into the repository.
+## Optional live database checks
 
-Verified October 12, 2026: the live example completed from 2000 to 2100 with 75,698 births, 67,291 deaths, and 58,407 living persons at the endpoint. Simulation elapsed time was approximately 0.23 seconds on this machine, excluding downloads. Counts satisfy `50000 + 75698 - 67291 = 58407`; this is not a completed ASFR/TFR or life-table validation. Hazard sampler, simulation, existing model/process/population tests, documentation examples, and Rd checks passed.
-
-The live run also revealed that HMDHFDplus 2.0.8 parses HMD web ages despite `fixup = FALSE`. The adapter now respects `OpenInterval` as well as raw `+` labels; local-reader regression tests and the opt-in online checks cover the open terminal mortality interval.
-
-## Live database integration
-
-`tests/testthat/test-database-online.R` is opt-in. It downloads USA mortality and fertility rates for 2000, passes the prepared rate tibbles to the ordinary setters, and checks the imported process structure, units, sex schedules, rates, and source metadata. It does not simulate a population or establish demographic accuracy. It never prints credentials or raw database tables.
-
-Install HMDHFDplus and supply `HMD_USERNAME`, `HMD_PASSWORD`, `HFD_USERNAME`, and `HFD_PASSWORD` through your environment or `~/.Renviron`. R reads the user environment file at startup (unless overridden by its startup configuration). Then run:
+Install HMDHFDplus and configure `HMD_USERNAME`, `HMD_PASSWORD`, `HFD_USERNAME`,
+and `HFD_PASSWORD` in the R environment or `~/.Renviron`. Then run:
 
 ```sh
 HAMMEL_RUN_ONLINE_TESTS=true Rscript -e 'devtools::test(filter = "database-online")'
 ```
 
-With no opt-in flag, the test skips before inspecting credentials or loading the optional dependency. With the flag enabled, missing credentials, authentication failures, unavailable data, and conversion errors fail the test. Live data can change; the test checks contracts rather than exact rate values. Offline tests use synthetic fixtures and temporary reader replacements to check exact conversions independently of database availability.
+Without opt-in, the test skips before inspecting credentials. With opt-in,
+missing credentials/dependency, authentication errors, or invalid data fail it.
+It checks USA/2000 rate preparation and provenance, not demographic simulation
+accuracy. It does not print credentials or raw downloaded tables.
 
-Verified October 12, 2026: authenticated USA/2000 downloads through both setters passed with HMDHFDplus 2.0.8. This verifies the current access and conversion paths, not future database availability or simulation correctness.
+Authenticated USA/2000 access was verified October 12, 2026 against HMDHFDplus
+2.0.8. Later midpoint verification used offline fixtures; that historical live
+check is not a guarantee of present database availability. Retained missing
+rates are rejected; neither tests nor helpers impute them.
 
-Continuous-time update verified October 12, 2026 on `continuous-execution`: all offline scripts passed after installation in a temporary library. The online script skipped without opt-in; live downloads were not rerun. New checks cover sampled continuous mortality times, chronological birth-before-death competition inside a former monthly bin, exact endpoint exclusion, fractional run durations, father availability, and the continuous renewal expectation with retained monthly compensation. Historical live-run counts above describe the former discrete engine.
+## Reproducible demographic assessment
 
-D025 verified October 12, 2026: all offline scripts passed with the new download helpers. Synthetic reader tests check RDS preservation of rates and source metadata for both databases and reuse in multiple models with readers replaced by functions that fail on any download. Live requests were not rerun.
+The [replication example](../inst/examples/milestone1_bootstrap.R) currently uses
+100,000 initial persons, one shared baseline, and 100 simulation seeds for
+100 years with USA/2000 schedules. It examines TFR, ASFR, life expectancy,
+ASMR with 20-year periods, and population growth. This conditions on the same
+starting population; it does not resample initial populations or observed data.
+Its filename uses “bootstrap,” but the runs are simulation replications.
 
-Download once and persist outside the repository as appropriate:
+The [Quarto template](../validation/milestone1.qmd) is the development report.
+Execution is disabled by default while the user drafts it. From the repository
+root:
 
-```r
-saveRDS(get_mortality_hmd("USA", 2000), "mortality-USA-2000.rds")
-saveRDS(get_fertility_hfd("USA", 2000), "fertility-USA-2000.rds")
-
-model <- hammel_model() |>
-  set_mortality(readRDS("mortality-USA-2000.rds")) |>
-  set_fertility(readRDS("fertility-USA-2000.rds"))
+```sh
+quarto render validation/milestone1.qmd
 ```
 
-RDS retains provenance; CSV does not preserve the `source` attribute. The former `mortality_hmd()`, `fertility_hfd()`, and database setters have been replaced by the download helpers.
+Rate downloads should be saved explicitly with RDS and loaded for later renders;
+record source attributes, checksums, seeds/settings, R/package versions, and
+commit plus any uncommitted code changes. CSV does not preserve provenance
+attributes. Local validation data/rendered output are Git-ignored, and the
+validation directory is excluded from package builds. Preserve completed inputs
+and evidence in a documented archive when sharing the report.
 
-D026 verified October 13, 2026: package installation, all seven offline test
-scripts, and generated documentation examples passed. The online test skipped
-without opt-in. Added checks cover fertility process spacing validation and
-18-month spacing through simulation and restart. Default renewal and zero-spacing
-chronological checks still pass. No live database requests were made.
+## Remaining milestone checks
 
-Testthat conversion verified October 13, 2026: all eight legacy test scripts
-were migrated to named test cases and testthat expectations, and removed from
-the top-level tests directory. Live tests retain explicit opt-in and fail on
-missing credentials or dependency when requested. No live downloads were run.
+- Quantify replicated ASFR/ASMR differences and TFR/life-table agreement,
+  distinguishing bias from variability and uncertainty in the mean.
+- Align input/output age bands and report sparse cells, especially oldest ages;
+  keep descriptive 100+ life-table comparisons distinct from aligned rates.
+- Choose observation/burn-in windows and numerical acceptance criteria with the
+  user. Initial excess fertility does not require an automatic correction.
+- Broaden beyond USA/2000 to higher fertility, five-year fertility bands, and
+  alternative spacing. An African historical case and new source integration
+  are currently postponed, not selected.
 
-Both `devtools::test()` and the installed-package `tests/testthat.R` runner
-passed: 1,791 expectations, zero failures or warnings, and one opt-in live-test
-skip across 52 named cases. Verification set `TZ=America/Los_Angeles` to avoid
-the sandbox's unavailable system timezone service. Testthat >= 3.2.0 is required
-for the scoped reader-mocking API.
-
-D027 verified October 13, 2026: continuous fertility compensation compiled and
-passed the development suite, installed-package testthat runner (1,839
-expectations before the final three decreasing-rate checks), and documentation
-examples. All 50 expectations in the final fertility-adjustment test file pass,
-including the additional decreasing-rate cases. The live database test skipped
-without opt-in; no downloads or live-data replications were run.
-
-`test-fertility-adjustment.R` checks analytic entry-window and constant renewal
-formulas, both signs of eligibility slope, independent R quadrature through
-rate boundaries and gaps, open tails, zero and fractional spacing, numerical
-stability, infeasible schedules, independent mortality after burn-in, and
-age-specific rates in a cohort initialized before fertility entry. Existing
-spacing/restart checks now include 1.13-year intervals. These establish the
-continuous algorithm's analytical cases, not full empirical demographic validity.
-
-D028 verified October 13, 2026: midpoint compensation and the shared Band/
-waiting_time implementation passed the development suite, optimized package
-installation, installed testthat runner (1,832 expectations, zero failures or
-warnings, one live-test skip), and documentation examples. Updated adjustment
-tests cover annual/five-year midpoint weights, windows crossing multiple bands
-and gaps, preserved endpoints, original-rate integration, zero spacing/rates,
-nonpositive midpoint eligibility, rejection of all open-ended fertility inputs
-at construction/attachment/execution, and constant fertility with independent
-mortality. Fractional spacing and restart tests continue to pass.
-
-Exact age-varying sampler tests from D027 were replaced by midpoint expectations.
-No live database requests or empirical ASFR/TFR replications were run; accuracy
-of the approximation for realistic age-varying schedules remains to be assessed.
+User-reported visual agreement and analytical unit checks are useful evidence,
+but do not establish full demographic accuracy or milestone completion. A
+controlled executable SOCSIM comparison has not been performed; use a pinned
+reference and statistical comparisons if that becomes appropriate.
