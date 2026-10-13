@@ -5,7 +5,7 @@ library(ggplot2)
 library(dplyr)
 
 set.seed(42)
-population <- create_baseline_population(100000, max_age = 70, end_time = 2000)
+population <- create_baseline_population(50000, max_age = 70, end_time = 2000)
 model <- hammel_model() |>
   set_population(population) |>
   set_mortality_hmd("USA", year = 2000) |>
@@ -40,7 +40,6 @@ lexis_counts |>
   select(time_start, time_end, age_start, sex, ex)
 
 # Results can initialize a subsequent model with the same or new processes:
-continued_model <- hammel_model() |>
+result2 <- model |>
   set_population(result) |>
-  set_mortality(model$processes$mortality$rates) |>
-  set_fertility(model$processes$fertility$rates)
+  simulate(100, seed = 13)

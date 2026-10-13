@@ -9,7 +9,7 @@ hazard_wait_cpp <- function(rates, ages, thresholds) {
     .Call(`_hammel_hazard_wait_cpp`, rates, ages, thresholds)
 }
 
-simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, steps, dt, spacing) {
-    .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, steps, dt, spacing)
+simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, spacing) {
+    .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, spacing)
 }
 

@@ -93,7 +93,7 @@ double rate_integral(const std::vector<Band>& bands, double lo, double hi) {
 std::vector<Band> adjusted_fertility(const std::vector<Band>& raw, double dt,
                                     int spacing, double max_age) {
   // With no spacing there is no eligibility correction. Otherwise build a
-  // step-sized age schedule once, covering all ages reachable during this run.
+  // monthly compensation age schedule once, covering all ages reachable during this run.
   if (!spacing) return raw;
   double count = std::ceil(max_age / dt) + 1;
   if (count > std::numeric_limits<int>::max()) stop("Age grid is too large.");
@@ -103,15 +103,15 @@ std::vector<Band> adjusted_fertility(const std::vector<Band>& raw, double dt,
   for (int k = 0; k < static_cast<int>(count); ++k) {
     if (k % 1024 == 0) checkUserInterrupt();
     const double lo = k * dt, hi = (k + 1.0) * dt;
-    // Average the input rate over this age step. Estimate the fraction excluded
-    // by recent births using the preceding spacing steps, then increase the
+    // Average the input rate over this age interval. Estimate the fraction excluded
+    // by recent births using the preceding compensation intervals, then increase the
     // hazard among eligible women. This SOCSIM-style correction is approximate.
     const double rate = rate_integral(raw, lo, hi) / dt;
     const double eligible = 1 - ineligible;
     if (eligible <= 0) stop("Birth interval and fertility rates imply nonpositive eligibility.");
     adjusted.push_back({lo, hi, rate / eligible});
     // Numerically stable 1 - exp(-rate * dt). Add the new probability to the
-    // moving window and remove the one leaving it before the next age step.
+    // moving window and remove the one leaving it before the next age interval.
     probabilities.push_back(-std::expm1(-rate * dt));
     ineligible += probabilities.back();
     if (k >= spacing) ineligible -= probabilities[k - spacing];
@@ -121,8 +121,8 @@ std::vector<Band> adjusted_fertility(const std::vector<Band>& raw, double dt,
 
 // [[Rcpp::export]]
 List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
-                  DataFrame fertility_rates, double start, int steps,
-                  double dt, int spacing) {
+                  DataFrame fertility_rates, double start, double years,
+                  double birth_interval, int spacing) {
   // R performs input validation and seed handling. All engine state below is
   // local to this call; public times and rates remain in years and person-years.
   NumericVector ids = persons["person_id"], births = persons["birth_time"];
@@ -159,19 +159,15 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   const auto male_rates = read_bands(mortality_rates, "m");
   const auto female_rates = read_bands(mortality_rates, "f");
   const auto fertility_rates_adjusted = adjusted_fertility(
-    read_bands(fertility_rates), dt, spacing, max_age + steps * dt);
-  // An ordered map stores only occupied steps, each with a growable event list.
-  // It lets us jump over empty steps while retaining future events in memory.
-  std::map<int, std::vector<Event>> queue;
-
-  // These lambdas are small functions sharing the enclosing run's state.
-  auto candidate = [&](double waiting, int step) -> int {
-    // Floor the continuous waiting time to an integer step offset. The value
-    // steps is a sentinel for no event before the half-open run endpoint.
-    if (!std::isfinite(waiting)) return steps;
-    double offset = std::floor(waiting / dt);
-    if (offset >= steps - step) return steps;
-    return step + static_cast<int>(offset);
+    read_bands(fertility_rates), 1.0 / 12.0, spacing, max_age + years);
+  // Continuous dates order events. Equivalent keys retain insertion order.
+  std::multimap<double, Event> queue;
+  const double end = start + years;
+  auto candidate = [&](double waiting, double now) {
+    double due = now + waiting;
+    if (std::isfinite(waiting) && due <= now)
+      stop("Event time cannot advance at this numerical scale.");
+    return due;
   };
   auto threshold = [&]() {
     // Use R's RNG, shared with the seed policy in simulate(). Exp(1) is the
@@ -180,103 +176,79 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     do { value = R::rexp(1.0); } while (value <= 0);
     return value;
   };
-  auto schedule = [&](int i, int step) {
+  auto schedule = [&](int i, double now) {
     const Person& p = people[i];
     if (!NumericVector::is_na(p.died)) return;
-    double now = start + step * dt;
     const auto& death_rates = p.female ? female_rates : male_rates;
-    // Sample independent death and birth candidates, incorporating future
-    // age-band changes. Dead persons never acquire another pending event.
-    int death_step = candidate(waiting_time(death_rates, now - p.born, threshold()), step);
-    int birth_step = steps;
+    double death_time = candidate(waiting_time(death_rates, now - p.born, threshold()), now);
+    double birth_time = std::numeric_limits<double>::infinity();
     if (p.female) {
-      // Derive spacing from elapsed years; round only to resolve numerical
-      // noise in already step-aligned birth dates, never calendar month counts.
-      double remaining = p.last_birth + spacing * dt - now;
-      double delay_steps = remaining > 0 ? std::ceil(remaining / dt - 1e-9) : 0;
-      if (delay_steps < steps - step) {
-        int first = step + static_cast<int>(delay_steps);
-        double age = start + first * dt - p.born;
-        // Start fertility sampling at the first step allowed by birth spacing.
-        birth_step = candidate(waiting_time(fertility_rates_adjusted, age, threshold()), first);
-      }
+      double first = std::max(now, p.last_birth + birth_interval);
+      if (first < end)
+        birth_time = candidate(waiting_time(fertility_rates_adjusted,
+          first - p.born, threshold()), first);
     }
-    int due = std::min(death_step, birth_step);
-    // Compare integer-step dates. Equality selects death, even if the continuous
-    // birth candidate preceded death within that same step. Discard the loser.
-    if (due < steps) queue[due].push_back({i, death_step <= birth_step});
+    double due = std::min(death_time, birth_time);
+    // Only exact ties select death; fractional ordering is preserved.
+    if (due < end) queue.emplace(due, Event{i, death_time <= birth_time});
   };
   // Initialize one next event for each living person. Known age changes are
   // already incorporated, so birthdays alone do not trigger resampling.
   for (int i = 0; i < static_cast<int>(people.size()); ++i) {
     if (i % 1024 == 0) checkUserInterrupt();
-    schedule(i, 0);
+    schedule(i, start);
   }
   double birth_count = 0, death_count = 0;
   unsigned long long processed = 0;
   while (!queue.empty()) {
-    // begin() is the earliest occupied step because std::map orders its keys.
-    int step = queue.begin()->first;
-    auto& events = queue.begin()->second;
-    while (!events.empty()) {
-      // Random sequential execution across people is distinct from the
-      // death-before-birth tie rule for one person's competing candidates.
-      // Drain this step fully, including new events scheduled into it.
-      if (++processed % 1024 == 0) checkUserInterrupt();
-      size_t choice = std::min(events.size() - 1,
-        static_cast<size_t>(R::runif(0, 1) * events.size()));
-      Event event = events[choice];
-      // Remove without shifting the whole vector: fill the selected slot with
-      // the last entry, then pop it. Event-list ordering has no meaning.
-      events[choice] = events.back();
-      events.pop_back();
-      const int i = event.person;
-      const double now = start + step * dt;
-      if (event.death) {
-        // Retain the person's history, record death, and stop their scheduling.
-        people[i].died = now;
-        if (!people[i].female) {
-          // Remove a dead male in constant time, updating the moved male's slot.
-          int slot = people[i].male_slot;
-          int moved = males.back();
-          males[slot] = moved;
-          people[moved].male_slot = slot;
-          males.pop_back();
-          people[i].male_slot = -1;
-        }
-        ++death_count;
-      } else {
-        // All living females face age-specific fertility risk, regardless of
-        // unions. Sample from all currently living males without age or kinship
-        // restrictions; preserve the birth with unknown father if none exist.
-        double father = NA_REAL;
-        if (!males.empty()) {
-          size_t selected = std::min(males.size() - 1,
-            static_cast<size_t>(R::runif(0, 1) * males.size()));
-          father = people[males[selected]].id;
-        }
-        if (next_id >= 9007199254740991.0 ||
-            people.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
-          stop("Population exceeds supported ID or row limits.");
-        // IDs increase beyond existing histories. Store newborn parentage and
-        // equal-probability sex; no union is created by this engine.
-        double mother = people[i].id;
-        people[i].last_birth = now;
-        bool female = R::runif(0, 1) < 0.5;
-        int child = static_cast<int>(people.size());
-        int slot = female ? -1 : static_cast<int>(males.size());
-        people.push_back({++next_id, now, NA_REAL, mother, father,
-                          -std::numeric_limits<double>::infinity(), female, slot});
-        if (!female) males.push_back(child);
-        ++birth_count;
-        // Both newborn and mother need fresh candidates. The mother now has a
-        // new last_birth; spacing delays her next birth, but not a possible death.
-        schedule(child, step);
-        schedule(i, step);
+    if (++processed % 1024 == 0) checkUserInterrupt();
+    auto next = queue.begin();
+    const double now = next->first;
+    const Event event = next->second;
+    queue.erase(next);
+    const int i = event.person;
+    if (event.death) {
+      // Retain the person's history, record death, and stop their scheduling.
+      people[i].died = now;
+      if (!people[i].female) {
+        // Remove a dead male in constant time, updating the moved male's slot.
+        int slot = people[i].male_slot;
+        int moved = males.back();
+        males[slot] = moved;
+        people[moved].male_slot = slot;
+        males.pop_back();
+        people[i].male_slot = -1;
       }
+      ++death_count;
+    } else {
+      // All living females face age-specific fertility risk, regardless of
+      // unions. Sample from all currently living males without age or kinship
+      // restrictions; preserve the birth with unknown father if none exist.
+      double father = NA_REAL;
+      if (!males.empty()) {
+        size_t selected = std::min(males.size() - 1,
+          static_cast<size_t>(R::runif(0, 1) * males.size()));
+        father = people[males[selected]].id;
+      }
+      if (next_id >= 9007199254740991.0 ||
+          people.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
+        stop("Population exceeds supported ID or row limits.");
+      // IDs increase beyond existing histories. Store newborn parentage and
+      // equal-probability sex; no union is created by this engine.
+      double mother = people[i].id;
+      people[i].last_birth = now;
+      bool female = R::runif(0, 1) < 0.5;
+      int child = static_cast<int>(people.size());
+      int slot = female ? -1 : static_cast<int>(males.size());
+      people.push_back({++next_id, now, NA_REAL, mother, father,
+                        -std::numeric_limits<double>::infinity(), female, slot});
+      if (!female) males.push_back(child);
+      ++birth_count;
+      // Both newborn and mother need fresh candidates. The mother now has a
+      // new last_birth; spacing delays her next birth, but not a possible death.
+      schedule(child, now);
+      schedule(i, now);
     }
-    // All events in this step, including same-step follow-ups, have executed.
-    queue.erase(step);
   }
   // Materialize ordinary R columns from the C++ records. The R wrapper restores
   // custom columns, closes existing unions affected by deaths, and assembles the

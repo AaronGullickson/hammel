@@ -2,29 +2,29 @@
 #'
 #' Advance a configured model and return a population that can initialize a
 #' later run. The C++ engine samples candidate waiting times across age bands,
-#' truncates to configured steps, and prioritizes death over birth on ties.
-#' Events within a step execute in random order. All living females face the
+#' executes at continuous times, and prioritizes death over birth on exact ties.
+#' Events execute chronologically. All living females face the
 #' fertility schedule; each birth samples a father uniformly from living males,
 #' or records an unknown father if none are available. No new unions are formed.
 #'
 #' Minimum birth spacing uses recorded maternal births, including on restart.
 #' SOCSIM-style eligible-risk adjustment compensates approximately for spacing;
-#' this is not a guarantee of exact ASFR matching. Fertility outside supplied
+#' its monthly age grid is independent of continuous event execution.
+#' This is not a guarantee of exact ASFR matching. Fertility outside supplied
 #' bands is zero. Mortality must cover all ages for both sexes, ending at `Inf`.
 #'
-#' Events are recorded at step starts in `[start, start + years)`. Rates and all
+#' Events are recorded at their sampled times in `[start, start + years)`. Rates and all
 #' times remain in person-year and year units. Newborn custom columns are missing;
 #' existing custom columns and histories are preserved. Restarting samples new
 #' pending events and does not reproduce an uninterrupted run exactly.
 #'
 #' @param model A `hammel_model` containing a population and both demographic
 #'   processes. The population must have a finite `end_time`.
-#' @param years Nonnegative simulation duration in years, a whole number of steps.
+#' @param years Nonnegative simulation duration in years.
 #' @param seed Optional integer seed. With a seed, the caller's RNG state is
 #'   restored afterward. With `NULL`, the simulation advances the current RNG.
-#' @param step_duration Positive step duration in years, initially `1/12`.
 #' @param birth_interval Nonnegative minimum time between maternal births in
-#'   years, initially `0.75`. Must be a whole number of steps.
+#'   years, initially `0.75`. Must be a whole number of monthly compensation intervals.
 #' @return A `hammel_population` with updated histories and endpoint, plus a
 #'   `simulation` component recording run settings and birth/death counts.
 #' @export
@@ -37,8 +37,7 @@
 #'   set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0.1))
 #' result <- simulate(model, years = 2, seed = 42)
 #' result$simulation
-simulate <- function(model, years, seed = NULL, step_duration = 1/12,
-                     birth_interval = 0.75) {
+simulate <- function(model, years, seed = NULL, birth_interval = 0.75) {
   check_model(model)
   if (is.null(model$population) || is.null(model$processes$mortality) ||
       is.null(model$processes$fertility)) {
@@ -49,13 +48,11 @@ simulate <- function(model, years, seed = NULL, step_duration = 1/12,
   validate_population(population)
   start <- population$end_time
   if (is.null(start)) stop("The population needs a finite `end_time`.", call. = FALSE)
-  if (!is.numeric(step_duration) || length(step_duration) != 1L ||
-      !is.finite(step_duration) || step_duration <= 0) {
-    stop("`step_duration` must be positive and finite, in years.", call. = FALSE)
+  if (!is.numeric(years) || length(years) != 1L || !is.finite(years) || years < 0) {
+    stop("`years` must be finite and nonnegative.", call. = FALSE)
   }
-  steps <- simulation_steps(years, step_duration, "years")
-  spacing <- simulation_steps(birth_interval, step_duration, "birth_interval")
-  if (!is.finite(start + years) || (years > 0 && start + step_duration == start)) {
+  spacing <- compensation_intervals(birth_interval)
+  if (!is.finite(start + years) || (years > 0 && start + years == start)) {
     stop("Simulation times cannot be represented at this scale.", call. = FALSE)
   }
   # Recheck edited specifications, without introducing a model diagnostic API.
@@ -92,9 +89,9 @@ simulate <- function(model, years, seed = NULL, step_duration = 1/12,
   }
   result <- population
   births <- deaths <- 0
-  if (steps > 0L) {
+  if (years > 0) {
     native <- simulate_cpp(population$persons, death_rates, birth_rates,
-                           start, steps, step_duration, spacing)
+                           start, years, birth_interval, spacing)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {
@@ -117,7 +114,7 @@ simulate <- function(model, years, seed = NULL, step_duration = 1/12,
   }
   result$end_time <- start + years
   result$simulation <- list(start_time = start, end_time = result$end_time,
-    step_duration = step_duration, birth_interval = birth_interval,
+    birth_interval = birth_interval,
     births = births, deaths = deaths)
   result$persons <- tibble::as_tibble(result$persons)
   result$unions <- tibble::as_tibble(result$unions)
@@ -125,13 +122,14 @@ simulate <- function(model, years, seed = NULL, step_duration = 1/12,
   result
 }
 
-simulation_steps <- function(duration, dt, argument) {
+compensation_intervals <- function(duration) {
+  dt <- 1/12
   if (!is.numeric(duration) || length(duration) != 1L || !is.finite(duration) ||
       duration < 0 || !is.finite(duration / dt) ||
       duration / dt > .Machine$integer.max ||
       abs(duration / dt - round(duration / dt)) > 1e-8) {
-    stop(sprintf("`%s` must be nonnegative and a whole number of simulation steps.",
-                 argument), call. = FALSE)
+    stop("`birth_interval` must be nonnegative and a whole number of monthly compensation intervals.",
+         call. = FALSE)
   }
   as.integer(round(duration / dt))
 }

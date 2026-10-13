@@ -37,8 +37,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // simulate_cpp
-List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, int steps, double dt, int spacing);
-RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP stepsSEXP, SEXP dtSEXP, SEXP spacingSEXP) {
+List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, int spacing);
+RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP spacingSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -46,10 +46,10 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< DataFrame >::type mortality_rates(mortality_ratesSEXP);
     Rcpp::traits::input_parameter< DataFrame >::type fertility_rates(fertility_ratesSEXP);
     Rcpp::traits::input_parameter< double >::type start(startSEXP);
-    Rcpp::traits::input_parameter< int >::type steps(stepsSEXP);
-    Rcpp::traits::input_parameter< double >::type dt(dtSEXP);
+    Rcpp::traits::input_parameter< double >::type years(yearsSEXP);
+    Rcpp::traits::input_parameter< double >::type birth_interval(birth_intervalSEXP);
     Rcpp::traits::input_parameter< int >::type spacing(spacingSEXP);
-    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, steps, dt, spacing));
+    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, spacing));
     return rcpp_result_gen;
 END_RCPP
 }

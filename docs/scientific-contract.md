@@ -175,3 +175,15 @@ Age-break clarification: `calculate_lexis_counts()` appends Inf when age breaks 
 TFR clarification: `calculate_tfr()` no longer takes `age_range`. Select female rows when sex is present, omit rows with infinite `age_end`, and sum ASFR times width across the remaining finite contiguous age bands for each period. Missing ASFRs in retained bands still produce NA. Report the actual finite range used.
 
 TFR missing-value clarification: at the user's direction, sum ASFR times interval width with `na.rm = TRUE`, omitting missing ASFR contributions. An all-missing set of retained bands therefore sums to zero, following R's sum semantics. Missing mortality-rate handling in life tables is unchanged.
+
+## Continuous-time execution (D024)
+
+Supersedes step-start truncation and random within-step execution above. Public times remain years. Sample continuous mortality and fertility candidates by cumulative-hazard inversion and execute the earliest candidate chronologically, without flooring or rounding. Keep one next event per person; exact equal-time candidates for a person select death. Across persons, exact ties execute in insertion order (initial population row order, then newborn before mother when rescheduling). This deterministic fallback consumes no additional random draws. No execution step or annual batching exists.
+
+Run boundaries remain half-open `[start, start + years)`; any finite nonnegative duration is allowed. After a birth at time `t`, maternal fertility sampling starts at `max(now, t + birth_interval)`, while mortality remains active throughout spacing. Newborns enter risk immediately. Events update father availability immediately. Restart behavior remains resampling rather than exact checkpoint continuation.
+
+Retain the SOCSIM-style fertility compensation on its existing monthly age grid (`1/12` years), with nine preceding intervals for the default spacing of 0.75 years. This grid describes the adjusted hazard, not execution times. Birth intervals still must be whole multiples of that compensation interval; zero spacing uses the unadjusted schedule. The adjustment remains approximate and is not a continuous-time calibration guarantee.
+
+Examples: a birth candidate at 0.02 years precedes a death candidate at 0.06 years, even though both lie in the first month. A birth at 1.03 with spacing 0.75 makes fertility eligible at 1.78, without rounding; mortality may occur before then. A candidate exactly at the endpoint is excluded. Constant adjusted hazard `h` with spacing `b` has long-run renewal rate `1 / (b + 1/h)`, unlike the previous truncated-wait expectation.
+
+Validation: exact sampled mortality dates against R exponential draws, chronological competing events within a former monthly bin, continuous birth spacing and restart spacing, half-open boundaries, constant-hazard survival, renewal expectation, accounting, reproducibility, and father availability at recorded birth times. Full age-specific demographic validation remains outstanding.

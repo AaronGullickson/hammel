@@ -195,3 +195,10 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 - **Status:** accepted October 12, 2026.
 - **Decision:** rename `summarize_demography()` to `calculate_lexis_counts()`.
 - **Scope:** retain existing exposure, counts, ASMR/ASFR, and interval behavior. Life-table missing-rate handling remains unchanged. This supersedes the function name in D020.
+
+## D024: Continuous-time event execution
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** on a branch from master, remove event-time truncation and the execution step; execute continuous candidates chronologically. Retain existing monthly SOCSIM-style fertility compensation separately.
+- **Supersedes:** D004/D008/D013/D019 requirements for discrete event execution, truncated candidate comparison, and random within-step order. Year units, cumulative-hazard sampling, and demographic scope remain in effect.
+- **Implementation rules:** scientific contract's continuous-time section specifies exact ties, boundaries, spacing, and analytical validation. Monthly compensation and its approximation remain; this does not establish demographic accuracy.
