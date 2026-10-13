@@ -163,3 +163,23 @@ ggplot(asmr_summary, aes(x = age_start))+
   facet_wrap(~sex)+
   scale_y_log10()+
   theme_bw()
+
+# Assess population growth ----------------------------------------------------
+
+pop_size <- map(
+  results, 
+  calculate_population_size, 
+  seq(from = 2000, to = 2100, by = 10)
+) |>
+  bind_rows(.id = "iteration") |>
+  mutate(iteration = as.integer(iteration))
+
+pop_size_summary <- pop_size |>
+  group_by(time) |>
+  summarize(mean = mean(population), median = median(population))
+
+ggplot(pop_size, aes(x = time))+
+  geom_line(alpha = 0.5, aes(y = population, group = iteration))+
+  geom_line(data = pop_size_summary, aes(y = mean), 
+            color = "red", alpha = 0.5, linewidth = 2)+
+  theme_bw()
