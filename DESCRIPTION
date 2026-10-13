@@ -14,8 +14,10 @@ LinkingTo:
     Rcpp
 SystemRequirements: C++17
 Suggests:
-    HMDHFDplus (>= 2.0.8)
+    HMDHFDplus (>= 2.0.8),
+    testthat (>= 3.2.0)
 Roxygen: list(markdown = TRUE)
 URL: https://github.com/AaronGullickson/hammel
 BugReports: https://github.com/AaronGullickson/hammel/issues
 Config/roxygen2/version: 8.1.1
+Config/testthat/edition: 3
