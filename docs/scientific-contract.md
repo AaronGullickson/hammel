@@ -99,6 +99,8 @@ This decision resolves the earlier open single-process conversion direction. It 
 
 ## Accepted hazard-scale waiting-time direction
 
+See [how waiting-time sampling works](waiting-time-sampling.md) for a plain-language explanation, a worked example, and the mathematical connection to SOCSIM.
+
 Sample candidate event times directly using cumulative hazard under piecewise constant hazards:
 
 1. Draw `U` uniformly on `(0, 1)` and set the positive threshold `E = -log(U)`.
