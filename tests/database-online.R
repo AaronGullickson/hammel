@@ -13,8 +13,8 @@ if (identical(Sys.getenv("HAMMEL_RUN_ONLINE_TESTS"), "true")) {
 
   # Credentials are consumed by the helpers; never print them or downloaded rows.
   model <- hammel_model() |>
-    set_mortality_hmd("USA", year = 2000) |>
-    set_fertility_hfd("USA", year = 2000)
+    set_mortality(get_mortality_hmd("USA", year = 2000)) |>
+    set_fertility(get_fertility_hfd("USA", year = 2000))
   deaths <- model$processes$mortality
   births <- model$processes$fertility
   stopifnot(

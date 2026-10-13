@@ -18,7 +18,7 @@ The live run also revealed that HMDHFDplus 2.0.8 parses HMD web ages despite `fi
 
 ## Live database integration
 
-`tests/database-online.R` is opt-in. It downloads USA mortality and fertility rates for 2000, exercises both pipeable database setters, and checks the imported process structure, units, sex schedules, rates, and source metadata. It does not simulate a population or establish demographic accuracy. It never prints credentials or raw database tables.
+`tests/database-online.R` is opt-in. It downloads USA mortality and fertility rates for 2000, passes the prepared rate tibbles to the ordinary setters, and checks the imported process structure, units, sex schedules, rates, and source metadata. It does not simulate a population or establish demographic accuracy. It never prints credentials or raw database tables.
 
 Install HMDHFDplus and supply `HMD_USERNAME`, `HMD_PASSWORD`, `HFD_USERNAME`, and `HFD_PASSWORD` through your environment or `~/.Renviron`. R reads the user environment file at startup (unless overridden by its startup configuration). Then run:
 
@@ -31,3 +31,18 @@ With no opt-in flag, the test skips before inspecting credentials or loading the
 Verified October 12, 2026: authenticated USA/2000 downloads through both setters passed with HMDHFDplus 2.0.8. This verifies the current access and conversion paths, not future database availability or simulation correctness.
 
 Continuous-time update verified October 12, 2026 on `continuous-execution`: all offline scripts passed after installation in a temporary library. The online script skipped without opt-in; live downloads were not rerun. New checks cover sampled continuous mortality times, chronological birth-before-death competition inside a former monthly bin, exact endpoint exclusion, fractional run durations, father availability, and the continuous renewal expectation with retained monthly compensation. Historical live-run counts above describe the former discrete engine.
+
+D025 verified October 12, 2026: all offline scripts passed with the new download helpers. Synthetic reader tests check RDS preservation of rates and source metadata for both databases and reuse in multiple models with readers replaced by functions that fail on any download. Live requests were not rerun.
+
+Download once and persist outside the repository as appropriate:
+
+```r
+saveRDS(get_mortality_hmd("USA", 2000), "mortality-USA-2000.rds")
+saveRDS(get_fertility_hfd("USA", 2000), "fertility-USA-2000.rds")
+
+model <- hammel_model() |>
+  set_mortality(readRDS("mortality-USA-2000.rds")) |>
+  set_fertility(readRDS("fertility-USA-2000.rds"))
+```
+
+RDS retains provenance; CSV does not preserve the `source` attribute. The former `mortality_hmd()`, `fertility_hfd()`, and database setters have been replaced by the download helpers.

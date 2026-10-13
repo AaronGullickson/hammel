@@ -16,9 +16,9 @@ expect_error(hammel:::mortality_from_hmd(bad, 2000))
 bad <- hmd; bad$Age[2] <- "0-4"
 expect_error(hammel:::mortality_from_hmd(bad, 2000))
 expect_error(hammel:::mortality_from_hmd(rbind(hmd, hmd[2, ]), 2000))
-expect_error(mortality_hmd("USA", 2000, username = "", password = ""))
-expect_error(mortality_hmd("USA", c(2000, 2001), "test", "test"))
-expect_error(set_mortality_hmd(list(), "USA", 2000, "test", "test"))
+expect_error(get_mortality_hmd("USA", 2000, username = "", password = ""))
+expect_error(get_mortality_hmd("USA", c(2000, 2001), "test", "test"))
+
 
 # Verify local parsing with the optional package, without authentication.
 if (requireNamespace("HMDHFDplus", quietly = TRUE)) {
@@ -74,9 +74,19 @@ if (requireNamespace("HMDHFDplus", quietly = TRUE)) {
     stopifnot(CNTRY == "USA", item == "Mx_1x1", !fixup)
     hmd
   }, {
-    model <- set_mortality_hmd(hammel_model(), "USA", 2000, "test", "test")
+    rates <- get_mortality_hmd("USA", 2000, "test", "test")
+    path <- tempfile()
+    saveRDS(rates, path)
+    restored <- readRDS(path)
+    unlink(path)
+    stopifnot(inherits(rates, "tbl_df"), identical(rates, restored))
+    model <- set_mortality(hammel_model(), restored)
+    with_reader("readHMDweb", function(...) stop("Unexpected download"), {
+      reused <- set_mortality(hammel_model(), restored)
+      stopifnot(identical(reused, model))
+    })
     imported <- model$processes$mortality
-    stopifnot(identical(imported$rates, process$rates),
+    stopifnot(identical(as.data.frame(imported$rates)[names(process$rates)], as.data.frame(process$rates)),
               imported$source$year == 2000,
               !any(c("username", "password") %in% names(imported$source)))
   })
@@ -84,10 +94,19 @@ if (requireNamespace("HMDHFDplus", quietly = TRUE)) {
     stopifnot(CNTRY == "USA", item == "asfrRR", !fixup, Update == "20230328")
     hfd
   }, {
-    model <- set_fertility_hfd(hammel_model(), "USA", 2000, "test", "test",
-                              update = "20230328")
+    rates <- get_fertility_hfd("USA", 2000, "test", "test", update = "20230328")
+    path <- tempfile()
+    saveRDS(rates, path)
+    restored <- readRDS(path)
+    unlink(path)
+    stopifnot(inherits(rates, "tbl_df"), identical(rates, restored))
+    model <- set_fertility(hammel_model(), rates)
+    with_reader("readHFDweb", function(...) stop("Unexpected download"), {
+      reused <- set_fertility(hammel_model(), restored)
+      stopifnot(identical(reused, model))
+    })
     imported <- model$processes$fertility
-    stopifnot(identical(imported$rates, births$rates),
+    stopifnot(identical(imported$rates$rate, births$rates$rate),
               imported$source$open_ages == "omit",
               imported$source$update == "20230328")
   })

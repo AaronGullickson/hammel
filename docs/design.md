@@ -91,3 +91,7 @@ The common operation is `set_process(model, process)`, using the name carried by
 `simulate(model, years, seed = NULL, birth_interval = 0.75)` returns an updated `hammel_population`. Required model components are population, mortality, and fertility. The population's `end_time` supplies the starting time. C++ handles cumulative-hazard sampling, adjusted fertility schedules, a sparse event queue, and constant-time random selection from currently living males. R handles configuration, optional seed isolation, custom-column preservation, and result assembly. Engine state is local to each call.
 
 Public units remain years and person-year rates; only explicit defaults express the initial monthly increment and nine-month birth spacing. See the scientific contract for boundary, competition, coverage, and adjustment details. The example in `inst/examples/milestone1.R` runs 50,000 initial persons for 100 years with downloaded constant USA/2000 rates. Scientific accuracy beyond the initial analytical checks remains to be assessed.
+
+## Reusable database inputs (D025)
+
+Download prepared rate tibbles with `get_mortality_hmd()` and `get_fertility_hfd()`. Save them with `saveRDS()` and reload with `readRDS()`; pass the tables to `set_mortality()` and `set_fertility()`. Downloading is separate from model configuration, and source metadata is retained.

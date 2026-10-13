@@ -1,4 +1,4 @@
-#' Download a mortality process from the Human Mortality Database
+#' Download prepared mortality rates from the Human Mortality Database
 #'
 #' Download the HMD `Mx_1x1` product through HMDHFDplus and select one calendar
 #' year. Male and female central death rates are retained in person-year units
@@ -8,7 +8,7 @@
 #'
 #' Single-year ages become `[age, age + 1)`; an upper open age such as `110+`
 #' becomes `[110, Inf)`. Missing rates are rejected, not interpolated or dropped.
-#' Credentials are passed to the reader and are not stored in the process.
+#' Credentials are passed to the reader and are not stored in the table.
 #'
 #' @param country A single HMD population code, such as `"USA"`.
 #' @param year A single whole-number calendar year to select.
@@ -16,58 +16,23 @@
 #'   environment variable.
 #' @param password Database password. Defaults to the `HMD_PASSWORD`
 #'   environment variable.
-#' @return A validated mortality process with source metadata.
+#' @return A validated mortality rate tibble with a `source` attribute.
 #' @export
 #' @examples
 #' \dontrun{
-#' process <- mortality_hmd("USA", year = 2000)
-#' model <- hammel_model() |> set_process(process)
+#' rates <- get_mortality_hmd("USA", year = 2000)
+#' saveRDS(rates, "rates.rds")
+#' model <- hammel_model() |> set_mortality(readRDS("rates.rds"))
 #' }
-mortality_hmd <- function(country, year, username = Sys.getenv("HMD_USERNAME"),
+get_mortality_hmd <- function(country, year, username = Sys.getenv("HMD_USERNAME"),
                           password = Sys.getenv("HMD_PASSWORD")) {
   check_database_request(country, year, username, password)
   data <- HMDHFDplus::readHMDweb(CNTRY = country, item = "Mx_1x1",
                                username = username, password = password,
                                fixup = FALSE)
-  process <- mortality_from_hmd(data, year)
-  process$source <- database_source("HMD", country, year, "Mx_1x1")
-  process
-}
-
-#' Set mortality from the Human Mortality Database
-#'
-#' Download and construct a process with [mortality_hmd()], then attach it
-#' through [set_process()].
-#' @param model A `hammel_model` object.
-#' @inheritParams mortality_hmd
-#' @return An updated `hammel_model`.
-#' @export
-set_mortality_hmd <- function(model, country, year,
-                              username = Sys.getenv("HMD_USERNAME"),
-                              password = Sys.getenv("HMD_PASSWORD")) {
-  check_model(model)
-  set_process(model, mortality_hmd(country, year, username, password))
-}
-
-check_database_request <- function(country, year, username, password) {
-  if (!is.character(country) || length(country) != 1L || is.na(country) ||
-      !nzchar(trimws(country))) {
-    stop("`country` must be a single nonempty population code.", call. = FALSE)
-  }
-  if (!is.numeric(year) || length(year) != 1L || !is.finite(year) ||
-      year != trunc(year)) {
-    stop("`year` must be a single whole-number calendar year.", call. = FALSE)
-  }
-  for (credential in list(username, password)) {
-    if (!is.character(credential) || length(credential) != 1L ||
-        is.na(credential) || !nzchar(credential)) {
-      stop("Supply database credentials as arguments or environment variables.",
-           call. = FALSE)
-    }
-  }
-  if (!requireNamespace("HMDHFDplus", quietly = TRUE)) {
-    stop("Install HMDHFDplus to download database rates.", call. = FALSE)
-  }
+  rates <- mortality_from_hmd(data, year)$rates
+  attr(rates, "source") <- database_source("HMD", country, year, "Mx_1x1")
+  rates
 }
 
 select_database_year <- function(data, year, columns) {
@@ -110,7 +75,7 @@ database_source <- function(database, country, year, item, update = NULL) {
        reader_version = as.character(utils::packageVersion("HMDHFDplus")))
 }
 
-#' Download a fertility process from the Human Fertility Database
+#' Download prepared fertility rates from the Human Fertility Database
 #'
 #' Download total period age-specific fertility rates (`asfrRR`) through
 #' HMDHFDplus and select one explicit year. Rates remain births per woman-year
@@ -120,7 +85,7 @@ database_source <- function(database, country, year, item, update = NULL) {
 #' HFD open-age rows such as `12-` and `55+` are omitted. The resulting
 #' schedule covers only closed single-year age bands, so its TFR excludes those
 #' endpoint contributions. No rates are supplied outside the retained schedule.
-#' Credentials are never retained in the process.
+#' Credentials are never retained in the table.
 #'
 #' @param country A single HFD population code.
 #' @param year A single whole-number calendar year.
@@ -128,14 +93,15 @@ database_source <- function(database, country, year, item, update = NULL) {
 #' @param password HFD password, defaulting to `HFD_PASSWORD`.
 #' @param update Optional HFD revision date as `"YYYYMMDD"`, passed as `Update`
 #'   to HMDHFDplus. `NULL` requests its current revision.
-#' @return A validated fertility process with source metadata.
+#' @return A validated fertility rate tibble with a `source` attribute.
 #' @export
 #' @examples
 #' \dontrun{
-#' process <- fertility_hfd("USA", 2000)
-#' model <- hammel_model() |> set_process(process)
+#' rates <- get_fertility_hfd("USA", 2000)
+#' saveRDS(rates, "rates.rds")
+#' model <- hammel_model() |> set_fertility(readRDS("rates.rds"))
 #' }
-fertility_hfd <- function(country, year, username = Sys.getenv("HFD_USERNAME"),
+get_fertility_hfd <- function(country, year, username = Sys.getenv("HFD_USERNAME"),
                           password = Sys.getenv("HFD_PASSWORD"), update = NULL) {
   check_database_request(country, year, username, password)
   if (!is.null(update) &&
@@ -146,27 +112,10 @@ fertility_hfd <- function(country, year, username = Sys.getenv("HFD_USERNAME"),
   data <- HMDHFDplus::readHFDweb(CNTRY = country, item = "asfrRR",
                                username = username, password = password,
                                fixup = FALSE, Update = update)
-  process <- fertility_from_hfd(data, year)
-  process$source <- database_source("HFD", country, year, "asfrRR", update)
-  process$source$open_ages <- "omit"
-  process
-}
-
-#' Set fertility from the Human Fertility Database
-#'
-#' Download and construct a process with [fertility_hfd()], then attach it
-#' through [set_process()].
-#' @param model A `hammel_model` object.
-#' @inheritParams fertility_hfd
-#' @return An updated `hammel_model`.
-#' @export
-set_fertility_hfd <- function(model, country, year,
-                              username = Sys.getenv("HFD_USERNAME"),
-                              password = Sys.getenv("HFD_PASSWORD"),
-                              update = NULL) {
-  check_model(model)
-  set_process(model, fertility_hfd(country, year, username, password,
-                                    update))
+  rates <- fertility_from_hfd(data, year)$rates
+  attr(rates, "source") <- database_source("HFD", country, year, "asfrRR", update)
+  attr(rates, "source")$open_ages <- "omit"
+  rates
 }
 
 fertility_from_hfd <- function(data, year) {
@@ -182,4 +131,25 @@ fertility_from_hfd <- function(data, year) {
   starts <- as.numeric(sub("[-+]$", "", ages))
   fertility(data.frame(age_start = starts, age_end = starts + 1,
                        rate = data$ASFR))
+}
+
+check_database_request <- function(country, year, username, password) {
+  if (!is.character(country) || length(country) != 1L || is.na(country) ||
+      !nzchar(trimws(country))) {
+    stop("`country` must be a single nonempty population code.", call. = FALSE)
+  }
+  if (!is.numeric(year) || length(year) != 1L || !is.finite(year) ||
+      year != trunc(year)) {
+    stop("`year` must be a single whole-number calendar year.", call. = FALSE)
+  }
+  for (credential in list(username, password)) {
+    if (!is.character(credential) || length(credential) != 1L ||
+        is.na(credential) || !nzchar(credential)) {
+      stop("Supply database credentials as arguments or environment variables.",
+           call. = FALSE)
+    }
+  }
+  if (!requireNamespace("HMDHFDplus", quietly = TRUE)) {
+    stop("Install HMDHFDplus to download database rates.", call. = FALSE)
+  }
 }

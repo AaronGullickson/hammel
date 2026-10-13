@@ -60,7 +60,8 @@ set_fertility <- function(model, rates) {
 #' piecewise constant over age intervals `[age_start, age_end)`, in years,
 #' and expressed per person-year. Overlapping intervals are rejected; adjacent
 #' intervals are allowed. Input order and custom columns are preserved; rate
-#' schedules are returned as tibbles.
+#' schedules are returned as tibbles. A `source` attribute on the input table
+#' is copied to the process's `source` field.
 #'
 #' Mortality requires separate schedules for both sexes. Gaps and uncovered
 #' ages are not filled or interpreted as zero rates. Coverage and fertility
@@ -94,7 +95,9 @@ fertility <- function(rates) {
 }
 
 new_rate_process <- function(name, rates) {
-  structure(list(name = name, rates = tibble::as_tibble(rates), rate_unit = "person_year"),
+  fields <- list(name = name, rates = tibble::as_tibble(rates), rate_unit = "person_year")
+  if (!is.null(attr(rates, "source"))) fields$source <- attr(rates, "source")
+  structure(fields,
             class = c(paste0("hammel_", name), "hammel_process"))
 }
 

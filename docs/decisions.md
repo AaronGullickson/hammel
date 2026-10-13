@@ -202,3 +202,10 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
 - **Decision:** on a branch from master, remove event-time truncation and the execution step; execute continuous candidates chronologically. Retain existing monthly SOCSIM-style fertility compensation separately.
 - **Supersedes:** D004/D008/D013/D019 requirements for discrete event execution, truncated candidate comparison, and random within-step order. Year units, cumulative-hazard sampling, and demographic scope remain in effect.
 - **Implementation rules:** scientific contract's continuous-time section specifies exact ties, boundaries, spacing, and analytical validation. Monthly compensation and its approximation remain; this does not establish demographic accuracy.
+
+## D025: Reusable database rate downloads
+
+- **Status:** accepted October 12, 2026.
+- **Decision:** separate HMD/HFD downloading and preparation from model configuration. Replace database process constructors and setters with `get_mortality_hmd()` and `get_fertility_hfd()`, returning validated rate tibbles accepted by ordinary process constructors and setters.
+- **Reuse:** users explicitly save/load tables with RDS; model configuration and repeated simulations need no database requests. Preserve source metadata as a `source` attribute on the table and carry it into constructed processes. Credentials are never retained.
+- **Scope:** retain D018's single-year selection, products, units, and age handling. Automatic caching and calendar-varying schedules are outside this change.
