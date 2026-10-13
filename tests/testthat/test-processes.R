@@ -107,7 +107,8 @@ test_that("fertility spacing is stored and revalidated on attachment", {
   spaced <- fertility(births, birth_interval = 1.5)
   expect_identical(set_process(model, spaced), set_fertility(model, births, birth_interval = 1.5))
   expect_equal(fertility(births, birth_interval = 0)$birth_interval, 0, tolerance = 0)
-  for (value in list(NULL, NA_real_, Inf, -1, 0.1, "1", c(1, 2))) {
+  expect_equal(fertility(births, birth_interval = 0.1)$birth_interval, 0.1)
+  for (value in list(NULL, NA_real_, Inf, -1, "1", c(1, 2), matrix(1))) {
     expect_error(fertility(births, birth_interval = value))
     expect_error(set_fertility(model, births, birth_interval = value))
     edited <- spaced

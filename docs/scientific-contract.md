@@ -1,3 +1,5 @@
+> Current timing and fertility update (D024/D028): events execute continuously. Fertility compensation evaluates the input-rate integral at each original age band's midpoint, then uses the shared constant-hazard sampler. Earlier monthly and exact age-varying compensation descriptions are historical and superseded.
+
 # Scientific contract
 
 ## Database rate helpers
@@ -134,7 +136,7 @@ Age boundaries and exposure accumulation must use elapsed years. Observation fre
 
 ## Initial process specification objects
 
-`mortality(rates)` and `fertility(rates)` construct inspectable `hammel_process` specifications without executing events. Both require nonempty data frames with `age_start`, `age_end`, and `rate`. Ages use years and half-open intervals `[age_start, age_end)`; starts must be finite and nonnegative, ends must be greater than starts and may be positive infinity. Rates must be finite and nonnegative, per person-year. Mortality also requires character `sex` labels and separate schedules for both `m` and `f`.
+`mortality(rates)` and `fertility(rates)` construct inspectable `hammel_process` specifications without executing events. Both require nonempty data frames with `age_start`, `age_end`, and `rate`. Ages use years and half-open intervals `[age_start, age_end)`; starts must be finite and nonnegative, ends must be greater than starts. Ends may be positive infinity for mortality; fertility ends must be finite under D028. Rates must be finite and nonnegative, per person-year. Mortality also requires character `sex` labels and separate schedules for both `m` and `f`.
 
 Reject overlapping intervals within each schedule, including duplicate and nested bands; adjacent bands are valid. Preserve input order and custom columns. Do not infer rates outside supplied intervals or fill gaps; coverage must be resolved before simulation. Reject `time_start` or `time_end` columns in this initial implementation to avoid pretending to support calendar-varying rates. The schedule interface is intended to gain that dimension later.
 
@@ -142,7 +144,7 @@ Reject overlapping intervals within each schedule, including duplicate and neste
 
 Known structural cases include adjacent age bands (accepted), overlapping bands (rejected), identical age bands across different sexes (accepted), and rates of zero or greater than one (accepted: these are rates, not probabilities). These constructors do not resolve fertility eligibility, population versus eligible-person denominators, competing-event execution, or state transitions.
 
-## First executable simulator contract
+## Historical first executable simulator contract (superseded by D024/D026/D027)
 
 Current user-authorized scope: mortality and fertility with all living females at risk under the age-specific population fertility schedule, random male parentage at each birth, and no new unions. Use C++ for scheduling and event execution with R setup and inspectable population output. The initial setup check requires a population plus mortality and fertility processes. Additional custom process execution is not supported yet.
 
@@ -186,7 +188,7 @@ Supersedes step-start truncation and random within-step execution above. Public 
 
 Run boundaries remain half-open `[start, start + years)`; any finite nonnegative duration is allowed. After a birth at time `t`, maternal fertility sampling starts at `max(now, t + birth_interval)`, while mortality remains active throughout spacing. Newborns enter risk immediately. Events update father availability immediately. Restart behavior remains resampling rather than exact checkpoint continuation.
 
-Retain the SOCSIM-style fertility compensation on its existing monthly age grid (`1/12` years), with nine preceding intervals for the default spacing of 0.75 years. This grid describes the adjusted hazard, not execution times. Birth intervals still must be whole multiples of that compensation interval; zero spacing uses the unadjusted schedule. The adjustment remains approximate and is not a continuous-time calibration guarantee.
+D028 now uses midpoint fertility compensation and the shared constant-hazard sampler, superseding D027's exact age-varying hazard. Birth spacing accepts any finite nonnegative duration in years. See the midpoint specification below.
 
 Examples: a birth candidate at 0.02 years precedes a death candidate at 0.06 years, even though both lie in the first month. A birth at 1.03 with spacing 0.75 makes fertility eligible at 1.78, without rounding; mortality may occur before then. A candidate exactly at the endpoint is excluded. Constant adjusted hazard `h` with spacing `b` has long-run renewal rate `1 / (b + 1/h)`, unlike the previous truncated-wait expectation.
 
@@ -201,10 +203,10 @@ seed = NULL)` reads this setting from the attached fertility process; it has
 no birth-spacing argument. Validate spacing at construction, attachment, and
 execution, including edited specifications. Missing settings are rejected.
 
-The existing demographic behavior is retained: one nonnegative finite scalar,
-a whole number of monthly compensation intervals, shared across mothers.
+Birth spacing is one nonnegative finite scalar in years, shared across mothers.
+D027 removes the earlier whole-month restriction.
 Zero disables spacing and compensation. Recorded maternal histories enforce
-spacing on restart; compensation remains approximate and execution continuous.
+spacing on restart; D028 specifies midpoint compensation with continuous execution.
 For example, a process with `birth_interval = 1.5` and a recorded birth at
 1.03 permits the next birth no earlier than 2.53. Default spacing remains
 0.75 years. Run metadata records the value actually used. Replacing the
@@ -213,3 +215,109 @@ fertility process replaces its spacing along with its rates.
 Validation covers constructor and setter equivalence, invalid and edited
 settings, nondefault spacing through execution and restart, zero-spacing
 chronological sampling, and the existing default renewal expectation.
+
+
+## Historical exact continuous fertility compensation (D027, superseded by D028)
+
+Accepted October 13, 2026: replace the monthly SOCSIM-style compensation with
+continuous birth-spacing compensation. Let f(a) be the supplied population
+ASFR in births per woman-year, zero outside supplied bands, and b the minimum
+birth-to-birth interval in years. Define
+
+    e(a) = 1 - integral from max(0, a-b) to a of f(u) du
+    h(a) = f(a) / e(a).
+
+This is a fixed age-specific eligible birth hazard, computed once per run from
+the input schedule. It does not estimate eligibility from simulated women or
+adjust for initialization. Unknown maternal histories still imply eligibility;
+recorded histories still determine each mother's next eligible time. Users
+choose burn-in/observation windows; no automatic burn-in or history fabrication.
+Any finite nonnegative birth interval is allowed, with default 0.75 years.
+Zero spacing gives the original hazard. Reject a schedule whose window integral
+reaches or exceeds one anywhere, rather than clipping eligibility. Validate
+feasibility when building the execution schedule, across its full age domain.
+
+The eligibility identity assumes cohorts have experienced the target schedule
+through the preceding window. With age-only mortality shared by eligible and
+excluded women, survival cancels between recent births and living female
+exposure. Fertility-dependent mortality, heterogeneity, unions, and
+calendar-varying rates require a separate treatment. This formula does not
+promise immediate ASFR agreement from arbitrary initial histories.
+
+For piecewise constant input rates, eligibility is piecewise linear, with
+breaks at input boundaries and those boundaries shifted by b. Within a segment
+starting at age A, let r=f(A), e0=e(A), and s=f(A-b)-f(A). Then
+
+    e(A+x) = e0 + s*x
+    H(x) = r*x/e0                        if s=0
+    H(x) = (r/s)*log1p(s*x/e0)            otherwise.
+
+Consume an Exp(1) threshold across segments. Within the event segment invert
+H analytically: x=E*e0/r for s=0, otherwise
+x=(e0/s)*expm1(s*E/r). Zero-rate gaps consume no threshold. Use half-open
+input bands and stable log1p/expm1 evaluation; no age grid, averaging into
+months, or numerical time step remains. This is an intentional departure
+from audited SOCSIM compensation; no source code is copied.
+
+Worked cases and validation:
+
+- Constant f=0.2, b=0.75 after the entry window: e=0.85, h=0.2/0.85;
+  mean birth interval b+1/h=5 years, giving long-run rate exactly 0.2.
+- Fertility begins at age 15 with f=0.2: for 15 <= a < 15.75,
+  e(a)=1-0.2*(a-15); thereafter e=0.85 until the next input boundary.
+  From age 15 a threshold E=0.1 is reached after
+  (1-exp(-0.1))/0.2 years, without monthly rounding.
+- A rate change 0.2 to 0.4 at age 16 has e(16)=0.85 and slope -0.2
+  for the next 0.75 years. Boundary and partial-window integrals must agree
+  with independent numerical integration, including gaps and open tails.
+- A zero schedule gives no births. f*b >= 1 on a sufficiently long constant
+  band is rejected; b=0 permits an otherwise high finite hazard.
+- Check arbitrary fractional spacing, restart spacing, reproducibility, exact
+  deterministic waiting times, near-constant segments, and constant-rate
+  recovery after burn-in with and without independent mortality.
+
+Supersedes the monthly compensation and whole-month spacing restrictions in
+D019/D024/D026 and earlier sections. Event competition and output semantics
+are unchanged. General age-specific demographic validation remains ongoing.
+
+## Midpoint fertility compensation (D028)
+
+Accepted October 13, 2026: preserve each original finite fertility age band and
+replace its rate by one constant eligible hazard calculated at its midpoint.
+For band [L,U), midpoint m=L+(U-L)/2, input ASFR f, and spacing b (years), use
+
+    e_mid = 1 - integral from max(0,m-b) to m of input ASFR(u) du
+    adjusted_rate = f / e_mid.
+
+The integral uses the unadjusted input schedule and exact duration overlaps,
+including portions of earlier bands; uncovered ages contribute zero. No shifted
+boundaries, monthly grid, FertilityBand type, or fertility-specific waiting-time
+sampler is needed. Mortality and adjusted fertility share Band and waiting_time.
+The adjustment is computed once per simulate() call. Original band endpoints,
+continuous event execution, the 0.75-year default, arbitrary finite nonnegative
+spacing, and recorded-history spacing/restarts remain unchanged. Zero spacing
+returns the original schedule. Nonpositive midpoint eligibility is rejected,
+not clipped. This checks the midpoint approximation, rather than checking the
+full age-varying eligibility curve used in D027.
+
+Initialization is unchanged and no transient correction is introduced. This
+is an approximation to D027: it need not reproduce input ASFR/TFR exactly,
+even after burn-in. Error depends on rate changes and band width. Empirical
+accuracy must be assessed separately from algorithmic correctness.
+
+Worked examples: with b=0.75, midpoint 25.5, ASFR 0.1 on [24,25) and 0.2 on
+[25,26), excluded fraction = 0.25*0.1 + 0.5*0.2 = 0.125; eligible fraction
+=0.875, and the adjusted rate for [25,26) is 0.2/0.875. If the preceding
+window lies wholly in a constant-rate band, adjustment is f/(1-b*f), with
+long-run renewal rate f away from age boundaries. A longer window may cross
+multiple bands and gaps; all overlaps must be included without using already
+adjusted rates. At the user's direction, all open-ended fertility input bands are rejected,
+including zero rates and zero-spacing schedules. Mortality retains its
+open-ended terminal band.
+
+Validation: exact weighted-overlap examples on annual and five-year bands,
+multiple-band/gap windows, preserved boundaries, shared waiting-time sampling,
+nonpositive midpoint eligibility, constant-rate recovery after burn-in,
+independent mortality, and fractional spacing/restarts. Remove D027 tests that
+assert exact age-varying hazard behavior. Supersedes D027's exact integration
+and inversion requirements, while retaining its year units and initialization.

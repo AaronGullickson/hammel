@@ -1,4 +1,4 @@
-> Current timing update (D024): event execution is continuous, with no truncation or execution step. The monthly SOCSIM-style fertility compensation is retained separately. Earlier monthly-engine descriptions below are superseded where they concern execution. See the continuous-time scientific contract.
+> Current timing and fertility update (D024/D028): events execute continuously. Fertility compensation evaluates the input-rate integral at each original age band's midpoint, then uses the shared constant-hazard sampler. Earlier monthly and exact age-varying compensation descriptions are historical and superseded.
 
 # Hammel project brief
 

@@ -9,8 +9,10 @@
 #'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
 #' and uses recorded maternal births, including on restart.
-#' SOCSIM-style eligible-risk adjustment compensates approximately for spacing;
-#' its monthly age grid is independent of continuous event execution.
+#' Midpoint eligible-risk adjustment uses the input fertility integral over
+#' the preceding birth interval at each original age band's midpoint. Each band
+#' has one adjusted hazard and shares the mortality waiting-time sampler.
+#' Initial eligibility is not calibrated.
 #' This is not a guarantee of exact ASFR matching. Fertility outside supplied
 #' bands is zero. Mortality must cover all ages for both sexes, ending at `Inf`.
 #'
@@ -59,7 +61,6 @@ simulate <- function(model, years, seed = NULL) {
   death_rates <- model$processes$mortality$rates
   birth_rates <- model$processes$fertility$rates
   birth_interval <- model$processes$fertility$birth_interval
-  spacing <- compensation_intervals(birth_interval)
   for (sex in c("m", "f")) {
     schedule <- death_rates[death_rates$sex == sex, , drop = FALSE]
     schedule <- schedule[order(schedule$age_start), , drop = FALSE]
@@ -91,7 +92,7 @@ simulate <- function(model, years, seed = NULL) {
   births <- deaths <- 0
   if (years > 0) {
     native <- simulate_cpp(population$persons, death_rates, birth_rates,
-                           start, years, birth_interval, spacing)
+                           start, years, birth_interval)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {
@@ -122,14 +123,11 @@ simulate <- function(model, years, seed = NULL) {
   result
 }
 
-compensation_intervals <- function(duration) {
-  dt <- 1/12
-  if (!is.numeric(duration) || length(duration) != 1L || !is.finite(duration) ||
-      duration < 0 || !is.finite(duration / dt) ||
-      duration / dt > .Machine$integer.max ||
-      abs(duration / dt - round(duration / dt)) > 1e-8) {
-    stop("`birth_interval` must be nonnegative and a whole number of monthly compensation intervals.",
+validate_birth_interval <- function(duration) {
+  if (!is.numeric(duration) || !is.null(dim(duration)) || length(duration) != 1L ||
+      !is.finite(duration) || duration < 0) {
+    stop("`birth_interval` must be a finite nonnegative number of years.",
          call. = FALSE)
   }
-  as.integer(round(duration / dt))
+  invisible(duration)
 }

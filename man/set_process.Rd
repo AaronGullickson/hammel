@@ -20,8 +20,7 @@ set_fertility(model, rates, birth_interval = 0.75)
 \item{rates}{An age-specific rate table passed to \code{\link[=mortality]{mortality()}} or \code{\link[=fertility]{fertility()}}.}
 
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
-defaulting to \code{0.75}. Must be finite, nonnegative, and a whole number of
-months for the retained fertility compensation grid.}
+defaulting to \code{0.75}. Must be finite and nonnegative.}
 }
 \value{
 An updated \code{hammel_model}. The input model is not modified.

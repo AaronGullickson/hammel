@@ -11,8 +11,7 @@
 #' @param process A `hammel_process` specification.
 #' @param rates An age-specific rate table passed to [mortality()] or [fertility()].
 #' @param birth_interval Minimum maternal birth-to-birth interval in years,
-#'   defaulting to `0.75`. Must be finite, nonnegative, and a whole number of
-#'   months for the retained fertility compensation grid.
+#'   defaulting to `0.75`. Must be finite and nonnegative.
 #'
 #' @return An updated `hammel_model`. The input model is not modified.
 #' @export
@@ -39,7 +38,7 @@ set_process <- function(model, process) {
       stop("Built-in process rates must use person-year units.", call. = FALSE)
     }
     validate_rates(process$rates, mortality = name == "mortality")
-    if (name == "fertility") compensation_intervals(process$birth_interval)
+    if (name == "fertility") validate_birth_interval(process$birth_interval)
     process$rates <- tibble::as_tibble(process$rates)
   }
   model$processes[name] <- list(process)
@@ -72,14 +71,20 @@ set_fertility <- function(model, rates, birth_interval = 0.75) {
 #' eligibility must be specified before simulation. Calendar-time-varying
 #' schedules are not yet supported; time interval columns are rejected.
 #'
+#' For fertility, one adjusted hazard is calculated at each original band's
+#' midpoint: the input rate divided by one minus the input fertility integral
+#' over the preceding `birth_interval`. The integral accounts for overlaps with
+#' other input bands. Execution rejects nonpositive midpoint eligibility.
+#' This approximates the age-varying adjustment; initialization is not calibrated.
+#'
 #' @param rates A nonempty data frame containing numeric `age_start`, `age_end`,
 #'   and `rate`. Starts must be finite and nonnegative; ends must exceed starts
-#'   and may be `Inf`. Rates must be finite and nonnegative. Mortality additionally
+#'   and must be finite for fertility; mortality ends may be `Inf`. Rates must
+#'   be finite and nonnegative. Mortality additionally
 #'   requires character `sex` values `"m"` and `"f"`, with both represented.
 #' @param birth_interval Minimum maternal birth-to-birth interval in years,
-#'   defaulting to `0.75`. Must be finite, nonnegative, and a whole number of
-#'   months for the retained fertility compensation grid. Applies to fertility
-#'   only; eligible hazards are adjusted approximately to compensate for spacing.
+#'   defaulting to `0.75`. Must be finite and nonnegative. Applies to fertility
+#'   only; eligible hazards use midpoint birth-spacing compensation.
 #' @return A named list containing `name`, `rates`, and `rate_unit`, plus
 #'   `birth_interval` for fertility, inheriting
 #'   from `hammel_mortality` or `hammel_fertility` and `hammel_process`.
@@ -100,7 +105,7 @@ mortality <- function(rates) {
 #' @export
 fertility <- function(rates, birth_interval = 0.75) {
   validate_rates(rates, mortality = FALSE)
-  compensation_intervals(birth_interval)
+  validate_birth_interval(birth_interval)
   process <- new_rate_process("fertility", rates)
   process$birth_interval <- birth_interval
   process
@@ -130,6 +135,9 @@ validate_rates <- function(rates, mortality) {
       any(ends <= rates$age_start) || any(rates$age_start < 0)) {
     stop("Age intervals must have nonnegative starts and greater ends (possibly Inf).",
          call. = FALSE)
+  }
+  if (!mortality && any(!is.finite(ends))) {
+    stop("Fertility age bands must have finite ends.", call. = FALSE)
   }
   if (any(rates$rate < 0)) {
     stop("`rates$rate` must be nonnegative.", call. = FALSE)

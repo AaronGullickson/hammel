@@ -12,13 +12,13 @@ fertility(rates, birth_interval = 0.75)
 \arguments{
 \item{rates}{A nonempty data frame containing numeric \code{age_start}, \code{age_end},
 and \code{rate}. Starts must be finite and nonnegative; ends must exceed starts
-and may be \code{Inf}. Rates must be finite and nonnegative. Mortality additionally
+and must be finite for fertility; mortality ends may be \code{Inf}. Rates must
+be finite and nonnegative. Mortality additionally
 requires character \code{sex} values \code{"m"} and \code{"f"}, with both represented.}
 
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
-defaulting to \code{0.75}. Must be finite, nonnegative, and a whole number of
-months for the retained fertility compensation grid. Applies to fertility
-only; eligible hazards are adjusted approximately to compensate for spacing.}
+defaulting to \code{0.75}. Must be finite and nonnegative. Applies to fertility
+only; eligible hazards use midpoint birth-spacing compensation.}
 }
 \value{
 A named list containing \code{name}, \code{rates}, and \code{rate_unit}, plus
@@ -38,6 +38,12 @@ Mortality requires separate schedules for both sexes. Gaps and uncovered
 ages are not filled or interpreted as zero rates. Coverage and fertility
 eligibility must be specified before simulation. Calendar-time-varying
 schedules are not yet supported; time interval columns are rejected.
+
+For fertility, one adjusted hazard is calculated at each original band's
+midpoint: the input rate divided by one minus the input fertility integral
+over the preceding \code{birth_interval}. The integral accounts for overlaps with
+other input bands. Execution rejects nonpositive midpoint eligibility.
+This approximates the age-varying adjustment; initialization is not calibrated.
 }
 \examples{
 deaths <- mortality(data.frame(sex = c("m", "f"), age_start = 0,

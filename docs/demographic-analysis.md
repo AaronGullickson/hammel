@@ -67,4 +67,4 @@ Empty cells remain in the summary. Zero exposure gives NA rates. TFR omits missi
 
 Analyze each independent simulation separately. There is no `groups` parameter at this stage. Stacked histories with duplicated IDs must be split before calling the summary function so parent references remain unambiguous. Extra person attributes are not automatically treated as analysis strata.
 
-These functions support formal validation rather than establish it. Step-start event recording, birth-spacing compensation, initialization, and sampling uncertainty still affect comparisons with inputs.
+These functions support formal validation rather than establish it. Birth-spacing compensation assumptions, initialization, and sampling uncertainty still affect comparisons with inputs. Execution is continuous under D024; compensation uses an age-band midpoint approximation under D028.

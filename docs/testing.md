@@ -76,3 +76,32 @@ passed: 1,791 expectations, zero failures or warnings, and one opt-in live-test
 skip across 52 named cases. Verification set `TZ=America/Los_Angeles` to avoid
 the sandbox's unavailable system timezone service. Testthat >= 3.2.0 is required
 for the scoped reader-mocking API.
+
+D027 verified October 13, 2026: continuous fertility compensation compiled and
+passed the development suite, installed-package testthat runner (1,839
+expectations before the final three decreasing-rate checks), and documentation
+examples. All 50 expectations in the final fertility-adjustment test file pass,
+including the additional decreasing-rate cases. The live database test skipped
+without opt-in; no downloads or live-data replications were run.
+
+`test-fertility-adjustment.R` checks analytic entry-window and constant renewal
+formulas, both signs of eligibility slope, independent R quadrature through
+rate boundaries and gaps, open tails, zero and fractional spacing, numerical
+stability, infeasible schedules, independent mortality after burn-in, and
+age-specific rates in a cohort initialized before fertility entry. Existing
+spacing/restart checks now include 1.13-year intervals. These establish the
+continuous algorithm's analytical cases, not full empirical demographic validity.
+
+D028 verified October 13, 2026: midpoint compensation and the shared Band/
+waiting_time implementation passed the development suite, optimized package
+installation, installed testthat runner (1,832 expectations, zero failures or
+warnings, one live-test skip), and documentation examples. Updated adjustment
+tests cover annual/five-year midpoint weights, windows crossing multiple bands
+and gaps, preserved endpoints, original-rate integration, zero spacing/rates,
+nonpositive midpoint eligibility, rejection of all open-ended fertility inputs
+at construction/attachment/execution, and constant fertility with independent
+mortality. Fractional spacing and restart tests continue to pass.
+
+Exact age-varying sampler tests from D027 were replaced by midpoint expectations.
+No live database requests or empirical ASFR/TFR replications were run; accuracy
+of the approximation for realistic age-varying schedules remains to be assessed.

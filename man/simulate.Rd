@@ -30,8 +30,10 @@ or records an unknown father if none are available. No new unions are formed.
 \details{
 Minimum birth spacing is configured in \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}
 and uses recorded maternal births, including on restart.
-SOCSIM-style eligible-risk adjustment compensates approximately for spacing;
-its monthly age grid is independent of continuous event execution.
+Midpoint eligible-risk adjustment uses the input fertility integral over
+the preceding birth interval at each original age band's midpoint. Each band
+has one adjusted hazard and shares the mortality waiting-time sampler.
+Initial eligibility is not calibrated.
 This is not a guarantee of exact ASFR matching. Fertility outside supplied
 bands is zero. Mortality must cover all ages for both sexes, ending at \code{Inf}.
 

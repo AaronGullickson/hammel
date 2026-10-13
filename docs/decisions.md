@@ -219,3 +219,31 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
   continuous execution, and existing spacing and rate-adjustment semantics.
   Run metadata continues to record the configured interval.
 - **Supersedes:** earlier execution signatures exposing `birth_interval`.
+
+## D027: Continuous birth-spacing compensation
+
+- **Status:** accepted October 13, 2026.
+- **Decision:** use `h(a) = f(a) / (1 - integral_{a-b}^{a} f(u) du)` with
+  fertility zero outside supplied bands, replacing monthly SOCSIM compensation.
+- **Scope:** fixed age schedule per run; retain current initialization and
+  recorded-history spacing, with no transient correction. Remove whole-month
+  spacing restrictions; retain the 0.75-year default and reject nonpositive
+  eligibility.
+- **Implementation:** piecewise linear eligibility and analytic cumulative
+  hazard integration/inversion; no numerical age grid or major dependencies.
+- **Supersedes:** monthly compensation portions of D019/D024/D026.
+
+## D028: Midpoint approximation using the shared hazard sampler
+
+- **Status:** accepted October 13, 2026.
+- **Decision:** calculate one adjusted rate at each original fertility band's
+  midpoint, using exact overlaps of the preceding birth interval with the
+  original input schedule. Use ordinary Band records and waiting_time() for
+  fertility and mortality.
+- **Rationale:** prefer a smaller implementation over exact within-band
+  adjustment; quantify resulting ASFR/TFR approximation separately.
+- **Scope:** retain continuous execution, arbitrary year-valued spacing,
+  the 0.75-year default, and existing initialization. Reject nonpositive
+  eligibility at evaluated midpoints. At the user's direction, reject all
+  open-ended fertility input bands, including zero rates/zero spacing.
+- **Supersedes:** D027's age-varying hazard representation and exact sampler.

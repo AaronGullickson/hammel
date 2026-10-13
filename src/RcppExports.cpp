@@ -36,9 +36,21 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// adjusted_fertility_cpp
+DataFrame adjusted_fertility_cpp(DataFrame rates, double birth_interval);
+RcppExport SEXP _hammel_adjusted_fertility_cpp(SEXP ratesSEXP, SEXP birth_intervalSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< DataFrame >::type rates(ratesSEXP);
+    Rcpp::traits::input_parameter< double >::type birth_interval(birth_intervalSEXP);
+    rcpp_result_gen = Rcpp::wrap(adjusted_fertility_cpp(rates, birth_interval));
+    return rcpp_result_gen;
+END_RCPP
+}
 // simulate_cpp
-List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, int spacing);
-RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP spacingSEXP) {
+List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval);
+RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -48,8 +60,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type start(startSEXP);
     Rcpp::traits::input_parameter< double >::type years(yearsSEXP);
     Rcpp::traits::input_parameter< double >::type birth_interval(birth_intervalSEXP);
-    Rcpp::traits::input_parameter< int >::type spacing(spacingSEXP);
-    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, spacing));
+    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -57,7 +68,8 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_hammel_demographic_counts_cpp", (DL_FUNC) &_hammel_demographic_counts_cpp, 3},
     {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
-    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 7},
+    {"_hammel_adjusted_fertility_cpp", (DL_FUNC) &_hammel_adjusted_fertility_cpp, 2},
+    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 6},
     {NULL, NULL, 0}
 };
 

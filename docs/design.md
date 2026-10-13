@@ -1,4 +1,4 @@
-> Current timing update (D024): event execution is continuous, with no truncation or execution step. The monthly SOCSIM-style fertility compensation is retained separately. Earlier monthly-engine descriptions below are superseded where they concern execution. See the continuous-time scientific contract.
+> Current timing and fertility update (D024/D028): events execute continuously. Fertility compensation evaluates the input-rate integral at each original age band's midpoint, then uses the shared constant-hazard sampler. Earlier monthly and exact age-varying compensation descriptions are historical and superseded.
 
 # Design specification
 
@@ -90,7 +90,7 @@ The common operation is `set_process(model, process)`, using the name carried by
 
 `simulate(model, years, seed = NULL)` returns an updated `hammel_population`. Required model components are population, mortality, and fertility. The population's `end_time` supplies the starting time. C++ handles cumulative-hazard sampling, adjusted fertility schedules, a sparse event queue, and constant-time random selection from currently living males. R handles configuration, optional seed isolation, custom-column preservation, and result assembly. Engine state is local to each call.
 
-Public units remain years and person-year rates; only explicit defaults express the initial monthly increment and nine-month birth spacing. See the scientific contract for boundary, competition, coverage, and adjustment details. The example in `inst/examples/milestone1.R` runs 50,000 initial persons for 100 years with downloaded constant USA/2000 rates. Scientific accuracy beyond the initial analytical checks remains to be assessed.
+Public units remain years and person-year rates; default minimum birth spacing is 0.75 years. Event execution is continuous; fertility compensation uses the original age-band midpoints (D028). See the scientific contract for boundary, competition, coverage, and adjustment details. The example in `inst/examples/milestone1.R` runs 50,000 initial persons for 100 years with downloaded constant USA/2000 rates. Scientific accuracy beyond the initial analytical checks remains to be assessed.
 
 ## Reusable database inputs (D025)
 

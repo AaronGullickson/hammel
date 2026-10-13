@@ -4,7 +4,7 @@ The user is stopping for the day. Do not begin the next tasks automatically.
 
 ## Current foundation
 
-The package builds pipeable models from `hammel_population` objects and mortality/fertility processes. C++ executes the initial simulation with year-based inputs and outputs, a configured monthly step, death priority on competing-event ties, minimum birth spacing with SOCSIM-style approximate rate compensation, and random living male parentage without creating unions. Outputs can initialize subsequent runs. Public tables are tibbles.
+The package builds pipeable models from `hammel_population` objects and mortality/fertility processes. C++ executes the initial simulation with year-based inputs and outputs, continuous event times, death priority on exact competing-event ties, minimum birth spacing with midpoint integral-based compensation (D028), and random living male parentage without creating unions. Outputs can initialize subsequent runs. Public tables are tibbles.
 
 Analysis functions are `calculate_lexis_counts()`, `calculate_tfr()`, `calculate_life_table()`, and `calculate_population_size()`. Lexis counts include exposure and age-specific rates; male births and ASFR are NA. Age breaks automatically gain an open interval if needed. TFR omits open age bands and sums with `na.rm = TRUE`. Life-table missing rates still propagate; that behavior is intentionally left unchanged for now. TFR and life tables also accept their corresponding input process objects or rate tables.
 
@@ -24,6 +24,6 @@ These are encouraging descriptive comparisons, not formal evidence of demographi
 
 1. The user will add more human-facing code comments to improve their understanding before further complexity. Preserve those edits; do not replace them with dense agent-oriented commentary.
 2. Develop formal uncertainty and accuracy checks across a range of fertility and mortality inputs. The user described this as bootstrapping; settle the experimental design before implementation. Independent simulation replications with distinct seeds are the natural starting point for measuring simulator variation. If resampling outputs is also desired, account for dependence among related persons rather than automatically treating person rows as independent.
-3. Compare outputs with input-derived expectations for matched age ranges, periods, rate interpretations, and units. Address burn-in, missing exposure, sample size, birth-spacing adjustment, and step discretization explicitly. Use analytical cases alongside realistic schedules, and distinguish sampling uncertainty from systematic departures.
+3. Compare outputs with input-derived expectations for matched age ranges, periods, rate interpretations, and units. Address burn-in, missing exposure, sample size, birth-spacing adjustment, and initialization assumptions explicitly. Use analytical cases alongside realistic schedules, and distinguish sampling uncertainty from systematic departures.
 
 See `scientific-contract.md`, `testing.md`, and `demographic-analysis.md` for the existing rules and checks. No new diagnostic suite or resampling study has been authorized to start in this handoff.

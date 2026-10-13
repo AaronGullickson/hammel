@@ -98,40 +98,51 @@ double rate_integral(const std::vector<Band>& bands, double lo, double hi) {
   return total;
 }
 
-// Increase eligible fertility hazards to approximately compensate for birth spacing.
-std::vector<Band> adjusted_fertility(const std::vector<Band>& raw, double dt,
-                                    int spacing, double max_age) {
-  // With no spacing there is no eligibility correction. Otherwise build a
-  // monthly compensation age schedule once, covering all ages reachable during this run.
-  if (!spacing) return raw;
-  double count = std::ceil(max_age / dt) + 1;
-  if (count > std::numeric_limits<int>::max()) stop("Age grid is too large.");
-  std::vector<double> probabilities;
+// Calculate one constant eligible hazard at each original band's midpoint.
+// Integrate the unadjusted rates across the preceding birth interval, including
+// overlaps with earlier bands and gaps. Event sampling uses the ordinary Band
+// representation and shared constant-hazard waiting_time() function.
+std::vector<Band> adjusted_fertility(const std::vector<Band>& raw,
+                                    double birth_interval) {
+  for (const Band& band : raw) {
+    if (!std::isfinite(band.end)) stop("Fertility age bands must have finite ends.");
+  }
+  if (birth_interval == 0) return raw;
   std::vector<Band> adjusted;
-  double ineligible = 0;
-  for (int k = 0; k < static_cast<int>(count); ++k) {
-    if (k % 1024 == 0) checkUserInterrupt();
-    const double lo = k * dt, hi = (k + 1.0) * dt;
-    // Average the input rate over this age interval. Estimate the fraction excluded
-    // by recent births using the preceding compensation intervals, then increase the
-    // hazard among eligible women. This SOCSIM-style correction is approximate.
-    const double rate = rate_integral(raw, lo, hi) / dt;
-    const double eligible = 1 - ineligible;
-    if (eligible <= 0) stop("Birth interval and fertility rates imply nonpositive eligibility.");
-    adjusted.push_back({lo, hi, rate / eligible});
-    // Numerically stable 1 - exp(-rate * dt). Add the new probability to the
-    // moving window and remove the one leaving it before the next age interval.
-    probabilities.push_back(-std::expm1(-rate * dt));
-    ineligible += probabilities.back();
-    if (k >= spacing) ineligible -= probabilities[k - spacing];
+  for (const Band& band : raw) {
+    checkUserInterrupt();
+    const double midpoint = band.start + (band.end - band.start) / 2;
+    const double eligible = 1 - rate_integral(raw,
+      std::max(0.0, midpoint - birth_interval), midpoint);
+    if (!(eligible > 0))
+      stop("Birth interval and fertility rates imply nonpositive midpoint eligibility.");
+    const double rate = band.rate / eligible;
+    if (!std::isfinite(rate)) stop("Adjusted fertility rate cannot be represented.");
+    adjusted.push_back({band.start, band.end, rate});
   }
   return adjusted;
+}
+
+// Internal deterministic entry point to inspect adjustment in analytical tests.
+// [[Rcpp::export]]
+DataFrame adjusted_fertility_cpp(DataFrame rates, double birth_interval) {
+  if (!R_finite(birth_interval) || birth_interval < 0)
+    stop("Birth interval must be finite and nonnegative.");
+  const auto bands = adjusted_fertility(read_bands(rates), birth_interval);
+  NumericVector starts(bands.size()), ends(bands.size()), values(bands.size());
+  for (size_t i = 0; i < bands.size(); ++i) {
+    starts[i] = bands[i].start;
+    ends[i] = bands[i].end;
+    values[i] = bands[i].rate;
+  }
+  return DataFrame::create(_["age_start"] = starts, _["age_end"] = ends,
+                          _["rate"] = values);
 }
 
 // [[Rcpp::export]]
 List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   DataFrame fertility_rates, double start, double years,
-                  double birth_interval, int spacing) {
+                  double birth_interval) {
   // R performs input validation and seed handling. All engine state below is
   // local to this call; public times and rates remain in years and person-years.
   NumericVector ids = persons["person_id"], births = persons["birth_time"];
@@ -144,7 +155,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::vector<Person> people;
   std::vector<int> males;
   std::map<double, int> index;
-  double next_id = 0, max_age = 0;
+  double next_id = 0;
   for (int i = 0; i < ids.size(); ++i) {
     bool female = as<std::string>(sexes[i]) == "f";
     bool alive = NumericVector::is_na(deaths[i]);
@@ -154,7 +165,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                       -std::numeric_limits<double>::infinity(), female, slot});
     index[ids[i]] = i;
     next_id = std::max(next_id, ids[i]);
-    if (alive) max_age = std::max(max_age, start - births[i]);
   }
   // On restart, recover the latest recorded maternal birth, including children
   // who have died. A mother with no recorded children has no spacing restriction.
@@ -168,7 +178,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   const auto male_rates = read_bands(mortality_rates, "m");
   const auto female_rates = read_bands(mortality_rates, "f");
   const auto fertility_rates_adjusted = adjusted_fertility(
-    read_bands(fertility_rates), 1.0 / 12.0, spacing, max_age + years);
+    read_bands(fertility_rates), birth_interval);
   // Continuous dates order events. Equivalent keys retain insertion order.
   std::multimap<double, Event> queue;
   const double end = start + years;
