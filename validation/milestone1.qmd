@@ -1,5 +1,5 @@
 ---
-title: "Hammel: milestone 1 validation"
+title: "Hammel: Milestone 1 Validation"
 author: "Aaron Gullickson"
 format:
   html:
@@ -7,90 +7,72 @@ format:
     number-sections: true
     code-fold: true
     code-tools: true
+    self-contained: true 
 execute:
-  eval: false
+  eval: true
   echo: true
   warning: true
   error: false
 ---
 
-This is a working template. Code execution is disabled above so the document
-can be rendered while it is being drafted. Enable execution when the saved
-inputs and analysis are ready. Paths in the chunks are relative to this
-document's `validation/` directory.
-
-Render from the repository root with:
-
-```bash
-quarto render validation/milestone1.qmd
-```
-
-## Purpose and completion criteria
-
-Assess whether the constant-rate mortality and fertility simulator reproduces
-the supplied demographic schedules adequately for milestone 1.
-
-**To complete:** specify the comparisons and acceptable differences before
-interpreting results. Distinguish systematic bias, variability between runs,
-and uncertainty in the estimated mean. Record any exploratory analyses.
-
-| Measure | Comparison | Acceptance criterion |
-|---|---|---|
-| ASFR | Output births / female exposure versus input rates | To specify |
-| TFR | Output versus input TFR over matched ages | To specify |
-| ASMR | Output deaths / exposure versus input rates, by sex | To specify |
-| Life expectancy | Output versus input-derived life table | To specify |
-| Birth spacing and accounting | Existing tests and checks on simulated histories | To specify |
-
-## Inputs and simulation design
-
-The starter settings below follow `inst/examples/milestone1_bootstrap.R`.
-They are editable analysis settings, not accepted accuracy thresholds.
-
 ```{r}
 #| label: setup
+#| include: false
+
 devtools::load_all("..", quiet = TRUE)
 library(dplyr)
 library(purrr)
 library(ggplot2)
-
-country <- "USA"
-rate_year <- 2000
-start_time <- 2000
-years <- 100
-end_time <- start_time + years
-population_size <- 100000
-max_age <- 100
-birth_interval <- 0.75
-population_seed <- 42
-replication_seeds <- seq_len(100)
-
-mortality_path <- file.path("data", "mortality-USA-2000.rds")
-fertility_path <- file.path("data", "fertility-USA-2000.rds")
 ```
 
-### Prepare and preserve inputs
+## Purpose and completion criteria
 
-Run this chunk manually once if needed. It remains disabled during rendering,
-even when execution is enabled for the rest of the report. Downloads require
-HMDHFDplus and configured HMD/HFD credentials. Save rate tables, not credentials.
+Assess whether the current simulator can reproduce the supplied demographic schedules of fertility and mortality over the simulation period adequately for milestone 1. For this assessment, the input fertility and mortality rates will be held constant across the simulation. 
+
+To make this assessment, I will replicate 100 simulations with the same input values and compare means of output measures to input measures. I will also repeat this process for different demographic profiles of fertility and mortality. 
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| ASFR | Output births / female exposure versus input rates | 95% CI of mean ASFR for each age group and time period falls includes true input ASFR |
+| TFR | Output versus input TFR over matched ages | 95% CI of mean TFR across iterations includes true input TFR for all time increments |
+| ASMR | Output deaths / exposure versus input rates, by sex | 95% CI of mean ASFR for each age group and time period falls includes true input ASFR |
+| Life expectancy | Output versus input-derived life table | 95% CI of mean TFR across iterations includes true input TFR for all time increments |
+| Birth spacing and accounting | Existing tests and checks on simulated histories | Successful unit tests |
+
+Our primary measure of acceptance will be that the true values for each measure fall within the 95% confidence interval of the mean estimate from the simulation. However, because we will be performing this test for a large number of points, we do expect that not every point will fall within that 95% CI. 
+
+## Inputs and simulation design
+
+```{r}
+#| label: set-settings
+
+# country to pull HFD/HMD data
+country <- "USA"
+# year to pull HFD/HMD data and also the beginning year of sim
+start_time <- 2000
+# years to run simulation
+years <- 100
+# ending time of the simulation
+end_time <- start_time + years
+# initial population construction parameters
+population_size <- 100000
+max_age <- 100
+# minimum birth interval in years (0.75 = 9 months)
+birth_interval <- 0.75
+# seeds for random processes
+population_seed <- 42
+replication_seeds <- seq_len(100)
+```
+
+### Prepare inputs
+
+Fertility and mortality rates come from the Human Fertility Database and Human Mortality Database, respectively. The open-ended categories for under 13 and over 55 for fertility are excluded. 
 
 ```{r}
 #| label: prepare-inputs
-#| eval: false
-dir.create("data", showWarnings = FALSE)
-saveRDS(get_mortality_hmd(country, rate_year), mortality_path)
-saveRDS(get_fertility_hfd(country, rate_year), fertility_path)
-```
 
-```{r}
-#| label: input-schedules
-mortality_rates <- readRDS(mortality_path)
-fertility_rates <- readRDS(fertility_path)
-
-attr(mortality_rates, "source")
-attr(fertility_rates, "source")
-tools::md5sum(c(mortality_path, fertility_path))
+mortality_rates <- get_mortality_hmd(country, start_time)
+fertility_rates <- get_fertility_hfd(country, start_time)
 
 input_tfr <- calculate_tfr(fertility_rates)
 input_life_table <- calculate_life_table(mortality_rates)
@@ -102,21 +84,13 @@ input_tfr
 input_life_expectancy
 ```
 
-**To complete:** describe the source revision and retained fertility ages.
-HFD open-ended fertility rows are omitted, so the reference TFR excludes their
-contributions. Mortality central rates are interpreted as piecewise constant
-hazards; the reference life table uses that same interpretation.
-
 ### Initialization and observation windows
 
 All replications below share one baseline population. They measure simulation
 variability conditional on that population. Baseline-generation variability
 would require a separate design.
 
-**To complete:** choose the burn-in/observation policy and explain treatment of
-the initial fertility transient. The baseline is not claimed to be stable or
-historically representative. Midpoint fertility compensation does not calibrate
-initial reproductive histories.
+Because of the arbitrary nature of the initial population, there will typically be a "burn-in" period before a stable population is achieved. Measures based on ASMR and ASFR still should be valid throughout, but population growth may be highly variable. However, because the simulation modifies actual fertility rates to account for non-exposure of pregnant mothers, the initial ASFR and TFR estimates will be slightly higher because all women start out as non-pregnant.
 
 ```{r}
 #| label: construct-model
@@ -133,7 +107,7 @@ fertility_time_breaks <- c(
   seq(start_time, start_time + 9, 1),
   seq(start_time + 10, end_time, 10)
 )
-mortality_time_breaks <- seq(start_time, end_time, 20)
+mortality_time_breaks <- seq(start_time, end_time, 10)
 # Finite last breakpoints automatically gain an open interval.
 life_table_age_breaks <- 0:100
 mortality_age_breaks <- 0:110
@@ -143,6 +117,8 @@ fertility_age_breaks <- sort(unique(c(
 ```
 
 ## Replications and demographic extraction
+
+The simulation is run 100 times and for each run, I calculate the lexis diagram to get person years, births, and deaths within given time and range brakets.
 
 ```{r}
 #| label: run-replications
@@ -162,13 +138,24 @@ life_table_counts <- map(results, calculate_lexis_counts,
   age_breaks = life_table_age_breaks)
 
 tfr <- map(fertility_counts, calculate_tfr) |>
-  bind_rows(.id = "replication")
+  bind_rows(.id = "replication") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  select(replication, time_mid, tfr)
 asfr <- bind_rows(fertility_counts, .id = "replication") |>
-  filter(sex == "f")
-asmr <- bind_rows(mortality_counts, .id = "replication")
+  filter(sex == "f") |>
+  mutate(time_mid = (time_start + time_end) / 2,
+         age_mid = (age_start + age_end) / 2) |>
+  select(replication, time_mid, age_mid, asfr) |>
+  filter(age_mid >= 13 & age_mid < 55)
+asmr <- bind_rows(mortality_counts, .id = "replication") |>
+  mutate(time_mid = (time_start + time_end) / 2,
+         age_mid = (age_start + age_end) / 2) |>
+  select(replication, time_mid, age_mid, sex, asmr)
 life_expectancy <- map(life_table_counts, calculate_life_table) |>
   bind_rows(.id = "replication") |>
-  filter(age_start == 0)
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  filter(age_start == 0) |>
+  select(replication, time_mid, sex, ex)
 ```
 
 ## Fertility results
@@ -176,46 +163,146 @@ life_expectancy <- map(life_table_counts, calculate_life_table) |>
 ### Total fertility rate
 
 ```{r}
-#| label: tfr-comparison
-# Add summaries and the TFR plot from the bootstrap script.
-# Report bias against input_tfr as well as variability across replications.
+#| label: fig-tfr-comparison
+#| fig-cap: Mean TFR across 100 simulations by time period. Grey ribbon shows 95% confidence interval for the sample mean. Dotted line shows the true TFR based on the input age-specific fertility rates.
+
+tfr_summary <- tfr |>
+  group_by(time_mid) |>
+  summarize(
+    mean = mean(tfr),
+    sd = sd(tfr),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+ggplot(tfr_summary, aes(x = time_mid, y = mean))+
+  geom_ribbon(aes(ymin = mean - 1.96 * se, ymax = mean + 1.96 * se), 
+              color = NA, fill = "grey")+
+  geom_line(color = "navy")+
+  geom_point(color = "navy")+
+  geom_hline(yintercept = input_tfr$tfr, linetype = 2, color = "tomato")+
+  labs(x = "year", y = "Mean TFR")+
+  theme_bw()
 ```
+
+@fig-tfr-comparison shows the mean TFR in each time period across the 100 replicated simulations. To account for the potential bias in the early simulation due to a lack of pregnant woman, I use one year time periods for the first decade and then ten year periods for the remainder of the simulation. 
+
+As expected, there is some upward bias initially due to the fertility adjustments. However, this bias is removed after the first two years of the simulation. Every remaining estimate's 95% confidence interval contains the true TFR and there is no evidence of a trend. 
 
 ### Age-specific fertility rates
 
 ```{r}
-#| label: asfr-comparison
-# Match input/output age_start and age_end before comparing rates.
-# Retain births and person_years for assessing sparse cells.
+#| label: fig-asfr-comparison
+#| fig-cap: The figure shows age specific fertility rates from the input data in red and a 95% confidence interval for the mean of the age-specific fertility rates across 100 simulations, separately by time period.
+
+asfr_summary <- asfr |>
+  group_by(time_mid, age_mid) |>
+  summarize(
+    mean = mean(asfr),
+    sd = sd(asfr),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+ggplot(asfr_summary, aes(x = age_mid, y = mean))+
+  geom_ribbon(aes(ymin = mean - 1.96 * se, ymax = mean + 1.96 * se), 
+              color = NA, fill = "grey20")+
+  #geom_line(color = "navy")+
+  geom_line(data = fertility_rates, aes(x = age_start + 0.5, y = rate),
+            color = "tomato", alpha = 0.5)+
+  facet_wrap(~time_mid)+
+  labs(x = "age (mid-point)", y = "age-specific fertility rate")+
+  theme_bw()
 ```
 
-**Interpretation:** to complete. Identify persistent age-specific differences
-and any change after the initial observation period.
+@fig-asfr-comparison shows a very close comparison between the estimated age-specific fertility rates across simulations and the input rates. The only differences are again in the first two years, where the estimated rates are slightly higher, as expected. 
 
 ## Mortality results
+
+### Life expectancy
+
+Because of sparsity over age 100, it is difficult to calculate life expectancy on life tables that extend to an open interval at 110+ years, consistent with the input data from HMD. Therefore, I truncate the open ended interval here to 100, which may lead to a slight systematic bias relative to the life expectancy estimated directly from the HMD data. However, given that mortality is high and flattens out in this period, the bias is likely to be very small.
+
+```{r}
+#| label: fig-le-comparison
+#| fig-cap: Mean life expectancy at age zero across 100 simulations by time period. Grey ribbon shows 95% confidence interval for the sample mean. Dotted line shows the true life expectancy based on the input age-specific mortality rates.
+
+life_exp_summary <- life_expectancy |>
+  group_by(time_mid, sex) |>
+  summarize(
+    mean = mean(ex),
+    sd = sd(ex),
+    n = sum(!is.na(ex)),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+ggplot(life_exp_summary, aes(x = time_mid, y = mean))+
+  geom_ribbon(aes(ymin = mean - 1.96 * se, ymax = mean + 1.96 * se), 
+              color = NA, fill = "grey")+
+  geom_line(color = "navy")+
+  geom_point(color = "navy")+
+  geom_hline(data = input_life_expectancy, aes(yintercept = ex), linetype = 2)+
+  facet_wrap(~sex, scales = "free_y")+
+  labs(x = "year", y = "Mean Life Expectancy at Age Zero")+
+  theme_bw()
+```
+
+@fig-le-comparison shows how well the empirically estimated life expectancy fits to the life expectancy of the input mortality rates, separately by gender. In general, it fits very well. Only one estimate's 95% confidence interval does not include the true input life expectancy, but this is quite plausibly a random error given the number of data points tested. I observe no trend here, nor any initial difficulty in the "burn in" period.
 
 ### Age-specific mortality rates
 
 ```{r}
-#| label: asmr-comparison
-# Add sex-specific ASMR summaries and plots against mortality_rates.
-# Report how many replications contribute to each age-period estimate.
-# Zero exposure gives NA; positive exposure with zero deaths gives zero.
-# Zero rates cannot be displayed on a logarithmic axis.
-```
+#| label: fig-asmr-comparison-male
+#| fig-cap: The figure shows male age specific mortality rates from the input data in red and a 95% confidence interval for the mean of the age-specific mortality rates across 100 simulations, separately by time period. Truncated at age 100 due to very small sample sizes at higher ages.
 
-### Life expectancy
+asmr_summary <- asmr |>
+  group_by(time_mid, age_mid, sex) |>
+  summarize(
+    mean = mean(asmr, na.rm = TRUE),
+    sd = sd(asmr, na.rm = TRUE),
+    n = sum(!is.na(asmr)),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+asmr_summary |>
+  filter(sex == "m") |>
+  ggplot(aes(x = age_mid, y = mean))+
+  geom_ribbon(aes(ymin = mean - 1.96 * se, ymax = mean + 1.96 * se), 
+              color = NA, fill = "grey20")+
+  geom_line(data = filter(mortality_rates, sex == "m"), 
+            aes(x = age_start + 0.5, y = rate),
+            color = "tomato", alpha = 0.5)+
+  facet_wrap(~time_mid)+
+  scale_y_log10(limits = c(.00005, .5))+
+  scale_x_continuous(limits = c(0, 100))+
+  labs(x = "age (mid-point)", y = "age-specific mortality rate (log scale)")+
+  theme_bw()
+```
 
 ```{r}
-#| label: life-expectancy-comparison
-# Add life-expectancy summaries and plots against input_life_expectancy.
-# Count missing, infinite, and finite estimates explicitly before summarizing.
+#| label: fig-asmr-comparison-female
+#| fig-cap: The figure shows female age specific mortality rates from the input data in red and a 95% confidence interval for the mean of the age-specific mortality rates across 100 simulations, separately by time period. Truncated at age 100 due to very small sample sizes at higher ages.
+
+asmr_summary |>
+  filter(sex == "f") |>
+  ggplot(aes(x = age_mid, y = mean))+
+  geom_ribbon(aes(ymin = mean - 1.96 * se, ymax = mean + 1.96 * se), 
+              color = NA, fill = "grey20")+
+  geom_line(data = filter(mortality_rates, sex == "f"), 
+            aes(x = age_start + 0.5, y = rate),
+            color = "tomato", alpha = 0.5)+
+  facet_wrap(~time_mid)+
+  scale_y_log10(limits = c(.00005, .5))+
+  scale_x_continuous(limits = c(0, 100))+
+  labs(x = "age (mid-point)", y = "age-specific mortality rate (log scale)")+
+  theme_bw()
 ```
 
-**Interpretation:** to complete. The empirical life tables above use
-`[100, Inf)`, whereas the input schedule retains its original oldest-age bands.
-Document that difference; this comparison is descriptive until terminal-age
-handling is made comparable. Do not silently fill missing mortality rates.
+@fig-asmr-comparison-male and @fig-asmr-comparison-female show the fit of male and female age-specific mortality rates, respectively, from the input schedules in comparison to the 95% CI of the mean ASFR for each simulation, across time. The simulated data fit extremely well to the expected input schedules.
 
 ## Population growth and mechanism checks
 
@@ -229,6 +316,18 @@ population_counts <- map(results, calculate_population_size,
 
 **To complete:** reference the relevant testthat checks and their results.
 Population growth is a supporting diagnostic, not a substitute for rate checks.
+
+```{r}
+#| label: test-results
+
+test_results <- testthat::test_local("..", reporter = "silent")
+
+test_table <- as.data.frame(test_results)
+
+knitr::kable(
+  test_table[, c("test", "passed", "failed", "error", "skipped", "warning")]
+)
+```
 
 ## Sensitivity cases
 
@@ -253,7 +352,3 @@ system2("git", c("-C", "..", "rev-parse", "HEAD"), stdout = TRUE)
 system2("git", c("-C", "..", "status", "--short"), stdout = TRUE)
 sessionInfo()
 ```
-
-Record the commit together with any uncommitted code changes used in the runs.
-For a completed report, preserve the input RDS files and seed/settings record
-alongside the rendered results or in a documented archive.
