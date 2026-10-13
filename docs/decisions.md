@@ -247,3 +247,16 @@ Both `set_population()` and `hammel_results()` now apply the shared structural c
   eligibility at evaluated midpoints. At the user's direction, reject all
   open-ended fertility input bands, including zero rates/zero spacing.
 - **Supersedes:** D027's age-varying hazard representation and exact sampler.
+
+## Deferred concern: fertility compensation across rate changes
+
+- **Status:** noted and deferred October 13, 2026, at the user's request.
+- **Issue:** sequential runs retain actual maternal birth histories, while
+  midpoint compensation uses only the new fertility schedule. Recently
+  excluded women may reflect earlier rates, producing a transition mismatch
+  with the new ASFR target. Its magnitude and duration remain unverified.
+- **Current action:** document the limitation; do not implement a correction.
+- **Proposal only:** retaining recent rate schedules and effective dates could
+  support a history-aware compensation calculation. No algorithm is accepted.
+- **Boundary:** this deferral does not adopt built-in calendar-varying rates
+  or establish a new scientific guarantee for incremental runs.

@@ -321,3 +321,21 @@ nonpositive midpoint eligibility, constant-rate recovery after burn-in,
 independent mortality, and fractional spacing/restarts. Remove D027 tests that
 assert exact age-varying hazard behavior. Supersedes D027's exact integration
 and inversion requirements, while retaining its year units and initialization.
+
+## Deferred issue: fertility compensation when rates change between runs
+
+Noted October 13, 2026; the user requested documentation only and deferred
+a correction. Users can reuse a population in successive runs and replace
+fertility rates at the boundaries. Recorded maternal births continue to enforce
+spacing, but each run's midpoint compensation is calculated solely from its
+current input schedule. It does not account for the previous schedule's role
+in producing women still within their exclusion interval. Realized fertility
+can therefore temporarily differ from the new target ASFR. Magnitude and
+duration have not been quantified; no convergence deadline is guaranteed.
+
+A possible future treatment would retain recent schedules and their effective
+dates, integrating fertility along age and calendar time through the preceding
+birth interval. This would require a transition adjustment that varies with
+time, or an explicit approximation compatible with the shared sampler. This
+is a proposal, not an accepted algorithm or authorization to implement it.
+For now, no schedule history or transient correction is added.
