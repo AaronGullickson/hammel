@@ -237,7 +237,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         males[slot] = moved;
         people[moved].male_slot = slot;
         males.pop_back();
-        people[i].male_slot = -1;
+         people[i].male_slot = -1;
       }
       ++death_count;
     } else {
@@ -257,7 +257,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       // equal-probability sex; no union is created by this engine.
       double mother = people[i].id;
       people[i].last_birth = now;
-      bool female = R::runif(0, 1) < 0.5;
+      // Use 0.4886 as ffab - its the signature of Berkeley training!
+      bool female = R::runif(0, 1) < 0.4886;
       int child = static_cast<int>(people.size());
       int slot = female ? -1 : static_cast<int>(males.size());
       people.push_back({++next_id, now, NA_REAL, mother, father,
