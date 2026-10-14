@@ -21,6 +21,7 @@ execute:
 
 devtools::load_all()
 library(dplyr)
+library(readr)
 library(purrr)
 library(ggplot2)
 ```
@@ -28,7 +29,7 @@ library(ggplot2)
 ## Purpose and completion criteria
 
 Assess whether the current simulator can reproduce the supplied demographic schedules of fertility and mortality over the simulation period adequately for milestone 1. For this assessment, the input fertility and mortality rates will be held constant across the simulation. 
-
+``
 To make this assessment, I will replicate 100 simulations with the same input values and compare means of output measures to input measures. I will also repeat this process for different demographic profiles of fertility and mortality. 
 
 | Measure | Comparison | Acceptance criterion |
@@ -36,7 +37,7 @@ To make this assessment, I will replicate 100 simulations with the same input va
 | ASFR | Output births / female exposure versus input rates | 95% CI of mean ASFR for each age group and time period falls includes true input ASFR |
 | TFR | Output versus input TFR over matched ages | 95% CI of mean TFR across iterations includes true input TFR for all time increments |
 | ASMR | Output deaths / exposure versus input rates, by sex | 95% CI of mean ASFR for each age group and time period falls includes true input ASFR |
-| Life expectancy | Output versus input-derived life table | 95% CI of mean TFR across iterations includes true input TFR for all time increments |
+| Life expectancy | Output versus input-derived life table | 95% CI of mean TFR across iterations includes true input TFR for all time incr.ements |
 | Birth spacing and accounting | Existing tests and checks on simulated histories | Successful unit tests |
 
 Our primary measure of acceptance will be that the true values for each measure fall within the 95% confidence interval of the mean estimate from the simulation. However, because we will be performing this test for a large number of points, we do expect that not every point will fall within that 95% CI. 
@@ -82,6 +83,8 @@ input_life_expectancy <- input_life_table |>
 
 input_tfr
 input_life_expectancy
+
+fertility_rates_niger <- read_csv("validation/data/niger_2012_asfr_wpp2024.csv")
 ```
 
 ### Initialization and observation windows
@@ -393,7 +396,6 @@ results_ext <- map2(results, replication_seeds, function(result, seed) {
 #| label: fig-pop-growth-ext
 #| fig-cap: Annual population growth by decade with an additional 100 yars added to simulation. The mean is shown across all simulations with a 95% confidence interval given by the bands. The dotted red line shows the expected stable populationg growth rate.
 
-
 map(
   results_ext, 
   calculate_population_size, 
@@ -421,7 +423,127 @@ map(
   theme_bw()
 ```
 
-@fig-pop-growth-ext shows the same average growth rate after adding 100 more years to the simulation. The figure clearly shows that the population has become a stable population by 100 years into the simulation, with the growth rate staying at the expected growth rate of the stable population. 
+@fig-pop-growth-ext shows the same average growth rate after adding 100 more years to the simulation. The figure clearly shows that the population has become a stable population by 100 years into the simulation, with the growth rate staying at the expected growth rate of the stable population.
+
+## Fertility Adjustment and Restart Issue
+
+The simulation includes a `birth_interval` variable that defaults to 0.75 (9 months) as a minimum length between births. Because women will spend some time not exposed to the risk of birth, the actual fertility rates used to determine waiting time until birth must be higher than the provided age specific fertility rates in order for the simulation to match those input fertility rates. For a simple static fertility rate $f$, this adjustment would be 
+
+$$\frac{f}{1-bf}$$
+
+where $b$ is the birth interval. With age-specific fertility rates, its somewhat more complicated as some of that 9 months may be spent outside the current age bracket and thus in a different fertility. The simulation currently uses the midpoint of the interval and assigns a duration weighted sum of ASFRs. For example, in the 20-21 age bracket, the mid point would be 20.5. 0.5 of the birth interval would then be within this bracket using $f_{20}$ and 0.25 would be in the previous bracket (19-20) and use $f_{19}$. So the adjustment in this case would be:
+
+$$\frac{f_{20}}{1-(0.5)(f_{20})-(0.25)(f_{19})}$$
+
+The results above show that this adjustment works very well to correctly reproduce the input ASFR and TFR in the output. The only issue is that when starting with a population consisting of women with no recent previous births (or any births), fertility will be overestimated for the first one or two years. Generally, we can chalk this up to the "burn in" period.
+
+However, there is one remaining issue that may arise when a simulation is extended with a new fertility schedule. The adjustment made to fertility in the new simulation will be determined by the new fertility schedule but should be determined by a mix of old and new as some women will have been partially ineligible under the old system. When fertility is increased this will likely lead to a positive bias and when fertility is decreased this will lead to a negative bias.
+
+To see how much of an issue this makes, I will extend our original simulation but replace the US fertility rates with those from Niger in 2012 (about 7.5 TFR).
+
+```{r}
+#| label: run-simulation-niger
+
+results_ext_niger <- map2(results, replication_seeds, function(result, seed) {
+  model <- model |>
+    set_population(result) |>
+    set_fertility(fertility_rates_niger)
+  simulate(model, years = 20, seed = seed)
+})
+```
+
+```{r}
+#| label: calculate-fertility-niger
+
+fertility_counts_ext_niger <- map(
+  results_ext_niger,
+  calculate_lexis_counts,
+  time_breaks = c(2090:2110),
+  age_breaks = fertility_age_breaks
+)
+
+tfr_ext_niger <- map(fertility_counts_ext_niger, calculate_tfr) |>
+  bind_rows(.id = "replication") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  select(replication, time_mid, tfr)
+```
+
+```{r}
+#| label: fig-fertility-niger
+#| fig-cap: Mean TFR across simulations before and after a simulation restart using Niger's 2012 fertility rates (TFR: 7.46). The red dotted lines show the expected TFR under the two scenarios and the dotted vertical line shows the transition between the restart of the simulation.
+
+tfr_ext_niger |>
+  group_by(time_mid) |>
+  summarize(
+    mean = mean(tfr),
+    sd = sd(tfr),
+    n = n(),
+    se = sd / sqrt(n)
+  ) |>
+  ggplot(aes(x = time_mid, y = mean))+
+  geom_point()+
+  geom_line()+
+  geom_hline(yintercept = c(input_tfr$tfr, sum(fertility_rates_niger$rate)),
+             linetype = 2, color = "red")+
+  geom_vline(xintercept = 2100, linetype = 2)+
+  labs(x = "year", y = "mean TFR across simulations")+
+  theme_bw()
+```
+
+@fig-fertility-niger shows the results for mean estimated TFR across the 100 simulations near the transition in restarting the simulation. There is a very clear single year blip immediately after the restart where fertility rates are higher than expected. This blip only lasts for the first year of the simulation, but if `birth_interval` was set higher, the bias could last longer.
+
+```{r}
+#| label: run-simulation-niger-longer
+
+results_ext_nigerl <- map2(results, replication_seeds, function(result, seed) {
+  model <- model |>
+    set_population(result) |>
+    set_fertility(fertility_rates_niger,  birth_interval = 1.25)
+  simulate(model, years = 20, seed = seed)
+})
+```
+
+```{r}
+#| label: calculate-fertility-niger
+
+fertility_counts_ext_nigerl <- map(
+  results_ext_nigerl,
+  calculate_lexis_counts,
+  time_breaks = c(2090:2110),
+  age_breaks = fertility_age_breaks
+)
+
+tfr_ext_nigerl <- map(fertility_counts_ext_nigerl, calculate_tfr) |>
+  bind_rows(.id = "replication") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  select(replication, time_mid, tfr)
+```
+
+```{r}
+#| label: fig-fertility-nigerl
+#| fig-cap: Mean TFR across simulations before and after a simulation restart using Niger's 2012 fertility rates (TFR: 7.46) and a longer minimum birth interval of 1.25 years. The red dotted lines show the expected TFR under the two scenarios and the dotted vertical line shows the transition between the restart of the simulation.
+
+tfr_ext_nigerl |>
+  group_by(time_mid) |>
+  summarize(
+    mean = mean(tfr),
+    sd = sd(tfr),
+    n = n(),
+    se = sd / sqrt(n)
+  ) |>
+  ggplot(aes(x = time_mid, y = mean))+
+  geom_point()+
+  geom_line()+
+  geom_hline(yintercept = c(input_tfr$tfr, sum(fertility_rates_niger$rate)),
+             linetype = 2, color = "red")+
+  geom_vline(xintercept = 2100, linetype = 2)+
+  labs(x = "year", y = "mean TFR across simulations")+
+  theme_bw()
+```
+
+@fig-fertility-nigerl shows the same result but for a minimum birth interval of 1.25. The spike in the first year of the restart is more pronounced and there is some disturbance in subsequent years before once again hitting the expected TFR.
+
+Ultimately, this is an issue which we should try to address. However, it is unlikely to cause substantial issues in most cases. The distortion observed here was generated by an extreme change in ASFR and in most cases simulations will not shift ASFR this much in a single restart so the actual bias will be much smaller. 
 
 ## Tests
 
@@ -438,15 +560,6 @@ knitr::kable(
   test_table[, c("test", "passed", "failed", "error", "skipped", "warning")]
 )
 ```
-
-## Sensitivity cases
-
-| Case | Inputs/settings | Reason | Result |
-|---|---|---|---|
-| USA/2000 | Starter case above | Initial benchmark | To complete |
-| Higher fertility | To choose | Assess spacing compensation | To complete |
-| Five-year fertility bands | To specify | Assess midpoint approximation | To complete |
-| Alternative birth interval | To choose | Assess spacing sensitivity | To complete |
 
 ## Conclusions and unresolved limitations
 
