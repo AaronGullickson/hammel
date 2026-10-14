@@ -19,7 +19,7 @@ execute:
 #| label: setup
 #| include: false
 
-devtools::load_all("..", quiet = TRUE)
+devtools::load_all()
 library(dplyr)
 library(purrr)
 library(ggplot2)
@@ -304,18 +304,128 @@ asmr_summary |>
 
 @fig-asmr-comparison-male and @fig-asmr-comparison-female show the fit of male and female age-specific mortality rates, respectively, from the input schedules in comparison to the 95% CI of the mean ASFR for each simulation, across time. The simulated data fit extremely well to the expected input schedules.
 
-## Population growth and mechanism checks
+## Population growth
 
 ```{r}
-#| label: population-growth
-population_counts <- map(results, calculate_population_size,
-  times = seq(start_time, end_time, 10)) |>
+#| label: count-population
+
+population_counts <- map(
+  results, 
+  calculate_population_size, 
+  times = seq(start_time, end_time, 10)
+) |>
   bind_rows(.id = "replication")
-# Add the population-growth plot and any accounting/spacing checks.
 ```
 
-**To complete:** reference the relevant testthat checks and their results.
-Population growth is a supporting diagnostic, not a substitute for rate checks.
+```{r}
+#| label: fig-population-size
+#| fig-cap: Size of the population across 100 simulation at 10 year intervals
+
+population_counts |>
+  ggplot(aes(x = time))+
+  geom_line(alpha = 0.5, aes(y = population, group = replication))+
+  labs(x = "year", y = "population size")+
+  theme_bw()
+```
+
+@fig-population size shows the population trajectory of each simulation over the simulation period. Because the simulation holds fertility and mortality rates constant, we should eventually reach a stable population trajectory. However, because the initial population provided did not match the age distribution of the expected stable population, we expect that the initial period will be highly variable. This is the "burn in" period. In this case, we get rapid population decline. The decline occurs because the initial population was uniformly distributed from zero to a hundred years of age and thus over-represented older people with high mortality. This decline levels off by 2025 and by 2050 appears to be approaching a stable gradual rate of decline.
+
+To analyze that rate of decline more formally, I will use the approximation of the stable population growth rate given by: 
+
+$$\frac{log(NRR)}{\mu}$$
+
+where $\mu$ is the mean age of childbearing (i.e. generational length).
+
+```{r}
+#| label: calculate-stable-growth-rate
+
+temp <- input_life_table |>
+  filter(sex == "f") |>
+  select(age_start, Lx) |>
+  inner_join(fertility_rates, by = "age_start")
+NRR <- 0.4886 * sum(temp$rate * temp$Lx)
+mu <- sum(((temp$age_start + temp$age_end) / 2) * temp$rate)/sum(temp$rate)
+growth_stable <- log(NRR)/mu
+growth_stable
+```
+
+The stable growth rate from these rates is a very small negative growth rate. Now I will estimate the actual growth rate in my simulation for each decade and take the mean across simulations.
+
+```{r}
+#| label: fig-pop-growth
+#| fig-cap: Annual population growth by decade. The mean is shown across all simulations with a 95% confidence interval given by the bands. The dotted red line shows the expected stable populationg growth rate.
+
+population_counts |>
+  group_by(replication) |>
+  arrange(time, .by_group = TRUE) |>
+  mutate(rate_growth = log(lead(population) / population) / (lead(time) - time)) |>
+  ungroup() |>
+  filter(!is.na(rate_growth)) |>
+  group_by(time) |>
+  summarize(
+    mean = mean(rate_growth),
+    sd = sd(rate_growth),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  ggplot(aes(x = time+5))+
+  geom_ribbon(aes(ymin = mean - 1.96 * se, ymax = mean + 1.96 * se))+
+  geom_line(aes(y = mean))+
+  geom_hline(yintercept = growth_stable, linetype = 2, color = "red")+
+  labs(x = "year", y = "mean annual population growth rate")+
+  theme_bw()
+```
+
+@fig-pop-growth shows that the population growth rate is approaching the stable population growth rate by the end of the period. A longer simulation would allow a better assessment of whether it will stay at that growth rate. To accomplish this and to also test how well the simulation when resuing output data as new input data, I extend the simulations an additional 100 years.
+
+```{r}
+#| label: extend-replications
+
+results_ext <- map2(results, replication_seeds, function(result, seed) {
+  model <- model |>
+    set_population(result)
+  simulate(model, years = years, seed = seed)
+})
+```
+
+```{r}
+#| label: fig-pop-growth-ext
+#| fig-cap: Annual population growth by decade with an additional 100 yars added to simulation. The mean is shown across all simulations with a 95% confidence interval given by the bands. The dotted red line shows the expected stable populationg growth rate.
+
+
+map(
+  results_ext, 
+  calculate_population_size, 
+  times = seq(start_time, end_time + years, 10)
+) |>
+  bind_rows(.id = "replication") |>
+  group_by(replication) |>
+  arrange(time, .by_group = TRUE) |>
+  mutate(rate_growth = log(lead(population) / population) / (lead(time) - time)) |>
+  ungroup() |>
+  filter(!is.na(rate_growth)) |>
+  group_by(time) |>
+  summarize(
+    mean = mean(rate_growth),
+    sd = sd(rate_growth),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  ggplot(aes(x = time+5))+
+  geom_ribbon(aes(ymin = mean - 1.96 * se, ymax = mean + 1.96 * se))+
+  geom_line(aes(y = mean))+
+  geom_hline(yintercept = growth_stable, linetype = 2, color = "red")+
+  labs(x = "year", y = "mean annual population growth rate")+
+  theme_bw()
+```
+
+@fig-pop-growth-ext shows the same average growth rate after adding 100 more years to the simulation. The figure clearly shows that the population has become a stable population by 100 years into the simulation, with the growth rate staying at the expected growth rate of the stable population. 
+
+## Tests
+
+The following tests have been constructed and are currently all passing.
 
 ```{r}
 #| label: test-results
