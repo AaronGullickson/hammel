@@ -46,6 +46,7 @@ To make this assessment, I will replicate 100 simulations with the same input va
 | TFR | Output versus input TFR over matched ages | Adequate coverage of 95% CI of mean TFR across iterations over true input TFR for all time periods |
 | ASMR | Output deaths / exposure versus input rates, by sex | Adequate coverage of 95% CI of mean ASMR for each age group and time period over true input ASFR |
 | Life expectancy | Output versus input-derived life table | Adequate coverage of 95% CI of mean life expectancy across iterations over true input TFR for all time increments |
+| Stable Population | Simulation output to Leslie matrix projection | On average, microsimulation population dynamics should converge to expected stable population growth rate and age distribution |
 | Birth spacing and accounting | Existing tests and checks on simulated histories | Successful unit tests |
 
 Our primary measure of acceptance will be that the true values for each measure fall within the 95% confidence interval of the mean estimate from the simulation. However, because we will be performing this test for a large number of points, we do expect that not every point will fall within that 95% CI. 
