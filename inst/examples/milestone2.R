@@ -22,3 +22,33 @@ timing <- system.time(result <- simulate(model, years = 100, seed = 42))
 print(result$simulation)
 cat("Living persons:", sum(is.na(result$persons$death_time)), "\n")
 cat("Simulation elapsed seconds:", timing[["elapsed"]], "\n")
+
+husbands <- result$persons |>
+  filter(sex == "m") |>
+  rename(
+    husband_id = person_id,
+    birth_time_h = birth_time,
+    death_time_h = death_time
+  ) |>
+  select(husband_id, birth_time_h, death_time_h)
+
+wives <- result$persons |>
+  filter(sex == "f") |>
+  rename(
+    wife_id = person_id,
+    birth_time_w = birth_time,
+    death_time_w = death_time
+  ) |>
+  select(wife_id, birth_time_w, death_time_w)
+
+unions <- result$unions |>
+  left_join(husbands) |>
+  left_join(wives) |>
+  mutate(
+    age_mar_h = start_time - birth_time_h,
+    age_mar_w = start_time - birth_time_w,
+    age_diff = age_mar_h - age_mar_w
+  )
+
+mean(result$persons$person_id %in% c(result$unions$husband_id, result$unions$wife_id))
+
