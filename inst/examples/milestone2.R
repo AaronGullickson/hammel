@@ -15,10 +15,14 @@ model <- hammel_model() |>
   set_population(population) |>
   set_mortality(mortality_rates) |>
   set_fertility(fertility_rates) |>
-  set_union_formation("on_demand",
+  set_union_formation(
+    "on_demand",
     create_matching_model(
       ~ age_difference + I(age_difference^2),
-      c(age_difference = 0.072, "I(age_difference^2)" = -0.014)))
+      c(age_difference = 0.072, "I(age_difference^2)" = -0.014)
+    ),
+    kinship_generations = 1
+  )
 
 timing <- system.time(result <- simulate(model, years = 100, seed = 42))
 print(result$simulation)
@@ -64,6 +68,21 @@ ggplot(unions, aes(x = factor(decade), y = age_diff))+
   theme_bw()
 
 
+# how many remain unmarried?
+result$persons |>
+  mutate(
+    ever_married = person_id %in% c(result$unions$husband_id, result$unions$wife_id),
+    birth_decade = floor(birth_time / 10) * 10
+  ) |>
+  group_by(birth_decade, sex) |>
+    summarize(prop_ever_married = mean(ever_married)) |>
+  print(n = 30)
+
+|>
+  ggplot(aes(x = birth_decade, y = prop_ever_married, group = sex, color = sex))+
+  geom_line()+
+  geom_point()+
+  theme_bw()
 
 mean(result$persons$person_id %in% c(result$unions$husband_id, result$unions$wife_id))
 

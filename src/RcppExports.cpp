@@ -23,6 +23,20 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// extract_kin_cpp
+DataFrame extract_kin_cpp(DataFrame persons, NumericVector ego_ids, NumericVector relative_ids, int generations);
+RcppExport SEXP _hammel_extract_kin_cpp(SEXP personsSEXP, SEXP ego_idsSEXP, SEXP relative_idsSEXP, SEXP generationsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< DataFrame >::type persons(personsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type ego_ids(ego_idsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type relative_ids(relative_idsSEXP);
+    Rcpp::traits::input_parameter< int >::type generations(generationsSEXP);
+    rcpp_result_gen = Rcpp::wrap(extract_kin_cpp(persons, ego_ids, relative_ids, generations));
+    return rcpp_result_gen;
+END_RCPP
+}
 // hazard_wait_cpp
 NumericVector hazard_wait_cpp(DataFrame rates, NumericVector ages, NumericVector thresholds);
 RcppExport SEXP _hammel_hazard_wait_cpp(SEXP ratesSEXP, SEXP agesSEXP, SEXP thresholdsSEXP) {
@@ -74,8 +88,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // simulate_cpp
-List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, DataFrame unions, int sample_size, List matching, double min_male_age);
-RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP unionsSEXP, SEXP sample_sizeSEXP, SEXP matchingSEXP, SEXP min_male_ageSEXP) {
+List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, DataFrame unions, int sample_size, List matching, double min_male_age, int kinship_generations);
+RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP unionsSEXP, SEXP sample_sizeSEXP, SEXP matchingSEXP, SEXP min_male_ageSEXP, SEXP kinship_generationsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -89,18 +103,20 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type sample_size(sample_sizeSEXP);
     Rcpp::traits::input_parameter< List >::type matching(matchingSEXP);
     Rcpp::traits::input_parameter< double >::type min_male_age(min_male_ageSEXP);
-    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching, min_male_age));
+    Rcpp::traits::input_parameter< int >::type kinship_generations(kinship_generationsSEXP);
+    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching, min_male_age, kinship_generations));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
     {"_hammel_demographic_counts_cpp", (DL_FUNC) &_hammel_demographic_counts_cpp, 3},
+    {"_hammel_extract_kin_cpp", (DL_FUNC) &_hammel_extract_kin_cpp, 4},
     {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
     {"_hammel_adjusted_fertility_cpp", (DL_FUNC) &_hammel_adjusted_fertility_cpp, 2},
     {"_hammel_inspect_matching_cpp", (DL_FUNC) &_hammel_inspect_matching_cpp, 3},
     {"_hammel_sample_male_positions_cpp", (DL_FUNC) &_hammel_sample_male_positions_cpp, 2},
-    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 10},
+    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 11},
     {NULL, NULL, 0}
 };
 

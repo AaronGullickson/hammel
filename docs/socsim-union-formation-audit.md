@@ -95,3 +95,26 @@ Candidate sampling before versus after eligibility, incomplete-ancestry policy,
 failed searches/retries, and birth-time classification need explicit choices.
 SOCSIM's status-specific fertility is evidence of state-dependent rate selection,
 not proof that Hammel's midpoint compensation is valid across status changes.
+
+## Further kin extraction (additional static inspection October 15, 2026)
+
+The same pinned checkout separates union prohibition from broader kin extraction.
+The native `check_incest()` has fixed two-generation arrays; it has no generic
+user-selected cousin-depth traversal. `defs.h:584–588` stores mother/father,
+next-elder maternal/paternal sibling, and last-born-child pointers. Native
+`utils.c`, including `child_census()` around line 657, contains hard-coded
+traversal/tally routines extending to aunts/uncles and great-aunts/uncles;
+these do not automatically extend the union screen.
+
+The rsocsim R layer has a separate `R/retrieve_kin.R`, `retrieve_kin()`, operating
+on output tables. It builds parent and parent-to-children lookups, composes
+parent/children/spouse operations, and returns named lists of relative IDs.
+Default categories include parents, grandparents, great-grandparents, siblings,
+spouse, children and grandchildren. Optional categories include aunts/uncles,
+great-aunts/uncles, first cousins, nieces/nephews, and in-laws, with optional
+sex-specific outputs. Siblings are children of either parent minus ego, so
+half siblings are included without a separate full/half classification.
+First cousins are children of aunts/uncles. This is a fixed category interface,
+not a generic arbitrary cousin-degree API. These findings are source inspection,
+not executable validation of every category, missing-history case, or overlap.
+No code was copied. Keep this R-layer function distinct from the SOCSIM engine.

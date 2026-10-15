@@ -29,7 +29,8 @@ union formation, use the woman's
 current partner, or sample men and choose one using conditional-logit
 probabilities from the matching formula to form a union at the birth.
 Sampled men must meet the configured minimum age (default 15 years).
-Other pair eligibility checks are not yet applied.
+Known kin are excluded within the configured generation bound on each side
+of a common ancestor (default two). Other eligibility rules remain pending.
 If no sampled men are eligible, preserve the birth with unknown father and no union.
 Rate-based union initiation is not yet implemented.
 }

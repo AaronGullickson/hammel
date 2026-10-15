@@ -10,7 +10,8 @@ union_formation(
   matching,
   sample_size = 1000,
   rates = NULL,
-  min_male_age = 15
+  min_male_age = 15,
+  kinship_generations = 2
 )
 
 set_union_formation(
@@ -19,7 +20,8 @@ set_union_formation(
   matching,
   sample_size = 1000,
   rates = NULL,
-  min_male_age = 15
+  min_male_age = 15,
+  kinship_generations = 2
 )
 }
 \arguments{
@@ -41,6 +43,13 @@ eligibility and gaps are not yet implemented. Must be NULL for \code{"on_demand"
 search, default \code{15}. Finite nonnegative scalar; zero disables this age
 exclusion. Existing unions are retained. No female minimum age is added.}
 
+\item{kinship_generations}{Generation bound on both sides of a known common
+ancestor, default \code{2}. Excludes parents, grandparents, siblings, aunts/uncles,
+nieces/nephews and first cousins, including half relationships, when known.
+Zero imposes no cross-person kin exclusion. Missing ancestry is not proof of
+unrelatedness; only demonstrated relationships are screened. Existing unions
+are retained. See \code{\link[=extract_kin]{extract_kin()}} for the shared distance definitions.}
+
 \item{model}{A \code{hammel_model} object.}
 }
 \value{
@@ -53,14 +62,16 @@ Construct or attach a union-formation specification without executing it.
 the woman's current partner, or sample living men and choose a partner using
 conditional-logit probabilities from the matching formula to form a union.
 Sampled men below \code{min_male_age} are excluded. If no eligible sampled men
-remain, preserve the birth with unknown father. Other exclusions are not yet
-applied, so partnered men and relatives can still be selected. Death ends affected
+remain, preserve the birth with unknown father. Known kin within
+\code{kinship_generations} on both sides of a common ancestor are excluded.
+Other restrictions are deferred, including male exclusivity. Death ends affected
 unions. Rate-based initiation and conditional fertility are not implemented.
 }
 \details{
 Sampling is from the available male pool BEFORE pair-specific screening.
 \code{sample_size = 0} means the whole pool. Otherwise sample without replacement
 up to that many men. Age screening occurs afterward, without refilling the
-sample. Other eligibility rules are deferred.
+sample. Kinship screening follows the same ordering. Existing unions are
+retained even if a new-search restriction would exclude the partner.
 Candidate sets will not be retained in simulation outputs.
 }

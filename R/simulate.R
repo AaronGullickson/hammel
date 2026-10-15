@@ -9,7 +9,8 @@
 #' current partner, or sample men and choose one using conditional-logit
 #' probabilities from the matching formula to form a union at the birth.
 #' Sampled men must meet the configured minimum age (default 15 years).
-#' Other pair eligibility checks are not yet applied.
+#' Known kin are excluded within the configured generation bound on each side
+#' of a common ancestor (default two). Other eligibility rules remain pending.
 #' If no sampled men are eligible, preserve the birth with unknown father and no union.
 #' Rate-based union initiation is not yet implemented.
 #'
@@ -109,7 +110,8 @@ simulate <- function(model, years, seed = NULL) {
     native <- simulate_cpp(population$persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
                            sample_size, prepare_matching_model(union_process$matching),
-                           union_process$min_male_age)
+                           union_process$min_male_age,
+                           as.integer(union_process$kinship_generations))
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {

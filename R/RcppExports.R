@@ -5,6 +5,10 @@ demographic_counts_cpp <- function(persons, time_breaks, age_breaks) {
     .Call(`_hammel_demographic_counts_cpp`, persons, time_breaks, age_breaks)
 }
 
+extract_kin_cpp <- function(persons, ego_ids, relative_ids, generations) {
+    .Call(`_hammel_extract_kin_cpp`, persons, ego_ids, relative_ids, generations)
+}
+
 hazard_wait_cpp <- function(rates, ages, thresholds) {
     .Call(`_hammel_hazard_wait_cpp`, rates, ages, thresholds)
 }
@@ -21,7 +25,7 @@ sample_male_positions_cpp <- function(count, requested) {
     .Call(`_hammel_sample_male_positions_cpp`, count, requested)
 }
 
-simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching, min_male_age) {
-    .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching, min_male_age)
+simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching, min_male_age, kinship_generations) {
+    .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching, min_male_age, kinship_generations)
 }
 

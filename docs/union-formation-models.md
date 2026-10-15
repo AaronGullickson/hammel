@@ -3,8 +3,8 @@
 Updated October 15, 2026 from the user's milestone 2 request.
 **Status: milestone scope accepted (D030); detailed demographic rules below
 remain proposals or open decisions. Process construction and formula scoring
-and conditional-logit on-demand execution with minimum male age screening
-are implemented; other pair restrictions and rate-based initiation remain pending.**
+and conditional-logit on-demand execution with minimum male age and known-kin
+screening are implemented; male exclusivity and rate-based initiation remain pending.**
 Every simulation requires a union-formation process. Current-partner lookup
 and union histories are common infrastructure for all initiation modes.
 
@@ -57,7 +57,7 @@ deterministic and must not mutate state. Data-dependent transformations require
 care: their basis can depend on the candidate pool. There is no fitted-model
 estimation interface yet.
 
-`union_formation(initiation, matching, sample_size = 1000, rates = NULL, min_male_age = 15)` constructs
+`union_formation(initiation, matching, sample_size = 1000, rates = NULL, min_male_age = 15, kinship_generations = 2)` constructs
 a process; `set_union_formation(model, ...)` attaches it. Initiation is explicitly
 `"on_demand"` or `"rate"`; initiation and coefficients have no defaults.
 The user selected a default sample size of 1000. `sample_size = 0` means use the full available pool; a positive
@@ -85,7 +85,7 @@ engine supports the conditional-logit on-demand increment specified below;
 At each birth, use the woman's existing living male partner when she has an
 ongoing union. Otherwise draw `min(sample_size, living men)` distinct men
 uniformly without replacement (`0` means all living men), then exclude sampled
-men below `min_male_age` without refilling. For every remaining candidate calculate `age_difference = male age - female age` in continuous
+men below `min_male_age` or within the configured kinship bound without refilling. For every remaining candidate calculate `age_difference = male age - female age` in continuous
 years. The shared search time cancels, so this equals the woman's birth time
 minus the man's birth time. Evaluate the user's matching formula and named
 coefficients to obtain utility V_j, then choose one candidate with probability
@@ -115,8 +115,9 @@ in C++ with the same formula semantics; other supported R formula transforms
 use the existing model-matrix evaluator on the sampled candidate data. There
 is no age discretization, cached age-grid approximation, or new dependency.
 
-Minimum male age is checked after sampling, as specified below. Other pair
-restrictions remain deferred: partnered men and relatives are not excluded. Men may have concurrent unions; this is not an
+Minimum male age and known kinship (default two generations on each side)
+are checked after sampling. Other restrictions remain deferred: partnered men
+are not excluded. Men may have concurrent unions; this is not an
 accepted final eligibility policy. A woman retains her current partner until
 death. Input must supply unambiguous active female/male unions with living
 partners and at most one ongoing union per woman. Ended histories are retained.
@@ -241,14 +242,19 @@ yet been demonstrated.
 
 ## Eligibility and ancestry
 
-Screen candidates before scoring or selection. Specify minimum ages, availability,
-existing-union exclusions, remarriage, and exact kin prohibitions. Distinguish
-parent/child, siblings and half-siblings, other ancestor/descendant relationships,
-aunt/uncle relationships, and cousin degrees rather than relying on “incest” as
-a complete rule. Decide how unknown parents and incomplete baseline ancestry
-limit screening. Unknown ancestry must not be represented as verified absence
-of kinship. Structural validation of input histories and ancestry cycles also
-needs a defined policy.
+The [shared kinship module](kinship.md) now supports configurable generation
+bounds and `extract_kin()` using the same recorded-parent traversal. The
+default two-generation bound screens demonstrated relationships only, including
+half kin and paternal links when a mother is unknown. Ancestry cycles are
+rejected by simulation and extraction; missing parent links remain unknown.
+
+Screen sampled candidates before scoring or selection without refilling. Male
+minimum age is implemented and there is no extra female age restriction. Male
+exclusivity, detailed availability/remarriage policies, and expanded social or
+categorical kin rules remain unresolved. The generation bound also limits direct
+ancestry: two does not automatically exclude a great-grandparent. Unknown
+ancestry must not be represented as verified absence of kinship. More extensive
+parent-age/sex validation remains separate from cycle-safe traversal.
 
 The [SOCSIM audit plan](socsim-audit.md) identifies the pinned reference and
 provenance requirements. The [static union-formation trace](socsim-union-formation-audit.md) records
@@ -257,8 +263,9 @@ These have not been verified with executable cases; do not claim complete parity
 
 ## Fertility and widowhood
 
-On-demand mode is intended to retain birth-triggered initiation; the outcome
-when no partner is found still needs a decision. Requiring a match before a
+On-demand mode retains birth-triggered initiation. When no sampled candidate
+passes screening, the accepted behavior preserves the birth with unknown father
+and no new union. Requiring a match before a
 birth would change the supplied fertility target through partner availability.
 
 For scheduled mode, partnered and unpartnered fertility rates require exposure denominators
@@ -282,7 +289,7 @@ No non-death dissolution process is included in milestone 2.
 | Matching coefficients and transformations | User-supplied formula; male-minus-female continuous-year gap |
 | Candidate sample size | Defaults to 1000; zero means full available pool, sampled before screening |
 | Wait alternative and its scope | Allows refusal; needs utility and retry semantics |
-| Exact age/kin exclusions and unknown ancestry policy | Defines candidate eligibility |
+| Male exclusivity and further eligibility | Minimum male age and two-sided known-kin distance are implemented; other policies remain open |
 | Conditional fertility inputs and spacing after status changes | Defines rates, exposure, and event resampling |
 | Birth-time union classification and father assignment | Defines observed histories and parentage |
 | Equal-time priorities and effects on both partners | Preserves state consistency |

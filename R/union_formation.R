@@ -124,14 +124,16 @@ prepare_matching_model <- function(matching) {
 #' the woman's current partner, or sample living men and choose a partner using
 #' conditional-logit probabilities from the matching formula to form a union.
 #' Sampled men below `min_male_age` are excluded. If no eligible sampled men
-#' remain, preserve the birth with unknown father. Other exclusions are not yet
-#' applied, so partnered men and relatives can still be selected. Death ends affected
+#' remain, preserve the birth with unknown father. Known kin within
+#' `kinship_generations` on both sides of a common ancestor are excluded.
+#' Other restrictions are deferred, including male exclusivity. Death ends affected
 #' unions. Rate-based initiation and conditional fertility are not implemented.
 #'
 #' Sampling is from the available male pool BEFORE pair-specific screening.
 #' `sample_size = 0` means the whole pool. Otherwise sample without replacement
 #' up to that many men. Age screening occurs afterward, without refilling the
-#' sample. Other eligibility rules are deferred.
+#' sample. Kinship screening follows the same ordering. Existing unions are
+#' retained even if a new-search restriction would exclude the partner.
 #' Candidate sets will not be retained in simulation outputs.
 #'
 #' @param initiation Either `"on_demand"` for birth-triggered searches or
@@ -142,6 +144,12 @@ prepare_matching_model <- function(matching) {
 #' @param min_male_age Minimum male age in continuous years at a new partner
 #'   search, default `15`. Finite nonnegative scalar; zero disables this age
 #'   exclusion. Existing unions are retained. No female minimum age is added.
+#' @param kinship_generations Generation bound on both sides of a known common
+#'   ancestor, default `2`. Excludes parents, grandparents, siblings, aunts/uncles,
+#'   nieces/nephews and first cousins, including half relationships, when known.
+#'   Zero imposes no cross-person kin exclusion. Missing ancestry is not proof of
+#'   unrelatedness; only demonstrated relationships are screened. Existing unions
+#'   are retained. See [extract_kin()] for the shared distance definitions.
 #' @param rates For `"rate"` initiation, an age-specific female search-hazard
 #'   table with `age_start`, `age_end`, and `rate`, in years and per person-year.
 #'   These specify search attempts, not guaranteed realized union formation.
@@ -152,10 +160,11 @@ prepare_matching_model <- function(matching) {
 #'   `set_union_formation()` returns an updated model. Rate tables are tibbles.
 #' @export
 union_formation <- function(initiation, matching, sample_size = 1000, rates = NULL,
-                            min_male_age = 15) {
+                            min_male_age = 15, kinship_generations = 2) {
   process <- structure(list(
     name = "union_formation", initiation = initiation, matching = matching,
     sample_size = sample_size, min_male_age = min_male_age,
+    kinship_generations = kinship_generations,
     rates = rates, rate_unit = "person_year",
     sampling_stage = "before_pair_screening"
   ), class = c("hammel_union_formation", "hammel_process"))
@@ -170,8 +179,9 @@ union_formation <- function(initiation, matching, sample_size = 1000, rates = NU
 #' @rdname union_formation
 #' @export
 set_union_formation <- function(model, initiation, matching, sample_size = 1000, rates = NULL,
-                            min_male_age = 15) {
-  set_process(model, union_formation(initiation, matching, sample_size, rates, min_male_age))
+                            min_male_age = 15, kinship_generations = 2) {
+  set_process(model, union_formation(initiation, matching, sample_size, rates,
+                                     min_male_age, kinship_generations))
 }
 
 validate_union_formation <- function(process) {
@@ -195,6 +205,7 @@ validate_union_formation <- function(process) {
       !is.finite(age) || age < 0) {
     stop("`min_male_age` must be a finite nonnegative number of years.", call. = FALSE)
   }
+  validate_kinship_generations(process$kinship_generations)
   validate_matching_model(process$matching)
   if (process$initiation == "on_demand") {
     if (!is.null(process$rates)) {

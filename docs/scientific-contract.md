@@ -149,8 +149,13 @@ terms have an exact native evaluator; other formulas use the R model matrix.
 After sampling and before scoring, exclude men younger than `min_male_age`
 (default 15 continuous years; finite nonnegative scalar, fractional values
 allowed). A man at exactly the threshold is eligible. Do not refill rejected
-samples. Other screening remains deferred: partnered men and relatives can
-still be selected. This search restriction does not invalidate existing unions,
+samples. Also exclude a sampled man if he and the woman share a recorded
+ancestor within `kinship_generations` parent steps of EACH (default 2), counting
+each person themself at distance zero. This includes known parents, grandparents,
+siblings, aunts/uncles and first cousins, including half kin; it does not impose
+an unlimited direct-ancestor exclusion. Zero disables cross-person kin exclusion.
+Only demonstrated links count: unknown parents do not imply unrelatedness and
+do not hide other known relationships. Male exclusivity remains deferred. This search restriction does not invalidate existing unions,
 and no extra minimum female age is imposed. A man
 can have concurrent unions; a woman keeps her current partner until death.
 No eligible sampled men means the birth proceeds with unknown father and no
@@ -174,6 +179,17 @@ values. C++ maintains union histories and shared partner caches for all runs,
 closing unions at death with `end_reason = "death_husband"` or
 `"death_wife"` according to the executed death event. Initiation mode will
 control search timing; it does not control whether partner state is tracked.
+
+### Shared kinship observations
+
+`extract_kin()` returns the same recorded-parent distance evidence used by
+eligibility, with compact nearest common-ancestor witnesses, lineage and
+within-depth ancestry completeness. Deceased ancestors remain in the graph.
+Simulation and extraction reject ancestry cycles; structural population
+validation alone does not perform this graph check. Newborn parent links are
+appended before future events; restarts reconstruct the graph from histories.
+See [kinship](kinship.md) for worked examples, extraction ordering, depth limits,
+and the distinction between evidence and proof of unrelatedness.
 
 ## Execution, competition, and random numbers
 
@@ -275,7 +291,7 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 | Midpoint approximation | Validate bias against supplied age schedules; no accuracy guarantee |
 | Rate changes between runs | Histories retain spacing, but compensation uses only the new schedule |
 | Sparse oldest ages | Missing cells remain missing; no automatic imputation or smoothing |
-| Union formation/dissolution | Conditional-logit on-demand formation and widowhood; minimum male age implemented; other screening and scheduled initiation pending |
+| Union formation/dissolution | Conditional-logit on-demand formation, minimum male age, known-kin distance screening, and widowhood; male exclusivity and scheduled initiation pending |
 | Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
 | Exact continuation | No saved queue/RNG checkpoint |
 

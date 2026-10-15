@@ -1,4 +1,5 @@
 #include <Rcpp.h>
+#include "kinship.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -228,11 +229,14 @@ int draw_partner_position(const NumericVector& probabilities) {
 std::vector<int> screen_male_candidates(const std::vector<int>& males,
                                        const std::vector<int>& sample,
                                        const std::vector<Person>& people,
-                                       double now, double min_male_age) {
+                                       double now, double min_male_age, int woman,
+                                       hammel::Kinship& kinship) {
   std::vector<int> eligible;
   eligible.reserve(sample.size());
+  const bool check_kinship = kinship.generations() > 0;
   for (int position : sample) {
-    if (now - people[males[position]].born >= min_male_age)
+    if (now - people[males[position]].born >= min_male_age &&
+        (!check_kinship || !kinship.known_related(woman, males[position])))
       eligible.push_back(position);
   }
   return eligible;
@@ -285,7 +289,8 @@ struct UnionRecord {
 List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   DataFrame fertility_rates, double start, double years,
                   double birth_interval, DataFrame unions,
-                  int sample_size, List matching, double min_male_age) {
+                  int sample_size, List matching, double min_male_age,
+                  int kinship_generations) {
   // R performs input validation and seed handling. All engine state below is
   // local to this call; public times and rates remain in years and person-years.
   NumericVector ids = persons["person_id"], births = persons["birth_time"];
@@ -310,6 +315,14 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     index[ids[i]] = i;
     next_id = std::max(next_id, ids[i]);
   }
+  std::vector<std::array<int, 2>> parent_links(people.size());
+  for (int person = 0; person < static_cast<int>(people.size()); ++person) {
+    parent_links[person] = {
+      NumericVector::is_na(people[person].mother) ? -1 : index.at(people[person].mother),
+      NumericVector::is_na(people[person].father) ? -1 : index.at(people[person].father)
+    };
+  }
+  hammel::Kinship kinship(std::move(parent_links), kinship_generations);
   std::vector<UnionRecord> union_history;
   std::vector<std::vector<int>> person_unions(people.size());
   std::vector<int> current_partner(people.size(), -1);
@@ -421,7 +434,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       if (partner < 0 && !males.empty()) {
         const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
                                                   sampling_workspace);
-        const auto eligible = screen_male_candidates(males, sample, people, now, min_male_age);
+        const auto eligible = screen_male_candidates(males, sample, people, now, min_male_age,
+                                                       i, kinship);
         partner = select_partner(males, eligible, people, i, matching);
         if (partner >= 0) {
           if (next_union_id >= 9007199254740991.0 ||
@@ -449,6 +463,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       int slot = female ? -1 : static_cast<int>(males.size());
       people.push_back({++next_id, now, NA_REAL, mother, father,
                         -std::numeric_limits<double>::infinity(), female, slot});
+      kinship.append(i, partner);
       if (!female) males.push_back(child);
       person_unions.emplace_back();
       current_partner.push_back(-1);

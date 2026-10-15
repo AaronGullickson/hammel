@@ -16,6 +16,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Standalone project and scientific ownership | D001–D002 |
 | Initial engine scope and milestone completion | D003 as narrowed by D019; D029 |
 | Milestone 2 union-formation scope | D030 |
+| Shared kinship and generation-distance exclusions | D036 |
 | Person-year inputs and hazard sampling | D005–D007, D013, D024 |
 | Population representation, sex labels, public tibbles | D012, D015, D016, D023 |
 | Process constructors/setters | D017, D026 |
@@ -462,6 +463,37 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 - **Validation:** constructor/edited-process checks, exact/fractional age
   boundaries, aging into eligibility, no added female restriction, retained
   existing partners, and sampling-before-screening failures.
+
+## D036: Shared kinship module and generation-distance exclusions
+
+**Current status:** Accepted and implemented.
+
+- **Status:** accepted October 15, 2026 through the user's implementation request
+  and explicit incomplete-ancestry decision.
+- **Decision:** use one separate native `kinship` module for union screening and
+  R extraction. Exclude candidates sharing a recorded ancestor within
+  `kinship_generations` parent steps of EACH person, including each person at
+  distance zero. Default two; zero imposes no cross-person exclusion.
+- **Incomplete histories:** exclude demonstrated relationships only. Unknown
+  links stop that branch and are not evidence of unrelatedness; do not skip
+  known paternal relationships because a mother is missing.
+- **Consequences:** two includes known half/full siblings and first cousins,
+  aunts/uncles, parents and grandparents. Removed/second cousins and direct
+  ancestors beyond two generations require a larger bound. No unlimited
+  direct-ancestor exclusion or new male-exclusivity rule is inferred.
+- **Engineering:** iterative cycle-safe traversal, lazily cached distinct
+  ancestors and minimum distances, shortest-route maternal/paternal evidence,
+  newborn append and restart reconstruction. No dense all-pairs kin matrix or
+  enumeration of all ancestry paths. No major new dependency or copied SOCSIM
+  implementation.
+- **R interface:** `extract_kin()` returns compact common-ancestor evidence for
+  selected egos/relatives as a tibble, using the same distance kernel. Output
+  retains closest tied witnesses rather than assigning ambiguous relationship
+  labels; lineage and within-depth completeness are explicit.
+- **Scope:** screening follows sampling and male-age checks, before utilities,
+  without refilling. Failed searches preserve births with unknown father.
+  Existing unions are retained. Social kin and genetic coefficients are not
+  implemented. See [kinship](kinship.md) for worked examples and limitations.
 
 ## Additional clarifications and deferred concerns
 

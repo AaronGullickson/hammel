@@ -67,8 +67,9 @@ whole pool). Optional waiting, detailed eligibility, and fertility-transition
 rules remain open. See [milestone 2 notes](union-formation-models.md)
 for scope, unresolved decisions, and validation. The on-demand C++ path now forms unions at births with formula-based
 conditional-logit selection and handles widowhood and restart histories.
-Minimum male age screening is implemented (default 15 years); other eligibility
-restrictions and scheduled initiation are not yet executed.
+Minimum male age screening (default 15 years) and known-kin exclusion within
+two generations of each partner are implemented. `extract_kin()` shares the
+native kinship module. Male exclusivity and scheduled initiation remain pending.
 
 ## Boundaries and future work
 

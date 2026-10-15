@@ -12,6 +12,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
 | Mortality/fertility specification and rate validation | `R/set_process.R` |
 | Union process construction and formula matching | `R/union_formation.R` |
+| Shared kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/kinship.R` |
 | HMD/HFD downloads and preparation | `R/construct_demographic_rates.R` |
 | Simulation validation, RNG isolation, result assembly | `R/simulate.R` |
 | Continuous scheduling and events | `src/simulate.cpp` |
@@ -134,7 +135,8 @@ coefficients. `union_formation()` and `set_union_formation()` specify initiation
 candidate sampling, and a matching specification. The current C++ on-demand
 increment creates unions at births using conditional-logit selection from
 sampled living men after minimum-male-age screening (default 15 continuous
-years). Other pair restrictions are not yet applied. Only age difference
+years) and known-kin screening (default two generations on each side of a
+common ancestor). Male exclusivity is not yet enforced. Only age difference
 (male minus female, continuous years) is supported initially. See the
 [union specification](union-formation-models.md) for worked examples and
 unresolved execution rules. `simulate()` rejects rate-based initiation.
@@ -170,3 +172,12 @@ A screening helper filters the temporary sample at the exact search time before
 matching. The male vector still contains all living men; age screening does not
 change the sampling frame or trigger refilling. Existing partner caches bypass
 new-search restrictions.
+
+The shared `Kinship` module resolves parent IDs to positions, rejects cycles,
+and lazily caches distinct ancestors to the configured generation bound.
+Screening marks one woman's ancestors and checks candidate membership directly
+in C++, skipping these queries at zero generations; R's `extract_kin()`
+uses the same kernel and an inverted ancestor index for selected relatives.
+Shortest-distance lineage and within-depth completeness accompany extraction
+rows. No all-pairs kin matrix or full ancestral-path expansion is constructed.
+Newborn append leaves existing ancestry caches valid; restart rebuilds them.

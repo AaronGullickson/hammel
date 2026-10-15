@@ -219,3 +219,52 @@ partners, and no added minimum age for female initiation. Existing
 conditional-logit, widowhood, restart, and demographic tests pass.
 No rates were downloaded or deferred formula benchmarks run. Rcpp/Rd
 generation and `git diff --check` passed.
+
+## Shared kinship checks (October 15, 2026)
+
+The D036 development suite initially passed 2,152 expectations with zero test
+failures/warnings and one opt-in live database skip. Subsequent extraction
+checks add base-data-frame input and half-first-cousin evidence; the targeted
+`devtools::test(filter = "kinship")` run passed all 149 expectations with no
+failures or warnings. Hand-built
+families cover direct ancestry, half/full siblings, aunts/uncles, first and
+removed/second cousins, missing maternal/paternal links, deceased ancestors,
+unrelated co-parents, shuffled/noncontiguous IDs, repeated ancestry, shortest
+lineage, empty schemas, invalid settings/IDs and ancestry cycles. A 5,000-person
+chain verifies iterative deep traversal. Pair-by-pair integration checks agree
+between R extraction and native partner screening. Newborn/restart cases
+verify sons cannot be selected by their mothers and recorded parent links
+are rebuilt consistently. Existing union histories are retained.
+
+A synthetic 50,000-person/100-year run (the existing constant-rate case,
+quadratic matching, sample 1000, minimum male age 15, seed 42) took 3.626 seconds
+with generation bound zero and 4.197 seconds with bound two. These are
+single-run debug-build diagnostics with different resulting stochastic
+histories (33,656 versus 33,554 births), not isolated profiling or the user's
+USA case. No rates were downloaded and the deferred R formula-fallback
+benchmark was not run. Rcpp/Rd regeneration and `git diff --check` passed.
+
+### Kinship screening optimization (October 15, 2026)
+
+After the user reported 8.92 seconds for their case, temporary native timing
+in the synthetic benchmark found roughly 0.035 seconds building ancestry
+caches versus 1.88 seconds in candidate screening. The repeated-comparison
+path was replaced with one marked ancestor set per woman and direct candidate
+membership checks. An additional zero-bound short circuit skips kinship
+queries/cache building when no cross-person relationship can be excluded.
+Cycle validation still runs. Temporary timing code/output was removed.
+
+The final synthetic benchmark took 2.608 seconds at zero and 3.481 at two
+generations, versus 3.859 and 4.196 in the instrumented original. These are
+single-run diagnostics; instrumentation and different simulated histories limit
+exact timing comparisons. The user subsequently reported approximately 4.4
+seconds at zero after reloading, close to their earlier 4.2-second baseline.
+
+Before the final zero-bound short circuit, the full `devtools::test()` suite
+passed all 2,160 expectations with no test failures/warnings and one live-test
+skip, including a regression for switching between women without stale
+ancestor markers. A saved 3,000-person, 100-year fixed-seed simulation was
+identical before/after the membership optimization. No scientific rule or
+random-number consumption was changed. The user's example edits were retained.
+After the zero-bound short circuit, all 174 targeted kinship/eligibility
+expectations passed, and the saved fixed-seed result remained identical.
