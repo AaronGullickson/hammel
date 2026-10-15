@@ -11,7 +11,7 @@ format:
 execute:
   eval: true
   echo: true
-  warning: true
+  warning: false
   error: false
 ---
 
@@ -20,24 +20,33 @@ execute:
 #| include: false
 
 devtools::load_all()
+library(here)
 library(dplyr)
 library(readr)
 library(purrr)
+library(tibble)
 library(ggplot2)
+library(gt)
 ```
+
+## AI Comments
+
+I read both files and inspected the rendered figures. It is close to ready for conclusions. The US comparisons look convincing, and the Niger restart plots clearly illustrate the transient. A few points need tightening first:
+
+For the conclusions, the evidence supports good reproduction of the tested fixed schedules after the initial fertility transient, plus a documented temporary distortion when fertility changes at restart. Keep the scope explicit: the detailed ASFR/ASMR validation uses US schedules; Niger provides a high-fertility TFR and restart check, with US mortality retained.
 
 ## Purpose and completion criteria
 
 Assess whether the current simulator can reproduce the supplied demographic schedules of fertility and mortality over the simulation period adequately for milestone 1. For this assessment, the input fertility and mortality rates will be held constant across the simulation. 
-``
+
 To make this assessment, I will replicate 100 simulations with the same input values and compare means of output measures to input measures. I will also repeat this process for different demographic profiles of fertility and mortality. 
 
 | Measure | Comparison | Acceptance criterion |
 |---|---|---|
-| ASFR | Output births / female exposure versus input rates | 95% CI of mean ASFR for each age group and time period falls includes true input ASFR |
-| TFR | Output versus input TFR over matched ages | 95% CI of mean TFR across iterations includes true input TFR for all time increments |
-| ASMR | Output deaths / exposure versus input rates, by sex | 95% CI of mean ASFR for each age group and time period falls includes true input ASFR |
-| Life expectancy | Output versus input-derived life table | 95% CI of mean TFR across iterations includes true input TFR for all time incr.ements |
+| ASFR | Output births / female exposure versus input rates | Adequate coverage of 95% CI of mean ASFR for each age group and time period over true input ASFR |
+| TFR | Output versus input TFR over matched ages | Adequate coverage of 95% CI of mean TFR across iterations over true input TFR for all time periods |
+| ASMR | Output deaths / exposure versus input rates, by sex | Adequate coverage of 95% CI of mean ASMR for each age group and time period over true input ASFR |
+| Life expectancy | Output versus input-derived life table | Adequate coverage of 95% CI of mean life expectancy across iterations over true input TFR for all time increments |
 | Birth spacing and accounting | Existing tests and checks on simulated histories | Successful unit tests |
 
 Our primary measure of acceptance will be that the true values for each measure fall within the 95% confidence interval of the mean estimate from the simulation. However, because we will be performing this test for a large number of points, we do expect that not every point will fall within that 95% CI. 
@@ -84,7 +93,7 @@ input_life_expectancy <- input_life_table |>
 input_tfr
 input_life_expectancy
 
-fertility_rates_niger <- read_csv("validation/data/niger_2012_asfr_wpp2024.csv")
+fertility_rates_niger <- read_csv(here("validation", "data", "niger_2012_asfr_wpp2024.csv"))
 ```
 
 ### Initialization and observation windows
@@ -93,7 +102,7 @@ All replications below share one baseline population. They measure simulation
 variability conditional on that population. Baseline-generation variability
 would require a separate design.
 
-Because of the arbitrary nature of the initial population, there will typically be a "burn-in" period before a stable population is achieved. Measures based on ASMR and ASFR still should be valid throughout, but population growth may be highly variable. However, because the simulation modifies actual fertility rates to account for non-exposure of pregnant mothers, the initial ASFR and TFR estimates will be slightly higher because all women start out as non-pregnant.
+Because of the arbitrary nature of the initial population, there will typically be a "burn-in" period before a stable population is achieved. Measures based on ASMR and ASFR still should be valid throughout, but population growth may be highly variable. However, because the simulation modifies actual fertility rates to account for non-exposure of mothers who recently gae birth, the initial ASFR and TFR estimates will be slightly higher because no women start will have recently given birth.
 
 ```{r}
 #| label: construct-model
@@ -189,7 +198,7 @@ ggplot(tfr_summary, aes(x = time_mid, y = mean))+
   theme_bw()
 ```
 
-@fig-tfr-comparison shows the mean TFR in each time period across the 100 replicated simulations. To account for the potential bias in the early simulation due to a lack of pregnant woman, I use one year time periods for the first decade and then ten year periods for the remainder of the simulation. 
+@fig-tfr-comparison shows the mean TFR in each time period across the 100 replicated simulations. To account for the potential bias in the early simulation due to a lack of women with recent prior births, I use one year time periods for the first decade and then ten year periods for the remainder of the simulation. 
 
 As expected, there is some upward bias initially due to the fertility adjustments. However, this bias is removed after the first two years of the simulation. Every remaining estimate's 95% confidence interval contains the true TFR and there is no evidence of a trend. 
 
@@ -220,7 +229,34 @@ ggplot(asfr_summary, aes(x = age_mid, y = mean))+
   theme_bw()
 ```
 
-@fig-asfr-comparison shows a very close comparison between the estimated age-specific fertility rates across simulations and the input rates. The only differences are again in the first two years, where the estimated rates are slightly higher, as expected. 
+@fig-asfr-comparison shows a very close comparison between the estimated age-specific fertility rates across simulations and the input rates. The most notable differences are in the first two years, where the estimated rates are slightly higher, as expected.
+
+```{r}
+#| label: tbl-asfr-coverage
+#| tbl-cap: Coverage of 95% confidence intervals for age-specific fertility rates by period.
+
+fertility_rates |>
+  mutate(age_mid = (age_start + age_end) / 2) |>
+  inner_join(asfr_summary, by = "age_mid") |>
+  mutate(upper = mean + 1.96 * se, lower = mean - 1.96 * se,
+         include = rate <= upper & rate >= lower) |>
+  group_by(time_mid) |>
+  summarize(
+    n = n(),
+    coverage = mean(include),
+    max_abs_deviation = max(abs(mean - rate)),
+    .groups = "drop"
+  ) |>
+  gt() |>
+  cols_label(
+    time_mid ~ "time period mid point",
+    n ~ "age groups",
+    coverage ~ "95% CI coverage",
+    max_abs_deviation = "maximum absolute deviation"
+  )
+```
+
+@tbl-asfr-coverage shows the 95% CI coverage for each time period, as well as the maximum absolute deviation. As expected the early period has less coverage and more deviation, but coverage after the first ten years is overall as expected, with low maximum absolute deviation.
 
 ## Mortality results
 
@@ -307,6 +343,34 @@ asmr_summary |>
 
 @fig-asmr-comparison-male and @fig-asmr-comparison-female show the fit of male and female age-specific mortality rates, respectively, from the input schedules in comparison to the 95% CI of the mean ASFR for each simulation, across time. The simulated data fit extremely well to the expected input schedules.
 
+```{r}
+#| label: tbl-asmr-coverage
+#| tbl-cap: Coverage of 95% confidence intervals for age-specific mortality rates by period. Ages above 90 are excluded due to low cell counts within simulations.
+
+mortality_rates |>
+  mutate(age_mid = (age_start + age_end) / 2) |>
+  inner_join(asmr_summary, by = c("age_mid", "sex")) |>
+  mutate(upper = mean + 1.96 * se, lower = mean - 1.96 * se,
+         include = rate <= upper & rate >= lower) |>
+  filter(!is.na(include), age_mid < 90) |>
+  group_by(time_mid) |>
+  summarize(
+    n = n(),
+    coverage = mean(include),
+    max_abs_deviation = max(abs(mean - rate)),
+    .groups = "drop"
+  ) |>
+  gt() |>
+  cols_label(
+    time_mid ~ "time period mid point",
+    n ~ "age groups",
+    coverage ~ "95% CI coverage",
+    max_abs_deviation = "maximum absolute deviation"
+  )
+```
+
+@tbl-asmr-coverage shows the 95% coverage and maximum absolute deviation of each time period for age groups younger than 90. After 90, relatively few survivors leads to very low cell counts. The results show good coverage and low deviation across the time period.
+
 ## Population growth
 
 ```{r}
@@ -331,7 +395,7 @@ population_counts |>
   theme_bw()
 ```
 
-@fig-population size shows the population trajectory of each simulation over the simulation period. Because the simulation holds fertility and mortality rates constant, we should eventually reach a stable population trajectory. However, because the initial population provided did not match the age distribution of the expected stable population, we expect that the initial period will be highly variable. This is the "burn in" period. In this case, we get rapid population decline. The decline occurs because the initial population was uniformly distributed from zero to a hundred years of age and thus over-represented older people with high mortality. This decline levels off by 2025 and by 2050 appears to be approaching a stable gradual rate of decline.
+@fig-population-size shows the population trajectory of each simulation over the simulation period. Because the simulation holds fertility and mortality rates constant, we should eventually reach a stable population trajectory. However, because the initial population provided did not match the age distribution of the expected stable population, we expect that the initial period will be highly variable. This is the "burn in" period. In this case, we get rapid population decline. The decline occurs because the initial population was uniformly distributed from zero to a hundred years of age and thus over-represented older people with high mortality. This decline levels off by 2025 and by 2050 appears to be approaching a stable gradual rate of decline.
 
 To analyze that rate of decline more formally, I will use the approximation of the stable population growth rate given by: 
 
@@ -423,7 +487,7 @@ map(
   theme_bw()
 ```
 
-@fig-pop-growth-ext shows the same average growth rate after adding 100 more years to the simulation. The figure clearly shows that the population has become a stable population by 100 years into the simulation, with the growth rate staying at the expected growth rate of the stable population.
+@fig-pop-growth-ext shows the same average growth rate after adding 100 more years to the simulation. The figure clearly shows that the population is converging toward a static population growth rate consistent with the stable population expectation.
 
 ## Fertility Adjustment and Restart Issue
 
@@ -470,7 +534,7 @@ tfr_ext_niger <- map(fertility_counts_ext_niger, calculate_tfr) |>
 
 ```{r}
 #| label: fig-fertility-niger
-#| fig-cap: Mean TFR across simulations before and after a simulation restart using Niger's 2012 fertility rates (TFR: 7.46). The red dotted lines show the expected TFR under the two scenarios and the dotted vertical line shows the transition between the restart of the simulation.
+#| fig-cap: Mean TFR across simulations before and after a simulation restart using Niger's 2012 fertility rates (TFR 7.46). The red dotted lines show the expected TFR under the two scenarios and the dotted vertical line shows the transition between the restart of the simulation.
 
 tfr_ext_niger |>
   group_by(time_mid) |>
@@ -504,7 +568,7 @@ results_ext_nigerl <- map2(results, replication_seeds, function(result, seed) {
 ```
 
 ```{r}
-#| label: calculate-fertility-niger
+#| label: calculate-fertility-niger-longer
 
 fertility_counts_ext_nigerl <- map(
   results_ext_nigerl,
@@ -520,8 +584,8 @@ tfr_ext_nigerl <- map(fertility_counts_ext_nigerl, calculate_tfr) |>
 ```
 
 ```{r}
-#| label: fig-fertility-nigerl
-#| fig-cap: Mean TFR across simulations before and after a simulation restart using Niger's 2012 fertility rates (TFR: 7.46) and a longer minimum birth interval of 1.25 years. The red dotted lines show the expected TFR under the two scenarios and the dotted vertical line shows the transition between the restart of the simulation.
+#| label: fig-fertility-niger-longer
+#| fig-cap: Mean TFR across simulations before and after a simulation restart using Niger's 2012 fertility rates (TFR 7.46) and a longer minimum birth interval of 1.25 years. The red dotted lines show the expected TFR under the two scenarios and the dotted vertical line shows the transition between the restart of the simulation.
 
 tfr_ext_nigerl |>
   group_by(time_mid) |>
@@ -541,9 +605,89 @@ tfr_ext_nigerl |>
   theme_bw()
 ```
 
-@fig-fertility-nigerl shows the same result but for a minimum birth interval of 1.25. The spike in the first year of the restart is more pronounced and there is some disturbance in subsequent years before once again hitting the expected TFR.
+@fig-fertility-niger-longer shows the same result but for a minimum birth interval of 1.25. The spike in the first year of the restart is more pronounced and there is some disturbance in subsequent years before once again hitting the expected TFR.
 
 Ultimately, this is an issue which we should try to address. However, it is unlikely to cause substantial issues in most cases. The distortion observed here was generated by an extreme change in ASFR and in most cases simulations will not shift ASFR this much in a single restart so the actual bias will be much smaller. 
+
+## Speed Tests
+
+I want to see how quickly the simulation runs under different specifications in terms of the base size of the population, how long the simulation is run, and whether the population is roughly stationary or growing. 
+
+```{r}
+#| label: time-tests
+
+scenarios <- tribble(
+  ~pop_size, ~time, ~growth,
+  10000,     50,    "stationary",
+  50000,     50,    "stationary",
+  100000,    50,    "stationary",
+  200000,    50,    "stationary",
+  10000,     100,   "stationary",
+  50000,     100,   "stationary",
+  100000,    100,   "stationary",
+  200000,    100,   "stationary",
+  10000,     200,   "stationary",
+  50000,     200,   "stationary",
+  100000,    200,   "stationary",
+  200000,    200,   "stationary",
+  10000,     50,    "growth",
+  50000,     50,    "growth",
+  100000,    50,    "growth",
+  200000,    50,    "growth",
+  10000,     100,   "growth",
+  50000,     100,   "growth",
+  100000,    100,   "growth",
+  200000,    100,   "growth",
+  10000,     200,   "growth",
+  50000,     200,   "growth",
+  100000,    200,   "growth",
+  200000,    200,   "growth"
+)
+
+elapsed_time <- NULL
+for(i in seq_along(1:nrow(scenarios))) {
+  pop_size <- scenarios$pop_size[i]
+  time <- scenarios$time[i]
+  growth <- scenarios$growth[i]
+  pop_test <- create_baseline_population(
+    pop_size, max_age = 80, end_time = 0
+  )
+  if (growth == "stationary") {
+    fert_test <- fertility_rates
+  } else {
+    # niger's fertility rates are so high that exponential growth over 200
+    # years will explode the population and blow up RAM, so halve the rates
+    fert_test <- fertility_rates_niger
+    fert_test$rate <- fert_test$rate / 2
+  }
+  model <- hammel_model() |>
+    set_population(pop_test) |>
+    set_mortality(mortality_rates) |>
+    set_fertility(fert_test, birth_interval = birth_interval)
+  timing <- system.time({
+    result <- simulate(model, years = time)
+  })
+  elapsed_time <- c(elapsed_time, unname(timing[["elapsed"]]))
+  # cat(i)
+}
+
+scenarios$elapsed_time <- elapsed_time
+```
+
+```{r}
+#| label: fig-time-tests
+#| fig-cap: Time in seconds to perform each simulation. Note that the two panels do not share the same y-scale.
+scenarios |>
+  ggplot(aes(x = time, y = elapsed_time, 
+    group = factor(pop_size), color = factor(pop_size)))+
+  geom_line()+
+  geom_point()+
+  facet_wrap(~growth, scale = "free_y")+
+  labs(x = "years of simulation", y = "seconds to run", color = "initial pop size")+
+  theme_bw()
+```
+
+@fig-time-tests shows the results of the tests. When the population is stationary, increasing the length of the simulation linearly increases the time to complete the simulation, with a steeper slope for higher initial population sizes. When the population is growing, increases in the length of the simulation exponentially increase the time to complete the simulation because the underlying population is growing exponentially. 
 
 ## Tests
 
