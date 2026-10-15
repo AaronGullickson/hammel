@@ -23,7 +23,10 @@ conventions: continuous chronology, person-year hazards, midpoint fertility
 compensation, and no union-formation events. Source findings do not imply fixed-
 seed equivalence or demographic accuracy. Match assumptions/units and use
 replicated statistical comparisons when a reference experiment is appropriate.
-Union matching, queue modes, and scoring have not been comprehensively audited.
+A [static union-formation trace](socsim-union-formation-audit.md) now covers
+queue modes, matching, eligibility, and fertility interactions in the pinned
+non-ENHANCED source. It is not executable validation or a complete audit of
+all variants.
 
 ## Reference links
 

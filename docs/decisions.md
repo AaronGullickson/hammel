@@ -1,6 +1,6 @@
 # Decision log
 
-Updated October 13, 2026. Entries retain the choices made at their original
+Updated October 15, 2026. Entries retain the choices made at their original
 dates; each numbered entry now states whether and how it remains current.
 Read [the scientific contract](scientific-contract.md) for implemented behavior,
 not a superseded API or timing statement buried in a historical entry.
@@ -14,7 +14,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Topic | Governing decisions |
 | --- | --- |
 | Standalone project and scientific ownership | D001–D002 |
-| Initial engine scope | D003 as narrowed by D019 |
+| Initial engine scope and milestone completion | D003 as narrowed by D019; D029 |
+| Milestone 2 union-formation scope | D030 |
 | Person-year inputs and hazard sampling | D005–D007, D013, D024 |
 | Population representation, sex labels, public tibbles | D012, D015, D016, D023 |
 | Process constructors/setters | D017, D026 |
@@ -45,7 +46,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D003: First demographic validation milestone
 
-**Current status:** Demographic validation remains current; D019 replaces initial partnership formation with random male parent assignment.
+**Current status:** Milestone 1 accepted as complete October 15, 2026 (D029); D019 replaced initial partnership formation with random male parent assignment.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** the first major milestone simulates a population with demographic rates constant over calendar time, including fertility, mortality, and a basic partnership mechanism to assign parents.
@@ -314,6 +315,61 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
   eligibility at evaluated midpoints. At the user's direction, reject all
   open-ended fertility input bands, including zero rates/zero spacing.
 - **Supersedes:** D027's age-varying hazard representation and exact sampler.
+
+## D029: Milestone 1 completion
+
+**Current status:** Milestone 1 complete; milestone 2 scope subsequently selected in D030.
+
+- **Status:** accepted October 15, 2026 by the user, after rendering the report.
+- **Decision:** close the initial mortality/fertility demographic-validation
+  milestone on the basis of Aaron Gullickson's completed assessment in
+  `validation/milestone1.qmd` and its rendered `validation/milestone1.html`.
+- **Evidence:** replicated demographic comparisons, age-specific coverage and
+  deviations, two-sex Leslie projection and stable age structure comparisons,
+  extended runs, fertility-rate restart cases, and performance/test results
+  presented in the report. The agent did not independently rerun the report
+  when recording acceptance.
+- **Implications:** completion reflects the user's scientific assessment of
+  the reported cases; it does not establish universal accuracy or add numerical
+  thresholds. Existing engine assumptions remain unchanged.
+- **Remaining limits:** initialization transients, sparse oldest ages, and
+  fertility compensation after rate changes. The latter remains deferred;
+  the report proposes a GitHub issue, but no issue is created by this decision.
+  No controlled executable SOCSIM comparison is claimed.
+- **Scope:** no new feature, union-formation implementation, or next milestone
+  is authorized by this completion decision.
+
+## D030: Milestone 2 union-formation scope
+
+**Current status:** Scope accepted; demographic details unresolved; not implemented.
+
+- **Status:** accepted October 15, 2026 through the user's milestone 2 request.
+- **Decision:** separate female search initiation from partner matching. Support
+  birth-triggered on-demand search and independently scheduled union-search
+  events. Use conditional-logit partner choice, initially based on age difference,
+  with an extensible matching specification and eligibility/kinship screening.
+  Scheduled mode must support partnered and unpartnered fertility. End unions by
+  widowhood; other dissolution is outside this milestone.
+- **Terminology:** use union/union formation and partnered/unpartnered in code
+  and documentation, agnostic about legal marriage versus cohabitation. The
+  user's conversational use of “marriage” does not introduce a legal-status model.
+- **Matching rationale:** probabilistic choice allows rare eligible matches
+  through model coefficients and later extensions such as group preferences.
+  The user also wants to validate matching by fitting the same choice model to
+  simulated decisions. Candidate sets will not be retained. Approximate model recovery will use
+  eligible men reconstructed in time slices; slice definitions and recovery
+  criteria remain unresolved.
+- **Deferred:** parity-specific fertility remains for a later milestone;
+  milestone 2 does not add it.
+- **Open choices:** full versus sampled candidate pools, optional waiting,
+  failed-search behavior, exact eligibility/kin prohibitions, age-gap model,
+  search-rate interpretation/retries, conditional-fertility compensation, and
+  birth-time classification/parent assignment. No defaults are accepted for these.
+- **Implications:** write specifications and worked examples and obtain dependent
+  demographic decisions before implementation. Keep milestone 1 behavior
+  available. SOCSIM matching and kinship behavior require a source audit before
+  claiming equivalence; no legacy algorithm is adopted by this decision.
+- **Evidence and next specification:** [milestone 2 notes](union-formation-models.md).
 
 ## Additional clarifications and deferred concerns
 

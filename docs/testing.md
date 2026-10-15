@@ -1,9 +1,9 @@
 # Testing and milestone validation
 
-Updated October 13, 2026. Software/analytical tests pass for midpoint fertility
-compensation. Broader demographic validation is ongoing; acceptance criteria
-and a completed milestone report are still needed. Earlier implementation-specific
-runs and counts are available in Git history; they do not verify a later engine.
+Updated October 15, 2026. The user accepted milestone 1 as complete after
+rendering the validation report. Software test history and the user's demographic
+assessment are distinct evidence; recording acceptance did not rerun either.
+Earlier implementation-specific runs and counts remain available in Git history.
 
 ## Run the suite
 
@@ -77,8 +77,9 @@ ASMR with 20-year periods, and population growth. This conditions on the same
 starting population; it does not resample initial populations or observed data.
 Its filename uses “bootstrap,” but the runs are simulation replications.
 
-The [Quarto template](../validation/milestone1.qmd) is the development report.
-Execution is disabled by default while the user drafts it. From the repository
+The completed [Quarto report](../validation/milestone1.qmd) contains the user's
+analysis and interpretation. Execution is enabled; rendering reruns simulations
+and input downloads and can require substantial memory. From the repository
 root:
 
 ```sh
@@ -92,19 +93,25 @@ attributes. Local validation data/rendered output are Git-ignored, and the
 validation directory is excluded from package builds. Preserve completed inputs
 and evidence in a documented archive when sharing the report.
 
-## Remaining milestone checks
+## Accepted milestone evidence and remaining limits
 
-- Quantify replicated ASFR/ASMR differences and TFR/life-table agreement,
-  distinguishing bias from variability and uncertainty in the mean.
-- Align input/output age bands and report sparse cells, especially oldest ages;
-  keep descriptive 100+ life-table comparisons distinct from aligned rates.
-- Choose observation/burn-in windows and numerical acceptance criteria with the
-  user. Initial excess fertility does not require an automatic correction.
-- Broaden beyond USA/2000 to higher fertility, five-year fertility bands, and
-  alternative spacing. An African historical case and new source integration
-  are currently postponed, not selected.
+The user rendered `validation/milestone1.html` and accepted milestone 1 on
+October 15, 2026 (D029). The source report includes replicated ASFR/ASMR coverage
+and deviations, TFR and life-expectancy comparisons, two-sex Leslie projection,
+stable growth and age structure, extended runs, fertility-rate restart cases,
+and performance/test results. Scientific conclusions belong to the report's
+author; no new acceptance thresholds are imposed here.
 
-User-reported visual agreement and analytical unit checks are useful evidence,
-but do not establish full demographic accuracy or milestone completion. A
-controlled executable SOCSIM comparison has not been performed; use a pinned
-reference and statistical comparisons if that becomes appropriate.
+At acceptance, the clean working tree was at commit
+`dd02ac681ca2cb3c14f98b8b73a5b0f625637445`. The local HTML artifact had SHA-256
+`66d3cb3ba35f86f44031fc1044abc594b76f967c259f1e7162ad948c46622974`.
+This identifies the inspected artifact, not an independent replication. The
+HTML and local validation data remain Git-ignored; they have not been deposited
+in an external archive as part of completion.
+
+Limitations remain: initial fertility transients, sparse oldest-age cells and
+normal-interval reliability, and fertility compensation after rate changes.
+The report defers correction of the restart issue beyond milestone 1. It does
+not establish accuracy for all rate schedules or supply a controlled executable
+SOCSIM comparison. Further studies and archive/publication work require their
+own scope; these are not outstanding conditions on the user's acceptance.

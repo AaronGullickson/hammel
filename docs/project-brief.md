@@ -1,8 +1,8 @@
 # Hammel project brief
 
-Updated October 13, 2026. The first mortality/fertility simulator is implemented.
-Milestone 1 remains in demographic validation; scientific acceptance thresholds
-and the completed validation report are not yet established.
+Updated October 15, 2026. The first mortality/fertility simulator is implemented.
+The user accepted milestone 1 as complete after rendering the validation report
+on October 15, 2026. See D029 and [testing](testing.md) for the evidence and limits.
 
 ## Purpose
 
@@ -32,7 +32,7 @@ calendar time, but potentially varying by age (D003/D019).
 | Relationships | Parent histories retained; no new unions formed |
 | Analysis | Exposure/counts, ASFR/ASMR, TFR, life tables, population sizes |
 | Restarts | Output can initialize another run; not an exact checkpoint |
-| Validation | Software/analytical checks pass; broader demographic assessment ongoing |
+| Validation | Milestone 1 accepted by the user October 15, 2026; completed report in `validation/milestone1.qmd` |
 
 D019 replaced the original basic-partnership requirement with random male
 parent assignment for the first executable milestone. D024 replaced monthly
@@ -40,29 +40,41 @@ execution with continuous event times. D028 replaced monthly and exact
 age-varying fertility compensation with one adjusted rate per original age
 band, evaluated at its midpoint. Those older descriptions are historical.
 
-## Remaining milestone work
+## Milestone 1 completion
 
-1. Complete the [Quarto validation report](../validation/milestone1.qmd), using
-   saved inputs, recorded seeds/settings, and identifiable code versions.
-2. Quantify replicated ASFR, ASMR, TFR, and life-expectancy agreement, with
-   sampling uncertainty, exposure coverage, and comparable age bands.
-3. Assess higher-fertility inputs, five-year fertility bands, and alternative
-   birth intervals; define acceptable approximation errors with the user.
-4. Record which criteria are met and which limitations remain.
+The completed [validation report](../validation/milestone1.qmd) documents the
+user's assessment of replicated fertility/mortality measures, population growth
+and stable age structure against a two-sex Leslie projection, restart behavior,
+and performance. Its conclusions and the user's explicit acceptance establish
+milestone completion; no additional numerical acceptance thresholds are inferred.
 
-Reported visual agreement in USA/2000 replications is encouraging evidence,
-not a completed scientific assessment. Union formation, calendar-varying rate
-support, and initialization correction are not requirements for closing this
-current milestone.
+Sparse oldest-age rates, initial fertility transients, and fertility compensation
+after rate changes remain limitations. The restart issue is deferred beyond this
+milestone. A controlled SOCSIM comparison has not been performed. Completion
+does not claim accuracy for every schedule or authorize new mechanisms.
+Union formation, calendar-varying rates, and initialization correction remain
+outside milestone 1's scope. Milestone 2 now targets union formation (D030), as specified below.
+
+## Milestone 2 scope
+
+The user selected union formation for milestone 2: female search initiation
+separate from conditional-logit matching, birth-triggered and scheduled search
+modes, initial age-difference matching, kinship screening, and partnered/unpartnered
+fertility in scheduled mode. Only death ends unions in this milestone. Parity-specific fertility is deferred
+to a later milestone.
+Candidate sampling and optional waiting remain open, along with detailed
+eligibility and fertility-transition rules. See [milestone 2 notes](union-formation-models.md)
+for scope, unresolved decisions, and proposed validation. No engine changes are
+implemented or detailed demographic defaults inferred from this scope.
 
 ## Boundaries and future work
 
 C++17/Rcpp is selected and implemented for the first engine (D019); tibble is
 used at the R boundary (D023). Package metadata and licensing are not yet ready
 for release. A universal simulation framework and legacy compatibility are not
-requirements. Custom process execution, union formation/dissolution, realistic
-matching, and richer initialization remain future work, not automatically
-authorized features.
+requirements. Union formation and matching are now in milestone 2 specification. Custom
+process execution, non-death union dissolution, and richer initialization remain
+future work, not automatically authorized features.
 
 The user has postponed finding an African historical alternative to USA/2000.
 No replacement case or new rate-source integration is currently selected.

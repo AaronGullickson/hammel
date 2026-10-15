@@ -1,6 +1,6 @@
 # Scientific contract
 
-Updated October 13, 2026. This is the current mortality/fertility contract,
+Updated October 15, 2026. This is the current mortality/fertility contract,
 reflecting D019, D024, D025, D026, and D028. Earlier monthly and exact
 age-varying compensation specifications are available in Git history; the
 [decision log](decisions.md) records their replacement. Acceptance
@@ -257,11 +257,16 @@ examples, constant-rate fertility after burn-in, spacing through restarts,
 accounting, identities, father availability, seed behavior, and empty/zero-risk
 runs. [Testing](testing.md) separates these from broader demographic assessment.
 
-Before marking milestone 1 complete, agree on rate/age alignment, observation
-windows, replications, acceptance thresholds, and sparse-cell treatment. Compare
-ASFR/ASMR as well as aggregate TFR/life-table measures. Report uncertainty and
-systematic departures separately. Compare with pinned SOCSIM over replications
-when appropriate; changed algorithms do not warrant exact seed matching.
+Milestone 1 was accepted as complete by the user on October 15, 2026 (D029),
+based on the completed [validation report](../validation/milestone1.qmd).
+This acceptance retains the documented limitations and does not establish
+universal accuracy or additional numerical thresholds. For further validation,
+make rate/age alignment, observation windows, replications, acceptance criteria,
+and sparse-cell treatment explicit. Compare ASFR/ASMR as well as aggregate
+TFR/life-table measures, reporting uncertainty and systematic departures
+separately. No controlled executable SOCSIM comparison has been performed;
+compare with a pinned reference when appropriate. Changed algorithms do not
+warrant exact seed matching.
 
 Every new consequential mechanism needs its own plain-language specification:
 status/scope, inputs/units, eligibility, timing/competition, state transitions

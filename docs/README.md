@@ -1,9 +1,9 @@
 # Hammel documentation
 
-Updated October 13, 2026. The mortality/fertility engine is implemented;
-milestone 1 demographic validation is in progress. Current behavior uses
+Updated October 15, 2026. The mortality/fertility engine is implemented;
+milestone 1 was accepted as complete by the user on October 15, 2026. Current behavior uses
 continuous event times and midpoint fertility compensation, with no monthly
-time grid. Union formation remains a proposal.
+time grid. Milestone 2 union-formation scope is accepted; its detailed rules remain unresolved.
 
 ## Reading order
 
@@ -26,11 +26,12 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | Document | Status |
 | --- | --- |
 | [Waiting-time sampling](waiting-time-sampling.md) | Explanation of the current shared hazard sampler |
-| [Union-formation models](union-formation-models.md) | Planning notes; no union algorithm accepted |
+| [Union-formation models](union-formation-models.md) | Milestone 2 scope; open modeling choices and proposed validation |
 | [Decision log](decisions.md) | Accepted choices and supersession history |
 | [SOCSIM audit plan](socsim-audit.md) | Scope and remaining reference investigation |
 | [SOCSIM rates](socsim-rate-audit.md) | Pinned static source findings |
 | [SOCSIM competing events](socsim-competing-events-audit.md) | Pinned static scheduling findings |
+| [SOCSIM union formation](socsim-union-formation-audit.md) | Pinned static search, matching, and eligibility findings |
 
 Git retains earlier specifications and verification records; do not keep
 snapshot copies in the docs tree. The decision log records rationale and
@@ -42,8 +43,9 @@ To inspect prior versions, use `git log -- docs` and
 
 ## Validation artifacts and examples
 
-- [Milestone 1 report template](../validation/milestone1.qmd): development
-  validation report; execution is disabled by default while the user drafts it.
+- [Milestone 1 validation report](../validation/milestone1.qmd): completed
+  assessment by Aaron Gullickson; the user rendered `validation/milestone1.html`
+  and accepted milestone 1. Execution is enabled and reruns the assessment.
 - [Replication example](../inst/examples/milestone1_bootstrap.R): USA/2000
   replications, demographic comparisons, and population growth.
 - [Single-run example](../inst/examples/milestone1.R): initial simulation and
