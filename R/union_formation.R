@@ -73,8 +73,8 @@ matching_design_matrix <- function(formula, data) {
   design
 }
 
-# Internal scoring for controlled probability checks; no population mutation.
-calculate_matching_probabilities <- function(matching, age_difference) {
+# Evaluate the same formula for R diagnostics and native fallback scoring.
+calculate_matching_utilities <- function(matching, age_difference) {
   check_numeric_column(age_difference, "age_difference")
   if (!length(age_difference)) return(numeric())
   design <- matching_design_matrix(matching$formula,
@@ -86,17 +86,44 @@ calculate_matching_probabilities <- function(matching, age_difference) {
   if (any(!is.finite(utility))) {
     stop("Matching utilities must be finite.", call. = FALSE)
   }
+  unname(utility)
+}
+
+calculate_matching_probabilities <- function(matching, age_difference) {
+  utility <- calculate_matching_utilities(matching, age_difference)
+  if (!length(utility)) return(numeric())
   weights <- exp(utility - max(utility))
-  unname(weights / sum(weights))
+  weights / sum(weights)
+}
+
+# Use an exact native path for the common linear/raw quadratic specification.
+# All other formulas retain model.matrix semantics through an R evaluator.
+prepare_matching_model <- function(matching) {
+  beta <- matching$coefficients
+  columns <- gsub("[[:space:]]", "", names(beta))
+  native <- all(columns %in% c("age_difference", "I(age_difference^2)"))
+  if ("I(age_difference^2)" %in% columns) {
+    native <- native && identical(
+      get("I", envir = environment(matching$formula), inherits = TRUE), base::I)
+  }
+  quadratic <- numeric()
+  if (native) {
+    quadratic <- c(sum(beta[columns == "age_difference"]),
+                   sum(beta[columns == "I(age_difference^2)"]))
+  }
+  list(quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
+       evaluate = function(age_difference) {
+         calculate_matching_utilities(matching, age_difference)
+       })
 }
 
 #' Specify a union-formation process
 #'
 #' Construct or attach a union-formation specification without executing it.
 #' [simulate()] supports a temporary on-demand implementation: at a birth use
-#' the woman's current partner, or sample living men and choose one uniformly
-#' to form a union. If no men exist, preserve the birth with unknown father.
-#' Pair eligibility and matching-model utilities are not yet applied, so even
+#' the woman's current partner, or sample living men and choose a partner using
+#' conditional-logit probabilities from the matching formula to form a union. If no men exist, preserve the birth with unknown father.
+#' Pair eligibility is not yet applied, so even
 #' partnered men, relatives, and children can be selected. Death ends affected
 #' unions. Rate-based initiation and conditional fertility are not implemented.
 #'

@@ -179,3 +179,21 @@ After adding sex-specific union death reasons, `devtools::test()` passed all
 skip. Cases cover wife/husband deaths in both supplied and newly formed
 unions, exact end times, and preservation of ended records on restart.
 `git diff --check` passed.
+
+## Conditional-logit execution checks (October 15, 2026)
+
+`devtools::test()` passed 1,969 expectations with zero test failures/warnings
+and one opt-in live database skip after D034. New tests cover the requested
+0.072/-0.014 quadratic peak, analytical utilities/probabilities, 50,000 choice
+draws within six marginal standard errors, native/R formula agreement,
+coefficient ordering, custom transformations, extreme/nonfinite utilities,
+empty/singleton pools, and birth-time selection in both age-gap directions.
+Existing partner retention, history, widowhood, restart, and RNG checks pass.
+This is algorithm validation; model recovery on demographic simulation data
+and milestone 2 scientific acceptance remain pending.
+
+The same synthetic 50,000-person/100-year case used in the sampling performance
+record took 2.374 seconds with a sample of 1000 and the requested quadratic
+coefficients (19,777 unions). This is a single development/debug-build timing,
+not the user's USA case or a performance guarantee. No rates were downloaded.
+Rcpp bindings and Rd documentation were regenerated.

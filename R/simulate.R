@@ -6,8 +6,9 @@
 #' Events execute chronologically. All living females face the
 #' fertility schedule. A union-formation process is required. With on-demand
 #' union formation, use the woman's
-#' current partner, or sample men and choose one uniformly to form a union at
-#' the birth. Eligibility checks and matching-model scores are not yet applied.
+#' current partner, or sample men and choose one using conditional-logit
+#' probabilities from the matching formula to form a union at the birth.
+#' Pair eligibility checks are not yet applied.
 #' If no men are available, preserve the birth with unknown father and no union.
 #' Rate-based union initiation is not yet implemented.
 #'
@@ -106,7 +107,7 @@ simulate <- function(model, years, seed = NULL) {
   if (years > 0) {
     native <- simulate_cpp(population$persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
-                           sample_size)
+                           sample_size, prepare_matching_model(union_process$matching))
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {

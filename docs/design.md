@@ -64,7 +64,7 @@ Mortality constructors permit partial nonoverlapping schedules, but simulation
 requires complete coverage. Fertility bands must be finite; gaps have zero risk
 at execution. Time-varying rate columns are rejected. Arbitrary named process
 specifications can be stored; execution supports mortality/fertility and the
-temporary uniform on-demand union process. Other processes are rejected.
+conditional-logit on-demand union process. Other processes are rejected.
 
 ## Execution and output
 
@@ -132,8 +132,8 @@ callbacks that can bypass consistency checks.
 `create_matching_model()` accepts an age-difference formula with named utility
 coefficients. `union_formation()` and `set_union_formation()` specify initiation,
 candidate sampling, and a matching specification. The current C++ on-demand
-increment creates unions at births using uniform selection from sampled living
-men; pair screening and formula utilities are not yet applied. Only age difference
+increment creates unions at births using conditional-logit selection from
+sampled living men; pair screening is not yet applied. Only age difference
 (male minus female, continuous years) is supported initially. See the
 [union specification](union-formation-models.md) for worked examples and
 unresolved execution rules. `simulate()` rejects rate-based initiation.
@@ -155,3 +155,11 @@ Fisher–Yates shuffle, undoing swaps after each sample. This avoids repeated
 hash allocations while retaining distinct sampled candidates and the existing
 RNG draw sequence. Workspace is local to each simulation; it tracks positions
 in the current male vector rather than person identity.
+
+Matching uses the entered formula and named coefficients. R prepares an exact
+native linear/raw-quadratic evaluator where applicable; other formulas retain
+`model.matrix()` evaluation through an R callback receiving age differences
+only. C++ computes stable softmax probabilities and samples one candidate. No
+formula callback receives mutable population state, and no candidate sets are
+retained. The native path avoids an R model-matrix call at every search for
+the common linear-plus-squared specification.

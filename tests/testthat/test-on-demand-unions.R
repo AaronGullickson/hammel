@@ -90,7 +90,7 @@ test_that("widowhood closes new unions and subsequent births search again", {
   expect_identical(continued$unions[1, ], result$unions[1, ])
 })
 
-test_that("screening and utility matching are deliberately not applied yet", {
+test_that("screening is deferred and singleton choices do not depend on utilities", {
   model <- make_on_demand_model(3, 1)
   model$population$persons$sex[2] <- "f"
   model$population$persons$birth_time[3] <- -1 # only man is a child

@@ -389,7 +389,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 - **Boundary:** scheduled initiation, pair eligibility, utility-based matching,
   and conditional fertility remain pending; the final eligibility policy is
   not established by this intentionally unrestricted increment.
-- **Specification:** [on-demand increment](union-formation-models.md#on-demand-engine-increment-specification-before-implementation).
+- **Specification:** [on-demand increment](union-formation-models.md#on-demand-conditional-logit-execution-specification).
 
 ## D032: Union formation required for execution
 
@@ -421,6 +421,27 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
   tables must be mapped by sex, not just renamed by position.
 - **Validation:** valid noncontiguous IDs, swapped-role rejection for ongoing
   and ended unions, empty schema, and existing birth/death/restart cases.
+
+## D034: Execute conditional-logit partner selection
+
+**Current status:** Accepted and implemented; supersedes temporary uniform choice in D031.
+
+- **Status:** accepted October 15, 2026 through the user's implementation request.
+- **Decision:** use the entered matching formula and coefficients to generate
+  candidate utilities on continuous male-minus-female age differences. Convert
+  utilities to softmax probabilities and sample one partner. Keep existing
+  sampling-before-screening order; eligibility screening remains deferred.
+- **Worked test model:** linear coefficient 0.072 and raw squared coefficient
+  -0.014 have a utility maximum at 2.5714286 years. These are requested test
+  inputs, not defaults or a target mean gap for every candidate pool.
+- **Implementation:** exact C++ evaluation for linear/raw quadratic terms,
+  existing R model-matrix semantics for other formulas, stable softmax and one
+  uniform selection draw. No candidate histories or new dependencies. Reject
+  nonfinite formula values rather than silently dropping candidates.
+- **Validation:** analytical utilities/probabilities, choice frequencies,
+  formula fallback, numerical extremes, birth-time parentage, and existing
+  reproducibility/widowhood/restart checks. Scientific model recovery from
+  reconstructed time slices is still future validation work.
 
 ## Additional clarifications and deferred concerns
 

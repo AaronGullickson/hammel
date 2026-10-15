@@ -170,14 +170,86 @@ std::vector<int> sample_male_positions(int count, int requested,
   return sample;
 }
 
-// Select a partner from the sampled pool, returning a position in people.
-// sample contains positions in males. Keep selection separate from sampling
-// and union creation so eligibility and utility scoring can be added here.
-int select_partner(const std::vector<int>& males, const std::vector<int>& sample) {
+// Evaluate candidate utilities without rounding age differences. Common linear
+// and raw quadratic formulas use an exact native path; other formulas call the
+// R model-matrix evaluator with candidate data only, never mutable engine state.
+NumericVector matching_utilities(const NumericVector& gaps, const List& matching) {
+  NumericVector quadratic = matching["quadratic"];
+  NumericVector utility(gaps.size());
+  if (quadratic.size() == 2) {
+    const bool has_squared = as<bool>(matching["has_squared"]);
+    for (R_xlen_t j = 0; j < gaps.size(); ++j) {
+      const double squared = has_squared ? gaps[j] * gaps[j] : 0;
+      if (!R_finite(squared)) stop("Matching formula must produce finite values for every candidate.");
+      utility[j] = quadratic[0] * gaps[j] + quadratic[1] * squared;
+    }
+  } else {
+    Function evaluate = matching["evaluate"];
+    utility = as<NumericVector>(evaluate(gaps));
+  }
+  if (utility.size() != gaps.size()) stop("Matching formula returned the wrong number of utilities.");
+  for (R_xlen_t j = 0; j < utility.size(); ++j) {
+    if (!R_finite(gaps[j]) || !R_finite(utility[j]))
+      stop("Matching ages and utilities must be finite.");
+  }
+  return utility;
+}
+
+NumericVector matching_probabilities(const NumericVector& utility) {
+  if (utility.size() == 0) return NumericVector();
+  const double maximum = *std::max_element(utility.begin(), utility.end());
+  NumericVector probabilities(utility.size());
+  double total = 0;
+  for (R_xlen_t j = 0; j < utility.size(); ++j) {
+    probabilities[j] = std::exp(utility[j] - maximum);
+    total += probabilities[j];
+  }
+  for (double& probability : probabilities) probability /= total;
+  return probabilities;
+}
+
+// One uniform draw selects a candidate from the softmax cumulative distribution.
+int draw_partner_position(const NumericVector& probabilities) {
+  if (probabilities.size() == 0) return -1;
+  const double draw = R::runif(0, 1);
+  double cumulative = 0;
+  int last_positive = -1;
+  for (R_xlen_t j = 0; j < probabilities.size(); ++j) {
+    if (probabilities[j] > 0) last_positive = static_cast<int>(j);
+    cumulative += probabilities[j];
+    if (draw < cumulative) return static_cast<int>(j);
+  }
+  // Roundoff must not select a zero-weight tail candidate.
+  return last_positive;
+}
+
+// Select a partner from sampled positions in males, returning a people position.
+// Age(male)-age(female) equals birth_time(female)-birth_time(male).
+int select_partner(const std::vector<int>& males, const std::vector<int>& sample,
+                   const std::vector<Person>& people, int woman, const List& matching) {
   if (sample.empty()) return -1;
-  const size_t selected = std::min(sample.size() - 1,
-    static_cast<size_t>(R::runif(0, 1) * sample.size()));
-  return males[sample[selected]];
+  NumericVector gaps(sample.size());
+  for (size_t j = 0; j < sample.size(); ++j)
+    gaps[j] = people[woman].born - people[males[sample[j]]].born;
+  const NumericVector utility = matching_utilities(gaps, matching);
+  const NumericVector probabilities = matching_probabilities(utility);
+  return males[sample[draw_partner_position(probabilities)]];
+}
+
+// Internal analytical/sampling diagnostics use the same scoring and draw helpers.
+// [[Rcpp::export]]
+List inspect_matching_cpp(NumericVector age_difference, List matching, int draws) {
+  if (draws < 0) stop("Number of draws must be nonnegative.");
+  const NumericVector utility = matching_utilities(age_difference, matching);
+  const NumericVector probabilities = matching_probabilities(utility);
+  IntegerVector choices(draws);
+  for (int j = 0; j < draws; ++j) {
+    if (j % 1024 == 0) checkUserInterrupt();
+    const int selected = draw_partner_position(probabilities);
+    choices[j] = selected < 0 ? NA_INTEGER : selected + 1;
+  }
+  return List::create(_["utilities"] = utility, _["probabilities"] = probabilities,
+                      _["choices"] = choices);
 }
 
 // Internal sampling entry point for checking size, uniqueness, and inclusion.
@@ -198,7 +270,7 @@ struct UnionRecord {
 List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   DataFrame fertility_rates, double start, double years,
                   double birth_interval, DataFrame unions,
-                  int sample_size) {
+                  int sample_size, List matching) {
   // R performs input validation and seed handling. All engine state below is
   // local to this call; public times and rates remain in years and person-years.
   NumericVector ids = persons["person_id"], births = persons["birth_time"];
@@ -334,7 +406,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       if (partner < 0 && !males.empty()) {
         const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
                                                   sampling_workspace);
-        partner = select_partner(males, sample);
+        partner = select_partner(males, sample, people, i, matching);
         if (next_union_id >= 9007199254740991.0 ||
             union_history.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
           stop("Union history exceeds supported ID or row limits.");

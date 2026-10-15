@@ -3,8 +3,8 @@
 Updated October 15, 2026 from the user's milestone 2 request.
 **Status: milestone scope accepted (D030); detailed demographic rules below
 remain proposals or open decisions. Process construction and formula scoring
-and temporary uniform on-demand execution are implemented; conditional-logit
-execution, pair screening, and rate-based initiation remain pending.**
+and conditional-logit on-demand execution are implemented; pair screening
+and rate-based initiation remain pending.**
 Every simulation requires a union-formation process. Current-partner lookup
 and union histories are common infrastructure for all initiation modes.
 
@@ -77,50 +77,60 @@ has no partner probabilities; its demographic consequences remain undecided.
 These are controlled mathematical cases, not suggested demographic defaults.
 
 The internal scoring helper is tested against these analytical cases. The
-engine supports only the temporary uniform on-demand increment specified below;
+engine supports the conditional-logit on-demand increment specified below;
 `simulate()` rejects rate-based initiation.
 
-## On-demand engine increment: specification before implementation
+## On-demand conditional-logit execution specification
 
-The user authorized a temporary uniform-choice implementation before matching
-and eligibility are added. The user subsequently made union formation a
-required process; the optional milestone 1 father-assignment path is removed. At each birth, use the woman's existing living male
-partner if she has an ongoing union. Otherwise draw `min(sample_size, living
-men)` distinct men uniformly without replacement (`0` means all living men),
-then choose one of those men uniformly. Create a union at the birth time and
-use that man as father. The newborn is not part of this pre-birth candidate pool.
-No age, ancestry, or existing-male-union exclusion is applied in this increment;
-a man can consequently have concurrent unions. This is explicitly temporary,
-not an accepted final eligibility policy. Matching coefficients are stored and
-validated but not used for this increment. Scheduled initiation remains rejected.
+At each birth, use the woman's existing living male partner when she has an
+ongoing union. Otherwise draw `min(sample_size, living men)` distinct men
+uniformly without replacement (`0` means all living men). For every sampled
+candidate calculate `age_difference = male age - female age` in continuous
+years. The shared search time cancels, so this equals the woman's birth time
+minus the man's birth time. Evaluate the user's matching formula and named
+coefficients to obtain utility V_j, then choose one candidate with probability
 
-An input woman with multiple ongoing unions or an ongoing same-sex/deceased
-partner cannot supply an unambiguous living male partner for this increment;
-reject such inconsistent/unsupported active input rather than select an arbitrary
-father. These checks are execution preconditions, not a general eligibility rule.
-Historical ended unions are preserved. A partner death ends every affected
-ongoing union, immediately clearing the woman's current partner; her next birth
-can trigger a new search. Widowhood itself does not trigger a search. Fertility
-and mortality schedules do not depend on union status in this increment, so
-formation and widowhood do not resample a surviving partner's existing event.
-Maternal birth and newborn scheduling retain their existing behavior.
+    P(j) = exp(V_j - max(V)) / sum_k exp(V_k - max(V)).
 
-Worked cases: a woman with a living partner and two births has one union and
-the same father for both; an unpartnered woman with one living male forms a
-union at her birth and assigns that male; after his death the union is ended
-and a subsequent birth searches the then-living pool. With four living men and
-`sample_size = 2`, the temporary sample contains two distinct men, and each
-of the four men has marginal partner probability 1/4. Candidate sets are not
-retained. When no men exist, retain the birth with unknown father and no new union,
-as accepted by the user for this increment. A future user toggle between
-missing-father assignment and birth cancellation is requested but deferred.
+Create the union at the birth time and use the selected man as father. A
+nonempty pool always produces a partner; there is no wait alternative. Empty
+pools preserve the birth with unknown father and no union. A future choice to
+cancel the birth is deferred. All-zero utilities give uniform probabilities.
+Nonfinite formula values/utilities are errors, not silently excluded candidates.
+Formula evaluation cannot directly mutate engine population state. Candidate
+sets are not retained.
 
-Validation will cover these worked cases, uniform sampling without replacement,
-empty/small/full pools, death and restarts, unique union IDs, custom-column
-preservation, reproducibility/independence, and regression of milestone 1
-fertility/mortality behavior with an explicit union process, plus rejection
-of missing union processes. No scientific validity is claimed for the
-intentionally unrestricted candidate pool or temporary uniform choice.
+Worked example requested by the user: formula
+`~ age_difference + I(age_difference^2)` with coefficients 0.072 and -0.014
+has utility `0.072*d - 0.014*d^2`. Its maximum is at
+`d = -0.072 / (2 * -0.014) = 2.5714286` years. Among equally represented
+candidate ages, this is the preferred gap; the resulting mean gap depends on
+candidate availability. With candidate gaps 0, 3, and 10, probabilities are
+proportional to `exp(c(0, 0.09, -0.68))`. The coefficients are test inputs,
+not demographic defaults.
+
+The temporary uniform-choice increment is superseded by this formula choice.
+Common linear and raw quadratic age-difference terms can be evaluated directly
+in C++ with the same formula semantics; other supported R formula transforms
+use the existing model-matrix evaluator on the sampled candidate data. There
+is no age discretization, cached age-grid approximation, or new dependency.
+
+Pair eligibility remains deliberately deferred: the pool includes partnered
+men, relatives, and children. Men may have concurrent unions; this is not an
+accepted final eligibility policy. A woman retains her current partner until
+death. Input must supply unambiguous active female/male unions with living
+partners and at most one ongoing union per woman. Ended histories are retained.
+A partner's death ends affected unions and clears current-partner state; a
+woman's next birth can search again. Union formation/widowhood do not change
+fertility or mortality schedules in this increment, so a surviving partner's
+pending event stays valid. Scheduled initiation remains rejected.
+
+Validation covers the analytical peak/probabilities, native versus R formula
+utilities, sampled choice frequencies, uniform and singleton/empty pools,
+extreme utilities and invalid formula output, reproducibility/independence,
+partner retention, union accounting, widowhood and restarts. Test thresholds
+for stochastic checks are sampling-error bounds, not demographic acceptance
+criteria. No scientific validity is claimed for the unrestricted candidate pool.
 
 ## Initiation, matching, and state consistency
 

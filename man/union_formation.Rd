@@ -39,9 +39,9 @@ eligibility and gaps are not yet implemented. Must be NULL for \code{"on_demand"
 \description{
 Construct or attach a union-formation specification without executing it.
 \code{\link[=simulate]{simulate()}} supports a temporary on-demand implementation: at a birth use
-the woman's current partner, or sample living men and choose one uniformly
-to form a union. If no men exist, preserve the birth with unknown father.
-Pair eligibility and matching-model utilities are not yet applied, so even
+the woman's current partner, or sample living men and choose a partner using
+conditional-logit probabilities from the matching formula to form a union. If no men exist, preserve the birth with unknown father.
+Pair eligibility is not yet applied, so even
 partnered men, relatives, and children can be selected. Death ends affected
 unions. Rate-based initiation and conditional fertility are not implemented.
 }

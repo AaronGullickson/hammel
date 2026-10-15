@@ -139,10 +139,15 @@ The former milestone 1 path without unions is no longer executable.
 
 With `union_formation(initiation = "on_demand", ...)`, use the woman's ongoing
 living male partner as father. If she has no partner, sample up to `sample_size`
-living men without replacement (default 1000; zero means the whole pool), choose
-one uniformly, and form a union at the birth time before assigning him as
-father. This temporary increment deliberately skips pair eligibility and the
-matching model: partnered men, relatives, and children can be selected. A man
+living men without replacement (default 1000; zero means the whole pool).
+Evaluate the matching formula on male-minus-female continuous age differences
+and multiply its non-intercept model-matrix columns by their named coefficients.
+For candidate utilities V, sample with probabilities proportional to
+`exp(V - max(V))`, form the union at the birth time, and assign the partner as
+father. Nonfinite formula values/utilities are errors. Linear/raw quadratic
+terms have an exact native evaluator; other formulas use the R model matrix.
+Pair screening remains deferred: partnered men, relatives, and children can
+be selected. A man
 can have concurrent unions; a woman keeps her current partner until death.
 No men means the birth proceeds with unknown father and no new union. A future
 choice to cancel births is deferred. Rate-based initiation is not executed.
@@ -265,7 +270,7 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 | Midpoint approximation | Validate bias against supplied age schedules; no accuracy guarantee |
 | Rate changes between runs | Histories retain spacing, but compensation uses only the new schedule |
 | Sparse oldest ages | Missing cells remain missing; no automatic imputation or smoothing |
-| Union formation/dissolution | Temporary uniform on-demand formation and widowhood; screening, logit matching, and scheduled initiation pending |
+| Union formation/dissolution | Conditional-logit on-demand formation and widowhood; screening and scheduled initiation pending |
 | Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
 | Exact continuation | No saved queue/RNG checkpoint |
 

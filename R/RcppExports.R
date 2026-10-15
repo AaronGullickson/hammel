@@ -13,11 +13,15 @@ adjusted_fertility_cpp <- function(rates, birth_interval) {
     .Call(`_hammel_adjusted_fertility_cpp`, rates, birth_interval)
 }
 
+inspect_matching_cpp <- function(age_difference, matching, draws) {
+    .Call(`_hammel_inspect_matching_cpp`, age_difference, matching, draws)
+}
+
 sample_male_positions_cpp <- function(count, requested) {
     .Call(`_hammel_sample_male_positions_cpp`, count, requested)
 }
 
-simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size) {
-    .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size)
+simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching) {
+    .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching)
 }
 
