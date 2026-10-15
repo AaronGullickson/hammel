@@ -31,9 +31,6 @@ library(ggplot2)
 library(gt)
 ```
 
-## AI Comments
-
-For the conclusions, the evidence supports good reproduction of the tested fixed schedules after the initial fertility transient, plus a documented temporary distortion when fertility changes at restart. Keep the scope explicit: the detailed ASFR/ASMR validation uses US schedules; Niger provides a high-fertility TFR and restart check, with US mortality retained.
 
 ## Purpose and completion criteria
 
