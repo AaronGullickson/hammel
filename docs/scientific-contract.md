@@ -127,6 +127,10 @@ adjustment and does not guarantee exact ASFR or TFR recovery after burn-in.
 
 ### Birth transition and parent assignment
 
+Union histories use `wife_id` for the female partner and `husband_id` for the
+male partner. These roles are validated for ended and ongoing unions and do
+not imply legal marriage.
+
 Each birth creates one child with a new unique ID above all supplied IDs,
 records the mother, and assigns female sex with probability 0.4886.
 A union-formation process is required for every simulation, including zero
@@ -157,7 +161,8 @@ Update the mother's latest birth and resample both newborn and mother. Newborns
 enter mortality risk immediately; their fertility depends on the supplied ages.
 Existing custom person/union columns are retained; new rows have missing custom
 values. C++ maintains union histories and shared partner caches for all runs,
-closing unions at death with `end_reason = "death"`. Initiation mode will
+closing unions at death with `end_reason = "death_husband"` or
+`"death_wife"` according to the executed death event. Initiation mode will
 control search timing; it does not control whether partner state is tracked.
 
 ## Execution, competition, and random numbers

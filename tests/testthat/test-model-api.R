@@ -164,21 +164,21 @@ test_that("population construction and attachment reject inconsistent histories"
   p <- persons
   p$father_id[1] <- 1L
   check_rejected(p)
-  u <- data.frame(union_id = 1L, partner1_id = 1L, partner2_id = 2L, start_time = -1, end_time = NA_real_,
+  u <- data.frame(union_id = 1L, wife_id = 2L, husband_id = 1L, start_time = -1, end_time = NA_real_,
     end_reason = NA_character_)
   expect_identical(hammel_population(persons, u, end_time = 0)$unions, tibble::as_tibble(u))
   v <- u
-  v$partner2_id <- 999L
+  v$husband_id <- 999L
   check_rejected(u = v)
   v <- u
-  v$partner2_id <- 1L
+  v$husband_id <- 2L
   check_rejected(u = v)
   v <- u
   v$end_time <- -2
   v$end_reason <- "dissolution"
   check_rejected(u = v)
   v <- u
-  v$end_reason <- "death"
+  v$end_reason <- "death_husband"
   check_rejected(u = v)
   v <- u
   v$start_time <- -30
@@ -276,3 +276,20 @@ test_that("sex labels are explicit and public population tables are tibbles", {
   expect_true(tibble::is_tibble(hammel_population(persons[FALSE, ])$persons))
 })
 
+
+test_that("union wife and husband columns enforce female and male roles", {
+  persons <- data.frame(person_id = c(40, 10), sex = c("m", "f"),
+    birth_time = c(-30, -25), death_time = NA_real_,
+    mother_id = NA_real_, father_id = NA_real_)
+  unions <- data.frame(union_id = 3, wife_id = 10, husband_id = 40,
+    start_time = -1, end_time = NA_real_, end_reason = NA_character_)
+  population <- hammel_population(persons, unions, end_time = 0)
+  expect_equal(population$unions$wife_id, 10)
+  expect_equal(population$unions$husband_id, 40)
+  swapped <- transform(unions, wife_id = 40, husband_id = 10)
+  expect_error(hammel_population(persons, swapped, end_time = 0), "wife_id.*female")
+  swapped$end_time <- -0.5
+  swapped$end_reason <- "dissolution"
+  expect_error(hammel_population(persons, swapped, end_time = 0), "wife_id.*female")
+  expect_identical(names(create_baseline_population(0)$unions), names(unions))
+})

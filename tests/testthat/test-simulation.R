@@ -116,12 +116,14 @@ test_that("adjusted fertility follows the continuous renewal expectation", {
 test_that("death closes existing unions without forming new unions", {
   model <- make_model(2, death_rate = 1e+08)
   model$population$persons$sex[2] <- "f"
-  model$population$unions <- data.frame(union_id = 1L, partner1_id = 1L, partner2_id = 2L,
+  model$population$unions <- data.frame(union_id = 1L, wife_id = 2L, husband_id = 1L,
     start_time = -1, end_time = NA_real_, end_reason = NA_character_)
   result <- simulate(model, 1/12, seed = 42)
   expect_equal(nrow(result$unions), 1L, tolerance = 0)
   expect_equal(result$unions$end_time, min(result$persons$death_time), tolerance = 0)
-  expect_equal(result$unions$end_reason, "death", tolerance = 0)
+  expected_reason <- if (result$persons$death_time[1] < result$persons$death_time[2])
+    "death_husband" else "death_wife"
+  expect_equal(result$unions$end_reason, expected_reason)
 })
 
 test_that("fractional run durations and tibble outputs are supported", {

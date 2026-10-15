@@ -32,8 +32,8 @@ test_that("on-demand birth creates one union and keeps the partner for later bir
   children <- result$persons[result$persons$mother_id %in% 10, ]
   expect_gt(nrow(children), 2)
   expect_equal(nrow(result$unions), 1)
-  expect_equal(result$unions$partner1_id, 10)
-  expect_equal(result$unions$partner2_id, 40)
+  expect_equal(result$unions$wife_id, 10)
+  expect_equal(result$unions$husband_id, 40)
   expect_equal(result$unions$start_time, min(children$birth_time))
   expect_true(all(children$father_id == 40))
   expect_true(is.na(result$unions$end_time))
@@ -45,10 +45,10 @@ test_that("on-demand birth creates one union and keeps the partner for later bir
   expect_true(all(later$persons$father_id[later$persons$mother_id %in% 10] == 40))
 })
 
-test_that("existing unions preserve partner identity, orientation and custom history", {
+test_that("existing unions preserve sex-specific partner identity and custom history", {
   model <- make_on_demand_model(3)
-  model$population$unions <- tibble::tibble(union_id = 9, partner1_id = 3,
-    partner2_id = 1, start_time = -1, end_time = NA_real_,
+  model$population$unions <- tibble::tibble(union_id = 9, wife_id = 1,
+    husband_id = 3, start_time = -1, end_time = NA_real_,
     end_reason = NA_character_, note = "retained")
   result <- simulate(model, 1, seed = 5)
   expect_identical(result$unions, model$population$unions)
@@ -81,7 +81,7 @@ test_that("widowhood closes new unions and subsequent births search again", {
   expect_gt(nrow(result$unions), 1)
   death <- result$persons$death_time[result$persons$person_id == 2]
   expect_equal(result$unions$end_time[1], death)
-  expect_equal(result$unions$end_reason[1], "death")
+  expect_equal(result$unions$end_reason[1], "death_husband")
   expect_gt(result$unions$start_time[2], death)
   children <- result$persons[result$persons$mother_id %in% 1, ]
   expect_true(all(children$father_id[children$birth_time < death] == 2))
@@ -96,8 +96,8 @@ test_that("screening and utility matching are deliberately not applied yet", {
   model$population$persons$birth_time[3] <- -1 # only man is a child
   result <- simulate(model, 1, seed = 19)
   expect_equal(nrow(result$unions), 2)
-  expect_true(all(result$unions$partner2_id == 3))
-  expect_equal(sort(result$unions$partner1_id), c(1, 2))
+  expect_true(all(result$unions$husband_id == 3))
+  expect_equal(sort(result$unions$wife_id), c(1, 2))
   model$processes$union_formation$matching$coefficients[] <- -100
   expect_identical(simulate(model, 1, seed = 19), result)
 })
@@ -105,12 +105,12 @@ test_that("screening and utility matching are deliberately not applied yet", {
 test_that("on-demand input and edited process errors are explicit", {
   model <- make_on_demand_model(3)
   model$population$persons$sex[3] <- "f"
-  model$population$unions <- tibble::tibble(union_id = 1, partner1_id = 1,
-    partner2_id = 3, start_time = -1, end_time = NA_real_, end_reason = NA_character_)
-  expect_error(simulate(model, 1), "living female/male")
+  model$population$unions <- tibble::tibble(union_id = 1, wife_id = 1,
+    husband_id = 3, start_time = -1, end_time = NA_real_, end_reason = NA_character_)
+  expect_error(simulate(model, 1), "wife_id.*female")
   model$population$persons$sex[3] <- "m"
   model$population$unions <- rbind(model$population$unions,
-    transform(model$population$unions, union_id = 2, partner2_id = 2))
+    transform(model$population$unions, union_id = 2, husband_id = 2))
   expect_error(simulate(model, 1), "multiple ongoing unions")
   model <- make_on_demand_model()
   model$processes$union_formation$sample_size <- -1
@@ -122,4 +122,30 @@ test_that("simulations require an explicit union process even for zero duration"
   model$processes$union_formation <- NULL
   expect_error(simulate(model, 1), "union-formation process")
   expect_error(simulate(model, 0), "union-formation process")
+})
+
+test_that("union death reasons identify the wife or husband for input and new unions", {
+  for (dead_sex in c("f", "m")) {
+    for (initial_union in c(FALSE, TRUE)) {
+      model <- make_on_demand_model()
+      if (initial_union) {
+        model$population$unions <- tibble::tibble(union_id = 1, wife_id = 1,
+          husband_id = 2, start_time = -1, end_time = NA_real_,
+          end_reason = NA_character_)
+      }
+      # Allow a union to form before the selected partner dies after age 20.5.
+      model <- set_mortality(model, data.frame(
+        sex = c(dead_sex, dead_sex, if (dead_sex == "f") "m" else "f"),
+        age_start = c(0, 20.5, 0), age_end = c(20.5, Inf, Inf),
+        rate = c(0, 1e8, 0)))
+      result <- simulate(model, 1, seed = 52)
+      expect_gt(nrow(result$unions), 0)
+      expect_equal(result$unions$end_reason[1],
+                   if (dead_sex == "f") "death_wife" else "death_husband")
+      deceased <- if (dead_sex == "f") 1 else 2
+      expect_equal(result$unions$end_time[1], result$persons$death_time[deceased])
+      later <- simulate(set_population(model, result), 0.1, seed = 53)
+      expect_identical(later$unions[1, ], result$unions[1, ])
+    }
+  }
 })

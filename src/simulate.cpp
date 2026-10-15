@@ -190,7 +190,8 @@ IntegerVector sample_male_positions_cpp(int count, int requested) {
 
 struct UnionRecord {
   double id, start, end;
-  int partner1, partner2;
+  int wife, husband;
+  bool wife_died = false;
 };
 
 // [[Rcpp::export]]
@@ -226,25 +227,23 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::vector<std::vector<int>> person_unions(people.size());
   std::vector<int> current_partner(people.size(), -1);
   double next_union_id = 0;
-  NumericVector uids = unions["union_id"], p1 = unions["partner1_id"];
-  NumericVector p2 = unions["partner2_id"], starts = unions["start_time"];
+  NumericVector uids = unions["union_id"], wives = unions["wife_id"];
+  NumericVector husbands = unions["husband_id"], starts = unions["start_time"];
   NumericVector ends = unions["end_time"];
   for (int u = 0; u < uids.size(); ++u) {
-    const int first = index.at(p1[u]), second = index.at(p2[u]);
-    union_history.push_back({uids[u], starts[u], ends[u], first, second});
+    const int woman = index.at(wives[u]), man = index.at(husbands[u]);
+    union_history.push_back({uids[u], starts[u], ends[u], woman, man});
     next_union_id = std::max(next_union_id, uids[u]);
     if (!NumericVector::is_na(ends[u])) continue;
-    if (!NumericVector::is_na(people[first].died) ||
-        !NumericVector::is_na(people[second].died) ||
-        people[first].female == people[second].female)
+    if (!NumericVector::is_na(people[woman].died) ||
+        !NumericVector::is_na(people[man].died) ||
+        !people[woman].female || people[man].female)
       stop("On-demand unions require living female/male partners in active input unions.");
-    const int woman = people[first].female ? first : second;
-    const int man = people[first].female ? second : first;
     if (current_partner[woman] >= 0)
       stop("On-demand input cannot have multiple ongoing unions for a woman.");
     current_partner[woman] = man;
-    person_unions[first].push_back(u);
-    person_unions[second].push_back(u);
+    person_unions[woman].push_back(u);
+    person_unions[man].push_back(u);
   }
   // On restart, recover the latest recorded maternal birth, including children
   // who have died. A mother with no recorded children has no spacing restriction.
@@ -314,8 +313,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         UnionRecord& relationship = union_history[u];
         if (!NumericVector::is_na(relationship.end)) continue;
         relationship.end = now;
-        const int woman = people[relationship.partner1].female ?
-          relationship.partner1 : relationship.partner2;
+        relationship.wife_died = i == relationship.wife;
+        const int woman = relationship.wife;
         current_partner[woman] = -1;
       }
       if (!people[i].female) {
@@ -382,30 +381,30 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     out_mother[i] = p.mother; out_father[i] = p.father;
     out_sex[i] = p.female ? "f" : "m";
   }
-  NumericVector out_uid(union_history.size()), out_p1(union_history.size());
-  NumericVector out_p2(union_history.size()), out_start(union_history.size());
+  NumericVector out_uid(union_history.size()), out_wife(union_history.size());
+  NumericVector out_husband(union_history.size()), out_start(union_history.size());
   NumericVector out_end(union_history.size());
   CharacterVector out_reason(union_history.size());
   CharacterVector input_reasons = unions["end_reason"];
   for (size_t u = 0; u < union_history.size(); ++u) {
     const UnionRecord& relationship = union_history[u];
     out_uid[u] = relationship.id;
-    out_p1[u] = people[relationship.partner1].id;
-    out_p2[u] = people[relationship.partner2].id;
+    out_wife[u] = people[relationship.wife].id;
+    out_husband[u] = people[relationship.husband].id;
     out_start[u] = relationship.start;
     out_end[u] = relationship.end;
     if (NumericVector::is_na(relationship.end)) out_reason[u] = NA_STRING;
     else if (u < static_cast<size_t>(unions.nrows())) {
       NumericVector input_ends = unions["end_time"];
       if (!NumericVector::is_na(input_ends[u])) out_reason[u] = input_reasons[u];
-      else out_reason[u] = "death";
-    } else out_reason[u] = "death";
+      else out_reason[u] = relationship.wife_died ? "death_wife" : "death_husband";
+    } else out_reason[u] = relationship.wife_died ? "death_wife" : "death_husband";
   }
   return List::create(_["persons"] = DataFrame::create(
     _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),
     _["unions"] = DataFrame::create(_["union_id"] = out_uid,
-      _["partner1_id"] = out_p1, _["partner2_id"] = out_p2,
+      _["wife_id"] = out_wife, _["husband_id"] = out_husband,
       _["start_time"] = out_start, _["end_time"] = out_end,
       _["end_reason"] = out_reason),
     _["births"] = birth_count, _["deaths"] = death_count);

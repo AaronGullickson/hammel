@@ -11,7 +11,9 @@ hammel_population(persons, unions = NULL, end_time = NULL)
 persons. Columns are preserved and the table is returned as a tibble.}
 
 \item{unions}{A data frame with one row per union episode, or \code{NULL}
-for no unions. An empty data frame is normalized to the union schema.}
+for no unions. \code{wife_id} references the female partner and \code{husband_id}
+the male partner; these roles do not imply legal marriage. An empty data
+frame is normalized to the union schema.}
 
 \item{end_time}{Optional finite simulation endpoint in years. Its calendar origin is supplied by the user. \code{NULL} means
 that the endpoint is unknown.}

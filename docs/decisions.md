@@ -406,6 +406,22 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
   the accepted milestone 1 report as historical evidence at its recorded commit;
   do not rewrite its analysis for the changed milestone 2 model.
 
+## D033: Sex-specific union partner columns
+
+**Current status:** Accepted and implemented; supersedes unordered union roles in D012.
+
+- **Status:** accepted October 15, 2026 at the user's request.
+- **Decision:** replace `partner1_id` and `partner2_id` with `wife_id` and
+  `husband_id`. Wife references a female person and husband a male person,
+  for both ongoing and ended histories. Continue using “union” for the
+  relationship; these role names do not establish legal marriage status.
+- **Implications:** population validation enforces sex roles. C++ histories,
+  partner lookup, death handling, and output use explicit wife/husband roles.
+  Empty union tables have the same renamed columns. Existing unordered
+  tables must be mapped by sex, not just renamed by position.
+- **Validation:** valid noncontiguous IDs, swapped-role rejection for ongoing
+  and ended unions, empty schema, and existing birth/death/restart cases.
+
 ## Additional clarifications and deferred concerns
 
 ### Demographic extraction implementation
@@ -451,3 +467,12 @@ processes until those rules are specified and implemented.
 
 The user subsequently selected `sample_size = 1000` as the default for both
 `union_formation()` and `set_union_formation()` on October 15, 2026.
+
+### Sex-specific union death reasons (October 15, 2026)
+
+At the user's direction, union `end_reason` now uses `death_husband` and
+`death_wife` in place of `death`. Existing `dissolution` and ongoing `NA`
+remain valid. The executed death event records the terminating partner;
+subsequent deaths do not overwrite an ended union, including equal-time
+events under existing queue ordering. Supplied ended histories and restart
+reasons are retained. This supersedes generic death labels in earlier entries.

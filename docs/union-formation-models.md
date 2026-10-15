@@ -14,7 +14,8 @@ Use **union**, **union formation**, and **partnered/unpartnered** in code and
 documentation. The user sometimes says “marriage” conversationally, but the
 model is deliberately agnostic about legal marriage, long-term cohabitation,
 and other union types. Milestone 2 does not introduce a legal-marital-status
-classification. Conditional fertility refers to whether a woman is in an
+classification. At the user's request, union tables nevertheless use explicit
+`wife_id` (female) and `husband_id` (male) roles so sex is clear. Conditional fertility refers to whether a woman is in an
 ongoing union, subject to the detailed exposure rules still to be specified.
 
 ## Accepted scope

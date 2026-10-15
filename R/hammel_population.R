@@ -7,7 +7,9 @@
 #' @param persons A data frame with one row per person, including deceased
 #'   persons. Columns are preserved and the table is returned as a tibble.
 #' @param unions A data frame with one row per union episode, or `NULL`
-#'   for no unions. An empty data frame is normalized to the union schema.
+#'   for no unions. `wife_id` references the female partner and `husband_id`
+#'   the male partner; these roles do not imply legal marriage. An empty data
+#'   frame is normalized to the union schema.
 #' @param end_time Optional finite simulation endpoint in years. Its calendar origin is supplied by the user. `NULL` means
 #'   that the endpoint is unknown.
 #'
@@ -86,16 +88,22 @@ validate_population <- function(results) {
            call. = FALSE)
     }
   }
-  for (field in c("union_id", "partner1_id", "partner2_id")) {
+  for (field in c("union_id", "wife_id", "husband_id")) {
     check_numeric_column(unions[[field]], paste0("unions$", field), id = TRUE)
   }
   if (anyDuplicated(unions$union_id)) {
     stop("`unions$union_id` must be unique.", call. = FALSE)
   }
-  if (any(!unions$partner1_id %in% persons$person_id |
-          !unions$partner2_id %in% persons$person_id |
-          unions$partner1_id == unions$partner2_id)) {
+  if (any(!unions$wife_id %in% persons$person_id |
+          !unions$husband_id %in% persons$person_id |
+          unions$wife_id == unions$husband_id)) {
     stop("Union partners must refer to two distinct persons.", call. = FALSE)
+  }
+  wife_sex <- persons$sex[match(unions$wife_id, persons$person_id)]
+  husband_sex <- persons$sex[match(unions$husband_id, persons$person_id)]
+  if (any(wife_sex != "f" | husband_sex != "m")) {
+    stop('`wife_id` must reference a female person and `husband_id` a male person.',
+         call. = FALSE)
   }
   check_numeric_column(unions$start_time, "unions$start_time")
   check_numeric_column(unions$end_time, "unions$end_time", missing = TRUE)
@@ -104,12 +112,12 @@ validate_population <- function(results) {
   }
   reason <- unions$end_reason
   if (!is.character(reason) || !is.null(dim(reason)) ||
-      any(!is.na(reason) & !reason %in% c("death", "dissolution")) ||
+      any(!is.na(reason) & !reason %in% c("death_husband", "death_wife", "dissolution")) ||
       any(is.na(reason) != is.na(unions$end_time))) {
-    stop("`unions$end_reason` must be death or dissolution for ended unions, and NA for ongoing unions.",
+    stop("`unions$end_reason` must be death_husband, death_wife, or dissolution for ended unions, and NA for ongoing unions.",
          call. = FALSE)
   }
-  for (partner in c("partner1_id", "partner2_id")) {
+  for (partner in c("wife_id", "husband_id")) {
     born <- persons$birth_time[match(unions[[partner]], persons$person_id)]
     if (any(unions$start_time < born)) {
       stop("Unions must not start before either partner's birth.", call. = FALSE)
@@ -134,7 +142,7 @@ normalize_unions <- function(unions) {
 
 empty_unions <- function() {
   tibble::tibble(
-    union_id = integer(), partner1_id = integer(), partner2_id = integer(),
+    union_id = integer(), wife_id = integer(), husband_id = integer(),
     start_time = numeric(), end_time = numeric(), end_reason = character()
   )
 }

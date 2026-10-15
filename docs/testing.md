@@ -163,3 +163,19 @@ build on the same machine; they are single-run diagnostics, not general timing
 guarantees or measurements of the user's USA case. Sampling size, sampling
 without replacement, uniform choice, and RNG draw order are preserved. Scratch
 storage grows with the largest partial-search male pool and remains call-local.
+
+## Sex-specific union schema checks (October 15, 2026)
+
+After D033 renamed union roles to `wife_id`/`husband_id`, `devtools::test()`
+passed 1,920 expectations with no test failures/warnings and one live-test skip.
+An added role-validation test was then checked with
+`devtools::test(filter = "model-api")`: all 106 expectations passed, including
+five new checks for valid roles, swapped roles in ongoing/ended histories, and
+the empty-table schema. Roxygen documentation and `git diff --check` passed.
+The user's edits to `inst/examples/milestone2.R` were preserved.
+
+After adding sex-specific union death reasons, `devtools::test()` passed all
+1,941 expectations with zero test failures/warnings and one opt-in live-test
+skip. Cases cover wife/husband deaths in both supplied and newly formed
+unions, exact end times, and preservation of ended records on restart.
+`git diff --check` passed.
