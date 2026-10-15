@@ -139,10 +139,65 @@ DataFrame adjusted_fertility_cpp(DataFrame rates, double birth_interval) {
                           _["rate"] = values);
 }
 
+// Partial Fisher-Yates using reusable positions, restored after each sample.
+// This avoids allocating a hash node for each candidate at every search.
+// Workspace positions are always identity between calls, including when the
+// living-male pool grows or shrinks. They index males, not fixed person IDs.
+std::vector<int> sample_male_positions(int count, int requested,
+                                     std::vector<int>& workspace) {
+  const int take = requested == 0 ? count : std::min(count, requested);
+  std::vector<int> sample;
+  sample.reserve(take);
+  if (take == count) {
+    for (int j = 0; j < count; ++j) sample.push_back(j);
+    return sample;
+  }
+  while (workspace.size() < static_cast<size_t>(count))
+    workspace.push_back(static_cast<int>(workspace.size()));
+  std::vector<int> swaps;
+  swaps.reserve(take);
+  for (int j = 0; j < take; ++j) {
+    if (j % 1024 == 0) checkUserInterrupt();
+    const int selected = j + std::min(count - j - 1,
+      static_cast<int>(R::runif(0, 1) * (count - j)));
+    std::swap(workspace[j], workspace[selected]);
+    sample.push_back(workspace[j]);
+    swaps.push_back(selected);
+  }
+  // Undo in reverse so the next search starts with identity positions again.
+  for (int j = take - 1; j >= 0; --j)
+    std::swap(workspace[j], workspace[swaps[j]]);
+  return sample;
+}
+
+// Select a partner from the sampled pool, returning a position in people.
+// sample contains positions in males. Keep selection separate from sampling
+// and union creation so eligibility and utility scoring can be added here.
+int select_partner(const std::vector<int>& males, const std::vector<int>& sample) {
+  if (sample.empty()) return -1;
+  const size_t selected = std::min(sample.size() - 1,
+    static_cast<size_t>(R::runif(0, 1) * sample.size()));
+  return males[sample[selected]];
+}
+
+// Internal sampling entry point for checking size, uniqueness, and inclusion.
+// [[Rcpp::export]]
+IntegerVector sample_male_positions_cpp(int count, int requested) {
+  if (count < 0 || requested < 0) stop("Sample sizes must be nonnegative.");
+  std::vector<int> workspace;
+  return wrap(sample_male_positions(count, requested, workspace));
+}
+
+struct UnionRecord {
+  double id, start, end;
+  int partner1, partner2;
+};
+
 // [[Rcpp::export]]
 List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   DataFrame fertility_rates, double start, double years,
-                  double birth_interval) {
+                  double birth_interval, DataFrame unions,
+                  int sample_size) {
   // R performs input validation and seed handling. All engine state below is
   // local to this call; public times and rates remain in years and person-years.
   NumericVector ids = persons["person_id"], births = persons["birth_time"];
@@ -154,6 +209,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   // public IDs to positions while reconstructing initial maternal histories.
   std::vector<Person> people;
   std::vector<int> males;
+  std::vector<int> sampling_workspace;
   std::map<double, int> index;
   double next_id = 0;
   for (int i = 0; i < ids.size(); ++i) {
@@ -165,6 +221,30 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                       -std::numeric_limits<double>::infinity(), female, slot});
     index[ids[i]] = i;
     next_id = std::max(next_id, ids[i]);
+  }
+  std::vector<UnionRecord> union_history;
+  std::vector<std::vector<int>> person_unions(people.size());
+  std::vector<int> current_partner(people.size(), -1);
+  double next_union_id = 0;
+  NumericVector uids = unions["union_id"], p1 = unions["partner1_id"];
+  NumericVector p2 = unions["partner2_id"], starts = unions["start_time"];
+  NumericVector ends = unions["end_time"];
+  for (int u = 0; u < uids.size(); ++u) {
+    const int first = index.at(p1[u]), second = index.at(p2[u]);
+    union_history.push_back({uids[u], starts[u], ends[u], first, second});
+    next_union_id = std::max(next_union_id, uids[u]);
+    if (!NumericVector::is_na(ends[u])) continue;
+    if (!NumericVector::is_na(people[first].died) ||
+        !NumericVector::is_na(people[second].died) ||
+        people[first].female == people[second].female)
+      stop("On-demand unions require living female/male partners in active input unions.");
+    const int woman = people[first].female ? first : second;
+    const int man = people[first].female ? second : first;
+    if (current_partner[woman] >= 0)
+      stop("On-demand input cannot have multiple ongoing unions for a woman.");
+    current_partner[woman] = man;
+    person_unions[first].push_back(u);
+    person_unions[second].push_back(u);
   }
   // On restart, recover the latest recorded maternal birth, including children
   // who have died. A mother with no recorded children has no spacing restriction.
@@ -230,6 +310,14 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (event.death) {
       // Retain the person's history, record death, and stop their scheduling.
       people[i].died = now;
+      for (int u : person_unions[i]) {
+        UnionRecord& relationship = union_history[u];
+        if (!NumericVector::is_na(relationship.end)) continue;
+        relationship.end = now;
+        const int woman = people[relationship.partner1].female ?
+          relationship.partner1 : relationship.partner2;
+        current_partner[woman] = -1;
+      }
       if (!people[i].female) {
         // Remove a dead male in constant time, updating the moved male's slot.
         int slot = people[i].male_slot;
@@ -241,20 +329,29 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       }
       ++death_count;
     } else {
-      // All living females face age-specific fertility risk, regardless of
-      // unions. Sample from all currently living males without age or kinship
-      // restrictions; preserve the birth with unknown father if none exist.
+      // Search initiation is on-demand for now; partner state is shared infrastructure.
       double father = NA_REAL;
-      if (!males.empty()) {
-        size_t selected = std::min(males.size() - 1,
-          static_cast<size_t>(R::runif(0, 1) * males.size()));
-        father = people[males[selected]].id;
+      int partner = current_partner[i];
+      if (partner < 0 && !males.empty()) {
+        const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
+                                                  sampling_workspace);
+        partner = select_partner(males, sample);
+        if (next_union_id >= 9007199254740991.0 ||
+            union_history.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
+          stop("Union history exceeds supported ID or row limits.");
+        const int u = static_cast<int>(union_history.size());
+        union_history.push_back({++next_union_id, now, NA_REAL, i, partner});
+        person_unions[i].push_back(u);
+        person_unions[partner].push_back(u);
+        current_partner[i] = partner;
       }
+      if (partner >= 0) father = people[partner].id;
+      // If no men exist, preserve the birth with unknown father and no union.
       if (next_id >= 9007199254740991.0 ||
           people.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
         stop("Population exceeds supported ID or row limits.");
       // IDs increase beyond existing histories. Store newborn parentage and
-      // equal-probability sex; no union is created by this engine.
+      // sex; union formation above happens before the newborn exists.
       double mother = people[i].id;
       people[i].last_birth = now;
       // Use 0.4886 as ffab - its the signature of Berkeley training!
@@ -264,6 +361,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       people.push_back({++next_id, now, NA_REAL, mother, father,
                         -std::numeric_limits<double>::infinity(), female, slot});
       if (!female) males.push_back(child);
+      person_unions.emplace_back();
+      current_partner.push_back(-1);
       ++birth_count;
       // Both newborn and mother need fresh candidates. The mother now has a
       // new last_birth; spacing delays her next birth, but not a possible death.
@@ -283,8 +382,31 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     out_mother[i] = p.mother; out_father[i] = p.father;
     out_sex[i] = p.female ? "f" : "m";
   }
+  NumericVector out_uid(union_history.size()), out_p1(union_history.size());
+  NumericVector out_p2(union_history.size()), out_start(union_history.size());
+  NumericVector out_end(union_history.size());
+  CharacterVector out_reason(union_history.size());
+  CharacterVector input_reasons = unions["end_reason"];
+  for (size_t u = 0; u < union_history.size(); ++u) {
+    const UnionRecord& relationship = union_history[u];
+    out_uid[u] = relationship.id;
+    out_p1[u] = people[relationship.partner1].id;
+    out_p2[u] = people[relationship.partner2].id;
+    out_start[u] = relationship.start;
+    out_end[u] = relationship.end;
+    if (NumericVector::is_na(relationship.end)) out_reason[u] = NA_STRING;
+    else if (u < static_cast<size_t>(unions.nrows())) {
+      NumericVector input_ends = unions["end_time"];
+      if (!NumericVector::is_na(input_ends[u])) out_reason[u] = input_reasons[u];
+      else out_reason[u] = "death";
+    } else out_reason[u] = "death";
+  }
   return List::create(_["persons"] = DataFrame::create(
     _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),
+    _["unions"] = DataFrame::create(_["union_id"] = out_uid,
+      _["partner1_id"] = out_p1, _["partner2_id"] = out_p2,
+      _["start_time"] = out_start, _["end_time"] = out_end,
+      _["end_reason"] = out_reason),
     _["births"] = birth_count, _["deaths"] = death_count);
 }

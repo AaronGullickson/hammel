@@ -127,3 +127,39 @@ provenance, edited-specification rejection, and the engine's explicit rejection
 of union processes. Documentation generation and `git diff --check` passed.
 These checks validate construction/scoring infrastructure, not executed union
 formation or milestone 2 scientific completion.
+
+## Temporary on-demand execution checks (October 15, 2026)
+
+After implementing D031, `devtools::test()` passed with 1,918 expectations,
+zero test failures/warnings, and the opt-in live database test skipped. New
+cases check sample sizes, uniqueness and inclusion frequencies, current-partner
+reuse, birth-time union creation/parentage, empty pools, historical IDs/custom
+columns, widowhood/repartnering, restarts, unsupported active histories,
+explicitly skipped screening and utilities, RNG isolation, and independence
+from later milestone 1 runs. Rcpp bindings and Rd documentation were regenerated;
+`git diff --check` passed. No rates were downloaded. The debug C++ build emitted
+the toolchain's `_FORTIFY_SOURCE` warning about compilation without optimization;
+compilation and installation succeeded. These are software checks of the
+temporary uniform implementation, not milestone 2 scientific acceptance.
+
+After D032 made union formation mandatory, the suite passed with 1,920
+expectations, zero test failures/warnings, and one opt-in live-test skip. The
+missing-process checks cover positive and zero duration. Simulation fixtures
+now supply an explicit union process; restart cases retain it. Current examples
+were updated, while the accepted milestone 1 report remains unchanged and
+should be reproduced at its recorded commit. The native enable flag and
+legacy no-union father-assignment branch were removed.
+
+## Candidate-sampling performance (October 15, 2026)
+
+A synthetic 50,000-person, 100-year run isolated candidate sampling overhead:
+with constant mortality 0.02 for both sexes and fertility 0.06 at ages 15–50,
+seed 42 for baseline and simulation, the hash-map sampler took 6.026 seconds
+with sample size 1000 versus 0.152 seconds with sample size 1. Replacing its
+per-candidate hash nodes with a reusable identity-position array and reversible
+partial Fisher–Yates swaps reduced sample-size-1000 elapsed time to 0.962 seconds
+(sample size 1: 0.163 seconds). Both measurements used the development/debug
+build on the same machine; they are single-run diagnostics, not general timing
+guarantees or measurements of the user's USA case. Sampling size, sampling
+without replacement, uniform choice, and RNG draw order are preserved. Scratch
+storage grows with the largest partial-search male pool and remains call-local.

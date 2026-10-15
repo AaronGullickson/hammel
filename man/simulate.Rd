@@ -7,8 +7,8 @@
 simulate(model, years, seed = NULL)
 }
 \arguments{
-\item{model}{A \code{hammel_model} containing a population and both demographic
-processes. The population must have a finite \code{end_time}.}
+\item{model}{A \code{hammel_model} containing a population, mortality, fertility,
+and union-formation processes. The population must have a finite \code{end_time}.}
 
 \item{years}{Nonnegative simulation duration in years.}
 
@@ -24,8 +24,12 @@ Advance a configured model and return a population that can initialize a
 later run. The C++ engine samples candidate waiting times across age bands,
 executes at continuous times, and prioritizes death over birth on exact ties.
 Events execute chronologically. All living females face the
-fertility schedule; each birth samples a father uniformly from living males,
-or records an unknown father if none are available. No new unions are formed.
+fertility schedule. A union-formation process is required. With on-demand
+union formation, use the woman's
+current partner, or sample men and choose one uniformly to form a union at
+the birth. Eligibility checks and matching-model scores are not yet applied.
+If no men are available, preserve the birth with unknown father and no union.
+Rate-based union initiation is not yet implemented.
 }
 \details{
 Minimum birth spacing is configured in \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}
@@ -48,7 +52,9 @@ model <- hammel_model() |>
   set_population(population) |>
   set_mortality(data.frame(sex = c("m", "f"), age_start = 0,
     age_end = Inf, rate = 0.01)) |>
-  set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0.1))
+  set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0.1)) |>
+  set_union_formation("on_demand",
+    create_matching_model(~ age_difference, c(age_difference = 0)))
 result <- simulate(model, years = 2, seed = 42)
 result$simulation
 }

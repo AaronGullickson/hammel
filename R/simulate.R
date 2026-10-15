@@ -4,8 +4,12 @@
 #' later run. The C++ engine samples candidate waiting times across age bands,
 #' executes at continuous times, and prioritizes death over birth on exact ties.
 #' Events execute chronologically. All living females face the
-#' fertility schedule; each birth samples a father uniformly from living males,
-#' or records an unknown father if none are available. No new unions are formed.
+#' fertility schedule. A union-formation process is required. With on-demand
+#' union formation, use the woman's
+#' current partner, or sample men and choose one uniformly to form a union at
+#' the birth. Eligibility checks and matching-model scores are not yet applied.
+#' If no men are available, preserve the birth with unknown father and no union.
+#' Rate-based union initiation is not yet implemented.
 #'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
 #' and uses recorded maternal births, including on restart.
@@ -21,8 +25,8 @@
 #' existing custom columns and histories are preserved. Restarting samples new
 #' pending events and does not reproduce an uninterrupted run exactly.
 #'
-#' @param model A `hammel_model` containing a population and both demographic
-#'   processes. The population must have a finite `end_time`.
+#' @param model A `hammel_model` containing a population, mortality, fertility,
+#'   and union-formation processes. The population must have a finite `end_time`.
 #' @param years Nonnegative simulation duration in years.
 #' @param seed Optional integer seed. With a seed, the caller's RNG state is
 #'   restored afterward. With `NULL`, the simulation advances the current RNG.
@@ -35,14 +39,16 @@
 #'   set_population(population) |>
 #'   set_mortality(data.frame(sex = c("m", "f"), age_start = 0,
 #'     age_end = Inf, rate = 0.01)) |>
-#'   set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0.1))
+#'   set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0.1)) |>
+#'   set_union_formation("on_demand",
+#'     create_matching_model(~ age_difference, c(age_difference = 0)))
 #' result <- simulate(model, years = 2, seed = 42)
 #' result$simulation
 simulate <- function(model, years, seed = NULL) {
   check_model(model)
   if (is.null(model$population) || is.null(model$processes$mortality) ||
-      is.null(model$processes$fertility)) {
-    stop("The model needs a population, mortality process, and fertility process.",
+      is.null(model$processes$fertility) || is.null(model$processes$union_formation)) {
+    stop("The model needs a population, mortality, fertility, and union-formation process.",
          call. = FALSE)
   }
   population <- model$population
@@ -71,9 +77,16 @@ simulate <- function(model, years, seed = NULL) {
            call. = FALSE)
     }
   }
-  if (any(!names(model$processes) %in% c("mortality", "fertility"))) {
-    stop("This engine currently executes only mortality and fertility.", call. = FALSE)
+  if (any(!names(model$processes) %in% c("mortality", "fertility", "union_formation"))) {
+    stop("This engine supports mortality, fertility, and on-demand union formation only.",
+         call. = FALSE)
   }
+  union_process <- model$processes$union_formation
+  set_process(model, union_process)
+  if (union_process$initiation != "on_demand") {
+    stop("Rate-based union formation is not yet implemented.", call. = FALSE)
+  }
+  sample_size <- as.integer(union_process$sample_size)
   if (!is.null(seed)) {
     if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
         seed != trunc(seed) || abs(seed) > .Machine$integer.max) {
@@ -92,7 +105,8 @@ simulate <- function(model, years, seed = NULL) {
   births <- deaths <- 0
   if (years > 0) {
     native <- simulate_cpp(population$persons, death_rates, birth_rates,
-                           start, years, birth_interval)
+                           start, years, birth_interval, population$unions,
+                           sample_size)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {
@@ -101,15 +115,12 @@ simulate <- function(model, years, seed = NULL) {
     for (column in names(native$persons)) persons[[column]] <- native$persons[[column]]
     result$persons <- tibble::as_tibble(persons)
     unions <- result$unions
-    if (nrow(unions)) {
-      death1 <- persons$death_time[match(unions$partner1_id, persons$person_id)]
-      death2 <- persons$death_time[match(unions$partner2_id, persons$person_id)]
-      ended <- pmin(death1, death2, na.rm = TRUE)
-      close <- is.na(unions$end_time) & !is.na(ended) & ended >= start
-      unions$end_time[close] <- ended[close]
-      unions$end_reason[close] <- "death"
-      result$unions <- unions
+    added_unions <- nrow(native$unions) - nrow(unions)
+    if (added_unions > 0L) {
+      unions <- rbind(unions, unions[rep(NA_integer_, added_unions), , drop = FALSE])
     }
+    for (column in names(native$unions)) unions[[column]] <- native$unions[[column]]
+    result$unions <- tibble::as_tibble(unions)
     births <- native$births
     deaths <- native$deaths
   }

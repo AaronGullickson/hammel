@@ -29,7 +29,8 @@ test_that("mortality survival is analytical and seeded runs preserve RNG and his
       (1 - expected)/n))
     expect_true(all(result$persons$death_time < 2, na.rm = TRUE))
     restart <- set_fertility(set_mortality(set_population(hammel_model(), result), model$processes$mortality$rates),
-      model$processes$fertility$rates)
+      model$processes$fertility$rates) |>
+      set_process(model$processes$union_formation)
     later <- simulate(restart, 1, seed = 43)
     dead <- !is.na(result$persons$death_time)
     expect_identical(later$persons$death_time[dead], result$persons$death_time[dead])
@@ -68,7 +69,7 @@ test_that("births preserve maternal IDs and allow initially unknown fathers", {
   expect_true(all(result$persons$mother_id[new] %in% seq_len(1000)))
   expect_true(all(is.na(result$persons$custom[new])))
   expect_identical(result$persons$custom[!new], seq_len(1000))
-  expect_equal(nrow(result$unions), 0L, tolerance = 0)
+  expect_true(all(result$unions$start_time >= 0))
   expect_true(is.na(result$persons$father_id[which(new)[1]]))
 })
 
@@ -92,7 +93,8 @@ test_that("birth accounting, father availability and spacing survive restarts", 
   }
   validate_population(result)
   restarted <- set_fertility(set_mortality(set_population(hammel_model(), result), model$processes$mortality$rates),
-    model$processes$fertility$rates)
+    model$processes$fertility$rates) |>
+      set_process(model$processes$union_formation)
   continued <- simulate(restarted, 1, seed = 43)
   for (times in split(continued$persons$birth_time[!is.na(continued$persons$mother_id)],
     continued$persons$mother_id[!is.na(continued$persons$mother_id)])) {

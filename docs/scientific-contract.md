@@ -128,16 +128,37 @@ adjustment and does not guarantee exact ASFR or TFR recovery after burn-in.
 ### Birth transition and parent assignment
 
 Each birth creates one child with a new unique ID above all supplied IDs,
-records the mother, and assigns newborn sex with equal probabilities. Sample
-the father uniformly from currently living males. There is no minimum paternal
-age, kinship exclusion, or union requirement in this deliberately basic model;
-if no males are living, retain the birth with unknown father.
+records the mother, and assigns female sex with probability 0.4886.
+A union-formation process is required for every simulation, including zero
+duration. Missing processes are rejected rather than given an implicit default.
+The former milestone 1 path without unions is no longer executable.
+
+With `union_formation(initiation = "on_demand", ...)`, use the woman's ongoing
+living male partner as father. If she has no partner, sample up to `sample_size`
+living men without replacement (default 1000; zero means the whole pool), choose
+one uniformly, and form a union at the birth time before assigning him as
+father. This temporary increment deliberately skips pair eligibility and the
+matching model: partnered men, relatives, and children can be selected. A man
+can have concurrent unions; a woman keeps her current partner until death.
+No men means the birth proceeds with unknown father and no new union. A future
+choice to cancel births is deferred. Rate-based initiation is not executed.
+
+On-demand input must provide unambiguous active female/male unions with living
+partners and at most one ongoing union per woman; unsupported or inconsistent
+active histories are rejected. Supplied ended histories remain unchanged.
+Death closes all affected ongoing unions and clears the woman's current
+partner immediately. Her next birth may trigger another search. Fertility and
+mortality remain independent of union status, so surviving partners' pending
+events need no resampling merely because a union forms or ends. Candidate
+sets are temporary and are not returned. See [union formation](union-formation-models.md)
+for worked examples and remaining milestone 2 rules.
 
 Update the mother's latest birth and resample both newborn and mother. Newborns
 enter mortality risk immediately; their fertility depends on the supplied ages.
-Existing custom person columns are retained; newborn custom values are missing.
-No new unions are formed. The R wrapper closes supplied ongoing unions when a
-partner dies, using the earliest partner death and `end_reason = "death"`.
+Existing custom person/union columns are retained; new rows have missing custom
+values. C++ maintains union histories and shared partner caches for all runs,
+closing unions at death with `end_reason = "death"`. Initiation mode will
+control search timing; it does not control whether partner state is tracked.
 
 ## Execution, competition, and random numbers
 
@@ -239,7 +260,7 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 | Midpoint approximation | Validate bias against supplied age schedules; no accuracy guarantee |
 | Rate changes between runs | Histories retain spacing, but compensation uses only the new schedule |
 | Sparse oldest ages | Missing cells remain missing; no automatic imputation or smoothing |
-| Union formation/dissolution | No new events; planning notes remain proposals |
+| Union formation/dissolution | Temporary uniform on-demand formation and widowhood; screening, logit matching, and scheduled initiation pending |
 | Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
 | Exact continuation | No saved queue/RNG checkpoint |
 

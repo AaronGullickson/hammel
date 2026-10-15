@@ -62,17 +62,20 @@ separate from conditional-logit matching, birth-triggered and scheduled search
 modes, initial age-difference matching, kinship screening, and partnered/unpartnered
 fertility in scheduled mode. Only death ends unions in this milestone. Parity-specific fertility is deferred
 to a later milestone.
-Candidate sampling and optional waiting remain open, along with detailed
-eligibility and fertility-transition rules. See [milestone 2 notes](union-formation-models.md)
-for scope, unresolved decisions, and proposed validation. No engine changes are
-implemented or detailed demographic defaults inferred from this scope.
+Candidate sampling defaults to 1000 men before pair screening (zero means the
+whole pool). Optional waiting, detailed eligibility, and fertility-transition
+rules remain open. See [milestone 2 notes](union-formation-models.md)
+for scope, unresolved decisions, and validation. A temporary on-demand C++
+path now forms unions at births with uniform selection and handles widowhood
+and restart histories (D031). Eligibility screening, conditional-logit choice,
+and scheduled initiation are not yet executed.
 
 ## Boundaries and future work
 
 C++17/Rcpp is selected and implemented for the first engine (D019); tibble is
 used at the R boundary (D023). Package metadata and licensing are not yet ready
 for release. A universal simulation framework and legacy compatibility are not
-requirements. Union formation and matching are now in milestone 2 specification. Custom
+requirements. Union formation and matching are now in milestone 2 development. Custom
 process execution, non-death union dissolution, and richer initialization remain
 future work, not automatically authorized features.
 

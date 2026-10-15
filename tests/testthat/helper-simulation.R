@@ -8,5 +8,7 @@ make_model <- function(n = 1000, sex = "m", age = 20, death_rate = 0,
   set_mortality(data.frame(sex = c("m", "f"), age_start = 0,
               age_end = Inf, rate = death_rate)) |>
   set_fertility(data.frame(age_start = 15, age_end = 50, rate = birth_rate),
-         birth_interval = birth_interval)
+         birth_interval = birth_interval) |>
+  set_union_formation("on_demand",
+    create_matching_model(~ age_difference, c(age_difference = 0)))
 }

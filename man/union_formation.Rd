@@ -38,13 +38,16 @@ eligibility and gaps are not yet implemented. Must be NULL for \code{"on_demand"
 }
 \description{
 Construct or attach a union-formation specification without executing it.
-Union formation is not yet supported by \code{\link[=simulate]{simulate()}}; models containing this
-process are rejected at execution. Detailed eligibility, failed-search,
-widowhood, and conditional-fertility execution rules remain unresolved.
+\code{\link[=simulate]{simulate()}} supports a temporary on-demand implementation: at a birth use
+the woman's current partner, or sample living men and choose one uniformly
+to form a union. If no men exist, preserve the birth with unknown father.
+Pair eligibility and matching-model utilities are not yet applied, so even
+partnered men, relatives, and children can be selected. Death ends affected
+unions. Rate-based initiation and conditional fertility are not implemented.
 }
 \details{
 Sampling is from the available male pool BEFORE pair-specific screening.
 \code{sample_size = 0} means the whole pool. Otherwise sample without replacement
-up to that many men. Screening can leave fewer candidates, including none.
+up to that many men. Pair screening is deferred in the temporary engine path.
 Candidate sets will not be retained in simulation outputs.
 }

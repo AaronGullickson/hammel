@@ -3,8 +3,10 @@
 Updated October 15, 2026 from the user's milestone 2 request.
 **Status: milestone scope accepted (D030); detailed demographic rules below
 remain proposals or open decisions. Process construction and formula scoring
-are implemented; union execution is not.**
-The current engine still assigns fathers without forming new unions.
+and temporary uniform on-demand execution are implemented; conditional-logit
+execution, pair screening, and rate-based initiation remain pending.**
+Every simulation requires a union-formation process. Current-partner lookup
+and union histories are common infrastructure for all initiation modes.
 
 ## Terminology
 
@@ -74,8 +76,50 @@ has no partner probabilities; its demographic consequences remain undecided.
 These are controlled mathematical cases, not suggested demographic defaults.
 
 The internal scoring helper is tested against these analytical cases. The
-continuous engine has not been extended: `simulate()` explicitly rejects models
-containing union formation, rather than silently ignoring the process.
+engine supports only the temporary uniform on-demand increment specified below;
+`simulate()` rejects rate-based initiation.
+
+## On-demand engine increment: specification before implementation
+
+The user authorized a temporary uniform-choice implementation before matching
+and eligibility are added. The user subsequently made union formation a
+required process; the optional milestone 1 father-assignment path is removed. At each birth, use the woman's existing living male
+partner if she has an ongoing union. Otherwise draw `min(sample_size, living
+men)` distinct men uniformly without replacement (`0` means all living men),
+then choose one of those men uniformly. Create a union at the birth time and
+use that man as father. The newborn is not part of this pre-birth candidate pool.
+No age, ancestry, or existing-male-union exclusion is applied in this increment;
+a man can consequently have concurrent unions. This is explicitly temporary,
+not an accepted final eligibility policy. Matching coefficients are stored and
+validated but not used for this increment. Scheduled initiation remains rejected.
+
+An input woman with multiple ongoing unions or an ongoing same-sex/deceased
+partner cannot supply an unambiguous living male partner for this increment;
+reject such inconsistent/unsupported active input rather than select an arbitrary
+father. These checks are execution preconditions, not a general eligibility rule.
+Historical ended unions are preserved. A partner death ends every affected
+ongoing union, immediately clearing the woman's current partner; her next birth
+can trigger a new search. Widowhood itself does not trigger a search. Fertility
+and mortality schedules do not depend on union status in this increment, so
+formation and widowhood do not resample a surviving partner's existing event.
+Maternal birth and newborn scheduling retain their existing behavior.
+
+Worked cases: a woman with a living partner and two births has one union and
+the same father for both; an unpartnered woman with one living male forms a
+union at her birth and assigns that male; after his death the union is ended
+and a subsequent birth searches the then-living pool. With four living men and
+`sample_size = 2`, the temporary sample contains two distinct men, and each
+of the four men has marginal partner probability 1/4. Candidate sets are not
+retained. When no men exist, retain the birth with unknown father and no new union,
+as accepted by the user for this increment. A future user toggle between
+missing-father assignment and birth cancellation is requested but deferred.
+
+Validation will cover these worked cases, uniform sampling without replacement,
+empty/small/full pools, death and restarts, unique union IDs, custom-column
+preservation, reproducibility/independence, and regression of milestone 1
+fertility/mortality behavior with an explicit union process, plus rejection
+of missing union processes. No scientific validity is claimed for the
+intentionally unrestricted candidate pool or temporary uniform choice.
 
 ## Initiation, matching, and state consistency
 

@@ -39,7 +39,11 @@ archive/provenance limits. Preserve the user's analysis and source comments.
 
 Milestone 2 union-formation scope is selected (D030); see
 [the specification notes](union-formation-models.md). Detailed modeling choices
-remain unresolved and no union implementation has started. The report proposes a
+remain unresolved. Process construction and a temporary uniform on-demand C++
+path are implemented (D031), including current-partner caches, union histories,
+widowhood, and restart reconstruction. D032 now requires an explicit union
+process for every simulation; partner state is initialized unconditionally. Eligibility and utility matching are
+deferred, and rate-based initiation remains rejected. The report proposes a
 GitHub issue for fertility compensation after changing rates at restart; no
 issue was created as part of recording completion. Follow the user's next request.
 

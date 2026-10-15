@@ -371,6 +371,41 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
   claiming equivalence; no legacy algorithm is adopted by this decision.
 - **Evidence and next specification:** [milestone 2 notes](union-formation-models.md).
 
+## D031: Temporary on-demand union execution
+
+**Current status:** Accepted and implemented as a narrow milestone 2 increment.
+
+- **Status:** accepted October 15, 2026 through the user's implementation request.
+- **Decision:** at birth use a woman's ongoing partner, otherwise sample living
+  men without replacement at the configured size and choose one uniformly to
+  form a union. Skip pair screening and conditional-logit choice for now.
+- **Empty pool:** the user explicitly selected preserving the birth with an
+  unknown father and no union. A future toggle for missing father versus birth
+  cancellation is requested but deferred.
+- **Implications:** the temporary pool includes partnered men, relatives, and
+  children. Maintain current partners, union histories, widowhood, restarts,
+  and unique IDs. No union-status fertility dependence is introduced, so
+  existing birth/death candidates of surviving partners remain valid.
+- **Boundary:** scheduled initiation, pair eligibility, utility-based matching,
+  and conditional fertility remain pending; the final eligibility policy is
+  not established by this intentionally unrestricted increment.
+- **Specification:** [on-demand increment](union-formation-models.md#on-demand-engine-increment-specification-before-implementation).
+
+## D032: Union formation required for execution
+
+**Current status:** Accepted and implemented; supersedes optional execution in D031.
+
+- **Status:** accepted October 15, 2026 at the user's direction.
+- **Decision:** every simulation requires an explicit union-formation process.
+  Initialize partner caches and union histories unconditionally; do not add an
+  enable flag. Initiation mode determines search timing, not state tracking.
+- **Implications:** remove the no-union father-assignment path. Missing union
+  processes fail even for zero-duration runs. On-demand is currently the only
+  executable initiation mode; scheduled initiation remains rejected.
+- **Compatibility:** existing workflows need `set_union_formation()`. Preserve
+  the accepted milestone 1 report as historical evidence at its recorded commit;
+  do not rewrite its analysis for the changed milestone 2 model.
+
 ## Additional clarifications and deferred concerns
 
 ### Demographic extraction implementation

@@ -75,6 +75,6 @@ test_that("union process validation and execution boundaries are explicit", {
     set_mortality(data.frame(sex = c("f", "m"), age_start = 0,
                             age_end = Inf, rate = 0.01)) |>
     set_fertility(data.frame(age_start = 20, age_end = 30, rate = 0.1)) |>
-    set_union_formation("on_demand", matching, 0)
-  expect_error(simulate(model, years = 1), "only mortality and fertility")
+    set_union_formation("rate", matching, 0, rates)
+  expect_error(simulate(model, years = 1), "Rate-based union formation")
 })

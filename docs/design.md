@@ -11,7 +11,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Model construction and population attachment | `R/hammel_model.R` |
 | Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
 | Mortality/fertility specification and rate validation | `R/set_process.R` |
-| Union process construction and formula matching (execution pending) | `R/union_formation.R` |
+| Union process construction and formula matching | `R/union_formation.R` |
 | HMD/HFD downloads and preparation | `R/construct_demographic_rates.R` |
 | Simulation validation, RNG isolation, result assembly | `R/simulate.R` |
 | Continuous scheduling and events | `src/simulate.cpp` |
@@ -37,7 +37,9 @@ fertility_rates <- data.frame(age_start = 15, age_end = 50, rate = 0.1)
 model <- hammel_model() |>
   set_population(population) |>
   set_mortality(mortality_rates) |>
-  set_fertility(fertility_rates, birth_interval = 0.75)
+  set_fertility(fertility_rates, birth_interval = 0.75) |>
+  set_union_formation("on_demand",
+    create_matching_model(~ age_difference, c(age_difference = 0)))
 
 result <- simulate(model, years = 10, seed = 123)
 ```
@@ -61,12 +63,13 @@ Setters validate built-in specifications again, including edited objects.
 Mortality constructors permit partial nonoverlapping schedules, but simulation
 requires complete coverage. Fertility bands must be finite; gaps have zero risk
 at execution. Time-varying rate columns are rejected. Arbitrary named process
-specifications can be stored, but this engine executes only mortality/fertility.
+specifications can be stored; execution supports mortality/fertility and the
+temporary uniform on-demand union process. Other processes are rejected.
 
 ## Execution and output
 
-`simulate(model, years, seed = NULL)` requires population, mortality, and
-fertility. It uses continuous years, with no `dt`, execution step, monthly
+`simulate(model, years, seed = NULL)` requires population, mortality,
+fertility, and an explicit union-formation process. It uses continuous years, with no `dt`, execution step, monthly
 compensation grid, or birth-spacing argument on the execution function.
 
 C++ constructs midpoint-adjusted fertility bands, samples cumulative-hazard
@@ -128,7 +131,27 @@ callbacks that can bypass consistency checks.
 
 `create_matching_model()` accepts an age-difference formula with named utility
 coefficients. `union_formation()` and `set_union_formation()` specify initiation,
-candidate sampling, and matching without executing unions. Only age difference
+candidate sampling, and a matching specification. The current C++ on-demand
+increment creates unions at births using uniform selection from sampled living
+men; pair screening and formula utilities are not yet applied. Only age difference
 (male minus female, continuous years) is supported initially. See the
 [union specification](union-formation-models.md) for worked examples and
-unresolved execution rules. `simulate()` still rejects this process.
+unresolved execution rules. `simulate()` rejects rate-based initiation.
+
+The engine always builds a call-local current-partner lookup for women once
+from ongoing union histories. Per-person union links allow death to close all
+affected unions. Formation/death update these caches immediately; restart
+reconstructs them from histories. This gives constant-time partner lookup at
+birth without adding redundant public `persons` columns. Multiple ongoing
+unions for a woman are unsupported; male exclusivity is deliberately not
+enforced until eligibility screening is implemented.
+
+There is no union-enable flag or no-union execution path. Rate-based initiation
+remains rejected until implemented; its eventual implementation will share the
+same partner and union state.
+
+Candidate sampling uses a reusable array of male-pool positions and a partial
+Fisher–Yates shuffle, undoing swaps after each sample. This avoids repeated
+hash allocations while retaining distinct sampled candidates and the existing
+RNG draw sequence. Workspace is local to each simulation; it tracks positions
+in the current male vector rather than person identity.
