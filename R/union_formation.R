@@ -121,12 +121,13 @@ prepare_matching_model <- function(matching) {
 #'
 #' Construct or attach a union-formation specification without executing it.
 #' [simulate()] supports a temporary on-demand implementation: at a birth use
-#' the woman's current partner, or sample living men and choose a partner using
+#' the woman's current partner, or sample living, unpartnered men and choose a partner using
 #' conditional-logit probabilities from the matching formula to form a union.
 #' Sampled men below `min_male_age` are excluded. If no eligible sampled men
 #' remain, preserve the birth with unknown father. Known kin within
 #' `kinship_generations` on both sides of a common ancestor are excluded.
-#' Other restrictions are deferred, including male exclusivity. Death ends affected
+#' Each person may have only one ongoing union. Partnered men are excluded
+#' before sampling; surviving husbands return to the pool at widowhood. Death ends affected
 #' unions. Rate-based initiation and conditional fertility are not implemented.
 #'
 #' Sampling is from the available male pool BEFORE pair-specific screening.

@@ -42,7 +42,8 @@ Screen minimum male age and kinship AFTER sampling and BEFORE matching-model
 scoring. Do not refill the sample. If no candidate passes, retain the birth
 with unknown father and no new union. Supplied existing unions are retained;
 these are restrictions on new searches, not retrospective history corrections.
-No extra minimum female age or male exclusivity is introduced.
+Kinship adds no minimum female age. Independently, D037 requires exclusive
+ongoing unions and removes partnered men before sampling.
 
 ## Shared native implementation contract
 

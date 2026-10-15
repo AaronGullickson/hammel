@@ -268,3 +268,13 @@ identical before/after the membership optimization. No scientific rule or
 random-number consumption was changed. The user's example edits were retained.
 After the zero-bound short circuit, all 174 targeted kinship/eligibility
 expectations passed, and the saved fixed-seed result remained identical.
+
+
+### Exclusive unions (D037; October 15, 2026)
+
+`devtools::test()` passed 2195 expectations with no failures. One live database
+test was skipped as intended; one local-reader dependency warning came from
+`lubridate` attempting unavailable sandbox `timedatectl` timezone discovery.
+New checks cover partnered men excluded before singleton sampling, male scarcity
+with preserved unknown-father births, widower re-entry, duplicate ongoing male
+union rejection, and restart consistency. Existing death and sampling tests pass.

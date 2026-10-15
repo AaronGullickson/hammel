@@ -69,7 +69,7 @@ for scope, unresolved decisions, and validation. The on-demand C++ path now form
 conditional-logit selection and handles widowhood and restart histories.
 Minimum male age screening (default 15 years) and known-kin exclusion within
 two generations of each partner are implemented. `extract_kin()` shares the
-native kinship module. Male exclusivity and scheduled initiation remain pending.
+native kinship module. Exclusive ongoing unions are enforced before sampling; scheduled initiation remains pending.
 
 ## Boundaries and future work
 

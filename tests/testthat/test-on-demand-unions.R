@@ -98,7 +98,8 @@ test_that("zero minimum age allows a child and singleton choices do not depend o
   model$population$persons$birth_time[3] <- -1 # only man is a child
   result <- simulate(model, 1, seed = 19)
   expect_equal(nrow(result$unions), 2)
-  expect_true(all(result$unions$husband_id == 3))
+  expect_true(3 %in% result$unions$husband_id)
+  expect_equal(anyDuplicated(result$unions$husband_id), 0L)
   expect_equal(sort(result$unions$wife_id), c(1, 2))
   model$processes$union_formation$matching$coefficients[] <- -100
   expect_identical(simulate(model, 1, seed = 19), result)
@@ -150,4 +151,57 @@ test_that("union death reasons identify the wife or husband for input and new un
       expect_identical(later$unions[1, ], result$unions[1, ])
     }
   }
+})
+
+test_that("partnered men are absent before even a singleton sample", {
+  model <- make_on_demand_model(4, 1)
+  model$population$persons$sex <- c("f", "m", "f", "m")
+  model$population$persons$birth_time <- c(-60, -25, -20, -23)
+  model$population$unions <- tibble::tibble(union_id = 1, wife_id = 1,
+    husband_id = 2, start_time = -1, end_time = NA_real_, end_reason = NA_character_)
+  for (seed in 1:10) {
+    result <- simulate(model, 0.5, seed = seed)
+    expect_equal(result$unions$husband_id, c(2, 4))
+    expect_equal(result$unions$wife_id, c(1, 3))
+  }
+  model$population$unions <- rbind(model$population$unions,
+    transform(model$population$unions, union_id = 2, wife_id = 3))
+  expect_error(simulate(model, 1), "multiple ongoing unions for a man")
+})
+
+test_that("scarcity preserves births without reusing partnered men", {
+  model <- make_on_demand_model(150)
+  model$population$persons$sex[1:100] <- "f"
+  result <- simulate(model, 1, seed = 19)
+  expect_equal(nrow(result$unions), 50)
+  expect_equal(anyDuplicated(result$unions$husband_id), 0L)
+  expect_equal(anyDuplicated(result$unions$wife_id), 0L)
+  children <- result$persons[result$persons$birth_time >= 0, ]
+  expect_true(any(is.na(children$father_id)))
+  continued <- simulate(set_population(model, result), 0.5, seed = 20)
+  expect_identical(continued$unions, result$unions)
+})
+
+test_that("a surviving husband returns immediately after his wife's death", {
+  model <- make_on_demand_model(3, 1)
+  model$population$persons$sex <- c("f", "m", "f")
+  model$population$persons$birth_time <- c(-60, -25, -20)
+  model$population$unions <- tibble::tibble(union_id = 1, wife_id = 1,
+    husband_id = 2, start_time = -1, end_time = NA_real_, end_reason = NA_character_)
+  model <- set_mortality(model, data.frame(sex = c("f", "f", "m"),
+    age_start = c(0, 60.25, 0), age_end = c(60.25, Inf, Inf),
+    rate = c(0, 1e8, 0)))
+  # Use the full available pool so infant boys cannot mask the returned widower.
+  model$processes$union_formation$sample_size <- 0
+  result <- simulate(model, 1, seed = 52)
+  expect_equal(result$unions$husband_id, c(2, 2))
+  expect_equal(result$unions$wife_id, c(1, 3))
+  death <- result$persons$death_time[1]
+  expect_equal(result$unions$end_time[1], death)
+  expect_equal(result$unions$end_reason[1], "death_wife")
+  expect_gt(result$unions$start_time[2], death)
+  children <- result$persons[result$persons$mother_id %in% 3, ]
+  expect_true(any(children$birth_time < death))
+  expect_true(all(is.na(children$father_id[children$birth_time < death])))
+  expect_true(all(children$father_id[children$birth_time > death] == 2))
 })

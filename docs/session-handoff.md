@@ -15,8 +15,8 @@ not authorization for additional features. Start with the [documentation index](
   requires complete age/sex coverage ending in an open interval.
 - Conditional-logit on-demand union formation, partner-based father assignment,
   minimum male age (default 15), and known-kin exclusion (default two generations
-  on each side). Failed searches retain births with unknown father; no male
-  exclusivity yet. Shared native kinship also backs R `extract_kin()`.
+  on each side). Failed searches retain births with unknown father; exclusive
+  ongoing unions are enforced before sampling (D037). Shared native kinship also backs R `extract_kin()`.
 - Output reuse with resampled candidates, not exact checkpoints.
 - Lexis exposure/counts, TFR, life tables, and population sizes; testthat suite
   and offline analytical checks pass.
@@ -46,7 +46,7 @@ path are implemented (D031), including current-partner caches, union histories,
 widowhood, and restart reconstruction. D032 now requires an explicit union
 process for every simulation; partner state is initialized unconditionally. Minimum male age screening is implemented (default 15 years, user-selectable);
 known-kin exclusion is also implemented (default two generations on each side),
-with shared C++ traversal and R extraction. Male exclusivity remains deferred,
+with shared C++ traversal and R extraction. Male exclusivity is now enforced (D037);
 and rate-based initiation remains rejected. Matching
 uses the user formula, with native linear/quadratic evaluation and an R fallback
 for other transformations. The report proposes a
@@ -69,3 +69,13 @@ issue was created as part of recording completion. Follow the user's next reques
 
 Earlier inspection/run records are available in Git history. Do not use a historical
 pause request, deprecated API, or superseded timing rule to govern current work.
+
+
+### Exclusive ongoing unions (October 15, 2026; D037)
+
+The available male pool now contains only living, unpartnered men, before
+candidate sampling. Formation removes a man; widowhood returns a surviving
+husband. Both sexes have a current-partner cache, reconstructed on restart;
+conflicting active input unions are rejected. Failed searches still preserve
+births with unknown fathers. Prior concurrent-union outputs need rerunning to
+apply this policy. Polygamy/polyamory is deferred.

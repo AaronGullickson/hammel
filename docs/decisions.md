@@ -549,3 +549,18 @@ remain valid. The executed death event records the terminating partner;
 subsequent deaths do not overwrite an ended union, including equal-time
 events under existing queue ordering. Supplied ended histories and restart
 reasons are retained. This supersedes generic death labels in earlier entries.
+
+
+## D037: Exclusive ongoing unions and pre-sampling male availability
+
+- **Status:** accepted by the user October 15, 2026.
+- **Decision:** require at most one ongoing union per person. Sample from living,
+  unpartnered men before applying age and kin restrictions. Remove a man when
+  selected; return a surviving husband when widowed. Never return dead men.
+  Reject conflicting ongoing input unions for either sex; retain ended history.
+- **Consequences:** scarcity can leave births with unknown fathers under the
+  existing failed-search policy. Fertility/mortality schedules remain unchanged.
+  This supersedes the temporary concurrent-male-union behavior in D031/D036.
+  Polygamy/polyamory remains a possible later explicit model, not current behavior.
+- **Validation:** pre-sampling exclusion, scarcity, widow re-entry, death removal,
+  conflicting input unions, restart consistency, and no concurrent unions.

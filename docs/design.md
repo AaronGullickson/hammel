@@ -136,18 +136,19 @@ candidate sampling, and a matching specification. The current C++ on-demand
 increment creates unions at births using conditional-logit selection from
 sampled living men after minimum-male-age screening (default 15 continuous
 years) and known-kin screening (default two generations on each side of a
-common ancestor). Male exclusivity is not yet enforced. Only age difference
+common ancestor). Only living, unpartnered men enter the sampling pool. Only age difference
 (male minus female, continuous years) is supported initially. See the
 [union specification](union-formation-models.md) for worked examples and
 unresolved execution rules. `simulate()` rejects rate-based initiation.
 
-The engine always builds a call-local current-partner lookup for women once
+The engine always builds a call-local current-partner lookup for both sexes once
 from ongoing union histories. Per-person union links allow death to close all
 affected unions. Formation/death update these caches immediately; restart
 reconstructs them from histories. This gives constant-time partner lookup at
 birth without adding redundant public `persons` columns. Multiple ongoing
-unions for a woman are unsupported; male exclusivity is deliberately not
-enforced until eligibility screening is implemented.
+unions for either sex are rejected. Formation removes the selected man from
+the pool; widowhood returns a surviving husband. Pool updates use constant-time
+swap removal with per-person slot tracking.
 
 There is no union-enable flag or no-union execution path. Rate-based initiation
 remains rejected until implemented; its eventual implementation will share the
@@ -169,7 +170,7 @@ the common linear-plus-squared specification.
 
 `min_male_age` is stored in the union process and passed to native execution.
 A screening helper filters the temporary sample at the exact search time before
-matching. The male vector still contains all living men; age screening does not
+matching. The male vector still contains all living, unpartnered men; age screening does not
 change the sampling frame or trigger refilling. Existing partner caches bypass
 new-search restrictions.
 

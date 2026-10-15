@@ -139,7 +139,7 @@ The former milestone 1 path without unions is no longer executable.
 
 With `union_formation(initiation = "on_demand", ...)`, use the woman's ongoing
 living male partner as father. If she has no partner, sample up to `sample_size`
-living men without replacement (default 1000; zero means the whole pool).
+living, unpartnered men without replacement (default 1000; zero means the whole pool).
 Evaluate the matching formula on male-minus-female continuous age differences
 and multiply its non-intercept model-matrix columns by their named coefficients.
 For candidate utilities V, sample with probabilities proportional to
@@ -155,17 +155,17 @@ each person themself at distance zero. This includes known parents, grandparents
 siblings, aunts/uncles and first cousins, including half kin; it does not impose
 an unlimited direct-ancestor exclusion. Zero disables cross-person kin exclusion.
 Only demonstrated links count: unknown parents do not imply unrelatedness and
-do not hide other known relationships. Male exclusivity remains deferred. This search restriction does not invalidate existing unions,
-and no extra minimum female age is imposed. A man
-can have concurrent unions; a woman keeps her current partner until death.
+do not hide other known relationships. Age and kin search restrictions do not invalidate existing unions,
+and no extra minimum female age is imposed. Each person can have at most one ongoing union. Formation removes the man
+from the pool before the next sample; widowhood returns a surviving husband.
 No eligible sampled men means the birth proceeds with unknown father and no
 new union. A future
 choice to cancel births is deferred. Rate-based initiation is not executed.
 
 On-demand input must provide unambiguous active female/male unions with living
-partners and at most one ongoing union per woman; unsupported or inconsistent
+partners and at most one ongoing union per person; unsupported or inconsistent
 active histories are rejected. Supplied ended histories remain unchanged.
-Death closes all affected ongoing unions and clears the woman's current
+Death closes all affected ongoing unions and clears both partners' current
 partner immediately. Her next birth may trigger another search. Fertility and
 mortality remain independent of union status, so surviving partners' pending
 events need no resampling merely because a union forms or ends. Candidate
@@ -291,7 +291,7 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 | Midpoint approximation | Validate bias against supplied age schedules; no accuracy guarantee |
 | Rate changes between runs | Histories retain spacing, but compensation uses only the new schedule |
 | Sparse oldest ages | Missing cells remain missing; no automatic imputation or smoothing |
-| Union formation/dissolution | Conditional-logit on-demand formation, minimum male age, known-kin distance screening, and widowhood; male exclusivity and scheduled initiation pending |
+| Union formation/dissolution | Conditional-logit on-demand formation, minimum male age, known-kin distance screening, and widowhood; exclusive ongoing unions enforced; scheduled initiation pending |
 | Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
 | Exact continuation | No saved queue/RNG checkpoint |
 

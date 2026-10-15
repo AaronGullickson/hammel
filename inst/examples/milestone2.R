@@ -21,7 +21,7 @@ model <- hammel_model() |>
       ~ age_difference + I(age_difference^2),
       c(age_difference = 0.072, "I(age_difference^2)" = -0.014)
     ),
-    kinship_generations = 1
+    kinship_generations = 2
   )
 
 timing <- system.time(result <- simulate(model, years = 100, seed = 42))
@@ -76,9 +76,6 @@ result$persons |>
   ) |>
   group_by(birth_decade, sex) |>
     summarize(prop_ever_married = mean(ever_married)) |>
-  print(n = 30)
-
-|>
   ggplot(aes(x = birth_decade, y = prop_ever_married, group = sex, color = sex))+
   geom_line()+
   geom_point()+

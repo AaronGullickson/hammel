@@ -4,7 +4,7 @@ Updated October 15, 2026 from the user's milestone 2 request.
 **Status: milestone scope accepted (D030); detailed demographic rules below
 remain proposals or open decisions. Process construction and formula scoring
 and conditional-logit on-demand execution with minimum male age and known-kin
-screening are implemented; male exclusivity and rate-based initiation remain pending.**
+screening are implemented; exclusive ongoing unions are enforced; rate-based initiation remains pending.**
 Every simulation requires a union-formation process. Current-partner lookup
 and union histories are common infrastructure for all initiation modes.
 
@@ -83,8 +83,8 @@ engine supports the conditional-logit on-demand increment specified below;
 ## On-demand conditional-logit execution specification
 
 At each birth, use the woman's existing living male partner when she has an
-ongoing union. Otherwise draw `min(sample_size, living men)` distinct men
-uniformly without replacement (`0` means all living men), then exclude sampled
+ongoing union. Otherwise draw `min(sample_size, living unpartnered men)` distinct men
+uniformly without replacement (`0` means all living unpartnered men), then exclude sampled
 men below `min_male_age` or within the configured kinship bound without refilling. For every remaining candidate calculate `age_difference = male age - female age` in continuous
 years. The shared search time cancels, so this equals the woman's birth time
 minus the man's birth time. Evaluate the user's matching formula and named
@@ -116,13 +116,23 @@ use the existing model-matrix evaluator on the sampled candidate data. There
 is no age discretization, cached age-grid approximation, or new dependency.
 
 Minimum male age and known kinship (default two generations on each side)
-are checked after sampling. Other restrictions remain deferred: partnered men
-are not excluded. Men may have concurrent unions; this is not an
-accepted final eligibility policy. A woman retains her current partner until
-death. Input must supply unambiguous active female/male unions with living
-partners and at most one ongoing union per woman. Ended histories are retained.
-A partner's death ends affected unions and clears current-partner state; a
-woman's next birth can search again. Union formation/widowhood do not change
+are checked after sampling. Partnered men are excluded BEFORE sampling: the
+available male vector contains living, unpartnered men only. Formation removes
+the selected man immediately; widowhood returns a surviving husband immediately.
+A woman retains her current partner until death. Input must supply active
+female/male unions with living partners and at most one ongoing union per
+person; conflicting active unions are rejected. Ended histories are retained.
+Death clears both partners' current-partner state; a woman's next birth can
+search again. A deceased husband never returns to the available pool.
+
+Worked availability cases: with 1000 partnered men and one unpartnered man,
+sample size 1 always samples the unpartnered man before age/kin screening.
+If he forms a union, a second woman cannot select him. If his wife dies,
+he returns to the pool and may form a later union; if he dies, he stays absent.
+If no unpartnered men remain, a birth proceeds with unknown father as before.
+Polygamy/polyamory is deferred and requires an explicit future model choice.
+
+Union formation/widowhood do not change
 fertility or mortality schedules in this increment, so a surviving partner's
 pending event stays valid. Scheduled initiation remains rejected.
 
@@ -142,7 +152,7 @@ are allowed and zero removes this age exclusion. A sampled man passes when
 rounding ages. No separate female minimum age is imposed; initiation eligibility
 is governed by fertility or, once implemented, union-search rates.
 
-Sample living men first at the configured sample size, then remove sampled
+Sample living unpartnered men first at the configured sample size, then remove sampled
 men below the minimum, then evaluate matching utilities and normalize
 probabilities over survivors. Do not refill the sample or search elsewhere
 when sampled candidates fail. Existing ongoing unions are not retroactively
@@ -249,9 +259,8 @@ half kin and paternal links when a mother is unknown. Ancestry cycles are
 rejected by simulation and extraction; missing parent links remain unknown.
 
 Screen sampled candidates before scoring or selection without refilling. Male
-minimum age is implemented and there is no extra female age restriction. Male
-exclusivity, detailed availability/remarriage policies, and expanded social or
-categorical kin rules remain unresolved. The generation bound also limits direct
+minimum age is implemented and there is no extra female age restriction. Exclusive ongoing unions are required before sampling. Expanded
+social or categorical kin rules remain unresolved. The generation bound also limits direct
 ancestry: two does not automatically exclude a great-grandparent. Unknown
 ancestry must not be represented as verified absence of kinship. More extensive
 parent-age/sex validation remains separate from cycle-safe traversal.
@@ -289,7 +298,7 @@ No non-death dissolution process is included in milestone 2.
 | Matching coefficients and transformations | User-supplied formula; male-minus-female continuous-year gap |
 | Candidate sample size | Defaults to 1000; zero means full available pool, sampled before screening |
 | Wait alternative and its scope | Allows refusal; needs utility and retry semantics |
-| Male exclusivity and further eligibility | Minimum male age and two-sided known-kin distance are implemented; other policies remain open |
+| Further eligibility | Exclusive ongoing unions, minimum male age and two-sided known-kin distance are implemented; further policies remain open |
 | Conditional fertility inputs and spacing after status changes | Defines rates, exposure, and event resampling |
 | Birth-time union classification and father assignment | Defines observed histories and parentage |
 | Equal-time priorities and effects on both partners | Preserves state consistency |

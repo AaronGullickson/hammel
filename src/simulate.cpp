@@ -78,7 +78,7 @@ NumericVector hazard_wait_cpp(DataFrame rates, NumericVector ages,
 
 struct Person {
   // Public history fields plus working state. NA died means currently alive;
-  // last_birth enforces spacing. male_slot locates this person in living males.
+  // last_birth enforces spacing. male_slot locates this person in available males.
   double id, born, died, mother, father, last_birth;
   bool female;
   int male_slot;
@@ -298,7 +298,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   NumericVector dads = persons["father_id"];
   CharacterVector sexes = persons["sex"];
   // people retains every history, including deaths. males contains positions
-  // of currently living males for fast uniform father selection. index maps
+  // of living, unpartnered males for candidate sampling. index maps
   // public IDs to positions while reconstructing initial maternal histories.
   std::vector<Person> people;
   std::vector<int> males;
@@ -326,6 +326,22 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::vector<UnionRecord> union_history;
   std::vector<std::vector<int>> person_unions(people.size());
   std::vector<int> current_partner(people.size(), -1);
+  // Swap removal keeps pool updates constant-time and slots valid after moves.
+  auto remove_male = [&](int man) {
+    const int slot = people[man].male_slot;
+    if (slot < 0) return; // Partnered men are already absent when they die.
+    const int moved = males.back();
+    males[slot] = moved;
+    people[moved].male_slot = slot;
+    males.pop_back();
+    people[man].male_slot = -1;
+  };
+  auto add_male = [&](int man) {
+    if (people[man].female || !NumericVector::is_na(people[man].died) ||
+        current_partner[man] >= 0 || people[man].male_slot >= 0) return;
+    people[man].male_slot = static_cast<int>(males.size());
+    males.push_back(man);
+  };
   double next_union_id = 0;
   NumericVector uids = unions["union_id"], wives = unions["wife_id"];
   NumericVector husbands = unions["husband_id"], starts = unions["start_time"];
@@ -341,7 +357,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       stop("On-demand unions require living female/male partners in active input unions.");
     if (current_partner[woman] >= 0)
       stop("On-demand input cannot have multiple ongoing unions for a woman.");
+    if (current_partner[man] >= 0)
+      stop("On-demand input cannot have multiple ongoing unions for a man.");
     current_partner[woman] = man;
+    current_partner[man] = woman;
+    remove_male(man);
     person_unions[woman].push_back(u);
     person_unions[man].push_back(u);
   }
@@ -414,18 +434,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         if (!NumericVector::is_na(relationship.end)) continue;
         relationship.end = now;
         relationship.wife_died = i == relationship.wife;
-        const int woman = relationship.wife;
-        current_partner[woman] = -1;
+        current_partner[relationship.wife] = -1;
+        current_partner[relationship.husband] = -1;
+        add_male(relationship.husband);
       }
-      if (!people[i].female) {
-        // Remove a dead male in constant time, updating the moved male's slot.
-        int slot = people[i].male_slot;
-        int moved = males.back();
-        males[slot] = moved;
-        people[moved].male_slot = slot;
-        males.pop_back();
-         people[i].male_slot = -1;
-      }
+      if (!people[i].female) remove_male(i);
       ++death_count;
     } else {
       // Search initiation is on-demand for now; partner state is shared infrastructure.
@@ -446,6 +459,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
           person_unions[i].push_back(u);
           person_unions[partner].push_back(u);
           current_partner[i] = partner;
+          current_partner[partner] = i;
+          remove_male(partner);
         }
       }
       if (partner >= 0) father = people[partner].id;
