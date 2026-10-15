@@ -22,6 +22,7 @@ execute:
 devtools::load_all()
 library(here)
 library(dplyr)
+library(tidyr)
 library(readr)
 library(purrr)
 library(tibble)
@@ -30,8 +31,6 @@ library(gt)
 ```
 
 ## AI Comments
-
-I read both files and inspected the rendered figures. It is close to ready for conclusions. The US comparisons look convincing, and the Niger restart plots clearly illustrate the transient. A few points need tightening first:
 
 For the conclusions, the evidence supports good reproduction of the tested fixed schedules after the initial fertility transient, plus a documented temporary distortion when fertility changes at restart. Keep the scope explicit: the detailed ASFR/ASMR validation uses US schedules; Niger provides a high-fertility TFR and restart check, with US mortality retained.
 
@@ -373,6 +372,119 @@ mortality_rates |>
 
 ## Population growth
 
+First, I will build a leslie matrix projection from the inputs so I can compare this to the microsimulation and assess stable population characteristics.
+
+```{r}
+#| label: construct-leslie-matrix
+
+k <- 111
+
+# calculate survival
+survival <- input_life_table |>
+  arrange(sex, age_start) |>
+  group_by(sex) |>
+  mutate(
+    S = lead(Lx) / Lx,
+    # adjust for survival into the open age group
+    S = if_else(
+      lead(age_end) == Inf,
+      lead(Lx) * (-expm1(-lead(mx))) / Lx,
+      S
+    ),
+    # open-ended age group gets exp(-mx)
+    S = if_else(
+      age_end == Inf,
+      exp(-mx),
+      S
+    )
+  ) |>
+  ungroup() |>
+  select(age_start, sex, S)
+
+S_female <- survival |> filter(sex == "f") |> pull(S)
+S_male <- survival |> filter(sex == "m") |> pull(S)
+
+mat_f <- matrix(0, k, k)
+mat_m <- matrix(0, k, k)
+# fill the survival subdiagonals
+mat_f[row(mat_f) == col(mat_f) + 1] <- S_female[1:(k - 1)]
+mat_m[row(mat_f) == col(mat_f) + 1] <- S_male[1:(k - 1)]
+# add the open ended case
+mat_f[k, k] <- S_female[k]
+mat_m[k, k] <- S_male[k]
+
+# construct full LM (no first row yet)
+lm <- rbind(
+  cbind(mat_f, matrix(0, k, k)), 
+  cbind(matrix(0, k, k), mat_m)
+)
+
+# now add first row
+ffab <- 0.4886
+
+fert <- survival |>
+  filter(sex == "f") |>
+  arrange(age_start) |>
+  left_join(
+    fertility_rates |> select(age_start, rate),
+    by = "age_start"
+  ) |>
+  mutate(
+    rate = coalesce(rate, 0),
+    fx = (rate + S * lead(rate, default = 0)) / 2
+  )
+
+# First-year newborn survival, assuming annual bands and radix 1.
+L0_f <- input_life_table |>
+  filter(sex == "f", age_start == 0) |>
+  pull(Lx)
+
+L0_m <- input_life_table |>
+  filter(sex == "m", age_start == 0) |>
+  pull(Lx)
+
+female_columns <- fert$age_start + 1L
+
+lm[1, female_columns] <- ffab * L0_f * fert$fx
+lm[k + 1, female_columns] <- (1 - ffab) * L0_m * fert$fx
+
+eig <- eigen(lm)
+lambda <- Re(eig$values[1])
+stable <- Re(eig$vectors[, 1])
+pop_stable <- stable / sum(stable)
+
+r_stable <- log(lambda)
+```
+
+```{r}
+#| label: project-leslie-matrix
+
+# get starting population with women and men stacked
+pop_start <- population$persons |>
+  mutate(age = floor(population$end_time - birth_time)) |>
+  group_by(sex, age) |>
+  summarize(n = n(), .groups = "drop") |>
+  complete(
+    sex = c("f", "m"),
+    age = 0:(k - 1),
+    fill = list(n = 0L)
+  ) |>
+  arrange(sex, age) |>
+  pull(n)
+
+# project for 150 years
+pop <- pop_start
+pop_mat <- cbind(pop)
+for(i in 1:150) {
+  pop_next <- drop(lm %*% pop)
+  pop_mat <- cbind(pop_mat, pop_next)
+  pop <- pop_next
+}
+colnames(pop_mat) <- NULL
+
+pop_total_lm <- apply(pop_mat, 2, sum)
+```
+
 ```{r}
 #| label: count-population
 
@@ -386,18 +498,33 @@ population_counts <- map(
 
 ```{r}
 #| label: fig-population-size
-#| fig-cap: Size of the population across 100 simulation at 10 year intervals
+#| fig-cap: Size of the population across 100 simulation at 10 year intervals. The red line shows the results of a leslie matrix projection from the same input.
+
+pop_proj <- tibble(
+  time = seq(from = 2000, to = 2100, by = 10),
+  population = pop_total_lm[seq(from = 1, to = 101, by = 10)]
+)
 
 population_counts |>
-  ggplot(aes(x = time))+
-  geom_line(alpha = 0.5, aes(y = population, group = replication))+
+  ggplot(aes(x = time, y = population))+
+  geom_line(alpha = 0.5, aes(group = replication))+
+  geom_line(data = pop_proj, color = "red", alpha = 1)+
   labs(x = "year", y = "population size")+
   theme_bw()
 ```
 
 @fig-population-size shows the population trajectory of each simulation over the simulation period. Because the simulation holds fertility and mortality rates constant, we should eventually reach a stable population trajectory. However, because the initial population provided did not match the age distribution of the expected stable population, we expect that the initial period will be highly variable. This is the "burn in" period. In this case, we get rapid population decline. The decline occurs because the initial population was uniformly distributed from zero to a hundred years of age and thus over-represented older people with high mortality. This decline levels off by 2025 and by 2050 appears to be approaching a stable gradual rate of decline.
 
-To analyze that rate of decline more formally, I will use the approximation of the stable population growth rate given by: 
+Notably, the spread of population projection outcomes fits well to the leslie matrix projection with dispersion driven by the underlying random processes (while the leslie matrix projection has no randomness). 
+
+To analyze that rate of decline more formally, I can use the stable population growth rate returned from the leslie matrix:
+
+```{r}
+#| label: show-stable-groth-rate
+r_stable
+```
+
+I can also confim that this growth rate is very close to the approximation of the stable population growth rate given by: 
 
 $$\frac{log(NRR)}{\mu}$$
 
@@ -416,7 +543,7 @@ growth_stable <- log(NRR)/mu
 growth_stable
 ```
 
-The stable growth rate from these rates is a very small negative growth rate. Now I will estimate the actual growth rate in my simulation for each decade and take the mean across simulations.
+The stable growth rate from these input fertility and mortality rates is a very small negative growth rate. Now I will estimate the actual growth rate in my simulation for each decade and take the mean across simulations.
 
 ```{r}
 #| label: fig-pop-growth
@@ -439,7 +566,7 @@ population_counts |>
   ggplot(aes(x = time+5))+
   geom_ribbon(aes(ymin = mean - 1.96 * se, ymax = mean + 1.96 * se))+
   geom_line(aes(y = mean))+
-  geom_hline(yintercept = growth_stable, linetype = 2, color = "red")+
+  geom_hline(yintercept = r_stable, linetype = 2, color = "red")+
   labs(x = "year", y = "mean annual population growth rate")+
   theme_bw()
 ```
@@ -482,12 +609,47 @@ map(
   ggplot(aes(x = time+5))+
   geom_ribbon(aes(ymin = mean - 1.96 * se, ymax = mean + 1.96 * se))+
   geom_line(aes(y = mean))+
-  geom_hline(yintercept = growth_stable, linetype = 2, color = "red")+
+  geom_hline(yintercept = r_stable, linetype = 2, color = "red")+
   labs(x = "year", y = "mean annual population growth rate")+
   theme_bw()
 ```
 
 @fig-pop-growth-ext shows the same average growth rate after adding 100 more years to the simulation. The figure clearly shows that the population is converging toward a static population growth rate consistent with the stable population expectation.
+
+As a final check on whether the simulations are producing a stable population outcome, I can compare the proportions of the population in each age group at the end of the simulation to the stable population proportions derived from the leslie matrix.
+
+```{r}
+#| label: fig-compare-stable-age-dist
+#| fig-cap: Comparison of proportions in each gender and age group based on the stable population and final population after simulation for 100 years, averaged across all simulations.
+
+age_dists <- results_ext |> 
+  map(function(result) {
+    result$persons |>
+      filter(is.na(death_time)) |>
+      mutate(age = pmin(floor(result$end_time - birth_time), k - 1)) |>
+      group_by(sex, age) |>
+      summarize(n = n(), .groups = "drop") |>
+      complete(
+        sex = c("f", "m"),
+        age = 0:(k - 1),
+        fill = list(n = 0L)
+      ) |>
+      arrange(sex, age) |>
+      mutate(prop = n / sum(n)) |>
+      pull(prop)
+  })
+# get mean proportions
+pop_sim <- Reduce(`+`, age_dists) / length(age_dists)
+
+tibble(pop_sim, pop_stable) |>
+  ggplot(aes(pop_stable, pop_sim))+
+  geom_abline(yintercept = 0, slope = 1)+
+  geom_point()+
+  labs(x = "proportion of stable population", y = "average proportion in final simulation (2150)")+
+  theme_bw()
+```
+
+@fig-compare-stable-age-dist shows that the empirical age distribution from the simulation fits very closely to the expected proportions of the stable population, determined from the Leslie matrix. This finding confirms that the microsimulations are correctly converging to stable populations. 
 
 ## Fertility Adjustment and Restart Issue
 
