@@ -564,3 +564,20 @@ reasons are retained. This supersedes generic death labels in earlier entries.
   Polygamy/polyamory remains a possible later explicit model, not current behavior.
 - **Validation:** pre-sampling exclusion, scarcity, widow re-entry, death removal,
   conflicting input unions, restart consistency, and no concurrent unions.
+
+
+## D038: Female rate-based search events and partnered-only births
+
+- **Status:** accepted by the user October 15, 2026.
+- **Decision:** use age-specific search hazards as competing events for
+  unpartnered women only, with no differentiation by previous/current legal
+  marital status. Reuse on-demand matching. Failed attempts draw another waiting
+  time from the same schedule, starting at failure. Rate mode permits births
+  only while partnered; union formation enables risk subject to birth spacing,
+  and widowhood cancels pending births and restores search risk immediately.
+- **Boundary:** retain the existing adjusted fertility schedule, without
+  claiming recovery of population ASFRs under this gate. Separate conditional
+  fertility schedules and the wait alternative remain unimplemented.
+- **Validation:** analytical competing search/death hazards, age support/gaps,
+  retries, shared partner choice, no unpartnered births, widowhood invalidation,
+  restart histories and reproducibility.

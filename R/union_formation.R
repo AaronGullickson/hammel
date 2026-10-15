@@ -120,7 +120,7 @@ prepare_matching_model <- function(matching) {
 #' Specify a union-formation process
 #'
 #' Construct or attach a union-formation specification without executing it.
-#' [simulate()] supports a temporary on-demand implementation: at a birth use
+#' In on-demand mode, at a birth use
 #' the woman's current partner, or sample living, unpartnered men and choose a partner using
 #' conditional-logit probabilities from the matching formula to form a union.
 #' Sampled men below `min_male_age` are excluded. If no eligible sampled men
@@ -128,7 +128,10 @@ prepare_matching_model <- function(matching) {
 #' `kinship_generations` on both sides of a common ancestor are excluded.
 #' Each person may have only one ongoing union. Partnered men are excluded
 #' before sampling; surviving husbands return to the pool at widowhood. Death ends affected
-#' unions. Rate-based initiation and conditional fertility are not implemented.
+#' unions. In rate mode unpartnered women face competing search events and
+#' cannot give birth. Failed searches draw another waiting time; a successful
+#' search starts birth risk, subject to spacing. Widowhood restores search risk.
+#' Status-specific fertility schedules are not yet implemented.
 #'
 #' Sampling is from the available male pool BEFORE pair-specific screening.
 #' `sample_size = 0` means the whole pool. Otherwise sample without replacement
@@ -154,8 +157,8 @@ prepare_matching_model <- function(matching) {
 #' @param rates For `"rate"` initiation, an age-specific female search-hazard
 #'   table with `age_start`, `age_end`, and `rate`, in years and per person-year.
 #'   These specify search attempts, not guaranteed realized union formation.
-#'   Nonoverlapping bands may have gaps or an open end; execution semantics for
-#'   eligibility and gaps are not yet implemented. Must be NULL for `"on_demand"`.
+#'   Nonoverlapping bands may have gaps or an open end; gaps and ages outside
+#'   support have zero hazard. Must be NULL for `"on_demand"`.
 #' @param model A `hammel_model` object.
 #' @return `union_formation()` returns a `hammel_union_formation` process;
 #'   `set_union_formation()` returns an updated model. Rate tables are tibbles.

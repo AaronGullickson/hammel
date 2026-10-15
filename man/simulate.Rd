@@ -23,8 +23,8 @@ A \code{hammel_population} with updated histories and endpoint, plus a
 Advance a configured model and return a population that can initialize a
 later run. The C++ engine samples candidate waiting times across age bands,
 executes at continuous times, and prioritizes death over birth on exact ties.
-Events execute chronologically. All living females face the
-fertility schedule. A union-formation process is required. With on-demand
+Events execute chronologically. In on-demand mode all living females face the
+fertility schedule; in rate mode only partnered females do. A union-formation process is required. With on-demand
 union formation, use the woman's
 current partner, or sample men and choose one using conditional-logit
 probabilities from the matching formula to form a union at the birth.
@@ -32,7 +32,9 @@ Sampled men must meet the configured minimum age (default 15 years).
 Known kin are excluded within the configured generation bound on each side
 of a common ancestor (default two). Other eligibility rules remain pending.
 If no sampled men are eligible, preserve the birth with unknown father and no union.
-Rate-based union initiation is not yet implemented.
+Rate initiation adds age-specific search events for unpartnered women only.
+Failed attempts draw another waiting time. Widowhood cancels pending births
+and restores search risk; a new union restores birth risk subject to spacing.
 }
 \details{
 Minimum birth spacing is configured in \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}

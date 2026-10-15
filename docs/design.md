@@ -65,7 +65,7 @@ Mortality constructors permit partial nonoverlapping schedules, but simulation
 requires complete coverage. Fertility bands must be finite; gaps have zero risk
 at execution. Time-varying rate columns are rejected. Arbitrary named process
 specifications can be stored; execution supports mortality/fertility and the
-conditional-logit on-demand union process. Other processes are rejected.
+conditional-logit on-demand and rate-based union processes. Other processes are rejected.
 
 ## Execution and output
 
@@ -139,7 +139,7 @@ years) and known-kin screening (default two generations on each side of a
 common ancestor). Only living, unpartnered men enter the sampling pool. Only age difference
 (male minus female, continuous years) is supported initially. See the
 [union specification](union-formation-models.md) for worked examples and
-unresolved execution rules. `simulate()` rejects rate-based initiation.
+unresolved execution rules. Rate-based initiation schedules searches for unpartnered women.
 
 The engine always builds a call-local current-partner lookup for both sexes once
 from ongoing union histories. Per-person union links allow death to close all
@@ -150,9 +150,10 @@ unions for either sex are rejected. Formation removes the selected man from
 the pool; widowhood returns a surviving husband. Pool updates use constant-time
 swap removal with per-person slot tracking.
 
-There is no union-enable flag or no-union execution path. Rate-based initiation
-remains rejected until implemented; its eventual implementation will share the
-same partner and union state.
+There is no union-enable flag or no-union execution path. Both initiation modes share the same partner and union state and search helper.
+Rate mode adds a search event type and per-person event versions to invalidate
+queued births after widowhood. Only partnered women face birth risk in rate mode.
+Failed searches reschedule at attained age; age-band gaps have zero hazard.
 
 Candidate sampling uses a reusable array of male-pool positions and a partial
 Fisher–Yates shuffle, undoing swaps after each sample. This avoids repeated

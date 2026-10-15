@@ -4,7 +4,7 @@ Updated October 15, 2026 from the user's milestone 2 request.
 **Status: milestone scope accepted (D030); detailed demographic rules below
 remain proposals or open decisions. Process construction and formula scoring
 and conditional-logit on-demand execution with minimum male age and known-kin
-screening are implemented; exclusive ongoing unions are enforced; rate-based initiation remains pending.**
+screening are implemented; exclusive ongoing unions are enforced; rate-based female search initiation is implemented.**
 Every simulation requires a union-formation process. Current-partner lookup
 and union histories are common infrastructure for all initiation modes.
 
@@ -78,7 +78,7 @@ These are controlled mathematical cases, not suggested demographic defaults.
 
 The internal scoring helper is tested against these analytical cases. The
 engine supports the conditional-logit on-demand increment specified below;
-`simulate()` rejects rate-based initiation.
+Rate-based initiation uses the execution increment below.
 
 ## On-demand conditional-logit execution specification
 
@@ -134,7 +134,7 @@ Polygamy/polyamory is deferred and requires an explicit future model choice.
 
 Union formation/widowhood do not change
 fertility or mortality schedules in this increment, so a surviving partner's
-pending event stays valid. Scheduled initiation remains rejected.
+pending event stays valid. Rate-based initiation is specified below.
 
 Validation covers the analytical peak/probabilities, native versus R formula
 utilities, sampled choice frequencies, uniform and singleton/empty pools,
@@ -325,3 +325,35 @@ validation includes:
 These are proposed validation cases, not completed findings or numerical
 scientific acceptance thresholds. A narrow SOCSIM source audit can inform the
 remaining choices without adopting legacy architecture or copying its code.
+
+## Rate-mode execution increment (October 15, 2026)
+
+The user requested female-only age-specific search events competing with death.
+Only living, unpartnered women face the supplied search hazard (per woman-year);
+never-partnered and widowed women use the same schedule. Age-band gaps and
+outside support have zero search hazard, using the shared `waiting_time()`.
+Men remain available for selection but never initiate a rate search.
+Search execution uses the same sampling, screening, utility and union-creation
+code as on-demand execution, without creating a child at union formation.
+
+In rate mode, only partnered women can have birth events. Union formation
+starts fertility risk at that instant, subject to recorded last birth plus
+birth spacing. A husband's death invalidates his wife's pending birth and
+starts her search risk immediately; her subsequent union restores birth risk.
+Death wins exact same-person event ties. Cross-person ties retain queue order.
+Pending events invalidated by a status change must never execute. Surviving
+women are rescheduled from the transition time using their attained age.
+Existing midpoint fertility adjustment is retained, without a claim that these
+status-gated births reproduce population ASFRs or fully calibrated conditional
+ASFRs. Separate partnered/unpartnered fertility inputs remain future work.
+
+Worked cases: zero search hazards and no initial union yield no unions/births,
+even with positive fertility. With zero mortality and a constant search hazard
+h and sufficient men, the fraction forming a first union by t is 1-exp(-h*t).
+A woman whose husband dies before her pending birth cannot execute that birth;
+she must form another union before births become possible again. A search
+outside fertility ages can still form a union, but cannot produce births.
+
+After a failed search, draw another waiting time from the same age-specific
+schedule starting at the attempt time, as selected by the user. Waiting/refusal for poor nonempty pools is
+still deferred until after this rate increment.

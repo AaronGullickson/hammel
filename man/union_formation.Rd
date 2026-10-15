@@ -36,8 +36,8 @@ zero requests the whole pool. Defaults to \code{1000}.}
 \item{rates}{For \code{"rate"} initiation, an age-specific female search-hazard
 table with \code{age_start}, \code{age_end}, and \code{rate}, in years and per person-year.
 These specify search attempts, not guaranteed realized union formation.
-Nonoverlapping bands may have gaps or an open end; execution semantics for
-eligibility and gaps are not yet implemented. Must be NULL for \code{"on_demand"}.}
+Nonoverlapping bands may have gaps or an open end; gaps and ages outside
+support have zero hazard. Must be NULL for \code{"on_demand"}.}
 
 \item{min_male_age}{Minimum male age in continuous years at a new partner
 search, default \code{15}. Finite nonnegative scalar; zero disables this age
@@ -58,7 +58,7 @@ are retained. See \code{\link[=extract_kin]{extract_kin()}} for the shared dista
 }
 \description{
 Construct or attach a union-formation specification without executing it.
-\code{\link[=simulate]{simulate()}} supports a temporary on-demand implementation: at a birth use
+In on-demand mode, at a birth use
 the woman's current partner, or sample living, unpartnered men and choose a partner using
 conditional-logit probabilities from the matching formula to form a union.
 Sampled men below \code{min_male_age} are excluded. If no eligible sampled men
@@ -66,7 +66,10 @@ remain, preserve the birth with unknown father. Known kin within
 \code{kinship_generations} on both sides of a common ancestor are excluded.
 Each person may have only one ongoing union. Partnered men are excluded
 before sampling; surviving husbands return to the pool at widowhood. Death ends affected
-unions. Rate-based initiation and conditional fertility are not implemented.
+unions. In rate mode unpartnered women face competing search events and
+cannot give birth. Failed searches draw another waiting time; a successful
+search starts birth risk, subject to spacing. Widowhood restores search risk.
+Status-specific fertility schedules are not yet implemented.
 }
 \details{
 Sampling is from the available male pool BEFORE pair-specific screening.

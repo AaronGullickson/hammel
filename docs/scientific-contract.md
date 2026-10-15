@@ -160,13 +160,13 @@ and no extra minimum female age is imposed. Each person can have at most one ong
 from the pool before the next sample; widowhood returns a surviving husband.
 No eligible sampled men means the birth proceeds with unknown father and no
 new union. A future
-choice to cancel births is deferred. Rate-based initiation is not executed.
+choice to cancel births is deferred. Rate-based initiation follows the separate rules below.
 
 On-demand input must provide unambiguous active female/male unions with living
 partners and at most one ongoing union per person; unsupported or inconsistent
 active histories are rejected. Supplied ended histories remain unchanged.
 Death closes all affected ongoing unions and clears both partners' current
-partner immediately. Her next birth may trigger another search. Fertility and
+partner immediately. Her next birth may trigger another search in on-demand mode. In that mode fertility and
 mortality remain independent of union status, so surviving partners' pending
 events need no resampling merely because a union forms or ends. Candidate
 sets are temporary and are not returned. See [union formation](union-formation-models.md)
@@ -179,6 +179,29 @@ values. C++ maintains union histories and shared partner caches for all runs,
 closing unions at death with `end_reason = "death_husband"` or
 `"death_wife"` according to the executed death event. Initiation mode will
 control search timing; it does not control whether partner state is tracked.
+
+### Rate-based union initiation
+
+With `initiation = "rate"`, only living unpartnered women face the supplied
+age-specific search hazard. Men never initiate searches. Gaps and ages outside
+search bands have zero hazard. Search waiting times use the same cumulative
+hazard sampler as deaths and births. Searches compete with death; death wins
+exact same-person ties. Search execution uses the same partner sampling,
+screening, matching and formation code as on-demand mode. A failed search
+reschedules from the attempt time using the same attained-age schedule.
+All unpartnered women use that schedule regardless of prior union history.
+
+Only partnered women face fertility risk in this mode. A new union starts
+birth risk at its formation time subject to the woman's recorded birth spacing.
+A husband's death cancels his wife's pending event and reschedules her with
+search risk and no birth risk. Versioned queue entries prevent invalidated
+birth/death candidates from executing; resampling uses attained age at the
+status transition. Surviving men's death hazards do not depend on union status.
+No nonmarital births or separate status-specific fertility inputs are included.
+Existing midpoint-adjusted fertility hazards are retained as a temporary
+partnered-only schedule; population-ASFR recovery and adjustment calibration
+across union transitions are not claimed. See the worked cases in the
+[union specification](union-formation-models.md#rate-mode-execution-increment-october-15-2026).
 
 ### Shared kinship observations
 
@@ -291,7 +314,7 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 | Midpoint approximation | Validate bias against supplied age schedules; no accuracy guarantee |
 | Rate changes between runs | Histories retain spacing, but compensation uses only the new schedule |
 | Sparse oldest ages | Missing cells remain missing; no automatic imputation or smoothing |
-| Union formation/dissolution | Conditional-logit on-demand formation, minimum male age, known-kin distance screening, and widowhood; exclusive ongoing unions enforced; scheduled initiation pending |
+| Union formation/dissolution | Conditional-logit on-demand formation, minimum male age, known-kin distance screening, and widowhood; exclusive ongoing unions enforced; female rate initiation implemented |
 | Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
 | Exact continuation | No saved queue/RNG checkpoint |
 

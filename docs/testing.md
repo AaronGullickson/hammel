@@ -278,3 +278,16 @@ test was skipped as intended; one local-reader dependency warning came from
 New checks cover partnered men excluded before singleton sampling, male scarcity
 with preserved unknown-father births, widower re-entry, duplicate ongoing male
 union rejection, and restart consistency. Existing death and sampling tests pass.
+
+
+### Female rate-based search events (D038; October 15, 2026)
+
+`TZ=UTC Rscript -e 'devtools::test()'` passed 2227 expectations, zero failures
+and warnings, with the live database test skipped as intended. Tests cover
+female-only searches independent of births, constant search hazards competing
+with mortality against an analytical probability, age support and gaps, failed
+search retries after a man reaches minimum age, no unpartnered births, spacing,
+restart retention, reproducibility, and widowhood invalidation/remarriage.
+Existing on-demand, eligibility, kinship and mortality/fertility checks pass.
+This verifies event behavior; population-ASFR recovery under partnered-only
+fertility has not been established.

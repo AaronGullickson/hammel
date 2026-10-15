@@ -47,7 +47,7 @@ widowhood, and restart reconstruction. D032 now requires an explicit union
 process for every simulation; partner state is initialized unconditionally. Minimum male age screening is implemented (default 15 years, user-selectable);
 known-kin exclusion is also implemented (default two generations on each side),
 with shared C++ traversal and R extraction. Male exclusivity is now enforced (D037);
-and rate-based initiation remains rejected. Matching
+and rate-based initiation is implemented as described below. Matching
 uses the user formula, with native linear/quadratic evaluation and an R fallback
 for other transformations. The report proposes a
 GitHub issue for fertility compensation after changing rates at restart; no
@@ -79,3 +79,13 @@ husband. Both sexes have a current-partner cache, reconstructed on restart;
 conflicting active input unions are rejected. Failed searches still preserve
 births with unknown fathers. Prior concurrent-union outputs need rerunning to
 apply this policy. Polygamy/polyamory is deferred.
+
+
+### Rate-based searches (D038; October 15, 2026)
+
+`initiation = "rate"` now schedules female unpartnered search attempts as
+competing events. Failed attempts draw a new waiting time. Both initiation
+modes share search/formation code. Only partnered women have births in rate
+mode; widowhood invalidates pending births and restores search risk. Existing
+fertility compensation is retained without a population-ASFR recovery claim.
+Separate status-specific fertility and refusal/wait remain future work.

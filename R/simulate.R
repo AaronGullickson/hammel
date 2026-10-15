@@ -3,8 +3,8 @@
 #' Advance a configured model and return a population that can initialize a
 #' later run. The C++ engine samples candidate waiting times across age bands,
 #' executes at continuous times, and prioritizes death over birth on exact ties.
-#' Events execute chronologically. All living females face the
-#' fertility schedule. A union-formation process is required. With on-demand
+#' Events execute chronologically. In on-demand mode all living females face the
+#' fertility schedule; in rate mode only partnered females do. A union-formation process is required. With on-demand
 #' union formation, use the woman's
 #' current partner, or sample men and choose one using conditional-logit
 #' probabilities from the matching formula to form a union at the birth.
@@ -12,7 +12,9 @@
 #' Known kin are excluded within the configured generation bound on each side
 #' of a common ancestor (default two). Other eligibility rules remain pending.
 #' If no sampled men are eligible, preserve the birth with unknown father and no union.
-#' Rate-based union initiation is not yet implemented.
+#' Rate initiation adds age-specific search events for unpartnered women only.
+#' Failed attempts draw another waiting time. Widowhood cancels pending births
+#' and restores search risk; a new union restores birth risk subject to spacing.
 #'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
 #' and uses recorded maternal births, including on restart.
@@ -81,14 +83,11 @@ simulate <- function(model, years, seed = NULL) {
     }
   }
   if (any(!names(model$processes) %in% c("mortality", "fertility", "union_formation"))) {
-    stop("This engine supports mortality, fertility, and on-demand union formation only.",
+    stop("This engine supports mortality, fertility, and union formation only.",
          call. = FALSE)
   }
   union_process <- model$processes$union_formation
   set_process(model, union_process)
-  if (union_process$initiation != "on_demand") {
-    stop("Rate-based union formation is not yet implemented.", call. = FALSE)
-  }
   sample_size <- as.integer(union_process$sample_size)
   if (!is.null(seed)) {
     if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
@@ -111,7 +110,11 @@ simulate <- function(model, years, seed = NULL) {
                            start, years, birth_interval, population$unions,
                            sample_size, prepare_matching_model(union_process$matching),
                            union_process$min_male_age,
-                           as.integer(union_process$kinship_generations))
+                           as.integer(union_process$kinship_generations),
+                           union_process$initiation == "rate",
+                           if (is.null(union_process$rates))
+                             data.frame(age_start = numeric(), age_end = numeric(), rate = numeric())
+                           else union_process$rates)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {

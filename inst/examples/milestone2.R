@@ -5,9 +5,14 @@
 devtools::load_all()
 library(ggplot2)
 library(dplyr)
+library(here)
+library(readr)
 
 mortality_rates <- get_mortality_hmd("USA", year = 2000)
 fertility_rates <- get_fertility_hfd("USA", year = 2000)
+marriage_rates <- read_csv(
+  here("validation", "data", "england_wales_2019_female_union_rates.csv")
+)
 
 set.seed(42)
 population <- create_baseline_population(50000, max_age = 70, end_time = 2000)
@@ -16,11 +21,12 @@ model <- hammel_model() |>
   set_mortality(mortality_rates) |>
   set_fertility(fertility_rates) |>
   set_union_formation(
-    "on_demand",
+    "rate",
     create_matching_model(
       ~ age_difference + I(age_difference^2),
       c(age_difference = 0.072, "I(age_difference^2)" = -0.014)
     ),
+    rates = marriage_rates,
     kinship_generations = 2
   )
 
@@ -82,4 +88,8 @@ result$persons |>
   theme_bw()
 
 mean(result$persons$person_id %in% c(result$unions$husband_id, result$unions$wife_id))
+
+lexis <- calculate_lexis_counts(result, seq(2000, 2100, 5), 0:100)
+
+lexis |> calculate_tfr()
 

@@ -84,8 +84,9 @@ struct Person {
   int male_slot;
 };
 // person is a zero-based position in people, not the public person_id.
-// Each person retains only one next event; death=false means a birth.
-struct Event { int person; bool death; };
+// A version invalidates queued events after a change in union status.
+enum class EventType { death, birth, search };
+struct Event { int person; EventType type; unsigned long long version; };
 
 double rate_integral(const std::vector<Band>& bands, double lo, double hi) {
   // Integrate the supplied annual rate over [lo, hi), accounting for bands
@@ -290,7 +291,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   DataFrame fertility_rates, double start, double years,
                   double birth_interval, DataFrame unions,
                   int sample_size, List matching, double min_male_age,
-                  int kinship_generations) {
+                  int kinship_generations, bool rate_initiation,
+                  DataFrame union_rates) {
   // R performs input validation and seed handling. All engine state below is
   // local to this call; public times and rates remain in years and person-years.
   NumericVector ids = persons["person_id"], births = persons["birth_time"];
@@ -354,11 +356,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (!NumericVector::is_na(people[woman].died) ||
         !NumericVector::is_na(people[man].died) ||
         !people[woman].female || people[man].female)
-      stop("On-demand unions require living female/male partners in active input unions.");
+      stop("Unions require living female/male partners in active input unions.");
     if (current_partner[woman] >= 0)
-      stop("On-demand input cannot have multiple ongoing unions for a woman.");
+      stop("Union input cannot have multiple ongoing unions for a woman.");
     if (current_partner[man] >= 0)
-      stop("On-demand input cannot have multiple ongoing unions for a man.");
+      stop("Union input cannot have multiple ongoing unions for a man.");
     current_partner[woman] = man;
     current_partner[man] = woman;
     remove_male(man);
@@ -374,10 +376,36 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         people[found->second].last_birth = std::max(people[found->second].last_birth, child.born);
     }
   }
+  // Both initiation modes share the entire search and union transition.
+  auto form_union = [&](int woman, double now) {
+    int partner = current_partner[woman];
+    if (partner < 0 && !males.empty()) {
+      const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
+                                                sampling_workspace);
+      const auto eligible = screen_male_candidates(males, sample, people, now, min_male_age,
+                                                     woman, kinship);
+      partner = select_partner(males, eligible, people, woman, matching);
+      if (partner >= 0) {
+        if (next_union_id >= 9007199254740991.0 ||
+            union_history.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
+          stop("Union history exceeds supported ID or row limits.");
+        const int u = static_cast<int>(union_history.size());
+        union_history.push_back({++next_union_id, now, NA_REAL, woman, partner});
+        person_unions[woman].push_back(u);
+        person_unions[partner].push_back(u);
+        current_partner[woman] = partner;
+        current_partner[partner] = woman;
+        remove_male(partner);
+      }
+    }
+    return partner;
+  };
   const auto male_rates = read_bands(mortality_rates, "m");
   const auto female_rates = read_bands(mortality_rates, "f");
   const auto fertility_rates_adjusted = adjusted_fertility(
     read_bands(fertility_rates), birth_interval);
+  const auto search_rates = rate_initiation ? read_bands(union_rates) : std::vector<Band>{};
+  std::vector<unsigned long long> event_versions(people.size(), 0);
   // Continuous dates order events. Equivalent keys retain insertion order.
   std::multimap<double, Event> queue;
   const double end = start + years;
@@ -395,20 +423,26 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     return value;
   };
   auto schedule = [&](int i, double now) {
+    const auto version = ++event_versions[i];
     const Person& p = people[i];
     if (!NumericVector::is_na(p.died)) return;
     const auto& death_rates = p.female ? female_rates : male_rates;
     double death_time = candidate(waiting_time(death_rates, now - p.born, threshold()), now);
     double birth_time = std::numeric_limits<double>::infinity();
-    if (p.female) {
+    if (p.female && (!rate_initiation || current_partner[i] >= 0)) {
       double first = std::max(now, p.last_birth + birth_interval);
       if (first < end)
         birth_time = candidate(waiting_time(fertility_rates_adjusted,
           first - p.born, threshold()), first);
     }
-    double due = std::min(death_time, birth_time);
-    // Only exact ties select death; fractional ordering is preserved.
-    if (due < end) queue.emplace(due, Event{i, death_time <= birth_time});
+    double search_time = std::numeric_limits<double>::infinity();
+    if (rate_initiation && p.female && current_partner[i] < 0)
+      search_time = candidate(waiting_time(search_rates, now - p.born, threshold()), now);
+    const double due = std::min(death_time, std::min(birth_time, search_time));
+    // Death wins exact ties. Birth and search risks are mutually exclusive in rate mode.
+    const auto type = death_time <= due ? EventType::death :
+      (birth_time <= search_time ? EventType::birth : EventType::search);
+    if (due < end) queue.emplace(due, Event{i, type, version});
   };
   // Initialize one next event for each living person. Known age changes are
   // already incorporated, so birthdays alone do not trigger resampling.
@@ -426,7 +460,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     const Event event = next->second;
     queue.erase(next);
     const int i = event.person;
-    if (event.death) {
+    if (event.version != event_versions[i]) continue;
+    if (event.type == EventType::death) {
       // Retain the person's history, record death, and stop their scheduling.
       people[i].died = now;
       for (int u : person_unions[i]) {
@@ -437,32 +472,19 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         current_partner[relationship.wife] = -1;
         current_partner[relationship.husband] = -1;
         add_male(relationship.husband);
+        // Her old birth candidate is invalid once her husband has died.
+        if (rate_initiation && i == relationship.husband)
+          schedule(relationship.wife, now);
       }
       if (!people[i].female) remove_male(i);
       ++death_count;
+    } else if (event.type == EventType::search) {
+      form_union(i, now);
+      schedule(i, now);
     } else {
-      // Search initiation is on-demand for now; partner state is shared infrastructure.
       double father = NA_REAL;
       int partner = current_partner[i];
-      if (partner < 0 && !males.empty()) {
-        const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
-                                                  sampling_workspace);
-        const auto eligible = screen_male_candidates(males, sample, people, now, min_male_age,
-                                                       i, kinship);
-        partner = select_partner(males, eligible, people, i, matching);
-        if (partner >= 0) {
-          if (next_union_id >= 9007199254740991.0 ||
-              union_history.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
-            stop("Union history exceeds supported ID or row limits.");
-          const int u = static_cast<int>(union_history.size());
-          union_history.push_back({++next_union_id, now, NA_REAL, i, partner});
-          person_unions[i].push_back(u);
-          person_unions[partner].push_back(u);
-          current_partner[i] = partner;
-          current_partner[partner] = i;
-          remove_male(partner);
-        }
-      }
+      if (!rate_initiation && partner < 0) partner = form_union(i, now);
       if (partner >= 0) father = people[partner].id;
       // If no sampled men are eligible, preserve the birth with unknown father and no union.
       if (next_id >= 9007199254740991.0 ||
@@ -482,6 +504,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       if (!female) males.push_back(child);
       person_unions.emplace_back();
       current_partner.push_back(-1);
+      event_versions.push_back(0);
       ++birth_count;
       // Both newborn and mother need fresh candidates. The mother now has a
       // new last_birth; spacing delays her next birth, but not a possible death.
