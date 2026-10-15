@@ -115,3 +115,15 @@ The report defers correction of the restart issue beyond milestone 1. It does
 not establish accuracy for all rate schedules or supply a controlled executable
 SOCSIM comparison. Further studies and archive/publication work require their
 own scope; these are not outstanding conditions on the user's acceptance.
+
+## Milestone 2 construction checks (October 15, 2026)
+
+After adding union-process construction and formula-based matching utilities,
+`devtools::test()` passed with 1,870 expectations, zero failures/warnings,
+and the opt-in live database test skipped. No rates were downloaded. The new
+checks cover analytical softmax probabilities, quadratic utilities, numerical
+stability, formula/coefficient validation, process attachment/replacement,
+provenance, edited-specification rejection, and the engine's explicit rejection
+of union processes. Documentation generation and `git diff --check` passed.
+These checks validate construction/scoring infrastructure, not executed union
+formation or milestone 2 scientific completion.

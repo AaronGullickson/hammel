@@ -2,7 +2,8 @@
 
 Updated October 15, 2026 from the user's milestone 2 request.
 **Status: milestone scope accepted (D030); detailed demographic rules below
-remain proposals or open decisions. No union-formation process is implemented.**
+remain proposals or open decisions. Process construction and formula scoring
+are implemented; union execution is not.**
 The current engine still assigns fathers without forming new unions.
 
 ## Terminology
@@ -27,8 +28,8 @@ Both initiation approaches must share eligibility screening and matching:
 
 Partner selection uses conditional-logit choice probabilities over eligible men.
 Users must be able to specify a flexible matching model; milestone 2 considers
-age difference only, while leaving room for later characteristics. Whether to
-use every eligible man or a smaller candidate sample remains undecided.
+age difference only, while leaving room for later characteristics. The user selected configurable sampling from the available male pool before
+pair-specific screening, following the inspected SOCSIM ordering.
 A wait/no-partner alternative for a poor pool is under consideration, not yet
 selected. Eligibility screening must support kin exclusions, including incest
 and cousin relationships; exact prohibited relationships remain to be specified.
@@ -39,7 +40,42 @@ Parity-specific fertility is deferred to a later milestone; milestone 2 does
 not add parity conditioning. Union dissolution is excluded except when a
 partner dies (widowhood). The user
 has not yet decided overlapping-union rules, remarriage eligibility, or search
-behavior following widowhood. No new union API or package dependency is selected.
+behavior following widowhood. The construction interface below adds no major dependency.
+
+## Implemented construction interface
+
+`create_matching_model(formula, coefficients)` stores a one-sided R formula
+and finite named coefficients matching its non-intercept model-matrix columns.
+Only `age_difference` is available initially, defined as male minus female age
+in continuous years. Ordinary R formula transformations are supported. An
+intercept is ignored because it cancels from partner-only choice probabilities;
+no outside/wait alternative is implemented. Formula functions must be
+deterministic and must not mutate state. Data-dependent transformations require
+care: their basis can depend on the candidate pool. There is no fitted-model
+estimation interface yet.
+
+`union_formation(initiation, matching, sample_size = 1000, rates = NULL)` constructs
+a process; `set_union_formation(model, ...)` attaches it. Initiation is explicitly
+`"on_demand"` or `"rate"`; initiation and coefficients have no defaults.
+The user selected a default sample size of 1000. `sample_size = 0` means use the full available pool; a positive
+integer requests up to that many men without replacement BEFORE pair-specific
+eligibility screening. Screening can leave no candidates. Rate-mode tables
+contain female search-attempt hazards by age (`age_start`, `age_end`, `rate`),
+in years and per person-year, with no calendar or sex columns; on-demand mode
+rejects rates. This construction layer retains schedules without assigning
+unresolved execution eligibility, retry, or gap behavior. Tables are tibbles
+and rate provenance is preserved. Edited specifications are checked on attachment.
+
+Worked scoring example: with `~ age_difference` and coefficient `log(2)`,
+three eligible candidates whose gaps are 0, 1, and 2 have relative weights
+1, 2, and 4 and probabilities 1/7, 2/7, and 4/7. With utilities 1000 and 2000,
+subtracting the maximum before exponentiation avoids overflow. An empty pool
+has no partner probabilities; its demographic consequences remain undecided.
+These are controlled mathematical cases, not suggested demographic defaults.
+
+The internal scoring helper is tested against these analytical cases. The
+continuous engine has not been extended: `simulate()` explicitly rejects models
+containing union formation, rather than silently ignoring the process.
 
 ## Initiation, matching, and state consistency
 
@@ -69,8 +105,8 @@ logit selects among the eligible candidate set C_i with
 
 Evaluate this with a numerically stable softmax. These are relative partner
 choice probabilities, not independent binary union-formation probabilities. This
-milestone uses age difference, but its definition, functional form, and
-coefficients still need user decisions. For example, a signed linear age-gap
+milestone uses age difference, but its sign and unit are accepted as male age minus female age in continuous
+years. Users specify transformations and coefficients through a formula. For example, a signed linear age-gap
 term implies a directional preference; a quadratic or absolute-deviation term
 can represent a preferred gap. No demographic coefficients are defaulted.
 
@@ -160,8 +196,8 @@ No non-death dissolution process is included in milestone 2.
 | Failed on-demand search: birth proceeds or depends on a match | Preserves or changes fertility targets |
 | One ongoing union per person; remarriage after widowhood | Defines availability and subsequent searches |
 | Initiation-rate denominator and failed-search retries | Separates attempted from realized formation |
-| Age gap sign, transformations, coefficients | Defines the matching model without demographic defaults |
-| Full pool versus subsampling | Changes cost and potentially selection probabilities |
+| Matching coefficients and transformations | User-supplied formula; male-minus-female continuous-year gap |
+| Candidate sample size | Defaults to 1000; zero means full available pool, sampled before screening |
 | Wait alternative and its scope | Allows refusal; needs utility and retry semantics |
 | Exact age/kin exclusions and unknown ancestry policy | Defines candidate eligibility |
 | Conditional fertility inputs and spacing after status changes | Defines rates, exposure, and event resampling |

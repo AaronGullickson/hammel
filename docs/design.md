@@ -11,6 +11,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Model construction and population attachment | `R/hammel_model.R` |
 | Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
 | Mortality/fertility specification and rate validation | `R/set_process.R` |
+| Union process construction and formula matching (execution pending) | `R/union_formation.R` |
 | HMD/HFD downloads and preparation | `R/construct_demographic_rates.R` |
 | Simulation validation, RNG isolation, result assembly | `R/simulate.R` |
 | Continuous scheduling and events | `src/simulate.cpp` |
@@ -122,3 +123,12 @@ These remain proposals or unresolved requirements:
 
 Do not infer future demographic rules from SOCSIM or implement arbitrary
 callbacks that can bypass consistency checks.
+
+## Milestone 2 construction
+
+`create_matching_model()` accepts an age-difference formula with named utility
+coefficients. `union_formation()` and `set_union_formation()` specify initiation,
+candidate sampling, and matching without executing unions. Only age difference
+(male minus female, continuous years) is supported initially. See the
+[union specification](union-formation-models.md) for worked examples and
+unresolved execution rules. `simulate()` still rejects this process.

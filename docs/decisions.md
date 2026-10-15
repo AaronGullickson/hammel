@@ -402,3 +402,17 @@ This supersedes the earlier missing-TFR statements in D020/D021 and the
 earlier scientific contract (available in Git history).
 It does not change life-table missing-rate propagation. This restates an
 existing accepted clarification; it is not a new decision from the doc audit.
+
+### Milestone 2 construction clarification (October 15, 2026)
+
+At the user's direction, candidate sampling precedes pair-specific screening.
+Age difference is male age minus female age in continuous years. Process
+construction now accepts explicit initiation, sample size (default 1000, zero for full pool),
+and a matching formula with named coefficients. R model-matrix expansion and
+stable softmax provide the construction/scoring infrastructure without a new
+major dependency. Union execution, eligibility, failed searches, waiting, and
+conditional fertility transitions remain unresolved; the engine rejects union
+processes until those rules are specified and implemented.
+
+The user subsequently selected `sample_size = 1000` as the default for both
+`union_formation()` and `set_union_formation()` on October 15, 2026.

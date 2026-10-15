@@ -41,6 +41,10 @@ set_process <- function(model, process) {
     if (name == "fertility") validate_birth_interval(process$birth_interval)
     process$rates <- tibble::as_tibble(process$rates)
   }
+  if (name == "union_formation") {
+    validate_union_formation(process)
+    if (!is.null(process$rates)) process$rates <- tibble::as_tibble(process$rates)
+  }
   model$processes[name] <- list(process)
   model
 }
