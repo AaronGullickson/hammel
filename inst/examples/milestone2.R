@@ -1,3 +1,5 @@
+# Updated for the required union process in milestone 2.
+# For the original milestone 1 behavior, use the accepted report's pinned commit.
 # Requires HMDHFDplus and HMD/HFD credentials in the R environment.
 #library(hammel)
 devtools::load_all()
@@ -13,7 +15,9 @@ population <- create_baseline_population(50000, max_age = 70, end_time = 2000)
 model <- hammel_model() |>
   set_population(population) |>
   set_mortality(mortality_rates) |>
-  set_fertility(fertility_rates)
+  set_fertility(fertility_rates) |>
+  set_union_formation("on_demand",
+    create_matching_model(~ age_difference, c(age_difference = 0)))
 
 timing <- system.time(result <- simulate(model, years = 100, seed = 42))
 print(result$simulation)
