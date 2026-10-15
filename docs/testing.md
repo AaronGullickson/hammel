@@ -197,3 +197,25 @@ record took 2.374 seconds with a sample of 1000 and the requested quadratic
 coefficients (19,777 unions). This is a single development/debug-build timing,
 not the user's USA case or a performance guarantee. No rates were downloaded.
 Rcpp bindings and Rd documentation were regenerated.
+
+## Deferred matching performance comparison
+
+At the user's request on October 15, 2026, defer benchmarking the R formula
+fallback against the native linear/raw-quadratic matching path. A future check
+should include a cubic term such as `I(age_difference^3)`, controlling inputs,
+candidate sample size, run duration, and build settings. Distinguish R
+model-matrix overhead from changes in model complexity and simulated population
+trajectory. No fallback slowdown has been measured; this note does not
+authorize running the benchmark now.
+
+## Minimum male age checks (October 15, 2026)
+
+After D035, `devtools::test()` passed 2,007 expectations with zero test
+failures/warnings and one opt-in live-test skip. Checks cover the default 15,
+fractional/zero thresholds, invalid and edited specifications, exact threshold
+entry, aging during a run, sampling before screening without refilling, births
+with missing fathers when all sampled men fail, retaining supplied underage
+partners, and no added minimum age for female initiation. Existing
+conditional-logit, widowhood, restart, and demographic tests pass.
+No rates were downloaded or deferred formula benchmarks run. Rcpp/Rd
+generation and `git diff --check` passed.

@@ -443,6 +443,26 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
   reproducibility/widowhood/restart checks. Scientific model recovery from
   reconstructed time slices is still future validation work.
 
+## D035: Minimum male age for partner searches
+
+**Current status:** Accepted and implemented.
+
+- **Status:** accepted October 15, 2026 through the user's eligibility request
+  and explicit choices of default age and failed-screen behavior.
+- **Decision:** add user-selectable `min_male_age`, default 15 continuous years.
+  Finite nonnegative scalar; fractional ages supported, zero disables exclusion.
+  Include men at or above the threshold at search time. No additional female
+  age restriction; fertility/search rates govern female initiation.
+- **Ordering:** sample first, exclude underage sampled men, then score and
+  normalize matching probabilities. No refilling or search outside the sample.
+- **Failed screen:** preserve the birth with unknown father and no new union
+  when no sampled men pass, as explicitly selected by the user.
+- **Scope:** applies to new searches; retain existing ongoing unions. Other
+  age/kinship/availability policies remain outside this increment.
+- **Validation:** constructor/edited-process checks, exact/fractional age
+  boundaries, aging into eligibility, no added female restriction, retained
+  existing partners, and sampling-before-screening failures.
+
 ## Additional clarifications and deferred concerns
 
 ### Demographic extraction implementation

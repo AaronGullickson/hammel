@@ -133,7 +133,8 @@ callbacks that can bypass consistency checks.
 coefficients. `union_formation()` and `set_union_formation()` specify initiation,
 candidate sampling, and a matching specification. The current C++ on-demand
 increment creates unions at births using conditional-logit selection from
-sampled living men; pair screening is not yet applied. Only age difference
+sampled living men after minimum-male-age screening (default 15 continuous
+years). Other pair restrictions are not yet applied. Only age difference
 (male minus female, continuous years) is supported initially. See the
 [union specification](union-formation-models.md) for worked examples and
 unresolved execution rules. `simulate()` rejects rate-based initiation.
@@ -163,3 +164,9 @@ only. C++ computes stable softmax probabilities and samples one candidate. No
 formula callback receives mutable population state, and no candidate sets are
 retained. The native path avoids an R model-matrix call at every search for
 the common linear-plus-squared specification.
+
+`min_male_age` is stored in the union process and passed to native execution.
+A screening helper filters the temporary sample at the exact search time before
+matching. The male vector still contains all living men; age screening does not
+change the sampling frame or trigger refilling. Existing partner caches bypass
+new-search restrictions.

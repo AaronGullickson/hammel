@@ -8,8 +8,9 @@
 #' union formation, use the woman's
 #' current partner, or sample men and choose one using conditional-logit
 #' probabilities from the matching formula to form a union at the birth.
-#' Pair eligibility checks are not yet applied.
-#' If no men are available, preserve the birth with unknown father and no union.
+#' Sampled men must meet the configured minimum age (default 15 years).
+#' Other pair eligibility checks are not yet applied.
+#' If no sampled men are eligible, preserve the birth with unknown father and no union.
 #' Rate-based union initiation is not yet implemented.
 #'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
@@ -107,7 +108,8 @@ simulate <- function(model, years, seed = NULL) {
   if (years > 0) {
     native <- simulate_cpp(population$persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
-                           sample_size, prepare_matching_model(union_process$matching))
+                           sample_size, prepare_matching_model(union_process$matching),
+                           union_process$min_male_age)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {

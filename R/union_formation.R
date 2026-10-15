@@ -122,14 +122,16 @@ prepare_matching_model <- function(matching) {
 #' Construct or attach a union-formation specification without executing it.
 #' [simulate()] supports a temporary on-demand implementation: at a birth use
 #' the woman's current partner, or sample living men and choose a partner using
-#' conditional-logit probabilities from the matching formula to form a union. If no men exist, preserve the birth with unknown father.
-#' Pair eligibility is not yet applied, so even
-#' partnered men, relatives, and children can be selected. Death ends affected
+#' conditional-logit probabilities from the matching formula to form a union.
+#' Sampled men below `min_male_age` are excluded. If no eligible sampled men
+#' remain, preserve the birth with unknown father. Other exclusions are not yet
+#' applied, so partnered men and relatives can still be selected. Death ends affected
 #' unions. Rate-based initiation and conditional fertility are not implemented.
 #'
 #' Sampling is from the available male pool BEFORE pair-specific screening.
 #' `sample_size = 0` means the whole pool. Otherwise sample without replacement
-#' up to that many men. Pair screening is deferred in the temporary engine path.
+#' up to that many men. Age screening occurs afterward, without refilling the
+#' sample. Other eligibility rules are deferred.
 #' Candidate sets will not be retained in simulation outputs.
 #'
 #' @param initiation Either `"on_demand"` for birth-triggered searches or
@@ -137,6 +139,9 @@ prepare_matching_model <- function(matching) {
 #' @param matching A specification created by [create_matching_model()].
 #' @param sample_size Nonnegative whole number of men to sample before screening;
 #'   zero requests the whole pool. Defaults to `1000`.
+#' @param min_male_age Minimum male age in continuous years at a new partner
+#'   search, default `15`. Finite nonnegative scalar; zero disables this age
+#'   exclusion. Existing unions are retained. No female minimum age is added.
 #' @param rates For `"rate"` initiation, an age-specific female search-hazard
 #'   table with `age_start`, `age_end`, and `rate`, in years and per person-year.
 #'   These specify search attempts, not guaranteed realized union formation.
@@ -146,10 +151,12 @@ prepare_matching_model <- function(matching) {
 #' @return `union_formation()` returns a `hammel_union_formation` process;
 #'   `set_union_formation()` returns an updated model. Rate tables are tibbles.
 #' @export
-union_formation <- function(initiation, matching, sample_size = 1000, rates = NULL) {
+union_formation <- function(initiation, matching, sample_size = 1000, rates = NULL,
+                            min_male_age = 15) {
   process <- structure(list(
     name = "union_formation", initiation = initiation, matching = matching,
-    sample_size = sample_size, rates = rates, rate_unit = "person_year",
+    sample_size = sample_size, min_male_age = min_male_age,
+    rates = rates, rate_unit = "person_year",
     sampling_stage = "before_pair_screening"
   ), class = c("hammel_union_formation", "hammel_process"))
   validate_union_formation(process)
@@ -162,8 +169,9 @@ union_formation <- function(initiation, matching, sample_size = 1000, rates = NU
 
 #' @rdname union_formation
 #' @export
-set_union_formation <- function(model, initiation, matching, sample_size = 1000, rates = NULL) {
-  set_process(model, union_formation(initiation, matching, sample_size, rates))
+set_union_formation <- function(model, initiation, matching, sample_size = 1000, rates = NULL,
+                            min_male_age = 15) {
+  set_process(model, union_formation(initiation, matching, sample_size, rates, min_male_age))
 }
 
 validate_union_formation <- function(process) {
@@ -181,6 +189,11 @@ validate_union_formation <- function(process) {
       !is.finite(n) || n < 0 || n != floor(n) || n > .Machine$integer.max) {
     stop("`sample_size` must be a nonnegative whole number within integer range.",
          call. = FALSE)
+  }
+  age <- process$min_male_age
+  if (!is.numeric(age) || length(age) != 1L || !is.null(dim(age)) ||
+      !is.finite(age) || age < 0) {
+    stop("`min_male_age` must be a finite nonnegative number of years.", call. = FALSE)
   }
   validate_matching_model(process$matching)
   if (process$initiation == "on_demand") {

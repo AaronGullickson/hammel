@@ -78,3 +78,17 @@ test_that("union process validation and execution boundaries are explicit", {
     set_union_formation("rate", matching, 0, rates)
   expect_error(simulate(model, years = 1), "Rate-based union formation")
 })
+
+test_that("minimum male age defaults to 15 and is configurable and revalidated", {
+  matching <- create_matching_model(~ age_difference, c(age_difference = 0))
+  expect_equal(union_formation("on_demand", matching)$min_male_age, 15)
+  model <- set_union_formation(hammel_model(), "on_demand", matching, min_male_age = 16.5)
+  expect_equal(model$processes$union_formation$min_male_age, 16.5)
+  expect_equal(union_formation("on_demand", matching, min_male_age = 0)$min_male_age, 0)
+  for (age in list(NULL, NA_real_, Inf, -1, "15", c(15, 16), matrix(15))) {
+    expect_error(union_formation("on_demand", matching, min_male_age = age), "min_male_age")
+    edited <- model$processes$union_formation
+    edited$min_male_age <- age
+    expect_error(set_process(hammel_model(), edited), "min_male_age")
+  }
+})

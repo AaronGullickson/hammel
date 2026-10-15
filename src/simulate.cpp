@@ -223,6 +223,21 @@ int draw_partner_position(const NumericVector& probabilities) {
   return last_positive;
 }
 
+// Apply search eligibility after sampling; retain positions in the male pool.
+// Further pair restrictions can be added here without changing sample size.
+std::vector<int> screen_male_candidates(const std::vector<int>& males,
+                                       const std::vector<int>& sample,
+                                       const std::vector<Person>& people,
+                                       double now, double min_male_age) {
+  std::vector<int> eligible;
+  eligible.reserve(sample.size());
+  for (int position : sample) {
+    if (now - people[males[position]].born >= min_male_age)
+      eligible.push_back(position);
+  }
+  return eligible;
+}
+
 // Select a partner from sampled positions in males, returning a people position.
 // Age(male)-age(female) equals birth_time(female)-birth_time(male).
 int select_partner(const std::vector<int>& males, const std::vector<int>& sample,
@@ -270,7 +285,7 @@ struct UnionRecord {
 List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   DataFrame fertility_rates, double start, double years,
                   double birth_interval, DataFrame unions,
-                  int sample_size, List matching) {
+                  int sample_size, List matching, double min_male_age) {
   // R performs input validation and seed handling. All engine state below is
   // local to this call; public times and rates remain in years and person-years.
   NumericVector ids = persons["person_id"], births = persons["birth_time"];
@@ -406,18 +421,21 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       if (partner < 0 && !males.empty()) {
         const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
                                                   sampling_workspace);
-        partner = select_partner(males, sample, people, i, matching);
-        if (next_union_id >= 9007199254740991.0 ||
-            union_history.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
-          stop("Union history exceeds supported ID or row limits.");
-        const int u = static_cast<int>(union_history.size());
-        union_history.push_back({++next_union_id, now, NA_REAL, i, partner});
-        person_unions[i].push_back(u);
-        person_unions[partner].push_back(u);
-        current_partner[i] = partner;
+        const auto eligible = screen_male_candidates(males, sample, people, now, min_male_age);
+        partner = select_partner(males, eligible, people, i, matching);
+        if (partner >= 0) {
+          if (next_union_id >= 9007199254740991.0 ||
+              union_history.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
+            stop("Union history exceeds supported ID or row limits.");
+          const int u = static_cast<int>(union_history.size());
+          union_history.push_back({++next_union_id, now, NA_REAL, i, partner});
+          person_unions[i].push_back(u);
+          person_unions[partner].push_back(u);
+          current_partner[i] = partner;
+        }
       }
       if (partner >= 0) father = people[partner].id;
-      // If no men exist, preserve the birth with unknown father and no union.
+      // If no sampled men are eligible, preserve the birth with unknown father and no union.
       if (next_id >= 9007199254740991.0 ||
           people.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
         stop("Population exceeds supported ID or row limits.");

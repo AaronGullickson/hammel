@@ -3,8 +3,8 @@
 Updated October 15, 2026 from the user's milestone 2 request.
 **Status: milestone scope accepted (D030); detailed demographic rules below
 remain proposals or open decisions. Process construction and formula scoring
-and conditional-logit on-demand execution are implemented; pair screening
-and rate-based initiation remain pending.**
+and conditional-logit on-demand execution with minimum male age screening
+are implemented; other pair restrictions and rate-based initiation remain pending.**
 Every simulation requires a union-formation process. Current-partner lookup
 and union histories are common infrastructure for all initiation modes.
 
@@ -57,7 +57,7 @@ deterministic and must not mutate state. Data-dependent transformations require
 care: their basis can depend on the candidate pool. There is no fitted-model
 estimation interface yet.
 
-`union_formation(initiation, matching, sample_size = 1000, rates = NULL)` constructs
+`union_formation(initiation, matching, sample_size = 1000, rates = NULL, min_male_age = 15)` constructs
 a process; `set_union_formation(model, ...)` attaches it. Initiation is explicitly
 `"on_demand"` or `"rate"`; initiation and coefficients have no defaults.
 The user selected a default sample size of 1000. `sample_size = 0` means use the full available pool; a positive
@@ -84,8 +84,8 @@ engine supports the conditional-logit on-demand increment specified below;
 
 At each birth, use the woman's existing living male partner when she has an
 ongoing union. Otherwise draw `min(sample_size, living men)` distinct men
-uniformly without replacement (`0` means all living men). For every sampled
-candidate calculate `age_difference = male age - female age` in continuous
+uniformly without replacement (`0` means all living men), then exclude sampled
+men below `min_male_age` without refilling. For every remaining candidate calculate `age_difference = male age - female age` in continuous
 years. The shared search time cancels, so this equals the woman's birth time
 minus the man's birth time. Evaluate the user's matching formula and named
 coefficients to obtain utility V_j, then choose one candidate with probability
@@ -93,7 +93,7 @@ coefficients to obtain utility V_j, then choose one candidate with probability
     P(j) = exp(V_j - max(V)) / sum_k exp(V_k - max(V)).
 
 Create the union at the birth time and use the selected man as father. A
-nonempty pool always produces a partner; there is no wait alternative. Empty
+nonempty screened pool always produces a partner; there is no wait alternative. Empty
 pools preserve the birth with unknown father and no union. A future choice to
 cancel the birth is deferred. All-zero utilities give uniform probabilities.
 Nonfinite formula values/utilities are errors, not silently excluded candidates.
@@ -115,8 +115,8 @@ in C++ with the same formula semantics; other supported R formula transforms
 use the existing model-matrix evaluator on the sampled candidate data. There
 is no age discretization, cached age-grid approximation, or new dependency.
 
-Pair eligibility remains deliberately deferred: the pool includes partnered
-men, relatives, and children. Men may have concurrent unions; this is not an
+Minimum male age is checked after sampling, as specified below. Other pair
+restrictions remain deferred: partnered men and relatives are not excluded. Men may have concurrent unions; this is not an
 accepted final eligibility policy. A woman retains her current partner until
 death. Input must supply unambiguous active female/male unions with living
 partners and at most one ongoing union per woman. Ended histories are retained.
@@ -130,7 +130,35 @@ utilities, sampled choice frequencies, uniform and singleton/empty pools,
 extreme utilities and invalid formula output, reproducibility/independence,
 partner retention, union accounting, widowhood and restarts. Test thresholds
 for stochastic checks are sampling-error bounds, not demographic acceptance
-criteria. No scientific validity is claimed for the unrestricted candidate pool.
+criteria. No scientific validity is claimed for the remaining unrestricted relationships.
+
+## Minimum male age: eligibility increment
+
+The user selected a configurable `min_male_age` in continuous years, default
+15. It must be a finite, nonnegative numeric scalar; fractional thresholds
+are allowed and zero removes this age exclusion. A sampled man passes when
+`search_time - birth_time >= min_male_age`. Check at the search, without
+rounding ages. No separate female minimum age is imposed; initiation eligibility
+is governed by fertility or, once implemented, union-search rates.
+
+Sample living men first at the configured sample size, then remove sampled
+men below the minimum, then evaluate matching utilities and normalize
+probabilities over survivors. Do not refill the sample or search elsewhere
+when sampled candidates fail. Existing ongoing unions are not retroactively
+ended by this search restriction. Other exclusions remain pending.
+
+Worked cases: with a threshold of 15, ages 14.999 and 15 are respectively
+excluded and included. With threshold 16.5, age 16.25 is excluded and age 16.5
+included. A boy initially below the threshold can become eligible later in the
+same continuous run. With sample size 1, drawing a boy can leave an empty pool
+even if an older man exists outside the sample. At the user's direction, a pool emptied by screening preserves the birth
+with unknown father and no new union, just like an empty living-male pool.
+
+Validate construction, attachment, and simulation of edited specifications;
+exercise exact/fractional boundaries, aging into eligibility, sampling before
+screening, zero threshold, existing partner retention, and no added female-age
+restriction. Eligibility changes matching alternatives; coefficients themselves
+remain unchanged.
 
 ## Initiation, matching, and state consistency
 

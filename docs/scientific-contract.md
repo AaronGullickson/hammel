@@ -146,10 +146,15 @@ For candidate utilities V, sample with probabilities proportional to
 `exp(V - max(V))`, form the union at the birth time, and assign the partner as
 father. Nonfinite formula values/utilities are errors. Linear/raw quadratic
 terms have an exact native evaluator; other formulas use the R model matrix.
-Pair screening remains deferred: partnered men, relatives, and children can
-be selected. A man
+After sampling and before scoring, exclude men younger than `min_male_age`
+(default 15 continuous years; finite nonnegative scalar, fractional values
+allowed). A man at exactly the threshold is eligible. Do not refill rejected
+samples. Other screening remains deferred: partnered men and relatives can
+still be selected. This search restriction does not invalidate existing unions,
+and no extra minimum female age is imposed. A man
 can have concurrent unions; a woman keeps her current partner until death.
-No men means the birth proceeds with unknown father and no new union. A future
+No eligible sampled men means the birth proceeds with unknown father and no
+new union. A future
 choice to cancel births is deferred. Rate-based initiation is not executed.
 
 On-demand input must provide unambiguous active female/male unions with living
@@ -270,7 +275,7 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 | Midpoint approximation | Validate bias against supplied age schedules; no accuracy guarantee |
 | Rate changes between runs | Histories retain spacing, but compensation uses only the new schedule |
 | Sparse oldest ages | Missing cells remain missing; no automatic imputation or smoothing |
-| Union formation/dissolution | Conditional-logit on-demand formation and widowhood; screening and scheduled initiation pending |
+| Union formation/dissolution | Conditional-logit on-demand formation and widowhood; minimum male age implemented; other screening and scheduled initiation pending |
 | Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
 | Exact continuation | No saved queue/RNG checkpoint |
 

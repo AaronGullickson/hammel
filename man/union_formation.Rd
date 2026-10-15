@@ -5,14 +5,21 @@
 \alias{set_union_formation}
 \title{Specify a union-formation process}
 \usage{
-union_formation(initiation, matching, sample_size = 1000, rates = NULL)
+union_formation(
+  initiation,
+  matching,
+  sample_size = 1000,
+  rates = NULL,
+  min_male_age = 15
+)
 
 set_union_formation(
   model,
   initiation,
   matching,
   sample_size = 1000,
-  rates = NULL
+  rates = NULL,
+  min_male_age = 15
 )
 }
 \arguments{
@@ -30,6 +37,10 @@ These specify search attempts, not guaranteed realized union formation.
 Nonoverlapping bands may have gaps or an open end; execution semantics for
 eligibility and gaps are not yet implemented. Must be NULL for \code{"on_demand"}.}
 
+\item{min_male_age}{Minimum male age in continuous years at a new partner
+search, default \code{15}. Finite nonnegative scalar; zero disables this age
+exclusion. Existing unions are retained. No female minimum age is added.}
+
 \item{model}{A \code{hammel_model} object.}
 }
 \value{
@@ -40,14 +51,16 @@ eligibility and gaps are not yet implemented. Must be NULL for \code{"on_demand"
 Construct or attach a union-formation specification without executing it.
 \code{\link[=simulate]{simulate()}} supports a temporary on-demand implementation: at a birth use
 the woman's current partner, or sample living men and choose a partner using
-conditional-logit probabilities from the matching formula to form a union. If no men exist, preserve the birth with unknown father.
-Pair eligibility is not yet applied, so even
-partnered men, relatives, and children can be selected. Death ends affected
+conditional-logit probabilities from the matching formula to form a union.
+Sampled men below \code{min_male_age} are excluded. If no eligible sampled men
+remain, preserve the birth with unknown father. Other exclusions are not yet
+applied, so partnered men and relatives can still be selected. Death ends affected
 unions. Rate-based initiation and conditional fertility are not implemented.
 }
 \details{
 Sampling is from the available male pool BEFORE pair-specific screening.
 \code{sample_size = 0} means the whole pool. Otherwise sample without replacement
-up to that many men. Pair screening is deferred in the temporary engine path.
+up to that many men. Age screening occurs afterward, without refilling the
+sample. Other eligibility rules are deferred.
 Candidate sets will not be retained in simulation outputs.
 }

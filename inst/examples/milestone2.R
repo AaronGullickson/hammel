@@ -49,8 +49,21 @@ unions <- result$unions |>
   mutate(
     age_mar_h = start_time - birth_time_h,
     age_mar_w = start_time - birth_time_w,
-    age_diff = age_mar_h - age_mar_w
+    age_diff = age_mar_h - age_mar_w,
+    decade = floor(start_time / 10) * 10
   )
+
+temp <- unions |>
+  group_by(decade) |>
+  summarize(age_diff = mean(age_diff))
+
+ggplot(unions, aes(x = factor(decade), y = age_diff))+
+  geom_boxplot()+
+  geom_jitter(alpha = 0.02)+
+  geom_hline(yintercept = 0.072 / (2 * 0.014), color = "red", linetype = 2)+
+  theme_bw()
+
+
 
 mean(result$persons$person_id %in% c(result$unions$husband_id, result$unions$wife_id))
 

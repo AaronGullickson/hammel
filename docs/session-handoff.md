@@ -42,13 +42,18 @@ Milestone 2 union-formation scope is selected (D030); see
 remain unresolved. Process construction and a conditional-logit on-demand C++
 path are implemented (D031), including current-partner caches, union histories,
 widowhood, and restart reconstruction. D032 now requires an explicit union
-process for every simulation; partner state is initialized unconditionally. Eligibility is deferred, and rate-based initiation remains rejected. Matching
+process for every simulation; partner state is initialized unconditionally. Minimum male age screening is implemented (default 15 years, user-selectable);
+other eligibility rules are deferred, and rate-based initiation remains rejected. Matching
 uses the user formula, with native linear/quadratic evaluation and an R fallback
 for other transformations. The report proposes a
 GitHub issue for fertility compensation after changing rates at restart; no
 issue was created as part of recording completion. Follow the user's next request.
 
 ## Deferred work
+
+- Benchmark R formula-fallback matching (for example a cubic age-gap term)
+  against the native linear/quadratic path later; explicitly deferred by the
+  user October 15, 2026. See [testing](testing.md#deferred-matching-performance-comparison).
 
 - Initial fertility calibration: retain simple initialization and assess burn-in.
 - Fertility transition adjustment after replacing rates between runs: document

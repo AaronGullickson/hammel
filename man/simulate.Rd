@@ -28,8 +28,9 @@ fertility schedule. A union-formation process is required. With on-demand
 union formation, use the woman's
 current partner, or sample men and choose one using conditional-logit
 probabilities from the matching formula to form a union at the birth.
-Pair eligibility checks are not yet applied.
-If no men are available, preserve the birth with unknown father and no union.
+Sampled men must meet the configured minimum age (default 15 years).
+Other pair eligibility checks are not yet applied.
+If no sampled men are eligible, preserve the birth with unknown father and no union.
 Rate-based union initiation is not yet implemented.
 }
 \details{

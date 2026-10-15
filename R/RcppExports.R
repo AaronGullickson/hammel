@@ -21,7 +21,7 @@ sample_male_positions_cpp <- function(count, requested) {
     .Call(`_hammel_sample_male_positions_cpp`, count, requested)
 }
 
-simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching) {
-    .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching)
+simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching, min_male_age) {
+    .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching, min_male_age)
 }
 

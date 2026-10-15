@@ -73,7 +73,8 @@ test_that("no men preserves the first birth with unknown father and no union", {
 })
 
 test_that("widowhood closes new unions and subsequent births search again", {
-  model <- make_on_demand_model()
+  model <- make_on_demand_model(3)
+  model$population$persons$birth_time[3] <- -19
   model <- set_mortality(model, data.frame(
     sex = c("f", "m", "m", "m"), age_start = c(0, 0, 20, 20.5),
     age_end = c(Inf, 20, 20.5, Inf), rate = c(0, 0, 0, 1e8)))
@@ -90,8 +91,9 @@ test_that("widowhood closes new unions and subsequent births search again", {
   expect_identical(continued$unions[1, ], result$unions[1, ])
 })
 
-test_that("screening is deferred and singleton choices do not depend on utilities", {
+test_that("zero minimum age allows a child and singleton choices do not depend on utilities", {
   model <- make_on_demand_model(3, 1)
+  model$processes$union_formation$min_male_age <- 0
   model$population$persons$sex[2] <- "f"
   model$population$persons$birth_time[3] <- -1 # only man is a child
   result <- simulate(model, 1, seed = 19)
