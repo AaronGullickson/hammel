@@ -1,6 +1,7 @@
 ---
 title: "Hammel: Milestone 1 Validation"
 author: "Aaron Gullickson"
+date: today
 format:
   html:
     toc: true
