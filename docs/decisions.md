@@ -725,3 +725,16 @@ reasons are retained. This supersedes generic death labels in earlier entries.
   to both default and union-status summaries. TFR and life-table extraction
   consume the new names; process schedules retain `rate` and life tables
   retain `mx`. Units and calculation rules are unchanged.
+
+## D049: Direct-rate approximation for USA 2001 marriage inputs
+
+- **Status:** requested by the user October 16, 2026.
+- **Decision:** provide separate female/male marriage schedules in
+  `validation/data`, with `age_start`, `age_end`, and `rate`, using published
+  transitions per 1,000 divided by 1,000 directly as rates per person-year.
+  Retain source bands, including 70+, and the original combined source table.
+- **Limits:** the source denominator is the unmarried population at the start
+  of the period, not person-years. This approximation does not apply a
+  probability-to-hazard transformation. The female schedule can configure
+  current union-search initiation; male rates are reference data. Search
+  failures can make realized formation rates differ from these inputs.

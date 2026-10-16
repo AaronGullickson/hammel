@@ -76,7 +76,160 @@ The actual partner is then sampled from eligible partners with the probability p
 
 For the rate model, when unmarried fertility takes place, we also use this matching model to select a father for the birth, although this does not lead to a union. By default, the same matching model is used but users can also specify an alternate model.
 
+## Inputs
+
+```{r}
+#| label: set-settings
+
+# beginning year of sim
+start_time <- 2000
+# years to run simulation
+years <- 100
+# ending time of the simulation
+end_time <- start_time + years
+# initial population construction parameters
+population_size <- 100000
+max_age <- 100
+# minimum birth interval in years (0.75 = 9 months)
+birth_interval <- 0.75
+# seeds for random processes
+population_seed <- 42
+replication_seeds <- seq_len(100)
+```
+
+I will use US rates for the simulation circa 2000-2001.
+
+```{r}
+#| label: get-input-data
+
+# use HMD for mortality rates
+mortality_rates <- get_mortality_hmd("USA", year = 2000)
+
+# get total, partnered, and unpartnered fertility rates from 
+# HCHS report data held in validation/data
+fertility_rates_total <- read_csv(
+  here("validation", "data", "usa_2000_fertility_overall.csv")
+)
+fertility_rates_by_status <- read_csv(
+  here("validation", "data", "usa_2000_fertility_by_union_status.csv")
+)
+marriage_rates <- read_csv(
+  here("validation", "data", "usa_2001_marriage_transitions.csv")
+)
+
+time_breaks <- seq(2000, 2100, 5)
+age_breaks <- seq(15, 70, 5)
+
+fertility_rates_total |> calculate_tfr()
+fertility_rates_by_status |> calculate_tfr()
+```
+
+```{r}
+#| label: initialize-model
+
+set.seed(population_seed)
+population <- create_baseline_population(
+  population_size, max_age = max_age, end_time = start_time
+)
+
+model_base <- hammel_model() |>
+  set_population(population) |>
+  set_mortality(mortality_rates)
+
+model_matching <- create_matching_model(
+  ~ age_difference + I(age_difference^2),
+  c(age_difference = 0.072, "I(age_difference^2)" = -0.014)
+)
+```
+
 ## Test On-Demand Model
+
+```{r}
+#| label: run-sim-ondemand
+
+model_ondemand <- model_base |>
+  set_fertility(fertility_rates_total) |>
+  set_union_formation(
+    "on_demand", 
+    model_matching,
+    diagnostics = TRUE
+  )
+
+results_ondemand <- map(replication_seeds, function(seed) {
+  simulate(model_ondemand, years = years, seed = seed)
+})
+names(results_ondemand) <- as.character(replication_seeds)
+
+counts_ondemand <- map(
+  results_ondemand,
+  calculate_lexis_counts,
+  time_breaks,
+  age_breaks,
+  include_unions = TRUE
+)
+
+asfr <- counts_ondemand |> 
+  bind_rows(.id = "replication") |>
+  filter(sex == "f", age_start >= 15 & age_start < 45) |>
+  group_by(union_status, age_start) |>
+  summarize(
+    rate = mean(rate_fertility),
+    sd = sd(rate_fertility),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+mar_rates <- counts_ondemand |>
+  bind_rows(.id = "replication") |>
+  filter(union_status == "unpartnered") |>
+  group_by(age_start, sex) |>
+  summarize(
+    rate = mean(rate_marriage),
+    sd = sd(rate_marriage),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+```
+
+How close do the age specific fertility rates in the output match the age specific fertility rates in the input? Because we are creating unions on demand, the match should be very good. 
+
+```{r}
+
+
+asfr |>
+  filter(union_status == "total") |>
+  ggplot(aes(x = age_start, y = rate))+
+  geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 * se), fill = "grey", color = NA)+
+  geom_point()+
+  geom_line(linetype = 2)+
+  geom_line(data = fertility_rates_total)+
+  theme_bw()
+```
+
+```{r}
+
+asfr |>
+  filter(union_status != "total") |>
+  ggplot(aes(x = age_start, y = rate, color = union_status, fill = union_status, group = union_status))+
+  #geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 * se), color = NA)+
+  geom_point()+
+  geom_line(linetype = 2)+
+  geom_line(data = fertility_rates_by_status)+
+  theme_bw()
+```
+
+```{r}
+mar_rates |>
+  filter(sex == "f") |>
+  ggplot(aes(x = age_start, y = rate))+
+  geom_point()+
+  geom_line(linetype = 2)+
+  theme_bw()
+
+```
 
 ## Test Rate Model
 

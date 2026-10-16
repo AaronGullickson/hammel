@@ -1,0 +1,58 @@
+{
+  "geography": "United States",
+  "fertility_year": 2000,
+  "marriage_survey_year": 2001,
+  "retrieved_at_utc": "2026-10-16T14:55:21.266034+00:00",
+  "fertility_source_url": "https://www.cdc.gov/nchs/data/nvsr/nvsr51/nvsr51_12.pdf",
+  "marriage_source_url": "https://www2.census.gov/programs-surveys/demo/tables/marriage-and-divorce/2001/tab02.xls",
+  "fertility_tables": [
+    1,
+    7,
+    8
+  ],
+  "marriage_table": 2,
+  "rebuild_script": "prepare_usa_2000_rates.R",
+  "transformations": [
+    "Extract all-races 2000 fertility rows; retain nonoverlapping five-year groups 15-19 through 40-44; divide per-1000 values by 1000.",
+    "Extract the Table 1 all-races 2000 overall fertility row; retain five-year bands 15-19 through 40-44 and divide rates per 1000 by 1000. Omit 10-14 and 45-49; preserve the published 40-44 rate (not the 40+ numerator used by Tables 7 and 8).",
+    "Map married to partnered and unmarried to unpartnered only in the simulation-format fertility file.",
+    "Extract marriage entry columns for both sexes, preserving age bands, estimates, starting populations and 90% margins of error. Divide entry estimates by 1000 to produce annual transition proportions, without hazard conversion.",
+    "Split marriage entries into female and male three-column schedules (age_start, age_end, rate); use transitions_per_1000 / 1000 directly as per-person-year rates under the user-selected approximation of October 16, 2026. Preserve source bands including 70+; no -log(1-p) transformation."
+  ],
+  "limitations_document": "usa_2000_rates.README.md",
+  "sha256": {
+    "usa_fertility_revised_nchs_2003.pdf": "16ae048abb16ce0b44ed7c22b65d99e5aaa24072146a33712434ac7319db5ac9",
+    "usa_marriage_transitions_2001_census.xls": "c0ab01bc26b5468ffeef2152d1f0679ce62b629c99ed36923746808cdbb10c2c",
+    "usa_2000_fertility_by_marital_status.csv": "c4eaa591a7965279fefffbf6a70266adaa98a84cf5c4629dfec91eaac4aff4a2",
+    "usa_2000_fertility_by_union_status.csv": "552f51260655c9cef4fe23282a125465b8cea5d070b0f87fa3e96fa2c812710c",
+    "usa_2001_marriage_transitions.csv": "8ba1447c88c014c36a3d7d6e681281c7e5f04c7634858c387a1edfe8b003fa64",
+    "usa_2000_fertility_overall.csv": "9ef778ef6e05658d26ae7ba3016781e3a2942d773a0393d28cb460aa5630e009",
+    "usa_2001_marriage_rates_female.csv": "2a49c877a79ff5b2c3f37abc2ce8fc4f81d7445cca020ae1382b9638c66c1fd5",
+    "usa_2001_marriage_rates_male.csv": "2449cb869c3a88344ffb9d01d8961b0343ef4b55a04a89590e3d378785db26bc"
+  },
+  "overall_fertility": {
+    "file": "usa_2000_fertility_overall.csv",
+    "source_table": 1,
+    "printed_page": 13,
+    "pdf_page": 13,
+    "age_range": "[15,45)",
+    "omitted_age_groups": [
+      "10-14",
+      "45-49"
+    ],
+    "rate_unit": "births per woman-year",
+    "age_40_44_numerator": "Births to women aged 40-44; differs from the 40+ numerator in marital-status Tables 7 and 8."
+  },
+  "marriage_rate_approximation": {
+    "files": {
+      "female": "usa_2001_marriage_rates_female.csv",
+      "male": "usa_2001_marriage_rates_male.csv"
+    },
+    "selected_on": "2026-10-16",
+    "formula": "rate = transitions_per_1000 / 1000",
+    "interpreted_unit": "per person-year",
+    "source_denominator": "People unmarried at beginning of period, not person-years",
+    "female_use": "Union-search schedule; realized union formation may differ when searches fail",
+    "male_use": "Reference comparison; engine schedules female searches only"
+  }
+}
