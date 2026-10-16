@@ -468,3 +468,21 @@ using attained age and current status. Do not change last_birth or start a new
 birth-spacing interval; any spacing from an actual prior birth remains valid.
 A man becoming eligible after several cancellations can therefore be selected
 at the next sampled birth attempt, without an artificial spacing delay.
+
+## Optional union diagnostics
+
+`diagnostics = TRUE` on the union process records `.n_eligible` and
+`.utility_rank` for each newly formed union in either initiation mode. The count
+is the sampled candidate set remaining after all eligibility screening, not the
+whole male pool. Rank is one plus the number of eligible candidates with strictly
+greater deterministic utility; 1 is best and ties share the minimum rank. For
+utilities 3, 3, 1, choosing either first candidate records rank 1 of 3; choosing
+the last records rank 3 of 3. A singleton records count 1 and rank 1.
+
+Diagnostics default off, consume no random draws, and do not change matching or
+event timing. Failed searches and nonmarital father selections create no union
+row. Existing recorded values survive restarts; missing historical diagnostics
+are NA, including when enabled for a zero-duration run. With diagnostics off,
+existing columns survive and newly formed unions have NA in those columns.
+Rank requires one linear pass over already computed utilities, without sorting
+or evaluating the formula again; that pass is skipped when disabled.

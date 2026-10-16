@@ -177,18 +177,22 @@ prepare_matching_model <- function(matching) {
 #'   These specify search attempts, not guaranteed realized union formation.
 #'   Nonoverlapping bands may have gaps or an open end; gaps and ages outside
 #'   support have zero hazard. Must be NULL for `"on_demand"`.
+#' @param diagnostics Logical, default `FALSE`. Record `.n_eligible` (sampled men
+#'   remaining after screening) and `.utility_rank` (1 = highest utility, ties
+#'   share the minimum rank) on newly formed unions. Historical unknowns are NA.
 #' @param model A `hammel_model` object.
 #' @return `union_formation()` returns a `hammel_union_formation` process;
 #'   `set_union_formation()` returns an updated model. Rate tables are tibbles.
 #' @export
 union_formation <- function(initiation, matching, sample_size = 1000, rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
-                            father_matching = NULL, cancel_birth_if_no_match = TRUE) {
+                            father_matching = NULL, cancel_birth_if_no_match = TRUE,
+                            diagnostics = FALSE) {
   process <- structure(list(
     name = "union_formation", initiation = initiation, matching = matching,
     sample_size = sample_size, min_male_age = min_male_age,
     kinship_generations = kinship_generations, father_matching = father_matching,
-    cancel_birth_if_no_match = cancel_birth_if_no_match,
+    cancel_birth_if_no_match = cancel_birth_if_no_match, diagnostics = diagnostics,
     rates = rates, rate_unit = "person_year",
     sampling_stage = "before_pair_screening"
   ), class = c("hammel_union_formation", "hammel_process"))
@@ -204,10 +208,11 @@ union_formation <- function(initiation, matching, sample_size = 1000, rates = NU
 #' @export
 set_union_formation <- function(model, initiation, matching, sample_size = 1000, rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
-                            father_matching = NULL, cancel_birth_if_no_match = TRUE) {
+                            father_matching = NULL, cancel_birth_if_no_match = TRUE,
+                            diagnostics = FALSE) {
   set_process(model, union_formation(initiation, matching, sample_size, rates,
                                      min_male_age, kinship_generations, father_matching,
-                                     cancel_birth_if_no_match))
+                                     cancel_birth_if_no_match, diagnostics))
 }
 
 validate_union_formation <- function(process) {
@@ -230,6 +235,11 @@ validate_union_formation <- function(process) {
   if (!is.numeric(age) || length(age) != 1L || !is.null(dim(age)) ||
       !is.finite(age) || age < 0) {
     stop("`min_male_age` must be a finite nonnegative number of years.", call. = FALSE)
+  }
+  diagnostic <- process$diagnostics
+  if (!is.logical(diagnostic) || length(diagnostic) != 1L ||
+      !is.null(dim(diagnostic)) || is.na(diagnostic)) {
+    stop("`diagnostics` must be TRUE or FALSE.", call. = FALSE)
   }
   cancel <- process$cancel_birth_if_no_match
   if (!is.logical(cancel) || length(cancel) != 1L || !is.null(dim(cancel)) || is.na(cancel)) {

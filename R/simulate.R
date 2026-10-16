@@ -137,7 +137,7 @@ simulate <- function(model, years, seed = NULL) {
                            if (is.null(union_process$rates))
                              data.frame(age_start = numeric(), age_end = numeric(), rate = numeric())
                            else union_process$rates, father_matching,
-                           union_process$cancel_birth_if_no_match)
+                           union_process$cancel_birth_if_no_match, union_process$diagnostics)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {
@@ -154,6 +154,12 @@ simulate <- function(model, years, seed = NULL) {
     result$unions <- tibble::as_tibble(unions)
     births <- native$births
     deaths <- native$deaths
+  }
+  if (union_process$diagnostics) {
+    for (column in c(".n_eligible", ".utility_rank")) {
+      if (!column %in% names(result$unions))
+        result$unions[[column]] <- rep(NA_integer_, nrow(result$unions))
+    }
   }
   result$end_time <- start + years
   result$simulation <- list(start_time = start, end_time = result$end_time,

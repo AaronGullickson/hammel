@@ -13,7 +13,8 @@ union_formation(
   min_male_age = 15,
   kinship_generations = 2,
   father_matching = NULL,
-  cancel_birth_if_no_match = TRUE
+  cancel_birth_if_no_match = TRUE,
+  diagnostics = FALSE
 )
 
 set_union_formation(
@@ -25,7 +26,8 @@ set_union_formation(
   min_male_age = 15,
   kinship_generations = 2,
   father_matching = NULL,
-  cancel_birth_if_no_match = TRUE
+  cancel_birth_if_no_match = TRUE,
+  diagnostics = FALSE
 )
 }
 \arguments{
@@ -66,6 +68,10 @@ Set \code{FALSE} to allow births with unknown fathers. Historical missing father
 IDs are retained. A cancellation starts no new spacing interval and draws
 fresh waiting times from the failed attempt. Partner scarcity can reduce
 realized fertility below inputs.}
+
+\item{diagnostics}{Logical, default \code{FALSE}. Record \code{.n_eligible} (sampled men
+remaining after screening) and \code{.utility_rank} (1 = highest utility, ties
+share the minimum rank) on newly formed unions. Historical unknowns are NA.}
 
 \item{model}{A \code{hammel_model} object.}
 }

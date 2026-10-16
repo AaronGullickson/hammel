@@ -250,14 +250,21 @@ std::vector<int> screen_male_candidates(const std::vector<int>& males,
 // Select a partner from sampled positions in males, returning a people position.
 // Age(male)-age(female) equals birth_time(female)-birth_time(male).
 int select_partner(const std::vector<int>& males, const std::vector<int>& sample,
-                   const std::vector<Person>& people, int woman, const List& matching) {
+                   const std::vector<Person>& people, int woman, const List& matching,
+                   int* utility_rank = nullptr) {
   if (sample.empty()) return -1;
   NumericVector gaps(sample.size());
   for (size_t j = 0; j < sample.size(); ++j)
     gaps[j] = people[woman].born - people[males[sample[j]]].born;
   const NumericVector utility = matching_utilities(gaps, matching);
   const NumericVector probabilities = matching_probabilities(utility);
-  return males[sample[draw_partner_position(probabilities)]];
+  const int chosen = draw_partner_position(probabilities);
+  if (utility_rank) {
+    *utility_rank = 1;
+    for (double score : utility)
+      if (score > utility[chosen]) ++*utility_rank;
+  }
+  return males[sample[chosen]];
 }
 
 // Internal analytical/sampling diagnostics use the same scoring and draw helpers.
@@ -297,7 +304,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   int sample_size, List matching, double min_male_age,
                   int kinship_generations, bool rate_initiation,
                   DataFrame union_rates, List father_matching,
-                  bool cancel_birth_if_no_match) {
+                  bool cancel_birth_if_no_match, bool diagnostics) {
   // R performs input validation and seed handling. All engine state below is
   // local to this call; public times and rates remain in years and person-years.
   NumericVector ids = persons["person_id"], births = persons["birth_time"];
@@ -331,6 +338,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   }
   hammel::Kinship kinship(std::move(parent_links), kinship_generations);
   std::vector<UnionRecord> union_history;
+  std::vector<int> diagnostic_counts, diagnostic_ranks;
   std::vector<std::vector<int>> person_unions(people.size());
   std::vector<int> current_partner(people.size(), -1);
   // Swap removal keeps pool updates constant-time and slots valid after moves.
@@ -383,24 +391,33 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   }
   // All father and partner searches share sampling, eligibility and matching.
   // Only form_union changes partner state or removes the selected man.
-  auto find_candidate = [&](int woman, double now, const List& choice_model) {
+  auto find_candidate = [&](int woman, double now, const List& choice_model,
+                            int* count = nullptr, int* rank = nullptr) {
     if (males.empty()) return -1;
     const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
                                              sampling_workspace);
     const auto eligible = screen_male_candidates(males, sample, people, now, min_male_age,
                                                  woman, kinship);
-    return select_partner(males, eligible, people, woman, choice_model);
+    if (count) *count = static_cast<int>(eligible.size());
+    return select_partner(males, eligible, people, woman, choice_model, rank);
   };
   auto form_union = [&](int woman, double now) {
     int partner = current_partner[woman];
     if (partner >= 0) return partner;
-    partner = find_candidate(woman, now, matching);
+    int count = NA_INTEGER, rank = NA_INTEGER;
+    partner = find_candidate(woman, now, matching,
+                             diagnostics ? &count : nullptr,
+                             diagnostics ? &rank : nullptr);
     if (partner >= 0) {
       if (next_union_id >= 9007199254740991.0 ||
           union_history.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
         stop("Union history exceeds supported ID or row limits.");
       const int u = static_cast<int>(union_history.size());
       union_history.push_back({++next_union_id, now, NA_REAL, woman, partner});
+      if (diagnostics) {
+        diagnostic_counts.push_back(count);
+        diagnostic_ranks.push_back(rank);
+      }
       person_unions[woman].push_back(u);
       person_unions[partner].push_back(u);
       current_partner[woman] = partner;
@@ -564,12 +581,29 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       else out_reason[u] = relationship.wife_died ? "death_wife" : "death_husband";
     } else out_reason[u] = relationship.wife_died ? "death_wife" : "death_husband";
   }
+  DataFrame out_unions = DataFrame::create(_["union_id"] = out_uid,
+    _["wife_id"] = out_wife, _["husband_id"] = out_husband,
+    _["start_time"] = out_start, _["end_time"] = out_end, _["end_reason"] = out_reason);
+  if (diagnostics) {
+    IntegerVector counts(union_history.size(), NA_INTEGER), ranks(union_history.size(), NA_INTEGER);
+    for (int u = 0; u < unions.nrows(); ++u) {
+      if (unions.containsElementNamed(".n_eligible"))
+        counts[u] = as<IntegerVector>(unions[".n_eligible"])[u];
+      if (unions.containsElementNamed(".utility_rank"))
+        ranks[u] = as<IntegerVector>(unions[".utility_rank"])[u];
+    }
+    for (size_t j = 0; j < diagnostic_counts.size(); ++j) {
+      counts[unions.nrows() + j] = diagnostic_counts[j];
+      ranks[unions.nrows() + j] = diagnostic_ranks[j];
+    }
+    out_unions[".n_eligible"] = counts;
+    out_unions[".utility_rank"] = ranks;
+    out_unions.attr("class") = "data.frame";
+    out_unions.attr("row.names") = IntegerVector::create(NA_INTEGER, -static_cast<int>(union_history.size()));
+  }
   return List::create(_["persons"] = DataFrame::create(
     _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),
-    _["unions"] = DataFrame::create(_["union_id"] = out_uid,
-      _["wife_id"] = out_wife, _["husband_id"] = out_husband,
-      _["start_time"] = out_start, _["end_time"] = out_end,
-      _["end_reason"] = out_reason),
+    _["unions"] = out_unions,
     _["births"] = birth_count, _["deaths"] = death_count);
 }
