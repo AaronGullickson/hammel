@@ -1,8 +1,10 @@
 # Directions beyond milestone 2
 
-Recorded October 15, 2026 from the user's planning notes. Milestone 2 remains
+Recorded October 15, 2026; expanded October 16, 2026 from the user's planning
+notes. Milestone 2 remains
 in validation. The user selected **groups as the theme for milestone 3**;
-other items below are prospective work without a milestone assignment. These
+**union dissolution is proposed for milestone 4**, after groups. Other items
+below are prospective work without a milestone assignment. These
 notes preserve intentions and open questions, not authorization to implement
 unspecified demographic rules or a selected public API.
 
@@ -48,6 +50,46 @@ proportions represent expected genealogical contributions or another quantity.
 A discrete group identity need not equal a majority-ancestry classification.
 These are open specification questions, not accepted restrictions on the design.
 
+## Proposed milestone 4: union dissolution
+
+The user proposes union dissolution after groups as the next step toward a
+fully functional simulator. On October 16, 2026, the user selected female
+age-specific divorce rates, maintaining the female-as-driver approach used
+elsewhere. Dissolution would have one clock per union, driven by the currently
+partnered woman's age, competing with the existing events. Do not add a second
+independent male divorce clock from male age-specific rates; both spouses'
+observed divorces describe the same union-ending event.
+
+Prefer a separate optional process, provisionally `union_dissolution`, rather
+than adding dissolution to `union_formation`. Users would not be required to
+specify it; leaving it absent would retain the current death-only union endings.
+This is a proposed process design, not an implemented API.
+
+Consider allowing dissolution risk to vary with couple characteristics in
+addition to female age. The user's example is higher divorce risk for couples
+with large age differences. This is an extension to investigate, not an accepted
+effect or coefficient: the functional form, supported characteristics, and how
+effects relate to baseline age-specific rates remain to be specified.
+
+Before implementation, specify the exposure/units of input rates, exact event
+ties, and eligibility for remarriage. Define the state updates and event
+invalidation for both former partners, including fertility status, search
+eligibility and male-pool membership. These details remain open; the proposed
+milestone does not select demographic defaults.
+
+## Polished model and simulation summaries
+
+Add custom print/summary displays for `hammel_model` and simulation results
+(the user's proposed `hammel_simulation` interface). Aim for a clear, polished
+console presentation inspired by usethis, making configured models and results
+easy to inspect. Specific contents and formatting remain to be designed.
+
+Simulation currently returns a `hammel_population` with a `simulation` metadata
+component. The summary proposal does not itself select a new result class or
+authorize changing that return contract. Keep underlying tables and settings
+available as ordinary inspectable R objects. No implementation milestone is
+assigned to these displays.
+
 ## Fertility heterogeneity
 
 Consider person-level fertility differences to represent persistent high- and
@@ -80,8 +122,9 @@ No emigration process is implied by the immigration request.
 - Previous-father continuity at subsequent births or union formation (D042).
 - Declining poor nonempty candidate pools and waiting (D044).
 - Transition-aware fertility compensation for status/rate changes (D045).
-- Parity-specific fertility, non-death union dissolution, and multiple concurrent
-  unions; no implementation milestone has yet been selected.
+- Parity-specific fertility and multiple concurrent unions; no implementation
+  milestone has yet been selected. Non-death union dissolution is now proposed
+  for milestone 4 above.
 
 R formula-fallback performance benchmarking belongs to milestone 2's final
 validation report. It is not deferred beyond that milestone. Broader existing
