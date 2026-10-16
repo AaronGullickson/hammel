@@ -4,8 +4,8 @@ Updated October 15, 2026 from the user's milestone 2 request.
 **Status: core milestone implementation is in place: both search modes,
 conditional-logit matching, age/kin/exclusivity restrictions, status-specific
 fertility, widowhood, and separate optional nonmarital father matching. The
-failed-match birth cancellation is implemented (default TRUE); fertility
-compensation remains required work. The poor-pool wait alternative is under consideration and may be postponed.
+failed-match birth cancellation is implemented (default TRUE); transition-aware fertility
+compensation is deferred (D045); final validation remains. The poor-pool wait alternative is deferred to a later milestone (D044).
 Demographic validation and user acceptance remain outstanding (D042).**
 Every simulation requires a union-formation process. Current-partner lookup
 and union histories are common infrastructure for all initiation modes.
@@ -35,8 +35,8 @@ Partner selection uses conditional-logit choice probabilities over eligible men.
 Users must be able to specify a flexible matching model; milestone 2 considers
 age difference only, while leaving room for later characteristics. The user selected configurable sampling from the available male pool before
 pair-specific screening, following the inspected SOCSIM ordering.
-A wait/no-partner alternative for a poor pool remains under consideration for
-milestone 2 and may be postponed; utility, scope and retry details are unresolved. Eligibility uses the
+A wait/no-partner alternative for a poor pool is deferred to a later milestone
+(D044); its utility, scope and retry details have not been selected. Eligibility uses the
 accepted age, generation-distance kin and exclusivity restrictions below.
 SOCSIM is an investigation reference, not an adopted matching algorithm.
 
@@ -355,7 +355,7 @@ outside fertility ages can still form a union, but cannot produce births.
 
 After a failed search, draw another waiting time from the same age-specific
 schedule starting at the attempt time, as selected by the user. Waiting/refusal for poor nonempty pools is
-still deferred until after this rate increment.
+deferred to a later milestone (D044).
 
 ## Fertility schedules by union status (D039)
 
@@ -384,8 +384,8 @@ same-person birth/search tie. Cross-person ties retain queue insertion order.
 
 Apply existing midpoint compensation independently within each schedule; do not
 integrate across statuses or claim calibrated status-specific ASFR recovery
-around transitions. Transition compensation is required remaining work for milestone 2 (D042);
-no corrective algorithm has yet been selected.
+around transitions. Transition-aware compensation is deferred under D045;
+its bias is unquantified and no corrective algorithm has been selected.
 
 Worked cases: overall rate 0.1 applies to both statuses with a rate-mode warning.
 Unpartnered rate zero and partnered rate 0.2 reproduces the former gate explicitly.

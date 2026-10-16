@@ -650,3 +650,31 @@ reasons are retained. This supersedes generic death labels in earlier entries.
 - **Retry:** accepted by the user: redraw from the attempt time without starting
   a new birth-spacing interval or changing the last actual birth. No correction
   should erase the intended fertility effect of failed matches.
+
+
+## D044: Defer poor-pool waiting to a later milestone
+
+- **Status:** accepted by the user October 15, 2026; supersedes D042's open scope.
+- **Decision:** postpone the option to decline a nonempty eligible pool and wait
+  to a later milestone. It is not a milestone 2 completion requirement.
+- **Current behavior:** a nonempty screened pool always yields a selection via
+  conditional-logit matching. Empty searches retain existing retry behavior;
+  unmatched births follow `cancel_birth_if_no_match` (default TRUE).
+- **Remaining milestone 2 work:** fertility compensation and final demographic
+  validation/report, including R formula-fallback performance benchmarking.
+
+
+## D045: Defer transition-aware fertility compensation
+
+- **Status:** accepted by the user October 15, 2026; supersedes D042/D044's
+  remaining implementation requirement.
+- **Decision:** postpone correction of fertility compensation across union-status
+  transitions and changes of rates between simulation runs to later work. Retain
+  per-schedule midpoint compensation and spacing based on actual recorded births.
+  No individual rate-history or dynamic exposure correction is implemented.
+- **Evidence boundary:** the user expects the bias may be small, but its magnitude
+  has not been quantified. Do not claim negligible bias or calibrated conditional
+  ASFR recovery; assess discrepancies in final validation and retain the limitation.
+- **Milestone 2:** final demographic validation/report remains, including the
+  R formula-fallback performance benchmark. Completion still requires user
+  acceptance. Poor-pool waiting and previous-father continuity remain deferred.

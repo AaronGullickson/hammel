@@ -349,8 +349,9 @@ schedule, so realized fertility can temporarily differ from the new target.
 Magnitude and duration have not been quantified; there is no guaranteed
 nine-month convergence deadline. A recent-schedule history and time-dependent
 adjustment were discussed as possible future treatments; the user explicitly
-deferred correction at that time. D042 brings transition compensation into milestone 2
-scope; the corrective algorithm and validation target still require agreement.
+deferred correction at that time. D045 defers transition-aware compensation again, including union-status
+transitions and rate changes between runs. The bias remains unquantified; the
+existing adjustment and actual-birth spacing are retained.
 
 ## Validation requirements and future mechanism specifications
 

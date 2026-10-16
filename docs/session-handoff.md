@@ -61,8 +61,8 @@ issue was created as part of recording completion. Follow the user's next reques
   report under D042. See [testing](testing.md#deferred-matching-performance-comparison).
 
 - Initial fertility calibration: retain simple initialization and assess burn-in.
-- Fertility compensation across status/rate transitions: required remaining
-  milestone 2 work (D042); no corrective algorithm selected.
+- Fertility compensation across status/rate transitions: deferred under D045;
+  no corrective algorithm selected and bias remains unquantified.
 - African historical benchmark/new rate-source preparation: postponed.
 - Non-death union dissolution remains beyond milestone 2. Union formation and
   matching are now active specification work, with detailed choices still open.
@@ -109,7 +109,7 @@ No column means an overall schedule. Rate mode applies overall fertility to
 both statuses with one warning per call; on-demand rejects conditional tables.
 Rate-mode unpartnered births select fathers without unions under D040. Transitions
 switch schedules with global maternal spacing retained. Compensation is computed
-separately per status; transition compensation is required remaining work (D042). Full suite:
+separately per status; transition-aware compensation is deferred (D045). Full suite:
 2269 passing expectations, no failures/warnings, one intentional live-data skip.
 
 ### Nonmarital father selection (D040; October 15, 2026)
@@ -138,10 +138,9 @@ preference is deferred to a later milestone (D042).
 
 ### Revised completion queue (D042; October 15, 2026)
 
-Required before milestone 2 completion: fertility compensation and demographic
-validation/report. The cancellation toggle is implemented under D043 below.
-Specify the compensation method before implementing dependent behavior. The wait alternative is under
-consideration and may be postponed. Previous-father continuity is deferred to
+Required before milestone 2 completion: final demographic validation/report
+(transition-aware compensation is deferred under D045). The cancellation toggle is implemented under D043 below.
+Specify the compensation method before implementing dependent behavior. The poor-pool wait alternative is deferred to a later milestone (D044). Previous-father continuity is deferred to
 a later milestone. Test R formula-fallback performance in the final validation
 report. No new simulation behavior or numerical acceptance criteria were adopted
 by this scope update.
@@ -157,3 +156,21 @@ FALSE explicitly preserves unknown-father births. Initial missing parent IDs
 remain unchanged. Old process objects lacking the required logical toggle must
 be reconstructed with the current constructor. Full suite: 2403 passing
 expectations, no failures/warnings, one intentional live-data skip.
+
+
+### Poor-pool waiting deferred (D044; October 15, 2026)
+
+The user postponed declining a poor nonempty candidate pool to a later milestone.
+Current matching always selects from nonempty screened pools. Empty-search
+retries and failed-match birth cancellation retain their existing rules.
+Milestone 2 remaining work is final demographic validation/report, including
+the R formula-fallback benchmark; compensation is deferred under D045.
+
+
+### Transition compensation deferred (D045; October 15, 2026)
+
+The user postponed compensation changes across union-status/rate transitions.
+Retain the current per-schedule midpoint adjustment and spacing from recorded
+births. Bias is unquantified, not established negligible. Final validation/report
+and user acceptance remain before milestone 2 completion, including the R formula
+fallback performance benchmark. No simulation behavior changed in this decision.
