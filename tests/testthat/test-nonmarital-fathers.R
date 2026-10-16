@@ -92,3 +92,66 @@ test_that("a father's death removes him from later nonmarital choices", {
   expect_true(all(children$father_id[children$birth_time < death] == 2))
   expect_true(all(is.na(children$father_id[children$birth_time > death])))
 })
+
+test_that("father_matching defaults to the general model and validates edited objects", {
+  general <- create_matching_model(~ age_difference, c(age_difference = 0.1))
+  process <- union_formation("on_demand", general)
+  expect_null(process$father_matching)
+  expect_identical(union_formation("on_demand", general, father_matching = general)$father_matching,
+                   general)
+  expect_error(union_formation("on_demand", general, father_matching = "invalid"), "matching")
+  model <- make_nonmarital_model(3)
+  model$population$persons$birth_time[3] <- -30
+  model$processes$union_formation$matching <- general
+  baseline <- simulate(model, 0.5, seed = 52)
+  explicit <- model
+  explicit$processes$union_formation$father_matching <- general
+  expect_identical(simulate(explicit, 0.5, seed = 52), baseline)
+  # Resolve NULL against the current general model, including edited models.
+  model$processes$union_formation$matching$coefficients[] <- -100
+  explicit$processes$union_formation$father_matching <- model$processes$union_formation$matching
+  expect_identical(simulate(model, 0.5, seed = 52), simulate(explicit, 0.5, seed = 52))
+  explicit$processes$union_formation$father_matching$coefficients <- c(other = 1)
+  expect_error(set_process(hammel_model(), explicit$processes$union_formation), "Coefficient names")
+  expect_error(simulate(explicit, 0), "Coefficient names")
+  updated <- set_union_formation(model, "rate", general,
+    rates = model$processes$union_formation$rates, father_matching = general)
+  expect_identical(updated$processes$union_formation$father_matching, general)
+})
+
+test_that("father_matching changes nonmarital fathers but not later union choices", {
+  model <- make_nonmarital_model(3)
+  model$population$persons$birth_time[3] <- -30
+  model$processes$union_formation$matching <- create_matching_model(
+    ~ age_difference, c(age_difference = 100))
+  model$processes$union_formation$father_matching <- create_matching_model(
+    ~ age_difference, c(age_difference = -100))
+  model$processes$union_formation$rates <- data.frame(
+    age_start = 20.5, age_end = Inf, rate = 100)
+  result <- simulate(model, 1, seed = 52)
+  expect_equal(result$unions$husband_id, 3)
+  children <- result$persons[result$persons$birth_time >= 0, ]
+  before <- children$birth_time < result$unions$start_time[1]
+  expect_true(any(before))
+  expect_true(any(!before))
+  expect_true(all(children$father_id[before] == 2))
+  expect_true(all(children$father_id[!before] == 3))
+})
+
+test_that("father_matching supports the R formula fallback and is unused on demand", {
+  model <- make_nonmarital_model(3)
+  model$population$persons$birth_time[3] <- -30
+  model$processes$union_formation$father_matching <- create_matching_model(
+    ~ age_difference, c(age_difference = -0.1))
+  native <- simulate(model, 1, seed = 72)
+  model$processes$union_formation$father_matching <- create_matching_model(
+    ~ I(age_difference^3), c("I(age_difference^3)" = -0.001))
+  # With available gaps 0 and 10 both utility specifications are identical.
+  expect_identical(simulate(model, 1, seed = 72), native)
+  model$processes$union_formation$initiation <- "on_demand"
+  model$processes$union_formation$rates <- NULL
+  model <- set_fertility(model, data.frame(age_start = 15, age_end = 50, rate = 20), 0)
+  alternative <- simulate(model, 0.5, seed = 52)
+  model$processes$union_formation$father_matching <- NULL
+  expect_identical(simulate(model, 0.5, seed = 52), alternative)
+})

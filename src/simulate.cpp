@@ -296,7 +296,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   double birth_interval, DataFrame unions,
                   int sample_size, List matching, double min_male_age,
                   int kinship_generations, bool rate_initiation,
-                  DataFrame union_rates) {
+                  DataFrame union_rates, List father_matching) {
   // R performs input validation and seed handling. All engine state below is
   // local to this call; public times and rates remain in years and person-years.
   NumericVector ids = persons["person_id"], births = persons["birth_time"];
@@ -382,18 +382,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   }
   // All father and partner searches share sampling, eligibility and matching.
   // Only form_union changes partner state or removes the selected man.
-  auto find_candidate = [&](int woman, double now) {
+  auto find_candidate = [&](int woman, double now, const List& choice_model) {
     if (males.empty()) return -1;
     const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
                                              sampling_workspace);
     const auto eligible = screen_male_candidates(males, sample, people, now, min_male_age,
                                                  woman, kinship);
-    return select_partner(males, eligible, people, woman, matching);
+    return select_partner(males, eligible, people, woman, choice_model);
   };
   auto form_union = [&](int woman, double now) {
     int partner = current_partner[woman];
     if (partner >= 0) return partner;
-    partner = find_candidate(woman, now);
+    partner = find_candidate(woman, now, matching);
     if (partner >= 0) {
       if (next_union_id >= 9007199254740991.0 ||
           union_history.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
@@ -499,7 +499,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       if (!rate_initiation && partner < 0) partner = form_union(i, now);
       // A nonmarital father stays available: parentage alone is not a union.
       const int father_position = partner >= 0 ? partner :
-        (rate_initiation ? find_candidate(i, now) : -1);
+        (rate_initiation ? find_candidate(i, now, father_matching) : -1);
       if (father_position >= 0) father = people[father_position].id;
       // If no sampled men are eligible, preserve the birth with unknown father and no union.
       if (next_id >= 9007199254740991.0 ||

@@ -315,3 +315,13 @@ conditional-logit choice frequencies, paternal kin links, later union selection,
 restart reconstruction and seed isolation. Existing status-specific birth-count
 tests now expect selected nonmarital fathers where candidates qualify. No
 preferential father persistence parameter is implemented or validated.
+
+### Separate father matching (D041; October 15, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test()'` passed 2328
+expectations with no test failures/warnings and one intentional live-data skip.
+Checks cover NULL/default and explicit-general equivalence under a fixed seed,
+current-general fallback after edits, constructor/attachment/simulation validation,
+opposite father/union preferences, native/R formula fallback agreement, and
+on-demand ignoring the optional father model. Debug compilation emitted the
+existing `_FORTIFY_SOURCE` warning from its `-O0` build settings.

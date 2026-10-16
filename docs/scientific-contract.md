@@ -208,7 +208,9 @@ changes. No qualifying sampled candidate leaves the father unknown while
 preserving the birth. Paternal links are appended to the kinship graph before
 subsequent events. Partnered births use the current husband. No special
 preference for an earlier child's father is implemented; that remains unresolved.
-Separate father/partner matching models are explicitly deferred. Birth and search candidates
+An optional `father_matching` specification applies only to unpartnered
+rate-mode births; NULL uses the current general `matching` model. Union searches
+always use the general model. Both follow the same formula contract. Birth and search candidates
 compete while unpartnered; death wins exact ties, followed by birth then search.
 
 A new union or husband's death invalidates the woman's pending event and

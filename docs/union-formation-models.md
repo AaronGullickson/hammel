@@ -395,8 +395,9 @@ labels/incomplete tables, independent compensation and RNG isolation.
 
 For a birth to an unpartnered woman in rate mode, select a father from the same
 living, currently unpartnered male vector used for union searches. Use the union
-process's sample size, sample-before-screening rule, minimum male age, known-kin
-exclusion and conditional-logit matching formula/coefficients. Selection is at
+process's sample size, sample-before-screening rule, minimum male age and known-kin
+exclusion. Use `father_matching` when provided, otherwise the general
+conditional-logit matching formula/coefficients. Selection is at
 birth time, before the newborn enters the population. Empty or entirely rejected
 samples preserve the birth with an unknown father and no refill.
 
@@ -405,8 +406,8 @@ the man from availability, or changing his event schedule. Record paternal links
 in the shared kinship graph immediately. Subsequent nonmarital births/searches
 use the same ordinary selection procedure, with no preferential reuse of an
 earlier child's father. Such preferential reuse is an unresolved extension;
-there is no new persistence parameter. Father selection and partner selection
-could use different models in a later extension, explicitly deferred by the user.
+there is no new persistence parameter. Father selection and partner selection can use separate matching models
+under D041 below.
 
 Worked cases: with one eligible unpartnered man, multiple nonmarital births can
 all name him while union history stays empty. If that man forms a union with
@@ -414,3 +415,27 @@ another woman, he is unavailable for further nonmarital father selection. With
 no eligible men, births continue with unknown fathers. Selection can repeat the
 same man by chance without implying a continuing partnership. Paternal half
 siblings share the recorded father in kinship extraction/screening.
+
+## Separate nonmarital father matching (D041)
+
+`union_formation()` and `set_union_formation()` accept `father_matching = NULL`.
+A non-NULL value must be a `create_matching_model()` specification with the same
+formula contract as general `matching`. Only rate-mode births to unpartnered
+women use this model. NULL resolves to the current general model at execution,
+not a copy frozen at process construction. Existing objects without the field
+also resolve to the general model.
+
+Union searches, including on-demand searches, always use `matching`; partnered
+births still use the current partner. On-demand mode does not use the optional
+father model. Validate any supplied model at construction, attachment and
+simulation, including zero-duration runs. Candidate pool, sampling, age/kin
+eligibility, parentage-only state changes and unknown-father fallback are shared.
+Both matching models support native linear/quadratic evaluation and R formula
+fallback. No new previous-father preference is introduced.
+
+Worked case: with equally available men at age gaps 0 and 10, general utility
+`100*d` selects the older man for unions, while father utility `-100*d` selects
+the younger man for nonmarital fatherhood. Setting father_matching to NULL
+restores the general utility and must reproduce an explicitly identical model
+under the same seed. Separate coefficients affect selection, not search hazards
+or fertility schedules.

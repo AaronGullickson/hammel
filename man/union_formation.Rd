@@ -11,7 +11,8 @@ union_formation(
   sample_size = 1000,
   rates = NULL,
   min_male_age = 15,
-  kinship_generations = 2
+  kinship_generations = 2,
+  father_matching = NULL
 )
 
 set_union_formation(
@@ -21,7 +22,8 @@ set_union_formation(
   sample_size = 1000,
   rates = NULL,
   min_male_age = 15,
-  kinship_generations = 2
+  kinship_generations = 2,
+  father_matching = NULL
 )
 }
 \arguments{
@@ -50,6 +52,12 @@ Zero imposes no cross-person kin exclusion. Missing ancestry is not proof of
 unrelatedness; only demonstrated relationships are screened. Existing unions
 are retained. See \code{\link[=extract_kin]{extract_kin()}} for the shared distance definitions.}
 
+\item{father_matching}{Optional matching specification for fathers of
+unpartnered births in rate mode, created by \code{\link[=create_matching_model]{create_matching_model()}}.
+Defaults to \code{NULL}, using the current general \code{matching} model. Union
+searches always use \code{matching}. Not used by on-demand initiation. Sampling
+and eligibility settings are shared by both models.}
+
 \item{model}{A \code{hammel_model} object.}
 }
 \value{
@@ -72,7 +80,8 @@ a search. Failed searches draw another waiting time; formation and widowhood
 switch fertility schedules while preserving spacing. An overall fertility
 schedule applies to both statuses, with a simulation warning. On-demand mode
 requires an overall fertility schedule. Unpartnered rate-mode births use the
-same candidate sampling, eligibility and matching to assign a father without
+same candidate sampling and eligibility to assign a father, using
+\code{father_matching} when supplied or otherwise \code{matching}, without
 forming a union or removing him from availability. Empty screened pools
 preserve births with unknown fathers. No previous-father preference is applied.
 }

@@ -192,5 +192,7 @@ covering sampling, screening and matching. Only `form_union` updates partner
 caches and removes the man from the available pool. Parentage alone leaves
 both parties unpartnered; the newborn's father index is appended to kinship
 independently of current-partner state. No candidate sets or additional
-persistence state are retained. Different father/partner matching models are
-deferred; previous-father preference remains unresolved.
+persistence state are retained. `father_matching = NULL` resolves to the general model at execution; an explicit
+model supplies a separately prepared scorer only for nonmarital father selection.
+Both scorers use the native evaluator or R formula fallback. Previous-father
+preference remains unresolved.

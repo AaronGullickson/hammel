@@ -610,3 +610,14 @@ reasons are retained. This supersedes generic death labels in earlier entries.
 - **Validation:** father assignment without unions, repeated availability,
   partnered/dead/young/kin exclusions, matching probabilities, known paternal
   links in kinship, retained births when no candidate qualifies, and restarts.
+
+## D041: Optional separate nonmarital father matching model
+
+- **Status:** accepted by the user October 15, 2026; supersedes D040's deferral.
+- **Decision:** add `father_matching = NULL` to union constructors/setters. NULL
+  uses the current general `matching` model; an explicit model applies only to
+  unpartnered rate-mode births. All union searches retain the general model.
+  Sampling, eligibility and parentage/state semantics remain shared.
+- **Validation:** constructor/edited-object checks, exact fallback equivalence,
+  opposite preference models separating births from unions, and native versus
+  R formula evaluation. Preferential reuse of previous fathers remains unresolved.

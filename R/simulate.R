@@ -18,7 +18,8 @@
 #' and switches to unpartnered fertility; a new union switches to partnered
 #' fertility, preserving birth spacing. Unpartnered births do not trigger searches
 #' in rate mode. Instead, select a father using the same available male pool,
-#' screening and matching model, without forming a union or reserving the man.
+#' screening and `father_matching` model (falling back to `matching`), without
+#' forming a union or reserving the man.
 #' If no candidate qualifies the father is unknown. On-demand mode rejects
 #' status schedules.
 #'
@@ -122,15 +123,18 @@ simulate <- function(model, years, seed = NULL) {
   result <- population
   births <- deaths <- 0
   if (years > 0) {
+    matching <- prepare_matching_model(union_process$matching)
+    father_matching <- if (is.null(union_process$father_matching)) matching else
+      prepare_matching_model(union_process$father_matching)
     native <- simulate_cpp(population$persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
-                           sample_size, prepare_matching_model(union_process$matching),
+                           sample_size, matching,
                            union_process$min_male_age,
                            as.integer(union_process$kinship_generations),
                            union_process$initiation == "rate",
                            if (is.null(union_process$rates))
                              data.frame(age_start = numeric(), age_end = numeric(), rate = numeric())
-                           else union_process$rates)
+                           else union_process$rates, father_matching)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {

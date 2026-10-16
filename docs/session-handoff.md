@@ -122,3 +122,14 @@ previous father at another birth/union remains unresolved. The pinned ordinary
 SOCSIM paths have no such preferential reuse; its optional random-father fallback
 also differs by allowing partnered men and not using spouse scores. Full suite:
 2313 passing expectations, no failures/warnings, one intentional live-data skip.
+
+
+### Optional father-matching model (D041; October 15, 2026)
+
+`union_formation()` and `set_union_formation()` now accept `father_matching = NULL`
+as a trailing argument. NULL uses the current general `matching` specification;
+an explicit model affects only unpartnered rate-mode father selection. General
+matching still governs all union searches and on-demand initiation. Both models
+are validated/prepared independently; candidate sampling and eligibility remain
+shared. This supersedes D040's separate-model deferral. Previous-father
+preference remains unresolved.

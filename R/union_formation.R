@@ -134,7 +134,8 @@ prepare_matching_model <- function(matching) {
 #' switch fertility schedules while preserving spacing. An overall fertility
 #' schedule applies to both statuses, with a simulation warning. On-demand mode
 #' requires an overall fertility schedule. Unpartnered rate-mode births use the
-#' same candidate sampling, eligibility and matching to assign a father without
+#' same candidate sampling and eligibility to assign a father, using
+#' `father_matching` when supplied or otherwise `matching`, without
 #' forming a union or removing him from availability. Empty screened pools
 #' preserve births with unknown fathers. No previous-father preference is applied.
 #'
@@ -148,6 +149,11 @@ prepare_matching_model <- function(matching) {
 #' @param initiation Either `"on_demand"` for birth-triggered searches or
 #'   `"rate"` for scheduled searches. No default is selected.
 #' @param matching A specification created by [create_matching_model()].
+#' @param father_matching Optional matching specification for fathers of
+#'   unpartnered births in rate mode, created by [create_matching_model()].
+#'   Defaults to `NULL`, using the current general `matching` model. Union
+#'   searches always use `matching`. Not used by on-demand initiation. Sampling
+#'   and eligibility settings are shared by both models.
 #' @param sample_size Nonnegative whole number of men to sample before screening;
 #'   zero requests the whole pool. Defaults to `1000`.
 #' @param min_male_age Minimum male age in continuous years at a new partner
@@ -169,11 +175,12 @@ prepare_matching_model <- function(matching) {
 #'   `set_union_formation()` returns an updated model. Rate tables are tibbles.
 #' @export
 union_formation <- function(initiation, matching, sample_size = 1000, rates = NULL,
-                            min_male_age = 15, kinship_generations = 2) {
+                            min_male_age = 15, kinship_generations = 2,
+                            father_matching = NULL) {
   process <- structure(list(
     name = "union_formation", initiation = initiation, matching = matching,
     sample_size = sample_size, min_male_age = min_male_age,
-    kinship_generations = kinship_generations,
+    kinship_generations = kinship_generations, father_matching = father_matching,
     rates = rates, rate_unit = "person_year",
     sampling_stage = "before_pair_screening"
   ), class = c("hammel_union_formation", "hammel_process"))
@@ -188,9 +195,10 @@ union_formation <- function(initiation, matching, sample_size = 1000, rates = NU
 #' @rdname union_formation
 #' @export
 set_union_formation <- function(model, initiation, matching, sample_size = 1000, rates = NULL,
-                            min_male_age = 15, kinship_generations = 2) {
+                            min_male_age = 15, kinship_generations = 2,
+                            father_matching = NULL) {
   set_process(model, union_formation(initiation, matching, sample_size, rates,
-                                     min_male_age, kinship_generations))
+                                     min_male_age, kinship_generations, father_matching))
 }
 
 validate_union_formation <- function(process) {
@@ -216,6 +224,7 @@ validate_union_formation <- function(process) {
   }
   validate_kinship_generations(process$kinship_generations)
   validate_matching_model(process$matching)
+  if (!is.null(process$father_matching)) validate_matching_model(process$father_matching)
   if (process$initiation == "on_demand") {
     if (!is.null(process$rates)) {
       stop("On-demand union formation does not take rates.", call. = FALSE)

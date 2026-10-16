@@ -88,8 +88,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // simulate_cpp
-List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, DataFrame unions, int sample_size, List matching, double min_male_age, int kinship_generations, bool rate_initiation, DataFrame union_rates);
-RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP unionsSEXP, SEXP sample_sizeSEXP, SEXP matchingSEXP, SEXP min_male_ageSEXP, SEXP kinship_generationsSEXP, SEXP rate_initiationSEXP, SEXP union_ratesSEXP) {
+List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, DataFrame unions, int sample_size, List matching, double min_male_age, int kinship_generations, bool rate_initiation, DataFrame union_rates, List father_matching);
+RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP unionsSEXP, SEXP sample_sizeSEXP, SEXP matchingSEXP, SEXP min_male_ageSEXP, SEXP kinship_generationsSEXP, SEXP rate_initiationSEXP, SEXP union_ratesSEXP, SEXP father_matchingSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -106,7 +106,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type kinship_generations(kinship_generationsSEXP);
     Rcpp::traits::input_parameter< bool >::type rate_initiation(rate_initiationSEXP);
     Rcpp::traits::input_parameter< DataFrame >::type union_rates(union_ratesSEXP);
-    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching, min_male_age, kinship_generations, rate_initiation, union_rates));
+    Rcpp::traits::input_parameter< List >::type father_matching(father_matchingSEXP);
+    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -118,7 +119,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_adjusted_fertility_cpp", (DL_FUNC) &_hammel_adjusted_fertility_cpp, 2},
     {"_hammel_inspect_matching_cpp", (DL_FUNC) &_hammel_inspect_matching_cpp, 3},
     {"_hammel_sample_male_positions_cpp", (DL_FUNC) &_hammel_sample_male_positions_cpp, 2},
-    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 13},
+    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 14},
     {NULL, NULL, 0}
 };
 
