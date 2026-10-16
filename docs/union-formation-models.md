@@ -1,10 +1,11 @@
 # Milestone 2: union formation
 
 Updated October 15, 2026 from the user's milestone 2 request.
-**Status: milestone scope accepted (D030); detailed demographic rules below
-remain proposals or open decisions. Process construction and formula scoring
-and conditional-logit on-demand execution with minimum male age and known-kin
-screening are implemented; exclusive ongoing unions are enforced; rate-based female search initiation is implemented.**
+**Status: core milestone implementation is in place: both search modes,
+conditional-logit matching, age/kin/exclusivity restrictions, status-specific
+fertility, widowhood, and separate optional nonmarital father matching. The
+poor-pool wait alternative remains in milestone 2 scope but unimplemented;
+demographic validation and user acceptance remain outstanding.**
 Every simulation requires a union-formation process. Current-partner lookup
 and union histories are common infrastructure for all initiation modes.
 
@@ -16,7 +17,7 @@ model is deliberately agnostic about legal marriage, long-term cohabitation,
 and other union types. Milestone 2 does not introduce a legal-marital-status
 classification. At the user's request, union tables nevertheless use explicit
 `wife_id` (female) and `husband_id` (male) roles so sex is clear. Conditional fertility refers to whether a woman is in an
-ongoing union, subject to the detailed exposure rules still to be specified.
+ongoing union; input rates use woman-years in the indicated status.
 
 ## Accepted scope
 
@@ -33,17 +34,16 @@ Partner selection uses conditional-logit choice probabilities over eligible men.
 Users must be able to specify a flexible matching model; milestone 2 considers
 age difference only, while leaving room for later characteristics. The user selected configurable sampling from the available male pool before
 pair-specific screening, following the inspected SOCSIM ordering.
-A wait/no-partner alternative for a poor pool is under consideration, not yet
-selected. Eligibility screening must support kin exclusions, including incest
-and cousin relationships; exact prohibited relationships remain to be specified.
+A wait/no-partner alternative for a poor pool remains selected for milestone 2,
+but its utility, scope and retry details are unresolved. Eligibility uses the
+accepted age, generation-distance kin and exclusivity restrictions below.
 SOCSIM is an investigation reference, not an adopted matching algorithm.
 
 Scheduled-search mode must support partnered and unpartnered fertility inputs.
 Parity-specific fertility is deferred to a later milestone; milestone 2 does
 not add parity conditioning. Union dissolution is excluded except when a
-partner dies (widowhood). The user
-has not yet decided overlapping-union rules, remarriage eligibility, or search
-behavior following widowhood. The construction interface below adds no major dependency.
+partner dies (widowhood). Exclusive ongoing unions, return of widowed men to
+availability and renewed female rate searches after widowhood are implemented. The construction interface below adds no major dependency.
 
 ## Implemented construction interface
 
@@ -57,7 +57,7 @@ deterministic and must not mutate state. Data-dependent transformations require
 care: their basis can depend on the candidate pool. There is no fitted-model
 estimation interface yet.
 
-`union_formation(initiation, matching, sample_size = 1000, rates = NULL, min_male_age = 15, kinship_generations = 2)` constructs
+`union_formation(initiation, matching, sample_size = 1000, rates = NULL, min_male_age = 15, kinship_generations = 2, father_matching = NULL)` constructs
 a process; `set_union_formation(model, ...)` attaches it. Initiation is explicitly
 `"on_demand"` or `"rate"`; initiation and coefficients have no defaults.
 The user selected a default sample size of 1000. `sample_size = 0` means use the full available pool; a positive
@@ -65,15 +65,16 @@ integer requests up to that many men without replacement BEFORE pair-specific
 eligibility screening. Screening can leave no candidates. Rate-mode tables
 contain female search-attempt hazards by age (`age_start`, `age_end`, `rate`),
 in years and per person-year, with no calendar or sex columns; on-demand mode
-rejects rates. This construction layer retains schedules without assigning
-unresolved execution eligibility, retry, or gap behavior. Tables are tibbles
+rejects rates. Search hazards apply to unpartnered women; gaps have zero hazard and failed
+searches draw a new waiting time. Tables are tibbles
 and rate provenance is preserved. Edited specifications are checked on attachment.
 
 Worked scoring example: with `~ age_difference` and coefficient `log(2)`,
 three eligible candidates whose gaps are 0, 1, and 2 have relative weights
 1, 2, and 4 and probabilities 1/7, 2/7, and 4/7. With utilities 1000 and 2000,
 subtracting the maximum before exponentiation avoids overflow. An empty pool
-has no partner probabilities; its demographic consequences remain undecided.
+has no partner probabilities: preserve births without a father, or reschedule
+a failed rate search, as appropriate.
 These are controlled mathematical cases, not suggested demographic defaults.
 
 The internal scoring helper is tested against these analytical cases. The

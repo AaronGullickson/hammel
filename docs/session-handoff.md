@@ -94,11 +94,11 @@ Status-specific fertility is implemented (D039); refusal/wait remains future wor
 
 ### Requested coherent empirical example
 
-Find a future validation/example population-period with union-entry (or legal
-marriage) rates plus partnered/married and unpartnered/unmarried fertility rates.
-Five-year age bands are acceptable. Prefer a common source and consistent
-status/exposure definitions; do not combine unrelated schedules and present
-them as a coherent empirical case. No dataset has yet been selected.
+England and Wales 2015 is now the selected empirical example. `validation/data`
+contains female marriage rates, partnered/unpartnered and overall fertility,
+tidy ONS Table 6 for 1999-2015, the source workbook, provenance and extraction
+script. Published age groups are retained. Legal marital status includes
+cohabiting women among unmarried women; non-death dissolution is not simulated.
 
 
 ### Status-specific fertility (D039; October 15, 2026)
