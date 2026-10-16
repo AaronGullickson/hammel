@@ -296,7 +296,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   double birth_interval, DataFrame unions,
                   int sample_size, List matching, double min_male_age,
                   int kinship_generations, bool rate_initiation,
-                  DataFrame union_rates, List father_matching) {
+                  DataFrame union_rates, List father_matching,
+                  bool cancel_birth_if_no_match) {
   // R performs input validation and seed handling. All engine state below is
   // local to this call; public times and rates remain in years and person-years.
   NumericVector ids = persons["person_id"], births = persons["birth_time"];
@@ -500,6 +501,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       // A nonmarital father stays available: parentage alone is not a union.
       const int father_position = partner >= 0 ? partner :
         (rate_initiation ? find_candidate(i, now, father_matching) : -1);
+      if (father_position < 0 && cancel_birth_if_no_match) {
+        // No child was born: retain last_birth and redraw risks from this instant.
+        schedule(i, now);
+        continue;
+      }
       if (father_position >= 0) father = people[father_position].id;
       // If no sampled men are eligible, preserve the birth with unknown father and no union.
       if (next_id >= 9007199254740991.0 ||

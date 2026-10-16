@@ -1,3 +1,5 @@
+# General demographic fixtures explicitly preserve unmatched births. Tests of
+# cancellation and constructors separately exercise the production default TRUE.
 make_model <- function(n = 1000, sex = "m", age = 20, death_rate = 0,
            birth_rate = 0, birth_interval = 0.75) {
  persons <- data.frame(person_id = seq_len(n), sex = rep(sex, n),
@@ -10,7 +12,8 @@ make_model <- function(n = 1000, sex = "m", age = 20, death_rate = 0,
   set_fertility(data.frame(age_start = 15, age_end = 50, rate = birth_rate),
          birth_interval = birth_interval) |>
   set_union_formation("on_demand",
-    create_matching_model(~ age_difference, c(age_difference = 0)))
+    create_matching_model(~ age_difference, c(age_difference = 0)),
+    cancel_birth_if_no_match = FALSE)
 }
 
 make_rate_model <- function(n = 2, search_rate = 1, birth_rate = 0, birth_interval = 0) {
@@ -23,5 +26,5 @@ make_rate_model <- function(n = 2, search_rate = 1, birth_rate = 0, birth_interv
   set_union_formation(model, "rate",
     create_matching_model(~ age_difference, c(age_difference = 0)),
     rates = data.frame(age_start = 15, age_end = Inf, rate = search_rate),
-    sample_size = 0)
+    sample_size = 0, cancel_birth_if_no_match = FALSE)
 }

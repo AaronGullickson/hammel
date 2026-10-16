@@ -9,7 +9,8 @@ make_kinship_pair_model <- function(ego, relative, generations = 2) {
     set_fertility(data.frame(age_start = age, age_end = age + 1, rate = 20), birth_interval = 0) |>
     set_union_formation("on_demand",
       create_matching_model(~ age_difference, c(age_difference = 0)),
-      sample_size = 0, min_male_age = 0, kinship_generations = generations)
+      sample_size = 0, min_male_age = 0, kinship_generations = generations,
+      cancel_birth_if_no_match = FALSE)
 }
 
 test_that("R extraction and native eligibility agree on known relatives", {

@@ -124,7 +124,8 @@ prepare_matching_model <- function(matching) {
 #' the woman's current partner, or sample living, unpartnered men and choose a partner using
 #' conditional-logit probabilities from the matching formula to form a union.
 #' Sampled men below `min_male_age` are excluded. If no eligible sampled men
-#' remain, preserve the birth with unknown father. Known kin within
+#' remain, cancel the birth by default; `cancel_birth_if_no_match = FALSE`
+#' preserves it with unknown father. Known kin within
 #' `kinship_generations` on both sides of a common ancestor are excluded.
 #' Each person may have only one ongoing union. Partnered men are excluded
 #' before sampling; surviving husbands return to the pool at widowhood. Death ends affected
@@ -137,7 +138,7 @@ prepare_matching_model <- function(matching) {
 #' same candidate sampling and eligibility to assign a father, using
 #' `father_matching` when supplied or otherwise `matching`, without
 #' forming a union or removing him from availability. Empty screened pools
-#' preserve births with unknown fathers. No previous-father preference is applied.
+#' cancel births by default. No previous-father preference is applied.
 #'
 #' Sampling is from the available male pool BEFORE pair-specific screening.
 #' `sample_size = 0` means the whole pool. Otherwise sample without replacement
@@ -149,6 +150,12 @@ prepare_matching_model <- function(matching) {
 #' @param initiation Either `"on_demand"` for birth-triggered searches or
 #'   `"rate"` for scheduled searches. No default is selected.
 #' @param matching A specification created by [create_matching_model()].
+#' @param cancel_birth_if_no_match Logical, default `TRUE`. Cancel a birth when
+#'   its on-demand partner search or rate-mode nonmarital father selection fails.
+#'   Set `FALSE` to allow births with unknown fathers. Historical missing father
+#'   IDs are retained. A cancellation starts no new spacing interval and draws
+#'   fresh waiting times from the failed attempt. Partner scarcity can reduce
+#'   realized fertility below inputs.
 #' @param father_matching Optional matching specification for fathers of
 #'   unpartnered births in rate mode, created by [create_matching_model()].
 #'   Defaults to `NULL`, using the current general `matching` model. Union
@@ -176,11 +183,12 @@ prepare_matching_model <- function(matching) {
 #' @export
 union_formation <- function(initiation, matching, sample_size = 1000, rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
-                            father_matching = NULL) {
+                            father_matching = NULL, cancel_birth_if_no_match = TRUE) {
   process <- structure(list(
     name = "union_formation", initiation = initiation, matching = matching,
     sample_size = sample_size, min_male_age = min_male_age,
     kinship_generations = kinship_generations, father_matching = father_matching,
+    cancel_birth_if_no_match = cancel_birth_if_no_match,
     rates = rates, rate_unit = "person_year",
     sampling_stage = "before_pair_screening"
   ), class = c("hammel_union_formation", "hammel_process"))
@@ -196,9 +204,10 @@ union_formation <- function(initiation, matching, sample_size = 1000, rates = NU
 #' @export
 set_union_formation <- function(model, initiation, matching, sample_size = 1000, rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
-                            father_matching = NULL) {
+                            father_matching = NULL, cancel_birth_if_no_match = TRUE) {
   set_process(model, union_formation(initiation, matching, sample_size, rates,
-                                     min_male_age, kinship_generations, father_matching))
+                                     min_male_age, kinship_generations, father_matching,
+                                     cancel_birth_if_no_match))
 }
 
 validate_union_formation <- function(process) {
@@ -221,6 +230,10 @@ validate_union_formation <- function(process) {
   if (!is.numeric(age) || length(age) != 1L || !is.null(dim(age)) ||
       !is.finite(age) || age < 0) {
     stop("`min_male_age` must be a finite nonnegative number of years.", call. = FALSE)
+  }
+  cancel <- process$cancel_birth_if_no_match
+  if (!is.logical(cancel) || length(cancel) != 1L || !is.null(dim(cancel)) || is.na(cancel)) {
+    stop("`cancel_birth_if_no_match` must be TRUE or FALSE.", call. = FALSE)
   }
   validate_kinship_generations(process$kinship_generations)
   validate_matching_model(process$matching)

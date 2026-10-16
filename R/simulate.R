@@ -12,7 +12,8 @@
 #' Sampled men must meet the configured minimum age (default 15 years).
 #' Known kin are excluded within the configured generation bound on each side
 #' of a common ancestor (default two). Other eligibility rules remain pending.
-#' If no sampled men are eligible, preserve the birth with unknown father and no union.
+#' If no sampled men are eligible, cancel the birth by default. Explicitly set
+#' `cancel_birth_if_no_match = FALSE` to preserve it with unknown father.
 #' Rate initiation adds age-specific search events for unpartnered women only.
 #' Failed attempts draw another waiting time. Widowhood cancels pending births
 #' and switches to unpartnered fertility; a new union switches to partnered
@@ -20,7 +21,8 @@
 #' in rate mode. Instead, select a father using the same available male pool,
 #' screening and `father_matching` model (falling back to `matching`), without
 #' forming a union or reserving the man.
-#' If no candidate qualifies the father is unknown. On-demand mode rejects
+#' A failed match cancels the birth unless explicitly allowed by the union process.
+#' Cancellation starts no new birth-spacing interval. On-demand mode rejects
 #' status schedules.
 #'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
@@ -134,7 +136,8 @@ simulate <- function(model, years, seed = NULL) {
                            union_process$initiation == "rate",
                            if (is.null(union_process$rates))
                              data.frame(age_start = numeric(), age_end = numeric(), rate = numeric())
-                           else union_process$rates, father_matching)
+                           else union_process$rates, father_matching,
+                           union_process$cancel_birth_if_no_match)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {

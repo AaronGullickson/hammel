@@ -4,8 +4,8 @@ Updated October 15, 2026 from the user's milestone 2 request.
 **Status: core milestone implementation is in place: both search modes,
 conditional-logit matching, age/kin/exclusivity restrictions, status-specific
 fertility, widowhood, and separate optional nonmarital father matching. The
-failed-match birth cancellation toggle and fertility compensation remain required
-work. The poor-pool wait alternative is under consideration and may be postponed.
+failed-match birth cancellation is implemented (default TRUE); fertility
+compensation remains required work. The poor-pool wait alternative is under consideration and may be postponed.
 Demographic validation and user acceptance remain outstanding (D042).**
 Every simulation requires a union-formation process. Current-partner lookup
 and union histories are common infrastructure for all initiation modes.
@@ -74,8 +74,8 @@ Worked scoring example: with `~ age_difference` and coefficient `log(2)`,
 three eligible candidates whose gaps are 0, 1, and 2 have relative weights
 1, 2, and 4 and probabilities 1/7, 2/7, and 4/7. With utilities 1000 and 2000,
 subtracting the maximum before exponentiation avoids overflow. An empty pool
-has no partner probabilities: preserve births without a father, or reschedule
-a failed rate search, as appropriate.
+has no partner probabilities: follow the configured birth-cancellation policy
+or reschedule a failed rate search, as appropriate.
 These are controlled mathematical cases, not suggested demographic defaults.
 
 The internal scoring helper is tested against these analytical cases. The
@@ -96,8 +96,8 @@ coefficients to obtain utility V_j, then choose one candidate with probability
 
 Create the union at the birth time and use the selected man as father. A
 nonempty screened pool always produces a partner; there is no wait alternative. Empty
-pools preserve the birth with unknown father and no union. A future choice to
-cancel the birth is required remaining work for milestone 2 (D042). All-zero utilities give uniform probabilities.
+pools cancel the birth by default, or preserve it with unknown father when
+`cancel_birth_if_no_match = FALSE` (D043). All-zero utilities give uniform probabilities.
 Nonfinite formula values/utilities are errors, not silently excluded candidates.
 Formula evaluation cannot directly mutate engine population state. Candidate
 sets are not retained.
@@ -131,7 +131,8 @@ Worked availability cases: with 1000 partnered men and one unpartnered man,
 sample size 1 always samples the unpartnered man before age/kin screening.
 If he forms a union, a second woman cannot select him. If his wife dies,
 he returns to the pool and may form a later union; if he dies, he stays absent.
-If no unpartnered men remain, a birth proceeds with unknown father as before.
+If no unpartnered men remain, cancellation follows D043; explicitly disabling
+cancellation permits a birth with unknown father.
 Polygamy/polyamory is deferred and requires an explicit future model choice.
 
 Union formation/widowhood do not change
@@ -164,8 +165,8 @@ Worked cases: with a threshold of 15, ages 14.999 and 15 are respectively
 excluded and included. With threshold 16.5, age 16.25 is excluded and age 16.5
 included. A boy initially below the threshold can become eligible later in the
 same continuous run. With sample size 1, drawing a boy can leave an empty pool
-even if an older man exists outside the sample. At the user's direction, a pool emptied by screening preserves the birth
-with unknown father and no new union, just like an empty living-male pool.
+even if an older man exists outside the sample. A pool emptied by screening follows the configured birth-cancellation policy
+(D043), just like an empty available-male pool.
 
 Validate construction, attachment, and simulation of edited specifications;
 exercise exact/fractional boundaries, aging into eligibility, sampling before
@@ -275,9 +276,9 @@ These have not been verified with executable cases; do not claim complete parity
 ## Fertility and widowhood
 
 On-demand mode retains birth-triggered initiation. When no sampled candidate
-passes screening, the accepted behavior preserves the birth with unknown father
-and no new union. Requiring a match before a
-birth would change the supplied fertility target through partner availability.
+passes screening, the birth is cancelled by default (D043). Explicitly disabling
+cancellation preserves the birth with unknown father and no new union. Requiring
+a match allows partner availability to reduce realized fertility.
 
 Partnered and unpartnered fertility rates use woman-years in the current union
 status; the implemented schedule and transition rules are specified under D039 below. D028's population-ASFR midpoint compensation cannot simply be
@@ -402,7 +403,8 @@ process's sample size, sample-before-screening rule, minimum male age and known-
 exclusion. Use `father_matching` when provided, otherwise the general
 conditional-logit matching formula/coefficients. Selection is at
 birth time, before the newborn enters the population. Empty or entirely rejected
-samples preserve the birth with an unknown father and no refill.
+samples cancel the birth by default, or preserve it with unknown father when
+cancellation is explicitly disabled. Do not refill.
 
 Assign parentage without forming a union, updating current partners, removing
 the man from availability, or changing his event schedule. Record paternal links
@@ -415,7 +417,7 @@ under D041 below.
 Worked cases: with one eligible unpartnered man, multiple nonmarital births can
 all name him while union history stays empty. If that man forms a union with
 another woman, he is unavailable for further nonmarital father selection. With
-no eligible men, births continue with unknown fathers. Selection can repeat the
+no eligible men, births are cancelled unless unknown fathers are explicitly allowed. Selection can repeat the
 same man by chance without implying a continuing partnership. Paternal half
 siblings share the recorded father in kinship extraction/screening.
 
@@ -442,3 +444,27 @@ the younger man for nonmarital fatherhood. Setting father_matching to NULL
 restores the general utility and must reproduce an explicitly identical model
 under the same seed. Separate coefficients affect selection, not search hazards
 or fertility schedules.
+
+## Failed-match birth cancellation (D043)
+
+`union_formation()` and `set_union_formation()` accept the scalar logical
+`cancel_birth_if_no_match`, default TRUE. Reject missing, nonlogical or nonscalar
+values at construction, attachment and simulation validation. In on-demand mode
+this applies when the birth-triggered union search fails; in rate mode it applies
+when an unpartnered birth's father selection fails. An empty available pool or
+sample emptied by age/kin screening both count as failure. Do not refill samples.
+
+TRUE prevents creating the child when no father is selected. Do not allocate a
+person ID, append kinship links, draw newborn sex, increment births, or create a
+union for that failed attempt. FALSE explicitly retains the existing unknown-
+father birth behavior. Partnered births and successful matches are unaffected.
+Input persons with missing historical father IDs remain unchanged; this controls
+new births only. Search events without births retain their existing retry policy.
+Cancellation allows partner scarcity to depress realized fertility below inputs;
+fertility compensation must not silently restore those suppressed births.
+
+After cancellation redraw competing event waiting times from the failed attempt,
+using attained age and current status. Do not change last_birth or start a new
+birth-spacing interval; any spacing from an actual prior birth remains valid.
+A man becoming eligible after several cancellations can therefore be selected
+at the next sampled birth attempt, without an artificial spacing delay.

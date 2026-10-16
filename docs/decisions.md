@@ -639,3 +639,14 @@ reasons are retained. This supersedes generic death labels in earlier entries.
   validation report rather than as a separate implementation task. No benchmark
   result is claimed. Parity conditioning, non-death dissolution and multiple
   ongoing unions remain outside current scope.
+
+## D043: Failed-match birth cancellation defaults on
+
+- **Status:** toggle and default accepted by the user October 15, 2026.
+- **Decision:** add `cancel_birth_if_no_match = TRUE` to the union process. Apply
+  to failed on-demand partner matching and failed rate-mode nonmarital father
+  matching. FALSE explicitly permits new births with unknown father; input
+  histories are preserved. This supersedes default birth preservation in D031/D040.
+- **Retry:** accepted by the user: redraw from the attempt time without starting
+  a new birth-spacing interval or changing the last actual birth. No correction
+  should erase the intended fertility effect of failed matches.

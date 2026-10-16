@@ -15,7 +15,7 @@ not authorization for additional features. Start with the [documentation index](
   requires complete age/sex coverage ending in an open interval.
 - Conditional-logit on-demand union formation, partner-based father assignment,
   minimum male age (default 15), and known-kin exclusion (default two generations
-  on each side). Failed searches retain births with unknown father; exclusive
+  on each side). Failed matches cancel births by default (D043); exclusive
   ongoing unions are enforced before sampling (D037). Shared native kinship also backs R `extract_kin()`.
 - Output reuse with resampled candidates, not exact checkpoints.
 - Lexis exposure/counts, TFR, life tables, and population sizes; testthat suite
@@ -138,11 +138,22 @@ preference is deferred to a later milestone (D042).
 
 ### Revised completion queue (D042; October 15, 2026)
 
-Required before milestone 2 completion: failed-match birth cancellation toggle,
-fertility compensation, and demographic validation/report. Define the toggle's
-applicable birth pathways, effect on spacing/retry scheduling, and compensation
-method before implementing dependent behavior. The wait alternative is under
+Required before milestone 2 completion: fertility compensation and demographic
+validation/report. The cancellation toggle is implemented under D043 below.
+Specify the compensation method before implementing dependent behavior. The wait alternative is under
 consideration and may be postponed. Previous-father continuity is deferred to
 a later milestone. Test R formula-fallback performance in the final validation
 report. No new simulation behavior or numerical acceptance criteria were adopted
 by this scope update.
+
+
+### Birth cancellation (D043; October 15, 2026)
+
+`cancel_birth_if_no_match = TRUE` now defaults on in both union constructors.
+Failed on-demand searches and nonmarital father selections cancel the attempted
+birth without allocating IDs, recording births/kinship, drawing sex, or updating
+last_birth. Draw new waiting times immediately; no new spacing interval starts.
+FALSE explicitly preserves unknown-father births. Initial missing parent IDs
+remain unchanged. Old process objects lacking the required logical toggle must
+be reconstructed with the current constructor. Full suite: 2403 passing
+expectations, no failures/warnings, one intentional live-data skip.

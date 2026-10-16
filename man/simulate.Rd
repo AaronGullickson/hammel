@@ -32,7 +32,8 @@ probabilities from the matching formula to form a union at the birth.
 Sampled men must meet the configured minimum age (default 15 years).
 Known kin are excluded within the configured generation bound on each side
 of a common ancestor (default two). Other eligibility rules remain pending.
-If no sampled men are eligible, preserve the birth with unknown father and no union.
+If no sampled men are eligible, cancel the birth by default. Explicitly set
+\code{cancel_birth_if_no_match = FALSE} to preserve it with unknown father.
 Rate initiation adds age-specific search events for unpartnered women only.
 Failed attempts draw another waiting time. Widowhood cancels pending births
 and switches to unpartnered fertility; a new union switches to partnered
@@ -40,7 +41,8 @@ fertility, preserving birth spacing. Unpartnered births do not trigger searches
 in rate mode. Instead, select a father using the same available male pool,
 screening and \code{father_matching} model (falling back to \code{matching}), without
 forming a union or reserving the man.
-If no candidate qualifies the father is unknown. On-demand mode rejects
+A failed match cancels the birth unless explicitly allowed by the union process.
+Cancellation starts no new birth-spacing interval. On-demand mode rejects
 status schedules.
 }
 \details{

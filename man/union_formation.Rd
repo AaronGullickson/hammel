@@ -12,7 +12,8 @@ union_formation(
   rates = NULL,
   min_male_age = 15,
   kinship_generations = 2,
-  father_matching = NULL
+  father_matching = NULL,
+  cancel_birth_if_no_match = TRUE
 )
 
 set_union_formation(
@@ -23,7 +24,8 @@ set_union_formation(
   rates = NULL,
   min_male_age = 15,
   kinship_generations = 2,
-  father_matching = NULL
+  father_matching = NULL,
+  cancel_birth_if_no_match = TRUE
 )
 }
 \arguments{
@@ -58,6 +60,13 @@ Defaults to \code{NULL}, using the current general \code{matching} model. Union
 searches always use \code{matching}. Not used by on-demand initiation. Sampling
 and eligibility settings are shared by both models.}
 
+\item{cancel_birth_if_no_match}{Logical, default \code{TRUE}. Cancel a birth when
+its on-demand partner search or rate-mode nonmarital father selection fails.
+Set \code{FALSE} to allow births with unknown fathers. Historical missing father
+IDs are retained. A cancellation starts no new spacing interval and draws
+fresh waiting times from the failed attempt. Partner scarcity can reduce
+realized fertility below inputs.}
+
 \item{model}{A \code{hammel_model} object.}
 }
 \value{
@@ -70,7 +79,8 @@ In on-demand mode, at a birth use
 the woman's current partner, or sample living, unpartnered men and choose a partner using
 conditional-logit probabilities from the matching formula to form a union.
 Sampled men below \code{min_male_age} are excluded. If no eligible sampled men
-remain, preserve the birth with unknown father. Known kin within
+remain, cancel the birth by default; \code{cancel_birth_if_no_match = FALSE}
+preserves it with unknown father. Known kin within
 \code{kinship_generations} on both sides of a common ancestor are excluded.
 Each person may have only one ongoing union. Partnered men are excluded
 before sampling; surviving husbands return to the pool at widowhood. Death ends affected
@@ -83,7 +93,7 @@ requires an overall fertility schedule. Unpartnered rate-mode births use the
 same candidate sampling and eligibility to assign a father, using
 \code{father_matching} when supplied or otherwise \code{matching}, without
 forming a union or removing him from availability. Empty screened pools
-preserve births with unknown fathers. No previous-father preference is applied.
+cancel births by default. No previous-father preference is applied.
 }
 \details{
 Sampling is from the available male pool BEFORE pair-specific screening.

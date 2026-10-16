@@ -325,3 +325,15 @@ current-general fallback after edits, constructor/attachment/simulation validati
 opposite father/union preferences, native/R formula fallback agreement, and
 on-demand ignoring the optional father model. Debug compilation emitted the
 existing `_FORTIFY_SOURCE` warning from its `-O0` build settings.
+
+
+### Failed-match cancellation (D043; October 15, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test()'` passed 2403
+expectations with no failures/warnings and one intentional live-data skip. New
+checks cover logical-scalar validation and edited objects, default cancellation
+in both modes for age/kin/partner exclusions, explicit FALSE preserving unknown
+fathers, seed isolation/reproducibility, no child/ID/kinship creation on failure,
+success after a man ages into eligibility without artificial birth spacing, and
+spacing/restarts following an actual birth. Existing demographic fixtures
+explicitly set FALSE where they require preserved unmatched births.

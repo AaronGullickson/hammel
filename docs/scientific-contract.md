@@ -164,10 +164,15 @@ Only demonstrated links count: unknown parents do not imply unrelatedness and
 do not hide other known relationships. Age and kin search restrictions do not invalidate existing unions,
 and no extra minimum female age is imposed. Each person can have at most one ongoing union. Formation removes the man
 from the pool before the next sample; widowhood returns a surviving husband.
-No eligible sampled men means the birth proceeds with unknown father and no
-new union. A future
-choice to cancel births is required remaining milestone 2 work (D042),
-but is not yet implemented. Rate-based initiation follows the separate rules below.
+If no sampled man is eligible, `cancel_birth_if_no_match = TRUE` (the default)
+cancels the birth. FALSE explicitly preserves it with unknown father and no
+union. A cancelled attempt creates no person, parentage, ID or birth count and
+does not update the last actual birth or start a spacing interval. Redraw risks
+from the attempt time at attained age; retain any spacing from actual prior
+births. This applies to on-demand partner selection and rate-mode nonmarital
+father selection. It does not rewrite input histories with unknown fathers.
+Partner scarcity can depress realized fertility below supplied rates; do not
+compensate away this intentional selection effect. Rate-based initiation follows the separate rules below.
 
 On-demand input must provide unambiguous active female/male unions with living
 partners and at most one ongoing union per person; unsupported or inconsistent
@@ -205,8 +210,8 @@ Unpartnered births in rate mode select a father from living, currently
 unpartnered men using the same sample size, minimum age, known-kin screening
 and conditional-logit matching as union searches. This creates parentage only:
 no union forms, the man remains available, and neither person's partner state
-changes. No qualifying sampled candidate leaves the father unknown while
-preserving the birth. Paternal links are appended to the kinship graph before
+changes. No qualifying sampled candidate cancels the birth by default; explicitly
+setting `cancel_birth_if_no_match = FALSE` retains it with unknown father. Paternal links are appended to the kinship graph before
 subsequent events. Partnered births use the current husband. No special
 preference for an earlier child's father is implemented; it is deferred to a
 later milestone (D042).
