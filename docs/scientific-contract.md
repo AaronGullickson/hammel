@@ -166,7 +166,8 @@ and no extra minimum female age is imposed. Each person can have at most one ong
 from the pool before the next sample; widowhood returns a surviving husband.
 No eligible sampled men means the birth proceeds with unknown father and no
 new union. A future
-choice to cancel births is deferred. Rate-based initiation follows the separate rules below.
+choice to cancel births is required remaining milestone 2 work (D042),
+but is not yet implemented. Rate-based initiation follows the separate rules below.
 
 On-demand input must provide unambiguous active female/male unions with living
 partners and at most one ongoing union per person; unsupported or inconsistent
@@ -207,7 +208,8 @@ no union forms, the man remains available, and neither person's partner state
 changes. No qualifying sampled candidate leaves the father unknown while
 preserving the birth. Paternal links are appended to the kinship graph before
 subsequent events. Partnered births use the current husband. No special
-preference for an earlier child's father is implemented; that remains unresolved.
+preference for an earlier child's father is implemented; it is deferred to a
+later milestone (D042).
 An optional `father_matching` specification applies only to unpartnered
 rate-mode births; NULL uses the current general `matching` model. Union searches
 always use the general model. Both follow the same formula contract. Birth and search candidates
@@ -342,7 +344,8 @@ schedule, so realized fertility can temporarily differ from the new target.
 Magnitude and duration have not been quantified; there is no guaranteed
 nine-month convergence deadline. A recent-schedule history and time-dependent
 adjustment were discussed as possible future treatments; the user explicitly
-deferred correction. Do not implement them as an assumed requirement.
+deferred correction at that time. D042 brings transition compensation into milestone 2
+scope; the corrective algorithm and validation target still require agreement.
 
 ## Validation requirements and future mechanism specifications
 

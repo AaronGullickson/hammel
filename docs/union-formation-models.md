@@ -4,8 +4,9 @@ Updated October 15, 2026 from the user's milestone 2 request.
 **Status: core milestone implementation is in place: both search modes,
 conditional-logit matching, age/kin/exclusivity restrictions, status-specific
 fertility, widowhood, and separate optional nonmarital father matching. The
-poor-pool wait alternative remains in milestone 2 scope but unimplemented;
-demographic validation and user acceptance remain outstanding.**
+failed-match birth cancellation toggle and fertility compensation remain required
+work. The poor-pool wait alternative is under consideration and may be postponed.
+Demographic validation and user acceptance remain outstanding (D042).**
 Every simulation requires a union-formation process. Current-partner lookup
 and union histories are common infrastructure for all initiation modes.
 
@@ -34,8 +35,8 @@ Partner selection uses conditional-logit choice probabilities over eligible men.
 Users must be able to specify a flexible matching model; milestone 2 considers
 age difference only, while leaving room for later characteristics. The user selected configurable sampling from the available male pool before
 pair-specific screening, following the inspected SOCSIM ordering.
-A wait/no-partner alternative for a poor pool remains selected for milestone 2,
-but its utility, scope and retry details are unresolved. Eligibility uses the
+A wait/no-partner alternative for a poor pool remains under consideration for
+milestone 2 and may be postponed; utility, scope and retry details are unresolved. Eligibility uses the
 accepted age, generation-distance kin and exclusivity restrictions below.
 SOCSIM is an investigation reference, not an adopted matching algorithm.
 
@@ -96,7 +97,7 @@ coefficients to obtain utility V_j, then choose one candidate with probability
 Create the union at the birth time and use the selected man as father. A
 nonempty screened pool always produces a partner; there is no wait alternative. Empty
 pools preserve the birth with unknown father and no union. A future choice to
-cancel the birth is deferred. All-zero utilities give uniform probabilities.
+cancel the birth is required remaining work for milestone 2 (D042). All-zero utilities give uniform probabilities.
 Nonfinite formula values/utilities are errors, not silently excluded candidates.
 Formula evaluation cannot directly mutate engine population state. Candidate
 sets are not retained.
@@ -382,7 +383,8 @@ same-person birth/search tie. Cross-person ties retain queue insertion order.
 
 Apply existing midpoint compensation independently within each schedule; do not
 integrate across statuses or claim calibrated status-specific ASFR recovery
-around transitions. History-aware compensation remains deferred.
+around transitions. Transition compensation is required remaining work for milestone 2 (D042);
+no corrective algorithm has yet been selected.
 
 Worked cases: overall rate 0.1 applies to both statuses with a rate-mode warning.
 Unpartnered rate zero and partnered rate 0.2 reproduces the former gate explicitly.
@@ -406,7 +408,7 @@ Assign parentage without forming a union, updating current partners, removing
 the man from availability, or changing his event schedule. Record paternal links
 in the shared kinship graph immediately. Subsequent nonmarital births/searches
 use the same ordinary selection procedure, with no preferential reuse of an
-earlier child's father. Such preferential reuse is an unresolved extension;
+earlier child's father. Such preferential reuse is deferred to a later milestone (D042);
 there is no new persistence parameter. Father selection and partner selection can use separate matching models
 under D041 below.
 
@@ -432,7 +434,7 @@ father model. Validate any supplied model at construction, attachment and
 simulation, including zero-duration runs. Candidate pool, sampling, age/kin
 eligibility, parentage-only state changes and unknown-father fallback are shared.
 Both matching models support native linear/quadratic evaluation and R formula
-fallback. No new previous-father preference is introduced.
+fallback. Previous-father preference is deferred to a later milestone (D042).
 
 Worked case: with equally available men at age gaps 0 and 10, general utility
 `100*d` selects the older man for unions, while father utility `-100*d` selects

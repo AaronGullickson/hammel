@@ -621,3 +621,21 @@ reasons are retained. This supersedes generic death labels in earlier entries.
 - **Validation:** constructor/edited-object checks, exact fallback equivalence,
   opposite preference models separating births from unions, and native versus
   R formula evaluation. Preferential reuse of previous fathers remains unresolved.
+
+
+## D042: Revised milestone 2 completion scope
+
+- **Status:** accepted by the user October 15, 2026.
+- **Required work:** implement a failed-match birth cancellation toggle and
+  address fertility compensation across status/rate transitions in milestone 2.
+  This supersedes their earlier deferral; exact cancellation semantics and the
+  compensation algorithm still require specification and user decisions.
+- **Under consideration:** the poor-pool wait alternative may remain in this
+  milestone or be postponed; do not treat it as a settled completion requirement.
+- **Later milestone:** preferential reuse of previous nonmarital fathers at
+  subsequent births or union formation is explicitly deferred. Current draws
+  retain no special previous-father preference.
+- **Validation:** benchmark R formula-fallback performance in the final milestone
+  validation report rather than as a separate implementation task. No benchmark
+  result is claimed. Parity conditioning, non-death dissolution and multiple
+  ongoing unions remain outside current scope.

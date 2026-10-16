@@ -57,11 +57,12 @@ issue was created as part of recording completion. Follow the user's next reques
 
 - Benchmark R formula-fallback matching (for example a cubic age-gap term)
   against the native linear/quadratic path later; explicitly deferred by the
-  user October 15, 2026. See [testing](testing.md#deferred-matching-performance-comparison).
+  user October 15, 2026; now scheduled for the final milestone validation
+  report under D042. See [testing](testing.md#deferred-matching-performance-comparison).
 
 - Initial fertility calibration: retain simple initialization and assess burn-in.
-- Fertility transition adjustment after replacing rates between runs: document
-  the mismatch, with no correction implemented.
+- Fertility compensation across status/rate transitions: required remaining
+  milestone 2 work (D042); no corrective algorithm selected.
 - African historical benchmark/new rate-source preparation: postponed.
 - Non-death union dissolution remains beyond milestone 2. Union formation and
   matching are now active specification work, with detailed choices still open.
@@ -108,7 +109,7 @@ No column means an overall schedule. Rate mode applies overall fertility to
 both statuses with one warning per call; on-demand rejects conditional tables.
 Rate-mode unpartnered births select fathers without unions under D040. Transitions
 switch schedules with global maternal spacing retained. Compensation is computed
-separately per status; history-aware compensation remains deferred. Full suite:
+separately per status; transition compensation is required remaining work (D042). Full suite:
 2269 passing expectations, no failures/warnings, one intentional live-data skip.
 
 ### Nonmarital father selection (D040; October 15, 2026)
@@ -118,7 +119,7 @@ pool using the same sampling, eligibility and formula model as partners.
 Selection creates parentage only and does not reserve the man or form a union.
 No qualifying sample leaves father unknown. Paternal links enter native kinship
 immediately. Separate models are explicitly deferred; preferential reuse of a
-previous father at another birth/union remains unresolved. The pinned ordinary
+previous father at another birth/union is deferred to a later milestone (D042). The pinned ordinary
 SOCSIM paths have no such preferential reuse; its optional random-father fallback
 also differs by allowing partnered men and not using spouse scores. Full suite:
 2313 passing expectations, no failures/warnings, one intentional live-data skip.
@@ -132,4 +133,16 @@ an explicit model affects only unpartnered rate-mode father selection. General
 matching still governs all union searches and on-demand initiation. Both models
 are validated/prepared independently; candidate sampling and eligibility remain
 shared. This supersedes D040's separate-model deferral. Previous-father
-preference remains unresolved.
+preference is deferred to a later milestone (D042).
+
+
+### Revised completion queue (D042; October 15, 2026)
+
+Required before milestone 2 completion: failed-match birth cancellation toggle,
+fertility compensation, and demographic validation/report. Define the toggle's
+applicable birth pathways, effect on spacing/retry scheduling, and compensation
+method before implementing dependent behavior. The wait alternative is under
+consideration and may be postponed. Previous-father continuity is deferred to
+a later milestone. Test R formula-fallback performance in the final validation
+report. No new simulation behavior or numerical acceptance criteria were adopted
+by this scope update.

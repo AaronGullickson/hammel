@@ -64,13 +64,16 @@ fertility in scheduled mode. Only death ends unions in this milestone. Parity-sp
 to a later milestone.
 Candidate sampling defaults to 1000 men before pair screening (zero means the
 whole pool). Eligibility and basic fertility transitions are implemented; the
-optional wait alternative remains in milestone scope, with detailed rules open. See [milestone 2 notes](union-formation-models.md)
+failed-match birth cancellation and fertility compensation are remaining required
+work. The wait alternative remains under consideration and may be postponed. See [milestone 2 notes](union-formation-models.md)
 for scope, unresolved decisions, and validation. The on-demand C++ path now forms unions at births with formula-based
 conditional-logit selection and handles widowhood and restart histories.
 Minimum male age screening (default 15 years) and known-kin exclusion within
 two generations of each partner are implemented. `extract_kin()` shares the
 native kinship module. Exclusive ongoing unions are enforced before sampling; female rate-based searches and status-specific fertility schedules are implemented.
-Overall fertility is also supported in rate mode with a warning; optional waiting remains pending.
+Overall fertility is also supported in rate mode with a warning. Previous-father
+continuity is deferred to a later milestone. Benchmark R formula-fallback
+performance during the final validation report (D042).
 
 ## Boundaries and future work
 
