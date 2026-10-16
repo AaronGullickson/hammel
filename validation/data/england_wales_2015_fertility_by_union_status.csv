@@ -1,0 +1,15 @@
+"union_status","age_start","age_end","rate"
+"partnered",15,20,0.2845
+"partnered",20,25,0.2027
+"partnered",25,30,0.1763
+"partnered",30,35,0.1376
+"partnered",35,40,0.0713
+"partnered",40,45,0.0133
+"partnered",45,50,0.001
+"unpartnered",15,20,0.0139
+"unpartnered",20,25,0.0494
+"unpartnered",25,30,0.0712
+"unpartnered",30,35,0.0799
+"unpartnered",35,40,0.0573
+"unpartnered",40,45,0.0154
+"unpartnered",45,50,0.0012
