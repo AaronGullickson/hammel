@@ -29,6 +29,7 @@ The old top-level base-R test scripts have been converted and removed.
 | `test-hazard-sampler.R` | Deterministic hazard inversion and analytical survival |
 | `test-fertility-adjustment.R` | Annual/five-year midpoint overlaps, gaps, shared sampler, feasibility, open-age rejection, independent mortality |
 | `test-simulation.R` | Chronology, spacing, renewal rate, accounting, parent availability, seed isolation, restarts, unions closing on death |
+| `test-lexis-unions.R` | Exact long status exposure/counts, pre-death status, boundary births/deaths, formation rates, conservation, empty histories, TFR/life-table grouping, unchanged default |
 | `test-demography.R` | Exact exposure, event boundaries, missing/zero cells, TFR widths, analytical life tables, population counts, tibbles |
 | `test-database-processes.R` | Synthetic/local conversions, metadata, RDS reuse without downloads |
 | `test-database-online.R` | Opt-in authenticated download contracts |

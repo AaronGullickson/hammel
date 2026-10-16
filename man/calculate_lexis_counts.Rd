@@ -21,18 +21,21 @@ If the final boundary is finite, Inf is appended to create an open-ended
 final age band starting at that boundary.}
 
 \item{include_unions}{Logical, default \code{FALSE}. Require a population object
-with union histories and add \code{person_years_unpartnered},
-\code{person_years_partnered}, \code{unions}, \code{births_unpartnered}, and
-\code{births_partnered}. Union starts count for each spouse at their own age;
-repeated unions count separately. Status covers \verb{[start_time, end_time)},
-so a birth at formation is partnered and a birth at ending is unpartnered
-unless another union starts then. Exposure includes birth-spacing time.
-Overlapping episodes count person-time only once. Missing prior histories
-cannot establish historical status; use windows with complete follow-up.}
+with union histories and return three rows per period/age/sex cell, labeled
+\code{total}, \code{partnered}, and \code{unpartnered} in \code{union_status}. Exposure, births,
+deaths, ASFR and ASMR use the corresponding status. Births use half-open
+union coverage, so births at formation are partnered. Deaths use status
+immediately before death, so union-ending deaths are partnered. Add \code{unions}
+and \code{rate_marriage} only on unpartnered rows (NA on other statuses): count
+each formation, including remarriages, at each spouse's age, and divide by
+unpartnered person-years. Rates with zero exposure are NA. Overlapping
+episodes do not duplicate exposure. Complete union histories are required
+for historical status. Do not sum total rows with their status components.}
 }
 \value{
 A tibble with time_start, time_end, sex, age_start, age_end,
-person_years, deaths, births, asmr, and asfr.
+person_years, deaths, births, rate_mortality, and rate_fertility. With \code{include_unions = TRUE},
+also union_status, unions, and rate_marriage.
 }
 \description{
 Calculate person-years, deaths, births, ASMR, and ASFR for each time period,

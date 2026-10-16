@@ -123,15 +123,9 @@ lexis |> calculate_tfr()
 
 
 asfr <- lexis |>
-  filter(sex == "f") |>
-  mutate(
-    asfr_unpartnered = births_unpartnered / person_years_unpartnered,
-    asfr_partnered = births_partnered / person_years_partnered,
-    asfr_partnered = coalesce(asfr_partnered, 0)
-  ) |>
-  select(time_start, time_end, age_start, age_end, asfr_unpartnered, asfr_partnered) |>
-  pivot_longer(cols = starts_with("asfr_"), names_prefix = "asfr_", 
-               names_to = "union_status", values_to = "rate")
+  filter(sex == "f", union_status != "total") |>
+  select(time_start, time_end, age_start, age_end, union_status,
+         rate = rate_fertility)
 
 
 asfr |>
@@ -145,32 +139,29 @@ asfr |>
   theme_bw()
 
 lexis |>
-  filter(sex == "f", age_start <= 45) |>
+  filter(sex == "f", union_status == "total", age_start <= 45) |>
   group_by(age_start) |>
-  summarize(rate = mean(asfr, na.rm = TRUE), .groups = "drop") |>
+  summarize(rate = mean(rate_fertility, na.rm = TRUE), .groups = "drop") |>
   ggplot(aes(x = age_start, y = rate))+
   geom_point()+
   geom_line(linetype = 2)+
   geom_line(data = fertility_rates)+
   theme_bw()
 
-mar_rate <- lexis |>
-  mutate(mar_rate = unions / person_years_unpartnered) |>
-  select(time_start, time_end, age_start, age_end, sex, mar_rate)
-
-mar_rate |>
-  filter(sex == "f") |>
+lexis |>
+  filter(sex == "f", union_status == "unpartnered") |>
   group_by(age_start) |>
-  summarize(rate = mean(mar_rate), .groups = "drop") |>
+  summarize(rate = mean(rate_marriage), .groups = "drop") |>
   ggplot(aes(x = age_start, y = rate))+
   geom_point()+
   geom_line(linetype = 2)+
   geom_line(data = marriage_rates)+
   theme_bw()
   
-mar_rate |>
+lexis |>
+  filter(union_status == "unpartnered") |>
   group_by(age_start, sex) |>
-  summarize(rate = mean(mar_rate), .groups = "drop") |>
+  summarize(rate = mean(rate_marriage), .groups = "drop") |>
   ggplot(aes(x = age_start, y = rate, group = sex, color = sex))+
   geom_point()+
   geom_line()+

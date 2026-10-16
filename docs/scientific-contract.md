@@ -280,7 +280,12 @@ replications are invalid. There are no custom strata/group arguments yet.
   exposure yields zero. Male birth counts/ASFR are `NA`.
 - With `include_unions = TRUE`, Lexis counts add exact partnered/unpartnered
   exposure for both sexes, union starts at each spouse's age (including repeat
-  unions), and births by maternal status. Union coverage is half-open
+  unions), and births/deaths by status, in separate `total`, `partnered`, and
+  `unpartnered` rows. `unions` and `rate_marriage` are only defined for
+  unpartnered rows; the rate is formations per unpartnered person-year.
+  Status components sum to total counts/exposure; do not sum all three rows.
+  Deaths use status immediately before death, so a union-ending death counts
+  as partnered. Birth/exposure union coverage is half-open
   `[start_time, end_time)`; births triggering on-demand formation are partnered.
   Overlapping records do not duplicate exposure. Complete union histories are
   needed: absence of a supplied episode is not evidence of historical singlehood.
@@ -289,12 +294,13 @@ replications are invalid. There are no custom strata/group arguments yet.
   spacing. Unknown mothers are counted by period in the tibble attribute
   `unassigned_births`; their births cannot be assigned an age-specific rate.
 - `calculate_tfr()` selects female rows, omits open age bands, and sums
-  `asfr * band_width` over the remaining contiguous finite bands by period.
+  `rate_fertility * band_width` over the remaining contiguous finite bands by period.
   Missing ASFR contributions are omitted with `na.rm = TRUE`; an all-missing
   set sums to zero. The returned finite age range does not indicate complete
   exposure, so inspect missing cells separately. There is no `age_range` argument.
 - `calculate_life_table()` requires contiguous bands from zero through an
-  explicit open interval and separates periods/sexes. For finite width `n`
+  explicit open interval and separates periods/sexes and union status when
+  present. Conditional tables do not model status transitions. For finite width `n`
   and hazard `m`, `q = 1-exp(-m*n)`, survival propagates exponentially, and
   `L = l*(1-exp(-m*n))/m`, with `L=l*n` at zero hazard. In the positive-rate
   open interval, `q=1` and `L=l/m`. `T` is remaining integrated person-years

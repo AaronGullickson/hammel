@@ -10,48 +10,57 @@ make_lexis_union_history <- function() {
   hammel_population(persons, unions, end_time = 3)
 }
 
-test_that("union counts match exact widowhood and remarriage examples", {
+test_that("long union counts match exact widowhood and remarriage examples", {
   population <- make_lexis_union_history()
-  counts <- calculate_lexis_counts(population, c(0, 3), c(0, 20, 30, 40, Inf),
-    include_unions = TRUE)
+  counts <- calculate_lexis_counts(population, c(0, 3), c(0, 20, 30, 40, Inf), TRUE)
+  expect_identical(counts$union_status, rep(c("total", "partnered", "unpartnered"), 8))
   women <- subset(counts, sex == "f" & age_start == 20)
-  expect_equal(women$person_years, 3)
-  expect_equal(women$person_years_partnered, 1.5)
-  expect_equal(women$person_years_unpartnered, 1.5)
-  expect_equal(women$unions, 2)
-  expect_equal(women$births, 4)
-  expect_equal(women$births_partnered, 2)
-  expect_equal(women$births_unpartnered, 2)
+  expect_equal(women$person_years, c(3, 1.5, 1.5))
+  expect_equal(women$unions, c(NA, NA, 2))
+  expect_equal(women$rate_marriage, c(NA, NA, 2/1.5))
+  expect_equal(women$births, c(4, 2, 2))
+  expect_equal(women$rate_fertility, c(4/3, 2/1.5, 2/1.5))
   men <- subset(counts, sex == "m" & age_start >= 30)
-  expect_equal(men$person_years_partnered, c(1, 0.5))
-  expect_equal(men$person_years_unpartnered, c(0.5, 2.5))
-  expect_equal(men$unions, c(1, 1))
-  expect_true(all(is.na(counts$births_partnered[counts$sex == "m"])))
-  expect_true(all(is.na(counts$births_unpartnered[counts$sex == "m"])))
-  expect_equal(counts$person_years_partnered + counts$person_years_unpartnered,
-    counts$person_years)
-  expect_equal(counts$births_partnered + counts$births_unpartnered, counts$births)
-  expect_equal(sum(counts$unions), 4)
+  expect_equal(men$person_years, c(1.5, 1, 0.5, 3, 0.5, 2.5))
+  expect_equal(men$unions, c(NA, NA, 1, NA, NA, 1))
+  expect_equal(men$rate_marriage, c(NA, NA, 2, NA, NA, 0.4))
+  expect_equal(men$deaths, c(1, 1, 0, 0, 0, 0))
+  expect_equal(men$rate_mortality, c(1/1.5, 1, 0, 0, 0, 0))
+  expect_true(all(is.na(counts$births[counts$sex == "m"])))
+  expect_true(all(is.na(counts$rate_fertility[counts$sex == "m"])))
+  total <- subset(counts, union_status == "total")
+  partnered <- subset(counts, union_status == "partnered")
+  unpartnered <- subset(counts, union_status == "unpartnered")
+  for (column in c("person_years", "births", "deaths"))
+    expect_equal(partnered[[column]] + unpartnered[[column]], total[[column]])
+  expect_equal(sum(unpartnered$unions), 4)
   plain <- calculate_lexis_counts(population, c(0, 3), c(0, 20, 30, 40, Inf))
-  expect_identical(counts[names(plain)], plain)
+  expect_identical(total[names(plain)], plain)
+  expect_identical(calculate_lexis_counts(population, c(0, 3),
+    c(0, 20, 30, 40, Inf), FALSE), plain)
 })
 
 test_that("union exposure and events respect age and period boundaries", {
   population <- make_lexis_union_history()
   counts <- calculate_lexis_counts(population, c(0, 0.5, 1.5, 2.5, 3),
-    c(0, 20, 20.5, 21.5, 22.5, 30, 40, Inf), include_unions = TRUE)
-  expect_equal(sum(counts$person_years_partnered), 3)
-  expect_equal(sum(counts$unions), 4)
-  starts <- subset(counts, sex == "f" & unions > 0)
+    c(0, 20, 20.5, 21.5, 22.5, 30, 40, Inf), TRUE)
+  partnered <- subset(counts, union_status == "partnered")
+  unpartnered <- subset(counts, union_status == "unpartnered")
+  expect_equal(sum(partnered$person_years), 3)
+  expect_equal(sum(unpartnered$unions), 4)
+  starts <- subset(unpartnered, sex == "f" & unions > 0)
   expect_equal(starts$time_start, c(0.5, 2.5))
   expect_equal(starts$age_start, c(20.5, 22.5))
-  births <- subset(counts, sex == "f" & births > 0)
-  expect_equal(births$births_partnered, c(0, 1, 0, 1))
-  expect_equal(births$births_unpartnered, c(1, 0, 1, 0))
+  expect_equal(subset(partnered, sex == "f" & births > 0)$time_start, c(0.5, 2.5))
+  expect_equal(subset(unpartnered, sex == "f" & births > 0)$time_start, c(0, 1.5))
+  death <- subset(partnered, deaths > 0)
+  expect_equal(death$time_start, 1.5)
+  expect_equal(death$deaths, 1)
+  expect_true(is.na(death$rate_mortality)) # No partnered exposure after the boundary death.
   expect_equal(attr(counts, "unassigned_births")$births, rep(0, 4))
   window <- calculate_lexis_counts(population, c(1, 2.5), c(0, Inf), TRUE)
-  expect_equal(sum(window$unions), 0)
-  expect_equal(sum(window$person_years_partnered), 1)
+  expect_equal(sum(window$unions, na.rm = TRUE), 0)
+  expect_equal(sum(subset(window, union_status == "partnered")$person_years), 1)
 })
 
 test_that("overlaps, touching episodes and zero durations do not duplicate time", {
@@ -64,10 +73,8 @@ test_that("overlaps, touching episodes and zero durations do not duplicate time"
     transform(population$unions[2, ], union_id = 5, start_time = 1.75, end_time = 1.75,
       end_reason = "dissolution"))
   counts <- calculate_lexis_counts(population, c(0, 3), c(0, Inf), TRUE)
-  expect_equal(counts$person_years_partnered, c(2, 2))
-  expect_equal(counts$unions, c(5, 5))
-  expect_equal(counts$person_years_partnered + counts$person_years_unpartnered,
-    counts$person_years)
+  expect_equal(subset(counts, union_status == "partnered")$person_years, c(2, 2))
+  expect_equal(subset(counts, union_status == "unpartnered")$unions, c(5, 5))
 })
 
 test_that("optional summaries require histories and handle empty union tables", {
@@ -79,13 +86,57 @@ test_that("optional summaries require histories and handle empty union tables", 
       "include_unions")
   population$unions <- population$unions[FALSE, ]
   counts <- calculate_lexis_counts(population, c(0, 3), c(0, Inf), TRUE)
-  expect_equal(counts$person_years_partnered, c(0, 0))
-  expect_equal(counts$person_years_unpartnered, counts$person_years)
-  expect_equal(counts$births_unpartnered, counts$births)
-  expect_equal(counts$unions, c(0, 0))
+  total <- subset(counts, union_status == "total")
+  partnered <- subset(counts, union_status == "partnered")
+  unpartnered <- subset(counts, union_status == "unpartnered")
+  expect_equal(partnered$person_years, c(0, 0))
+  expect_true(all(is.na(partnered$rate_mortality)))
+  expect_true(all(is.na(partnered$rate_fertility)))
+  expect_equal(unpartnered$person_years, total$person_years)
+  expect_equal(unpartnered$births, total$births)
+  expect_equal(unpartnered$deaths, total$deaths)
+  expect_equal(unpartnered$rate_marriage, c(0, 0))
   population <- hammel_population(population$persons[FALSE, ], end_time = 3)
   empty <- calculate_lexis_counts(population, c(0, 3), c(0, Inf), TRUE)
   expect_s3_class(empty, "tbl_df")
-  expect_equal(empty$person_years_partnered, c(0, 0))
-  expect_equal(empty$births_partnered, c(NA, 0))
+  expect_equal(nrow(empty), 6)
+  expect_equal(empty$person_years, rep(0, 6))
+  expect_equal(empty$births, c(rep(NA_real_, 3), rep(0, 3)))
+  expect_equal(empty$unions, c(NA, NA, 0, NA, NA, 0))
+  expect_true(all(is.na(empty$rate_marriage)))
+  expect_true(all(is.na(empty$rate_mortality)))
+  expect_true(all(is.na(empty$rate_fertility)))
+})
+
+test_that("death status uses the left limit at union boundaries", {
+  population <- make_lexis_union_history()
+  # Widow dies after her first union, before the second; remove that second union.
+  population$unions <- population$unions[1, ]
+  population$persons$death_time[1] <- 2
+  counts <- calculate_lexis_counts(population, c(0, 3), c(0, Inf), TRUE)
+  expect_equal(subset(counts, sex == "f")$deaths, c(1, 0, 1))
+  expect_equal(subset(counts, sex == "m")$deaths, c(1, 1, 0))
+  # A zero-duration union at death creates no preceding partnered status.
+  population$unions$start_time <- 1.5
+  counts <- calculate_lexis_counts(population, c(0, 3), c(0, Inf), TRUE)
+  expect_equal(subset(counts, sex == "m")$deaths, c(1, 0, 1))
+})
+
+test_that("existing TFR and life-table grouping accepts long Lexis results", {
+  counts <- calculate_lexis_counts(make_lexis_union_history(), c(0, 3),
+    c(0, 20, 30, 40, Inf), TRUE)
+  tfr <- calculate_tfr(counts)
+  expect_identical(tfr$union_status, c("total", "partnered", "unpartnered"))
+  expect_equal(tfr$tfr, c(40/3, 40/3, 40/3))
+  expect_s3_class(tfr, "tbl_df")
+  expect_identical(attr(tfr, "unassigned_births"), attr(counts, "unassigned_births"))
+  life <- calculate_life_table(counts)
+  expect_s3_class(life, "tbl_df")
+  expect_equal(nrow(life), nrow(counts))
+  for (status in c("total", "partnered", "unpartnered")) {
+    plain <- calculate_life_table(subset(counts, union_status == status,
+      select = -union_status))
+    observed <- subset(life, union_status == status, select = -union_status)
+    expect_equal(observed, plain)
+  }
 })

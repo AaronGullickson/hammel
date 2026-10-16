@@ -689,7 +689,7 @@ reasons are retained. This supersedes generic death labels in earlier entries.
   Union status is current partnership, not first-marriage history or legal
   marital status. Births at the union start are partnered, including those
   triggering on-demand formation; use half-open union episodes.
-- **Implementation:** `include_unions = TRUE` adds columns to the existing
+- **Implementation:** superseded by D047 below. Initially, `include_unions = TRUE` added columns to the existing
   period/age/sex grid. Count repeat union starts for both spouses at their
   respective ages. Integrate coverage without duplicating overlapping
   person-time; existing overall measures remain unchanged. Require a population
@@ -699,3 +699,29 @@ reasons are retained. This supersedes generic death labels in earlier entries.
   widowhood/remarriage, overlapping and zero-duration episodes, empty histories,
   conservation, and unchanged default summaries. No demographic calibration or
   milestone acceptance is implied.
+
+## D047: Long union-status Lexis summaries and marriage rates
+
+- **Status:** accepted by the user October 16, 2026; supersedes D046's wide layout.
+- **Decision:** `include_unions = TRUE` gives `total`, `partnered`, and
+  `unpartnered` rows identified by `union_status`. Split exposure, births,
+  and deaths, with ASFR/ASMR using each row's exposure. `unions` is NA on
+  total/partnered rows; on unpartnered rows count formations for each spouse.
+  Add `marriage_rate = unions / person_years` on unpartnered rows, NA elsewhere
+  and whenever exposure is zero. All rates retain person-year units.
+- **Observation convention:** deaths use status immediately before death,
+  including partnered status for a death ending a union. Births retain D046's
+  half-open status. See the scientific contract and worked analysis example.
+- **Compatibility:** default FALSE stays unchanged. Existing TFR status grouping
+  handles long results without changes to its API. Life tables preserve status
+  grouping too. The total duplicates status components and must not be added
+  to them. Complete histories are still required.
+
+## D048: Consistent rate column names
+
+- **Status:** requested by the user October 16, 2026.
+- **Decision:** rename Lexis rate columns to `rate_fertility`, `rate_mortality`,
+  and `rate_marriage` (formerly `asfr`, `asmr`, and `marriage_rate`). This applies
+  to both default and union-status summaries. TFR and life-table extraction
+  consume the new names; process schedules retain `rate` and life tables
+  retain `mx`. Units and calculation rules are unchanged.

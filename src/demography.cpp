@@ -112,6 +112,23 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
       }
     }
   }
+  NumericVector deaths_partnered(cells), deaths_unpartnered(cells);
+  for (int i = 0; i < ids.size(); ++i) {
+    if (i % 1024 == 0) checkUserInterrupt();
+    const int t = demographic_bin(died[i], time_breaks);
+    const int a = demographic_bin(died[i] - born[i], age_breaks);
+    if (t < 0 || a < 0) continue;
+    const int s = as<std::string>(sex[i]) == "m" ? 0 : 1;
+    const auto& intervals = episodes[i];
+    // Left-limit status: the death closing an episode is partnered.
+    const auto after = std::lower_bound(intervals.begin(), intervals.end(), died[i],
+      [](const std::pair<double, double>& interval, double time) {
+        return interval.first < time;
+      });
+    const bool in_union = after != intervals.begin() && died[i] <= std::prev(after)->second;
+    if (in_union) deaths_partnered[t + nt * (a + na * s)] += 1;
+    else deaths_unpartnered[t + nt * (a + na * s)] += 1;
+  }
   NumericVector births_partnered(cells), births_unpartnered(cells);
   NumericVector mothers = persons["mother_id"];
   for (int child = 0; child < ids.size(); ++child) {
@@ -130,7 +147,9 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
     if (in_union) births_partnered[t + nt * (a + na)] += 1;
     else births_unpartnered[t + nt * (a + na)] += 1;
   }
-  return List::create(_["births_partnered"] = births_partnered,
+  return List::create(_["deaths_partnered"] = deaths_partnered,
+                      _["deaths_unpartnered"] = deaths_unpartnered,
+                      _["births_partnered"] = births_partnered,
                       _["births_unpartnered"] = births_unpartnered,
                       _["person_years_partnered"] = partnered,
                       _["unions"] = formations);

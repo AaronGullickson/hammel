@@ -8,13 +8,13 @@ calculate_life_table(rates, radix = 1)
 }
 \arguments{
 \item{rates}{A table returned by \code{\link[=calculate_lexis_counts]{calculate_lexis_counts()}}, a mortality
-process object, or a data frame with \code{age_start}, \code{age_end}, and \code{asmr},
+process object, or a data frame with \code{age_start}, \code{age_end}, and \code{rate_mortality},
 \code{mx}, or \code{rate} per person-year.}
 
 \item{radix}{Initial life-table survivors, a positive finite number.}
 }
 \value{
-A tibble with period and sex identifiers (when supplied),
+A tibble with period, sex, and union-status identifiers (when supplied),
 \code{age_start}, \code{age_end}, \code{mx}, \code{n}, \code{ax}, \code{qx}, \code{lx}, \code{lx_end}, \code{dx},
 \code{Lx}, \code{Tx}, and \code{ex}. Summary counts and exposure columns are omitted.
 Life expectancy is \code{Tx / lx} in years.
@@ -25,7 +25,9 @@ is exponential, and person-years are integrated under that same assumption.
 This does not apply conventional HMD infant adjustments. Missing rates remain
 unknown. A zero terminal rate gives infinite remaining lifetime when terminal
 survivorship is positive. Require a final explicit open age interval.
-Tables are constructed separately for each period and sex present.
+Tables are constructed separately for each period, sex, and union status
+present. Status-specific tables hold that status fixed; they do not model
+transitions between statuses.
 }
 \examples{
 calculate_life_table(data.frame(age_start = c(0, 1, 5),
