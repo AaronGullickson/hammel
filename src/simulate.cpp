@@ -16,14 +16,18 @@ struct Band {
 
 // Copy the R rate table into a growable C++ collection. Mortality selects
 // one sex; fertility uses all rows. Sort the copy without changing R inputs.
-std::vector<Band> read_bands(DataFrame rates, const std::string& sex = "") {
+std::vector<Band> read_bands(DataFrame rates, const std::string& sex = "",
+                             const std::string& status = "") {
   NumericVector starts = rates["age_start"], ends = rates["age_end"];
   NumericVector values = rates["rate"];
   CharacterVector sexes;
   if (!sex.empty()) sexes = rates["sex"];
+  CharacterVector statuses;
+  if (!status.empty()) statuses = rates["union_status"];
   std::vector<Band> bands;
   for (int i = 0; i < starts.size(); ++i) {
-    if (sex.empty() || as<std::string>(sexes[i]) == sex)
+    if ((sex.empty() || as<std::string>(sexes[i]) == sex) &&
+        (status.empty() || as<std::string>(statuses[i]) == status))
       bands.push_back({starts[i], ends[i], values[i]});
   }
   std::sort(bands.begin(), bands.end(), [](const Band& a, const Band& b) {
@@ -402,8 +406,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   };
   const auto male_rates = read_bands(mortality_rates, "m");
   const auto female_rates = read_bands(mortality_rates, "f");
-  const auto fertility_rates_adjusted = adjusted_fertility(
-    read_bands(fertility_rates), birth_interval);
+  const bool status_fertility = fertility_rates.containsElementNamed("union_status");
+  const auto partnered_fertility = adjusted_fertility(
+    read_bands(fertility_rates, "", status_fertility ? "partnered" : ""), birth_interval);
+  const auto unpartnered_fertility = status_fertility ? adjusted_fertility(
+    read_bands(fertility_rates, "", "unpartnered"), birth_interval) : partnered_fertility;
   const auto search_rates = rate_initiation ? read_bands(union_rates) : std::vector<Band>{};
   std::vector<unsigned long long> event_versions(people.size(), 0);
   // Continuous dates order events. Equivalent keys retain insertion order.
@@ -429,17 +436,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     const auto& death_rates = p.female ? female_rates : male_rates;
     double death_time = candidate(waiting_time(death_rates, now - p.born, threshold()), now);
     double birth_time = std::numeric_limits<double>::infinity();
-    if (p.female && (!rate_initiation || current_partner[i] >= 0)) {
+    if (p.female) {
+      const auto& fertility = current_partner[i] >= 0 ? partnered_fertility : unpartnered_fertility;
       double first = std::max(now, p.last_birth + birth_interval);
       if (first < end)
-        birth_time = candidate(waiting_time(fertility_rates_adjusted,
+        birth_time = candidate(waiting_time(fertility,
           first - p.born, threshold()), first);
     }
     double search_time = std::numeric_limits<double>::infinity();
     if (rate_initiation && p.female && current_partner[i] < 0)
       search_time = candidate(waiting_time(search_rates, now - p.born, threshold()), now);
     const double due = std::min(death_time, std::min(birth_time, search_time));
-    // Death wins exact ties. Birth and search risks are mutually exclusive in rate mode.
+    // Exact same-person ties select death, then birth, then search.
     const auto type = death_time <= due ? EventType::death :
       (birth_time <= search_time ? EventType::birth : EventType::search);
     if (due < end) queue.emplace(due, Event{i, type, version});

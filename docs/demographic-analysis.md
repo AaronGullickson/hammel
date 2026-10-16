@@ -132,3 +132,11 @@ Use aligned ASFR/ASMR alongside aggregate TFR/life expectancy. Distinguish
 sampling variability from persistent differences due to midpoint compensation,
 initialization, or grouped ages. See [testing and validation](testing.md) and
 [the report template](../validation/milestone1.qmd).
+
+
+When input fertility rates include `union_status`, `calculate_tfr()` returns a
+separate row per status and period, preserving the status column. Each sum is
+`rate * age-band width` over that status's finite contiguous age range. These
+conditional TFRs describe continuous exposure to a status, not additive
+components of the overall TFR. Tables without status retain their existing
+behavior; Lexis summaries currently use all female exposure.

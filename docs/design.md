@@ -152,7 +152,9 @@ swap removal with per-person slot tracking.
 
 There is no union-enable flag or no-union execution path. Both initiation modes share the same partner and union state and search helper.
 Rate mode adds a search event type and per-person event versions to invalidate
-queued births after widowhood. Only partnered women face birth risk in rate mode.
+queued births after widowhood. Rate mode selects the current status fertility schedule; an overall schedule
+applies to both statuses with one warning per simulation. On-demand requires
+overall fertility. Birth spacing persists across status transitions.
 Failed searches reschedule at attained age; age-band gaps have zero hazard.
 
 Candidate sampling uses a reusable array of male-pool positions and a partial

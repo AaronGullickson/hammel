@@ -96,9 +96,10 @@ calculate_lexis_counts <- function(population, time_breaks, age_breaks) {
   table
 }
 
-# Summary calculations separate only the built-in period and sex columns.
-summary_rows <- function(table, by_sex = FALSE) {
-  columns <- intersect(c("time_start", "time_end", if (by_sex) "sex"), names(table))
+# Summary calculations use explicit built-in grouping columns.
+summary_rows <- function(table, by_sex = FALSE, by_union_status = FALSE) {
+  columns <- intersect(c("time_start", "time_end", if (by_sex) "sex",
+                         if (by_union_status) "union_status"), names(table))
   if (!length(columns)) return(list(seq_len(nrow(table))))
   codes <- lapply(table[columns], function(column) match(column, unique(column)))
   keys <- do.call(paste, c(codes, sep = ":"))
@@ -110,11 +111,15 @@ summary_rows <- function(table, by_sex = FALSE) {
 #' Sum age-specific fertility rates times their actual interval widths.
 #' Open-ended age bands are omitted. The remaining finite, contiguous age range
 #' defines the TFR reported. Missing ASFRs are omitted from the sum.
+#' When `union_status` is present, calculate a separate sum for each status
+#' within each period. These conditional sums describe fertility under continuous
+#' exposure to that status; they are not components to add into an overall TFR.
 #' @param rates A table returned by [calculate_lexis_counts()], a fertility
 #'   process object, or a data frame with `age_start`, `age_end`, and `asfr`
 #'   or `rate` in births per woman-year. Bare `rate` tables are interpreted as
 #'   fertility rates; mortality processes are not valid inputs.
-#' @return A tibble with period columns, `age_start`, `age_end`, and `tfr`.
+#' @return A tibble with period columns, `union_status` when supplied,
+#'   `age_start`, `age_end`, and `tfr`.
 #'   If `sex` is present, only female rows are used.
 #' @export
 calculate_tfr <- function(rates) {
@@ -135,18 +140,18 @@ calculate_tfr <- function(rates) {
   if (!is.numeric(rates$age_end) || anyNA(rates$age_end))
     stop("`age_end` must contain numeric age boundaries without missing values.", call. = FALSE)
   rates <- rates[is.finite(rates$age_end), , drop = FALSE]
-  periods <- intersect(c("time_start", "time_end"), names(rates))
+  groups <- intersect(c("time_start", "time_end", "union_status"), names(rates))
   check_numeric_column(rates$asfr, "rates$asfr", missing = TRUE)
   if (any(rates$asfr < 0, na.rm = TRUE)) stop("ASFRs must be nonnegative.", call. = FALSE)
   if (!nrow(rates)) {
-    result <- rates[FALSE, c(periods, "age_start", "age_end"), drop = FALSE]
+    result <- rates[FALSE, c(groups, "age_start", "age_end"), drop = FALSE]
     result$tfr <- numeric()
     return(tibble::as_tibble(result))
   }
-  tables <- lapply(summary_rows(rates), function(rows) {
+  tables <- lapply(summary_rows(rates, by_union_status = TRUE), function(rows) {
     r <- rates[rows, , drop = FALSE]
     check_summary_intervals(r, open = FALSE)
-    key <- r[1, periods, drop = FALSE]
+    key <- r[1, groups, drop = FALSE]
     cbind(key, data.frame(age_start = min(r$age_start), age_end = max(r$age_end),
                          tfr = sum(r$asfr * (r$age_end - r$age_start), na.rm = TRUE)))
   })

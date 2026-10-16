@@ -76,7 +76,8 @@ test_that("union process validation and execution boundaries are explicit", {
                             age_end = Inf, rate = 0.01)) |>
     set_fertility(data.frame(age_start = 20, age_end = 30, rate = 0.1)) |>
     set_union_formation("rate", matching, 0, rates)
-  expect_equal(nrow(simulate(model, years = 1)$unions), 0)
+  expect_warning(result <- simulate(model, years = 1), "overall fertility schedule")
+  expect_equal(nrow(result$unions), 0)
 })
 
 test_that("minimum male age defaults to 15 and is configurable and revalidated", {

@@ -291,3 +291,17 @@ restart retention, reproducibility, and widowhood invalidation/remarriage.
 Existing on-demand, eligibility, kinship and mortality/fertility checks pass.
 This verifies event behavior; population-ASFR recovery under partnered-only
 fertility has not been established.
+
+
+### Union-status fertility schedules (D039; October 15, 2026)
+
+`TZ=UTC Rscript -e 'devtools::test()'` passed 2269 expectations with zero
+failures/warnings and one intentional live-data skip. New tests cover optional
+status labels and both-status requirements, per-status overlap and different
+age support, simulation revalidation, on-demand rejection including zero years,
+one warning for rate-mode overall fertility, unknown fathers without searches,
+formation/widowhood schedule changes, spacing through formation and restart,
+independent compensation, and analytical constant-rate birth counts in both
+statuses. Existing tests use explicit zero unpartnered rates where suppression
+is intended. Recovery around status transitions remains unverified; a coherent
+empirical rate example has been requested but not selected.

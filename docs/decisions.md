@@ -581,3 +581,16 @@ reasons are retained. This supersedes generic death labels in earlier entries.
 - **Validation:** analytical competing search/death hazards, age support/gaps,
   retries, shared partner choice, no unpartnered births, widowhood invalidation,
   restart histories and reproducibility.
+
+## D039: Stacked union-status fertility schedules and overall fallback
+
+- **Status:** accepted by the user October 15, 2026.
+- **Decision:** keep the fertility API, adding an optional `union_status` column
+  with both `partnered` and `unpartnered`. Without it, use one overall schedule.
+  Reject partial/mixed status tables; explicit zero schedules express suppression.
+  On-demand rejects conditional tables. Rate mode accepts overall rates for both
+  statuses with one warning per call, superseding D038's partnered-only gate.
+- **Transitions:** reschedule on formation/widowhood, preserving maternal spacing;
+  births to unpartnered women in rate mode have unknown father and do not search.
+  Existing midpoint adjustment operates separately on each schedule; transition
+  compensation remains deferred. Death wins ties, then birth, then search.

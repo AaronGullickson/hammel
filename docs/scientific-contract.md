@@ -84,8 +84,14 @@ Months here are explanatory durations, not an execution grid.
 
 ## Fertility and birth spacing
 
-All living females face the supplied population fertility schedule, regardless
-of union status. After a recorded birth at time `t`, fertility sampling starts
+Without `union_status`, all living females face the supplied overall fertility
+schedule. With a `union_status` column, require both `partnered` and
+`unpartnered` schedules, interpreted per woman-year in that status. Only those
+two character labels are permitted; partial or mixed tables are errors. Check
+age overlap separately within each status; boundaries may differ and gaps are
+zero risk. Use explicit zeros to suppress births for a status. On-demand
+formation rejects status-specific fertility schedules, including at zero duration.
+Rate formation accepts overall rates with one warning per simulation call. After a recorded birth at time `t`, fertility sampling starts
 at `max(now, t + birth_interval)`. Mortality remains active throughout spacing.
 A birth at 1.03 with spacing 0.75 permits the next birth no earlier than 1.78.
 Zero spacing disables both the exclusion and compensation. Arbitrary finite
@@ -100,7 +106,7 @@ midpoint `m = L + (U-L)/2`, input rate `f`, and spacing `b`:
     adjusted_rate = f / eligibility_mid
 
 Evaluate the integral using exact duration overlaps with the unadjusted input
-bands. Gaps and ages outside the schedule contribute zero. Preserve the
+bands within the same status schedule. Gaps and ages outside the schedule contribute zero. Preserve the
 original boundaries and use the resulting constant rates in the shared sampler.
 Compute this schedule once per simulation call, not from the actual fraction
 eligible in the simulated population. Reject nonpositive midpoint eligibility
@@ -191,17 +197,21 @@ screening, matching and formation code as on-demand mode. A failed search
 reschedules from the attempt time using the same attained-age schedule.
 All unpartnered women use that schedule regardless of prior union history.
 
-Only partnered women face fertility risk in this mode. A new union starts
-birth risk at its formation time subject to the woman's recorded birth spacing.
-A husband's death cancels his wife's pending event and reschedules her with
-search risk and no birth risk. Versioned queue entries prevent invalidated
-birth/death candidates from executing; resampling uses attained age at the
-status transition. Surviving men's death hazards do not depend on union status.
-No nonmarital births or separate status-specific fertility inputs are included.
-Existing midpoint-adjusted fertility hazards are retained as a temporary
-partnered-only schedule; population-ASFR recovery and adjustment calibration
-across union transitions are not claimed. See the worked cases in the
-[union specification](union-formation-models.md#rate-mode-execution-increment-october-15-2026).
+Women face birth risk in both statuses: the current `union_status` selects
+fertility, or an overall schedule applies equally to both. With overall rates,
+warn once per simulation call that fertility does not depend on union status.
+Unpartnered births in rate mode have unknown fathers and do not trigger a
+search. Partnered births use the current husband. Birth and search candidates
+compete while unpartnered; death wins exact ties, followed by birth then search.
+
+A new union or husband's death invalidates the woman's pending event and
+reschedules at attained age with the new fertility schedule, preserving her
+recorded birth spacing. Widowhood also restores search risk. Versioned queue
+entries prevent invalidated candidates executing. Surviving men's death hazards
+do not depend on union status. Midpoint compensation is computed independently
+within each schedule; it is not calibrated to the woman's prior-status history.
+Recovery of conditional ASFRs around status transitions remains unverified.
+See [union fertility specification](union-formation-models.md#fertility-schedules-by-union-status-d039).
 
 ### Shared kinship observations
 

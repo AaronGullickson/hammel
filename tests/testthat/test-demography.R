@@ -215,3 +215,25 @@ test_that("all public demographic tables are tibbles including empty outputs", {
   expect_true(tibble::is_tibble(calculate_life_table(summary[FALSE, ])))
 })
 
+
+test_that("TFR separates union statuses in input tables and fertility processes", {
+  rates <- data.frame(union_status = c("unpartnered", "partnered", "unpartnered", "partnered"),
+    age_start = c(15, 20, 20, 25), age_end = c(20, 25, 25, 30),
+    rate = c(0.1, 0.3, 0.2, 0.4))
+  expected <- tibble::tibble(union_status = c("unpartnered", "partnered"),
+    age_start = c(15, 20), age_end = c(25, 30), tfr = c(1.5, 3.5))
+  expect_equal(calculate_tfr(rates), expected)
+  expect_equal(calculate_tfr(fertility(rates)), expected)
+  later <- transform(rates, rate = rate * 2, time_start = 2005, time_end = 2010)
+  first <- transform(rates, time_start = 2000, time_end = 2005)
+  result <- calculate_tfr(rbind(first, later))
+  expect_equal(result$tfr, c(1.5, 3.5, 3, 7))
+  expect_equal(result$union_status, rep(c("unpartnered", "partnered"), 2))
+  expect_equal(result$time_start, c(2000, 2000, 2005, 2005))
+  expect_identical(calculate_tfr(rates[FALSE, ])$union_status, character())
+  bad <- rates
+  bad$age_start[3] <- 21
+  expect_error(calculate_tfr(bad), "contiguous")
+  rates$rate[3] <- NA_real_
+  expect_equal(calculate_tfr(rates)$tfr, c(0.5, 3.5))
+})

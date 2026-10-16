@@ -277,10 +277,8 @@ passes screening, the accepted behavior preserves the birth with unknown father
 and no new union. Requiring a match before a
 birth would change the supplied fertility target through partner availability.
 
-For scheduled mode, partnered and unpartnered fertility rates require exposure denominators
-based on union status. Decide whether these are separate status-specific ASFRs,
-how gaps/zero rates work, and what happens to an already scheduled birth when
-status changes. D028's population-ASFR midpoint compensation cannot simply be
+Partnered and unpartnered fertility rates use woman-years in the current union
+status; the implemented schedule and transition rules are specified under D039 below. D028's population-ASFR midpoint compensation cannot simply be
 assumed correct across status transitions; specify the target and spacing
 compensation before implementing conditional fertility.
 
@@ -336,24 +334,59 @@ Men remain available for selection but never initiate a rate search.
 Search execution uses the same sampling, screening, utility and union-creation
 code as on-demand execution, without creating a child at union formation.
 
-In rate mode, only partnered women can have birth events. Union formation
-starts fertility risk at that instant, subject to recorded last birth plus
-birth spacing. A husband's death invalidates his wife's pending birth and
-starts her search risk immediately; her subsequent union restores birth risk.
+In rate mode, both statuses can have birth events according to the fertility
+schedule selected under D039. Formation and widowhood switch schedules; a
+husband's death also restores search risk immediately. Birth spacing is preserved.
 Death wins exact same-person event ties. Cross-person ties retain queue order.
 Pending events invalidated by a status change must never execute. Surviving
 women are rescheduled from the transition time using their attained age.
-Existing midpoint fertility adjustment is retained, without a claim that these
-status-gated births reproduce population ASFRs or fully calibrated conditional
-ASFRs. Separate partnered/unpartnered fertility inputs remain future work.
+Midpoint fertility adjustment operates independently within each schedule,
+without a claim of calibrated conditional ASFRs across status transitions.
 
-Worked cases: zero search hazards and no initial union yield no unions/births,
-even with positive fertility. With zero mortality and a constant search hazard
+Worked cases: zero search hazards and no initial union yield no unions; births then follow
+the unpartnered schedule. With explicit zero unpartnered rates, there are no births. With zero mortality and a constant search hazard
 h and sufficient men, the fraction forming a first union by t is 1-exp(-h*t).
 A woman whose husband dies before her pending birth cannot execute that birth;
-she must form another union before births become possible again. A search
+birth risk now follows the unpartnered schedule. A search
 outside fertility ages can still form a union, but cannot produce births.
 
 After a failed search, draw another waiting time from the same age-specific
 schedule starting at the attempt time, as selected by the user. Waiting/refusal for poor nonempty pools is
 still deferred until after this rate increment.
+
+## Fertility schedules by union status (D039)
+
+An optional character `union_status` column in the fertility table must contain
+both `partnered` and `unpartnered`, with no missing or other values. Without
+that column the table is one overall schedule. Mixing overall and conditional
+rows or providing only one status is an error; explicitly provide zero rates
+for a status intended to have no births. Validate finite nonoverlapping age
+bands separately within each status; their age boundaries may differ. Gaps
+and ages outside each schedule have zero fertility. Rates are births per
+woman-year in the indicated status; an overall schedule applies to all women.
+
+On-demand initiation requires an overall schedule and rejects conditional
+schedules at simulation validation, including zero-duration runs. Rate initiation
+accepts either form. With overall rates it emits one warning per simulate call
+that the same schedule applies to both statuses. This replaces D038's temporary
+suppression of all unpartnered births in rate mode.
+
+In rate mode an unpartnered woman faces birth, search and death simultaneously;
+a birth does not trigger a search and records an unknown father. Partnered
+births use the current husband. Formation and widowhood switch the applicable
+fertility schedule and reschedule from the transition time. Birth spacing is
+shared across statuses and survives transitions/restarts. Failed searches retain
+unpartnered fertility. Death wins exact ties; birth precedes search on an exact
+same-person birth/search tie. Cross-person ties retain queue insertion order.
+
+Apply existing midpoint compensation independently within each schedule; do not
+integrate across statuses or claim calibrated status-specific ASFR recovery
+around transitions. History-aware compensation remains deferred.
+
+Worked cases: overall rate 0.1 applies to both statuses with a rate-mode warning.
+Unpartnered rate zero and partnered rate 0.2 reproduces the former gate explicitly.
+If union formation occurs within a birth-spacing interval, no birth can occur
+before that interval ends, regardless of the new schedule. A widow switches to
+unpartnered fertility, so a previously scheduled partnered birth is invalidated.
+Validate these cases alongside different age bands, rejection of invalid status
+labels/incomplete tables, independent compensation and RNG isolation.

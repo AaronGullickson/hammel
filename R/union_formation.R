@@ -129,9 +129,11 @@ prepare_matching_model <- function(matching) {
 #' Each person may have only one ongoing union. Partnered men are excluded
 #' before sampling; surviving husbands return to the pool at widowhood. Death ends affected
 #' unions. In rate mode unpartnered women face competing search events and
-#' cannot give birth. Failed searches draw another waiting time; a successful
-#' search starts birth risk, subject to spacing. Widowhood restores search risk.
-#' Status-specific fertility schedules are not yet implemented.
+#' use their unpartnered fertility schedule and may give birth without initiating
+#' a search. Failed searches draw another waiting time; formation and widowhood
+#' switch fertility schedules while preserving spacing. An overall fertility
+#' schedule applies to both statuses, with a simulation warning. On-demand mode
+#' requires an overall fertility schedule.
 #'
 #' Sampling is from the available male pool BEFORE pair-specific screening.
 #' `sample_size = 0` means the whole pool. Otherwise sample without replacement

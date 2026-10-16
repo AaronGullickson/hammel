@@ -4,7 +4,8 @@
 #' later run. The C++ engine samples candidate waiting times across age bands,
 #' executes at continuous times, and prioritizes death over birth on exact ties.
 #' Events execute chronologically. In on-demand mode all living females face the
-#' fertility schedule; in rate mode only partnered females do. A union-formation process is required. With on-demand
+#' fertility schedule. Rate mode uses either overall rates for all women (with
+#' a warning), or separate `union_status` schedules. A union-formation process is required. With on-demand
 #' union formation, use the woman's
 #' current partner, or sample men and choose one using conditional-logit
 #' probabilities from the matching formula to form a union at the birth.
@@ -14,7 +15,9 @@
 #' If no sampled men are eligible, preserve the birth with unknown father and no union.
 #' Rate initiation adds age-specific search events for unpartnered women only.
 #' Failed attempts draw another waiting time. Widowhood cancels pending births
-#' and restores search risk; a new union restores birth risk subject to spacing.
+#' and switches to unpartnered fertility; a new union switches to partnered
+#' fertility, preserving birth spacing. Unpartnered births do not trigger searches
+#' in rate mode and have unknown fathers. On-demand mode rejects status schedules.
 #'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
 #' and uses recorded maternal births, including on restart.
@@ -88,6 +91,16 @@ simulate <- function(model, years, seed = NULL) {
   }
   union_process <- model$processes$union_formation
   set_process(model, union_process)
+  status_fertility <- "union_status" %in% names(birth_rates)
+  if (union_process$initiation == "on_demand" && status_fertility) {
+    stop('On-demand union formation requires an overall fertility schedule without `union_status`.',
+         call. = FALSE)
+  }
+  if (union_process$initiation == "rate" && !status_fertility) {
+    warning(paste("Rate-based union formation is using an overall fertility schedule for both",
+                  "partnered and unpartnered women. To make fertility depend on union status,",
+                  "supply separate schedules using `union_status`."), call. = FALSE)
+  }
   sample_size <- as.integer(union_process$sample_size)
   if (!is.null(seed)) {
     if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||

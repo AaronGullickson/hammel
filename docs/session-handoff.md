@@ -85,7 +85,28 @@ apply this policy. Polygamy/polyamory is deferred.
 
 `initiation = "rate"` now schedules female unpartnered search attempts as
 competing events. Failed attempts draw a new waiting time. Both initiation
-modes share search/formation code. Only partnered women have births in rate
-mode; widowhood invalidates pending births and restores search risk. Existing
+modes share search/formation code. Fertility follows the current status schedule
+or an overall schedule for all women (D039); widowhood invalidates pending
+events and restores search risk. Existing
 fertility compensation is retained without a population-ASFR recovery claim.
-Separate status-specific fertility and refusal/wait remain future work.
+Status-specific fertility is implemented (D039); refusal/wait remains future work.
+
+
+### Requested coherent empirical example
+
+Find a future validation/example population-period with union-entry (or legal
+marriage) rates plus partnered/married and unpartnered/unmarried fertility rates.
+Five-year age bands are acceptable. Prefer a common source and consistent
+status/exposure definitions; do not combine unrelated schedules and present
+them as a coherent empirical case. No dataset has yet been selected.
+
+
+### Status-specific fertility (D039; October 15, 2026)
+
+Fertility accepts optional `union_status` with both `partnered` and `unpartnered`.
+No column means an overall schedule. Rate mode applies overall fertility to
+both statuses with one warning per call; on-demand rejects conditional tables.
+Rate-mode unpartnered births have unknown fathers and do not search. Transitions
+switch schedules with global maternal spacing retained. Compensation is computed
+separately per status; history-aware compensation remains deferred. Full suite:
+2269 passing expectations, no failures/warnings, one intentional live-data skip.

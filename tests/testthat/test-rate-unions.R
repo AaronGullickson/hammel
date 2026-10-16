@@ -1,12 +1,3 @@
-make_rate_model <- function(n = 2, search_rate = 1, birth_rate = 0, birth_interval = 0) {
-  model <- make_model(n, birth_rate = birth_rate, birth_interval = birth_interval)
-  if (n) model$population$persons$sex[1] <- "f"
-  set_union_formation(model, "rate",
-    create_matching_model(~ age_difference, c(age_difference = 0)),
-    rates = data.frame(age_start = 15, age_end = Inf, rate = search_rate),
-    sample_size = 0)
-}
-
 test_that("rate searches form unions independently of births and never originate from men", {
   model <- make_rate_model(search_rate = 20)
   result <- simulate(model, 1, seed = 52)
@@ -19,7 +10,7 @@ test_that("rate searches form unions independently of births and never originate
   expect_equal(nrow(simulate(model, 1, seed = 52)$unions), 0)
 })
 
-test_that("unpartnered women cannot give birth in rate mode", {
+test_that("explicit zero unpartnered fertility suppresses births in rate mode", {
   for (n in c(1, 2)) {
     model <- make_rate_model(n, search_rate = 0, birth_rate = 20)
     result <- simulate(model, 1, seed = 52)
