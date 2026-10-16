@@ -113,8 +113,16 @@ fertility_rates_total <- read_csv(
 fertility_rates_by_status <- read_csv(
   here("validation", "data", "usa_2000_fertility_by_union_status.csv")
 )
-marriage_rates <- read_csv(
-  here("validation", "data", "usa_2001_marriage_transitions.csv")
+mar_rates_female <- read_csv(
+  here("validation", "data", "usa_2001_marriage_rates_female.csv")
+)
+mar_rates_male <- read_csv(
+  here("validation", "data", "usa_2001_marriage_rates_male.csv")
+)
+
+mar_rates_both <- bind_rows(
+  mar_rates_female |> mutate(sex = "f"),
+  mar_rates_male |> mutate(sex = "m")
 )
 
 time_breaks <- seq(2000, 2100, 5)
@@ -227,7 +235,20 @@ mar_rates |>
   ggplot(aes(x = age_start, y = rate))+
   geom_point()+
   geom_line(linetype = 2)+
+  geom_line(data = mar_rates_female)+
   theme_bw()
+
+
+```
+
+```{r}
+mar_rates |>
+  ggplot(aes(x = age_start, y = rate, group = sex, color = sex))+
+  geom_point()+
+  geom_line(linetype = 2)+
+  geom_line(data = mar_rates_both)+
+  theme_bw()
+
 
 ```
 
