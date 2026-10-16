@@ -174,3 +174,14 @@ Retain the current per-schedule midpoint adjustment and spacing from recorded
 births. Bias is unquantified, not established negligible. Final validation/report
 and user acceptance remain before milestone 2 completion, including the R formula
 fallback performance benchmark. No simulation behavior changed in this decision.
+
+
+### Beyond milestone 2 planning (October 15, 2026)
+
+User priorities are captured in [roadmap](roadmap.md): milestone 3 groups with
+intergroup matching, proportional rate modifiers, flexible child group identity
+and possible proportional ancestry; further analysis/input helpers, fertility
+heterogeneity, life-course/inherited characteristics and within-run immigration
+with generational status. The group theme is selected, but detailed algorithms
+and demographic defaults remain open. Do not implement those notes before
+specification or replace current milestone 2 validation with future feature work.

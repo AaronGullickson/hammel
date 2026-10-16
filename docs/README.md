@@ -28,6 +28,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [Waiting-time sampling](waiting-time-sampling.md) | Explanation of the current shared hazard sampler |
 | [Union-formation models](union-formation-models.md) | Milestone 2 scope; open modeling choices and proposed validation |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
+| [Future roadmap](roadmap.md) | User priorities beyond milestone 2; milestone 3 groups and open specifications |
 | [Decision log](decisions.md) | Accepted choices and supersession history |
 | [SOCSIM audit plan](socsim-audit.md) | Scope and remaining reference investigation |
 | [SOCSIM rates](socsim-rate-audit.md) | Pinned static source findings |

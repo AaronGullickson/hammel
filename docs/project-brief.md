@@ -75,6 +75,16 @@ Overall fertility is also supported in rate mode with a warning. Previous-father
 continuity is deferred to a later milestone. Benchmark R formula-fallback
 performance during the final validation report (D042).
 
+## Beyond milestone 2
+
+The user selected groups as milestone 3's theme: intergroup matching, baseline
+rate multipliers, flexible child group identity and possible proportional group
+ancestry. Other future priorities are analysis helpers, input-rate preparation,
+fertility heterogeneity, inherited/life-course characteristics (such as education),
+and within-run immigration with generational status. Detailed demographic rules
+are not selected. See the [roadmap](roadmap.md); these notes do not move work
+ahead of milestone 2 validation.
+
 ## Boundaries and future work
 
 C++17/Rcpp is selected and implemented for the first engine (D019); tibble is
