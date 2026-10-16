@@ -116,7 +116,7 @@ result$persons |>
   theme_bw()
 
 
-lexis <- calculate_lexis_counts(result, seq(2000, 2100, 5), seq(15, 50, 5), include_unions = TRUE)
+lexis <- calculate_lexis_counts(result, seq(2000, 2100, 5), seq(15, 65, 5), include_unions = TRUE)
 
 lexis |> calculate_tfr()
 
@@ -141,3 +141,25 @@ asfr |>
   geom_point()+
   geom_line(data = fertility_rates_status, linetype = 2)+
   theme_bw()
+
+mar_rate <- lexis |>
+  mutate(mar_rate = unions / person_years_unpartnered) |>
+  select(time_start, time_end, age_start, age_end, sex, mar_rate)
+
+mar_rate |>
+  filter(sex == "f") |>
+  group_by(age_start) |>
+  summarize(rate = mean(mar_rate), .groups = "drop") |>
+  ggplot(aes(x = age_start, y = rate))+
+  geom_point()+
+  geom_line(data = marriage_rates)+
+  theme_bw()
+  
+mar_rate |>
+  group_by(age_start, sex) |>
+  summarize(rate = mean(mar_rate), .groups = "drop") |>
+  ggplot(aes(x = age_start, y = rate, group = sex, color = sex))+
+  geom_point()+
+  geom_line()+
+  theme_bw()
+
