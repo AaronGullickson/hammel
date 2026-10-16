@@ -32,6 +32,7 @@ model <- hammel_model() |>
   set_population(population) |>
   set_mortality(mortality_rates) |>
   set_fertility(fertility_rates_status) |>
+  #set_fertility(fertility_rates)
   set_union_formation(
     "rate",
     create_matching_model(
@@ -139,7 +140,18 @@ asfr |>
   summarize(rate = mean(rate), .groups = "drop") |>
   ggplot(aes(x = age_start, y = rate, group = union_status, color = union_status))+
   geom_point()+
-  geom_line(data = fertility_rates_status, linetype = 2)+
+  geom_line(linetype = 2)+
+  geom_line(data = fertility_rates_status)+
+  theme_bw()
+
+lexis |>
+  filter(sex == "f", age_start <= 45) |>
+  group_by(age_start) |>
+  summarize(rate = mean(asfr, na.rm = TRUE), .groups = "drop") |>
+  ggplot(aes(x = age_start, y = rate))+
+  geom_point()+
+  geom_line(linetype = 2)+
+  geom_line(data = fertility_rates)+
   theme_bw()
 
 mar_rate <- lexis |>
@@ -152,6 +164,7 @@ mar_rate |>
   summarize(rate = mean(mar_rate), .groups = "drop") |>
   ggplot(aes(x = age_start, y = rate))+
   geom_point()+
+  geom_line(linetype = 2)+
   geom_line(data = marriage_rates)+
   theme_bw()
   
