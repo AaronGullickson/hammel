@@ -48,12 +48,12 @@ test_that("on-demand rejects status schedules, rate overall warns exactly once",
   expect_warning(simulate(model, 0), "overall fertility schedule")
 })
 
-test_that("unpartnered births neither find fathers nor trigger unions", {
+test_that("unpartnered births select fathers without triggering unions", {
   model <- set_fertility(make_rate_model(search_rate = 0), status_rates(0, 20), 0)
   expect_no_warning(result <- simulate(model, 1, seed = 52))
   expect_gt(result$simulation$births, 0)
   expect_equal(nrow(result$unions), 0)
-  expect_true(all(is.na(result$persons$father_id)))
+  expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 2))
   expect_identical(result, simulate(model, 1, seed = 52))
 })
 
@@ -118,5 +118,5 @@ test_that("constant status-specific fertility gives the corresponding birth coun
   expect_lt(abs(sum(partnered) - 450), 6 * sqrt(450))
   expect_lt(abs(sum(!partnered) - 150), 6 * sqrt(150))
   expect_true(all(children$father_id[partnered] == children$mother_id[partnered] + 3000))
-  expect_true(all(is.na(children$father_id[!partnered])))
+  expect_true(all(children$father_id[!partnered] %in% 4501:6000))
 })

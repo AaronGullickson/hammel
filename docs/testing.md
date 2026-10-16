@@ -305,3 +305,13 @@ independent compensation, and analytical constant-rate birth counts in both
 statuses. Existing tests use explicit zero unpartnered rates where suppression
 is intended. Recovery around status transitions remains unverified; a coherent
 empirical rate example has been requested but not selected.
+
+### Nonmarital fathers (D040; October 15, 2026)
+
+`TZ=UTC Rscript -e 'devtools::test()'` passed 2313 expectations with zero failures
+or warnings and one intentional live-data skip. New checks cover repeated father
+availability without unions, current-partner/age/kin/death exclusions, analytical
+conditional-logit choice frequencies, paternal kin links, later union selection,
+restart reconstruction and seed isolation. Existing status-specific birth-count
+tests now expect selected nonmarital fathers where candidates qualify. No
+preferential father persistence parameter is implemented or validated.

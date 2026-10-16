@@ -71,7 +71,10 @@ use their unpartnered fertility schedule and may give birth without initiating
 a search. Failed searches draw another waiting time; formation and widowhood
 switch fertility schedules while preserving spacing. An overall fertility
 schedule applies to both statuses, with a simulation warning. On-demand mode
-requires an overall fertility schedule.
+requires an overall fertility schedule. Unpartnered rate-mode births use the
+same candidate sampling, eligibility and matching to assign a father without
+forming a union or removing him from availability. Empty screened pools
+preserve births with unknown fathers. No previous-father preference is applied.
 }
 \details{
 Sampling is from the available male pool BEFORE pair-specific screening.

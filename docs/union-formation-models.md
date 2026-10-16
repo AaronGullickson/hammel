@@ -372,7 +372,7 @@ that the same schedule applies to both statuses. This replaces D038's temporary
 suppression of all unpartnered births in rate mode.
 
 In rate mode an unpartnered woman faces birth, search and death simultaneously;
-a birth does not trigger a search and records an unknown father. Partnered
+a birth does not initiate a union but selects a father under D040 below. Partnered
 births use the current husband. Formation and widowhood switch the applicable
 fertility schedule and reschedule from the transition time. Birth spacing is
 shared across statuses and survives transitions/restarts. Failed searches retain
@@ -390,3 +390,27 @@ before that interval ends, regardless of the new schedule. A widow switches to
 unpartnered fertility, so a previously scheduled partnered birth is invalidated.
 Validate these cases alongside different age bands, rejection of invalid status
 labels/incomplete tables, independent compensation and RNG isolation.
+
+## Nonmarital father selection (D040)
+
+For a birth to an unpartnered woman in rate mode, select a father from the same
+living, currently unpartnered male vector used for union searches. Use the union
+process's sample size, sample-before-screening rule, minimum male age, known-kin
+exclusion and conditional-logit matching formula/coefficients. Selection is at
+birth time, before the newborn enters the population. Empty or entirely rejected
+samples preserve the birth with an unknown father and no refill.
+
+Assign parentage without forming a union, updating current partners, removing
+the man from availability, or changing his event schedule. Record paternal links
+in the shared kinship graph immediately. Subsequent nonmarital births/searches
+use the same ordinary selection procedure, with no preferential reuse of an
+earlier child's father. Such preferential reuse is an unresolved extension;
+there is no new persistence parameter. Father selection and partner selection
+could use different models in a later extension, explicitly deferred by the user.
+
+Worked cases: with one eligible unpartnered man, multiple nonmarital births can
+all name him while union history stays empty. If that man forms a union with
+another woman, he is unavailable for further nonmarital father selection. With
+no eligible men, births continue with unknown fathers. Selection can repeat the
+same man by chance without implying a continuing partnership. Paternal half
+siblings share the recorded father in kinship extraction/screening.

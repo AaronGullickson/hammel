@@ -185,3 +185,12 @@ uses the same kernel and an inverted ancestor index for selected relatives.
 Shortest-distance lineage and within-depth completeness accompany extraction
 rows. No all-pairs kin matrix or full ancestral-path expansion is constructed.
 Newborn append leaves existing ancestry caches valid; restart rebuilds them.
+
+
+Nonmarital rate-mode births and union searches share a `find_candidate` helper
+covering sampling, screening and matching. Only `form_union` updates partner
+caches and removes the man from the available pool. Parentage alone leaves
+both parties unpartnered; the newborn's father index is appended to kinship
+independently of current-partner state. No candidate sets or additional
+persistence state are retained. Different father/partner matching models are
+deferred; previous-father preference remains unresolved.

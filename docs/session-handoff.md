@@ -106,7 +106,19 @@ them as a coherent empirical case. No dataset has yet been selected.
 Fertility accepts optional `union_status` with both `partnered` and `unpartnered`.
 No column means an overall schedule. Rate mode applies overall fertility to
 both statuses with one warning per call; on-demand rejects conditional tables.
-Rate-mode unpartnered births have unknown fathers and do not search. Transitions
+Rate-mode unpartnered births select fathers without unions under D040. Transitions
 switch schedules with global maternal spacing retained. Compensation is computed
 separately per status; history-aware compensation remains deferred. Full suite:
 2269 passing expectations, no failures/warnings, one intentional live-data skip.
+
+### Nonmarital father selection (D040; October 15, 2026)
+
+Rate-mode nonmarital births select a father from the existing available male
+pool using the same sampling, eligibility and formula model as partners.
+Selection creates parentage only and does not reserve the man or form a union.
+No qualifying sample leaves father unknown. Paternal links enter native kinship
+immediately. Separate models are explicitly deferred; preferential reuse of a
+previous father at another birth/union remains unresolved. The pinned ordinary
+SOCSIM paths have no such preferential reuse; its optional random-father fallback
+also differs by allowing partnered men and not using spouse scores. Full suite:
+2313 passing expectations, no failures/warnings, one intentional live-data skip.

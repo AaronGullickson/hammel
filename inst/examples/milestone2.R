@@ -10,16 +10,27 @@ library(readr)
 
 mortality_rates <- get_mortality_hmd("USA", year = 2000)
 fertility_rates <- get_fertility_hfd("USA", year = 2000)
+# Use data on England and Wales that provides marital and non-marital rates
+
 marriage_rates <- read_csv(
-  here("validation", "data", "england_wales_2019_female_union_rates.csv")
+  here("validation", "data", "england_wales_2015_female_union_rates.csv")
 )
+fertility_rates_status <- read_csv(
+  here("validation", "data", "england_wales_2015_fertility_by_union_status.csv")
+)
+fertility_rates <- read_csv(
+  here("validation", "data", "england_wales_2015_overall_fertility.csv")
+)
+
+fertility_rates |> calculate_tfr()
+fertility_rates_status |> calculate_tfr()
 
 set.seed(42)
 population <- create_baseline_population(50000, max_age = 70, end_time = 2000)
 model <- hammel_model() |>
   set_population(population) |>
   set_mortality(mortality_rates) |>
-  set_fertility(fertility_rates) |>
+  set_fertility(fertility_rates_status) |>
   set_union_formation(
     "rate",
     create_matching_model(
@@ -87,7 +98,6 @@ result$persons |>
   geom_point()+
   theme_bw()
 
-mean(result$persons$person_id %in% c(result$unions$husband_id, result$unions$wife_id))
 
 lexis <- calculate_lexis_counts(result, seq(2000, 2100, 5), 0:100)
 

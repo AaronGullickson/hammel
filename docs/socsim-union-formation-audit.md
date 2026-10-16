@@ -118,3 +118,19 @@ First cousins are children of aunts/uncles. This is a fixed category interface,
 not a generic arbitrary cousin-degree API. These findings are source inspection,
 not executable validation of every category, missing-history case, or overlap.
 No code was copied. Keep this R-layer function distinct from the SOCSIM engine.
+
+## Previous nonmarital fathers (additional static inspection October 15, 2026)
+
+In the same pinned non-ENHANCED checkout, `xevents.c:50–69` assigns the current
+ongoing husband/cohabitant or invokes `find_random_father(child)` when enabled.
+`find_random_father()` at lines 1509–1663 scans event-queue month buckets from a
+random starting bucket, screens potential fathers with `marriage_allowable()`,
+and selects from the first qualifying bucket. It does not consult the mother's
+previous children or their fathers, and it deliberately does not require a
+potential father to be currently unmarried. It does not use ordinary spouse
+scoring. `marriage()` and `score3()` likewise contain no preference for a
+previous child's father in the inspected ordinary paths. The mother/child/sibling
+pointers store parentage but do not themselves implement preferential reuse.
+These are static source findings, not executable validation or claims about
+custom ENHANCED variants. No code was copied. Hammel intentionally differs by
+using conditional-logit matching restricted to living unpartnered men.

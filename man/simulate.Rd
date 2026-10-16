@@ -37,7 +37,10 @@ Rate initiation adds age-specific search events for unpartnered women only.
 Failed attempts draw another waiting time. Widowhood cancels pending births
 and switches to unpartnered fertility; a new union switches to partnered
 fertility, preserving birth spacing. Unpartnered births do not trigger searches
-in rate mode and have unknown fathers. On-demand mode rejects status schedules.
+in rate mode. Instead, select a father using the same available male pool,
+screening and matching model, without forming a union or reserving the man.
+If no candidate qualifies the father is unknown. On-demand mode rejects
+status schedules.
 }
 \details{
 Minimum birth spacing is configured in \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}

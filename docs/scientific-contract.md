@@ -200,8 +200,15 @@ All unpartnered women use that schedule regardless of prior union history.
 Women face birth risk in both statuses: the current `union_status` selects
 fertility, or an overall schedule applies equally to both. With overall rates,
 warn once per simulation call that fertility does not depend on union status.
-Unpartnered births in rate mode have unknown fathers and do not trigger a
-search. Partnered births use the current husband. Birth and search candidates
+Unpartnered births in rate mode select a father from living, currently
+unpartnered men using the same sample size, minimum age, known-kin screening
+and conditional-logit matching as union searches. This creates parentage only:
+no union forms, the man remains available, and neither person's partner state
+changes. No qualifying sampled candidate leaves the father unknown while
+preserving the birth. Paternal links are appended to the kinship graph before
+subsequent events. Partnered births use the current husband. No special
+preference for an earlier child's father is implemented; that remains unresolved.
+Separate father/partner matching models are explicitly deferred. Birth and search candidates
 compete while unpartnered; death wins exact ties, followed by birth then search.
 
 A new union or husband's death invalidates the woman's pending event and

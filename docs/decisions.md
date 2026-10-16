@@ -594,3 +594,19 @@ reasons are retained. This supersedes generic death labels in earlier entries.
   births to unpartnered women in rate mode have unknown father and do not search.
   Existing midpoint adjustment operates separately on each schedule; transition
   compensation remains deferred. Death wins ties, then birth, then search.
+
+## D040: Nonmarital father selection shares union matching
+
+- **Status:** accepted by the user October 15, 2026.
+- **Decision:** rate-mode unpartnered births select fathers from currently living,
+  unpartnered men using the same sampling, eligibility and matching model as
+  partner selection. Assigning a father does not form a union or reserve the man.
+  Empty screened pools preserve births with unknown father. This supersedes
+  D039's unconditional unknown-father rule for unpartnered births.
+- **Deferred:** separate father-selection and partner-selection models are an
+  explicitly deferred extension. Preferential reuse of the previous child's
+  father at later births or union formation is under discussion, not accepted;
+  current selections have no special persistence preference.
+- **Validation:** father assignment without unions, repeated availability,
+  partnered/dead/young/kin exclusions, matching probabilities, known paternal
+  links in kinship, retained births when no candidate qualifies, and restarts.

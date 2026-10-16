@@ -380,27 +380,31 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         people[found->second].last_birth = std::max(people[found->second].last_birth, child.born);
     }
   }
-  // Both initiation modes share the entire search and union transition.
+  // All father and partner searches share sampling, eligibility and matching.
+  // Only form_union changes partner state or removes the selected man.
+  auto find_candidate = [&](int woman, double now) {
+    if (males.empty()) return -1;
+    const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
+                                             sampling_workspace);
+    const auto eligible = screen_male_candidates(males, sample, people, now, min_male_age,
+                                                 woman, kinship);
+    return select_partner(males, eligible, people, woman, matching);
+  };
   auto form_union = [&](int woman, double now) {
     int partner = current_partner[woman];
-    if (partner < 0 && !males.empty()) {
-      const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
-                                                sampling_workspace);
-      const auto eligible = screen_male_candidates(males, sample, people, now, min_male_age,
-                                                     woman, kinship);
-      partner = select_partner(males, eligible, people, woman, matching);
-      if (partner >= 0) {
-        if (next_union_id >= 9007199254740991.0 ||
-            union_history.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
-          stop("Union history exceeds supported ID or row limits.");
-        const int u = static_cast<int>(union_history.size());
-        union_history.push_back({++next_union_id, now, NA_REAL, woman, partner});
-        person_unions[woman].push_back(u);
-        person_unions[partner].push_back(u);
-        current_partner[woman] = partner;
-        current_partner[partner] = woman;
-        remove_male(partner);
-      }
+    if (partner >= 0) return partner;
+    partner = find_candidate(woman, now);
+    if (partner >= 0) {
+      if (next_union_id >= 9007199254740991.0 ||
+          union_history.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
+        stop("Union history exceeds supported ID or row limits.");
+      const int u = static_cast<int>(union_history.size());
+      union_history.push_back({++next_union_id, now, NA_REAL, woman, partner});
+      person_unions[woman].push_back(u);
+      person_unions[partner].push_back(u);
+      current_partner[woman] = partner;
+      current_partner[partner] = woman;
+      remove_male(partner);
     }
     return partner;
   };
@@ -493,7 +497,10 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       double father = NA_REAL;
       int partner = current_partner[i];
       if (!rate_initiation && partner < 0) partner = form_union(i, now);
-      if (partner >= 0) father = people[partner].id;
+      // A nonmarital father stays available: parentage alone is not a union.
+      const int father_position = partner >= 0 ? partner :
+        (rate_initiation ? find_candidate(i, now) : -1);
+      if (father_position >= 0) father = people[father_position].id;
       // If no sampled men are eligible, preserve the birth with unknown father and no union.
       if (next_id >= 9007199254740991.0 ||
           people.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
@@ -508,7 +515,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       int slot = female ? -1 : static_cast<int>(males.size());
       people.push_back({++next_id, now, NA_REAL, mother, father,
                         -std::numeric_limits<double>::infinity(), female, slot});
-      kinship.append(i, partner);
+      kinship.append(i, father_position);
       if (!female) males.push_back(child);
       person_unions.emplace_back();
       current_partner.push_back(-1);
