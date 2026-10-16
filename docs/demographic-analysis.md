@@ -140,3 +140,62 @@ separate row per status and period, preserving the status column. Each sum is
 conditional TFRs describe continuous exposure to a status, not additive
 components of the overall TFR. Tables without status retain their existing
 behavior; Lexis summaries currently use all female exposure.
+
+## Union exposure and formation counts
+
+The optional extension retains the existing period/age/sex rows and
+adds `person_years_unpartnered`, `person_years_partnered`, and `unions` when
+`include_unions = TRUE`. It requires a population object containing union
+histories; bare person tables cannot establish union status. The default is
+FALSE and preserves existing output and computation.
+
+Exposure is the overlap of recorded lifetimes, observation cells, and union
+episodes, with ongoing episodes censored at the observation endpoint. Partnered
+means covered by at least one recorded episode; overlapping episodes must not
+double-count exposure. Unpartnered exposure is the remaining lifetime exposure,
+including widowhood and time between unions. These are current partnership
+statuses, not never-married/ever-married categories. Missing earlier histories
+cannot establish true historical status; users must select windows with complete
+union follow-up. Union records do not distinguish legal marriage.
+
+Each recorded union start counts once for each spouse, at that spouse's attained
+age and the formation time, using the usual half-open age and period cells.
+Repeated unions count separately. Starts before the observation window contribute
+exposure but no formation; starts at its upper endpoint are excluded.
+
+Worked exposure example: a woman aged 20 at time 0 enters a union at 0.5,
+becomes widowed at 1.5, and forms another union at 2.5. Across [0, 3), she
+contributes 1.5 partnered and 1.5 unpartnered person-years and two formations.
+Splitting at time 1 gives partnered exposure 0.5 and 1.0 in the two periods.
+Each husband contributes his own age-specific exposure and formation count.
+
+`births_partnered` and `births_unpartnered` split maternal births by recorded
+status, with NA for men. A union covers `[start_time, end_time)`: births exactly
+at formation are partnered, including births triggering on-demand formation.
+Births exactly at ending are unpartnered unless another union covers that time.
+Unknown mothers remain in `unassigned_births`; their status is not inferred.
+
+Validation checks exact interval overlap, age/period boundaries, widowhood,
+remarriage, ongoing and zero-duration episodes, empty histories, conservation
+of total exposure and births, spouse-specific formation ages, and unchanged
+default output. Rates require positive denominators: status-specific fertility
+uses births in that status divided by female exposure in the same status;
+formation rates among unpartnered people use `unions / person_years_unpartnered`.
+
+```r
+counts <- calculate_lexis_counts(result, seq(2020, 2100, 20), 0:100,
+                                include_unions = TRUE)
+counts <- counts |> dplyr::mutate(
+  asfr_partnered = dplyr::if_else(person_years_partnered > 0,
+    births_partnered / person_years_partnered, NA_real_),
+  asfr_unpartnered = dplyr::if_else(person_years_unpartnered > 0,
+    births_unpartnered / person_years_unpartnered, NA_real_),
+  union_formation_rate = dplyr::if_else(person_years_unpartnered > 0,
+    unions / person_years_unpartnered, NA_real_)
+)
+```
+
+`calculate_tfr(counts)` continues to use overall `asfr`. To calculate a
+status-specific TFR, select female rows and replace `asfr` with the desired
+conditional rate before calling `calculate_tfr()`. The optional columns do not
+change the overall mortality or fertility measures.

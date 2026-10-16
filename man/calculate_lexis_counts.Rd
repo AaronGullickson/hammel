@@ -4,7 +4,12 @@
 \alias{calculate_lexis_counts}
 \title{Summarize demographic exposure and rates}
 \usage{
-calculate_lexis_counts(population, time_breaks, age_breaks)
+calculate_lexis_counts(
+  population,
+  time_breaks,
+  age_breaks,
+  include_unions = FALSE
+)
 }
 \arguments{
 \item{population}{A hammel_population or persons data frame.}
@@ -14,6 +19,16 @@ calculate_lexis_counts(population, time_breaks, age_breaks)
 \item{age_breaks}{Strictly increasing nonnegative age boundaries in years.
 If the final boundary is finite, Inf is appended to create an open-ended
 final age band starting at that boundary.}
+
+\item{include_unions}{Logical, default \code{FALSE}. Require a population object
+with union histories and add \code{person_years_unpartnered},
+\code{person_years_partnered}, \code{unions}, \code{births_unpartnered}, and
+\code{births_partnered}. Union starts count for each spouse at their own age;
+repeated unions count separately. Status covers \verb{[start_time, end_time)},
+so a birth at formation is partnered and a birth at ending is unpartnered
+unless another union starts then. Exposure includes birth-spacing time.
+Overlapping episodes count person-time only once. Missing prior histories
+cannot establish historical status; use windows with complete follow-up.}
 }
 \value{
 A tibble with time_start, time_end, sex, age_start, age_end,

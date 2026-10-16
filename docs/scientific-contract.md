@@ -278,6 +278,13 @@ replications are invalid. There are no custom strata/group arguments yet.
   age breakpoint automatically gains `Inf`; for example `0:110` ends with
   `[110, Inf)`. Zero exposure yields `NA` rates; zero events with positive
   exposure yields zero. Male birth counts/ASFR are `NA`.
+- With `include_unions = TRUE`, Lexis counts add exact partnered/unpartnered
+  exposure for both sexes, union starts at each spouse's age (including repeat
+  unions), and births by maternal status. Union coverage is half-open
+  `[start_time, end_time)`; births triggering on-demand formation are partnered.
+  Overlapping records do not duplicate exposure. Complete union histories are
+  needed: absence of a supplied episode is not evidence of historical singlehood.
+  See the worked examples and rate denominators in demographic analysis.
 - Births use maternal age and all female exposure, including time excluded by
   spacing. Unknown mothers are counted by period in the tibble attribute
   `unassigned_births`; their births cannot be assigned an age-specific rate.

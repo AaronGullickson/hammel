@@ -7,6 +7,7 @@ library(ggplot2)
 library(dplyr)
 library(here)
 library(readr)
+library(tidyr)
 
 mortality_rates <- get_mortality_hmd("USA", year = 2000)
 fertility_rates <- get_fertility_hfd("USA", year = 2000)
@@ -25,7 +26,7 @@ fertility_rates <- read_csv(
 fertility_rates |> calculate_tfr()
 fertility_rates_status |> calculate_tfr()
 
-set.seed(42)
+set.seed(39)
 population <- create_baseline_population(50000, max_age = 70, end_time = 2000)
 model <- hammel_model() |>
   set_population(population) |>
@@ -38,7 +39,8 @@ model <- hammel_model() |>
       c(age_difference = 0.072, "I(age_difference^2)" = -0.014)
     ),
     rates = marriage_rates,
-    kinship_generations = 2
+    kinship_generations = 2,
+    diagnostics = TRUE
   )
 
 timing <- system.time(result <- simulate(model, years = 100, seed = 42))
@@ -76,7 +78,10 @@ unions <- result$unions |>
 
 temp <- unions |>
   group_by(decade) |>
-  summarize(age_diff = mean(age_diff))
+  summarize(
+    age_diff = mean(age_diff),
+    n_eligible = mean(.n_eligible)
+  )
 
 ggplot(unions, aes(x = factor(decade), y = age_diff))+
   geom_boxplot()+
@@ -84,6 +89,18 @@ ggplot(unions, aes(x = factor(decade), y = age_diff))+
   geom_hline(yintercept = 0.072 / (2 * 0.014), color = "red", linetype = 2)+
   theme_bw()
 
+ggplot(temp, aes(x = decade, y = n_eligible))+
+  geom_line()+
+  geom_point()+
+  theme_bw()
+
+ggplot(unions, aes(x = factor(decade), y = .n_eligible))+
+  geom_boxplot()+
+  theme_bw()
+
+ggplot(unions, aes(x = factor(decade), y = .utility_rank))+
+  geom_boxplot()+
+  theme_bw()
 
 # how many remain unmarried?
 result$persons |>
@@ -99,7 +116,28 @@ result$persons |>
   theme_bw()
 
 
-lexis <- calculate_lexis_counts(result, seq(2000, 2100, 5), 0:100)
+lexis <- calculate_lexis_counts(result, seq(2000, 2100, 5), seq(15, 50, 5), include_unions = TRUE)
 
 lexis |> calculate_tfr()
 
+
+asfr <- lexis |>
+  filter(sex == "f") |>
+  mutate(
+    asfr_unpartnered = births_unpartnered / person_years_unpartnered,
+    asfr_partnered = births_partnered / person_years_partnered,
+    asfr_partnered = coalesce(asfr_partnered, 0)
+  ) |>
+  select(time_start, time_end, age_start, age_end, asfr_unpartnered, asfr_partnered) |>
+  pivot_longer(cols = starts_with("asfr_"), names_prefix = "asfr_", 
+               names_to = "union_status", values_to = "rate")
+
+
+asfr |>
+  filter(age_start >= 15 & age_start <=45, time_start > 2020) |>
+  group_by(union_status, age_start) |>
+  summarize(rate = mean(rate), .groups = "drop") |>
+  ggplot(aes(x = age_start, y = rate, group = union_status, color = union_status))+
+  geom_point()+
+  geom_line(data = fertility_rates_status, linetype = 2)+
+  theme_bw()

@@ -57,13 +57,29 @@ calculate_population_size <- function(population, times) {
 #' @param age_breaks Strictly increasing nonnegative age boundaries in years.
 #'   If the final boundary is finite, Inf is appended to create an open-ended
 #'   final age band starting at that boundary.
+#' @param include_unions Logical, default `FALSE`. Require a population object
+#'   with union histories and add `person_years_unpartnered`,
+#'   `person_years_partnered`, `unions`, `births_unpartnered`, and
+#'   `births_partnered`. Union starts count for each spouse at their own age;
+#'   repeated unions count separately. Status covers `[start_time, end_time)`,
+#'   so a birth at formation is partnered and a birth at ending is unpartnered
+#'   unless another union starts then. Exposure includes birth-spacing time.
+#'   Overlapping episodes count person-time only once. Missing prior histories
+#'   cannot establish historical status; use windows with complete follow-up.
 #' @return A tibble with time_start, time_end, sex, age_start, age_end,
 #'   person_years, deaths, births, asmr, and asfr.
 #' @export
 #' @examples
 #' population <- create_baseline_population(100, end_time = 0)
 #' calculate_lexis_counts(population, c(-1, 0), c(0, 20, 40, Inf))
-calculate_lexis_counts <- function(population, time_breaks, age_breaks) {
+calculate_lexis_counts <- function(population, time_breaks, age_breaks,
+                                   include_unions = FALSE) {
+  if (!is.logical(include_unions) || length(include_unions) != 1L ||
+      !is.null(dim(include_unions)) || is.na(include_unions))
+    stop("`include_unions` must be TRUE or FALSE.", call. = FALSE)
+  if (include_unions && !inherits(population, "hammel_population"))
+    stop("`include_unions = TRUE` requires a hammel_population with union histories.",
+         call. = FALSE)
   check_demographic_breaks(time_breaks, "time_breaks")
   check_demographic_breaks(age_breaks, "age_breaks", ages = TRUE)
   if (is.finite(tail(age_breaks, 1))) age_breaks <- c(age_breaks, Inf)
@@ -91,6 +107,16 @@ calculate_lexis_counts <- function(population, time_breaks, age_breaks) {
                                 table$deaths / table$person_years, NA_real_))
   table$asfr <- as.numeric(ifelse(table$person_years > 0,
                                 table$births / table$person_years, NA_real_))
+  if (include_unions) {
+    unions <- union_counts_cpp(persons, population$unions, time_breaks, age_breaks)
+    table$person_years_partnered <- unions$person_years_partnered
+    table$person_years_unpartnered <- pmax(0, table$person_years - table$person_years_partnered)
+    table$unions <- unions$unions
+    table$births_partnered <- unions$births_partnered
+    table$births_unpartnered <- unions$births_unpartnered
+    table$births_partnered[table$sex == "m"] <- NA_real_
+    table$births_unpartnered[table$sex == "m"] <- NA_real_
+  }
   attr(table, "unassigned_births") <- tibble::tibble(time_start = head(time_breaks, -1),
     time_end = tail(time_breaks, -1), births = counts$unassigned_births)
   table

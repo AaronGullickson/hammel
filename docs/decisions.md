@@ -678,3 +678,24 @@ reasons are retained. This supersedes generic death labels in earlier entries.
 - **Milestone 2:** final demographic validation/report remains, including the
   R formula-fallback performance benchmark. Completion still requires user
   acceptance. Poor-pool waiting and previous-father continuity remain deferred.
+
+## D046: Optional union summaries in Lexis counts
+
+- **Status:** union exposure and formation summaries requested by the user
+  October 16, 2026; classification at formation explicitly accepted that day.
+- **Decision:** expose partnered/unpartnered person-years and union formation
+  counts for both sexes through an optional Lexis summary extension. Include
+  maternal births by status to support conditional fertility denominators.
+  Union status is current partnership, not first-marriage history or legal
+  marital status. Births at the union start are partnered, including those
+  triggering on-demand formation; use half-open union episodes.
+- **Implementation:** `include_unions = TRUE` adds columns to the existing
+  period/age/sex grid. Count repeat union starts for both spouses at their
+  respective ages. Integrate coverage without duplicating overlapping
+  person-time; existing overall measures remain unchanged. Require a population
+  object with union histories. Missing earlier records do not prove historical
+  singlehood; users must choose windows with complete follow-up.
+- **Validation:** worked exact exposure, boundary births, spouse-specific ages,
+  widowhood/remarriage, overlapping and zero-duration episodes, empty histories,
+  conservation, and unchanged default summaries. No demographic calibration or
+  milestone acceptance is implied.
