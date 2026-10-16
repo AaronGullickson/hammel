@@ -1,0 +1,113 @@
+---
+title: "Hammel: Milestone 2 Validation"
+author: "Aaron Gullickson"
+date: today
+format:
+  html:
+    toc: true
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    self-contained: true 
+execute:
+  eval: true
+  echo: true
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+devtools::load_all()
+library(here)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(purrr)
+library(tibble)
+library(ggplot2)
+library(gt)
+```
+
+
+## Purpose and completion criteria
+
+Assess whether the current simulation successfully handles union formation among men and women, across different model specifications.
+
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| Mean age difference between partners | Compare to matching model specification | May not match exactly due to differences in male supply and eligibility requirements, but should shift in expected direction when model parameters change |
+| Percent never married by age 50 | Comparison between gender and across specifications | Reasonable values and similar results for men and women | 
+| percent ever married at age intervals | | | 
+| SMAFM | | | 
+| Preservation of TFR in on demand model | Comparison of observed TFR to input rate TFR | Close similarity between observed TFR and input rate TFR | 
+| Matching Model Parameters     | Parameters to Estimates from Conditional Logit Model | Close similarity between parameters and estimates |
+| Accounting and implementation | Existing tests | Successful unit tests |
+
+## Overview of Design
+
+Modeling union formation is complicated by the relationship between fertility and union formation. If women are only allowed to have children after being partnered, then the observed fertilty rates will fall below those of the input rates because women will spend some time not exposed to the risk of birth. This difference can be very substantial in modern populations where marriage happens late. This can be addressed by separating fertility rates into partnered fertility rates and unpartnered fertility rates, but this has requires more detailed input data (or stronger assumptions). 
+
+### Searching Model
+
+We handle this by providing two alternate models of when women search for a partner. In the first **on demand** case, partnerships are formed when a birth event would happend to an unpartnered women. Essentially, every union becomes a shotgun wedding. This approach will not produce realistic age specific marriage rates. However, it will ensure that input fertility rates are accurately reproduced in the simulation because it is the birth event that is "in the driver's seat." For researchers who are not concerned with modeling marriage specifically, this provides a very simple and straightforward option.
+
+In the second **rate** case, we specify age specific partnership rates for women that compete with births and death as the next event. If a partnership search is assigned as the next event, then the woman will look for a partner using the same approach as in the **on demand** case. For the **rate** case, we also allow the user to specify in the fertility rates, an *unpartnered* and *partnered* schedule of fertility rates to better control overall fertility. This is not required, but if users do not specify these rates separately, then fertility rates and decisions will be completely independent of partnership status.
+
+In both cases, it is the woman who initiates the search and then finds matches among men. We use this approach because it is substantially less complicated than a two-sided searching function with fewer data requirements.
+
+### Matching Model
+
+Once a decision is made to search for a partner, regardless of whether the **on demand** or **rate** model is used, a matching model based on a conditional logit model will be used. For a woman who is searching a sample of N unpartnered living men is drawn (N = 1000 by default but this can be modified). These men are then checked for eligibility. To be eligible they must:
+
+- Be a certain minimum age (15 by default but adjustable by the user)
+- They must not be kin within K generations of the woman. This defaults to two generations which rules out fathers, brothers, uncles, and first cousins. It can be set by the user.
+
+All eligible men are then assigned a logit score based on model parameters that can be set by the user. Currently, only one variable - the age difference between partners - is available but additional variables will be added as the program develops. This age difference can be fit as a polynomial. The default setting uses a linear and quadratic term and allows the user to set the coefficients of each. So for example setting the linear term to 0.07 and the quadratic term to -0.014, would lead to a model where the likelihood of a union is maximized when the husband is 2.57 years older than the wife. 
+
+These logit scores are then used to construct a probability for each eligible potential partner by:
+
+EQUATION HERE 
+
+The actual partner is then sampled from eligible partners with the probability provided above.
+
+For the rate model, when unmarried fertility takes place, we also use this matching model to select a father for the birth, although this does not lead to a union. By default, the same matching model is used but users can also specify an alternate model.
+
+## Test On-Demand Model
+
+## Test Rate Model
+
+## Estimating Model Parameters from Data
+
+## Speed Tests
+
+## Tests
+
+The following tests have been constructed and are currently all passing.
+
+```{r}
+#| label: test-results
+
+test_results <- testthat::test_local("..", reporter = "silent")
+
+test_table <- as.data.frame(test_results)
+
+knitr::kable(
+  test_table[, c("test", "passed", "failed", "error", "skipped", "warning")]
+)
+```
+
+## Conclusions and unresolved limitations
+
+
+## Reproducibility record
+
+```{r}
+#| label: reproducibility
+system2("git", c("-C", "..", "rev-parse", "HEAD"), stdout = TRUE)
+system2("git", c("-C", "..", "status", "--short"), stdout = TRUE)
+sessionInfo()
+```
