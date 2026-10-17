@@ -13,7 +13,7 @@ make_lexis_union_history <- function() {
 test_that("long union counts match exact widowhood and remarriage examples", {
   population <- make_lexis_union_history()
   counts <- calculate_lexis_counts(population, c(0, 3), c(0, 20, 30, 40, Inf), TRUE)
-  expect_identical(counts$union_status, rep(c("total", "partnered", "unpartnered"), 8))
+  expect_identical(counts$union_status, rep(c("overall", "partnered", "unpartnered"), 8))
   women <- subset(counts, sex == "f" & age_start == 20)
   expect_equal(women$person_years, c(3, 1.5, 1.5))
   expect_equal(women$unions, c(NA, NA, 2))
@@ -28,7 +28,7 @@ test_that("long union counts match exact widowhood and remarriage examples", {
   expect_equal(men$rate_mortality, c(1/1.5, 1, 0, 0, 0, 0))
   expect_true(all(is.na(counts$births[counts$sex == "m"])))
   expect_true(all(is.na(counts$rate_fertility[counts$sex == "m"])))
-  total <- subset(counts, union_status == "total")
+  total <- subset(counts, union_status == "overall")
   partnered <- subset(counts, union_status == "partnered")
   unpartnered <- subset(counts, union_status == "unpartnered")
   for (column in c("person_years", "births", "deaths"))
@@ -86,7 +86,7 @@ test_that("optional summaries require histories and handle empty union tables", 
       "include_unions")
   population$unions <- population$unions[FALSE, ]
   counts <- calculate_lexis_counts(population, c(0, 3), c(0, Inf), TRUE)
-  total <- subset(counts, union_status == "total")
+  total <- subset(counts, union_status == "overall")
   partnered <- subset(counts, union_status == "partnered")
   unpartnered <- subset(counts, union_status == "unpartnered")
   expect_equal(partnered$person_years, c(0, 0))
@@ -126,14 +126,14 @@ test_that("existing TFR and life-table grouping accepts long Lexis results", {
   counts <- calculate_lexis_counts(make_lexis_union_history(), c(0, 3),
     c(0, 20, 30, 40, Inf), TRUE)
   tfr <- calculate_tfr(counts)
-  expect_identical(tfr$union_status, c("total", "partnered", "unpartnered"))
+  expect_identical(tfr$union_status, c("overall", "partnered", "unpartnered"))
   expect_equal(tfr$tfr, c(40/3, 40/3, 40/3))
   expect_s3_class(tfr, "tbl_df")
   expect_identical(attr(tfr, "unassigned_births"), attr(counts, "unassigned_births"))
   life <- calculate_life_table(counts)
   expect_s3_class(life, "tbl_df")
   expect_equal(nrow(life), nrow(counts))
-  for (status in c("total", "partnered", "unpartnered")) {
+  for (status in c("overall", "partnered", "unpartnered")) {
     plain <- calculate_life_table(subset(counts, union_status == status,
       select = -union_status))
     observed <- subset(life, union_status == status, select = -union_status)

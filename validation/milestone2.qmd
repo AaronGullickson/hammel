@@ -78,26 +78,13 @@ For the rate model, when unmarried fertility takes place, we also use this match
 
 ## Inputs
 
-```{r}
-#| label: set-settings
 
-# beginning year of sim
-start_time <- 2000
-# years to run simulation
-years <- 100
-# ending time of the simulation
-end_time <- start_time + years
-# initial population construction parameters
-population_size <- 100000
-max_age <- 100
-# minimum birth interval in years (0.75 = 9 months)
-birth_interval <- 0.75
-# seeds for random processes
-population_seed <- 42
-replication_seeds <- seq_len(100)
-```
+For all validation checks, I will use rates from the USA circa 2000-2001. 
 
-I will use US rates for the simulation circa 2000-2001.
+- Mortality rates come directly from the Human Mortality Database in one year intervals up to the open-ended interval at 110.
+- All fertility rates, including unpartnered and partnered fertility rates, come from the NCHS report *Revised Birth and Fertility Rates for the 1990s and New Rates for Hispanic Populations, 2000 and 2001: United States*, NVSR 51(12), August 4, 2003, revised June 2004. These fertility rates are limited to the population aged 15-44, in five year age groups.
+- Marriage rates come from the Census report, *Number, Timing, and Duration of Marriages and
+Divorces: 2001* and are based on SIPP panel data. Marriage rates are recorded in five year age groups starting at age 15, with an open-ended group at age 70. Marriage rates are provided for both men and women. Only women's rates are used in the simulation, but I do also use the men's rates to compare to model output.
 
 ```{r}
 #| label: get-input-data
@@ -107,7 +94,7 @@ mortality_rates <- get_mortality_hmd("USA", year = 2000)
 
 # get total, partnered, and unpartnered fertility rates from 
 # HCHS report data held in validation/data
-fertility_rates_total <- read_csv(
+fertility_rates_overall <- read_csv(
   here("validation", "data", "usa_2000_fertility_overall.csv")
 )
 fertility_rates_by_status <- read_csv(
@@ -132,6 +119,33 @@ fertility_rates_total |> calculate_tfr()
 fertility_rates_by_status |> calculate_tfr()
 ```
 
+Simulations are run for a hundred years starting from a base population that is uniformly distributed between zero and a hundred years. The starting population begins unmarried. A burn-in period is required before stable population dynamics will be achieved, but age-specific rates should be accurate from the beginning.
+
+I also set up a matching model where the relativelikelihood of a union is given by:
+
+$$0.072(\texttt{age_difference} - 0.014(\texttt{age_difference^2})$$
+
+Where `age_difference` is the difference between potential husband's and wife's ages. The coefficients are derived from Gullickson (CITE) and come from US data (FROM WHEN?). Under this model the likelihood of a union will be maximized when the husband is 2.57 years older than the wife. Later, I will vary these parameters to confirm that they change the observed age differences between partners.
+
+```{r}
+#| label: set-settings
+
+# beginning year of sim
+start_time <- 2000
+# years to run simulation
+years <- 100
+# ending time of the simulation
+end_time <- start_time + years
+# initial population construction parameters
+population_size <- 100000
+max_age <- 100
+# minimum birth interval in years (0.75 = 9 months)
+birth_interval <- 0.75
+# seeds for random processes
+population_seed <- 42
+replication_seeds <- seq_len(100)
+```
+
 ```{r}
 #| label: initialize-model
 
@@ -150,13 +164,15 @@ model_matching <- create_matching_model(
 )
 ```
 
-## Test On-Demand Model
+## Evaluate On-Demand Model
+
+To test the on-demand model, I run 100 separate simulations with the "on_demand" setting. I can then estimate average age-specific fertility rates, total fertility rates, marriage rates, and other characteristics across simulations.
 
 ```{r}
 #| label: run-sim-ondemand
 
 model_ondemand <- model_base |>
-  set_fertility(fertility_rates_total) |>
+  set_fertility(fertility_rates_overall) |>
   set_union_formation(
     "on_demand", 
     model_matching,
@@ -215,28 +231,72 @@ tfr <- map(counts_ondemand, calculate_tfr) |>
 
 ### Fertility rates
 
-How close do the age specific fertility rates in the output match the age specific fertility rates in the input? Because we are creating unions on demand, the match should be very good. 
+The intent of the on-demand model is to preserve the age-specific fertility rates input by the user. Therefore, the first check is how closely the average observed age-specific fertility rates match those inputs.
 
 ```{r}
 #| label: fig-fertility-on-demand
-#| fig-cap: Estimated mean age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates.
+#| fig-cap: Estimated mean age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Red dotted line shows the input rates.
 
 asfr |>
-  filter(union_status == "total") |>
+  filter(union_status == "overall") |>
   ggplot(aes(x = age_start + 2.5, y = rate))+
   geom_point()+
-  geom_line(linetype = 2)+
-  geom_line(data = fertility_rates_total)+
+  geom_line(linetype = 1)+
+  geom_line(data = fertility_rates_overall, linetype = 2, color = "red")+
   labs(x = "age", y = "fertility rate")+
   theme_bw()
 ```
+
+@fig-fertility-on-demand shows the average age-specific fertility rates across all one hundred simulations in comparison to the expected input rates (shown by the dotted red line). The match is extremely good. As desired, the input fertility rates are being preserved in the simulations. 
+
+```{r}
+#| label: tbl-fertility-coverage
+#| tbl-cap: Coverage of 95% confidence intervals for age-specific fertility rates by period.
+
+counts_ondemand |> 
+  bind_rows(.id = "replication") |>
+  filter(sex == "f", age_start >= 15 & age_start < 45, union_status == "overall") |>
+  select(time_start, time_end, age_start, age_end, rate_fertility) |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, age_start) |>
+  summarize(
+    mean = mean(rate_fertility),
+    sd = sd(rate_fertility),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  inner_join(fertility_rates_overall, by = "age_start") |>
+  mutate(
+    upper = mean + 1.96 * se, lower = mean - 1.96 * se,
+    include = rate <= upper & rate >= lower
+  ) |>
+  group_by(time_mid) |> 
+  summarize(
+    n = n(),
+    coverage = mean(include),
+    max_abs_deviation = max(abs(mean - rate)),
+    .groups = "drop"
+  ) |>
+  gt() |>
+  cols_label(
+    time_mid ~ "time period mid point",
+    n ~ "age groups",
+    coverage ~ "95% CI coverage",
+    max_abs_deviation = "maximum absolute deviation"
+  )
+```
+
+@tbl-fertility-coverage shows the share of age groups covered by the 95% confidence interval within each time period. With a small number of age groups, the coverage can be noisy, but the results here indicate a high level of coverage and very small maximum absolute deviation.  
+
+Although the overall input fertility rates are preserved in the simulation output, I don't expect that the fertility rates disaggregated union status will match those empirically observed for the input case because the on demand model enforces a union on any birth to an unpartnered woman. @fig-union-status-fertility-on-demand shows the mean partnered and unpartnered age specific ferility rates observed in the simulation in comparison to those same rates from the input data. As expected, the results here are discrepant. Unpartnered fertility rates are forced to zero by the simulation and, to compensate, partnered fertility rates are higher than those actually observed. This finding does not invalidate the on demand model as it was expected, but users should be aware that this model cannot be used to generate reasonable partnered and unpartnered fertility rates.
 
 ```{r}
 #| label: fig-union-status-fertility-on-demand
 #| fig-cap: Estimated mean unpartnered and partnered age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates.
 
 asfr |>
-  filter(union_status != "total") |>
+  filter(union_status != "overall") |>
   ggplot(aes(
     x = age_start + 2.5, y = rate, 
     color = union_status, group = union_status
@@ -249,9 +309,11 @@ asfr |>
 ```
 
 ```{r}
+#| label: fig-tfr-on-demand
+#| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines.
 
 input_tfr <- bind_rows(
-  fertility_rates_total |> calculate_tfr() |> mutate(union_status = "total"),
+  fertility_rates_overall |> calculate_tfr() |> mutate(union_status = "overall"),
   fertility_rates_by_status |> calculate_tfr()
 )
 
@@ -265,22 +327,31 @@ tfr |>
   theme_bw()
 ```
 
+@fig-tfr-on-demand summarizes the age-specific fertility rates by showing the total fertility rate by union status and overall across five year time periods. The results are consistent with the previous figures showing that the mean overall TFR is identical to the input TFR across all time periods, while the mean unpartnered TFR is forced to zero and the mean partnered TFR is slightly higher than the input data. 
+
+Notably, the TFRs in all three cases are stationary across time except for the partnered case in the beginning of the simulation where it starts very high. This is because the entire population begins as unpartnered and only transitions to a partnered status with a birth, so the initial ratio of births to person-years lived as partnered is very high. This quickly reverts to an equilibrium level that is much closer to the partnered TFR from the input data although still higher. In general, the results here demonstrate that the on demand model should not be used to analyze fertility rates disaggregated by partnership status, as expected.
 
 ### Age specific marriage rates
 
+Because the goal of the on demand model is to preserve overall fertility rates and not marriage rates,  I don't expect it to produce accurate marriage rates. Because unions occur when an unpartnered women gives birth and we do not yet allow union dissolution, the marriage rates observed in the simulation will closely match the rate of first births for women (with some moditification due to remarriages upon widowhood) and not actual marriage rates. However, it is useful to see how closely it tracks the actual marriage rates observed in the input data.
+
 ```{r}
 #| label: fig-mar-rates-on-demand
-#| fig-cap: Estimated mean age specific marriage rates for women across 100 simulations and 20 time periods compared to age specific marriage rates for women from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates.
+#| fig-cap: Estimated mean age specific marriage rates for women across 100 simulations and 20 time periods compared to age specific marriage rates for women from input data. Input rates are shown by dotted red line. 
 
 mar_rates |>
   filter(sex == "f") |>
   ggplot(aes(x = age_start + 2.5, y = rate))+
   geom_point()+
-  geom_line(linetype = 2)+
-  geom_line(data = mar_rates_female)+
+  geom_line()+
+  geom_line(data = mar_rates_female, linetype = 2, color = "red")+
   labs(x = "age", y = "marriage rate")+
   theme_bw()
 ```
+
+@fig-mar-rates-on-demand shows the mean age-specific marriage rates for women from the simulations in comparison to those same races for the input data. As expected the two schedules differ somewhat. The observed marriage rates peak earlier and then decline faster than the input marriage rates. 
+
+Because this result is dependent upon the fertility schedule, the degree of fit between these two sources will vary considerably across simulations depending on a variety of factors. Therefore, the results from @fig-mar-rates-on-demand should not be taken as a generalizable statement of the degree of agreement or disagreement expected when using the on demand model.
 
 ```{r}
 #| label: fig-gender-mar-rates-on-demand
@@ -289,21 +360,60 @@ mar_rates |>
 mar_rates |>
   ggplot(aes(x = age_start, y = rate, group = sex, color = sex))+
   geom_point()+
-  geom_line(linetype = 2)+
-  geom_line(data = mar_rates_both)+
+  geom_line()+
   labs(x = "age", y = "marriage rate", color = "sex")+
   theme_bw()
 ```
 
+@fig-gender-mar-rates-on-demand compares the mean age specific rates for women and men in the simulation. The two results are quite close, but the peak for men is lower and the decline is slower. This is expected because the model assumes a slight preference for women to marry older men.
 
-## Share ever married
+### Share ever married
 
 ```{r}
-result$persons |>
+result <- results_ondemand[[1]]
+first_mar_husband <- result$unions |>
+  rename(mar_time = start_time, person_id = husband_id) |>
+  select(person_id, mar_time) |>
+  filter(!duplicated(person_id))
+first_mar_wife <- result$unions |>
+  rename(mar_time = start_time, person_id = wife_id) |>
+  select(person_id, mar_time) |>
+  filter(!duplicated(person_id))
+first_mar <- rbind(first_mar_wife, first_mar_husband)
+temp <- result$persons |>
+  select(person_id, sex, birth_time, death_time) |>
+  left_join(first_mar, by = "person_id") |>
   mutate(
-    ever_married = person_id %in% c(result$unions$husband_id, result$unions$wife_id),
-    birth_decade = floor(birth_time / 10) * 10
-  ) |>
+    age_mar = mar_time - birth_time,
+    age_death = death_time - birth_time,
+    age_observed = if_else(is.na(age_death), result$end_time - birth_time, age_death)
+  )
+
+temp <- temp |>
+  filter(age_observed >= 50) |>
+  mutate(ever_married = !is.na(age_mar) & age_mar <= 50)
+
+temp |>
+  mutate(birth_decade = floor(birth_time / 10) * 10) |>
+  group_by(sex, birth_decade) |>
+  summarize(prop_ever_married = mean(ever_married), .groups = "drop") |>
+  ggplot(aes(x = birth_decade + 5, y = prop_ever_married, group = sex, color = sex))+
+  geom_line()+
+  theme_bw()
+
+
+```
+
+
+```{r}
+
+results_ondemand |> map(function(x) {
+  x$persons |>
+    mutate(
+      ever_married = person_id %in% c(x$unions$husband_id, x$unions$wife_id),
+      birth_decade = floor(birth_time / 10) * 10
+    )
+}) |>
   group_by(birth_decade, sex) |>
     summarize(prop_ever_married = mean(ever_married)) |>
   ggplot(aes(x = birth_decade, y = prop_ever_married, group = sex, color = sex))+
@@ -312,10 +422,10 @@ result$persons |>
   theme_bw()
 ```
 
-## Test Rate Model
+## Evaluate Rate Model
 
-## Estimating Model Parameters from Data
-
+## Evaluate Matching Model
+ 
 ## Speed Tests
 
 ## Tests

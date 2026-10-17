@@ -738,3 +738,8 @@ reasons are retained. This supersedes generic death labels in earlier entries.
   probability-to-hazard transformation. The female schedule can configure
   current union-search initiation; male rates are reference data. Search
   failures can make realized formation rates differ from these inputs.
+
+The user renamed D047's pooled `union_status` label from `total` to `overall`
+on October 17, 2026, to avoid confusion with total fertility rate terminology.
+This changes the label in Lexis counts and downstream summaries, without changing
+counts, denominators, or demographic behavior.

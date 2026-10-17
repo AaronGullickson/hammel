@@ -280,10 +280,10 @@ replications are invalid. There are no custom strata/group arguments yet.
   exposure yields zero. Male birth counts/ASFR are `NA`.
 - With `include_unions = TRUE`, Lexis counts add exact partnered/unpartnered
   exposure for both sexes, union starts at each spouse's age (including repeat
-  unions), and births/deaths by status, in separate `total`, `partnered`, and
+  unions), and births/deaths by status, in separate `overall`, `partnered`, and
   `unpartnered` rows. `unions` and `rate_marriage` are only defined for
   unpartnered rows; the rate is formations per unpartnered person-year.
-  Status components sum to total counts/exposure; do not sum all three rows.
+  Status components sum to overall counts/exposure; do not sum all three rows.
   Deaths use status immediately before death, so a union-ending death counts
   as partnered. Birth/exposure union coverage is half-open
   `[start_time, end_time)`; births triggering on-demand formation are partnered.

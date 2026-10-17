@@ -113,7 +113,7 @@ There is no automatic disk cache or rate refresh.
 `calculate_population_size()` operate on inspectable outputs. See
 [demographic analysis](demographic-analysis.md) for exposure, missing cells,
 replications, and age alignment. `calculate_lexis_counts(include_unions = TRUE)`
-returns total/partnered/unpartnered rows with exposure, births, deaths, and
+returns overall/partnered/unpartnered rows with exposure, births, deaths, and
 rates. Union counts and marriage rates appear only on unpartnered rows,
 using the recorded union histories (D046/D047).
 

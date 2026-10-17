@@ -59,7 +59,7 @@ calculate_population_size <- function(population, times) {
 #'   final age band starting at that boundary.
 #' @param include_unions Logical, default `FALSE`. Require a population object
 #'   with union histories and return three rows per period/age/sex cell, labeled
-#'   `total`, `partnered`, and `unpartnered` in `union_status`. Exposure, births,
+#'   `overall`, `partnered`, and `unpartnered` in `union_status`. Exposure, births,
 #'   deaths, ASFR and ASMR use the corresponding status. Births use half-open
 #'   union coverage, so births at formation are partnered. Deaths use status
 #'   immediately before death, so union-ending deaths are partnered. Add `unions`
@@ -67,7 +67,7 @@ calculate_population_size <- function(population, times) {
 #'   each formation, including remarriages, at each spouse's age, and divide by
 #'   unpartnered person-years. Rates with zero exposure are NA. Overlapping
 #'   episodes do not duplicate exposure. Complete union histories are required
-#'   for historical status. Do not sum total rows with their status components.
+#'   for historical status. Do not sum overall rows with their status components.
 #' @return A tibble with time_start, time_end, sex, age_start, age_end,
 #'   person_years, deaths, births, rate_mortality, and rate_fertility. With `include_unions = TRUE`,
 #'   also union_status, unions, and rate_marriage.
@@ -113,7 +113,7 @@ calculate_lexis_counts <- function(population, time_breaks, age_breaks,
   if (include_unions) {
     unions <- union_counts_cpp(persons, population$unions, time_breaks, age_breaks)
     total <- table
-    total$union_status <- "total"
+    total$union_status <- "overall"
     total$unions <- NA_real_
     total$rate_marriage <- NA_real_
     partnered <- total
@@ -169,7 +169,8 @@ summary_rows <- function(table, by_sex = FALSE, by_union_status = FALSE) {
 #'   process object, or a data frame with `age_start`, `age_end`, and `rate_fertility`
 #'   or `rate` in births per woman-year. Bare `rate` tables are interpreted as
 #'   fertility rates; mortality processes are not valid inputs.
-#' @return A tibble with period columns, `union_status` when supplied,
+#' @return A tibble with period columns, `union_status` when supplied (including
+#'   `overall` for Lexis counts pooled across partnership statuses),
 #'   `age_start`, `age_end`, and `tfr`.
 #'   If `sex` is present, only female rows are used.
 #' @export
