@@ -31,6 +31,27 @@ library(ggplot2)
 library(gt)
 ```
 
+```{r}
+#| label: create-functions
+
+calc_ever_married <- function(result, age) {
+  result$unions |>
+    select(start_time, husband_id, wife_id) |>
+    pivot_longer(cols = c(husband_id, wife_id), values_to = "person_id") |>
+    group_by(person_id) |>
+    summarize(mar_time = min(start_time), .groups = "drop") |>
+    right_join(result$persons, by = "person_id") |>
+    mutate(
+      age_observed = pmin(death_time, result$end_time, na.rm = TRUE) - birth_time,
+      age_mar = mar_time - birth_time
+    ) |>
+    filter(age_observed >= age) |>
+    mutate(ever_married = !is.na(age_mar) & age_mar <= age) |>
+    mutate(birth_decade = floor(birth_time / 10) * 10) |>
+    group_by(sex, birth_decade) |>
+    summarize(prop_ever_married = mean(ever_married), .groups = "drop")
+}
+```
 
 ## Purpose and completion criteria
 
@@ -39,25 +60,31 @@ Assess whether the current simulation successfully handles union formation among
 
 | Measure | Comparison | Acceptance criterion |
 |---|---|---|
+| Fertility (ASFR and TFR) | Mean output measures across simulations to input rates | On-demand model should approximately equal overall ASFR and TFR; rate model should approximately equal union status specific ASFR and TFR| 
+| Age-specific marriage rates | Mean output measures across simulations to input rates | rate model should approximately equal female age-specific marriage rates from input; male rates from input data will not necessarily equal results from either search model |
+| Percent ever married by age 30 and 50 | Comparison between gender and across birth cohorts | Reasonable values and similar results for men and women | 
 | Mean age difference between partners | Compare to matching model specification | May not match exactly due to differences in male supply and eligibility requirements, but should shift in expected direction when model parameters change |
-| Percent never married by age 50 | Comparison between gender and across specifications | Reasonable values and similar results for men and women | 
-| percent ever married at age intervals | | | 
-| SMAFM | | | 
-| Preservation of TFR in on demand model | Comparison of observed TFR to input rate TFR | Close similarity between observed TFR and input rate TFR | 
 | Matching Model Parameters     | Parameters to Estimates from Conditional Logit Model | Close similarity between parameters and estimates |
 | Accounting and implementation | Existing tests | Successful unit tests |
 
 ## Overview of Design
 
-Modeling union formation is complicated by the relationship between fertility and union formation. If women are only allowed to have children after being partnered, then the observed fertilty rates will fall below those of the input rates because women will spend some time not exposed to the risk of birth. This difference can be very substantial in modern populations where marriage happens late. This can be addressed by separating fertility rates into partnered fertility rates and unpartnered fertility rates, but this has requires more detailed input data (or stronger assumptions). 
+Union formation is modeled using two separate models:
+
+- First, we model the decision of a currently unpartnered female to initiate a search for a male partner. This is the **searching model** and it can be done either **on demand** when fertility happens or by explicitly inputing age specific marriage **rates**, as described below.
+- Second, once a decision to search has been made, the women must decide on a partner between currently eligible men. This is the **matching model**. 
+
+In both models, women are the "drivers" - they decide when to initiate searches and they select from available men. We thus do not allow for a full two-sex model of partner selection. This is largely a convenience that allows for simpler and more efficient simulation. Further variations of the union formation process could implement a true two-sex model, but that is not a target for this milestone.
+
+Also, be separating these two models, we do not allow for any interaction between deciding when to marry and choosing who to marrry. The most notable limitation here is that, when available partner choice is bad, a woman might delay marriage, such as during a marriage squeeze. The decision to wait may be implemented in future versions of the simulation, but is not a target for this milestone. 
 
 ### Searching Model
+
+Modeling union formation is complicated by the relationship between fertility and union formation. If women are only allowed to have children after being partnered, then the observed fertilty rates will fall below those of the input rates because women will spend some time not exposed to the risk of birth. This difference can be very substantial in modern populations where marriage happens late. This can be addressed by separating fertility rates into partnered fertility rates and unpartnered fertility rates, but this has requires more detailed input data (or stronger assumptions). 
 
 We handle this by providing two alternate models of when women search for a partner. In the first **on demand** case, partnerships are formed when a birth event would happend to an unpartnered women. Essentially, every union becomes a shotgun wedding. This approach will not produce realistic age specific marriage rates. However, it will ensure that input fertility rates are accurately reproduced in the simulation because it is the birth event that is "in the driver's seat." For researchers who are not concerned with modeling marriage specifically, this provides a very simple and straightforward option.
 
 In the second **rate** case, we specify age specific partnership rates for women that compete with births and death as the next event. If a partnership search is assigned as the next event, then the woman will look for a partner using the same approach as in the **on demand** case. For the **rate** case, we also allow the user to specify in the fertility rates, an *unpartnered* and *partnered* schedule of fertility rates to better control overall fertility. This is not required, but if users do not specify these rates separately, then fertility rates and decisions will be completely independent of partnership status.
-
-In both cases, it is the woman who initiates the search and then finds matches among men. We use this approach because it is substantially less complicated than a two-sided searching function with fewer data requirements.
 
 ### Matching Model
 
@@ -115,13 +142,15 @@ mar_rates_both <- bind_rows(
 time_breaks <- seq(2000, 2100, 5)
 age_breaks <- seq(15, 70, 5)
 
-fertility_rates_total |> calculate_tfr()
-fertility_rates_by_status |> calculate_tfr()
+input_tfr <- bind_rows(
+  fertility_rates_overall |> calculate_tfr() |> mutate(union_status = "overall"),
+  fertility_rates_by_status |> calculate_tfr()
+)
 ```
 
 Simulations are run for a hundred years starting from a base population that is uniformly distributed between zero and a hundred years. The starting population begins unmarried. A burn-in period is required before stable population dynamics will be achieved, but age-specific rates should be accurate from the beginning.
 
-I also set up a matching model where the relativelikelihood of a union is given by:
+I also set up a matching model where the relative likelihood of a union is given by:
 
 $$0.072(\texttt{age_difference} - 0.014(\texttt{age_difference^2})$$
 
@@ -312,11 +341,6 @@ asfr |>
 #| label: fig-tfr-on-demand
 #| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines.
 
-input_tfr <- bind_rows(
-  fertility_rates_overall |> calculate_tfr() |> mutate(union_status = "overall"),
-  fertility_rates_by_status |> calculate_tfr()
-)
-
 
 tfr |> 
   ggplot(aes(x = time_mid, y = tfr, group = union_status, color = union_status, fill = union_status))+
@@ -370,28 +394,6 @@ mar_rates |>
 ### Share ever married
 
 ```{r}
-#| label: create-ever-married-function
-
-calc_ever_married <- function(result, age) {
-  result$unions |>
-    select(start_time, husband_id, wife_id) |>
-    pivot_longer(cols = c(husband_id, wife_id), values_to = "person_id") |>
-    group_by(person_id) |>
-    summarize(mar_time = min(start_time), .groups = "drop") |>
-    right_join(result$persons, by = "person_id") |>
-    mutate(
-      age_observed = pmin(death_time, result$end_time, na.rm = TRUE) - birth_time,
-      age_mar = mar_time - birth_time
-    ) |>
-    filter(age_observed >= age) |>
-    mutate(ever_married = !is.na(age_mar) & age_mar <= age) |>
-    mutate(birth_decade = floor(birth_time / 10) * 10) |>
-    group_by(sex, birth_decade) |>
-    summarize(prop_ever_married = mean(ever_married), .groups = "drop")
-}
-```
-
-```{r}
 #| label: fig-ever-married-50
 #| fig-cap: Mean proportion ever married by age 50 by ten-year birth cohorts that have reached 50 by the end of the simulation, across 100 simulations.
 
@@ -422,6 +424,219 @@ results_ondemand |> map(calc_ever_married, 30) |>
 I have no prior expecation of what these proportions should be for this model aside from being reasonable values, which I judge them to be.
 
 ## Evaluate Rate Model
+
+
+```{r}
+#| label: run-sim-rates
+
+model_rates <- model_base |>
+  set_fertility(fertility_rates_by_status) |>
+  set_union_formation(
+    "rate",
+    model_matching,
+    rates = mar_rates_female,
+    diagnostics = TRUE
+  )
+
+results_rates <- map(replication_seeds, function(seed) {
+  simulate(model_rates, years = years, seed = seed)
+})
+names(results_rates) <- as.character(replication_seeds)
+
+counts_rates <- map(
+  results_rates,
+  calculate_lexis_counts,
+  time_breaks,
+  age_breaks,
+  include_unions = TRUE
+)
+
+asfr <- counts_rates |> 
+  bind_rows(.id = "replication") |>
+  filter(sex == "f", age_start >= 15 & age_start < 45) |>
+  group_by(union_status, age_start) |>
+  summarize(
+    rate = mean(rate_fertility),
+    sd = sd(rate_fertility),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+mar_rates <- counts_rates |>
+  bind_rows(.id = "replication") |>
+  filter(union_status == "unpartnered") |>
+  group_by(age_start, sex) |>
+  summarize(
+    rate = mean(rate_marriage),
+    sd = sd(rate_marriage),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+tfr <- map(counts_rates, calculate_tfr) |>
+  bind_rows(.id = "replication") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, union_status) |>
+  summarize(
+    sd = sd(tfr),
+    tfr = mean(tfr),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+### Fertility rates
+
+```{r}
+#| label: fig-fertility-rates
+#| fig-cap: Estimated mean age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Red dotted line shows the input rates.
+
+asfr |>
+  filter(union_status == "overall") |>
+  ggplot(aes(x = age_start + 2.5, y = rate))+
+  geom_point()+
+  geom_line(linetype = 1)+
+  geom_line(data = fertility_rates_overall, linetype = 2, color = "red")+
+  labs(x = "age", y = "fertility rate")+
+  theme_bw()
+```
+
+
+```{r}
+#| label: tbl-fertility-coverage-rates
+#| tbl-cap: Coverage of 95% confidence intervals for age-specific fertility rates by period.
+
+counts_rates |> 
+  bind_rows(.id = "replication") |>
+  filter(sex == "f", age_start >= 15 & age_start < 45, union_status == "overall") |>
+  select(time_start, time_end, age_start, age_end, rate_fertility) |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, age_start) |>
+  summarize(
+    mean = mean(rate_fertility),
+    sd = sd(rate_fertility),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  inner_join(fertility_rates_overall, by = "age_start") |>
+  mutate(
+    upper = mean + 1.96 * se, lower = mean - 1.96 * se,
+    include = rate <= upper & rate >= lower
+  ) |>
+  group_by(time_mid) |> 
+  summarize(
+    n = n(),
+    coverage = mean(include),
+    max_abs_deviation = max(abs(mean - rate)),
+    .groups = "drop"
+  ) |>
+  gt() |>
+  cols_label(
+    time_mid ~ "time period mid point",
+    n ~ "age groups",
+    coverage ~ "95% CI coverage",
+    max_abs_deviation = "maximum absolute deviation"
+  )
+```
+
+
+```{r}
+#| label: fig-union-status-fertility-rates
+#| fig-cap: Estimated mean unpartnered and partnered age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates.
+
+asfr |>
+  filter(union_status != "overall") |>
+  ggplot(aes(
+    x = age_start + 2.5, y = rate, 
+    color = union_status, group = union_status
+  ))+
+  geom_point()+
+  geom_line(linetype = 2)+
+  geom_line(data = fertility_rates_by_status)+
+  labs(x = "age", y = "fertility rate", color = "union status")+
+  theme_bw()
+```
+
+```{r}
+#| label: fig-tfr-rates
+#| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines.
+
+input_tfr <- bind_rows(
+  fertility_rates_overall |> calculate_tfr() |> mutate(union_status = "overall"),
+  fertility_rates_by_status |> calculate_tfr()
+)
+
+
+tfr |> 
+  ggplot(aes(x = time_mid, y = tfr, group = union_status, color = union_status, fill = union_status))+
+  geom_point()+
+  geom_hline(data = input_tfr, aes(yintercept = tfr, color = union_status),
+             linetype = 2)+
+  labs(x = "time", y = "total fertility rate", color = "union status")+
+  theme_bw()
+```
+
+### Age specific marriage rates
+
+```{r}
+#| label: fig-mar-rates-rates
+#| fig-cap: Estimated mean age specific marriage rates for women across 100 simulations and 20 time periods compared to age specific marriage rates for women from input data. Input rates are shown by dotted red line. 
+
+mar_rates |>
+  filter(sex == "f") |>
+  ggplot(aes(x = age_start + 2.5, y = rate))+
+  geom_point()+
+  geom_line()+
+  geom_line(data = mar_rates_female, linetype = 2, color = "red")+
+  labs(x = "age", y = "marriage rate")+
+  theme_bw()
+```
+
+
+```{r}
+#| label: fig-gender-mar-rates-rates
+#| fig-cap: Estimated mean age specific marriage rates for men and women across 100 simulations and 20 time periods.
+
+mar_rates |>
+  ggplot(aes(x = age_start, y = rate, group = sex, color = sex))+
+  geom_point()+
+  geom_line()+
+  labs(x = "age", y = "marriage rate", color = "sex")+
+  theme_bw()
+```
+
+### Share ever married
+
+```{r}
+#| label: fig-ever-married-50-rates
+#| fig-cap: Mean proportion ever married by age 50 by ten-year birth cohorts that have reached 50 by the end of the simulation, across 100 simulations.
+
+results_rates |> map(calc_ever_married, 50) |>
+  bind_rows(.id = "replication") |>
+  group_by(sex, birth_decade) |>
+  summarize(prop_ever_married = mean(prop_ever_married), .groups = "drop") |>
+  ggplot(aes(x = birth_decade, y = prop_ever_married, group = sex, color = sex))+
+  labs(x= "birth year", y = "proportion ever married by age 50")+
+  geom_line()+theme_bw()
+```
+
+```{r}
+#| label: fig-ever-married-30-rates
+#| fig-cap: Mean proportion ever married by age 30 by ten-year birth cohorts that have reached 30 by the end of the simulation, across 100 simulations.
+
+results_rates |> map(calc_ever_married, 30) |>
+  bind_rows(.id = "replication") |>
+  group_by(sex, birth_decade) |>
+  summarize(prop_ever_married = mean(prop_ever_married), .groups = "drop") |>
+  ggplot(aes(x = birth_decade, y = prop_ever_married, group = sex, color = sex))+
+  labs(x= "birth year", y = "proportion ever married by age 30")+
+  geom_line()+theme_bw()
+```
+
 
 ## Evaluate Matching Model
  
