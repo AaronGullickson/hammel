@@ -1,6 +1,6 @@
 # Directions beyond milestone 2
 
-Recorded October 15, 2026; expanded October 16, 2026 from the user's planning
+Recorded October 15, 2026; expanded October 17, 2026 from the user's planning
 notes. Milestone 2 remains
 in validation. The user selected **groups as the theme for milestone 3**;
 **union dissolution is proposed for milestone 4**, after groups. Other items
@@ -98,6 +98,45 @@ model. The user reports SOCSIM has a mechanism for this; its precise behavior
 has not been audited for this task. Distribution, persistence, association with
 other attributes, inheritance and calibration to aggregate rates are unselected.
 No heterogeneity parameter or demographic default is adopted here.
+
+## Population feedback
+
+Consider allowing fertility or other demographic rates to respond to population
+size or age composition. Discussed October 17, 2026 as future work, without an
+assigned milestone. No feedback rule, demographic response, or public API has
+been selected.
+
+The event queue can coexist with population summaries: a living-person count
+could be updated at births and deaths, while age composition could be calculated
+from living persons' birth dates when needed. The main scheduling issue is that
+a population-wide rate change makes pending events sampled under the previous
+rates obsolete. Immediate feedback after every birth or death could therefore
+require frequent rescheduling across the affected population.
+
+A proposed approach is periodic feedback, with the user defining the period
+length in years. Schedule feedback boundaries explicitly, so they are processed
+even when no demographic event occurs during a period. At each boundary, assess
+the current population, calculate any rate adjustment, and invalidate and
+reschedule affected individuals' pending events from that boundary before
+executing later events. Hold the adjustment fixed until the next boundary.
+For fertility changes, reconsider each affected woman's next competing event,
+preserving her current state and spacing restrictions from actual births.
+This would retain continuous demographic event times; the feedback period is
+a response interval, not a simulation execution step.
+
+Before implementation, specify the population signal and reference population,
+response function, any lag, first feedback time, boundary tie ordering, and
+which processes and individuals are affected. The response interval is a
+demographic assumption as well as a computational choice. Interaction with
+fertility compensation after rate changes remains an open issue (D045).
+Any user-defined feedback mechanism must obey state consistency and event
+invalidation rules; arbitrary callbacks must not mutate simulation state.
+
+For a precedent, see Mike Murphy's
+[Bringing behaviour back into micro-simulation: Feedback mechanisms in demographic models](https://www.demogr.mpg.de/Papers/workshops/010221_paper10.pdf)
+(2001 workshop paper). Murphy extended SOCSIM with population-pressure feedback
+through nuptiality, evaluating population size at 25-year intervals. This is a
+reference for investigation, not an adopted response rule or period length.
 
 ## Characteristics
 
