@@ -263,8 +263,8 @@ tfr <- map(counts_ondemand, calculate_tfr) |>
 The intent of the on-demand model is to preserve the age-specific fertility rates input by the user. Therefore, the first check is how closely the average observed age-specific fertility rates match those inputs.
 
 ```{r}
-#| label: fig-fertility-on-demand
-#| fig-cap: Estimated mean age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Red dotted line shows the input rates.
+#| label: fig-fertility-model-on-demand
+#| fig-cap: Estimated mean age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Red dotted line shows the input rates. On demand model used.
 
 asfr |>
   filter(union_status == "overall") |>
@@ -276,11 +276,11 @@ asfr |>
   theme_bw()
 ```
 
-@fig-fertility-on-demand shows the average age-specific fertility rates across all one hundred simulations in comparison to the expected input rates (shown by the dotted red line). The match is extremely good. As desired, the input fertility rates are being preserved in the simulations. 
+@fig-fertility-model-on-demand shows the average age-specific fertility rates across all one hundred simulations in comparison to the expected input rates (shown by the dotted red line). The match is extremely good. As desired, the input fertility rates are being preserved in the simulations. 
 
 ```{r}
-#| label: tbl-fertility-coverage
-#| tbl-cap: Coverage of 95% confidence intervals for age-specific fertility rates by period.
+#| label: tbl-fertility-coverage-model-on-demand
+#| tbl-cap: Coverage of 95% confidence intervals for age-specific fertility rates by period. On demand model used.
 
 counts_ondemand |> 
   bind_rows(.id = "replication") |>
@@ -316,13 +316,14 @@ counts_ondemand |>
   )
 ```
 
-@tbl-fertility-coverage shows the share of age groups covered by the 95% confidence interval within each time period. With a small number of age groups, the coverage can be noisy, but the results here indicate a high level of coverage and very small maximum absolute deviation.  
+@tbl-fertility-coverage-model-on-demand shows the share of age groups covered by the 95% confidence interval within each time period. With a small number of age groups, the coverage can be noisy, but the results here indicate a high level of coverage and very small maximum absolute deviation.  
 
-Although the overall input fertility rates are preserved in the simulation output, I don't expect that the fertility rates disaggregated union status will match those empirically observed for the input case because the on demand model enforces a union on any birth to an unpartnered woman. @fig-union-status-fertility-on-demand shows the mean partnered and unpartnered age specific ferility rates observed in the simulation in comparison to those same rates from the input data. As expected, the results here are discrepant. Unpartnered fertility rates are forced to zero by the simulation and, to compensate, partnered fertility rates are higher than those actually observed. This finding does not invalidate the on demand model as it was expected, but users should be aware that this model cannot be used to generate reasonable partnered and unpartnered fertility rates.
+Although the overall input fertility rates are preserved in the simulation output, I don't expect that the fertility rates disaggregated union status will match those empirically observed for the input case because the on demand model enforces a union on any birth to an unpartnered woman. @fig-union-status-fertility-model-on-demand shows the mean partnered and unpartnered age specific ferility rates observed in the simulation in comparison to those same rates from the input data. As expected, the results here are discrepant. Unpartnered fertility rates are forced to zero by the simulation and, to compensate, partnered fertility rates are higher than those actually observed. This finding does not invalidate the on demand model as it was expected, but users should be aware that this model cannot be used to generate reasonable partnered and unpartnered fertility rates.
 
 ```{r}
-#| label: fig-union-status-fertility-on-demand
-#| fig-cap: Estimated mean unpartnered and partnered age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates.
+#| label: fig-union-status-fertility-model-on-demand
+#| fig-cap: Estimated mean unpartnered and partnered age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates. On demand model used.
+
 
 asfr |>
   filter(union_status != "overall") |>
@@ -338,8 +339,9 @@ asfr |>
 ```
 
 ```{r}
-#| label: fig-tfr-on-demand
-#| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines.
+#| label: fig-tfr-model-on-demand
+#| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines. On demand model used.
+
 
 
 tfr |> 
@@ -351,7 +353,7 @@ tfr |>
   theme_bw()
 ```
 
-@fig-tfr-on-demand summarizes the age-specific fertility rates by showing the total fertility rate by union status and overall across five year time periods. The results are consistent with the previous figures showing that the mean overall TFR is identical to the input TFR across all time periods, while the mean unpartnered TFR is forced to zero and the mean partnered TFR is slightly higher than the input data. 
+@fig-tfr-model-on-demand summarizes the age-specific fertility rates by showing the total fertility rate by union status and overall across five year time periods. The results are consistent with the previous figures showing that the mean overall TFR is identical to the input TFR across all time periods, while the mean unpartnered TFR is forced to zero and the mean partnered TFR is slightly higher than the input data. 
 
 Notably, the TFRs in all three cases are stationary across time except for the partnered case in the beginning of the simulation where it starts very high. This is because the entire population begins as unpartnered and only transitions to a partnered status with a birth, so the initial ratio of births to person-years lived as partnered is very high. This quickly reverts to an equilibrium level that is much closer to the partnered TFR from the input data although still higher. In general, the results here demonstrate that the on demand model should not be used to analyze fertility rates disaggregated by partnership status, as expected.
 
@@ -360,8 +362,9 @@ Notably, the TFRs in all three cases are stationary across time except for the p
 Because the goal of the on demand model is to preserve overall fertility rates and not marriage rates,  I don't expect it to produce accurate marriage rates. Because unions occur when an unpartnered women gives birth and we do not yet allow union dissolution, the marriage rates observed in the simulation will closely match the rate of first births for women (with some moditification due to remarriages upon widowhood) and not actual marriage rates. However, it is useful to see how closely it tracks the actual marriage rates observed in the input data.
 
 ```{r}
-#| label: fig-mar-rates-on-demand
-#| fig-cap: Estimated mean age specific marriage rates for women across 100 simulations and 20 time periods compared to age specific marriage rates for women from input data. Input rates are shown by dotted red line. 
+#| label: fig-mar-rates-model-on-demand
+#| fig-cap: Estimated mean age specific marriage rates for women across 100 simulations and 20 time periods compared to age specific marriage rates for women from input data. Input rates are shown by dotted red line.  On demand model used.
+
 
 mar_rates |>
   filter(sex == "f") |>
@@ -373,13 +376,14 @@ mar_rates |>
   theme_bw()
 ```
 
-@fig-mar-rates-on-demand shows the mean age-specific marriage rates for women from the simulations in comparison to those same races for the input data. As expected the two schedules differ somewhat. The observed marriage rates peak earlier and then decline faster than the input marriage rates. 
+@fig-mar-rates-model-on-demand shows the mean age-specific marriage rates for women from the simulations in comparison to those same races for the input data. As expected the two schedules differ somewhat. The observed marriage rates peak earlier and then decline faster than the input marriage rates. 
 
 Because this result is dependent upon the fertility schedule, the degree of fit between these two sources will vary considerably across simulations depending on a variety of factors. Therefore, the results from @fig-mar-rates-on-demand should not be taken as a generalizable statement of the degree of agreement or disagreement expected when using the on demand model.
 
 ```{r}
-#| label: fig-gender-mar-rates-on-demand
-#| fig-cap: Estimated mean age specific marriage rates for men and women across 100 simulations and 20 time periods.
+#| label: fig-gender-mar-rates-model-on-demand
+#| fig-cap: Estimated mean age specific marriage rates for men and women across 100 simulations and 20 time periods. On demand model used.
+
 
 mar_rates |>
   ggplot(aes(x = age_start, y = rate, group = sex, color = sex))+
@@ -389,13 +393,14 @@ mar_rates |>
   theme_bw()
 ```
 
-@fig-gender-mar-rates-on-demand compares the mean age specific rates for women and men in the simulation. The two results are quite close, but the peak for men is lower and the decline is slower. This is expected because the model assumes a slight preference for women to marry older men.
+@fig-gender-mar-rates--model-on-demand compares the mean age specific rates for women and men in the simulation. The two results are quite close, but the peak for men is lower and the decline is slower. This is expected because the model assumes a slight preference for women to marry older men.
 
 ### Share ever married
 
 ```{r}
-#| label: fig-ever-married-50
-#| fig-cap: Mean proportion ever married by age 50 by ten-year birth cohorts that have reached 50 by the end of the simulation, across 100 simulations.
+#| label: fig-ever-married-50-model-on-demand
+#| fig-cap: Mean proportion ever married by age 50 by ten-year birth cohorts that have reached 50 by the end of the simulation, across 100 simulations. On demand model used.
+
 
 results_ondemand |> map(calc_ever_married, 50) |>
   bind_rows(.id = "replication") |>
@@ -407,8 +412,9 @@ results_ondemand |> map(calc_ever_married, 50) |>
 ```
 
 ```{r}
-#| label: fig-ever-married-30
-#| fig-cap: Mean proportion ever married by age 30 by ten-year birth cohorts that have reached 30 by the end of the simulation, across 100 simulations.
+#| label: fig-ever-married-30-model-on-demand
+#| fig-cap: Mean proportion ever married by age 30 by ten-year birth cohorts that have reached 30 by the end of the simulation, across 100 simulations. On demand model used.
+
 
 results_ondemand |> map(calc_ever_married, 30) |>
   bind_rows(.id = "replication") |>
@@ -419,7 +425,7 @@ results_ondemand |> map(calc_ever_married, 30) |>
   geom_line()+theme_bw()
 ```
 
-@fig-ever-married-50 and @fig-ever-married-30 show the proportion of men and women married across the 100 simulations by birth cohorts, excluding individuals who died before reaching the focal age and cohorts that had not reached that age by the end of the simulation. As expected this proportion is ero for cohorts who were old by the start of the simulation but rises quickly for cohorts in the marriageable ages. Once we reach cohorts born within the simulation, those proportions remain stationary for the remainder of the simulation. 
+@fig-ever-married-50-model-on-demand and @fig-ever-married-30-model-on-demand show the proportion of men and women married across the 100 simulations by birth cohorts, excluding individuals who died before reaching the focal age and cohorts that had not reached that age by the end of the simulation. As expected this proportion is ero for cohorts who were old by the start of the simulation but rises quickly for cohorts in the marriageable ages. Once we reach cohorts born within the simulation, those proportions remain stationary for the remainder of the simulation. 
 
 I have no prior expecation of what these proportions should be for this model aside from being reasonable values, which I judge them to be.
 
@@ -491,8 +497,8 @@ tfr <- map(counts_rates, calculate_tfr) |>
 ### Fertility rates
 
 ```{r}
-#| label: fig-fertility-rates
-#| fig-cap: Estimated mean age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Red dotted line shows the input rates.
+#| label: fig-fertility-model-rate
+#| fig-cap: Estimated mean age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Red dotted line shows the input rates. Rate model used.
 
 asfr |>
   filter(union_status == "overall") |>
@@ -506,8 +512,9 @@ asfr |>
 
 
 ```{r}
-#| label: tbl-fertility-coverage-rates
-#| tbl-cap: Coverage of 95% confidence intervals for age-specific fertility rates by period.
+#| label: tbl-fertility-coverage-model-rate
+#| tbl-cap: Coverage of 95% confidence intervals for age-specific fertility rates by period. Rate model used.
+
 
 counts_rates |> 
   bind_rows(.id = "replication") |>
@@ -545,8 +552,9 @@ counts_rates |>
 
 
 ```{r}
-#| label: fig-union-status-fertility-rates
-#| fig-cap: Estimated mean unpartnered and partnered age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates.
+#| label: fig-union-status-fertility-model-rate
+#| fig-cap: Estimated mean unpartnered and partnered age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates. Rate model used.
+
 
 asfr |>
   filter(union_status != "overall") |>
@@ -562,8 +570,9 @@ asfr |>
 ```
 
 ```{r}
-#| label: fig-tfr-rates
-#| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines.
+#| label: fig-tfr-model-rate
+#| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines. Rate model used.
+
 
 input_tfr <- bind_rows(
   fertility_rates_overall |> calculate_tfr() |> mutate(union_status = "overall"),
@@ -583,8 +592,9 @@ tfr |>
 ### Age specific marriage rates
 
 ```{r}
-#| label: fig-mar-rates-rates
-#| fig-cap: Estimated mean age specific marriage rates for women across 100 simulations and 20 time periods compared to age specific marriage rates for women from input data. Input rates are shown by dotted red line. 
+#| label: fig-mar-rates--model-rate
+#| fig-cap: Estimated mean age specific marriage rates for women across 100 simulations and 20 time periods compared to age specific marriage rates for women from input data. Input rates are shown by dotted red line. Rate model used.
+ 
 
 mar_rates |>
   filter(sex == "f") |>
@@ -598,8 +608,9 @@ mar_rates |>
 
 
 ```{r}
-#| label: fig-gender-mar-rates-rates
-#| fig-cap: Estimated mean age specific marriage rates for men and women across 100 simulations and 20 time periods.
+#| label: fig-gender-mar-rates-model-rate
+#| fig-cap: Estimated mean age specific marriage rates for men and women across 100 simulations and 20 time periods. Rate model used.
+
 
 mar_rates |>
   ggplot(aes(x = age_start, y = rate, group = sex, color = sex))+
@@ -612,8 +623,9 @@ mar_rates |>
 ### Share ever married
 
 ```{r}
-#| label: fig-ever-married-50-rates
-#| fig-cap: Mean proportion ever married by age 50 by ten-year birth cohorts that have reached 50 by the end of the simulation, across 100 simulations.
+#| label: fig-ever-married-50-model-rate
+#| fig-cap: Mean proportion ever married by age 50 by ten-year birth cohorts that have reached 50 by the end of the simulation, across 100 simulations. Rate model used.
+
 
 results_rates |> map(calc_ever_married, 50) |>
   bind_rows(.id = "replication") |>
@@ -625,8 +637,9 @@ results_rates |> map(calc_ever_married, 50) |>
 ```
 
 ```{r}
-#| label: fig-ever-married-30-rates
-#| fig-cap: Mean proportion ever married by age 30 by ten-year birth cohorts that have reached 30 by the end of the simulation, across 100 simulations.
+#| label: fig-ever-married-30-model-rate
+#| fig-cap: Mean proportion ever married by age 30 by ten-year birth cohorts that have reached 30 by the end of the simulation, across 100 simulations. Rate model used.
+
 
 results_rates |> map(calc_ever_married, 30) |>
   bind_rows(.id = "replication") |>
