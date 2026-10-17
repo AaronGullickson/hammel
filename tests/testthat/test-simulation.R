@@ -74,6 +74,13 @@ test_that("births preserve maternal IDs and allow initially unknown fathers", {
 })
 
 test_that("birth accounting, father availability and spacing survive restarts", {
+  expect_valid_spacing <- function(times, mother_ids) {
+    intervals <- lapply(split(times, mother_ids), function(x) diff(sort(x)))
+    expect_gt(sum(lengths(intervals)), 0L)
+    invalid <- vapply(intervals, function(x) any(x < 0.75 - 1e-09), logical(1))
+    expect_false(any(invalid), info = paste(
+      "Birth spacing violated for mother IDs:", paste(names(intervals)[invalid], collapse = ", ")))
+  }
   model <- make_model(2000, birth_rate = 0.2)
   model$population$persons$sex[seq_len(1000)] <- "f"
   result <- simulate(model, 5, seed = 42)
@@ -88,18 +95,15 @@ test_that("birth accounting, father availability and spacing survive restarts", 
   expect_true(all(result$persons$birth_time[father_rows] <= child_times))
   expect_true(all(is.na(result$persons$death_time[father_rows]) | result$persons$death_time[father_rows] >=
     child_times))
-  for (times in split(result$persons$birth_time[new], result$persons$mother_id[new])) {
-    expect_true(all(diff(sort(times)) >= 0.75 - 1e-09))
-  }
+  expect_valid_spacing(result$persons$birth_time[new], result$persons$mother_id[new])
   validate_population(result)
   restarted <- set_fertility(set_mortality(set_population(hammel_model(), result), model$processes$mortality$rates),
     model$processes$fertility$rates) |>
       set_process(model$processes$union_formation)
   continued <- simulate(restarted, 1, seed = 43)
-  for (times in split(continued$persons$birth_time[!is.na(continued$persons$mother_id)],
-    continued$persons$mother_id[!is.na(continued$persons$mother_id)])) {
-    expect_true(all(diff(sort(times)) >= 0.75 - 1e-09))
-  }
+  children <- !is.na(continued$persons$mother_id)
+  expect_valid_spacing(continued$persons$birth_time[children],
+    continued$persons$mother_id[children])
 })
 
 test_that("adjusted fertility follows the continuous renewal expectation", {
