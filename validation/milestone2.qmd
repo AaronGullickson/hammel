@@ -200,56 +200,116 @@ mar_rates <- counts_ondemand |>
     .groups = "drop"
   )
 
+tfr <- map(counts_ondemand, calculate_tfr) |>
+  bind_rows(.id = "replication") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, union_status) |>
+  summarize(
+    sd = sd(tfr),
+    tfr = mean(tfr),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
 ```
+
+### Fertility rates
 
 How close do the age specific fertility rates in the output match the age specific fertility rates in the input? Because we are creating unions on demand, the match should be very good. 
 
 ```{r}
-
+#| label: fig-fertility-on-demand
+#| fig-cap: Estimated mean age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates.
 
 asfr |>
   filter(union_status == "total") |>
-  ggplot(aes(x = age_start, y = rate))+
-  geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 * se), fill = "grey", color = NA)+
+  ggplot(aes(x = age_start + 2.5, y = rate))+
   geom_point()+
   geom_line(linetype = 2)+
   geom_line(data = fertility_rates_total)+
+  labs(x = "age", y = "fertility rate")+
   theme_bw()
 ```
 
 ```{r}
+#| label: fig-union-status-fertility-on-demand
+#| fig-cap: Estimated mean unpartnered and partnered age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates.
 
 asfr |>
   filter(union_status != "total") |>
-  ggplot(aes(x = age_start, y = rate, color = union_status, fill = union_status, group = union_status))+
-  #geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 * se), color = NA)+
+  ggplot(aes(
+    x = age_start + 2.5, y = rate, 
+    color = union_status, group = union_status
+  ))+
   geom_point()+
   geom_line(linetype = 2)+
   geom_line(data = fertility_rates_by_status)+
+  labs(x = "age", y = "fertility rate", color = "union status")+
   theme_bw()
 ```
 
 ```{r}
+
+input_tfr <- bind_rows(
+  fertility_rates_total |> calculate_tfr() |> mutate(union_status = "total"),
+  fertility_rates_by_status |> calculate_tfr()
+)
+
+
+tfr |> 
+  ggplot(aes(x = time_mid, y = tfr, group = union_status, color = union_status, fill = union_status))+
+  geom_point()+
+  geom_hline(data = input_tfr, aes(yintercept = tfr, color = union_status),
+             linetype = 2)+
+  labs(x = "time", y = "total fertility rate", color = "union status")+
+  theme_bw()
+```
+
+
+### Age specific marriage rates
+
+```{r}
+#| label: fig-mar-rates-on-demand
+#| fig-cap: Estimated mean age specific marriage rates for women across 100 simulations and 20 time periods compared to age specific marriage rates for women from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates.
+
 mar_rates |>
   filter(sex == "f") |>
-  ggplot(aes(x = age_start, y = rate))+
+  ggplot(aes(x = age_start + 2.5, y = rate))+
   geom_point()+
   geom_line(linetype = 2)+
   geom_line(data = mar_rates_female)+
+  labs(x = "age", y = "marriage rate")+
   theme_bw()
-
-
 ```
 
 ```{r}
+#| label: fig-gender-mar-rates-on-demand
+#| fig-cap: Estimated mean age specific marriage rates for men and women across 100 simulations and 20 time periods.
+
 mar_rates |>
   ggplot(aes(x = age_start, y = rate, group = sex, color = sex))+
   geom_point()+
   geom_line(linetype = 2)+
   geom_line(data = mar_rates_both)+
+  labs(x = "age", y = "marriage rate", color = "sex")+
   theme_bw()
+```
 
 
+## Share ever married
+
+```{r}
+result$persons |>
+  mutate(
+    ever_married = person_id %in% c(result$unions$husband_id, result$unions$wife_id),
+    birth_decade = floor(birth_time / 10) * 10
+  ) |>
+  group_by(birth_decade, sex) |>
+    summarize(prop_ever_married = mean(ever_married)) |>
+  ggplot(aes(x = birth_decade, y = prop_ever_married, group = sex, color = sex))+
+  geom_line()+
+  geom_point()+
+  theme_bw()
 ```
 
 ## Test Rate Model
