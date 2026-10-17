@@ -370,57 +370,56 @@ mar_rates |>
 ### Share ever married
 
 ```{r}
-result <- results_ondemand[[1]]
-first_mar_husband <- result$unions |>
-  rename(mar_time = start_time, person_id = husband_id) |>
-  select(person_id, mar_time) |>
-  filter(!duplicated(person_id))
-first_mar_wife <- result$unions |>
-  rename(mar_time = start_time, person_id = wife_id) |>
-  select(person_id, mar_time) |>
-  filter(!duplicated(person_id))
-first_mar <- rbind(first_mar_wife, first_mar_husband)
-temp <- result$persons |>
-  select(person_id, sex, birth_time, death_time) |>
-  left_join(first_mar, by = "person_id") |>
-  mutate(
-    age_mar = mar_time - birth_time,
-    age_death = death_time - birth_time,
-    age_observed = if_else(is.na(age_death), result$end_time - birth_time, age_death)
-  )
+#| label: create-ever-married-function
 
-temp <- temp |>
-  filter(age_observed >= 50) |>
-  mutate(ever_married = !is.na(age_mar) & age_mar <= 50)
-
-temp |>
-  mutate(birth_decade = floor(birth_time / 10) * 10) |>
-  group_by(sex, birth_decade) |>
-  summarize(prop_ever_married = mean(ever_married), .groups = "drop") |>
-  ggplot(aes(x = birth_decade + 5, y = prop_ever_married, group = sex, color = sex))+
-  geom_line()+
-  theme_bw()
-
-
+calc_ever_married <- function(result, age) {
+  result$unions |>
+    select(start_time, husband_id, wife_id) |>
+    pivot_longer(cols = c(husband_id, wife_id), values_to = "person_id") |>
+    group_by(person_id) |>
+    summarize(mar_time = min(start_time), .groups = "drop") |>
+    right_join(result$persons, by = "person_id") |>
+    mutate(
+      age_observed = pmin(death_time, result$end_time, na.rm = TRUE) - birth_time,
+      age_mar = mar_time - birth_time
+    ) |>
+    filter(age_observed >= age) |>
+    mutate(ever_married = !is.na(age_mar) & age_mar <= age) |>
+    mutate(birth_decade = floor(birth_time / 10) * 10) |>
+    group_by(sex, birth_decade) |>
+    summarize(prop_ever_married = mean(ever_married), .groups = "drop")
+}
 ```
-
 
 ```{r}
+#| label: fig-ever-married-50
+#| fig-cap: Mean proportion ever married by age 50 by ten-year birth cohorts that have reached 50 by the end of the simulation, across 100 simulations.
 
-results_ondemand |> map(function(x) {
-  x$persons |>
-    mutate(
-      ever_married = person_id %in% c(x$unions$husband_id, x$unions$wife_id),
-      birth_decade = floor(birth_time / 10) * 10
-    )
-}) |>
-  group_by(birth_decade, sex) |>
-    summarize(prop_ever_married = mean(ever_married)) |>
+results_ondemand |> map(calc_ever_married, 50) |>
+  bind_rows(.id = "replication") |>
+  group_by(sex, birth_decade) |>
+  summarize(prop_ever_married = mean(prop_ever_married), .groups = "drop") |>
   ggplot(aes(x = birth_decade, y = prop_ever_married, group = sex, color = sex))+
-  geom_line()+
-  geom_point()+
-  theme_bw()
+  labs(x= "birth year", y = "proportion ever married by age 50")+
+  geom_line()+theme_bw()
 ```
+
+```{r}
+#| label: fig-ever-married-30
+#| fig-cap: Mean proportion ever married by age 30 by ten-year birth cohorts that have reached 30 by the end of the simulation, across 100 simulations.
+
+results_ondemand |> map(calc_ever_married, 30) |>
+  bind_rows(.id = "replication") |>
+  group_by(sex, birth_decade) |>
+  summarize(prop_ever_married = mean(prop_ever_married), .groups = "drop") |>
+  ggplot(aes(x = birth_decade, y = prop_ever_married, group = sex, color = sex))+
+  labs(x= "birth year", y = "proportion ever married by age 30")+
+  geom_line()+theme_bw()
+```
+
+@fig-ever-married-50 and @fig-ever-married-30 show the proportion of men and women married across the 100 simulations by birth cohorts, excluding individuals who died before reaching the focal age and cohorts that had not reached that age by the end of the simulation. As expected this proportion is ero for cohorts who were old by the start of the simulation but rises quickly for cohorts in the marriageable ages. Once we reach cohorts born within the simulation, those proportions remain stationary for the remainder of the simulation. 
+
+I have no prior expecation of what these proportions should be for this model aside from being reasonable values, which I judge them to be.
 
 ## Evaluate Rate Model
 
