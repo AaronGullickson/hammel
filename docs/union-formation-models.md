@@ -60,7 +60,11 @@ estimation interface yet.
 
 `union_formation(initiation, matching, sample_size = 1000, rates = NULL, min_male_age = 15, kinship_generations = 2, father_matching = NULL)` constructs
 a process; `set_union_formation(model, ...)` attaches it. Initiation is explicitly
-`"on_demand"` or `"rate"`; initiation and coefficients have no defaults.
+`"on_demand"` or `"rate"`; initiation has no default. Omitting `matching` uses
+`create_age_gap_matching_model(0, 5)`: a preferred male-minus-female age gap of
+zero years and a symmetric half-weight distance of five years. Explicit matching
+models override this default in both the constructor and setter. With
+`father_matching = NULL`, nonmarital father selection uses this same model.
 The user selected a default sample size of 1000. `sample_size = 0` means use the full available pool; a positive
 integer requests up to that many men without replacement BEFORE pair-specific
 eligibility screening. Screening can leave no candidates. Rate-mode tables
@@ -486,3 +490,18 @@ are NA, including when enabled for a zero-duration run. With diagnostics off,
 existing columns survive and newly formed unions have NA in those columns.
 Rank requires one linear pass over already computed utilities, without sorting
 or evaluating the formula again; that pass is skipped when disabled.
+## Age-gap matching helper
+
+`create_age_gap_matching_model(preferred_age_gap, half_weight_distance)` converts
+two explicit inputs in years into the existing formula-based matching model.
+Age gap is male age minus female age; the preferred gap may be negative or zero.
+The half-weight distance must be strictly positive. There are no defaults.
+With preferred gap `d` and distance `h`, utility is equivalent, up to an ignored
+constant, to `-log(2) * ((age_difference - d) / h)^2`. The quadratic coefficient
+is `-log(2) / h^2`; the linear coefficient is `-2 * d * quadratic`.
+For example, `d = 3` and `h = 5` give equal half-peak weights at gaps -2 and 8.
+Decline is symmetric. These are relative candidate selection weights, not
+guaranteed realized age-gap frequencies or a halving of utility itself.
+The helper returns an ordinary matching model and retains the native quadratic
+execution path. Inputs must be finite numeric scalars and yield representable
+finite coefficients with strictly negative quadratic curvature.

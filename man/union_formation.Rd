@@ -7,7 +7,7 @@
 \usage{
 union_formation(
   initiation,
-  matching,
+  matching = create_age_gap_matching_model(0, 5),
   sample_size = 1000,
   rates = NULL,
   min_male_age = 15,
@@ -20,7 +20,7 @@ union_formation(
 set_union_formation(
   model,
   initiation,
-  matching,
+  matching = create_age_gap_matching_model(0, 5),
   sample_size = 1000,
   rates = NULL,
   min_male_age = 15,
@@ -34,7 +34,9 @@ set_union_formation(
 \item{initiation}{Either \code{"on_demand"} for birth-triggered searches or
 \code{"rate"} for scheduled searches. No default is selected.}
 
-\item{matching}{A specification created by \code{\link[=create_matching_model]{create_matching_model()}}.}
+\item{matching}{A specification created by \code{\link[=create_matching_model]{create_matching_model()}}. Defaults
+to \code{create_age_gap_matching_model(0, 5)}: preferred age gap zero years,
+with selection weight halving five years on either side.}
 
 \item{sample_size}{Nonnegative whole number of men to sample before screening;
 zero requests the whole pool. Defaults to \code{1000}.}

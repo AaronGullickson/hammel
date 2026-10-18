@@ -45,6 +45,13 @@ model <- hammel_model() |>
   )
 
 timing <- system.time(result <- simulate(model, years = 100, seed = 42))
+
+#result <- population
+#timing <- system.time(for(i in 1:100) {
+#  model <- model |> set_population(result)
+#  result <- simulate(model, years = 1, seed = 27)
+#})
+
 print(result$simulation)
 cat("Living persons:", sum(is.na(result$persons$death_time)), "\n")
 cat("Simulation elapsed seconds:", timing[["elapsed"]], "\n")
@@ -167,3 +174,15 @@ lexis |>
   geom_line()+
   theme_bw()
 
+tibble(
+  age_diff = seq(from = -20, to = 20, by = 0.1),
+  logit = 0.025 * age_diff - 0.005 * age_diff^2
+) |>
+  ggplot(aes(x = age_diff, y = logit))+
+  geom_line()+
+  geom_vline(xintercept = 0.072 / (2 * 0.014), linetype = 2)+
+  theme_bw()
+
+# if h is halving time of the utility and d is the preferred age difference where utility is maximized, then:
+# b_quadratic = - log(2)/h^2
+# b_linear = -2 * d * b_quadratic

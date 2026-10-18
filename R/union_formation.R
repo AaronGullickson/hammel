@@ -31,6 +31,44 @@ create_matching_model <- function(formula, coefficients) {
   model
 }
 
+#' Create a quadratic matching model from interpretable age-gap preferences
+#'
+#' Convert a preferred age gap and a symmetric half-weight distance into a
+#' formula and coefficients for [create_matching_model()]. Age difference is
+#' male age minus female age. Candidates at the preferred gap plus or minus
+#' `half_weight_distance` receive half the selection weight of a candidate at
+#' the preferred gap. Availability and eligibility also affect realized gaps.
+#'
+#' The quadratic coefficient is `-log(2) / half_weight_distance^2` and the linear
+#' coefficient is `-2 * preferred_age_gap * quadratic`. This specifies relative
+#' selection weights, not a halving of utility or a realized standard deviation.
+#' @param preferred_age_gap Finite numeric scalar in years; negative values allowed.
+#' @param half_weight_distance Finite positive numeric scalar in years from the
+#'   preferred gap at which selection weight halves.
+#' @return A `hammel_matching_model` with linear and quadratic age-difference terms.
+#' @export
+#' @examples
+#' # Illustrative preferences, not demographic defaults.
+#' matching <- create_age_gap_matching_model(3, 5)
+create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance) {
+  for (name in c("preferred_age_gap", "half_weight_distance")) {
+    value <- get(name)
+    if (!is.numeric(value) || length(value) != 1L || !is.null(dim(value)) ||
+        !is.finite(value)) {
+      stop("`", name, "` must be a finite numeric scalar.", call. = FALSE)
+    }
+  }
+  if (half_weight_distance <= 0)
+    stop("`half_weight_distance` must be positive.", call. = FALSE)
+  quadratic <- -(sqrt(log(2)) / half_weight_distance)^2
+  linear <- -2 * (preferred_age_gap * quadratic)
+  if (!is.finite(quadratic) || quadratic >= 0 || !is.finite(linear))
+    stop("Inputs must yield finite coefficients with a negative quadratic term.",
+         call. = FALSE)
+  create_matching_model(~ age_difference + I(age_difference^2),
+    c(age_difference = unname(linear), "I(age_difference^2)" = unname(quadratic)))
+}
+
 validate_matching_model <- function(model) {
   if (!inherits(model, "hammel_matching_model") || !is.list(model)) {
     stop("`matching` must be created with create_matching_model().", call. = FALSE)
@@ -149,7 +187,9 @@ prepare_matching_model <- function(matching) {
 #'
 #' @param initiation Either `"on_demand"` for birth-triggered searches or
 #'   `"rate"` for scheduled searches. No default is selected.
-#' @param matching A specification created by [create_matching_model()].
+#' @param matching A specification created by [create_matching_model()]. Defaults
+#'   to `create_age_gap_matching_model(0, 5)`: preferred age gap zero years,
+#'   with selection weight halving five years on either side.
 #' @param cancel_birth_if_no_match Logical, default `TRUE`. Cancel a birth when
 #'   its on-demand partner search or rate-mode nonmarital father selection fails.
 #'   Set `FALSE` to allow births with unknown fathers. Historical missing father
@@ -184,7 +224,8 @@ prepare_matching_model <- function(matching) {
 #' @return `union_formation()` returns a `hammel_union_formation` process;
 #'   `set_union_formation()` returns an updated model. Rate tables are tibbles.
 #' @export
-union_formation <- function(initiation, matching, sample_size = 1000, rates = NULL,
+union_formation <- function(initiation, matching = create_age_gap_matching_model(0, 5),
+                            sample_size = 1000, rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
                             diagnostics = FALSE) {
@@ -206,7 +247,8 @@ union_formation <- function(initiation, matching, sample_size = 1000, rates = NU
 
 #' @rdname union_formation
 #' @export
-set_union_formation <- function(model, initiation, matching, sample_size = 1000, rates = NULL,
+set_union_formation <- function(model, initiation, matching = create_age_gap_matching_model(0, 5),
+                            sample_size = 1000, rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
                             diagnostics = FALSE) {

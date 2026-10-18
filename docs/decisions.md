@@ -743,3 +743,11 @@ The user renamed D047's pooled `union_status` label from `total` to `overall`
 on October 17, 2026, to avoid confusion with total fertility rate terminology.
 This changes the label in Lexis counts and downstream summaries, without changing
 counts, denominators, or demographic behavior.
+
+## Default age-gap matching preferences
+
+Accepted by the user October 18, 2026: `union_formation()` and
+`set_union_formation()` default to `create_age_gap_matching_model(0, 5)` when
+matching is omitted. The preferred male-minus-female age gap is zero years;
+selection weight halves at a distance of five years on either side. Explicit
+matching specifications override this default. Initiation mode remains explicit.
