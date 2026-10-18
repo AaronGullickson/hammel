@@ -324,7 +324,6 @@ Although the overall input fertility rates are preserved in the simulation outpu
 #| label: fig-union-status-fertility-model-on-demand
 #| fig-cap: Estimated mean unpartnered and partnered age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates. On demand model used.
 
-
 asfr |>
   filter(union_status != "overall") |>
   ggplot(aes(
@@ -341,8 +340,6 @@ asfr |>
 ```{r}
 #| label: fig-tfr-model-on-demand
 #| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines. On demand model used.
-
-
 
 tfr |> 
   ggplot(aes(x = time_mid, y = tfr, group = union_status, color = union_status, fill = union_status))+
@@ -365,7 +362,6 @@ Because the goal of the on demand model is to preserve overall fertility rates a
 #| label: fig-mar-rates-model-on-demand
 #| fig-cap: Estimated mean age specific marriage rates for women across 100 simulations and 20 time periods compared to age specific marriage rates for women from input data. Input rates are shown by dotted red line.  On demand model used.
 
-
 mar_rates |>
   filter(sex == "f") |>
   ggplot(aes(x = age_start + 2.5, y = rate))+
@@ -384,7 +380,6 @@ Because this result is dependent upon the fertility schedule, the degree of fit 
 #| label: fig-gender-mar-rates-model-on-demand
 #| fig-cap: Estimated mean age specific marriage rates for men and women across 100 simulations and 20 time periods. On demand model used.
 
-
 mar_rates |>
   ggplot(aes(x = age_start, y = rate, group = sex, color = sex))+
   geom_point()+
@@ -401,7 +396,6 @@ mar_rates |>
 #| label: fig-ever-married-50-model-on-demand
 #| fig-cap: Mean proportion ever married by age 50 by ten-year birth cohorts that have reached 50 by the end of the simulation, across 100 simulations. On demand model used.
 
-
 results_ondemand |> map(calc_ever_married, 50) |>
   bind_rows(.id = "replication") |>
   group_by(sex, birth_decade) |>
@@ -414,7 +408,6 @@ results_ondemand |> map(calc_ever_married, 50) |>
 ```{r}
 #| label: fig-ever-married-30-model-on-demand
 #| fig-cap: Mean proportion ever married by age 30 by ten-year birth cohorts that have reached 30 by the end of the simulation, across 100 simulations. On demand model used.
-
 
 results_ondemand |> map(calc_ever_married, 30) |>
   bind_rows(.id = "replication") |>
@@ -515,7 +508,6 @@ asfr |>
 #| label: tbl-fertility-coverage-model-rate
 #| tbl-cap: Coverage of 95% confidence intervals for age-specific fertility rates by period. Rate model used.
 
-
 counts_rates |> 
   bind_rows(.id = "replication") |>
   filter(sex == "f", age_start >= 15 & age_start < 45, union_status == "overall") |>
@@ -555,7 +547,6 @@ counts_rates |>
 #| label: fig-union-status-fertility-model-rate
 #| fig-cap: Estimated mean unpartnered and partnered age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates. Rate model used.
 
-
 asfr |>
   filter(union_status != "overall") |>
   ggplot(aes(
@@ -573,13 +564,6 @@ asfr |>
 #| label: fig-tfr-model-rate
 #| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines. Rate model used.
 
-
-input_tfr <- bind_rows(
-  fertility_rates_overall |> calculate_tfr() |> mutate(union_status = "overall"),
-  fertility_rates_by_status |> calculate_tfr()
-)
-
-
 tfr |> 
   ggplot(aes(x = time_mid, y = tfr, group = union_status, color = union_status, fill = union_status))+
   geom_point()+
@@ -595,7 +579,6 @@ tfr |>
 #| label: fig-mar-rates--model-rate
 #| fig-cap: Estimated mean age specific marriage rates for women across 100 simulations and 20 time periods compared to age specific marriage rates for women from input data. Input rates are shown by dotted red line. Rate model used.
  
-
 mar_rates |>
   filter(sex == "f") |>
   ggplot(aes(x = age_start + 2.5, y = rate))+
@@ -610,7 +593,6 @@ mar_rates |>
 ```{r}
 #| label: fig-gender-mar-rates-model-rate
 #| fig-cap: Estimated mean age specific marriage rates for men and women across 100 simulations and 20 time periods. Rate model used.
-
 
 mar_rates |>
   ggplot(aes(x = age_start, y = rate, group = sex, color = sex))+
