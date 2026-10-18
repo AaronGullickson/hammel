@@ -88,20 +88,48 @@ In the second **rate** case, we specify age specific partnership rates for women
 
 ### Matching Model
 
-Once a decision is made to search for a partner, regardless of whether the **on demand** or **rate** model is used, a matching model based on a conditional logit model will be used. For a woman who is searching a sample of N unpartnered living men is drawn (N = 1000 by default but this can be modified). These men are then checked for eligibility. To be eligible they must:
+Once a decision is made to search for a partner, regardless of whether the **on demand** or **rate** model is used, a matching model based on a conditional logit model will be used. For a woman who is searching a sample of $N$ unpartnered living men is drawn ($N = 1000$ by default, but this value can be modified). These men are then checked for eligibility. To be eligible they must:
 
 - Be a certain minimum age (15 by default but adjustable by the user)
 - They must not be kin within K generations of the woman. This defaults to two generations which rules out fathers, brothers, uncles, and first cousins. It can be set by the user.
 
-All eligible men are then assigned a logit score based on model parameters that can be set by the user. Currently, only one variable - the age difference between partners - is available but additional variables will be added as the program develops. This age difference can be fit as a polynomial. The default setting uses a linear and quadratic term and allows the user to set the coefficients of each. So for example setting the linear term to 0.07 and the quadratic term to -0.014, would lead to a model where the likelihood of a union is maximized when the husband is 2.57 years older than the wife. 
+Each  eligible man is then assigned a logit score (or utility) $v_i$ based on model parameters that can be set by the user. These logit scores are then used to construct a probability $p_i$ for each eligible potential partner by:
 
-These logit scores are then used to construct a probability for each eligible potential partner by:
+$$p_i = \frac{\exp(v_i)}{\sum_{j=1}^{N}\exp(v_j)}$$
 
-EQUATION HERE 
+The actual partner is then sampled from eligible partners with the given probabilities.
 
-The actual partner is then sampled from eligible partners with the probability provided above.
+Currently, only one variable - the age difference between partners - is available as a model parameter, but additional exposed variables may be added as the program develops. In the `create_matching_model` function, users can apply any valid R formula of `age_difference` as well as coefficients for each parameter. However, the expectation is that for many cases, the best fit will be a quadratic formula as follows:
 
-For the rate model, when unmarried fertility takes place, we also use this matching model to select a father for the birth, although this does not lead to a union. By default, the same matching model is used but users can also specify an alternate model.
+$$v_i = \beta_l(\texttt{agediff}) + \beta_q(\texttt{agediff}^2)$$
+
+Where $\beta_l >= 0$ and $\beta_q < 0$. In this case, the resulting parabola will have a single maximum at $\beta_l/(-2\beta_q)$ which defines the preferred age gap with a symmetric decline around that maximum, where the speed of the decline is determined by $\beta_q$. For a halving time of the utility in $h$ years, the value of $\beta_q$ is given by $-\log(2)/h^2$.
+
+For many users, it will be easier to think of this age matching model by two alternate parameters. The $d$ parameter provides the preferred age difference and the $h$ parameter provides the number of years of age difference to halve the logit score. Given those two parameters, the model parameters can be determined by:
+
+$$\beta_q = -\frac{\log(2)}{h^2}$$
+$$\beta_l = -2d\beta_q$$
+
+A convenience function, `create_age_gap_matching_model` provides the ability for users to set the model using these two parameters.
+
+For more fine-grained control, users can enter any valid R formula of `age_difference` when creating the matching model. For example, if users wanted an asymmetric decline from a peak of a 3 year age difference where the likelihood declines twice as fast when below the preferred age gap as it does above it, they could use the following:
+
+```r
+h <- 5
+
+matching <- create_matching_model(
+  ~ I(pmin(age_difference - 3, 0)^2) +
+    I(pmax(age_difference - 3, 0)^2),
+  coefficients = c(
+    "I(pmin(age_difference - 3, 0)^2)" = -log(2) / (h/2)^2,
+    "I(pmax(age_difference - 3, 0)^2)" = -log(2) / h^2
+  )
+)
+```
+
+In this model framework, the preferred age gap is entered manually as a constant, and we use a spline of the squared term around that preferred age gap.
+
+For the rate model, we also use this matching model to select a father for births to unpartnered mothers, although this does not form a union. By default, the same matching model is used as for union formation but users can also specify an alternate model.
 
 ## Inputs
 
@@ -152,9 +180,9 @@ Simulations are run for a hundred years starting from a base population that is 
 
 I also set up a matching model where the relative likelihood of a union is given by:
 
-$$0.072(\texttt{age_difference} - 0.014(\texttt{age_difference^2})$$
+$$v_i = 0.072(\texttt{agediff}) - 0.014(\texttt{agediff}^2)$$
 
-Where `age_difference` is the difference between potential husband's and wife's ages. The coefficients are derived from Gullickson (CITE) and come from US data (FROM WHEN?). Under this model the likelihood of a union will be maximized when the husband is 2.57 years older than the wife. Later, I will vary these parameters to confirm that they change the observed age differences between partners.
+Where `agediff` is the difference between potential husband's and wife's ages. The coefficients are derived from Gullickson (CITE) and come from US data (FROM WHEN?). Under this model the likelihood of a union will be maximized when the husband is 2.57 years older than the wife and the halving time in that likelihood is about 7.04 years. Later, I will vary these parameters to confirm that they change the observed age differences between partners.
 
 ```{r}
 #| label: set-settings
@@ -424,6 +452,7 @@ I have no prior expecation of what these proportions should be for this model as
 
 ## Evaluate Rate Model
 
+To test the ratte model, I run 100 separate simulations with the "rate" setting. I can then estimate average age-specific fertility rates, total fertility rates, marriage rates, and other characteristics across simulations.
 
 ```{r}
 #| label: run-sim-rates
