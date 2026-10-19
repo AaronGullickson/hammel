@@ -749,6 +749,8 @@ The discrepancy with overall fertility is expected and not problematic for the r
 To assess if this was the issue, I reran the simulations with `birth_interval` set to zero.
 
 ```{r}
+#| label: run-sim-rate-nobt
+
 model_rates_nobt <- model_base |>
   set_fertility(fertility_rates_by_status, birth_interval = 0) |>
   set_union_formation(
@@ -941,7 +943,7 @@ results_rates |> map(calc_ever_married, 30) |>
 For the matching model, evaluation will be based on single simulations rather than a bootstrap of 100 simulations. The matching model is independent of the search model, but the different search models may produce differences in the eligible partner pool, so I will compare across each simulation type.
 
 ```{r}
-#| get-sims-matching
+#| label: get-sims-matching
 
 result_ondemand <- simulate(model_ondemand, years = years, seed = 42)
 result_rates <- simulate(model_rates, years = years, seed = 42)
@@ -990,7 +992,7 @@ result_rates_no_kin_b <- simulate(
     rates = mar_rates_female,
     diagnostics = TRUE,
     min_male_age = 15, kinship_generations = 0
-  )
+  ),
   years = years, seed = 42
 )
 
@@ -1223,7 +1225,7 @@ for(i in seq_along(1:nrow(scenarios))) {
     result <- simulate(model_scenario, years = 100)
   })
   elapsed_time <- c(elapsed_time, unname(timing[["elapsed"]]))
-  cat(i)
+  #cat(i)
 }
 
 scenarios$elapsed_time <- elapsed_time
