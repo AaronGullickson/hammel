@@ -1,6 +1,6 @@
 # Hammel project brief
 
-Updated October 15, 2026. The first mortality/fertility simulator is implemented.
+Updated October 19, 2026. The first mortality/fertility simulator is implemented.
 The user accepted milestone 1 as complete after rendering the validation report
 on October 15, 2026. See D029 and [testing](testing.md) for the evidence and limits.
 
@@ -17,12 +17,13 @@ customizable demographic mechanisms. The user owns demographic requirements
 and scientific interpretation; agents investigate, implement, document, and
 validate software.
 
-## Milestone 1 scope and status
+## Accepted milestone 1 scope and status
 
-The accepted initial scope is fertility and mortality schedules constant over
-calendar time, but potentially varying by age (D003/D019).
+The accepted initial scope was fertility and mortality schedules constant over
+calendar time, but potentially varying by age (D003/D019). The table records
+that milestone at acceptance, not the current mandatory-union engine (D032).
 
-| Component | Current state |
+| Component | State at milestone 1 acceptance |
 | --- | --- |
 | Population/model construction | Implemented; public tables are tibbles |
 | Mortality | Piecewise constant age/sex hazards; continuous sampling |
@@ -66,14 +67,19 @@ Candidate sampling defaults to 1000 men before pair screening (zero means the
 whole pool). Eligibility and basic fertility transitions are implemented; the
 failed-match birth cancellation is implemented (default TRUE); transition-aware fertility
 compensation is deferred (D045); final validation remains. The poor-pool wait alternative is deferred to a later milestone (D044). See [milestone 2 notes](union-formation-models.md)
-for scope, unresolved decisions, and validation. The on-demand C++ path now forms unions at births with formula-based
+for implemented rules, deferred decisions, and validation. The on-demand C++ path now forms unions at births with formula-based
 conditional-logit selection and handles widowhood and restart histories.
 Minimum male age screening (default 15 years) and known-kin exclusion within
 two generations of each partner are implemented. `extract_kin()` shares the
 native kinship module. Exclusive ongoing unions are enforced before sampling; female rate-based searches and status-specific fertility schedules are implemented.
 Overall fertility is also supported in rate mode with a warning. Previous-father
-continuity is deferred to a later milestone. Benchmark R formula-fallback
-performance during the final validation report (D042).
+continuity is deferred to a later milestone. The user-authored [milestone 2 report](../validation/milestone2.qmd) now includes
+USA circa 2000–2001 demographic comparisons, matching-parameter recovery, and
+R formula-fallback performance comparisons (D042). Milestone 2 is nearing
+completion: the user will compile the report, obtain agent feedback, and write
+conclusions before final acceptance. Matching defaults to
+`create_age_gap_matching_model(0, 5)`, and optional union diagnostics record
+eligible sample counts and selected utility ranks.
 
 ## Beyond milestone 2
 

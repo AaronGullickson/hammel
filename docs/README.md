@@ -1,9 +1,12 @@
 # Hammel documentation
 
-Updated October 15, 2026. The mortality/fertility engine is implemented;
+Updated October 19, 2026. The mortality/fertility engine is implemented;
 milestone 1 was accepted as complete by the user on October 15, 2026. Current behavior uses
 continuous event times and midpoint fertility compensation, with no monthly
-time grid. Milestone 2 union-formation scope is accepted; its detailed rules remain unresolved.
+time grid. Milestone 2 union formation is implemented and in demographic validation;
+its report includes parameter recovery and performance comparisons. It is
+nearing completion: report compilation, agent feedback, and user-written
+conclusions remain before final acceptance.
 
 ## Reading order
 
@@ -26,7 +29,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | Document | Status |
 | --- | --- |
 | [Waiting-time sampling](waiting-time-sampling.md) | Explanation of the current shared hazard sampler |
-| [Union-formation models](union-formation-models.md) | Milestone 2 scope; open modeling choices and proposed validation |
+| [Union-formation models](union-formation-models.md) | Implemented milestone 2 rules, matching defaults, diagnostics, and deferred work |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
 | [Future roadmap](roadmap.md) | User priorities beyond milestone 2; milestone 3 groups and open specifications |
 | [Decision log](decisions.md) | Accepted choices and supersession history |
@@ -47,11 +50,16 @@ To inspect prior versions, use `git log -- docs` and
 
 - [Milestone 1 validation report](../validation/milestone1.qmd): completed
   assessment by Aaron Gullickson; the user rendered `validation/milestone1.html`
-  and accepted milestone 1. Execution is enabled and reruns the assessment.
-- [Replication example](../inst/examples/milestone1_bootstrap.R): USA/2000
-  replications, demographic comparisons, and population growth.
-- [Single-run example](../inst/examples/milestone1.R): initial simulation and
-  reuse of its output.
+  and accepted milestone 1. Reproduce at the recorded acceptance commit; current
+  execution requires a union process absent from that historical assessment.
+- [Milestone 2 validation report](../validation/milestone2.qmd): user-authored
+  analysis in progress using USA circa 2000–2001 inputs; includes both initiation
+  modes, matching-parameter recovery, and performance comparisons. Rendering
+  executes simulations and an HMD download. No milestone acceptance is recorded.
+- [Union-formation example](../inst/examples/milestone2.R): current construction
+  and execution workflow.
+The former `milestone1.R` and `milestone1_bootstrap.R` examples have been
+removed from the current tree; use Git history for those historical workflows.
 
 `inst/examples/` ships with the installed R package. `validation/` and `docs/`
 are development material excluded from package builds. Local validation data

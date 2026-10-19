@@ -89,10 +89,11 @@ milestone 2 scope.
 
 ## Consequences for Hammel
 
-This trace informs open decisions without adopting legacy rules. Hammel's
-conditional-logit choice deliberately differs from maximum-score selection.
-Candidate sampling before versus after eligibility, incomplete-ancestry policy,
-failed searches/retries, and birth-time classification need explicit choices.
+This trace informed the accepted rules without adopting legacy architecture.
+Hammel's conditional-logit choice deliberately differs from maximum-score
+selection. Sampling before screening, demonstrated-kin exclusion, failed-search
+retries, default unmatched-birth cancellation, and partnered classification at
+union formation are now specified in the [scientific contract](scientific-contract.md).
 SOCSIM's status-specific fertility is evidence of state-dependent rate selection,
 not proof that Hammel's midpoint compensation is valid across status changes.
 

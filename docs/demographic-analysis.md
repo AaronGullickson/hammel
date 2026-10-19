@@ -1,6 +1,6 @@
 # Demographic analysis
 
-Updated October 13, 2026. All outputs are tibbles; base data frames are valid
+Updated October 19, 2026. All outputs are tibbles; base data frames are valid
 inputs. Dates and age boundaries use years, and exposure uses person-years.
 See the [scientific contract](scientific-contract.md) for model assumptions.
 
@@ -131,7 +131,8 @@ of age-specific bias.
 Use aligned ASFR/ASMR alongside aggregate TFR/life expectancy. Distinguish
 sampling variability from persistent differences due to midpoint compensation,
 initialization, or grouped ages. See [testing and validation](testing.md) and
-[the report template](../validation/milestone1.qmd).
+the [accepted milestone 1 report](../validation/milestone1.qmd) and
+[ongoing milestone 2 report](../validation/milestone2.qmd).
 
 
 When input fertility rates include `union_status`, `calculate_tfr()` returns a
@@ -139,7 +140,8 @@ separate row per status and period, preserving the status column. Each sum is
 `rate * age-band width` over that status's finite contiguous age range. These
 conditional TFRs describe continuous exposure to a status, not additive
 components of the overall TFR. Tables without status retain their existing
-behavior; Lexis summaries currently use all female exposure.
+behavior; default Lexis summaries use all female exposure, while
+`include_unions = TRUE` also returns status-specific exposure as described below.
 
 ## Union exposure and formation counts
 

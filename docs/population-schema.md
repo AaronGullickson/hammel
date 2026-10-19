@@ -4,7 +4,7 @@ All public tables are returned as tibbles. Base data frames remain valid input;
 constructors normalize the table class while preserving column contents and
 order. Both empty and populated `persons` and `unions` tables follow this rule.
 
-Updated October 15, 2026. The schema is implemented under D012/D015/D016/D023.
+Updated October 19, 2026. The schema is implemented under D012/D015/D016/D023.
 Normalization and structural validation are shared by population construction
 and attachment. See the [scientific contract](scientific-contract.md) for
 event and restart semantics.
@@ -45,6 +45,11 @@ required schema. Existing tables must be mapped by sex, not blindly renamed
 by column position. For example, an old row with male partner 1 and female
 partner 2 must place partner 2 in `wife_id` and partner 1 in `husband_id`. `unions = NULL` on person-table input denotes no supplied unions, as already accepted. NULL unions and zero-row, zero-column data frames are normalized to a typed empty union table. Other inputs must supply every schema column; extra columns and data-frame subclasses are preserved.
 
+Optional union diagnostics `.n_eligible` and `.utility_rank` are populated for
+new unions when the process sets `diagnostics = TRUE`; they are not required
+core columns. Historical unknowns remain NA. See
+[diagnostic semantics](union-formation-models.md#optional-union-diagnostics).
+
 ## Time representation
 
 Dates are numeric years, including fractions, with a user-supplied common
@@ -68,6 +73,13 @@ Require the listed columns and their types, finite dates (except allowed NA), un
 partner whose executed death event ended the union; if both die at the same
 time, the first processed death closes it under the existing event ordering. When a reference time is supplied, recorded events cannot lie after it. Equal event dates are permitted; monthly alignment is not required by table validation.
 
-This is structural validation, not a full demographic eligibility contract. Parent-age and sex constraints, overlapping unions, death-related union consistency, and further process-specific eligibility still require scientific specification. Ancestry cycles are rejected by the shared kinship module when simulating or extracting kin; the structural population validator itself does not traverse ancestry. No missing core fields are silently filled in. Unknown parents use NA, not SOCSIM's zero sentinel.
+This is structural validation, not a full demographic eligibility contract.
+Simulation additionally rejects conflicting ongoing unions and ongoing unions
+with dead partners; it enforces the implemented search eligibility rules.
+Broader validation of historical overlaps, parent ages/sexes, and ended-union
+consistency is not provided by the structural validator. Ancestry cycles are rejected by the shared kinship module when simulating or extracting kin; the structural population validator itself does not traverse ancestry. No missing core fields are silently filled in. Unknown parents use NA, not SOCSIM's zero sentinel.
 
-Normalization and validation are separate operations. `hammel_population()` normalizes absent unions before checking the constructed object. `validate_population()` verifies a `hammel_population` without mutation and returns it invisibly. `set_population()` accepts only a population object, validates it, and stores it unchanged as `model$population`. These functions and helpers live in `R/hammel_population.R`.
+Normalization and validation are separate operations. `hammel_population()` normalizes absent unions before checking the constructed object. `validate_population()` verifies a `hammel_population` without mutation and returns it invisibly. `set_population()` accepts only a population object, validates it, normalizes
+its person/union tables to tibbles, and stores it as `model$population` while
+preserving extra components. Population construction/validation lives in
+`R/hammel_population.R`; the model setter lives in `R/hammel_model.R`.

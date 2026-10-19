@@ -39,8 +39,9 @@ prove unrelatedness. Unrelated co-parents do not become blood kin through a
 shared child. Death does not remove an ancestor or its recorded links.
 
 Screen minimum male age and kinship AFTER sampling and BEFORE matching-model
-scoring. Do not refill the sample. If no candidate passes, retain the birth
-with unknown father and no new union. Supplied existing unions are retained;
+scoring. Do not refill the sample. If no candidate passes, birth attempts are
+cancelled by default (D043); `cancel_birth_if_no_match = FALSE` retains a birth
+with unknown father and no new union. Failed rate searches reschedule. Supplied existing unions are retained;
 these are restrictions on new searches, not retrospective history corrections.
 Kinship adds no minimum female age. Independently, D037 requires exclusive
 ongoing unions and removes partnered men before sampling.

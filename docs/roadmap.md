@@ -14,8 +14,9 @@ Expand the existing extraction/summary functions into a coherent user toolkit
 for useful quantities from simulation histories. Existing functions cover Lexis
 counts, fertility, life tables, population sizes and recorded kin. Identify
 additional quantities and exposure/observation definitions from actual workflows.
-Status-specific exposure and fertility summaries are relevant to milestone 2
-validation; do not assume they are implemented by this roadmap.
+Status-specific exposure, fertility, mortality and formation summaries are
+implemented through `calculate_lexis_counts(include_unions = TRUE)` (D046–D048).
+See [demographic analysis](demographic-analysis.md) for their observation rules.
 
 ## Preparing input schedules
 
@@ -165,7 +166,8 @@ No emigration process is implied by the immigration request.
   milestone has yet been selected. Non-death union dissolution is now proposed
   for milestone 4 above.
 
-R formula-fallback performance benchmarking belongs to milestone 2's final
-validation report. It is not deferred beyond that milestone. Broader existing
+R formula-fallback performance comparisons are now included in the user-authored
+milestone 2 validation report; final assessment and milestone acceptance remain
+outstanding. Broader existing
 future notes about calendar-varying schedules, initialization and exact
 checkpoints remain separate from the user's new priorities above.

@@ -1,6 +1,6 @@
 # Testing and milestone validation
 
-Updated October 15, 2026. The user accepted milestone 1 as complete after
+Updated October 19, 2026. The user accepted milestone 1 as complete after
 rendering the validation report. Software test history and the user's demographic
 assessment are distinct evidence; recording acceptance did not rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
@@ -38,17 +38,9 @@ Minimum-spacing checks group births by mother, sort dates, and check successive
 intervals against the configured spacing with a small numerical tolerance.
 They include default 0.75 years and nondefault 1.13 years across restarts.
 
-Most recent recorded implementation verification: the development suite,
-optimized package installation, installed-package runner, and documentation
-examples passed for D028. The installed suite recorded 1,832 expectations,
-zero failures/warnings, and one opt-in live-test skip. Those expectation counts
-are an execution record, not a scientific acceptance criterion. R's timezone
-service was unavailable in the sandbox, so verification set
-`TZ=America/Los_Angeles` explicitly.
-
-The development suite was rerun during this documentation audit and passed,
-with the opt-in live test skipped. Synthetic construction, simulation, analysis,
-and restart examples also ran successfully; no data downloads were made.
+Historical suite counts and implementation-specific timings are available in
+Git history. They are execution records, not scientific acceptance criteria.
+Set `TZ=UTC` (or the local timezone) when sandbox timezone discovery is unavailable.
 
 ## Optional live database checks
 
@@ -71,17 +63,18 @@ rates are rejected; neither tests nor helpers impute them.
 
 ## Reproducible demographic assessment
 
-The [replication example](../inst/examples/milestone1_bootstrap.R) currently uses
-100,000 initial persons, one shared baseline, and 100 simulation seeds for
-100 years with USA/2000 schedules. It examines TFR, ASFR, life expectancy,
-ASMR with 20-year periods, and population growth. This conditions on the same
-starting population; it does not resample initial populations or observed data.
-Its filename uses “bootstrap,” but the runs are simulation replications.
+The current executable example is [milestone2.R](../inst/examples/milestone2.R).
+The former milestone 1 single-run and replication scripts have been removed;
+Git history retains them. Analyze simulation replications separately before
+combining summaries; replication uncertainty does not resample the observed
+input data or imply uncertainty over initial populations.
 
-The completed [Quarto report](../validation/milestone1.qmd) contains the user's
-analysis and interpretation. Execution is enabled; rendering reruns simulations
-and input downloads and can require substantial memory. From the repository
-root:
+The accepted [milestone 1 report](../validation/milestone1.qmd) contains the
+user's analysis and interpretation. Reproduce it from the acceptance commit
+below, in a separate checkout: the current engine requires a union process,
+while this historical report used the former no-union path. Rendering executes
+simulations and input downloads and can require substantial memory. From that
+checkout's repository root:
 
 ```sh
 quarto render validation/milestone1.qmd
@@ -117,224 +110,52 @@ not establish accuracy for all rate schedules or supply a controlled executable
 SOCSIM comparison. Further studies and archive/publication work require their
 own scope; these are not outstanding conditions on the user's acceptance.
 
-## Milestone 2 construction checks (October 15, 2026)
+## Current milestone 2 software coverage
 
-After adding union-process construction and formula-based matching utilities,
-`devtools::test()` passed with 1,870 expectations, zero failures/warnings,
-and the opt-in live database test skipped. No rates were downloaded. The new
-checks cover analytical softmax probabilities, quadratic utilities, numerical
-stability, formula/coefficient validation, process attachment/replacement,
-provenance, edited-specification rejection, and the engine's explicit rejection
-of union processes. Documentation generation and `git diff --check` passed.
-These checks validate construction/scoring infrastructure, not executed union
-formation or milestone 2 scientific completion.
+| Test files | Main evidence |
+| --- | --- |
+| `test-union-formation.R`, `test-conditional-logit.R`, `test-age-gap-matching.R` | Constructors, defaults, named coefficients, analytical utilities/probabilities, native/R formula agreement and age-gap helper |
+| `test-on-demand-unions.R`, `test-union-eligibility.R`, `test-union-kinship.R` | Sampling, birth-time unions, age/kin screening, exclusivity, widowhood and restarts |
+| `test-kinship.R` | Shared recorded-parent traversal, distance witnesses, incomplete ancestry and cycles |
+| `test-rate-unions.R`, `test-status-fertility.R` | Search hazards, retries, status-specific fertility, spacing and event invalidation |
+| `test-nonmarital-fathers.R`, `test-cancel-births.R` | Separate father matching, parentage without unions, failed-match cancellation and retry semantics |
+| `test-union-diagnostics.R` | Eligible counts, utility ranks, tied utilities, historical retention and unchanged RNG/results |
 
-## Temporary on-demand execution checks (October 15, 2026)
+These checks establish software behavior and analytical cases, not universal
+demographic accuracy. Use `devtools::test()` for ordinary verification, with
+live database checks disabled.
 
-After implementing D031, `devtools::test()` passed with 1,918 expectations,
-zero test failures/warnings, and the opt-in live database test skipped. New
-cases check sample sizes, uniqueness and inclusion frequencies, current-partner
-reuse, birth-time union creation/parentage, empty pools, historical IDs/custom
-columns, widowhood/repartnering, restarts, unsupported active histories,
-explicitly skipped screening and utilities, RNG isolation, and independence
-from later milestone 1 runs. Rcpp bindings and Rd documentation were regenerated;
-`git diff --check` passed. No rates were downloaded. The debug C++ build emitted
-the toolchain's `_FORTIFY_SOURCE` warning about compilation without optimization;
-compilation and installation succeeded. These are software checks of the
-temporary uniform implementation, not milestone 2 scientific acceptance.
+## Milestone 2 demographic assessment in progress
 
-After D032 made union formation mandatory, the suite passed with 1,920
-expectations, zero test failures/warnings, and one opt-in live-test skip. The
-missing-process checks cover positive and zero duration. Simulation fixtures
-now supply an explicit union process; restart cases retain it. Current examples
-were updated, while the accepted milestone 1 report remains unchanged and
-should be reproduced at its recorded commit. The native enable flag and
-legacy no-union father-assignment branch were removed.
+The user-authored [report](../validation/milestone2.qmd) uses USA circa
+2000–2001 HMD mortality, NCHS overall/status-specific fertility, and SIPP-based
+female marriage inputs with male rates as a reference. Input preparation and
+limitations are recorded in [data provenance](../validation/data/usa_2000_rates.README.md).
+England and Wales 2015 prepared data are an additional example, not the case
+used in the current report.
 
-## Candidate-sampling performance (October 15, 2026)
+The report now includes both initiation modes, conditional fertility and
+formation rates, ever-married summaries, eligible-candidate diagnostics,
+age-gap sensitivity, and conditional-logit recovery using 5,000 on-demand
+unions and 50 reconstructed alternatives per union. The user reports recovery
+of the generating linear/quadratic coefficients 0.072 and -0.014. Reconstruction
+uses each union's formation time, age, survival and partnership eligibility;
+it does not recover the actual sampled choice set or apply pair-specific kin
+screening. See [matching validation](union-formation-models.md#rationale-and-matching-model-validation).
 
-A synthetic 50,000-person, 100-year run isolated candidate sampling overhead:
-with constant mortality 0.02 for both sexes and fertility 0.06 at ages 15–50,
-seed 42 for baseline and simulation, the hash-map sampler took 6.026 seconds
-with sample size 1000 versus 0.152 seconds with sample size 1. Replacing its
-per-candidate hash nodes with a reusable identity-position array and reversible
-partial Fisher–Yates swaps reduced sample-size-1000 elapsed time to 0.962 seconds
-(sample size 1: 0.163 seconds). Both measurements used the development/debug
-build on the same machine; they are single-run diagnostics, not general timing
-guarantees or measurements of the user's USA case. Sampling size, sampling
-without replacement, uniform choice, and RNG draw order are preserved. Scratch
-storage grows with the largest partial-search male pool and remains call-local.
+### Matching performance comparison
 
-## Sex-specific union schema checks (October 15, 2026)
+The report includes timing comparisons for 50,000 initial persons over 100
+years, varying initiation, kin-screening depth and a custom formula
+requiring R evaluation. The author's interpretation reports custom matching
+as the largest timing cost. This comparison is no longer an unstarted task;
+these are report findings, not an independently rerun benchmark or performance
+guarantee. Formula and resulting population trajectories can affect timings.
 
-After D033 renamed union roles to `wife_id`/`husband_id`, `devtools::test()`
-passed 1,920 expectations with no test failures/warnings and one live-test skip.
-An added role-validation test was then checked with
-`devtools::test(filter = "model-api")`: all 106 expectations passed, including
-five new checks for valid roles, swapped roles in ongoing/ended histories, and
-the empty-table schema. Roxygen documentation and `git diff --check` passed.
-The user's edits to `inst/examples/milestone2.R` were preserved.
-
-After adding sex-specific union death reasons, `devtools::test()` passed all
-1,941 expectations with zero test failures/warnings and one opt-in live-test
-skip. Cases cover wife/husband deaths in both supplied and newly formed
-unions, exact end times, and preservation of ended records on restart.
-`git diff --check` passed.
-
-## Conditional-logit execution checks (October 15, 2026)
-
-`devtools::test()` passed 1,969 expectations with zero test failures/warnings
-and one opt-in live database skip after D034. New tests cover the requested
-0.072/-0.014 quadratic peak, analytical utilities/probabilities, 50,000 choice
-draws within six marginal standard errors, native/R formula agreement,
-coefficient ordering, custom transformations, extreme/nonfinite utilities,
-empty/singleton pools, and birth-time selection in both age-gap directions.
-Existing partner retention, history, widowhood, restart, and RNG checks pass.
-This is algorithm validation; model recovery on demographic simulation data
-and milestone 2 scientific acceptance remain pending.
-
-The same synthetic 50,000-person/100-year case used in the sampling performance
-record took 2.374 seconds with a sample of 1000 and the requested quadratic
-coefficients (19,777 unions). This is a single development/debug-build timing,
-not the user's USA case or a performance guarantee. No rates were downloaded.
-Rcpp bindings and Rd documentation were regenerated.
-
-## Deferred matching performance comparison
-
-At the user's request on October 15, 2026, defer benchmarking the R formula
-fallback against the native linear/raw-quadratic matching path. A future check
-should include a cubic term such as `I(age_difference^3)`, controlling inputs,
-candidate sample size, run duration, and build settings. Distinguish R
-model-matrix overhead from changes in model complexity and simulated population
-trajectory. No fallback slowdown has been measured; this note does not
-authorize running the benchmark now.
-
-## Minimum male age checks (October 15, 2026)
-
-After D035, `devtools::test()` passed 2,007 expectations with zero test
-failures/warnings and one opt-in live-test skip. Checks cover the default 15,
-fractional/zero thresholds, invalid and edited specifications, exact threshold
-entry, aging during a run, sampling before screening without refilling, births
-with missing fathers when all sampled men fail, retaining supplied underage
-partners, and no added minimum age for female initiation. Existing
-conditional-logit, widowhood, restart, and demographic tests pass.
-No rates were downloaded or deferred formula benchmarks run. Rcpp/Rd
-generation and `git diff --check` passed.
-
-## Shared kinship checks (October 15, 2026)
-
-The D036 development suite initially passed 2,152 expectations with zero test
-failures/warnings and one opt-in live database skip. Subsequent extraction
-checks add base-data-frame input and half-first-cousin evidence; the targeted
-`devtools::test(filter = "kinship")` run passed all 149 expectations with no
-failures or warnings. Hand-built
-families cover direct ancestry, half/full siblings, aunts/uncles, first and
-removed/second cousins, missing maternal/paternal links, deceased ancestors,
-unrelated co-parents, shuffled/noncontiguous IDs, repeated ancestry, shortest
-lineage, empty schemas, invalid settings/IDs and ancestry cycles. A 5,000-person
-chain verifies iterative deep traversal. Pair-by-pair integration checks agree
-between R extraction and native partner screening. Newborn/restart cases
-verify sons cannot be selected by their mothers and recorded parent links
-are rebuilt consistently. Existing union histories are retained.
-
-A synthetic 50,000-person/100-year run (the existing constant-rate case,
-quadratic matching, sample 1000, minimum male age 15, seed 42) took 3.626 seconds
-with generation bound zero and 4.197 seconds with bound two. These are
-single-run debug-build diagnostics with different resulting stochastic
-histories (33,656 versus 33,554 births), not isolated profiling or the user's
-USA case. No rates were downloaded and the deferred R formula-fallback
-benchmark was not run. Rcpp/Rd regeneration and `git diff --check` passed.
-
-### Kinship screening optimization (October 15, 2026)
-
-After the user reported 8.92 seconds for their case, temporary native timing
-in the synthetic benchmark found roughly 0.035 seconds building ancestry
-caches versus 1.88 seconds in candidate screening. The repeated-comparison
-path was replaced with one marked ancestor set per woman and direct candidate
-membership checks. An additional zero-bound short circuit skips kinship
-queries/cache building when no cross-person relationship can be excluded.
-Cycle validation still runs. Temporary timing code/output was removed.
-
-The final synthetic benchmark took 2.608 seconds at zero and 3.481 at two
-generations, versus 3.859 and 4.196 in the instrumented original. These are
-single-run diagnostics; instrumentation and different simulated histories limit
-exact timing comparisons. The user subsequently reported approximately 4.4
-seconds at zero after reloading, close to their earlier 4.2-second baseline.
-
-Before the final zero-bound short circuit, the full `devtools::test()` suite
-passed all 2,160 expectations with no test failures/warnings and one live-test
-skip, including a regression for switching between women without stale
-ancestor markers. A saved 3,000-person, 100-year fixed-seed simulation was
-identical before/after the membership optimization. No scientific rule or
-random-number consumption was changed. The user's example edits were retained.
-After the zero-bound short circuit, all 174 targeted kinship/eligibility
-expectations passed, and the saved fixed-seed result remained identical.
-
-
-### Exclusive unions (D037; October 15, 2026)
-
-`devtools::test()` passed 2195 expectations with no failures. One live database
-test was skipped as intended; one local-reader dependency warning came from
-`lubridate` attempting unavailable sandbox `timedatectl` timezone discovery.
-New checks cover partnered men excluded before singleton sampling, male scarcity
-with preserved unknown-father births, widower re-entry, duplicate ongoing male
-union rejection, and restart consistency. Existing death and sampling tests pass.
-
-
-### Female rate-based search events (D038; October 15, 2026)
-
-`TZ=UTC Rscript -e 'devtools::test()'` passed 2227 expectations, zero failures
-and warnings, with the live database test skipped as intended. Tests cover
-female-only searches independent of births, constant search hazards competing
-with mortality against an analytical probability, age support and gaps, failed
-search retries after a man reaches minimum age, no unpartnered births, spacing,
-restart retention, reproducibility, and widowhood invalidation/remarriage.
-Existing on-demand, eligibility, kinship and mortality/fertility checks pass.
-This verifies event behavior; population-ASFR recovery under partnered-only
-fertility has not been established.
-
-
-### Union-status fertility schedules (D039; October 15, 2026)
-
-`TZ=UTC Rscript -e 'devtools::test()'` passed 2269 expectations with zero
-failures/warnings and one intentional live-data skip. New tests cover optional
-status labels and both-status requirements, per-status overlap and different
-age support, simulation revalidation, on-demand rejection including zero years,
-one warning for rate-mode overall fertility, unknown fathers without searches,
-formation/widowhood schedule changes, spacing through formation and restart,
-independent compensation, and analytical constant-rate birth counts in both
-statuses. Existing tests use explicit zero unpartnered rates where suppression
-is intended. Recovery around status transitions remains unverified; a coherent
-empirical rate example has been requested but not selected.
-
-### Nonmarital fathers (D040; October 15, 2026)
-
-`TZ=UTC Rscript -e 'devtools::test()'` passed 2313 expectations with zero failures
-or warnings and one intentional live-data skip. New checks cover repeated father
-availability without unions, current-partner/age/kin/death exclusions, analytical
-conditional-logit choice frequencies, paternal kin links, later union selection,
-restart reconstruction and seed isolation. Existing status-specific birth-count
-tests now expect selected nonmarital fathers where candidates qualify. No
-preferential father persistence parameter is implemented or validated.
-
-### Separate father matching (D041; October 15, 2026)
-
-`TZ=UTC Rscript -e 'devtools::document(); devtools::test()'` passed 2328
-expectations with no test failures/warnings and one intentional live-data skip.
-Checks cover NULL/default and explicit-general equivalence under a fixed seed,
-current-general fallback after edits, constructor/attachment/simulation validation,
-opposite father/union preferences, native/R formula fallback agreement, and
-on-demand ignoring the optional father model. Debug compilation emitted the
-existing `_FORTIFY_SOURCE` warning from its `-O0` build settings.
-
-
-### Failed-match cancellation (D043; October 15, 2026)
-
-`TZ=UTC Rscript -e 'devtools::document(); devtools::test()'` passed 2403
-expectations with no failures/warnings and one intentional live-data skip. New
-checks cover logical-scalar validation and edited objects, default cancellation
-in both modes for age/kin/partner exclusions, explicit FALSE preserving unknown
-fathers, seed isolation/reproducibility, no child/ID/kinship creation on failure,
-success after a man ages into eligibility without artificial birth spacing, and
-spacing/restarts following an actual birth. Existing demographic fixtures
-explicitly set FALSE where they require preserved unmatched births.
+The user reports milestone 2 is nearing completion: compile the report, obtain
+agent feedback, then write conclusions before final acceptance. Preserve the
+user's analysis; no acceptance thresholds are added by
+this documentation review. Rendering the report executes an HMD download and
+substantial simulations and was not part of this review. Transition-aware
+compensation remains deferred under D045; the report examines discrepancies,
+but no general correction or guarantee of conditional ASFR recovery exists.

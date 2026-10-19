@@ -36,6 +36,8 @@ Hammel now uses continuous event times (D024): within-month ordering and
 integer-month ties above describe SOCSIM, not current Hammel. Only exact
 same-person death/birth ties prioritize death. Current Hammel restart behavior
 also resamples candidates, but that does not establish algorithm/RNG equivalence.
-Union-event invalidation remains future work because Hammel forms no new unions.
+Hammel now forms unions in both on-demand and rate modes. In rate mode,
+formation and widowhood invalidate and resample the woman's pending event
+using her current fertility status and search eligibility (D038/D039).
 
 Verify these behaviors with controlled executable cases. Audit all handlers, eligibility and matching rules, segment changes, numerical floors, and birth-spacing adjustments before asserting a complete scientific contract. In particular, do not equate integer-month tie priority with continuous-time competing-hazard semantics.

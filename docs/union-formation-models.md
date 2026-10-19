@@ -1,6 +1,6 @@
 # Milestone 2: union formation
 
-Updated October 15, 2026 from the user's milestone 2 request.
+Updated October 19, 2026. Implemented milestone 2 specification.
 **Status: core milestone implementation is in place: both search modes,
 conditional-logit matching, age/kin/exclusivity restrictions, status-specific
 fertility, widowhood, and separate optional nonmarital father matching. The
@@ -58,7 +58,16 @@ deterministic and must not mutate state. Data-dependent transformations require
 care: their basis can depend on the candidate pool. There is no fitted-model
 estimation interface yet.
 
-`union_formation(initiation, matching, sample_size = 1000, rates = NULL, min_male_age = 15, kinship_generations = 2, father_matching = NULL)` constructs
+```r
+union_formation(
+  initiation, matching = create_age_gap_matching_model(0, 5),
+  sample_size = 1000, rates = NULL, min_male_age = 15,
+  kinship_generations = 2, father_matching = NULL,
+  cancel_birth_if_no_match = TRUE, diagnostics = FALSE
+)
+```
+
+This constructs
 a process; `set_union_formation(model, ...)` attaches it. Initiation is explicitly
 `"on_demand"` or `"rate"`; initiation has no default. Omitting `matching` uses
 `create_age_gap_matching_model(0, 5)`: a preferred male-minus-female age gap of
@@ -139,16 +148,16 @@ If no unpartnered men remain, cancellation follows D043; explicitly disabling
 cancellation permits a birth with unknown father.
 Polygamy/polyamory is deferred and requires an explicit future model choice.
 
-Union formation/widowhood do not change
-fertility or mortality schedules in this increment, so a surviving partner's
-pending event stays valid. Rate-based initiation is specified below.
+In on-demand mode, union formation/widowhood do not change fertility or
+mortality schedules, so a surviving partner's pending event stays valid.
+Rate mode invalidates and resamples women's events as specified below.
 
 Validation covers the analytical peak/probabilities, native versus R formula
 utilities, sampled choice frequencies, uniform and singleton/empty pools,
 extreme utilities and invalid formula output, reproducibility/independence,
 partner retention, union accounting, widowhood and restarts. Test thresholds
 for stochastic checks are sampling-error bounds, not demographic acceptance
-criteria. No scientific validity is claimed for the remaining unrestricted relationships.
+criteria; broader demographic assessment is recorded separately in the report.
 
 ## Minimum male age: eligibility increment
 
@@ -157,13 +166,13 @@ The user selected a configurable `min_male_age` in continuous years, default
 are allowed and zero removes this age exclusion. A sampled man passes when
 `search_time - birth_time >= min_male_age`. Check at the search, without
 rounding ages. No separate female minimum age is imposed; initiation eligibility
-is governed by fertility or, once implemented, union-search rates.
+is governed by fertility or union-search rates, according to initiation mode.
 
 Sample living unpartnered men first at the configured sample size, then remove sampled
 men below the minimum, then evaluate matching utilities and normalize
 probabilities over survivors. Do not refill the sample or search elsewhere
 when sampled candidates fail. Existing ongoing unions are not retroactively
-ended by this search restriction. Other exclusions remain pending.
+ended by this search restriction. Known-kin screening follows the age check.
 
 Worked cases: with a threshold of 15, ages 14.999 and 15 are respectively
 excluded and included. With threshold 16.5, age 16.25 is excluded and age 16.5
@@ -180,22 +189,19 @@ remain unchanged.
 
 ## Initiation, matching, and state consistency
 
-The initiation process determines when a search occurs. The matching process
-receives the woman, current time, and eligible candidate information and returns
-a supported selection or failure/wait outcome. Matching specifications must not
-mutate population state directly. The engine owns union creation, history,
-partner availability, parent assignment, and dependent event invalidation.
+The initiation process determines when a search occurs. Native matching scores
+the screened age differences and selects a partner, or reports failure for an
+empty set. Formula callbacks receive age differences only and must not mutate
+state. The engine owns union creation, history, partner availability, parent
+assignment, and dependent event invalidation. No wait outcome is implemented.
 
-Public times remain years and hazards per person-year. A scheduled search hazard
-is not automatically a realized union-formation hazard: failures and optional waiting
-can make realized union formation lower than search initiation. Decide which
-quantity the input specifies before defining exposure and validation.
-
-Birth, death, union formation, and widowhood can change eligibility and conditional
-fertility. Their timing and invalidation rules need explicit worked examples
-before implementation. In on-demand mode, determine whether a union created at
-a birth changes that birth's classification and father assignment. There is no
-conception process, so no implicit gestational timing should be introduced.
+Public times remain years and hazards per person-year. Scheduled input hazards
+specify search attempts per unpartnered woman-year, not guaranteed formations:
+failed searches can reduce realized formation rates. In on-demand mode a
+successful search forms the union at birth, assigns its husband as father, and
+classifies that birth as partnered in union-status summaries (D046). There is
+no conception process or implicit gestational timing. Rate-mode transitions
+and tie priorities are specified below and in the scientific contract.
 
 ## Matching probabilities and candidate pools
 
@@ -209,19 +215,19 @@ choice probabilities, not independent binary union-formation probabilities. This
 milestone uses age difference, but its sign and unit are accepted as male age minus female age in continuous
 years. Users specify transformations and coefficients through a formula. For example, a signed linear age-gap
 term implies a directional preference; a quadratic or absolute-deviation term
-can represent a preferred gap. No demographic coefficients are defaulted.
+can represent a preferred gap. The accepted default uses a zero-year preferred
+gap and five-year half-weight distance; explicit specifications override it.
 
 A common additive utility constant cancels from partner-only probabilities.
 Without an outside alternative, the model chooses someone whenever the pool is
 nonempty, even if all candidates have low utilities. A wait alternative would
 require an explicit utility scale relative to partners and defined retry timing.
-Whether it belongs in on-demand mode, scheduled mode, or both remains open.
+It is deferred beyond milestone 2 (D044); its scope and semantics remain open.
 
-Candidate subsampling changes the choice set and generally changes the induced
-matching distribution. With a wait alternative it can also change the chance of
-forming any union. Specify sampling, any correction, and the intended target
-before implementing it as an efficiency option. Begin by investigating full-pool
-costs; this is not a decision to adopt a particular sampling scheme.
+Candidate subsampling changes the choice set and can change the induced
+matching distribution. The accepted implementation samples up to 1000 living,
+unpartnered men by default before screening, without refilling; zero requests
+the full pool. No sampling correction or outside alternative is implemented.
 
 ## Rationale and matching-model validation
 
@@ -237,25 +243,20 @@ the available pool, not fixed realized exogamy proportions.
 
 The second rationale is testability: fit the specified choice model back to
 simulated matching decisions and assess approximate recovery of its parameters.
-At the user's direction, do not retain candidate sets. Instead, reconstruct
-approximate alternatives from eligible men in time slices using recorded
-population and union histories. Time-slice width, reference instant, eligibility
-reconstruction, and any sampling scheme remain to be specified for analysis.
+At the user's direction, candidate sets are not retained. The
+[user-authored milestone 2 report](../validation/milestone2.qmd) now reconstructs
+alternatives at each sampled union's exact formation time: 5,000 on-demand
+unions, each combined with 50 alternative living, unpartnered men aged at least
+15. It fits linear and quadratic age-gap coefficients and reports recovery of
+the generating values 0.072 and -0.014. This replaces the earlier proposed
+coarse time-slice analysis; it does not introduce a package estimation API.
 
-This is approximate model recovery rather than the exact likelihood of the
-simulation's choices. Within-slice births, deaths, aging, and union formation or
-widowhood can change availability. If simulation searches use sampled pools,
-the reconstructed eligible population will also differ from the actual sampled
-alternatives. An optional wait alternative would require an additional analysis
-design because formed unions alone omit decisions to wait or failed searches.
-These limits do not authorize candidate-set retention or imply extra search logs
-are accepted. Assess sensitivity to time-slice width when developing validation.
-
-Combine this approximate recovery analysis with controlled known-utility choice
-experiments that check probabilities without retaining candidate sets in
-simulation outputs. Model form, sample sizes, and scientific acceptance criteria
-remain to be agreed. Neither demographic realism nor parameter recovery has
-yet been demonstrated.
+The reconstructed alternatives are not the actual simulation samples. The
+report's helper checks age, survival and partnership status but does not apply
+pair-specific kin screening or reconstruct ordering of coincident events.
+Keep these limits distinct from controlled known-utility software checks.
+The report's findings are the user's analysis, not an independent replication
+or recorded milestone acceptance. No new scientific thresholds are imposed.
 
 ## Eligibility and ancestry
 
@@ -285,51 +286,32 @@ cancellation preserves the birth with unknown father and no new union. Requiring
 a match allows partner availability to reduce realized fertility.
 
 Partnered and unpartnered fertility rates use woman-years in the current union
-status; the implemented schedule and transition rules are specified under D039 below. D028's population-ASFR midpoint compensation cannot simply be
-assumed correct across status transitions; specify the target and spacing
-compensation before implementing conditional fertility.
+status; the implemented schedule and transition rules are specified under D039
+below. Midpoint compensation is computed independently per status. It does not
+account for prior-status rate history; correction is deferred under D045.
 
-A partner's death ends the ongoing union. Specify the survivor's next search
-eligibility and timing, fertility changes, and subsequent father assignment.
-No non-death dissolution process is included in milestone 2.
+A partner's death ends the ongoing union. In rate mode, a surviving woman
+resumes search risk and switches fertility status with pending events
+invalidated; in on-demand mode, her next birth attempt can trigger a new search.
+Surviving men return to the available pool. No non-death dissolution process
+is included in milestone 2.
 
-## Open decisions before implementation
+## Deferred decisions and validation status
 
-| Decision | Consequence |
-| --- | --- |
-| Failed on-demand search: birth proceeds or depends on a match | Preserves or changes fertility targets |
-| One ongoing union per person; remarriage after widowhood | Defines availability and subsequent searches |
-| Initiation-rate denominator and failed-search retries | Separates attempted from realized formation |
-| Matching coefficients and transformations | User-supplied formula; male-minus-female continuous-year gap |
-| Candidate sample size | Defaults to 1000; zero means full available pool, sampled before screening |
-| Wait alternative and its scope | Allows refusal; needs utility and retry semantics |
-| Further eligibility | Exclusive ongoing unions, minimum male age and two-sided known-kin distance are implemented; further policies remain open |
-| Conditional fertility inputs and spacing after status changes | Defines rates, exposure, and event resampling |
-| Birth-time union classification and father assignment | Defines observed histories and parentage |
-| Equal-time priorities and effects on both partners | Preserves state consistency |
+Poor-pool waiting, previous-father continuity, transition-aware fertility
+compensation, parity conditioning and additional matching characteristics are
+future work. Their detailed rules remain open; see the [roadmap](roadmap.md).
+Current initiation, eligibility, retries, birth cancellation, status fertility,
+event priorities and birth-time classification are implemented, not open choices.
 
-## Specification and validation work
-
-Once dependent decisions are settled, write the executable scientific contract,
-worked examples, and observation definitions before engine changes. Proposed
-validation includes:
-
-- Uniform matching at equal utilities and known probability ratios at unequal
-  utilities; stable behavior for large utilities; fixed-seed reproducibility.
-- Empty/single-candidate pools, exact age boundaries, prohibited kin pairs,
-  incomplete ancestry, availability, and any selected sampling/wait rules.
-- On-demand births with successful and failed searches, including classification
-  and father assignment under the agreed rules.
-- Analytical search waiting times where every search succeeds; attempted versus
-  realized rates where searches can fail.
-- Union history accounting, widowhood, and event invalidation for both partners;
-  no non-death dissolution or prohibited overlap under the selected rules.
-- Status-specific fertility exposure, transitions, birth spacing, and accounting;
-  unchanged milestone 1 behavior when union formation is not enabled.
-
-These are proposed validation cases, not completed findings or numerical
-scientific acceptance thresholds. A narrow SOCSIM source audit can inform the
-remaining choices without adopting legacy architecture or copying its code.
+Software checks cover analytical choice probabilities, numerical stability,
+empty/singleton samples, age/kin/exclusivity restrictions, search hazards,
+widowhood and invalidation, birth spacing, restart histories, diagnostics and
+reproducibility. [Testing](testing.md) maps these to the current suite.
+Demographic assessment, parameter recovery and timing comparisons appear in
+`validation/milestone2.qmd`. The user describes the milestone as nearing
+completion, with report compilation, agent feedback, and conclusions remaining
+before final acceptance. Passing software tests does not establish demographic validity.
 
 ## Rate-mode execution increment (October 15, 2026)
 
@@ -389,7 +371,8 @@ same-person birth/search tie. Cross-person ties retain queue insertion order.
 Apply existing midpoint compensation independently within each schedule; do not
 integrate across statuses or claim calibrated status-specific ASFR recovery
 around transitions. Transition-aware compensation is deferred under D045;
-its bias is unquantified and no corrective algorithm has been selected.
+the report examines case-specific discrepancies, but no general bias bound or
+corrective algorithm has been established.
 
 Worked cases: overall rate 0.1 applies to both statuses with a rate-mode warning.
 Unpartnered rate zero and partnered rate 0.2 reproduces the former gate explicitly.
@@ -438,7 +421,8 @@ Union searches, including on-demand searches, always use `matching`; partnered
 births still use the current partner. On-demand mode does not use the optional
 father model. Validate any supplied model at construction, attachment and
 simulation, including zero-duration runs. Candidate pool, sampling, age/kin
-eligibility, parentage-only state changes and unknown-father fallback are shared.
+eligibility, parentage-only state changes and failed-match cancellation settings
+are shared.
 Both matching models support native linear/quadratic evaluation and R formula
 fallback. Previous-father preference is deferred to a later milestone (D042).
 

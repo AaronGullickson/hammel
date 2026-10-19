@@ -1,7 +1,7 @@
 # Scientific contract
 
-Updated October 15, 2026. This is the current mortality/fertility contract,
-reflecting D019, D024, D025, D026, and D028. Earlier monthly and exact
+Updated October 19, 2026. This is the current mortality, fertility, union-formation,
+and observation contract, including the accepted milestone 2 rules. Earlier monthly and exact
 age-varying compensation specifications are available in Git history; the
 [decision log](decisions.md) records their replacement. Acceptance
 of a model assumption is distinct from evidence of demographic accuracy.
@@ -23,8 +23,8 @@ input order and extra columns; native scheduling sorts its own copy.
 
 | Rule | Mortality | Fertility |
 | --- | --- | --- |
-| Input interpretation | Piecewise constant age/sex hazard | Population ASFR, births per woman-year |
-| Denominator for output rates | Living person-years by age/sex | All female person-years, including excluded time |
+| Input interpretation | Piecewise constant age/sex hazard | Overall or status-specific ASFR, births per woman-year in the specified population |
+| Denominator for output rates | Living person-years by age/sex | Female person-years overall or in the indicated status, including spacing-excluded time |
 | Open-ended input band | Allowed; required at execution | Rejected, even with zero rates/spacing |
 | Coverage at execution | `[0, Inf)` for each sex, with no gaps | Zero outside supplied finite bands, including gaps |
 | Additional setting | None | `birth_interval`, finite nonnegative scalar years; default 0.75 |
@@ -143,6 +143,11 @@ A union-formation process is required for every simulation, including zero
 duration. Missing processes are rejected rather than given an implicit default.
 The former milestone 1 path without unions is no longer executable.
 
+When matching is omitted, both initiation modes use
+`create_age_gap_matching_model(0, 5)`: preferred male-minus-female gap zero
+years, with relative weight halved five years either side. Explicit models
+override that default; it does not fix the realized age-gap distribution.
+
 With `union_formation(initiation = "on_demand", ...)`, use the woman's ongoing
 living male partner as father. If she has no partner, sample up to `sample_size`
 living, unpartnered men without replacement (default 1000; zero means the whole pool).
@@ -181,7 +186,9 @@ Death closes all affected ongoing unions and clears both partners' current
 partner immediately. Her next birth may trigger another search in on-demand mode. In that mode fertility and
 mortality remain independent of union status, so surviving partners' pending
 events need no resampling merely because a union forms or ends. Candidate
-sets are temporary and are not returned. See [union formation](union-formation-models.md)
+sets are temporary and are not returned. Optional `diagnostics = TRUE` records
+only eligible sample size and selected utility rank on newly formed unions;
+it defaults off and consumes no additional random draws. See [union formation](union-formation-models.md)
 for worked examples and remaining milestone 2 rules.
 
 Update the mother's latest birth and resample both newborn and mother. Newborns
@@ -189,8 +196,8 @@ enter mortality risk immediately; their fertility depends on the supplied ages.
 Existing custom person/union columns are retained; new rows have missing custom
 values. C++ maintains union histories and shared partner caches for all runs,
 closing unions at death with `end_reason = "death_husband"` or
-`"death_wife"` according to the executed death event. Initiation mode will
-control search timing; it does not control whether partner state is tracked.
+`"death_wife"` according to the executed death event. Initiation mode
+controls search timing; it does not control whether partner state is tracked.
 
 ### Rate-based union initiation
 
@@ -226,7 +233,8 @@ recorded birth spacing. Widowhood also restores search risk. Versioned queue
 entries prevent invalidated candidates executing. Surviving men's death hazards
 do not depend on union status. Midpoint compensation is computed independently
 within each schedule; it is not calibrated to the woman's prior-status history.
-Recovery of conditional ASFRs around status transitions remains unverified.
+The milestone 2 report examines conditional ASFR discrepancies; general
+recovery across status transitions is not established.
 See [union fertility specification](union-formation-models.md#fertility-schedules-by-union-status-d039).
 
 ### Shared kinship observations
@@ -359,12 +367,14 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 
 For changed fertility rates, recently excluded women may reflect the previous
 schedule, so realized fertility can temporarily differ from the new target.
-Magnitude and duration have not been quantified; there is no guaranteed
-nine-month convergence deadline. A recent-schedule history and time-dependent
+The milestone reports examine particular rate-change and status-transition
+cases, but do not establish a general magnitude or duration; there is no
+guaranteed nine-month convergence deadline. A recent-schedule history and time-dependent
 adjustment were discussed as possible future treatments; the user explicitly
 deferred correction at that time. D045 defers transition-aware compensation again, including union-status
-transitions and rate changes between runs. The bias remains unquantified; the
-existing adjustment and actual-birth spacing are retained.
+transitions and rate changes between runs. The existing adjustment and
+actual-birth spacing are retained; see the user-authored reports for case-specific
+assessment rather than a general accuracy guarantee.
 
 ## Validation requirements and future mechanism specifications
 

@@ -2,7 +2,8 @@
 
 Updated October 13, 2026. This explains the current shared `Band` and
 `waiting_time()` sampler in `src/simulate.cpp`. Mortality uses its input hazards;
-fertility first obtains one adjusted constant hazard per original band from
+rate-based union searches use the supplied search hazards, and fertility first
+obtains one adjusted constant hazard per original band from
 [midpoint compensation](scientific-contract.md#midpoint-compensation-d028).
 
 The engine draws a random amount of accumulated risk needed before an event occurs. Time consumes that amount faster when the event hazard is high. The explanation below uses mortality; the same sampling principle applies to the fertility hazard while a woman is eligible.

@@ -1,187 +1,67 @@
 # Current project handoff
 
-Updated October 15, 2026. Milestone 1 is complete by explicit user acceptance
-following the rendered validation report (D029). This is a dated status record,
-not authorization for additional features. Start with the [documentation index](README.md).
+Updated October 19, 2026. This is a dated status record, not authorization for
+additional features. Start with the [documentation index](README.md); the
+current user request controls work.
 
-## Implemented foundation
+## Implemented state
 
-- R model/population/process construction; all public tables are tibbles.
-- Continuous C++17/Rcpp mortality/fertility scheduling with R RNG and call-local
-  state; midpoint compensation uses ordinary Band and shared waiting_time (D028).
-- Fertility-process `birth_interval`, default 0.75 years, accepting fractional
-  durations. Recorded histories enforce spacing on restart.
-- Finite fertility inputs only; HFD open endpoints are omitted. Mortality
-  requires complete age/sex coverage ending in an open interval.
-- Conditional-logit on-demand union formation, partner-based father assignment,
-  minimum male age (default 15), and known-kin exclusion (default two generations
-  on each side). Failed matches cancel births by default (D043); exclusive
-  ongoing unions are enforced before sampling (D037). Shared native kinship also backs R `extract_kin()`.
-- Output reuse with resampled candidates, not exact checkpoints.
-- Lexis exposure/counts, TFR, life tables, and population sizes; testthat suite
-  and offline analytical checks pass.
+- Call-local C++17/Rcpp continuous event scheduling, R RNG isolation, tibble
+  interfaces, and recorded population/union histories.
+- Mortality and fertility with shared hazard sampling, per-schedule midpoint
+  compensation, and actual-birth spacing preserved across restarts.
+- A mandatory union process with on-demand and female rate-based initiation,
+  conditional-logit matching, sampling before age/kin screening, exclusive
+  ongoing unions, widowhood, and event invalidation after status changes.
+- Overall fertility or, in rate mode, partnered/unpartnered schedules. Nonmarital
+  births select fathers without creating unions; `father_matching` can override
+  the general matching model. Failed matches cancel births by default (D043).
+- Default matching through `create_age_gap_matching_model(0, 5)`; optional
+  `.n_eligible` and `.utility_rank` diagnostics on new union rows.
+- Shared native kinship screening and `extract_kin()`. Lexis summaries optionally
+  include overall/partnered/unpartnered exposure, births, deaths and formation
+  rates, using `rate_fertility`, `rate_mortality` and `rate_marriage`.
 
 See [design](design.md), [scientific contract](scientific-contract.md), and
-[testing](testing.md) for details and evidence.
+[union formation](union-formation-models.md) for current rules and limitations.
 
-## Completed validation and ownership
+## Validation and ownership
 
-Aaron Gullickson completed [milestone1.qmd](../validation/milestone1.qmd), rendered
-`validation/milestone1.html`, and accepted milestone 1 on October 15, 2026.
-The report includes demographic coverage/deviation summaries, a two-sex Leslie
-projection, stable growth and age structure comparisons, extended runs,
-fertility-rate restart assessments, and performance/test results.
+Milestone 1 was accepted by the user on October 15, 2026 (D029).
+`validation/milestone1.qmd` is the accepted historical assessment. Reproduce it
+at its recorded commit: current simulation requires a union process that was
+not part of that assessment. [Testing](testing.md) retains the acceptance
+artifact provenance and archive limitations.
 
-The agent reviewed the source and identified the local rendered artifact;
-it did not rerun simulations or independently verify all scientific conclusions.
-[Testing](testing.md) records the artifact hash, source commit, and remaining
-archive/provenance limits. Preserve the user's analysis and source comments.
+The user is writing `validation/milestone2.qmd`. It now includes demographic
+comparisons for both search modes, union diagnostics, age-gap comparisons,
+conditional-logit parameter recovery, and performance comparisons including
+R formula fallback. The current report uses USA circa 2000–2001 mortality,
+fertility and marriage inputs. England and Wales 2015 preparation remains
+available in `validation/data`, but is not the current report's empirical case.
+The report's conclusions section is empty and no milestone 2 acceptance is
+recorded. Preserve the user's report and explanatory source comments.
 
-## Next work
+The October 19 documentation review inspected report source and implementation;
+it did not rerender the reports, download rates, independently reproduce the
+scientific findings, or set acceptance thresholds. Earlier implementation
+verification counts and timings remain in Git history.
 
-Milestone 2 union-formation scope is selected (D030); see
-[the specification notes](union-formation-models.md). Detailed modeling choices
-remain unresolved. Process construction and a conditional-logit on-demand C++
-path are implemented (D031), including current-partner caches, union histories,
-widowhood, and restart reconstruction. D032 now requires an explicit union
-process for every simulation; partner state is initialized unconditionally. Minimum male age screening is implemented (default 15 years, user-selectable);
-known-kin exclusion is also implemented (default two generations on each side),
-with shared C++ traversal and R extraction. Male exclusivity is now enforced (D037);
-and rate-based initiation is implemented as described below. Matching
-uses the user formula, with native linear/quadratic evaluation and an R fallback
-for other transformations. The report proposes a
-GitHub issue for fertility compensation after changing rates at restart; no
-issue was created as part of recording completion. Follow the user's next request.
+## Remaining and deferred work
 
-## Deferred work
+The user confirmed on October 19 that milestone 2 is nearing completion. The
+remaining sequence is to compile the report, obtain agent feedback, and then
+write the conclusions before final user acceptance. Parameter recovery and
+R formula-fallback timing are already present. Report conclusions and scientific
+interpretation belong to the user.
 
-- Benchmark R formula-fallback matching (for example a cubic age-gap term)
-  against the native linear/quadratic path later; explicitly deferred by the
-  user October 15, 2026; now scheduled for the final milestone validation
-  report under D042. See [testing](testing.md#deferred-matching-performance-comparison).
+Transition-aware fertility compensation (D045), poor-pool waiting (D044), and
+previous-father continuity (D042) are deferred. The current adjustment does not
+establish calibrated conditional ASFRs through status transitions or rate
+changes between runs. Retain this limitation when interpreting report results.
 
-- Initial fertility calibration: retain simple initialization and assess burn-in.
-- Fertility compensation across status/rate transitions: deferred under D045;
-  no corrective algorithm selected and bias remains unquantified.
-- African historical benchmark/new rate-source preparation: postponed.
-- Non-death union dissolution remains beyond milestone 2. Union formation and
-  matching are now active specification work, with detailed choices still open.
-- Calendar-varying schedules, arbitrary custom processes, and exact checkpoints.
-
-Earlier inspection/run records are available in Git history. Do not use a historical
-pause request, deprecated API, or superseded timing rule to govern current work.
-
-
-### Exclusive ongoing unions (October 15, 2026; D037)
-
-The available male pool now contains only living, unpartnered men, before
-candidate sampling. Formation removes a man; widowhood returns a surviving
-husband. Both sexes have a current-partner cache, reconstructed on restart;
-conflicting active input unions are rejected. Failed searches still preserve
-births with unknown fathers. Prior concurrent-union outputs need rerunning to
-apply this policy. Polygamy/polyamory is deferred.
-
-
-### Rate-based searches (D038; October 15, 2026)
-
-`initiation = "rate"` now schedules female unpartnered search attempts as
-competing events. Failed attempts draw a new waiting time. Both initiation
-modes share search/formation code. Fertility follows the current status schedule
-or an overall schedule for all women (D039); widowhood invalidates pending
-events and restores search risk. Existing
-fertility compensation is retained without a population-ASFR recovery claim.
-Status-specific fertility is implemented (D039); refusal/wait remains future work.
-
-
-### Requested coherent empirical example
-
-England and Wales 2015 is now the selected empirical example. `validation/data`
-contains female marriage rates, partnered/unpartnered and overall fertility,
-tidy ONS Table 6 for 1999-2015, the source workbook, provenance and extraction
-script. Published age groups are retained. Legal marital status includes
-cohabiting women among unmarried women; non-death dissolution is not simulated.
-
-
-### Status-specific fertility (D039; October 15, 2026)
-
-Fertility accepts optional `union_status` with both `partnered` and `unpartnered`.
-No column means an overall schedule. Rate mode applies overall fertility to
-both statuses with one warning per call; on-demand rejects conditional tables.
-Rate-mode unpartnered births select fathers without unions under D040. Transitions
-switch schedules with global maternal spacing retained. Compensation is computed
-separately per status; transition-aware compensation is deferred (D045). Full suite:
-2269 passing expectations, no failures/warnings, one intentional live-data skip.
-
-### Nonmarital father selection (D040; October 15, 2026)
-
-Rate-mode nonmarital births select a father from the existing available male
-pool using the same sampling, eligibility and formula model as partners.
-Selection creates parentage only and does not reserve the man or form a union.
-No qualifying sample leaves father unknown. Paternal links enter native kinship
-immediately. Separate models are explicitly deferred; preferential reuse of a
-previous father at another birth/union is deferred to a later milestone (D042). The pinned ordinary
-SOCSIM paths have no such preferential reuse; its optional random-father fallback
-also differs by allowing partnered men and not using spouse scores. Full suite:
-2313 passing expectations, no failures/warnings, one intentional live-data skip.
-
-
-### Optional father-matching model (D041; October 15, 2026)
-
-`union_formation()` and `set_union_formation()` now accept `father_matching = NULL`
-as a trailing argument. NULL uses the current general `matching` specification;
-an explicit model affects only unpartnered rate-mode father selection. General
-matching still governs all union searches and on-demand initiation. Both models
-are validated/prepared independently; candidate sampling and eligibility remain
-shared. This supersedes D040's separate-model deferral. Previous-father
-preference is deferred to a later milestone (D042).
-
-
-### Revised completion queue (D042; October 15, 2026)
-
-Required before milestone 2 completion: final demographic validation/report
-(transition-aware compensation is deferred under D045). The cancellation toggle is implemented under D043 below.
-Specify the compensation method before implementing dependent behavior. The poor-pool wait alternative is deferred to a later milestone (D044). Previous-father continuity is deferred to
-a later milestone. Test R formula-fallback performance in the final validation
-report. No new simulation behavior or numerical acceptance criteria were adopted
-by this scope update.
-
-
-### Birth cancellation (D043; October 15, 2026)
-
-`cancel_birth_if_no_match = TRUE` now defaults on in both union constructors.
-Failed on-demand searches and nonmarital father selections cancel the attempted
-birth without allocating IDs, recording births/kinship, drawing sex, or updating
-last_birth. Draw new waiting times immediately; no new spacing interval starts.
-FALSE explicitly preserves unknown-father births. Initial missing parent IDs
-remain unchanged. Old process objects lacking the required logical toggle must
-be reconstructed with the current constructor. Full suite: 2403 passing
-expectations, no failures/warnings, one intentional live-data skip.
-
-
-### Poor-pool waiting deferred (D044; October 15, 2026)
-
-The user postponed declining a poor nonempty candidate pool to a later milestone.
-Current matching always selects from nonempty screened pools. Empty-search
-retries and failed-match birth cancellation retain their existing rules.
-Milestone 2 remaining work is final demographic validation/report, including
-the R formula-fallback benchmark; compensation is deferred under D045.
-
-
-### Transition compensation deferred (D045; October 15, 2026)
-
-The user postponed compensation changes across union-status/rate transitions.
-Retain the current per-schedule midpoint adjustment and spacing from recorded
-births. Bias is unquantified, not established negligible. Final validation/report
-and user acceptance remain before milestone 2 completion, including the R formula
-fallback performance benchmark. No simulation behavior changed in this decision.
-
-
-### Beyond milestone 2 planning (October 15, 2026)
-
-User priorities are captured in [roadmap](roadmap.md): milestone 3 groups with
-intergroup matching, proportional rate modifiers, flexible child group identity
-and possible proportional ancestry; further analysis/input helpers, fertility
-heterogeneity, life-course/inherited characteristics and within-run immigration
-with generational status. The group theme is selected, but detailed algorithms
-and demographic defaults remain open. Do not implement those notes before
-specification or replace current milestone 2 validation with future feature work.
+The [roadmap](roadmap.md) records groups as the milestone 3 theme and proposed
+non-death dissolution for milestone 4. Detailed group rules, parity conditioning,
+calendar-varying schedules, arbitrary custom mechanisms, initialization
+correction, exact checkpoints, and other future work are not implicitly
+authorized. An African historical benchmark remains postponed.

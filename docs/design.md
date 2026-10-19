@@ -1,6 +1,6 @@
 # Design and implemented interface
 
-Updated October 13, 2026. This document describes implemented architecture.
+Updated October 19, 2026. This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
 The [scientific contract](scientific-contract.md) defines demographic semantics.
 
@@ -18,7 +18,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Continuous scheduling and events | `src/simulate.cpp` |
 | Demographic extraction and measures | `src/demography.cpp`, `R/calc_demographic_measures.R` |
 | Software and analytical validation | `tests/testthat/` |
-| Replication assessment | `inst/examples/milestone1_bootstrap.R`, `validation/milestone1.qmd` |
+| Replication assessment | `validation/milestone1.qmd`, `validation/milestone2.qmd` |
 
 The engine is C++17 with Rcpp. R exposes ordinary list objects and tibbles.
 `Band` and `waiting_time()` are shared by mortality and adjusted fertility.
@@ -122,8 +122,9 @@ using the recorded union histories (D046/D047).
 These remain proposals or unresolved requirements:
 
 - Custom process execution and permitted state mutations/invalidation.
-- Union initiation, partner eligibility, matching, dissolution, and fertility
-  denominators; see [union-formation notes](union-formation-models.md).
+- Non-death union dissolution, poor-pool waiting, previous-father continuity,
+  and transition-aware fertility compensation; see [union formation](union-formation-models.md)
+  and the [roadmap](roadmap.md).
 - Heterogeneity, parity-specific fertility, and user-defined newborn attributes.
 - Observation retention controls and exact stochastic checkpoints.
 - Calendar-varying rate representations and additional database adapters.
@@ -142,7 +143,7 @@ years) and known-kin screening (default two generations on each side of a
 common ancestor). Only living, unpartnered men enter the sampling pool. Only age difference
 (male minus female, continuous years) is supported initially. See the
 [union specification](union-formation-models.md) for worked examples and
-unresolved execution rules. Rate-based initiation schedules searches for unpartnered women.
+deferred extensions. Rate-based initiation schedules searches for unpartnered women.
 
 The engine always builds a call-local current-partner lookup for both sexes once
 from ongoing union histories. Per-person union links allow death to close all
@@ -198,4 +199,11 @@ independently of current-partner state. No candidate sets or additional
 persistence state are retained. `father_matching = NULL` resolves to the general model at execution; an explicit
 model supplies a separately prepared scorer only for nonmarital father selection.
 Both scorers use the native evaluator or R formula fallback. Previous-father
-preference remains unresolved.
+preference is deferred (D042).
+
+Omitting `matching` uses `create_age_gap_matching_model(0, 5)`. The helper
+converts a preferred age gap and half-weight distance in years to the existing
+quadratic utility model. `diagnostics = TRUE` adds `.n_eligible` and
+`.utility_rank` to new union records without retaining candidate sets or
+consuming additional random draws. Diagnostics default off; see the
+[union specification](union-formation-models.md#optional-union-diagnostics).
