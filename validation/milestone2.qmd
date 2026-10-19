@@ -759,6 +759,7 @@ asfr_nobt |>
   labs(x = "age", y = "fertility rate", color = "union status")+
   theme_bw()
 ```
+
 ```{r}
 #| label: fig-tfr-model-rate-nobt
 #| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines. Rate model with no birth intervals used.
@@ -776,10 +777,12 @@ tfr_nobt |>
 
 ### Age specific marriage rates
 
+The rate model is explicitly designed to preserve the marriage rates of the input data. @fig-mar-rates-model-rate shows a comparison between the mean age specific marriage rates from the simulations and the input rates. The fit is very good. 
+
 ```{r}
-#| label: fig-mar-rates--model-rate
+#| label: fig-mar-rates-model-rate
 #| fig-cap: Estimated mean age specific marriage rates for women across 100 simulations and 20 time periods compared to age specific marriage rates for women from input data. Input rates are shown by dotted red line. Rate model used.
- 
+
 mar_rates |>
   filter(sex == "f") |>
   ggplot(aes(x = age_start + 2.5, y = rate))+
@@ -792,16 +795,62 @@ mar_rates |>
 
 
 ```{r}
-#| label: fig-gender-mar-rates-model-rate
-#| fig-cap: Estimated mean age specific marriage rates for men and women across 100 simulations and 20 time periods. Rate model used.
+#| label: tbl-mar-rates-coverage-model-rate
+#| tbl-cap: Coverage of 95% confidence intervals for partnered age-specific fertility rates by period. Rate model used.
+
+counts_rates |>
+  bind_rows(.id = "replication") |>
+  filter(sex == "f", age_start >= 15 & age_start < 70, union_status == "unpartnered") |>
+  select(time_start, time_end, age_start, age_end, rate_marriage) |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, age_start) |>
+  summarize(
+    mean = mean(rate_marriage),
+    sd = sd(rate_marriage),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  inner_join(mar_rates_female, by = "age_start") |>
+  mutate(
+    upper = mean + 1.96 * se, lower = mean - 1.96 * se,
+    include = rate <= upper & rate >= lower
+  ) |>
+  group_by(time_mid) |> 
+  summarize(
+    n = n(),
+    coverage = mean(include),
+    max_abs_deviation = max(abs(mean - rate)),
+    .groups = "drop"
+  ) |>
+  gt() |>
+  cols_label(
+    time_mid ~ "time period mid point",
+    n ~ "age groups",
+    coverage ~ "95% CI coverage",
+    max_abs_deviation = "maximum absolute deviation"
+  )
+```
+
+@tbl-mar-rates-coverage-model-rate shows the coverage for the age-specific marriage rates across time. The results show excellent coverage and small maximum absolute deviation, conssistent with the visually good fit in @fig-mar-rates-model-rate.
+
+The simulation preserves the female marriage rates but not the male marriage rates. Nonetheless, it is useful to compare the implied male marriage rates that the simulation produces to those of the input data. 
+
+```{r}
+#| label: fig-mar-rates-male-model-rate
+#| fig-cap: Estimated mean age specific marriage rates for men across 100 simulations and 20 time periods compared to age specific marriage rates for men from input data. Input rates are shown by dotted red line. Rate model used.
 
 mar_rates |>
-  ggplot(aes(x = age_start, y = rate, group = sex, color = sex))+
+  filter(sex == "m") |>
+  ggplot(aes(x = age_start + 2.5, y = rate))+
   geom_point()+
   geom_line()+
-  labs(x = "age", y = "marriage rate", color = "sex")+
+  geom_line(data = mar_rates_male, linetype = 2, color = "red")+
+  labs(x = "age", y = "marriage rate")+
   theme_bw()
 ```
+
+@fig-mar-rates-male-model-rate compares the mean age-specific marriage rates for men from the simulations to the age-specific rates in the input data. Ase expected, the fit is not exact, but does produce something reasonably close to what the input data produce. 
 
 ### Share ever married
 
