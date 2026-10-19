@@ -446,7 +446,7 @@ results_ondemand |> map(calc_ever_married, 30) |>
   geom_line()+theme_bw()
 ```
 
-@fig-ever-married-50-model-on-demand and @fig-ever-married-30-model-on-demand show the proportion of men and women married across the 100 simulations by birth cohorts, excluding individuals who died before reaching the focal age and cohorts that had not reached that age by the end of the simulation. As expected this proportion is ero for cohorts who were old by the start of the simulation but rises quickly for cohorts in the marriageable ages. Once we reach cohorts born within the simulation, those proportions remain stationary for the remainder of the simulation. 
+@fig-ever-married-50-model-on-demand and @fig-ever-married-30-model-on-demand show the proportion of men and women married across the 100 simulations by birth cohorts, excluding individuals who died before reaching the focal age and cohorts that had not reached that age by the end of the simulation. As expected this proportion is zero for cohorts who were old by the start of the simulation but rises quickly for cohorts in the marriageable ages. Once we reach cohorts born within the simulation, those proportions remain stationary for the remainder of the simulation. 
 
 I have no prior expecation of what these proportions should be for this model aside from being reasonable values, which I judge them to be.
 
@@ -518,6 +518,8 @@ tfr <- map(counts_rates, calculate_tfr) |>
 
 ### Fertility rates
 
+The intent of the rate model is to preserve the marriage rates and union-status specific fertility rates. This will not necessarily preserve the overall age specific fertility rates because the share of women who are partnered and unpartnered may vary across the simulation.
+
 ```{r}
 #| label: fig-fertility-model-rate
 #| fig-cap: Estimated mean age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Red dotted line shows the input rates. Rate model used.
@@ -532,6 +534,7 @@ asfr |>
   theme_bw()
 ```
 
+@fig-fertility-model-rate compares the observed overall age-specifir fertility rates in comparison to those from the input data Although this simulation did not use the overall total fertility rates directly, the observed overall age-specific fertility rates actually fit quite closely. @tbl-fertility-coverage-model-rate shows that while the rates fit the pattern quite closely and have a low maximum absolute deviation, the true rates rarely fall within the 95% confidence interval of the mean of the observed rates. This finding is not unexpected as the simulation did not use the overall fertility rates directly.
 
 ```{r}
 #| label: tbl-fertility-coverage-model-rate
@@ -571,7 +574,6 @@ counts_rates |>
   )
 ```
 
-
 ```{r}
 #| label: fig-union-status-fertility-model-rate
 #| fig-cap: Estimated mean unpartnered and partnered age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates. Rate model used.
@@ -579,7 +581,7 @@ counts_rates |>
 asfr |>
   filter(union_status != "overall") |>
   ggplot(aes(
-    x = age_start + 2.5, y = rate, 
+    x = age_start + 2.5, y = rate,
     color = union_status, group = union_status
   ))+
   geom_point()+
@@ -589,11 +591,97 @@ asfr |>
   theme_bw()
 ```
 
+@fig-union-status-fertility-model-rate compares the estimated mean partnered and unpartnered age specific fertility rates from the simulations to the input rates. The fit is very exact for unpartnered fertility rates. it is also very close for the partnered fertility rates, but not exact. In particular, the rates estimated from the model are slightly higher in the younger ages than those from the input rates.
+
+```{r}
+#| label: tbl-fertility-unpartnered-coverage-model-rate
+#| tbl-cap: Coverage of 95% confidence intervals for unpartnered age-specific fertility rates by period. Rate model used.
+
+counts_rates |> 
+  bind_rows(.id = "replication") |>
+  filter(sex == "f", age_start >= 15 & age_start < 45, union_status == "unpartnered") |>
+  select(time_start, time_end, age_start, age_end, rate_fertility) |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, age_start) |>
+  summarize(
+    mean = mean(rate_fertility),
+    sd = sd(rate_fertility),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  inner_join(fertility_rates_by_status |> filter(union_status == "unpartnered"), by = "age_start") |>
+  mutate(
+    upper = mean + 1.96 * se, lower = mean - 1.96 * se,
+    include = rate <= upper & rate >= lower
+  ) |>
+  group_by(time_mid) |> 
+  summarize(
+    n = n(),
+    coverage = mean(include),
+    max_abs_deviation = max(abs(mean - rate)),
+    .groups = "drop"
+  ) |>
+  gt() |>
+  cols_label(
+    time_mid ~ "time period mid point",
+    n ~ "age groups",
+    coverage ~ "95% CI coverage",
+    max_abs_deviation = "maximum absolute deviation"
+  )
+```
+
+
+```{r}
+#| label: tbl-fertility-partnered-coverage-model-rate
+#| tbl-cap: Coverage of 95% confidence intervals for partnered age-specific fertility rates by period. Rate model used.
+
+counts_rates |> 
+  bind_rows(.id = "replication") |>
+  filter(sex == "f", age_start >= 15 & age_start < 45, union_status == "partnered") |>
+  select(time_start, time_end, age_start, age_end, rate_fertility) |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, age_start) |>
+  summarize(
+    mean = mean(rate_fertility),
+    sd = sd(rate_fertility),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  inner_join(fertility_rates_by_status |> filter(union_status == "partnered"), by = "age_start") |>
+  mutate(
+    upper = mean + 1.96 * se, lower = mean - 1.96 * se,
+    include = rate <= upper & rate >= lower
+  ) |>
+  group_by(time_mid) |> 
+  summarize(
+    n = n(),
+    coverage = mean(include),
+    max_abs_deviation = max(abs(mean - rate)),
+    .groups = "drop"
+  ) |>
+  gt() |>
+  cols_label(
+    time_mid ~ "time period mid point",
+    n ~ "age groups",
+    coverage ~ "95% CI coverage",
+    max_abs_deviation = "maximum absolute deviation"
+  )
+```
+
+@tbl-fertility-unpartnered-coverage-model-rate and @tbl-fertility-partnered-coverage-model-rate show the coverage for unpartnered and partnered age-specific fertility, respectively. The results for unpartnered fertility are very good and reach expected benchmarks for being within the 95% confidence interval and have very small maximum absolute deviation.
+
+The results for partnered fertility also have small maximum absolute deviation but have lower coverage as expected from @fig-union-status-fertility-model-rate.
+
+One final check is to examine the mean total fertility rate from the estimated rates in comparison to the total fertility rate expected by the input rates. @fig-tfr-model-rate shows this comparison for overall, partnered, and unpartnered fertility. the unpartnered TFR fits to the input TFR very well, but the partnered and overall fertility are slightly higher for most of the simulation. Overall TFR is also non-stable in the early part of the simulation because all women begin as unpartnered and so overall fertility is weighted more toward unpartnered fertility than partnered fertility relative to the stable population.
+
+
 ```{r}
 #| label: fig-tfr-model-rate
 #| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines. Rate model used.
 
-tfr |> 
+tfr |>
   ggplot(aes(x = time_mid, y = tfr, group = union_status, color = union_status, fill = union_status))+
   geom_point()+
   geom_hline(data = input_tfr, aes(yintercept = tfr, color = union_status),
@@ -601,6 +689,90 @@ tfr |>
   labs(x = "time", y = "total fertility rate", color = "union status")+
   theme_bw()
 ```
+
+The discrepancy with overall fertility is expected and not problematic for the rate model, but why is partnered fertility so high. The most likely culprit is the same issue identified in milestone 1. Fertility rates are adjusted upward to account for birth intervals where women are not exposed to the risk of giving birth. When women transition between states with different underlying fertility rates during this birth interval, the risk adjustment is not properly accounted for because some person years were lived under a different risk state. When transitioning to higher rates (as for partnered fertility) this will lead to a positive bias, and when transitioning to lower rates this will lead to a negative bias.
+
+To assess if this was the issue, I reran the simulations with `birth_interval` set to zero.
+
+```{r}
+model_rates_nobt <- model_base |>
+  set_fertility(fertility_rates_by_status, birth_interval = 0) |>
+  set_union_formation(
+    "rate",
+    model_matching,
+    rates = mar_rates_female,
+    diagnostics = TRUE
+  )
+
+# run on a a smaller sample to keep runtime down
+results_rates_nobt <- map(1:25, function(seed) {
+  simulate(model_rates_nobt, years = years, seed = seed)
+})
+
+counts_rates_nobt <- map(
+  results_rates_nobt,
+  calculate_lexis_counts,
+  time_breaks,
+  age_breaks,
+  include_unions = TRUE
+)
+
+asfr_nobt <- counts_rates_nobt |> 
+  bind_rows(.id = "replication") |>
+  filter(sex == "f", age_start >= 15 & age_start < 45) |>
+  group_by(union_status, age_start) |>
+  summarize(
+    rate = mean(rate_fertility),
+    sd = sd(rate_fertility),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+tfr_nobt <- map(counts_rates_nobt, calculate_tfr) |>
+  bind_rows(.id = "replication") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, union_status) |>
+  summarize(
+    sd = sd(tfr),
+    tfr = mean(tfr),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+
+```{r}
+#| label: fig-union-status-fertility-model-rate-no-bt
+#| fig-cap: Estimated mean unpartnered and partnered age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates. Rate model with no birth intervals used.
+
+asfr_nobt |>
+  filter(union_status != "overall") |>
+  ggplot(aes(
+    x = age_start + 2.5, y = rate,
+    color = union_status, group = union_status
+  ))+
+  geom_point()+
+  geom_line(linetype = 2)+
+  geom_line(data = fertility_rates_by_status)+
+  labs(x = "age", y = "fertility rate", color = "union status")+
+  theme_bw()
+```
+```{r}
+#| label: fig-tfr-model-rate-nobt
+#| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines. Rate model with no birth intervals used.
+
+tfr_nobt |>
+  ggplot(aes(x = time_mid, y = tfr, group = union_status, color = union_status, fill = union_status))+
+  geom_point()+
+  geom_hline(data = input_tfr, aes(yintercept = tfr, color = union_status),
+             linetype = 2)+
+  labs(x = "time", y = "total fertility rate", color = "union status")+
+  theme_bw()
+```
+
+@fig-union-status-fertility-model-rate-no-bt and @fig-tfr-model-rate-nobt show figures of age specific fertility rates and TFR, consistent with the earlier figures but with `birth_interval` set to zero. As expected, these results show a tight fit between partnered fertility rates from the simulation and the input rates. This indicates that the discrepancy here is driven by the birth interval is, consistent with the earlier figures but with `birth_interval` set to zero. As expected, these results show a tight fit between partnered fertility rates from the simulation and the input rates. This finding indicates that the discrepancy here is driven by the birth interval issue. This issue is being deferred to a later milestone and does not block this milestone. In most cases, the differences here will be very minor.
 
 ### Age specific marriage rates
 
