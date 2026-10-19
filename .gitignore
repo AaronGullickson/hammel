@@ -4,6 +4,7 @@
 .httr-oauth
 .DS_Store
 .quarto
+nvim.log
 src/*.o
 src/*.so
 src/*.dll
