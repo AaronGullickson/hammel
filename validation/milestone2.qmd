@@ -83,6 +83,28 @@ add_union_info <- function(pop) {
 
   return(pop)
 }
+
+get_eligible_bachelors <- function(mar_time, pop) {
+  # get husband ids of current marriages
+  current_husbands <- pop$unions |>
+    filter(
+      start_time < .env$mar_time,
+      is.na(end_time) | (end_time > .env$mar_time)
+    ) |>
+    distinct(husband_id) |>
+    pull(husband_id)
+
+  pop$persons |>
+    filter(
+      # must be men
+      sex == "m",
+      # must be alive and age 15 or older at time of marriage
+      is.na(death_time) | (death_time > .env$mar_time),
+      .env$mar_time - birth_time >= 15,
+      # must not be currently married
+      !(person_id %in% current_husbands)
+    )
+}
 ```
 
 ## Purpose and completion criteria
@@ -1085,29 +1107,6 @@ union_sample <- result_ondemand |>
   slice_sample(n = 5000) |>
   select(union_id, husband_id, start_time, age_mar_h, age_mar_w, age_diff) |>
   mutate(chosen = TRUE)
-
-# create a function to get all eligible men at the marriage start time, ingoring kinship
-get_eligible_bachelors <- function(mar_time, pop) {
-  # get husband ids of current marriages
-  current_husbands <- pop$unions |>
-    filter(
-      start_time < .env$mar_time,
-      is.na(end_time) | (end_time > .env$mar_time)
-    ) |>
-    distinct(husband_id) |>
-    pull(husband_id)
-
-  pop$persons |>
-    filter(
-      # must be men
-      sex == "m",
-      # must be alive and age 15 or older at time of marriage
-      is.na(death_time) | (death_time > .env$mar_time),
-      .env$mar_time - birth_time >= 15,
-      # must not be currently married
-      !(person_id %in% current_husbands)
-    )
-}
 
 choice_sets <- NULL
 
