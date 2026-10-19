@@ -8,7 +8,7 @@ format:
     number-sections: true
     code-fold: true
     code-tools: true
-    self-contained: true 
+    self-contained: true
 execute:
   eval: true
   echo: true
@@ -50,6 +50,37 @@ calc_ever_married <- function(result, age) {
     mutate(birth_decade = floor(birth_time / 10) * 10) |>
     group_by(sex, birth_decade) |>
     summarize(prop_ever_married = mean(ever_married), .groups = "drop")
+}
+
+add_union_info <- function(pop) {
+  husbands <- pop$persons |>
+    filter(sex == "m") |>
+    rename(
+      husband_id = person_id,
+      birth_time_h = birth_time,
+      death_time_h = death_time
+    ) |>
+    select(husband_id, birth_time_h, death_time_h)
+
+  wives <- pop$persons |>
+    filter(sex == "f") |>
+    rename(
+      wife_id = person_id,
+      birth_time_w = birth_time,
+      death_time_w = death_time
+    ) |>
+    select(wife_id, birth_time_w, death_time_w)
+
+  pop$unions <- pop$unions |>
+    left_join(husbands, by = "husband_id") |>
+    left_join(wives, by = "wife_id") |>
+    mutate(
+      age_mar_h = start_time - birth_time_h,
+      age_mar_w = start_time - birth_time_w,
+      age_diff = age_mar_h - age_mar_w
+    )
+
+  return(pop)
 }
 ```
 
@@ -883,7 +914,150 @@ results_rates |> map(calc_ever_married, 30) |>
 @fig-ever-married-50-model-rate and @fig-ever-married-30-model-rate show the share of a birth cohort that are ever married by age 50 and age 30, respectively. As for the on-demand model, these proportions are zero for cohorts who were already passed marriageable ages by the start of the simulation but quickly converge on  a stable proportion that appears reasonable.
 
 ## Evaluate Matching Model
- 
+
+For the matching model, evaluation will be based on single simulations rather than a bootstrap of 100 simulations. The matching model is independent of the search model, but the different search models may produce differences in the eligible partner pool, so I will compare across each simulation type.
+
+```{r}
+#| get-sims-matching
+
+result_ondemand <- simulate(model_ondemand, years = years, seed = 42)
+result_rates <- simulate(model_rates, years = years, seed = 42)
+```
+
+### Eligible partners
+
+```{r}
+#| label: fig-eligible
+#| fig-cap: Boxplots of the number of eligible partners for each union, by year and simulation type.
+
+bind_rows(
+  result_ondemand$unions |> mutate(search_model = "on demand"),
+  result_rates$unions |> mutate(search_model = "rate")
+) |>
+  ggplot(aes(x = factor(floor(start_time)), y = .n_eligible))+
+  geom_boxplot()+
+  facet_wrap(~search_model)+
+  scale_x_discrete(breaks = seq(2000, 2100, 10))+
+  labs(x = "year", y = "number of eligible partners")+
+  theme_bw()
+```
+
+
+```{r}
+#| label: fig-eligible-no-kin-b
+#| fig-cap: Boxplots of the number of eligible partners for each union, by year of the simulation, for simulation in which all kin are eligible.
+
+result_ondemand_no_kin_b <- simulate(
+  model_ondemand |> set_union_formation(
+    "on_demand",
+    model_matching,
+    diagnostics = TRUE,
+    min_male_age = 15, kinship_generations = 0
+  ),
+  years = years, seed = 42
+)
+result_rates_no_kin_b <- simulate(
+  model_rates |> set_union_formation(
+    "rate",
+    model_matching,
+    rates = mar_rates_female,
+    diagnostics = TRUE,
+    min_male_age = 15, kinship_generations = 0
+  ),
+  years = years, seed = 42
+)
+
+bind_rows(
+  result_ondemand_no_kin_b$unions |> mutate(search_model = "on demand"),
+  result_rates_no_kin_b$unions |> mutate(search_model = "rate")
+) |>
+  ggplot(aes(x = factor(floor(start_time)), y = .n_eligible))+
+  geom_boxplot()+
+  facet_wrap(~search_model)+
+  scale_x_discrete(breaks = seq(2000, 2100, 10))+
+  labs(x = "year", y = "number of eligible partners")+
+  theme_bw()
+```
+
+### Age differences
+
+```{r}
+#| label: fig-age-diff
+#| fig-cap: Boxplot of observed age difference between partners, by year and simulation type. Red dotted line shows the preferred age gap from the matching model.
+
+u <- bind_rows(
+add_union_info(result_ondemand)$unions |> mutate(search_model = "on demand"),
+add_union_info(result_rates)$unions |> mutate(search_model = "rate")
+)
+
+# u |>
+#   mutate(year = floor(start_time)) |>
+#   group_by(year, search_model) |>
+#   summarize(
+#     mean = mean(age_diff),
+#     median = median(age_diff),
+#     p25 = quantile(age_diff, 0.25),
+#     p75 = quantile(age_diff, 0.75)
+#   ) |>
+#   ggplot(aes(x = year))+
+#   geom_ribbon(aes(ymin = p25, ymax = p75), color = NA, fill = "grey90")+
+#   geom_line(aes(y = mean), color = "navy")+
+#   geom_line(aes(y = median), color = "tomato")+
+#   geom_hline(yintercept = 2.57, color = "red", linetype = 2)+
+#   facet_wrap(~search_model)+
+#   labs(x = "year", y = "age difference")+
+#   theme_bw()
+
+u |>
+  ggplot(aes(x = factor(floor(start_time)), y = age_diff))+
+  geom_boxplot()+
+  geom_hline(yintercept = 2.57, color = "red", linetype = 2)+
+  facet_wrap(~search_model)+
+  scale_x_discrete(breaks = seq(2000, 2100, 10))+
+  labs(x = "year", y = "age difference")+
+  theme_bw()
+```
+
+```{r}
+#| label: fig-age-gap-test
+#| fig-cap: Mean age gap difference across all unions in last fifty years of simulation, for simulations with different preferred age gaps. Dotted line shows the y=x line.
+
+h <- 5
+agediffs <- map(c(-5:5), function(d) {
+
+  model <- model_base |>
+    set_fertility(fertility_rates_overall) |>
+    set_union_formation(
+      "on_demand",
+      matching = create_age_gap_matching_model(d, h)
+    )
+  result <- simulate(model, years = years, seed = 42) |>
+    add_union_info()
+  x <- result$unions |>
+    # drop first half for burn in
+    filter(start_time < 2050) |>
+    pull(age_diff)
+
+  # return as tibble
+  tibble(d = d, n = length(x), mean = mean(x), se = sd(x)/sqrt(length(x)))
+}) |>
+  bind_rows()
+
+ggplot(agediffs, aes(x = d, y = mean))+
+  geom_ribbon(aes(ymin = mean - 1.96 * se, ymax = mean + 1.96 * se),
+              color = NA, fill = "grey80")+
+  geom_point()+
+  geom_line()+
+  geom_abline(intercept = 0, slope = 1, linetype = 2)+
+  scale_y_continuous(limits = c(-5, 5))+
+  labs(x = "preferred age gap", y = "mean observed age gap")+
+  theme_bw()
+```
+
+### Estimate model parameters
+
+
+
 ## Speed Tests
 
 ## Tests
