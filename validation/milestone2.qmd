@@ -1147,6 +1147,125 @@ modelsummary(model, gof_map = c("nobs"), estimate = "{estimate} [{conf.low}, {co
 
 ## Speed Tests
 
+Time tests for population size and simulation length were conducted for milestone 1. Here I want to vary characteristics ofthe union formation process that might affect speed of computation. Specifically:
+
+- **on demand vs. rate search model** I expect that adding another waiting time and processing those events will add time for therate model compared to the on demand model.
+- **kinship depth** Number of kin increases exponentially with depth, so forcing an exclusion of more kin may increase computational time.
+- **custom matching formula** Custom matching formulae must be processed in R rather than C++ which may increase computational time.
+
+```{r}
+#| label: run-time-tests
+
+scenarios <- tribble(
+  ~search_model, ~kin_depth, ~custom_match,
+  "on_demand",   0,          FALSE,
+  "on_demand",   1,          FALSE,
+  "on_demand",   2,          FALSE,
+  "on_demand",   3,          FALSE,
+  "on_demand",   4,          FALSE,
+  "rate",        0,          FALSE,
+  "rate",        1,          FALSE,
+  "rate",        2,          FALSE,
+  "rate",        3,          FALSE,
+  "rate",        4,          FALSE,
+  "on_demand",   0,          TRUE,
+  "on_demand",   1,          TRUE,
+  "on_demand",   2,          TRUE,
+  "on_demand",   3,          TRUE,
+  "on_demand",   4,          TRUE,
+  "rate",        0,          TRUE,
+  "rate",        1,          TRUE,
+  "rate",        2,          TRUE,
+  "rate",        3,          TRUE,
+  "rate",        4,          TRUE
+)
+
+
+population <- create_baseline_population(50000, max_age = 75, end_time = 2000)
+
+elapsed_time <- NULL
+for(i in seq_along(1:nrow(scenarios))) {
+  search_model <- scenarios$search_model[i]
+  kin_depth <- scenarios$kin_depth[i]
+  custom_match <- scenarios$custom_match[i]
+
+  if(search_model == "rate") {
+    fert <- fertility_rates_by_status
+    mar_rates <- mar_rates_female
+  } else {
+    fert <- fertility_rates_overall
+    mar_rates <- NULL
+  }
+
+  if(custom_match) {
+    model_match <- create_matching_model(
+      ~ I(pmin(age_difference - 3, 0)^2) +
+        I(pmax(age_difference - 3, 0)^2),
+      coefficients = c(
+        "I(pmin(age_difference - 3, 0)^2)" = -log(2) / (5/2)^2,
+        "I(pmax(age_difference - 3, 0)^2)" = -log(2) / 5^2
+      )
+    )
+  } else {
+    model_match <- create_age_gap_matching_model(3, 5)
+  }
+
+  model_scenario <- model_base |> 
+    set_population(population) |>
+    set_fertility(fert) |>
+    set_union_formation(
+      search_model,
+      model_match,
+      rates = mar_rates,
+      kinship_generations = kin_depth
+    )
+  timing <- system.time({
+    result <- simulate(model_scenario, years = 100)
+  })
+  elapsed_time <- c(elapsed_time, unname(timing[["elapsed"]]))
+  cat(i)
+}
+
+scenarios$elapsed_time <- elapsed_time
+```
+
+```{r}
+#| label: tbl-time-tests
+#| tbl-cap: Time (in seconds) to run simulations with differeing parameters. All simulations start with 50,000 individuals and are simulated for 100 years.
+
+scenarios |>
+  gt() |>
+  cols_label(
+    search_model ~ "Search model",
+    kin_depth ~ "Excluded kin generations",
+    custom_match ~ "Custom matching formula",
+    elapsed_time ~ "Time (in seconds)"
+  )
+```
+
+```{r}
+#| label: fig-time-tests
+#| fig-cap: Time to run simulation by various factors. All simulations run for a 50K population over 100 years.
+
+scenarios |>
+  mutate(custom_match = factor(
+    custom_match,
+    levels = c(FALSE, TRUE),
+    labels = c("Standard matching", "Custom matching")
+  )) |>
+  ggplot(aes(x = kin_depth, y = elapsed_time, group = search_model, color = search_model))+
+  geom_point()+
+  geom_line()+
+  facet_wrap(~custom_match)+
+  scale_y_continuous(limits = c(0, 90))+
+  labs(x = "kin depth", color = "search model", y = "time (in seconds)")+
+  theme_bw()
+```
+
+@tbl-time-tests and @fig-time-tests show the amount of time to process each simulation. These numbers are not exact because other factors can affect total processing time. The on-demand models were faster to process than the rate models. The biggest difference in computation was driven by custom matching which increased computation by a factor of four or more. This increase in computation time is driven by the needto use R rather than C++ to compute logit scores from the model.
+
+Excluding a greater number of kin generations generally increased computational time but the effect was slight overall, and non-existent in some cases. The biggest gain was for excluding no kin becasue then the simulation doesn't even run the kin exclusion routine at all.
+
 ## Tests
 
 The following tests have been constructed and are currently all passing.
