@@ -926,6 +926,8 @@ result_rates <- simulate(model_rates, years = years, seed = 42)
 
 ### Eligible partners
 
+I first look at eligible partners over time in each simulation. The maximum number is set to 1000 for the simulation, but will be reproduced by eligibility requirements which are men at least 15 years of age and no kin within 2 generations.
+
 ```{r}
 #| label: fig-eligible
 #| fig-cap: Boxplots of the number of eligible partners for each union, by year and simulation type.
@@ -941,6 +943,8 @@ bind_rows(
   labs(x = "year", y = "number of eligible partners")+
   theme_bw()
 ```
+
+@fig-eligible shows the distribution of the eligible partners considered for each union by the year of the union. The value drops from about 85% eligibility in the beginning of the simulation to a value of around 55-60% by the midpoint of the simulation where it remains roughly stable. Because we start the simulation with a uniform age distrbution out to 100, the initial 85% figure makes sense as about 15% of the male population will be below age 15 and everyone begins unpartnered. As the age distribution becomes more stable, this percentage increases. To demonstrate that most of this eligibility is being driven by age and not kinship, I ran a second set of simulations with no restrictions on kin. 
 
 
 ```{r}
@@ -963,7 +967,7 @@ result_rates_no_kin_b <- simulate(
     rates = mar_rates_female,
     diagnostics = TRUE,
     min_male_age = 15, kinship_generations = 0
-  ),
+  )
   years = years, seed = 42
 )
 
@@ -978,6 +982,10 @@ bind_rows(
   labs(x = "year", y = "number of eligible partners")+
   theme_bw()
 ```
+
+@fig-eligible-no-kin-b shows the same results as the previous figure but with no kin restrictions. The results are very similar to @fig-eligible, indicating that most of the loss of eligible partners is due to age limitations on male partners. 
+
+Notably, the percent of male partners eligible drops to 60% or less by the last fifty years of the simulation, even though the stable age distribution does not give us 40% of men under age 15. However, because men under age 15 will never be selected for unions, they will be overrepresented among unpartnered kin.
 
 ### Age differences
 
@@ -1018,6 +1026,12 @@ u |>
   theme_bw()
 ```
 
+@fig-age-diff shows the distribution of age difference between partners by year of the simulation. The median drops somewhat from the initial period of the simulation before stabilizing. The actual observed median is somewhat below the preferred age gap from the model. This is not neessarily a problem because the actual age gap will be affected by the age distribution of available men as well as by the underlying preferences from the model. Recoving those parameters from conditional logit models will provide a better test of whether the model is accurately represented.
+
+The overall distribution seems reasonable, with most age differences clustered tightly around the median, but with a few outliers in the 20 year range.
+
+To better test that the age gap models are producing the expected results I ran simulations of the on demand model with preferred age gaps from -5 to 5 in one year increments, along with a static halving time of five years. To avoid any issues with the burn-in period, I then took the mean of age difference in each simulation for the last fifty years of the simulation. I don't expect that these means will exactly match the preferred age gap, but I do expect that they will be strongly positively correlated and that a higher value of preferred age difference from the model will translate into a higher observed mean.
+
 ```{r}
 #| label: fig-age-gap-test
 #| fig-cap: Mean age gap difference across all unions in last fifty years of simulation, for simulations with different preferred age gaps. Dotted line shows the y=x line.
@@ -1053,6 +1067,8 @@ ggplot(agediffs, aes(x = d, y = mean))+
   labs(x = "preferred age gap", y = "mean observed age gap")+
   theme_bw()
 ```
+
+@fig-age-gap-test shows the results of this test. The means line up as expected with a roughly linear slope with some possible curvature. Higher values of the preferred age gap produce greater mean age differences in the expected direction.
 
 ### Estimate model parameters
 
