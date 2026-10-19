@@ -858,7 +858,6 @@ mar_rates |>
 #| label: fig-ever-married-50-model-rate
 #| fig-cap: Mean proportion ever married by age 50 by ten-year birth cohorts that have reached 50 by the end of the simulation, across 100 simulations. Rate model used.
 
-
 results_rates |> map(calc_ever_married, 50) |>
   bind_rows(.id = "replication") |>
   group_by(sex, birth_decade) |>
@@ -872,7 +871,6 @@ results_rates |> map(calc_ever_married, 50) |>
 #| label: fig-ever-married-30-model-rate
 #| fig-cap: Mean proportion ever married by age 30 by ten-year birth cohorts that have reached 30 by the end of the simulation, across 100 simulations. Rate model used.
 
-
 results_rates |> map(calc_ever_married, 30) |>
   bind_rows(.id = "replication") |>
   group_by(sex, birth_decade) |>
@@ -882,6 +880,7 @@ results_rates |> map(calc_ever_married, 30) |>
   geom_line()+theme_bw()
 ```
 
+@fig-ever-married-50-model-rate and @fig-ever-married-30-model-rate show the share of a birth cohort that are ever married by age 50 and age 30, respectively. As for the on-demand model, these proportions are zero for cohorts who were already passed marriageable ages by the start of the simulation but quickly converge on  a stable proportion that appears reasonable.
 
 ## Evaluate Matching Model
  
