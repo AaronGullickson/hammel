@@ -29,6 +29,7 @@ library(purrr)
 library(tibble)
 library(ggplot2)
 library(gt)
+library(survival)
 ```
 
 ```{r}
@@ -250,14 +251,6 @@ model_matching <- create_matching_model(
   ~ age_difference + I(age_difference^2),
   c(age_difference = 0.072, "I(age_difference^2)" = -0.014)
 )
-```
-
-## Evaluate On-Demand Model
-
-To test the on-demand model, I run 100 separate simulations with the "on_demand" setting. I can then estimate average age-specific fertility rates, total fertility rates, marriage rates, and other characteristics across simulations.
-
-```{r}
-#| label: run-sim-ondemand
 
 model_ondemand <- model_base |>
   set_fertility(fertility_rates_overall) |>
@@ -266,6 +259,23 @@ model_ondemand <- model_base |>
     model_matching,
     diagnostics = TRUE
   )
+
+model_rates <- model_base |>
+  set_fertility(fertility_rates_by_status) |>
+  set_union_formation(
+    "rate",
+    model_matching,
+    rates = mar_rates_female,
+    diagnostics = TRUE
+  )
+```
+
+## Evaluate On-Demand Model
+
+To test the on-demand model, I run 100 separate simulations with the "on_demand" setting. I can then estimate average age-specific fertility rates, total fertility rates, marriage rates, and other characteristics across simulations.
+
+```{r}
+#| label: run-sim-ondemand
 
 results_ondemand <- map(replication_seeds, function(seed) {
   simulate(model_ondemand, years = years, seed = seed)
@@ -487,15 +497,6 @@ To test the ratte model, I run 100 separate simulations with the "rate" setting.
 
 ```{r}
 #| label: run-sim-rates
-
-model_rates <- model_base |>
-  set_fertility(fertility_rates_by_status) |>
-  set_union_formation(
-    "rate",
-    model_matching,
-    rates = mar_rates_female,
-    diagnostics = TRUE
-  )
 
 results_rates <- map(replication_seeds, function(seed) {
   simulate(model_rates, years = years, seed = seed)
@@ -926,7 +927,7 @@ result_rates <- simulate(model_rates, years = years, seed = 42)
 
 ### Eligible partners
 
-I first look at eligible partners over time in each simulation. The maximum number is set to 1000 for the simulation, but will be reproduced by eligibility requirements which are men at least 15 years of age and no kin within 2 generations.
+I first look at eligible partners over time in each simulation. The maximum number is set to 1000 for the simulation, but will be reduced by eligibility requirements which are men at least 15 years of age and no kin within 2 generations.
 
 ```{r}
 #| label: fig-eligible
@@ -983,7 +984,7 @@ bind_rows(
   theme_bw()
 ```
 
-@fig-eligible-no-kin-b shows the same results as the previous figure but with no kin restrictions. The results are very similar to @fig-eligible, indicating that most of the loss of eligible partners is due to age limitations on male partners. 
+@fig-eligible-no-kin-b shows the same results as the previous figure but with no kin restrictions. The results are very similar to @fig-eligible, indicating that most of the loss of eligible partners is due to age limitations on male partners.
 
 Notably, the percent of male partners eligible drops to 60% or less by the last fifty years of the simulation, even though the stable age distribution does not give us 40% of men under age 15. However, because men under age 15 will never be selected for unions, they will be overrepresented among unpartnered kin.
 
@@ -1072,7 +1073,78 @@ ggplot(agediffs, aes(x = d, y = mean))+
 
 ### Estimate model parameters
 
+I can estimate model parameters by taking a sample of unions from the simulatd data. For each sampled union, I can draw a sample of alternate partners from the simulated data (men who were alive, unpartnered, and age 15 or older at the time of the union). I combine these alternate unions with the real union to create a choice set. I use a sample of 5000 unions from the "on demand" model and create 50 alternate unions for each real union.
 
+```{r}
+#| label: construct-choice-sets
+
+set.seed(42)
+union_sample <- result_ondemand |>
+  add_union_info() |>
+  pluck("unions") |>
+  slice_sample(n = 5000) |>
+  select(union_id, husband_id, start_time, age_mar_h, age_mar_w, age_diff) |>
+  mutate(chosen = TRUE)
+
+# create a function to get all eligible men at the marriage start time, ingoring kinship
+get_eligible_bachelors <- function(mar_time, pop) {
+  # get husband ids of current marriages
+  current_husbands <- pop$unions |>
+    filter(
+      start_time < .env$mar_time,
+      is.na(end_time) | (end_time > .env$mar_time)
+    ) |>
+    distinct(husband_id) |>
+    pull(husband_id)
+
+  pop$persons |>
+    filter(
+      # must be men
+      sex == "m",
+      # must be alive and age 15 or older at time of marriage
+      is.na(death_time) | (death_time > .env$mar_time),
+      .env$mar_time - birth_time >= 15,
+      # must not be currently married
+      !(person_id %in% current_husbands)
+    )
+}
+
+choice_sets <- NULL
+
+for(i in 1:nrow(union_sample)) {
+  union_real <- union_sample[i,]
+
+  unions_fake <- get_eligible_bachelors(union_real$start_time, result_ondemand) |>
+    filter(person_id != union_real$husband_id) |>
+    slice_sample(n = 50) |>
+    rename(husband_id = person_id) |>
+    mutate(
+      union_id = union_real$union_id,
+      start_time = union_real$start_time,
+      age_mar_h = start_time - birth_time,
+      age_mar_w = union_real$age_mar_w,
+      age_diff = age_mar_h - age_mar_w,
+      chosen = FALSE
+    ) |>
+    select(union_id, husband_id, start_time, age_mar_h, age_mar_w, age_diff, chosen)
+
+  choice_set <- rbind(union_real, unions_fake)
+  choice_sets <- rbind(choice_sets, choice_set)
+}
+```
+
+Once, I have the choice sets, I can feed these into a conditional logit model where the true union is predicted by age difference and its square.
+
+```{r}
+#| label: tbl-clogit
+#| tbl-cap: Conditional logit model predicting partner choice by partner age difference and its square. Results are based on a random sample of 5000 unions from the on demand model with 50 alternate partners per union. 95% confidence intervals are shown in brackets.
+
+model <- clogit(chosen ~ age_diff + I(age_diff^2) + strata(union_id), data = choice_sets)
+modelsummary(model, gof_map = c("nobs"), estimate = "{estimate} [{conf.low}, {conf.high}]",
+             statistic = NULL, conf_level = 0.95, fmt = 3, output = "gt")
+```
+
+@tbl-clogit shows the fit of this model. The true parameters are 0.072 and -0.014 for the linear and quadratic terms, respectively. The model estimates fit extremely well and easily fall within the 95% confidence interval. The matching model is behaving as expected.
 
 ## Speed Tests
 
