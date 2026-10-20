@@ -192,6 +192,16 @@ screening, zero threshold, existing partner retention, and no added female-age
 restriction. Eligibility changes matching alternatives; coefficients themselves
 remain unchanged.
 
+## Group eligibility restrictions
+
+`prevent_exogamy` belongs to each matching model and defaults to FALSE. TRUE
+requires same-group candidates; a character vector such as `c("A::B", "A:C")`
+prohibits selected symmetric/directed cross-group combinations. Sample before
+these restrictions, and do not refill exclusions. The selected father/partner
+model supplies the restrictions, finite score effects cannot override them,
+and an empty sample follows existing failure/cancellation rules. Existing
+partners are retained. See [group matching](group-matching.md).
+
 ## Initiation, matching, and state consistency
 
 The initiation process determines when a search occurs. Native matching scores

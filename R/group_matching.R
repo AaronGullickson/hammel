@@ -84,10 +84,44 @@ matching_pair_offsets <- function(matching, female_group, male_group) {
 
 validate_matching_groups <- function(matching, population_groups) {
   pairs <- expand_group_exogamy(matching$group_exogamy)
-  if ((nrow(pairs) || matching_has_group_formula(matching)) && is.null(population_groups))
+  restrictions <- expand_prevent_exogamy(matching$prevent_exogamy)
+  if ((nrow(pairs) || matching_has_group_formula(matching) || restrictions$all ||
+       nrow(restrictions$pairs)) && is.null(population_groups))
     stop("Group matching effects require population group identities.", call. = FALSE)
   if (any(all.vars(matching$formula) %in% c("female_group", "male_group")) &&
       any(!as.character(population_groups) %in% as.character(matching$group_levels)))
     stop("Population groups must be covered by matching `group_levels`.", call. = FALSE)
   invisible(matching)
+}
+
+expand_prevent_exogamy <- function(x) {
+  empty <- expand_group_exogamy(NULL)[c("female_group", "male_group")]
+  if (is.null(x)) x <- FALSE
+  if (is.logical(x) && length(x) == 1L && is.null(dim(x)) && !is.na(x))
+    return(list(all = x, pairs = empty))
+  pairs <- tryCatch({
+    if (is.character(x) && is.null(dim(x)) && !anyNA(x)) {
+      expand_group_exogamy(stats::setNames(rep(0, length(x)), x))
+    } else if (is.data.frame(x)) {
+      check_columns(x, c("female_group", "male_group"), "prevent_exogamy")
+      x$log_odds <- rep(0, nrow(x))
+      expand_group_exogamy(x)
+    } else stop("Use FALSE, TRUE, a character vector of pairs, or a directional pair table.")
+  }, error = function(e) stop("Invalid `prevent_exogamy`: ", conditionMessage(e), call. = FALSE))
+  if (any(pairs$female_group == pairs$male_group))
+    stop("`prevent_exogamy` pairs must join different groups.", call. = FALSE)
+  list(all = FALSE, pairs = pairs[c("female_group", "male_group")])
+}
+
+matching_group_allowed <- function(matching, female_group, male_group) {
+  restrictions <- expand_prevent_exogamy(matching$prevent_exogamy)
+  female <- rep(as.character(female_group), length.out = length(male_group))
+  male <- as.character(male_group)
+  if (restrictions$all) return(female == male)
+  allowed <- rep(TRUE, length(male))
+  for (i in seq_len(nrow(restrictions$pairs))) {
+    pair <- restrictions$pairs[i, ]
+    allowed[female == pair$female_group & male == pair$male_group] <- FALSE
+  }
+  allowed
 }

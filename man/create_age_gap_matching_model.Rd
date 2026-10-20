@@ -7,7 +7,8 @@
 create_age_gap_matching_model(
   preferred_age_gap,
   half_weight_distance,
-  group_exogamy = NULL
+  group_exogamy = NULL,
+  prevent_exogamy = FALSE
 )
 }
 \arguments{
@@ -18,6 +19,9 @@ preferred gap at which selection weight halves.}
 
 \item{group_exogamy}{Optional additive group-pair effects passed to
 \code{\link[=create_matching_model]{create_matching_model()}}.}
+
+\item{prevent_exogamy}{Optional post-sampling group restrictions passed to
+\code{\link[=create_matching_model]{create_matching_model()}}. Defaults to \code{FALSE}.}
 }
 \value{
 A \code{hammel_matching_model} with linear and quadratic age-difference terms.

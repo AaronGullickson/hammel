@@ -7,7 +7,7 @@ library(here)
 library(readr)
 library(tidyr)
 
-# Get rates --------------------------------------------------------
+# Set inputs ------------------------------------------------------------------
 
 mortality_rates_usa2000 <- get_mortality_hmd("USA", year = 2000)
 mortality_rates_usa1950 <- get_mortality_hmd("USA", year = 1950)
@@ -43,10 +43,10 @@ calculate_life_table(mortality_rates_grouped) |>
 
 calculate_tfr(fertility_rates_overall_usa)
 
-# Test simulations -----------------------------------------------------------
-
 pop_baseline <- create_baseline_population(20000, max_age = 70, end_time = 2000, 
                                            group_weights = c("A" = 2, "B" = 1))
+
+# Test group specific rates ---------------------------------------------------
 
 result <- hammel_model() |>
   set_population(pop_baseline) |>
@@ -117,7 +117,7 @@ lexis_counts |> calculate_life_table() |>
   select(time_start, time_end, sex, group, ex) |>
   print(n = 40)
 
-
+# Test exogamy parameters -----------------------------------------------------
 
 result <- hammel_model() |>
   set_population(pop_baseline) |>
@@ -138,3 +138,55 @@ result |> get_detailed_unions() |>
   pivot_wider(id_cols = time_span, names_from = c(group_w, group_h), values_from = n) |>
   mutate(log_odds = log(A_B) + log(B_A) - log(A_A) - log(B_B))
 
+result <- hammel_model() |>
+  set_population(pop_baseline) |>
+  set_fertility(fertility_rates_overall_usa) |>
+  set_mortality(mortality_rates_usa2000) |>
+  set_union_formation(
+    "on_demand", 
+    matching = create_age_gap_matching_model(
+      0, 5,
+      group_exogamy = c("A:B" = -4, "B:A" = -2)
+    )
+  ) |>
+  simulate(years = 100)
+
+result |> get_detailed_unions() |>
+  mutate(time_span = floor(start_time / 100) * 100) |>
+  count(time_span, group_w, group_h) |>
+  pivot_wider(id_cols = time_span, names_from = c(group_w, group_h), values_from = n) |>
+  mutate(log_odds = log(A_B) + log(B_A) - log(A_A) - log(B_B))
+
+result <- hammel_model() |>
+  set_population(pop_baseline) |>
+  set_fertility(fertility_rates_overall_usa) |>
+  set_mortality(mortality_rates_usa2000) |>
+  set_union_formation(
+    "on_demand", 
+    matching = create_age_gap_matching_model(
+      0, 5, prevent_exogamy = TRUE,
+    )
+  ) |>
+  simulate(years = 100)
+
+result |> get_detailed_unions() |>
+  mutate(time_span = floor(start_time / 100) * 100) |>
+  count(time_span, group_w, group_h) |>
+  pivot_wider(id_cols = time_span, names_from = c(group_w, group_h), values_from = n)
+
+result <- hammel_model() |>
+  set_population(pop_baseline) |>
+  set_fertility(fertility_rates_overall_usa) |>
+  set_mortality(mortality_rates_usa2000) |>
+  set_union_formation(
+    "on_demand", 
+    matching = create_age_gap_matching_model(
+      0, 5, prevent_exogamy = c("A:B"),
+    )
+  ) |>
+  simulate(years = 100)
+
+result |> get_detailed_unions() |>
+  mutate(time_span = floor(start_time / 100) * 100) |>
+  count(time_span, group_w, group_h) |>
+  pivot_wider(id_cols = time_span, names_from = c(group_w, group_h), values_from = n)

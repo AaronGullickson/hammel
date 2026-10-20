@@ -28,6 +28,7 @@ The old top-level base-R test scripts have been converted and removed.
 | `test-group-prop-hazard.R` | Multiplier validation, explicit-schedule equivalence, compensation order, omitted/unit/zero factors, warnings, RNG preservation, restarts, numeric codes, empty populations, and overflow |
 | `test-ancestry.R` | Starting identities, supplied proportions and IDs, parental averaging across generations, unknown shares, restarts/deaths, numeric labels, empty tables, and RNG independence |
 | `test-group-matching.R` | Directed/symmetric offsets, analytical probabilities, fixed factor contrasts/interactions, native/custom score agreement, father overrides, final utility ranks, validation, and unchanged RNG |
+| `test-prevent-exogamy.R` | Post-sampling restrictions, no refilling, scarcity/failure, direction/symmetry, father overrides, diagnostics, retained partners, and unchanged disabled RNG |
 | `test-detailed-unions.R` | Spouse-ID joins, repeated episodes, deaths, optional group types, empty tables, unchanged inputs, and name collisions |
 | `test-model-api.R` | Construction, replacement, schemas, history and metadata retention |
 | `test-baseline-population.R` | Reproducibility, bounds, known cases, distributions, empty populations |

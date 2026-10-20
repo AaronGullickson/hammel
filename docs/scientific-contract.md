@@ -207,6 +207,17 @@ available in formulas; categorical terms require fixed declared `group_levels`
 with treatment contrasts. Missing population identity data errors when a model
 uses group effects. See [group matching](group-matching.md) for worked cases.
 
+Matching models also accept `prevent_exogamy = FALSE` (no restrictions), TRUE
+(only same-group candidates), or selected cross-group pairs with female-first
+`:` and symmetric `::` notation. Sample the original male pool first, then
+screen age, known kin, and these group restrictions without refilling. Thus
+minority-group encounter scarcity may make a sample empty even when compatible
+men exist elsewhere in the pool. Existing retry/cancellation rules apply to an
+empty result. Restrictions override finite scores, apply to the selected father
+or partner model, and do not invalidate existing partners. Eligibility counts
+and utility ranks use the final filtered set. Group restrictions require known
+population identities; exact group exclusions do not use NA or infinite scores.
+
 With `union_formation(initiation = "on_demand", ...)`, use the woman's ongoing
 living male partner as father. If she has no partner, sample up to `sample_size`
 living, unpartnered men without replacement (default 1000; zero means the whole pool).

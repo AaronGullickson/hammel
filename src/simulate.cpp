@@ -444,8 +444,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (males.empty()) return -1;
     const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
                                              sampling_workspace);
-    const auto eligible = screen_male_candidates(males, sample, people, now, min_male_age,
-                                                 woman, kinship);
+    auto eligible = screen_male_candidates(males, sample, people, now, min_male_age,
+                                           woman, kinship);
+    const bool prevent_all = choice_model["prevent_exogamy_all"];
+    LogicalMatrix blocked = choice_model["blocked_pairs"];
+    if (prevent_all || blocked.nrow()) {
+      const int female_group = people[woman].group;
+      eligible.erase(std::remove_if(eligible.begin(), eligible.end(), [&](int position) {
+        const int male_group = people[males[position]].group;
+        return (prevent_all && female_group != male_group) ||
+          (blocked.nrow() && blocked(female_group, male_group));
+      }), eligible.end());
+    }
     if (count) *count = static_cast<int>(eligible.size());
     return select_partner(males, eligible, people, woman, choice_model, rank);
   };

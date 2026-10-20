@@ -35,6 +35,15 @@
 #'   `female_group` or `male_group`; must cover population groups. Sets fixed
 #'   treatment reference/columns, independent of candidate samples. Not required
 #'   for `same_group` or pair effects alone.
+#' @param prevent_exogamy `FALSE` (default) for no group restrictions; `TRUE`
+#'   excludes all different-group candidates. A character vector such as
+#'   `c("A::B", "A:C")` excludes selected pairs with female-first `:` and
+#'   symmetric `::` notation. Alternatively supply a directional data frame
+#'   with `female_group` and `male_group`. Pairs must join different groups.
+#'   Restrictions filter the original sample alongside age/kin eligibility,
+#'   without refilling. Empty samples follow existing failed-search and birth
+#'   cancellation rules. Restrictions override finite preferences, require
+#'   population identities, and do not invalidate existing partners.
 #' @return An inspectable `hammel_matching_model` list containing `formula`
 #'   and `coefficients`. This specifies a model; it does not estimate one.
 #' @export
@@ -44,9 +53,10 @@
 #'   ~ age_difference + I(age_difference^2),
 #'   c(age_difference = 0.1, "I(age_difference^2)" = -0.02)
 #' )
-create_matching_model <- function(formula, coefficients, group_exogamy = NULL, group_levels = NULL) {
+create_matching_model <- function(formula, coefficients, group_exogamy = NULL, group_levels = NULL, prevent_exogamy = FALSE) {
   model <- structure(list(formula = formula, coefficients = coefficients,
-                          group_exogamy = group_exogamy, group_levels = group_levels),
+                          group_exogamy = group_exogamy, group_levels = group_levels,
+                          prevent_exogamy = prevent_exogamy),
                      class = "hammel_matching_model")
   validate_matching_model(model)
   model
@@ -66,6 +76,8 @@ create_matching_model <- function(formula, coefficients, group_exogamy = NULL, g
 #' @param preferred_age_gap Finite numeric scalar in years; negative values allowed.
 #' @param group_exogamy Optional additive group-pair effects passed to
 #'   [create_matching_model()].
+#' @param prevent_exogamy Optional post-sampling group restrictions passed to
+#'   [create_matching_model()]. Defaults to `FALSE`.
 #' @param half_weight_distance Finite positive numeric scalar in years from the
 #'   preferred gap at which selection weight halves.
 #' @return A `hammel_matching_model` with linear and quadratic age-difference terms.
@@ -73,7 +85,7 @@ create_matching_model <- function(formula, coefficients, group_exogamy = NULL, g
 #' @examples
 #' # Illustrative preferences, not demographic defaults.
 #' matching <- create_age_gap_matching_model(3, 5)
-create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL) {
+create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL, prevent_exogamy = FALSE) {
   for (name in c("preferred_age_gap", "half_weight_distance")) {
     value <- get(name)
     if (!is.numeric(value) || length(value) != 1L || !is.null(dim(value)) ||
@@ -90,7 +102,7 @@ create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distanc
          call. = FALSE)
   create_matching_model(~ age_difference + I(age_difference^2),
     c(age_difference = unname(linear), "I(age_difference^2)" = unname(quadratic)),
-    group_exogamy = group_exogamy)
+    group_exogamy = group_exogamy, prevent_exogamy = prevent_exogamy)
 }
 
 validate_matching_model <- function(model) {
@@ -113,6 +125,7 @@ validate_matching_model <- function(model) {
          call. = FALSE)
   }
   expand_group_exogamy(model$group_exogamy)
+  expand_prevent_exogamy(model$prevent_exogamy)
   levels <- model$group_levels
   if (!is.null(levels)) {
     labels <- matching_group_labels(levels, "group_levels")
@@ -182,8 +195,19 @@ calculate_matching_utilities <- function(matching, age_difference, female_group 
 calculate_matching_probabilities <- function(matching, age_difference, female_group = NULL, male_group = NULL) {
   utility <- calculate_matching_utilities(matching, age_difference, female_group, male_group)
   if (!length(utility)) return(numeric())
-  weights <- exp(utility - max(utility))
-  weights / sum(weights)
+  restrictions <- expand_prevent_exogamy(matching$prevent_exogamy)
+  allowed <- rep(TRUE, length(utility))
+  if (restrictions$all || nrow(restrictions$pairs)) {
+    if (is.null(female_group) || is.null(male_group))
+      stop("Group restrictions require female and male group data.", call. = FALSE)
+    allowed <- matching_group_allowed(matching, female_group, male_group)
+  }
+  weights <- numeric(length(utility))
+  if (any(allowed)) {
+    weights[allowed] <- exp(utility[allowed] - max(utility[allowed]))
+    weights <- weights / sum(weights)
+  }
+  weights
 }
 
 # Use an exact native path for the common linear/raw quadratic specification.
@@ -213,8 +237,19 @@ prepare_matching_model <- function(matching, population_groups = NULL) {
       if (!is.na(female) && !is.na(male)) offsets[female, male] <- pairs$log_odds[i]
     }
   }
+  restrictions <- expand_prevent_exogamy(matching$prevent_exogamy)
+  blocked <- matrix(FALSE, 0, 0)
+  if (nrow(restrictions$pairs)) {
+    blocked <- matrix(FALSE, length(labels), length(labels))
+    for (i in seq_len(nrow(restrictions$pairs))) {
+      female <- match(restrictions$pairs$female_group[i], labels)
+      male <- match(restrictions$pairs$male_group[i], labels)
+      if (!is.na(female) && !is.na(male)) blocked[female, male] <- TRUE
+    }
+  }
   group_formula <- matching_has_group_formula(matching)
-  list(quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
+  list(prevent_exogamy_all = restrictions$all, blocked_pairs = blocked,
+quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
        group_formula = group_formula, needs_groups = group_formula || nrow(pairs) > 0,
        pair_offsets = offsets,
        evaluate = function(age_difference, female_group = NULL, male_group = NULL) {

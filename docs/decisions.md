@@ -985,3 +985,25 @@ matching specifications override this default. Initiation mode remains explicit.
   for zero effects. Multiple identities and exact group prohibitions are not
   introduced. The user requested later diagnostic tools to flag potential
   omissions; these remain future work. See [group matching](group-matching.md).
+
+
+## D057: Hard group exclusions after candidate sampling
+
+- **Status:** selected by the user October 20, 2026.
+- **Decision:** add `prevent_exogamy` to matching models: FALSE by default,
+  TRUE to prohibit every different-group pairing, or a character vector of
+  cross-group pairs with female-first `:` and symmetric `::` syntax. A
+  directional table also supports labels containing colons.
+- **Sampling:** draw from the unchanged male pool, then exclude prohibited
+  pairs alongside age/kin eligibility without refilling. The user selected this
+  to preserve encounter scarcity for minorities and the same encounter frame
+  used by finite penalties. Users may increase candidate sample size.
+- **Failure and scope:** empty eligible samples use existing retry and
+  cancellation rules. Restrictions override finite scores, but do not alter
+  existing partners. The applicable matching/father model owns its restrictions;
+  NULL father matching inherits the general specification. Diagnostics count
+  and rank the final eligible set. No NA or infinite utility effects are added.
+- **Validation:** direction/symmetry, no refilling, compatible partners outside
+  an unsuccessful sample, complete exclusion, finite-penalty contrast, father
+  overrides, retained partners, diagnostics and unchanged RNG when disabled.
+  See [group matching](group-matching.md).

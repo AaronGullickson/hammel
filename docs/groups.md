@@ -96,8 +96,9 @@ schedule using the original finite bands and existing birth-spacing rules.
 
 For this increment, every newborn inherits the mother's group automatically.
 The child's own schedule applies from birth, including neonatal mortality.
-The father need not share that group. Group membership does not restrict the
-candidate pool. Optional group formula terms and directed/symmetric pair effects
+The father need not share that group by default. Optional `prevent_exogamy`
+restrictions filter sampled candidates without refilling; the initial sampling
+pool remains unchanged. Group formula terms and directed/symmetric pair effects
 can change matching utilities; see [group matching](group-matching.md).
 Other eligibility rules remain.
 Group identity is fixed over life and retained across restarts. Ancestry

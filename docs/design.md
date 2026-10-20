@@ -168,6 +168,15 @@ These remain proposals or unresolved requirements:
 Do not infer future demographic rules from SOCSIM or implement arbitrary
 callbacks that can bypass consistency checks.
 
+## Post-sampling group restrictions
+
+Matching models support `prevent_exogamy`: all exogamy or selected directed/
+symmetric pairs are screened after sampling, alongside age and kin restrictions,
+without refilling. Compiled specifications carry either a same-group flag or
+blocked-pair matrix. Partner/father searches use their applicable model's
+restrictions; diagnostics count and rank only the final eligible set. See
+[group matching](group-matching.md).
+
 ## Milestone 2 construction
 
 `create_matching_model()` accepts a formula with age and group predictors,

@@ -19,7 +19,35 @@ Reject overlaps after expanding symmetric entries, rather than applying
 precedence. `A:B` and `A::B`, or `A::B` and `B::A`, conflict. `A::A` describes
 only one within-group pair. Reject malformed separators, missing labels,
 nonfinite values, and unnamed vectors. Finite values do not prohibit matches;
-exact prohibitions and multiple identities are outside this increment.
+multiple identities remain outside this increment. Hard group restrictions are
+specified separately below.
+
+## Hard group restrictions
+
+The user selected post-sampling restrictions on October 20, 2026.
+`prevent_exogamy = FALSE` on a matching model imposes none. TRUE excludes
+every different-group candidate. A character vector such as
+`c("A::B", "A:C")` excludes selected cross-group pairs, using the same
+female-first and symmetric syntax as `group_exogamy`. A directional table with
+`female_group` and `male_group` is also accepted for colon-containing labels.
+Listed pairs must join different groups; overlapping entries are errors.
+
+Draw from the original living, unpartnered male pool, then apply age, kinship,
+and group screening to that sample without refilling. Group restrictions win
+over any finite utility preference. Do not rescore or replace existing partners.
+An empty eligible sample follows the existing search-retry/birth-cancellation
+rules, including births with unknown fathers only when explicitly allowed.
+Restrictions belong to the selected matching model: NULL `father_matching`
+inherits them, while an explicit father model has its own restrictions.
+Diagnostic eligible counts and utility ranks refer to the final eligible set.
+
+This retains the possibility that a minority woman samples no compatible men
+even when some exist in the full pool. With equally aged compatible A and
+incompatible B men, a one-man sample may fail; the full pool will find A.
+A finite penalty of -10 still selects B from a sample containing B alone,
+whereas prohibiting A:B makes that sample empty. Increasing `sample_size`
+changes encounter coverage, not the restriction. No extra random draws occur
+in group screening; FALSE must retain the existing histories and RNG state.
 
 For labels containing colons, accept an alternative directional data frame
 with `female_group`, `male_group`, and `log_odds`. Duplicate directed pairs

@@ -8,7 +8,8 @@ create_matching_model(
   formula,
   coefficients,
   group_exogamy = NULL,
-  group_levels = NULL
+  group_levels = NULL,
+  prevent_exogamy = FALSE
 )
 }
 \arguments{
@@ -32,6 +33,16 @@ numeric codes). Required with at least two levels when the formula uses
 \code{female_group} or \code{male_group}; must cover population groups. Sets fixed
 treatment reference/columns, independent of candidate samples. Not required
 for \code{same_group} or pair effects alone.}
+
+\item{prevent_exogamy}{\code{FALSE} (default) for no group restrictions; \code{TRUE}
+excludes all different-group candidates. A character vector such as
+\code{c("A::B", "A:C")} excludes selected pairs with female-first \code{:} and
+symmetric \code{::} notation. Alternatively supply a directional data frame
+with \code{female_group} and \code{male_group}. Pairs must join different groups.
+Restrictions filter the original sample alongside age/kin eligibility,
+without refilling. Empty samples follow existing failed-search and birth
+cancellation rules. Restrictions override finite preferences, require
+population identities, and do not invalidate existing partners.}
 }
 \value{
 An inspectable \code{hammel_matching_model} list containing \code{formula}
