@@ -57,9 +57,11 @@ Groups are intended to capture an immutable group identity that is assigned at b
 - Allow users to control the degree of group exogamy allowed by gender symmetric and gender specific pairings.
 - Allow users to control inheritance rules for children born to parents of different groups, including custom R functions using exposed variables.
 
-Group dynamics are not defined by a separate process, but rather are inferred from other elements in the simulation. To use groups, either the initial population must include a `group` column. How groups affect rate schedules, exogamy, and inheritance are determined by arguments that belong to each relevant process. 
+Group dynamics are not defined by a separate process, but rather are inferred from other elements in the simulation. To use groups, the initial population must include a `group` column. How groups affect rate schedules, exogamy, and inheritance are determined by arguments that belong to each relevant process. 
 
-This milestone distinguishes between **group identity** and **group ancestry** and both are tracked. **Group identity** is the currently assigned group of the person and affects their rate schedules and marriage choices. **Group ancestry** is the share of ancestry that comes from each group and is also tracked in a separate `ancestry` tibble that is now part of the simulation output in `hammel_population`. The simulation makes not special accomodation for mixed group identity (e.g. person identifies with both groups A and B) but it is possible for users to accomodate such mixed groups by specifying a specific mixed group (e.g. "AB") and using a custom function to control how inheritance assigns assigns some births to that group.
+This milestone distinguishes between **group identity** and **group ancestry** and both are tracked. **Group identity** is the currently assigned group of the person and affects their rate schedules and marriage choices. **Group ancestry** is the share of ancestry that comes from each group and is also tracked in a separate `ancestry` tibble that is now part of the simulation output in `hammel_population`. 
+
+The simulation makes no special accomodation for mixed group identity (e.g. person identifies with both groups A and B) but it is possible for users to accomodate such mixed groups by specifying a specific mixed group (e.g. "AB") and using a custom function to control how inheritance assigns some births to that group.
 
 ### Group-specific rates
 
@@ -117,7 +119,7 @@ where $r$ and $c$ represent the row and column scaling factors accounting for gr
 
 When calculating the log odds ratio for this 2x2 table, the row and column scaling factors will cancel, leaving:
 
-$$log(\frac{N_{AB}N_{BA}}{N_{AA}N_{BB}} = log(e^{\beta}e^{\beta} = 2\beta$$
+$$log(\frac{N_{AB}N_{BA}}{N_{AA}N_{BB}}) = log(e^{\beta}e^{\beta}) = 2\beta$$
 
 Observed counts will vary through sampling, and aggregation across ages or changing partner pools may introduce departures from this benchmark. Nonetheless, this can be useful benchmark to keep in mind when assigning exogamy values.
 
@@ -147,7 +149,7 @@ hammel_model() |>
   set_fertility(rates = fertility_rates, inheritance = "ancestry")
 ```
 
-The final two methods require a bit more explanation. The `hierarchy` method assigns the highest ordered group on a vector of group names provided in a separate `order` argument and can be used to simulate processes of hypodescent/hyperdescent (e.g. the one drop rule). The decision is based on parent's identified group membership, not ancestry. Additionally, this method can also take an argument called `passing` which provides a proportion. This proportion will be used as the probability that the hierarchy is inverted in any given case. So for example, to fit a model where group B is always assigned over group A and group A is always assigned over group B, but 5% of cases are inverted.
+The final two methods require a bit more explanation. The `hierarchy` method assigns the highest ordered group on a vector of group names provided in a separate `order` argument and can be used to simulate processes of hypodescent/hyperdescent (e.g. the one drop rule). The decision is based on parent's identified group membership, not ancestry. Additionally, this method can also take an argument called `passing` which provides a proportion. This proportion will be used as the probability that the hierarchy is inverted in any given case. So for example, to fit a model where group B is almost always assigned over group A and group A is almost always assigned over group B, but 5% of cases are inverted.
 
 ```r
 create_group_inheritance("hierarchy", order = c("B", "A", "C"), passing = 0.05)
@@ -155,9 +157,9 @@ create_group_inheritance("hierarchy", order = c("B", "A", "C"), passing = 0.05)
 
 This method assumes that the order is transitive. For more complex formulations, use a custom function.
 
-When `custom` is defined the user must supply a custom R function that will be used to determine inheritance. This function can take the following exposed variables as arguments `mother_group`, `father_group`, `mother_ancestry`, `father_ancestry`, `child_ancestry`, `child_sex` (`"f"` or `"m"`), and `parents_in_union` (TRUE/FALSE). The ancestry variables are named lists where each name is "group_{group_name}" as well as "unknown" for any unknown ancestry share. 
+When `custom` is defined the user must supply a custom R function that will be used to determine inheritance. This function can take the following exposed variables as arguments: `mother_group`, `father_group`, `mother_ancestry`, `father_ancestry`, `child_ancestry`, `child_sex` (`"f"` or `"m"`), and `parents_in_union` (TRUE/FALSE). The ancestry variables are named lists where each name is "group_{group_name}" as well as "unknown" for any unknown ancestry share. 
 
-The inheritance methods have no allowance for individuals that identify with multiple groups. However, users can build in "mixed" groups by using the custom function. When doing so, users should also define the `groups` object which is a vector of all the possible groups even if they don't currently exist in the population. This will allow users to add groups that emerge from the population but are initially present. 
+The inheritance methods have no allowance for individuals that identify with multiple groups. However, users can build in "mixed" groups by using the custom function. When doing so, users should also define the `groups` object which is a vector of all the possible groups even if they don't currently exist in the population. This will allow users to add groups that emerge from the population but are not initially present. 
 
 For example, to allow for a mixed group from a two-group simulation using a multinomial logit model:
 
