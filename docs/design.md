@@ -62,6 +62,16 @@ process when present. `set_process(model, process)` stores a process under its
 own name. The demographic setters construct and attach it in one operation.
 Replacing a process replaces that specification and retains the others.
 
+Mortality, fertility, and rate-based union formation also accept optional
+`group_prop_hazard` vectors on constructors and setters. The process stores the
+vector separately from its input rates. Execution scales a private schedule
+copy, expanding shared schedules by population group where needed, before
+native schedule construction and fertility compensation. Omitted group factors
+are 1.0; absent population groups cause a warning and the vector is ignored.
+Conditional fertility may instead store a named list of partnered/unpartnered
+vectors. Omitted statuses also use 1.0; a single vector scales both statuses.
+See [groups](groups.md) for effective-rate examples and validation rules.
+
 Setters validate built-in specifications again, including edited objects.
 Mortality constructors permit partial nonoverlapping schedules, but simulation
 requires complete coverage. Fertility bands must be finite; gaps have zero risk

@@ -5,9 +5,9 @@
 \alias{fertility}
 \title{Specify age-specific demographic rates}
 \usage{
-mortality(rates)
+mortality(rates, group_prop_hazard = NULL)
 
-fertility(rates, birth_interval = 0.75)
+fertility(rates, birth_interval = 0.75, group_prop_hazard = NULL)
 }
 \arguments{
 \item{rates}{A nonempty data frame containing numeric \code{age_start}, \code{age_end},
@@ -15,6 +15,19 @@ and \code{rate}. Starts must be finite and nonnegative; ends must exceed starts
 and must be finite for fertility; mortality ends may be \code{Inf}. Rates must
 be finite and nonnegative. Mortality additionally
 requires character \code{sex} values \code{"m"} and \code{"f"}, with both represented.}
+
+\item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
+rate multipliers, with unique nonempty group names. Missing groups use 1.0;
+zero suppresses the risk. Values are not normalized. At execution, multiply
+the selected input schedule by the person's group factor, including all
+sex/status strata. Fertility multiplication precedes spacing compensation.
+Without population groups, warn and ignore multipliers. Stored rate tables
+and their source metadata are unchanged; rate-table summaries use those
+stored rates, without applying population-dependent multipliers.
+Fertility with \code{union_status} rates also accepts a named list such as
+\code{list(partnered = c(A = 1.1, B = 0.9), unpartnered = c(A = 1.05))}.
+An omitted status or group uses 1.0. A single vector applies to both
+statuses (or overall fertility). Status lists require \code{union_status} rates.}
 
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
 defaulting to \code{0.75}. Must be finite and nonnegative. Applies to fertility

@@ -12,6 +12,12 @@
 #' @param rates An age-specific rate table passed to [mortality()] or [fertility()].
 #' @param birth_interval Minimum maternal birth-to-birth interval in years,
 #'   defaulting to `0.75`. Must be finite and nonnegative.
+#' @param group_prop_hazard Optional named numeric vector of finite nonnegative
+#'   rate multipliers by group. Missing groups use 1.0; values are not normalized.
+#'   Scales shared or group-specific input rates before fertility birth-spacing
+#'   compensation. Without population groups, simulation warns and ignores it.
+#'   Fertility also accepts a named list of vectors for `partnered` and/or
+#'   `unpartnered` when rates include `union_status`; omitted statuses use 1.0.
 #'
 #' @return An updated `hammel_model`. The input model is not modified.
 #' @export
@@ -38,6 +44,11 @@ set_process <- function(model, process) {
       stop("Built-in process rates must use person-year units.", call. = FALSE)
     }
     validate_rates(process$rates, mortality = name == "mortality")
+    if (name == "fertility") {
+      validate_fertility_group_prop_hazard(process$group_prop_hazard, process$rates)
+    } else {
+      validate_group_prop_hazard(process$group_prop_hazard)
+    }
     if (name == "fertility") validate_birth_interval(process$birth_interval)
     process$rates <- tibble::as_tibble(process$rates)
   }
@@ -51,14 +62,15 @@ set_process <- function(model, process) {
 
 #' @rdname set_process
 #' @export
-set_mortality <- function(model, rates) {
-  set_process(model, mortality(rates))
+set_mortality <- function(model, rates, group_prop_hazard = NULL) {
+  set_process(model, mortality(rates, group_prop_hazard = group_prop_hazard))
 }
 
 #' @rdname set_process
 #' @export
-set_fertility <- function(model, rates, birth_interval = 0.75) {
-  set_process(model, fertility(rates, birth_interval = birth_interval))
+set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard = NULL) {
+  set_process(model, fertility(rates, birth_interval = birth_interval,
+                              group_prop_hazard = group_prop_hazard))
 }
 
 #' Specify age-specific demographic rates
@@ -107,6 +119,18 @@ set_fertility <- function(model, rates, birth_interval = 0.75) {
 #' @param birth_interval Minimum maternal birth-to-birth interval in years,
 #'   defaulting to `0.75`. Must be finite and nonnegative. Applies to fertility
 #'   only; eligible hazards use midpoint birth-spacing compensation.
+#' @param group_prop_hazard Optional named numeric vector of finite nonnegative
+#'   rate multipliers, with unique nonempty group names. Missing groups use 1.0;
+#'   zero suppresses the risk. Values are not normalized. At execution, multiply
+#'   the selected input schedule by the person's group factor, including all
+#'   sex/status strata. Fertility multiplication precedes spacing compensation.
+#'   Without population groups, warn and ignore multipliers. Stored rate tables
+#'   and their source metadata are unchanged; rate-table summaries use those
+#'   stored rates, without applying population-dependent multipliers.
+#'   Fertility with `union_status` rates also accepts a named list such as
+#'   `list(partnered = c(A = 1.1, B = 0.9), unpartnered = c(A = 1.05))`.
+#'   An omitted status or group uses 1.0. A single vector applies to both
+#'   statuses (or overall fertility). Status lists require `union_status` rates.
 #' @return A named list containing `name`, `rates`, and `rate_unit`, plus
 #'   `birth_interval` for fertility, inheriting
 #'   from `hammel_mortality` or `hammel_fertility` and `hammel_process`.
@@ -118,18 +142,23 @@ set_fertility <- function(model, rates, birth_interval = 0.75) {
 #' model <- hammel_model() |>
 #'   set_process(deaths) |>
 #'   set_process(births)
-mortality <- function(rates) {
+mortality <- function(rates, group_prop_hazard = NULL) {
   validate_rates(rates, mortality = TRUE)
-  new_rate_process("mortality", rates)
+  validate_group_prop_hazard(group_prop_hazard)
+  process <- new_rate_process("mortality", rates)
+  process$group_prop_hazard <- group_prop_hazard
+  process
 }
 
 #' @rdname mortality
 #' @export
-fertility <- function(rates, birth_interval = 0.75) {
+fertility <- function(rates, birth_interval = 0.75, group_prop_hazard = NULL) {
   validate_rates(rates, mortality = FALSE)
+  validate_fertility_group_prop_hazard(group_prop_hazard, rates)
   validate_birth_interval(birth_interval)
   process <- new_rate_process("fertility", rates)
   process$birth_interval <- birth_interval
+  process$group_prop_hazard <- group_prop_hazard
   process
 }
 

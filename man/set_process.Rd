@@ -8,9 +8,9 @@
 \usage{
 set_process(model, process)
 
-set_mortality(model, rates)
+set_mortality(model, rates, group_prop_hazard = NULL)
 
-set_fertility(model, rates, birth_interval = 0.75)
+set_fertility(model, rates, birth_interval = 0.75, group_prop_hazard = NULL)
 }
 \arguments{
 \item{model}{A \code{hammel_model} object.}
@@ -18,6 +18,13 @@ set_fertility(model, rates, birth_interval = 0.75)
 \item{process}{A \code{hammel_process} specification.}
 
 \item{rates}{An age-specific rate table passed to \code{\link[=mortality]{mortality()}} or \code{\link[=fertility]{fertility()}}.}
+
+\item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
+rate multipliers by group. Missing groups use 1.0; values are not normalized.
+Scales shared or group-specific input rates before fertility birth-spacing
+compensation. Without population groups, simulation warns and ignores it.
+Fertility also accepts a named list of vectors for \code{partnered} and/or
+\code{unpartnered} when rates include \code{union_status}; omitted statuses use 1.0.}
 
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
 defaulting to \code{0.75}. Must be finite and nonnegative.}

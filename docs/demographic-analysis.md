@@ -117,6 +117,12 @@ TFR uses `rate_fertility` or fertility `rate`; life tables use `mx`, `rate_morta
 `rate`. Typed processes prevent passing mortality to TFR or fertility to a life
 table. A bare `rate` column has no such type protection.
 
+Input-rate summaries, including those passed a process object, summarize its
+stored rate table. They do not apply `group_prop_hazard` settings or expand a
+shared table to population groups. Account for those factors when preparing
+effective input-rate comparisons; summaries of simulated histories already
+reflect the configured multipliers.
+
 ## Population size and observation boundaries
 
 ```r

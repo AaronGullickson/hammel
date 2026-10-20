@@ -902,3 +902,33 @@ matching specifications override this default. Initiation mode remains explicit.
   accounting identities, analytical TFR and exponential life tables, input
   validation, label types, empty tibbles, and unchanged pooled defaults. See
   [groups](groups.md) and [demographic analysis](demographic-analysis.md).
+
+## D054: Group rate multipliers, including conditional fertility
+
+- **Status:** requested and specified by the user October 20, 2026.
+- **Decision:** add optional `group_prop_hazard` to mortality, fertility, and
+  rate-based union-formation constructors and setters. Named vector entries
+  multiply the selected shared or group-specific rates; missing groups use 1.0.
+  Factors are dimensionless and not normalized. Require finite nonnegative
+  factors with unique, nonmissing, nonempty group names; zero suppresses risk.
+- **Fertility order:** the user selected multiplication of input ASFRs before
+  existing midpoint birth-spacing compensation. This is equivalent to explicitly
+  scaled input group schedules, rather than scaling adjusted eligible hazards.
+- **Conditional fertility:** the user requested either a shared named vector
+  or a named list of partnered/unpartnered group vectors. The user selected
+  1.0 for an omitted status, as for an omitted group. Status lists require
+  conditional fertility input rates; a shared vector applies to both statuses
+  or to overall fertility. Mortality and search processes accept vectors only.
+- **No population groups:** the user selected a simulation warning and ignoring
+  multipliers. Existing alphabetical fallback for grouped rate tables remains
+  separate. Factors do not create groups or supply missing schedules.
+- **Execution:** scale an execution copy of input schedules before native
+  construction; retain original tables and provenance in processes. Reject
+  nonfinite effective rates or infeasible effective fertility compensation.
+  Search factors apply to women and do not modify partner utilities; on-demand
+  formation has no search hazard and rejects non-NULL multipliers.
+- **Validation and scope:** require fixed-seed equivalence to explicit schedules,
+  omitted/unit/zero factors, conditional-status defaults, no-group warnings,
+  edited-object validation, RNG preservation, restarts, and empty populations.
+  Input-rate summaries still describe stored tables; population-dependent
+  factors are applied by simulation, not those summaries. See [groups](groups.md).

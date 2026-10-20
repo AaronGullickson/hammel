@@ -93,3 +93,26 @@ lexis_counts |> calculate_life_table() |>
   filter(age_start == 0, !is.na(ex)) |>
   select(time_start, time_end, sex, group, ex) |>
   print(n = 40)
+
+result <- hammel_model() |>
+  set_population(pop_baseline) |>
+  set_fertility(fertility_rates_overall_usa, group_prop_hazard = c("A" = 1.1, "B" = 0.9)) |>
+  set_mortality(mortality_rates_usa2000, group_prop_hazard = c("B" = 1.8)) |>
+  set_union_formation("on_demand") |>
+  simulate(years = 100)
+
+calculate_population_size(result, c(2000, 2050, 2100))
+
+calculate_population_size(result, c(2000, 2050, 2100), by_group = TRUE) |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ungroup()
+
+lexis_counts <- calculate_lexis_counts(result, seq(2000, 2100, 10), 0:85, by_group = TRUE)
+
+lexis_counts |> calculate_tfr()
+
+lexis_counts |> calculate_life_table() |>
+  filter(age_start == 0, !is.na(ex)) |>
+  select(time_start, time_end, sex, group, ex) |>
+  print(n = 40)

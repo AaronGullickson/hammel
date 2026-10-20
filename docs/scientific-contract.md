@@ -55,6 +55,21 @@ compensation is separate within each group/status schedule. Group values are
 nonmissing character labels or finite numeric codes, with nonempty labels.
 See [groups](groups.md) for full rules, ordering, examples, and validation scope.
 
+Mortality, fertility, and rate-based union formation optionally accept
+`group_prop_hazard`, a named vector of dimensionless finite nonnegative factors.
+Multiply the selected input rates by the person's group factor (the woman's for
+searches), using 1.0 for omitted groups. Fertility multiplication precedes
+midpoint spacing compensation, making it equivalent to explicitly scaled input
+ASFRs. Zero suppresses that risk; factors are not normalized. Without population
+groups, warn and ignore factors. Shared and stratified schedules are supported;
+factors do not supply missing grouped schedules. On-demand union formation has
+no search hazard and rejects this option. Stored input tables remain unchanged;
+overflow and infeasible effective fertility schedules fail explicitly.
+Conditional fertility also accepts a named list of vectors for partnered and/or
+unpartnered rates. Omitted statuses and omitted groups within a status use 1.0.
+A single vector applies to both statuses; overall fertility requires the vector
+form. Each effective group/status schedule is compensated independently.
+
 ## Initialization and population history
 
 The [population schema](population-schema.md) specifies required fields and

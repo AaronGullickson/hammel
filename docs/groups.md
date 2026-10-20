@@ -2,8 +2,67 @@
 
 Milestone 3 initial scope, requested October 20, 2026. Group data belongs in
 the population and its effects belong in the relevant processes (D051).
-This specification does not select the deferred
-inheritance-model API or proportional rate multipliers.
+This specification does not select the deferred inheritance-model API.
+
+## Proportional rate multipliers
+
+The user requested optional `group_prop_hazard` named numeric vectors for
+mortality, fertility, and rate-based union formation on October 20, 2026.
+Each vector name identifies a population group, using the same character
+representation as group-rate lookup. Values are dimensionless, finite,
+nonnegative factors; zero suppresses the affected risk and factors are not
+normalized. Names must be unique, nonmissing, and nonempty. NULL means no
+multipliers; a group omitted from the vector receives factor 1.0. Extra names
+do not create population groups.
+
+Each process owns its multipliers and preserves its supplied rate table and
+source metadata. Construction, attachment, and simulation validate edited
+vectors. Mortality factors apply to both sex schedules of a group, fertility
+factors apply to both union statuses where present, and search factors use
+the woman's group. Factors may modify an existing group-specific schedule
+or a shared schedule; they do not supply missing age bands or replace the
+requirement for an explicit matching schedule in grouped rate tables.
+
+The user selected multiplication of input rates before fertility birth-spacing
+compensation. For a group with input ASFR 0.1 and factor 1.1, the effective ASFR
+is 0.11. With spacing 0.75 in a constant-rate band, its adjusted eligible hazard
+is `0.11 / (1 - 0.75 * 0.11)`, exactly as for an explicit group schedule of 0.11.
+Mortality 0.02 with factor 0.9 becomes 0.018 per person-year. Search rate 0.2
+with factor zero suppresses searches for that group without altering fertility
+or partner matching. Unspecified groups retain their original rates.
+
+Without a population `group` column, warn once per process and ignore its
+multipliers, even for zero-duration simulation. Existing alphabetical fallback
+for grouped rate tables remains independent and emits its own warning. A group
+column on an empty population remains valid and requires no multiplier fallback.
+On-demand formation has no search hazard to multiply; non-NULL multipliers are
+rejected for that mode. The option does not change matching utility.
+
+At execution, scale a private rate-table copy before constructing native
+schedules. Reject nonfinite products rather than clipping them; effective
+fertility must pass the existing midpoint-eligibility check. No new random
+draws are introduced. Multipliers of one or equivalent explicit schedules must
+reproduce the same histories under the same seed, including newborns and
+restarts.
+
+For conditional fertility, `group_prop_hazard` may instead be a named list of
+named vectors, for example `list(partnered = c(A = 1.1, B = 0.9),
+unpartnered = c(A = 1.05))`. Only `partnered` and `unpartnered` list names are
+allowed, without duplicates. The user selected factor 1.0 for an omitted
+status, as for an omitted group within a status. Each supplied list element
+must be a valid named numeric multiplier vector. A status list requires input
+fertility rates with `union_status`; overall fertility uses a single vector.
+Mortality and union formation accept only a single vector. A single fertility
+vector still applies to both statuses. For example, partnered A rate 0.1
+becomes 0.11 and unpartnered A rate 0.02 becomes 0.021 with the list above;
+unpartnered B stays unchanged. Compensation then uses each effective
+group/status schedule independently. Without population groups, ignore the
+entire vector/list and warn once for fertility.
+
+Rate-table summaries (`calculate_tfr()` and `calculate_life_table()`,
+including process inputs) continue to summarize the stored input rate table;
+they do not expand population-dependent multiplier settings. Grouped simulation
+summaries measure the resulting histories normally.
 
 ## Lookup and timing
 

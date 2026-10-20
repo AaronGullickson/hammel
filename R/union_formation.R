@@ -224,6 +224,12 @@ prepare_matching_model <- function(matching) {
 #' @param diagnostics Logical, default `FALSE`. Record `.n_eligible` (sampled men
 #'   remaining after screening) and `.utility_rank` (1 = highest utility, ties
 #'   share the minimum rank) on newly formed unions. Historical unknowns are NA.
+#' @param group_prop_hazard Optional named numeric vector of finite nonnegative
+#'   search-rate multipliers by the woman's group. Missing groups use 1.0;
+#'   zero suppresses searches. Applies to shared or group-specific input rates.
+#'   Without population groups, simulation warns and ignores multipliers.
+#'   Requires `initiation = "rate"`; on-demand formation has no search hazard.
+#'   Matching utilities and input rate tables are unchanged.
 #' @param model A `hammel_model` object.
 #' @return `union_formation()` returns a `hammel_union_formation` process;
 #'   `set_union_formation()` returns an updated model. Rate tables are tibbles.
@@ -232,13 +238,13 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
                             sample_size = 1000, rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
-                            diagnostics = FALSE) {
+                            diagnostics = FALSE, group_prop_hazard = NULL) {
   process <- structure(list(
     name = "union_formation", initiation = initiation, matching = matching,
     sample_size = sample_size, min_male_age = min_male_age,
     kinship_generations = kinship_generations, father_matching = father_matching,
     cancel_birth_if_no_match = cancel_birth_if_no_match, diagnostics = diagnostics,
-    rates = rates, rate_unit = "person_year",
+    rates = rates, rate_unit = "person_year", group_prop_hazard = group_prop_hazard,
     sampling_stage = "before_pair_screening"
   ), class = c("hammel_union_formation", "hammel_process"))
   validate_union_formation(process)
@@ -255,13 +261,14 @@ set_union_formation <- function(model, initiation, matching = create_age_gap_mat
                             sample_size = 1000, rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
-                            diagnostics = FALSE) {
+                            diagnostics = FALSE, group_prop_hazard = NULL) {
   set_process(model, union_formation(initiation, matching, sample_size, rates,
                                      min_male_age, kinship_generations, father_matching,
-                                     cancel_birth_if_no_match, diagnostics))
+                                     cancel_birth_if_no_match, diagnostics, group_prop_hazard))
 }
 
 validate_union_formation <- function(process) {
+  validate_group_prop_hazard(process$group_prop_hazard)
   if (!identical(process$name, "union_formation") ||
       !identical(process$rate_unit, "person_year") ||
       !identical(process$sampling_stage, "before_pair_screening")) {
@@ -295,6 +302,10 @@ validate_union_formation <- function(process) {
   validate_matching_model(process$matching)
   if (!is.null(process$father_matching)) validate_matching_model(process$father_matching)
   if (process$initiation == "on_demand") {
+    if (!is.null(process$group_prop_hazard)) {
+      stop("`group_prop_hazard` requires rate-based union initiation; on-demand formation has no search hazard.",
+           call. = FALSE)
+    }
     if (!is.null(process$rates)) {
       stop("On-demand union formation does not take rates.", call. = FALSE)
     }

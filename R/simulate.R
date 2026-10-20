@@ -120,6 +120,14 @@ simulate <- function(model, years, seed = NULL) {
   union_rates <- if (is.null(union_process$rates))
     data.frame(age_start = numeric(), age_end = numeric(), rate = numeric()) else
     prepare_group_rates(union_process$rates, population$persons, "union formation")
+  death_rates <- apply_group_prop_hazard(death_rates, population$persons,
+    model$processes$mortality$group_prop_hazard, "mortality")
+  birth_rates <- apply_group_prop_hazard(birth_rates, population$persons,
+    model$processes$fertility$group_prop_hazard, "fertility")
+  if (union_process$initiation == "rate") {
+    union_rates <- apply_group_prop_hazard(union_rates, population$persons,
+      union_process$group_prop_hazard, "union formation")
+  }
   group_values <- if ("group" %in% names(population$persons))
     unique(population$persons$group) else NULL
   engine_persons <- population$persons

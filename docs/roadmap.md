@@ -32,8 +32,10 @@ provenance. Avoid automatic downloads as part of simulation execution.
 ## Milestone 3: groups
 
 Initial group schedules, maternal inheritance, and weighted baseline sampling
-are specified in [groups](groups.md) under D052 (October 20, 2026). These cover
-only the first increment; the richer directions below remain future work.
+are specified in [groups](groups.md) under D052 (October 20, 2026). Group
+observations (D053) and proportional input-rate multipliers, including separate
+partnered/unpartnered fertility factors (D054), are also implemented. Intergroup
+matching terms, configurable inheritance, and ancestry remain future work.
 
 The user selected the following directions for group support:
 
@@ -63,9 +65,10 @@ specification, analogous to the matching model. Exact mode names, random
 assignment probabilities, model inputs and semantics remain to be specified.
 This is an accepted design direction, not implemented functionality.
 
-Before implementation specify which processes can use multipliers, how they
-combine with status schedules and birth-spacing compensation, and the formula
-predictors/contrasts for each parent's group. For ancestry proportions clarify
+Mortality, fertility, and rate-based searches now accept group multipliers;
+fertility factors apply before compensation and may differ by union status
+(D054). Before extending matching, specify formula predictors/contrasts for
+each parent's group. For ancestry proportions clarify
 the reference ancestors, missing-parent treatment, initialization and whether
 proportions represent expected genealogical contributions or another quantity.
 A discrete group identity need not equal a majority-ancestry classification.

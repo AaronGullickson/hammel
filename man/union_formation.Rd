@@ -14,7 +14,8 @@ union_formation(
   kinship_generations = 2,
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
-  diagnostics = FALSE
+  diagnostics = FALSE,
+  group_prop_hazard = NULL
 )
 
 set_union_formation(
@@ -27,7 +28,8 @@ set_union_formation(
   kinship_generations = 2,
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
-  diagnostics = FALSE
+  diagnostics = FALSE,
+  group_prop_hazard = NULL
 )
 }
 \arguments{
@@ -78,6 +80,13 @@ realized fertility below inputs.}
 \item{diagnostics}{Logical, default \code{FALSE}. Record \code{.n_eligible} (sampled men
 remaining after screening) and \code{.utility_rank} (1 = highest utility, ties
 share the minimum rank) on newly formed unions. Historical unknowns are NA.}
+
+\item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
+search-rate multipliers by the woman's group. Missing groups use 1.0;
+zero suppresses searches. Applies to shared or group-specific input rates.
+Without population groups, simulation warns and ignores multipliers.
+Requires \code{initiation = "rate"}; on-demand formation has no search hazard.
+Matching utilities and input rate tables are unchanged.}
 
 \item{model}{A \code{hammel_model} object.}
 }
