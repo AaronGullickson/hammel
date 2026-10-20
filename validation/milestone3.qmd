@@ -51,32 +51,148 @@ replication design should be specified before interpreting results.
 
 ## Overview of Design
 
-Group identity is stored on persons. Demographic schedules and proportional
-input-rate multipliers belong to their respective processes; group preferences
-and restrictions belong to matching models. Ancestry is tracked independently
-of identity. Fertility assigns newborn identity using a built-in or custom rule.
+Groups are intended to capture an immutable group identity that is assigned at birth (e.g. race, ethnicity), not characteristics that can change over time. The goal is to add such mutable characteristics as a later feature. The goal of this milestone is to allow for the following:
+
+- Ability to specify different rate schedules for fertility, mortality, and marriage by group.
+- Allow users to control the degree of group exogamy allowed by gender symmetric and gender specific pairings.
+- Allow users to control inheritance rules for children born to parents of different groups, including custom R functions using exposed variables.
+
+Group dynamics are not defined by a separate process, but rather are inferred from other elements in the simulation. To use groups, either the initial population must include a `group` column. How groups affect rate schedules, exogamy, and inheritance are determined by arguments that belong to each relevant process. 
+
+This milestone distinguishes between **group identity** and **group ancestry** and both are tracked. **Group identity** is the currently assigned group of the person and affects their rate schedules and marriage choices. **Group ancestry** is the share of ancestry that comes from each group and is also tracked in a separate `ancestry` tibble that is now part of the simulation output in `hammel_population`. The simulation makes not special accomodation for mixed group identity (e.g. person identifies with both groups A and B) but it is possible for users to accomodate such mixed groups by specifying a specific mixed group (e.g. "AB") and using a custom function to control how inheritance assigns assigns some births to that group.
 
 ### Group-specific rates
 
-Describe shared versus stratified schedules, missing-schedule errors, and
-no-population-group fallback warnings. Document proportional multipliers,
-omitted factors of 1.0, and fertility multiplication before birth compensation.
-Include separate partnered/unpartnered fertility multipliers.
+Group-specific rates can be defined in one of two ways. The first route is to supply rate objects that are stratified by group. These should include a `group` column that gives the appropriate age-specific rate for every group in the simulation. Hammel will recognize these as group-related and assign them to the correct group. If the rates input into a process are not stratified by group, then Hammel will use the same rates for each group. Users can mix and match these to, for example, provide shared mortality rates but group-specific fertility and marriage rates.
+
+using group stratified rate schedule provides the user a great deal of control over the simulation, but is also requires more demanding data and preparation. An alternative is to provide a general rate schedule and specify proportional hazard ratios for each group. The specific rates for each group will be derived by multiplying the base rate provided by the hazard ratio. So to increase, the mortality rates of group B compared to group A by 5%, the user could do:
+
+```r
+hammel_model() |>
+  set_population(population) |>
+  set_mortality(rates = mortality_rates, group_prop_hazard = c("A" = 1.05))
+```
+
+The `group_prop_hazard` function takes a named vector where the names correspond to groups. Groups left out are given an implict 1.0 multiplier. 
+
+The `group_prop_hazard` function can be used for all rate processes. For fertility processes where partnered and unpartnered fertility rates are both specified, the format is a little different and should correspond to a named list of "partnered" and "unpartnered" each containing a named vector. For example, 
+
+```r
+hammel_model() |>
+  set_population(poulation) |>
+  set_fertility(
+    rates = rates_by_union_status, 
+    group_prop_hazard = list(
+      "partnered" = c("A" = 1.1, "B" = 0.9),
+      "unpartnered" = c("A" = 1.05, "B"" = 0.95)
+    )
+  )
+```
 
 ### Group matching
 
-Describe female-first `A:B` and symmetric `A::B` effects, formula predictors,
-and the zero log effect for omitted pairs. Hard restrictions apply after
-candidate sampling without refilling. Distinguish partner matching from an
-explicit nonmarital father-matching model.
+Group exogamy levels are defined in the `matching_model` that is input into the union formation process. The user can use the `group_exogamy` argument to specify the log-odds of exogamy as a named vector for named pairings. These values are then added to the logit score/utility for each possible match using that pairing. Negative values will make exogamy rarer than endogamy, positive values will make it more common, and a value of zero (the default unless specified) means that exogamy is as likely as endogamy. 
 
-### Ancestry and identity inheritance
+The names for the vector should equal the two groups separated by either a `:` for gender specific effects or `::` for gender symmetric effects. For gender specific effects, the woman is listed first. So, `A:B` indicates pairings of A women and B men, `B:A` indicates pairings of B women and A men, and `A::B` indicates either type of A/B pairing regardless of gender. 
 
-Describe initial pure-group ancestry versus supplied proportions, unknown
-ancestry, and parental averaging. Cover maternal, paternal, random-parent,
-same-sex, opposite-sex, ancestry, hierarchy/passing, and custom identity rules.
-Custom rules may introduce declared identities such as AB without introducing
-an AB ancestry component. Include birth-time `parents_in_union` where relevant.
+So, a user could define the following:
+
+```r
+create_age_gap_matching_model(
+  0, 5,
+  group_exogamy = c("A::B" = -5, "A::C" = -0.5, "B:C" = -2, "C:B = -1")
+)
+```
+
+In this case, unions between A and B individuals regardless of the gender combination are very rare, while unions between A and C individuals are much more common. For unions between B and C individuals, cases where the woman is B and the man is C are more common than cases where the woman is C and the man is B.
+
+As a benchmark rule of thumb, a gender-symmetric score will be equal to half the log odds ratio from the cross-product derived from the contingency table between partners. To see this take the case of two groups, A and B, with a gender-symmetric $\beta$ score for exogamy. Under a multiplicatie model, the expected cell counts of the two-way table of wife's group by husband's group will approximately be:
+
+|          | Male A           | Male B              |
+|----------|------------------|---------------------|
+| Female A |$r_Ac_A$          |$r_Ac_Be^{\beta}$    |
+| Female B |$r_Bc_Ae^{\beta}$ |$r_Bc_B$             |
+
+where $r$ and $c$ represent the row and column scaling factors accounting for group size and availability, respectively.
+
+When calculating the log odds ratio for this 2x2 table, the row and column scaling factors will cancel, leaving:
+
+$$log(\frac{N_{AB}N_{BA}}{N_{AA}N_{BB}} = log(e^{\beta}e^{\beta} = 2\beta$$
+
+Observed counts will vary through sampling, and aggregation across ages or changing partner pools may introduce departures from this benchmark. Nonetheless, this can be useful benchmark to keep in mind when assigning exogamy values.
+
+### Group inheritance of births
+
+New births must be assigned a group. This is done in the simulation with a `group_inheritance` model that is now an argument to the fertility process and can be assigned via the `create_group_inheritance()` function. 
+
+The first argument to this model (and in most cases the only argument) provides the name of several out-of-the-box methods as well as a custom option. The available options are:
+
+
+| Method | Identity assignment |
+| --- | --- |
+| `mother` | Mother's group. This is the default and fallback method |
+| `father` | Father's group |
+| `random_parent` | Select mother or father's group with equal probability |
+| `same_sex` | Mother's group for daughters, father's group for sons |
+| `opposite_sex` | Father's group for daughters, mother's group for sons |
+| `ancestry` | Sample a group using the child's known ancestry shares as weights |
+| `hierarchy` | Choose the higher-ranked parental identity in `order` |
+| `custom` | Use custom function defined in `fun` |
+
+For every case except `hierarchy` and `custom`, only the name needs to be supplied. In these cases, users can also just provide the name of the desired method to the `inheritance` argument in `set_fertility`. So, to use ancestry to determine group:
+
+```r
+hammel_model() |>
+  set_population() |>
+  set_fertility(rates = fertility_rates, inheritance = "ancestry")
+```
+
+The final two methods require a bit more explanation. The `hierarchy` method assigns the highest ordered group on a vector of group names provided in a separate `order` argument and can be used to simulate processes of hypodescent/hyperdescent (e.g. the one drop rule). The decision is based on parent's identified group membership, not ancestry. Additionally, this method can also take an argument called `passing` which provides a proportion. This proportion will be used as the probability that the hierarchy is inverted in any given case. So for example, to fit a model where group B is always assigned over group A and group A is always assigned over group B, but 5% of cases are inverted.
+
+```r
+create_group_inheritance("hierarchy", order = c("B", "A", "C"), passing = 0.05)
+```
+
+This method assumes that the order is transitive. For more complex formulations, use a custom function.
+
+When `custom` is defined the user must supply a custom R function that will be used to determine inheritance. This function can take the following exposed variables as arguments `mother_group`, `father_group`, `mother_ancestry`, `father_ancestry`, `child_ancestry`, `child_sex` (`"f"` or `"m"`), and `parents_in_union` (TRUE/FALSE). The ancestry variables are named lists where each name is "group_{group_name}" as well as "unknown" for any unknown ancestry share. 
+
+The inheritance methods have no allowance for individuals that identify with multiple groups. However, users can build in "mixed" groups by using the custom function. When doing so, users should also define the `groups` object which is a vector of all the possible groups even if they don't currently exist in the population. This will allow users to add groups that emerge from the population but are initially present. 
+
+For example, to allow for a mixed group from a two-group simulation using a multinomial logit model:
+
+```r
+inheritance <- create_group_inheritance(
+  "custom",
+  groups = c("A", "B", "AB"),
+  fun = function(child_ancestry, mother_group, father_group, ...) {
+    # Same identity or missing father: follow mother
+    if (is.na(father_group) || mother_group == father_group) {
+      return(mother_group)
+    }
+
+    # Entirely unknown ancestry: follow mother
+    known <- 1 - child_ancestry[["unknown"]]
+    if (known <= 0) return(mother_group)
+    
+    # if we are here then assign as a function of group A ancestry
+    # be sure to normalize proportions by removing unknown ancestry
+    prop_A <- child_ancestry[["group_A"]] / known
+
+    logits <- c(
+      A  = -5.138 + 11.88 * prop_A - 15.3 * prop_A^2 + 9.553 * prop_A^3,
+      B  = 0.949 - 9.39 * prop_A + 11.935 * prop_A^2 - 8.483 * prop_A^3,
+      AB = 0
+    )
+    # subtracting the max helps avoid overflow effects
+    weights <- exp(logits - max(logits))
+
+    sample(names(weights), size = 1, prob = weights)
+  }
+)
+```
+
+Values from the multinomial logit are taken from Gullickson and Saperstein (TODO: CITE). 
 
 ## Inputs and simulation design
 
@@ -226,7 +342,7 @@ tests remain opt-in; this chunk is disabled in the skeleton.
 
 ```{r}
 #| label: test-results
-#| eval: false
+
 test_results <- devtools::test(pkg = here::here(), reporter = "silent")
 test_table <- as.data.frame(test_results)
 knitr::kable(
