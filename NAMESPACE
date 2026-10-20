@@ -23,4 +23,8 @@ export(simulate)
 export(union_formation)
 export(validate_population)
 importFrom(Rcpp,evalCpp)
+importFrom(utils,
+  head,
+  tail
+)
 useDynLib(hammel, .registration = TRUE)

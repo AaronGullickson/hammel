@@ -4,3 +4,4 @@
 ^docs$
 ^validation$
 ^\.github$
+^nvim\.log$
