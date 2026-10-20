@@ -1,6 +1,6 @@
 # SOCSIM reference audit plan
 
-Updated October 13, 2026. Status: broader audit planned. An initial narrow source trace of rate conversion is recorded in [SOCSIM rate conversion](socsim-rate-audit.md); no executable reference validation or complete scheduling audit has been performed. References below are starting points recorded in the earlier conversation.
+Updated October 19, 2026. Status: broader audit planned. An initial narrow source trace of rate conversion is recorded in [SOCSIM rate conversion](socsim-rate-audit.md); no executable reference validation or complete scheduling audit has been performed. References below are starting points recorded in the earlier conversation.
 
 ## Establish the reference
 
@@ -20,10 +20,14 @@ Hammel's package license remains undecided and no audited source was copied.
 
 Current Hammel intentionally departs from SOCSIM's monthly timing and input
 conventions: continuous chronology, person-year hazards, midpoint fertility
-compensation, and no union-formation events. Source findings do not imply fixed-
+compensation, conditional-logit partner selection, configurable known-kin
+screening, and default cancellation of unmatched birth attempts. Source findings do not imply fixed-
 seed equivalence or demographic accuracy. Match assumptions/units and use
 replicated statistical comparisons when a reference experiment is appropriate.
-Union matching, queue modes, and scoring have not been comprehensively audited.
+A [static union-formation trace](socsim-union-formation-audit.md) now covers
+queue modes, matching, eligibility, and fertility interactions in the pinned
+non-ENHANCED source. It is not executable validation or a complete audit of
+all variants.
 
 ## Reference links
 

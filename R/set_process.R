@@ -41,6 +41,10 @@ set_process <- function(model, process) {
     if (name == "fertility") validate_birth_interval(process$birth_interval)
     process$rates <- tibble::as_tibble(process$rates)
   }
+  if (name == "union_formation") {
+    validate_union_formation(process)
+    if (!is.null(process$rates)) process$rates <- tibble::as_tibble(process$rates)
+  }
   model$processes[name] <- list(process)
   model
 }
@@ -71,10 +75,20 @@ set_fertility <- function(model, rates, birth_interval = 0.75) {
 #' eligibility must be specified before simulation. Calendar-time-varying
 #' schedules are not yet supported; time interval columns are rejected.
 #'
+#' Fertility optionally accepts `union_status` containing both `"partnered"`
+#' and `"unpartnered"`. Rates then use woman-years in the indicated status.
+#' Without that column, one overall schedule applies to all women. A partial
+#' status table or any other label is rejected; use explicit zero rates to
+#' suppress births in a status. Overlap is checked separately within each status.
+#' On-demand union formation requires overall rates; rate-based formation accepts
+#' either form and warns when an overall schedule is used.
+#'
 #' For fertility, one adjusted hazard is calculated at each original band's
 #' midpoint: the input rate divided by one minus the input fertility integral
 #' over the preceding `birth_interval`. The integral accounts for overlaps with
-#' other input bands. Execution rejects nonpositive midpoint eligibility.
+#' other input bands within the same status schedule. Execution rejects
+#' nonpositive midpoint eligibility. Birth spacing persists across status changes;
+#' compensation for the prior status history is not implemented.
 #' This approximates the age-varying adjustment; initialization is not calibrated.
 #'
 #' @param rates A nonempty data frame containing numeric `age_start`, `age_end`,
@@ -155,7 +169,17 @@ validate_rates <- function(rates, mortality) {
       stop("Fertility schedules do not take a sex column in this initial interface.",
            call. = FALSE)
     }
-    schedules <- list(seq_len(nrow(rates)))
+    if ("union_status" %in% names(rates)) {
+      status <- rates$union_status
+      if (!is.character(status) || !is.null(dim(status)) || anyNA(status) ||
+          !setequal(status, c("partnered", "unpartnered"))) {
+        stop('Fertility `union_status` must contain both "partnered" and "unpartnered", with no other or missing values.',
+             call. = FALSE)
+      }
+      schedules <- split(seq_len(nrow(rates)), status)
+    } else {
+      schedules <- list(seq_len(nrow(rates)))
+    }
   }
   for (rows in schedules) {
     rows <- rows[order(rates$age_start[rows])]

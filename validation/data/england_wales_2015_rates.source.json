@@ -1,0 +1,57 @@
+{
+  "publisher": "Office for National Statistics",
+  "geography": "England and Wales",
+  "example_year": 2015,
+  "fertility_years": [
+    1999,
+    2000,
+    2001,
+    2002,
+    2003,
+    2004,
+    2005,
+    2006,
+    2007,
+    2008,
+    2009,
+    2010,
+    2011,
+    2012,
+    2013,
+    2014,
+    2015
+  ],
+  "fertility_source": "Births by Parents Characteristics, 2015 edition, Table 6; released 29 November 2016",
+  "fertility_url": "https://www.ons.gov.uk/file?uri=%2Fpeoplepopulationandcommunity%2Fbirthsdeathsandmarriages%2Flivebirths%2Fdatasets%2Fbirthsbyparentscharacteristics%2F2015%2Fbirthsbyparentscharacteristics2015v2.xls",
+  "marriage_source": "Marriages in England and Wales: 2019, Figure 2b, 2015 row",
+  "marriage_url": "https://www.ons.gov.uk/generator?format=csv&uri=%2Fpeoplepopulationandcommunity%2Fbirthsdeathsandmarriages%2Fmarriagecohabitationandcivilpartnerships%2Fbulletins%2Fmarriagesinenglandandwalesprovisional%2F2019%2Fa3ea2123",
+  "prepared_at_utc": "2026-10-15T23:52:20.936936+00:00",
+  "licence": "Open Government Licence v3.0; contains public sector information licensed under OGL v3.0",
+  "source_rate_units": "per 1000 women in corresponding marital status per year",
+  "output_rate_units": "per woman-year in corresponding status",
+  "transformation": "Read Table 6 age-specific rate cells and divide by 1000; keep published one-decimal source precision. No age interpolation. Map within marriage/civil partnership to partnered, outside to unpartnered. Total retained only in archival long table and separate overall CSV.",
+  "age_endpoint_note": "Table 6 uses 15-19 exposure for Under 20 births and 45-49 exposure for 45 and over births. CSV finite endpoint bands reflect exposure ages; endpoint numerators include births outside those bands.",
+  "limitations": [
+    "Marriage and fertility schedules refer to legal status; unmarried includes cohabitation.",
+    "Marital fertility includes marriage/civil partnership and small numbers of same-sex-parent births; the marriage series is opposite-sex marriages.",
+    "Marriage rates exclude age 15 while fertility starts at 15.",
+    "Divorce and non-death dissolution are absent from current simulator.",
+    "Long-table total rows cannot be mixed with conditional rows in fertility input."
+  ],
+  "checks": [
+    "357 year/status/age rows, all finite nonnegative rates",
+    "No duplicate year/status/age keys",
+    "Conditional birth counts sum exactly to total counts for each year/age",
+    "2015 married age 20-24 rate equals 0.2027",
+    "2015 conditional CSV has 14 rows, overall CSV has 7 rows, marriage CSV has 11 rows"
+  ],
+  "sha256": {
+    "england_wales_births_by_parents_2015_ons.xls": "b0a84840563c431fd9d794cdb9e20edc58b0a0b73ac271fd8113780fb0ce349d",
+    "england_wales_marriage_rates_ons_figure2b.csv": "3d966ef9018508f4b0f895583b3dcde95bbf04f34579694bf307c67254198c20",
+    "england_wales_fertility_ons_table6.csv": "de9ddcfe7deab0e4da7d9bf4ca464bcdc57aa12cb33db80bd198d47b8449f6c8",
+    "england_wales_2015_fertility_by_union_status.csv": "e0ca5a6a81e539d9eba4d61f3323c6cc6aa9b5bbabeaeb4c7d3f420b0f7f2cc1",
+    "england_wales_2015_overall_fertility.csv": "20e5af36ea19b76c8984a0d24cc2d88f6aca9ccc8cac8dbf0d316f9dc1806fb1",
+    "england_wales_2015_female_union_rates.csv": "17d2be4786cb0d9011678743dd952dd9fd4f5e8565766b7adbff41c148c91f62"
+  },
+  "rebuild_script": "prepare_england_wales_2015_rates.R"
+}

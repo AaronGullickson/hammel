@@ -1,65 +1,66 @@
 # Current project handoff
 
-Updated October 13, 2026. This is a concise status record, not a stop instruction
-or authorization for additional features. Follow the user's current request.
-Start with the [documentation index](README.md).
+Updated October 19, 2026. This is a dated status record, not authorization for
+additional features. Start with the [documentation index](README.md); the
+current user request controls work.
 
-## Implemented foundation
+## Implemented state
 
-- R model/population/process construction; all public tables are tibbles.
-- Continuous C++17/Rcpp mortality/fertility scheduling with R RNG and call-local
-  state; midpoint compensation uses ordinary Band and shared waiting_time (D028).
-- Fertility-process `birth_interval`, default 0.75 years, accepting fractional
-  durations. Recorded histories enforce spacing on restart.
-- Finite fertility inputs only; HFD open endpoints are omitted. Mortality
-  requires complete age/sex coverage ending in an open interval.
-- Random living-male parent assignment; unknown father if none exists. No
-  new unions, minimum paternal age, or kinship restrictions.
-- Output reuse with resampled candidates, not exact checkpoints.
-- Lexis exposure/counts, TFR, life tables, and population sizes; testthat suite
-  and offline analytical checks pass.
+- Call-local C++17/Rcpp continuous event scheduling, R RNG isolation, tibble
+  interfaces, and recorded population/union histories.
+- Mortality and fertility with shared hazard sampling, per-schedule midpoint
+  compensation, and actual-birth spacing preserved across restarts.
+- A mandatory union process with on-demand and female rate-based initiation,
+  conditional-logit matching, sampling before age/kin screening, exclusive
+  ongoing unions, widowhood, and event invalidation after status changes.
+- Overall fertility or, in rate mode, partnered/unpartnered schedules. Nonmarital
+  births select fathers without creating unions; `father_matching` can override
+  the general matching model. Failed matches cancel births by default (D043).
+- Default matching through `create_age_gap_matching_model(0, 5)`; optional
+  `.n_eligible` and `.utility_rank` diagnostics on new union rows.
+- Shared native kinship screening and `extract_kin()`. Lexis summaries optionally
+  include overall/partnered/unpartnered exposure, births, deaths and formation
+  rates, using `rate_fertility`, `rate_mortality` and `rate_marriage`.
 
 See [design](design.md), [scientific contract](scientific-contract.md), and
-[testing](testing.md) for details and evidence.
+[union formation](union-formation-models.md) for current rules and limitations.
 
-## Active validation work
+## Validation and ownership
 
-The user is developing [milestone1.qmd](../validation/milestone1.qmd) from the
-[replication example](../inst/examples/milestone1_bootstrap.R). The template
-renders successfully with execution disabled; it is not a completed analysis.
-The example remains USA/2000, with 100,000 initial persons and 100 runs.
-No alternative data source/country is currently selected.
+Milestone 1 was accepted by the user on October 15, 2026 (D029).
+`validation/milestone1.qmd` is the accepted historical assessment. Reproduce it
+at its recorded commit: current simulation requires a union process that was
+not part of that assessment. [Testing](testing.md) retains the acceptance
+artifact provenance and archive limitations.
 
-The user reported decadal TFR means around 2.05–2.06 in 100 runs, and first-year
-TFR around 2.12 settling to roughly 2.05–2.06 in later years. Those reported
-summaries preceded the final midpoint rewrite and are not current-version
-verification. More recently, the user reported close ASFR/ASMR agreement with
-input curves, with smoother ASMRs under 20-year pooling. The plots and
-replication outputs were not independently rerun or archived by the agent.
+The user accepted milestone 2 as complete on October 19, 2026 (D050), after
+review of `validation/milestone2.qmd` and its rendered HTML and user revisions.
+The report includes demographic comparisons for both search modes, union
+diagnostics, age-gap comparisons, conditional-logit parameter recovery, and
+performance comparisons including R formula fallback. It uses USA circa
+2000–2001 mortality, fertility and marriage inputs. England and Wales 2015
+preparation remains available as an additional example. Preserve the user's
+report and explanatory source comments.
 
-Life-expectancy summaries use 100+ pooling to avoid sparse older cells. Direct
-ASMR comparisons use single-year bands through 110 with an appended open tail.
-These are distinct comparisons; the input life table retains its original
-older-age bands. Missing ASMR cells and zero terminal estimates can cause NA
-or infinite life expectancy. Report coverage rather than silently ignoring it.
+Report review inspected source, rendered tables and figures; the acceptance
+documentation update did not rerender reports, download rates, or independently
+rerun simulations or tests. No new scientific acceptance thresholds are set.
+The report and documentation are to be committed together; this record does
+not assign a final artifact hash or acceptance commit.
 
-## Next work and ownership
+## Deferred work and next scope
 
-The remaining milestone work is to quantify agreement and uncertainty, broaden
-rate/spacing cases, agree on acceptance criteria, and complete the reproducible
-report. The user will write its analysis and interpretation; do not fill in
-scientific conclusions or start a new replication study without a request.
-Preserve the user's edits and explanatory code comments.
+Milestones 1 and 2 are complete by user acceptance. Report findings and
+scientific interpretation belong to the user. Completion does not imply every
+review suggestion was implemented or remove documented limitations.
 
-## Deferred work
+Transition-aware fertility compensation (D045), poor-pool waiting (D044), and
+previous-father continuity (D042) are deferred. The current adjustment does not
+establish calibrated conditional ASFRs through status transitions or rate
+changes between runs. Retain this limitation when interpreting report results.
 
-- Initial fertility calibration: retain simple initialization and assess burn-in.
-- Fertility transition adjustment after replacing rates between runs: document
-  the mismatch, with no correction implemented.
-- African historical benchmark/new rate-source preparation: postponed.
-- Union formation and matching: [planning notes](union-formation-models.md),
-  with no algorithm accepted and no implementation authorization.
-- Calendar-varying schedules, arbitrary custom processes, and exact checkpoints.
-
-Earlier inspection/run records are available in Git history. Do not use a historical
-pause request, deprecated API, or superseded timing rule to govern current work.
+The [roadmap](roadmap.md) records groups as the milestone 3 theme and proposed
+non-death dissolution for milestone 4. Detailed group rules, parity conditioning,
+calendar-varying schedules, arbitrary custom mechanisms, initialization
+correction, exact checkpoints, and other future work are not implicitly
+authorized. An African historical benchmark remains postponed.

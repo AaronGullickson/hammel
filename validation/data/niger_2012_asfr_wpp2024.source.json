@@ -1,0 +1,20 @@
+{
+  "database": "United Nations World Population Prospects",
+  "revision": 2024,
+  "country": "Niger",
+  "iso3": "NER",
+  "location_id": 562,
+  "year": 2012,
+  "variant": "Medium",
+  "product": "WPP2024_Fertility_by_Age1.csv.gz",
+  "source_url": "https://population.un.org/wpp/assets/Excel%20Files/1_Indicator%20(Standard)/CSV_FILES/WPP2024_Fertility_by_Age1.csv.gz",
+  "retrieved_at_utc": "2026-10-14T21:26:07.469457+00:00",
+  "source_sha256": "b2a1ab1f6dff7c7bc2ae90323486b5ab086f48c21ad99ae95aed127cc2e7a985",
+  "csv_sha256": "f7c34dffa574dc4b5389752d024ce2b94d899fdd52f85dcfa2fb2d07d5b1554c",
+  "source_units": "births per 1,000 woman-years",
+  "output_units": "births per woman-year",
+  "transformation": "Select ISO3_code NER and Time 2012; age_start = AgeGrpStart; age_end = age_start + AgeGrpSpan; rate = ASFR / 1000. No interpolation or rounding.",
+  "age_intervals": "Half-open [age_start, age_end). This downloadable product supplies ages 15 through 49; no outside ages were imputed.",
+  "row_count": 35,
+  "tfr_ages_15_49": "7.468122"
+}

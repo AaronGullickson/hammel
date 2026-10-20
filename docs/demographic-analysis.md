@@ -1,6 +1,6 @@
 # Demographic analysis
 
-Updated October 13, 2026. All outputs are tibbles; base data frames are valid
+Updated October 19, 2026. All outputs are tibbles; base data frames are valid
 inputs. Dates and age boundaries use years, and exposure uses person-years.
 See the [scientific contract](scientific-contract.md) for model assumptions.
 
@@ -25,8 +25,8 @@ removed. Existing `Inf` breaks are retained.
 | `time_start`, `time_end` | Half-open observation period |
 | `sex`, `age_start`, `age_end` | Sex and half-open age band |
 | `person_years` | Exact recorded-lifetime exposure in the cell |
-| `deaths`, `asmr` | Deaths and deaths/person-years |
-| `births`, `asfr` | Maternal births and births/all female person-years |
+| `deaths`, `rate_mortality` | Deaths and deaths/person-years |
+| `births`, `rate_fertility` | Maternal births and births/all female person-years |
 
 Birth counts and ASFR are `NA` for males. Female exposure includes the time
 excluded by birth spacing. Zero events with positive exposure give a zero rate;
@@ -87,7 +87,7 @@ the terminal treatment is aligned. A pooled target ASMR requires exposure
 weights within the pooled band, not an unweighted average of input rates.
 
 TFR and life-table functions also accept their corresponding `$rates` tables.
-TFR uses `asfr` or fertility `rate`; life tables use `mx`, `asmr`, or mortality
+TFR uses `rate_fertility` or fertility `rate`; life tables use `mx`, `rate_mortality`, or mortality
 `rate`. Typed processes prevent passing mortality to TFR or fertility to a life
 table. A bare `rate` column has no such type protection.
 
@@ -131,4 +131,87 @@ of age-specific bias.
 Use aligned ASFR/ASMR alongside aggregate TFR/life expectancy. Distinguish
 sampling variability from persistent differences due to midpoint compensation,
 initialization, or grouped ages. See [testing and validation](testing.md) and
-[the report template](../validation/milestone1.qmd).
+the [accepted milestone 1 report](../validation/milestone1.qmd) and
+[accepted milestone 2 report](../validation/milestone2.qmd).
+
+
+When input fertility rates include `union_status`, `calculate_tfr()` returns a
+separate row per status and period, preserving the status column. Each sum is
+`rate * age-band width` over that status's finite contiguous age range. These
+conditional TFRs describe continuous exposure to a status, not additive
+components of the overall TFR. Tables without status retain their existing
+behavior; default Lexis summaries use all female exposure, while
+`include_unions = TRUE` also returns status-specific exposure as described below.
+
+## Union exposure and formation counts
+
+`include_unions = TRUE` returns three adjacent rows per period/age/sex cell,
+identified by `union_status`: `overall`, `partnered`, and `unpartnered`. All use
+`person_years`, `deaths`, `births`, `rate_mortality`, and `rate_fertility`. Births and ASFR are NA
+for men. The option also adds `unions` and `rate_marriage`, populated only for
+`unpartnered`; both are NA on `overall` and `partnered` rows. The default FALSE
+preserves the original output and computation. A population object with union
+histories is required; bare person tables cannot establish status.
+
+Exposure is the overlap of recorded lifetimes, observation cells, and union
+episodes, with ongoing episodes censored at the observation endpoint. Partnered
+means covered by at least one recorded episode; overlapping episodes do not
+double-count exposure. Unpartnered exposure is the remaining lifetime exposure,
+including widowhood and time between unions. These are current partnership
+statuses, not never-married/ever-married categories. Missing earlier histories
+cannot establish true historical status; select windows with complete union
+follow-up. Union records do not distinguish legal marriage.
+
+Each recorded union start counts once for each spouse at their own attained
+age and the formation time, using half-open age and period cells. Repeated
+unions count separately. Starts before the window contribute exposure but no
+formation; starts at its upper endpoint are excluded. All formation counts are
+reported on the unpartnered row, representing entry into a union.
+
+Birth status uses `[start_time, end_time)`: births at formation are partnered,
+including those triggering on-demand formation. Births at ending are unpartnered
+unless another union covers that time. Unknown mothers remain in the
+`unassigned_births` attribute; their status is not inferred. That attribute
+remains one count per period, not repeated by status.
+
+Deaths use status immediately before death: a union covers the death when
+`start_time < death_time <= end_time`. Thus a death ending a union is partnered;
+a later death following widowhood is unpartnered. A union starting exactly at
+death or a zero-duration union contributes no preceding partnered time. This
+observation convention uses the left limit even for coincident recorded events;
+it does not reconstruct their within-time execution order. Event period and age
+classification still use the death time and usual half-open cells.
+
+Worked example: a woman aged 20 at time 0 enters a union at 0.5, becomes
+widowed at 1.5, and forms another union at 2.5. Across [0,3), her overall row
+has 3 person-years; partnered and unpartnered rows each have 1.5. Two union
+formations on the unpartnered row give `rate_marriage = 2 / 1.5`. Births at
+0.25 and 1.5 are unpartnered; births at 0.5 and 2.5 are partnered, giving
+conditional ASFR 2 / 1.5 in each status and overall ASFR 4 / 3. Her first
+husband's death at 1.5 is partnered. Each husband has his own age-specific
+exposure and formation count.
+
+All rates use each row's `person_years`: `rate_mortality = deaths / person_years`,
+`rate_fertility = births / person_years`, and, on unpartnered rows only,
+`rate_marriage = unions / person_years`. Rates are per person-year, with ASFR
+per woman-year, and are NA when exposure is zero. Positive exposure with zero
+events gives rate zero. Exposure includes time excluded by birth spacing.
+
+```r
+counts <- calculate_lexis_counts(result, seq(2020, 2100, 20), 0:100,
+                                include_unions = TRUE)
+# Existing TFR grouping reads union_status without a new option:
+tfr <- calculate_tfr(counts)
+```
+
+`calculate_tfr()` already groups by `union_status`, yielding overall, partnered,
+and unpartnered TFRs per period. Conditional TFRs describe continuous exposure
+to the selected status, and do not add to the overall TFR. Existing missing-ASFR
+summation rules still apply. Life tables also keep statuses separate; conditional
+mortality life tables do not model transitions between partnership statuses.
+
+The overall row duplicates the combined status rows. Do not sum all three:
+partnered plus unpartnered exposure, deaths, and maternal births equal overall.
+Validation covers exact overlap, boundaries, widowhood/remarriage, empty and
+overlapping histories, zero-duration episodes, count conservation, rate
+formulas, downstream grouping, and unchanged default output.

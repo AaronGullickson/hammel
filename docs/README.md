@@ -1,9 +1,12 @@
 # Hammel documentation
 
-Updated October 13, 2026. The mortality/fertility engine is implemented;
-milestone 1 demographic validation is in progress. Current behavior uses
+Updated October 19, 2026. The mortality/fertility engine is implemented;
+milestone 1 was accepted as complete by the user on October 15, 2026. Current behavior uses
 continuous event times and midpoint fertility compensation, with no monthly
-time grid. Union formation remains a proposal.
+time grid. The user accepted milestone 2 union formation as complete on
+October 19, 2026 (D050), based on the validation report and review.
+Transition-aware fertility compensation and other deferred mechanisms remain
+future work.
 
 ## Reading order
 
@@ -26,11 +29,14 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | Document | Status |
 | --- | --- |
 | [Waiting-time sampling](waiting-time-sampling.md) | Explanation of the current shared hazard sampler |
-| [Union-formation models](union-formation-models.md) | Planning notes; no union algorithm accepted |
+| [Union-formation models](union-formation-models.md) | Implemented milestone 2 rules, matching defaults, diagnostics, and deferred work |
+| [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
+| [Future roadmap](roadmap.md) | User priorities beyond milestone 2; milestone 3 groups and open specifications |
 | [Decision log](decisions.md) | Accepted choices and supersession history |
 | [SOCSIM audit plan](socsim-audit.md) | Scope and remaining reference investigation |
 | [SOCSIM rates](socsim-rate-audit.md) | Pinned static source findings |
 | [SOCSIM competing events](socsim-competing-events-audit.md) | Pinned static scheduling findings |
+| [SOCSIM union formation](socsim-union-formation-audit.md) | Pinned static search, matching, and eligibility findings |
 
 Git retains earlier specifications and verification records; do not keep
 snapshot copies in the docs tree. The decision log records rationale and
@@ -42,12 +48,18 @@ To inspect prior versions, use `git log -- docs` and
 
 ## Validation artifacts and examples
 
-- [Milestone 1 report template](../validation/milestone1.qmd): development
-  validation report; execution is disabled by default while the user drafts it.
-- [Replication example](../inst/examples/milestone1_bootstrap.R): USA/2000
-  replications, demographic comparisons, and population growth.
-- [Single-run example](../inst/examples/milestone1.R): initial simulation and
-  reuse of its output.
+- [Milestone 1 validation report](../validation/milestone1.qmd): completed
+  assessment by Aaron Gullickson; the user rendered `validation/milestone1.html`
+  and accepted milestone 1. Reproduce at the recorded acceptance commit; current
+  execution requires a union process absent from that historical assessment.
+- [Milestone 2 validation report](../validation/milestone2.qmd): user-authored
+  assessment accepted October 19, 2026 (D050), using USA circa 2000–2001 inputs; includes both initiation
+  modes, matching-parameter recovery, and performance comparisons. Rendering
+  executes simulations and an HMD download. Deferred limitations remain documented.
+- [Union-formation example](../inst/examples/milestone2.R): current construction
+  and execution workflow.
+The former `milestone1.R` and `milestone1_bootstrap.R` examples have been
+removed from the current tree; use Git history for those historical workflows.
 
 `inst/examples/` ships with the installed R package. `validation/` and `docs/`
 are development material excluded from package builds. Local validation data

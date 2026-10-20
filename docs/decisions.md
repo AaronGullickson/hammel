@@ -1,6 +1,6 @@
 # Decision log
 
-Updated October 13, 2026. Entries retain the choices made at their original
+Updated October 19, 2026. Entries retain the choices made at their original
 dates; each numbered entry now states whether and how it remains current.
 Read [the scientific contract](scientific-contract.md) for implemented behavior,
 not a superseded API or timing statement buried in a historical entry.
@@ -14,7 +14,11 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Topic | Governing decisions |
 | --- | --- |
 | Standalone project and scientific ownership | D001–D002 |
-| Initial engine scope | D003 as narrowed by D019 |
+| Initial engine scope and milestone completion | D003 as narrowed by D019; D029 |
+| Milestone 2 union-formation scope and completion | D030–D043; scope narrowed by D044/D045; completion D050 |
+| Union-status summaries and rate-column names | D046–D048; October 17 `overall` label clarification |
+| Default age-gap matching | October 18 default age-gap matching entry below |
+| Shared kinship and generation-distance exclusions | D036 |
 | Person-year inputs and hazard sampling | D005–D007, D013, D024 |
 | Population representation, sex labels, public tibbles | D012, D015, D016, D023 |
 | Process constructors/setters | D017, D026 |
@@ -45,7 +49,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D003: First demographic validation milestone
 
-**Current status:** Demographic validation remains current; D019 replaces initial partnership formation with random male parent assignment.
+**Current status:** Milestone 1 accepted as complete October 15, 2026 (D029); D019
+replaced initial partnership formation with random male parent assignment.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** the first major milestone simulates a population with demographic rates constant over calendar time, including fertility, mortality, and a basic partnership mechanism to assign parents.
@@ -56,7 +61,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D004: Monthly time for the first milestone
 
-**Current status:** Superseded for execution by D024. There is no monthly engine or configurable execution increment.
+**Current status:** Superseded for execution by D024. There is no monthly engine or
+configurable execution increment.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** use a fixed month as the simulation time unit for the first milestone, following SOCSIM's monthly convention.
@@ -66,7 +72,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D005: Person-year rate inputs
 
-**Current status:** Person-year input units remain current; D024/D028 remove internal monthly execution/compensation conversions.
+**Current status:** Person-year input units remain current; D024/D028 remove internal
+monthly execution/compensation conversions.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** users can supply age-specific fertility and mortality rates as events per person-year. For the monthly engine, convert these internally to events per person-month by dividing by twelve; users need not prepare monthly rate files.
@@ -76,7 +83,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D006: Rate-based event probability conversion
 
-**Current status:** The constant-hazard identity and mortality interpretation remain current; current execution rules are in the scientific contract.
+**Current status:** The constant-hazard identity and mortality interpretation remain
+current; current execution rules are in the scientific contract.
 - **Status:** accepted October 12, 2026.
 - **Decision:** use rates as the input convention and derive an event probability over a time span `dt` using `1 - exp(-rate * dt)`. For person-year rates and a month, `dt = 1/12`.
 - **Assumption:** this expression is exact for a hazard constant over the relevant span. Rates may vary between age bands; handling spans that cross rate boundaries still requires specification.
@@ -86,7 +94,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D007: Sample waiting times directly on the hazard scale
 
-**Current status:** Cumulative-hazard sampling remains current. D024 resolves continuous dates and ties; the implementation draws Exp(1) thresholds.
+**Current status:** Cumulative-hazard sampling remains current. D024 resolves continuous
+dates and ties; the implementation draws Exp(1) thresholds.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** use the mathematical equivalence between log survival and cumulative hazard to sample candidate waiting times directly from rates, without converting to probabilities and back to logarithms.
@@ -97,7 +106,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D008: Integer-month candidate dates and competing-event ties
 
-**Current status:** Integer truncation and equal-month competition are superseded by D024's continuous chronology and exact ties.
+**Current status:** Integer truncation and equal-month competition are superseded by
+D024's continuous chronology and exact ties.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** adopt SOCSIM-style integer truncation of nonnegative candidate waiting times to months and its priority for competing candidate events in the same month.
@@ -110,7 +120,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D009: Simulation result class and core tables
 
-**Current status:** Core person/union tables remain current; the class is now hammel_population (D015), with tibble outputs (D023).
+**Current status:** Core person/union tables remain current; the class is now
+hammel_population (D015), with tibble outputs (D023).
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** expose simulation results as a named list with class `hammel_results`. Its two core datasets are `persons` and `unions`, accessed as `result$persons` and `result$unions`.
@@ -120,7 +131,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D010: Reuse simulation output as input
 
-**Current status:** Output reuse is implemented. D019/D024 specify history retention, resampling, and seed behavior; exact checkpointing remains unsupported.
+**Current status:** Output reuse is implemented. D019/D024 specify history retention,
+resampling, and seed behavior; exact checkpointing remains unsupported.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** simulation output must be reusable as input for further simulation, preserving the useful SOCSIM workflow. A `hammel_results` supplies the person and union histories and population state needed to initialize a subsequent run.
@@ -131,7 +143,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D011: Basic model configuration API and result rename
 
-**Current status:** Historical API stage. D015 replaces population inputs/class; D017 replaces process setter signatures; public metadata is in years.
+**Current status:** Historical API stage. D015 replaces population inputs/class; D017
+replaces process setter signatures; public metadata is in years.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** rename the result class and constructor to `hammel_results`. Use `hammel_model()` for an empty specification and pipeable `set_population()`, `set_process()`, `set_mortality()`, and `set_fertility()` functions.
@@ -143,7 +156,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D012: Initial table schema and year-based dates
 
-**Current status:** Table structure and year-valued dates remain current. Migration/validation are implemented; monthly timing references are superseded by D024.
+**Current status:** Table structure and year-valued dates remain current.
+Migration/validation are implemented; monthly timing references are superseded by D024.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** use the initial person and union history schema in `population-schema.md`, leaving marital status off `persons`. Expose times as numeric years with fractional years rather than month indices.
@@ -154,7 +168,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D013: Canonical year units and explicit step duration
 
-**Current status:** Canonical year units remain current. Explicit monthly steps and integer execution indices are superseded by D024.
+**Current status:** Canonical year units remain current. Explicit monthly steps and
+integer execution indices are superseded by D024.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** record public times and durations in years, exposure in person-years, and inputs as rates per person-year. Use monthly increments for the initial milestone but do not hard-code month assumptions throughout the implementation.
@@ -164,7 +179,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D014: Store the population as a result object
 
-**Current status:** Single stored population remains current; its class/setter are replaced by D015.
+**Current status:** Single stored population remains current; its class/setter are
+replaced by D015.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** `hammel_model` stores one `population` component of class `hammel_results`, alongside `processes`. Do not duplicate `persons`, `unions`, or the starting time at the model's top level.
@@ -173,7 +189,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D015: Population class and single population setter input
 
-**Current status:** Current population class and setter. D023 normalizes tables to tibbles while preserving contents and extra components.
+**Current status:** Current population class and setter. D023 normalizes tables to
+tibbles while preserving contents and extra components.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** rename the class and constructor from `hammel_results` to `hammel_population`. Simplify the setter to `set_population(model, population)`, accepting only that class.
@@ -191,7 +208,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D017: Mortality and fertility process constructors
 
-**Current status:** Current constructors and setter names. D028 subsequently prohibits open-ended fertility inputs; execution resolves coverage and eligibility.
+**Current status:** Current constructors and setter names. D028 subsequently prohibits
+open-ended fertility inputs; execution resolves coverage and eligibility.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** add `mortality(rates)` and `fertility(rates)` constructors inheriting from `hammel_process`; use `set_process(model, process)` and make demographic setters constructor-plus-setter shortcuts.
@@ -201,7 +219,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D018: HMD and HFD download helpers
 
-**Current status:** Data products and endpoint omission remain current. D025 replaces database-specific process/setter interfaces with reusable rate downloads.
+**Current status:** Data products and endpoint omission remain current. D025 replaces
+database-specific process/setter interfaces with reusable rate downloads.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** use HMDHFDplus download functions to configure mortality and fertility from a population code and one explicitly selected year, producing constant-over-time schedules for the first milestone.
@@ -211,7 +230,9 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D019: First executable simulator scope
 
-**Current status:** C++/R implementation, fertility scope, and parent assignment remain current. D024 replaces discrete scheduling; D026 moves spacing to the process; D028 replaces compensation.
+**Current status:** C++/R implementation, fertility scope, and parent assignment remain
+current. D024 replaces discrete scheduling; D026 moves spacing to the process; D028
+replaces compensation.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** implement the initial simulator in C++ with R interfaces. All living females face population age-specific fertility risk; assign a uniformly sampled currently living male parent at each birth, without forming unions. If no males are living, retain the birth with unknown father.
@@ -222,7 +243,9 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D020: Unified demographic summary
 
-**Current status:** Shared analysis and built-in period/sex grouping remain current. D021 changes age-range handling; D022 renames the function calculate_lexis_counts(). Missing-ASFR handling was clarified subsequently.
+**Current status:** Shared analysis and built-in period/sex grouping remain current.
+D021 changes age-range handling; D022 renames the function calculate_lexis_counts().
+Missing-ASFR handling was clarified subsequently.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** expose one verb-named `summarize_demography()` function returning person-years, counts, ASMR, and ASFR by period, age, and sex. Male births and ASFR are NA. Remove the three separate exposure/mortality/fertility extraction functions and the user-supplied `groups` interface.
@@ -231,7 +254,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D021: Automatic open-age handling in demographic summaries
 
-**Current status:** Open-age summary/TFR behavior remains current. Missing ASFR contributions are now omitted, as recorded in the scientific-contract clarification.
+**Current status:** Open-age summary/TFR behavior remains current. Missing ASFR
+contributions are now omitted, as recorded in the scientific-contract clarification.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** append Inf to summary age breaks when absent. For TFR, omit open-ended age rows and use all remaining finite age bands; remove the age_range argument.
@@ -255,7 +279,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D024: Continuous-time event execution
 
-**Current status:** Continuous event execution remains current. Its retained monthly compensation is superseded by D027/D028.
+**Current status:** Continuous event execution remains current. Its retained monthly
+compensation is superseded by D027/D028.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** on a branch from master, remove event-time truncation and the execution step; execute continuous candidates chronologically. Retain existing monthly SOCSIM-style fertility compensation separately.
@@ -273,7 +298,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D026: Birth interval belongs to the fertility process
 
-**Current status:** Spacing belongs to fertility. D027/D028 remove its earlier whole-month restriction.
+**Current status:** Spacing belongs to fertility. D027/D028 remove its earlier whole-
+month restriction.
 
 - **Status:** accepted October 13, 2026.
 - **Decision:** move `birth_interval` from `simulate()` to `fertility()` and
@@ -285,7 +311,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D027: Continuous birth-spacing compensation
 
-**Current status:** Exact age-varying compensation/specialized sampler superseded by D028. Year-valued fractional spacing remains current.
+**Current status:** Exact age-varying compensation/specialized sampler superseded by
+D028. Year-valued fractional spacing remains current.
 
 - **Status:** accepted October 13, 2026.
 - **Decision:** use `h(a) = f(a) / (1 - integral_{a-b}^{a} f(u) du)` with
@@ -300,7 +327,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 
 ## D028: Midpoint approximation using the shared hazard sampler
 
-**Current status:** Current midpoint compensation, shared sampler, and finite fertility inputs.
+**Current status:** Current midpoint compensation, shared sampler, and finite fertility
+inputs.
 
 - **Status:** accepted October 13, 2026.
 - **Decision:** calculate one adjusted rate at each original fertility band's
@@ -314,6 +342,195 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
   eligibility at evaluated midpoints. At the user's direction, reject all
   open-ended fertility input bands, including zero rates/zero spacing.
 - **Supersedes:** D027's age-varying hazard representation and exact sampler.
+
+## D029: Milestone 1 completion
+
+**Current status:** Milestone 1 complete; milestone 2 scope subsequently selected in
+D030.
+
+- **Status:** accepted October 15, 2026 by the user, after rendering the report.
+- **Decision:** close the initial mortality/fertility demographic-validation
+  milestone on the basis of Aaron Gullickson's completed assessment in
+  `validation/milestone1.qmd` and its rendered `validation/milestone1.html`.
+- **Evidence:** replicated demographic comparisons, age-specific coverage and
+  deviations, two-sex Leslie projection and stable age structure comparisons,
+  extended runs, fertility-rate restart cases, and performance/test results
+  presented in the report. The agent did not independently rerun the report
+  when recording acceptance.
+- **Implications:** completion reflects the user's scientific assessment of
+  the reported cases; it does not establish universal accuracy or add numerical
+  thresholds. Existing engine assumptions remain unchanged.
+- **Remaining limits:** initialization transients, sparse oldest ages, and
+  fertility compensation after rate changes. The latter remains deferred;
+  the report proposes a GitHub issue, but no issue is created by this decision.
+  No controlled executable SOCSIM comparison is claimed.
+- **Scope:** no new feature, union-formation implementation, or next milestone
+  is authorized by this completion decision.
+
+## D030: Milestone 2 union-formation scope
+
+**Current status:** Implemented under D031–D043 with waiting and transition-aware
+compensation deferred by D044/D045. The report now includes demographic analysis,
+parameter recovery and performance comparisons; D050 records user acceptance
+of milestone completion on October 19, 2026.
+D032 supersedes the original requirement to keep no-union execution available.
+
+- **Status:** accepted October 15, 2026 through the user's milestone 2 request.
+- **Decision:** separate female search initiation from partner matching. Support
+  birth-triggered on-demand search and independently scheduled union-search
+  events. Use conditional-logit partner choice, initially based on age difference,
+  with an extensible matching specification and eligibility/kinship screening.
+  Scheduled mode must support partnered and unpartnered fertility. End unions by
+  widowhood; other dissolution is outside this milestone.
+- **Terminology:** use union/union formation and partnered/unpartnered in code
+  and documentation, agnostic about legal marriage versus cohabitation. The
+  user's conversational use of “marriage” does not introduce a legal-status model.
+- **Matching rationale:** probabilistic choice allows rare eligible matches
+  through model coefficients and later extensions such as group preferences.
+  The user also wants to validate matching by fitting the same choice model to
+  simulated decisions. Candidate sets will not be retained. Approximate model recovery will use
+  eligible men reconstructed in time slices; slice definitions and recovery
+  criteria remain unresolved.
+- **Deferred:** parity-specific fertility remains for a later milestone;
+  milestone 2 does not add it.
+- **Open choices:** full versus sampled candidate pools, optional waiting,
+  failed-search behavior, exact eligibility/kin prohibitions, age-gap model,
+  search-rate interpretation/retries, conditional-fertility compensation, and
+  birth-time classification/parent assignment. No defaults are accepted for these.
+- **Implications:** write specifications and worked examples and obtain dependent
+  demographic decisions before implementation. Keep milestone 1 behavior
+  available. SOCSIM matching and kinship behavior require a source audit before
+  claiming equivalence; no legacy algorithm is adopted by this decision.
+- **Evidence and next specification:** [milestone 2 notes](union-formation-models.md).
+
+## D031: Temporary on-demand union execution
+
+**Current status:** Temporary uniform/unrestricted matching is superseded by
+D034–D037; D043 replaces default unmatched-birth preservation. Both initiation
+modes and conditional fertility are now implemented (D038–D041).
+
+- **Status:** accepted October 15, 2026 through the user's implementation request.
+- **Decision:** at birth use a woman's ongoing partner, otherwise sample living
+  men without replacement at the configured size and choose one uniformly to
+  form a union. Skip pair screening and conditional-logit choice for now.
+- **Empty pool:** the user explicitly selected preserving the birth with an
+  unknown father and no union. A future toggle for missing father versus birth
+  cancellation is requested but deferred.
+- **Implications:** the temporary pool includes partnered men, relatives, and
+  children. Maintain current partners, union histories, widowhood, restarts,
+  and unique IDs. No union-status fertility dependence is introduced, so
+  existing birth/death candidates of surviving partners remain valid.
+- **Boundary:** scheduled initiation, pair eligibility, utility-based matching,
+  and conditional fertility remain pending; the final eligibility policy is
+  not established by this intentionally unrestricted increment.
+- **Specification:** [on-demand increment](union-formation-models.md#on-demand-conditional-logit-execution-specification).
+
+## D032: Union formation required for execution
+
+**Current status:** Accepted and implemented; supersedes optional execution in
+D031. D038 subsequently adds rate-based initiation.
+
+- **Status:** accepted October 15, 2026 at the user's direction.
+- **Decision:** every simulation requires an explicit union-formation process.
+  Initialize partner caches and union histories unconditionally; do not add an
+  enable flag. Initiation mode determines search timing, not state tracking.
+- **Implications:** remove the no-union father-assignment path. Missing union
+  processes fail even for zero-duration runs. On-demand is currently the only
+  executable initiation mode; scheduled initiation remains rejected.
+- **Compatibility:** existing workflows need `set_union_formation()`. Preserve
+  the accepted milestone 1 report as historical evidence at its recorded commit;
+  do not rewrite its analysis for the changed milestone 2 model.
+
+## D033: Sex-specific union partner columns
+
+**Current status:** Accepted and implemented; supersedes unordered union roles in D012.
+
+- **Status:** accepted October 15, 2026 at the user's request.
+- **Decision:** replace `partner1_id` and `partner2_id` with `wife_id` and
+  `husband_id`. Wife references a female person and husband a male person,
+  for both ongoing and ended histories. Continue using “union” for the
+  relationship; these role names do not establish legal marriage status.
+- **Implications:** population validation enforces sex roles. C++ histories,
+  partner lookup, death handling, and output use explicit wife/husband roles.
+  Empty union tables have the same renamed columns. Existing unordered
+  tables must be mapped by sex, not just renamed by position.
+- **Validation:** valid noncontiguous IDs, swapped-role rejection for ongoing
+  and ended unions, empty schema, and existing birth/death/restart cases.
+
+## D034: Execute conditional-logit partner selection
+
+**Current status:** Current conditional-logit implementation; eligibility is now
+implemented under D035–D037. The milestone 2 report now includes parameter recovery.
+
+- **Status:** accepted October 15, 2026 through the user's implementation request.
+- **Decision:** use the entered matching formula and coefficients to generate
+  candidate utilities on continuous male-minus-female age differences. Convert
+  utilities to softmax probabilities and sample one partner. Keep existing
+  sampling-before-screening order; eligibility screening remains deferred.
+- **Worked test model:** linear coefficient 0.072 and raw squared coefficient
+  -0.014 have a utility maximum at 2.5714286 years. These are requested test
+  inputs, not defaults or a target mean gap for every candidate pool.
+- **Implementation:** exact C++ evaluation for linear/raw quadratic terms,
+  existing R model-matrix semantics for other formulas, stable softmax and one
+  uniform selection draw. No candidate histories or new dependencies. Reject
+  nonfinite formula values rather than silently dropping candidates.
+- **Validation:** analytical utilities/probabilities, choice frequencies,
+  formula fallback, numerical extremes, birth-time parentage, and existing
+  reproducibility/widowhood/restart checks. Scientific model recovery from
+  reconstructed time slices is still future validation work.
+
+## D035: Minimum male age for partner searches
+
+**Current status:** Implemented; D043 supersedes the original failed-screen birth-
+preservation default.
+
+- **Status:** accepted October 15, 2026 through the user's eligibility request
+  and explicit choices of default age and failed-screen behavior.
+- **Decision:** add user-selectable `min_male_age`, default 15 continuous years.
+  Finite nonnegative scalar; fractional ages supported, zero disables exclusion.
+  Include men at or above the threshold at search time. No additional female
+  age restriction; fertility/search rates govern female initiation.
+- **Ordering:** sample first, exclude underage sampled men, then score and
+  normalize matching probabilities. No refilling or search outside the sample.
+- **Failed screen:** preserve the birth with unknown father and no new union
+  when no sampled men pass, as explicitly selected by the user.
+- **Scope:** applies to new searches; retain existing ongoing unions. Other
+  age/kinship/availability policies remain outside this increment.
+- **Validation:** constructor/edited-process checks, exact/fractional age
+  boundaries, aging into eligibility, no added female restriction, retained
+  existing partners, and sampling-before-screening failures.
+
+## D036: Shared kinship module and generation-distance exclusions
+
+**Current status:** Implemented; D037 adds exclusivity and D043 supersedes the original
+failed-screen birth-preservation default.
+
+- **Status:** accepted October 15, 2026 through the user's implementation request
+  and explicit incomplete-ancestry decision.
+- **Decision:** use one separate native `kinship` module for union screening and
+  R extraction. Exclude candidates sharing a recorded ancestor within
+  `kinship_generations` parent steps of EACH person, including each person at
+  distance zero. Default two; zero imposes no cross-person exclusion.
+- **Incomplete histories:** exclude demonstrated relationships only. Unknown
+  links stop that branch and are not evidence of unrelatedness; do not skip
+  known paternal relationships because a mother is missing.
+- **Consequences:** two includes known half/full siblings and first cousins,
+  aunts/uncles, parents and grandparents. Removed/second cousins and direct
+  ancestors beyond two generations require a larger bound. No unlimited
+  direct-ancestor exclusion or new male-exclusivity rule is inferred.
+- **Engineering:** iterative cycle-safe traversal, lazily cached distinct
+  ancestors and minimum distances, shortest-route maternal/paternal evidence,
+  newborn append and restart reconstruction. No dense all-pairs kin matrix or
+  enumeration of all ancestry paths. No major new dependency or copied SOCSIM
+  implementation.
+- **R interface:** `extract_kin()` returns compact common-ancestor evidence for
+  selected egos/relatives as a tibble, using the same distance kernel. Output
+  retains closest tied witnesses rather than assigning ambiguous relationship
+  labels; lineage and within-depth completeness are explicit.
+- **Scope:** screening follows sampling and male-age checks, before utilities,
+  without refilling. Failed searches preserve births with unknown father.
+  Existing unions are retained. Social kin and genetic coefficients are not
+  implemented. See [kinship](kinship.md) for worked examples and limitations.
 
 ## Additional clarifications and deferred concerns
 
@@ -346,3 +563,274 @@ This supersedes the earlier missing-TFR statements in D020/D021 and the
 earlier scientific contract (available in Git history).
 It does not change life-table missing-rate propagation. This restates an
 existing accepted clarification; it is not a new decision from the doc audit.
+
+### Milestone 2 construction clarification (October 15, 2026)
+
+At the user's direction, candidate sampling precedes pair-specific screening.
+Age difference is male age minus female age in continuous years. Process
+construction now accepts explicit initiation, sample size (default 1000, zero for full pool),
+and a matching formula with named coefficients. R model-matrix expansion and
+stable softmax provide the construction/scoring infrastructure without a new
+major dependency. At that construction-only stage, execution rules were unresolved and the engine
+rejected union processes. D031–D043 subsequently implemented both initiation
+modes and their eligibility, matching, failure and fertility-transition rules;
+D044/D045 defer waiting and transition-aware compensation.
+
+The user subsequently selected `sample_size = 1000` as the default for both
+`union_formation()` and `set_union_formation()` on October 15, 2026.
+
+### Sex-specific union death reasons (October 15, 2026)
+
+At the user's direction, union `end_reason` now uses `death_husband` and
+`death_wife` in place of `death`. Existing `dissolution` and ongoing `NA`
+remain valid. The executed death event records the terminating partner;
+subsequent deaths do not overwrite an ended union, including equal-time
+events under existing queue ordering. Supplied ended histories and restart
+reasons are retained. This supersedes generic death labels in earlier entries.
+
+
+## D037: Exclusive ongoing unions and pre-sampling male availability
+
+**Current status:** Implemented; D043 supersedes the referenced birth-preservation
+default.
+
+- **Status:** accepted by the user October 15, 2026.
+- **Decision:** require at most one ongoing union per person. Sample from living,
+  unpartnered men before applying age and kin restrictions. Remove a man when
+  selected; return a surviving husband when widowed. Never return dead men.
+  Reject conflicting ongoing input unions for either sex; retain ended history.
+- **Consequences:** scarcity can leave births with unknown fathers under the
+  existing failed-search policy. Fertility/mortality schedules remain unchanged.
+  This supersedes the temporary concurrent-male-union behavior in D031/D036.
+  Polygamy/polyamory remains a possible later explicit model, not current behavior.
+- **Validation:** pre-sampling exclusion, scarcity, widow re-entry, death removal,
+  conflicting input unions, restart consistency, and no concurrent unions.
+
+
+## D038: Female rate-based search events and partnered-only births
+
+**Current status:** Search scheduling remains current; D039/D040 replace partnered-only
+births with status-specific fertility and nonmarital father selection.
+
+- **Status:** accepted by the user October 15, 2026.
+- **Decision:** use age-specific search hazards as competing events for
+  unpartnered women only, with no differentiation by previous/current legal
+  marital status. Reuse on-demand matching. Failed attempts draw another waiting
+  time from the same schedule, starting at failure. Rate mode permits births
+  only while partnered; union formation enables risk subject to birth spacing,
+  and widowhood cancels pending births and restores search risk immediately.
+- **Boundary:** retain the existing adjusted fertility schedule, without
+  claiming recovery of population ASFRs under this gate. Separate conditional
+  fertility schedules and the wait alternative remain unimplemented.
+- **Validation:** analytical competing search/death hazards, age support/gaps,
+  retries, shared partner choice, no unpartnered births, widowhood invalidation,
+  restart histories and reproducibility.
+
+## D039: Stacked union-status fertility schedules and overall fallback
+
+**Current status:** Implemented; D040/D041 replace unconditional unknown-father
+assignment and D043 governs failed matches.
+
+- **Status:** accepted by the user October 15, 2026.
+- **Decision:** keep the fertility API, adding an optional `union_status` column
+  with both `partnered` and `unpartnered`. Without it, use one overall schedule.
+  Reject partial/mixed status tables; explicit zero schedules express suppression.
+  On-demand rejects conditional tables. Rate mode accepts overall rates for both
+  statuses with one warning per call, superseding D038's partnered-only gate.
+- **Transitions:** reschedule on formation/widowhood, preserving maternal spacing;
+  births to unpartnered women in rate mode have unknown father and do not search.
+  Existing midpoint adjustment operates separately on each schedule; transition
+  compensation remains deferred. Death wins ties, then birth, then search.
+
+## D040: Nonmarital father selection shares union matching
+
+**Current status:** Implemented with D041 separate father matching and D043 default
+failed-match cancellation.
+
+- **Status:** accepted by the user October 15, 2026.
+- **Decision:** rate-mode unpartnered births select fathers from currently living,
+  unpartnered men using the same sampling, eligibility and matching model as
+  partner selection. Assigning a father does not form a union or reserve the man.
+  Empty screened pools preserve births with unknown father. This supersedes
+  D039's unconditional unknown-father rule for unpartnered births.
+- **Deferred:** separate father-selection and partner-selection models are an
+  explicitly deferred extension. Preferential reuse of the previous child's
+  father at later births or union formation is under discussion, not accepted;
+  current selections have no special persistence preference.
+- **Validation:** father assignment without unions, repeated availability,
+  partnered/dead/young/kin exclusions, matching probabilities, known paternal
+  links in kinship, retained births when no candidate qualifies, and restarts.
+
+## D041: Optional separate nonmarital father matching model
+
+**Current status:** Implemented; previous-father continuity is deferred under D042.
+
+- **Status:** accepted by the user October 15, 2026; supersedes D040's deferral.
+- **Decision:** add `father_matching = NULL` to union constructors/setters. NULL
+  uses the current general `matching` model; an explicit model applies only to
+  unpartnered rate-mode births. All union searches retain the general model.
+  Sampling, eligibility and parentage/state semantics remain shared.
+- **Validation:** constructor/edited-object checks, exact fallback equivalence,
+  opposite preference models separating births from unions, and native versus
+  R formula evaluation. Preferential reuse of previous fathers remains unresolved.
+
+
+## D042: Revised milestone 2 completion scope
+
+**Current status:** Completion scope subsequently narrowed by D044/D045; cancellation is
+implemented (D043), and the report includes performance comparisons. Milestone 2
+was accepted as complete on October 19, 2026 (D050).
+
+- **Status:** accepted by the user October 15, 2026.
+- **Required work:** implement a failed-match birth cancellation toggle and
+  address fertility compensation across status/rate transitions in milestone 2.
+  This supersedes their earlier deferral; exact cancellation semantics and the
+  compensation algorithm still require specification and user decisions.
+- **Under consideration:** the poor-pool wait alternative may remain in this
+  milestone or be postponed; do not treat it as a settled completion requirement.
+- **Later milestone:** preferential reuse of previous nonmarital fathers at
+  subsequent births or union formation is explicitly deferred. Current draws
+  retain no special previous-father preference.
+- **Validation:** benchmark R formula-fallback performance in the final milestone
+  validation report rather than as a separate implementation task. No benchmark
+  result is claimed. Parity conditioning, non-death dissolution and multiple
+  ongoing unions remain outside current scope.
+
+## D043: Failed-match birth cancellation defaults on
+
+- **Status:** toggle and default accepted by the user October 15, 2026.
+- **Decision:** add `cancel_birth_if_no_match = TRUE` to the union process. Apply
+  to failed on-demand partner matching and failed rate-mode nonmarital father
+  matching. FALSE explicitly permits new births with unknown father; input
+  histories are preserved. This supersedes default birth preservation in D031/D040.
+- **Retry:** accepted by the user: redraw from the attempt time without starting
+  a new birth-spacing interval or changing the last actual birth. No correction
+  should erase the intended fertility effect of failed matches.
+
+
+## D044: Defer poor-pool waiting to a later milestone
+
+**Current status:** Waiting remains deferred; D045 also defers compensation. The report
+includes performance comparisons; milestone 2 is complete (D050).
+
+- **Status:** accepted by the user October 15, 2026; supersedes D042's open scope.
+- **Decision:** postpone the option to decline a nonempty eligible pool and wait
+  to a later milestone. It is not a milestone 2 completion requirement.
+- **Current behavior:** a nonempty screened pool always yields a selection via
+  conditional-logit matching. Empty searches retain existing retry behavior;
+  unmatched births follow `cancel_birth_if_no_match` (default TRUE).
+- **Subsequent disposition:** D045 deferred compensation; the report includes
+  demographic validation and R formula-fallback timing. D050 records completion.
+
+
+## D045: Defer transition-aware fertility compensation
+
+**Current status:** Compensation remains deferred; the report now assesses fertility
+discrepancies and performance. Milestone 2 was accepted as complete (D050);
+this deferral remains in force.
+
+- **Status:** accepted by the user October 15, 2026; supersedes D042/D044's
+  remaining implementation requirement.
+- **Decision:** postpone correction of fertility compensation across union-status
+  transitions and changes of rates between simulation runs to later work. Retain
+  per-schedule midpoint compensation and spacing based on actual recorded births.
+  No individual rate-history or dynamic exposure correction is implemented.
+- **Evidence boundary:** the report assesses discrepancies for its input case;
+  it does not establish generally negligible bias or calibrated conditional
+  ASFR recovery. Retain this limitation after acceptance.
+- **Milestone 2:** the report includes demographic assessment and R formula-fallback
+  timing; D050 records user acceptance. Poor-pool waiting and previous-father
+  continuity remain deferred.
+
+## D046: Optional union summaries in Lexis counts
+
+- **Status:** union exposure and formation summaries requested by the user
+  October 16, 2026; classification at formation explicitly accepted that day.
+- **Decision:** expose partnered/unpartnered person-years and union formation
+  counts for both sexes through an optional Lexis summary extension. Include
+  maternal births by status to support conditional fertility denominators.
+  Union status is current partnership, not first-marriage history or legal
+  marital status. Births at the union start are partnered, including those
+  triggering on-demand formation; use half-open union episodes.
+- **Implementation:** superseded by D047 below. Initially, `include_unions = TRUE` added columns to the existing
+  period/age/sex grid. Count repeat union starts for both spouses at their
+  respective ages. Integrate coverage without duplicating overlapping
+  person-time; existing overall measures remain unchanged. Require a population
+  object with union histories. Missing earlier records do not prove historical
+  singlehood; users must choose windows with complete follow-up.
+- **Validation:** worked exact exposure, boundary births, spouse-specific ages,
+  widowhood/remarriage, overlapping and zero-duration episodes, empty histories,
+  conservation, and unchanged default summaries. No demographic calibration or
+  milestone acceptance is implied.
+
+## D047: Long union-status Lexis summaries and marriage rates
+
+**Current status:** Implemented with D048 rate-column names and the October 17 pooled
+label `overall` replacing `total`.
+
+- **Status:** accepted by the user October 16, 2026; supersedes D046's wide layout.
+- **Decision:** `include_unions = TRUE` gives `total`, `partnered`, and
+  `unpartnered` rows identified by `union_status`. Split exposure, births,
+  and deaths, with ASFR/ASMR using each row's exposure. `unions` is NA on
+  total/partnered rows; on unpartnered rows count formations for each spouse.
+  Add `marriage_rate = unions / person_years` on unpartnered rows, NA elsewhere
+  and whenever exposure is zero. All rates retain person-year units.
+- **Observation convention:** deaths use status immediately before death,
+  including partnered status for a death ending a union. Births retain D046's
+  half-open status. See the scientific contract and worked analysis example.
+- **Compatibility:** default FALSE stays unchanged. Existing TFR status grouping
+  handles long results without changes to its API. Life tables preserve status
+  grouping too. The total duplicates status components and must not be added
+  to them. Complete histories are still required.
+
+## D048: Consistent rate column names
+
+- **Status:** requested by the user October 16, 2026.
+- **Decision:** rename Lexis rate columns to `rate_fertility`, `rate_mortality`,
+  and `rate_marriage` (formerly `asfr`, `asmr`, and `marriage_rate`). This applies
+  to both default and union-status summaries. TFR and life-table extraction
+  consume the new names; process schedules retain `rate` and life tables
+  retain `mx`. Units and calculation rules are unchanged.
+
+## D049: Direct-rate approximation for USA 2001 marriage inputs
+
+- **Status:** requested by the user October 16, 2026.
+- **Decision:** provide separate female/male marriage schedules in
+  `validation/data`, with `age_start`, `age_end`, and `rate`, using published
+  transitions per 1,000 divided by 1,000 directly as rates per person-year.
+  Retain source bands, including 70+, and the original combined source table.
+- **Limits:** the source denominator is the unmarried population at the start
+  of the period, not person-years. This approximation does not apply a
+  probability-to-hazard transformation. The female schedule can configure
+  current union-search initiation; male rates are reference data. Search
+  failures can make realized formation rates differ from these inputs.
+
+The user renamed D047's pooled `union_status` label from `total` to `overall`
+on October 17, 2026, to avoid confusion with total fertility rate terminology.
+This changes the label in Lexis counts and downstream summaries, without changing
+counts, denominators, or demographic behavior.
+
+## Default age-gap matching preferences
+
+Accepted by the user October 18, 2026: `union_formation()` and
+`set_union_formation()` default to `create_age_gap_matching_model(0, 5)` when
+matching is omitted. The preferred male-minus-female age gap is zero years;
+selection weight halves at a distance of five years on either side. Explicit
+matching specifications override this default. Initiation mode remains explicit.
+
+
+## D050: Milestone 2 accepted as complete
+
+- **Status:** accepted by the user October 19, 2026, following review of
+  `validation/milestone2.qmd` and its rendered HTML and user revisions.
+- **Decision:** mark milestone 2 union formation complete. The user accepts
+  the demographic assessment of both initiation modes, status-specific fertility,
+  formation rates, union diagnostics, matching-parameter recovery and performance.
+  The report and status documentation are to be committed together.
+- **Limits:** acceptance retains deferred transition-aware fertility compensation
+  (D045), poor-pool waiting (D044), and previous-father continuity (D042). It does
+  not establish universal accuracy, independent replication, or completion of
+  every review suggestion. No new scientific acceptance thresholds are imposed.
+- **Next scope:** groups remain the selected milestone 3 theme. Detailed rules
+  require user decisions; milestone completion does not authorize implementation
+  of unspecified mechanisms or other roadmap proposals.

@@ -4,7 +4,12 @@
 \alias{calculate_lexis_counts}
 \title{Summarize demographic exposure and rates}
 \usage{
-calculate_lexis_counts(population, time_breaks, age_breaks)
+calculate_lexis_counts(
+  population,
+  time_breaks,
+  age_breaks,
+  include_unions = FALSE
+)
 }
 \arguments{
 \item{population}{A hammel_population or persons data frame.}
@@ -14,10 +19,23 @@ calculate_lexis_counts(population, time_breaks, age_breaks)
 \item{age_breaks}{Strictly increasing nonnegative age boundaries in years.
 If the final boundary is finite, Inf is appended to create an open-ended
 final age band starting at that boundary.}
+
+\item{include_unions}{Logical, default \code{FALSE}. Require a population object
+with union histories and return three rows per period/age/sex cell, labeled
+\code{overall}, \code{partnered}, and \code{unpartnered} in \code{union_status}. Exposure, births,
+deaths, ASFR and ASMR use the corresponding status. Births use half-open
+union coverage, so births at formation are partnered. Deaths use status
+immediately before death, so union-ending deaths are partnered. Add \code{unions}
+and \code{rate_marriage} only on unpartnered rows (NA on other statuses): count
+each formation, including remarriages, at each spouse's age, and divide by
+unpartnered person-years. Rates with zero exposure are NA. Overlapping
+episodes do not duplicate exposure. Complete union histories are required
+for historical status. Do not sum overall rows with their status components.}
 }
 \value{
 A tibble with time_start, time_end, sex, age_start, age_end,
-person_years, deaths, births, asmr, and asfr.
+person_years, deaths, births, rate_mortality, and rate_fertility. With \code{include_unions = TRUE},
+also union_status, unions, and rate_marriage.
 }
 \description{
 Calculate person-years, deaths, births, ASMR, and ASFR for each time period,

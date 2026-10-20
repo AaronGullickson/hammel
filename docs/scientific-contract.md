@@ -1,7 +1,9 @@
 # Scientific contract
 
-Updated October 13, 2026. This is the current mortality/fertility contract,
-reflecting D019, D024, D025, D026, and D028. Earlier monthly and exact
+Updated October 19, 2026. This is the current mortality, fertility, union-formation,
+and observation contract. Milestone 2 was accepted as complete by the user on
+October 19, 2026 (D050), retaining the documented deferred limitations.
+Earlier monthly and exact
 age-varying compensation specifications are available in Git history; the
 [decision log](decisions.md) records their replacement. Acceptance
 of a model assumption is distinct from evidence of demographic accuracy.
@@ -23,8 +25,8 @@ input order and extra columns; native scheduling sorts its own copy.
 
 | Rule | Mortality | Fertility |
 | --- | --- | --- |
-| Input interpretation | Piecewise constant age/sex hazard | Population ASFR, births per woman-year |
-| Denominator for output rates | Living person-years by age/sex | All female person-years, including excluded time |
+| Input interpretation | Piecewise constant age/sex hazard | Overall or status-specific ASFR, births per woman-year in the specified population |
+| Denominator for output rates | Living person-years by age/sex | Female person-years overall or in the indicated status, including spacing-excluded time |
 | Open-ended input band | Allowed; required at execution | Rejected, even with zero rates/spacing |
 | Coverage at execution | `[0, Inf)` for each sex, with no gaps | Zero outside supplied finite bands, including gaps |
 | Additional setting | None | `birth_interval`, finite nonnegative scalar years; default 0.75 |
@@ -84,8 +86,14 @@ Months here are explanatory durations, not an execution grid.
 
 ## Fertility and birth spacing
 
-All living females face the supplied population fertility schedule, regardless
-of union status. After a recorded birth at time `t`, fertility sampling starts
+Without `union_status`, all living females face the supplied overall fertility
+schedule. With a `union_status` column, require both `partnered` and
+`unpartnered` schedules, interpreted per woman-year in that status. Only those
+two character labels are permitted; partial or mixed tables are errors. Check
+age overlap separately within each status; boundaries may differ and gaps are
+zero risk. Use explicit zeros to suppress births for a status. On-demand
+formation rejects status-specific fertility schedules, including at zero duration.
+Rate formation accepts overall rates with one warning per simulation call. After a recorded birth at time `t`, fertility sampling starts
 at `max(now, t + birth_interval)`. Mortality remains active throughout spacing.
 A birth at 1.03 with spacing 0.75 permits the next birth no earlier than 1.78.
 Zero spacing disables both the exclusion and compensation. Arbitrary finite
@@ -100,7 +108,7 @@ midpoint `m = L + (U-L)/2`, input rate `f`, and spacing `b`:
     adjusted_rate = f / eligibility_mid
 
 Evaluate the integral using exact duration overlaps with the unadjusted input
-bands. Gaps and ages outside the schedule contribute zero. Preserve the
+bands within the same status schedule. Gaps and ages outside the schedule contribute zero. Preserve the
 original boundaries and use the resulting constant rates in the shared sampler.
 Compute this schedule once per simulation call, not from the actual fraction
 eligible in the simulated population. Reject nonpositive midpoint eligibility
@@ -127,17 +135,120 @@ adjustment and does not guarantee exact ASFR or TFR recovery after burn-in.
 
 ### Birth transition and parent assignment
 
+Union histories use `wife_id` for the female partner and `husband_id` for the
+male partner. These roles are validated for ended and ongoing unions and do
+not imply legal marriage.
+
 Each birth creates one child with a new unique ID above all supplied IDs,
-records the mother, and assigns newborn sex with equal probabilities. Sample
-the father uniformly from currently living males. There is no minimum paternal
-age, kinship exclusion, or union requirement in this deliberately basic model;
-if no males are living, retain the birth with unknown father.
+records the mother, and assigns female sex with probability 0.4886.
+A union-formation process is required for every simulation, including zero
+duration. Missing processes are rejected rather than given an implicit default.
+The former milestone 1 path without unions is no longer executable.
+
+When matching is omitted, both initiation modes use
+`create_age_gap_matching_model(0, 5)`: preferred male-minus-female gap zero
+years, with relative weight halved five years either side. Explicit models
+override that default; it does not fix the realized age-gap distribution.
+
+With `union_formation(initiation = "on_demand", ...)`, use the woman's ongoing
+living male partner as father. If she has no partner, sample up to `sample_size`
+living, unpartnered men without replacement (default 1000; zero means the whole pool).
+Evaluate the matching formula on male-minus-female continuous age differences
+and multiply its non-intercept model-matrix columns by their named coefficients.
+For candidate utilities V, sample with probabilities proportional to
+`exp(V - max(V))`, form the union at the birth time, and assign the partner as
+father. Nonfinite formula values/utilities are errors. Linear/raw quadratic
+terms have an exact native evaluator; other formulas use the R model matrix.
+After sampling and before scoring, exclude men younger than `min_male_age`
+(default 15 continuous years; finite nonnegative scalar, fractional values
+allowed). A man at exactly the threshold is eligible. Do not refill rejected
+samples. Also exclude a sampled man if he and the woman share a recorded
+ancestor within `kinship_generations` parent steps of EACH (default 2), counting
+each person themself at distance zero. This includes known parents, grandparents,
+siblings, aunts/uncles and first cousins, including half kin; it does not impose
+an unlimited direct-ancestor exclusion. Zero disables cross-person kin exclusion.
+Only demonstrated links count: unknown parents do not imply unrelatedness and
+do not hide other known relationships. Age and kin search restrictions do not invalidate existing unions,
+and no extra minimum female age is imposed. Each person can have at most one ongoing union. Formation removes the man
+from the pool before the next sample; widowhood returns a surviving husband.
+If no sampled man is eligible, `cancel_birth_if_no_match = TRUE` (the default)
+cancels the birth. FALSE explicitly preserves it with unknown father and no
+union. A cancelled attempt creates no person, parentage, ID or birth count and
+does not update the last actual birth or start a spacing interval. Redraw risks
+from the attempt time at attained age; retain any spacing from actual prior
+births. This applies to on-demand partner selection and rate-mode nonmarital
+father selection. It does not rewrite input histories with unknown fathers.
+Partner scarcity can depress realized fertility below supplied rates; do not
+compensate away this intentional selection effect. Rate-based initiation follows the separate rules below.
+
+On-demand input must provide unambiguous active female/male unions with living
+partners and at most one ongoing union per person; unsupported or inconsistent
+active histories are rejected. Supplied ended histories remain unchanged.
+Death closes all affected ongoing unions and clears both partners' current
+partner immediately. Her next birth may trigger another search in on-demand mode. In that mode fertility and
+mortality remain independent of union status, so surviving partners' pending
+events need no resampling merely because a union forms or ends. Candidate
+sets are temporary and are not returned. Optional `diagnostics = TRUE` records
+only eligible sample size and selected utility rank on newly formed unions;
+it defaults off and consumes no additional random draws. See [union formation](union-formation-models.md)
+for worked examples and implemented milestone 2 rules.
 
 Update the mother's latest birth and resample both newborn and mother. Newborns
 enter mortality risk immediately; their fertility depends on the supplied ages.
-Existing custom person columns are retained; newborn custom values are missing.
-No new unions are formed. The R wrapper closes supplied ongoing unions when a
-partner dies, using the earliest partner death and `end_reason = "death"`.
+Existing custom person/union columns are retained; new rows have missing custom
+values. C++ maintains union histories and shared partner caches for all runs,
+closing unions at death with `end_reason = "death_husband"` or
+`"death_wife"` according to the executed death event. Initiation mode
+controls search timing; it does not control whether partner state is tracked.
+
+### Rate-based union initiation
+
+With `initiation = "rate"`, only living unpartnered women face the supplied
+age-specific search hazard. Men never initiate searches. Gaps and ages outside
+search bands have zero hazard. Search waiting times use the same cumulative
+hazard sampler as deaths and births. Searches compete with death; death wins
+exact same-person ties. Search execution uses the same partner sampling,
+screening, matching and formation code as on-demand mode. A failed search
+reschedules from the attempt time using the same attained-age schedule.
+All unpartnered women use that schedule regardless of prior union history.
+
+Women face birth risk in both statuses: the current `union_status` selects
+fertility, or an overall schedule applies equally to both. With overall rates,
+warn once per simulation call that fertility does not depend on union status.
+Unpartnered births in rate mode select a father from living, currently
+unpartnered men using the same sample size, minimum age, known-kin screening
+and conditional-logit matching as union searches. This creates parentage only:
+no union forms, the man remains available, and neither person's partner state
+changes. No qualifying sampled candidate cancels the birth by default; explicitly
+setting `cancel_birth_if_no_match = FALSE` retains it with unknown father. Paternal links are appended to the kinship graph before
+subsequent events. Partnered births use the current husband. No special
+preference for an earlier child's father is implemented; it is deferred to a
+later milestone (D042).
+An optional `father_matching` specification applies only to unpartnered
+rate-mode births; NULL uses the current general `matching` model. Union searches
+always use the general model. Both follow the same formula contract. Birth and search candidates
+compete while unpartnered; death wins exact ties, followed by birth then search.
+
+A new union or husband's death invalidates the woman's pending event and
+reschedules at attained age with the new fertility schedule, preserving her
+recorded birth spacing. Widowhood also restores search risk. Versioned queue
+entries prevent invalidated candidates executing. Surviving men's death hazards
+do not depend on union status. Midpoint compensation is computed independently
+within each schedule; it is not calibrated to the woman's prior-status history.
+The milestone 2 report examines conditional ASFR discrepancies; general
+recovery across status transitions is not established.
+See [union fertility specification](union-formation-models.md#fertility-schedules-by-union-status-d039).
+
+### Shared kinship observations
+
+`extract_kin()` returns the same recorded-parent distance evidence used by
+eligibility, with compact nearest common-ancestor witnesses, lineage and
+within-depth ancestry completeness. Deceased ancestors remain in the graph.
+Simulation and extraction reject ancestry cycles; structural population
+validation alone does not perform this graph check. Newborn parent links are
+appended before future events; restarts reconstruct the graph from histories.
+See [kinship](kinship.md) for worked examples, extraction ordering, depth limits,
+and the distinction between evidence and proof of unrelatedness.
 
 ## Execution, competition, and random numbers
 
@@ -177,16 +288,29 @@ replications are invalid. There are no custom strata/group arguments yet.
   age breakpoint automatically gains `Inf`; for example `0:110` ends with
   `[110, Inf)`. Zero exposure yields `NA` rates; zero events with positive
   exposure yields zero. Male birth counts/ASFR are `NA`.
+- With `include_unions = TRUE`, Lexis counts add exact partnered/unpartnered
+  exposure for both sexes, union starts at each spouse's age (including repeat
+  unions), and births/deaths by status, in separate `overall`, `partnered`, and
+  `unpartnered` rows. `unions` and `rate_marriage` are only defined for
+  unpartnered rows; the rate is formations per unpartnered person-year.
+  Status components sum to overall counts/exposure; do not sum all three rows.
+  Deaths use status immediately before death, so a union-ending death counts
+  as partnered. Birth/exposure union coverage is half-open
+  `[start_time, end_time)`; births triggering on-demand formation are partnered.
+  Overlapping records do not duplicate exposure. Complete union histories are
+  needed: absence of a supplied episode is not evidence of historical singlehood.
+  See the worked examples and rate denominators in demographic analysis.
 - Births use maternal age and all female exposure, including time excluded by
   spacing. Unknown mothers are counted by period in the tibble attribute
   `unassigned_births`; their births cannot be assigned an age-specific rate.
 - `calculate_tfr()` selects female rows, omits open age bands, and sums
-  `asfr * band_width` over the remaining contiguous finite bands by period.
+  `rate_fertility * band_width` over the remaining contiguous finite bands by period.
   Missing ASFR contributions are omitted with `na.rm = TRUE`; an all-missing
   set sums to zero. The returned finite age range does not indicate complete
   exposure, so inspect missing cells separately. There is no `age_range` argument.
 - `calculate_life_table()` requires contiguous bands from zero through an
-  explicit open interval and separates periods/sexes. For finite width `n`
+  explicit open interval and separates periods/sexes and union status when
+  present. Conditional tables do not model status transitions. For finite width `n`
   and hazard `m`, `q = 1-exp(-m*n)`, survival propagates exponentially, and
   `L = l*(1-exp(-m*n))/m`, with `L=l*n` at zero hazard. In the positive-rate
   open interval, `q=1` and `L=l/m`. `T` is remaining integrated person-years
@@ -239,16 +363,20 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 | Midpoint approximation | Validate bias against supplied age schedules; no accuracy guarantee |
 | Rate changes between runs | Histories retain spacing, but compensation uses only the new schedule |
 | Sparse oldest ages | Missing cells remain missing; no automatic imputation or smoothing |
-| Union formation/dissolution | No new events; planning notes remain proposals |
+| Union formation/dissolution | Conditional-logit on-demand formation, minimum male age, known-kin distance screening, and widowhood; exclusive ongoing unions enforced; female rate initiation implemented |
 | Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
 | Exact continuation | No saved queue/RNG checkpoint |
 
 For changed fertility rates, recently excluded women may reflect the previous
 schedule, so realized fertility can temporarily differ from the new target.
-Magnitude and duration have not been quantified; there is no guaranteed
-nine-month convergence deadline. A recent-schedule history and time-dependent
+The milestone reports examine particular rate-change and status-transition
+cases, but do not establish a general magnitude or duration; there is no
+guaranteed nine-month convergence deadline. A recent-schedule history and time-dependent
 adjustment were discussed as possible future treatments; the user explicitly
-deferred correction. Do not implement them as an assumed requirement.
+deferred correction at that time. D045 defers transition-aware compensation again, including union-status
+transitions and rate changes between runs. The existing adjustment and
+actual-birth spacing are retained; see the user-authored reports for case-specific
+assessment rather than a general accuracy guarantee.
 
 ## Validation requirements and future mechanism specifications
 
@@ -257,11 +385,16 @@ examples, constant-rate fertility after burn-in, spacing through restarts,
 accounting, identities, father availability, seed behavior, and empty/zero-risk
 runs. [Testing](testing.md) separates these from broader demographic assessment.
 
-Before marking milestone 1 complete, agree on rate/age alignment, observation
-windows, replications, acceptance thresholds, and sparse-cell treatment. Compare
-ASFR/ASMR as well as aggregate TFR/life-table measures. Report uncertainty and
-systematic departures separately. Compare with pinned SOCSIM over replications
-when appropriate; changed algorithms do not warrant exact seed matching.
+Milestone 1 was accepted as complete by the user on October 15, 2026 (D029),
+based on the completed [validation report](../validation/milestone1.qmd).
+This acceptance retains the documented limitations and does not establish
+universal accuracy or additional numerical thresholds. For further validation,
+make rate/age alignment, observation windows, replications, acceptance criteria,
+and sparse-cell treatment explicit. Compare ASFR/ASMR as well as aggregate
+TFR/life-table measures, reporting uncertainty and systematic departures
+separately. No controlled executable SOCSIM comparison has been performed;
+compare with a pinned reference when appropriate. Changed algorithms do not
+warrant exact seed matching.
 
 Every new consequential mechanism needs its own plain-language specification:
 status/scope, inputs/units, eligibility, timing/competition, state transitions

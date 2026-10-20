@@ -1,8 +1,8 @@
 # Hammel project brief
 
-Updated October 13, 2026. The first mortality/fertility simulator is implemented.
-Milestone 1 remains in demographic validation; scientific acceptance thresholds
-and the completed validation report are not yet established.
+Updated October 19, 2026. The user accepted milestone 1 (mortality/fertility)
+on October 15, 2026 (D029), and milestone 2 (union formation) on October 19,
+2026 (D050). See [testing](testing.md) for evidence and limits.
 
 ## Purpose
 
@@ -17,12 +17,13 @@ customizable demographic mechanisms. The user owns demographic requirements
 and scientific interpretation; agents investigate, implement, document, and
 validate software.
 
-## Milestone 1 scope and status
+## Accepted milestone 1 scope and status
 
-The accepted initial scope is fertility and mortality schedules constant over
-calendar time, but potentially varying by age (D003/D019).
+The accepted initial scope was fertility and mortality schedules constant over
+calendar time, but potentially varying by age (D003/D019). The table records
+that milestone at acceptance, not the current mandatory-union engine (D032).
 
-| Component | Current state |
+| Component | State at milestone 1 acceptance |
 | --- | --- |
 | Population/model construction | Implemented; public tables are tibbles |
 | Mortality | Piecewise constant age/sex hazards; continuous sampling |
@@ -32,7 +33,7 @@ calendar time, but potentially varying by age (D003/D019).
 | Relationships | Parent histories retained; no new unions formed |
 | Analysis | Exposure/counts, ASFR/ASMR, TFR, life tables, population sizes |
 | Restarts | Output can initialize another run; not an exact checkpoint |
-| Validation | Software/analytical checks pass; broader demographic assessment ongoing |
+| Validation | Milestone 1 accepted by the user October 15, 2026; completed report in `validation/milestone1.qmd` |
 
 D019 replaced the original basic-partnership requirement with random male
 parent assignment for the first executable milestone. D024 replaced monthly
@@ -40,29 +41,64 @@ execution with continuous event times. D028 replaced monthly and exact
 age-varying fertility compensation with one adjusted rate per original age
 band, evaluated at its midpoint. Those older descriptions are historical.
 
-## Remaining milestone work
+## Milestone 1 completion
 
-1. Complete the [Quarto validation report](../validation/milestone1.qmd), using
-   saved inputs, recorded seeds/settings, and identifiable code versions.
-2. Quantify replicated ASFR, ASMR, TFR, and life-expectancy agreement, with
-   sampling uncertainty, exposure coverage, and comparable age bands.
-3. Assess higher-fertility inputs, five-year fertility bands, and alternative
-   birth intervals; define acceptable approximation errors with the user.
-4. Record which criteria are met and which limitations remain.
+The completed [validation report](../validation/milestone1.qmd) documents the
+user's assessment of replicated fertility/mortality measures, population growth
+and stable age structure against a two-sex Leslie projection, restart behavior,
+and performance. Its conclusions and the user's explicit acceptance establish
+milestone completion; no additional numerical acceptance thresholds are inferred.
 
-Reported visual agreement in USA/2000 replications is encouraging evidence,
-not a completed scientific assessment. Union formation, calendar-varying rate
-support, and initialization correction are not requirements for closing this
-current milestone.
+Sparse oldest-age rates, initial fertility transients, and fertility compensation
+after rate changes remain limitations. The restart issue is deferred beyond this
+milestone. A controlled SOCSIM comparison has not been performed. Completion
+does not claim accuracy for every schedule or authorize new mechanisms.
+Union formation, calendar-varying rates, and initialization correction remain
+outside milestone 1's scope. Milestone 2 now targets union formation (D030), as specified below.
+
+## Milestone 2 scope
+
+The user selected union formation for milestone 2: female search initiation
+separate from conditional-logit matching, birth-triggered and scheduled search
+modes, initial age-difference matching, kinship screening, and partnered/unpartnered
+fertility in scheduled mode. Only death ends unions in this milestone. Parity-specific fertility is deferred
+to a later milestone.
+Candidate sampling defaults to 1000 men before pair screening (zero means the
+whole pool). Eligibility and basic fertility transitions are implemented; the
+failed-match birth cancellation is implemented (default TRUE); transition-aware fertility
+compensation remains deferred (D045), including after milestone acceptance (D050). The poor-pool wait alternative is deferred to a later milestone (D044). See [milestone 2 notes](union-formation-models.md)
+for implemented rules, deferred decisions, and validation. The on-demand C++ path now forms unions at births with formula-based
+conditional-logit selection and handles widowhood and restart histories.
+Minimum male age screening (default 15 years) and known-kin exclusion within
+two generations of each partner are implemented. `extract_kin()` shares the
+native kinship module. Exclusive ongoing unions are enforced before sampling; female rate-based searches and status-specific fertility schedules are implemented.
+Overall fertility is also supported in rate mode with a warning. Previous-father
+continuity is deferred to a later milestone. The user-authored [milestone 2 report](../validation/milestone2.qmd) now includes
+USA circa 2000–2001 demographic comparisons, matching-parameter recovery, and
+R formula-fallback performance comparisons (D042). The user accepted milestone 2
+as complete on October 19, 2026 (D050), retaining the documented limitations.
+Matching defaults to
+`create_age_gap_matching_model(0, 5)`, and optional union diagnostics record
+eligible sample counts and selected utility ranks.
+
+## Beyond milestone 2
+
+The user selected groups as milestone 3's theme: intergroup matching, baseline
+rate multipliers, flexible child group identity and possible proportional group
+ancestry. Other future priorities are analysis helpers, input-rate preparation,
+fertility heterogeneity, inherited/life-course characteristics (such as education),
+and within-run immigration with generational status. Detailed demographic rules
+are not selected. See the [roadmap](roadmap.md); milestone 2 completion does
+not authorize unspecified future demographic behavior.
 
 ## Boundaries and future work
 
 C++17/Rcpp is selected and implemented for the first engine (D019); tibble is
 used at the R boundary (D023). Package metadata and licensing are not yet ready
 for release. A universal simulation framework and legacy compatibility are not
-requirements. Custom process execution, union formation/dissolution, realistic
-matching, and richer initialization remain future work, not automatically
-authorized features.
+requirements. Union formation and matching are implemented and milestone 2 is complete. Custom
+process execution, non-death union dissolution, and richer initialization remain
+future work, not automatically authorized features.
 
 The user has postponed finding an African historical alternative to USA/2000.
 No replacement case or new rate-source integration is currently selected.

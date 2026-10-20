@@ -73,11 +73,15 @@ the user's agreement.
   archives in `docs/`. Keep rationale and supersession in `docs/decisions.md`.
   Do not make readers reconcile contradictory current rules with appended
   corrections.
-- Mark union-formation notes and other future work as proposals. Milestone 1 is
-  in demographic validation; union formation is deferred from its initial scope.
-- `validation/milestone1.qmd` is a development report template. The user is
-  writing its analysis and interpretation; do not fabricate results, set
-  scientific acceptance thresholds, or mark the milestone complete.
+- Milestone 1 was accepted as complete on October 15, 2026 (D029). Milestone 2
+  union formation was accepted as complete on October 19, 2026 (D050);
+  distinguish its current specification from deferred mechanisms and future proposals.
+- `validation/milestone1.qmd` is the accepted historical assessment; reproduce it
+  at its recorded commit because current execution requires a union process.
+  `validation/milestone2.qmd` contains the user's accepted assessment, including
+  matching-parameter recovery and performance comparisons. Preserve both reports;
+  do not fabricate results or set scientific acceptance thresholds. Milestone
+  completion retains documented limitations and does not authorize future features.
 - Use `devtools::test()` for the testthat suite. Live database tests require
   explicit opt-in; ordinary verification must not download rates or expose
   credentials. See `docs/testing.md` for commands and evidence.

@@ -5,6 +5,14 @@ demographic_counts_cpp <- function(persons, time_breaks, age_breaks) {
     .Call(`_hammel_demographic_counts_cpp`, persons, time_breaks, age_breaks)
 }
 
+union_counts_cpp <- function(persons, unions, time_breaks, age_breaks) {
+    .Call(`_hammel_union_counts_cpp`, persons, unions, time_breaks, age_breaks)
+}
+
+extract_kin_cpp <- function(persons, ego_ids, relative_ids, generations) {
+    .Call(`_hammel_extract_kin_cpp`, persons, ego_ids, relative_ids, generations)
+}
+
 hazard_wait_cpp <- function(rates, ages, thresholds) {
     .Call(`_hammel_hazard_wait_cpp`, rates, ages, thresholds)
 }
@@ -13,7 +21,15 @@ adjusted_fertility_cpp <- function(rates, birth_interval) {
     .Call(`_hammel_adjusted_fertility_cpp`, rates, birth_interval)
 }
 
-simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval) {
-    .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval)
+inspect_matching_cpp <- function(age_difference, matching, draws) {
+    .Call(`_hammel_inspect_matching_cpp`, age_difference, matching, draws)
+}
+
+sample_male_positions_cpp <- function(count, requested) {
+    .Call(`_hammel_sample_male_positions_cpp`, count, requested)
+}
+
+simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics) {
+    .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics)
 }
 

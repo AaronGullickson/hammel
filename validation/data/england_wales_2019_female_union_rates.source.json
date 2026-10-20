@@ -1,0 +1,27 @@
+{
+  "publisher": "Office for National Statistics",
+  "geography": "England and Wales",
+  "year": 2019,
+  "sex": "f",
+  "measure": "Opposite-sex marriages, all previous legal marital statuses combined",
+  "source_product": "Marriages in England and Wales: 2019, Figure 2b",
+  "published_date": "2022-05-19",
+  "source_url": "https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/marriagecohabitationandcivilpartnerships/bulletins/marriagesinenglandandwalesprovisional/2019",
+  "download_url": "https://www.ons.gov.uk/generator?format=csv&uri=%2Fpeoplepopulationandcommunity%2Fbirthsdeathsandmarriages%2Fmarriagecohabitationandcivilpartnerships%2Fbulletins%2Fmarriagesinenglandandwalesprovisional%2F2019%2Fa3ea2123",
+  "retrieved_at_utc": "2026-10-15T22:41:17.029077+00:00",
+  "source_units": "Marriages per 1000 unmarried women per year",
+  "output_units": "Marriages per unmarried woman-year",
+  "interpolation": "Piecewise linear between finite group midpoints 18, 22.5, 27.5, ..., 62.5. Evaluate at single-year interval midpoints age_start + 0.5. Hold the nearest endpoint rate outside these midpoints within ages 16 to 64. Divide by 1000.",
+  "open_age_group": "Retain the published 65+ rate as [65, Inf), without single-year interpolation.",
+  "outside_support": "No rows below age 16; no inferred rates there.",
+  "limitations": [
+    "Illustrative union-search input derived from legal marriage rates, not observed search hazards or rates of all unions.",
+    "Unmarried legally can include cohabiting women, unlike the simulation unpartnered risk set.",
+    "Interpolated values are estimates, not ONS single-year observations; interpolation does not preserve exposure-weighted grouped rates without age-specific exposure.",
+    "No distinction by current marital status or union order."
+  ],
+  "row_count": 50,
+  "source_sha256": "3d966ef9018508f4b0f895583b3dcde95bbf04f34579694bf307c67254198c20",
+  "csv_sha256": "c562dccb2e16af0dd11f59d1c449a49efebea846a766aa2dec281bc57d542249",
+  "rebuild_script": "prepare_england_wales_2019_union_rates.R"
+}

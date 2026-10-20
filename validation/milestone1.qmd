@@ -1,6 +1,7 @@
 ---
 title: "Hammel: Milestone 1 Validation"
 author: "Aaron Gullickson"
+date: today
 format:
   html:
     toc: true
@@ -30,9 +31,6 @@ library(ggplot2)
 library(gt)
 ```
 
-## AI Comments
-
-For the conclusions, the evidence supports good reproduction of the tested fixed schedules after the initial fertility transient, plus a documented temporary distortion when fertility changes at restart. Keep the scope explicit: the detailed ASFR/ASMR validation uses US schedules; Niger provides a high-fertility TFR and restart check, with US mortality retained.
 
 ## Purpose and completion criteria
 
@@ -870,9 +868,9 @@ knitr::kable(
 
 ## Conclusions and unresolved limitations
 
-**To complete:** state which criteria were met, which remain unresolved, and
-whether the evidence is sufficient for milestone 1. Separate measured findings
-from assumptions and proposed follow-up work.
+All criteria for the milestone have been met. The microsimulation is producing results consistent with the input demographic rates and converging to stable population characteristics over time.
+
+One remaining issue is the restart issue with changes in fertility rates. This issue will be reported as an issue on GitHub but will not be resolved for this milestone. In practice, unless restarts produce large changes in fertility, the distortion here will be minimal. Even with large changes in fertility, the distortion will only last for a few years. 
 
 ## Reproducibility record
 

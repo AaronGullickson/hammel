@@ -9,14 +9,14 @@ test_that("Lexis counts use exact exposure and maternal ages", {
   expect_equal(sum(exposure$person_years), 2, tolerance = 0)
   mx <- calculate_lexis_counts(population, c(0, 1), c(0, 1, Inf))
   expect_equal(mx$deaths[mx$sex == "f" & mx$age_start == 1], 1, tolerance = 0)
-  expect_equal(mx$asmr[mx$sex == "f" & mx$age_start == 1], 4, tolerance = 0)
-  expect_true(is.na(mx$asmr[mx$sex == "m" & mx$age_start == 1]))
-  asfr <- calculate_lexis_counts(population, c(0, 1), c(0, 1, 2))
-  expect_identical(asfr$births[asfr$sex == "f"], c(0, 1, 0))
-  expect_true(all(is.na(asfr$births[asfr$sex == "m"])))
-  expect_true(all(is.na(asfr$asfr[asfr$sex == "m"])))
-  expect_equal(asfr$asfr[asfr$sex == "f"][2], 4, tolerance = 0)
-  expect_equal(attr(asfr, "unassigned_births")$births, 1, tolerance = 0)
+  expect_equal(mx$rate_mortality[mx$sex == "f" & mx$age_start == 1], 4, tolerance = 0)
+  expect_true(is.na(mx$rate_mortality[mx$sex == "m" & mx$age_start == 1]))
+  rate_fertility <- calculate_lexis_counts(population, c(0, 1), c(0, 1, 2))
+  expect_identical(rate_fertility$births[rate_fertility$sex == "f"], c(0, 1, 0))
+  expect_true(all(is.na(rate_fertility$births[rate_fertility$sex == "m"])))
+  expect_true(all(is.na(rate_fertility$rate_fertility[rate_fertility$sex == "m"])))
+  expect_equal(rate_fertility$rate_fertility[rate_fertility$sex == "f"][2], 4, tolerance = 0)
+  expect_equal(attr(rate_fertility, "unassigned_births")$births, 1, tolerance = 0)
 })
 
 test_that("fractional periods and ages conserve exposure", {
@@ -59,11 +59,11 @@ test_that("duplicate identities in stacked histories are rejected", {
 })
 
 test_that("TFR uses band widths, omits missing rates and groups periods", {
-  rates <- data.frame(age_start = c(15, 20, 30), age_end = c(20, 30, 50), asfr = c(0.1,
+  rates <- data.frame(age_start = c(15, 20, 30), age_end = c(20, 30, 50), rate_fertility = c(0.1,
     0.2, 0.05))
   expect_equal(calculate_tfr(rates)$tfr, 3.5, tolerance = 0)
   bad <- rates
-  bad$asfr[2] <- NA_real_
+  bad$rate_fertility[2] <- NA_real_
   expect_equal(calculate_tfr(bad)$tfr, 1.5, tolerance = 0)
   expect_error(calculate_tfr(rates[c(1, 3), ]))
   bad <- rates
@@ -74,7 +74,7 @@ test_that("TFR uses band widths, omits missing rates and groups periods", {
   later <- rates
   later$time_start <- 1
   later$time_end <- 2
-  later$asfr <- later$asfr * 2
+  later$rate_fertility <- later$rate_fertility * 2
   expect_identical(calculate_tfr(rbind(rates, later))$tfr, c(3.5, 7))
 })
 
@@ -131,7 +131,7 @@ test_that("empty populations have zero exposure and missing mortality rates", {
   empty_rates <- calculate_lexis_counts(empty, c(0, 1), c(0, 1, Inf))
   expect_true(all(empty_rates$person_years == 0))
   expect_true(all(empty_rates$deaths == 0))
-  expect_true(all(is.na(empty_rates$asmr)))
+  expect_true(all(is.na(empty_rates$rate_mortality)))
 })
 
 test_that("Lexis summaries feed TFR and life tables directly", {
@@ -164,7 +164,7 @@ test_that("rate tables and typed processes give equivalent summaries", {
   input_fertility <- data.frame(age_start = c(15, 20, 30), age_end = c(20, 30, 50), rate = c(0.1,
     0.2, 0.05))
   expected <- input_fertility
-  expected$asfr <- expected$rate
+  expected$rate_fertility <- expected$rate
   expected$rate <- NULL
   expect_identical(calculate_tfr(input_fertility), calculate_tfr(expected))
   expect_identical(calculate_tfr(fertility(input_fertility)), calculate_tfr(expected))
@@ -215,3 +215,25 @@ test_that("all public demographic tables are tibbles including empty outputs", {
   expect_true(tibble::is_tibble(calculate_life_table(summary[FALSE, ])))
 })
 
+
+test_that("TFR separates union statuses in input tables and fertility processes", {
+  rates <- data.frame(union_status = c("unpartnered", "partnered", "unpartnered", "partnered"),
+    age_start = c(15, 20, 20, 25), age_end = c(20, 25, 25, 30),
+    rate = c(0.1, 0.3, 0.2, 0.4))
+  expected <- tibble::tibble(union_status = c("unpartnered", "partnered"),
+    age_start = c(15, 20), age_end = c(25, 30), tfr = c(1.5, 3.5))
+  expect_equal(calculate_tfr(rates), expected)
+  expect_equal(calculate_tfr(fertility(rates)), expected)
+  later <- transform(rates, rate = rate * 2, time_start = 2005, time_end = 2010)
+  first <- transform(rates, time_start = 2000, time_end = 2005)
+  result <- calculate_tfr(rbind(first, later))
+  expect_equal(result$tfr, c(1.5, 3.5, 3, 7))
+  expect_equal(result$union_status, rep(c("unpartnered", "partnered"), 2))
+  expect_equal(result$time_start, c(2000, 2000, 2005, 2005))
+  expect_identical(calculate_tfr(rates[FALSE, ])$union_status, character())
+  bad <- rates
+  bad$age_start[3] <- 21
+  expect_error(calculate_tfr(bad), "contiguous")
+  rates$rate[3] <- NA_real_
+  expect_equal(calculate_tfr(rates)$tfr, c(0.5, 3.5))
+})

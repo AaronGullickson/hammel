@@ -39,10 +39,20 @@ ages are not filled or interpreted as zero rates. Coverage and fertility
 eligibility must be specified before simulation. Calendar-time-varying
 schedules are not yet supported; time interval columns are rejected.
 
+Fertility optionally accepts \code{union_status} containing both \code{"partnered"}
+and \code{"unpartnered"}. Rates then use woman-years in the indicated status.
+Without that column, one overall schedule applies to all women. A partial
+status table or any other label is rejected; use explicit zero rates to
+suppress births in a status. Overlap is checked separately within each status.
+On-demand union formation requires overall rates; rate-based formation accepts
+either form and warns when an overall schedule is used.
+
 For fertility, one adjusted hazard is calculated at each original band's
 midpoint: the input rate divided by one minus the input fertility integral
 over the preceding \code{birth_interval}. The integral accounts for overlaps with
-other input bands. Execution rejects nonpositive midpoint eligibility.
+other input bands within the same status schedule. Execution rejects
+nonpositive midpoint eligibility. Birth spacing persists across status changes;
+compensation for the prior status history is not implemented.
 This approximates the age-varying adjustment; initialization is not calibrated.
 }
 \examples{

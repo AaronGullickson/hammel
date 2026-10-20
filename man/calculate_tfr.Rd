@@ -8,16 +8,21 @@ calculate_tfr(rates)
 }
 \arguments{
 \item{rates}{A table returned by \code{\link[=calculate_lexis_counts]{calculate_lexis_counts()}}, a fertility
-process object, or a data frame with \code{age_start}, \code{age_end}, and \code{asfr}
+process object, or a data frame with \code{age_start}, \code{age_end}, and \code{rate_fertility}
 or \code{rate} in births per woman-year. Bare \code{rate} tables are interpreted as
 fertility rates; mortality processes are not valid inputs.}
 }
 \value{
-A tibble with period columns, \code{age_start}, \code{age_end}, and \code{tfr}.
+A tibble with period columns, \code{union_status} when supplied (including
+\code{overall} for Lexis counts pooled across partnership statuses),
+\code{age_start}, \code{age_end}, and \code{tfr}.
 If \code{sex} is present, only female rows are used.
 }
 \description{
 Sum age-specific fertility rates times their actual interval widths.
 Open-ended age bands are omitted. The remaining finite, contiguous age range
 defines the TFR reported. Missing ASFRs are omitted from the sum.
+When \code{union_status} is present, calculate a separate sum for each status
+within each period. These conditional sums describe fertility under continuous
+exposure to that status; they are not components to add into an overall TFR.
 }

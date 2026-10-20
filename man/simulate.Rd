@@ -7,8 +7,8 @@
 simulate(model, years, seed = NULL)
 }
 \arguments{
-\item{model}{A \code{hammel_model} containing a population and both demographic
-processes. The population must have a finite \code{end_time}.}
+\item{model}{A \code{hammel_model} containing a population, mortality, fertility,
+and union-formation processes. The population must have a finite \code{end_time}.}
 
 \item{years}{Nonnegative simulation duration in years.}
 
@@ -23,9 +23,27 @@ A \code{hammel_population} with updated histories and endpoint, plus a
 Advance a configured model and return a population that can initialize a
 later run. The C++ engine samples candidate waiting times across age bands,
 executes at continuous times, and prioritizes death over birth on exact ties.
-Events execute chronologically. All living females face the
-fertility schedule; each birth samples a father uniformly from living males,
-or records an unknown father if none are available. No new unions are formed.
+Events execute chronologically. In on-demand mode all living females face the
+fertility schedule. Rate mode uses either overall rates for all women (with
+a warning), or separate \code{union_status} schedules. A union-formation process is required. With on-demand
+union formation, use the woman's
+current partner, or sample men and choose one using conditional-logit
+probabilities from the matching formula to form a union at the birth.
+Sampled men must meet the configured minimum age (default 15 years).
+Known kin are excluded within the configured generation bound on each side
+of a common ancestor (default two). Other eligibility rules remain pending.
+If no sampled men are eligible, cancel the birth by default. Explicitly set
+\code{cancel_birth_if_no_match = FALSE} to preserve it with unknown father.
+Rate initiation adds age-specific search events for unpartnered women only.
+Failed attempts draw another waiting time. Widowhood cancels pending births
+and switches to unpartnered fertility; a new union switches to partnered
+fertility, preserving birth spacing. Unpartnered births do not trigger searches
+in rate mode. Instead, select a father using the same available male pool,
+screening and \code{father_matching} model (falling back to \code{matching}), without
+forming a union or reserving the man.
+A failed match cancels the birth unless explicitly allowed by the union process.
+Cancellation starts no new birth-spacing interval. On-demand mode rejects
+status schedules.
 }
 \details{
 Minimum birth spacing is configured in \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}
@@ -48,7 +66,9 @@ model <- hammel_model() |>
   set_population(population) |>
   set_mortality(data.frame(sex = c("m", "f"), age_start = 0,
     age_end = Inf, rate = 0.01)) |>
-  set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0.1))
+  set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0.1)) |>
+  set_union_formation("on_demand",
+    create_matching_model(~ age_difference, c(age_difference = 0)))
 result <- simulate(model, years = 2, seed = 42)
 result$simulation
 }

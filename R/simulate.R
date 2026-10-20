@@ -3,9 +3,27 @@
 #' Advance a configured model and return a population that can initialize a
 #' later run. The C++ engine samples candidate waiting times across age bands,
 #' executes at continuous times, and prioritizes death over birth on exact ties.
-#' Events execute chronologically. All living females face the
-#' fertility schedule; each birth samples a father uniformly from living males,
-#' or records an unknown father if none are available. No new unions are formed.
+#' Events execute chronologically. In on-demand mode all living females face the
+#' fertility schedule. Rate mode uses either overall rates for all women (with
+#' a warning), or separate `union_status` schedules. A union-formation process is required. With on-demand
+#' union formation, use the woman's
+#' current partner, or sample men and choose one using conditional-logit
+#' probabilities from the matching formula to form a union at the birth.
+#' Sampled men must meet the configured minimum age (default 15 years).
+#' Known kin are excluded within the configured generation bound on each side
+#' of a common ancestor (default two). Other eligibility rules remain pending.
+#' If no sampled men are eligible, cancel the birth by default. Explicitly set
+#' `cancel_birth_if_no_match = FALSE` to preserve it with unknown father.
+#' Rate initiation adds age-specific search events for unpartnered women only.
+#' Failed attempts draw another waiting time. Widowhood cancels pending births
+#' and switches to unpartnered fertility; a new union switches to partnered
+#' fertility, preserving birth spacing. Unpartnered births do not trigger searches
+#' in rate mode. Instead, select a father using the same available male pool,
+#' screening and `father_matching` model (falling back to `matching`), without
+#' forming a union or reserving the man.
+#' A failed match cancels the birth unless explicitly allowed by the union process.
+#' Cancellation starts no new birth-spacing interval. On-demand mode rejects
+#' status schedules.
 #'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
 #' and uses recorded maternal births, including on restart.
@@ -21,8 +39,8 @@
 #' existing custom columns and histories are preserved. Restarting samples new
 #' pending events and does not reproduce an uninterrupted run exactly.
 #'
-#' @param model A `hammel_model` containing a population and both demographic
-#'   processes. The population must have a finite `end_time`.
+#' @param model A `hammel_model` containing a population, mortality, fertility,
+#'   and union-formation processes. The population must have a finite `end_time`.
 #' @param years Nonnegative simulation duration in years.
 #' @param seed Optional integer seed. With a seed, the caller's RNG state is
 #'   restored afterward. With `NULL`, the simulation advances the current RNG.
@@ -35,14 +53,16 @@
 #'   set_population(population) |>
 #'   set_mortality(data.frame(sex = c("m", "f"), age_start = 0,
 #'     age_end = Inf, rate = 0.01)) |>
-#'   set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0.1))
+#'   set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0.1)) |>
+#'   set_union_formation("on_demand",
+#'     create_matching_model(~ age_difference, c(age_difference = 0)))
 #' result <- simulate(model, years = 2, seed = 42)
 #' result$simulation
 simulate <- function(model, years, seed = NULL) {
   check_model(model)
   if (is.null(model$population) || is.null(model$processes$mortality) ||
-      is.null(model$processes$fertility)) {
-    stop("The model needs a population, mortality process, and fertility process.",
+      is.null(model$processes$fertility) || is.null(model$processes$union_formation)) {
+    stop("The model needs a population, mortality, fertility, and union-formation process.",
          call. = FALSE)
   }
   population <- model$population
@@ -71,9 +91,23 @@ simulate <- function(model, years, seed = NULL) {
            call. = FALSE)
     }
   }
-  if (any(!names(model$processes) %in% c("mortality", "fertility"))) {
-    stop("This engine currently executes only mortality and fertility.", call. = FALSE)
+  if (any(!names(model$processes) %in% c("mortality", "fertility", "union_formation"))) {
+    stop("This engine supports mortality, fertility, and union formation only.",
+         call. = FALSE)
   }
+  union_process <- model$processes$union_formation
+  set_process(model, union_process)
+  status_fertility <- "union_status" %in% names(birth_rates)
+  if (union_process$initiation == "on_demand" && status_fertility) {
+    stop('On-demand union formation requires an overall fertility schedule without `union_status`.',
+         call. = FALSE)
+  }
+  if (union_process$initiation == "rate" && !status_fertility) {
+    warning(paste("Rate-based union formation is using an overall fertility schedule for both",
+                  "partnered and unpartnered women. To make fertility depend on union status,",
+                  "supply separate schedules using `union_status`."), call. = FALSE)
+  }
+  sample_size <- as.integer(union_process$sample_size)
   if (!is.null(seed)) {
     if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
         seed != trunc(seed) || abs(seed) > .Machine$integer.max) {
@@ -91,8 +125,19 @@ simulate <- function(model, years, seed = NULL) {
   result <- population
   births <- deaths <- 0
   if (years > 0) {
+    matching <- prepare_matching_model(union_process$matching)
+    father_matching <- if (is.null(union_process$father_matching)) matching else
+      prepare_matching_model(union_process$father_matching)
     native <- simulate_cpp(population$persons, death_rates, birth_rates,
-                           start, years, birth_interval)
+                           start, years, birth_interval, population$unions,
+                           sample_size, matching,
+                           union_process$min_male_age,
+                           as.integer(union_process$kinship_generations),
+                           union_process$initiation == "rate",
+                           if (is.null(union_process$rates))
+                             data.frame(age_start = numeric(), age_end = numeric(), rate = numeric())
+                           else union_process$rates, father_matching,
+                           union_process$cancel_birth_if_no_match, union_process$diagnostics)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {
@@ -101,17 +146,20 @@ simulate <- function(model, years, seed = NULL) {
     for (column in names(native$persons)) persons[[column]] <- native$persons[[column]]
     result$persons <- tibble::as_tibble(persons)
     unions <- result$unions
-    if (nrow(unions)) {
-      death1 <- persons$death_time[match(unions$partner1_id, persons$person_id)]
-      death2 <- persons$death_time[match(unions$partner2_id, persons$person_id)]
-      ended <- pmin(death1, death2, na.rm = TRUE)
-      close <- is.na(unions$end_time) & !is.na(ended) & ended >= start
-      unions$end_time[close] <- ended[close]
-      unions$end_reason[close] <- "death"
-      result$unions <- unions
+    added_unions <- nrow(native$unions) - nrow(unions)
+    if (added_unions > 0L) {
+      unions <- rbind(unions, unions[rep(NA_integer_, added_unions), , drop = FALSE])
     }
+    for (column in names(native$unions)) unions[[column]] <- native$unions[[column]]
+    result$unions <- tibble::as_tibble(unions)
     births <- native$births
     deaths <- native$deaths
+  }
+  if (union_process$diagnostics) {
+    for (column in c(".n_eligible", ".utility_rank")) {
+      if (!column %in% names(result$unions))
+        result$unions[[column]] <- rep(NA_integer_, nrow(result$unions))
+    }
   }
   result$end_time <- start + years
   result$simulation <- list(start_time = start, end_time = result$end_time,
