@@ -88,7 +88,10 @@ rate multipliers, flexible child group identity and possible proportional group
 ancestry. Other future priorities are analysis helpers, input-rate preparation,
 fertility heterogeneity, inherited/life-course characteristics (such as education),
 and within-run immigration with generational status. Initial optional group schedules, maternal inheritance, and weighted baseline
-sampling are specified in [groups](groups.md) (D052). Richer demographic rules
+sampling are specified in [groups](groups.md) (D052). Newborn identity now has
+built-in/custom inheritance rules (D058), including declared mixed labels and
+independently configured schedules; see [group inheritance](group-inheritance.md).
+Multiple simultaneous identities and other richer demographic rules
 remain open. See the [roadmap](roadmap.md); milestone 2 completion does
 not authorize unspecified future demographic behavior.
 

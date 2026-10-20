@@ -89,7 +89,8 @@ compensation grid, or birth-spacing argument on the execution function.
 C++ constructs midpoint-adjusted fertility bands, samples cumulative-hazard
 thresholds, and processes the earliest event in a sparse ordered queue.
 R validates inputs and assembles the returned `hammel_population`, retaining
-histories and existing extra person columns. Newborns inherit the mother's optional `group`; other custom attributes are
+histories and existing extra person columns. Newborn group identity follows
+the fertility inheritance model (maternal by default); other custom attributes are
 missing. Group-specific schedules and baseline group sampling are documented in
 [groups](groups.md). The `simulation` component records `start_time`, `end_time`,
 `birth_interval`, `births`, and `deaths` for the latest run.
@@ -107,6 +108,16 @@ components; it does not traverse the genealogy or draw random numbers. See
 With an explicit seed, R's RNG state is restored after the call. With no seed,
 the current state advances normally. See the scientific contract for ties,
 run boundaries, parent assignment, and resampling.
+
+## Newborn identity configuration
+
+`create_group_inheritance()` attaches through fertility's `inheritance` argument.
+R validates the mode, possible identity registry, grouped schedule coverage,
+and matching levels. Native built-ins assign identity after sex and ancestry
+are known, then schedule with the selected group's rates. Custom R functions
+receive copied inputs, return a validated registry index, and cannot access
+mutable state through the interface. RNG state is synchronized around custom
+calls. See [group inheritance](group-inheritance.md).
 
 ## Reusing outputs and changing rates
 

@@ -10,7 +10,13 @@ set_process(model, process)
 
 set_mortality(model, rates, group_prop_hazard = NULL)
 
-set_fertility(model, rates, birth_interval = 0.75, group_prop_hazard = NULL)
+set_fertility(
+  model,
+  rates,
+  birth_interval = 0.75,
+  group_prop_hazard = NULL,
+  inheritance = create_group_inheritance()
+)
 }
 \arguments{
 \item{model}{A \code{hammel_model} object.}
@@ -28,6 +34,10 @@ Fertility also accepts a named list of vectors for \code{partnered} and/or
 
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
 defaulting to \code{0.75}. Must be finite and nonnegative.}
+
+\item{inheritance}{A group identity model from \code{\link[=create_group_inheritance]{create_group_inheritance()}}.
+Applies to fertility and defaults to following the mother. Assignment is
+independent of recorded ancestry proportions.}
 }
 \value{
 An updated \code{hammel_model}. The input model is not modified.

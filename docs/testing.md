@@ -26,6 +26,7 @@ The old top-level base-R test scripts have been converted and removed.
 | `test-groups.R` | Group rate lookup, analytical survival, coverage errors, fallback warnings, maternal inheritance, cross-group unions, restarts, RNG equivalence, and weighted initialization |
 | `test-group-demography.R` | Exact group exposure/counts, cross-group parent and spouse attribution, conservation, analytical group TFR/life tables, population sizes, validation, and typed empty tables |
 | `test-group-prop-hazard.R` | Multiplier validation, explicit-schedule equivalence, compensation order, omitted/unit/zero factors, warnings, RNG preservation, restarts, numeric codes, empty populations, and overflow |
+| `test-group-inheritance.R` | All assignment rules/fallbacks, passing and ancestry probabilities, custom RNG, mixed identity rates, future-group coverage, restarts, and unchanged maternal defaults |
 | `test-ancestry.R` | Starting identities, supplied proportions and IDs, parental averaging across generations, unknown shares, restarts/deaths, numeric labels, empty tables, and RNG independence |
 | `test-group-matching.R` | Directed/symmetric offsets, analytical probabilities, fixed factor contrasts/interactions, native/custom score agreement, father overrides, final utility ranks, validation, and unchanged RNG |
 | `test-prevent-exogamy.R` | Post-sampling restrictions, no refilling, scarcity/failure, direction/symmetry, father overrides, diagnostics, retained partners, and unchanged disabled RNG |

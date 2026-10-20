@@ -341,7 +341,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   int kinship_generations, bool rate_initiation,
                   DataFrame union_rates, List father_matching,
                   bool cancel_birth_if_no_match, bool diagnostics,
-                  NumericMatrix initial_ancestry) {
+                  NumericMatrix initial_ancestry, List inheritance) {
   // R performs input validation and seed handling. All engine state below is
   // local to this call; public times and rates remain in years and person-years.
   NumericVector ids = persons["person_id"], births = persons["birth_time"];
@@ -487,7 +487,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   struct GroupSchedules {
     std::vector<Band> male, female, partnered, unpartnered, search;
   };
-  int group_count = 1;
+  int group_count = std::max(1, as<int>(inheritance["group_count"]));
+  const int inheritance_method = inheritance["method"];
+  const double passing = inheritance["passing"];
+  IntegerVector inheritance_ranks = inheritance["ranks"];
+  IntegerVector ancestry_groups = inheritance["ancestry_groups"];
+  Function inherit_custom = inheritance["custom"];
   for (int value : person_groups) group_count = std::max(group_count, value + 1);
   std::vector<GroupSchedules> schedules(group_count);
   const bool status_fertility = fertility_rates.containsElementNamed("union_status");
@@ -618,6 +623,67 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         ancestry[child_offset + g] = 0.5 *
           ancestry[static_cast<size_t>(i) * ancestry_components + g] + 0.5 * paternal;
       }
+      // Sex and ancestry are now available; assign identity before any newborn
+      // hazard or matching lookup. Existing people's identities never change.
+      const int maternal_group = people[i].group;
+      const int paternal_group = father_position < 0 ? -1 : people[father_position].group;
+      int child_group = maternal_group;
+      if (inheritance_method == 1 && paternal_group >= 0) child_group = paternal_group;
+      else if (inheritance_method == 2 && paternal_group >= 0 && paternal_group != maternal_group)
+        child_group = R::runif(0, 1) < 0.5 ? maternal_group : paternal_group;
+      else if (inheritance_method == 3 && !female && paternal_group >= 0) child_group = paternal_group;
+      else if (inheritance_method == 4 && female && paternal_group >= 0) child_group = paternal_group;
+      else if (inheritance_method == 5 && ancestry_components > 0 &&
+               ancestry[child_offset + ancestry_components - 1] < 1.0) {
+        double total = 0;
+        int positive = 0, sole_group = maternal_group;
+        for (size_t g = 0; g + 1 < ancestry_components; ++g) {
+          const double share = ancestry[child_offset + g];
+          if (share > 0) {
+            if (ancestry_groups[g] < 0) stop("Positive ancestry has no declared identity group.");
+            total += share; ++positive; sole_group = ancestry_groups[g];
+          }
+        }
+        if (positive == 1) child_group = sole_group;
+        else if (positive > 1) {
+          const double draw = R::runif(0, total);
+          double cumulative = 0;
+          child_group = sole_group; // Protect the final cell against rounding.
+          for (size_t g = 0; g + 1 < ancestry_components; ++g) {
+            cumulative += ancestry[child_offset + g];
+            if (draw < cumulative) { child_group = ancestry_groups[g]; break; }
+          }
+        }
+      } else if (inheritance_method == 6 && paternal_group >= 0 && paternal_group != maternal_group) {
+        const int maternal_rank = inheritance_ranks[maternal_group];
+        const int paternal_rank = inheritance_ranks[paternal_group];
+        if (maternal_rank >= 0 && paternal_rank >= 0) {
+          const bool reverse = passing == 1 || (passing > 0 && R::runif(0, 1) < passing);
+          const bool maternal_first = maternal_rank < paternal_rank;
+          child_group = (maternal_first != reverse) ? maternal_group : paternal_group;
+        }
+      } else if (inheritance_method == 7) {
+        NumericVector maternal(ancestry_components), paternal(ancestry_components), child_shares(ancestry_components);
+        for (size_t g = 0; g < ancestry_components; ++g) {
+          maternal[g] = ancestry[static_cast<size_t>(i) * ancestry_components + g];
+          if (father_position >= 0)
+            paternal[g] = ancestry[static_cast<size_t>(father_position) * ancestry_components + g];
+          child_shares[g] = ancestry[child_offset + g];
+        }
+        // R's random functions must see all preceding native draws, and native
+        // scheduling must resume from the state left by the R callback.
+        PutRNGstate();
+        try {
+          child_group = as<int>(inherit_custom(maternal_group, paternal_group,
+            female ? "f" : "m", maternal, paternal, child_shares, partner >= 0));
+        } catch (...) {
+          GetRNGstate();
+          throw;
+        }
+        GetRNGstate();
+      }
+      if (child_group < 0 || child_group >= group_count) stop("Invalid newborn group index.");
+      people[child].group = child_group;
       kinship.append(i, father_position);
       if (!female) males.push_back(child);
       person_unions.emplace_back();

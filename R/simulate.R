@@ -35,8 +35,9 @@
 #' bands is zero. Mortality must cover all ages for both sexes, ending at `Inf`.
 #'
 #' Events are recorded at their sampled times in `[start, start + years)`. Rates and all
-#' times remain in person-year and year units. Newborns inherit the mother's
-#' `group`, if present; other newborn custom columns are missing. Grouped rate
+#' times remain in person-year and year units. Newborn group identity uses
+#' fertility's inheritance model (maternal by default), if groups are present;
+#' other newborn custom columns are missing. Grouped rate
 #' tables use each person's group (the woman's group for union searches).
 #' Ungrouped tables apply to everyone. Missing population groups in a grouped
 #' rate table are errors. Without population groups, each grouped table uses its
@@ -120,21 +121,21 @@ simulate <- function(model, years, seed = NULL) {
                   "partnered and unpartnered women. To make fertility depend on union status,",
                   "supply separate schedules using `union_status`."), call. = FALSE)
   }
-  death_rates <- prepare_group_rates(death_rates, population$persons, "mortality")
-  birth_rates <- prepare_group_rates(birth_rates, population$persons, "fertility")
+  inheritance <- prepare_group_inheritance(model$processes$fertility$inheritance, population)
+  group_values <- inheritance$values
+  death_rates <- prepare_group_rates(death_rates, population$persons, "mortality", group_values)
+  birth_rates <- prepare_group_rates(birth_rates, population$persons, "fertility", group_values)
   union_rates <- if (is.null(union_process$rates))
     data.frame(age_start = numeric(), age_end = numeric(), rate = numeric()) else
-    prepare_group_rates(union_process$rates, population$persons, "union formation")
+    prepare_group_rates(union_process$rates, population$persons, "union formation", group_values)
   death_rates <- apply_group_prop_hazard(death_rates, population$persons,
-    model$processes$mortality$group_prop_hazard, "mortality")
+    model$processes$mortality$group_prop_hazard, "mortality", group_values)
   birth_rates <- apply_group_prop_hazard(birth_rates, population$persons,
-    model$processes$fertility$group_prop_hazard, "fertility")
+    model$processes$fertility$group_prop_hazard, "fertility", group_values)
   if (union_process$initiation == "rate") {
     union_rates <- apply_group_prop_hazard(union_rates, population$persons,
-      union_process$group_prop_hazard, "union formation")
+      union_process$group_prop_hazard, "union formation", group_values)
   }
-  group_values <- if ("group" %in% names(population$persons))
-    unique(population$persons$group) else NULL
   validate_matching_groups(union_process$matching, group_values)
   if (!is.null(union_process$father_matching))
     validate_matching_groups(union_process$father_matching, group_values)
@@ -172,7 +173,8 @@ simulate <- function(model, years, seed = NULL) {
                            union_process$cancel_birth_if_no_match, union_process$diagnostics,
                            if (is.null(population[["ancestry"]]))
                              matrix(numeric(), nrow = nrow(engine_persons), ncol = 0L) else
-                             as.matrix(population[["ancestry"]][setdiff(names(population[["ancestry"]]), "person_id")]))
+                             as.matrix(population[["ancestry"]][setdiff(names(population[["ancestry"]]), "person_id")]),
+                           inheritance)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {

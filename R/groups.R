@@ -55,7 +55,8 @@ split_rate_groups <- function(rates) {
   else list(seq_len(nrow(rates)))
 }
 
-prepare_group_rates <- function(rates, persons, process) {
+prepare_group_rates <- function(rates, persons, process,
+                                group_values = if ("group" %in% names(persons)) unique(persons$group) else NULL) {
   rates$.hammel_group <- NULL
   if (!"group" %in% names(rates)) return(rates)
   labels <- as.character(rates$group)
@@ -65,7 +66,7 @@ prepare_group_rates <- function(rates, persons, process) {
                     process, first), call. = FALSE)
     return(rates[labels == first, , drop = FALSE])
   }
-  groups <- unique(as.character(persons$group))
+  groups <- as.character(group_values)
   missing <- setdiff(groups, labels)
   if (length(missing)) {
     stop(sprintf("%s rates are missing schedules for population group(s): %s.",
@@ -77,14 +78,15 @@ prepare_group_rates <- function(rates, persons, process) {
 
 # Rates have already passed group coverage/fallback checks. Expand shared
 # schedules only on this execution copy; preserve the user's process inputs.
-apply_group_prop_hazard <- function(rates, persons, multipliers, process) {
+apply_group_prop_hazard <- function(rates, persons, multipliers, process,
+                                    group_values = if ("group" %in% names(persons)) unique(persons$group) else NULL) {
   if (is.null(multipliers)) return(rates)
   if (!"group" %in% names(persons)) {
     warning(sprintf("`group_prop_hazard` was specified for %s but no groups found in the population; ignoring multipliers.",
                     process), call. = FALSE)
     return(rates)
   }
-  groups <- unique(as.character(persons$group))
+  groups <- as.character(group_values)
   if (!length(groups)) return(rates)
   if (!".hammel_group" %in% names(rates)) {
     rows <- nrow(rates)

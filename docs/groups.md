@@ -2,7 +2,7 @@
 
 Milestone 3 initial scope, requested October 20, 2026. Group data belongs in
 the population and its effects belong in the relevant processes (D051).
-This specification does not select the deferred inheritance-model API.
+Newborn identity rules are specified in [group inheritance](group-inheritance.md).
 
 ## Proportional rate multipliers
 
@@ -94,8 +94,12 @@ schedule using the original finite bands and existing birth-spacing rules.
 
 ## Births and unions
 
-For this increment, every newborn inherits the mother's group automatically.
-The child's own schedule applies from birth, including neonatal mortality.
+Newborns follow their mother's group by default. Fertility may attach a
+`create_group_inheritance()` object for other parental, ancestry, hierarchy,
+or custom assignment rules. The child's assigned schedule applies from birth,
+including neonatal mortality. Possible identities include initial identities,
+positive reference ancestry groups, and explicitly declared outputs; grouped
+schedules and categorical matching must cover the full set before execution.
 The father need not share that group by default. Optional `prevent_exogamy`
 restrictions filter sampled candidates without refilling; the initial sampling
 pool remains unchanged. Group formula terms and directed/symmetric pair effects
@@ -104,7 +108,8 @@ Other eligibility rules remain.
 Group identity is fixed over life and retained across restarts. Ancestry
 proportions are tracked separately in the population's `ancestry` tibble;
 see [ancestry](ancestry.md) for initialization, averaging, and unknown shares.
-Configurable group-identity inheritance remains future work.
+See [group inheritance](group-inheritance.md) for fallbacks, passing, and custom
+assignment of mixed identities such as AB.
 
 ## Baseline initialization
 

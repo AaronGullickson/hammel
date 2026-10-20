@@ -1,8 +1,8 @@
 # Group ancestry proportions
 
 Requested by the user October 20, 2026. Ancestry is tracked independently of
-assigned group identity, without changing rates, matching, or maternal group
-inheritance. It represents expected genealogical contributions, not stochastic
+assigned group identity, without changing rates, matching, or configured identity
+assignment. It represents expected genealogical contributions, not stochastic
 realized genetic inheritance.
 
 ## Initialization and public table
@@ -41,8 +41,9 @@ half the father's share. A missing parent contributes its entire half to
 their unknown share by the same averaging rule. Existing engine births always
 have a known mother; an allowed unmatched birth may have an unknown father.
 Ancestry is appended at birth before the newborn enters risk, and is retained
-after death. Group identity remains inherited from the mother and does not
-change ancestry proportions.
+after death. Group identity follows the mother by default or the configured
+fertility inheritance model. Assignment does not change ancestry proportions;
+see [group inheritance](group-inheritance.md).
 
 Keep supplied/returned proportions across attachment, simulation, and restarts;
 do not reinitialize them from identity. If a grouped population lacks an ancestry

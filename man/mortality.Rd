@@ -7,7 +7,12 @@
 \usage{
 mortality(rates, group_prop_hazard = NULL)
 
-fertility(rates, birth_interval = 0.75, group_prop_hazard = NULL)
+fertility(
+  rates,
+  birth_interval = 0.75,
+  group_prop_hazard = NULL,
+  inheritance = create_group_inheritance()
+)
 }
 \arguments{
 \item{rates}{A nonempty data frame containing numeric \code{age_start}, \code{age_end},
@@ -32,6 +37,12 @@ statuses (or overall fertility). Status lists require \code{union_status} rates.
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
 defaulting to \code{0.75}. Must be finite and nonnegative. Applies to fertility
 only; eligible hazards use midpoint birth-spacing compensation.}
+
+\item{inheritance}{A group identity model from \code{\link[=create_group_inheritance]{create_group_inheritance()}}.
+Fertility defaults to following the mother. Other parental, ancestry,
+hierarchy, and custom rules assign identity after child sex and ancestry
+are calculated. Possible identities are checked against grouped schedules
+and categorical matching levels before execution. Applies to fertility only.}
 }
 \value{
 A named list containing \code{name}, \code{rates}, and \code{rate_unit}, plus

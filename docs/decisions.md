@@ -1007,3 +1007,42 @@ matching specifications override this default. Initiation mode remains explicit.
   an unsuccessful sample, complete exclusion, finite-penalty contrast, father
   overrides, retained partners, diagnostics and unchanged RNG when disabled.
   See [group matching](group-matching.md).
+
+
+## D058: Configurable newborn identity inheritance on fertility
+
+- **Status:** specified and authorized by the user October 20, 2026; maternal
+  assignment remains the explicit default when users supply no rule.
+- **Decision:** attach a `create_group_inheritance()` object to fertility.
+  Built-ins follow mother, father, random parent (0.5/0.5), same-sex parent,
+  opposite-sex parent, known child ancestry, or a strict hierarchy of parental
+  identities. Missing required information falls back to the mother's group,
+  including missing fathers and unranked parents. Ancestry sampling conditions
+  out unknown shares and falls back to mother if entirely unknown.
+- **Hierarchy:** highest first in `order`; optional `passing` is the per-birth
+  probability of reversing the hierarchy (default zero). Equal identities or
+  missing information retain the maternal fallback. Complex hierarchies/ties
+  use custom functions.
+- **Custom rules:** receive parental groups and ancestry, child ancestry, and
+  child sex and logical `parents_in_union` at birth (including on-demand
+  formation; FALSE for nonmarital/unknown-father births); return one valid
+  identity. The union-status input was requested October 20, 2026; callbacks
+  without the new argument or `...` remain supported. Ordinary R RNG draws share the native
+  stream. Only copied inputs are exposed; functions must not mutate simulation
+  state. Errors and invalid/undeclared returns fail explicitly.
+- **Possible groups:** infer starting identities plus reference groups with
+  positive ancestry; optional `groups` adds possible outputs. Validate all
+  grouped schedules and categorical matching levels before execution, and keep
+  a fixed registry during a run. All-zero ancestry columns add no identity.
+- **Timing:** calculate sex and ancestry, assign identity, then schedule newborn
+  hazards. Assignment does not change ancestry, existing people's identities,
+  or default maternal random-number consumption. Rules are reapplied only to
+  new births, with supplied proportions retained on restart.
+- **Mixed labels:** the user explicitly noted that custom rules can assign AB
+  from A/B parents and configure independent AB rates/matching. AB identity
+  need not introduce an AB ancestry component. Multiple simultaneous identities
+  remain deferred.
+- **Validation:** all rules/fallbacks, sampling probabilities, passing endpoints,
+  custom/native RNG agreement and error restoration, future identity rate and
+  matching coverage, AB neonatal mortality and within-run matching, numeric
+  labels, empty populations, and restarts. See [group inheritance](group-inheritance.md).

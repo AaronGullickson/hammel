@@ -50,8 +50,9 @@ may contain `group`. Ungrouped rate tables apply to everyone; grouped tables
 must cover every population group. Without population groups, use each table's
 alphabetically first group and emit a simulation warning. Group does not affect
 matching eligibility. Optional group formula predictors and directed/symmetric
-pair effects can change utility. Newborns automatically inherit their mother's
-group and enter their own group's mortality schedule immediately. Fertility
+pair effects can change utility. Newborns follow their mother's group by default
+or the configured inheritance rule, entering the assigned group's mortality
+schedule immediately. Fertility
 compensation is separate within each group/status schedule. Group values are
 nonmissing character labels or finite numeric codes, with nonempty labels.
 See [groups](groups.md) for full rules, ordering, examples, and validation scope.
@@ -144,6 +145,27 @@ at `max(now, t + birth_interval)`. Mortality remains active throughout spacing.
 A birth at 1.03 with spacing 0.75 permits the next birth no earlier than 1.78.
 Zero spacing disables both the exclusion and compensation. Arbitrary finite
 nonnegative intervals are allowed; there is no whole-month restriction.
+
+### Newborn group identity
+
+Fertility holds a `create_group_inheritance()` object, defaulting to `mother`.
+Other built-in methods follow father, random parent, same/opposite-sex parent,
+known ancestry shares, or a strict hierarchy of parental identities. Required
+missing inputs fall back to the mother. Ancestry sampling conditions out unknown
+shares; all-unknown ancestry falls back to the mother. Hierarchy `passing` is
+an independent probability of reversed order, default 0. Missing ranks or
+father use the maternal fallback. Custom functions receive copied parental
+identities/ancestry, child ancestry, and child sex and must return one valid
+identity. Invalid returns and undeclared outputs error.
+
+Infer possible groups from starting identities, positive ancestry reference
+shares, and optional explicit declarations. Grouped rates and categorical
+matching levels must cover the full set before execution. Assignment follows
+sex and ancestry calculation, consumes draws only when the chosen rule requires
+randomness, and finishes before scheduling the newborn. Custom R draws share
+the engine RNG stream and explicit seeds restore state even on errors. Identity
+does not alter ancestry: a custom AB identity may retain only A/B ancestry.
+See [group inheritance](group-inheritance.md) for rules and worked examples.
 
 ### Midpoint compensation (D028)
 
@@ -264,7 +286,7 @@ for worked examples and implemented milestone 2 rules.
 Update the mother's latest birth and resample both newborn and mother. Newborns
 enter mortality risk immediately; their fertility depends on the supplied ages.
 Existing custom person/union columns are retained; new rows have missing custom
-values, except that `group` is inherited from the mother. C++ maintains union histories and shared partner caches for all runs,
+values, except that `group` is assigned by the fertility inheritance model. C++ maintains union histories and shared partner caches for all runs,
 closing unions at death with `end_reason = "death_husband"` or
 `"death_wife"` according to the executed death event. Initiation mode
 controls search timing; it does not control whether partner state is tracked.

@@ -38,7 +38,10 @@ partnered/unpartnered fertility factors (D054), are also implemented. Ancestry
 proportions are tracked separately with parental averaging (D055); see
 [ancestry](ancestry.md). Directed/symmetric pair effects and group matching
 formula terms are implemented under D056; see [group matching](group-matching.md).
-Configurable identity inheritance and multiple identities remain future work.
+Built-in/custom newborn identity assignment is implemented under D058; see
+[group inheritance](group-inheritance.md). Multiple simultaneous identities
+remain future work. Custom rules can already assign discrete mixed identities
+such as AB with independently supplied AB demographic schedules.
 
 The user selected the following directions for group support:
 
@@ -46,9 +49,9 @@ The user selected the following directions for group support:
 - Allow proportional rate differences by group relative to a baseline schedule,
   avoiding a complete duplicate rate table for each group. An illustrative
   fertility multiplier is 1.1 times the baseline, not a demographic default.
-- Support flexible child group assignment when parents have different groups,
-  with more user control than the user has found in SOCSIM. The rules have not
-  been selected; do not presume maternal, paternal or probabilistic assignment.
+- Support flexible child group assignment when parents have different groups.
+  Parental, ancestry, hierarchy/passing, and custom rules are now implemented
+  under D058, with maternal assignment as the default.
 - Consider tracking each person's proportional ancestry by group separately
   from assigned group identity.
 
@@ -61,12 +64,11 @@ will be no separate general group process for milestone 3. Fertility will hold
 an inheritance model object that specifies newborn group assignment and, where
 supported, ancestry inheritance.
 
-Simple inheritance rules will use character-string modes rather than a boolean;
-following the mother, following the father, and random assignment are examples
-of intended alternatives. The object may also contain a richer model
-specification, analogous to the matching model. Exact mode names, random
-assignment probabilities, model inputs and semantics remain to be specified.
-This is an accepted design direction, not implemented functionality.
+Inheritance rules now use character-string modes in an object attached to
+fertility. Built-ins cover parental, ancestry, and hierarchy assignment with
+passing; custom functions support more complex rules and declared identities
+(D058). Ancestry remains separate from identity. Multiple-identity representation
+and specialized model constructors remain unselected.
 
 Mortality, fertility, and rate-based searches now accept group multipliers;
 fertility factors apply before compensation and may differ by union status
