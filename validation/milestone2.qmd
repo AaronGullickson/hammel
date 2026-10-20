@@ -466,7 +466,7 @@ mar_rates |>
 
 @fig-mar-rates-model-on-demand shows the mean age-specific marriage rates for women from the simulations in comparison to those same races for the input data. As expected the two schedules differ somewhat. The observed marriage rates peak earlier and then decline faster than the input marriage rates. 
 
-Because this result is dependent upon the fertility schedule, the degree of fit between these two sources will vary considerably across simulations depending on a variety of factors. Therefore, the results from @fig-mar-rates-on-demand should not be taken as a generalizable statement of the degree of agreement or disagreement expected when using the on demand model.
+Because this result is dependent upon the fertility schedule, the degree of fit between these two sources will vary considerably across simulations depending on a variety of factors. Therefore, the results from @fig-mar-rates-model-on-demand should not be taken as a generalizable statement of the degree of agreement or disagreement expected when using the on demand model.
 
 ```{r}
 #| label: fig-gender-mar-rates-model-on-demand
@@ -480,7 +480,7 @@ mar_rates |>
   theme_bw()
 ```
 
-@fig-gender-mar-rates--model-on-demand compares the mean age specific rates for women and men in the simulation. The two results are quite close, but the peak for men is lower and the decline is slower. This is expected because the model assumes a slight preference for women to marry older men.
+@fig-gender-mar-rates-model-on-demand compares the mean age specific rates for women and men in the simulation. The two results are quite close, but the peak for men is lower and the decline is slower. This is expected because the model assumes a slight preference for women to marry older men.
 
 ### Share ever married
 
