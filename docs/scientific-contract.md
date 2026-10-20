@@ -91,6 +91,24 @@ that does not establish that she truly had no previous children. For supplied
 histories and restarts, recover the latest recorded maternal birth, including
 children who have died. No initial histories are fabricated.
 
+### Ancestry proportions
+
+An optional `ancestry` tibble stores one row per person with `group_<label>`
+shares and an explicit `unknown` share. Without supplied proportions, grouped
+populations initialize every starting person at 100% of their recorded group,
+irrespective of earlier parent histories. Supplied proportions are used as given
+and retained across restarts. Shares must be finite, in `[0,1]`, and sum to one
+within `1e-8`; missing ancestry is represented explicitly as unknown, not NA.
+No table is created automatically without groups, though supplied ancestry may
+be retained without current group identities.
+
+At birth, average each parent's shares with weights 0.5 and 0.5. A missing
+parent contributes its entire half to unknown; known parents' unknown shares
+are averaged normally. This is deterministic expected genealogical ancestry,
+independent of assigned group identity. All shares are retained after death;
+the engine appends them before scheduling the newborn without extra RNG draws.
+See [ancestry](ancestry.md) for the public schema, examples, and validation.
+
 ## Shared waiting-time sampling
 
 The engine draws a positive threshold `E` from R's `Exp(1)` generator,

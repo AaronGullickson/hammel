@@ -28,6 +28,9 @@ hammel_model <- function() {
 #' their reference time. Tables are normalized to tibbles; column contents and
 #' additional components are retained. Existing process configuration is retained.
 #' The input model is not modified.
+#' Grouped populations without ancestry proportions initialize each starting
+#' person at 100% ancestry in their recorded group. Supplied ancestry is
+#' retained and normalized to a tibble in person order; see [hammel_population()].
 #'
 #' @param model A `hammel_model` object.
 #' @param population A `hammel_population` object. Construct it from tables with
@@ -45,6 +48,7 @@ hammel_model <- function() {
 set_population <- function(model, population) {
   check_model(model)
   validate_population(population)
+  population <- normalize_population_ancestry(population)
   population$persons <- tibble::as_tibble(population$persons)
   population$unions <- tibble::as_tibble(population$unions)
   model$population <- population

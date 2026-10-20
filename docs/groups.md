@@ -98,8 +98,10 @@ For this increment, every newborn inherits the mother's group automatically.
 The child's own schedule applies from birth, including neonatal mortality.
 The father need not share that group. Group membership neither restricts the
 candidate pool nor changes matching utilities. Other eligibility rules remain.
-Group identity is fixed over life and retained across restarts. No ancestry
-proportions or configurable inheritance model are added.
+Group identity is fixed over life and retained across restarts. Ancestry
+proportions are tracked separately in the population's `ancestry` tibble;
+see [ancestry](ancestry.md) for initialization, averaging, and unknown shares.
+Configurable group-identity inheritance remains future work.
 
 ## Baseline initialization
 

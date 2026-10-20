@@ -68,6 +68,7 @@ test_that("shared and identical grouped schedules preserve fixed-seed histories"
   grouped <- simulate(model, 5, seed = 123)
   expect_identical(grouped, shared)
   shared$persons$group <- NULL
+  shared$ancestry <- NULL
   expect_identical(shared, ungrouped)
 })
 
@@ -188,6 +189,7 @@ test_that("baseline group weights are normalized, sampled and reproducible", {
   set.seed(135)
   ungrouped <- create_baseline_population(10000)
   p$persons$group <- NULL
+  p$ancestry <- NULL
   expect_identical(p, ungrouped)
   expect_identical(create_baseline_population(0, group_weights = c(A = 1))$persons$group,
                    character())

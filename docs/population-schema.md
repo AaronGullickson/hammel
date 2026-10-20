@@ -25,6 +25,17 @@ One row per person, including deceased persons.
 
 Omit marital status and latest-union pointers. Derive relationship state from `unions`; the engine may cache derived state for performance without requiring another user-facing column. Unknown earlier histories must not be silently interpreted as known lifetime singlehood. Fertility multipliers, sibling pointers, and last-born-child pointers are also omitted for now. Group labels must be nonempty; their input type is preserved. See [groups](groups.md) for schedule lookup and inheritance rules.
 
+## Ancestry
+
+An optional `ancestry` tibble has one row per person, including deceased people,
+keyed by `person_id`. Known shares are in `group_<label>` columns; `unknown`
+records unknown ancestry. Shares are finite and in `[0,1]`, summing to one per
+person within `1e-8`. Supplied rows are aligned to persons; reference groups may
+differ from current identity groups. Without supplied shares, grouped populations
+initialize everyone at 100% of their recorded group. Without groups or supplied
+shares, no table is created. Newborns average parental shares; a missing parent
+contributes half to unknown. See [ancestry](ancestry.md) for examples and restarts.
+
 ## Unions
 
 One row per union episode; repeated unions have distinct IDs.

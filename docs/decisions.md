@@ -932,3 +932,29 @@ matching specifications override this default. Initiation mode remains explicit.
   edited-object validation, RNG preservation, restarts, and empty populations.
   Input-rate summaries still describe stored tables; population-dependent
   factors are applied by simulation, not those summaries. See [groups](groups.md).
+
+## D055: Track ancestry shares at birth
+
+- **Status:** requested and specified by the user October 20, 2026.
+- **Decision:** track expected group ancestry separately from assigned identity
+  in an optional `ancestry` tibble on `hammel_population`. Without supplied
+  proportions, every starting person is 100% of their recorded group, even when
+  existing parent histories are present. Otherwise retain supplied proportions.
+  No ancestry table is created automatically without population groups.
+- **Births:** each component is half the mother's share plus half the father's.
+  Missing parental contributions enter an explicit unknown share; parental
+  unknown shares transmit by the same averaging rule. Group identity still
+  follows the mother. No stochastic genetic transmission is modeled.
+- **Restarts and state:** preserve existing proportions, including deceased
+  people. Store call-local ancestry state in the engine and append at birth,
+  with no genealogy traversal or additional RNG draws. Ancestry does not yet
+  affect rates or matching.
+- **Table representation:** `person_id`, known shares named `group_<label>`,
+  and `unknown`. Require exactly one row per person, finite shares in `[0,1]`,
+  and row sums within `1e-8` of one; do not renormalize. Reference groups may
+  differ from current identity groups. Align supplied rows to person order;
+  retain supplied ancestry even without current group identities.
+- **Validation:** worked pure/mixed parents and unknown fathers, multiple
+  generations, supplied values and shuffled IDs, restarts, deaths, empty
+  populations, numeric labels, run independence, and unchanged demographic RNG
+  consumption. See [ancestry](ancestry.md).

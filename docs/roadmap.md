@@ -34,8 +34,10 @@ provenance. Avoid automatic downloads as part of simulation execution.
 Initial group schedules, maternal inheritance, and weighted baseline sampling
 are specified in [groups](groups.md) under D052 (October 20, 2026). Group
 observations (D053) and proportional input-rate multipliers, including separate
-partnered/unpartnered fertility factors (D054), are also implemented. Intergroup
-matching terms, configurable inheritance, and ancestry remain future work.
+partnered/unpartnered fertility factors (D054), are also implemented. Ancestry
+proportions are tracked separately with parental averaging (D055); see
+[ancestry](ancestry.md). Intergroup matching terms and configurable identity
+inheritance remain future work.
 
 The user selected the following directions for group support:
 
@@ -68,11 +70,11 @@ This is an accepted design direction, not implemented functionality.
 Mortality, fertility, and rate-based searches now accept group multipliers;
 fertility factors apply before compensation and may differ by union status
 (D054). Before extending matching, specify formula predictors/contrasts for
-each parent's group. For ancestry proportions clarify
-the reference ancestors, missing-parent treatment, initialization and whether
-proportions represent expected genealogical contributions or another quantity.
-A discrete group identity need not equal a majority-ancestry classification.
-These are open specification questions, not accepted restrictions on the design.
+each parent's group. Ancestry initialization and unknown-parent treatment are
+now specified under D055: starting identities supply pure proportions unless
+shares are provided, and missing parental contributions enter an unknown share.
+These are expected genealogical contributions, independent of discrete group
+identity. They do not select a majority-ancestry identity classification.
 
 ## Proposed milestone 4: union dissolution
 

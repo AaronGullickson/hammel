@@ -173,6 +173,7 @@ test_that("group observations return typed empty outputs", {
   expect_s3_class(empty_times, "tbl_df")
   expect_equal(nrow(empty_times), 0)
   p$persons <- p$persons[FALSE, ]
+  p$ancestry <- p$ancestry[FALSE, ]
   p$unions <- p$unions[FALSE, ]
   sizes <- calculate_population_size(p, c(0, 1), TRUE)
   expect_equal(nrow(sizes), 0)

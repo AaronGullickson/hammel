@@ -11,6 +11,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | --- | --- |
 | Model construction and population attachment | `R/hammel_model.R` |
 | Group validation and rate lookup | `R/groups.R` |
+| Ancestry schema and initialization | `R/ancestry.R` |
 | Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
 | Mortality/fertility specification and rate validation | `R/set_process.R` |
 | Union process construction and formula matching | `R/union_formation.R` |
@@ -92,6 +93,16 @@ histories and existing extra person columns. Newborns inherit the mother's optio
 missing. Group-specific schedules and baseline group sampling are documented in
 [groups](groups.md). The `simulation` component records `start_time`, `end_time`,
 `birth_interval`, `births`, and `deaths` for the latest run.
+
+Grouped populations also have an `ancestry` tibble, or may supply it explicitly
+to `hammel_population(ancestry = ...)`. Initialization uses recorded identities
+only when proportions are absent. The engine keeps call-local row-major numeric
+ancestry shares, appending parental averages at each birth; it returns the table
+in person order with `group_<label>` columns and `unknown`. Missing fathers
+contribute half to unknown. Death and restart retain existing shares. This
+requires work per birth and storage per person proportional to the number of
+components; it does not traverse the genealogy or draw random numbers. See
+[ancestry](ancestry.md).
 
 With an explicit seed, R's RNG state is restored after the call. With no seed,
 the current state advances normally. See the scientific contract for ties,

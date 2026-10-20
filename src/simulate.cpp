@@ -308,13 +308,23 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   int sample_size, List matching, double min_male_age,
                   int kinship_generations, bool rate_initiation,
                   DataFrame union_rates, List father_matching,
-                  bool cancel_birth_if_no_match, bool diagnostics) {
+                  bool cancel_birth_if_no_match, bool diagnostics,
+                  NumericMatrix initial_ancestry) {
   // R performs input validation and seed handling. All engine state below is
   // local to this call; public times and rates remain in years and person-years.
   NumericVector ids = persons["person_id"], births = persons["birth_time"];
   NumericVector deaths = persons["death_time"], moms = persons["mother_id"];
   NumericVector dads = persons["father_id"];
   CharacterVector sexes = persons["sex"];
+  // Row-major ancestry shares belong to this simulation. The last component
+  // is unknown; zero components means ancestry tracking is absent.
+  const size_t ancestry_components = initial_ancestry.ncol();
+  if (initial_ancestry.nrow() != ids.size()) stop("Ancestry rows must match persons.");
+  std::vector<double> ancestry(static_cast<size_t>(ids.size()) * ancestry_components);
+  for (int i = 0; i < ids.size(); ++i) {
+    for (size_t g = 0; g < ancestry_components; ++g)
+      ancestry[static_cast<size_t>(i) * ancestry_components + g] = initial_ancestry(i, g);
+  }
   IntegerVector person_groups(ids.size(), 0);
   if (persons.containsElementNamed(".hammel_group")) person_groups = persons[".hammel_group"];
   // people retains every history, including deaths. males contains positions
@@ -554,6 +564,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       int slot = female ? -1 : static_cast<int>(males.size());
       people.push_back({++next_id, now, NA_REAL, mother, father,
                         -std::numeric_limits<double>::infinity(), female, slot, people[i].group});
+      // Append ancestry before scheduling the child. Missing fathers contribute
+      // their entire half to unknown; supplied parental unknown shares transmit
+      // through the same deterministic averaging rule.
+      const size_t child_offset = static_cast<size_t>(child) * ancestry_components;
+      ancestry.resize(child_offset + ancestry_components);
+      for (size_t g = 0; g < ancestry_components; ++g) {
+        const double paternal = father_position >= 0 ?
+          ancestry[static_cast<size_t>(father_position) * ancestry_components + g] :
+          (g + 1 == ancestry_components ? 1.0 : 0.0);
+        ancestry[child_offset + g] = 0.5 *
+          ancestry[static_cast<size_t>(i) * ancestry_components + g] + 0.5 * paternal;
+      }
       kinship.append(i, father_position);
       if (!female) males.push_back(child);
       person_unions.emplace_back();
@@ -579,6 +601,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     out_mother[i] = p.mother; out_father[i] = p.father;
     out_sex[i] = p.female ? "f" : "m";
     out_group[i] = p.group;
+  }
+  NumericMatrix out_ancestry(people.size(), ancestry_components);
+  for (size_t i = 0; i < people.size(); ++i) {
+    for (size_t g = 0; g < ancestry_components; ++g)
+      out_ancestry(i, g) = ancestry[i * ancestry_components + g];
   }
   NumericVector out_uid(union_history.size()), out_wife(union_history.size());
   NumericVector out_husband(union_history.size()), out_start(union_history.size());
@@ -622,6 +649,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   return List::create(_["persons"] = DataFrame::create(
     _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),
-    _["groups"] = out_group, _["unions"] = out_unions,
+    _["groups"] = out_group, _["unions"] = out_unions, _["ancestry"] = out_ancestry,
     _["births"] = birth_count, _["deaths"] = death_count);
 }

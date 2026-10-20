@@ -43,6 +43,10 @@
 #' first alphabetical group with a warning; this does not create group identities.
 #' Group has no effect on partner matching. Existing custom columns and histories are preserved. Restarting samples new
 #' pending events and does not reproduce an uninterrupted run exactly.
+#' When ancestry is tracked, each newborn receives half of each parent's shares,
+#' with a missing parent contributing its half to unknown ancestry. Initial
+#' shares are retained, including on restart; grouped populations without shares
+#' initialize from recorded identities. No additional random draws are made.
 #'
 #' @param model A `hammel_model` containing a population, mortality, fertility,
 #'   and union-formation processes. The population must have a finite `end_time`.
@@ -72,6 +76,7 @@ simulate <- function(model, years, seed = NULL) {
   }
   population <- model$population
   validate_population(population)
+  population <- normalize_population_ancestry(population)
   start <- population$end_time
   if (is.null(start)) stop("The population needs a finite `end_time`.", call. = FALSE)
   if (!is.numeric(years) || length(years) != 1L || !is.finite(years) || years < 0) {
@@ -161,7 +166,10 @@ simulate <- function(model, years, seed = NULL) {
                            as.integer(union_process$kinship_generations),
                            union_process$initiation == "rate",
                            union_rates, father_matching,
-                           union_process$cancel_birth_if_no_match, union_process$diagnostics)
+                           union_process$cancel_birth_if_no_match, union_process$diagnostics,
+                           if (is.null(population[["ancestry"]]))
+                             matrix(numeric(), nrow = nrow(engine_persons), ncol = 0L) else
+                             as.matrix(population[["ancestry"]][setdiff(names(population[["ancestry"]]), "person_id")]))
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {
@@ -170,6 +178,12 @@ simulate <- function(model, years, seed = NULL) {
     for (column in names(native$persons)) persons[[column]] <- native$persons[[column]]
     if (!is.null(group_values)) persons$group <- group_values[native$groups + 1L]
     result$persons <- tibble::as_tibble(persons)
+    if (!is.null(population[["ancestry"]])) {
+      ancestry <- tibble::as_tibble(native$ancestry, .name_repair = "minimal")
+      names(ancestry) <- setdiff(names(population[["ancestry"]]), "person_id")
+      result$ancestry <- tibble::tibble(person_id = persons$person_id)
+      for (column in names(ancestry)) result$ancestry[[column]] <- ancestry[[column]]
+    }
     unions <- result$unions
     added_unions <- nrow(native$unions) - nrow(unions)
     if (added_unions > 0L) {

@@ -15,9 +15,18 @@
 #'   frame is normalized to the union schema.
 #' @param end_time Optional finite simulation endpoint in years. Its calendar origin is supplied by the user. `NULL` means
 #'   that the endpoint is unknown.
+#' @param ancestry Optional data frame with exactly one row per person, keyed
+#'   by `person_id`, known shares in `group_<label>` columns, and an `unknown`
+#'   share. Numeric shares must be finite, between zero and one, and sum to one
+#'   per row (tolerance `1e-8`). Supplied shares are preserved, with rows aligned
+#'   to persons. Without it, grouped persons start with 100% ancestry in their
+#'   recorded group, regardless of parent histories. Without groups, no ancestry
+#'   table is created automatically. Newborns average parental shares; a missing
+#'   parent contributes its half to `unknown`. Identity remains separate.
 #'
 #' @return A named list of class `hammel_population` with components `persons`,
-#'   `unions`, and `end_time`.
+#'   `unions`, and `end_time`, plus an `ancestry` tibble when supplied or when
+#'   persons has groups. Ancestry is retained across restarts and deaths.
 #' @export
 #'
 #' @examples
@@ -29,12 +38,14 @@
 #' )
 #' sim$persons
 #' sim$unions
-hammel_population <- function(persons, unions = NULL, end_time = NULL) {
+hammel_population <- function(persons, unions = NULL, end_time = NULL, ancestry = NULL) {
   results <- structure(
     list(persons = persons, unions = normalize_unions(unions), end_time = end_time),
     class = "hammel_population"
   )
+  if (!is.null(ancestry)) results$ancestry <- ancestry
   validate_population(results)
+  results <- normalize_population_ancestry(results)
   results$persons <- tibble::as_tibble(results$persons)
   results$unions <- tibble::as_tibble(results$unions)
   results
@@ -133,6 +144,7 @@ validate_population <- function(results) {
     stop("Recorded events must not occur after the population's reference time.",
          call. = FALSE)
   }
+  validate_ancestry(results[["ancestry"]], persons)
   invisible(results)
 }
 

@@ -64,6 +64,10 @@ rate table are errors. Without population groups, each grouped table uses its
 first alphabetical group with a warning; this does not create group identities.
 Group has no effect on partner matching. Existing custom columns and histories are preserved. Restarting samples new
 pending events and does not reproduce an uninterrupted run exactly.
+When ancestry is tracked, each newborn receives half of each parent's shares,
+with a missing parent contributing its half to unknown ancestry. Initial
+shares are retained, including on restart; grouped populations without shares
+initialize from recorded identities. No additional random draws are made.
 }
 \examples{
 population <- create_baseline_population(100, max_age = 50)
