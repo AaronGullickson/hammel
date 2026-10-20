@@ -26,6 +26,9 @@ A named list of class \code{hammel_population} with components \code{persons},
 Collect person and union histories in an inspectable population object.
 This constructor does not run a simulation. It validates
 consistent tables against the population schema. Custom columns are retained.
+An optional \code{group} column contains nonmissing character labels or finite
+numeric codes (character labels must be nonempty). Newborns inherit their
+mother's group; group type is preserved.
 }
 \examples{
 sim <- hammel_population(

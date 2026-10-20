@@ -23,6 +23,7 @@ The old top-level base-R test scripts have been converted and removed.
 
 | Test file | Main evidence |
 | --- | --- |
+| `test-groups.R` | Group rate lookup, analytical survival, coverage errors, fallback warnings, maternal inheritance, cross-group unions, restarts, RNG equivalence, and weighted initialization |
 | `test-model-api.R` | Construction, replacement, schemas, history and metadata retention |
 | `test-baseline-population.R` | Reproducibility, bounds, known cases, distributions, empty populations |
 | `test-processes.R` | Rate validation, typed specifications, units, spacing, edited objects |

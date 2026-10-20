@@ -35,8 +35,13 @@
 #' bands is zero. Mortality must cover all ages for both sexes, ending at `Inf`.
 #'
 #' Events are recorded at their sampled times in `[start, start + years)`. Rates and all
-#' times remain in person-year and year units. Newborn custom columns are missing;
-#' existing custom columns and histories are preserved. Restarting samples new
+#' times remain in person-year and year units. Newborns inherit the mother's
+#' `group`, if present; other newborn custom columns are missing. Grouped rate
+#' tables use each person's group (the woman's group for union searches).
+#' Ungrouped tables apply to everyone. Missing population groups in a grouped
+#' rate table are errors. Without population groups, each grouped table uses its
+#' first alphabetical group with a warning; this does not create group identities.
+#' Group has no effect on partner matching. Existing custom columns and histories are preserved. Restarting samples new
 #' pending events and does not reproduce an uninterrupted run exactly.
 #'
 #' @param model A `hammel_model` containing a population, mortality, fertility,
@@ -81,14 +86,17 @@ simulate <- function(model, years, seed = NULL) {
   death_rates <- model$processes$mortality$rates
   birth_rates <- model$processes$fertility$rates
   birth_interval <- model$processes$fertility$birth_interval
-  for (sex in c("m", "f")) {
-    schedule <- death_rates[death_rates$sex == sex, , drop = FALSE]
-    schedule <- schedule[order(schedule$age_start), , drop = FALSE]
-    if (schedule$age_start[1] != 0 || tail(schedule$age_end, 1) != Inf ||
-        (nrow(schedule) > 1L &&
-         any(head(schedule$age_end, -1) != tail(schedule$age_start, -1)))) {
-      stop("Mortality schedules must cover [0, Inf) without gaps for each sex.",
-           call. = FALSE)
+  for (rows in split_rate_groups(death_rates)) {
+    for (sex in c("m", "f")) {
+      schedule <- death_rates[rows, , drop = FALSE]
+      schedule <- schedule[schedule$sex == sex, , drop = FALSE]
+      schedule <- schedule[order(schedule$age_start), , drop = FALSE]
+      if (schedule$age_start[1] != 0 || tail(schedule$age_end, 1) != Inf ||
+          (nrow(schedule) > 1L &&
+           any(head(schedule$age_end, -1) != tail(schedule$age_start, -1)))) {
+        stop("Mortality schedules must cover [0, Inf) without gaps for each sex and group.",
+             call. = FALSE)
+      }
     }
   }
   if (any(!names(model$processes) %in% c("mortality", "fertility", "union_formation"))) {
@@ -107,6 +115,16 @@ simulate <- function(model, years, seed = NULL) {
                   "partnered and unpartnered women. To make fertility depend on union status,",
                   "supply separate schedules using `union_status`."), call. = FALSE)
   }
+  death_rates <- prepare_group_rates(death_rates, population$persons, "mortality")
+  birth_rates <- prepare_group_rates(birth_rates, population$persons, "fertility")
+  union_rates <- if (is.null(union_process$rates))
+    data.frame(age_start = numeric(), age_end = numeric(), rate = numeric()) else
+    prepare_group_rates(union_process$rates, population$persons, "union formation")
+  group_values <- if ("group" %in% names(population$persons))
+    unique(population$persons$group) else NULL
+  engine_persons <- population$persons
+  engine_persons$.hammel_group <- if (is.null(group_values)) rep(0L, nrow(engine_persons)) else
+    match(as.character(engine_persons$group), as.character(group_values)) - 1L
   sample_size <- as.integer(union_process$sample_size)
   if (!is.null(seed)) {
     if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
@@ -128,15 +146,13 @@ simulate <- function(model, years, seed = NULL) {
     matching <- prepare_matching_model(union_process$matching)
     father_matching <- if (is.null(union_process$father_matching)) matching else
       prepare_matching_model(union_process$father_matching)
-    native <- simulate_cpp(population$persons, death_rates, birth_rates,
+    native <- simulate_cpp(engine_persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
                            sample_size, matching,
                            union_process$min_male_age,
                            as.integer(union_process$kinship_generations),
                            union_process$initiation == "rate",
-                           if (is.null(union_process$rates))
-                             data.frame(age_start = numeric(), age_end = numeric(), rate = numeric())
-                           else union_process$rates, father_matching,
+                           union_rates, father_matching,
                            union_process$cancel_birth_if_no_match, union_process$diagnostics)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
@@ -144,6 +160,7 @@ simulate <- function(model, years, seed = NULL) {
       persons <- rbind(persons, persons[rep(NA_integer_, added), , drop = FALSE])
     }
     for (column in names(native$persons)) persons[[column]] <- native$persons[[column]]
+    if (!is.null(group_values)) persons$group <- group_values[native$groups + 1L]
     result$persons <- tibble::as_tibble(persons)
     unions <- result$unions
     added_unions <- nrow(native$unions) - nrow(unions)

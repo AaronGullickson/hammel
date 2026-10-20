@@ -34,6 +34,14 @@ schedules are returned as tibbles. A \code{source} attribute on the input table
 is copied to the process's \code{source} field.
 }
 \details{
+An optional \code{group} column supplies separate schedules by nonmissing character
+label or finite numeric code. Without it, rates apply to all groups. Each
+mortality group needs both sexes, and each conditional fertility group needs
+both statuses. Overlap and fertility compensation are checked within groups.
+Simulation requires schedules for every population group. Without population
+groups, simulation warns and uses the first group alphabetically (radix order
+of character representations, including numeric codes).
+
 Mortality requires separate schedules for both sexes. Gaps and uncovered
 ages are not filled or interpreted as zero rates. Coverage and fertility
 eligibility must be specified before simulation. Calendar-time-varying

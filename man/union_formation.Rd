@@ -44,6 +44,10 @@ zero requests the whole pool. Defaults to \code{1000}.}
 \item{rates}{For \code{"rate"} initiation, an age-specific female search-hazard
 table with \code{age_start}, \code{age_end}, and \code{rate}, in years and per person-year.
 These specify search attempts, not guaranteed realized union formation.
+An optional \code{group} column selects the woman's group. Without it, all groups
+share the schedule. Group does not restrict partner matching. With no
+population groups, simulation warns and selects the first alphabetical group.
+See \code{\link[=mortality]{mortality()}} for group-label and rate-coverage rules.
 Nonoverlapping bands may have gaps or an open end; gaps and ages outside
 support have zero hazard. Must be NULL for \code{"on_demand"}.}
 

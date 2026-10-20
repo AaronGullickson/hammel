@@ -17,17 +17,21 @@ struct Band {
 // Copy the R rate table into a growable C++ collection. Mortality selects
 // one sex; fertility uses all rows. Sort the copy without changing R inputs.
 std::vector<Band> read_bands(DataFrame rates, const std::string& sex = "",
-                             const std::string& status = "") {
+                             const std::string& status = "", int group = -1) {
   NumericVector starts = rates["age_start"], ends = rates["age_end"];
   NumericVector values = rates["rate"];
   CharacterVector sexes;
   if (!sex.empty()) sexes = rates["sex"];
   CharacterVector statuses;
   if (!status.empty()) statuses = rates["union_status"];
+  IntegerVector groups;
+  const bool grouped = rates.containsElementNamed(".hammel_group");
+  if (grouped) groups = rates[".hammel_group"];
   std::vector<Band> bands;
   for (int i = 0; i < starts.size(); ++i) {
     if ((sex.empty() || as<std::string>(sexes[i]) == sex) &&
-        (status.empty() || as<std::string>(statuses[i]) == status))
+        (status.empty() || as<std::string>(statuses[i]) == status) &&
+        (!grouped || groups[i] == group))
       bands.push_back({starts[i], ends[i], values[i]});
   }
   std::sort(bands.begin(), bands.end(), [](const Band& a, const Band& b) {
@@ -85,7 +89,7 @@ struct Person {
   // last_birth enforces spacing. male_slot locates this person in available males.
   double id, born, died, mother, father, last_birth;
   bool female;
-  int male_slot;
+  int male_slot, group;
 };
 // person is a zero-based position in people, not the public person_id.
 // A version invalidates queued events after a change in union status.
@@ -311,6 +315,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   NumericVector deaths = persons["death_time"], moms = persons["mother_id"];
   NumericVector dads = persons["father_id"];
   CharacterVector sexes = persons["sex"];
+  IntegerVector person_groups(ids.size(), 0);
+  if (persons.containsElementNamed(".hammel_group")) person_groups = persons[".hammel_group"];
   // people retains every history, including deaths. males contains positions
   // of living, unpartnered males for candidate sampling. index maps
   // public IDs to positions while reconstructing initial maternal histories.
@@ -325,7 +331,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     int slot = (!female && alive) ? static_cast<int>(males.size()) : -1;
     if (slot >= 0) males.push_back(i);
     people.push_back({ids[i], births[i], deaths[i], moms[i], dads[i],
-                      -std::numeric_limits<double>::infinity(), female, slot});
+                      -std::numeric_limits<double>::infinity(), female, slot, person_groups[i]});
     index[ids[i]] = i;
     next_id = std::max(next_id, ids[i]);
   }
@@ -426,14 +432,23 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     }
     return partner;
   };
-  const auto male_rates = read_bands(mortality_rates, "m");
-  const auto female_rates = read_bands(mortality_rates, "f");
+  struct GroupSchedules {
+    std::vector<Band> male, female, partnered, unpartnered, search;
+  };
+  int group_count = 1;
+  for (int value : person_groups) group_count = std::max(group_count, value + 1);
+  std::vector<GroupSchedules> schedules(group_count);
   const bool status_fertility = fertility_rates.containsElementNamed("union_status");
-  const auto partnered_fertility = adjusted_fertility(
-    read_bands(fertility_rates, "", status_fertility ? "partnered" : ""), birth_interval);
-  const auto unpartnered_fertility = status_fertility ? adjusted_fertility(
-    read_bands(fertility_rates, "", "unpartnered"), birth_interval) : partnered_fertility;
-  const auto search_rates = rate_initiation ? read_bands(union_rates) : std::vector<Band>{};
+  for (int group = 0; group < group_count; ++group) {
+    auto& rates = schedules[group];
+    rates.male = read_bands(mortality_rates, "m", "", group);
+    rates.female = read_bands(mortality_rates, "f", "", group);
+    rates.partnered = adjusted_fertility(read_bands(fertility_rates, "",
+      status_fertility ? "partnered" : "", group), birth_interval);
+    rates.unpartnered = status_fertility ? adjusted_fertility(
+      read_bands(fertility_rates, "", "unpartnered", group), birth_interval) : rates.partnered;
+    if (rate_initiation) rates.search = read_bands(union_rates, "", "", group);
+  }
   std::vector<unsigned long long> event_versions(people.size(), 0);
   // Continuous dates order events. Equivalent keys retain insertion order.
   std::multimap<double, Event> queue;
@@ -455,11 +470,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     const auto version = ++event_versions[i];
     const Person& p = people[i];
     if (!NumericVector::is_na(p.died)) return;
-    const auto& death_rates = p.female ? female_rates : male_rates;
+    const auto& rates = schedules[p.group];
+    const auto& death_rates = p.female ? rates.female : rates.male;
     double death_time = candidate(waiting_time(death_rates, now - p.born, threshold()), now);
     double birth_time = std::numeric_limits<double>::infinity();
     if (p.female) {
-      const auto& fertility = current_partner[i] >= 0 ? partnered_fertility : unpartnered_fertility;
+      const auto& fertility = current_partner[i] >= 0 ? rates.partnered : rates.unpartnered;
       double first = std::max(now, p.last_birth + birth_interval);
       if (first < end)
         birth_time = candidate(waiting_time(fertility,
@@ -467,7 +483,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     }
     double search_time = std::numeric_limits<double>::infinity();
     if (rate_initiation && p.female && current_partner[i] < 0)
-      search_time = candidate(waiting_time(search_rates, now - p.born, threshold()), now);
+      search_time = candidate(waiting_time(rates.search, now - p.born, threshold()), now);
     const double due = std::min(death_time, std::min(birth_time, search_time));
     // Exact same-person ties select death, then birth, then search.
     const auto type = death_time <= due ? EventType::death :
@@ -537,7 +553,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       int child = static_cast<int>(people.size());
       int slot = female ? -1 : static_cast<int>(males.size());
       people.push_back({++next_id, now, NA_REAL, mother, father,
-                        -std::numeric_limits<double>::infinity(), female, slot});
+                        -std::numeric_limits<double>::infinity(), female, slot, people[i].group});
       kinship.append(i, father_position);
       if (!female) males.push_back(child);
       person_unions.emplace_back();
@@ -556,11 +572,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   NumericVector out_id(people.size()), out_birth(people.size()), out_death(people.size());
   NumericVector out_mother(people.size()), out_father(people.size());
   CharacterVector out_sex(people.size());
+  IntegerVector out_group(people.size());
   for (size_t i = 0; i < people.size(); ++i) {
     const Person& p = people[i];
     out_id[i] = p.id; out_birth[i] = p.born; out_death[i] = p.died;
     out_mother[i] = p.mother; out_father[i] = p.father;
     out_sex[i] = p.female ? "f" : "m";
+    out_group[i] = p.group;
   }
   NumericVector out_uid(union_history.size()), out_wife(union_history.size());
   NumericVector out_husband(union_history.size()), out_start(union_history.size());
@@ -604,6 +622,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   return List::create(_["persons"] = DataFrame::create(
     _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),
-    _["unions"] = out_unions,
+    _["groups"] = out_group, _["unions"] = out_unions,
     _["births"] = birth_count, _["deaths"] = death_count);
 }

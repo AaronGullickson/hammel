@@ -10,6 +10,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Responsibility | Implementation |
 | --- | --- |
 | Model construction and population attachment | `R/hammel_model.R` |
+| Group validation and rate lookup | `R/groups.R` |
 | Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
 | Mortality/fertility specification and rate validation | `R/set_process.R` |
 | Union process construction and formula matching | `R/union_formation.R` |
@@ -77,8 +78,9 @@ compensation grid, or birth-spacing argument on the execution function.
 C++ constructs midpoint-adjusted fertility bands, samples cumulative-hazard
 thresholds, and processes the earliest event in a sparse ordered queue.
 R validates inputs and assembles the returned `hammel_population`, retaining
-histories and existing extra person columns. Newborn custom attributes are
-missing. The `simulation` component records `start_time`, `end_time`,
+histories and existing extra person columns. Newborns inherit the mother's optional `group`; other custom attributes are
+missing. Group-specific schedules and baseline group sampling are documented in
+[groups](groups.md). The `simulation` component records `start_time`, `end_time`,
 `birth_interval`, `births`, and `deaths` for the latest run.
 
 With an explicit seed, R's RNG state is restored after the call. With no seed,

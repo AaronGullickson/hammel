@@ -3,6 +3,9 @@
 #' Collect person and union histories in an inspectable population object.
 #' This constructor does not run a simulation. It validates
 #' consistent tables against the population schema. Custom columns are retained.
+#' An optional `group` column contains nonmissing character labels or finite
+#' numeric codes (character labels must be nonempty). Newborns inherit their
+#' mother's group; group type is preserved.
 #'
 #' @param persons A data frame with one row per person, including deceased
 #'   persons. Columns are preserved and the table is returned as a tibble.
@@ -64,6 +67,7 @@ validate_population <- function(results) {
   check_time(time, "end_time")
   check_columns(persons, c("person_id", "sex", "birth_time", "death_time",
                           "mother_id", "father_id"), "persons")
+  check_groups(persons, "persons")
   check_columns(unions, names(empty_unions()), "unions")
   check_numeric_column(persons$person_id, "persons$person_id", id = TRUE)
   if (anyDuplicated(persons$person_id)) {
@@ -163,6 +167,11 @@ empty_unions <- function() {
 #'   minus the sampled ages. Defaults to a relative time origin of zero.
 #' @param female_probability Probability of assigning sex "f" (female).
 #'   The other sex value is "m" (male). This does not enforce exact proportions.
+#' @param group_weights Optional named numeric vector of nonnegative, finite
+#'   weights with at least one positive value. Unique, nonempty names give group
+#'   labels. Weights are normalized and each person's group is sampled
+#'   independently of age and sex. Realized group counts are random. `NULL`
+#'   (the default) adds no group column and consumes no extra random draws.
 #'
 #' @return A validated `hammel_population` object.
 #' @export
@@ -172,7 +181,7 @@ empty_unions <- function() {
 #' model <- hammel_model() |>
 #'   set_population(population)
 create_baseline_population <- function(size, max_age = 70, end_time = 0,
-                                female_probability = 0.5) {
+                                female_probability = 0.5, group_weights = NULL) {
   if (!is.numeric(size) || length(size) != 1L || !is.finite(size) ||
       size < 0 || size != trunc(size) || size > .Machine$integer.max) {
     stop("`size` must be a nonnegative whole number no larger than R's integer limit.",
@@ -192,6 +201,20 @@ create_baseline_population <- function(size, max_age = 70, end_time = 0,
     stop("`female_probability` must be a number between 0 and 1.", call. = FALSE)
   }
 
+  if (!is.null(group_weights)) {
+    labels <- names(group_weights)
+    if (!is.numeric(group_weights) || !is.null(dim(group_weights)) ||
+        !length(group_weights) || anyNA(group_weights) ||
+        any(!is.finite(group_weights)) || any(group_weights < 0) ||
+        !any(group_weights > 0) || is.null(labels) || anyNA(labels) ||
+        any(!nzchar(trimws(labels))) || anyDuplicated(labels)) {
+      stop("`group_weights` must be a named numeric vector with unique nonempty group names and finite nonnegative weights, including a positive weight.",
+           call. = FALSE)
+    }
+    # Scale before summation to avoid overflow for large finite weights.
+    probabilities <- group_weights / max(group_weights)
+    probabilities <- probabilities / sum(probabilities)
+  }
   persons <- data.frame(
     person_id = seq_len(size),
     sex = as.character(ifelse(stats::rbinom(size, size = 1, prob = female_probability) == 1,
@@ -201,5 +224,9 @@ create_baseline_population <- function(size, max_age = 70, end_time = 0,
     mother_id = rep(NA_integer_, size),
     father_id = rep(NA_integer_, size)
   )
+  if (!is.null(group_weights)) {
+    persons$group <- names(group_weights)[sample.int(length(group_weights), size,
+                                                   replace = TRUE, prob = probabilities)]
+  }
   hammel_population(persons, end_time = end_time)
 }

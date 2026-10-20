@@ -31,6 +31,10 @@ provenance. Avoid automatic downloads as part of simulation execution.
 
 ## Milestone 3: groups
 
+Initial group schedules, maternal inheritance, and weighted baseline sampling
+are specified in [groups](groups.md) under D052 (October 20, 2026). These cover
+only the first increment; the richer directions below remain future work.
+
 The user selected the following directions for group support:
 
 - Include intergroup unions in formula-based matching, alongside age difference.

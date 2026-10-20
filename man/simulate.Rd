@@ -56,8 +56,13 @@ This is not a guarantee of exact ASFR matching. Fertility outside supplied
 bands is zero. Mortality must cover all ages for both sexes, ending at \code{Inf}.
 
 Events are recorded at their sampled times in \verb{[start, start + years)}. Rates and all
-times remain in person-year and year units. Newborn custom columns are missing;
-existing custom columns and histories are preserved. Restarting samples new
+times remain in person-year and year units. Newborns inherit the mother's
+\code{group}, if present; other newborn custom columns are missing. Grouped rate
+tables use each person's group (the woman's group for union searches).
+Ungrouped tables apply to everyone. Missing population groups in a grouped
+rate table are errors. Without population groups, each grouped table uses its
+first alphabetical group with a warning; this does not create group identities.
+Group has no effect on partner matching. Existing custom columns and histories are preserved. Restarting samples new
 pending events and does not reproduce an uninterrupted run exactly.
 }
 \examples{

@@ -215,6 +215,10 @@ prepare_matching_model <- function(matching) {
 #' @param rates For `"rate"` initiation, an age-specific female search-hazard
 #'   table with `age_start`, `age_end`, and `rate`, in years and per person-year.
 #'   These specify search attempts, not guaranteed realized union formation.
+#'   An optional `group` column selects the woman's group. Without it, all groups
+#'   share the schedule. Group does not restrict partner matching. With no
+#'   population groups, simulation warns and selects the first alphabetical group.
+#'   See [mortality()] for group-label and rate-coverage rules.
 #'   Nonoverlapping bands may have gaps or an open end; gaps and ages outside
 #'   support have zero hazard. Must be NULL for `"on_demand"`.
 #' @param diagnostics Logical, default `FALSE`. Record `.n_eligible` (sampled men
@@ -307,10 +311,13 @@ validate_union_formation <- function(process) {
       stop("Use nonnegative female search rates in valid age bands, without sex or calendar columns.",
            call. = FALSE)
     }
-    ordered <- rates[order(rates$age_start), ]
-    if (nrow(ordered) > 1L &&
-        any(tail(ordered$age_start, -1) < head(cummax(ordered$age_end), -1))) {
-      stop("Union-search age bands must not overlap.", call. = FALSE)
+    for (rows in split_rate_groups(rates)) {
+      ordered <- rates[rows, , drop = FALSE]
+      ordered <- ordered[order(ordered$age_start), , drop = FALSE]
+      if (nrow(ordered) > 1L &&
+          any(tail(ordered$age_start, -1) < head(cummax(ordered$age_end), -1))) {
+        stop("Union-search age bands must not overlap.", call. = FALSE)
+      }
     }
   }
   invisible(process)

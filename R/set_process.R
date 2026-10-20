@@ -70,6 +70,14 @@ set_fertility <- function(model, rates, birth_interval = 0.75) {
 #' schedules are returned as tibbles. A `source` attribute on the input table
 #' is copied to the process's `source` field.
 #'
+#' An optional `group` column supplies separate schedules by nonmissing character
+#' label or finite numeric code. Without it, rates apply to all groups. Each
+#' mortality group needs both sexes, and each conditional fertility group needs
+#' both statuses. Overlap and fertility compensation are checked within groups.
+#' Simulation requires schedules for every population group. Without population
+#' groups, simulation warns and uses the first group alphabetically (radix order
+#' of character representations, including numeric codes).
+#'
 #' Mortality requires separate schedules for both sexes. Gaps and uncovered
 #' ages are not filled or interpreted as zero rates. Coverage and fertility
 #' eligibility must be specified before simulation. Calendar-time-varying
@@ -136,6 +144,14 @@ validate_rates <- function(rates, mortality) {
   columns <- c("age_start", "age_end", "rate")
   if (mortality) columns <- c("sex", columns)
   check_columns(rates, columns, "rates")
+  if ("group" %in% names(rates)) {
+    for (rows in split_rate_groups(rates)) {
+      schedule <- rates[rows, setdiff(names(rates), "group"), drop = FALSE]
+      validate_rates(schedule, mortality)
+    }
+    if (!nrow(rates)) stop("`rates` must contain at least one age interval.", call. = FALSE)
+    return(invisible(rates))
+  }
   if (nrow(rates) == 0L) {
     stop("`rates` must contain at least one age interval.", call. = FALSE)
   }

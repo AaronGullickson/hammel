@@ -855,3 +855,30 @@ matching specifications override this default. Initiation mode remains explicit.
   semantics, and interactions among group effects and existing schedules
   require specification before implementation. No default inheritance rule or
   probability is selected by this decision.
+
+
+## D052: Initial group schedules, maternal inheritance, and baseline sampling
+
+- **Status:** requested and accepted by the user October 20, 2026.
+- **Decision:** permit optional `group` columns in population persons and
+  mortality, fertility, and female union-search rate tables. Ungrouped rate
+  tables apply to all groups. Grouped tables must cover every population group;
+  the user selected an error for missing group schedules.
+- **Fallback:** without population groups, select each grouped table's first
+  group alphabetically and issue a simulation warning. Do not create population
+  group identities from that fallback. Group values accept nonmissing character
+  labels or numeric codes; finite numeric codes and nonempty labels are required.
+  Alphabetical lookup uses radix order of character representations.
+- **Births and matching:** initially inherit each newborn's group from the
+  mother automatically. Group introduces no matching barriers or utility terms.
+  This is an explicitly requested initial rule, not the deferred configurable
+  inheritance model described in D051.
+- **Initialization:** add optional named numeric `group_weights` to
+  `create_baseline_population()`. Names give groups; normalize finite nonnegative
+  weights with at least one positive weight and independently sample every
+  person's identity. A named vector is the chosen interface; omitted weights
+  preserve the existing generator and its RNG draws.
+- **Scope:** group/status-specific fertility compensation uses the existing
+  midpoint method. No group transitions, ancestry, proportional multipliers,
+  inheritance model API, or group summary extension is included. See
+  [groups](groups.md) for rules and worked validation cases.

@@ -43,6 +43,18 @@ For a constant hazard `h` and elapsed years `d`, the event probability is
 `1 - exp(-h*d)`; multiplying a rate by duration gives cumulative hazard,
 not a probability. There is no requirement to convert to monthly units.
 
+## Group-specific schedules (initial milestone 3 support)
+
+Population persons and mortality, fertility, and female union-search rate tables
+may contain `group`. Ungrouped rate tables apply to everyone; grouped tables
+must cover every population group. Without population groups, use each table's
+alphabetically first group and emit a simulation warning. Group does not affect
+matching eligibility or utilities. Newborns automatically inherit their mother's
+group and enter their own group's mortality schedule immediately. Fertility
+compensation is separate within each group/status schedule. Group values are
+nonmissing character labels or finite numeric codes, with nonempty labels.
+See [groups](groups.md) for full rules, ordering, examples, and validation scope.
+
 ## Initialization and population history
 
 The [population schema](population-schema.md) specifies required fields and
@@ -196,7 +208,7 @@ for worked examples and implemented milestone 2 rules.
 Update the mother's latest birth and resample both newborn and mother. Newborns
 enter mortality risk immediately; their fertility depends on the supplied ages.
 Existing custom person/union columns are retained; new rows have missing custom
-values. C++ maintains union histories and shared partner caches for all runs,
+values, except that `group` is inherited from the mother. C++ maintains union histories and shared partner caches for all runs,
 closing unions at death with `end_reason = "death_husband"` or
 `"death_wife"` according to the executed death event. Initiation mode
 controls search timing; it does not control whether partner state is tracked.

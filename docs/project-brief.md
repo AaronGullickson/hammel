@@ -87,8 +87,9 @@ The user selected groups as milestone 3's theme: intergroup matching, baseline
 rate multipliers, flexible child group identity and possible proportional group
 ancestry. Other future priorities are analysis helpers, input-rate preparation,
 fertility heterogeneity, inherited/life-course characteristics (such as education),
-and within-run immigration with generational status. Detailed demographic rules
-are not selected. See the [roadmap](roadmap.md); milestone 2 completion does
+and within-run immigration with generational status. Initial optional group schedules, maternal inheritance, and weighted baseline
+sampling are specified in [groups](groups.md) (D052). Richer demographic rules
+remain open. See the [roadmap](roadmap.md); milestone 2 completion does
 not authorize unspecified future demographic behavior.
 
 ## Boundaries and future work

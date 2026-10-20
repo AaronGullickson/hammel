@@ -16,6 +16,7 @@ future work.
 | [Design](design.md) | Implemented architecture, API, and source locations |
 | [Scientific contract](scientific-contract.md) | Current demographic assumptions and event rules |
 | [Population schema](population-schema.md) | Person/union tables and structural validation |
+| [Groups](groups.md) | Group-specific schedules, fallback warnings, maternal inheritance, and baseline sampling |
 | [Demographic analysis](demographic-analysis.md) | Exposure, ASFR/ASMR, TFR, and life-table workflows |
 | [Testing and validation](testing.md) | Test commands, evidence, and remaining validation |
 | [Current handoff](session-handoff.md) | Recent findings, active work, and deferred issues |
