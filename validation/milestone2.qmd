@@ -30,6 +30,7 @@ library(tibble)
 library(ggplot2)
 library(gt)
 library(survival)
+library(modelsummary)
 ```
 
 ```{r}
