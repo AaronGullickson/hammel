@@ -93,6 +93,20 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// inspect_group_matching_cpp
+List inspect_group_matching_cpp(NumericVector age_difference, List matching, int female_group, IntegerVector male_groups);
+RcppExport SEXP _hammel_inspect_group_matching_cpp(SEXP age_differenceSEXP, SEXP matchingSEXP, SEXP female_groupSEXP, SEXP male_groupsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type age_difference(age_differenceSEXP);
+    Rcpp::traits::input_parameter< List >::type matching(matchingSEXP);
+    Rcpp::traits::input_parameter< int >::type female_group(female_groupSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type male_groups(male_groupsSEXP);
+    rcpp_result_gen = Rcpp::wrap(inspect_group_matching_cpp(age_difference, matching, female_group, male_groups));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sample_male_positions_cpp
 IntegerVector sample_male_positions_cpp(int count, int requested);
 RcppExport SEXP _hammel_sample_male_positions_cpp(SEXP countSEXP, SEXP requestedSEXP) {
@@ -140,6 +154,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
     {"_hammel_adjusted_fertility_cpp", (DL_FUNC) &_hammel_adjusted_fertility_cpp, 2},
     {"_hammel_inspect_matching_cpp", (DL_FUNC) &_hammel_inspect_matching_cpp, 3},
+    {"_hammel_inspect_group_matching_cpp", (DL_FUNC) &_hammel_inspect_group_matching_cpp, 4},
     {"_hammel_sample_male_positions_cpp", (DL_FUNC) &_hammel_sample_male_positions_cpp, 2},
     {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 17},
     {NULL, NULL, 0}

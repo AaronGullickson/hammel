@@ -49,7 +49,8 @@ Population persons and mortality, fertility, and female union-search rate tables
 may contain `group`. Ungrouped rate tables apply to everyone; grouped tables
 must cover every population group. Without population groups, use each table's
 alphabetically first group and emit a simulation warning. Group does not affect
-matching eligibility or utilities. Newborns automatically inherit their mother's
+matching eligibility. Optional group formula predictors and directed/symmetric
+pair effects can change utility. Newborns automatically inherit their mother's
 group and enter their own group's mortality schedule immediately. Fertility
 compensation is separate within each group/status schedule. Group values are
 nonmissing character labels or finite numeric codes, with nonempty labels.
@@ -194,6 +195,17 @@ When matching is omitted, both initiation modes use
 `create_age_gap_matching_model(0, 5)`: preferred male-minus-female gap zero
 years, with relative weight halved five years either side. Explicit models
 override that default; it does not fix the realized age-gap distribution.
+
+Matching models optionally accept `group_exogamy`: a named vector using `A:B`
+for female A/male B and `A::B` for equal effects in both directions. Effects
+are finite log-scale additions after the full formula score. An omitted pair
+has odds ratio 1.0 (zero log effect). Within-group effects are allowed; overlaps
+after symmetric expansion are errors. A directional pair table is also accepted
+for labels containing colons. These are selection preferences, not hazards or
+prohibitions. `female_group`, `male_group`, and numeric 0/1 `same_group` are
+available in formulas; categorical terms require fixed declared `group_levels`
+with treatment contrasts. Missing population identity data errors when a model
+uses group effects. See [group matching](group-matching.md) for worked cases.
 
 With `union_formation(initiation = "on_demand", ...)`, use the woman's ongoing
 living male partner as father. If she has no partner, sample up to `sample_size`

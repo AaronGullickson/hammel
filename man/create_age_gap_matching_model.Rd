@@ -4,13 +4,20 @@
 \alias{create_age_gap_matching_model}
 \title{Create a quadratic matching model from interpretable age-gap preferences}
 \usage{
-create_age_gap_matching_model(preferred_age_gap, half_weight_distance)
+create_age_gap_matching_model(
+  preferred_age_gap,
+  half_weight_distance,
+  group_exogamy = NULL
+)
 }
 \arguments{
 \item{preferred_age_gap}{Finite numeric scalar in years; negative values allowed.}
 
 \item{half_weight_distance}{Finite positive numeric scalar in years from the
 preferred gap at which selection weight halves.}
+
+\item{group_exogamy}{Optional additive group-pair effects passed to
+\code{\link[=create_matching_model]{create_matching_model()}}.}
 }
 \value{
 A \code{hammel_matching_model} with linear and quadratic age-difference terms.

@@ -184,6 +184,33 @@ behavior; default Lexis summaries use all female exposure, while
 
 ## Union exposure and formation counts
 
+### Detailed union records
+
+`get_detailed_unions(population)` accepts a `hammel_population` and returns a
+separate tibble containing all union rows and columns, in their original order,
+with partner attributes matched through `wife_id` and `husband_id`. It adds
+`birth_time_w`, `death_time_w`, `birth_time_h`, and `death_time_h`, plus
+`group_w` and `group_h` when persons has a group column. Groups retain their
+input type. These are recorded person attributes, not inferred historical group
+transitions; current group identity is fixed over life. A surviving partner's
+death time remains NA. Dates remain in years and can be combined with union
+`start_time` to derive ages at formation and the age gap.
+
+An empty union table returns the same enriched zero-row schema. The input is
+unchanged, including its union table and custom columns. Existing columns with
+the names to be added cause an error rather than being overwritten. No known
+population endpoint is required merely to attach recorded partner information.
+
+For example, a union whose wife ID is 10 and husband ID is 30 receives birth
+dates from those IDs regardless of their row positions in persons; repeated
+unions reuse those attributes while retaining distinct episode records.
+
+```r
+detailed_unions <- get_detailed_unions(result)
+```
+
+### Status exposure and events
+
 `include_unions = TRUE` returns three adjacent rows per period/age/sex cell,
 identified by `union_status`: `overall`, `partnered`, and `unpartnered`. All use
 `person_years`, `deaths`, `births`, `rate_mortality`, and `rate_fertility`. Births and ASFR are NA

@@ -958,3 +958,30 @@ matching specifications override this default. Initiation mode remains explicit.
   generations, supplied values and shuffled IDs, restarts, deaths, empty
   populations, numeric labels, run independence, and unchanged demographic RNG
   consumption. See [ancestry](ancestry.md).
+
+## D056: Add group effects to matching scores
+
+- **Status:** requested and specified by the user October 20, 2026.
+- **Decision:** attach optional `group_exogamy` effects to matching models, adding their
+  log-scale value after all formula terms are evaluated. Named-vector syntax
+  `A:B` means female A/male B; `A::B` supplies the same effect in both directions.
+  The user clarified that omitted pairs have odds ratio 1.0, hence zero log
+  effect. Within-group effects are allowed. Reject overlapping directed entries
+  after expansion rather than choosing precedence. A directional table supports
+  group labels containing colons.
+- **Formula interface:** expose `female_group`, `male_group`, and numeric 0/1
+  `same_group` alongside continuous male-minus-female age difference. Categorical
+  formulas use explicitly supplied `group_levels` and fixed treatment contrasts;
+  group columns and coefficients must not vary with sampled availability.
+- **Execution:** pair effects apply after either native age scoring or custom
+  formula evaluation, before softmax and diagnostic utility ranking. Both
+  initiation modes and nonmarital father choice use the applicable full matching
+  model. An explicit `father_matching` replaces general preferences for father
+  choice; NULL reuses them. Group preferences require population identities.
+- **Scope and validation:** finite utility effects change preference, not
+  eligibility or search hazards. Validate analytical probabilities, direction,
+  symmetry, factor stability and interactions, native/R agreement, father
+  overrides, ranking, errors, empty populations and unchanged RNG consumption
+  for zero effects. Multiple identities and exact group prohibitions are not
+  introduced. The user requested later diagnostic tools to flag potential
+  omissions; these remain future work. See [group matching](group-matching.md).

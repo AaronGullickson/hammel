@@ -141,6 +141,11 @@ returns overall/partnered/unpartnered rows with exposure, births, deaths, and
 rates. Union counts and marriage rates appear only on unpartnered rows,
 using the recorded union histories (D046/D047).
 
+`get_detailed_unions(population)` returns a separate tibble preserving union
+records and appending each partner's birth/death time and optional group, with
+`_w` and `_h` suffixes. It joins by partner IDs, preserves types and row order,
+and leaves the population unchanged. See [demographic analysis](demographic-analysis.md).
+
 `calculate_lexis_counts(by_group = TRUE)` and
 `calculate_population_size(by_group = TRUE)` optionally split observations by
 recorded group. The native count kernels retain full histories and add a group
@@ -165,14 +170,16 @@ callbacks that can bypass consistency checks.
 
 ## Milestone 2 construction
 
-`create_matching_model()` accepts an age-difference formula with named utility
-coefficients. `union_formation()` and `set_union_formation()` specify initiation,
+`create_matching_model()` accepts a formula with age and group predictors,
+named utility coefficients, and optional directed/symmetric additive pair effects.
+Categorical group formulas declare fixed `group_levels`; see
+[group matching](group-matching.md). `union_formation()` and `set_union_formation()` specify initiation,
 candidate sampling, and a matching specification. The current C++ on-demand
 increment creates unions at births using conditional-logit selection from
 sampled living men after minimum-male-age screening (default 15 continuous
 years) and known-kin screening (default two generations on each side of a
-common ancestor). Only living, unpartnered men enter the sampling pool. Only age difference
-(male minus female, continuous years) is supported initially. See the
+common ancestor). Only living, unpartnered men enter the sampling pool. Group
+preferences alter utility after screening, without imposing group barriers. See the
 [union specification](union-formation-models.md) for worked examples and
 deferred extensions. Rate-based initiation schedules searches for unpartnered women.
 
@@ -200,8 +207,9 @@ in the current male vector rather than person identity.
 
 Matching uses the entered formula and named coefficients. R prepares an exact
 native linear/raw-quadratic evaluator where applicable; other formulas retain
-`model.matrix()` evaluation through an R callback receiving age differences
-only. C++ computes stable softmax probabilities and samples one candidate. No
+`model.matrix()` evaluation through an R callback receiving age differences and requested fixed group predictors.
+Additive pair effects use a matrix indexed by simulation group codes and are
+added after either formula evaluator; the native age scorer remains available. C++ computes stable softmax probabilities and samples one candidate. No
 formula callback receives mutable population state, and no candidate sets are
 retained. The native path avoids an R model-matrix call at every search for
 the common linear-plus-squared specification.

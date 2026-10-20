@@ -36,8 +36,9 @@ are specified in [groups](groups.md) under D052 (October 20, 2026). Group
 observations (D053) and proportional input-rate multipliers, including separate
 partnered/unpartnered fertility factors (D054), are also implemented. Ancestry
 proportions are tracked separately with parental averaging (D055); see
-[ancestry](ancestry.md). Intergroup matching terms and configurable identity
-inheritance remain future work.
+[ancestry](ancestry.md). Directed/symmetric pair effects and group matching
+formula terms are implemented under D056; see [group matching](group-matching.md).
+Configurable identity inheritance and multiple identities remain future work.
 
 The user selected the following directions for group support:
 
@@ -69,8 +70,9 @@ This is an accepted design direction, not implemented functionality.
 
 Mortality, fertility, and rate-based searches now accept group multipliers;
 fertility factors apply before compensation and may differ by union status
-(D054). Before extending matching, specify formula predictors/contrasts for
-each parent's group. Ancestry initialization and unknown-parent treatment are
+(D054). Matching now supports female/male group factors with explicit fixed
+levels, numeric same-group indicators, and additive pair effects (D056).
+Ancestry initialization and unknown-parent treatment are
 now specified under D055: starting identities supply pure proportions unless
 shares are provided, and missing parental contributions enter an unknown share.
 These are expected genealogical contributions, independent of discrete group
@@ -104,6 +106,10 @@ eligibility and male-pool membership. These details remain open; the proposed
 milestone does not select demographic defaults.
 
 ## Polished model and simulation summaries
+
+The user also requested future model diagnostic tools (October 20, 2026),
+including checks that help identify unintentionally omitted group-pair settings.
+This is a later project; no diagnostic interface or implementation is selected.
 
 Add custom print/summary displays for `hammel_model` and simulation results
 (the user's proposed `hammel_simulation` interface). Aim for a clear, polished

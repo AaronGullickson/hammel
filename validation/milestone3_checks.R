@@ -116,3 +116,25 @@ lexis_counts |> calculate_life_table() |>
   filter(age_start == 0, !is.na(ex)) |>
   select(time_start, time_end, sex, group, ex) |>
   print(n = 40)
+
+
+
+result <- hammel_model() |>
+  set_population(pop_baseline) |>
+  set_fertility(fertility_rates_overall_usa) |>
+  set_mortality(mortality_rates_usa2000) |>
+  set_union_formation(
+    "on_demand", 
+    matching = create_age_gap_matching_model(
+      0, 5,
+      group_exogamy = c("A::B" = -4)
+    )
+  ) |>
+  simulate(years = 100)
+
+result |> get_detailed_unions() |>
+  mutate(time_span = floor(start_time / 100) * 100) |>
+  count(time_span, group_w, group_h) |>
+  pivot_wider(id_cols = time_span, names_from = c(group_w, group_h), values_from = n) |>
+  mutate(log_odds = log(A_B) + log(B_A) - log(A_A) - log(B_B))
+

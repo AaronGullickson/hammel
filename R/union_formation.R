@@ -1,11 +1,16 @@
 #' Specify a conditional-logit matching model
 #'
 #' Define relative partner utilities with an R formula and named coefficients.
-#' Currently the only predictor is `age_difference`: male age minus female age,
+#' Predictors include `age_difference`: male age minus female age,
 #' in continuous years at the search time. Formula transformations such as
 #' `I(age_difference^2)` and `abs(age_difference)` are supported through
 #' [stats::model.matrix()]. An intercept is ignored because it cancels from
 #' partner-only conditional-logit probabilities. No wait alternative is included.
+#' `female_group` and `male_group` are factors with explicit `group_levels` and
+#' fixed treatment contrasts (first level is reference). `same_group` is numeric
+#' 1 for equal identities, 0 otherwise. Pair effects are added after the formula,
+#' including custom formulas. Group effects require population identities.
+#' These modify relative candidate weights, not search hazards or eligibility.
 #'
 #' Coefficient names must match the non-intercept model-matrix columns exactly.
 #' Supply all coefficients explicitly; no demographic coefficients are defaulted.
@@ -13,8 +18,23 @@
 #' Data-dependent transformations can change with the candidate pool; use fixed
 #' transformations when coefficients should have a fixed interpretation.
 #'
-#' @param formula A one-sided R formula using only `age_difference`.
+#' @param formula A one-sided R formula using `age_difference`, `female_group`,
+#'   `male_group`, and/or `same_group`. Use `~ 1` and `numeric()` coefficients
+#'   for pair-effects-only matching.
 #' @param coefficients A finite named numeric vector of utility coefficients.
+#' @param group_exogamy Optional finite named numeric vector: `"A:B"` means
+#'   female A/male B; `"A::B"` supplies the same effect in both directions.
+#'   Omitted pairs have odds ratio 1.0 (zero log effect); within-group entries are
+#'   allowed. Overlapping
+#'   directed pairs after expansion are errors. Alternatively provide a data
+#'   frame with `female_group`, `male_group`, and `log_odds`, one directed pair
+#'   per row, including for group labels containing colons. Effects add to final
+#'   formula scores; they do not create a matching prohibition.
+#' @param group_levels Optional ordered vector of group labels (character or
+#'   numeric codes). Required with at least two levels when the formula uses
+#'   `female_group` or `male_group`; must cover population groups. Sets fixed
+#'   treatment reference/columns, independent of candidate samples. Not required
+#'   for `same_group` or pair effects alone.
 #' @return An inspectable `hammel_matching_model` list containing `formula`
 #'   and `coefficients`. This specifies a model; it does not estimate one.
 #' @export
@@ -24,8 +44,9 @@
 #'   ~ age_difference + I(age_difference^2),
 #'   c(age_difference = 0.1, "I(age_difference^2)" = -0.02)
 #' )
-create_matching_model <- function(formula, coefficients) {
-  model <- structure(list(formula = formula, coefficients = coefficients),
+create_matching_model <- function(formula, coefficients, group_exogamy = NULL, group_levels = NULL) {
+  model <- structure(list(formula = formula, coefficients = coefficients,
+                          group_exogamy = group_exogamy, group_levels = group_levels),
                      class = "hammel_matching_model")
   validate_matching_model(model)
   model
@@ -43,6 +64,8 @@ create_matching_model <- function(formula, coefficients) {
 #' coefficient is `-2 * preferred_age_gap * quadratic`. This specifies relative
 #' selection weights, not a halving of utility or a realized standard deviation.
 #' @param preferred_age_gap Finite numeric scalar in years; negative values allowed.
+#' @param group_exogamy Optional additive group-pair effects passed to
+#'   [create_matching_model()].
 #' @param half_weight_distance Finite positive numeric scalar in years from the
 #'   preferred gap at which selection weight halves.
 #' @return A `hammel_matching_model` with linear and quadratic age-difference terms.
@@ -50,7 +73,7 @@ create_matching_model <- function(formula, coefficients) {
 #' @examples
 #' # Illustrative preferences, not demographic defaults.
 #' matching <- create_age_gap_matching_model(3, 5)
-create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance) {
+create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL) {
   for (name in c("preferred_age_gap", "half_weight_distance")) {
     value <- get(name)
     if (!is.numeric(value) || length(value) != 1L || !is.null(dim(value)) ||
@@ -66,7 +89,8 @@ create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distanc
     stop("Inputs must yield finite coefficients with a negative quadratic term.",
          call. = FALSE)
   create_matching_model(~ age_difference + I(age_difference^2),
-    c(age_difference = unname(linear), "I(age_difference^2)" = unname(quadratic)))
+    c(age_difference = unname(linear), "I(age_difference^2)" = unname(quadratic)),
+    group_exogamy = group_exogamy)
 }
 
 validate_matching_model <- function(model) {
@@ -75,23 +99,41 @@ validate_matching_model <- function(model) {
   }
   formula <- model$formula
   if (!inherits(formula, "formula") || length(formula) != 2L ||
-      any(!all.vars(formula) %in% "age_difference")) {
-    stop("Use a one-sided matching formula with only `age_difference`.", call. = FALSE)
+      any(!all.vars(formula) %in% c("age_difference", "female_group", "male_group", "same_group"))) {
+    stop("Use a one-sided matching formula with `age_difference`, `female_group`, `male_group`, or `same_group`.", call. = FALSE)
   }
   if (length(attr(stats::terms(formula), "offset"))) {
     stop("Matching formula offsets are not supported.", call. = FALSE)
   }
   beta <- model$coefficients
-  if (!is.numeric(beta) || !is.null(dim(beta)) || any(!is.finite(beta)) ||
-      is.null(names(beta)) || anyNA(names(beta)) || any(!nzchar(names(beta))) ||
+  if (!is.numeric(beta) || is.complex(beta) || !is.null(dim(beta)) || any(!is.finite(beta)) ||
+      (length(beta) && is.null(names(beta))) || anyNA(names(beta)) || any(!nzchar(names(beta))) ||
       anyDuplicated(names(beta))) {
     stop("`coefficients` must be a finite numeric vector with unique nonempty names.",
          call. = FALSE)
   }
-  # Validate expansion and coefficient names on representative age gaps.
+  expand_group_exogamy(model$group_exogamy)
+  levels <- model$group_levels
+  if (!is.null(levels)) {
+    labels <- matching_group_labels(levels, "group_levels")
+    if (!length(labels) || anyDuplicated(labels))
+      stop("`group_levels` must be unique nonempty group labels.", call. = FALSE)
+  }
+  categorical <- any(all.vars(formula) %in% c("female_group", "male_group"))
+  if (categorical && length(levels) < 2L)
+    stop("Categorical matching formulas require at least two explicit `group_levels`.", call. = FALSE)
+  # A fixed validation grid covers both sexes' group levels, equality, and gaps.
   data <- data.frame(age_difference = seq(-50, 50, length.out = 101))
+  if (matching_has_group_formula(model)) {
+    labels <- if (categorical) as.character(levels) else c("A", "B")
+    size <- max(101L, 2L * length(labels))
+    female <- rep(labels, length.out = size)
+    male <- rep(c(labels[-1L], labels[1L]), length.out = size)
+    male[seq_len(size) %% 2L == 0L] <- female[seq_len(size) %% 2L == 0L]
+    data <- matching_predictor_data(model, rep(data$age_difference, length.out = size), female, male)
+  }
   design <- matching_design_matrix(formula, data)
-  if (!ncol(design) || !setequal(colnames(design), names(beta))) {
+  if (!setequal(colnames(design), names(beta))) {
     stop("Coefficient names must match all non-intercept model-matrix columns.",
          call. = FALSE)
   }
@@ -99,11 +141,15 @@ validate_matching_model <- function(model) {
 }
 
 matching_design_matrix <- function(formula, data) {
-  design <- withCallingHandlers(
-    stats::model.matrix(formula, data = data, na.action = stats::na.pass),
-    warning = function(w) stop("Matching formula evaluation: ", conditionMessage(w),
-                               call. = FALSE)
-  )
+  design <- withCallingHandlers({
+    frame <- stats::model.frame(formula, data = data, na.action = stats::na.pass,
+                                drop.unused.levels = FALSE)
+    factors <- frame[vapply(frame, is.factor, logical(1))]
+    contrasts <- if (length(factors)) lapply(factors, function(x)
+      stats::contr.treatment(levels(x))) else NULL
+    stats::model.matrix(formula, data = frame, contrasts.arg = contrasts)
+  }, warning = function(w) stop("Matching formula evaluation: ", conditionMessage(w),
+                                call. = FALSE))
   design <- design[, colnames(design) != "(Intercept)", drop = FALSE]
   if (nrow(design) != nrow(data) || any(!is.finite(design))) {
     stop("Matching formula must produce finite values for every candidate.", call. = FALSE)
@@ -112,23 +158,29 @@ matching_design_matrix <- function(formula, data) {
 }
 
 # Evaluate the same formula for R diagnostics and native fallback scoring.
-calculate_matching_utilities <- function(matching, age_difference) {
+calculate_matching_utilities <- function(matching, age_difference, female_group = NULL,
+                                         male_group = NULL, add_group_exogamy = TRUE) {
   check_numeric_column(age_difference, "age_difference")
   if (!length(age_difference)) return(numeric())
-  design <- matching_design_matrix(matching$formula,
-                                  data.frame(age_difference = age_difference))
+  data <- matching_predictor_data(matching, age_difference, female_group, male_group)
+  design <- matching_design_matrix(matching$formula, data)
   if (!setequal(colnames(design), names(matching$coefficients))) {
     stop("Matching formula columns changed for the supplied candidates.", call. = FALSE)
   }
   utility <- drop(design %*% matching$coefficients[colnames(design)])
+  if (add_group_exogamy && nrow(expand_group_exogamy(matching$group_exogamy))) {
+    if (is.null(female_group) || is.null(male_group))
+      stop("Pair effects require female and male group data.", call. = FALSE)
+    utility <- utility + matching_pair_offsets(matching, female_group, male_group)
+  }
   if (any(!is.finite(utility))) {
     stop("Matching utilities must be finite.", call. = FALSE)
   }
   unname(utility)
 }
 
-calculate_matching_probabilities <- function(matching, age_difference) {
-  utility <- calculate_matching_utilities(matching, age_difference)
+calculate_matching_probabilities <- function(matching, age_difference, female_group = NULL, male_group = NULL) {
+  utility <- calculate_matching_utilities(matching, age_difference, female_group, male_group)
   if (!length(utility)) return(numeric())
   weights <- exp(utility - max(utility))
   weights / sum(weights)
@@ -136,7 +188,8 @@ calculate_matching_probabilities <- function(matching, age_difference) {
 
 # Use an exact native path for the common linear/raw quadratic specification.
 # All other formulas retain model.matrix semantics through an R evaluator.
-prepare_matching_model <- function(matching) {
+prepare_matching_model <- function(matching, population_groups = NULL) {
+  validate_matching_groups(matching, population_groups)
   beta <- matching$coefficients
   columns <- gsub("[[:space:]]", "", names(beta))
   native <- all(columns %in% c("age_difference", "I(age_difference^2)"))
@@ -149,9 +202,25 @@ prepare_matching_model <- function(matching) {
     quadratic <- c(sum(beta[columns == "age_difference"]),
                    sum(beta[columns == "I(age_difference^2)"]))
   }
+  pairs <- expand_group_exogamy(matching$group_exogamy)
+  offsets <- matrix(numeric(), 0, 0)
+  labels <- as.character(population_groups)
+  if (nrow(pairs)) {
+    offsets <- matrix(0, length(labels), length(labels))
+    for (i in seq_len(nrow(pairs))) {
+      female <- match(pairs$female_group[i], labels)
+      male <- match(pairs$male_group[i], labels)
+      if (!is.na(female) && !is.na(male)) offsets[female, male] <- pairs$log_odds[i]
+    }
+  }
+  group_formula <- matching_has_group_formula(matching)
   list(quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
-       evaluate = function(age_difference) {
-         calculate_matching_utilities(matching, age_difference)
+       group_formula = group_formula, needs_groups = group_formula || nrow(pairs) > 0,
+       pair_offsets = offsets,
+       evaluate = function(age_difference, female_group = NULL, male_group = NULL) {
+         calculate_matching_utilities(matching, age_difference,
+           if (is.null(female_group)) NULL else labels[female_group + 1L],
+           if (is.null(male_group)) NULL else labels[male_group + 1L], add_group_exogamy = FALSE)
        })
 }
 

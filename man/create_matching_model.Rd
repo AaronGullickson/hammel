@@ -4,12 +4,34 @@
 \alias{create_matching_model}
 \title{Specify a conditional-logit matching model}
 \usage{
-create_matching_model(formula, coefficients)
+create_matching_model(
+  formula,
+  coefficients,
+  group_exogamy = NULL,
+  group_levels = NULL
+)
 }
 \arguments{
-\item{formula}{A one-sided R formula using only \code{age_difference}.}
+\item{formula}{A one-sided R formula using \code{age_difference}, \code{female_group},
+\code{male_group}, and/or \code{same_group}. Use \code{~ 1} and \code{numeric()} coefficients
+for pair-effects-only matching.}
 
 \item{coefficients}{A finite named numeric vector of utility coefficients.}
+
+\item{group_exogamy}{Optional finite named numeric vector: \code{"A:B"} means
+female A/male B; \code{"A::B"} supplies the same effect in both directions.
+Omitted pairs have odds ratio 1.0 (zero log effect); within-group entries are
+allowed. Overlapping
+directed pairs after expansion are errors. Alternatively provide a data
+frame with \code{female_group}, \code{male_group}, and \code{log_odds}, one directed pair
+per row, including for group labels containing colons. Effects add to final
+formula scores; they do not create a matching prohibition.}
+
+\item{group_levels}{Optional ordered vector of group labels (character or
+numeric codes). Required with at least two levels when the formula uses
+\code{female_group} or \code{male_group}; must cover population groups. Sets fixed
+treatment reference/columns, independent of candidate samples. Not required
+for \code{same_group} or pair effects alone.}
 }
 \value{
 An inspectable \code{hammel_matching_model} list containing \code{formula}
@@ -17,11 +39,16 @@ and \code{coefficients}. This specifies a model; it does not estimate one.
 }
 \description{
 Define relative partner utilities with an R formula and named coefficients.
-Currently the only predictor is \code{age_difference}: male age minus female age,
+Predictors include \code{age_difference}: male age minus female age,
 in continuous years at the search time. Formula transformations such as
 \code{I(age_difference^2)} and \code{abs(age_difference)} are supported through
 \code{\link[stats:model.matrix]{stats::model.matrix()}}. An intercept is ignored because it cancels from
 partner-only conditional-logit probabilities. No wait alternative is included.
+\code{female_group} and \code{male_group} are factors with explicit \code{group_levels} and
+fixed treatment contrasts (first level is reference). \code{same_group} is numeric
+1 for equal identities, 0 otherwise. Pair effects are added after the formula,
+including custom formulas. Group effects require population identities.
+These modify relative candidate weights, not search hazards or eligibility.
 }
 \details{
 Coefficient names must match the non-intercept model-matrix columns exactly.

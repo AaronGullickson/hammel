@@ -183,7 +183,9 @@ std::vector<int> sample_male_positions(int count, int requested,
 // Evaluate candidate utilities without rounding age differences. Common linear
 // and raw quadratic formulas use an exact native path; other formulas call the
 // R model-matrix evaluator with candidate data only, never mutable engine state.
-NumericVector matching_utilities(const NumericVector& gaps, const List& matching) {
+NumericVector matching_utilities(const NumericVector& gaps, const List& matching,
+                                 int female_group = -1,
+                                 IntegerVector male_groups = IntegerVector()) {
   NumericVector quadratic = matching["quadratic"];
   NumericVector utility(gaps.size());
   if (quadratic.size() == 2) {
@@ -195,9 +197,22 @@ NumericVector matching_utilities(const NumericVector& gaps, const List& matching
     }
   } else {
     Function evaluate = matching["evaluate"];
-    utility = as<NumericVector>(evaluate(gaps));
+    if (as<bool>(matching["group_formula"])) {
+      if (female_group < 0 || male_groups.size() != gaps.size())
+        stop("Matching group predictors require group data.");
+      utility = as<NumericVector>(evaluate(gaps, female_group, male_groups));
+    } else utility = as<NumericVector>(evaluate(gaps));
   }
   if (utility.size() != gaps.size()) stop("Matching formula returned the wrong number of utilities.");
+  NumericMatrix offsets = matching["pair_offsets"];
+  if (offsets.nrow()) {
+    if (female_group < 0 || female_group >= offsets.nrow() || male_groups.size() != gaps.size())
+      stop("Pair effects require group data.");
+    for (R_xlen_t j = 0; j < utility.size(); ++j) {
+      if (male_groups[j] < 0 || male_groups[j] >= offsets.ncol()) stop("Invalid matching group index.");
+      utility[j] += offsets(female_group, male_groups[j]);
+    }
+  }
   for (R_xlen_t j = 0; j < utility.size(); ++j) {
     if (!R_finite(gaps[j]) || !R_finite(utility[j]))
       stop("Matching ages and utilities must be finite.");
@@ -260,7 +275,13 @@ int select_partner(const std::vector<int>& males, const std::vector<int>& sample
   NumericVector gaps(sample.size());
   for (size_t j = 0; j < sample.size(); ++j)
     gaps[j] = people[woman].born - people[males[sample[j]]].born;
-  const NumericVector utility = matching_utilities(gaps, matching);
+  IntegerVector male_groups;
+  if (as<bool>(matching["needs_groups"])) {
+    male_groups = IntegerVector(sample.size());
+    for (size_t j = 0; j < sample.size(); ++j)
+      male_groups[j] = people[males[sample[j]]].group;
+  }
+  const NumericVector utility = matching_utilities(gaps, matching, people[woman].group, male_groups);
   const NumericVector probabilities = matching_probabilities(utility);
   const int chosen = draw_partner_position(probabilities);
   if (utility_rank) {
@@ -285,6 +306,17 @@ List inspect_matching_cpp(NumericVector age_difference, List matching, int draws
   }
   return List::create(_["utilities"] = utility, _["probabilities"] = probabilities,
                       _["choices"] = choices);
+}
+
+// Analytical diagnostics for group-aware scoring use the same native kernel.
+// Group indices refer to the labels supplied to prepare_matching_model().
+// [[Rcpp::export]]
+List inspect_group_matching_cpp(NumericVector age_difference, List matching,
+                                int female_group, IntegerVector male_groups) {
+  const NumericVector utility = matching_utilities(age_difference, matching,
+                                                  female_group, male_groups);
+  return List::create(_["utilities"] = utility,
+                      _["probabilities"] = matching_probabilities(utility));
 }
 
 // Internal sampling entry point for checking size, uniqueness, and inclusion.

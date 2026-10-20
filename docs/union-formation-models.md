@@ -49,10 +49,14 @@ availability and renewed female rate searches after widowhood are implemented. T
 
 ## Implemented construction interface
 
-`create_matching_model(formula, coefficients)` stores a one-sided R formula
-and finite named coefficients matching its non-intercept model-matrix columns.
-Only `age_difference` is available initially, defined as male minus female age
-in continuous years. Ordinary R formula transformations are supported. An
+`create_matching_model(formula, coefficients, group_exogamy = NULL,
+group_levels = NULL)` stores a one-sided R formula and finite named coefficients
+matching its non-intercept model-matrix columns. Predictors include
+`age_difference` (male minus female age in continuous years), `female_group`,
+`male_group`, and numeric `same_group`. Categorical group terms require explicit
+fixed `group_levels`. Optional directed/symmetric pair effects add to the formula
+score. See [group matching](group-matching.md) for syntax, factor contrasts, and
+worked probabilities. Ordinary R formula transformations are supported. An
 intercept is ignored because it cancels from partner-only choice probabilities;
 no outside/wait alternative is implemented. Formula functions must be
 deterministic and must not mutate state. Data-dependent transformations require
@@ -192,8 +196,9 @@ remain unchanged.
 
 The initiation process determines when a search occurs. Native matching scores
 the screened age differences and selects a partner, or reports failure for an
-empty set. Formula callbacks receive age differences only and must not mutate
-state. The engine owns union creation, history, partner availability, parent
+empty set. Formula callbacks receive age differences and, when requested,
+fixed group-identity predictors; they must not mutate state. Add pair offsets
+only after the formula score is computed. The engine owns union creation, history, partner availability, parent
 assignment, and dependent event invalidation. No wait outcome is implemented.
 
 Public times remain years and hazards per person-year. Scheduled input hazards

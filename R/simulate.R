@@ -135,6 +135,9 @@ simulate <- function(model, years, seed = NULL) {
   }
   group_values <- if ("group" %in% names(population$persons))
     unique(population$persons$group) else NULL
+  validate_matching_groups(union_process$matching, group_values)
+  if (!is.null(union_process$father_matching))
+    validate_matching_groups(union_process$father_matching, group_values)
   engine_persons <- population$persons
   engine_persons$.hammel_group <- if (is.null(group_values)) rep(0L, nrow(engine_persons)) else
     match(as.character(engine_persons$group), as.character(group_values)) - 1L
@@ -156,9 +159,9 @@ simulate <- function(model, years, seed = NULL) {
   result <- population
   births <- deaths <- 0
   if (years > 0) {
-    matching <- prepare_matching_model(union_process$matching)
+    matching <- prepare_matching_model(union_process$matching, group_values)
     father_matching <- if (is.null(union_process$father_matching)) matching else
-      prepare_matching_model(union_process$father_matching)
+      prepare_matching_model(union_process$father_matching, group_values)
     native <- simulate_cpp(engine_persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
                            sample_size, matching,

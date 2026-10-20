@@ -25,6 +25,10 @@ inspect_matching_cpp <- function(age_difference, matching, draws) {
     .Call(`_hammel_inspect_matching_cpp`, age_difference, matching, draws)
 }
 
+inspect_group_matching_cpp <- function(age_difference, matching, female_group, male_groups) {
+    .Call(`_hammel_inspect_group_matching_cpp`, age_difference, matching, female_group, male_groups)
+}
+
 sample_male_positions_cpp <- function(count, requested) {
     .Call(`_hammel_sample_male_positions_cpp`, count, requested)
 }
