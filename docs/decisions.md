@@ -834,3 +834,24 @@ matching specifications override this default. Initiation mode remains explicit.
 - **Next scope:** groups remain the selected milestone 3 theme. Detailed rules
   require user decisions; milestone completion does not authorize implementation
   of unspecified mechanisms or other roadmap proposals.
+
+## D051: Distribute group support and attach inheritance to fertility
+
+- **Status:** accepted by the user October 20, 2026; design direction only,
+  not implemented functionality.
+- **Decision:** store group data in the population and configure group effects
+  in the relevant demographic processes. Group-specific schedules and
+  proportional rate effects belong with their rate processes; group effects on
+  partner selection belong with matching. Do not introduce a separate general
+  group process for milestone 3.
+- **Inheritance:** attach a distinct inheritance model object to fertility to
+  specify newborn group assignment and, if supported, ancestry inheritance.
+  Allow simple rules through character-string modes rather than a boolean,
+  with following the mother, following the father, and random assignment as
+  examples. Richer model specifications may be supported through the same
+  object, analogous to matching models.
+- **Open details:** exact constructors and mode names, random assignment rules
+  and probabilities, richer model inputs, missing-parent handling, ancestry
+  semantics, and interactions among group effects and existing schedules
+  require specification before implementation. No default inheritance rule or
+  probability is selected by this decision.

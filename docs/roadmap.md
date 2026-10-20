@@ -43,6 +43,22 @@ The user selected the following directions for group support:
 - Consider tracking each person's proportional ancestry by group separately
   from assigned group identity.
 
+### Accepted organization (October 20, 2026; D051)
+
+Group identity and optional ancestry data belong in the population. Group effects
+belong in the relevant demographic processes, including group-specific rate
+schedules and proportional multipliers, and group predictors in matching. There
+will be no separate general group process for milestone 3. Fertility will hold
+an inheritance model object that specifies newborn group assignment and, where
+supported, ancestry inheritance.
+
+Simple inheritance rules will use character-string modes rather than a boolean;
+following the mother, following the father, and random assignment are examples
+of intended alternatives. The object may also contain a richer model
+specification, analogous to the matching model. Exact mode names, random
+assignment probabilities, model inputs and semantics remain to be specified.
+This is an accepted design direction, not implemented functionality.
+
 Before implementation specify which processes can use multipliers, how they
 combine with status schedules and birth-spacing compensation, and the formula
 predictors/contrasts for each parent's group. For ancestry proportions clarify
