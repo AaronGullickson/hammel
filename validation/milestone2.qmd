@@ -130,13 +130,13 @@ Union formation is modeled using two separate models:
 
 In both models, women are the "drivers" - they decide when to initiate searches and they select from available men. We thus do not allow for a full two-sex model of partner selection. This is largely a convenience that allows for simpler and more efficient simulation. Further variations of the union formation process could implement a true two-sex model, but that is not a target for this milestone.
 
-Also, be separating these two models, we do not allow for any interaction between deciding when to marry and choosing who to marrry. The most notable limitation here is that, when available partner choice is bad, a woman might delay marriage, such as during a marriage squeeze. The decision to wait may be implemented in future versions of the simulation, but is not a target for this milestone. 
+Also, be separating these two models, we do not allow for any interaction between deciding when to marry and choosing who to marry. The most notable limitation here is that, when available partner choice is bad, a woman might delay marriage, such as during a marriage squeeze. The decision to wait may be implemented in future versions of the simulation, but is not a target for this milestone. 
 
 ### Searching Model
 
-Modeling union formation is complicated by the relationship between fertility and union formation. If women are only allowed to have children after being partnered, then the observed fertilty rates will fall below those of the input rates because women will spend some time not exposed to the risk of birth. This difference can be very substantial in modern populations where marriage happens late. This can be addressed by separating fertility rates into partnered fertility rates and unpartnered fertility rates, but this has requires more detailed input data (or stronger assumptions). 
+Modeling union formation is complicated by the relationship between fertility and union formation. If women are only allowed to have children after being partnered, then the observed fertility rates will fall below those of the input rates because women will spend some time not exposed to the risk of birth. This difference can be very substantial in modern populations where marriage happens late. This can be addressed by separating fertility rates into partnered fertility rates and unpartnered fertility rates, but this has requires more detailed input data (or stronger assumptions). 
 
-We handle this by providing two alternate models of when women search for a partner. In the first **on demand** case, partnerships are formed when a birth event would happend to an unpartnered women. Essentially, every union becomes a shotgun wedding. This approach will not produce realistic age specific marriage rates. However, it will ensure that input fertility rates are accurately reproduced in the simulation because it is the birth event that is "in the driver's seat." For researchers who are not concerned with modeling marriage specifically, this provides a very simple and straightforward option.
+We handle this by providing two alternate models of when women search for a partner. In the first **on demand** case, partnerships are formed when a birth event would happen to an unpartnered women. Essentially, every union becomes a shotgun wedding. This approach will not produce realistic age specific marriage rates. However, it will ensure that input fertility rates are accurately reproduced in the simulation because it is the birth event that is "in the driver's seat." For researchers who are not concerned with modeling marriage specifically, this provides a very simple and straightforward option.
 
 In the second **rate** case, we specify age specific partnership rates for women that compete with births and death as the next event. If a partnership search is assigned as the next event, then the woman will look for a partner using the same approach as in the **on demand** case. For the **rate** case, we also allow the user to specify in the fertility rates, an *unpartnered* and *partnered* schedule of fertility rates to better control overall fertility. This is not required, but if users do not specify these rates separately, then fertility rates and decisions will be completely independent of partnership status.
 
@@ -236,7 +236,7 @@ I also set up a matching model where the relative likelihood of a union is given
 
 $$v_i = 0.072(\texttt{agediff}) - 0.014(\texttt{agediff}^2)$$
 
-Where `agediff` is the difference between potential husband's and wife's ages. The coefficients are derived from Gullickson (CITE) and come from US data (FROM WHEN?). Under this model the likelihood of a union will be maximized when the husband is 2.57 years older than the wife and the halving time in that likelihood is about 7.04 years. Later, I will vary these parameters to confirm that they change the observed age differences between partners.
+Where `agediff` is the difference between potential husband's and wife's ages. The coefficients are derived from Gullickson (2021) and come from US data from 2012-2017. Under this model the likelihood of a union will be maximized when the husband is 2.57 years older than the wife and the halving time of that likelihood is about 7.04 years. Later, I will vary these parameters to confirm that they change the observed age differences between partners.
 
 ```{r}
 #| label: set-settings
@@ -409,7 +409,7 @@ counts_ondemand |>
 
 @tbl-fertility-coverage-model-on-demand shows the share of age groups covered by the 95% confidence interval within each time period. With a small number of age groups, the coverage can be noisy, but the results here indicate a high level of coverage and very small maximum absolute deviation.  
 
-Although the overall input fertility rates are preserved in the simulation output, I don't expect that the fertility rates disaggregated union status will match those empirically observed for the input case because the on demand model enforces a union on any birth to an unpartnered woman. @fig-union-status-fertility-model-on-demand shows the mean partnered and unpartnered age specific ferility rates observed in the simulation in comparison to those same rates from the input data. As expected, the results here are discrepant. Unpartnered fertility rates are forced to zero by the simulation and, to compensate, partnered fertility rates are higher than those actually observed. This finding does not invalidate the on demand model as it was expected, but users should be aware that this model cannot be used to generate reasonable partnered and unpartnered fertility rates.
+Although the overall input fertility rates are preserved in the simulation output, I don't expect that the fertility rates disaggregated union status will match those empirically observed for the input case because the on demand model enforces a union on any birth to an unpartnered woman. @fig-union-status-fertility-model-on-demand shows the mean partnered and unpartnered age specific fertility rates observed in the simulation in comparison to those same rates from the input data. As expected, the results here are discrepant. Partnered fertility rates are forced to zero by the simulation and, to compensate, partnered fertility rates are higher than those actually observed. This finding does not invalidate the on demand model as it was expected, but users should be aware that this model cannot be used to generate reasonable partnered and unpartnered fertility rates.
 
 ```{r}
 #| label: fig-union-status-fertility-model-on-demand
@@ -447,7 +447,7 @@ Notably, the TFRs in all three cases are stationary across time except for the p
 
 ### Age specific marriage rates
 
-Because the goal of the on demand model is to preserve overall fertility rates and not marriage rates,  I don't expect it to produce accurate marriage rates. Because unions occur when an unpartnered women gives birth and we do not yet allow union dissolution, the marriage rates observed in the simulation will closely match the rate of first births for women (with some moditification due to remarriages upon widowhood) and not actual marriage rates. However, it is useful to see how closely it tracks the actual marriage rates observed in the input data.
+Because the goal of the on demand model is to preserve overall fertility rates and not marriage rates,  I don't expect it to produce accurate marriage rates. Because unions occur when an unpartnered women gives birth and we do not yet allow union dissolution, the marriage rates observed in the simulation will closely match the rate of first births for women (with some modification due to remarriages upon widowhood) and not actual marriage rates. However, it is useful to see how closely it tracks the actual marriage rates observed in the input data.
 
 ```{r}
 #| label: fig-mar-rates-model-on-demand
@@ -511,11 +511,11 @@ results_ondemand |> map(calc_ever_married, 30) |>
 
 @fig-ever-married-50-model-on-demand and @fig-ever-married-30-model-on-demand show the proportion of men and women married across the 100 simulations by birth cohorts, excluding individuals who died before reaching the focal age and cohorts that had not reached that age by the end of the simulation. As expected this proportion is zero for cohorts who were old by the start of the simulation but rises quickly for cohorts in the marriageable ages. Once we reach cohorts born within the simulation, those proportions remain stationary for the remainder of the simulation. 
 
-I have no prior expecation of what these proportions should be for this model aside from being reasonable values, which I judge them to be.
+I have no prior expectation of what these proportions should be for this model aside from being reasonable values, which I judge them to be.
 
 ## Evaluate Rate Model
 
-To test the ratte model, I run 100 separate simulations with the "rate" setting. I can then estimate average age-specific fertility rates, total fertility rates, marriage rates, and other characteristics across simulations.
+To test the rate model, I run 100 separate simulations with the "rate" setting. I can then estimate average age-specific fertility rates, total fertility rates, marriage rates, and other characteristics across simulations.
 
 ```{r}
 #| label: run-sim-rates
@@ -588,7 +588,7 @@ asfr |>
   theme_bw()
 ```
 
-@fig-fertility-model-rate compares the observed overall age-specifir fertility rates in comparison to those from the input data Although this simulation did not use the overall total fertility rates directly, the observed overall age-specific fertility rates actually fit quite closely. @tbl-fertility-coverage-model-rate shows that while the rates fit the pattern quite closely and have a low maximum absolute deviation, the true rates rarely fall within the 95% confidence interval of the mean of the observed rates. This finding is not unexpected as the simulation did not use the overall fertility rates directly.
+@fig-fertility-model-rate compares the observed overall age-specific fertility rates in comparison to those from the input data Although this simulation did not use the overall total fertility rates directly, the observed overall age-specific fertility rates actually fit quite closely. @tbl-fertility-coverage-model-rate shows that while the rates fit the pattern quite closely and have a low maximum absolute deviation, the true rates rarely fall within the 95% confidence interval of the mean of the observed rates. This finding is not unexpected as the simulation did not use the overall fertility rates directly.
 
 ```{r}
 #| label: tbl-fertility-coverage-model-rate
@@ -743,7 +743,7 @@ tfr |>
   labs(x = "time", y = "total fertility rate", color = "union status")+
   theme_bw()
 ```
-
+f
 The discrepancy with overall fertility is expected and not problematic for the rate model, but why is partnered fertility so high. The most likely culprit is the same issue identified in milestone 1. Fertility rates are adjusted upward to account for birth intervals where women are not exposed to the risk of giving birth. When women transition between states with different underlying fertility rates during this birth interval, the risk adjustment is not properly accounted for because some person years were lived under a different risk state. When transitioning to higher rates (as for partnered fertility) this will lead to a positive bias, and when transitioning to lower rates this will lead to a negative bias.
 
 To assess if this was the issue, I reran the simulations with `birth_interval` set to zero.
@@ -888,7 +888,7 @@ counts_rates |>
   )
 ```
 
-@tbl-mar-rates-coverage-model-rate shows the coverage for the age-specific marriage rates across time. The results show excellent coverage and small maximum absolute deviation, conssistent with the visually good fit in @fig-mar-rates-model-rate.
+@tbl-mar-rates-coverage-model-rate shows the coverage for the age-specific marriage rates across time. The results show excellent coverage and small maximum absolute deviation, consistent with the visually good fit in @fig-mar-rates-model-rate.
 
 The simulation preserves the female marriage rates but not the male marriage rates. Nonetheless, it is useful to compare the implied male marriage rates that the simulation produces to those of the input data. 
 
@@ -969,7 +969,7 @@ bind_rows(
   theme_bw()
 ```
 
-@fig-eligible shows the distribution of the eligible partners considered for each union by the year of the union. The value drops from about 85% eligibility in the beginning of the simulation to a value of around 55-60% by the midpoint of the simulation where it remains roughly stable. Because we start the simulation with a uniform age distrbution out to 100, the initial 85% figure makes sense as about 15% of the male population will be below age 15 and everyone begins unpartnered. As the age distribution becomes more stable, this percentage increases. To demonstrate that most of this eligibility is being driven by age and not kinship, I ran a second set of simulations with no restrictions on kin. 
+@fig-eligible shows the distribution of the eligible partners considered for each union by the year of the union. The value drops from about 85% eligibility in the beginning of the simulation to a value of around 55-60% by the midpoint of the simulation where it remains roughly stable. Because we start the simulation with a uniform age distribution out to 100, the initial 85% figure makes sense as about 15% of the male population will be below age 15 and everyone begins unpartnered. As the age distribution becomes more stable, this percentage increases. To demonstrate that most of this eligibility is being driven by age and not kinship, I ran a second set of simulations with no restrictions on kin. 
 
 
 ```{r}
@@ -1051,7 +1051,7 @@ u |>
   theme_bw()
 ```
 
-@fig-age-diff shows the distribution of age difference between partners by year of the simulation. The median drops somewhat from the initial period of the simulation before stabilizing. The actual observed median is somewhat below the preferred age gap from the model. This is not neessarily a problem because the actual age gap will be affected by the age distribution of available men as well as by the underlying preferences from the model. Recoving those parameters from conditional logit models will provide a better test of whether the model is accurately represented.
+@fig-age-diff shows the distribution of age difference between partners by year of the simulation. The median drops somewhat from the initial period of the simulation before stabilizing. The actual observed median is somewhat below the preferred age gap from the model. This is not necessarily a problem because the actual age gap will be affected by the age distribution of available men as well as by the underlying preferences from the model. Recovering those parameters from conditional logit models will provide a better test of whether the model is accurately represented.
 
 The overall distribution seems reasonable, with most age differences clustered tightly around the median, but with a few outliers in the 20 year range.
 
@@ -1097,7 +1097,7 @@ ggplot(agediffs, aes(x = d, y = mean))+
 
 ### Estimate model parameters
 
-I can estimate model parameters by taking a sample of unions from the simulatd data. For each sampled union, I can draw a sample of alternate partners from the simulated data (men who were alive, unpartnered, and age 15 or older at the time of the union). I combine these alternate unions with the real union to create a choice set. I use a sample of 5000 unions from the "on demand" model and create 50 alternate unions for each real union.
+I can estimate model parameters by taking a sample of unions from the simulated data. For each sampled union, I can draw a sample of alternate partners from the simulated data (men who were alive, unpartnered, and age 15 or older at the time of the union). I combine these alternate unions with the real union to create a choice set. I use a sample of 5000 unions from the "on demand" model and create 50 alternate unions for each real union.
 
 ```{r}
 #| label: construct-choice-sets
@@ -1149,11 +1149,11 @@ modelsummary(model, gof_map = c("nobs"), estimate = "{estimate} [{conf.low}, {co
 
 ## Speed Tests
 
-Time tests for population size and simulation length were conducted for milestone 1. Here I want to vary characteristics ofthe union formation process that might affect speed of computation. Specifically:
+Time tests for population size and simulation length were conducted for milestone 1. Here I want to vary characteristics of the union formation process that might affect speed of computation. Specifically:
 
-- **on demand vs. rate search model** I expect that adding another waiting time and processing those events will add time for therate model compared to the on demand model.
+- **on demand vs. rate search model** I expect that adding another waiting time and processing those events will add time for the rate model compared to the on demand model.
 - **kinship depth** Number of kin increases exponentially with depth, so forcing an exclusion of more kin may increase computational time.
-- **custom matching formula** Custom matching formulae must be processed in R rather than C++ which may increase computational time.
+- **custom matching formula** Custom matching formulas must be processed in R rather than C++ which may increase computational time.
 
 ```{r}
 #| label: run-time-tests
@@ -1233,7 +1233,7 @@ scenarios$elapsed_time <- elapsed_time
 
 ```{r}
 #| label: tbl-time-tests
-#| tbl-cap: Time (in seconds) to run simulations with differeing parameters. All simulations start with 50,000 individuals and are simulated for 100 years.
+#| tbl-cap: Time (in seconds) to run simulations with differing parameters. All simulations start with 50,000 individuals and are simulated for 100 years.
 
 scenarios |>
   gt() |>
@@ -1264,9 +1264,9 @@ scenarios |>
   theme_bw()
 ```
 
-@tbl-time-tests and @fig-time-tests show the amount of time to process each simulation. These numbers are not exact because other factors can affect total processing time. The on-demand models were faster to process than the rate models. The biggest difference in computation was driven by custom matching which increased computation by a factor of four or more. This increase in computation time is driven by the needto use R rather than C++ to compute logit scores from the model.
+@tbl-time-tests and @fig-time-tests show the amount of time to process each simulation. These numbers are not exact because other factors can affect total processing time. The on-demand models were faster to process than the rate models. The biggest difference in computation was driven by custom matching which increased computation by a factor of four or more. This increase in computation time is driven by the need to use R rather than C++ to compute logit scores from the model.
 
-Excluding a greater number of kin generations generally increased computational time but the effect was slight overall, and non-existent in some cases. The biggest gain was for excluding no kin becasue then the simulation doesn't even run the kin exclusion routine at all.
+Excluding a greater number of kin generations generally increased computational time but the effect was slight overall, and non-existent in some cases. The biggest gain was for excluding no kin because then the simulation doesn't even run the kin exclusion routine at all.
 
 ## Tests
 
@@ -1286,6 +1286,9 @@ knitr::kable(
 
 ## Conclusions and unresolved limitations
 
+All criteria for this milestone have been reached. The results are consistent with expectations and match model input where applicable. Where no specific model input exists to make a comparison, the model produces plausible results.
+
+The one remaining issue is the issue with a slight inflation of partnered fertility rates due to transitions between unpartnered and partnered status for women in a birth interval. This issue is related to the issue identified in milestone 1 and has been deferred to a later date. At present, the bias it introduces will be extremely modest in most cases.
 
 ## Reproducibility record
 
@@ -1295,3 +1298,7 @@ system2("git", c("-C", "..", "rev-parse", "HEAD"), stdout = TRUE)
 system2("git", c("-C", "..", "status", "--short"), stdout = TRUE)
 sessionInfo()
 ```
+
+## References
+
+Gullickson, Aaron. 2021. "A Counterfactual Choice Approach to the Study of Partner Selection." *Demographic Research* 44: 513–36. <https://doi.org/10.4054/DemRes.2021.44.22>.
