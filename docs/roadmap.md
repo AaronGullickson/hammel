@@ -1,33 +1,22 @@
-# Directions beyond milestone 2
+# Development roadmap
 
-Recorded October 15, 2026; expanded October 17, 2026 from the user's planning
-notes; status updated October 19, 2026. Milestone 2 was accepted as complete
-by the user on October 19, 2026 (D050). The user selected **groups as the theme for milestone 3**;
-**union dissolution is proposed for milestone 4**, after groups. Other items
-below are prospective work without a milestone assignment. These
-notes preserve intentions and open questions, not authorization to implement
+Recorded October 15, 2026; expanded October 17 and October 20, 2026 from the
+user's planning notes. Milestone 2 was accepted October 19, 2026 (D050).
+Milestone 3's agreed group features are implemented; its validation report and
+acceptance remain pending. The user proposed the following sequence on
+October 20, 2026. These are planning priorities, not authorization to implement
 unspecified demographic rules or a selected public API.
 
-## Analysis helpers
-
-Expand the existing extraction/summary functions into a coherent user toolkit
-for useful quantities from simulation histories. Existing functions cover Lexis
-counts, fertility, life tables, population sizes and recorded kin. Identify
-additional quantities and exposure/observation definitions from actual workflows.
-Status-specific exposure, fertility, mortality and formation summaries are
-implemented through `calculate_lexis_counts(include_unions = TRUE)` (D046–D048).
-See [demographic analysis](demographic-analysis.md) for their observation rules.
-
-## Preparing input schedules
-
-Provide more helpers for building required input rates, including retrieving or
-using model life tables and splitting overall fertility into partnered and
-unpartnered schedules. No source, model-life-table family, fitting method or
-split rule has been selected. Overall fertility alone does not identify two
-status-specific schedules: decomposition needs additional information or
-assumptions, such as age-specific status proportions and relative fertility.
-Keep empirical rates, inferred rates and user assumptions inspectable with
-provenance. Avoid automatic downloads as part of simulation execution.
+| Milestone | Proposed scope | Status |
+| --- | --- | --- |
+| 4 | Union dissolution, separate remarriage rates, possibly cohabitation | Proposed; cohabitation undecided |
+| 5 | Parity-specific fertility and fertility heterogeneity | Proposed |
+| 6 | Rate changes within a simulation run | Proposed |
+| 7 | Group conversions | Provisional; distinguish identity from characteristics and region |
+| 8 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed |
+| 9 | Immigration from outside the system, tracking generation | Tentative |
+| 10 | Internal migration between regions, with unions restricted to the same region | Tentative |
+| 11 | Individual characteristics with custom inheritance and life-course change, affecting rates and union formation | Tentative |
 
 ## Milestone 3: groups
 
@@ -80,7 +69,7 @@ shares are provided, and missing parental contributions enter an unknown share.
 These are expected genealogical contributions, independent of discrete group
 identity. They do not select a majority-ancestry identity classification.
 
-## Proposed milestone 4: union dissolution
+## Proposed milestone 4: dissolution and remarriage
 
 The user proposes union dissolution after groups as the next step toward a
 fully functional simulator. On October 16, 2026, the user selected female
@@ -101,17 +90,54 @@ with large age differences. This is an extension to investigate, not an accepted
 effect or coefficient: the functional form, supported characteristics, and how
 effects relate to baseline age-specific rates remain to be specified.
 
+Add separate remarriage rates, with the distinctions between first unions and
+subsequent unions, previous marital statuses, and any marriage-order dependence
+to be specified. Cohabitation is a possible addition, not yet a committed part
+of the milestone; its statuses, conversion to marriage, and dissolution rules
+would need explicit definitions.
+
 Before implementation, specify the exposure/units of input rates, exact event
 ties, and eligibility for remarriage. Define the state updates and event
 invalidation for both former partners, including fertility status, search
 eligibility and male-pool membership. These details remain open; the proposed
 milestone does not select demographic defaults.
 
-## Polished model and simulation summaries
+## Proposed milestone 5: parity-specific fertility and heterogeneity
+
+Add fertility schedules that depend on parity as well as the existing schedule
+axes. Define parity from recorded births, initialization for incomplete histories,
+and how parity changes interact with spacing and pending events before
+implementation.
+
+Consider person-level fertility differences to represent persistent high- and
+low-fertility individuals and increase outcome variance beyond the current
+model. The user reports SOCSIM has a mechanism for this; its precise behavior
+has not been audited for this task. Distribution, persistence, association with
+other attributes, inheritance and calibration to aggregate rates are unselected.
+No heterogeneity parameter or demographic default is adopted here.
+
+## Proposed milestone 6: rate changes within a run
+
+Allow demographic schedules to change during a single simulation, rather than
+requiring population restarts. Specify calendar-time inputs, change boundaries,
+which processes may change, event ordering at boundaries, and invalidation of
+pending events. Preserve birth spacing from actual births and address the
+interaction with fertility compensation after rate changes (D045). No rate-change
+API, interpolation rule, or demographic default is selected.
+
+## Provisional milestone 7: group conversions
+
+Consider changes in group identity during life. The user is uncertain about the
+scope: many applications should instead use separate individual characteristics
+(milestone 11), while location should use a dedicated region mechanism
+(milestone 10). Do not treat groups as a universal state variable. Conversion
+rules, timing, ancestry implications, and effects on pending events remain open.
+
+## Proposed milestone 8: summaries, diagnostics, and helpers
 
 The user also requested future model diagnostic tools (October 20, 2026),
 including checks that help identify unintentionally omitted group-pair settings.
-This is a later project; no diagnostic interface or implementation is selected.
+No diagnostic interface or implementation is selected.
 
 Add custom print/summary displays for `hammel_model` and simulation results
 (the user's proposed `hammel_simulation` interface). Aim for a clear, polished
@@ -121,17 +147,56 @@ easy to inspect. Specific contents and formatting remain to be designed.
 Simulation currently returns a `hammel_population` with a `simulation` metadata
 component. The summary proposal does not itself select a new result class or
 authorize changing that return contract. Keep underlying tables and settings
-available as ordinary inspectable R objects. No implementation milestone is
-assigned to these displays.
+available as ordinary inspectable R objects.
 
-## Fertility heterogeneity
+### Post-simulation helpers
 
-Consider person-level fertility differences to represent persistent high- and
-low-fertility individuals and increase outcome variance beyond the current
-model. The user reports SOCSIM has a mechanism for this; its precise behavior
-has not been audited for this task. Distribution, persistence, association with
-other attributes, inheritance and calibration to aggregate rates are unselected.
-No heterogeneity parameter or demographic default is adopted here.
+Expand the existing extraction/summary functions into a coherent user toolkit
+for useful quantities from simulation histories. Existing functions cover Lexis
+counts, fertility, life tables, population sizes and recorded kin. Identify
+additional quantities and exposure/observation definitions from actual workflows.
+Status-specific exposure, fertility, mortality and formation summaries are
+implemented through `calculate_lexis_counts(include_unions = TRUE)` (D046–D048).
+See [demographic analysis](demographic-analysis.md) for their observation rules.
+
+## Tentative milestone 9: immigration from outside the system
+
+Add immigrants within a running simulation, rather than requiring a restart.
+The user envisages specifying numbers and an age/sex distribution and tracking
+individual immigrant generational status. Timing (batch dates versus arrivals),
+meaning of supplied numbers, attribute/kin/union initialization, ancestry and
+generation definitions, and interactions with group assignment remain open.
+No emigration process is implied by the immigration request.
+
+## Tentative milestone 10: internal migration and regions
+
+Represent location with a dedicated `region` column, separately from group
+identity. Allow internal migration using rates between regions, and restrict
+union formation to partners within the same region. The region schema, migration
+clock and rate strata, individual versus household movement, and treatment of
+existing unions when partners move remain to be specified. No migration default
+or rule about relocating existing partners is selected.
+
+## Tentative milestone 11: individual characteristics
+
+Consider characteristics that can affect rates and matching without functioning
+as definitive group identities. Education is the user's example. Users would
+provide custom functions for inheritance and life-course change. Characteristics
+would be exposed to modify demographic rates and union formation. Initialization
+and callback contracts remain to be specified. Define permitted changes and event invalidation, not arbitrary state
+mutation. No distinction between categorical/continuous attributes or transition
+model has been fixed by these notes.
+
+## Preparing input schedules
+
+Provide more helpers for building required input rates, including retrieving or
+using model life tables and splitting overall fertility into partnered and
+unpartnered schedules. No source, model-life-table family, fitting method or
+split rule has been selected. Overall fertility alone does not identify two
+status-specific schedules: decomposition needs additional information or
+assumptions, such as age-specific status proportions and relative fertility.
+Keep empirical rates, inferred rates and user assumptions inspectable with
+provenance. Avoid automatic downloads as part of simulation execution.
 
 ## Population feedback
 
@@ -172,35 +237,15 @@ For a precedent, see Mike Murphy's
 through nuptiality, evaluating population size at 25-year intervals. This is a
 reference for investigation, not an adopted response rule or period length.
 
-## Characteristics
-
-Consider characteristics that can affect rates and matching without functioning
-as definitive group identities. Education is the user's example. Users would
-need to specify intergenerational inheritance/initialization and life-course
-models. Define permitted changes and event invalidation, not arbitrary state
-mutation. No distinction between categorical/continuous attributes or transition
-model has been fixed by these notes.
-
-## Immigration
-
-Add immigrants within a running simulation, rather than requiring a restart.
-The user envisages specifying numbers and an age/sex distribution and tracking
-individual immigrant generational status. Timing (batch dates versus arrivals),
-meaning of supplied numbers, attribute/kin/union initialization, ancestry and
-generation definitions, and interactions with group assignment remain open.
-No emigration process is implied by the immigration request.
-
 ## Previously deferred items
 
 - Previous-father continuity at subsequent births or union formation (D042).
 - Declining poor nonempty candidate pools and waiting (D044).
 - Transition-aware fertility compensation for status/rate changes (D045).
-- Parity-specific fertility and multiple concurrent unions; no implementation
-  milestone has yet been selected. Non-death union dissolution is now proposed
-  for milestone 4 above.
+- Multiple concurrent unions remain unassigned. Parity-specific fertility is
+  proposed for milestone 5 and non-death union dissolution for milestone 4.
 
 R formula-fallback performance comparisons are now included in the user-authored
 milestone 2 validation report, accepted by the user on October 19, 2026 (D050).
-Broader existing
-future notes about calendar-varying schedules, initialization and exact
-checkpoints remain separate from the user's new priorities above.
+Initialization and exact checkpoints remain separate future topics. Calendar-varying
+schedules now fall under proposed milestone 6 above.
