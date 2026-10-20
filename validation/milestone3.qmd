@@ -1,0 +1,256 @@
+---
+title: "Hammel: Milestone 3 Validation"
+author: "Aaron Gullickson"
+date: today
+format:
+  html:
+    toc: true
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    self-contained: true
+execute:
+  eval: true
+  echo: true
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(here)
+devtools::load_all(here::here())
+library(dplyr)
+library(tidyr)
+library(readr)
+library(purrr)
+library(tibble)
+library(ggplot2)
+library(gt)
+```
+
+## Purpose and completion criteria
+
+Assess group-specific demographic rates, partner selection, ancestry tracking,
+and newborn group identity assignment. This is a report skeleton; results and
+milestone acceptance remain pending. Numerical acceptance criteria and the
+replication design should be specified before interpreting results.
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| Group initialization | Observed group shares versus normalized input weights | To be specified |
+| Fertility, mortality, and union-search rates | Grouped output versus supplied schedules or multiplied input rates | To be specified; retain known fertility-transition and partner-scarcity limitations |
+| Group matching | Estimated choice effects versus configured effects | To be specified |
+| Hard exogamy restrictions | New unions and selected fathers versus prohibited pairs | No prohibited selections under the applicable matching model |
+| Ancestry | Child shares versus half of each parent's shares | Accounting identity, including unknown paternal contribution |
+| Group inheritance | Observed assignments versus deterministic rules or specified probabilities | Exact deterministic rules; probabilistic criteria to be specified |
+| Grouped summaries | Group totals versus pooled counts and exposure | Accounting identities |
+| Implementation | Automated tests, seed reproducibility, and restart checks | Record results and limitations |
+
+## Overview of Design
+
+Group identity is stored on persons. Demographic schedules and proportional
+input-rate multipliers belong to their respective processes; group preferences
+and restrictions belong to matching models. Ancestry is tracked independently
+of identity. Fertility assigns newborn identity using a built-in or custom rule.
+
+### Group-specific rates
+
+Describe shared versus stratified schedules, missing-schedule errors, and
+no-population-group fallback warnings. Document proportional multipliers,
+omitted factors of 1.0, and fertility multiplication before birth compensation.
+Include separate partnered/unpartnered fertility multipliers.
+
+### Group matching
+
+Describe female-first `A:B` and symmetric `A::B` effects, formula predictors,
+and the zero log effect for omitted pairs. Hard restrictions apply after
+candidate sampling without refilling. Distinguish partner matching from an
+explicit nonmarital father-matching model.
+
+### Ancestry and identity inheritance
+
+Describe initial pure-group ancestry versus supplied proportions, unknown
+ancestry, and parental averaging. Cover maternal, paternal, random-parent,
+same-sex, opposite-sex, ancestry, hierarchy/passing, and custom identity rules.
+Custom rules may introduce declared identities such as AB without introducing
+an AB ancestry component. Include birth-time `parents_in_union` where relevant.
+
+## Inputs and simulation design
+
+### Prepare inputs
+
+Record rate sources, years, units, retrieval dates, and any transformations.
+Use saved inputs for reproducibility; this skeleton does not download rates.
+The exploratory script `validation/milestone3_checks.R` is a source of candidate
+examples, not completed validation evidence.
+
+```{r}
+#| label: prepare-inputs
+# TODO: Load saved fertility, mortality, and union-search schedules.
+# TODO: Construct grouped schedules and proportional multiplier scenarios.
+```
+
+### Initialization, observation windows, and replications
+
+Specify initial size, age/sex composition, equal and unequal group weights,
+birth spacing, initiation modes, matching parameters, sample sizes, simulation
+duration, observation periods, and independent replication seeds. Distinguish
+initialization transients from later observations. Do not stack person histories
+from separate runs before calling demographic extraction functions.
+
+```{r}
+#| label: simulation-design
+# TODO: Set parameters and seeds; create baseline populations and scenario table.
+```
+
+## Replications and demographic extraction
+
+```{r}
+#| label: run-replications
+# TODO: Run each scenario and replication; retain scenario and seed identifiers.
+# TODO: Extract grouped Lexis counts, TFR, life tables, population sizes,
+#       detailed unions, and ancestry summaries separately for each run.
+```
+
+## Evaluate Group-Specific Rates
+
+### Shared schedules and group initialization
+
+Compare sampled initial shares with normalized weights. Assess grouped results
+under shared rates and reconcile group counts/exposure with pooled summaries.
+
+### Stratified schedules and proportional multipliers
+
+Compare ASFR, TFR, ASMR, and female union-search rates with scenario-specific
+inputs. Compare equivalent explicit schedules and multiplier configurations.
+Include conditional fertility and omitted group/status factors. Report sparse
+oldest-age cells and infinite life expectancy explicitly.
+
+```{r}
+#| label: group-rate-results
+# TODO: Tables and plots of input versus replicated output by group and period.
+```
+
+## Evaluate Group Matching
+
+### Directed and symmetric effects
+
+Compare configured effects with estimates accounting for available candidates
+and age preferences. Cross-product log odds are a descriptive check: a symmetric
+effect beta contributes 2 * beta under a separable table model, but aggregate
+union counts need not recover that relationship under changing availability.
+
+### Hard restrictions and candidate scarcity
+
+Check prohibited pair counts, eligible sample sizes, failed searches/births,
+and sensitivity to candidate sample size. Check on-demand and rate initiation,
+including an explicit father-matching override.
+
+```{r}
+#| label: group-matching-results
+# TODO: Pair tables, choice-model recovery, and restriction/availability checks.
+```
+
+## Evaluate Ancestry Tracking
+
+Check row coverage, nonnegative shares summing to one, parental averaging,
+unknown fathers, supplied starting proportions, and restart preservation.
+Report ancestry among living persons separately from all historical persons.
+
+```{r}
+#| label: ancestry-results
+# TODO: Ancestry accounting checks and distributions by identity and period.
+```
+
+## Evaluate Group Inheritance
+
+### Built-in rules
+
+Check deterministic assignments, missing-father maternal fallback, random-parent
+probabilities, known-ancestry conditioning, and hierarchy/passing probabilities.
+Compare string shorthand with the equivalent constructed model.
+
+### Custom rules and mixed identities
+
+Check predicted versus observed assignment probabilities among eligible simulated
+births, excluding founders and separating deterministic early-return cases.
+Include declared AB identities, their schedules, and birth-time union status.
+For ancestry models, use the same known-ancestry normalization as the callback;
+mean ancestry within identities is not the assignment probability conditional
+on ancestry. Record the actual custom function and coefficients used.
+
+```{r}
+#| label: inheritance-results
+# TODO: Predicted/observed assignments and identity/ancestry distributions.
+```
+
+### Investigate paternal-inheritance population trajectories
+
+Exploratory separate unseeded runs suggested that paternal inheritance reduced
+the minority share more than maternal inheritance and changed off-identity
+ancestry. No systematic difference or cause has been established; sampling
+noise remains possible.
+
+Compare simple inheritance rules over replications with equal and unequal
+starting group sizes. Report population shares, sex composition, and uncertainty.
+If a difference persists, examine cross-group births by parental direction,
+partnership availability by sex/group, and births per union. Minority status
+alone does not imply unequal partner availability for minority men and women.
+Do not attribute a difference to `ffab` or female-driven matching without evidence.
+The current birth sex probability is part of the recorded model; alternative
+values would require a separately specified experiment.
+
+```{r}
+#| label: paternal-inheritance-investigation
+# TODO: Replicated trajectories and contrasts; investigate mechanisms if needed.
+```
+
+## Speed Tests
+
+Compare runtime and memory with and without groups, ancestry, and custom
+inheritance on documented workloads. Record final population sizes alongside
+timings, and separate compilation/input preparation from simulation execution.
+
+```{r}
+#| label: speed-tests
+# TODO: Specify and run comparable workloads; summarize timing distributions.
+```
+
+## Tests
+
+Run the ordinary suite explicitly when preparing the assessment. Live database
+tests remain opt-in; this chunk is disabled in the skeleton.
+
+```{r}
+#| label: test-results
+#| eval: false
+test_results <- devtools::test(pkg = here::here(), reporter = "silent")
+test_table <- as.data.frame(test_results)
+knitr::kable(
+  test_table[, c("test", "passed", "failed", "error", "skipped", "warning")]
+)
+```
+
+## Conclusions and unresolved limitations
+
+TODO: Assess each completion criterion against the evidence. Record remaining
+limitations and the status of the paternal-inheritance question. Milestone 3
+has not yet been accepted on the basis of this report. Multiple simultaneous
+identities and model diagnostic tools remain outside the agreed feature scope.
+
+## Reproducibility record
+
+```{r}
+#| label: reproducibility
+system2("git", c("-C", shQuote(here::here()), "rev-parse", "HEAD"), stdout = TRUE)
+system2("git", c("-C", shQuote(here::here()), "status", "--short"), stdout = TRUE)
+sessionInfo()
+```
+
+## References
+
+TODO: Add sources for rate inputs, matching comparisons, and any custom
+inheritance model evaluated in this report.

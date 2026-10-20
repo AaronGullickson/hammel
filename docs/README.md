@@ -62,6 +62,9 @@ To inspect prior versions, use `git log -- docs` and
   executes simulations and an HMD download. Deferred limitations remain documented.
 - [Union-formation example](../inst/examples/milestone2.R): current construction
   and execution workflow.
+- [Milestone 3 validation report](../validation/milestone3.qmd): skeleton for
+  group rates, matching, ancestry, and inheritance evaluation, including the
+  unresolved paternal-inheritance comparison. Results and acceptance are pending.
 The former `milestone1.R` and `milestone1_bootstrap.R` examples have been
 removed from the current tree; use Git history for those historical workflows.
 
