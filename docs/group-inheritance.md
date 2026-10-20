@@ -13,6 +13,14 @@ it. Unspecified inheritance, including older specifications without this field,
 retains maternal assignment and its RNG consumption. Configuration is validated
 at construction, attachment, and execution.
 
+For rules requiring no additional parameters, `inheritance` also accepts a
+method name: `"mother"`, `"father"`, `"random_parent"`, `"same_sex"`,
+`"opposite_sex"`, or `"ancestry"`. For example,
+`set_fertility(model, rates, inheritance = "father")` is equivalent to using
+`create_group_inheritance("father")`. Stored process specifications contain the
+full model object. Hierarchy and custom rules still require the constructor
+to supply `order` or `fun`; their bare names produce the corresponding error.
+
 | Method | Identity assignment |
 | --- | --- |
 | `mother` | Mother's group |

@@ -1014,6 +1014,9 @@ matching specifications override this default. Initiation mode remains explicit.
 - **Status:** specified and authorized by the user October 20, 2026; maternal
   assignment remains the explicit default when users supply no rule.
 - **Decision:** attach a `create_group_inheritance()` object to fertility.
+  Parameter-free method names may also be supplied directly as strings to
+  fertility constructors/setters, which normalize them to the same model object
+  (user requested October 20, 2026).
   Built-ins follow mother, father, random parent (0.5/0.5), same-sex parent,
   opposite-sex parent, known child ancestry, or a strict hierarchy of parental
   identities. Missing required information falls back to the mother's group,

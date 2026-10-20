@@ -51,6 +51,13 @@ inheritance_methods <- function() {
   c("mother", "father", "random_parent", "same_sex", "opposite_sex", "ancestry", "hierarchy", "custom")
 }
 
+normalize_group_inheritance <- function(model) {
+  if (is.null(model)) model <- create_group_inheritance()
+  if (is.character(model)) model <- create_group_inheritance(method = model)
+  validate_group_inheritance(model)
+  model
+}
+
 validate_group_inheritance <- function(model) {
   if (is.null(model)) return(invisible(model)) # Older fertility objects default to mother.
   if (!inherits(model, "hammel_group_inheritance") || !is.list(model))
@@ -93,8 +100,7 @@ extend_identity_groups <- function(values, additions) {
 }
 
 prepare_group_inheritance <- function(model, population) {
-  if (is.null(model)) model <- create_group_inheritance()
-  validate_group_inheritance(model)
+  model <- normalize_group_inheritance(model)
   if (!"group" %in% names(population$persons)) {
     if (model$method != "mother" || length(model$groups))
       stop("Group inheritance requires population group identities.", call. = FALSE)

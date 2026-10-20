@@ -7,6 +7,24 @@ inheritance_test_model <- function(rule = create_group_inheritance(), birth_rate
 
 inheritance_children <- function(result) result$persons[result$persons$birth_time >= 0, ]
 
+test_that("inheritance method strings are equivalent to constructed models", {
+  for (method in c("mother", "father", "random_parent", "same_sex", "opposite_sex", "ancestry")) {
+    model <- inheritance_test_model(method)
+    explicit <- inheritance_test_model(create_group_inheritance(method))
+    expect_identical(model$processes$fertility$inheritance,
+                     explicit$processes$fertility$inheritance)
+    expect_identical(simulate(model, 1, seed = 52), simulate(explicit, 1, seed = 52))
+    model$processes$fertility$inheritance <- method
+    expect_identical(set_process(model, model$processes$fertility)$processes$fertility$inheritance,
+                     explicit$processes$fertility$inheritance)
+    expect_identical(simulate(model, 1, seed = 52), simulate(explicit, 1, seed = 52))
+  }
+  for (method in list("other", NA_character_, c("mother", "father"), character()))
+    expect_error(inheritance_test_model(method), "method")
+  expect_error(inheritance_test_model("hierarchy"), "order")
+  expect_error(inheritance_test_model("custom"), "fun")
+})
+
 test_that("custom inheritance receives parents' union status at birth", {
   rule <- create_group_inheritance("custom", groups = c("partnered", "nonmarital"),
     fun = function(parents_in_union, ...) {

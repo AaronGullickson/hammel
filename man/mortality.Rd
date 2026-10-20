@@ -38,7 +38,9 @@ statuses (or overall fertility). Status lists require \code{union_status} rates.
 defaulting to \code{0.75}. Must be finite and nonnegative. Applies to fertility
 only; eligible hazards use midpoint birth-spacing compensation.}
 
-\item{inheritance}{A group identity model from \code{\link[=create_group_inheritance]{create_group_inheritance()}}.
+\item{inheritance}{A group identity model from \code{\link[=create_group_inheritance]{create_group_inheritance()}},
+or a method name requiring no additional parameters: \code{"mother"}, \code{"father"},
+\code{"random_parent"}, \code{"same_sex"}, \code{"opposite_sex"}, or \code{"ancestry"}.
 Fertility defaults to following the mother. Other parental, ancestry,
 hierarchy, and custom rules assign identity after child sex and ancestry
 are calculated. Possible identities are checked against grouped schedules

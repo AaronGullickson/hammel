@@ -221,10 +221,7 @@ result$persons |>
 # fathers should be similar
 result <- hammel_model() |>
   set_population(pop_baseline) |>
-  set_fertility(
-    fertility_rates_overall_usa,
-    inheritance = create_group_inheritance("father")
-  ) |>
+  set_fertility(fertility_rates_overall_usa, inheritance = "father") |>
   set_mortality(mortality_rates_usa2000) |>
   set_union_formation(
     "on_demand", 
@@ -249,10 +246,7 @@ result$persons |>
 # randome parent
 result <- hammel_model() |>
   set_population(pop_baseline) |>
-  set_fertility(
-    fertility_rates_overall_usa,
-    inheritance = create_group_inheritance("random_parent")
-  ) |>
+  set_fertility(fertility_rates_overall_usa, inheritance = "random_parent") |>
   set_mortality(mortality_rates_usa2000) |>
   set_union_formation(
     "on_demand", 
@@ -278,9 +272,7 @@ result$persons |>
 result <- hammel_model() |>
   set_population(pop_baseline) |>
   set_fertility(
-    fertility_rates_overall_usa,
-    inheritance = create_group_inheritance("same_sex")
-  ) |>
+    fertility_rates_overall_usa, inheritance = "same_sex") |>
   set_mortality(mortality_rates_usa2000) |>
   set_union_formation(
     "on_demand", 
@@ -306,9 +298,7 @@ result$persons |>
 result <- hammel_model() |>
   set_population(pop_baseline) |>
   set_fertility(
-    fertility_rates_overall_usa,
-    inheritance = create_group_inheritance("opposite_sex")
-  ) |>
+    fertility_rates_overall_usa, inheritance = "opposite_sex") |>
   set_mortality(mortality_rates_usa2000) |>
   set_union_formation(
     "on_demand", 
@@ -334,9 +324,7 @@ result$persons |>
 result <- hammel_model() |>
   set_population(pop_baseline) |>
   set_fertility(
-    fertility_rates_overall_usa,
-    inheritance = create_group_inheritance("ancestry")
-  ) |>
+    fertility_rates_overall_usa, inheritance = "ancestry") |>
   set_mortality(mortality_rates_usa2000) |>
   set_union_formation(
     "on_demand", 
@@ -428,8 +416,7 @@ inheritance <- create_group_inheritance(
     known <- 1 - child_ancestry[["unknown"]]
     if (known <= 0) return(mother_group)
     
-    # if we are here then assign as a function of group A 
-    # ancestry
+    # if we are here then assign as a function of group A ancestry
     prop_A <- child_ancestry[["group_A"]] / known
 
     logits <- c(

@@ -18,7 +18,9 @@
 #'   compensation. Without population groups, simulation warns and ignores it.
 #'   Fertility also accepts a named list of vectors for `partnered` and/or
 #'   `unpartnered` when rates include `union_status`; omitted statuses use 1.0.
-#' @param inheritance A group identity model from [create_group_inheritance()].
+#' @param inheritance A group identity model from [create_group_inheritance()],
+#'   or a method name requiring no additional parameters: `"mother"`, `"father"`,
+#'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
 #'   Applies to fertility and defaults to following the mother. Assignment is
 #'   independent of recorded ancestry proportions.
 #'
@@ -49,7 +51,7 @@ set_process <- function(model, process) {
     validate_rates(process$rates, mortality = name == "mortality")
     if (name == "fertility") {
       validate_fertility_group_prop_hazard(process$group_prop_hazard, process$rates)
-      validate_group_inheritance(process$inheritance)
+      process$inheritance <- normalize_group_inheritance(process$inheritance)
     } else {
       validate_group_prop_hazard(process$group_prop_hazard)
     }
@@ -136,7 +138,9 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #'   `list(partnered = c(A = 1.1, B = 0.9), unpartnered = c(A = 1.05))`.
 #'   An omitted status or group uses 1.0. A single vector applies to both
 #'   statuses (or overall fertility). Status lists require `union_status` rates.
-#' @param inheritance A group identity model from [create_group_inheritance()].
+#' @param inheritance A group identity model from [create_group_inheritance()],
+#'   or a method name requiring no additional parameters: `"mother"`, `"father"`,
+#'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
 #'   Fertility defaults to following the mother. Other parental, ancestry,
 #'   hierarchy, and custom rules assign identity after child sex and ancestry
 #'   are calculated. Possible identities are checked against grouped schedules
@@ -166,7 +170,7 @@ fertility <- function(rates, birth_interval = 0.75, group_prop_hazard = NULL,
                       inheritance = create_group_inheritance()) {
   validate_rates(rates, mortality = FALSE)
   validate_fertility_group_prop_hazard(group_prop_hazard, rates)
-  validate_group_inheritance(inheritance)
+  inheritance <- normalize_group_inheritance(inheritance)
   validate_birth_interval(birth_interval)
   process <- new_rate_process("fertility", rates)
   process$inheritance <- if (is.null(inheritance)) create_group_inheritance() else inheritance

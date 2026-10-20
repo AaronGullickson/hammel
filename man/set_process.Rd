@@ -35,7 +35,9 @@ Fertility also accepts a named list of vectors for \code{partnered} and/or
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
 defaulting to \code{0.75}. Must be finite and nonnegative.}
 
-\item{inheritance}{A group identity model from \code{\link[=create_group_inheritance]{create_group_inheritance()}}.
+\item{inheritance}{A group identity model from \code{\link[=create_group_inheritance]{create_group_inheritance()}},
+or a method name requiring no additional parameters: \code{"mother"}, \code{"father"},
+\code{"random_parent"}, \code{"same_sex"}, \code{"opposite_sex"}, or \code{"ancestry"}.
 Applies to fertility and defaults to following the mother. Assignment is
 independent of recorded ancestry proportions.}
 }
