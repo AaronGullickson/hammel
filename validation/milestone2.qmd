@@ -410,7 +410,7 @@ counts_ondemand |>
 
 @tbl-fertility-coverage-model-on-demand shows the share of age groups covered by the 95% confidence interval within each time period. With a small number of age groups, the coverage can be noisy, but the results here indicate a high level of coverage and very small maximum absolute deviation.  
 
-Although the overall input fertility rates are preserved in the simulation output, I don't expect that the fertility rates disaggregated union status will match those empirically observed for the input case because the on demand model enforces a union on any birth to an unpartnered woman. @fig-union-status-fertility-model-on-demand shows the mean partnered and unpartnered age specific fertility rates observed in the simulation in comparison to those same rates from the input data. As expected, the results here are discrepant. Partnered fertility rates are forced to zero by the simulation and, to compensate, partnered fertility rates are higher than those actually observed. This finding does not invalidate the on demand model as it was expected, but users should be aware that this model cannot be used to generate reasonable partnered and unpartnered fertility rates.
+Although the overall input fertility rates are preserved in the simulation output, I don't expect that the fertility rates disaggregated union status will match those empirically observed for the input case because the on demand model enforces a union on any birth to an unpartnered woman. @fig-union-status-fertility-model-on-demand shows the mean partnered and unpartnered age specific fertility rates observed in the simulation in comparison to those same rates from the input data. As expected, the results here are discrepant. Unpartnered fertility rates are forced to zero by the simulation and, to compensate, partnered fertility rates are higher than those actually observed. This finding does not invalidate the on demand model as it was expected, but users should be aware that this model cannot be used to generate reasonable partnered and unpartnered fertility rates.
 
 ```{r}
 #| label: fig-union-status-fertility-model-on-demand
@@ -434,7 +434,7 @@ asfr |>
 #| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines. On demand model used.
 
 tfr |> 
-  ggplot(aes(x = time_mid, y = tfr, group = union_status, color = union_status, fill = union_status))+
+  ggplot(aes(x = time_mid, y = tfr, group = union_status, color = union_status))+
   geom_point()+
   geom_hline(data = input_tfr, aes(yintercept = tfr, color = union_status),
              linetype = 2)+
@@ -737,7 +737,7 @@ One final check is to examine the mean total fertility rate from the estimated r
 #| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines. Rate model used.
 
 tfr |>
-  ggplot(aes(x = time_mid, y = tfr, group = union_status, color = union_status, fill = union_status))+
+  ggplot(aes(x = time_mid, y = tfr, group = union_status, color = union_status))+
   geom_point()+
   geom_hline(data = input_tfr, aes(yintercept = tfr, color = union_status),
              linetype = 2)+
@@ -802,7 +802,7 @@ tfr_nobt <- map(counts_rates_nobt, calculate_tfr) |>
 
 ```{r}
 #| label: fig-union-status-fertility-model-rate-no-bt
-#| fig-cap: Estimated mean unpartnered and partnered age specific fertility rates across 100 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates. Rate model with no birth intervals used.
+#| fig-cap: Estimated mean unpartnered and partnered age specific fertility rates across 25 simulations and 20 time periods compared to age specific fertility rates from input data. Points and dotted lines show empirically estimated rates and solid lines show input rates. Rate model with no birth intervals used.
 
 asfr_nobt |>
   filter(union_status != "overall") |>
@@ -819,10 +819,10 @@ asfr_nobt |>
 
 ```{r}
 #| label: fig-tfr-model-rate-nobt
-#| fig-cap: Estimated mean total fertility rate over time from the simulation, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines. Rate model with no birth intervals used.
+#| fig-cap: Estimated mean total fertility rate over time from the simulations, separated by union status in comparison to input total fertility rates. Input total fertility rates are shown by dotted horizontal lines. Rate model with no birth intervals used.
 
 tfr_nobt |>
-  ggplot(aes(x = time_mid, y = tfr, group = union_status, color = union_status, fill = union_status))+
+  ggplot(aes(x = time_mid, y = tfr, group = union_status, color = union_status))+
   geom_point()+
   geom_hline(data = input_tfr, aes(yintercept = tfr, color = union_status),
              linetype = 2)+
@@ -830,7 +830,7 @@ tfr_nobt |>
   theme_bw()
 ```
 
-@fig-union-status-fertility-model-rate-no-bt and @fig-tfr-model-rate-nobt show figures of age specific fertility rates and TFR, consistent with the earlier figures but with `birth_interval` set to zero. As expected, these results show a tight fit between partnered fertility rates from the simulation and the input rates. This indicates that the discrepancy here is driven by the birth interval is, consistent with the earlier figures but with `birth_interval` set to zero. As expected, these results show a tight fit between partnered fertility rates from the simulation and the input rates. This finding indicates that the discrepancy here is driven by the birth interval issue. This issue is being deferred to a later milestone and does not block this milestone. In most cases, the differences here will be very minor.
+@fig-union-status-fertility-model-rate-no-bt and @fig-tfr-model-rate-nobt show figures of age specific fertility rates and TFR, consistent with the earlier figures but with `birth_interval` set to zero. As expected, these results show a tight fit between partnered fertility rates from the simulation and the input rates. This indicates that the discrepancy here is driven by the birth interval, consistent with the earlier figures but with `birth_interval` set to zero. As expected, these results show a tight fit between partnered fertility rates from the simulation and the input rates. This finding indicates that the discrepancy here is likely driven by the birth interval issue. This issue is being deferred to a later milestone and does not block this milestone. In most cases, the differences here will be very minor.
 
 ### Age specific marriage rates
 
@@ -1075,7 +1075,7 @@ agediffs <- map(c(-5:5), function(d) {
     add_union_info()
   x <- result$unions |>
     # drop first half for burn in
-    filter(start_time < 2050) |>
+    filter(start_time >= 2050) |>
     pull(age_diff)
 
   # return as tibble
@@ -1265,7 +1265,7 @@ scenarios |>
   theme_bw()
 ```
 
-@tbl-time-tests and @fig-time-tests show the amount of time to process each simulation. These numbers are not exact because other factors can affect total processing time. The on-demand models were faster to process than the rate models. The biggest difference in computation was driven by custom matching which increased computation by a factor of four or more. This increase in computation time is driven by the need to use R rather than C++ to compute logit scores from the model.
+@tbl-time-tests and @fig-time-tests show the amount of time to process each simulation. These numbers are not exact because other factors can affect total processing time. The on-demand models were faster to process than the rate models. The biggest difference in computation was driven by custom matching which increased computation by a factor of three or more. This increase in computation time is driven by the need to use R rather than C++ to compute logit scores from the model.
 
 Excluding a greater number of kin generations generally increased computational time but the effect was slight overall, and non-existent in some cases. The biggest gain was for excluding no kin because then the simulation doesn't even run the kin exclusion routine at all.
 
@@ -1289,7 +1289,7 @@ knitr::kable(
 
 All criteria for this milestone have been reached. The results are consistent with expectations and match model input where applicable. Where no specific model input exists to make a comparison, the model produces plausible results.
 
-The one remaining issue is the issue with a slight inflation of partnered fertility rates due to transitions between unpartnered and partnered status for women in a birth interval. This issue is related to the issue identified in milestone 1 and has been deferred to a later date. At present, the bias it introduces will be extremely modest in most cases.
+The one remaining issue is the issue with a slight inflation of partnered fertility rates due to transitions between unpartnered and partnered status for women in a birth interval. This issue is related to the issue identified in milestone 1 and has been deferred to a later date. At present, the bias it introduces will be likely be modest in most cases.
 
 ## Reproducibility record
 
