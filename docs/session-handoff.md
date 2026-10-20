@@ -33,27 +33,26 @@ at its recorded commit: current simulation requires a union process that was
 not part of that assessment. [Testing](testing.md) retains the acceptance
 artifact provenance and archive limitations.
 
-The user is writing `validation/milestone2.qmd`. It now includes demographic
-comparisons for both search modes, union diagnostics, age-gap comparisons,
-conditional-logit parameter recovery, and performance comparisons including
-R formula fallback. The current report uses USA circa 2000–2001 mortality,
-fertility and marriage inputs. England and Wales 2015 preparation remains
-available in `validation/data`, but is not the current report's empirical case.
-The report's conclusions section is empty and no milestone 2 acceptance is
-recorded. Preserve the user's report and explanatory source comments.
+The user accepted milestone 2 as complete on October 19, 2026 (D050), after
+review of `validation/milestone2.qmd` and its rendered HTML and user revisions.
+The report includes demographic comparisons for both search modes, union
+diagnostics, age-gap comparisons, conditional-logit parameter recovery, and
+performance comparisons including R formula fallback. It uses USA circa
+2000–2001 mortality, fertility and marriage inputs. England and Wales 2015
+preparation remains available as an additional example. Preserve the user's
+report and explanatory source comments.
 
-The October 19 documentation review inspected report source and implementation;
-it did not rerender the reports, download rates, independently reproduce the
-scientific findings, or set acceptance thresholds. Earlier implementation
-verification counts and timings remain in Git history.
+Report review inspected source, rendered tables and figures; the acceptance
+documentation update did not rerender reports, download rates, or independently
+rerun simulations or tests. No new scientific acceptance thresholds are set.
+The report and documentation are to be committed together; this record does
+not assign a final artifact hash or acceptance commit.
 
-## Remaining and deferred work
+## Deferred work and next scope
 
-The user confirmed on October 19 that milestone 2 is nearing completion. The
-remaining sequence is to compile the report, obtain agent feedback, and then
-write the conclusions before final user acceptance. Parameter recovery and
-R formula-fallback timing are already present. Report conclusions and scientific
-interpretation belong to the user.
+Milestones 1 and 2 are complete by user acceptance. Report findings and
+scientific interpretation belong to the user. Completion does not imply every
+review suggestion was implemented or remove documented limitations.
 
 Transition-aware fertility compensation (D045), poor-pool waiting (D044), and
 previous-father continuity (D042) are deferred. The current adjustment does not

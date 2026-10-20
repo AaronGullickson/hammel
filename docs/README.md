@@ -3,10 +3,10 @@
 Updated October 19, 2026. The mortality/fertility engine is implemented;
 milestone 1 was accepted as complete by the user on October 15, 2026. Current behavior uses
 continuous event times and midpoint fertility compensation, with no monthly
-time grid. Milestone 2 union formation is implemented and in demographic validation;
-its report includes parameter recovery and performance comparisons. It is
-nearing completion: report compilation, agent feedback, and user-written
-conclusions remain before final acceptance.
+time grid. The user accepted milestone 2 union formation as complete on
+October 19, 2026 (D050), based on the validation report and review.
+Transition-aware fertility compensation and other deferred mechanisms remain
+future work.
 
 ## Reading order
 
@@ -53,9 +53,9 @@ To inspect prior versions, use `git log -- docs` and
   and accepted milestone 1. Reproduce at the recorded acceptance commit; current
   execution requires a union process absent from that historical assessment.
 - [Milestone 2 validation report](../validation/milestone2.qmd): user-authored
-  analysis in progress using USA circa 2000–2001 inputs; includes both initiation
+  assessment accepted October 19, 2026 (D050), using USA circa 2000–2001 inputs; includes both initiation
   modes, matching-parameter recovery, and performance comparisons. Rendering
-  executes simulations and an HMD download. No milestone acceptance is recorded.
+  executes simulations and an HMD download. Deferred limitations remain documented.
 - [Union-formation example](../inst/examples/milestone2.R): current construction
   and execution workflow.
 The former `milestone1.R` and `milestone1_bootstrap.R` examples have been

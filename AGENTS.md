@@ -74,14 +74,14 @@ the user's agreement.
   Do not make readers reconcile contradictory current rules with appended
   corrections.
 - Milestone 1 was accepted as complete on October 15, 2026 (D029). Milestone 2
-  union formation is implemented and in demographic validation; distinguish its
-  current specification from deferred mechanisms and future proposals.
+  union formation was accepted as complete on October 19, 2026 (D050);
+  distinguish its current specification from deferred mechanisms and future proposals.
 - `validation/milestone1.qmd` is the accepted historical assessment; reproduce it
   at its recorded commit because current execution requires a union process.
-  `validation/milestone2.qmd` contains the user's ongoing analysis, including
+  `validation/milestone2.qmd` contains the user's accepted assessment, including
   matching-parameter recovery and performance comparisons. Preserve both reports;
-  do not fabricate results, set scientific acceptance thresholds, or mark
-  milestone 2 complete without the user's acceptance.
+  do not fabricate results or set scientific acceptance thresholds. Milestone
+  completion retains documented limitations and does not authorize future features.
 - Use `devtools::test()` for the testthat suite. Live database tests require
   explicit opt-in; ordinary verification must not download rates or expose
   credentials. See `docs/testing.md` for commands and evidence.

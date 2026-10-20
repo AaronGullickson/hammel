@@ -1,8 +1,8 @@
 # Directions beyond milestone 2
 
 Recorded October 15, 2026; expanded October 17, 2026 from the user's planning
-notes. Milestone 2 remains
-in validation. The user selected **groups as the theme for milestone 3**;
+notes; status updated October 19, 2026. Milestone 2 was accepted as complete
+by the user on October 19, 2026 (D050). The user selected **groups as the theme for milestone 3**;
 **union dissolution is proposed for milestone 4**, after groups. Other items
 below are prospective work without a milestone assignment. These
 notes preserve intentions and open questions, not authorization to implement
@@ -167,7 +167,7 @@ No emigration process is implied by the immigration request.
   for milestone 4 above.
 
 R formula-fallback performance comparisons are now included in the user-authored
-milestone 2 validation report; final assessment and milestone acceptance remain
-outstanding. Broader existing
+milestone 2 validation report, accepted by the user on October 19, 2026 (D050).
+Broader existing
 future notes about calendar-varying schedules, initialization and exact
 checkpoints remain separate from the user's new priorities above.

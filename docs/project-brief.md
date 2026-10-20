@@ -1,8 +1,8 @@
 # Hammel project brief
 
-Updated October 19, 2026. The first mortality/fertility simulator is implemented.
-The user accepted milestone 1 as complete after rendering the validation report
-on October 15, 2026. See D029 and [testing](testing.md) for the evidence and limits.
+Updated October 19, 2026. The user accepted milestone 1 (mortality/fertility)
+on October 15, 2026 (D029), and milestone 2 (union formation) on October 19,
+2026 (D050). See [testing](testing.md) for evidence and limits.
 
 ## Purpose
 
@@ -66,7 +66,7 @@ to a later milestone.
 Candidate sampling defaults to 1000 men before pair screening (zero means the
 whole pool). Eligibility and basic fertility transitions are implemented; the
 failed-match birth cancellation is implemented (default TRUE); transition-aware fertility
-compensation is deferred (D045); final validation remains. The poor-pool wait alternative is deferred to a later milestone (D044). See [milestone 2 notes](union-formation-models.md)
+compensation remains deferred (D045), including after milestone acceptance (D050). The poor-pool wait alternative is deferred to a later milestone (D044). See [milestone 2 notes](union-formation-models.md)
 for implemented rules, deferred decisions, and validation. The on-demand C++ path now forms unions at births with formula-based
 conditional-logit selection and handles widowhood and restart histories.
 Minimum male age screening (default 15 years) and known-kin exclusion within
@@ -75,9 +75,9 @@ native kinship module. Exclusive ongoing unions are enforced before sampling; fe
 Overall fertility is also supported in rate mode with a warning. Previous-father
 continuity is deferred to a later milestone. The user-authored [milestone 2 report](../validation/milestone2.qmd) now includes
 USA circa 2000–2001 demographic comparisons, matching-parameter recovery, and
-R formula-fallback performance comparisons (D042). Milestone 2 is nearing
-completion: the user will compile the report, obtain agent feedback, and write
-conclusions before final acceptance. Matching defaults to
+R formula-fallback performance comparisons (D042). The user accepted milestone 2
+as complete on October 19, 2026 (D050), retaining the documented limitations.
+Matching defaults to
 `create_age_gap_matching_model(0, 5)`, and optional union diagnostics record
 eligible sample counts and selected utility ranks.
 
@@ -88,15 +88,15 @@ rate multipliers, flexible child group identity and possible proportional group
 ancestry. Other future priorities are analysis helpers, input-rate preparation,
 fertility heterogeneity, inherited/life-course characteristics (such as education),
 and within-run immigration with generational status. Detailed demographic rules
-are not selected. See the [roadmap](roadmap.md); these notes do not move work
-ahead of milestone 2 validation.
+are not selected. See the [roadmap](roadmap.md); milestone 2 completion does
+not authorize unspecified future demographic behavior.
 
 ## Boundaries and future work
 
 C++17/Rcpp is selected and implemented for the first engine (D019); tibble is
 used at the R boundary (D023). Package metadata and licensing are not yet ready
 for release. A universal simulation framework and legacy compatibility are not
-requirements. Union formation and matching are now in milestone 2 development. Custom
+requirements. Union formation and matching are implemented and milestone 2 is complete. Custom
 process execution, non-death union dissolution, and richer initialization remain
 future work, not automatically authorized features.
 

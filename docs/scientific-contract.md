@@ -1,7 +1,9 @@
 # Scientific contract
 
 Updated October 19, 2026. This is the current mortality, fertility, union-formation,
-and observation contract, including the accepted milestone 2 rules. Earlier monthly and exact
+and observation contract. Milestone 2 was accepted as complete by the user on
+October 19, 2026 (D050), retaining the documented deferred limitations.
+Earlier monthly and exact
 age-varying compensation specifications are available in Git history; the
 [decision log](decisions.md) records their replacement. Acceptance
 of a model assumption is distinct from evidence of demographic accuracy.
@@ -189,7 +191,7 @@ events need no resampling merely because a union forms or ends. Candidate
 sets are temporary and are not returned. Optional `diagnostics = TRUE` records
 only eligible sample size and selected utility rank on newly formed unions;
 it defaults off and consumes no additional random draws. See [union formation](union-formation-models.md)
-for worked examples and remaining milestone 2 rules.
+for worked examples and implemented milestone 2 rules.
 
 Update the mother's latest birth and resample both newborn and mother. Newborns
 enter mortality risk immediately; their fertility depends on the supplied ages.

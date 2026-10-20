@@ -15,7 +15,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | --- | --- |
 | Standalone project and scientific ownership | D001–D002 |
 | Initial engine scope and milestone completion | D003 as narrowed by D019; D029 |
-| Milestone 2 union-formation scope | D030–D043; completion scope narrowed by D044/D045 |
+| Milestone 2 union-formation scope and completion | D030–D043; scope narrowed by D044/D045; completion D050 |
 | Union-status summaries and rate-column names | D046–D048; October 17 `overall` label clarification |
 | Default age-gap matching | October 18 default age-gap matching entry below |
 | Shared kinship and generation-distance exclusions | D036 |
@@ -371,7 +371,8 @@ D030.
 
 **Current status:** Implemented under D031–D043 with waiting and transition-aware
 compensation deferred by D044/D045. The report now includes demographic analysis,
-parameter recovery and performance comparisons; final user acceptance remains.
+parameter recovery and performance comparisons; D050 records user acceptance
+of milestone completion on October 19, 2026.
 D032 supersedes the original requirement to keep no-union execution available.
 
 - **Status:** accepted October 15, 2026 through the user's milestone 2 request.
@@ -677,8 +678,8 @@ failed-match cancellation.
 ## D042: Revised milestone 2 completion scope
 
 **Current status:** Completion scope subsequently narrowed by D044/D045; cancellation is
-implemented (D043), and the report now includes performance comparisons. Final
-assessment and user acceptance remain.
+implemented (D043), and the report includes performance comparisons. Milestone 2
+was accepted as complete on October 19, 2026 (D050).
 
 - **Status:** accepted by the user October 15, 2026.
 - **Required work:** implement a failed-match birth cancellation toggle and
@@ -710,7 +711,7 @@ assessment and user acceptance remain.
 ## D044: Defer poor-pool waiting to a later milestone
 
 **Current status:** Waiting remains deferred; D045 also defers compensation. The report
-now includes performance comparisons.
+includes performance comparisons; milestone 2 is complete (D050).
 
 - **Status:** accepted by the user October 15, 2026; supersedes D042's open scope.
 - **Decision:** postpone the option to decline a nonempty eligible pool and wait
@@ -718,14 +719,15 @@ now includes performance comparisons.
 - **Current behavior:** a nonempty screened pool always yields a selection via
   conditional-logit matching. Empty searches retain existing retry behavior;
   unmatched births follow `cancel_birth_if_no_match` (default TRUE).
-- **Remaining milestone 2 work:** fertility compensation and final demographic
-  validation/report, including R formula-fallback performance benchmarking.
+- **Subsequent disposition:** D045 deferred compensation; the report includes
+  demographic validation and R formula-fallback timing. D050 records completion.
 
 
 ## D045: Defer transition-aware fertility compensation
 
 **Current status:** Compensation remains deferred; the report now assesses fertility
-discrepancies and performance, without recorded milestone 2 acceptance.
+discrepancies and performance. Milestone 2 was accepted as complete (D050);
+this deferral remains in force.
 
 - **Status:** accepted by the user October 15, 2026; supersedes D042/D044's
   remaining implementation requirement.
@@ -733,12 +735,12 @@ discrepancies and performance, without recorded milestone 2 acceptance.
   transitions and changes of rates between simulation runs to later work. Retain
   per-schedule midpoint compensation and spacing based on actual recorded births.
   No individual rate-history or dynamic exposure correction is implemented.
-- **Evidence boundary:** the user expects the bias may be small, but its magnitude
-  has not been quantified. Do not claim negligible bias or calibrated conditional
-  ASFR recovery; assess discrepancies in final validation and retain the limitation.
-- **Milestone 2:** final demographic validation/report remains, including the
-  R formula-fallback performance benchmark. Completion still requires user
-  acceptance. Poor-pool waiting and previous-father continuity remain deferred.
+- **Evidence boundary:** the report assesses discrepancies for its input case;
+  it does not establish generally negligible bias or calibrated conditional
+  ASFR recovery. Retain this limitation after acceptance.
+- **Milestone 2:** the report includes demographic assessment and R formula-fallback
+  timing; D050 records user acceptance. Poor-pool waiting and previous-father
+  continuity remain deferred.
 
 ## D046: Optional union summaries in Lexis counts
 
@@ -815,3 +817,20 @@ Accepted by the user October 18, 2026: `union_formation()` and
 matching is omitted. The preferred male-minus-female age gap is zero years;
 selection weight halves at a distance of five years on either side. Explicit
 matching specifications override this default. Initiation mode remains explicit.
+
+
+## D050: Milestone 2 accepted as complete
+
+- **Status:** accepted by the user October 19, 2026, following review of
+  `validation/milestone2.qmd` and its rendered HTML and user revisions.
+- **Decision:** mark milestone 2 union formation complete. The user accepts
+  the demographic assessment of both initiation modes, status-specific fertility,
+  formation rates, union diagnostics, matching-parameter recovery and performance.
+  The report and status documentation are to be committed together.
+- **Limits:** acceptance retains deferred transition-aware fertility compensation
+  (D045), poor-pool waiting (D044), and previous-father continuity (D042). It does
+  not establish universal accuracy, independent replication, or completion of
+  every review suggestion. No new scientific acceptance thresholds are imposed.
+- **Next scope:** groups remain the selected milestone 3 theme. Detailed rules
+  require user decisions; milestone completion does not authorize implementation
+  of unspecified mechanisms or other roadmap proposals.

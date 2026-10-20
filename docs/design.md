@@ -1,6 +1,7 @@
 # Design and implemented interface
 
-Updated October 19, 2026. This document describes implemented architecture.
+Updated October 19, 2026. Milestone 2 was accepted as complete by the user
+on this date (D050). This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
 The [scientific contract](scientific-contract.md) defines demographic semantics.
 

@@ -1,12 +1,13 @@
 # Milestone 2: union formation
 
-Updated October 19, 2026. Implemented milestone 2 specification.
+Updated October 19, 2026. Implemented milestone 2 specification; the user
+accepted the milestone as complete on this date (D050).
 **Status: core milestone implementation is in place: both search modes,
 conditional-logit matching, age/kin/exclusivity restrictions, status-specific
 fertility, widowhood, and separate optional nonmarital father matching. The
 failed-match birth cancellation is implemented (default TRUE); transition-aware fertility
-compensation is deferred (D045); final validation remains. The poor-pool wait alternative is deferred to a later milestone (D044).
-Demographic validation and user acceptance remain outstanding (D042).**
+compensation (D045) and poor-pool waiting (D044) remain deferred.
+The user accepted milestone 2 as complete on October 19, 2026 (D050).**
 Every simulation requires a union-formation process. Current-partner lookup
 and union histories are common infrastructure for all initiation modes.
 
@@ -255,8 +256,9 @@ The reconstructed alternatives are not the actual simulation samples. The
 report's helper checks age, survival and partnership status but does not apply
 pair-specific kin screening or reconstruct ordering of coincident events.
 Keep these limits distinct from controlled known-utility software checks.
-The report's findings are the user's analysis, not an independent replication
-or recorded milestone acceptance. No new scientific thresholds are imposed.
+The report's findings are the user's analysis, not an independent replication.
+The user accepted milestone 2 on October 19, 2026 (D050), retaining these
+limitations. No new scientific thresholds are imposed.
 
 ## Eligibility and ancestry
 
@@ -309,9 +311,10 @@ empty/singleton samples, age/kin/exclusivity restrictions, search hazards,
 widowhood and invalidation, birth spacing, restart histories, diagnostics and
 reproducibility. [Testing](testing.md) maps these to the current suite.
 Demographic assessment, parameter recovery and timing comparisons appear in
-`validation/milestone2.qmd`. The user describes the milestone as nearing
-completion, with report compilation, agent feedback, and conclusions remaining
-before final acceptance. Passing software tests does not establish demographic validity.
+`validation/milestone2.qmd`. The user accepted milestone 2 as complete on
+October 19, 2026 (D050), based on the report and review, with deferred
+limitations retained. Passing software tests alone does not establish
+demographic validity.
 
 ## Rate-mode execution increment (October 15, 2026)
 

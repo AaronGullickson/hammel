@@ -132,7 +132,7 @@ Use aligned ASFR/ASMR alongside aggregate TFR/life expectancy. Distinguish
 sampling variability from persistent differences due to midpoint compensation,
 initialization, or grouped ages. See [testing and validation](testing.md) and
 the [accepted milestone 1 report](../validation/milestone1.qmd) and
-[ongoing milestone 2 report](../validation/milestone2.qmd).
+[accepted milestone 2 report](../validation/milestone2.qmd).
 
 
 When input fertility rates include `union_status`, `calculate_tfr()` returns a

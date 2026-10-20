@@ -125,7 +125,7 @@ These checks establish software behavior and analytical cases, not universal
 demographic accuracy. Use `devtools::test()` for ordinary verification, with
 live database checks disabled.
 
-## Milestone 2 demographic assessment in progress
+## Accepted milestone 2 demographic assessment
 
 The user-authored [report](../validation/milestone2.qmd) uses USA circa
 2000–2001 HMD mortality, NCHS overall/status-specific fertility, and SIPP-based
@@ -152,10 +152,12 @@ as the largest timing cost. This comparison is no longer an unstarted task;
 these are report findings, not an independently rerun benchmark or performance
 guarantee. Formula and resulting population trajectories can affect timings.
 
-The user reports milestone 2 is nearing completion: compile the report, obtain
-agent feedback, then write conclusions before final acceptance. Preserve the
-user's analysis; no acceptance thresholds are added by
-this documentation review. Rendering the report executes an HMD download and
-substantial simulations and was not part of this review. Transition-aware
-compensation remains deferred under D045; the report examines discrepancies,
-but no general correction or guarantee of conditional ASFR recovery exists.
+The user accepted milestone 2 as complete on October 19, 2026 (D050), after
+report review and revisions. Acceptance records the user's demographic assessment;
+this documentation update does not independently rerun simulations or tests,
+set acceptance thresholds, or claim every review suggestion was implemented.
+The report and documentation are to be committed together; no separate final
+artifact hash or acceptance commit is recorded here. Rendering executes an HMD
+download and substantial simulations. Transition-aware compensation remains
+deferred under D045; the report examines discrepancies, but no general
+correction or guarantee of conditional ASFR recovery exists.
