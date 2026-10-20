@@ -32,10 +32,33 @@ Birth counts and ASFR are `NA` for males. Female exposure includes the time
 excluded by birth spacing. Zero events with positive exposure give a zero rate;
 zero exposure gives `NA`. Keep those situations distinct.
 
-Births with unknown mothers cannot be assigned maternal age. Their period
+`by_group = TRUE` returns a separate grid for every group in the person
+history, preserving character labels or numeric codes. The default FALSE pools
+groups. TRUE requires a `group` column; no pooled group row is added. Exposure
+and deaths follow each person's group; births follow the mother's group, even
+when the child's group differs. It can be combined with `include_unions = TRUE`:
+each spouse's formations and exposure follow their own group. Complete histories
+are retained during extraction, so cross-group family links remain available.
+
+```r
+group_counts <- calculate_lexis_counts(
+  result, seq(2020, 2100, 20), 0:100,
+  by_group = TRUE, include_unions = TRUE
+)
+group_tfr <- calculate_tfr(group_counts)
+group_life_tables <- calculate_life_table(group_counts)
+```
+
+Groups appear in first-occurrence order, with all period/age/sex cells retained,
+including zero exposure. Empty grouped histories produce typed empty tables.
+See [groups](groups.md) for exact accounting examples and observation rules.
+
+Births with unknown mothers cannot be assigned maternal age or group. Their period
 counts are in `attr(summary, "unassigned_births")`, also a tibble. Initial
 persons born within the observation window can appear there if parents are
-unknown; a baseline is not complete historical birth follow-up.
+unknown; a baseline is not complete historical birth follow-up. The attribute
+remains one pooled count per period when `by_group = TRUE`; the child's group
+does not establish an unknown mother's group.
 
 ## Total fertility rate
 
@@ -48,6 +71,9 @@ output_tfr <- summary |> calculate_tfr()
 and sums ASFR times each finite band's actual width by period. There is no
 `age_range` argument; subset the summary to the desired age range first.
 Remaining bands must be contiguous. The output reports the finite range used.
+A `group` column automatically separates TFR calculations within each period
+and union status, preserving group labels and their type. This applies to
+process rates as well as Lexis summaries; groups are not averaged together.
 
 Missing ASFR contributions are omitted with `na.rm = TRUE`; an all-missing set
 sums to zero. That is the accepted calculation rule, not evidence of zero
@@ -66,7 +92,7 @@ output_life_table |>
   dplyr::select(time_start, time_end, sex, ex)
 ```
 
-Each period/sex needs contiguous age bands from zero through an explicit open
+Each period/sex/group/status combination present needs contiguous age bands from zero through an explicit open
 interval. Lexis counts add that interval automatically; manually supplied rate
 tables must define it themselves. The function treats mortality as piecewise
 constant hazards, integrates exponential survival/person-years, and calculates
@@ -100,6 +126,12 @@ population_sizes <- result |>
 
 This returns `time` and `population`. Counts include births and exclude deaths
 at the requested instant, preserving input order and repeated times.
+`calculate_population_size(result, times, by_group = TRUE)` adds `group` and
+counts each group separately. It requires group data, retains the group's input
+type, and lists groups in first-occurrence order within each requested time.
+Groups present in the history get zero counts where no members are alive.
+There is no extra pooled row. Empty time vectors and empty group histories
+return zero-row tibbles with the appropriate column types.
 
 Lexis exposure splits `[birth_time, death_time)` directly at period/age
 boundaries; fractional years and unequal bands are supported. Population
@@ -109,8 +141,9 @@ Missing death times are censored there.
 
 ## Replications and interpretation
 
-Analyze each independent history before combining summaries. There is no
-`groups` argument or automatic custom stratification. Stacking person tables
+Analyze each independent history before combining summaries. Group stratification
+is available through `by_group`; arbitrary custom stratification is not supported.
+Stacking person tables
 with repeated IDs would make parent references ambiguous and is rejected.
 Retain a replication ID when binding derived tables:
 

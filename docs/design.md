@@ -120,6 +120,13 @@ returns overall/partnered/unpartnered rows with exposure, births, deaths, and
 rates. Union counts and marriage rates appear only on unpartnered rows,
 using the recorded union histories (D046/D047).
 
+`calculate_lexis_counts(by_group = TRUE)` and
+`calculate_population_size(by_group = TRUE)` optionally split observations by
+recorded group. The native count kernels retain full histories and add a group
+axis to their output arrays, preserving cross-group parent and spouse links.
+TFR and life-table calculations automatically retain input group strata. See
+[groups](groups.md) for attribution, ordering, and empty-output rules (D053).
+
 ## Extension questions
 
 These remain proposals or unresolved requirements:

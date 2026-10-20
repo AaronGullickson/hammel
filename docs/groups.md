@@ -40,7 +40,7 @@ The child's own schedule applies from birth, including neonatal mortality.
 The father need not share that group. Group membership neither restricts the
 candidate pool nor changes matching utilities. Other eligibility rules remain.
 Group identity is fixed over life and retained across restarts. No ancestry
-proportions, configurable inheritance model, or new group summaries are added.
+proportions or configurable inheritance model are added.
 
 ## Baseline initialization
 
@@ -70,5 +70,46 @@ does not associate group with age or sex.
 
 Validation covers these cases, group/status compensation, search selection,
 newborn schedule selection, empty populations, restart persistence, edited
-objects, and unchanged behavior without group columns. Existing summaries
-continue to pool groups.
+objects, and unchanged behavior without group columns.
+
+## Group observations
+
+`calculate_lexis_counts(..., by_group = TRUE)` and
+`calculate_population_size(..., by_group = TRUE)` return separate counts for
+each group appearing anywhere in the supplied person history. Both default to
+FALSE, preserving pooled output. TRUE requires a population/persons `group`
+column; no group identity is inferred when that column is absent. Labels retain
+their input type and groups appear in first-occurrence order. No extra pooled
+group rows or groups absent from the history are added.
+
+Lexis counts retain the full period/age/sex grid in every group, including
+zero-exposure cells. Exposure and deaths use the person's group; births use
+the mother's group, even if an input child's group differs. Existing maternal
+age rules, half-open boundaries, and zero-exposure NA rates are unchanged.
+Unknown-mother births stay in the single period-level `unassigned_births`
+attribute and are not assigned a maternal group from the child. Combining
+`by_group = TRUE` and `include_unions = TRUE` returns the existing overall,
+partnered, and unpartnered rows within each group. Each spouse's formation and
+exposure belong to that spouse's group, including cross-group unions.
+
+`calculate_tfr()` and `calculate_life_table()` automatically treat an input
+`group` column as an additional stratum alongside periods and union status
+(and sex for life tables). Age-contiguity checks, missing-rate rules, and
+life-table assumptions apply independently within each stratum. The group
+column is preserved, including in empty outputs; no averaging or pooling is
+performed across groups.
+
+Population sizes retain requested time order and repeated times, with groups
+in first-occurrence order within each time. Each existing group gets zero
+counts where no members are alive. Empty histories with group columns produce
+typed empty group summaries; empty time vectors produce zero rows.
+
+Worked observation case: woman A and man B form a union at 0.5 in a window
+`[0, 1)`. If both live throughout it, each contributes one person-year in
+their own group and 0.5 partnered person-years. Each contributes one formation
+to their group's unpartnered row. Their birth at 0.75 counts for maternal
+group A, regardless of the child's recorded group. Summing group exposure,
+deaths, and maternal births recovers pooled cells; group population counts
+sum to pooled counts at every requested instant. Tests use these accounting
+identities, boundary examples, analytical group TFR/life expectancy, and empty
+outputs, as well as unchanged default results.

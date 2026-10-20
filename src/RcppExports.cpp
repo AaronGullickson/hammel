@@ -11,21 +11,23 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // demographic_counts_cpp
-List demographic_counts_cpp(DataFrame persons, NumericVector time_breaks, NumericVector age_breaks);
-RcppExport SEXP _hammel_demographic_counts_cpp(SEXP personsSEXP, SEXP time_breaksSEXP, SEXP age_breaksSEXP) {
+List demographic_counts_cpp(DataFrame persons, NumericVector time_breaks, NumericVector age_breaks, IntegerVector group_indices, int group_count);
+RcppExport SEXP _hammel_demographic_counts_cpp(SEXP personsSEXP, SEXP time_breaksSEXP, SEXP age_breaksSEXP, SEXP group_indicesSEXP, SEXP group_countSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< DataFrame >::type persons(personsSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type time_breaks(time_breaksSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type age_breaks(age_breaksSEXP);
-    rcpp_result_gen = Rcpp::wrap(demographic_counts_cpp(persons, time_breaks, age_breaks));
+    Rcpp::traits::input_parameter< IntegerVector >::type group_indices(group_indicesSEXP);
+    Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
+    rcpp_result_gen = Rcpp::wrap(demographic_counts_cpp(persons, time_breaks, age_breaks, group_indices, group_count));
     return rcpp_result_gen;
 END_RCPP
 }
 // union_counts_cpp
-List union_counts_cpp(DataFrame persons, DataFrame unions, NumericVector time_breaks, NumericVector age_breaks);
-RcppExport SEXP _hammel_union_counts_cpp(SEXP personsSEXP, SEXP unionsSEXP, SEXP time_breaksSEXP, SEXP age_breaksSEXP) {
+List union_counts_cpp(DataFrame persons, DataFrame unions, NumericVector time_breaks, NumericVector age_breaks, IntegerVector group_indices, int group_count);
+RcppExport SEXP _hammel_union_counts_cpp(SEXP personsSEXP, SEXP unionsSEXP, SEXP time_breaksSEXP, SEXP age_breaksSEXP, SEXP group_indicesSEXP, SEXP group_countSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -33,7 +35,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< DataFrame >::type unions(unionsSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type time_breaks(time_breaksSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type age_breaks(age_breaksSEXP);
-    rcpp_result_gen = Rcpp::wrap(union_counts_cpp(persons, unions, time_breaks, age_breaks));
+    Rcpp::traits::input_parameter< IntegerVector >::type group_indices(group_indicesSEXP);
+    Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
+    rcpp_result_gen = Rcpp::wrap(union_counts_cpp(persons, unions, time_breaks, age_breaks, group_indices, group_count));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -129,8 +133,8 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_hammel_demographic_counts_cpp", (DL_FUNC) &_hammel_demographic_counts_cpp, 3},
-    {"_hammel_union_counts_cpp", (DL_FUNC) &_hammel_union_counts_cpp, 4},
+    {"_hammel_demographic_counts_cpp", (DL_FUNC) &_hammel_demographic_counts_cpp, 5},
+    {"_hammel_union_counts_cpp", (DL_FUNC) &_hammel_union_counts_cpp, 6},
     {"_hammel_extract_kin_cpp", (DL_FUNC) &_hammel_extract_kin_cpp, 4},
     {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
     {"_hammel_adjusted_fertility_cpp", (DL_FUNC) &_hammel_adjusted_fertility_cpp, 2},

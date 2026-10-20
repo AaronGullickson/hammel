@@ -8,7 +8,8 @@ calculate_lexis_counts(
   population,
   time_breaks,
   age_breaks,
-  include_unions = FALSE
+  include_unions = FALSE,
+  by_group = FALSE
 )
 }
 \arguments{
@@ -31,11 +32,21 @@ each formation, including remarriages, at each spouse's age, and divide by
 unpartnered person-years. Rates with zero exposure are NA. Overlapping
 episodes do not duplicate exposure. Complete union histories are required
 for historical status. Do not sum overall rows with their status components.}
+
+\item{by_group}{Logical, default \code{FALSE}. With \code{TRUE}, require a persons
+\code{group} column and return the complete period/age/sex grid for each group
+appearing in the person history, in first-occurrence order. Labels retain
+their type. Exposure and deaths use the person's group; births use the
+mother's group, even when the child has a different group. Union counts
+use each spouse's own group. Combines with \code{include_unions}. No pooled
+group row is added. Unknown-mother births remain in the single period-level
+\code{unassigned_births} attribute, without a group assignment.}
 }
 \value{
 A tibble with time_start, time_end, sex, age_start, age_end,
 person_years, deaths, births, rate_mortality, and rate_fertility. With \code{include_unions = TRUE},
-also union_status, unions, and rate_marriage.
+also union_status, unions, and rate_marriage. With \code{by_group = TRUE}, also
+group; groups form separate blocks of rows.
 }
 \description{
 Calculate person-years, deaths, births, ASMR, and ASFR for each time period,

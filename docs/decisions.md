@@ -882,3 +882,23 @@ matching specifications override this default. Initiation mode remains explicit.
   midpoint method. No group transitions, ancestry, proportional multipliers,
   inheritance model API, or group summary extension is included. See
   [groups](groups.md) for rules and worked validation cases.
+
+## D053: Group-specific demographic observations
+
+- **Status:** requested by the user October 20, 2026.
+- **Decision:** add optional group counts to `calculate_lexis_counts()` and
+  `calculate_population_size()`. Automatically calculate TFR and life tables
+  separately by group whenever the rate input includes a `group` column.
+- **Interface:** `by_group = FALSE` preserves pooled counting; TRUE requires
+  group data and retains a group column in the output. Group labels retain
+  their type and first-occurrence order. No extra pooled group rows are added.
+  Lexis group counts combine with existing union-status summaries.
+- **Existing attribution rules:** births follow the mother (including her
+  group), exposure and deaths follow the individual, and union formation counts
+  follow each spouse. Unknown-mother births remain in the single period-level
+  attribute; no maternal group is inferred from the child. Full histories must
+  remain available for cross-group parent and partner references.
+- **Validation:** exact exposure and event boundaries, group and union-status
+  accounting identities, analytical TFR and exponential life tables, input
+  validation, label types, empty tibbles, and unchanged pooled defaults. See
+  [groups](groups.md) and [demographic analysis](demographic-analysis.md).

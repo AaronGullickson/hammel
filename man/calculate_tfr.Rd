@@ -15,7 +15,7 @@ fertility rates; mortality processes are not valid inputs.}
 \value{
 A tibble with period columns, \code{union_status} when supplied (including
 \code{overall} for Lexis counts pooled across partnership statuses),
-\code{age_start}, \code{age_end}, and \code{tfr}.
+\code{group} when supplied, \code{age_start}, \code{age_end}, and \code{tfr}.
 If \code{sex} is present, only female rows are used.
 }
 \description{
@@ -25,4 +25,7 @@ defines the TFR reported. Missing ASFRs are omitted from the sum.
 When \code{union_status} is present, calculate a separate sum for each status
 within each period. These conditional sums describe fertility under continuous
 exposure to that status; they are not components to add into an overall TFR.
+A \code{group} column automatically adds separate group strata, with its type and
+labels preserved; groups are not pooled. Age bands are checked independently
+within each period/group/status combination.
 }

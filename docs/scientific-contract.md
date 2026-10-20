@@ -293,7 +293,13 @@ with `set_population(result)` to retain its process specifications.
 
 See [demographic analysis](demographic-analysis.md) for worked workflows.
 Analyze one independent history per call; duplicated IDs from stacked
-replications are invalid. There are no custom strata/group arguments yet.
+replications are invalid. `by_group = TRUE` optionally separates Lexis and
+population-size counts by the recorded group. TFR and life tables automatically
+preserve group strata in input tables. Exposure/deaths use the person's group,
+births use the mother's group, and union formations use each spouse's own group.
+Unknown-mother births remain in the period-level attribute without assigning a
+maternal group. Defaults pool groups; arbitrary custom strata are not supported.
+See [groups](groups.md) for output ordering, empty cases, and worked examples.
 
 - `calculate_lexis_counts()` splits recorded lifetimes at half-open period/age
   boundaries and reports exposure, deaths, births, ASMR, and ASFR. A finite last
