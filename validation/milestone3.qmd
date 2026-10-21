@@ -20,8 +20,8 @@ execute:
 #| label: setup
 #| include: false
 
-library(here)
 devtools::load_all(here::here())
+library(here)
 library(dplyr)
 library(tidyr)
 library(readr)
@@ -282,25 +282,26 @@ time_breaks <- seq(2025, 2100, 5)
 
 set.seed(population_seed)
 pop_baseline_uneven_2g <- create_baseline_population(
-  30000, max_age = 100, end_time = 2000, group_weights = c("A" = 2, "B" = 1)
+  50000, max_age = 100, end_time = 2000, group_weights = c("A" = 2, "B" = 1)
 )
 pop_baseline_even_2g <- create_baseline_population(
-  30000, max_age = 100, end_time = 2000, group_weights = c("A" = 1, "B" = 1)
+  50000, max_age = 100, end_time = 2000, group_weights = c("A" = 1, "B" = 1)
 )
 ```
 
-## Replications and demographic extraction
+## Evaluate Group-Specific Rates
+
+### Stratified schedules
+
+To evaluate the use of group stratified input schedules, I run the fullest possible simulation for two groups where all rates, including partnered and unpartnered fertility and marriage rates, are supplied and all rates vary by group. I run 100 simulations and then take average age-specific rates across all simulations and years and average life expectancy at birth and total fertility rates by five year time period.
 
 ```{r}
-#| label: run-replications
-# TODO: Run each scenario and replication; retain scenario and seed identifiers.
-# TODO: Extract grouped Lexis counts, TFR, life tables, population sizes,
-#       detailed unions, and ancestry summaries separately for each run.
+#| label: run-fully-stratified-sim
 
-model_uneven <- hammel_model() |>
+model <- hammel_model() |>
   set_population(pop_baseline_uneven_2g) |>
   set_fertility(fertility_rates_by_status_grouped) |>
-  set_mortality(mortality_rates_2g) |>
+  set_mortality(mortality_rates_grouped) |>
   set_union_formation(
     "rate",
     matching = create_age_gap_matching_model(
@@ -310,12 +311,10 @@ model_uneven <- hammel_model() |>
     rates = mar_rates_female_grouped
   )
 
-
-results_uneven  <- map(replication_seeds, function(seed) {
-  simulate(model_uneven, years = years, seed = seed)
+results  <- map(replication_seeds, function(seed) {
+  simulate(model, years = years, seed = seed)
 })
-names(results_uneven) <- as.character(replication_seeds)
-
+names(results) <- as.character(replication_seeds)
 
 counts <- map(
   results_uneven, 
@@ -325,6 +324,7 @@ counts <- map(
   include_unions = TRUE,
   by_group = TRUE
 )
+
 mortality_counts <- map(
   results_uneven,
   calculate_lexis_counts,
@@ -335,7 +335,7 @@ mortality_counts <- map(
 
 asfr <- counts |> 
   bind_rows(.id = "replication") |>
-  filter(sex == "f", age_start >= 15 & age_start < 45) |>
+  filter(sex == "f", age_start >= 15 & age_start < 50, person_years > 0) |>
   group_by(union_status, age_start, group) |>
   summarize(
     rate = mean(rate_fertility),
@@ -368,6 +368,21 @@ asmr <- mortality_counts |>
     .groups = "drop"
   )
 
+tfr_pooled <- counts |>
+  bind_rows() |>
+  filter(sex == "f") |>
+  group_by(time_start, time_end, union_status, group,
+           age_start, age_end) |>
+  summarize(
+    births = sum(births),
+    person_years = sum(person_years),
+    .groups = "drop"
+  ) |>
+  mutate(rate_fertility = if_else(
+    person_years > 0, births / person_years, NA_real_
+  )) |>
+  calculate_tfr()
+
 tfr <- map(counts, calculate_tfr) |>
   bind_rows(.id = "replication") |>
   mutate(time_mid = (time_start + time_end) / 2) |>
@@ -394,14 +409,98 @@ life_exp <- map(mortality_counts, calculate_life_table) |>
   )
 ```
 
-## Evaluate Group-Specific Rates
+#### Fertility
 
-### Shared schedules and group initialization
+```{r}
+#| label: fig-asfr-strat-rates
+#| fig-cap: Mean age-specific fertility rates by union status and group across 100 simulations and years compared to input rates. Mean rates are shown by dots with a 95% confidence interval and input rates are shown by dotted lines.
 
-Compare sampled initial shares with normalized weights. Assess grouped results
-under shared rates and reconcile group counts/exposure with pooled summaries.
+asfr |>
+  filter(union_status != "overall") |>
+  ggplot(aes(x = age_start+2.5, y = rate, group = group, color = group))+
+  geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
+  geom_line(linetype = 2)+
+  geom_point(data = fertility_rates_by_status_grouped)+
+  facet_wrap(~union_status)+
+  labs(x = "age", y = "age-specific fertility rate")+
+  theme_bw()
+```
 
-### Stratified schedules and proportional multipliers
+@fig-asfr-strat-rates shows the mean age-specific fertility rates across time periods and simulations. For comparison, the expected input rates are shown by dotted lines. Unpartnered fertility matches extremely well. Unpartnered fertility also matches very well, except for the very first age group, but here it is within the 95% confidence interval which is particularly wide for group B. The reason for the wide confidence interval for Group B is that the marriage rate for this age group is very low (0.0011 marriages per person year), which means that rates are estimated off of very small person-year counts in each simulation. In some cases, the person year count here is zero leading to an NA for this age-specific rate.  
+
+```{r}
+#| label: fig-tfr-strat-rates
+#| fig-cap: Mean total fertility rate by five year time periods, union status, and group across 100 simulations. 95% confidence band shown on each estimate. Horizontal lines show the corresponding input total fertility rate by group and union status. 
+
+tfr |>
+  filter(union_status != "overall") |>
+  ggplot(aes(x = time_mid, color = group, group = group))+
+  geom_ribbon(aes(ymin = tfr - 1.96 * se, ymax = tfr + 1.96 *se, fill = group),
+              color = NA, alpha = 0.4)+
+  geom_point(aes(y = tfr))+
+  geom_line(aes(y = tfr), linetype = 2)+
+  geom_hline(data = input_tfr_by_status, aes(yintercept = tfr, color = group))+
+  facet_wrap(~union_status)+
+  labs(x = "age", y = "total fertility rate")+
+  theme_bw()
+```
+
+@fig-tfr-strat-rates shows the mean TFR across simulations estimated at five year intervals for each union status and group. The horizontal lines show the expected TFR from the input rates. As discussed in previous milestones, we expect a small positive bias for partnered fertility due to the birth interval adjustment across schedule transitions. As expected both groups unpartnered TFR closely matches the input rate expectation, and the partnered TFR for Group A is slightly higher than the input TFR, as expected. However, no values are plotted for the partnered TFR of group B. This is because of the sparsity problem with person-years in the youngest age group, which leads to NA in some ASFR and therefor NA for TFR.  
+
+I could restrict mean TFR to only non-missing cases, but the result would be massive confidence intervals that would make it difficult to see anything. Instead, I pool person-years and births across simulations first, and then calculate pooled ASFR and pooled TFR estimates. 
+
+```{r}
+#| label: fig-tfr-pooled-strat-rates
+#| fig-cap: Total fertility rate by five year time periods, union status, and group, pooled across 100 simulations.
+
+tfr_pooled |>
+  filter(union_status != "overall") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  ggplot(aes(x = time_mid, color = group, group = group))+
+  geom_point(aes(y = tfr))+
+  geom_line(aes(y = tfr), linetype = 2)+
+  geom_hline(data = input_tfr_by_status, aes(yintercept = tfr, color = group))+
+  facet_wrap(~union_status)+
+  labs(x = "age", y = "total fertility rate")+
+  theme_bw()
+```
+
+@fig-tfr-pooled-strat-rates shows the pooled TFRs by time period, union status, and group. The results for partnered TFR of group B look approximately correct but are still quite noisy due to the person year sparsity in the first age group. To further examine this issue, I pool across all time periods as well to produce a single pooled TFR for each group and union status.
+
+```{r}
+#| label: tbl-tfr-pooled-strat-rates
+#| tbl-cap: Total fertiity rate by union status and group, pooled across 100 simulations and time. Expected input TFR and difference also shown.
+
+counts |>
+  bind_rows() |>
+  filter(sex == "f", union_status != "overall") |>
+  group_by(union_status, group, age_start, age_end) |>
+  summarize(
+    births = sum(births),
+    person_years = sum(person_years),
+    .groups = "drop"
+  ) |>
+  mutate(rate_fertility = if_else(
+    person_years > 0, births / person_years, NA_real_
+  )) |>
+  calculate_tfr() |>
+  rename(tfr_observed = tfr) |>
+  left_join(input_tfr_by_status, by = c("group", "union_status")) |>
+  select(-starts_with("age")) |>
+  mutate(diff = tfr_observed - tfr) |>
+  gt() |>
+  cols_label(
+    "group" ~ "Group",
+    "union_status" ~ "Union status",
+    "tfr_observed" ~ "Observed TFR",
+    "tfr" ~ "Input TFR",
+    "diff" ~ "Difference"
+  ) |>
+  fmt_number(starts_with("tfr"), decimals = 3) |>
+  fmt_number(diff, decimals = 4)
+```
+
+@tbl-tfr-pooled-strat-rates shows the pooled TFRs across simulations and time by group and union status. The results are quite close to the expected input rate for all cases. The partnered TFRs both show a slight positive bias as expected, but this bias is quite small.
 
 ```{r}
 life_exp |>
@@ -416,12 +515,12 @@ life_exp |>
 ```
 
 
+
 ```{r}
-tfr |>
+tfr_pooled |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
   filter(union_status != "overall") |>
   ggplot(aes(x = time_mid, color = group, group = group))+
-  geom_ribbon(aes(ymin = tfr - 1.96 * se, ymax = tfr + 1.96 *se, fill = group),
-              color = NA, alpha = 0.4)+
   geom_point(aes(y = tfr))+
   geom_line(aes(y = tfr), linetype = 2)+
   geom_hline(data = input_tfr_by_status, aes(yintercept = tfr, color = group))+
@@ -442,17 +541,7 @@ asmr |>
   theme_bw()
 ```
 
-```{r}
-asfr |>
-  filter(union_status != "overall") |>
-  ggplot(aes(x = age_start, y = rate, group = group, color = group))+
-  #geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se, fill = group),
-  #            color = NA, alpha = 0.5)+
-  geom_point()+
-  geom_line(data = fertility_rates_by_status_2g, linetype = 2)+
-  facet_wrap(~union_status)+
-  theme_bw()
-```
+### Proportional multipliers
 
 
 
@@ -460,11 +549,6 @@ Compare ASFR, TFR, ASMR, and female union-search rates with scenario-specific
 inputs. Compare equivalent explicit schedules and multiplier configurations.
 Include conditional fertility and omitted group/status factors. Report sparse
 oldest-age cells and infinite life expectancy explicitly.
-
-```{r}
-#| label: group-rate-results
-# TODO: Tables and plots of input versus replicated output by group and period.
-```
 
 ## Evaluate Group Matching
 
