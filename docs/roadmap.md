@@ -11,7 +11,7 @@ unspecified demographic rules or a selected public API.
 | --- | --- | --- |
 | 4 | Union dissolution, separate remarriage rates, possibly cohabitation | Proposed; cohabitation undecided |
 | 5 | Parity-specific fertility and fertility heterogeneity | Proposed |
-| 6 | Rate changes within a simulation run | Proposed |
+| 6 | Time-varying rates, matching, and inheritance within a simulation run | Proposed |
 | 7 | Group conversions | Provisional; distinguish identity from characteristics and region |
 | 8 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed |
 | 9 | Immigration from outside the system, tracking generation | Tentative |
@@ -116,7 +116,7 @@ has not been audited for this task. Distribution, persistence, association with
 other attributes, inheritance and calibration to aggregate rates are unselected.
 No heterogeneity parameter or demographic default is adopted here.
 
-## Proposed milestone 6: rate changes within a run
+## Proposed milestone 6: time-varying inputs within a run
 
 Allow demographic schedules to change during a single simulation, rather than
 requiring population restarts. Specify calendar-time inputs, change boundaries,
@@ -124,6 +124,47 @@ which processes may change, event ordering at boundaries, and invalidation of
 pending events. Preserve birth spacing from actual births and address the
 interaction with fertility compensation after rate changes (D045). No rate-change
 API, interpolation rule, or demographic default is selected.
+
+### Input representation proposal (October 21, 2026)
+
+The user requested retaining the following approach for milestone 6, allowing
+inputs to change without restarting the simulation:
+
+- Keep rate schedules as flat tibbles, adding `time_start` and `time_end`
+  alongside age, sex, group, union status, and other supported rate strata.
+  This preserves ordinary filtering, joins, plotting, and inspection.
+- For structured inputs that are not already rate tibbles, use a schedule
+  tibble with `time_start`, `time_end`, and a list column containing a complete
+  model object for each interval. Matching models and group inheritance models
+  are the current examples. Changing the whole matching model permits changes
+  to formulas, coefficients, and group exogamy effects without making each
+  internal parameter separately time-varying.
+- Keep the time schedule outside each individual model object. A shared
+  scheduling helper could validate intervals and select objects, while rates
+  retain their flat representation. Constructor names and public arguments
+  remain to be designed; no generic framework beyond these needs is selected.
+
+For example, a matching schedule could have the following shape (illustrative
+data structure, not an implemented process interface):
+
+```r
+tibble::tibble(
+  time_start = c(2000, 2050),
+  time_end = c(2050, Inf),
+  matching = list(matching_model_before, matching_model_after)
+)
+```
+
+An inheritance schedule would similarly hold complete inheritance models in
+a list column. Shared half-open calendar intervals `[time_start, time_end)`
+are a proposed convention. Selecting matching at search/father-selection
+execution and inheritance at birth, without rewriting existing unions or
+identities, is a proposal requiring confirmation in the scientific specification.
+Before implementation, resolve coverage, gaps, overlaps, boundary ties,
+validation of all scheduled models, and interactions with pending events.
+Rate sampling must account for future rate boundaries rather than assume the
+rate at scheduling time persists indefinitely. This note records a future
+design direction, not implementation authorization or accepted timing rules.
 
 ## Provisional milestone 7: group conversions
 
