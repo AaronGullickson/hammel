@@ -114,6 +114,15 @@ test_that("TFR separates groups jointly with periods and union statuses", {
   bad <- grid
   bad$age_end[1] <- 19
   expect_error(calculate_tfr(bad), "contiguous")
+  # Missing exposure affects only its own period/group/status estimate.
+  incomplete <- grid
+  incomplete$rate[1] <- NA_real_
+  observed <- calculate_tfr(incomplete)
+  affected <- observed$group == grid$group[1] &
+    observed$time_start == grid$time_start[1] &
+    observed$union_status == grid$union_status[1]
+  expect_identical(is.na(observed$tfr), affected)
+  expect_equal(observed$tfr[!affected], calculate_tfr(grid)$tfr[!affected])
 })
 
 test_that("group life tables follow analytical constant-hazard survival", {

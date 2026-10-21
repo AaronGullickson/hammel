@@ -254,8 +254,8 @@ Missing-ASFR handling was clarified subsequently.
 
 ## D021: Automatic open-age handling in demographic summaries
 
-**Current status:** Open-age summary/TFR behavior remains current. Missing ASFR
-contributions are now omitted, as recorded in the scientific-contract clarification.
+**Current status:** Open-age summary/TFR behavior remains current. D059
+supersedes the later clarification that omitted missing ASFR contributions.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** append Inf to summary age breaks when absent. For TFR, omit open-ended age rows and use all remaining finite age bands; remove the age_range argument.
@@ -556,6 +556,8 @@ history per call. See [demographic analysis](demographic-analysis.md).
   or establish a new scientific guarantee for incremental runs.
 
 ### Missing-ASFR clarification
+
+**Superseded by D059:** missing ASFRs now propagate into TFR.
 
 At the user's direction, `calculate_tfr()` sums with `na.rm = TRUE`, omitting
 missing contributions; an all-missing retained age range therefore sums to zero.
@@ -1049,3 +1051,21 @@ matching specifications override this default. Initiation mode remains explicit.
   custom/native RNG agreement and error restoration, future identity rate and
   matching coverage, AB neonatal mortality and within-run matching, numeric
   labels, empty populations, and restarts. See [group inheritance](group-inheritance.md).
+
+
+## D059: Propagate missing ASFRs into TFR
+
+- **Status:** accepted by the user October 21, 2026.
+- **Decision:** `calculate_tfr()` returns `NA` if any ASFR in the included
+  finite age bands is missing, independently within each period/group/status.
+  All-missing bands also yield `NA`; known zero rates still contribute zero.
+  Open age bands remain excluded. This supersedes omission of missing ASFR
+  contributions from TFR sums.
+- **Rationale:** sparse partnered exposure for minority-group teenagers can
+  leave age-specific rates unobserved. Summing remaining bands produced
+  incomplete TFRs that looked complete and depressed replication means.
+  Returning `NA` exposes missing information; it does not remove variability
+  from tiny positive exposures. Summaries omitting missing TFRs describe only
+  complete estimates and should report their nonmissing count.
+- **Validation:** partial/all-missing schedules, zero rates, excluded open
+  bands, and isolation across period/group/status strata.

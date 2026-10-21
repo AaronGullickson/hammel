@@ -198,7 +198,7 @@ summary_rows <- function(table, by_sex = FALSE, by_union_status = FALSE) {
 #'
 #' Sum age-specific fertility rates times their actual interval widths.
 #' Open-ended age bands are omitted. The remaining finite, contiguous age range
-#' defines the TFR reported. Missing ASFRs are omitted from the sum.
+#' defines the TFR reported. Any missing ASFR in those bands makes the TFR missing.
 #' When `union_status` is present, calculate a separate sum for each status
 #' within each period. These conditional sums describe fertility under continuous
 #' exposure to that status; they are not components to add into an overall TFR.
@@ -246,7 +246,7 @@ calculate_tfr <- function(rates) {
     check_summary_intervals(r, open = FALSE)
     key <- r[1, groups, drop = FALSE]
     cbind(key, data.frame(age_start = min(r$age_start), age_end = max(r$age_end),
-                         tfr = sum(r$rate_fertility * (r$age_end - r$age_start), na.rm = TRUE)))
+                         tfr = sum(r$rate_fertility * (r$age_end - r$age_start))))
   })
   result <- do.call(rbind, tables)
   result <- tibble::as_tibble(result)

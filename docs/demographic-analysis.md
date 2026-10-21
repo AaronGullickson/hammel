@@ -75,9 +75,13 @@ A `group` column automatically separates TFR calculations within each period
 and union status, preserving group labels and their type. This applies to
 process rates as well as Lexis summaries; groups are not averaged together.
 
-Missing ASFR contributions are omitted with `na.rm = TRUE`; an all-missing set
-sums to zero. That is the accepted calculation rule, not evidence of zero
-fertility in unobserved ages. Inspect exposure and missing rates alongside TFR.
+If any ASFR in the included finite age bands is missing, TFR is `NA` for
+that period/group/status, including when all ASFRs are missing. Known zero
+rates contribute zero. For example, two five-year bands with rates 0.1 and
+`NA` yield `NA`, not 0.5; rates 0.1 and zero yield 0.5. Missing rates in
+excluded open age bands do not affect TFR. Inspect exposure and missing rates
+alongside TFR; when summarizing with `na.rm = TRUE`, report the number of
+nonmissing TFRs because the summary includes only complete estimates.
 HFD input TFR excludes the omitted open endpoint rows, so do not compare it
 uncritically with the full published HFD TFR.
 

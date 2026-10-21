@@ -401,9 +401,9 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   `unassigned_births`; their births cannot be assigned an age-specific rate.
 - `calculate_tfr()` selects female rows, omits open age bands, and sums
   `rate_fertility * band_width` over the remaining contiguous finite bands by period.
-  Missing ASFR contributions are omitted with `na.rm = TRUE`; an all-missing
-  set sums to zero. The returned finite age range does not indicate complete
-  exposure, so inspect missing cells separately. There is no `age_range` argument.
+  Any missing ASFR in the included finite bands makes the corresponding
+  period/group/status TFR `NA`, including an all-missing set. Known zero rates
+  contribute zero; missing rates in excluded open bands do not affect TFR. There is no `age_range` argument.
 - `calculate_life_table()` requires contiguous bands from zero through an
   explicit open interval and separates periods/sexes and union status when
   present. Conditional tables do not model status transitions. For finite width `n`

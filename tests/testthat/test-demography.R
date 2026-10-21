@@ -58,16 +58,21 @@ test_that("duplicate identities in stacked histories are rejected", {
   expect_error(calculate_lexis_counts(stacked, c(0, 1), c(0, Inf)))
 })
 
-test_that("TFR uses band widths, omits missing rates and groups periods", {
+test_that("TFR uses band widths, propagates missing rates and groups periods", {
   rates <- data.frame(age_start = c(15, 20, 30), age_end = c(20, 30, 50), rate_fertility = c(0.1,
     0.2, 0.05))
   expect_equal(calculate_tfr(rates)$tfr, 3.5, tolerance = 0)
   bad <- rates
   bad$rate_fertility[2] <- NA_real_
-  expect_equal(calculate_tfr(bad)$tfr, 1.5, tolerance = 0)
+  expect_identical(calculate_tfr(bad)$tfr, NA_real_)
+  bad$rate_fertility[] <- NA_real_
+  expect_identical(calculate_tfr(bad)$tfr, NA_real_)
+  bad$rate_fertility[] <- 0
+  expect_identical(calculate_tfr(bad)$tfr, 0)
   expect_error(calculate_tfr(rates[c(1, 3), ]))
   bad <- rates
   bad$age_end[3] <- Inf
+  bad$rate_fertility[3] <- NA_real_
   expect_equal(calculate_tfr(bad)$tfr, 2.5, tolerance = 0)
   rates$time_start <- 0
   rates$time_end <- 1
@@ -235,5 +240,5 @@ test_that("TFR separates union statuses in input tables and fertility processes"
   bad$age_start[3] <- 21
   expect_error(calculate_tfr(bad), "contiguous")
   rates$rate[3] <- NA_real_
-  expect_equal(calculate_tfr(rates)$tfr, c(0.5, 3.5))
+  expect_equal(calculate_tfr(rates)$tfr, c(NA_real_, 3.5))
 })
