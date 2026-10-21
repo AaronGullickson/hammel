@@ -274,9 +274,6 @@ population_seed <- 42
 replication_seeds <- seq_len(100)
 years <- 100
 
-# mortality age breaks are 1 year and to age 85
-age_breaks <- seq(15, 70, 5)
-mortality_age_breaks <- 0:85
 # skip first 25 years for time
 time_breaks <- seq(2025, 2100, 5)
 
@@ -315,21 +312,21 @@ results  <- map(replication_seeds, function(seed) {
   simulate(model, years = years, seed = seed)
 })
 names(results) <- as.character(replication_seeds)
+```
+
+#### Fertility
+
+I calculate fertility rates in five year age brackets that match those of the input data and in five year periods across the 100 years of the simulation. Very low marriage rates for the youngest age bracket can create problems for generating enough person years of exposure for partnered fertility as I show below.
+
+```{r}
+#| label: caclulate-fert-rates-strat-rates
 
 counts <- map(
-  results_uneven, 
-  calculate_lexis_counts,
-  time_breaks = time_breaks,
-  age_breaks = age_breaks, 
-  include_unions = TRUE,
-  by_group = TRUE
-)
-
-mortality_counts <- map(
   results_uneven,
   calculate_lexis_counts,
-  time_breaks = time_breaks,
-  age_breaks = mortality_age_breaks,
+  time_breaks = time_breaks, 
+  age_breaks = seq(15, 50, 5), 
+  include_unions = TRUE,
   by_group = TRUE
 )
 
@@ -345,24 +342,13 @@ asfr <- counts |>
     .groups = "drop"
   )
 
-mar_rates <- counts |>
+tfr <- map(counts, calculate_tfr) |>
   bind_rows(.id = "replication") |>
-  filter(union_status == "unpartnered") |>
-  group_by(age_start, sex, group) |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, union_status, group) |>
   summarize(
-    rate = mean(rate_marriage),
-    sd = sd(rate_marriage),
-    n = n(),
-    se = sd / sqrt(n),
-    .groups = "drop"
-  )
-
-asmr <- mortality_counts |>
-  bind_rows(.id = "replication") |>
-  group_by(age_start, sex, group) |>
-  summarize(
-    rate = mean(rate_mortality),
-    sd = sd(rate_mortality),
+    sd = sd(tfr),
+    tfr = mean(tfr),
     n = n(),
     se = sd / sqrt(n),
     .groups = "drop"
@@ -382,34 +368,7 @@ tfr_pooled <- counts |>
     person_years > 0, births / person_years, NA_real_
   )) |>
   calculate_tfr()
-
-tfr <- map(counts, calculate_tfr) |>
-  bind_rows(.id = "replication") |>
-  mutate(time_mid = (time_start + time_end) / 2) |>
-  group_by(time_mid, union_status, group) |>
-  summarize(
-    sd = sd(tfr),
-    tfr = mean(tfr),
-    n = n(),
-    se = sd / sqrt(n),
-    .groups = "drop"
-  )
-
-life_exp <- map(mortality_counts, calculate_life_table) |>
-  bind_rows(.id = "replication") |>
-  filter(age_start == 0) |>
-  mutate(time_mid = (time_start + time_end) / 2) |>
-  group_by(time_mid, sex, group) |>
-  summarize(
-    sd = sd(ex),
-    ex = mean(ex),
-    n = n(),
-    se = sd / sqrt(n),
-    .groups = "drop"
-  )
 ```
-
-#### Fertility
 
 ```{r}
 #| label: fig-asfr-strat-rates
@@ -500,46 +459,114 @@ counts |>
   fmt_number(diff, decimals = 4)
 ```
 
-@tbl-tfr-pooled-strat-rates shows the pooled TFRs across simulations and time by group and union status. The results are quite close to the expected input rate for all cases. The partnered TFRs both show a slight positive bias as expected, but this bias is quite small.
+@tbl-tfr-pooled-strat-rates shows the pooled TFRs across simulations and time by group and union status. The results are quite close to the expected input rate for all cases. The partnered TFRs both show a slight positive bias as expected, but this bias is quite small. Overall, the fertility rates from the simulation match expectation.
+
+#### Mortality
+
+Mortality is measured in 1-year age groups across 5 year time periods. The input mortality data extends to 100 years of age but at the highest ages, estimated mortality rates can fluctuate substantially due to a small number of person years lived at those ages, and can also be missing due to zero person years lived at a sepcific age. Therefore, I use an open ended age group of 85+. This may cause a slight discrepancy between the life expectancy estimated from the data and the life expectancy of the input data, but it is likely to be small. 
 
 ```{r}
+#| label: calculate-mort-rates-strat-rates
+
+counts <- map(
+  results_uneven,
+  calculate_lexis_counts,
+  time_breaks = time_breaks,
+  age_breaks = 0:85,
+  by_group = TRUE
+)
+
+asmr <- counts |>
+  bind_rows(.id = "replication") |>
+  group_by(age_start, sex, group) |>
+  summarize(
+    rate = mean(rate_mortality),
+    sd = sd(rate_mortality),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+life_exp <- map(counts, calculate_life_table) |>
+  bind_rows(.id = "replication") |>
+  filter(age_start == 0) |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, sex, group) |>
+  summarize(
+    sd = sd(ex),
+    ex = mean(ex),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: fig-asmr-strat-rates
+#| fig-cap: Mean age-specific mortality rates by sex and group across 100 simulations and years compared to input rates. Mean rates are shown by 95% confidence bands and input rates are shown by lines.
+
+asmr |>
+  filter(age_start < 85) |>
+  ggplot(aes(x = age_start+2.5, y = rate, group = group, color = group))+
+  geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se, fill = group),
+              color = NA, alpha = 0.4)+
+  #geom_line()+
+  geom_line(data = mortality_rates_grouped |> filter(age_start < 85), linetype = 1)+
+  scale_y_log10()+
+  facet_wrap(~sex)+
+  labs(x = "age", y = "age-specific mortality rate")+
+  theme_bw()
+```
+
+@fig-asmr-strat-rates shows mean age-specific mortality rates by sex and group, along with a 95% confidence band. Overall, the input rates fit well within the 95% confidence band of the estimated rates from the simulation.
+
+```{r}
+#| label: fig-life-exp-strat-rates
+#| fig-cap: Mean life expectancy at age zero by five-year time period, sex, and group across 100 simulations. 95% confidence bands shown for each estimate. Horizontal lines show the expected life expectancy from the input rates.
+
 life_exp |>
   ggplot(aes(x = time_mid, color = group, group = group))+
   geom_ribbon(aes(ymin = ex - 1.96 * se, ymax = ex + 1.96 *se, fill = group),
               color = NA, alpha = 0.4)+
-  geom_point(aes(y = ex))+
+  #geom_point(aes(y = ex))+
   geom_line(aes(y = ex), linetype = 2)+
   geom_hline(data = input_life_exp, aes(yintercept = ex, color = group))+
   facet_wrap(~sex)+
+  labs(x = "time", y = "life expectany at birth")+
   theme_bw()
 ```
 
+@fig-life-exp-strat-rates show the mean life expectancy at birth along with a 95% confidence band. The true input life expectancy fits well within this band in most cases. The few exceptions are expected when comparing this many individual points. 
 
+Overall, the evidence indicates that the observed mortality rates by group correspond well to the input rates by group. 
+
+#### Marriage
 
 ```{r}
-tfr_pooled |>
-  mutate(time_mid = (time_start + time_end) / 2) |>
-  filter(union_status != "overall") |>
-  ggplot(aes(x = time_mid, color = group, group = group))+
-  geom_point(aes(y = tfr))+
-  geom_line(aes(y = tfr), linetype = 2)+
-  geom_hline(data = input_tfr_by_status, aes(yintercept = tfr, color = group))+
-  facet_wrap(~union_status)+
-  theme_bw()
+#| label: caclulate-mar-rates-strat-rates
+
+counts <- map(
+  results_uneven,
+  calculate_lexis_counts,
+  time_breaks = time_breaks,
+  age_breaks = seq(15, 70, 5), 
+  include_unions = TRUE,
+  by_group = TRUE
+)
+
+mar_rates <- counts |>
+  bind_rows(.id = "replication") |>
+  filter(union_status == "unpartnered") |>
+  group_by(age_start, sex, group) |>
+  summarize(
+    rate = mean(rate_marriage),
+    sd = sd(rate_marriage),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
 ```
 
-```{r}
-asmr |>
-  ggplot(aes(x = age_start, y = rate, group = group, color = group))+
-  geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se, fill = group),
-              color = NA, alpha = 0.4)+
-  #geom_line()+
-  geom_line(data = mortality_rates_grouped, linetype = 1)+
-  scale_y_log10()+
-  scale_x_continuous(limits = c(0, 85))+
-  facet_wrap(~sex)+
-  theme_bw()
-```
 
 ### Proportional multipliers
 
