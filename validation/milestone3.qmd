@@ -86,7 +86,7 @@ hammel_model() |>
     rates = rates_by_union_status, 
     group_prop_hazard = list(
       "partnered" = c("A" = 1.1, "B" = 0.9),
-      "unpartnered" = c("A" = 1.05, "B"" = 0.95)
+      "unpartnered" = c("A" = 1.05, "B" = 0.95)
     )
   )
 ```
@@ -322,7 +322,7 @@ I calculate fertility rates in five year age brackets that match those of the in
 #| label: caclulate-fert-rates-strat-rates
 
 counts <- map(
-  results_uneven,
+  results,
   calculate_lexis_counts,
   time_breaks = time_breaks, 
   age_breaks = seq(15, 50, 5), 
@@ -469,7 +469,7 @@ Mortality is measured in 1-year age groups across 5 year time periods. The input
 #| label: calculate-mort-rates-strat-rates
 
 counts <- map(
-  results_uneven,
+  results,
   calculate_lexis_counts,
   time_breaks = time_breaks,
   age_breaks = 0:85,
@@ -542,11 +542,13 @@ Overall, the evidence indicates that the observed mortality rates by group corre
 
 #### Marriage
 
+Age-specific marriage rates are calculated in five year age groups from 15 to age 70 in 5-year time increments.
+
 ```{r}
 #| label: caclulate-mar-rates-strat-rates
 
 counts <- map(
-  results_uneven,
+  results,
   calculate_lexis_counts,
   time_breaks = time_breaks,
   age_breaks = seq(15, 70, 5), 
@@ -567,15 +569,72 @@ mar_rates <- counts |>
   )
 ```
 
+```{r}
+#| label: fig-mar-rates-strat-rates
+#| fig-cap: Mean age-specific female marriage rates by group across 100 simulations and years compared to input rates. Mean rates are shown by dots with a 95% confidence interval and input rates are shown by dotted lines.
+
+mar_rates |>
+  filter(sex == "f") |>
+  mutate(age_start = if_else(age_start == 15 & group == "B", 16, age_start)) |>
+  ggplot(aes(x = age_start + 2.5, y = rate, group = group, color = group))+
+  geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
+  geom_line(linetype = 2)+
+  geom_point(data = mar_rates_female_grouped)+
+  labs(x = "age", y = "age-specific marital rate")+
+  theme_bw()
+```
+
+@fig-mar-rates-strat-rates show the empirically estimated mean age-specific marriage rates compared to the input rates The match is extremely close.
 
 ### Proportional multipliers
 
+```{r}
+m#| label: run-prop-hazards-sim
 
+ratio_fert_partnered_A <- 1.2
+ratio_fert_partnered_B <- 0.8
+ratio_fert_unpartnered_A <- 0.9
+ratio_fert_unpartnered_B <- 1.1
+ratio_mort_A <- 1.1
+ratio_mort_B <- 0.9
+ratio_mar_A <- 0.95
+ratio_mar_B <- 1.1
 
-Compare ASFR, TFR, ASMR, and female union-search rates with scenario-specific
-inputs. Compare equivalent explicit schedules and multiplier configurations.
-Include conditional fertility and omitted group/status factors. Report sparse
-oldest-age cells and infinite life expectancy explicitly.
+model <- hammel_model() |>
+  set_population(pop_baseline_uneven_2g) |>
+  set_fertility(
+    fertility_rates_by_status_usa,
+    group_prop_hazard = list(
+      "partnered" = c("A" = ratio_fert_partnered_A, "B" = ratio_fert_partnered_B),
+      "unpartnered" = c("A" = ratio_fert_unpartnered_A, "B" = ratio_fert_unpartnered_B)
+      )
+    )
+  ) |>
+  set_mortality(
+    mortality_rates_usa2000, 
+    group_prop_hazard = c("A" = ratio_mort_A, "B" = ratio_mort_B)
+  ) |>
+  set_union_formation(
+    "rate",
+    matching = create_age_gap_matching_model(
+      0, 5,
+      group_exogamy = c("A::B" = -2)
+    ),
+    rates = mar_rates_female_usa,
+    group_prop_hazard = c("A" = ratio_mar_A, "B" = ratio_mar_B)
+  )
+
+results  <- map(replication_seeds, function(seed) {
+  simulate(model, years = years, seed = seed)
+})
+names(results) <- as.character(replication_seeds)
+```
+
+#### Fertility
+
+#### Mortality
+
+#### Marriage
 
 ## Evaluate Group Matching
 
