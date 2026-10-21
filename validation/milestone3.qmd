@@ -376,7 +376,7 @@ tfr_pooled <- counts |>
 
 asfr |>
   filter(union_status != "overall") |>
-  ggplot(aes(x = age_start+2.5, y = rate, group = group, color = group))+
+  ggplot(aes(x = age_start + 2.5, y = rate, group = group, color = group))+
   geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
   geom_line(linetype = 2)+
   geom_point(data = fertility_rates_by_status_grouped)+
@@ -575,7 +575,6 @@ mar_rates <- counts |>
 
 mar_rates |>
   filter(sex == "f") |>
-  mutate(age_start = if_else(age_start == 15 & group == "B", 16, age_start)) |>
   ggplot(aes(x = age_start + 2.5, y = rate, group = group, color = group))+
   geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
   geom_line(linetype = 2)+
@@ -607,7 +606,6 @@ model <- hammel_model() |>
     group_prop_hazard = list(
       "partnered" = c("A" = ratio_fert_partnered_A, "B" = ratio_fert_partnered_B),
       "unpartnered" = c("A" = ratio_fert_unpartnered_A, "B" = ratio_fert_unpartnered_B)
-      )
     )
   ) |>
   set_mortality(
@@ -632,10 +630,255 @@ names(results) <- as.character(replication_seeds)
 
 #### Fertility
 
+```{r}
+#| label: caclulate-fert-rates-prop-hazards
+
+counts <- map(
+  results,
+  calculate_lexis_counts,
+  time_breaks = time_breaks, 
+  age_breaks = seq(15, 50, 5), 
+  include_unions = TRUE,
+  by_group = TRUE
+)
+
+asfr <- counts |> 
+  bind_rows(.id = "replication") |>
+  filter(sex == "f", age_start >= 15 & age_start < 50, person_years > 0) |>
+  group_by(union_status, age_start, group) |>
+  summarize(
+    rate = mean(rate_fertility),
+    sd = sd(rate_fertility),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+tfr <- map(counts, calculate_tfr) |>
+  bind_rows(.id = "replication") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, union_status, group) |>
+  summarize(
+    sd = sd(tfr),
+    tfr = mean(tfr),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+tfr_pooled <- counts |>
+  bind_rows() |>
+  filter(sex == "f") |>
+  group_by(time_start, time_end, union_status, group,
+           age_start, age_end) |>
+  summarize(
+    births = sum(births),
+    person_years = sum(person_years),
+    .groups = "drop"
+  ) |>
+  mutate(rate_fertility = if_else(
+    person_years > 0, births / person_years, NA_real_
+  )) |>
+  calculate_tfr()
+```
+
+```{r}
+#| label: fig-asfr-prop-hazards
+#| fig-cap: Mean age-specific fertility rates by union status and group across 100 simulations and years compared to input rates. Mean rates are shown by dots with a 95% confidence interval and input rates are shown by dotted lines.
+
+bind_rows(
+  fertility_rates_by_status_usa |>
+    mutate()
+
+
+asfr |>
+  filter(union_status != "overall") |>
+  ggplot(aes(x = age_start + 2.5, y = rate, group = group, color = group))+
+  geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
+  geom_line(linetype = 2)+
+  geom_point(data = fertility_rates_by_status_grouped)+
+  facet_wrap(~union_status)+
+  labs(x = "age", y = "age-specific fertility rate")+
+  theme_bw()
+```
+
+```{r}
+#| label: fig-tfr-prop-hazards
+#| fig-cap: Mean total fertility rate by five year time periods, union status, and group across 100 simulations. 95% confidence band shown on each estimate. Horizontal lines show the corresponding input total fertility rate by group and union status. 
+
+tfr |>
+  filter(union_status != "overall") |>
+  ggplot(aes(x = time_mid, color = group, group = group))+
+  geom_ribbon(aes(ymin = tfr - 1.96 * se, ymax = tfr + 1.96 *se, fill = group),
+              color = NA, alpha = 0.4)+
+  geom_point(aes(y = tfr))+
+  geom_line(aes(y = tfr), linetype = 2)+
+  geom_hline(data = input_tfr_by_status, aes(yintercept = tfr, color = group))+
+  facet_wrap(~union_status)+
+  labs(x = "age", y = "total fertility rate")+
+  theme_bw()
+```
+
+```{r}
+#| label: fig-tfr-pooled-prop-hazards
+#| fig-cap: Total fertility rate by five year time periods, union status, and group, pooled across 100 simulations.
+
+tfr_pooled |>
+  filter(union_status != "overall") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  ggplot(aes(x = time_mid, color = group, group = group))+
+  geom_point(aes(y = tfr))+
+  geom_line(aes(y = tfr), linetype = 2)+
+  geom_hline(data = input_tfr_by_status, aes(yintercept = tfr, color = group))+
+  facet_wrap(~union_status)+
+  labs(x = "age", y = "total fertility rate")+
+  theme_bw()
+```
+
+```{r}
+#| label: tbl-tfr-pooled-prop-hazards
+#| tbl-cap: Total fertiity rate by union status and group, pooled across 100 simulations and time. Expected input TFR and difference also shown.
+
+counts |>
+  bind_rows() |>
+  filter(sex == "f", union_status != "overall") |>
+  group_by(union_status, group, age_start, age_end) |>
+  summarize(
+    births = sum(births),
+    person_years = sum(person_years),
+    .groups = "drop"
+  ) |>
+  mutate(rate_fertility = if_else(
+    person_years > 0, births / person_years, NA_real_
+  )) |>
+  calculate_tfr() |>
+  rename(tfr_observed = tfr) |>
+  left_join(input_tfr_by_status, by = c("group", "union_status")) |>
+  select(-starts_with("age")) |>
+  mutate(diff = tfr_observed - tfr) |>
+  gt() |>
+  cols_label(
+    "group" ~ "Group",
+    "union_status" ~ "Union status",
+    "tfr_observed" ~ "Observed TFR",
+    "tfr" ~ "Input TFR",
+    "diff" ~ "Difference"
+  ) |>
+  fmt_number(starts_with("tfr"), decimals = 3) |>
+  fmt_number(diff, decimals = 4)
+```
 #### Mortality
+
+```{r}
+#| label: calculate-mort-rates-prop-hazards
+
+counts <- map(
+  results,
+  calculate_lexis_counts,
+  time_breaks = time_breaks,
+  age_breaks = 0:85,
+  by_group = TRUE
+)
+
+asmr <- counts |>
+  bind_rows(.id = "replication") |>
+  group_by(age_start, sex, group) |>
+  summarize(
+    rate = mean(rate_mortality),
+    sd = sd(rate_mortality),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+life_exp <- map(counts, calculate_life_table) |>
+  bind_rows(.id = "replication") |>
+  filter(age_start == 0) |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, sex, group) |>
+  summarize(
+    sd = sd(ex),
+    ex = mean(ex),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: fig-asmr-prop-hazards
+#| fig-cap: Mean age-specific mortality rates by sex and group across 100 simulations and years compared to input rates. Mean rates are shown by 95% confidence bands and input rates are shown by lines.
+
+asmr |>
+  filter(age_start < 85) |>
+  ggplot(aes(x = age_start+2.5, y = rate, group = group, color = group))+
+  geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se, fill = group),
+              color = NA, alpha = 0.4)+
+  #geom_line()+
+  geom_line(data = mortality_rates_grouped |> filter(age_start < 85), linetype = 1)+
+  scale_y_log10()+
+  facet_wrap(~sex)+
+  labs(x = "age", y = "age-specific mortality rate")+
+  theme_bw()
+```
+
+```{r}
+#| label: fig-life-exp-prop-hazards
+#| fig-cap: Mean life expectancy at age zero by five-year time period, sex, and group across 100 simulations. 95% confidence bands shown for each estimate. Horizontal lines show the expected life expectancy from the input rates.
+
+life_exp |>
+  ggplot(aes(x = time_mid, color = group, group = group))+
+  geom_ribbon(aes(ymin = ex - 1.96 * se, ymax = ex + 1.96 *se, fill = group),
+              color = NA, alpha = 0.4)+
+  #geom_point(aes(y = ex))+
+  geom_line(aes(y = ex), linetype = 2)+
+  geom_hline(data = input_life_exp, aes(yintercept = ex, color = group))+
+  facet_wrap(~sex)+
+  labs(x = "time", y = "life expectany at birth")+
+  theme_bw()
+```
 
 #### Marriage
 
+```{r}
+#| label: caclulate-mar-rates-prop-hazards
+
+counts <- map(
+  results,
+  calculate_lexis_counts,
+  time_breaks = time_breaks,
+  age_breaks = seq(15, 70, 5), 
+  include_unions = TRUE,
+  by_group = TRUE
+)
+
+mar_rates <- counts |>
+  bind_rows(.id = "replication") |>
+  filter(union_status == "unpartnered") |>
+  group_by(age_start, sex, group) |>
+  summarize(
+    rate = mean(rate_marriage),
+    sd = sd(rate_marriage),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: fig-mar-rates-prop-hazards
+#| fig-cap: Mean age-specific female marriage rates by group across 100 simulations and years compared to input rates. Mean rates are shown by dots with a 95% confidence interval and input rates are shown by dotted lines.
+
+mar_rates |>
+  filter(sex == "f") |>
+  mutate(age_start = if_else(age_start == 15 & group == "B", 16, age_start)) |>
+  ggplot(aes(x = age_start + 2.5, y = rate, group = group, color = group))+
+  geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
+  geom_line(linetype = 2)+
+  geom_point(data = mar_rates_female_grouped)+
+  labs(x = "age", y = "age-specific marital rate")+
+  theme_bw()
+```
 ## Evaluate Group Matching
 
 ### Directed and symmetric effects
