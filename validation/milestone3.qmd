@@ -228,10 +228,13 @@ fertility_rates_by_status_usa <- read_csv(
 )
 fertility_rates_overall_england <- read_csv(
   here("validation", "data", "england_wales_2015_overall_fertility.csv")
-)
+) |>
+  # adjust earliest age group to match US - not necessary but makes validation easier
+  mutate(age_start = if_else(age_start == 16, 15, age_start))
 fertility_rates_by_status_england <- read_csv(
   here("validation", "data", "england_wales_2015_fertility_by_union_status.csv")
-)
+) |>
+  mutate(age_start = if_else(age_start == 16, 15, age_start))
 
 fertility_rates_overall_grouped <- bind_rows(
   fertility_rates_overall_usa |> mutate(group = "A"),
@@ -250,7 +253,8 @@ mar_rates_female_usa <- read_csv(
 )
 mar_rates_female_england <- read_csv(
   here("validation", "data", "england_wales_2015_female_union_rates.csv")
-)
+) |>
+  mutate(age_start = if_else(age_start == 16, 15, age_start))
 
 mar_rates_female_grouped <- bind_rows(
   mar_rates_female_usa |> mutate(group = "A"),
@@ -686,9 +690,23 @@ tfr_pooled <- counts |>
 #| label: fig-asfr-prop-hazards
 #| fig-cap: Mean age-specific fertility rates by union status and group across 100 simulations and years compared to input rates. Mean rates are shown by dots with a 95% confidence interval and input rates are shown by dotted lines.
 
-bind_rows(
+fert_input <- bind_rows(
   fertility_rates_by_status_usa |>
-    mutate()
+    mutate(
+      group = "A",
+      rate = rate * if_else(union_status == "partnered",
+                            ratio_fert_partnered_A,
+                            ratio_fert_unpartnered_A)
+  ),
+  fertility_rates_by_status_usa |>
+    mutate(
+      group = "B",
+      rate = rate * if_else(union_status == "partnered",
+                            ratio_fert_partnered_B,
+                            ratio_fert_unpartnered_B)
+  )
+
+)
 
 
 asfr |>
@@ -696,42 +714,9 @@ asfr |>
   ggplot(aes(x = age_start + 2.5, y = rate, group = group, color = group))+
   geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
   geom_line(linetype = 2)+
-  geom_point(data = fertility_rates_by_status_grouped)+
+  geom_point(data = fert_input)+
   facet_wrap(~union_status)+
   labs(x = "age", y = "age-specific fertility rate")+
-  theme_bw()
-```
-
-```{r}
-#| label: fig-tfr-prop-hazards
-#| fig-cap: Mean total fertility rate by five year time periods, union status, and group across 100 simulations. 95% confidence band shown on each estimate. Horizontal lines show the corresponding input total fertility rate by group and union status. 
-
-tfr |>
-  filter(union_status != "overall") |>
-  ggplot(aes(x = time_mid, color = group, group = group))+
-  geom_ribbon(aes(ymin = tfr - 1.96 * se, ymax = tfr + 1.96 *se, fill = group),
-              color = NA, alpha = 0.4)+
-  geom_point(aes(y = tfr))+
-  geom_line(aes(y = tfr), linetype = 2)+
-  geom_hline(data = input_tfr_by_status, aes(yintercept = tfr, color = group))+
-  facet_wrap(~union_status)+
-  labs(x = "age", y = "total fertility rate")+
-  theme_bw()
-```
-
-```{r}
-#| label: fig-tfr-pooled-prop-hazards
-#| fig-cap: Total fertility rate by five year time periods, union status, and group, pooled across 100 simulations.
-
-tfr_pooled |>
-  filter(union_status != "overall") |>
-  mutate(time_mid = (time_start + time_end) / 2) |>
-  ggplot(aes(x = time_mid, color = group, group = group))+
-  geom_point(aes(y = tfr))+
-  geom_line(aes(y = tfr), linetype = 2)+
-  geom_hline(data = input_tfr_by_status, aes(yintercept = tfr, color = group))+
-  facet_wrap(~union_status)+
-  labs(x = "age", y = "total fertility rate")+
   theme_bw()
 ```
 
@@ -753,7 +738,7 @@ counts |>
   )) |>
   calculate_tfr() |>
   rename(tfr_observed = tfr) |>
-  left_join(input_tfr_by_status, by = c("group", "union_status")) |>
+  left_join(tfr_input, by = c("group", "union_status")) |>
   select(-starts_with("age")) |>
   mutate(diff = tfr_observed - tfr) |>
   gt() |>
