@@ -705,7 +705,6 @@ fert_input <- bind_rows(
                             ratio_fert_partnered_B,
                             ratio_fert_unpartnered_B)
   )
-
 )
 
 
@@ -794,13 +793,20 @@ life_exp <- map(counts, calculate_life_table) |>
 #| label: fig-asmr-prop-hazards
 #| fig-cap: Mean age-specific mortality rates by sex and group across 100 simulations and years compared to input rates. Mean rates are shown by 95% confidence bands and input rates are shown by lines.
 
+mort_input <- bind_rows(
+  mortality_rates_usa2000 |>
+    mutate(group = "A", rate = rate * ratio_mort_A),
+  mortality_rates_usa2000 |>
+    mutate(group = "B", rate = rate * ratio_mort_B)
+)
+
 asmr |>
   filter(age_start < 85) |>
   ggplot(aes(x = age_start+2.5, y = rate, group = group, color = group))+
   geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se, fill = group),
               color = NA, alpha = 0.4)+
   #geom_line()+
-  geom_line(data = mortality_rates_grouped |> filter(age_start < 85), linetype = 1)+
+  geom_line(data = mort_input |> filter(age_start < 85), linetype = 1)+
   scale_y_log10()+
   facet_wrap(~sex)+
   labs(x = "age", y = "age-specific mortality rate")+
@@ -811,13 +817,18 @@ asmr |>
 #| label: fig-life-exp-prop-hazards
 #| fig-cap: Mean life expectancy at age zero by five-year time period, sex, and group across 100 simulations. 95% confidence bands shown for each estimate. Horizontal lines show the expected life expectancy from the input rates.
 
+ex_input <- mort_input |>
+  calculate_life_table() |>
+  filter(age_start == 0) |>
+  select(sex, group, ex)
+
 life_exp |>
   ggplot(aes(x = time_mid, color = group, group = group))+
   geom_ribbon(aes(ymin = ex - 1.96 * se, ymax = ex + 1.96 *se, fill = group),
               color = NA, alpha = 0.4)+
   #geom_point(aes(y = ex))+
   geom_line(aes(y = ex), linetype = 2)+
-  geom_hline(data = input_life_exp, aes(yintercept = ex, color = group))+
+  geom_hline(data = ex_input, aes(yintercept = ex, color = group))+
   facet_wrap(~sex)+
   labs(x = "time", y = "life expectany at birth")+
   theme_bw()
@@ -854,13 +865,20 @@ mar_rates <- counts |>
 #| label: fig-mar-rates-prop-hazards
 #| fig-cap: Mean age-specific female marriage rates by group across 100 simulations and years compared to input rates. Mean rates are shown by dots with a 95% confidence interval and input rates are shown by dotted lines.
 
+mar_input <- bind_rows(
+  mar_rates_female_usa  |>
+    mutate(group = "A", rate = rate * ratio_mar_A),
+  mar_rates_female_usa |>
+    mutate(group = "B", rate = rate * ratio_mar_B)
+)
+
 mar_rates |>
   filter(sex == "f") |>
   mutate(age_start = if_else(age_start == 15 & group == "B", 16, age_start)) |>
   ggplot(aes(x = age_start + 2.5, y = rate, group = group, color = group))+
   geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
   geom_line(linetype = 2)+
-  geom_point(data = mar_rates_female_grouped)+
+  geom_point(data = mar_input)+
   labs(x = "age", y = "age-specific marital rate")+
   theme_bw()
 ```
