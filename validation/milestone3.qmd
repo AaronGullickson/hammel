@@ -207,8 +207,55 @@ examples, not completed validation evidence.
 
 ```{r}
 #| label: prepare-inputs
-# TODO: Load saved fertility, mortality, and union-search schedules.
-# TODO: Construct grouped schedules and proportional multiplier scenarios.
+
+mortality_rates_usa2000 <- get_mortality_hmd("USA", year = 2000)
+mortality_rates_usa1950 <- get_mortality_hmd("USA", year = 1950)
+
+mortality_rates_grouped <- bind_rows(
+  mortality_rates_usa2000 |> mutate(group = "A"),
+  mortality_rates_usa1950 |> mutate(group = "B")
+)
+
+input_life_exp <- calculate_life_table(mortality_rates_grouped) |>
+  filter(age_start == 0) |>
+  select(sex, group, ex)
+
+fertility_rates_overall_usa <- read_csv(
+  here("validation", "data", "usa_2000_fertility_overall.csv")
+)
+fertility_rates_by_status_usa <- read_csv(
+  here("validation", "data", "usa_2000_fertility_by_union_status.csv")
+)
+fertility_rates_overall_england <- read_csv(
+  here("validation", "data", "england_wales_2015_overall_fertility.csv")
+)
+fertility_rates_by_status_england <- read_csv(
+  here("validation", "data", "england_wales_2015_fertility_by_union_status.csv")
+)
+
+fertility_rates_overall_grouped <- bind_rows(
+  fertility_rates_overall_usa |> mutate(group = "A"),
+  fertility_rates_overall_england |> mutate(group = "B")
+)
+fertility_rates_by_status_grouped <- bind_rows(
+  fertility_rates_by_status_usa |> mutate(group = "A"),
+  fertility_rates_by_status_england |> mutate(group = "B")
+)
+
+fertility_rates_overall_grouped |> calculate_tfr()
+input_tfr_by_status <- fertility_rates_by_status_grouped |> calculate_tfr()
+
+mar_rates_female_usa <- read_csv(
+  here("validation", "data", "usa_2001_marriage_rates_female.csv")
+)
+mar_rates_female_england <- read_csv(
+  here("validation", "data", "england_wales_2015_female_union_rates.csv")
+)
+
+mar_rates_female_grouped <- bind_rows(
+  mar_rates_female_usa |> mutate(group = "A"),
+  mar_rates_female_england |> mutate(group = "B")
+)
 ```
 
 ### Initialization, observation windows, and replications
@@ -222,6 +269,24 @@ from separate runs before calling demographic extraction functions.
 ```{r}
 #| label: simulation-design
 # TODO: Set parameters and seeds; create baseline populations and scenario table.
+
+population_seed <- 42
+replication_seeds <- seq_len(100)
+years <- 100
+
+# mortality age breaks are 1 year and to age 85
+age_breaks <- seq(15, 70, 5)
+mortality_age_breaks <- 0:85
+# skip first 25 years for time
+time_breaks <- seq(2025, 2100, 5)
+
+set.seed(population_seed)
+pop_baseline_uneven_2g <- create_baseline_population(
+  30000, max_age = 100, end_time = 2000, group_weights = c("A" = 2, "B" = 1)
+)
+pop_baseline_even_2g <- create_baseline_population(
+  30000, max_age = 100, end_time = 2000, group_weights = c("A" = 1, "B" = 1)
+)
 ```
 
 ## Replications and demographic extraction
@@ -231,6 +296,102 @@ from separate runs before calling demographic extraction functions.
 # TODO: Run each scenario and replication; retain scenario and seed identifiers.
 # TODO: Extract grouped Lexis counts, TFR, life tables, population sizes,
 #       detailed unions, and ancestry summaries separately for each run.
+
+model_uneven <- hammel_model() |>
+  set_population(pop_baseline_uneven_2g) |>
+  set_fertility(fertility_rates_by_status_grouped) |>
+  set_mortality(mortality_rates_2g) |>
+  set_union_formation(
+    "rate",
+    matching = create_age_gap_matching_model(
+      0, 5, 
+      group_exogamy = c("A::B" = -2)
+    ),
+    rates = mar_rates_female_grouped
+  )
+
+
+results_uneven  <- map(replication_seeds, function(seed) {
+  simulate(model_uneven, years = years, seed = seed)
+})
+names(results_uneven) <- as.character(replication_seeds)
+
+
+counts <- map(
+  results_uneven, 
+  calculate_lexis_counts,
+  time_breaks = time_breaks,
+  age_breaks = age_breaks, 
+  include_unions = TRUE,
+  by_group = TRUE
+)
+mortality_counts <- map(
+  results_uneven,
+  calculate_lexis_counts,
+  time_breaks = time_breaks,
+  age_breaks = mortality_age_breaks,
+  by_group = TRUE
+)
+
+asfr <- counts |> 
+  bind_rows(.id = "replication") |>
+  filter(sex == "f", age_start >= 15 & age_start < 45) |>
+  group_by(union_status, age_start, group) |>
+  summarize(
+    rate = mean(rate_fertility),
+    sd = sd(rate_fertility),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+mar_rates <- counts |>
+  bind_rows(.id = "replication") |>
+  filter(union_status == "unpartnered") |>
+  group_by(age_start, sex, group) |>
+  summarize(
+    rate = mean(rate_marriage),
+    sd = sd(rate_marriage),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+asmr <- mortality_counts |>
+  bind_rows(.id = "replication") |>
+  group_by(age_start, sex, group) |>
+  summarize(
+    rate = mean(rate_mortality),
+    sd = sd(rate_mortality),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+tfr <- map(counts, calculate_tfr) |>
+  bind_rows(.id = "replication") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, union_status, group) |>
+  summarize(
+    sd = sd(tfr),
+    tfr = mean(tfr),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+life_exp <- map(mortality_counts, calculate_life_table) |>
+  bind_rows(.id = "replication") |>
+  filter(age_start == 0) |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, sex, group) |>
+  summarize(
+    sd = sd(ex),
+    ex = mean(ex),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
 ```
 
 ## Evaluate Group-Specific Rates
@@ -241,6 +402,59 @@ Compare sampled initial shares with normalized weights. Assess grouped results
 under shared rates and reconcile group counts/exposure with pooled summaries.
 
 ### Stratified schedules and proportional multipliers
+
+```{r}
+life_exp |>
+  ggplot(aes(x = time_mid, color = group, group = group))+
+  geom_ribbon(aes(ymin = ex - 1.96 * se, ymax = ex + 1.96 *se, fill = group),
+              color = NA, alpha = 0.4)+
+  geom_point(aes(y = ex))+
+  geom_line(aes(y = ex), linetype = 2)+
+  geom_hline(data = input_life_exp, aes(yintercept = ex, color = group))+
+  facet_wrap(~sex)+
+  theme_bw()
+```
+
+
+```{r}
+tfr |>
+  filter(union_status != "overall") |>
+  ggplot(aes(x = time_mid, color = group, group = group))+
+  geom_ribbon(aes(ymin = tfr - 1.96 * se, ymax = tfr + 1.96 *se, fill = group),
+              color = NA, alpha = 0.4)+
+  geom_point(aes(y = tfr))+
+  geom_line(aes(y = tfr), linetype = 2)+
+  geom_hline(data = input_tfr_by_status, aes(yintercept = tfr, color = group))+
+  facet_wrap(~union_status)+
+  theme_bw()
+```
+
+```{r}
+asmr |>
+  ggplot(aes(x = age_start, y = rate, group = group, color = group))+
+  geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se, fill = group),
+              color = NA, alpha = 0.4)+
+  #geom_line()+
+  geom_line(data = mortality_rates_grouped, linetype = 1)+
+  scale_y_log10()+
+  scale_x_continuous(limits = c(0, 85))+
+  facet_wrap(~sex)+
+  theme_bw()
+```
+
+```{r}
+asfr |>
+  filter(union_status != "overall") |>
+  ggplot(aes(x = age_start, y = rate, group = group, color = group))+
+  #geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se, fill = group),
+  #            color = NA, alpha = 0.5)+
+  geom_point()+
+  geom_line(data = fertility_rates_by_status_2g, linetype = 2)+
+  facet_wrap(~union_status)+
+  theme_bw()
+```
+
+
 
 Compare ASFR, TFR, ASMR, and female union-search rates with scenario-specific
 inputs. Compare equivalent explicit schedules and multiplier configurations.
