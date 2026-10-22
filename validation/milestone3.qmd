@@ -591,8 +591,10 @@ mar_rates |>
 
 ### Proportional multipliers
 
+To evaluate the use of proportional hazards on a shared input schedules, I run the fullest possible simulation for two groups where all rates, including partnered and unpartnered fertility and marriage rates, are supplied. I then apply a different proportional hazard for each group and each rate to produce differences in the observed rates as shown in the code below. I run 100 simulations and then take average age-specific rates across all simulations and years and average life expectancy at birth and total fertility rates by five year time period.
+
 ```{r}
-m#| label: run-prop-hazards-sim
+#| label: run-prop-hazards-sim
 
 ratio_fert_partnered_A <- 1.2
 ratio_fert_partnered_B <- 0.8
@@ -633,6 +635,8 @@ names(results) <- as.character(replication_seeds)
 ```
 
 #### Fertility
+
+I calculate fertility rates in five year age brackets that match those of the input data and in five year periods across the 100 years of the simulation.
 
 ```{r}
 #| label: caclulate-fert-rates-prop-hazards
@@ -719,9 +723,13 @@ asfr |>
   theme_bw()
 ```
 
+@fig-asfr-prop-hazards shows the mean estimated age specific fertility rates from the simulations in comparison to the input rates. All of the observed mean rates fit very closely to the input rates across groups and union status. 
+
 ```{r}
 #| label: tbl-tfr-pooled-prop-hazards
 #| tbl-cap: Total fertiity rate by union status and group, pooled across 100 simulations and time. Expected input TFR and difference also shown.
+
+tfr_input <- fert_input |> calculate_tfr()
 
 counts |>
   bind_rows() |>
@@ -751,7 +759,12 @@ counts |>
   fmt_number(starts_with("tfr"), decimals = 3) |>
   fmt_number(diff, decimals = 4)
 ```
+
+@tbl-tfr-pooled-prop-hazards shows the TFR from the simulations by group and union status based on pooled person years and births across years and simulations. For reference, the input TFRs are also shown as well as the difference. The TFRs estimated from the data are very close to the expected TFRs. A slight positive bias is present for for the partnered fertility rates, as expected (see discussion above for @tbl-tfr-pooled-strat-rates).
+
 #### Mortality
+
+Mortality is measured in 1-year age groups across 5 year time periods. The input mortality data extends to 100 years of age but at the highest ages, estimated mortality rates can fluctuate substantially due to a small number of person years lived at those ages, and can also be missing due to zero person years lived at a sepcific age. Therefore, I use an open ended age group of 85+. This may cause a slight discrepancy between the life expectancy estimated from the data and the life expectancy of the input data, but it is likely to be small. 
 
 ```{r}
 #| label: calculate-mort-rates-prop-hazards
@@ -813,6 +826,8 @@ asmr |>
   theme_bw()
 ```
 
+@fig-asmr-prop-hazards shows the mean age-specific mortality rates across simulations and years compared to the input rates. The estimated rates are shown by a 95% confidence band and the input rates are shown by a line. The figure shows that the input rates fall within the 95% confidence band for both sexes and groups across ages.
+
 ```{r}
 #| label: fig-life-exp-prop-hazards
 #| fig-cap: Mean life expectancy at age zero by five-year time period, sex, and group across 100 simulations. 95% confidence bands shown for each estimate. Horizontal lines show the expected life expectancy from the input rates.
@@ -834,7 +849,14 @@ life_exp |>
   theme_bw()
 ```
 
+@fig-life-exp-prop-hazards show the mean life expectancy at birth along with a 95% confidence band. The true input life expectancy fits well within this band in most cases. The few exceptions are expected when comparing this many individual points. 
+
+Overall, the evidence indicates that the observed mortality rates by group correspond well to the input rates by group. 
+
+
 #### Marriage
+
+Age-specific marriage rates are calculated in five year age groups from 15 to age 70 in 5-year time increments.
 
 ```{r}
 #| label: caclulate-mar-rates-prop-hazards
@@ -882,6 +904,9 @@ mar_rates |>
   labs(x = "age", y = "age-specific marital rate")+
   theme_bw()
 ```
+
+@fig-mar-rates-strat-rates show the empirically estimated mean age-specific marriage rates compared to the input rates The match is extremely close.
+
 ## Evaluate Group Matching
 
 ### Directed and symmetric effects
