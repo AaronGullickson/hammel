@@ -15,7 +15,8 @@ union_formation(
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
   diagnostics = FALSE,
-  group_prop_hazard = NULL
+  group_prop_hazard = NULL,
+  matching_method = "female_choice"
 )
 
 set_union_formation(
@@ -29,7 +30,8 @@ set_union_formation(
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
   diagnostics = FALSE,
-  group_prop_hazard = NULL
+  group_prop_hazard = NULL,
+  matching_method = "female_choice"
 )
 }
 \arguments{
@@ -55,7 +57,8 @@ support have zero hazard. Must be NULL for \code{"on_demand"}.}
 
 \item{min_male_age}{Minimum male age in continuous years at a new partner
 search, default \code{15}. Finite nonnegative scalar; zero disables this age
-exclusion. Existing unions are retained. No female minimum age is added.}
+exclusion. Existing unions are retained. No minimum is added for actual
+female event eligibility. Two-sided alternate women use this same cutoff.}
 
 \item{kinship_generations}{Generation bound on both sides of a known common
 ancestor, default \code{2}. Excludes parents, grandparents, siblings, aunts/uncles,
@@ -87,6 +90,14 @@ zero suppresses searches. Applies to shared or group-specific input rates.
 Without population groups, simulation warns and ignores multipliers.
 Requires \code{initiation = "rate"}; on-demand formation has no search hazard.
 Matching utilities and input rate tables are unchanged.}
+
+\item{matching_method}{\code{"female_choice"} (default) for existing ego-only
+choice, or experimental \code{"two_sided"} for sequential temporary markets.
+The latter samples alternate unpartnered women with the male age cutoff,
+randomly selects the choosing sex each round, and stops when ego matches.
+It applies to union formation and nonmarital father selection. Temporary
+pairs never change population state. Aggregate parameter recovery is under
+investigation; the method can cost quadratic work in candidate sample size.}
 
 \item{model}{A \code{hammel_model} object.}
 }
@@ -123,4 +134,11 @@ up to that many men. Age screening occurs afterward, without refilling the
 sample. Kinship screening follows the same ordering. Existing unions are
 retained even if a new-search restriction would exclude the partner.
 Candidate sets will not be retained in simulation outputs.
+
+Experimental \code{matching_method = "two_sided"} adds alternate women to a
+temporary market after ego's male eligibility screening. Only the selected
+remaining row/column is scored at each round, including for R formulas.
+Hard group exclusions apply to hypothetical pairs; kinship applies only to
+ego. If fewer alternate women exist, randomly reduce the eligible men to
+keep the initial market square. Only ego's final outcome changes real state.
 }

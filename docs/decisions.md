@@ -1086,3 +1086,24 @@ matching specifications override this default. Initiation mode remains explicit.
 - **Scope:** no sex-specific fertility input or group/time-varying sex
   probabilities are introduced. This does not establish a cause for the
   inheritance trajectories under investigation.
+
+
+## D061: Prototype sequential two-sided temporary matching markets
+
+- **Status:** experiment authorized by the user October 22, 2026; scientific
+  acceptance and parameter benchmarks remain pending.
+- **Decision:** add optional `matching_method = "two_sided"` to union formation,
+  preserving `"female_choice"` as the default. Sample M - 1 alternate living,
+  unpartnered women with the same age cutoff as ego's M eligible sampled men.
+  Uniformly reduce men if too few women exist. Do not weight alternate women
+  by demographic hazards or apply kinship to their hypothetical pairs.
+- **Procedure:** repeatedly flip a fair sex coin, uniformly draw an initiator,
+  and select their partner with the existing conditional-logit pair utilities.
+  Remove hypothetical pairs locally and stop when ego matches. Enforce hard
+  group exclusions; an alternate woman with no allowed man leaves unmatched.
+  All scores retain female-first/male-second orientation.
+- **Scope:** shared selection for unions and nonmarital fathers, preserving
+  explicit father preferences, actual eligibility, and existing event timing.
+  No hypothetical pair changes population state. The user requested runtime
+  comparisons and will assess input benchmarks using milestone 3 analyses.
+- **Specification:** see [experimental two-sided matching](two-sided-matching.md).

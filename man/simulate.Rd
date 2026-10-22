@@ -31,7 +31,7 @@ current partner, or sample men and choose one using conditional-logit
 probabilities from the matching formula to form a union at the birth.
 Sampled men must meet the configured minimum age (default 15 years).
 Known kin are excluded within the configured generation bound on each side
-of a common ancestor (default two). Other eligibility rules remain pending.
+of a common ancestor (default two). Hard group exclusions also apply.
 If no sampled men are eligible, cancel the birth by default. Explicitly set
 \code{cancel_birth_if_no_match = FALSE} to preserve it with unknown father.
 Rate initiation adds age-specific search events for unpartnered women only.
@@ -44,6 +44,9 @@ forming a union or reserving the man.
 A failed match cancels the birth unless explicitly allowed by the union process.
 Cancellation starts no new birth-spacing interval. On-demand mode rejects
 status schedules.
+Optional \code{matching_method = "two_sided"} on \code{\link[=union_formation]{union_formation()}} uses
+probabilistic sequential temporary markets instead of default ego-only
+female choice. Only ego's outcome is retained; event initiation is unchanged.
 }
 \details{
 Minimum birth spacing is configured in \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}
@@ -63,7 +66,7 @@ tables use each person's group (the woman's group for union searches).
 Ungrouped tables apply to everyone. Missing population groups in a grouped
 rate table are errors. Without population groups, each grouped table uses its
 first alphabetical group with a warning; this does not create group identities.
-Group has no effect on partner matching. Existing custom columns and histories are preserved. Restarting samples new
+Matching can use group predictors and pair effects. Existing custom columns and histories are preserved. Restarting samples new
 pending events and does not reproduce an uninterrupted run exactly.
 When ancestry is tracked, each newborn receives half of each parent's shares,
 with a missing parent contributing its half to unknown ancestry. Initial

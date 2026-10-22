@@ -212,7 +212,7 @@ calculate_matching_probabilities <- function(matching, age_difference, female_gr
 
 # Use an exact native path for the common linear/raw quadratic specification.
 # All other formulas retain model.matrix semantics through an R evaluator.
-prepare_matching_model <- function(matching, population_groups = NULL) {
+prepare_matching_model <- function(matching, population_groups = NULL, two_sided = FALSE) {
   validate_matching_groups(matching, population_groups)
   beta <- matching$coefficients
   columns <- gsub("[[:space:]]", "", names(beta))
@@ -248,7 +248,7 @@ prepare_matching_model <- function(matching, population_groups = NULL) {
     }
   }
   group_formula <- matching_has_group_formula(matching)
-  list(prevent_exogamy_all = restrictions$all, blocked_pairs = blocked,
+  list(two_sided = two_sided, prevent_exogamy_all = restrictions$all, blocked_pairs = blocked,
 quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
        group_formula = group_formula, needs_groups = group_formula || nrow(pairs) > 0,
        pair_offsets = offsets,
@@ -289,6 +289,13 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' retained even if a new-search restriction would exclude the partner.
 #' Candidate sets will not be retained in simulation outputs.
 #'
+#' Experimental `matching_method = "two_sided"` adds alternate women to a
+#' temporary market after ego's male eligibility screening. Only the selected
+#' remaining row/column is scored at each round, including for R formulas.
+#' Hard group exclusions apply to hypothetical pairs; kinship applies only to
+#' ego. If fewer alternate women exist, randomly reduce the eligible men to
+#' keep the initial market square. Only ego's final outcome changes real state.
+#'
 #' @param initiation Either `"on_demand"` for birth-triggered searches or
 #'   `"rate"` for scheduled searches. No default is selected.
 #' @param matching A specification created by [create_matching_model()]. Defaults
@@ -309,7 +316,8 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   zero requests the whole pool. Defaults to `1000`.
 #' @param min_male_age Minimum male age in continuous years at a new partner
 #'   search, default `15`. Finite nonnegative scalar; zero disables this age
-#'   exclusion. Existing unions are retained. No female minimum age is added.
+#'   exclusion. Existing unions are retained. No minimum is added for actual
+#'   female event eligibility. Two-sided alternate women use this same cutoff.
 #' @param kinship_generations Generation bound on both sides of a known common
 #'   ancestor, default `2`. Excludes parents, grandparents, siblings, aunts/uncles,
 #'   nieces/nephews and first cousins, including half relationships, when known.
@@ -334,6 +342,13 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   Without population groups, simulation warns and ignores multipliers.
 #'   Requires `initiation = "rate"`; on-demand formation has no search hazard.
 #'   Matching utilities and input rate tables are unchanged.
+#' @param matching_method `"female_choice"` (default) for existing ego-only
+#'   choice, or experimental `"two_sided"` for sequential temporary markets.
+#'   The latter samples alternate unpartnered women with the male age cutoff,
+#'   randomly selects the choosing sex each round, and stops when ego matches.
+#'   It applies to union formation and nonmarital father selection. Temporary
+#'   pairs never change population state. Aggregate parameter recovery is under
+#'   investigation; the method can cost quadratic work in candidate sample size.
 #' @param model A `hammel_model` object.
 #' @return `union_formation()` returns a `hammel_union_formation` process;
 #'   `set_union_formation()` returns an updated model. Rate tables are tibbles.
@@ -342,14 +357,15 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
                             sample_size = 1000, rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
-                            diagnostics = FALSE, group_prop_hazard = NULL) {
+                            diagnostics = FALSE, group_prop_hazard = NULL,
+                            matching_method = "female_choice") {
   process <- structure(list(
     name = "union_formation", initiation = initiation, matching = matching,
     sample_size = sample_size, min_male_age = min_male_age,
     kinship_generations = kinship_generations, father_matching = father_matching,
     cancel_birth_if_no_match = cancel_birth_if_no_match, diagnostics = diagnostics,
     rates = rates, rate_unit = "person_year", group_prop_hazard = group_prop_hazard,
-    sampling_stage = "before_pair_screening"
+    sampling_stage = "before_pair_screening", matching_method = matching_method
   ), class = c("hammel_union_formation", "hammel_process"))
   validate_union_formation(process)
   if (!is.null(rates)) {
@@ -365,13 +381,19 @@ set_union_formation <- function(model, initiation, matching = create_age_gap_mat
                             sample_size = 1000, rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
-                            diagnostics = FALSE, group_prop_hazard = NULL) {
+                            diagnostics = FALSE, group_prop_hazard = NULL,
+                            matching_method = "female_choice") {
   set_process(model, union_formation(initiation, matching, sample_size, rates,
                                      min_male_age, kinship_generations, father_matching,
-                                     cancel_birth_if_no_match, diagnostics, group_prop_hazard))
+                                     cancel_birth_if_no_match, diagnostics, group_prop_hazard, matching_method))
 }
 
 validate_union_formation <- function(process) {
+  method <- if ("matching_method" %in% names(process)) process$matching_method else "female_choice"
+  if (!is.character(method) || length(method) != 1L || !is.null(dim(method)) ||
+      is.na(method) || !method %in% c("female_choice", "two_sided")) {
+    stop('`matching_method` must be "female_choice" or "two_sided".', call. = FALSE)
+  }
   validate_group_prop_hazard(process$group_prop_hazard)
   if (!identical(process$name, "union_formation") ||
       !identical(process$rate_unit, "person_year") ||

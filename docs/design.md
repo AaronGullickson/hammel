@@ -193,6 +193,17 @@ These remain proposals or unresolved requirements:
 Do not infer future demographic rules from SOCSIM or implement arbitrary
 callbacks that can bypass consistency checks.
 
+## Experimental sequential two-sided matching
+
+`union_formation()` and its setter accept optional `matching_method = "two_sided"`
+(D061); the default remains `"female_choice"`. Both union formation and nonmarital
+father selection use temporary markets with alternate women. Hypothetical
+pairs never mutate population state. Native and R scorers receive only the
+selected remaining row/column. The engine maintains an age-eligible unpartnered
+female pool with queued age entries, rebuilt on restart. See
+[two-sided matching](two-sided-matching.md) for the scientific specification and
+benchmark procedure. Aggregate parameter recovery remains under investigation.
+
 ## Post-sampling group restrictions
 
 Matching models support `prevent_exogamy`: all exogamy or selected directed/

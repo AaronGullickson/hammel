@@ -19,6 +19,7 @@ future work.
 | [Groups](groups.md) | Group-specific schedules, fallback warnings, maternal inheritance, and baseline sampling |
 | [Ancestry](ancestry.md) | Starting proportions, parental averaging, unknown shares, and restarts |
 | [Group inheritance](group-inheritance.md) | Built-in/custom identity rules, passing, and possible groups |
+| [Two-sided matching experiment](two-sided-matching.md) | Optional sequential temporary markets, scientific contract, and timing plan |
 | [Group matching](group-matching.md) | Directed/symmetric pair effects and fixed group formula predictors |
 | [Demographic analysis](demographic-analysis.md) | Exposure, ASFR/ASMR, TFR, and life-table workflows |
 | [Testing and validation](testing.md) | Test commands, evidence, and remaining validation |

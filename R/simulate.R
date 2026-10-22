@@ -11,7 +11,7 @@
 #' probabilities from the matching formula to form a union at the birth.
 #' Sampled men must meet the configured minimum age (default 15 years).
 #' Known kin are excluded within the configured generation bound on each side
-#' of a common ancestor (default two). Other eligibility rules remain pending.
+#' of a common ancestor (default two). Hard group exclusions also apply.
 #' If no sampled men are eligible, cancel the birth by default. Explicitly set
 #' `cancel_birth_if_no_match = FALSE` to preserve it with unknown father.
 #' Rate initiation adds age-specific search events for unpartnered women only.
@@ -24,6 +24,9 @@
 #' A failed match cancels the birth unless explicitly allowed by the union process.
 #' Cancellation starts no new birth-spacing interval. On-demand mode rejects
 #' status schedules.
+#' Optional `matching_method = "two_sided"` on [union_formation()] uses
+#' probabilistic sequential temporary markets instead of default ego-only
+#' female choice. Only ego's outcome is retained; event initiation is unchanged.
 #'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
 #' and uses recorded maternal births, including on restart.
@@ -42,7 +45,7 @@
 #' Ungrouped tables apply to everyone. Missing population groups in a grouped
 #' rate table are errors. Without population groups, each grouped table uses its
 #' first alphabetical group with a warning; this does not create group identities.
-#' Group has no effect on partner matching. Existing custom columns and histories are preserved. Restarting samples new
+#' Matching can use group predictors and pair effects. Existing custom columns and histories are preserved. Restarting samples new
 #' pending events and does not reproduce an uninterrupted run exactly.
 #' When ancestry is tracked, each newborn receives half of each parent's shares,
 #' with a missing parent contributing its half to unknown ancestry. Initial
@@ -161,9 +164,10 @@ simulate <- function(model, years, seed = NULL) {
   result <- population
   births <- deaths <- 0
   if (years > 0) {
-    matching <- prepare_matching_model(union_process$matching, group_values)
+    two_sided <- identical(union_process$matching_method, "two_sided")
+    matching <- prepare_matching_model(union_process$matching, group_values, two_sided)
     father_matching <- if (is.null(union_process$father_matching)) matching else
-      prepare_matching_model(union_process$father_matching, group_values)
+      prepare_matching_model(union_process$father_matching, group_values, two_sided)
     native <- simulate_cpp(engine_persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
                            sample_size, matching,

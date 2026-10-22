@@ -74,9 +74,11 @@ Coefficient names must match all non-intercept design columns exactly. An
 intercept remains ignored, since it cancels in conditional selection. A formula
 `~ 1` with `numeric()` coefficients permits pair-effects-only matching. Formula
 functions remain deterministic; fixed group identity information is supplied
-as candidate data, never mutable state. Female-only terms are constant within
-a search and cancel from conditional choice probabilities. Group effects in
-both the formula and pair table intentionally add together.
+as candidate data, never mutable state. Under default female choice,
+female-only terms are constant within a search and cancel. In the experimental
+two-sided method, they can vary across a man's female alternatives and affect
+his choice. Group effects in both the formula and pair table intentionally add
+together.
 
 ## Execution and validation
 
@@ -98,40 +100,26 @@ and interactions, native/R agreement, malformed or conflicting specifications,
 matching modes and father overrides, diagnostic ranks, reproducibility,
 empty populations, and unchanged behavior without group preferences.
 
-## Two-sided availability investigation (October 22, 2026)
+## Experimental two-sided selection (October 22, 2026)
 
-Current selection normalizes scores within each initiating woman's candidate
-set. Symmetric group coefficients do not guarantee equal directional union or
-birth counts with unequal group sizes. The user wants a general correction
-based on availability on both sides, retaining directed preferences and real
-sex-specific availability differences. This is not yet implemented.
+Current default selection normalizes scores within each initiating woman's
+candidate set. Symmetric group coefficients do not guarantee equal directional
+union or birth counts with unequal group sizes.
 
-The user selected a sampling design for investigation, subsequently refined
-to use M final eligible male candidates and M - 1 alternate living, unpartnered
-women, excluding the initiating woman and using the same age cutoff as male
-candidates. Add the initiating woman to form an `M x M` pair-score matrix.
-Alternate women represent availability without fertility or
-search-hazard weighting; do not apply kinship screening to their hypothetical
-pairs. No unions form for alternate women. Actual matching retains its
-eligibility checks. The adjustment must consume full matching scores rather
-than special-case age or group coefficients.
+The user authorized an optional `matching_method = "two_sided"` experiment on
+`experiment/two-sided-sequential-matching` (D061). A temporary market contains
+M ego-eligible men, M - 1 sampled alternate women, and ego. At each round,
+a fair coin selects the choosing sex, an initiator is sampled uniformly,
+and their partner is drawn with the existing conditional-logit utilities.
+Only ego's outcome is retained. Scores are calculated only for the selected
+remaining row/column, including when the formula uses the R fallback.
+See [two-sided matching](two-sided-matching.md) for the full contract,
+shortage and exclusion rules, worked examples, validation, and timing plan.
 
-The user subsequently proposed probabilistic joint pairing in this temporary
-market, retaining only the initiating woman's outcome. Equal sample sizes are
-intended to include her in a complete matching. The assignment probability law
-is not yet specified or implemented. For probabilities proportional to the
-exponential of summed pair utilities, complete matching of fixed participant
-sets cancels additive female-only and male-only score components. In particular,
-the linear age-gap term cannot affect assignment probabilities conditional on
-the participant sets, and two-group directional count differences are fixed
-by the sampled sex-specific group margins. Randomizing assignments does not
-remove those constraints; preserving the intended parameter meanings remains
-unresolved.
-
-The earlier rescaling rule also remains unresolved. Dividing candidate weights by total
-female-side demand can overcorrect; ordinary IPF with fixed female and male
-marriage margins suppresses directional count differences in a two-group case
-with identical margins. Neither rule is selected. Before implementation,
-resolve the rescaling, insufficient female samples, full-pool sampling,
-other hard restrictions on hypothetical pairs, and applicability to nonmarital
-father choice (which does not remove the man from the available pool).
+This differs from the earlier proposed matrix rescaling or sampling assignments
+in proportion to `exp(sum of utilities)`. Neither rescaling by female demand
+nor fixed-margin IPF was selected. The latter's constraints and the behavior
+of directed and age effects motivated testing a sequential choice mechanism.
+The optional prototype does not establish aggregate odds-ratio recovery,
+preferred age-gap recovery, or balanced inheritance trajectories. Scientific
+assessment remains with the user and the milestone 3 analyses.

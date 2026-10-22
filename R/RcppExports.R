@@ -21,6 +21,14 @@ adjusted_fertility_cpp <- function(rates, birth_interval) {
     .Call(`_hammel_adjusted_fertility_cpp`, rates, birth_interval)
 }
 
+inspect_sequential_matrix_cpp <- function(utility, ego, draws) {
+    .Call(`_hammel_inspect_sequential_matrix_cpp`, utility, ego, draws)
+}
+
+inspect_sequential_matching_cpp <- function(female_born, male_born, female_groups, male_groups, matching, draws, precompute = FALSE) {
+    .Call(`_hammel_inspect_sequential_matching_cpp`, female_born, male_born, female_groups, male_groups, matching, draws, precompute)
+}
+
 inspect_matching_cpp <- function(age_difference, matching, draws) {
     .Call(`_hammel_inspect_matching_cpp`, age_difference, matching, draws)
 }
