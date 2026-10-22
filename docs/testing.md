@@ -33,6 +33,7 @@ The old top-level base-R test scripts have been converted and removed.
 | `test-detailed-unions.R` | Spouse-ID joins, repeated episodes, deaths, optional group types, empty tables, unchanged inputs, and name collisions |
 | `test-model-api.R` | Construction, replacement, schemas, history and metadata retention |
 | `test-baseline-population.R` | Reproducibility, bounds, known cases, distributions, empty populations |
+| `test-ffab.R` | Female-birth probability validation, defaults, endpoint outcomes, RNG isolation, inheritance, independent runs, and restart settings |
 | `test-processes.R` | Rate validation, typed specifications, units, spacing, edited objects |
 | `test-hazard-sampler.R` | Deterministic hazard inversion and analytical survival |
 | `test-fertility-adjustment.R` | Annual/five-year midpoint overlaps, gaps, shared sampler, feasibility, open-age rejection, independent mortality |

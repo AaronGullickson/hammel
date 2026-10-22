@@ -341,7 +341,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   int kinship_generations, bool rate_initiation,
                   DataFrame union_rates, List father_matching,
                   bool cancel_birth_if_no_match, bool diagnostics,
-                  NumericMatrix initial_ancestry, List inheritance) {
+                  NumericMatrix initial_ancestry, List inheritance, double ffab) {
+  if (!R_finite(ffab) || ffab < 0 || ffab > 1)
+    stop("ffab must be a finite probability in [0, 1].");
   // R performs input validation and seed handling. All engine state below is
   // local to this call; public times and rates remain in years and person-years.
   NumericVector ids = persons["person_id"], births = persons["birth_time"];
@@ -605,8 +607,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       // sex; union formation above happens before the newborn exists.
       double mother = people[i].id;
       people[i].last_birth = now;
-      // Use 0.4886 as ffab - its the signature of Berkeley training!
-      bool female = R::runif(0, 1) < 0.4886;
+      // Default ffab is 0.4886 - its the signature of Berkeley training!
+      bool female = R::runif(0, 1) < ffab;
       int child = static_cast<int>(people.size());
       int slot = female ? -1 : static_cast<int>(males.size());
       people.push_back({++next_id, now, NA_REAL, mother, father,

@@ -11,7 +11,8 @@ fertility(
   rates,
   birth_interval = 0.75,
   group_prop_hazard = NULL,
-  inheritance = create_group_inheritance()
+  inheritance = create_group_inheritance(),
+  ffab = 0.4886
 )
 }
 \arguments{
@@ -45,10 +46,13 @@ Fertility defaults to following the mother. Other parental, ancestry,
 hierarchy, and custom rules assign identity after child sex and ancestry
 are calculated. Possible identities are checked against grouped schedules
 and categorical matching levels before execution. Applies to fertility only.}
+
+\item{ffab}{Probability that a newborn is female, default \code{0.4886}.
+Must be a finite numeric scalar in \verb{[0, 1]}. Applies to fertility only.}
 }
 \value{
 A named list containing \code{name}, \code{rates}, and \code{rate_unit}, plus
-\code{birth_interval} for fertility, inheriting
+\code{birth_interval} and \code{ffab} for fertility, inheriting
 from \code{hammel_mortality} or \code{hammel_fertility} and \code{hammel_process}.
 }
 \description{

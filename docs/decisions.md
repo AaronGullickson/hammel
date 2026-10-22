@@ -1069,3 +1069,20 @@ matching specifications override this default. Initiation mode remains explicit.
   complete estimates and should report their nonmissing count.
 - **Validation:** partial/all-missing schedules, zero rates, excluded open
   bands, and isolation across period/group/status strata.
+
+
+## D060: Configurable female fraction at birth
+
+- **Status:** requested and accepted by the user October 22, 2026.
+- **Decision:** add `ffab` to `set_fertility()` and `fertility()`, defaulting
+  to the existing 0.4886. It is a finite scalar probability in `[0, 1]`,
+  applying to every actual birth under that process. Sex precedes group
+  inheritance and newborn scheduling; existing people are unchanged.
+- **Software contract:** append the argument to preserve positional calls;
+  validate at construction, attachment, and execution. Missing fields in older
+  process objects use the original default. Preserve one uniform draw per
+  birth at all probabilities, including endpoints, and record the effective
+  setting in simulation metadata. Default seeded histories remain unchanged.
+- **Scope:** no sex-specific fertility input or group/time-varying sex
+  probabilities are introduced. This does not establish a cause for the
+  inheritance trajectories under investigation.

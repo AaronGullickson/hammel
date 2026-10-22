@@ -18,6 +18,8 @@
 #'   compensation. Without population groups, simulation warns and ignores it.
 #'   Fertility also accepts a named list of vectors for `partnered` and/or
 #'   `unpartnered` when rates include `union_status`; omitted statuses use 1.0.
+#' @param ffab Probability that a newborn is female, default `0.4886`.
+#'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
 #' @param inheritance A group identity model from [create_group_inheritance()],
 #'   or a method name requiring no additional parameters: `"mother"`, `"father"`,
 #'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
@@ -55,7 +57,11 @@ set_process <- function(model, process) {
     } else {
       validate_group_prop_hazard(process$group_prop_hazard)
     }
-    if (name == "fertility") validate_birth_interval(process$birth_interval)
+    if (name == "fertility") {
+      validate_birth_interval(process$birth_interval)
+      if (!"ffab" %in% names(process)) process$ffab <- 0.4886
+      validate_ffab(process$ffab)
+    }
     process$rates <- tibble::as_tibble(process$rates)
   }
   if (name == "union_formation") {
@@ -75,9 +81,10 @@ set_mortality <- function(model, rates, group_prop_hazard = NULL) {
 #' @rdname set_process
 #' @export
 set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard = NULL,
-                          inheritance = create_group_inheritance()) {
+                          inheritance = create_group_inheritance(), ffab = 0.4886) {
   set_process(model, fertility(rates, birth_interval = birth_interval,
-                              group_prop_hazard = group_prop_hazard, inheritance = inheritance))
+                              group_prop_hazard = group_prop_hazard,
+                              inheritance = inheritance, ffab = ffab))
 }
 
 #' Specify age-specific demographic rates
@@ -138,6 +145,8 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #'   `list(partnered = c(A = 1.1, B = 0.9), unpartnered = c(A = 1.05))`.
 #'   An omitted status or group uses 1.0. A single vector applies to both
 #'   statuses (or overall fertility). Status lists require `union_status` rates.
+#' @param ffab Probability that a newborn is female, default `0.4886`.
+#'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
 #' @param inheritance A group identity model from [create_group_inheritance()],
 #'   or a method name requiring no additional parameters: `"mother"`, `"father"`,
 #'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
@@ -146,7 +155,7 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #'   are calculated. Possible identities are checked against grouped schedules
 #'   and categorical matching levels before execution. Applies to fertility only.
 #' @return A named list containing `name`, `rates`, and `rate_unit`, plus
-#'   `birth_interval` for fertility, inheriting
+#'   `birth_interval` and `ffab` for fertility, inheriting
 #'   from `hammel_mortality` or `hammel_fertility` and `hammel_process`.
 #' @export
 #' @examples
@@ -167,14 +176,16 @@ mortality <- function(rates, group_prop_hazard = NULL) {
 #' @rdname mortality
 #' @export
 fertility <- function(rates, birth_interval = 0.75, group_prop_hazard = NULL,
-                      inheritance = create_group_inheritance()) {
+                      inheritance = create_group_inheritance(), ffab = 0.4886) {
   validate_rates(rates, mortality = FALSE)
   validate_fertility_group_prop_hazard(group_prop_hazard, rates)
   inheritance <- normalize_group_inheritance(inheritance)
   validate_birth_interval(birth_interval)
+  validate_ffab(ffab)
   process <- new_rate_process("fertility", rates)
   process$inheritance <- if (is.null(inheritance)) create_group_inheritance() else inheritance
   process$birth_interval <- birth_interval
+  process$ffab <- ffab
   process$group_prop_hazard <- group_prop_hazard
   process
 }
@@ -252,4 +263,13 @@ validate_rates <- function(rates, mortality) {
     }
   }
   invisible(rates)
+}
+
+validate_ffab <- function(probability) {
+  if (!is.numeric(probability) || !is.null(dim(probability)) ||
+      length(probability) != 1L || !is.finite(probability) ||
+      probability < 0 || probability > 1) {
+    stop("`ffab` must be a finite numeric probability in [0, 1].", call. = FALSE)
+  }
+  invisible(probability)
 }

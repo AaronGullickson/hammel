@@ -208,7 +208,22 @@ male partner. These roles are validated for ended and ongoing unions and do
 not imply legal marriage.
 
 Each birth creates one child with a new unique ID above all supplied IDs,
-records the mother, and assigns female sex with probability 0.4886.
+records the mother, and assigns female sex with probability `ffab`, configured
+on `fertility()` / `set_fertility()` (default 0.4886). `ffab` is one finite,
+dimensionless numeric probability in `[0, 1]`, shared by all births in that
+fertility process. Sex is drawn at each actual birth before identity inheritance
+and newborn event scheduling. Each birth retains one uniform sex draw, including
+at probabilities zero and one; cancelled attempts do not draw child sex.
+Changing `ffab` does not change existing people's sex or adjust input fertility
+rates. A restart uses the newly attached fertility setting for subsequent births.
+Older fertility specifications without this field retain the default.
+
+For example, `set_fertility(model, rates, ffab = 0)` produces only male
+newborns, `ffab = 1` only female newborns, and `ffab = 0.5` gives equal
+probabilities per birth, not an exactly balanced realized population. The
+setting is recorded in the latest-run simulation metadata. Validation covers
+invalid and edited specifications, endpoint outcomes in both initiation modes,
+sex-dependent inheritance, RNG isolation, and unchanged seeded default histories.
 A union-formation process is required for every simulation, including zero
 duration. Missing processes are rejected rather than given an implicit default.
 The former milestone 1 path without unions is no longer executable.

@@ -58,7 +58,8 @@ model. An unknown endpoint is allowed for construction, but not execution.
 
 `mortality(rates)` and `fertility(rates, birth_interval = 0.75)` return typed
 `hammel_process` objects with `name`, `rates`, and `rate_unit = "person_year"`.
-Fertility also stores `birth_interval`; source attributes are copied into the
+Fertility also stores `birth_interval` and the female-birth probability `ffab`
+(default 0.4886); source attributes are copied into the
 process when present. `set_process(model, process)` stores a process under its
 own name. The demographic setters construct and attach it in one operation.
 Replacing a process replaces that specification and retains the others.
@@ -93,7 +94,7 @@ histories and existing extra person columns. Newborn group identity follows
 the fertility inheritance model (maternal by default); other custom attributes are
 missing. Group-specific schedules and baseline group sampling are documented in
 [groups](groups.md). The `simulation` component records `start_time`, `end_time`,
-`birth_interval`, `births`, and `deaths` for the latest run.
+`birth_interval`, `ffab`, `births`, and `deaths` for the latest run.
 
 Grouped populations also have an `ancestry` tibble, or may supply it explicitly
 to `hammel_population(ancestry = ...)`. Initialization uses recorded identities

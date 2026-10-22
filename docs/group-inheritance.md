@@ -86,9 +86,11 @@ simulation/global state. Custom functions must handle missing inputs as needed,
 using the mother's group as the fallback. Errors, missing/invalid returns,
 or identities outside the fixed possible set fail explicitly.
 
-Sex is drawn and ancestry calculated before identity assignment. Each custom
-call returns exactly one nonmissing character label or finite numeric code in
-the registry. Synchronize R and native RNG state around calls so ordinary R
+Sex is drawn and ancestry calculated before identity assignment. The female
+birth probability is configured through fertility's `ffab` (default 0.4886);
+the same-sex/opposite-sex rules and custom callbacks use that realized sex.
+Each custom call returns exactly one nonmissing character label or finite
+numeric code in the registry. Synchronize R and native RNG state around calls so ordinary R
 draws participate in the same stream and explicit seeds restore caller state,
 including errors. Assignment finishes before scheduling the newborn. Ancestry
 shares are unaffected by identity assignment. Existing people are not reassigned.

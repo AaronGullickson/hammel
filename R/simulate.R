@@ -88,10 +88,11 @@ simulate <- function(model, years, seed = NULL) {
   }
   # Recheck edited specifications, without introducing a model diagnostic API.
   set_process(model, model$processes$mortality)
-  set_process(model, model$processes$fertility)
+  model <- set_process(model, model$processes$fertility)
   death_rates <- model$processes$mortality$rates
   birth_rates <- model$processes$fertility$rates
   birth_interval <- model$processes$fertility$birth_interval
+  ffab <- model$processes$fertility$ffab
   for (rows in split_rate_groups(death_rates)) {
     for (sex in c("m", "f")) {
       schedule <- death_rates[rows, , drop = FALSE]
@@ -174,7 +175,7 @@ simulate <- function(model, years, seed = NULL) {
                            if (is.null(population[["ancestry"]]))
                              matrix(numeric(), nrow = nrow(engine_persons), ncol = 0L) else
                              as.matrix(population[["ancestry"]][setdiff(names(population[["ancestry"]]), "person_id")]),
-                           inheritance)
+                           inheritance, ffab)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {
@@ -207,7 +208,7 @@ simulate <- function(model, years, seed = NULL) {
   }
   result$end_time <- start + years
   result$simulation <- list(start_time = start, end_time = result$end_time,
-    birth_interval = birth_interval,
+    birth_interval = birth_interval, ffab = ffab,
     births = births, deaths = deaths)
   result$persons <- tibble::as_tibble(result$persons)
   result$unions <- tibble::as_tibble(result$unions)

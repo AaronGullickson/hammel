@@ -134,7 +134,7 @@ test_that("fractional run durations and tibble outputs are supported", {
   result <- simulate(make_model(), 0.123, seed = 42)
   expect_equal(result$end_time, 0.123, tolerance = 0)
   expect_identical(names(result$simulation), c("start_time", "end_time", "birth_interval",
-    "births", "deaths"))
+    "ffab", "births", "deaths"))
   expect_error(simulate(make_model(), -1))
   expect_error(simulate(make_model(), 1, step_duration = 1))
   expect_true(tibble::is_tibble(result$persons))
