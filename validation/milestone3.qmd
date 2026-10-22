@@ -1517,5 +1517,4 @@ sessionInfo()
 
 ## References
 
-TODO: Add sources for rate inputs, matching comparisons, and any custom
-inheritance model evaluated in this report.
+Gullickson, Aaron, and Aliya Saperstein. 2026. "The Dynamics of Population Mixing: A Simulation Approach." Presented at the Annual Meeting of the Population Association of America, St. Louis, MO, May 8, 2026.
