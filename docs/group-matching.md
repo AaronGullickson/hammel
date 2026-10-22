@@ -97,3 +97,41 @@ entry. Tests cover these analytical scores/probabilities, stable factor designs
 and interactions, native/R agreement, malformed or conflicting specifications,
 matching modes and father overrides, diagnostic ranks, reproducibility,
 empty populations, and unchanged behavior without group preferences.
+
+## Two-sided availability investigation (October 22, 2026)
+
+Current selection normalizes scores within each initiating woman's candidate
+set. Symmetric group coefficients do not guarantee equal directional union or
+birth counts with unequal group sizes. The user wants a general correction
+based on availability on both sides, retaining directed preferences and real
+sex-specific availability differences. This is not yet implemented.
+
+The user selected a sampling design for investigation, subsequently refined
+to use M final eligible male candidates and M - 1 alternate living, unpartnered
+women, excluding the initiating woman and using the same age cutoff as male
+candidates. Add the initiating woman to form an `M x M` pair-score matrix.
+Alternate women represent availability without fertility or
+search-hazard weighting; do not apply kinship screening to their hypothetical
+pairs. No unions form for alternate women. Actual matching retains its
+eligibility checks. The adjustment must consume full matching scores rather
+than special-case age or group coefficients.
+
+The user subsequently proposed probabilistic joint pairing in this temporary
+market, retaining only the initiating woman's outcome. Equal sample sizes are
+intended to include her in a complete matching. The assignment probability law
+is not yet specified or implemented. For probabilities proportional to the
+exponential of summed pair utilities, complete matching of fixed participant
+sets cancels additive female-only and male-only score components. In particular,
+the linear age-gap term cannot affect assignment probabilities conditional on
+the participant sets, and two-group directional count differences are fixed
+by the sampled sex-specific group margins. Randomizing assignments does not
+remove those constraints; preserving the intended parameter meanings remains
+unresolved.
+
+The earlier rescaling rule also remains unresolved. Dividing candidate weights by total
+female-side demand can overcorrect; ordinary IPF with fixed female and male
+marriage margins suppresses directional count differences in a two-group case
+with identical margins. Neither rule is selected. Before implementation,
+resolve the rescaling, insufficient female samples, full-pool sampling,
+other hard restrictions on hypothetical pairs, and applicability to nonmarital
+father choice (which does not remove the man from the available pool).

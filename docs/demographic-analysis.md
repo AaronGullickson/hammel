@@ -186,6 +186,27 @@ components of the overall TFR. Tables without status retain their existing
 behavior; default Lexis summaries use all female exposure, while
 `include_unions = TRUE` also returns status-specific exposure as described below.
 
+## Parent information
+
+`get_parent_info(population)` enriches the full persons table with
+`age_mother` and `age_father` at each person's birth, in years, and
+`group_mother` and `group_father` when the population records groups.
+Parents are matched by ID, including deceased parents. Unknown parents yield
+missing values; founder rows remain present. For example, birth in 2000.5
+and maternal birth in 1975.25 give `age_mother = 25.25`.
+
+```r
+parent_info <- get_parent_info(result)
+cross_group_births <- parent_info |>
+  dplyr::filter(!is.na(group_mother), !is.na(group_father),
+                group_mother != group_father)
+```
+
+All original person rows and columns are preserved, as are group types.
+Conflicting names cause an error. Empty populations return the enriched
+zero-row tibble. No endpoint is required and the population is not modified.
+Parent groups are recorded identities, not reconstructed past transitions.
+
 ## Union exposure and formation counts
 
 ### Detailed union records

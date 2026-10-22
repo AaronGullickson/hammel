@@ -158,6 +158,19 @@ records and appending each partner's birth/death time and optional group, with
 `_w` and `_h` suffixes. It joins by partner IDs, preserves types and row order,
 and leaves the population unchanged. See [demographic analysis](demographic-analysis.md).
 
+`get_parent_info(population)` returns a separate tibble preserving all persons
+and their columns, adding `age_mother` and `age_father` in years at each
+person's birth, plus `group_mother` and `group_father` when groups are recorded.
+Parents are matched by ID, including deceased parents; unknown parents yield
+missing fields. Row order and group types are preserved, conflicting column
+names are rejected, and no endpoint is required. For example, a person born
+in 2000.5 whose mother was born in 1975.25 has `age_mother = 25.25`.
+Founders with unknown parents retain their rows with missing parent fields;
+an empty population retains the enriched schema. These are recorded identities,
+not reconstructions of past group transitions. Validation uses shuffled IDs,
+fractional ages, siblings, unknown/deceased parents, optional groups, empty
+tables, and unchanged inputs.
+
 `calculate_lexis_counts(by_group = TRUE)` and
 `calculate_population_size(by_group = TRUE)` optionally split observations by
 recorded group. The native count kernels retain full histories and add a group
