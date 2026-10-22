@@ -27,6 +27,7 @@ library(tidyr)
 library(readr)
 library(purrr)
 library(tibble)
+library(stringr)
 library(ggplot2)
 library(gt)
 library(survival)
@@ -1202,53 +1203,275 @@ Check effects of candidate scarcity in small populations.
 
 ## Evaluate Group Inheritance
 
+### Built-in methods
+
+To evaluate the built-in methods, I will run simulations with two ueven groups (A = 75%; B = 25%). Groups will share all rate schedules such that their share should remain the same across the simulation, apart from differences in inheritance rules. Exogamy will be symmetric and somewhat low (-2.5). 
+
+```{r}
+#| label: setup-inheritance-model
+
+pop_baseline_inheritance <- create_baseline_population(50000, max_age = 100, 2000, group_weights = c("A" = 3, "B" = 1))
+
+model_inheritance <- hammel_model() |>
+  set_population(pop_baseline_inheritance) |>
+  set_mortality(mortality_rates_usa2000) |>
+  set_union_formation(
+    "on_demand",
+    matching = create_age_gap_matching_model(0, 5, group_exogamy = c("A::B" = -2.5))
+  )
+```
+
+I will then try each of the built in methods. For the hierarchy case, I will use a strict hierarchy where B > A and passing = 0 and a less strict hierarchy where passing = 0.05. 
+
+```{r}
+#| label: set-inheritance-scenarios
+
+inheritance_scenarios <- c("mother", "father", "random_parent", "same_sex", "opposite_sex", "ancestry", 
+                           "hierarchy_strict", "hierarchy_passing")
+```
+
+To keep overall run time down, I will only run 20 simulations for each case. For each simulation, we will track two measures in the final simulated living population of each simulation: 
+
+- Mean group shares of the population
+- Mean ancestry shares conditional on group identity
+
+```{r}
+#| label: run-inheritance-simulations
+
+df_inheritance <- map(inheritance_scenarios, function(scenario) {
+
+  if (str_detect(scenario, "^hierarchy")) {
+    if(scenario == "hierarchy_strict") {
+      model <- model_inheritance |>
+        set_fertility(
+          fertility_rates_overall_usa, 
+          inheritance = create_group_inheritance("hierarchy", order = c("B", "A"))
+        )
+    } else {
+      model <- model_inheritance |>
+        set_fertility(
+          fertility_rates_overall_usa, 
+          inheritance = create_group_inheritance("hierarchy", order = c("B", "A"), passing = 0.05)
+        )
+    }
+  } else {
+    model <- model_inheritance |>
+      set_fertility(fertility_rates_overall_usa, inheritance = scenario)
+  }
+
+  results <- map(replication_seeds[1:20], function(seed) {
+    simulate(model, years = years, seed = seed)
+  })
+  
+  share <- results |>
+    map(calculate_population_size, times = 2100, by_group = TRUE) |>
+    bind_rows(.id = "replication") |>
+    group_by(replication) |>
+    mutate(prop = population / sum(population)) |>
+    ungroup() |>
+    group_by(group) |>
+    summarize(
+      share_mean = mean(prop),
+      share_sd = sd(prop),
+      share_n = n(),
+      share_se = share_sd / sqrt(share_n),
+      .groups = "drop"
+    ) |> 
+    select(group, share_mean, share_se)
+
+
+  ancestry <- results |>
+    map(function(result) {
+      result$persons |>
+        filter(is.na(death_time)) |>
+        left_join(result$ancestry, by = "person_id") |>
+        group_by(group) |>
+        summarize(ancestry_A = mean(group_A), ancestry_B = mean(group_B), .groups = "drop")
+    }) |>
+    bind_rows(.id = "replication") |>
+    group_by(group) |>
+    summarize(
+      n = n(),
+      ancestry_A_mean = mean(ancestry_A),
+      ancestry_A_sd = sd(ancestry_A),
+      ancestry_A_se = ancestry_A_sd / sqrt(n),
+      ancestry_B_mean = mean(ancestry_B),
+      ancestry_B_sd = sd(ancestry_B),
+      ancestry_B_se = ancestry_B_sd / sqrt(n),
+      .groups = "drop"
+    ) |>
+    select(group, ancestry_A_mean, ancestry_A_se, ancestry_B_mean, ancestry_B_se)
+
+  full_join(share, ancestry, by = "group") |> mutate(scenario = scenario)
+}) |>
+  bind_rows()
+```
+
+I have the following expectations by inheritance method:
+
+- `mother`, `father`, `random_parent`, `same_sex`, and `different_sex` should all produce similar results with group size shares at the end that roughly match the start and similar ancestry shares where more A ancestry in group B than B ancestry in Group A.
+- strict `hierarchy` (B > A) should cause the B group to grow relative to A. A individuals will have no B ancestry but B individuals will have more A ancestry than in other rules. Somewhat similar results with passing but moderated and A individuals will have a little B ancestry.
+- I think ancestry based approach should favor the larger group A. A should become larger share and B individuals will contain more A ancestry than vice versa.
+
+```{r}
+#| label: fig-ending-group-pop
+#| fig-cap: Mean proportion of group B in final simulated population across inheritance scenarios, with 20 simulations per scenario. 95% confidence intervals shown. Dotted line shows the share B in the starting population.
+
+start_share <- mean(pop_baseline_inheritance$persons$group == "B")
+
+df_inheritance |>
+  filter(group == "B") |>
+  ggplot(aes(x = scenario, y = share_mean))+
+  geom_hline(yintercept = start_share, linetype = 2)+
+  geom_point()+
+  geom_linerange(aes(ymin = share_mean - 1.96 * share_se, ymax = share_mean + 1.96 * share_se))+
+  coord_flip()+
+  theme_bw()
+```
+
+```{r}
+#| label: fig-other-ancestry-share
+#| fig-cap: Mean share of non-identifying ancestry for Group A and B individuals in the final simulated population across inheritance scenarios. 95% confidence intervals shown.
+
+df_inheritance |>
+  mutate(
+    ancestry_other = if_else(group == "A", ancestry_B_mean, ancestry_A_mean),
+    se = if_else(group == "A", ancestry_B_se, ancestry_A_se)
+  ) |>
+  ggplot(aes(x = scenario, y = ancestry_other, group = group, color = group))+
+  geom_point()+
+  geom_linerange(aes(ymin = ancestry_other - 1.96 * se, ymax = ancestry_other + 1.96 * se))+
+  coord_flip()+
+  theme_bw()
+```
+
+The results for hierarchy and ancestry match expectations, but there are differences between the other scenarios that I didn't expect. The same sex, random parent, and opposite sex methods all produce about the same ancestry shares but not the same group shares. Father and mother are different on all of them. What is going on here? Could this be a result of the female driven union formation process? Could the same and opposite sex differences be related to ffab? This needs further exploration.
+
+One thing we could do is track share of births to B mothers and A fathers vs vice versa to see if there is a difference there.
+
 ### Custom rules and mixed identities
 
-<!-- Check predicted versus observed assignment probabilities among eligible simulated
-births, excluding founders and separating deterministic early-return cases.
-Include declared AB identities, their schedules, and birth-time union status.
-For ancestry models, use the same known-ancestry normalization as the callback;
-mean ancestry within identities is not the assignment probability conditional
-on ancestry. Record the actual custom function and coefficients used. --> 
+To test out the custom rules and the emergence of mixed identities, I will use one of the multinomial logit models developed by Gullickson and Saperstein (2025) to assign births based on the share of A ancestry. This will only be applied to births whose parents differ in their own identities (otherwise assign the shared parental identity). The model will maximize the probability of identifying as AB at about 70% when the proportion of A ancestry is 50%. As that proportion moves toward either 0% or 100%, this probability will gradually decline and the probability of identifying with the dominant ancestry will increase.
 
-Run two uneven group models with symmetric exogamy and different inheritance terms. Run only 20 per case to keep total time down. For hierarchy run with 0 passing and 5% passing.
-
-What are we checking
-
-- Group size at the end of the sim
-- Mean ancestry shares conditional group identity
-
-What are the expectations
-
-- mother, father, random parent, same sex, and different sex should all produce similar results with group size shares at the end that roughly match the start and similar ancestry shares where more A ancestry in group B than B ancestry in Group A.
-- strict hierarchy (B > A) should cause the B group to grow relative to A. A individuals will have no B ancestry but B individuals will have more A ancestry than in other rules. Somewhat similare results with passing but moderated and A individuals will have a little B ancestry.
-- I think ancestry based approach should favor the larger group A. A should become larger share and A individuals will contain more B ancestry than vice versa. 
+I will run one simulation with an even group distribution between A and B at the start for 200 years using this custom inheritance model.
 
 ```{r}
-#| label: inheritance-results
-# TODO: Predicted/observed assignments and identity/ancestry distributions.
+#| label: run-custom-inheritance
+
+# custom function
+custom_inheritance <- create_group_inheritance(
+  "custom",
+  groups = c("A", "B", "AB"),
+  fun = function(child_ancestry, mother_group, father_group, ...) {
+    # Same identity or missing father: follow mother
+    if (is.na(father_group) || mother_group == father_group) {
+      return(mother_group)
+    }
+
+    # Entirely unknown ancestry: follow mother
+    known <- 1 - child_ancestry[["unknown"]]
+    if (known <= 0) return(mother_group)
+
+    # if we are here then assign as a function of group A ancestry
+    prop_A <- child_ancestry[["group_A"]] / known
+
+    logits <- c(
+      A  = -5.138 + 11.88 * prop_A - 15.3 * prop_A^2 + 9.553 * prop_A^3,
+      B  = 0.949 - 9.39 * prop_A + 11.935 * prop_A^2 - 8.483 * prop_A^3,
+      AB = 0
+    )
+    weights <- exp(logits - max(logits))
+
+    sample(names(weights), size = 1, prob = weights)
+  }
+)
+
+pop_baseline_custom <- create_baseline_population(50000, max_age = 100, 2000, group_weights = c("A" = 1, "B" = 1))
+
+model_custom <- hammel_model() |>
+  set_population(pop_baseline_custom) |>
+  set_mortality(mortality_rates_usa2000) |>
+  set_fertility(fertility_rates_overall_usa, inheritance = custom_inheritance) |>
+  set_union_formation(
+    "on_demand",
+    matching = create_age_gap_matching_model(
+      0, 5, group_exogamy = c("A::B" = -2.5, "A::AB" = -1.25, "B::AB" = -1.25)
+    )
+  )
+
+result_custom <- simulate(model_custom, 200, seed = 42)
 ```
-
-### Investigate paternal-inheritance population trajectories
-
-Exploratory separate unseeded runs suggested that paternal inheritance reduced
-the minority share more than maternal inheritance and changed off-identity
-ancestry. No systematic difference or cause has been established; sampling
-noise remains possible.
-
-Compare simple inheritance rules over replications with equal and unequal
-starting group sizes. Report population shares, sex composition, and uncertainty.
-If a difference persists, examine cross-group births by parental direction,
-partnership availability by sex/group, and births per union. Minority status
-alone does not imply unequal partner availability for minority men and women.
-Do not attribute a difference to `ffab` or female-driven matching without evidence.
-The current birth sex probability is part of the recorded model; alternative
-values would require a separately specified experiment.
 
 ```{r}
-#| label: paternal-inheritance-investigation
-# TODO: Replicated trajectories and contrasts; investigate mechanisms if needed.
+#| label: fig-group-share-custom-inheritance
+#| fig-cap: Group share across time in custom inheritance simulation
+
+result_custom |>
+  calculate_population_size(2000:2200, by_group = TRUE) |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ggplot(aes(x = time, y = prop, group = group, fill = group))+
+  geom_area()+
+  labs(x = "year", y = "share of population")+
+  theme_bw()
 ```
+
+@fig-group-share-custom-inheritance shows the emergence of the mixed AB identity group over the simulation. Because the probability of mixed group identification is high, this population grows at the expense of both A and B. 
+
+```{r}
+#| label: fig-custom-inheritance-prob
+#| fig-cap: Probability of group assignment as a function of proportion A ancestry among births to parents belonging to different groups for all births in a single simulation. Proportion A ancestry is plotted in 10 percent bins by the midpoint of the bin. 95% confidence intervals shown. The dotted line shows the expected probability from the inheritance model.
+
+temp <- tibble(
+  prop_A = seq(0.005, 0.995, 0.005),
+  logit_A = -5.138 + 11.88 * prop_A - 15.3 * prop_A^2 + 9.553 * prop_A^3,
+  logit_B = 0.949 - 9.39 * prop_A + 11.935 * prop_A^2 - 8.483 * prop_A^3,
+  denom = exp(logit_A) + exp(logit_B) + exp(0),
+  prob_A = exp(logit_A)/denom,
+  prob_B = exp(logit_B)/denom,
+  prob_AB = exp(0)/denom
+) |>
+  select(prop_A, starts_with("prob_")) |>
+  pivot_longer(cols = starts_with("prob_"), names_prefix = "prob_", names_to = "group", values_to = "prop") |>
+  rename(prop_a_group = prop_A)
+
+result_custom$persons |>
+  left_join(result_custom$ancestry, by = "person_id") |>
+  left_join(
+    result_custom$persons |> 
+      select(person_id, group) |> 
+      rename(father_id = person_id, group_father = group),
+    by = "father_id"
+  ) |>
+  left_join(
+    result_custom$persons |> 
+      select(person_id, group) |> 
+      rename(mother_id = person_id, group_mother = group),
+    by = "mother_id"
+  ) |>
+  filter(!is.na(group_father) & !is.na(group_mother) &
+    group_father != group_mother) |>
+  mutate(
+    prop_a_group = cut(
+      group_A,
+      breaks = seq(0, 1, 0.1),
+      labels = FALSE,
+      include.lowest = TRUE
+    ) * 0.1 - 0.05
+  ) |>
+  group_by(prop_a_group, group) |>
+  summarize(n = n()) |>
+  mutate(prop = n / sum(n), se = sqrt(prop * (1 - prop) / n)) |>
+  ungroup() |>
+  ggplot(aes(x = prop_a_group, y = prop, group = group, color = group))+
+  geom_line(data = temp, linetype = 2)+
+  geom_point()+
+  geom_linerange(aes(ymin = prop - 1.96 * se, ymax = prop + 1.96 * se))+
+  labs(x = "proportion A ancestry", y = "probability of group identity")+
+  theme_bw()
+```
+
+@fig-custom-inheritance-prob shows the observed probability of being assigned to a given group as a function of share of A ancestry for births to parents from different groups. The dotted line shows the expected probabilities from the model. The results line up closely to expectation and all 95% confidence intervals contain the expected value.
 
 ## Speed Tests
 
