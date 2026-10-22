@@ -254,67 +254,58 @@ int draw_partner_position(const NumericVector& probabilities) {
 }
 
 // Local hypothetical markets never mutate population or event state.
-struct SequentialResult { int man = -1, steps = 0, chooser = -1; double scored = 0; };
+struct TwoSidedResult { int man = -1, steps = 0, chooser = -1; double scored = 0; };
 
 template <typename Score>
-SequentialResult draw_sequential_market(int nw, int nm, int ego, Score score) {
-  SequentialResult result;
+TwoSidedResult draw_two_sided_market(int nw, int nm, int ego, Score score) {
+  TwoSidedResult result;
+  if (!nw || !nm) return result;
   std::vector<int> women(nw), men(nm);
   for (int i = 0; i < nw; ++i) women[i] = i;
   for (int j = 0; j < nm; ++j) men[j] = j;
-  std::vector<int> alternatives;
-  std::vector<double> utilities;
-  while (!women.empty() && !men.empty()) {
-    if (result.steps++ % 64 == 0) checkUserInterrupt();
-    const bool female_chooses = R::runif(0, 1) < 0.5;
-    const int count = female_chooses ? women.size() : men.size();
-    const int initiator = std::min(count - 1, static_cast<int>(R::runif(0, 1) * count));
-    const int options = female_chooses ? men.size() : women.size();
-    alternatives.clear(); utilities.clear();
-    const NumericVector values = score(women, men, female_chooses, initiator);
-    if (values.size() != options) stop("Temporary matching returned the wrong number of scores.");
-    for (int k = 0; k < options; ++k) {
-      const double value = values[k];
+  std::vector<double> column_max(nm, R_NegInf), column_sum(nm, 0), ego_score(nm);
+  for (int i = 0; i < nw; ++i) {
+    if (i % 64 == 0) checkUserInterrupt();
+    const NumericVector values = score(women, men, true, i);
+    if (values.size() != nm) stop("Temporary matching returned the wrong number of scores.");
+    for (int j = 0; j < nm; ++j) {
+      const double value = values[j];
       ++result.scored;
-      if (value == R_NegInf) continue; // A hard group exclusion, not a utility.
+      if (i == ego) ego_score[j] = value;
+      if (value == R_NegInf) continue;
       if (!R_finite(value)) stop("Temporary matching utilities must be finite or excluded.");
-      alternatives.push_back(k); utilities.push_back(value);
+      if (value > column_max[j]) {
+        column_sum[j] = column_sum[j] * std::exp(column_max[j] - value) + 1;
+        column_max[j] = value;
+      } else column_sum[j] += std::exp(value - column_max[j]);
     }
-    if (alternatives.empty()) {
-      // Ego has all retained men eligible. Only an alternate can leave here
-      // during simulation; general diagnostic matrices can also isolate ego.
-      if (female_chooses) {
-        if (women[initiator] == ego) return result;
-        women[initiator] = women.back(); women.pop_back();
-      } else { men[initiator] = men.back(); men.pop_back(); }
-      continue;
-    }
-    const double maximum = *std::max_element(utilities.begin(), utilities.end());
-    double total = 0;
-    for (double& value : utilities) { value = std::exp(value - maximum); total += value; }
-    const double draw = R::runif(0, 1) * total;
-    double cumulative = 0;
-    int selected = -1;
-    for (size_t k = 0; k < utilities.size(); ++k) {
-      if (utilities[k] > 0) selected = k;
-      cumulative += utilities[k];
-      if (draw < cumulative) { selected = k; break; }
-    }
-    const int chosen = alternatives[selected];
-    const int wi = female_chooses ? initiator : chosen;
-    const int mj = female_chooses ? chosen : initiator;
-    if (women[wi] == ego) {
-      result.man = men[mj]; result.chooser = female_chooses ? 0 : 1;
-      return result;
-    }
-    women[wi] = women.back(); women.pop_back();
-    men[mj] = men.back(); men.pop_back();
   }
+  const double maximum = *std::max_element(ego_score.begin(), ego_score.end());
+  if (maximum == R_NegInf) return result;
+  double row_sum = 0;
+  for (double value : ego_score) row_sum += std::exp(value - maximum);
+  std::vector<double> weights(nm);
+  double total = 0;
+  for (int j = 0; j < nm; ++j) {
+    if (ego_score[j] == R_NegInf) continue;
+    const double a = std::exp(ego_score[j] - maximum) / row_sum;
+    const double b = std::exp(ego_score[j] - column_max[j]) / column_sum[j];
+    // Equal pool sizes in production; factors also support rectangular diagnostics.
+    weights[j] = a / nw + b / nm;
+    total += weights[j];
+  }
+  const double draw = R::runif(0, 1) * total;
+  double cumulative = 0;
+  for (int j = 0; j < nm; ++j) {
+    if (weights[j] > 0) result.man = j;
+    cumulative += weights[j];
+    if (draw < cumulative) break;
+  }
+  result.steps = 1; // One integrated draw; no initiator is sampled.
   return result;
 }
 
-// Native and R models receive only the selected row/column choice vector.
-// Scores use the alternatives remaining in that round, not the whole market.
+// Evaluate each fixed female row once; reuse its scores in both normalizations.
 class TemporaryScores {
   NumericVector female_born, male_born, quadratic;
   IntegerVector female_groups, male_groups;
@@ -376,7 +367,7 @@ class TemporaryScores {
 
 // Internal deterministic-market entry points use the actual simulation kernel.
 // [[Rcpp::export]]
-List inspect_sequential_matrix_cpp(NumericMatrix utility, int ego, int draws) {
+List inspect_two_sided_matrix_cpp(NumericMatrix utility, int ego, int draws) {
   if (ego < 1 || ego > utility.nrow() || draws < 0) stop("Invalid ego or number of draws.");
   for (double value : utility)
     if (!R_finite(value) && value != R_NegInf) stop("Utilities must be finite or -Inf for exclusions.");
@@ -384,7 +375,7 @@ List inspect_sequential_matrix_cpp(NumericMatrix utility, int ego, int draws) {
   NumericVector scored(draws);
   for (int k = 0; k < draws; ++k) {
     if (k % 1024 == 0) checkUserInterrupt();
-    auto result = draw_sequential_market(utility.nrow(), utility.ncol(), ego - 1,
+    auto result = draw_two_sided_market(utility.nrow(), utility.ncol(), ego - 1,
       [&](const std::vector<int>& women, const std::vector<int>& men, bool female, int initiator) {
         NumericVector values(female ? men.size() : women.size());
         for (R_xlen_t k = 0; k < values.size(); ++k)
@@ -399,7 +390,7 @@ List inspect_sequential_matrix_cpp(NumericMatrix utility, int ego, int draws) {
 }
 
 // [[Rcpp::export]]
-List inspect_sequential_matching_cpp(NumericVector female_born, NumericVector male_born,
+List inspect_two_sided_matching_cpp(NumericVector female_born, NumericVector male_born,
                                     IntegerVector female_groups, IntegerVector male_groups,
                                     List matching, int draws, bool precompute = false) {
   if (!female_born.size() || draws < 0) stop("Need ego and a nonnegative number of draws.");
@@ -422,7 +413,7 @@ List inspect_sequential_matching_cpp(NumericVector female_born, NumericVector ma
         grid.insert(grid.end(), row.begin(), row.end());
       }
     }
-    auto result = draw_sequential_market(female_born.size(), male_born.size(), 0,
+    auto result = draw_two_sided_market(female_born.size(), male_born.size(), 0,
       [&](const std::vector<int>& women, const std::vector<int>& men, bool female, int initiator) {
         if (!precompute) return scores.choice(women, men, female, initiator);
         NumericVector values(female ? men.size() : women.size());
@@ -709,7 +700,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       mb[k] = people[males[eligible[k]]].born; mg[k] = people[males[eligible[k]]].group;
     }
     TemporaryScores scores(fb, mb, fg, mg, choice_model);
-    const auto outcome = draw_sequential_market(market_size, market_size, 0,
+    const auto outcome = draw_two_sided_market(market_size, market_size, 0,
       [&](const std::vector<int>& women, const std::vector<int>& men, bool female, int initiator) {
         return scores.choice(women, men, female, initiator);
       });

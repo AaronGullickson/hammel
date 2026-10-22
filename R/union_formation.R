@@ -290,8 +290,9 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' Candidate sets will not be retained in simulation outputs.
 #'
 #' Experimental `matching_method = "two_sided"` adds alternate women to a
-#' temporary market after ego's male eligibility screening. Only the selected
-#' remaining row/column is scored at each round, including for R formulas.
+#' temporary market after ego's male eligibility screening. Each fixed female
+#' row is scored once, including for R formulas; row and column probabilities
+#' are combined for one partner draw.
 #' Hard group exclusions apply to hypothetical pairs; kinship applies only to
 #' ego. If fewer alternate women exist, randomly reduce the eligible men to
 #' keep the initial market square. Only ego's final outcome changes real state.
@@ -343,9 +344,9 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   Requires `initiation = "rate"`; on-demand formation has no search hazard.
 #'   Matching utilities and input rate tables are unchanged.
 #' @param matching_method `"female_choice"` (default) for existing ego-only
-#'   choice, or experimental `"two_sided"` for sequential temporary markets.
+#'   choice, or experimental `"two_sided"` for fixed-pool two-sided probabilities.
 #'   The latter samples alternate unpartnered women with the male age cutoff,
-#'   randomly selects the choosing sex each round, and stops when ego matches.
+#'   combines ego-choice and male-choice probabilities without removing pairs.
 #'   It applies to union formation and nonmarital father selection. Temporary
 #'   pairs never change population state. Aggregate parameter recovery is under
 #'   investigation; the method can cost quadratic work in candidate sample size.

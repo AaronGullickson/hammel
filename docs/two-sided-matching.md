@@ -1,4 +1,4 @@
-# Experimental sequential two-sided matching
+# Experimental fixed-pool two-sided matching
 
 Authorized for implementation and investigation October 22, 2026 on
 `experiment/two-sided-sequential-matching`, branched from `milestone3-groups`
@@ -20,7 +20,7 @@ All scores use the existing matching model: continuous male age minus female
 age, fixed female/male group orientation, and additive directed/symmetric
 pair effects. No conversion of utility coefficients into equilibrium margins
 is performed. Finite utilities give conditional probabilities proportional to
-`exp(utility - max(utility))` among the remaining allowed alternatives.
+`exp(utility - max(utility))` among the fixed allowed alternatives.
 
 ## Sampling and eligibility
 
@@ -35,10 +35,10 @@ is performed. Finite utilities give conditional probabilities proportional to
 4. With M eligible men, sample M - 1 alternate women without replacement.
    If there are too few women, uniformly reduce the eligible men to one plus
    the number of available alternate women, then sample that many women.
-   Ego plus alternates and the retained men form a square initial market.
+   Ego plus alternates and the retained men form a square fixed market.
 5. Enforce hard group exclusions for every hypothetical pair. Do not apply
    kinship screening to alternate women. All retained men were screened for
-   ego, so her row always has an allowed alternative while she is present.
+   ego, so her row always has an allowed alternative.
 
 Alternate women may themselves have children or prior ended unions. Their
 only pool conditions are living, unpartnered, and the common age cutoff.
@@ -48,40 +48,40 @@ available at their cutoff birthday, without requiring a demographic event at
 that birthday. Pool state belongs to each simulation call and is reconstructed
 on restart.
 
-## Temporary pairing
+## Fixed-pool probability calculation
 
-At each round:
+The user authorized replacing sequential depletion on October 22, 2026.
+Keep the sampled market fixed. Calculate each allowed pair's utility U[i,j],
+with women as rows and men as columns. Hard exclusions have zero weight.
+Normalize ego's row to obtain a[j] = P(ego chooses man j). Normalize each
+column across women to obtain b[j] = P(man j chooses ego). Draw once with
+probabilities (a[j] + b[j]) / sum(a + b).
 
-1. Draw a fair independent coin for female or male choice.
-2. Uniformly select one remaining person of that sex.
-3. Draw a partner using conditional-logit probabilities over their remaining
-   allowed alternatives. When a man chooses, score each candidate woman with
-   female-first group orientation and male-minus-female age gaps.
-4. If an alternate woman has no allowed men remaining, remove only her from
-   the temporary market and continue; she remains actually unpartnered.
-5. If ego is in the selected pair, stop and return the selected man. Otherwise
-   remove both participants from the temporary market and continue.
+This exactly integrates repeated rounds that flip a fair sex coin, uniformly
+select an initiator, and draw a conditional-logit partner, stopping when ego
+is involved. Non-ego pairs are discarded without removing anyone. Equal pool
+sizes make the common initiator factor cancel. A person with no allowed
+partners produces no pair in a hypothetical round; they remain in the pool.
+Ego's eligible row ensures termination with probability one. No hypothetical
+pairs are actually generated, and only one uniform partner draw is consumed.
 
-There are no actual unions, parent links, removals, spacing changes, or event
-rescheduling for hypothetical pairs. Only ego's returned match is used by the
-existing union/father-selection event. Nonmarital father selection still does
-not form a union or remove the father from actual availability.
+Scores retain female-first group orientation and male-minus-female age gaps.
+For custom R formulas, evaluate each woman's full allowed male vector once;
+use those same fixed utilities for both normalizations. Data-dependent
+transforms therefore operate within each woman's allowed row, never on a
+changing vector or separately re-evaluated column. Female-only score terms
+remain relevant to column probabilities. Row and column sums use stable
+log-scale accumulation; no full matrix allocation is necessary.
 
-If one man and ego remain, the same round/draw procedure is used; there is no
-special deterministic last-pair shortcut. All sampling uses R's RNG within the
-existing seed-isolation contract. Experimental histories need not match the
-female-choice method. Explicit/default female choice must preserve existing
-seeded histories and RNG consumption.
+No hypothetical outcome changes unions, parent links, availability, spacing,
+or event schedules. Only ego's returned match changes actual state through
+the existing event. Nonmarital father selection still creates no union.
+Default female choice retains its existing seeded histories and RNG consumption;
+the experimental method changes histories relative to the prior prototype.
 
-Common native linear/quadratic age scores and group offsets can be evaluated
-on demand for the selected row/column without allocating a full matrix.
-For a general R formula, pass only the selected person's remaining allowed
-row/column alternatives to the R evaluator, once per choice. No full-market
-information is exposed to the formula. Data-dependent transforms therefore
-operate on that round's choice vector, just as in ordinary ego-only selection. Female-only terms can affect
-male-initiated choices and must not be removed as row constants; the formula
-intercept still cancels within every choice. Custom native/fallback parity
-is tested for pointwise-equivalent formulas.
+Worked two-by-two example: pair weights [[1,3],[2,4]] give ego's row
+probabilities [1/4,3/4] and men's probabilities of choosing ego [1/3,3/7].
+Adding and normalizing gives partner probabilities [49/148,99/148].
 
 ## Observations and examples
 
@@ -91,13 +91,12 @@ eligible set using ego's original utilities. Diagnostics do not change draws.
 No temporary market histories are added to public population tables.
 
 - With one eligible man and no alternate women, ego selects that man.
-- With two men and one alternate woman, either sex may choose. A hypothetical
-  pair removes only its local participants; the remaining actual persons and
-  their event schedules are unchanged.
+- With two men and one alternate woman, the combined probabilities reflect
+  both choosing directions without generating hypothetical pairs.
 - With three eligible men but only one alternate woman available, randomly
   retain two men and use the resulting two-by-two market.
 - With a B ego, only B men eligible under strict endogamy, and an A alternate,
-  the alternate may leave unmatched. Ego can still select a B man.
+  the alternate has zero weight in those columns. Ego can still select a B man.
 
 ## Validation and benchmarking
 
@@ -121,9 +120,7 @@ synthetic optimized-build timings. The measured October 22 results and raw
 tables are recorded in
 [the timing assessment](../validation/two_sided_matching_benchmark.md).
 
-Worst-case score work is quadratic in market size; early termination at ego's
-match reduces work in individual searches. Native score evaluation uses linear
-scratch storage, as does the R formula fallback (with an R evaluation per
-round that has allowed alternatives). Full-pool
-sampling can be expensive. Measure overhead rather than infer it solely from
-complexity.
+Score work is quadratic in market size, with linear scratch storage and one
+R evaluation per nonempty female row for custom formulas. There is no iterative
+matching or early termination. Historical sequential timings in the timing
+assessment describe the superseded prototype; compare against fresh measurements.

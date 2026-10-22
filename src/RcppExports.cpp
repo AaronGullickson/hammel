@@ -80,22 +80,22 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// inspect_sequential_matrix_cpp
-List inspect_sequential_matrix_cpp(NumericMatrix utility, int ego, int draws);
-RcppExport SEXP _hammel_inspect_sequential_matrix_cpp(SEXP utilitySEXP, SEXP egoSEXP, SEXP drawsSEXP) {
+// inspect_two_sided_matrix_cpp
+List inspect_two_sided_matrix_cpp(NumericMatrix utility, int ego, int draws);
+RcppExport SEXP _hammel_inspect_two_sided_matrix_cpp(SEXP utilitySEXP, SEXP egoSEXP, SEXP drawsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< NumericMatrix >::type utility(utilitySEXP);
     Rcpp::traits::input_parameter< int >::type ego(egoSEXP);
     Rcpp::traits::input_parameter< int >::type draws(drawsSEXP);
-    rcpp_result_gen = Rcpp::wrap(inspect_sequential_matrix_cpp(utility, ego, draws));
+    rcpp_result_gen = Rcpp::wrap(inspect_two_sided_matrix_cpp(utility, ego, draws));
     return rcpp_result_gen;
 END_RCPP
 }
-// inspect_sequential_matching_cpp
-List inspect_sequential_matching_cpp(NumericVector female_born, NumericVector male_born, IntegerVector female_groups, IntegerVector male_groups, List matching, int draws, bool precompute);
-RcppExport SEXP _hammel_inspect_sequential_matching_cpp(SEXP female_bornSEXP, SEXP male_bornSEXP, SEXP female_groupsSEXP, SEXP male_groupsSEXP, SEXP matchingSEXP, SEXP drawsSEXP, SEXP precomputeSEXP) {
+// inspect_two_sided_matching_cpp
+List inspect_two_sided_matching_cpp(NumericVector female_born, NumericVector male_born, IntegerVector female_groups, IntegerVector male_groups, List matching, int draws, bool precompute);
+RcppExport SEXP _hammel_inspect_two_sided_matching_cpp(SEXP female_bornSEXP, SEXP male_bornSEXP, SEXP female_groupsSEXP, SEXP male_groupsSEXP, SEXP matchingSEXP, SEXP drawsSEXP, SEXP precomputeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -106,7 +106,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< List >::type matching(matchingSEXP);
     Rcpp::traits::input_parameter< int >::type draws(drawsSEXP);
     Rcpp::traits::input_parameter< bool >::type precompute(precomputeSEXP);
-    rcpp_result_gen = Rcpp::wrap(inspect_sequential_matching_cpp(female_born, male_born, female_groups, male_groups, matching, draws, precompute));
+    rcpp_result_gen = Rcpp::wrap(inspect_two_sided_matching_cpp(female_born, male_born, female_groups, male_groups, matching, draws, precompute));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -185,8 +185,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_extract_kin_cpp", (DL_FUNC) &_hammel_extract_kin_cpp, 4},
     {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
     {"_hammel_adjusted_fertility_cpp", (DL_FUNC) &_hammel_adjusted_fertility_cpp, 2},
-    {"_hammel_inspect_sequential_matrix_cpp", (DL_FUNC) &_hammel_inspect_sequential_matrix_cpp, 3},
-    {"_hammel_inspect_sequential_matching_cpp", (DL_FUNC) &_hammel_inspect_sequential_matching_cpp, 7},
+    {"_hammel_inspect_two_sided_matrix_cpp", (DL_FUNC) &_hammel_inspect_two_sided_matrix_cpp, 3},
+    {"_hammel_inspect_two_sided_matching_cpp", (DL_FUNC) &_hammel_inspect_two_sided_matching_cpp, 7},
     {"_hammel_inspect_matching_cpp", (DL_FUNC) &_hammel_inspect_matching_cpp, 3},
     {"_hammel_inspect_group_matching_cpp", (DL_FUNC) &_hammel_inspect_group_matching_cpp, 4},
     {"_hammel_sample_male_positions_cpp", (DL_FUNC) &_hammel_sample_male_positions_cpp, 2},

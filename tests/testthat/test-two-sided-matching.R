@@ -1,70 +1,62 @@
-# Independent R reference: explicitly draw from the remaining utility matrix.
-reference_sequential_market <- function(utility, ego = 1L, draws = 1L, scorer = NULL) {
-  answer <- list(choices = integer(draws), steps = integer(draws),
-    chooser = integer(draws), scored_pairs = numeric(draws))
-  remove_slot <- function(x, i) { x[i] <- tail(x, 1); head(x, -1) }
-  for (draw in seq_len(draws)) {
-    women <- seq_len(nrow(utility)); men <- seq_len(ncol(utility))
-    answer$choices[draw] <- NA_integer_; answer$chooser[draw] <- -1L
-    while (length(women) && length(men)) {
-      answer$steps[draw] <- answer$steps[draw] + 1L
-      female <- runif(1) < 0.5
-      n <- if (female) length(women) else length(men)
-      initiator <- floor(runif(1) * n) + 1L
-      scores <- if (!is.null(scorer)) scorer(women, men, female, initiator) else
-        if (female) utility[women[initiator], men] else utility[women, men[initiator]]
-      answer$scored_pairs[draw] <- answer$scored_pairs[draw] + length(scores)
-      allowed <- which(is.finite(scores))
-      if (!length(allowed)) {
-        if (female) {
-          if (women[initiator] == ego) break
-          women <- remove_slot(women, initiator)
-        } else men <- remove_slot(men, initiator)
-        next
-      }
-      weights <- exp(scores[allowed] - max(scores[allowed]))
-      selected <- allowed[which(runif(1) * sum(weights) < cumsum(weights))[1]]
-      wi <- if (female) initiator else selected
-      mj <- if (female) selected else initiator
-      if (women[wi] == ego) {
-        answer$choices[draw] <- men[mj]
-        answer$chooser[draw] <- if (female) 0L else 1L
-        break
-      }
-      women <- remove_slot(women, wi); men <- remove_slot(men, mj)
-    }
+# Independent fixed-matrix reference; one uniform draw per retained match.
+reference_two_sided_market <- function(utility, ego = 1L, draws = 1L, scorer = NULL) {
+  if (!is.null(scorer)) utility <- t(vapply(seq_len(nrow(utility)), function(i)
+    scorer(seq_len(nrow(utility)), seq_len(ncol(utility)), TRUE, i), numeric(ncol(utility))))
+  normalize <- function(x) {
+    if (all(!is.finite(x))) return(rep(0, length(x)))
+    w <- exp(x - max(x)); w / sum(w)
   }
-  answer
+  a <- normalize(utility[ego, ])
+  b <- vapply(seq_len(ncol(utility)), function(j) normalize(utility[, j])[ego], numeric(1))
+  w <- a / nrow(utility) + b / ncol(utility)
+  choices <- vapply(seq_len(draws), function(i)
+    which(runif(1) * sum(w) < cumsum(w))[1], integer(1))
+  list(choices = choices, steps = rep(1L, draws), chooser = rep(-1L, draws),
+    scored_pairs = rep(as.double(length(utility)), draws))
 }
 
-test_that("sequential kernel agrees with an independent probabilistic reference", {
+test_that("fixed-pool kernel agrees with independently normalized matrix probabilities", {
   for (utility in list(matrix(c(0, 1, -2, 4, 0, -1, 2, -3, 1), 3),
                        matrix(c(0, -Inf, 2, -Inf, 0, 1, -2, -Inf, 0), 3),
                        matrix(c(1000, -1000), 1))) {
     set.seed(361)
-    expected <- reference_sequential_market(utility, draws = 1000L)
+    expected <- reference_two_sided_market(utility, draws = 1000L)
     expected_rng <- .Random.seed
     set.seed(361)
-    observed <- inspect_sequential_matrix_cpp(utility, 1L, 1000L)
+    observed <- inspect_two_sided_matrix_cpp(utility, 1L, 1000L)
     expect_identical(observed, expected)
     expect_identical(.Random.seed, expected_rng)
   }
 })
 
-test_that("two by two choices match analytical probabilities", {
+test_that("integrated choices match analytical probabilities and repeated rejection draws", {
   weights <- matrix(c(1, 2, 3, 4), 2)
-  expected <- (weights[1, 1] / sum(weights[1, ]) +
-    weights[2, 2] / sum(weights[2, ]) + weights[1, 1] / sum(weights[, 1]) +
-    weights[2, 2] / sum(weights[, 2])) / 4
+  expected <- 49 / 148
   set.seed(362)
-  result <- inspect_sequential_matrix_cpp(log(weights), 1L, 12000L)
+  result <- inspect_two_sided_matrix_cpp(log(weights), 1L, 12000L)
   expect_lt(abs(mean(result$choices == 1L) - expected),
     6 * sqrt(expected * (1 - expected) / 12000))
-  expect_true(all(result$steps %in% 1:2))
-  expect_setequal(result$chooser, 0:1)
-  expect_true(all(result$choices %in% 1:2))
-  expect_error(inspect_sequential_matrix_cpp(matrix(NA_real_, 1), 1L, 1L), "finite")
-  expect_error(inspect_sequential_matrix_cpp(matrix(0, 1), 0L, 1L), "ego")
+  expect_true(all(result$steps == 1L))
+  # Independent literal implementation: keep both pools fixed until ego appears.
+  rejection <- replicate(12000, {
+    repeat {
+      female <- runif(1) < 0.5
+      initiator <- sample.int(2, 1)
+      if (female) {
+        partner <- sample.int(2, 1, prob = weights[initiator, ])
+        if (initiator == 1) break
+      } else {
+        woman <- sample.int(2, 1, prob = weights[, initiator])
+        if (woman == 1) { partner <- initiator; break }
+      }
+    }
+    partner
+  })
+  expect_lt(abs(mean(rejection == 1) - expected),
+    6 * sqrt(expected * (1 - expected) / 12000))
+  expect_error(inspect_two_sided_matrix_cpp(matrix(NA_real_, 1), 1L, 1L), "finite")
+  expect_error(inspect_two_sided_matrix_cpp(matrix(0, 1), 0L, 1L), "ego")
+  expect_true(is.na(inspect_two_sided_matrix_cpp(matrix(-Inf, 1), 1L, 1L)$choices))
 })
 
 test_that("native and custom scoring retain female-first orientation in male choices", {
@@ -86,9 +78,9 @@ test_that("native and custom scoring retain female-first orientation in male cho
       calculate_matching_utilities(model, fb[i] - mb, c("A", "B")[fg[i] + 1L],
         c("A", "B")[mg + 1L])))
     set.seed(363)
-    expected <- inspect_sequential_matrix_cpp(utility, 1L, 1000L)
+    expected <- inspect_two_sided_matrix_cpp(utility, 1L, 1000L)
     set.seed(363)
-    outputs[[k]] <- inspect_sequential_matching_cpp(fb, mb, fg, mg,
+    outputs[[k]] <- inspect_two_sided_matching_cpp(fb, mb, fg, mg,
       prepare_matching_model(model, c("A", "B"), TRUE), 1000L)
     expect_identical(outputs[[k]], expected)
   }
@@ -198,7 +190,7 @@ test_that("nonmarital fathers share two-sided selection and respect overrides", 
 })
 
 
-test_that("R scoring receives only the selected remaining row or column", {
+test_that("R scoring evaluates each fixed female row once", {
   fb <- c(-20, -30, -40); mb <- c(-22, -28, -38)
   model <- create_matching_model(~ I((age_difference - mean(age_difference))^2),
     c("I((age_difference - mean(age_difference))^2)" = -0.02))
@@ -214,22 +206,23 @@ test_that("R scoring receives only the selected remaining row or column", {
     calculate_matching_utilities(model, gaps)
   }
   set.seed(371)
-  expected <- reference_sequential_market(matrix(0, 3, 3), draws = 100L, scorer = scorer)
+  expected <- reference_two_sided_market(matrix(0, 3, 3), draws = 100L, scorer = scorer)
   set.seed(371)
-  observed <- inspect_sequential_matching_cpp(fb, mb, rep(0L, 3), rep(0L, 3), prepared, 100L)
+  observed <- inspect_two_sided_matching_cpp(fb, mb, rep(0L, 3), rep(0L, 3), prepared, 100L)
   expect_identical(observed, expected)
   expect_true(all(observed_lengths %in% 1:3))
-  expect_true(any(observed_lengths < 3))
+  expect_true(all(observed_lengths == 3))
+  expect_length(observed_lengths, 300)
 })
 
-test_that("eager and on-demand native scores give identical sequential outcomes", {
+test_that("materialized and streamed native matrices give identical fixed-pool outcomes", {
   prepared <- prepare_matching_model(create_age_gap_matching_model(3, 5), two_sided = TRUE)
   set.seed(372)
-  lazy <- inspect_sequential_matching_cpp(c(-20, -30, -40), c(-22, -28, -38),
+  lazy <- inspect_two_sided_matching_cpp(c(-20, -30, -40), c(-22, -28, -38),
     rep(0L, 3), rep(0L, 3), prepared, 1000L)
   state <- .Random.seed
   set.seed(372)
-  eager <- inspect_sequential_matching_cpp(c(-20, -30, -40), c(-22, -28, -38),
+  eager <- inspect_two_sided_matching_cpp(c(-20, -30, -40), c(-22, -28, -38),
     rep(0L, 3), rep(0L, 3), prepared, 1000L, precompute = TRUE)
   expect_identical(eager, lazy)
   expect_identical(.Random.seed, state)

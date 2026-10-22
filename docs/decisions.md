@@ -1107,3 +1107,22 @@ matching specifications override this default. Initiation mode remains explicit.
   No hypothetical pair changes population state. The user requested runtime
   comparisons and will assess input benchmarks using milestone 3 analyses.
 - **Specification:** see [experimental two-sided matching](two-sided-matching.md).
+
+
+## D062: Fixed-pool reciprocal probabilities for the two-sided experiment
+
+- **Status:** implementation authorized by the user October 22, 2026;
+  scientific parameter recovery remains under investigation.
+- **Decision:** supersede D061's sequential temporary depletion. Retain its
+  sampling, eligibility, shortage, hard exclusion, and father-selection rules.
+  Score the fixed market, sum ego's row-normalized partner probabilities and
+  the men's column-normalized probabilities of choosing ego, normalize, and
+  draw once. This integrates the agreed fair-coin, uniform-initiator procedure
+  with replacement until ego participates.
+- **Custom formulas:** evaluate each woman's allowed male row once, then use
+  those fixed pair utilities for both normalizations. No column-specific
+  re-evaluation of data-dependent transforms occurs.
+- **Validation:** analytical probabilities, independent rejection simulation,
+  extreme utilities, exclusions, native/R parity, actual-state invariants,
+  default compatibility, and measured timing against the previous prototype.
+- **Specification:** [two-sided matching](two-sided-matching.md).

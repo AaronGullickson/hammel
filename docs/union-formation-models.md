@@ -11,7 +11,7 @@ The user accepted milestone 2 as complete on October 19, 2026 (D050).**
 Every simulation requires a union-formation process. Current-partner lookup
 and union histories are common infrastructure for all initiation modes.
 
-An optional sequential two-sided selection experiment was added October 22,
+An optional fixed-pool two-sided selection experiment was added October 22,
 2026 (D061), with `matching_method = "two_sided"`. The specification below
 continues to describe default female choice; see
 [two-sided matching](two-sided-matching.md) for the experiment's temporary

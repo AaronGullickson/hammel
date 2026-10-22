@@ -4,8 +4,10 @@
 # Optional output directory: HAMMEL_BENCH_DIR=/tmp/hammel-two-sided-benchmark
 # This uses local synthetic rates only and never renders or edits the report.
 
+# Remove existing objects: force alone can reuse objects from a debug build.
+pkgbuild::clean_dll()
 pkgbuild::compile_dll(debug = FALSE, force = TRUE, quiet = TRUE)
-devtools::load_all(quiet = TRUE)
+devtools::load_all(quiet = TRUE, compile = FALSE)
 output_dir <- Sys.getenv("HAMMEL_BENCH_DIR", "/tmp/hammel-two-sided-benchmark")
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -20,17 +22,17 @@ for (size in c(10L, 50L, 100L, 300L, 1000L)) {
   draws <- if (size <= 100) 200L else if (size <= 300) 50L else 20L
   for (trial in 1:3) {
     answers <- list()
-    for (mode in if (trial %% 2) c("on_demand", "eager") else c("eager", "on_demand")) {
+    for (mode in if (trial %% 2) c("streamed", "materialized") else c("materialized", "streamed")) {
       invisible(gc())
       set.seed(730 + trial)
-      elapsed <- system.time(answer <- inspect_sequential_matching_cpp(
-        fb, mb, fg, mg, prepared, draws, precompute = mode == "eager"))[["elapsed"]]
+      elapsed <- system.time(answer <- inspect_two_sided_matching_cpp(
+        fb, mb, fg, mg, prepared, draws, precompute = mode == "materialized"))[["elapsed"]]
       answers[[mode]] <- answer
       rows[[length(rows) + 1L]] <- data.frame(size, trial, mode, draws,
         elapsed, milliseconds_per_market = 1000 * elapsed / draws,
         mean_steps = mean(answer$steps), mean_choice_pairs = mean(answer$scored_pairs))
     }
-    stopifnot(identical(answers$on_demand, answers$eager))
+    stopifnot(identical(answers$streamed, answers$materialized))
   }
   message("Finished fixed-market size ", size)
 }

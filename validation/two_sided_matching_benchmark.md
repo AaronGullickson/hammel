@@ -1,92 +1,102 @@
-# Sequential two-sided matching: synthetic timing record
+# Fixed-pool versus sequential two-sided matching: timings
 
-Measured October 22, 2026 on aarch64 Linux with R 4.6.1. This is a software
-performance experiment, not scientific validation or acceptance of input
-parameter benchmarks. It did not execute or alter milestone3.qmd.
+Measured October 22, 2026 on aarch64 Linux, R 4.6.1, GCC 16.1.1. This is
+software performance evidence; recovery of demographic input parameters
+remains under investigation. The milestone 3 report was not executed or edited.
 
-Run [the benchmark script](two_sided_matching_benchmark.R) from the package
-root. It uses only synthetic/local inputs. Raw measurements are in
-[fixed_markets.csv](two_sided_matching_benchmark/fixed_markets.csv),
-[simulations.csv](two_sided_matching_benchmark/simulations.csv), and
-[callbacks.csv](two_sided_matching_benchmark/callbacks.csv).
+The new fixed-pool method was slower than sequential depletion in these
+workloads. Every pair must contribute to column probabilities; the sequential
+method scores only selected remaining rows/columns and stops when ego matches.
+Removing the partner-draw loop therefore does not remove the dominant score
+work. Both are substantially more expensive than default female choice.
 
-## Build and provenance
+## Complete simulations
 
-Base commit: `4d03f55d814344fccff258a0f3f3912a88711db0`. Experimental changes were uncommitted.
-Native code was rebuilt with `pkgbuild::compile_dll(debug = FALSE, force = TRUE)`
-using the installed R compiler flags. Methods in each comparison used the
-same build. The compiler was GCC 16.1.1. Reversing method order between trials
-reduces simple order effects; three trials do not provide a broad hardware
-or workload assessment. Millisecond-scale baseline timings are coarse.
+Three trials per method/sample size, medians in seconds. Each starts with the
+same seeded 2,000-person population, ages 0–80, 75% A / 25% B. Mortality is
+0.01/year, fertility 0.08/year at ages 15–45 with default spacing, duration
+20 years, on-demand formation, preferred gap zero, half-weight distance five,
+and symmetric cross-group effect −2.5. Sample size precedes eligibility
+screening. Histories/event counts differ because algorithms consume different
+random streams; raw CSVs retain births, deaths, unions, and final history sizes.
 
-MD5 hashes at measurement time (later documentation-only edits may differ):
+| Sample size | Female choice | Sequential two-sided | Fixed-pool two-sided | Fixed / sequential |
+| --- | ---: | ---: | ---: | ---: |
+| 50 | 0.016 | 0.019 | 0.024 | 1.26 |
+| 200 | 0.017 | 0.053 | 0.112 | 2.11 |
+| 1000 | 0.025 | 0.662 | 1.685 | 2.55 |
 
-- `src/simulate.cpp`: `ebccacbf934fe2d468bffb9e7b1fde85`
-- `R/union_formation.R`: `d64fb2dc269c800a6e5c7c07e8e96291`
-- `R/simulate.R`: `10f6f14670ee97b3910e97be60cac168`
+These are synthetic timings, not predictions for the user's 10,000-person
+rate-mode workload. Baseline durations of a few milliseconds have coarse
+resolution. Timing comparisons do not assess scientific performance.
 
-## Native on-demand scoring versus a full precomputed matrix
+## Fixed markets
 
-The market has M women and M men, with ego aged 25, other ages uniform on
-15–65, independently sampled 75% A/25% B identities, preferred gap zero,
-half-weight distance five, and symmetric cross-group effect -2.5. For each
-size and trial the same RNG seed is used for both scoring strategies. The
-full matrix is rebuilt per fresh market, not amortized over repeated draws.
-All recorded choices, choosing sexes, steps, and RNG-dependent results agree
-exactly between strategies. The simulation uses the on-demand strategy.
+Milliseconds per fresh market, medians of three trials. M women and M men,
+ego age 25, other ages uniform 15–65, independent 75% A / 25% B groups, same
+preferences as above. Native production paths are compared. The fixed-pool
+implementation streams female rows and retains column sums plus ego's row,
+using linear scratch space rather than allocating the complete matrix.
 
-Median milliseconds per fresh market:
-
-| M | On demand | Precomputed | Precomputed / on demand |
-| --- | ---: | ---: | ---: |
-| 10 | 0.005 | 0.015 | 3.00 |
-| 50 | 0.080 | 0.180 | 2.25 |
-| 100 | 0.270 | 0.675 | 2.50 |
-| 300 | 2.160 | 5.640 | 2.61 |
-| 1000 | 23.100 | 62.200 | 2.69 |
-
-## Complete native-scored simulations
-
-Each run starts with the same seeded 2,000-person population, ages 0–80,
-75% A/25% B. Mortality is 0.01/year for both sexes; fertility is 0.08/year
-at ages 15–45 with default spacing. Runs last 20 years and use on-demand
-formation with the same age/group preference model as above. Three seeds
-are used for each method and sample size. Matching methods consume different
-random streams and produce slightly different event counts; timings are not
-comparisons of identical histories. Candidate sample size precedes screening,
-so actual temporary markets can be smaller than the requested sample.
-
-Median wall-clock seconds and event counts:
-
-| Sample size | Female choice s | Two-sided s | Ratio | Female choice unions | Two-sided unions |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| 50 | 0.020 | 0.037 | 1.85 | 346 | 344 |
-| 200 | 0.029 | 0.232 | 8.00 | 336 | 342 |
-| 1000 | 0.060 | 3.708 | 61.80 | 349 | 342 |
-
-Final history sizes and births/deaths are retained in the raw CSV. These
-measurements demonstrate substantial sample-size-dependent overhead; they
-are not runtime predictions for the user's larger validation workloads.
-
-## R formula overhead
-
-A pointwise-equivalent R expression `I(abs(age_difference)^2)` forces the R
-fallback while preserving the native curve. These two-sided runs use the
-same population and synthetic inputs but last five years, with three seeds.
-Both paths score only the chosen remaining row/column. Median seconds:
-
-| Sample size | Native | R formula |
+| M | Sequential | Fixed pool |
 | --- | ---: | ---: |
-| 50 | 0.023 | 0.465 |
-| 200 | 0.095 | 1.861 |
+| 50 | 0.015 | 0.030 |
+| 100 | 0.050 | 0.110 |
+| 300 | 0.380 | 0.920 |
+| 1000 | 3.850 | 10.350 |
 
-## Software verification
+The new script also compares streamed scores with explicitly materialized
+matrices and verifies identical choices and RNG states. Raw measurements
+include M=10, whose timings approach timer resolution.
 
-The complete `devtools::test()` suite passed after implementation; live database
-tests remained skipped. Additional checks established exact default seeded
-history agreement with pre-experiment runs in both initiation modes. Tests
-cover analytical two-by-two probabilities, an independent R reference, ego
-eligibility, shortage reduction, group exclusions, selected-vector R callbacks,
-actual-state isolation, father overrides, ageing-in, deaths, widowhood, restart
-pool reconstruction, and diagnostics/RNG invariance. No inference about
-scientific parameter recovery follows from these software checks.
+## R formulas
+
+Five-year simulations with the same population and three trials. A pointwise
+equivalent `I(abs(age_difference)^2)` formula forces R evaluation. Each fixed
+female row is evaluated once; the sequential method evaluates only each chosen
+remaining row/column. Median seconds:
+
+| Sample size | Sequential native | Fixed native | Sequential R | Fixed R |
+| --- | ---: | ---: | ---: | ---: |
+| 50 | 0.015 | 0.016 | 0.445 | 0.901 |
+| 200 | 0.028 | 0.047 | 1.692 | 3.629 |
+
+## Reproduction and provenance
+
+Run `TZ=America/Los_Angeles Rscript validation/two_sided_matching_benchmark.R`
+from the package root. It uses synthetic inputs only. The script now removes
+existing compiled objects before `compile_dll(debug = FALSE, force = TRUE)`
+and loads with `compile = FALSE`. Requesting `force = TRUE` alone can reuse
+debug objects; earlier recorded timings did not establish a clean optimized
+build and should not be compared directly with this assessment.
+
+The sequential comparison used a separate temporary package tree with the
+source from commit `03eba9b` (the previous experimental implementation), no
+pre-existing compiled objects, and the same benchmark workload. The current
+fixed-pool implementation is an uncommitted change on that commit. Three
+trials alternate method order within each build; builds were measured
+sequentially on the same machine, so machine-load differences remain possible.
+
+Raw CSVs and R session/build metadata are under
+[fixed_pool](two_sided_matching_benchmark/fixed_pool/simulations.csv) and
+[sequential](two_sided_matching_benchmark/sequential/simulations.csv), with
+`fixed_markets.csv`, `simulations.csv`, `callbacks.csv`, and `metadata.rds` in
+each directory. Earlier raw files at the parent directory retain the original
+prototype measurements; their optimized-build status is unverified.
+
+Source MD5 hashes at measurement time:
+
+- Fixed pool `src/simulate.cpp`: `443af8c24c73495159a78801b9edb921`
+- Fixed pool `R/union_formation.R`: `1a9c5ef5c1a97272f8edafbee7e8cc8e`
+- Fixed pool `R/simulate.R`: `cc513bfc4e0f3e98215a57672b5479fa`
+- Sequential `src/simulate.cpp`: `ebccacbf934fe2d468bffb9e7b1fde85`
+
+## Verification
+
+The full `devtools::test()` suite passed; live database tests remained skipped.
+Checks include analytical probabilities, an independent literal rejection
+simulation with replacement, fixed-matrix normalization, extreme utilities,
+exclusions, pointwise native/R agreement, row-context custom formulas, one
+selection draw, state isolation, eligibility, shortages, father overrides,
+restart/pool maintenance, and diagnostic invariance. Scientific odds-ratio
+recovery is a separate milestone 3 assessment.

@@ -344,16 +344,16 @@ The milestone 2 report examines conditional ASFR discrepancies; general
 recovery across status transitions is not established.
 See [union fertility specification](union-formation-models.md#fertility-schedules-by-union-status-d039).
 
-### Experimental sequential two-sided selection
+### Experimental fixed-pool two-sided selection
 
-D061 authorizes optional `matching_method = "two_sided"`, preserving
+D061/D062 authorize optional `matching_method = "two_sided"`, preserving
 `"female_choice"` as the default. Female event initiation is unchanged; within
 a temporary market either sex may choose. The method applies to shared union
 and nonmarital father selection. It samples alternate living, unpartnered women
 using the male age cutoff, without hazard weighting or hypothetical kinship
 screening; hard group exclusions apply to every temporary pair. Only ego's
 selected partner affects actual state. The full eligibility, sampling,
-shortage, sequential-draw, diagnostic, and validation rules are specified in
+shortage, reciprocal-probability, diagnostic, and validation rules are specified in
 [two-sided matching](two-sided-matching.md). Those experimental rules qualify
 the default single-woman choice described above. Scientific benchmarks for
 aggregate pairing, age gaps, and inheritance remain to be assessed.

@@ -25,7 +25,7 @@
 #' Cancellation starts no new birth-spacing interval. On-demand mode rejects
 #' status schedules.
 #' Optional `matching_method = "two_sided"` on [union_formation()] uses
-#' probabilistic sequential temporary markets instead of default ego-only
+#' probabilistic fixed-pool temporary markets instead of default ego-only
 #' female choice. Only ego's outcome is retained; event initiation is unchanged.
 #'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]

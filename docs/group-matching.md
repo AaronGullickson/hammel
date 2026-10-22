@@ -108,18 +108,19 @@ union or birth counts with unequal group sizes.
 
 The user authorized an optional `matching_method = "two_sided"` experiment on
 `experiment/two-sided-sequential-matching` (D061). A temporary market contains
-M ego-eligible men, M - 1 sampled alternate women, and ego. At each round,
-a fair coin selects the choosing sex, an initiator is sampled uniformly,
-and their partner is drawn with the existing conditional-logit utilities.
-Only ego's outcome is retained. Scores are calculated only for the selected
-remaining row/column, including when the formula uses the R fallback.
+M ego-eligible men, M - 1 sampled alternate women, and ego. D062 replaces
+sequential depletion with fixed utilities. Normalize ego's row and each man's
+column, add the probabilities of either choosing the other, normalize, and
+draw once. Each woman's allowed male row is evaluated once, including for R
+formulas; column normalization reuses those same scores. No hypothetical pairs
+are removed. This integrates repeated fair-coin uniform initiation with replacement.
 See [two-sided matching](two-sided-matching.md) for the full contract,
 shortage and exclusion rules, worked examples, validation, and timing plan.
 
 This differs from the earlier proposed matrix rescaling or sampling assignments
 in proportion to `exp(sum of utilities)`. Neither rescaling by female demand
 nor fixed-margin IPF was selected. The latter's constraints and the behavior
-of directed and age effects motivated testing a sequential choice mechanism.
+of directed and age effects motivated the two-sided experiments.
 The optional prototype does not establish aggregate odds-ratio recovery,
 preferred age-gap recovery, or balanced inheritance trajectories. Scientific
 assessment remains with the user and the milestone 3 analyses.
