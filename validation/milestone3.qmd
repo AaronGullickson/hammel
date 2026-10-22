@@ -20,8 +20,8 @@ execute:
 #| label: setup
 #| include: false
 
-devtools::load_all(here::here())
 library(here)
+devtools::load_all(here::here())
 library(dplyr)
 library(tidyr)
 library(readr)
@@ -29,6 +29,34 @@ library(purrr)
 library(tibble)
 library(ggplot2)
 library(gt)
+library(survival)
+library(modelsummary)
+```
+
+```{r}
+#| label: create-functions
+
+get_eligible_bachelors <- function(mar_time, pop) {
+  # get husband ids of current marriages
+  current_husbands <- pop$unions |>
+    filter(
+      start_time < .env$mar_time,
+      is.na(end_time) | (end_time > .env$mar_time)
+    ) |>
+    distinct(husband_id) |>
+    pull(husband_id)
+
+  pop$persons |>
+    filter(
+      # must be men
+      sex == "m",
+      # must be alive and age 15 or older at time of marriage
+      is.na(death_time) | (death_time > .env$mar_time),
+      .env$mar_time - birth_time >= 15,
+      # must not be currently married
+      !(person_id %in% current_husbands)
+    )
+}
 ```
 
 ## Purpose and completion criteria
@@ -157,7 +185,7 @@ create_group_inheritance("hierarchy", order = c("B", "A", "C"), passing = 0.05)
 
 This method assumes that the order is transitive. For more complex formulations, use a custom function.
 
-When `custom` is defined the user must supply a custom R function that will be used to determine inheritance. This function can take the following exposed variables as arguments: `mother_group`, `father_group`, `mother_ancestry`, `father_ancestry`, `child_ancestry`, `child_sex` (`"f"` or `"m"`), and `parents_in_union` (TRUE/FALSE). The ancestry variables are named lists where each name is "group_{group_name}" as well as "unknown" for any unknown ancestry share. 
+When `custom` is defined, the user must supply a custom R function that will be used to determine inheritance. This function can take the following exposed variables as arguments: `mother_group`, `father_group`, `mother_ancestry`, `father_ancestry`, `child_ancestry`, `child_sex` (`"f"` or `"m"`), and `parents_in_union` (TRUE/FALSE). The ancestry variables are named lists where each name is "group_{group_name}" as well as "unknown" for any unknown ancestry share. 
 
 The inheritance methods have no allowance for individuals that identify with multiple groups. However, users can build in "mixed" groups by using the custom function. When doing so, users should also define the `groups` object which is a vector of all the possible groups even if they don't currently exist in the population. This will allow users to add groups that emerge from the population but are not initially present. 
 
@@ -285,8 +313,11 @@ set.seed(population_seed)
 pop_baseline_uneven_2g <- create_baseline_population(
   50000, max_age = 100, end_time = 2000, group_weights = c("A" = 2, "B" = 1)
 )
-pop_baseline_even_2g <- create_baseline_population(
-  50000, max_age = 100, end_time = 2000, group_weights = c("A" = 1, "B" = 1)
+pop_baseline_uneven_3g <- create_baseline_population(
+  50000, max_age = 100, end_time = 2000, group_weights = c("A" = 5, "B" = 3, "C" = 1)
+)
+pop_baseline_even_3g <- create_baseline_population(
+  50000, max_age = 100, end_time = 2000, group_weights = c("A" = 1, "B" = 1, "C" = 1)
 )
 ```
 
@@ -909,51 +940,289 @@ mar_rates |>
 
 ## Evaluate Group Matching
 
-### Directed and symmetric effects
+### Group matching parameters
 
-Compare configured effects with estimates accounting for available candidates
-and age preferences. Cross-product log odds are a descriptive check: a symmetric
-effect beta contributes 2 * beta under a separable table model, but aggregate
-union counts need not recover that relationship under changing availability.
+To test group matching parameters, I start with a three group population with uneven sizes. Group A and B are given a symmetric exogamy ratio while B and C have directed effects by gender, and there are no barriers between A and C. I use shared fertility and mortality rates across groups, since we are not concerned with that feature for this evaluation. I also use on demand union formation because we are focused on the matching model itself here and the on demand model runs faster. I then run 100 simulations.
+
+```{r}
+#| label: run-intermarriage-sim-uneven
+
+model <- hammel_model() |>
+  set_population(pop_baseline_uneven_3g) |>
+  set_fertility(fertility_rates_overall_usa) |>
+  set_mortality(mortality_rates_usa2000) |>
+  set_union_formation(
+    "on_demand",
+    matching = create_age_gap_matching_model(
+      0, 5, 
+      group_exogamy = c("A::B" = -3, "B:C" = -1, "C:B" = -0.5)
+    )
+  )
+
+results  <- map(replication_seeds, function(seed) {
+  simulate(model, years = years, seed = seed)
+})
+names(results) <- as.character(replication_seeds)
+```
+
+```{r}
+#| label: fig-exogamy-uneven
+#| fig-cap: Mean log odds ratio of each group pairing by decade of the simulation, across 100 simulations using uneven group sizes. 95% confidence bands shown. Dotted horizontal line give the expected log odds ratio from iput.
+
+expected <- tribble(
+  ~pairing, ~log_odds,
+  "AB",     -6,
+  "BC",     -1.5,
+  "AC",     0
+)
+
+map(results, get_detailed_unions) |>
+  bind_rows(.id = "replication") |>
+  mutate(time_span = floor(start_time / 10) * 10) |> 
+  count(replication, time_span, group_w, group_h) |>
+  pivot_wider(id_cols = c(replication, time_span), names_from = c(group_w, group_h), values_from = n) |>
+  mutate(
+    log_odds_AB = log(A_B) + log(B_A) - log(A_A) - log(B_B),
+    log_odds_BC = log(B_C) + log(C_B) - log(B_B) - log(C_C),
+    log_odds_AC = log(A_C) + log(C_A) - log(A_A) - log(C_C)
+  ) |>
+  select(replication, time_span, starts_with("log_odds")) |>
+  pivot_longer(
+    cols = starts_with("log_odds_"), 
+    names_prefix = "log_odds_", 
+    names_to = "pairing", 
+    values_to = "log_odds"
+  ) |>
+  group_by(time_span, pairing) |>
+  summarize(
+    sd = sd(log_odds),
+    log_odds = mean(log_odds),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  ggplot(aes(x = time_span + 5, y = log_odds, group = pairing, color = pairing))+
+  geom_ribbon(aes(ymin = log_odds - 1.96 * se, ymax = log_odds + 1.96 * se, fill = pairing), 
+              color = NA, alpha = 0.3)+
+  geom_point()+
+  geom_hline(data = expected, aes(yintercept = log_odds, color = pairing), linetype = 2)+
+  labs(x = "year", y = "log odds ratio")+
+  theme_bw()
+```
+
+@fig-exogamy-uneven shows the estimated mean log odds ratio for each pairing in decade intervals. These log odds ratios should equal double the symmetric log odds ratio from the input and the sum of the separate ratios for gender-specific effects. The results show a tight correspondence between the expected odds ratios and those observed in the simulations.
+
+I can also test the values of the parameters by drawing a sample of unions from one of the simulations and constructing alternate union choice sets for a conditional logit model, using the same basic procedure as the milestone 2 report.
+
+```{r}
+#| label: construct-choice-sets
+
+set.seed(42)
+union_sample <- results[[1]] |>
+  get_detailed_unions() |>
+  slice_sample(n = 10000) |>
+  mutate(
+    age_mar_w = start_time - birth_time_w, 
+    age_mar_h = start_time - birth_time_h,
+    age_diff = age_mar_h - age_mar_w,
+  ) |>
+  select(union_id, husband_id, start_time, age_mar_w, age_mar_h, age_diff, group_w, group_h) |>
+  mutate(chosen = TRUE)
+
+choice_sets <- NULL
+
+for(i in 1:nrow(union_sample)) {
+  union_real <- union_sample[i,]
+
+  unions_fake <- get_eligible_bachelors(union_real$start_time, results[[1]]) |>
+    filter(person_id != union_real$husband_id) |>
+    slice_sample(n = 50) |>
+    rename(husband_id = person_id) |>
+    mutate(
+      union_id = union_real$union_id,
+      start_time = union_real$start_time,
+      age_mar_h = start_time - birth_time,
+      age_mar_w = union_real$age_mar_w,
+      age_diff = age_mar_h - age_mar_w,
+      group_w = union_real$group_w,
+      group_h = group,
+      chosen = FALSE
+    ) |>
+    select(union_id, husband_id, start_time, age_mar_w, age_mar_h, age_diff, group_w, group_h, chosen)
+
+  choice_set <- rbind(union_real, unions_fake)
+  choice_sets <- rbind(choice_sets, choice_set)
+}
+```
+
+Once, I have the choice sets, I can feed these into a conditional logit model where the true union is predicted by age difference and its square, symmetric exogamy dummies for AB and AC exogamy and directed exogamy dummies for BC exogamy.
+
+```{r}
+#| label: tbl-clogit
+#| tbl-cap: Conditional logit model predicting partner choice by partner age differences and group exogamy. Results are based on a random sample of 10000 unions from a single simulation with uneven group sizes with 50 alternate partners per union. 95% confidence intervals are shown in brackets.
+
+choice_sets <- choice_sets |>
+  mutate(
+    ABsym = (group_w == "A" & group_h == "B") | (group_w == "B" & group_h == "A"),
+    ACsym = (group_w == "A" & group_h == "C") | (group_w == "C" & group_h == "A"),
+    BC = (group_w == "B" & group_h == "C"),
+    CB = (group_w == "C" & group_h == "B")
+  )
+
+model_clogit <- clogit(chosen ~ age_diff + I(age_diff^2) + ABsym + ACsym + BC + CB + strata(union_id), data = choice_sets)
+modelsummary(
+  model_clogit, 
+  estimate = "{estimate} [{conf.low}, {conf.high}]",
+  statistic = NULL, 
+  fmt = 3, 
+  conf_level = 0.95,
+  coef_map = c("age_diff" = "age difference", "I(age_diff^2)" = "age difference sq.",
+               "ABsymTRUE" = "A::B", "ACsymTRUE" = "A::C", "BCTRUE" = "B:C", "CBTRUE" = "C:B"),
+  gof_map = c("nobs"), 
+  output = "gt",
+)
+```
+
+The results here match closely to the expectations from the input values. All of the exogamy terms are very close to the expectation from the input (A::B = -3, A::C = 0, B:C = -1, and C:B = -0.5) and fall well within the 95% confidence interval. The age difference parameters are also very close to their expectation (linear = 0, quadratic = -0.0277).
+
+```{r}
+#| label: calc-outmarriage-share-uneven
+
+outmarriage_uneven <- results |>
+  map(get_detailed_unions) |>
+  bind_rows(.id = "replication") |>
+  mutate(outmarriage = group_w != group_h, year = floor(start_time)) |>
+  group_by(year) |>
+  summarize(
+    sd = sd(outmarriage),
+    outmarriage = mean(outmarriage),
+    n = n(),
+    se = sd/sqrt(n),
+    .groups = "drop"
+  ) |>
+  mutate(pop_share = "uneven")
+```
+
+One feature of the log-odds ratio approach is that it should be indifferent to group size. So, the simulation will produce the same log-odds ratios under different shares of group size, whereas other measures like the outmarriage rate will vary by group size.^[This feature can break down when one group becomes very small because it is possible to sample zero members in the choice set of eligible partners which means that intermarriage will not be possible in some choice sets. This will bias exogamy log-odds ratios downward.] This allows users to distinguish likelihoods of intergroup unions that are separate from group size effects that may change over the simulation.
+
+To demonstrate this, I will re-run the simulations with an even population share for the the three groups but holding everything else constant.
+
+```{r}
+#| label: run-intermarriage-sim-even
+
+model <- model |>
+  set_population(pop_baseline_even_3g)
+
+results  <- map(replication_seeds, function(seed) {
+  simulate(model, years = years, seed = seed)
+})
+names(results) <- as.character(replication_seeds)
+```
+
+```{r}
+#| label: fig-exogamy-even
+#| fig-cap: Mean log odds ratio of each group pairing by decade of the simulation, across 100 simulations using even group sizes. 95% confidence bands shown. Dotted horizontal line give the expected log odds ratio from iput.
+
+map(results, get_detailed_unions) |>
+  bind_rows(.id = "replication") |>
+  mutate(time_span = floor(start_time / 10) * 10) |> 
+  count(replication, time_span, group_w, group_h) |>
+  pivot_wider(id_cols = c(replication, time_span), names_from = c(group_w, group_h), values_from = n) |>
+  mutate(
+    log_odds_AB = log(A_B) + log(B_A) - log(A_A) - log(B_B),
+    log_odds_BC = log(B_C) + log(C_B) - log(B_B) - log(C_C),
+    log_odds_AC = log(A_C) + log(C_A) - log(A_A) - log(C_C)
+  ) |>
+  select(replication, time_span, starts_with("log_odds")) |>
+  pivot_longer(
+    cols = starts_with("log_odds_"), 
+    names_prefix = "log_odds_", 
+    names_to = "pairing", 
+    values_to = "log_odds"
+  ) |>
+  group_by(time_span, pairing) |>
+  summarize(
+    sd = sd(log_odds),
+    log_odds = mean(log_odds),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  ggplot(aes(x = time_span + 5, y = log_odds, group = pairing, color = pairing))+
+  geom_ribbon(aes(ymin = log_odds - 1.96 * se, ymax = log_odds + 1.96 * se, fill = pairing), 
+              color = NA, alpha = 0.3)+
+  geom_point()+
+  geom_hline(data = expected, aes(yintercept = log_odds, color = pairing), linetype = 2)+
+  labs(x = "year", y = "log odds ratio")+
+  theme_bw()
+```
+
+@fig-exogamy-even shows the same figure as @fig-exogamy-uneven but for an even starting population. As the figure shows, the estimated log-odds ratios are consistent with the uneven case and with the input values.
+
+```{r}
+#| label: calc-outmarriage-share-even
+
+outmarriage_even <- results |>
+  map(get_detailed_unions) |>
+  bind_rows(.id = "replication") |>
+  mutate(outmarriage = group_w != group_h, year = floor(start_time)) |>
+  group_by(year) |>
+  summarize(
+    sd = sd(outmarriage),
+    outmarriage = mean(outmarriage),
+    n = n(),
+    se = sd/sqrt(n),
+    .groups = "drop"
+  ) |>
+  mutate(pop_share = "even")
+```
+
+```{r}
+#| label: fig-outmarriage-rate
+#| fig-cap: Mean outmarriage rates across 100 simulations by year of the simulation. Separate results shown for the cases with even and uneven group size in the starting population.
+
+bind_rows(outmarriage_uneven, outmarriage_even) |>
+  ggplot(aes(x = year, y = outmarriage, group = pop_share, color = pop_share))+
+  geom_line()+
+  labs(y = "outmarriage rate", color = "group share")+
+  scale_y_continuous(limits = c(0, NA))+
+  theme_bw()
+```
+
+@fig-outmarriage-rate shows the mean outmarriage rates in the uneven and even starting group size cases across each year of the simulations. The outmarriage rate is simply the proportion of all unions formed in a given year that are between partners belonging to different groups. Notably, these rates are not the same across the cases even though everything else in the simulations is held constant and they have the same underlying log odds ratio of exogamy. In the even group case, the opportunities for intermarriage are greater because the groups are of similar size which leads to a much higher outmarriage ratio.
 
 ### Hard restrictions and candidate scarcity
 
-Check prohibited pair counts, eligible sample sizes, failed searches/births,
-and sensitivity to candidate sample size. Check on-demand and rate initiation,
-including an explicit father-matching override.
+Check effects of candidate scarcity in small populations.
 
 ```{r}
 #| label: group-matching-results
 # TODO: Pair tables, choice-model recovery, and restriction/availability checks.
 ```
 
-## Evaluate Ancestry Tracking
-
-Check row coverage, nonnegative shares summing to one, parental averaging,
-unknown fathers, supplied starting proportions, and restart preservation.
-Report ancestry among living persons separately from all historical persons.
-
-```{r}
-#| label: ancestry-results
-# TODO: Ancestry accounting checks and distributions by identity and period.
-```
-
 ## Evaluate Group Inheritance
-
-### Built-in rules
-
-Check deterministic assignments, missing-father maternal fallback, random-parent
-probabilities, known-ancestry conditioning, and hierarchy/passing probabilities.
-Compare string shorthand with the equivalent constructed model.
 
 ### Custom rules and mixed identities
 
-Check predicted versus observed assignment probabilities among eligible simulated
+<!-- Check predicted versus observed assignment probabilities among eligible simulated
 births, excluding founders and separating deterministic early-return cases.
 Include declared AB identities, their schedules, and birth-time union status.
 For ancestry models, use the same known-ancestry normalization as the callback;
 mean ancestry within identities is not the assignment probability conditional
-on ancestry. Record the actual custom function and coefficients used.
+on ancestry. Record the actual custom function and coefficients used. --> 
+
+Run two uneven group models with symmetric exogamy and different inheritance terms. Run only 20 per case to keep total time down. For hierarchy run with 0 passing and 5% passing.
+
+What are we checking
+
+- Group size at the end of the sim
+- Mean ancestry shares conditional group identity
+
+What are the expectations
+
+- mother, father, random parent, same sex, and different sex should all produce similar results with group size shares at the end that roughly match the start and similar ancestry shares where more A ancestry in group B than B ancestry in Group A.
+- strict hierarchy (B > A) should cause the B group to grow relative to A. A individuals will have no B ancestry but B individuals will have more A ancestry than in other rules. Somewhat similare results with passing but moderated and A individuals will have a little B ancestry.
+- I think ancestry based approach should favor the larger group A. A should become larger share and A individuals will contain more B ancestry than vice versa. 
 
 ```{r}
 #| label: inheritance-results
