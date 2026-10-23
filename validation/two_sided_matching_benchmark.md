@@ -1,5 +1,8 @@
 # Fixed-pool versus sequential two-sided matching: timings
 
+These measurements precede the native bulk optimization. See
+[native performance](native_two_sided_performance.md) for current measurements.
+
 Measured October 22, 2026 on aarch64 Linux, R 4.6.1, GCC 16.1.1. This is
 software performance evidence; recovery of demographic input parameters
 remains under investigation. The milestone 3 report was not executed or edited.

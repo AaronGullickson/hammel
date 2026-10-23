@@ -256,6 +256,34 @@ int draw_partner_position(const NumericVector& probabilities) {
 // Local hypothetical markets never mutate population or event state.
 struct TwoSidedResult { int man = -1, steps = 0, chooser = -1; double scored = 0; };
 
+TwoSidedResult finish_two_sided_market(int nw, int nm,
+    const std::vector<double>& column_max, const std::vector<double>& column_sum,
+    const std::vector<double>& ego_score, TwoSidedResult result) {
+  const double maximum = *std::max_element(ego_score.begin(), ego_score.end());
+  if (maximum == R_NegInf) return result;
+  double row_sum = 0;
+  for (double value : ego_score) row_sum += std::exp(value - maximum);
+  std::vector<double> weights(nm);
+  double total = 0;
+  for (int j = 0; j < nm; ++j) {
+    if (ego_score[j] == R_NegInf) continue;
+    const double a = std::exp(ego_score[j] - maximum) / row_sum;
+    const double b = std::exp(ego_score[j] - column_max[j]) / column_sum[j];
+    // Equal pool sizes in production; factors also support rectangular diagnostics.
+    weights[j] = a / nw + b / nm;
+    total += weights[j];
+  }
+  const double draw = R::runif(0, 1) * total;
+  double cumulative = 0;
+  for (int j = 0; j < nm; ++j) {
+    if (weights[j] > 0) result.man = j;
+    cumulative += weights[j];
+    if (draw < cumulative) break;
+  }
+  result.steps = 1; // One integrated draw; no initiator is sampled.
+  return result;
+}
+
 template <typename Score>
 TwoSidedResult draw_two_sided_market(int nw, int nm, int ego, Score score) {
   TwoSidedResult result;
@@ -280,29 +308,7 @@ TwoSidedResult draw_two_sided_market(int nw, int nm, int ego, Score score) {
       } else column_sum[j] += std::exp(value - column_max[j]);
     }
   }
-  const double maximum = *std::max_element(ego_score.begin(), ego_score.end());
-  if (maximum == R_NegInf) return result;
-  double row_sum = 0;
-  for (double value : ego_score) row_sum += std::exp(value - maximum);
-  std::vector<double> weights(nm);
-  double total = 0;
-  for (int j = 0; j < nm; ++j) {
-    if (ego_score[j] == R_NegInf) continue;
-    const double a = std::exp(ego_score[j] - maximum) / row_sum;
-    const double b = std::exp(ego_score[j] - column_max[j]) / column_sum[j];
-    // Equal pool sizes in production; factors also support rectangular diagnostics.
-    weights[j] = a / nw + b / nm;
-    total += weights[j];
-  }
-  const double draw = R::runif(0, 1) * total;
-  double cumulative = 0;
-  for (int j = 0; j < nm; ++j) {
-    if (weights[j] > 0) result.man = j;
-    cumulative += weights[j];
-    if (draw < cumulative) break;
-  }
-  result.steps = 1; // One integrated draw; no initiator is sampled.
-  return result;
+  return finish_two_sided_market(nw, nm, column_max, column_sum, ego_score, result);
 }
 
 // Evaluate each fixed female row once; reuse its scores in both normalizations.
@@ -332,6 +338,55 @@ class TemporaryScores {
       for (int group : mg) if (group < 0 || (groups && group >= groups)) stop("Invalid male group.");
     }
   }
+  bool is_native() const { return native; }
+
+  // Batched matrix columns: no R allocations or Rcpp element proxies per row.
+  // Keep raw gap arithmetic, rather than expanding calendar-time squares.
+  TwoSidedResult draw_native(int ego = 0) const {
+    const int nw = female_born.size(), nm = male_born.size();
+    TwoSidedResult result;
+    if (!nw || !nm) return result;
+    const double* fb = REAL(female_born);
+    const double* mb = REAL(male_born);
+    const int* fg = INTEGER(female_groups);
+    const int* mg = INTEGER(male_groups);
+    const int ng = offsets.nrow(), nb = blocked.nrow();
+    const double* pair = ng ? REAL(offsets) : nullptr;
+    const int* excluded = nb ? LOGICAL(blocked) : nullptr;
+    const double linear = quadratic[0], quadratic_term = quadratic[1];
+    std::vector<double> column_max(nm, R_NegInf), column_sum(nm, 0), ego_score(nm), values(nw);
+    for (int j = 0; j < nm; ++j) {
+      if (j % 64 == 0) checkUserInterrupt();
+      const double male_birth = mb[j];
+      const int male_group = mg[j];
+      double maximum = R_NegInf;
+      for (int i = 0; i < nw; ++i) {
+        if ((prevent_all && fg[i] != male_group) ||
+            (excluded && excluded[fg[i] + nb * male_group])) {
+          values[i] = R_NegInf;
+          continue;
+        }
+        const double gap = fb[i] - male_birth;
+        const double square = squared ? gap * gap : 0;
+        if (!R_finite(gap) || !R_finite(square)) stop("Matching ages and utilities must be finite.");
+        double value = linear * gap + quadratic_term * square;
+        if (pair) value += pair[fg[i] + ng * male_group];
+        if (!R_finite(value)) stop("Matching ages and utilities must be finite.");
+        values[i] = value;
+        maximum = std::max(maximum, value);
+      }
+      column_max[j] = maximum;
+      ego_score[j] = values[ego];
+      if (maximum != R_NegInf) {
+        double sum = 0;
+        for (double value : values) sum += std::exp(value - maximum);
+        column_sum[j] = sum;
+      }
+    }
+    result.scored = static_cast<double>(nw) * nm;
+    return finish_two_sided_market(nw, nm, column_max, column_sum, ego_score, result);
+  }
+
   NumericVector choice(const std::vector<int>& women, const std::vector<int>& men,
                        bool female_chooses, int initiator) const {
     const int n = female_chooses ? men.size() : women.size();
@@ -413,7 +468,8 @@ List inspect_two_sided_matching_cpp(NumericVector female_born, NumericVector mal
         grid.insert(grid.end(), row.begin(), row.end());
       }
     }
-    auto result = draw_two_sided_market(female_born.size(), male_born.size(), 0,
+    auto result = (!precompute && scores.is_native()) ? scores.draw_native() :
+      draw_two_sided_market(female_born.size(), male_born.size(), 0,
       [&](const std::vector<int>& women, const std::vector<int>& men, bool female, int initiator) {
         if (!precompute) return scores.choice(women, men, female, initiator);
         NumericVector values(female ? men.size() : women.size());
@@ -700,7 +756,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       mb[k] = people[males[eligible[k]]].born; mg[k] = people[males[eligible[k]]].group;
     }
     TemporaryScores scores(fb, mb, fg, mg, choice_model);
-    const auto outcome = draw_two_sided_market(market_size, market_size, 0,
+    const auto outcome = scores.is_native() ? scores.draw_native() :
+      draw_two_sided_market(market_size, market_size, 0,
       [&](const std::vector<int>& women, const std::vector<int>& men, bool female, int initiator) {
         return scores.choice(women, men, female, initiator);
       });

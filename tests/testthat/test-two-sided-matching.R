@@ -314,3 +314,27 @@ test_that("widowhood restores the female pool without altering prior unions", {
   expect_equal(result$unions$end_reason, c("death_husband", NA_character_))
   expect_equal(result$unions$start_time[1], -1)
 })
+
+test_that("bulk native columns agree with materialized matrices across restrictions and scales", {
+  models <- list(
+    create_matching_model(~ age_difference, c(age_difference = 0.1)),
+    create_age_gap_matching_model(3, 5,
+      group_exogamy = c("A:B" = 1000, "B:A" = -1000)),
+    create_age_gap_matching_model(0, 5, prevent_exogamy = "A:B"),
+    create_age_gap_matching_model(0, 5, prevent_exogamy = TRUE))
+  for (model in models) {
+    prepared <- prepare_matching_model(model, c("A", "B"), TRUE)
+    set.seed(821)
+    fb <- -runif(17, 15, 80); mb <- -runif(13, 15, 80)
+    fg <- sample(0:1, 17, TRUE); mg <- sample(0:1, 13, TRUE)
+    set.seed(822)
+    bulk <- inspect_two_sided_matching_cpp(fb, mb, fg, mg, prepared, 300L)
+    state <- .Random.seed
+    set.seed(822)
+    matrix <- inspect_two_sided_matching_cpp(fb, mb, fg, mg, prepared, 300L, TRUE)
+    expect_identical(bulk, matrix)
+    expect_identical(.Random.seed, state)
+  }
+  prepared <- prepare_matching_model(create_age_gap_matching_model(0, 5), two_sided = TRUE)
+  expect_error(inspect_two_sided_matching_cpp(-1e200, 1e200, 0L, 0L, prepared, 1L), "finite")
+})

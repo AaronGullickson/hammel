@@ -1126,3 +1126,18 @@ matching specifications override this default. Initiation mode remains explicit.
   extreme utilities, exclusions, native/R parity, actual-state invariants,
   default compatibility, and measured timing against the previous prototype.
 - **Specification:** [two-sided matching](two-sided-matching.md).
+
+
+## D063: Geometric rescaling experiment removed
+
+- **Status:** tested and removed at the user's request October 22, 2026.
+- **Experiment:** replace D062's additive probabilities with exponentiated
+  pair scores divided by the square root of their row sum times column sum,
+  then normalize across ego's male candidates. Sampling and eligibility were
+  unchanged. Fixed-matrix cross-product odds were preserved analytically.
+- **User-reported assessment:** aggregate log odds -5.79 (SE 0.0165), against
+  -6, and directional ratio 0.943 (SE 0.0140), against 1. The fixed-matrix
+  property did not establish aggregate recovery or directional balance in
+  the simulation. The user requested removal and further consideration.
+- **Current behavior:** restore D062's additive fixed-pool selection. Its
+  documented limitations remain; no replacement mechanism is accepted.

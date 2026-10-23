@@ -124,3 +124,22 @@ Score work is quadratic in market size, with linear scratch storage and one
 R evaluation per nonempty female row for custom formulas. There is no iterative
 matching or early termination. Historical sequential timings in the timing
 assessment describe the superseded prototype; compare against fresh measurements.
+
+## Native bulk calculation contract
+
+Native linear/quadratic age-gap models may calculate whole matrix columns in
+reusable C++ scratch arrays, with group offsets and hard exclusions applied
+in female-first orientation. This is a software optimization of D062, not a
+change to its probabilities, square sampling, eligibility, or single draw.
+No new demographic rule or dependency is introduced. The R formula path
+retains one evaluation per female row, including contextual transforms.
+
+Validation compares the bulk native kernel against the original row-streamed
+calculation and explicitly materialized matrices, including extreme scores,
+restrictions, directed effects, and RNG state. Column summation may differ
+at floating-point roundoff; probability agreement and sampled fixed-seed
+histories are checked. Benchmarks use clean optimized builds and report
+market size, full-simulation event counts, and workload limitations.
+
+The measured optimization and explicit vectorized R comparison are recorded
+in [native performance](../validation/native_two_sided_performance.md).
