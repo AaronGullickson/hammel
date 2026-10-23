@@ -1302,3 +1302,41 @@ matching specifications override this default. Initiation mode remains explicit.
   intentionally combine these settings silence only the relevant warning. The
   full suite passed with no failures or warnings, the live database test
   skipped.
+
+## D070: Weighted-choice refinements: strict endogamy and weight diagnostics
+
+- **Status:** requested by the user October 23, 2026.
+- **Strict endogamy:** a matching model with `prevent_exogamy = TRUE` skips
+  weighted-choice calibration, because a group weight cannot change a choice
+  among same-group candidates. It reproduces female choice exactly and no
+  longer raises target warnings for unreachable groups. Partial restrictions
+  still calibrate.
+- **Diagnostics:** with `diagnostics = TRUE`, a weighted general matching
+  model in a grouped population records `.log_weight_<group>` on new unions:
+  the applied log group weights (reference group 0; unweighted searches 0;
+  earlier rows NA). These serve as exact conditional-logit offsets.
+- **Coverage:** weighted choice with identities created during a run (custom
+  AB inheritance), previously tested only under female choice after D069, is
+  now tested directly, including a male group with no counted women.
+- **Validation:** full suite passed with no failures or warnings; the live
+  database test skipped.
+
+## D071: Weighted-choice calibration accuracy fixes
+
+- **Status:** accepted by the user October 23, 2026, after an external
+  review (Codex) reported two issues, both reproduced here.
+- **Unmet targets reported as success:** women whose only allowed men belonged
+  to zero-target groups (log weight -1000, underflowing to zero) dropped out
+  of the solve and final flows, so an impossible target was reported as met.
+  Final flows are now computed in log space including those women, and any
+  miss above 1e-8 marks the search approximate, triggering the warning.
+  Actual partner selection was already correct.
+- **Narrow rate bands:** bin intensities used the hazard at each bin's centre
+  age, so a band narrower than a quarter-year bin could be missed, silently
+  returning unit weights. Intensities now average the hazard over each bin's
+  age span. The whole-bin age cutoff and bin-centre pair utilities remain
+  documented approximations; measured sensitivity is in the specification.
+- **Validation:** both reported cases added as tests (the impossible target is
+  flagged; a 0.05-year band at a woman's age gives the analytical weight), plus
+  one-year bands against an exact person-level reference. Full suite passed
+  with no failures or warnings; the live database test skipped.

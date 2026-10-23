@@ -269,8 +269,9 @@ test_that("weighted choice warns once when weights must be approximated", {
   persons <- population$persons
   persons$group[persons$sex == "m"][1:40] <- "B"
   population <- hammel_population(persons, population$unions, end_time = 0)
+  # A partial restriction keeps calibration active (full prevention skips it).
   matching <- create_matching_model(~ age_difference, c(age_difference = 0),
-                                    prevent_exogamy = TRUE)
+                                    prevent_exogamy = "A::B")
   model <- weighted_model(population, "weighted_choice", matching = matching)
   warnings <- character()
   withCallingHandlers(simulate(model, 10, seed = 908),
@@ -355,5 +356,115 @@ test_that("female choice with sex-specific inheritance warns while building grou
   for (weights in list(NULL, c(A = 1))) {
     plain <- set_population(base, weighted_population(200, weights))
     expect_no_warning(set_union_formation(set_fertility(plain, fertility_rates), "on_demand", female))
+  }
+})
+
+test_that("strict endogamy skips weighting and reproduces female choice", {
+  population <- weighted_population(600, c(A = 3, B = 1))
+  matching <- create_age_gap_matching_model(0, 5, prevent_exogamy = TRUE)
+  for (initiation in c("on_demand", "rate")) {
+    expect_no_warning(weighted <- simulate(weighted_model(population, "weighted_choice", initiation,
+                                                          matching = matching), 15, seed = 912))
+    female <- simulate(weighted_model(population, "female_choice", initiation, matching = matching),
+                       15, seed = 912)
+    expect_identical(weighted, female)
+  }
+})
+
+test_that("weighted choice handles identities created during the run", {
+  # Men of a group with no counted women use the population-wide female rate.
+  women <- data.frame(born = rep(-30, 400), group = rep(0:1, c(300, 100)), fertile = TRUE)
+  men <- data.frame(born = rep(-30, 450), group = rep(0:2, c(300, 100, 50)))
+  result <- calibrate(women, men, create_age_gap_matching_model(0, 5, group_exogamy = c("A::B" = -1)),
+                      data.frame(age_start = 15, age_end = 50, rate = 0.1), c("A", "B", "AB"))
+  expect_false(result$infeasible)
+  expect_equal(result$target[3], 50 / 450, tolerance = 1e-12)
+  expect_equal(result$flow, result$target, tolerance = 1e-9)
+  # Mixed couples have AB children, who later enter the pools and form unions.
+  rule <- create_group_inheritance("custom", groups = "AB", fun = function(mother_group, father_group, ...) {
+    if (is.na(father_group) || mother_group == father_group) mother_group else "AB"
+  })
+  population <- weighted_population(800, c(A = 3, B = 1))
+  model <- hammel_model() |>
+    set_population(population) |>
+    set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)) |>
+    set_fertility(data.frame(age_start = 15, age_end = 45, rate = 0.15), inheritance = rule) |>
+    set_union_formation("on_demand",
+      create_age_gap_matching_model(0, 5, group_exogamy = c("A::B" = -1, "A::AB" = -0.5, "B::AB" = -0.5)),
+      diagnostics = TRUE)
+  expect_no_warning(result <- simulate(model, 40, seed = 913))
+  expect_identical(result, simulate(model, 40, seed = 913))
+  expect_true(any(result$persons$group == "AB"))
+  unions <- get_detailed_unions(result)
+  expect_true(any(unions$group_w == "AB" | unions$group_h == "AB"))
+  expect_true(all(c(".log_weight_A", ".log_weight_B", ".log_weight_AB") %in% names(result$unions)))
+  restart <- simulate(set_population(model, result), 5, seed = 914)
+  expect_equal(restart$end_time, result$end_time + 5)
+})
+
+test_that("diagnostics record the group log weights applied at each union", {
+  population <- weighted_population(600, c(A = 3, B = 1))
+  matching <- create_age_gap_matching_model(0, 5, group_exogamy = c("A::B" = -2))
+  model <- weighted_model(population, "weighted_choice", matching = matching, diagnostics = TRUE)
+  first <- simulate(model, 10, seed = 915)
+  columns <- c(".log_weight_A", ".log_weight_B")
+  expect_true(all(columns %in% names(first$unions)))
+  weights <- as.matrix(first$unions[columns])
+  expect_true(nrow(weights) > 0 && all(is.finite(weights)))
+  # One group is the reference (log weight 0); only differences between groups matter.
+  expect_true(any(weights[, 1] != weights[, 2]))
+  expect_true(all(apply(weights, 1, function(w) any(w == 0))))
+  # Diagnostics add columns without changing histories.
+  plain <- simulate(weighted_model(population, "weighted_choice", matching = matching), 10, seed = 915)
+  expect_identical(first$persons, plain$persons)
+  expect_identical(first$unions[names(plain$unions)], plain$unions)
+  # Restarts keep earlier rows and fill only new unions.
+  second <- simulate(set_population(model, first), 5, seed = 916)
+  expect_identical(second$unions[seq_len(nrow(first$unions)), columns], first$unions[columns])
+  expect_true(all(is.finite(as.matrix(second$unions[-seq_len(nrow(first$unions)), columns]))))
+  # Female choice and zero-duration runs add no weight values; no groups, no columns.
+  female <- simulate(weighted_model(population, "female_choice", matching = matching,
+                                    diagnostics = TRUE), 10, seed = 915)
+  expect_false(any(columns %in% names(female$unions)))
+  expect_true(all(columns %in% names(simulate(model, 0)$unions)))
+  ungrouped <- simulate(weighted_model(weighted_population(300), "weighted_choice",
+                                       diagnostics = TRUE), 5, seed = 917)
+  expect_false(any(grepl("^\\.log_weight_", names(ungrouped$unions))))
+})
+
+test_that("unmet targets hidden by near-zero weights are reported as approximate", {
+  # B women are present but inactive, so B men's target is zero; C women can
+  # only partner B men (C:A prohibited, no C men), so that target cannot hold.
+  women <- data.frame(born = c(rep(-30, 60), rep(-60, 20), rep(-30, 20)),
+                      group = rep(0:2, c(60, 20, 20)), fertile = TRUE)
+  men <- data.frame(born = -30, group = rep(0:1, c(60, 20)))
+  rates <- data.frame(age_start = 15, age_end = 50, rate = 0.1)
+  matching <- create_age_gap_matching_model(0, 5, prevent_exogamy = "C:A")
+  result <- calibrate(women, men, matching, rates, c("A", "B", "C"))
+  expect_equal(result$target, c(1, 0, 0))
+  expect_true(result$infeasible)
+  expect_equal(result$flow, c(0.75, 0.25, 0), tolerance = 1e-9)
+})
+
+test_that("bin intensities average hazards over each bin's age span", {
+  # A band much narrower than a bin, which a bin-centre age would miss.
+  x <- group_only(c(0.75, 0.25), c(0.75, 0.25), -3)
+  x$women$born <- -30.01
+  narrow <- data.frame(age_start = c(30, 30.05), age_end = c(30.05, 60), rate = c(1, 0))
+  result <- calibrate(x$women, x$men, x$matching, narrow, c("A", "B"))
+  expect_false(result$infeasible)
+  expect_equal(exp(result$log_weights[2]), 1.682979, tolerance = 1e-6)
+  # One-year bands put a band edge inside many bins; agreement with the exact
+  # individual-level reference stays close at the default width.
+  set.seed(918)
+  women <- data.frame(born = -runif(500, 12, 60), group = sample(0:1, 500, TRUE, c(0.7, 0.3)),
+                      fertile = runif(500) < 0.8)
+  men <- data.frame(born = -runif(450, 12, 70), group = sample(0:1, 450, TRUE, c(0.6, 0.4)))
+  yearly <- data.frame(age_start = 15:49, age_end = 16:50, rate = runif(35, 0, 0.3))
+  matching <- create_age_gap_matching_model(1, 5, group_exogamy = c("A::B" = -2))
+  for (fertility in c(FALSE, TRUE)) {
+    expected <- reference_weights(women, men, matching, yearly, c("A", "B"), fertility = fertility)
+    default <- calibrate(women, men, matching, yearly, c("A", "B"), fertility = fertility)
+    expect_equal(default$log_weights, expected$log_weights, tolerance = 0.02)
   }
 })

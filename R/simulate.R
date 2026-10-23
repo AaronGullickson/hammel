@@ -215,6 +215,19 @@ simulate <- function(model, years, seed = NULL) {
       if (!column %in% names(result$unions))
         result$unions[[column]] <- rep(NA_integer_, nrow(result$unions))
     }
+    # Weighted choice records the log group weights applied at each union's
+    # search (0 = unit weight), one column per group; earlier unions are NA.
+    if (identical(union_process$matching$matching_method, "weighted_choice") &&
+        !is.null(group_values)) {
+      added <- if (years > 0) native$diagnostic_log_weights else matrix(numeric(), 0, length(group_values))
+      new_rows <- seq_len(nrow(added)) + nrow(population$unions)
+      for (g in seq_along(group_values)) {
+        column <- paste0(".log_weight_", as.character(group_values)[g])
+        if (!column %in% names(result$unions))
+          result$unions[[column]] <- rep(NA_real_, nrow(result$unions))
+        result$unions[[column]][new_rows] <- added[, g]
+      }
+    }
   }
   result$end_time <- start + years
   result$simulation <- list(start_time = start, end_time = result$end_time,

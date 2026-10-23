@@ -77,7 +77,12 @@ realized fertility below inputs.}
 
 \item{diagnostics}{Logical, default \code{FALSE}. Record \code{.n_eligible} (sampled men
 remaining after screening) and \code{.utility_rank} (1 = highest utility, ties
-share the minimum rank) on newly formed unions. Historical unknowns are NA.}
+share the minimum rank) on newly formed unions. Historical unknowns are NA.
+When the general matching model uses weighted choice in a grouped
+population, also record \verb{.log_weight_<group>} columns: the log group
+weights applied at the search that formed each union (0 for the reference
+group and for unweighted searches). Use the column for each alternative's
+group as a conditional-logit offset in wife-side choice sets.}
 
 \item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
 search-rate multipliers by the woman's group. Missing groups use 1.0;

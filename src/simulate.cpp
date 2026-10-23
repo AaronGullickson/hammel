@@ -557,7 +557,10 @@ class WeightCalibrator {
           women_count[g] += women_[i];
           const double at_risk = fertility ? fertile_[i] : women_[i];
           if (at_risk > 0) {
-            const double hazard = band_rate(*hazards[g], age);
+            // Average hazard over the bin's whole age span, so narrow or
+            // misaligned rate bands are not missed by a single centre age.
+            const double oldest = now - static_cast<double>(first_ + k) * width_;
+            const double hazard = rate_integral(*hazards[g], oldest - width_, oldest) / width_;
             if (hazard > 0) { rows.push_back({g, k, at_risk * hazard}); intensity[g] += at_risk * hazard; }
           }
         }
@@ -708,18 +711,36 @@ class WeightCalibrator {
       if (!converged) s.infeasible = true;
       for (int j = 0; j < n; ++j) s.log_weights[free_groups[j]] = x[j];
     }
-    // Expected flows under the final weights, for inspection.
+    // Expected flows under the final weights, in log space so that women whose
+    // only allowed men carry near-zero weights still count, as they do in
+    // actual selection. Women with no allowed men cannot be matched by any
+    // weights and are left out. A remaining miss means the target was not met.
     double flow_total = 0;
+    std::vector<double> share(G);
     for (int r = 0; r < R; ++r) {
+      double top = R_NegInf;
+      for (int m = 0; m < G; ++m) {
+        const double pool = S[static_cast<size_t>(r) * G + m];
+        if (pool > 0) top = std::max(top, s.log_weights[m] + std::log(pool));
+      }
+      if (top == R_NegInf) continue;
       double denominator = 0;
-      for (int m = 0; m < G; ++m)
-        denominator += std::exp(s.log_weights[m]) * S[static_cast<size_t>(r) * G + m];
-      if (!(denominator > 0)) continue;
+      for (int m = 0; m < G; ++m) {
+        const double pool = S[static_cast<size_t>(r) * G + m];
+        share[m] = pool > 0 ? std::exp(s.log_weights[m] + std::log(pool) - top) : 0;
+        denominator += share[m];
+      }
       flow_total += rows[r].lambda;
-      for (int m = 0; m < G; ++m)
-        s.flow[m] += rows[r].lambda * std::exp(s.log_weights[m]) * S[static_cast<size_t>(r) * G + m] / denominator;
+      for (int m = 0; m < G; ++m) s.flow[m] += rows[r].lambda * share[m] / denominator;
     }
-    if (flow_total > 0) for (double& value : s.flow) value /= flow_total;
+    if (flow_total > 0) {
+      double miss = 0;
+      for (int m = 0; m < G; ++m) {
+        s.flow[m] /= flow_total;
+        miss = std::max(miss, std::abs(s.flow[m] - s.target[m]));
+      }
+      if (miss > 1e-8) s.infeasible = true;
+    }
     warm = s.log_weights;
     return s;
   }
@@ -863,6 +884,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   hammel::Kinship kinship(std::move(parent_links), kinship_generations);
   std::vector<UnionRecord> union_history;
   std::vector<int> diagnostic_counts, diagnostic_ranks;
+  // Log group weights applied at each union-forming search (empty = unit weights).
+  std::vector<std::vector<double>> diagnostic_log_weights;
   std::vector<std::vector<int>> person_unions(people.size());
   std::vector<int> current_partner(people.size(), -1);
   // weighted_choice state (D066). The calibrator exists only for grouped
@@ -965,17 +988,22 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   LagTable union_table, father_table_storage;
   int union_table_id = 0, father_table_id = 0;
   // Each matching model carries its own method; a NULL father model is the
-  // same object as the general model and shares its method and table.
-  const bool union_weighted = matching.containsElementNamed("weighted") &&
-    as<bool>(matching["weighted"]);
-  const bool father_weighted = father_matching.containsElementNamed("weighted") &&
-    as<bool>(father_matching["weighted"]);
+  // same object as the general model and shares its method and table. When a
+  // model prevents all exogamy, every woman sees only her own group's men, so
+  // a group weight cannot change her choice: skip calibration (female choice).
+  auto applies_weights = [](const List& model) {
+    return model.containsElementNamed("weighted") && as<bool>(model["weighted"]) &&
+      !as<bool>(model["prevent_exogamy_all"]);
+  };
+  const bool union_weighted = applies_weights(matching);
+  const bool father_weighted = applies_weights(father_matching);
   std::vector<double> union_warm, father_warm;
   double weighted_infeasible = 0;
   // All father and partner searches share sampling, eligibility and matching.
   // Only form_union changes partner state or removes the selected man.
   auto find_candidate = [&](int woman, double now, const List& choice_model,
-                            int* count = nullptr, int* rank = nullptr, bool father = false) {
+                            int* count = nullptr, int* rank = nullptr, bool father = false,
+                            std::vector<double>* applied = nullptr) {
     if (males.empty()) return -1;
     const int sample_size = as<int>(choice_model["sample_size"]);
     const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
@@ -1003,6 +1031,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         father ? father_table_id : union_table_id,
         as<double>(choice_model["imbalance_absorption"]), father ? father_warm : union_warm);
       if (weights.infeasible) ++weighted_infeasible;
+      if (applied) *applied = weights.log_weights;
       return select_partner(males, eligible, people, woman, choice_model, rank,
                             &weights.log_weights);
     }
@@ -1012,9 +1041,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     int partner = current_partner[woman];
     if (partner >= 0) return partner;
     int count = NA_INTEGER, rank = NA_INTEGER;
+    std::vector<double> applied;
     partner = find_candidate(woman, now, matching,
                              diagnostics ? &count : nullptr,
-                             diagnostics ? &rank : nullptr);
+                             diagnostics ? &rank : nullptr, false,
+                             diagnostics ? &applied : nullptr);
     if (partner >= 0) {
       if (next_union_id >= 9007199254740991.0 ||
           union_history.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
@@ -1024,6 +1055,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       if (diagnostics) {
         diagnostic_counts.push_back(count);
         diagnostic_ranks.push_back(rank);
+        diagnostic_log_weights.push_back(applied);
       }
       person_unions[woman].push_back(u);
       person_unions[partner].push_back(u);
@@ -1346,5 +1378,14 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),
     _["groups"] = out_group, _["unions"] = out_unions, _["ancestry"] = out_ancestry,
     _["births"] = birth_count, _["deaths"] = death_count,
-    _["weighted_infeasible"] = weighted_infeasible);
+    _["weighted_infeasible"] = weighted_infeasible,
+    _["diagnostic_log_weights"] = [&]() {
+      // Rows are new unions in order; columns are group indices. Unions formed
+      // without weights (unit weights) record zeros.
+      NumericMatrix out(static_cast<int>(diagnostic_log_weights.size()), group_count);
+      for (size_t u = 0; u < diagnostic_log_weights.size(); ++u)
+        for (int g = 0; g < group_count; ++g)
+          out(u, g) = diagnostic_log_weights[u].empty() ? 0 : diagnostic_log_weights[u][g];
+      return out;
+    }());
 }

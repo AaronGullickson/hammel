@@ -44,7 +44,7 @@ warning. This verifies software behavior, not demographic parameter recovery.
 | `test-matching-sample-size.R` | Matching-model size validation, actual default-1000 sampling, independent general/father sizes, NULL inheritance, and removed union-level API |
 | `test-prevent-exogamy.R` | Post-sampling restrictions, no refilling, scarcity/failure, direction/symmetry, father overrides, diagnostics, retained partners, and unchanged disabled RNG |
 | `test-detailed-unions.R` | Spouse-ID joins, repeated episodes, deaths, optional group types, empty tables, unchanged inputs, and name collisions |
-| `test-weighted-choice.R` | Analytical weights and absorption, binned versus exact calibration, three groups, zero/unattainable targets, incremental sums versus full rebuild, female-choice equality for one group, both modes, fathers, restarts, diagnostics, warning, validation |
+| `test-weighted-choice.R` | Analytical weights and absorption, binned versus exact calibration, three groups, zero/unattainable targets, incremental sums versus full rebuild, mid-run identities, strict endogamy, unmet-target detection, narrow and one-year rate bands, recorded log weights, construction and inheritance warnings, female-choice equality for one group, both modes, fathers, restarts, diagnostics, warning, validation |
 | `test-parent-info.R` | Parent-ID joins, ages at birth, deceased/unknown parents, optional groups, empty tables, unchanged inputs, and name collisions |
 | `test-model-api.R` | Construction, replacement, schemas, history and metadata retention |
 | `test-baseline-population.R` | Reproducibility, bounds, known cases, distributions, empty populations |

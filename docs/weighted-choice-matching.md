@@ -127,15 +127,23 @@ The engine keeps counts of unpartnered men and women by group and 0.25-year
 birth-time bin, and of women past their birth-spacing interval. Counts change
 only at events (birth, death, formation, widowhood) and when a queued spacing
 interval ends; restarts rebuild them from histories. At a search, each bin's
-age is the current time minus its centre birth time, which determines the age
-cutoff and hazards.
+centre age (current time minus centre birth time) determines whether the whole
+bin is at or above the age cutoff, for both sexes. A bin's intensity uses the
+average hazard over its full quarter-year age span, so rate bands narrower than
+a bin or edges inside it are not missed (D071); the only remaining
+approximation is how births are spread within a bin.
 
 Pair utilities depend only on the lag between bin centres, which equals male
 age minus female age. A table over every lag in the run's birth-time range is
 built once per matching model, including one evaluation of a custom R formula
 on that grid. The formula must therefore give finite values at every such lag.
 Bin width is a numerical tolerance, not a demographic parameter. Candidate
-selection itself uses exact ages.
+selection itself uses exact ages. Remaining binning approximations are the
+whole-bin age cutoff and pair utilities at bin-centre ages (gap error up to
+about 0.25 years, which matters only for very sharp age preferences). With
+one-year rate bands and a 5-year half-weight distance, default bins gave B
+log weights within 0.0001 to 0.0003 of an exact person-level calculation;
+0.01-year bins agreed to within 0.00001 (October 23, 2026).
 
 The pool sums S are maintained incrementally for every female bin, group pair
 and matching model: a man joining or leaving the eligible pool updates them,
@@ -147,12 +155,25 @@ roundoff. This is a software optimization (October 23, 2026): probabilities
 are unchanged up to floating-point roundoff, which can in principle alter
 fixed-seed histories relative to the first implementation.
 
+### Strict endogamy
+
+When a matching model sets `prevent_exogamy = TRUE`, every woman sees only men
+of her own group, so a group weight scales all her candidates equally and
+cannot change her choice. Calibration is skipped for that model, giving
+female choice exactly, with no warnings (D070). Partial restrictions (listed
+pairs) still calibrate.
+
 ### When no solution exists
 
 A male group may have a positive target but no feasible demand, for example
 under `prevent_exogamy` when no compatible women have positive intensity. Its
 log weight is set to 50 and the search is counted as approximate; Newton
-non-convergence within 100 iterations is counted likewise. A group with zero
+non-convergence within 100 iterations is counted likewise. After solving,
+expected flows are recomputed in log space with every woman who has an
+allowed man, including those whose only allowed men carry near-zero weights;
+any flow missing its target by more than 1e-8 also marks the search
+approximate (D071). Women with no allowed man are left out, since no weights
+can match them. A group with zero
 target receives log weight -1000. If no women have positive intensity, all
 weights are 1. As selected by the user, `simulate()` warns once, reporting the
 number of searches that used approximate weights.
@@ -199,7 +220,16 @@ direction) or `male_group` formula terms warns once (D069).
 ## Diagnostics and interpreting estimates
 
 `.n_eligible` and `.utility_rank` keep their meanings: rank uses U, not the
-weighted score. Weights are not recorded and consume no random draws.
+weighted score. Weights consume no random draws. When the general matching
+model uses weighted choice in a grouped population, `diagnostics = TRUE` also
+records `.log_weight_<group>` on each new union: the log group weights applied
+at the search that formed it (October 23, 2026, D070). One group is the
+reference with log weight 0; only differences between groups matter, and
+unweighted searches record 0 for every group. Earlier unions and new groups'
+columns for earlier rows are NA. In a wife-side choice set, using the column
+for each alternative's group as an offset gives the exact benchmark, in place
+of approximating the weights with a male-group main effect. Nonmarital father
+selections form no union and are not recorded.
 
 A conditional logit fitted to wife-side choice sets with the input terms only
 estimates separate directed group terms offset by log(b) differences, while
@@ -274,7 +304,9 @@ Findings from these runs and their discussion:
 (including absorption 0, 0.5 and 1, and balanced symmetry at every absorption),
 binned calibration against an exact individual-level R reference for native
 and custom formulas in both intensity types, three-group convergence, zero and
-unattainable targets, exact equality with female choice for one or no groups
+unattainable targets, a male group with no counted women, identities created
+during a run (custom AB inheritance) and restarts with them, strict endogamy
+reproducing female choice, recorded log weights across restarts, exact equality with female choice for one or no groups
 in both initiation modes, reproducibility, restarts, separate father models,
 diagnostics without changed histories, the single warning, and input
 validation, and incremental pool sums against a full rebuild after thousands
