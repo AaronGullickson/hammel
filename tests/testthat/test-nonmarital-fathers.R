@@ -52,10 +52,9 @@ test_that("father searches exclude partnered men, boys and demonstrated kin", {
 
 test_that("female-choice father selection uses the entered conditional-logit probabilities", {
   model <- make_nonmarital_model(3, birth_rate = 500)
-  model$processes$union_formation$matching_method <- "female_choice"
   model$population$persons$birth_time[3] <- -30
   model$processes$union_formation$matching <- create_matching_model(
-    ~ age_difference, c(age_difference = log(3) / 10))
+    ~ age_difference, c(age_difference = log(3) / 10), matching_method = "female_choice")
   result <- simulate(model, 1, seed = 72)
   children <- result$persons[result$persons$birth_time >= 0, ]
   n <- nrow(children)
@@ -122,12 +121,11 @@ test_that("father_matching defaults to the general model and validates edited ob
 
 test_that("father_matching changes nonmarital fathers but not later union choices", {
   model <- make_nonmarital_model(3)
-  model$processes$union_formation$matching_method <- "female_choice"
   model$population$persons$birth_time[3] <- -30
   model$processes$union_formation$matching <- create_matching_model(
-    ~ age_difference, c(age_difference = 100))
+    ~ age_difference, c(age_difference = 100), matching_method = "female_choice")
   model$processes$union_formation$father_matching <- create_matching_model(
-    ~ age_difference, c(age_difference = -100))
+    ~ age_difference, c(age_difference = -100), matching_method = "female_choice")
   model$processes$union_formation$rates <- data.frame(
     age_start = 20.5, age_end = Inf, rate = 100)
   result <- simulate(model, 1, seed = 52)

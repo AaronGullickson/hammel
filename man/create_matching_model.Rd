@@ -10,8 +10,9 @@ create_matching_model(
   group_exogamy = NULL,
   group_levels = NULL,
   prevent_exogamy = FALSE,
-  sample_size = 250,
-  imbalance_absorption = 1
+  sample_size = 1000,
+  imbalance_absorption = 1,
+  matching_method = "weighted_choice"
 )
 }
 \arguments{
@@ -47,18 +48,30 @@ cancellation rules. Restrictions override finite preferences, require
 population identities, and do not invalidate existing partners.}
 
 \item{sample_size}{Nonnegative whole number of men to sample before
-pair-specific screening. Defaults to \code{250}; zero requests the whole
+pair-specific screening. Defaults to \code{1000}; zero requests the whole
 available pool. Rejected candidates are not replaced. A separate
 \code{father_matching} model uses its own sample size.}
 
-\item{imbalance_absorption}{Used only by \code{matching_method = "weighted_choice"}
-in \code{\link[=union_formation]{union_formation()}}. Share, in \verb{[0, 1]}, of a group's sex imbalance among
+\item{imbalance_absorption}{Used only when \code{matching_method = "weighted_choice"}.
+Share, in \verb{[0, 1]}, of a group's sex imbalance among
 unpartnered people that is absorbed through cross-group unions. Default \code{1}
 gives each unpartnered man the per-capita union intensity of an unpartnered
 woman of his group. \code{0} makes each male group's share of unions equal its
 female group's share, so the excess sex waits longer. Intermediate values
 interpolate the male group targets. Symmetric preferences with balanced sex
 composition give equal directional pairing counts at every value.}
+
+\item{matching_method}{\code{"weighted_choice"} (default) for female choice with
+calibrated male-group weights, or \code{"female_choice"} for unweighted ego-only
+choice. Female choice accounts for available men but leaves how often each
+male group forms unions unspecified. With unequal group sizes, symmetric
+group preferences can then produce unequal female-A/male-B and
+female-B/male-A pairing counts, which can systematically affect group
+inheritance and later group composition. Weighted choice adds the missing
+rule for men without changing the preference association; with one group
+it equals female choice. The method belongs to this model: a separate
+\code{father_matching} model in \code{\link[=union_formation]{union_formation()}} uses its own method, and a
+NULL father model inherits this one.}
 }
 \value{
 An inspectable \code{hammel_matching_model} list containing \code{formula}

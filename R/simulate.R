@@ -24,12 +24,11 @@
 #' A failed match cancels the birth unless explicitly allowed by the union process.
 #' Cancellation starts no new birth-spacing interval. On-demand mode rejects
 #' status schedules.
-#' Default `matching_method = "two_sided"` on [union_formation()] uses
-#' probabilistic fixed-pool temporary markets. Explicit `"female_choice"`
-#' retains ego-only selection. Only ego's outcome is retained; event initiation
-#' is unchanged. Experimental `"weighted_choice"` uses female choice with
-#' male-group weights recalibrated at each search; it warns once if any search
-#' needed approximate weights.
+#' Matching models default to `matching_method = "weighted_choice"`: female
+#' choice with male-group weights recalibrated at each search; simulation warns
+#' once if any search needed approximate weights. `"female_choice"` uses
+#' unweighted selection. A separate father model uses its own method. Event
+#' initiation is unchanged.
 #'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
 #' and uses recorded maternal births, including on restart.
@@ -166,11 +165,9 @@ simulate <- function(model, years, seed = NULL) {
   result <- population
   births <- deaths <- 0
   if (years > 0) {
-    two_sided <- identical(union_process$matching_method, "two_sided")
-    weighted <- identical(union_process$matching_method, "weighted_choice")
-    matching <- prepare_matching_model(union_process$matching, group_values, two_sided, weighted)
+    matching <- prepare_matching_model(union_process$matching, group_values)
     father_matching <- if (is.null(union_process$father_matching)) matching else
-      prepare_matching_model(union_process$father_matching, group_values, two_sided, weighted)
+      prepare_matching_model(union_process$father_matching, group_values)
     native <- simulate_cpp(engine_persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
                            matching,
@@ -207,8 +204,9 @@ simulate <- function(model, years, seed = NULL) {
     births <- native$births
     deaths <- native$deaths
     if (native$weighted_infeasible > 0) {
-      warning(sprintf(paste("weighted_choice found no exact male-group weights in %d search(es);",
-                            "approximate weights were used."), as.integer(native$weighted_infeasible)),
+      warning(sprintf(paste("weighted_choice could not meet male-group targets in %d search(es),",
+                            "for example because no eligible woman may partner a group's men;",
+                            "capped approximate weights were used."), as.integer(native$weighted_infeasible)),
               call. = FALSE)
     }
   }

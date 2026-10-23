@@ -63,8 +63,8 @@ separate from conditional-logit matching, birth-triggered and scheduled search
 modes, initial age-difference matching, kinship screening, and partnered/unpartnered
 fertility in scheduled mode. Only death ends unions in this milestone. Parity-specific fertility is deferred
 to a later milestone.
-Candidate sampling now defaults to 250 men on the matching model before pair
-screening (D065; zero means the whole pool). Eligibility and basic fertility transitions are implemented; the
+Candidate sampling now defaults to 1000 men on the matching model before pair
+screening (D065, D067; zero means the whole pool). Eligibility and basic fertility transitions are implemented; the
 failed-match birth cancellation is implemented (default TRUE); transition-aware fertility
 compensation remains deferred (D045), including after milestone acceptance (D050). The poor-pool wait alternative is deferred to a later milestone (D044). See [milestone 2 notes](union-formation-models.md)
 for implemented rules, deferred decisions, and validation. The on-demand C++ path now forms unions at births with formula-based

@@ -1090,8 +1090,8 @@ matching specifications override this default. Initiation mode remains explicit.
 
 ## D061: Prototype sequential two-sided temporary matching markets
 
-- **Status:** experiment authorized by the user October 22, 2026; scientific
-  acceptance and parameter benchmarks remain pending.
+- **Status:** experiment authorized by the user October 22, 2026; superseded
+  by D062 and removed with the two-sided method in D067.
 - **Decision:** add optional `matching_method = "two_sided"` to union formation,
   preserving `"female_choice"` as the default. Sample M - 1 alternate living,
   unpartnered women with the same age cutoff as ego's M eligible sampled men.
@@ -1106,13 +1106,14 @@ matching specifications override this default. Initiation mode remains explicit.
   explicit father preferences, actual eligibility, and existing event timing.
   No hypothetical pair changes population state. The user requested runtime
   comparisons and will assess input benchmarks using milestone 3 analyses.
-- **Specification:** see [experimental two-sided matching](two-sided-matching.md).
+- **Specification:** `docs/two-sided-matching.md`, removed in D067; see Git
+  history.
 
 
 ## D062: Fixed-pool reciprocal probabilities for the two-sided experiment
 
 - **Status:** implementation authorized by the user October 22, 2026;
-  scientific parameter recovery remains under investigation.
+  removed by the user October 23, 2026 (D067).
 - **Decision:** supersede D061's sequential temporary depletion. Retain its
   sampling, eligibility, shortage, hard exclusion, and father-selection rules.
   Score the fixed market, sum ego's row-normalized partner probabilities and
@@ -1125,7 +1126,8 @@ matching specifications override this default. Initiation mode remains explicit.
 - **Validation:** analytical probabilities, independent rejection simulation,
   extreme utilities, exclusions, native/R parity, actual-state invariants,
   default compatibility, and measured timing against the previous prototype.
-- **Specification:** [two-sided matching](two-sided-matching.md).
+- **Specification:** `docs/two-sided-matching.md`, removed in D067; see Git
+  history.
 
 
 ## D063: Geometric rescaling experiment removed
@@ -1144,7 +1146,8 @@ matching specifications override this default. Initiation mode remains explicit.
 
 ## D064: Two-sided matching is the default for new specifications
 
-- **Status:** implemented at the user's request October 22, 2026.
+- **Status:** implemented at the user's request October 22, 2026; superseded
+  by D067.
 - **Decision:** default `union_formation()` and `set_union_formation()` to
   `matching_method = "two_sided"`, using D062's existing additive fixed-pool
   probabilities. Retain explicit `"female_choice"` and its inheritance warning.
@@ -1164,7 +1167,8 @@ matching specifications override this default. Initiation mode remains explicit.
 
 ## D065: Candidate sample size belongs to the matching model
 
-- **Status:** implemented at the user's request October 22, 2026.
+- **Status:** implemented at the user's request October 22, 2026; the
+  default size of 250 is superseded by 1000 in D067.
 - **Decision:** both matching-model constructors accept `sample_size = 250`.
   Remove the argument from union formation and its setter, without a deprecated
   alias. The user prefers direct API changes while the package is unpublished.
@@ -1189,7 +1193,8 @@ matching specifications override this default. Initiation mode remains explicit.
 ## D066: Experimental weighted-choice matching
 
 - **Status:** specified with and authorized by the user October 23, 2026;
-  scientific assessment pending.
+  made the default in D067, which also supersedes its retention of two-sided
+  matching.
 - **Decision:** add `matching_method = "weighted_choice"`: female choice among
   screened candidates, with each man's selection weight multiplied by a weight
   for his group. Weights are recalibrated at every search, in continuous time,
@@ -1219,3 +1224,56 @@ matching specifications override this default. Initiation mode remains explicit.
   implementation. This also records the user's October 23 clarification that
   candidate `sample_size` is a speed shortcut, not an encounter model, which
   qualifies the encounter-scarcity rationale recorded under D057.
+
+## D067: Weighted choice is the default; two-sided matching removed
+
+- **Status:** decided and requested by the user October 23, 2026, after
+  reviewing the replicated results recorded in
+  [weighted-choice matching](weighted-choice-matching.md).
+- **Decision:** `union_formation()` and `set_union_formation()` default to
+  `matching_method = "weighted_choice"`, and both matching-model constructors
+  default to `sample_size = 1000`. Remove the additive two-sided method
+  (D061/D062/D064) entirely: its engine code, inspection functions, tests,
+  specification, and benchmark scripts and results. Explicit
+  `"female_choice"` remains available; older objects without a method field
+  retain it. Objects storing `"two_sided"` are rejected with an instruction to
+  rebuild, following the user's preference for direct API changes while the
+  package is unpublished.
+- **Rationale:** the user judged two-sided matching a dead end: its additive
+  probabilities attenuate the input association. Weighted choice balanced
+  directional pairing and recovered preferences in the user's runs. A
+  250-man sample attenuated pooled associations under both remaining methods;
+  1000 removed most of this at modest cost for weighted choice.
+- **Consequences:** default seeded histories change. With hard exclusions that
+  leave a male group unreachable, the default now warns that male-group
+  targets could not be met. The milestone 3 report's chunk using
+  `matching_method = "two_sided"` must be changed by the user.
+- **Validation:** full suite passed with no failures or warnings; the opt-in
+  live database test was skipped. See [testing](testing.md).
+
+## D068: Matching method belongs to the matching model
+
+- **Status:** requested by the user October 23, 2026.
+- **Decision:** move `matching_method` from `union_formation()` and
+  `set_union_formation()` to `create_matching_model()` and
+  `create_age_gap_matching_model()`, defaulting to `"weighted_choice"`. A
+  separate `father_matching` model applies its own method; NULL inherits the
+  general model's method, as for `sample_size` (D065) and
+  `imbalance_absorption`.
+- **Rationale:** the method describes how a matching model turns utilities
+  into choices, not how unions are initiated. It sits with the other
+  matching-model settings and allows, for example, weighted unions with
+  female-choice nonmarital fathers.
+- **No legacy handling:** at the user's direction, there are no compatibility
+  checks while the package is unpublished. Matching models lacking
+  `matching_method` or `imbalance_absorption` fail ordinary validation; a
+  `matching_method` field left on an old union process is ignored. The earlier
+  rule that process objects without a method retain female choice is removed.
+- **Engine:** the calibrator is built when either model is weighted in a
+  grouped population; each search applies weights only if its own model is
+  weighted.
+- **Validation:** constructor defaults and validation, removal of the union
+  argument, NULL father inheritance of the method, and mixed union/father
+  methods; the full suite passed with no failures or warnings, the live
+  database test skipped. The milestone 3 report's chunks passing
+  `matching_method` to `set_union_formation()` must be updated by the user.

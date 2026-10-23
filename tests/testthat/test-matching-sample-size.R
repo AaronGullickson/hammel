@@ -1,7 +1,7 @@
 test_that("matching sample size defaults and validation belong to matching models", {
-  expect_equal(create_matching_model(~ 1, numeric())$sample_size, 250)
-  expect_equal(create_age_gap_matching_model(0, 5)$sample_size, 250)
-  expect_equal(union_formation("on_demand")$matching$sample_size, 250)
+  expect_equal(create_matching_model(~ 1, numeric())$sample_size, 1000)
+  expect_equal(create_age_gap_matching_model(0, 5)$sample_size, 1000)
+  expect_equal(union_formation("on_demand")$matching$sample_size, 1000)
   for (size in c(0, 1, 50, .Machine$integer.max)) {
     matching <- create_matching_model(~ 1, numeric(), sample_size = size)
     expect_equal(create_age_gap_matching_model(0, 5, sample_size = size)$sample_size, size)
@@ -27,27 +27,28 @@ test_that("matching sample size defaults and validation belong to matching model
   expect_error(set_process(hammel_model(), legacy), "matching model")
 })
 
-test_that("the default samples 250 men in both matching methods", {
-  model <- make_model(601, birth_rate = 100, birth_interval = 0)
-  model$population$persons$sex <- c("f", rep("m", 300), rep("f", 300))
-  model$population$persons$birth_time <- c(-20, rep(-25, 300), rep(-60, 300))
-  for (method in c("female_choice", "two_sided")) {
-    model <- set_union_formation(model, "on_demand", diagnostics = TRUE, matching_method = method)
+test_that("the default samples 1000 men in both matching methods", {
+  model <- make_model(2201, birth_rate = 100, birth_interval = 0)
+  model$population$persons$sex <- c("f", rep("m", 1100), rep("f", 1100))
+  model$population$persons$birth_time <- c(-20, rep(-25, 1100), rep(-60, 1100))
+  for (method in c("female_choice", "weighted_choice")) {
+    model <- set_union_formation(model, "on_demand", diagnostics = TRUE,
+      matching = create_age_gap_matching_model(0, 5, matching_method = method))
     result <- simulate(model, 0.2, seed = 52)
     expect_equal(nrow(result$unions), 1)
-    expect_identical(result$unions$.n_eligible, 250L)
+    expect_identical(result$unions$.n_eligible, 1000L)
   }
 })
 
 test_that("union and father models use independent sample sizes with NULL inheritance", {
-  for (method in c("female_choice", "two_sided")) {
+  for (method in c("female_choice", "weighted_choice")) {
     union_sizes <- father_sizes <- integer()
     record_union <- function(gap) { union_sizes <<- c(union_sizes, length(gap)); gap }
     record_father <- function(gap) { father_sizes <<- c(father_sizes, length(gap)); gap }
     general <- create_matching_model(~ record_union(age_difference),
-      c("record_union(age_difference)" = 0), sample_size = 3)
+      c("record_union(age_difference)" = 0), sample_size = 3, matching_method = method)
     fathers <- create_matching_model(~ record_father(age_difference),
-      c("record_father(age_difference)" = 0), sample_size = 1)
+      c("record_father(age_difference)" = 0), sample_size = 1, matching_method = method)
     model <- make_model(6)
     model$population$persons$sex <- c("f", "m", "m", "m", "f", "f")
     model$population$persons$birth_time <- c(-20, -20, -25, -30, -60, -60)
@@ -56,7 +57,7 @@ test_that("union and father models use independent sample sizes with NULL inheri
       age_start = 19, age_end = 21, rate = 100), birth_interval = 0, ffab = 1)
     model <- set_union_formation(model, "rate", general, father_matching = fathers,
       rates = data.frame(age_start = 20.2, age_end = 21, rate = 1000),
-      matching_method = method, diagnostics = TRUE)
+      diagnostics = TRUE)
     # Constructor and execution validation evaluate formulas on a 101-row grid;
     # keep those validation calls distinct from actual candidate-set sizes.
     result <- simulate(model, 0.4, seed = 52)

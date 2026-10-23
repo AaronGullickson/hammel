@@ -1,10 +1,12 @@
-# Experimental weighted-choice matching
+# Weighted-choice matching
 
-Specified with the user and authorized for implementation October 23, 2026 on
-`experiment/two-sided-sequential-matching` (D066). This describes implemented
-behavior of `matching_method = "weighted_choice"`. Scientific assessment is
-pending; no acceptance thresholds are set. Additive two-sided matching remains
-available and remains the default for new specifications (D064).
+Specified with the user and implemented October 23, 2026 on
+`experiment/two-sided-sequential-matching` (D066). The user made
+`matching_method = "weighted_choice"` the default, with matching-model
+`sample_size = 1000`, and removed additive two-sided matching (D067). The
+method is an argument of the matching-model constructors (D068), so a separate
+father model can use its own; `"female_choice"` remains available. This describes
+implemented behavior; no acceptance thresholds are set.
 
 ## Problem
 
@@ -16,7 +18,7 @@ preferences are symmetric and each group's sexes are balanced.
 | Method | Preferences recovered | Directional balance |
 | --- | --- | --- |
 | Female choice | Yes | No: 75/25 groups, A::B = -3 give AB/BA = 0.377 |
-| Additive two-sided (D062) | No: same case gives cross-product -5.77, not -6 | Approximately |
+| Additive two-sided (D062; removed in D067) | No: same case gives cross-product -5.77, not -6 | Approximately |
 | Sinkhorn balancing of each temporary market | No: age and group effects attenuated | No: overcorrected |
 
 The female-choice imbalance arises because nothing specifies how often each
@@ -106,15 +108,16 @@ unions. At 1, men receive the full mirrored target. At 0, each male group's
 share of unions equals its female group's share, so the excess sex waits
 longer. With symmetric preferences and balanced sex composition, F = M and
 every value gives equal directional counts. With no group preferences, values
-below 1 still disfavor men of an over-represented group. Other matching
-methods ignore the argument; older matching objects without it use 1.
+below 1 still disfavor men of an over-represented group. Female-choice models
+ignore the argument.
 
 ### Nonmarital fathers
 
 Rate-mode father selection has its own weights, calibrated from fertility
 intensity with the applicable father utilities (`father_matching`, or
 `matching` when NULL) and that model's `imbalance_absorption` (user, October
-23, 2026). Union searches keep weights calibrated from search hazards. The
+23, 2026). Each model applies its own `matching_method`: for example, weighted
+unions with female-choice fathers, or the reverse (D068). Union searches keep weights calibrated from search hazards. The
 male pool, target rule, and solver are shared. On-demand mode has one
 calibration, driven by fertility.
 
@@ -272,7 +275,7 @@ of pool changes and cutoff crossings.
 Timing, October 23, 2026 (optimized build; 20,000 starting persons in two
 groups, on-demand, 50 years, one seed; synthetic test mortality): female
 choice 0.13 s and 0.29 s at sample sizes 250 and 1,000; weighted choice 0.28 s
-and 0.44 s; additive two-sided 1.05 s at 250. Before incremental sums,
+and 0.44 s; additive two-sided (since removed) 1.05 s at 250. Before incremental sums,
 weighted choice took 1.1 s at 250. These are single-scenario measurements, not
 performance guarantees.
 

@@ -2,7 +2,8 @@
 # each search so expected male group flows meet the mirrored target.
 
 prepare_weighted <- function(model, groups) {
-  prepare_matching_model(model, groups, weighted = TRUE)
+  model$matching_method <- "weighted_choice"
+  prepare_matching_model(model, groups)
 }
 
 calibrate <- function(women, men, matching, rates, groups, now = 0, cutoff = 15,
@@ -160,20 +161,29 @@ weighted_population <- function(n = 600, weights = NULL, seed = 903) {
   create_baseline_population(n, max_age = 60, end_time = 0, group_weights = weights)
 }
 
-weighted_model <- function(population, method, initiation = "on_demand", ...) {
+with_method <- function(matching, method) {
+  if (!is.null(matching)) matching$matching_method <- method
+  matching
+}
+
+weighted_model <- function(population, method, initiation = "on_demand",
+                           matching = create_age_gap_matching_model(0, 5),
+                           father_matching = NULL, ...) {
+  matching <- with_method(matching, method)
+  father_matching <- with_method(father_matching, method)
   model <- hammel_model() |>
     set_population(population) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01))
   if (initiation == "on_demand") {
     model |>
       set_fertility(data.frame(age_start = 15, age_end = 45, rate = 0.12)) |>
-      set_union_formation("on_demand", matching_method = method, ...)
+      set_union_formation("on_demand", matching, father_matching = father_matching, ...)
   } else {
     model |>
       set_fertility(data.frame(age_start = 15, age_end = 45, rate = c(0.15, 0.05),
                                union_status = c("partnered", "unpartnered"))) |>
-      set_union_formation("rate", rates = data.frame(age_start = 15, age_end = 50, rate = 0.15),
-                          matching_method = method, ...)
+      set_union_formation("rate", matching, rates = data.frame(age_start = 15, age_end = 50, rate = 0.15),
+                          father_matching = father_matching, ...)
   }
 }
 
@@ -227,6 +237,31 @@ test_that("grouped weighted choice runs in both modes, restarts, and is reproduc
   expect_true(all(!is.na(born$father_id)))
 })
 
+test_that("union and father models apply their own matching methods", {
+  population <- weighted_population(600, c(A = 3, B = 1))
+  matching <- create_age_gap_matching_model(0, 5, group_exogamy = c("A::B" = -2))
+  run <- function(union_method, father_method) {
+    model <- weighted_model(population, union_method, "rate", matching = matching,
+                            father_matching = matching)
+    # The helper applies one method to both models; then give fathers their own.
+    model$processes$union_formation$father_matching$matching_method <- father_method
+    simulate(model, 20, seed = 910)
+  }
+  both_female <- run("female_choice", "female_choice")
+  both_weighted <- run("weighted_choice", "weighted_choice")
+  # A NULL father model inherits the general model, including its method.
+  inherited <- simulate(weighted_model(population, "weighted_choice", "rate", matching = matching),
+                        20, seed = 910)
+  expect_identical(inherited, both_weighted)
+  # Mixed methods run, are reproducible, and differ from either uniform choice.
+  for (methods in list(c("weighted_choice", "female_choice"), c("female_choice", "weighted_choice"))) {
+    mixed <- run(methods[1], methods[2])
+    expect_identical(mixed, run(methods[1], methods[2]))
+    expect_false(identical(mixed$persons, both_female$persons))
+    expect_false(identical(mixed$persons, both_weighted$persons))
+  }
+})
+
 test_that("weighted choice warns once when weights must be approximated", {
   population <- weighted_population(300, c(A = 1))
   persons <- population$persons
@@ -238,21 +273,28 @@ test_that("weighted choice warns once when weights must be approximated", {
   warnings <- character()
   withCallingHandlers(simulate(model, 10, seed = 908),
     warning = function(w) { warnings <<- c(warnings, conditionMessage(w)); invokeRestart("muffleWarning") })
-  expect_length(grep("weighted_choice found no exact", warnings), 1)
+  expect_length(grep("could not meet male-group targets", warnings), 1)
 })
 
-test_that("matching method and absorption inputs are validated", {
-  expect_identical(union_formation("on_demand", matching_method = "weighted_choice")$matching_method,
-                   "weighted_choice")
-  expect_error(union_formation("on_demand", matching_method = "weighted"), "weighted_choice")
-  for (bad in list(-0.1, 1.1, NA_real_, c(0.5, 0.5), "1", Inf))
+test_that("matching method and absorption inputs are validated on matching models", {
+  expect_identical(create_matching_model(~ 1, numeric())$matching_method, "weighted_choice")
+  expect_identical(create_age_gap_matching_model(0, 5)$matching_method, "weighted_choice")
+  expect_identical(union_formation("on_demand")$matching$matching_method, "weighted_choice")
+  expect_identical(create_age_gap_matching_model(0, 5, matching_method = "female_choice")$matching_method,
+                   "female_choice")
+  for (bad in list("weighted", "two_sided", NA_character_, c("female_choice", "weighted_choice"), 1, NULL))
+    expect_error(create_age_gap_matching_model(0, 5, matching_method = bad), "matching_method")
+  expect_error(union_formation("on_demand", matching_method = "female_choice"), "unused argument")
+  expect_error(set_union_formation(hammel_model(), "on_demand", matching_method = "female_choice"),
+               "unused argument")
+  edited <- create_age_gap_matching_model(0, 5)
+  edited$matching_method <- "two_sided"
+  expect_error(union_formation("on_demand", edited), "matching_method")
+  expect_error(union_formation("on_demand", father_matching = edited, rates = NULL), "matching_method")
+  for (bad in list(-0.1, 1.1, NA_real_, c(0.5, 0.5), "1", Inf, NULL))
     expect_error(create_age_gap_matching_model(0, 5, imbalance_absorption = bad),
                  "imbalance_absorption")
   expect_identical(create_matching_model(~ 1, numeric())$imbalance_absorption, 1)
-  # Older matching objects without the field use the default.
-  legacy <- create_age_gap_matching_model(0, 5)
-  legacy$imbalance_absorption <- NULL
-  expect_identical(prepare_matching_model(legacy, weighted = TRUE)$imbalance_absorption, 1)
   edited <- create_age_gap_matching_model(0, 5)
   edited$imbalance_absorption <- 2
   expect_error(union_formation("on_demand", edited), "imbalance_absorption")

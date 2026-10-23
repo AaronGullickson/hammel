@@ -257,29 +257,30 @@ population identities; exact group exclusions do not use NA or infinite scores.
 
 Candidate sample size belongs to the matching model. Both
 `create_matching_model()` and `create_age_gap_matching_model()` accept
-`sample_size = 250`: a nonnegative whole count of men, sampled uniformly
-without replacement before age, kinship, and group screening. Zero means the
-full available male pool. Rejected candidates are not replaced. The setting
-applies to both matching methods; two-sided market size can be smaller after
-screening or female shortage. A separate `father_matching` model uses its own
-sample size; NULL inherits the general matching model, including sampling.
-For example, a general model with size 250 and a father model with size 50
-sample up to 250 men for union searches and 50 for unpartnered rate-mode
-births. Existing partners need no search. Changing sampling can affect
-encounters, matches, birth cancellations, seeded histories, and runtime; it
-does not change initiation hazards or matching utilities. This default does
-not assert scientific convergence at a sample size of 250.
+`sample_size = 1000` (D067): a nonnegative whole count of men, sampled
+uniformly without replacement before age, kinship, and group screening. Zero
+means the full available male pool. Rejected candidates are not replaced. The
+setting applies to both matching methods. A separate `father_matching` model
+uses its own sample size; NULL inherits the general matching model, including
+sampling. For example, a general model with size 1000 and a father model with
+size 50 sample up to 1000 men for union searches and 50 for unpartnered
+rate-mode births. Existing partners need no search. Changing sampling can
+affect encounters, matches, birth cancellations, seeded histories, and runtime;
+it does not change initiation hazards or matching utilities. Sampling is a
+speed shortcut, not a model of encounters: small samples give each woman a
+noisy mix of men near her age, which attenuated pooled group associations at
+250 men in the user's runs. The default of 1000 does not assert convergence.
 
 With `union_formation(initiation = "on_demand", ...)`, use the woman's ongoing
 living male partner as father. If she has no partner, sample up to `sample_size`
-living, unpartnered men without replacement (matching-model default 250;
+living, unpartnered men without replacement (matching-model default 1000;
 zero means the whole pool).
 Evaluate the matching formula on male-minus-female continuous age differences
 and multiply its non-intercept model-matrix columns by their named coefficients.
 With explicit `matching_method = "female_choice"`, sample candidate utilities V
 with probabilities proportional to `exp(V - max(V))`. The default
-`"two_sided"` method combines female and male conditional choices in a temporary
-market as specified below. Form the union at the birth time and assign the partner as
+`"weighted_choice"` method multiplies those weights by a calibrated weight for
+each man's group, as specified below. Form the union at the birth time and assign the partner as
 father. Nonfinite formula values/utilities are errors. Linear/raw quadratic
 terms have an exact native evaluator; other formulas use the R model matrix.
 After sampling and before scoring, exclude men younger than `min_male_age`
@@ -362,25 +363,12 @@ The milestone 2 report examines conditional ASFR discrepancies; general
 recovery across status transitions is not established.
 See [union fertility specification](union-formation-models.md#fertility-schedules-by-union-status-d039).
 
-### Experimental fixed-pool two-sided selection
+### Weighted choice
 
-D061/D062 specify `matching_method = "two_sided"`; D064 makes it the default
-for new process specifications. Explicit `"female_choice"` remains available,
-and older objects without the field retain female choice. Female event
-initiation is unchanged; within
-a temporary market either sex may choose. The method applies to shared union
-and nonmarital father selection. It samples alternate living, unpartnered women
-using the male age cutoff, without hazard weighting or hypothetical kinship
-screening; hard group exclusions apply to every temporary pair. Only ego's
-selected partner affects actual state. The full eligibility, sampling,
-shortage, reciprocal-probability, diagnostic, and validation rules are specified in
-[two-sided matching](two-sided-matching.md). Those experimental rules qualify
-the explicit single-woman choice described above. Scientific benchmarks for
-aggregate pairing, age gaps, and inheritance remain to be assessed.
-
-### Experimental weighted choice
-
-D066 specifies `matching_method = "weighted_choice"`: ego still chooses among
+D066 specifies `matching_method = "weighted_choice"`, the matching-model
+default since D067; `"female_choice"` remains available. The method belongs to
+each matching model (D068), so a separate `father_matching` model applies its
+own method and a NULL father model inherits the general one. Ego still chooses among
 her screened candidates with probabilities proportional to exp(U), multiplied
 by a weight for each man's group. Weights are recalculated at every search so
 expected male union flows by group meet a target mirroring female per-capita

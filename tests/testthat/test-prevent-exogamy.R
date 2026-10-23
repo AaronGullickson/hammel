@@ -10,7 +10,8 @@ exogamy_test_model <- function(prevent = FALSE, group_exogamy = NULL) {
 test_that("hard restrictions exclude candidates before scoring and diagnostics", {
   for (prevent in list(TRUE, "A:B", "A::B")) {
     model <- exogamy_test_model(prevent, c("A:B" = 1000))
-    result <- simulate(model, 0.3, seed = 52)
+    # B men are unreachable for the only woman, so weighted choice warns.
+    expect_warning(result <- simulate(model, 0.3, seed = 52), "could not meet male-group targets")
     expect_equal(result$unions$husband_id, 2)
     expect_equal(result$unions$.n_eligible, 1L)
     expect_equal(result$unions$.utility_rank, 1L)
@@ -24,10 +25,11 @@ test_that("hard restrictions exclude candidates before scoring and diagnostics",
 test_that("directional and symmetric prohibitions use female-first identities", {
   model <- exogamy_test_model("B:A", c("A:B" = 1000))
   # This assertion exercises the one-sided near-certain score preference.
-  model$processes$union_formation$matching_method <- "female_choice"
+  model$processes$union_formation$matching$matching_method <- "female_choice"
   expect_equal(simulate(model, 0.3, seed = 52)$unions$husband_id, 3)
   model <- exogamy_test_model("B::A", c("A:B" = 1000))
-  expect_equal(simulate(model, 0.3, seed = 52)$unions$husband_id, 2)
+  expect_warning(result <- simulate(model, 0.3, seed = 52), "male-group targets")
+  expect_equal(result$unions$husband_id, 2)
   for (bad in list(NA, c(TRUE, FALSE), 1, "A:::B", "A:A", c("A:B", "A::B"), c(NA_character_)))
     expect_error(create_age_gap_matching_model(0, 5, prevent_exogamy = bad))
   model$processes$union_formation$matching$prevent_exogamy <- NA
@@ -61,10 +63,11 @@ test_that("sampling remains broad with no refilling after group exclusions", {
   full <- small
   full$processes$union_formation$matching$sample_size <- 0L
   # Some one-man encounter samples miss the compatible man although he exists.
-  outcomes <- vapply(1:30, function(seed) {
+  # Unreachable B men make weighted choice warn; that is not under test here.
+  outcomes <- suppressWarnings(vapply(1:30, function(seed) {
     nrow(simulate(full, 0.1, seed = seed)$unions) > 0 &&
       nrow(simulate(small, 0.1, seed = seed)$unions) == 0
-  }, logical(1))
+  }, logical(1)))
   expect_true(any(outcomes))
 })
 
@@ -72,13 +75,15 @@ test_that("rate searches retry and father overrides carry independent restrictio
   model <- exogamy_test_model(TRUE)
   model <- set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
     age_start = 15, age_end = 50, rate = c(0, 20)), 0)
-  model <- set_union_formation(model, "rate", matching = model$processes$union_formation$matching,
+  matching <- model$processes$union_formation$matching
+  matching$matching_method <- "female_choice"
+  model <- set_union_formation(model, "rate", matching = matching,
     rates = data.frame(age_start = 15, age_end = Inf, rate = 0),
-    cancel_birth_if_no_match = FALSE, matching_method = "female_choice")
+    cancel_birth_if_no_match = FALSE)
   result <- simulate(model, 0.3, seed = 52)
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 2))
   model$processes$union_formation$father_matching <- create_age_gap_matching_model(0, 5,
-    group_exogamy = c("A:B" = 1000))
+    group_exogamy = c("A:B" = 1000), matching_method = "female_choice")
   result <- simulate(model, 0.3, seed = 52)
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 3))
   model$processes$union_formation$rates$rate <- 100

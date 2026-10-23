@@ -193,25 +193,20 @@ These remain proposals or unresolved requirements:
 Do not infer future demographic rules from SOCSIM or implement arbitrary
 callbacks that can bypass consistency checks.
 
-## Experimental fixed-pool two-sided matching
+## Candidate sample size
 
-Matching models own `sample_size` (default 250; zero means the full male pool).
-Union formation does not take a sample-size argument. An explicit father model
-supplies its own size; NULL inherits the general matching model's size (D065).
+Matching models own `sample_size` (default 1000, D067; zero means the full
+male pool). Union formation does not take a sample-size argument. An explicit
+father model supplies its own size; NULL inherits the general matching
+model's size (D065).
 
-`union_formation()` and its setter default to `matching_method = "two_sided"`
-(D061/D062/D064); explicit `"female_choice"` remains available. Older objects
-without this field retain female choice. Both union formation and nonmarital
-father selection use temporary markets with alternate women. Hypothetical
-pairs never mutate population state. Native and R scorers evaluate each fixed female row once; column and ego-row
-probabilities are combined in one draw without hypothetical depletion. The engine maintains an age-eligible unpartnered
-female pool with queued age entries, rebuilt on restart. See
-[two-sided matching](two-sided-matching.md) for the scientific specification and
-benchmark procedure. Aggregate parameter recovery remains under investigation.
+## Weighted-choice matching
 
-## Experimental weighted-choice matching
-
-`matching_method = "weighted_choice"` (D066) keeps female choice among screened
+Matching models carry `matching_method`, defaulting to `"weighted_choice"`
+(D066/D067/D068); `"female_choice"` remains available. A separate father model
+uses its own method and a NULL father model inherits the general one. The
+engine builds the calibrator when either model is weighted and grouped. The
+two-sided temporary-market method was removed (D067). `"weighted_choice"` keeps female choice among screened
 candidates and adds a log weight for each man's group to selection scores.
 `WeightCalibrator` in `src/simulate.cpp` keeps unpartnered counts by group and
 birth-time bin and incrementally maintained pool sums for each matching model's

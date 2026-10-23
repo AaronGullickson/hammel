@@ -11,13 +11,12 @@ The user accepted milestone 2 as complete on October 19, 2026 (D050).**
 Every simulation requires a union-formation process. Current-partner lookup
 and union histories are common infrastructure for all initiation modes.
 
-An optional fixed-pool two-sided selection experiment was added October 22,
-2026 (D061), with `matching_method = "two_sided"`. The specification below
-describes the explicit female-choice option; new process specifications default
-to two-sided matching at the user's request (D064). See
-[two-sided matching](two-sided-matching.md) for the experiment's temporary
-markets and unchanged event-initiation rules. Its demographic benchmarks
-remain under investigation.
+The specification below describes female-choice selection. Matching models
+default to `matching_method = "weighted_choice"` (D066/D067/D068),
+which multiplies each candidate's selection weight by a calibrated weight for
+his group, with unchanged initiation and eligibility rules; see
+[weighted-choice matching](weighted-choice-matching.md). The two-sided
+temporary-market experiment was removed (D067).
 
 ## Terminology
 
@@ -58,7 +57,8 @@ availability and renewed female rate searches after widowhood are implemented. T
 ## Implemented construction interface
 
 `create_matching_model(formula, coefficients, group_exogamy = NULL,
-group_levels = NULL, prevent_exogamy = FALSE, sample_size = 250)` stores a
+group_levels = NULL, prevent_exogamy = FALSE, sample_size = 1000,
+imbalance_absorption = 1, matching_method = "weighted_choice")` stores a
 one-sided R formula and finite named coefficients
 matching its non-intercept model-matrix columns. Predictors include
 `age_difference` (male minus female age in continuous years), `female_group`,
@@ -88,7 +88,7 @@ a process; `set_union_formation(model, ...)` attaches it. Initiation is explicit
 zero years and a symmetric half-weight distance of five years. Explicit matching
 models override this default in both the constructor and setter. With
 `father_matching = NULL`, nonmarital father selection uses this same model.
-Both matching-model constructors default to `sample_size = 250` (D065).
+Both matching-model constructors default to `sample_size = 1000` (D065, D067).
 Set it on the matching model, not union formation. A separate `father_matching`
 model uses its own size; NULL inherits the general model including its size.
 `sample_size = 0` means use the full available pool; a positive
@@ -253,9 +253,9 @@ require an explicit utility scale relative to partners and defined retry timing.
 It is deferred beyond milestone 2 (D044); its scope and semantics remain open.
 
 Candidate subsampling changes the choice set and can change the induced
-matching distribution. The accepted implementation samples up to 1000 living,
-unpartnered men by default before screening, without refilling; zero requests
-the full pool. No sampling correction or outside alternative is implemented.
+matching distribution. The implementation samples up to the matching model's
+`sample_size` (default 1000) living, unpartnered men before screening, without
+refilling; zero requests the full pool. No sampling correction or outside alternative is implemented.
 
 ## Rationale and matching-model validation
 

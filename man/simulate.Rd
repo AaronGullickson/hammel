@@ -44,12 +44,11 @@ forming a union or reserving the man.
 A failed match cancels the birth unless explicitly allowed by the union process.
 Cancellation starts no new birth-spacing interval. On-demand mode rejects
 status schedules.
-Default \code{matching_method = "two_sided"} on \code{\link[=union_formation]{union_formation()}} uses
-probabilistic fixed-pool temporary markets. Explicit \code{"female_choice"}
-retains ego-only selection. Only ego's outcome is retained; event initiation
-is unchanged. Experimental \code{"weighted_choice"} uses female choice with
-male-group weights recalibrated at each search; it warns once if any search
-needed approximate weights.
+Matching models default to \code{matching_method = "weighted_choice"}: female
+choice with male-group weights recalibrated at each search; simulation warns
+once if any search needed approximate weights. \code{"female_choice"} uses
+unweighted selection. A separate father model uses its own method. Event
+initiation is unchanged.
 }
 \details{
 Minimum birth spacing is configured in \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}

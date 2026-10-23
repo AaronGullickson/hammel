@@ -14,8 +14,7 @@ union_formation(
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
   diagnostics = FALSE,
-  group_prop_hazard = NULL,
-  matching_method = "two_sided"
+  group_prop_hazard = NULL
 )
 
 set_union_formation(
@@ -28,8 +27,7 @@ set_union_formation(
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
   diagnostics = FALSE,
-  group_prop_hazard = NULL,
-  matching_method = "two_sided"
+  group_prop_hazard = NULL
 )
 }
 \arguments{
@@ -53,7 +51,8 @@ support have zero hazard. Must be NULL for \code{"on_demand"}.}
 \item{min_male_age}{Minimum male age in continuous years at a new partner
 search, default \code{15}. Finite nonnegative scalar; zero disables this age
 exclusion. Existing unions are retained. No minimum is added for actual
-female event eligibility. Two-sided alternate women use this same cutoff.}
+female event eligibility. Weighted choice counts unpartnered men and women
+at or above this same cutoff when calibrating its weights.}
 
 \item{kinship_generations}{Generation bound on both sides of a known common
 ancestor, default \code{2}. Excludes parents, grandparents, siblings, aunts/uncles,
@@ -87,23 +86,6 @@ Without population groups, simulation warns and ignores multipliers.
 Requires \code{initiation = "rate"}; on-demand formation has no search hazard.
 Matching utilities and input rate tables are unchanged.}
 
-\item{matching_method}{\code{"two_sided"} (default) for fixed-pool two-sided
-probabilities, \code{"female_choice"} for ego-only choice, or experimental
-\code{"weighted_choice"} for female choice with calibrated male-group weights.
-Female choice accounts for available men but not reciprocal competition
-among women. With unequal group sizes, symmetric group preferences can
-produce unequal female-A/male-B and female-B/male-A pairing counts.
-These imbalances can systematically affect group inheritance and subsequent
-group composition, especially when maternal and paternal inheritance differ.
-Two-sided matching samples alternate unpartnered women with the male age cutoff,
-combines ego-choice and male-choice probabilities without removing pairs.
-It applies to union formation and nonmarital father selection. Temporary
-pairs never change population state. Aggregate parameter recovery is under
-investigation; the method can cost quadratic work in candidate sample size.
-Older process objects without this field retain female choice. New calls
-omitting the argument use two-sided matching, changing seeded histories
-relative to the previous default.}
-
 \item{model}{A \code{hammel_model} object.}
 }
 \value{
@@ -134,31 +116,24 @@ cancel births by default. No previous-father preference is applied.
 }
 \details{
 Sampling is from the available male pool BEFORE pair-specific screening.
-The matching model defaults to \code{sample_size = 250}; zero means the whole pool.
+The matching model defaults to \code{sample_size = 1000}; zero means the whole pool.
 Otherwise sample without replacement
 up to that many men. Age screening occurs afterward, without refilling the
 sample. Kinship screening follows the same ordering. Existing unions are
 retained even if a new-search restriction would exclude the partner.
 Candidate sets will not be retained in simulation outputs.
 
-Explicit \code{matching_method = "weighted_choice"} keeps female choice among the
-screened candidates but multiplies each man's selection weight by a weight
+Matching models default to \code{matching_method = "weighted_choice"}, which keeps
+female choice among the screened candidates but multiplies each man's selection weight by a weight
 for his group. Weights are recalculated at every search, in continuous time,
 so that expected male union flows by group match a mirrored target: each
 unpartnered man has the per-capita intensity of an unpartnered woman of his
 group, adjusted by the matching model's \code{imbalance_absorption}. Women's
 intensity is the search hazard for rate-mode searches and the unpartnered
 fertility hazard (zero during birth spacing) for on-demand searches and
-nonmarital father selection, which has its own weights. Weights depend only
+nonmarital father selection, which has its own weights and uses the father
+model's method when one is supplied. Weights depend only
 on the man's group, so they do not change the association between partners'
 characteristics. With one group the method equals female choice. When no
 exact weights exist, approximate weights are used with a warning.
-
-Default \code{matching_method = "two_sided"} adds alternate women to a
-temporary market after ego's male eligibility screening. Each fixed female
-row is scored once, including for R formulas; row and column probabilities
-are combined for one partner draw.
-Hard group exclusions apply to hypothetical pairs; kinship applies only to
-ego. If fewer alternate women exist, randomly reduce the eligible men to
-keep the initial market square. Only ego's final outcome changes real state.
 }

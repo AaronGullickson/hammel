@@ -46,7 +46,7 @@ even when some exist in the full pool. With equally aged compatible A and
 incompatible B men, a one-man sample may fail; the full pool will find A.
 A finite penalty of -10 still selects B from a sample containing B alone,
 whereas prohibiting A:B makes that sample empty. Increasing the matching
-model's `sample_size` (default 250)
+model's `sample_size` (default 1000)
 changes encounter coverage, not the restriction. No extra random draws occur
 in group screening; FALSE must retain the existing histories and RNG state.
 
@@ -76,10 +76,9 @@ intercept remains ignored, since it cancels in conditional selection. A formula
 `~ 1` with `numeric()` coefficients permits pair-effects-only matching. Formula
 functions remain deterministic; fixed group identity information is supplied
 as candidate data, never mutable state. Under explicit female choice,
-female-only terms are constant within a search and cancel. In the experimental
-two-sided method, they can vary across a man's female alternatives and affect
-his choice. Group effects in both the formula and pair table intentionally add
-together.
+female-only terms are constant within a search and cancel; weighted choice
+keeps that property, since its weights depend only on the man's group. Group
+effects in both the formula and pair table intentionally add together.
 
 ## Execution and validation
 
@@ -101,45 +100,24 @@ and interactions, native/R agreement, malformed or conflicting specifications,
 matching modes and father overrides, diagnostic ranks, reproducibility,
 empty populations, and unchanged behavior without group preferences.
 
-## Experimental two-sided selection (October 22, 2026)
+## Directional pairing and matching methods
 
 Explicit female-choice selection normalizes scores within each initiating
-woman's candidate set. Symmetric group coefficients do not guarantee equal directional
-union or birth counts with unequal group sizes.
+woman's candidate set. Symmetric group coefficients do not guarantee equal
+directional union or birth counts with unequal group sizes.
 
 **Inheritance warning:** `matching_method = "female_choice"` accounts for male
-availability but not reciprocal competition among women. With unequal group
-sizes, even symmetric preferences can produce unequal female-A/male-B and
-female-B/male-A pairing counts. The user's inheritance experiments identified
-these directional imbalances as a source of unexpected group-composition
-trajectories. They can systematically affect inheritance outcomes, especially
-when maternal and paternal group inheritance differ. Female choice remains
-available as an intentional one-sided behavioral assumption; assess directional
-pairing counts and inheritance trajectories before interpreting group change.
-Two-sided matching addresses this concern experimentally; it is not a guarantee
-of equal directional counts under arbitrary demographic conditions.
+availability but leaves how often each male group forms unions unspecified.
+With unequal group sizes, even symmetric preferences can produce unequal
+female-A/male-B and female-B/male-A pairing counts. The user's inheritance
+experiments identified these directional imbalances as a source of unexpected
+group-composition trajectories, especially when maternal and paternal group
+inheritance differ. Female choice remains available as an intentional
+one-sided behavioral assumption.
 
-The user selected `matching_method = "two_sided"` as the default for new
-process specifications (D064). Explicit female choice remains available;
-older objects without a matching-method field retain female choice. Default
-selection changes seeded histories and may increase runtime, without changing
-the decision or timing of union initiation.
-
-The user authorized an optional `matching_method = "two_sided"` experiment on
-`experiment/two-sided-sequential-matching` (D061). A temporary market contains
-M ego-eligible men, M - 1 sampled alternate women, and ego. D062 replaces
-sequential depletion with fixed utilities. Normalize ego's row and each man's
-column, add the probabilities of either choosing the other, normalize, and
-draw once. Each woman's allowed male row is evaluated once, including for R
-formulas; column normalization reuses those same scores. No hypothetical pairs
-are removed. This integrates repeated fair-coin uniform initiation with replacement.
-See [two-sided matching](two-sided-matching.md) for the full contract,
-shortage and exclusion rules, worked examples, validation, and timing plan.
-
-This differs from the earlier proposed matrix rescaling or sampling assignments
-in proportion to `exp(sum of utilities)`. Neither rescaling by female demand
-nor fixed-margin IPF was selected. The latter's constraints and the behavior
-of directed and age effects motivated the two-sided experiments.
-The optional prototype does not establish aggregate odds-ratio recovery,
-preferred age-gap recovery, or balanced inheritance trajectories. Scientific
-assessment remains with the user and the milestone 3 analyses.
+The default `"weighted_choice"` (D066/D067) adds calibrated male-group weights
+that supply the missing rule for men while leaving the preference association
+unchanged; see [weighted-choice matching](weighted-choice-matching.md). It
+equalizes directional counts only when preferences are symmetric and each
+group's unpartnered sexes are balanced. The additive two-sided method (D061,
+D062, D064) was removed in D067 because it attenuated the input preferences.

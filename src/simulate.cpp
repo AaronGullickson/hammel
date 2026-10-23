@@ -254,240 +254,6 @@ int draw_partner_position(const NumericVector& probabilities) {
   return last_positive;
 }
 
-// Local hypothetical markets never mutate population or event state.
-struct TwoSidedResult { int man = -1, steps = 0, chooser = -1; double scored = 0; };
-
-TwoSidedResult finish_two_sided_market(int nw, int nm,
-    const std::vector<double>& column_max, const std::vector<double>& column_sum,
-    const std::vector<double>& ego_score, TwoSidedResult result) {
-  const double maximum = *std::max_element(ego_score.begin(), ego_score.end());
-  if (maximum == R_NegInf) return result;
-  double row_sum = 0;
-  for (double value : ego_score) row_sum += std::exp(value - maximum);
-  std::vector<double> weights(nm);
-  double total = 0;
-  for (int j = 0; j < nm; ++j) {
-    if (ego_score[j] == R_NegInf) continue;
-    const double a = std::exp(ego_score[j] - maximum) / row_sum;
-    const double b = std::exp(ego_score[j] - column_max[j]) / column_sum[j];
-    // Equal pool sizes in production; factors also support rectangular diagnostics.
-    weights[j] = a / nw + b / nm;
-    total += weights[j];
-  }
-  const double draw = R::runif(0, 1) * total;
-  double cumulative = 0;
-  for (int j = 0; j < nm; ++j) {
-    if (weights[j] > 0) result.man = j;
-    cumulative += weights[j];
-    if (draw < cumulative) break;
-  }
-  result.steps = 1; // One integrated draw; no initiator is sampled.
-  return result;
-}
-
-template <typename Score>
-TwoSidedResult draw_two_sided_market(int nw, int nm, int ego, Score score) {
-  TwoSidedResult result;
-  if (!nw || !nm) return result;
-  std::vector<int> women(nw), men(nm);
-  for (int i = 0; i < nw; ++i) women[i] = i;
-  for (int j = 0; j < nm; ++j) men[j] = j;
-  std::vector<double> column_max(nm, R_NegInf), column_sum(nm, 0), ego_score(nm);
-  for (int i = 0; i < nw; ++i) {
-    if (i % 64 == 0) checkUserInterrupt();
-    const NumericVector values = score(women, men, true, i);
-    if (values.size() != nm) stop("Temporary matching returned the wrong number of scores.");
-    for (int j = 0; j < nm; ++j) {
-      const double value = values[j];
-      ++result.scored;
-      if (i == ego) ego_score[j] = value;
-      if (value == R_NegInf) continue;
-      if (!R_finite(value)) stop("Temporary matching utilities must be finite or excluded.");
-      if (value > column_max[j]) {
-        column_sum[j] = column_sum[j] * std::exp(column_max[j] - value) + 1;
-        column_max[j] = value;
-      } else column_sum[j] += std::exp(value - column_max[j]);
-    }
-  }
-  return finish_two_sided_market(nw, nm, column_max, column_sum, ego_score, result);
-}
-
-// Evaluate each fixed female row once; reuse its scores in both normalizations.
-class TemporaryScores {
-  NumericVector female_born, male_born, quadratic;
-  IntegerVector female_groups, male_groups;
-  NumericMatrix offsets;
-  LogicalMatrix blocked;
-  List matching;
-  bool native, squared, prevent_all;
-  bool allowed(int i, int j) const {
-    const int fg = female_groups[i], mg = male_groups[j];
-    return !(prevent_all && fg != mg) && !(blocked.nrow() && blocked(fg, mg));
-  }
- public:
-  TemporaryScores(NumericVector fb, NumericVector mb, IntegerVector fg,
-                  IntegerVector mg, const List& model) :
-      female_born(fb), male_born(mb), quadratic(model["quadratic"]),
-      female_groups(fg), male_groups(mg), offsets(model["pair_offsets"]),
-      blocked(model["blocked_pairs"]), matching(model), native(quadratic.size() == 2),
-      squared(as<bool>(model["has_squared"])),
-      prevent_all(as<bool>(model["prevent_exogamy_all"])) {
-    if (fg.size() != fb.size() || mg.size() != mb.size()) stop("Temporary market group lengths differ.");
-    if (as<bool>(model["needs_groups"])) {
-      const int groups = std::max(offsets.nrow(), blocked.nrow());
-      for (int group : fg) if (group < 0 || (groups && group >= groups)) stop("Invalid female group.");
-      for (int group : mg) if (group < 0 || (groups && group >= groups)) stop("Invalid male group.");
-    }
-  }
-  bool is_native() const { return native; }
-
-  // Batched matrix columns: no R allocations or Rcpp element proxies per row.
-  // Keep raw gap arithmetic, rather than expanding calendar-time squares.
-  TwoSidedResult draw_native(int ego = 0) const {
-    const int nw = female_born.size(), nm = male_born.size();
-    TwoSidedResult result;
-    if (!nw || !nm) return result;
-    const double* fb = REAL(female_born);
-    const double* mb = REAL(male_born);
-    const int* fg = INTEGER(female_groups);
-    const int* mg = INTEGER(male_groups);
-    const int ng = offsets.nrow(), nb = blocked.nrow();
-    const double* pair = ng ? REAL(offsets) : nullptr;
-    const int* excluded = nb ? LOGICAL(blocked) : nullptr;
-    const double linear = quadratic[0], quadratic_term = quadratic[1];
-    std::vector<double> column_max(nm, R_NegInf), column_sum(nm, 0), ego_score(nm), values(nw);
-    for (int j = 0; j < nm; ++j) {
-      if (j % 64 == 0) checkUserInterrupt();
-      const double male_birth = mb[j];
-      const int male_group = mg[j];
-      double maximum = R_NegInf;
-      for (int i = 0; i < nw; ++i) {
-        if ((prevent_all && fg[i] != male_group) ||
-            (excluded && excluded[fg[i] + nb * male_group])) {
-          values[i] = R_NegInf;
-          continue;
-        }
-        const double gap = fb[i] - male_birth;
-        const double square = squared ? gap * gap : 0;
-        if (!R_finite(gap) || !R_finite(square)) stop("Matching ages and utilities must be finite.");
-        double value = linear * gap + quadratic_term * square;
-        if (pair) value += pair[fg[i] + ng * male_group];
-        if (!R_finite(value)) stop("Matching ages and utilities must be finite.");
-        values[i] = value;
-        maximum = std::max(maximum, value);
-      }
-      column_max[j] = maximum;
-      ego_score[j] = values[ego];
-      if (maximum != R_NegInf) {
-        double sum = 0;
-        for (double value : values) sum += std::exp(value - maximum);
-        column_sum[j] = sum;
-      }
-    }
-    result.scored = static_cast<double>(nw) * nm;
-    return finish_two_sided_market(nw, nm, column_max, column_sum, ego_score, result);
-  }
-
-  NumericVector choice(const std::vector<int>& women, const std::vector<int>& men,
-                       bool female_chooses, int initiator) const {
-    const int n = female_chooses ? men.size() : women.size();
-    NumericVector output(n, R_NegInf);
-    std::vector<int> positions;
-    for (int k = 0; k < n; ++k) {
-      const int i = female_chooses ? women[initiator] : women[k];
-      const int j = female_chooses ? men[k] : men[initiator];
-      if (!allowed(i, j)) continue;
-      if (!native) { positions.push_back(k); continue; }
-      const double gap = female_born[i] - male_born[j];
-      const double square = squared ? gap * gap : 0;
-      if (!R_finite(gap) || !R_finite(square)) stop("Matching ages and utilities must be finite.");
-      double value = quadratic[0] * gap + quadratic[1] * square;
-      if (offsets.nrow()) value += offsets(female_groups[i], male_groups[j]);
-      if (!R_finite(value)) stop("Matching ages and utilities must be finite.");
-      output[k] = value;
-    }
-    if (!native && !positions.empty()) {
-      NumericVector gaps(positions.size());
-      IntegerVector fg(positions.size()), mg(positions.size());
-      for (size_t k = 0; k < positions.size(); ++k) {
-        const int i = female_chooses ? women[initiator] : women[positions[k]];
-        const int j = female_chooses ? men[positions[k]] : men[initiator];
-        gaps[k] = female_born[i] - male_born[j]; fg[k] = female_groups[i]; mg[k] = male_groups[j];
-      }
-      const auto values = matching_utilities(gaps, matching, -1, mg, fg);
-      for (size_t k = 0; k < positions.size(); ++k) output[positions[k]] = values[k];
-    }
-    return output;
-  }
-};
-
-// Internal deterministic-market entry points use the actual simulation kernel.
-// [[Rcpp::export]]
-List inspect_two_sided_matrix_cpp(NumericMatrix utility, int ego, int draws) {
-  if (ego < 1 || ego > utility.nrow() || draws < 0) stop("Invalid ego or number of draws.");
-  for (double value : utility)
-    if (!R_finite(value) && value != R_NegInf) stop("Utilities must be finite or -Inf for exclusions.");
-  IntegerVector choices(draws), steps(draws), chooser(draws);
-  NumericVector scored(draws);
-  for (int k = 0; k < draws; ++k) {
-    if (k % 1024 == 0) checkUserInterrupt();
-    auto result = draw_two_sided_market(utility.nrow(), utility.ncol(), ego - 1,
-      [&](const std::vector<int>& women, const std::vector<int>& men, bool female, int initiator) {
-        NumericVector values(female ? men.size() : women.size());
-        for (R_xlen_t k = 0; k < values.size(); ++k)
-          values[k] = female ? utility(women[initiator], men[k]) : utility(women[k], men[initiator]);
-        return values;
-      });
-    choices[k] = result.man < 0 ? NA_INTEGER : result.man + 1;
-    steps[k] = result.steps; chooser[k] = result.chooser; scored[k] = result.scored;
-  }
-  return List::create(_["choices"] = choices, _["steps"] = steps,
-                      _["chooser"] = chooser, _["scored_pairs"] = scored);
-}
-
-// [[Rcpp::export]]
-List inspect_two_sided_matching_cpp(NumericVector female_born, NumericVector male_born,
-                                    IntegerVector female_groups, IntegerVector male_groups,
-                                    List matching, int draws, bool precompute = false) {
-  if (!female_born.size() || draws < 0) stop("Need ego and a nonnegative number of draws.");
-  TemporaryScores scores(female_born, male_born, female_groups, male_groups, matching);
-  IntegerVector choices(draws), steps(draws), chooser(draws);
-  NumericVector scored(draws);
-  for (int k = 0; k < draws; ++k) {
-    if (k % 1024 == 0) checkUserInterrupt();
-    // Rebuild the eager matrix for every draw: benchmarking one fresh market
-    // must not amortize its cost over repeated selections from a fixed matrix.
-    std::vector<double> grid;
-    if (precompute) {
-      std::vector<int> women(female_born.size()), men(male_born.size());
-      for (int i = 0; i < female_born.size(); ++i) women[i] = i;
-      for (int j = 0; j < male_born.size(); ++j) men[j] = j;
-      grid.reserve(static_cast<size_t>(women.size()) * men.size());
-      for (int i = 0; i < female_born.size(); ++i) {
-        if (i % 64 == 0) checkUserInterrupt();
-        const auto row = scores.choice(women, men, true, i);
-        grid.insert(grid.end(), row.begin(), row.end());
-      }
-    }
-    auto result = (!precompute && scores.is_native()) ? scores.draw_native() :
-      draw_two_sided_market(female_born.size(), male_born.size(), 0,
-      [&](const std::vector<int>& women, const std::vector<int>& men, bool female, int initiator) {
-        if (!precompute) return scores.choice(women, men, female, initiator);
-        NumericVector values(female ? men.size() : women.size());
-        for (R_xlen_t j = 0; j < values.size(); ++j) {
-          const int wi = female ? women[initiator] : women[j];
-          const int mj = female ? men[j] : men[initiator];
-          values[j] = grid[static_cast<size_t>(wi) * male_born.size() + mj];
-        }
-        return values;
-      });
-    choices[k] = result.man < 0 ? NA_INTEGER : result.man + 1;
-    steps[k] = result.steps; chooser[k] = result.chooser; scored[k] = result.scored;
-  }
-  return List::create(_["choices"] = choices, _["steps"] = steps,
-                      _["chooser"] = chooser, _["scored_pairs"] = scored);
-}
-
 // Apply search eligibility after sampling; retain positions in the male pool.
 // Further pair restrictions can be added here without changing sample size.
 std::vector<int> screen_male_candidates(const std::vector<int>& males,
@@ -1154,32 +920,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         people[found->second].last_birth = std::max(people[found->second].last_birth, child.born);
     }
   }
-  const bool two_sided = as<bool>(matching["two_sided"]);
-  std::vector<int> females, female_slots(two_sided ? people.size() : 0, -1);
-  std::vector<int> female_sampling_workspace, reduction_workspace;
-  std::multimap<double, int> female_age_entries;
-  auto remove_female = [&](int woman) {
-    if (!two_sided || female_slots[woman] < 0) return;
-    const int slot = female_slots[woman], moved = females.back();
-    females[slot] = moved; female_slots[moved] = slot;
-    females.pop_back(); female_slots[woman] = -1;
-  };
-  auto add_female = [&](int woman, double now) {
-    if (!two_sided || !people[woman].female || !NumericVector::is_na(people[woman].died) ||
-        current_partner[woman] >= 0 || female_slots[woman] >= 0) return;
-    if (now - people[woman].born < min_male_age) {
-      double entry = people[woman].born + min_male_age;
-      // Avoid rescheduling at an already-reached rounded birthday when the
-      // subtraction-based age check still places her just below the cutoff.
-      if (entry <= now) entry = std::nextafter(now, std::numeric_limits<double>::infinity());
-      female_age_entries.emplace(entry, woman);
-      return;
-    }
-    female_slots[woman] = females.size(); females.push_back(woman);
-  };
-  if (two_sided) {
-    for (int woman = 0; woman < static_cast<int>(people.size()); ++woman) add_female(woman, start);
-  }
   // weighted_choice counts living, unpartnered women; fertility-driven intensity
   // also requires the birth-spacing interval to have ended (queued re-entry).
   auto add_counted_woman = [&](int woman, double now) {
@@ -1224,6 +964,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::vector<const std::vector<Band>*> search_hazards, fertility_hazards;
   LagTable union_table, father_table_storage;
   int union_table_id = 0, father_table_id = 0;
+  // Each matching model carries its own method; a NULL father model is the
+  // same object as the general model and shares its method and table.
+  const bool union_weighted = matching.containsElementNamed("weighted") &&
+    as<bool>(matching["weighted"]);
+  const bool father_weighted = father_matching.containsElementNamed("weighted") &&
+    as<bool>(father_matching["weighted"]);
   std::vector<double> union_warm, father_warm;
   double weighted_infeasible = 0;
   // All father and partner searches share sampling, eligibility and matching.
@@ -1247,7 +993,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       }), eligible.end());
     }
     if (count) *count = static_cast<int>(eligible.size());
-    if (calibrator && !eligible.empty()) {
+    if (calibrator && !eligible.empty() && (father ? father_weighted : union_weighted)) {
       // Searches and on-demand unions use the union-formation calibration;
       // rate-mode nonmarital fathers have their own, driven by fertility.
       release_spacing(now);
@@ -1260,59 +1006,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       return select_partner(males, eligible, people, woman, choice_model, rank,
                             &weights.log_weights);
     }
-    if (!two_sided || eligible.empty())
-      return select_partner(males, eligible, people, woman, choice_model, rank);
-    // Promote age-eligible women before sampling, without adding execution steps.
-    while (!female_age_entries.empty() && female_age_entries.begin()->first <= now) {
-      const auto entry = *female_age_entries.begin();
-      female_age_entries.erase(female_age_entries.begin());
-      add_female(entry.second, now);
-    }
-    const int ego_slot = female_slots[woman];
-    const int available = static_cast<int>(females.size()) - (ego_slot >= 0 ? 1 : 0);
-    const int market_size = std::min(static_cast<int>(eligible.size()), available + 1);
-    const auto original_eligible = rank ? eligible : std::vector<int>();
-    if (market_size < static_cast<int>(eligible.size())) {
-      const auto kept = sample_male_positions(eligible.size(), market_size, reduction_workspace);
-      std::vector<int> reduced;
-      reduced.reserve(market_size);
-      for (int k : kept) reduced.push_back(eligible[k]);
-      eligible.swap(reduced);
-    }
-    std::vector<int> women{woman};
-    if (market_size > 1) {
-      const auto positions = sample_male_positions(available, market_size - 1, female_sampling_workspace);
-      for (int position : positions)
-        women.push_back(females[position + (ego_slot >= 0 && position >= ego_slot ? 1 : 0)]);
-    }
-    NumericVector fb(market_size), mb(market_size);
-    IntegerVector fg(market_size), mg(market_size);
-    for (int k = 0; k < market_size; ++k) {
-      fb[k] = people[women[k]].born; fg[k] = people[women[k]].group;
-      mb[k] = people[males[eligible[k]]].born; mg[k] = people[males[eligible[k]]].group;
-    }
-    TemporaryScores scores(fb, mb, fg, mg, choice_model);
-    const auto outcome = scores.is_native() ? scores.draw_native() :
-      draw_two_sided_market(market_size, market_size, 0,
-      [&](const std::vector<int>& women, const std::vector<int>& men, bool female, int initiator) {
-        return scores.choice(women, men, female, initiator);
-      });
-    if (outcome.man < 0) stop("Ego lost all eligible temporary partners.");
-    const int selected = males[eligible[outcome.man]];
-    if (rank) {
-      NumericVector gaps(original_eligible.size());
-      IntegerVector groups(original_eligible.size());
-      int selected_position = -1;
-      for (size_t j = 0; j < original_eligible.size(); ++j) {
-        const int man = males[original_eligible[j]];
-        gaps[j] = people[woman].born - people[man].born; groups[j] = people[man].group;
-        if (man == selected) selected_position = j;
-      }
-      const auto utility = matching_utilities(gaps, choice_model, people[woman].group, groups);
-      *rank = 1;
-      for (double value : utility) if (value > utility[selected_position]) ++*rank;
-    }
-    return selected;
+    return select_partner(males, eligible, people, woman, choice_model, rank);
   };
   auto form_union = [&](int woman, double now) {
     int partner = current_partner[woman];
@@ -1336,7 +1030,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       current_partner[woman] = partner;
       current_partner[partner] = woman;
       remove_male(partner);
-      remove_female(woman);
       remove_counted_woman(woman);
     }
     return partner;
@@ -1365,8 +1058,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   }
   // weighted_choice needs schedules and group indices, so it starts here.
   // One group means unit weights: the method then equals female choice.
-  if (matching.containsElementNamed("weighted") && as<bool>(matching["weighted"]) &&
-      group_count > 1) {
+  if ((union_weighted || father_weighted) && group_count > 1) {
     double min_birth = start;
     for (const Person& person : people) min_birth = std::min(min_birth, person.born);
     calibrator.reset(new WeightCalibrator(min_birth, start + years, group_count,
@@ -1375,9 +1067,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       search_hazards.push_back(&schedules[group].search);
       fertility_hazards.push_back(&schedules[group].unpartnered);
     }
-    union_table = build_lag_table(matching, group_count, calibrator->bins(), kWeightBinWidth);
-    union_table_id = father_table_id = calibrator->add_table(&union_table);
-    if (SEXP(father_matching) != SEXP(matching)) {
+    if (union_weighted) {
+      union_table = build_lag_table(matching, group_count, calibrator->bins(), kWeightBinWidth);
+      union_table_id = father_table_id = calibrator->add_table(&union_table);
+    }
+    if (father_weighted && SEXP(father_matching) != SEXP(matching)) {
       father_table_storage = build_lag_table(father_matching, group_count, calibrator->bins(),
                                              kWeightBinWidth);
       father_table_id = calibrator->add_table(&father_table_storage);
@@ -1457,14 +1151,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         current_partner[relationship.wife] = -1;
         current_partner[relationship.husband] = -1;
         add_male(relationship.husband);
-        add_female(relationship.wife, now);
         add_counted_woman(relationship.wife, now);
         // Her old birth candidate is invalid once her husband has died.
         if (rate_initiation && i == relationship.husband)
           schedule(relationship.wife, now);
       }
       if (!people[i].female) remove_male(i);
-      else { remove_female(i); remove_counted_woman(i); }
+      else remove_counted_woman(i);
       ++death_count;
     } else if (event.type == EventType::search) {
       form_union(i, now);
@@ -1577,7 +1270,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       }
       person_unions.emplace_back();
       current_partner.push_back(-1);
-      if (two_sided) { female_slots.push_back(-1); add_female(child, now); }
       if (calibrator) {
         counted_woman.push_back(0);
         counted_fertile.push_back(0);
