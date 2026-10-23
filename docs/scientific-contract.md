@@ -260,8 +260,10 @@ living male partner as father. If she has no partner, sample up to `sample_size`
 living, unpartnered men without replacement (default 1000; zero means the whole pool).
 Evaluate the matching formula on male-minus-female continuous age differences
 and multiply its non-intercept model-matrix columns by their named coefficients.
-For candidate utilities V, sample with probabilities proportional to
-`exp(V - max(V))`, form the union at the birth time, and assign the partner as
+With explicit `matching_method = "female_choice"`, sample candidate utilities V
+with probabilities proportional to `exp(V - max(V))`. The default
+`"two_sided"` method combines female and male conditional choices in a temporary
+market as specified below. Form the union at the birth time and assign the partner as
 father. Nonfinite formula values/utilities are errors. Linear/raw quadratic
 terms have an exact native evaluator; other formulas use the R model matrix.
 After sampling and before scoring, exclude men younger than `min_male_age`
@@ -346,8 +348,10 @@ See [union fertility specification](union-formation-models.md#fertility-schedule
 
 ### Experimental fixed-pool two-sided selection
 
-D061/D062 authorize optional `matching_method = "two_sided"`, preserving
-`"female_choice"` as the default. Female event initiation is unchanged; within
+D061/D062 specify `matching_method = "two_sided"`; D064 makes it the default
+for new process specifications. Explicit `"female_choice"` remains available,
+and older objects without the field retain female choice. Female event
+initiation is unchanged; within
 a temporary market either sex may choose. The method applies to shared union
 and nonmarital father selection. It samples alternate living, unpartnered women
 using the male age cutoff, without hazard weighting or hypothetical kinship
@@ -355,7 +359,7 @@ screening; hard group exclusions apply to every temporary pair. Only ego's
 selected partner affects actual state. The full eligibility, sampling,
 shortage, reciprocal-probability, diagnostic, and validation rules are specified in
 [two-sided matching](two-sided-matching.md). Those experimental rules qualify
-the default single-woman choice described above. Scientific benchmarks for
+the explicit single-woman choice described above. Scientific benchmarks for
 aggregate pairing, age gaps, and inheritance remain to be assessed.
 
 ### Shared kinship observations

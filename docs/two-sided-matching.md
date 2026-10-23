@@ -2,13 +2,14 @@
 
 Authorized for implementation and investigation October 22, 2026 on
 `experiment/two-sided-sequential-matching`, branched from `milestone3-groups`
-at `4d03f55`. This experiment is not accepted demographic validation or a change
-to the default matching mechanism. Preserve the user's milestone 3 report.
+at `4d03f55`. The user selected this mechanism as the default for new process
+specifications on October 22, 2026 (D064). General demographic validation
+remains pending. Preserve the user's milestone 3 report.
 
 ## Scope and inputs
 
 `union_formation()` / `set_union_formation()` accept
-`matching_method = "female_choice"` (existing default) or `"two_sided"`.
+`matching_method = "two_sided"` (default) or explicit `"female_choice"`.
 Older process objects lacking this field retain female choice. The method
 applies through the shared selection routine to on-demand union formation,
 rate-based union searches, and rate-mode nonmarital father selection. An explicit
@@ -19,8 +20,10 @@ birth cancellation, spacing, and event invalidation remain unchanged.
 All scores use the existing matching model: continuous male age minus female
 age, fixed female/male group orientation, and additive directed/symmetric
 pair effects. No conversion of utility coefficients into equilibrium margins
-is performed. Finite utilities give conditional probabilities proportional to
-`exp(utility - max(utility))` among the fixed allowed alternatives.
+is performed. Within each choosing direction, finite utilities give conditional
+probabilities proportional to `exp(utility - max(utility))` among the fixed
+allowed alternatives. The integrated partner probabilities combine those
+directions as described below.
 
 ## Sampling and eligibility
 
@@ -76,12 +79,112 @@ log-scale accumulation; no full matrix allocation is necessary.
 No hypothetical outcome changes unions, parent links, availability, spacing,
 or event schedules. Only ego's returned match changes actual state through
 the existing event. Nonmarital father selection still creates no union.
-Default female choice retains its existing seeded histories and RNG consumption;
+Explicit female choice retains its existing seeded histories and RNG consumption;
 the experimental method changes histories relative to the prior prototype.
 
 Worked two-by-two example: pair weights [[1,3],[2,4]] give ego's row
 probabilities [1/4,3/4] and men's probabilities of choosing ego [1/3,3/7].
 Adding and normalizing gives partner probabilities [49/148,99/148].
+
+## Conditional-logit parameters and contingency-table odds
+
+Preliminary results reported by the user on October 22, 2026 show fitted
+conditional-logit coefficients close to the input values and improved balance
+between A-woman/B-man and B-woman/A-man union counts. These are distinct from
+recovery of the aggregate contingency-table association. The latter depends
+on how individual choices combine into a table, as the following analytical
+example demonstrates. These reported results are not general validation of
+parameter recovery or scientific acceptance of the experiment.
+
+### When the familiar relationship holds
+
+Consider a fixed group-only market with positive weights, no age variation or
+hard exclusions, a shared male pool, and uniform initiation within each female
+group. Let U[i,j] be the utility for female group i and male group j, f[i] the
+female initiation share, and m[j] the male availability share. Female choice
+gives expected pairing shares
+
+```text
+R[i] = sum_j m[j] exp(U[i,j])
+T[i,j] = f[i] m[j] exp(U[i,j]) / R[i]
+       = a[i] b[j] exp(U[i,j]).
+```
+
+Female initiation and row normalization enter a row factor a[i]; male
+availability enters a column factor b[j]. Both factors cancel from the
+cross-product:
+
+```text
+log(T[A,B] T[B,A] / (T[A,A] T[B,B]))
+  = U[A,B] + U[B,A] - U[A,A] - U[B,B].
+```
+
+With zero within-group utilities and symmetric cross-group coefficient beta,
+the log cross-product equals 2 * beta. Thus interpreting beta as one half of
+the log cross-product has a mathematical basis under these assumptions.
+Conditional logit itself describes relative probabilities within a choice set;
+see [McFadden, Conditional Logit Analysis of Qualitative Choice Behavior
+(1974)](https://eml.berkeley.edu/reprints/mcfadden/zarembka.pdf).
+
+### Why mixing the choosing directions changes the association
+
+Suppose both sexes have 75% A and 25% B members, within-group weights are 1,
+and cross-group weights are exp(-3). A minority B woman has fewer preferred
+within-group alternatives, so normalization gives her cross-group alternatives
+more probability than an A woman's cross-group alternatives. Uniform female
+initiation therefore produces unequal directional flows. Male initiation
+transposes the table. A fair coin between those two procedures averages their
+expected pair-draw tables:
+
+| Pair | Female-initiated draws | Male-initiated draws | Equal mixture |
+| --- | ---: | ---: | ---: |
+| AA | 73.78% | 73.78% | 73.78% |
+| AB | 1.22% | 3.25% | 2.24% |
+| BA | 3.25% | 1.22% | 2.24% |
+| BB | 21.75% | 21.75% | 21.75% |
+
+Each initiating direction separately has log cross-product -6. Averaging
+equalizes the off-diagonal cells while increasing their product: in the
+rounded percentage units above, 1.22 * 3.25 is about 3.97, whereas
+2.24 * 2.24 is about 5.02. The diagonal cells are unchanged. Using unrounded
+probabilities, the mixture has log cross-product -5.770809, rather than -6.
+Odds ratios are not preserved by averaging tables, even when the component
+tables have identical odds ratios.
+
+These percentages describe hypothetical pair draws before conditioning on
+ego, not actual union shares under female event initiation. Repeating draws
+until ego participates conditions that pair-draw distribution on her row.
+In this fixed group-only market, assigning the externally determined female
+initiation shares then rescales rows, preserving the mixture's cross-product.
+It need not preserve the mixture's exactly equal AB and BA shares. The
+implemented procedure thus retains the association change even though it
+exactly integrates the repeated-draw experiment.
+
+With equal group shares, the two component tables coincide and the discrepancy
+disappears. More generally, the additive procedure combines differently
+normalized probabilities. Its pair weights include a factor of the form
+1 / R[i] + 1 / C[j], where C[j] is weighted female availability to male group j.
+This factor generally cannot be separated into a row factor times a column
+factor, so it does not cancel from the cross-product.
+
+### Interpreting parameter-recovery checks
+
+Each choosing direction uses the original conditional-logit utility, but their
+integrated probabilities are generally not those of an ordinary female-choice
+conditional logit with that utility. Fitted coefficients near the inputs in
+the user's reconstructed choice sets are empirical findings; they do not
+establish exact recovery for every composition or make the aggregate
+cross-product equal twice the symmetric input coefficient. The relationship
+between those fitted coefficients and the integrated probabilities remains
+to be established.
+
+The worked example isolates mixing in a fixed group-only market. Age
+heterogeneity, individual eligibility, sampled markets, and changing partner
+availability can additionally prevent a pooled table from having the simple
+separable form above. Conditional associations holding age fixed and group
+associations after pooling ages are different benchmarks. The numerical
+example is an analytical explanation, not a prediction of every full
+simulation's aggregate table.
 
 ## Observations and examples
 

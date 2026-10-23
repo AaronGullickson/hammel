@@ -69,21 +69,24 @@ test_that("stable softmax handles extreme utilities, empty pools, and invalid sc
   expect_error(inspect_matching_cpp(c(1, 2), bad, 0), "wrong number")
 })
 
-test_that("birth-time selection uses formula scores and male-minus-female gap", {
+test_that("female-choice birth-time selection uses formula scores and male-minus-female gap", {
   model <- make_model(3, birth_rate = 20, birth_interval = 0)
   model$population$persons$sex[1] <- "f"
   model$population$persons$birth_time <- c(-20, -20, -30)
   positive <- create_matching_model(~ age_difference, c(age_difference = 1000))
-  model <- set_union_formation(model, "on_demand", positive, sample_size = 0)
+  model <- set_union_formation(model, "on_demand", positive, sample_size = 0,
+    matching_method = "female_choice")
   result <- simulate(model, 0.5, seed = 52)
   expect_equal(result$unions$husband_id, 3)
   expect_true(all(result$persons$father_id[result$persons$mother_id %in% 1] == 3))
   expect_identical(result, simulate(model, 0.5, seed = 52))
   negative <- create_matching_model(~ age_difference, c(age_difference = -1000))
-  changed <- simulate(set_union_formation(model, "on_demand", negative, 0), 0.5, seed = 52)
+  changed <- simulate(set_union_formation(model, "on_demand", negative, 0,
+    matching_method = "female_choice"), 0.5, seed = 52)
   expect_equal(changed$unions$husband_id, 2)
   fallback <- create_matching_model(~ abs(age_difference - 10),
     c("abs(age_difference - 10)" = -1000))
-  expect_equal(simulate(set_union_formation(model, "on_demand", fallback, 0),
+  expect_equal(simulate(set_union_formation(model, "on_demand", fallback, 0,
+                        matching_method = "female_choice"),
                         0.5, seed = 52)$unions$husband_id, 3)
 })

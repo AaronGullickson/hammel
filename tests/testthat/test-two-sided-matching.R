@@ -88,19 +88,15 @@ test_that("native and custom scoring retain female-first orientation in male cho
 })
 
 test_that("matching method is optional, validated and backwards compatible", {
-  expect_identical(union_formation("on_demand")$matching_method, "female_choice")
+  expect_identical(union_formation("on_demand")$matching_method, "two_sided")
   expect_identical(set_union_formation(hammel_model(), "on_demand",
-    matching_method = "two_sided")$processes$union_formation$matching_method, "two_sided")
+    matching_method = "female_choice")$processes$union_formation$matching_method, "female_choice")
   for (bad in list(NULL, NA, TRUE, "both", c("female_choice", "two_sided"))) {
     expect_error(union_formation("on_demand", matching_method = bad), "matching_method")
     model <- make_model(0)
     model$processes$union_formation["matching_method"] <- list(bad)
     expect_error(simulate(model, 0), "matching_method")
   }
-  model <- make_model(30, sex = "f", birth_rate = 1)
-  expected <- simulate(model, 1, seed = 364)
-  model$processes$union_formation$matching_method <- NULL
-  expect_identical(simulate(model, 1, seed = 364), expected)
 })
 
 make_two_sided_model <- function(mode = "on_demand", extra_women = 5L) {
@@ -113,6 +109,30 @@ make_two_sided_model <- function(mode = "on_demand", extra_women = 5L) {
     sample_size = 0, matching_method = "two_sided", diagnostics = TRUE,
     rates = if (mode == "rate") data.frame(age_start = 19, age_end = 21, rate = 100) else NULL)
 }
+
+test_that("legacy specifications retain explicit female-choice behavior", {
+  model <- make_two_sided_model()
+  model$processes$union_formation$matching_method <- "female_choice"
+  expected <- simulate(model, 0.2, seed = 364)
+  model$processes$union_formation$matching_method <- NULL
+  expect_identical(simulate(model, 0.2, seed = 364), expected)
+})
+
+test_that("omitted matching method executes two-sided matching in both initiation modes", {
+  for (mode in c("on_demand", "rate")) {
+    explicit <- make_two_sided_model(mode)
+    process <- explicit$processes$union_formation
+    arguments <- unclass(process)[setdiff(names(process),
+      c("name", "rate_unit", "sampling_stage", "matching_method"))]
+    implicit <- explicit
+    implicit$processes$union_formation <- do.call(union_formation, arguments)
+    attached <- do.call(set_union_formation, c(list(model = explicit), arguments))
+    expected <- suppressWarnings(simulate(explicit, 0.2, seed = 364))
+    expect_equal(nrow(expected$unions), 1L)
+    expect_identical(suppressWarnings(simulate(implicit, 0.2, seed = 364)), expected)
+    expect_identical(suppressWarnings(simulate(attached, 0.2, seed = 364)), expected)
+  }
+})
 
 test_that("only ego's actual union changes state in either initiation mode", {
   for (mode in c("on_demand", "rate")) {

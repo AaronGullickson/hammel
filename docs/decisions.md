@@ -1141,3 +1141,23 @@ matching specifications override this default. Initiation mode remains explicit.
   the simulation. The user requested removal and further consideration.
 - **Current behavior:** restore D062's additive fixed-pool selection. Its
   documented limitations remain; no replacement mechanism is accepted.
+
+## D064: Two-sided matching is the default for new specifications
+
+- **Status:** implemented at the user's request October 22, 2026.
+- **Decision:** default `union_formation()` and `set_union_formation()` to
+  `matching_method = "two_sided"`, using D062's existing additive fixed-pool
+  probabilities. Retain explicit `"female_choice"` and its inheritance warning.
+- **Rationale:** preliminary user-reported conditional-logit parameter recovery
+  and improved directional pairing balance support using reciprocal competition
+  by default. Aggregate log cross-products need not equal twice symmetric input
+  coefficients. This default change does not establish general scientific
+  validation; further parameter-recovery and inheritance assessment remains open.
+- **Compatibility:** new calls omitting the argument use two-sided matching and
+  may change seeded histories and runtime. Existing specifications explicitly
+  storing a method retain it; older objects without the field retain female
+  choice. Initiation hazards, birth timing, and existing unions are unchanged.
+- **Validation:** omitted and explicit two-sided matching agree in both
+  initiation modes for constructors and setters; explicit female choice agrees
+  with legacy objects. `TZ=UTC Rscript -e 'devtools::test(reporter = "summary")'`
+  passed with no failures or warnings; the opt-in live database test was skipped.

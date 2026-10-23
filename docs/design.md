@@ -195,8 +195,9 @@ callbacks that can bypass consistency checks.
 
 ## Experimental fixed-pool two-sided matching
 
-`union_formation()` and its setter accept optional `matching_method = "two_sided"`
-(D061/D062); the default remains `"female_choice"`. Both union formation and nonmarital
+`union_formation()` and its setter default to `matching_method = "two_sided"`
+(D061/D062/D064); explicit `"female_choice"` remains available. Older objects
+without this field retain female choice. Both union formation and nonmarital
 father selection use temporary markets with alternate women. Hypothetical
 pairs never mutate population state. Native and R scorers evaluate each fixed female row once; column and ego-row
 probabilities are combined in one draw without hypothetical depletion. The engine maintains an age-eligible unpartnered

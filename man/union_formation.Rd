@@ -16,7 +16,7 @@ union_formation(
   cancel_birth_if_no_match = TRUE,
   diagnostics = FALSE,
   group_prop_hazard = NULL,
-  matching_method = "female_choice"
+  matching_method = "two_sided"
 )
 
 set_union_formation(
@@ -31,7 +31,7 @@ set_union_formation(
   cancel_birth_if_no_match = TRUE,
   diagnostics = FALSE,
   group_prop_hazard = NULL,
-  matching_method = "female_choice"
+  matching_method = "two_sided"
 )
 }
 \arguments{
@@ -91,13 +91,21 @@ Without population groups, simulation warns and ignores multipliers.
 Requires \code{initiation = "rate"}; on-demand formation has no search hazard.
 Matching utilities and input rate tables are unchanged.}
 
-\item{matching_method}{\code{"female_choice"} (default) for existing ego-only
-choice, or experimental \code{"two_sided"} for fixed-pool two-sided probabilities.
-The latter samples alternate unpartnered women with the male age cutoff,
+\item{matching_method}{\code{"two_sided"} (default) for fixed-pool two-sided
+probabilities, or \code{"female_choice"} for ego-only choice.
+Female choice accounts for available men but not reciprocal competition
+among women. With unequal group sizes, symmetric group preferences can
+produce unequal female-A/male-B and female-B/male-A pairing counts.
+These imbalances can systematically affect group inheritance and subsequent
+group composition, especially when maternal and paternal inheritance differ.
+Two-sided matching samples alternate unpartnered women with the male age cutoff,
 combines ego-choice and male-choice probabilities without removing pairs.
 It applies to union formation and nonmarital father selection. Temporary
 pairs never change population state. Aggregate parameter recovery is under
-investigation; the method can cost quadratic work in candidate sample size.}
+investigation; the method can cost quadratic work in candidate sample size.
+Older process objects without this field retain female choice. New calls
+omitting the argument use two-sided matching, changing seeded histories
+relative to the previous default.}
 
 \item{model}{A \code{hammel_model} object.}
 }
@@ -135,7 +143,7 @@ sample. Kinship screening follows the same ordering. Existing unions are
 retained even if a new-search restriction would exclude the partner.
 Candidate sets will not be retained in simulation outputs.
 
-Experimental \code{matching_method = "two_sided"} adds alternate women to a
+Default \code{matching_method = "two_sided"} adds alternate women to a
 temporary market after ego's male eligibility screening. Each fixed female
 row is scored once, including for R formulas; row and column probabilities
 are combined for one partner draw.

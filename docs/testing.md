@@ -21,6 +21,14 @@ optional HMDHFDplus reader checks skip if it is unavailable, and mocked reader
 bindings restore on exit. The live database test skips unless explicitly enabled.
 The old top-level base-R test scripts have been converted and removed.
 
+On October 22, 2026, the D064 two-sided default change passed
+`TZ=UTC Rscript -e 'devtools::test(reporter = "summary")'` with no failures or
+warnings and the live database test skipped. Matching checks cover omitted
+versus explicit two-sided selection through both constructors and setters in
+both initiation modes, and legacy objects versus explicit female choice.
+Tests of one-sided analytical probabilities request female choice explicitly.
+This verifies the default change, not general demographic parameter recovery.
+
 | Test file | Main evidence |
 | --- | --- |
 | `test-groups.R` | Group rate lookup, analytical survival, coverage errors, fallback warnings, maternal inheritance, cross-group unions, restarts, RNG equivalence, and weighted initialization |

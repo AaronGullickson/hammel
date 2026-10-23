@@ -24,9 +24,10 @@
 #' A failed match cancels the birth unless explicitly allowed by the union process.
 #' Cancellation starts no new birth-spacing interval. On-demand mode rejects
 #' status schedules.
-#' Optional `matching_method = "two_sided"` on [union_formation()] uses
-#' probabilistic fixed-pool temporary markets instead of default ego-only
-#' female choice. Only ego's outcome is retained; event initiation is unchanged.
+#' Default `matching_method = "two_sided"` on [union_formation()] uses
+#' probabilistic fixed-pool temporary markets. Explicit `"female_choice"`
+#' retains ego-only selection. Only ego's outcome is retained; event initiation
+#' is unchanged.
 #'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
 #' and uses recorded maternal births, including on restart.

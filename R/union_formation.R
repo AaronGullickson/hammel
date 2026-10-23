@@ -289,7 +289,7 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' retained even if a new-search restriction would exclude the partner.
 #' Candidate sets will not be retained in simulation outputs.
 #'
-#' Experimental `matching_method = "two_sided"` adds alternate women to a
+#' Default `matching_method = "two_sided"` adds alternate women to a
 #' temporary market after ego's male eligibility screening. Each fixed female
 #' row is scored once, including for R formulas; row and column probabilities
 #' are combined for one partner draw.
@@ -343,13 +343,21 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   Without population groups, simulation warns and ignores multipliers.
 #'   Requires `initiation = "rate"`; on-demand formation has no search hazard.
 #'   Matching utilities and input rate tables are unchanged.
-#' @param matching_method `"female_choice"` (default) for existing ego-only
-#'   choice, or experimental `"two_sided"` for fixed-pool two-sided probabilities.
-#'   The latter samples alternate unpartnered women with the male age cutoff,
+#' @param matching_method `"two_sided"` (default) for fixed-pool two-sided
+#'   probabilities, or `"female_choice"` for ego-only choice.
+#'   Female choice accounts for available men but not reciprocal competition
+#'   among women. With unequal group sizes, symmetric group preferences can
+#'   produce unequal female-A/male-B and female-B/male-A pairing counts.
+#'   These imbalances can systematically affect group inheritance and subsequent
+#'   group composition, especially when maternal and paternal inheritance differ.
+#'   Two-sided matching samples alternate unpartnered women with the male age cutoff,
 #'   combines ego-choice and male-choice probabilities without removing pairs.
 #'   It applies to union formation and nonmarital father selection. Temporary
 #'   pairs never change population state. Aggregate parameter recovery is under
 #'   investigation; the method can cost quadratic work in candidate sample size.
+#'   Older process objects without this field retain female choice. New calls
+#'   omitting the argument use two-sided matching, changing seeded histories
+#'   relative to the previous default.
 #' @param model A `hammel_model` object.
 #' @return `union_formation()` returns a `hammel_union_formation` process;
 #'   `set_union_formation()` returns an updated model. Rate tables are tibbles.
@@ -359,7 +367,7 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
                             diagnostics = FALSE, group_prop_hazard = NULL,
-                            matching_method = "female_choice") {
+                            matching_method = "two_sided") {
   process <- structure(list(
     name = "union_formation", initiation = initiation, matching = matching,
     sample_size = sample_size, min_male_age = min_male_age,
@@ -383,7 +391,7 @@ set_union_formation <- function(model, initiation, matching = create_age_gap_mat
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
                             diagnostics = FALSE, group_prop_hazard = NULL,
-                            matching_method = "female_choice") {
+                            matching_method = "two_sided") {
   set_process(model, union_formation(initiation, matching, sample_size, rates,
                                      min_male_age, kinship_generations, father_matching,
                                      cancel_birth_if_no_match, diagnostics, group_prop_hazard, matching_method))

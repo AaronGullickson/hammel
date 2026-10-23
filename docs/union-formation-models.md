@@ -13,7 +13,8 @@ and union histories are common infrastructure for all initiation modes.
 
 An optional fixed-pool two-sided selection experiment was added October 22,
 2026 (D061), with `matching_method = "two_sided"`. The specification below
-continues to describe default female choice; see
+describes the explicit female-choice option; new process specifications default
+to two-sided matching at the user's request (D064). See
 [two-sided matching](two-sided-matching.md) for the experiment's temporary
 markets and unchanged event-initiation rules. Its demographic benchmarks
 remain under investigation.

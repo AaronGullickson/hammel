@@ -50,8 +50,9 @@ test_that("father searches exclude partnered men, boys and demonstrated kin", {
   }
 })
 
-test_that("father selection uses the entered conditional-logit probabilities", {
+test_that("female-choice father selection uses the entered conditional-logit probabilities", {
   model <- make_nonmarital_model(3, birth_rate = 500)
+  model$processes$union_formation$matching_method <- "female_choice"
   model$population$persons$birth_time[3] <- -30
   model$processes$union_formation$matching <- create_matching_model(
     ~ age_difference, c(age_difference = log(3) / 10))
@@ -121,6 +122,7 @@ test_that("father_matching defaults to the general model and validates edited ob
 
 test_that("father_matching changes nonmarital fathers but not later union choices", {
   model <- make_nonmarital_model(3)
+  model$processes$union_formation$matching_method <- "female_choice"
   model$population$persons$birth_time[3] <- -30
   model$processes$union_formation$matching <- create_matching_model(
     ~ age_difference, c(age_difference = 100))

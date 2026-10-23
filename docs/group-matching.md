@@ -74,7 +74,7 @@ Coefficient names must match all non-intercept design columns exactly. An
 intercept remains ignored, since it cancels in conditional selection. A formula
 `~ 1` with `numeric()` coefficients permits pair-effects-only matching. Formula
 functions remain deterministic; fixed group identity information is supplied
-as candidate data, never mutable state. Under default female choice,
+as candidate data, never mutable state. Under explicit female choice,
 female-only terms are constant within a search and cancel. In the experimental
 two-sided method, they can vary across a man's female alternatives and affect
 his choice. Group effects in both the formula and pair table intentionally add
@@ -102,9 +102,27 @@ empty populations, and unchanged behavior without group preferences.
 
 ## Experimental two-sided selection (October 22, 2026)
 
-Current default selection normalizes scores within each initiating woman's
-candidate set. Symmetric group coefficients do not guarantee equal directional
+Explicit female-choice selection normalizes scores within each initiating
+woman's candidate set. Symmetric group coefficients do not guarantee equal directional
 union or birth counts with unequal group sizes.
+
+**Inheritance warning:** `matching_method = "female_choice"` accounts for male
+availability but not reciprocal competition among women. With unequal group
+sizes, even symmetric preferences can produce unequal female-A/male-B and
+female-B/male-A pairing counts. The user's inheritance experiments identified
+these directional imbalances as a source of unexpected group-composition
+trajectories. They can systematically affect inheritance outcomes, especially
+when maternal and paternal group inheritance differ. Female choice remains
+available as an intentional one-sided behavioral assumption; assess directional
+pairing counts and inheritance trajectories before interpreting group change.
+Two-sided matching addresses this concern experimentally; it is not a guarantee
+of equal directional counts under arbitrary demographic conditions.
+
+The user selected `matching_method = "two_sided"` as the default for new
+process specifications (D064). Explicit female choice remains available;
+older objects without a matching-method field retain female choice. Default
+selection changes seeded histories and may increase runtime, without changing
+the decision or timing of union initiation.
 
 The user authorized an optional `matching_method = "two_sided"` experiment on
 `experiment/two-sided-sequential-matching` (D061). A temporary market contains

@@ -79,7 +79,8 @@ group_choice_model <- function(initiation = "on_demand", matching, father_matchi
   }
   set_union_formation(model, initiation, matching, sample_size = 0,
     rates = if (initiation == "rate") data.frame(age_start = 15, age_end = Inf, rate = 0) else NULL,
-    father_matching = father_matching, diagnostics = TRUE)
+    father_matching = father_matching, diagnostics = TRUE,
+    matching_method = "female_choice")
 }
 
 test_that("pair effects drive both union modes, father choice, and final utility ranks", {

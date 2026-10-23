@@ -23,6 +23,8 @@ test_that("hard restrictions exclude candidates before scoring and diagnostics",
 
 test_that("directional and symmetric prohibitions use female-first identities", {
   model <- exogamy_test_model("B:A", c("A:B" = 1000))
+  # This assertion exercises the one-sided near-certain score preference.
+  model$processes$union_formation$matching_method <- "female_choice"
   expect_equal(simulate(model, 0.3, seed = 52)$unions$husband_id, 3)
   model <- exogamy_test_model("B::A", c("A:B" = 1000))
   expect_equal(simulate(model, 0.3, seed = 52)$unions$husband_id, 2)
@@ -72,7 +74,7 @@ test_that("rate searches retry and father overrides carry independent restrictio
     age_start = 15, age_end = 50, rate = c(0, 20)), 0)
   model <- set_union_formation(model, "rate", matching = model$processes$union_formation$matching,
     rates = data.frame(age_start = 15, age_end = Inf, rate = 0), sample_size = 0,
-    cancel_birth_if_no_match = FALSE)
+    cancel_birth_if_no_match = FALSE, matching_method = "female_choice")
   result <- simulate(model, 0.3, seed = 52)
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 2))
   model$processes$union_formation$father_matching <- create_age_gap_matching_model(0, 5,
