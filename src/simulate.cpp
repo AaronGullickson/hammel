@@ -583,6 +583,10 @@ IntegerVector sample_male_positions_cpp(int count, int requested) {
 constexpr double kWeightBinWidth = 0.25;
 constexpr double kZeroTargetLogWeight = -1000; // effectively zero weight
 constexpr double kMaxLogWeight = 50;           // cap for unattainable targets
+// Incremental pool sums: entries below this floor are recomputed exactly at a
+// search, and all sums are rebuilt after this many updates, bounding drift.
+constexpr double kPoolSumFloor = 1e-6;
+constexpr unsigned long long kPoolSumRefresh = 100000;
 
 double band_rate(const std::vector<Band>& bands, double age) {
   for (const Band& band : bands)
@@ -673,6 +677,32 @@ class WeightCalibrator {
   long long first_;
   double width_, cutoff_;
   std::vector<double> men_, women_, fertile_; // [group * bins + bin]
+  // Per registered utility table: sums[(female group * G + male group) * bins
+  // + female bin] of count * weight over included male bins. Male bins
+  // [0, included_) have reached the age cutoff; older bins have lower indices.
+  std::vector<const LagTable*> tables_;
+  std::vector<std::vector<double>> sums_;
+  int included_ = 0;
+  unsigned long long updates_ = 0;
+  void spread(size_t t, int male_group, int male_bin, double delta) {
+    const LagTable& table = *tables_[t];
+    std::vector<double>& sums = sums_[t];
+    for (int f = 0; f < groups_; ++f) {
+      // Lags for consecutive female bins are contiguous in the table.
+      const double* weight = &table.weight[table.index(f, male_group, bins_ - 1 - male_bin)];
+      double* out = &sums[(static_cast<size_t>(f) * groups_ + male_group) * bins_];
+      for (int k = 0; k < bins_; ++k) out[k] += delta * weight[k];
+    }
+  }
+  void advance(double now) {
+    while (included_ < bins_ && now - centre(included_) >= cutoff_) {
+      for (int g = 0; g < groups_; ++g) {
+        const double count = men_[static_cast<size_t>(g) * bins_ + included_];
+        if (count != 0) for (size_t t = 0; t < tables_.size(); ++t) spread(t, g, included_, count);
+      }
+      ++included_;
+    }
+  }
   double centre(int k) const { return (static_cast<double>(first_ + k) + 0.5) * width_; }
   size_t cell(int group, double born) const {
     const long long k = static_cast<long long>(std::floor(born / width_)) - first_;
@@ -696,7 +726,39 @@ class WeightCalibrator {
     fertile_ = men_;
   }
   int bins() const { return bins_; }
-  void add_man(int group, double born, double delta) { men_[cell(group, born)] += delta; }
+  // Register a utility table before counts are added; returns its index.
+  int add_table(const LagTable* table) {
+    tables_.push_back(table);
+    sums_.emplace_back(static_cast<size_t>(groups_) * groups_ * bins_, 0.0);
+    return static_cast<int>(tables_.size()) - 1;
+  }
+  // Rebuild every pool sum from the counts, discarding accumulated roundoff.
+  void refresh() {
+    for (size_t t = 0; t < tables_.size(); ++t) {
+      std::fill(sums_[t].begin(), sums_[t].end(), 0.0);
+      for (int k = 0; k < included_; ++k)
+        for (int g = 0; g < groups_; ++g) {
+          const double count = men_[static_cast<size_t>(g) * bins_ + k];
+          if (count != 0) spread(t, g, k, count);
+        }
+    }
+    updates_ = 0;
+  }
+  double max_sum_difference(const WeightCalibrator& other, size_t t) const {
+    double difference = 0;
+    for (size_t i = 0; i < sums_[t].size(); ++i)
+      difference = std::max(difference, std::abs(sums_[t][i] - other.sums_[t][i]));
+    return difference;
+  }
+  void add_man(int group, double born, double delta) {
+    const size_t i = cell(group, born);
+    men_[i] += delta;
+    const int k = static_cast<int>(i % bins_);
+    if (k < included_) {
+      for (size_t t = 0; t < tables_.size(); ++t) spread(t, group, k, delta);
+      if (++updates_ >= kPoolSumRefresh) refresh();
+    }
+  }
   void add_woman(int group, double born, double delta) { women_[cell(group, born)] += delta; }
   void add_fertile(int group, double born, double delta) { fertile_[cell(group, born)] += delta; }
 
@@ -705,8 +767,11 @@ class WeightCalibrator {
   // weights so those shares meet the mirrored target (Newton on a convex
   // objective, warm-started). Empty or uninformative states return b = 1.
   WeightSolution solve(double now, const std::vector<const std::vector<Band>*>& hazards,
-                       bool fertility, const LagTable& table, double absorption,
-                       std::vector<double>& warm) const {
+                       bool fertility, int table_id, double absorption,
+                       std::vector<double>& warm) {
+    advance(now);
+    const LagTable& table = *tables_[table_id];
+    const std::vector<double>& sums = sums_[table_id];
     const int G = groups_;
     WeightSolution s;
     s.log_weights.assign(G, 0.0);
@@ -755,15 +820,20 @@ class WeightCalibrator {
         intensity[g] / female_with_men : 0;
       s.target[g] = female_share + absorption * (mirror[g] / mirror_sum - female_share);
     }
-    // Pool sums S[row, male group]; rescale a row in log space if it underflows.
+    // Pool sums S[row, male group] come from the maintained sums. Entries below
+    // the floor are recomputed exactly; a row that underflows is rescaled in
+    // log space.
     const int R = static_cast<int>(rows.size());
     std::vector<double> S(static_cast<size_t>(R) * G, 0);
     for (int r = 0; r < R; ++r) {
       double total = 0;
       for (int m = 0; m < G; ++m) {
-        double sum = 0;
-        for (const auto& bin : men[m])
-          sum += bin.second * table.weight[table.index(rows[r].group, m, rows[r].bin - bin.first + bins_ - 1)];
+        double sum = sums[(static_cast<size_t>(rows[r].group) * G + m) * bins_ + rows[r].bin];
+        if (!(sum >= kPoolSumFloor)) {
+          sum = 0;
+          for (const auto& bin : men[m])
+            sum += bin.second * table.weight[table.index(rows[r].group, m, rows[r].bin - bin.first + bins_ - 1)];
+        }
         S[static_cast<size_t>(r) * G + m] = sum;
         total += sum;
       }
@@ -903,6 +973,8 @@ List inspect_weighted_calibration_cpp(NumericVector female_born, IntegerVector f
   for (double born : female_born) { lo = std::min(lo, born); hi = std::max(hi, born); }
   for (double born : male_born) { lo = std::min(lo, born); hi = std::max(hi, born); }
   WeightCalibrator calibrator(lo, hi, group_count, width, cutoff);
+  const LagTable table = build_lag_table(matching, group_count, calibrator.bins(), width);
+  calibrator.add_table(&table);
   for (R_xlen_t i = 0; i < male_born.size(); ++i) calibrator.add_man(male_groups[i], male_born[i], 1);
   for (R_xlen_t i = 0; i < female_born.size(); ++i) {
     calibrator.add_woman(female_groups[i], female_born[i], 1);
@@ -914,12 +986,53 @@ List inspect_weighted_calibration_cpp(NumericVector female_born, IntegerVector f
     bands[g] = read_bands(rates, "", "", g);
     hazards[g] = &bands[g];
   }
-  const LagTable table = build_lag_table(matching, group_count, calibrator.bins(), width);
   std::vector<double> warm;
-  const WeightSolution s = calibrator.solve(now, hazards, fertility, table,
+  const WeightSolution s = calibrator.solve(now, hazards, fertility, 0,
     as<double>(matching["imbalance_absorption"]), warm);
   return List::create(_["log_weights"] = wrap(s.log_weights), _["target"] = wrap(s.target),
                       _["flow"] = wrap(s.flow), _["infeasible"] = s.infeasible);
+}
+
+// Internal entry point: apply a sequence of male pool changes at increasing
+// times, then compare incremental pool sums and weights with a full rebuild.
+// [[Rcpp::export]]
+List inspect_weighted_incremental_cpp(NumericVector female_born, IntegerVector female_groups,
+                                      NumericVector male_born, IntegerVector male_groups,
+                                      NumericVector op_times, IntegerVector op_men,
+                                      NumericVector op_deltas, DataFrame rates, List matching,
+                                      int group_count, double cutoff) {
+  if (op_times.size() == 0 || op_men.size() != op_times.size() || op_deltas.size() != op_times.size())
+    stop("Invalid incremental-calibration inputs.");
+  double lo = op_times[0], hi = op_times[op_times.size() - 1];
+  for (double born : female_born) { lo = std::min(lo, born); hi = std::max(hi, born); }
+  for (double born : male_born) { lo = std::min(lo, born); hi = std::max(hi, born); }
+  WeightCalibrator incremental(lo, hi, group_count, kWeightBinWidth, cutoff);
+  const LagTable table = build_lag_table(matching, group_count, incremental.bins(), kWeightBinWidth);
+  incremental.add_table(&table);
+  for (R_xlen_t i = 0; i < female_born.size(); ++i) {
+    incremental.add_woman(female_groups[i], female_born[i], 1);
+    incremental.add_fertile(female_groups[i], female_born[i], 1);
+  }
+  for (R_xlen_t i = 0; i < male_born.size(); ++i) incremental.add_man(male_groups[i], male_born[i], 1);
+  std::vector<std::vector<Band>> bands(group_count);
+  std::vector<const std::vector<Band>*> hazards(group_count);
+  for (int g = 0; g < group_count; ++g) { bands[g] = read_bands(rates, "", "", g); hazards[g] = &bands[g]; }
+  const double absorption = as<double>(matching["imbalance_absorption"]);
+  std::vector<double> warm;
+  for (R_xlen_t i = 0; i < op_times.size(); ++i) {
+    if (i % 1024 == 0) checkUserInterrupt();
+    incremental.solve(op_times[i], hazards, false, 0, absorption, warm);
+    incremental.add_man(male_groups[op_men[i]], male_born[op_men[i]], op_deltas[i]);
+  }
+  const double end = op_times[op_times.size() - 1];
+  WeightCalibrator rebuilt = incremental;
+  rebuilt.refresh();
+  const double difference = incremental.max_sum_difference(rebuilt, 0);
+  std::vector<double> warm_a, warm_b;
+  const WeightSolution a = incremental.solve(end, hazards, false, 0, absorption, warm_a);
+  const WeightSolution b = rebuilt.solve(end, hazards, false, 0, absorption, warm_b);
+  return List::create(_["max_sum_difference"] = difference,
+                      _["incremental"] = wrap(a.log_weights), _["rebuilt"] = wrap(b.log_weights));
 }
 
 struct UnionRecord {
@@ -1110,7 +1223,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   };
   std::vector<const std::vector<Band>*> search_hazards, fertility_hazards;
   LagTable union_table, father_table_storage;
-  const LagTable* father_table = &union_table;
+  int union_table_id = 0, father_table_id = 0;
   std::vector<double> union_warm, father_warm;
   double weighted_infeasible = 0;
   // All father and partner searches share sampling, eligibility and matching.
@@ -1141,7 +1254,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       const bool fertility_driven = !rate_initiation || father;
       const WeightSolution weights = calibrator->solve(now,
         fertility_driven ? fertility_hazards : search_hazards, fertility_driven,
-        father ? *father_table : union_table,
+        father ? father_table_id : union_table_id,
         as<double>(choice_model["imbalance_absorption"]), father ? father_warm : union_warm);
       if (weights.infeasible) ++weighted_infeasible;
       return select_partner(males, eligible, people, woman, choice_model, rank,
@@ -1263,10 +1376,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       fertility_hazards.push_back(&schedules[group].unpartnered);
     }
     union_table = build_lag_table(matching, group_count, calibrator->bins(), kWeightBinWidth);
+    union_table_id = father_table_id = calibrator->add_table(&union_table);
     if (SEXP(father_matching) != SEXP(matching)) {
       father_table_storage = build_lag_table(father_matching, group_count, calibrator->bins(),
                                              kWeightBinWidth);
-      father_table = &father_table_storage;
+      father_table_id = calibrator->add_table(&father_table_storage);
     }
     counted_woman.assign(people.size(), 0);
     counted_fertile.assign(people.size(), 0);

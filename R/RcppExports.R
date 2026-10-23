@@ -45,6 +45,10 @@ inspect_weighted_calibration_cpp <- function(female_born, female_groups, female_
     .Call(`_hammel_inspect_weighted_calibration_cpp`, female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility)
 }
 
+inspect_weighted_incremental_cpp <- function(female_born, female_groups, male_born, male_groups, op_times, op_men, op_deltas, rates, matching, group_count, cutoff) {
+    .Call(`_hammel_inspect_weighted_incremental_cpp`, female_born, female_groups, male_born, male_groups, op_times, op_men, op_deltas, rates, matching, group_count, cutoff)
+}
+
 simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab) {
     .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab)
 }

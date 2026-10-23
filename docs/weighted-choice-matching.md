@@ -134,6 +134,16 @@ on that grid. The formula must therefore give finite values at every such lag.
 Bin width is a numerical tolerance, not a demographic parameter. Candidate
 selection itself uses exact ages.
 
+The pool sums S are maintained incrementally for every female bin, group pair
+and matching model: a man joining or leaving the eligible pool updates them,
+and a male birth cohort is added once when its bin reaches the age cutoff. A
+search then reads its rows directly instead of summing over all male bins.
+Entries below 1e-6 are recomputed exactly at the search, and all sums are
+rebuilt from the counts after every 100,000 updates, bounding accumulated
+roundoff. This is a software optimization (October 23, 2026): probabilities
+are unchanged up to floating-point roundoff, which can in principle alter
+fixed-seed histories relative to the first implementation.
+
 ### When no solution exists
 
 A male group may have a positive target but no feasible demand, for example
@@ -187,6 +197,66 @@ absorbs the weights. In the static analysis, calibrated weights left the age
 term (-0.0278 against -0.0277) and symmetric group term (-2.87 to -2.91,
 against -2.92 to -2.96 for female choice) essentially unchanged.
 
+Choice sets reconstructed from the wife's side match the simulated choice
+process and are the appropriate recovery benchmark. Husband-side sets treat
+each husband as choosing among unpartnered women, but men do not choose in
+this model: which women form unions, and when, follows women's hazards, which
+those sets read as male age preferences. Weights apply only to men's groups,
+so men's ages at union formation remain an outcome, not an input.
+
+## User-reported assessment (October 23, 2026)
+
+The user ran these replicated comparisons in the milestone 3 report's uneven
+two-group scenario (on-demand formation, `create_age_gap_matching_model(0, 5)`
+with A::B = -3, 100 years). The 250-man runs of both methods and the
+1,000-man female-choice run used the same 20 seeds; the 1,000-man
+weighted-choice runs used 40 replications. Values are means across replications,
+with standard errors from between-replication variation. These are the user's
+results and assessment; they were not independently rerun for this document.
+
+| Method, sample size | Pooled cross-product (input -6) | AB/BA |
+| --- | --- | --- |
+| Female choice, 250 | -5.87 (0.017) | 0.596 (0.008) |
+| Weighted choice, 250 | -5.88 (0.015) | 1.01 (0.039) |
+| Female choice, 1,000 | -5.98 (0.017) | 0.615 (0.008) |
+| Weighted choice, 1,000 | -5.95 (0.0095) | 0.983 (0.023) |
+
+Wife-side conditional logit (inputs: linear 0, quadratic -0.0277, symmetric
+group -3):
+
+| Method, sample size, terms | Linear | Quadratic | ABsym | Male group B |
+| --- | --- | --- | --- | --- |
+| Female choice, 250 | -0.0030 (0.0027) | -0.0275 (0.0005) | -3.03 (0.060) | |
+| Weighted choice, 250 | 0.0023 (0.0028) | -0.0262 (0.0005) | -3.02 (0.056) | |
+| Weighted choice, 250, + male group | -0.0025 (0.0039) | -0.0265 (0.0006) | -3.06 (0.064) | 0.322 (0.043) |
+| Weighted choice, 1,000, + male group | 0.0013 (0.0019) | -0.0277 (0.0004) | -3.02 (0.037) | 0.311 (0.038) |
+| Weighted choice, 1,000 | 0.0005 (0.0019) | -0.0274 (0.0004) | -3.03 (0.039) | |
+| Same, new choice-set draws | 0.0011 (0.0020) | -0.0283 (0.0003) | -3.00 (0.037) | |
+
+With weighted choice at 250 men, husband-side sets alone gave a linear term
+of -0.0383 (0.0030), quadratic -0.0263 (0.0005), and directed terms AB -3.25
+and BA -2.57; combining husband- and wife-side sets gave linear -0.0233
+(0.0022), quadratic -0.0267 (0.0003), and ABsym -3.01 (0.031).
+
+Findings from these runs and their discussion:
+
+- Weighted choice removes female choice's directional imbalance (AB/BA about
+  1 rather than 0.6) and recovers the input preferences in wife-side sets.
+- At 250 men, both methods' pooled cross-products fell about 0.12 short of -6,
+  and weighted choice's quadratic term was slightly flat. At 1,000 men both
+  largely disappeared. Each woman's sample contains few men near her age, and
+  varying group mixes across samples attenuate pooled associations; candidate
+  sampling is a speed shortcut, so the larger sample is closer to the intended
+  model. A small residual pooled shortfall remains under both methods.
+- At 1,000 men the male-group term is not needed for recovery; its estimate,
+  about 0.31, reflects the B men's average log weight.
+- Husband-side sets are not a valid benchmark (see above).
+- After the incremental pool sums, the user's rerun with an installed build
+  reproduced the cross-products and AB/BA exactly; the clogit differed only
+  through new choice-set draws. In the user's setup, weighted choice at 1,000
+  men took 6.4 s per run before that optimization and 2.18 s after (5.5 s at
+  250 before); build settings may differ from the timings above.
+
 ## Validation
 
 `tests/testthat/test-weighted-choice.R` covers the analytical examples above
@@ -196,7 +266,15 @@ and custom formulas in both intensity types, three-group convergence, zero and
 unattainable targets, exact equality with female choice for one or no groups
 in both initiation modes, reproducibility, restarts, separate father models,
 diagnostics without changed histories, the single warning, and input
-validation. Timing has not yet been measured.
+validation, and incremental pool sums against a full rebuild after thousands
+of pool changes and cutoff crossings.
+
+Timing, October 23, 2026 (optimized build; 20,000 starting persons in two
+groups, on-demand, 50 years, one seed; synthetic test mortality): female
+choice 0.13 s and 0.29 s at sample sizes 250 and 1,000; weighted choice 0.28 s
+and 0.44 s; additive two-sided 1.05 s at 250. Before incremental sums,
+weighted choice took 1.1 s at 250. These are single-scenario measurements, not
+performance guarantees.
 
 Scientific assessment (user): the milestone 3 group-matching scenarios, with
 directional counts, unpartnered pool composition by sex and group over time,

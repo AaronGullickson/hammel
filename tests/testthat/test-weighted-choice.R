@@ -101,6 +101,29 @@ test_that("binned calibration agrees with an exact individual-level reference", 
   expect_equal(fine$log_weights, expected$log_weights, tolerance = 2e-3)
 })
 
+test_that("incremental pool sums match a full rebuild after many pool changes", {
+  set.seed(909)
+  women <- data.frame(born = -runif(300, 10, 60), group = sample(0:1, 300, TRUE, c(0.7, 0.3)))
+  men <- data.frame(born = -runif(400, 5, 80), group = sample(0:1, 400, TRUE, c(0.6, 0.4)))
+  # Men leave and rejoin the pool while time advances 30 years, so younger
+  # cohorts also cross the age cutoff part-way through.
+  n_ops <- 4000
+  times <- sort(runif(n_ops, 0, 30))
+  present <- rep(TRUE, nrow(men))
+  who <- sample.int(nrow(men), n_ops, TRUE)
+  deltas <- numeric(n_ops)
+  for (i in seq_len(n_ops)) {
+    deltas[i] <- if (present[who[i]]) -1 else 1
+    present[who[i]] <- !present[who[i]]
+  }
+  matching <- create_age_gap_matching_model(0, 5, group_exogamy = c("A::B" = -2))
+  result <- inspect_weighted_incremental_cpp(women$born, women$group, men$born, men$group,
+    times, who - 1L, deltas, data.frame(age_start = 15, age_end = 50, rate = 0.1),
+    prepare_weighted(matching, c("A", "B")), 2L, 15)
+  expect_lt(result$max_sum_difference, 1e-9)
+  expect_equal(result$incremental, result$rebuilt, tolerance = 1e-8)
+})
+
 test_that("three-group calibration meets targets and handles zero and unattainable targets", {
   set.seed(902)
   women <- data.frame(born = -runif(600, 15, 45), group = sample(0:2, 600, TRUE, c(5, 3, 1)),

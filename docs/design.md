@@ -214,8 +214,9 @@ benchmark procedure. Aggregate parameter recovery remains under investigation.
 `matching_method = "weighted_choice"` (D066) keeps female choice among screened
 candidates and adds a log weight for each man's group to selection scores.
 `WeightCalibrator` in `src/simulate.cpp` keeps unpartnered counts by group and
-birth-time bin, updated at events, and solves the weights at each search from
-a per-model table of utilities over bin-centre lags. Matching models carry
+birth-time bin and incrementally maintained pool sums for each matching model's
+table of utilities over bin-centre lags, updated at events, and solves the
+weights at each search from those sums. Matching models carry
 `imbalance_absorption` (default 1). One group gives unit weights and female
 choice exactly. See [weighted-choice matching](weighted-choice-matching.md).
 

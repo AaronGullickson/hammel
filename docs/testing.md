@@ -47,7 +47,7 @@ invalid edited specifications, and removal of the union-level argument.
 | `test-prevent-exogamy.R` | Post-sampling restrictions, no refilling, scarcity/failure, direction/symmetry, father overrides, diagnostics, retained partners, and unchanged disabled RNG |
 | `test-detailed-unions.R` | Spouse-ID joins, repeated episodes, deaths, optional group types, empty tables, unchanged inputs, and name collisions |
 | `test-two-sided-matching.R` | Analytical and independent-rejection fixed-pool choices, native/R orientation, female-row callbacks, streamed/materialized equivalence, actual-state invariants, eligibility, father overrides, RNG and compatibility |
-| `test-weighted-choice.R` | Analytical weights and absorption, binned versus exact calibration, three groups, zero/unattainable targets, female-choice equality for one group, both modes, fathers, restarts, diagnostics, warning, validation |
+| `test-weighted-choice.R` | Analytical weights and absorption, binned versus exact calibration, three groups, zero/unattainable targets, incremental sums versus full rebuild, female-choice equality for one group, both modes, fathers, restarts, diagnostics, warning, validation |
 | `test-parent-info.R` | Parent-ID joins, ages at birth, deceased/unknown parents, optional groups, empty tables, unchanged inputs, and name collisions |
 | `test-model-api.R` | Construction, replacement, schemas, history and metadata retention |
 | `test-baseline-population.R` | Reproducibility, bounds, known cases, distributions, empty populations |
