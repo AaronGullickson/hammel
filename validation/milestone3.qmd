@@ -46,26 +46,72 @@ future::plan(future::multicore, workers = 4)
 ```{r}
 #| label: create-functions
 
-get_eligible_bachelors <- function(mar_time, pop) {
-  # get husband ids of current marriages
-  current_husbands <- pop$unions |>
+get_eligible_partners <- function(mar_time, pop, ego_spouse) {
+  ego_spouse <- match.arg(ego_spouse, c("wife", "husband"))
+
+  opposite_sex <- if (ego_spouse == "wife") "m" else "f"
+  partner_id <- if (ego_spouse == "wife") "husband_id" else "wife_id"
+
+  current_spouses <- pop$unions |>
     filter(
       start_time < .env$mar_time,
-      is.na(end_time) | (end_time > .env$mar_time)
+      is.na(end_time) | end_time > .env$mar_time
     ) |>
-    distinct(husband_id) |>
-    pull(husband_id)
+    pull(all_of(partner_id)) |>
+    unique()
 
   pop$persons |>
     filter(
-      # must be men
-      sex == "m",
-      # must be alive and age 15 or older at time of marriage
-      is.na(death_time) | (death_time > .env$mar_time),
+      sex == .env$opposite_sex,
+      is.na(death_time) | death_time > .env$mar_time,
       .env$mar_time - birth_time >= 15,
-      # must not be currently married
-      !(person_id %in% current_husbands)
+      !(person_id %in% .env$current_spouses)
     )
+}
+
+construct_choice_set <- function(union_real, population, ego_spouse, set_size) {
+  ego_spouse <- match.arg(ego_spouse, c("wife", "husband"))
+  suffix <- if (ego_spouse == "wife") "h" else "w"
+
+  partner_id <- if (ego_spouse == "wife") "husband_id" else "wife_id"
+  partner_birth <- paste0("birth_time_", suffix)
+  partner_group <- paste0("group_", suffix)
+
+  # draw candidates
+  candidates <- get_eligible_partners(
+    union_real$start_time, population, ego_spouse
+  ) |>
+    filter(person_id != .env$union_real[[partner_id]]) |>
+    slice_sample(n = set_size)
+
+  # Copy ego's information, then substitute each alternate partner.
+  unions_fake <- union_real[rep(1L, nrow(candidates)), ]
+  unions_fake[[partner_id]] <- candidates$person_id
+  unions_fake[[partner_birth]] <- candidates$birth_time
+  unions_fake[[partner_group]] <- candidates$group
+  unions_fake$chosen <- FALSE
+
+  bind_rows(union_real, unions_fake)
+}
+
+construct_choice_sets <- function(population, sample_size, set_size) {
+
+  # draw the sample
+  union_sample <- population |>
+    get_detailed_unions() |>
+    slice_sample(n = sample_size) |>
+    mutate(
+      chosen = TRUE
+    )
+
+  # half the choice sets are from wives and half from husbands
+  choice_sets <- map(seq_len(nrow(union_sample)), function(i) {
+    ego_spouse <- if (i <= nrow(union_sample) %/% 2) "wife" else "husband"
+    construct_choice_set(union_sample[i, ], population, ego_spouse, set_size)
+  }) |>
+    bind_rows()
+
+  return(choice_sets)
 }
 ```
 
@@ -962,10 +1008,8 @@ mar_rates |>
 
 ## Evaluate Group Matching
 
-### Group matching parameters
-
 ```{r}
-#| label: run-intermarriage-sim-uneven
+#| label: run-intermarriage-sim-test
 
 model <- hammel_model() |>
   set_population(pop_baseline_uneven_2g) |>
@@ -975,83 +1019,42 @@ model <- hammel_model() |>
     "on_demand",
     matching = create_age_gap_matching_model(
       0, 5, 
-      group_exogamy = c("A::B" = -3), sample_size = 250
+group_exogamy = c("A::B" = -3)
     ),
     matching_method = "two_sided"
   )
 
-system.time(result <- simulate(model, years = years, seed = 1))
-
-results  <- map(replication_seeds, function(seed) {
-  simulate(model, years = years, seed = seed)
-})
-names(results) <- as.character(replication_seeds)
+system.time(result <- simulate(model, years = years, seed = 42))
 ```
 
 ```{r}
 
-map(results, get_detailed_unions) |>
-  bind_rows(.id = "replication") |>
-  filter(start_time > 2050) |>
-  count(replication, group_w, group_h) |>
-  pivot_wider(id_cols = c(replication), names_from = c(group_w, group_h), values_from = n) |>
+result |>
+  get_detailed_unions() |>
+  count(group_w, group_h) |>
+  pivot_wider(names_from = c(group_w, group_h), values_from = n) |>
   mutate(
     log_odds = log(A_B) + log(B_A) - log(A_A) - log(B_B),
     gender_ratio = A_B/B_A
-  ) |>
-  summarize(
-    log_odds_se = sd(log_odds) / sqrt(n()),
-    log_odds = mean(log_odds),
-    gender_ratio_se = sd(gender_ratio) / sqrt(n()),
-    gender_ratio = mean(gender_ratio)
   )
 ```
 
-
 ```{r}
-#| label: fig-exogamy-uneven
-#| fig-cap: Mean log odds ratio of each group pairing by decade of the simulation, across 100 simulations using uneven group sizes. 95% confidence bands shown. Dotted horizontal line give the expected log odds ratio from iput.
+choice_sets <- construct_choice_sets(result, 10000, 50)
 
-expected <- tribble(
-  ~pairing, ~log_odds,
-  "AB",     -6,
-  "BC",     -1.5,
-  "AC",     0
-)
-
-map(results, get_detailed_unions) |>
-  bind_rows(.id = "replication") |>
-  mutate(time_span = floor(start_time / 10) * 10) |> 
-  count(replication, time_span, group_w, group_h) |>
-  pivot_wider(id_cols = c(replication, time_span), names_from = c(group_w, group_h), values_from = n) |>
+choice_sets <- choice_sets |>
   mutate(
-    log_odds_AB = log(A_B) + log(B_A) - log(A_A) - log(B_B),
-    log_odds_BC = log(B_C) + log(C_B) - log(B_B) - log(C_C),
-    log_odds_AC = log(A_C) + log(C_A) - log(A_A) - log(C_C)
-  ) |>
-  select(replication, time_span, starts_with("log_odds")) |>
-  pivot_longer(
-    cols = starts_with("log_odds_"), 
-    names_prefix = "log_odds_", 
-    names_to = "pairing", 
-    values_to = "log_odds"
-  ) |>
-  group_by(time_span, pairing) |>
-  summarize(
-    sd = sd(log_odds),
-    log_odds = mean(log_odds),
-    n = n(),
-    se = sd / sqrt(n),
-    .groups = "drop"
-  ) |>
-  ggplot(aes(x = time_span + 5, y = log_odds, group = pairing, color = pairing))+
-  geom_ribbon(aes(ymin = log_odds - 1.96 * se, ymax = log_odds + 1.96 * se, fill = pairing), 
-              color = NA, alpha = 0.3)+
-  geom_point()+
-  geom_hline(data = expected, aes(yintercept = log_odds, color = pairing), linetype = 2)+
-  labs(x = "year", y = "log odds ratio")+
-  theme_bw()
+    age_diff = birth_time_w - birth_time_h,
+    ABsym = (group_w == "A" & group_h == "B") | (group_w == "B" & group_h == "A"),
+    AB = (group_w == "A" & group_h == "B"),
+    BA = (group_w == "B" & group_h == "A") 
+  )
+
+model_clogit <- clogit(chosen ~ age_diff + I(age_diff^2) + AB + BA + strata(union_id), data = choice_sets)
+summary(model_clogit)
 ```
+
+### Group matching parameters
 
 To test group matching parameters, I start with a three group population with uneven sizes. Group A and B are given a symmetric exogamy ratio while B and C have directed effects by gender, and there are no barriers between A and C. I use shared fertility and mortality rates across groups, since we are not concerned with that feature for this evaluation. I also use on demand union formation because we are focused on the matching model itself here and the on demand model runs faster. I then run 100 simulations.
 
