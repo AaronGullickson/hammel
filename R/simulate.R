@@ -92,8 +92,8 @@ simulate <- function(model, years, seed = NULL) {
     stop("Simulation times cannot be represented at this scale.", call. = FALSE)
   }
   # Recheck edited specifications, without introducing a model diagnostic API.
-  set_process(model, model$processes$mortality)
-  model <- set_process(model, model$processes$fertility)
+  attach_process(model, model$processes$mortality)
+  model <- attach_process(model, model$processes$fertility)
   death_rates <- model$processes$mortality$rates
   birth_rates <- model$processes$fertility$rates
   birth_interval <- model$processes$fertility$birth_interval
@@ -116,7 +116,7 @@ simulate <- function(model, years, seed = NULL) {
          call. = FALSE)
   }
   union_process <- model$processes$union_formation
-  set_process(model, union_process)
+  attach_process(model, union_process)
   status_fertility <- "union_status" %in% names(birth_rates)
   if (union_process$initiation == "on_demand" && status_fertility) {
     stop('On-demand union formation requires an overall fertility schedule without `union_status`.',

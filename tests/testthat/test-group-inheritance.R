@@ -194,7 +194,7 @@ test_that("future identities are checked against rates and categorical matching 
     edited$processes[[name]]$rates <- rbind(transform(rates, group = "A"), transform(rates, group = "B"))
     expect_error(simulate(edited, 0), "missing schedules.*AB")
   }
-  matching <- create_matching_model(~ male_group, c(male_groupB = 0), group_levels = c("A", "B"))
+  matching <- create_matching_model(~ male_group, c(male_groupB = 0), group_levels = c("A", "B"), matching_method = "female_choice")
   model$processes$union_formation$matching <- matching
   expect_error(simulate(model, 0), "covered.*group_levels")
   # Positive reference shares also infer identities; zero-only columns do not.
@@ -259,12 +259,11 @@ test_that("new AB identities are available to categorical partner matching durin
   model <- set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
     age_start = 15, age_end = 50, rate = c(0, 20)), 0, inheritance = rule)
   matching <- create_matching_model(~ male_group,
-    c(male_groupB = 0, male_groupAB = 1000), group_levels = c("A", "B", "AB"), sample_size = 0)
+    c(male_groupB = 0, male_groupAB = 1000), group_levels = c("A", "B", "AB"), sample_size = 0, matching_method = "female_choice")
   model <- set_union_formation(model, "rate", matching, rates = data.frame(
     age_start = 0, age_end = Inf, rate = 0), min_male_age = 0, kinship_generations = 0,
     cancel_birth_if_no_match = FALSE)
-  # A +1000 AB utility leaves other men unreachable within the weight cap.
-  expect_warning(result <- simulate(model, 1, seed = 52), "male-group targets")
+  result <- simulate(model, 1, seed = 52)
   children <- inheritance_children(result)
   father_groups <- result$persons$group[match(children$father_id, result$persons$person_id)]
   expect_true(any(father_groups == "AB"))

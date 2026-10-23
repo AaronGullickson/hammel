@@ -83,7 +83,8 @@ test_that("binned calibration agrees with an exact individual-level reference", 
                       fertile = runif(400) < 0.8)
   men <- data.frame(born = -runif(350, 10, 85), group = sample(0:1, 350, TRUE, c(0.6, 0.4)))
   rates <- data.frame(age_start = c(15, 30), age_end = c(30, 50), rate = c(0.2, 0.05))
-  matching <- create_age_gap_matching_model(2, 5, group_exogamy = c("A:B" = -2, "B:A" = -1))
+  expect_warning(matching <- create_age_gap_matching_model(2, 5,
+    group_exogamy = c("A:B" = -2, "B:A" = -1)), "only the sum")
   for (fertility in c(FALSE, TRUE)) {
     expected <- reference_weights(women, men, matching, rates, c("A", "B"), fertility = fertility)
     fine <- calibrate(women, men, matching, rates, c("A", "B"), width = 0.001, fertility = fertility)
@@ -131,8 +132,9 @@ test_that("three-group calibration meets targets and handles zero and unattainab
                       fertile = TRUE)
   men <- data.frame(born = -runif(600, 15, 50), group = sample(0:2, 600, TRUE, c(4, 4, 1)))
   rates <- data.frame(age_start = 15, age_end = 50, rate = 0.1)
-  matching <- create_age_gap_matching_model(0, 5,
-    group_exogamy = c("A::B" = -3, "B:C" = -1, "C:B" = -0.5), imbalance_absorption = 0.5)
+  expect_warning(matching <- create_age_gap_matching_model(0, 5,
+    group_exogamy = c("A::B" = -3, "B:C" = -1, "C:B" = -0.5), imbalance_absorption = 0.5),
+    "only the sum")
   result <- calibrate(women, men, matching, rates, c("A", "B", "C"))
   expect_false(result$infeasible)
   expect_equal(result$flow, result$target, tolerance = 1e-9)
@@ -174,7 +176,7 @@ weighted_model <- function(population, method, initiation = "on_demand",
   model <- hammel_model() |>
     set_population(population) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01))
-  if (initiation == "on_demand") {
+  quiet_inheritance(if (initiation == "on_demand") {
     model |>
       set_fertility(data.frame(age_start = 15, age_end = 45, rate = 0.12)) |>
       set_union_formation("on_demand", matching, father_matching = father_matching, ...)
@@ -184,7 +186,7 @@ weighted_model <- function(population, method, initiation = "on_demand",
                                union_status = c("partnered", "unpartnered"))) |>
       set_union_formation("rate", matching, rates = data.frame(age_start = 15, age_end = 50, rate = 0.15),
                           father_matching = father_matching, ...)
-  }
+  })
 }
 
 test_that("one group or no groups reproduce explicit female choice exactly", {
@@ -298,4 +300,60 @@ test_that("matching method and absorption inputs are validated on matching model
   edited <- create_age_gap_matching_model(0, 5)
   edited$imbalance_absorption <- 2
   expect_error(union_formation("on_demand", edited), "imbalance_absorption")
+})
+
+test_that("weighted choice warns at construction about absorbed group effects", {
+  # Directed pairs whose two directions differ, including one-sided entries.
+  for (effects in list(c("A:B" = -1), c("A:B" = -1, "B:A" = -2),
+                       data.frame(female_group = "A", male_group = "B", log_odds = -1)))
+    expect_warning(create_age_gap_matching_model(0, 5, group_exogamy = effects), "only the sum")
+  # Male-group formula terms are absorbed by the weights.
+  expect_warning(create_matching_model(~ male_group, c(male_groupB = 1), group_levels = c("A", "B")),
+                 "male_group are absorbed")
+  # Symmetric, equal-valued, within-group, same_group, and female-choice models are silent.
+  expect_silent(create_age_gap_matching_model(0, 5, group_exogamy = c("A::B" = -3)))
+  expect_silent(create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2, "B:A" = -2)))
+  expect_silent(create_age_gap_matching_model(0, 5, group_exogamy = c("A:A" = 1)))
+  expect_silent(create_matching_model(~ same_group, c(same_group = 1)))
+  expect_silent(create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1),
+                                              matching_method = "female_choice"))
+  expect_silent(create_matching_model(~ male_group, c(male_groupB = 1), group_levels = c("A", "B"),
+                                      matching_method = "female_choice"))
+  # Warn once at construction, not again when the model is attached or simulated.
+  matching <- suppressWarnings(create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1)))
+  expect_silent(union_formation("on_demand", matching))
+})
+
+test_that("female choice with sex-specific inheritance warns while building grouped models", {
+  population <- weighted_population(200, c(A = 3, B = 1))
+  female <- create_age_gap_matching_model(0, 5, matching_method = "female_choice")
+  base <- hammel_model() |>
+    set_population(population) |>
+    set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01))
+  fertility_rates <- data.frame(age_start = 15, age_end = 45, rate = 0.12)
+  pattern <- "sex-specific inheritance rule"
+  for (rule in c("mother", "father", "same_sex", "opposite_sex")) {
+    with_fertility <- set_fertility(base, fertility_rates, inheritance = rule)
+    expect_warning(set_union_formation(with_fertility, "on_demand", female), pattern)
+  }
+  # Whichever setter completes the combination warns, including set_population.
+  with_unions <- set_union_formation(base, "on_demand", female)
+  expect_warning(model <- set_fertility(with_unions, fertility_rates), pattern)
+  expect_warning(set_population(model, population), pattern)
+  # A female-choice father model alone also counts.
+  expect_warning(set_union_formation(set_fertility(base, fertility_rates), "rate",
+    rates = data.frame(age_start = 15, age_end = 50, rate = 0.1), father_matching = female), pattern)
+  # simulate() re-validates without repeating the warning.
+  expect_no_warning(simulate(model, 1, seed = 911))
+  # Parent-symmetric rules, weighted choice, and ungrouped or one-group populations are silent.
+  for (rule in c("random_parent", "ancestry", "hierarchy")) {
+    inheritance <- if (rule == "hierarchy") create_group_inheritance(rule, order = c("A", "B")) else rule
+    expect_no_warning(set_union_formation(set_fertility(base, fertility_rates, inheritance = inheritance),
+                                          "on_demand", female))
+  }
+  expect_no_warning(set_union_formation(set_fertility(base, fertility_rates), "on_demand"))
+  for (weights in list(NULL, c(A = 1))) {
+    plain <- set_population(base, weighted_population(200, weights))
+    expect_no_warning(set_union_formation(set_fertility(plain, fertility_rates), "on_demand", female))
+  }
 })

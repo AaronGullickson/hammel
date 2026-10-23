@@ -50,7 +50,12 @@ inheritance and later group composition. Weighted choice adds the missing
 rule for men without changing the preference association; with one group
 it equals female choice. The method belongs to this model: a separate
 \code{father_matching} model in \code{\link[=union_formation]{union_formation()}} uses its own method, and a
-NULL father model inherits this one.}
+NULL father model inherits this one. Weighted choice warns at construction
+when directed group effects or \code{male_group} formula terms are present,
+because it pins how often each male group forms unions: with two groups
+only the sum of a directed pair affects pairing, and \code{male_group} main
+effects have no effect. Building a grouped model that combines female
+choice with a sex-specific inheritance rule also warns (see \code{\link[=fertility]{fertility()}}).}
 }
 \value{
 A \code{hammel_matching_model} with linear and quadratic age-difference terms.

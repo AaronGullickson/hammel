@@ -175,11 +175,19 @@ within-group utility, and absorption 1 unless stated:
 
 Consequences:
 
+Because of the first two points below, constructing a weighted-choice matching
+model with directed pair effects (two directions differing, including a single
+direction) or `male_group` formula terms warns once (D069).
+
 - **Directed effects in two groups.** A:B = -1 with B:A = -2 produces exactly
   the same expected table as A::B = -1.5. With both sexes' group flows fixed,
   a two-group table has one free quantity, its cross-product. Directed effects
   change which weights are needed, not the flows. With more groups, only
-  combinations not absorbed by the group flows affect pairing.
+  combinations not absorbed by the group flows affect pairing. A
+  `male_group` main effect in the formula has no effect at all, since the
+  group weights absorb it. Under female choice directed effects do move group
+  flows, but they mix with female choice's directional bias when group sizes
+  differ (for example, AB/BA = 0.52 with symmetric -1.5 effects at 75/25).
 - **Sensitivity to composition.** AB - BA equals the difference between the
   male and female group-B shares of unions. When exogamy is rare, small
   differences in the sexes' unpartnered group shares move AB/BA strongly.

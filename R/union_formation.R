@@ -58,7 +58,12 @@
 #'   rule for men without changing the preference association; with one group
 #'   it equals female choice. The method belongs to this model: a separate
 #'   `father_matching` model in [union_formation()] uses its own method, and a
-#'   NULL father model inherits this one.
+#'   NULL father model inherits this one. Weighted choice warns at construction
+#'   when directed group effects or `male_group` formula terms are present,
+#'   because it pins how often each male group forms unions: with two groups
+#'   only the sum of a directed pair affects pairing, and `male_group` main
+#'   effects have no effect. Building a grouped model that combines female
+#'   choice with a sex-specific inheritance rule also warns (see [fertility()]).
 #' @param imbalance_absorption Used only when `matching_method = "weighted_choice"`.
 #'   Share, in `[0, 1]`, of a group's sex imbalance among
 #'   unpartnered people that is absorbed through cross-group unions. Default `1`
@@ -85,7 +90,33 @@ create_matching_model <- function(formula, coefficients, group_exogamy = NULL, g
                           matching_method = matching_method),
                      class = "hammel_matching_model")
   validate_matching_model(model)
+  warn_weighted_directed_effects(model)
   model
+}
+
+# Weighted choice pins how often each male group forms unions, so group terms
+# that act only through male group flows lose some or all of their effect.
+# Warn once at construction rather than at every simulation.
+warn_weighted_directed_effects <- function(model) {
+  if (!identical(model$matching_method, "weighted_choice")) return(invisible(FALSE))
+  pairs <- expand_group_exogamy(model$group_exogamy)
+  cross <- pairs[pairs$female_group != pairs$male_group, , drop = FALSE]
+  value <- function(f, m) {
+    i <- which(pairs$female_group == f & pairs$male_group == m)
+    if (length(i)) pairs$log_odds[i] else 0
+  }
+  directed <- nrow(cross) > 0 && any(vapply(seq_len(nrow(cross)), function(i)
+    cross$log_odds[i] != value(cross$male_group[i], cross$female_group[i]), logical(1)))
+  male_terms <- "male_group" %in% all.vars(model$formula)
+  if (!directed && !male_terms) return(invisible(FALSE))
+  warning(paste(
+    "Under matching_method = \"weighted_choice\", group effects cannot change how often",
+    "each male group forms unions.",
+    if (directed) "With two groups, only the sum of each directed pair (e.g. A:B plus B:A) affects pairing; with more groups, directed effects are only partly reflected.",
+    if (male_terms) "Formula terms using male_group are absorbed: main effects have no effect and interactions are only partly reflected.",
+    "Use matching_method = \"female_choice\" if they should change male union rates,",
+    "noting its directional bias when group sizes differ."), call. = FALSE)
+  invisible(TRUE)
 }
 
 #' Create a quadratic matching model from interpretable age-gap preferences

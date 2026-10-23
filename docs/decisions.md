@@ -1277,3 +1277,28 @@ matching specifications override this default. Initiation mode remains explicit.
   methods; the full suite passed with no failures or warnings, the live
   database test skipped. The milestone 3 report's chunks passing
   `matching_method` to `set_union_formation()` must be updated by the user.
+
+## D069: Advisory warnings for matching-method interactions
+
+- **Status:** requested by the user October 23, 2026.
+- **Weighted choice and directed effects:** constructing a weighted-choice
+  matching model warns once when `group_exogamy` contains directed pairs whose
+  two directions differ (including one-sided entries) or the formula uses
+  `male_group`. Weighted choice pins male group flows, so with two groups only
+  each pair's sum affects pairing, directed effects are partly reflected with
+  more groups, and `male_group` main effects are absorbed entirely. Symmetric,
+  equal-valued, within-group, and `same_group` terms do not warn.
+- **Female choice and inheritance:** a model with fertility, union formation,
+  and a population of at least two groups warns when a female-choice union or
+  father model is combined with the `mother`, `father`, `same_sex`, or
+  `opposite_sex` inheritance rule. The user proposed warning for every built-in
+  rule except `random_parent`; `ancestry` and `hierarchy` were excluded because
+  they treat mother and father symmetrically, so directional imbalance does
+  not change their outcomes. Custom rules are not checked. The check runs in
+  `set_process()` and `set_population()`, so it fires while building a model;
+  `simulate()` re-validates without repeating it.
+- **Validation:** warning and silent cases for both checks, each setter path,
+  father-only female choice, and no repetition at simulation; tests that
+  intentionally combine these settings silence only the relevant warning. The
+  full suite passed with no failures or warnings, the live database test
+  skipped.
