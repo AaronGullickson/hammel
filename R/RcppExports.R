@@ -41,6 +41,10 @@ sample_male_positions_cpp <- function(count, requested) {
     .Call(`_hammel_sample_male_positions_cpp`, count, requested)
 }
 
+inspect_weighted_calibration_cpp <- function(female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility) {
+    .Call(`_hammel_inspect_weighted_calibration_cpp`, female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility)
+}
+
 simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab) {
     .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab)
 }

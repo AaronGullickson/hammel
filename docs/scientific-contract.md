@@ -378,6 +378,16 @@ shortage, reciprocal-probability, diagnostic, and validation rules are specified
 the explicit single-woman choice described above. Scientific benchmarks for
 aggregate pairing, age gaps, and inheritance remain to be assessed.
 
+### Experimental weighted choice
+
+D066 specifies `matching_method = "weighted_choice"`: ego still chooses among
+her screened candidates with probabilities proportional to exp(U), multiplied
+by a weight for each man's group. Weights are recalculated at every search so
+expected male union flows by group meet a target mirroring female per-capita
+intensity, adjusted by `imbalance_absorption`. Event initiation, eligibility,
+exclusions and timing are unchanged. Rules, examples, and consequences are in
+[weighted-choice matching](weighted-choice-matching.md).
+
 ### Shared kinship observations
 
 `extract_kin()` returns the same recorded-parent distance evidence used by

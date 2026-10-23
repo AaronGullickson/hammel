@@ -91,7 +91,8 @@ construct_choice_set <- function(union_real, population, ego_spouse, set_size) {
   unions_fake[[partner_group]] <- candidates$group
   unions_fake$chosen <- FALSE
 
-  bind_rows(union_real, unions_fake)
+  bind_rows(union_real, unions_fake) |>
+    mutate(ego_spouse = .env$ego_spouse)
 }
 
 construct_choice_sets <- function(population, sample_size, set_size) {
@@ -1019,39 +1020,70 @@ model <- hammel_model() |>
     "on_demand",
     matching = create_age_gap_matching_model(
       0, 5, 
-group_exogamy = c("A::B" = -3)
+      group_exogamy = c("A::B" = -3)
     ),
-    matching_method = "two_sided"
+    matching_method = "weighted_choice"
   )
 
-system.time(result <- simulate(model, years = years, seed = 42))
+
+results  <- future_map(
+  replication_seeds[1:20], 
+  function(seed) {
+    simulate(model, years = years, seed = seed) 
+  },
+  .options = furrr_options(seed = NULL)
+)
 ```
 
 ```{r}
 
-result |>
-  get_detailed_unions() |>
-  count(group_w, group_h) |>
-  pivot_wider(names_from = c(group_w, group_h), values_from = n) |>
+results |>
+  map(get_detailed_unions) |>
+  bind_rows(.id = "replication") |>
+  count(replication, group_w, group_h) |>
+  pivot_wider(id_cols = replication, names_from = c(group_w, group_h), values_from = n) |>
   mutate(
     log_odds = log(A_B) + log(B_A) - log(A_A) - log(B_B),
     gender_ratio = A_B/B_A
+  ) |>
+  summarize(
+    se_log_odds = sd(log_odds) / sqrt(n()),
+    mean_log_odds = mean(log_odds),
+    se_gender_ratio = sd(gender_ratio) / sqrt(n()),
+    mean_gender_ratio = mean(gender_ratio)
   )
 ```
 
 ```{r}
-choice_sets <- construct_choice_sets(result, 10000, 50)
+models <- results |> map(function(result) {
+  choice_sets <- construct_choice_sets(result, 1000, 50) |>
+    filter(ego_spouse == "wife")
 
-choice_sets <- choice_sets |>
-  mutate(
-    age_diff = birth_time_w - birth_time_h,
-    ABsym = (group_w == "A" & group_h == "B") | (group_w == "B" & group_h == "A"),
-    AB = (group_w == "A" & group_h == "B"),
-    BA = (group_w == "B" & group_h == "A") 
-  )
+  choice_sets <- choice_sets |>
+    mutate(
+      age_diff = birth_time_w - birth_time_h,
+      ABsym = (group_w == "A" & group_h == "B") | (group_w == "B" & group_h == "A"),
+      AB = (group_w == "A" & group_h == "B"),
+      BA = (group_w == "B" & group_h == "A") 
+    )
 
-model_clogit <- clogit(chosen ~ age_diff + I(age_diff^2) + AB + BA + strata(union_id), data = choice_sets)
-summary(model_clogit)
+  clogit(chosen ~ age_diff + I(age_diff^2) + ABsym + strata(union_id), data = choice_sets)
+})
+
+temp <- models |> map(coef) |>
+  bind_rows()
+temp |>
+  summarise(across(
+    everything(),
+    list(
+      mean = ~ mean(.x),
+      se = ~ sd(.x) / sqrt(length(.x))
+    )
+  ))
+
+
+colMeans(temp)
+
 ```
 
 ### Group matching parameters

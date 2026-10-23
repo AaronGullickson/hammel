@@ -27,7 +27,9 @@
 #' Default `matching_method = "two_sided"` on [union_formation()] uses
 #' probabilistic fixed-pool temporary markets. Explicit `"female_choice"`
 #' retains ego-only selection. Only ego's outcome is retained; event initiation
-#' is unchanged.
+#' is unchanged. Experimental `"weighted_choice"` uses female choice with
+#' male-group weights recalibrated at each search; it warns once if any search
+#' needed approximate weights.
 #'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
 #' and uses recorded maternal births, including on restart.
@@ -165,9 +167,10 @@ simulate <- function(model, years, seed = NULL) {
   births <- deaths <- 0
   if (years > 0) {
     two_sided <- identical(union_process$matching_method, "two_sided")
-    matching <- prepare_matching_model(union_process$matching, group_values, two_sided)
+    weighted <- identical(union_process$matching_method, "weighted_choice")
+    matching <- prepare_matching_model(union_process$matching, group_values, two_sided, weighted)
     father_matching <- if (is.null(union_process$father_matching)) matching else
-      prepare_matching_model(union_process$father_matching, group_values, two_sided)
+      prepare_matching_model(union_process$father_matching, group_values, two_sided, weighted)
     native <- simulate_cpp(engine_persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
                            matching,
@@ -203,6 +206,11 @@ simulate <- function(model, years, seed = NULL) {
     result$unions <- tibble::as_tibble(unions)
     births <- native$births
     deaths <- native$deaths
+    if (native$weighted_infeasible > 0) {
+      warning(sprintf(paste("weighted_choice found no exact male-group weights in %d search(es);",
+                            "approximate weights were used."), as.integer(native$weighted_infeasible)),
+              call. = FALSE)
+    }
   }
   if (union_process$diagnostics) {
     for (column in c(".n_eligible", ".utility_rank")) {

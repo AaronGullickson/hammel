@@ -48,6 +48,14 @@
 #'   pair-specific screening. Defaults to `250`; zero requests the whole
 #'   available pool. Rejected candidates are not replaced. A separate
 #'   `father_matching` model uses its own sample size.
+#' @param imbalance_absorption Used only by `matching_method = "weighted_choice"`
+#'   in [union_formation()]. Share, in `[0, 1]`, of a group's sex imbalance among
+#'   unpartnered people that is absorbed through cross-group unions. Default `1`
+#'   gives each unpartnered man the per-capita union intensity of an unpartnered
+#'   woman of his group. `0` makes each male group's share of unions equal its
+#'   female group's share, so the excess sex waits longer. Intermediate values
+#'   interpolate the male group targets. Symmetric preferences with balanced sex
+#'   composition give equal directional pairing counts at every value.
 #' @return An inspectable `hammel_matching_model` list containing `formula`
 #'   and `coefficients`. This specifies a model; it does not estimate one.
 #' @export
@@ -57,10 +65,12 @@
 #'   ~ age_difference + I(age_difference^2),
 #'   c(age_difference = 0.1, "I(age_difference^2)" = -0.02)
 #' )
-create_matching_model <- function(formula, coefficients, group_exogamy = NULL, group_levels = NULL, prevent_exogamy = FALSE, sample_size = 250) {
+create_matching_model <- function(formula, coefficients, group_exogamy = NULL, group_levels = NULL, prevent_exogamy = FALSE, sample_size = 250,
+                                  imbalance_absorption = 1) {
   model <- structure(list(formula = formula, coefficients = coefficients,
                           group_exogamy = group_exogamy, group_levels = group_levels,
-                          prevent_exogamy = prevent_exogamy, sample_size = sample_size),
+                          prevent_exogamy = prevent_exogamy, sample_size = sample_size,
+                          imbalance_absorption = imbalance_absorption),
                      class = "hammel_matching_model")
   validate_matching_model(model)
   model
@@ -90,7 +100,8 @@ create_matching_model <- function(formula, coefficients, group_exogamy = NULL, g
 #' @examples
 #' # Illustrative preferences, not demographic defaults.
 #' matching <- create_age_gap_matching_model(3, 5)
-create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL, prevent_exogamy = FALSE, sample_size = 250) {
+create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL, prevent_exogamy = FALSE, sample_size = 250,
+                                          imbalance_absorption = 1) {
   for (name in c("preferred_age_gap", "half_weight_distance")) {
     value <- get(name)
     if (!is.numeric(value) || length(value) != 1L || !is.null(dim(value)) ||
@@ -108,7 +119,20 @@ create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distanc
   create_matching_model(~ age_difference + I(age_difference^2),
     c(age_difference = unname(linear), "I(age_difference^2)" = unname(quadratic)),
     group_exogamy = group_exogamy, prevent_exogamy = prevent_exogamy,
-    sample_size = sample_size)
+    sample_size = sample_size, imbalance_absorption = imbalance_absorption)
+}
+
+# Older matching objects lack the field and use the default.
+matching_imbalance_absorption <- function(model) {
+  if ("imbalance_absorption" %in% names(model)) model$imbalance_absorption else 1
+}
+
+validate_imbalance_absorption <- function(x) {
+  if (!is.numeric(x) || is.complex(x) || length(x) != 1L || !is.null(dim(x)) ||
+      !is.finite(x) || x < 0 || x > 1) {
+    stop("`imbalance_absorption` must be a finite number between 0 and 1.", call. = FALSE)
+  }
+  invisible(x)
 }
 
 validate_sample_size <- function(n) {
@@ -125,6 +149,7 @@ validate_matching_model <- function(model) {
     stop("`matching` must be created with create_matching_model().", call. = FALSE)
   }
   validate_sample_size(model$sample_size)
+  validate_imbalance_absorption(matching_imbalance_absorption(model))
   formula <- model$formula
   if (!inherits(formula, "formula") || length(formula) != 2L ||
       any(!all.vars(formula) %in% c("age_difference", "female_group", "male_group", "same_group"))) {
@@ -228,7 +253,8 @@ calculate_matching_probabilities <- function(matching, age_difference, female_gr
 
 # Use an exact native path for the common linear/raw quadratic specification.
 # All other formulas retain model.matrix semantics through an R evaluator.
-prepare_matching_model <- function(matching, population_groups = NULL, two_sided = FALSE) {
+prepare_matching_model <- function(matching, population_groups = NULL, two_sided = FALSE,
+                                   weighted = FALSE) {
   validate_matching_groups(matching, population_groups)
   beta <- matching$coefficients
   columns <- gsub("[[:space:]]", "", names(beta))
@@ -265,7 +291,9 @@ prepare_matching_model <- function(matching, population_groups = NULL, two_sided
   }
   group_formula <- matching_has_group_formula(matching)
   list(sample_size = as.integer(matching$sample_size),
-       two_sided = two_sided, prevent_exogamy_all = restrictions$all, blocked_pairs = blocked,
+       two_sided = two_sided, weighted = weighted,
+       imbalance_absorption = as.numeric(matching_imbalance_absorption(matching)),
+       prevent_exogamy_all = restrictions$all, blocked_pairs = blocked,
 quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
        group_formula = group_formula, needs_groups = group_formula || nrow(pairs) > 0,
        pair_offsets = offsets,
@@ -306,6 +334,19 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' sample. Kinship screening follows the same ordering. Existing unions are
 #' retained even if a new-search restriction would exclude the partner.
 #' Candidate sets will not be retained in simulation outputs.
+#'
+#' Explicit `matching_method = "weighted_choice"` keeps female choice among the
+#' screened candidates but multiplies each man's selection weight by a weight
+#' for his group. Weights are recalculated at every search, in continuous time,
+#' so that expected male union flows by group match a mirrored target: each
+#' unpartnered man has the per-capita intensity of an unpartnered woman of his
+#' group, adjusted by the matching model's `imbalance_absorption`. Women's
+#' intensity is the search hazard for rate-mode searches and the unpartnered
+#' fertility hazard (zero during birth spacing) for on-demand searches and
+#' nonmarital father selection, which has its own weights. Weights depend only
+#' on the man's group, so they do not change the association between partners'
+#' characteristics. With one group the method equals female choice. When no
+#' exact weights exist, approximate weights are used with a warning.
 #'
 #' Default `matching_method = "two_sided"` adds alternate women to a
 #' temporary market after ego's male eligibility screening. Each fixed female
@@ -361,7 +402,8 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   Requires `initiation = "rate"`; on-demand formation has no search hazard.
 #'   Matching utilities and input rate tables are unchanged.
 #' @param matching_method `"two_sided"` (default) for fixed-pool two-sided
-#'   probabilities, or `"female_choice"` for ego-only choice.
+#'   probabilities, `"female_choice"` for ego-only choice, or experimental
+#'   `"weighted_choice"` for female choice with calibrated male-group weights.
 #'   Female choice accounts for available men but not reciprocal competition
 #'   among women. With unequal group sizes, symmetric group preferences can
 #'   produce unequal female-A/male-B and female-B/male-A pairing counts.
@@ -417,8 +459,8 @@ set_union_formation <- function(model, initiation, matching = create_age_gap_mat
 validate_union_formation <- function(process) {
   method <- if ("matching_method" %in% names(process)) process$matching_method else "female_choice"
   if (!is.character(method) || length(method) != 1L || !is.null(dim(method)) ||
-      is.na(method) || !method %in% c("female_choice", "two_sided")) {
-    stop('`matching_method` must be "female_choice" or "two_sided".', call. = FALSE)
+      is.na(method) || !method %in% c("female_choice", "two_sided", "weighted_choice")) {
+    stop('`matching_method` must be "female_choice", "two_sided", or "weighted_choice".', call. = FALSE)
   }
   validate_group_prop_hazard(process$group_prop_hazard)
   if (!identical(process$name, "union_formation") ||

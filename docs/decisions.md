@@ -1185,3 +1185,37 @@ matching specifications override this default. Initiation mode remains explicit.
   failures or warnings; the opt-in live database test was skipped. The report's
   three explicit size-250 settings were moved into its matching models without
   executing the report or downloading rates.
+
+## D066: Experimental weighted-choice matching
+
+- **Status:** specified with and authorized by the user October 23, 2026;
+  scientific assessment pending.
+- **Decision:** add `matching_method = "weighted_choice"`: female choice among
+  screened candidates, with each man's selection weight multiplied by a weight
+  for his group. Weights are recalibrated at every search, in continuous time,
+  so expected male union flows by group meet a target: each unpartnered man
+  receives the per-capita intensity of an unpartnered woman of his group
+  (crude counts at or above `min_male_age`), interpolated toward female group
+  shares by the matching model's `imbalance_absorption` (default 1).
+- **Intensity:** search hazards for rate-mode searches; unpartnered fertility,
+  zero during birth spacing, for on-demand searches. Rate-mode nonmarital
+  fathers use separate fertility-driven weights with the father model.
+- **Rationale:** female choice leaves male group flows unspecified, producing
+  directional imbalance; additive two-sided probabilities (D062) attenuate
+  preferences; per-market Sinkhorn balancing attenuated age and group effects
+  in an exploratory static analysis. Group-only weights leave the preference
+  association unchanged. Age-standardized targets and male input marriage
+  rates were not selected: they would impose a male age pattern or targets
+  women's timing cannot meet.
+- **Retained:** additive two-sided matching remains available and the default;
+  explicit female choice is unchanged. With one group the new method equals
+  female choice exactly.
+- **Consequences:** in two-group populations directed effects change weights,
+  not expected group flows; directional counts are sensitive to the sexes'
+  group composition among unpartnered people. Approximate weights are used,
+  with one warning per simulation, when no exact solution exists.
+- **Specification:** [weighted-choice matching](weighted-choice-matching.md).
+- **Validation:** see that document; the full suite passed after
+  implementation. This also records the user's October 23 clarification that
+  candidate `sample_size` is a speed shortcut, not an encounter model, which
+  qualifies the encounter-scarcity rationale recorded under D057.

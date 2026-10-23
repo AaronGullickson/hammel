@@ -20,6 +20,7 @@ future work.
 | [Ancestry](ancestry.md) | Starting proportions, parental averaging, unknown shares, and restarts |
 | [Group inheritance](group-inheritance.md) | Built-in/custom identity rules, passing, and possible groups |
 | [Two-sided matching](two-sided-matching.md) | Default fixed-pool temporary markets, scientific contract, and timing plan |
+| [Weighted-choice matching](weighted-choice-matching.md) | Experimental female choice with calibrated male-group weights (D066) |
 | [Group matching](group-matching.md) | Directed/symmetric pair effects and fixed group formula predictors |
 | [Demographic analysis](demographic-analysis.md) | Exposure, ASFR/ASMR, TFR, and life-table workflows |
 | [Testing and validation](testing.md) | Test commands, evidence, and remaining validation |

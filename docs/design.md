@@ -209,6 +209,16 @@ female pool with queued age entries, rebuilt on restart. See
 [two-sided matching](two-sided-matching.md) for the scientific specification and
 benchmark procedure. Aggregate parameter recovery remains under investigation.
 
+## Experimental weighted-choice matching
+
+`matching_method = "weighted_choice"` (D066) keeps female choice among screened
+candidates and adds a log weight for each man's group to selection scores.
+`WeightCalibrator` in `src/simulate.cpp` keeps unpartnered counts by group and
+birth-time bin, updated at events, and solves the weights at each search from
+a per-model table of utilities over bin-centre lags. Matching models carry
+`imbalance_absorption` (default 1). One group gives unit weights and female
+choice exactly. See [weighted-choice matching](weighted-choice-matching.md).
+
 ## Post-sampling group restrictions
 
 Matching models support `prevent_exogamy`: all exogamy or selected directed/

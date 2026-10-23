@@ -9,7 +9,8 @@ create_age_gap_matching_model(
   half_weight_distance,
   group_exogamy = NULL,
   prevent_exogamy = FALSE,
-  sample_size = 250
+  sample_size = 250,
+  imbalance_absorption = 1
 )
 }
 \arguments{
@@ -28,6 +29,15 @@ preferred gap at which selection weight halves.}
 pair-specific screening. Defaults to \code{250}; zero requests the whole
 available pool. Rejected candidates are not replaced. A separate
 \code{father_matching} model uses its own sample size.}
+
+\item{imbalance_absorption}{Used only by \code{matching_method = "weighted_choice"}
+in \code{\link[=union_formation]{union_formation()}}. Share, in \verb{[0, 1]}, of a group's sex imbalance among
+unpartnered people that is absorbed through cross-group unions. Default \code{1}
+gives each unpartnered man the per-capita union intensity of an unpartnered
+woman of his group. \code{0} makes each male group's share of unions equal its
+female group's share, so the excess sex waits longer. Intermediate values
+interpolate the male group targets. Symmetric preferences with balanced sex
+composition give equal directional pairing counts at every value.}
 }
 \value{
 A \code{hammel_matching_model} with linear and quadratic age-difference terms.

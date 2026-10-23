@@ -88,7 +88,8 @@ Requires \code{initiation = "rate"}; on-demand formation has no search hazard.
 Matching utilities and input rate tables are unchanged.}
 
 \item{matching_method}{\code{"two_sided"} (default) for fixed-pool two-sided
-probabilities, or \code{"female_choice"} for ego-only choice.
+probabilities, \code{"female_choice"} for ego-only choice, or experimental
+\code{"weighted_choice"} for female choice with calibrated male-group weights.
 Female choice accounts for available men but not reciprocal competition
 among women. With unequal group sizes, symmetric group preferences can
 produce unequal female-A/male-B and female-B/male-A pairing counts.
@@ -139,6 +140,19 @@ up to that many men. Age screening occurs afterward, without refilling the
 sample. Kinship screening follows the same ordering. Existing unions are
 retained even if a new-search restriction would exclude the partner.
 Candidate sets will not be retained in simulation outputs.
+
+Explicit \code{matching_method = "weighted_choice"} keeps female choice among the
+screened candidates but multiplies each man's selection weight by a weight
+for his group. Weights are recalculated at every search, in continuous time,
+so that expected male union flows by group match a mirrored target: each
+unpartnered man has the per-capita intensity of an unpartnered woman of his
+group, adjusted by the matching model's \code{imbalance_absorption}. Women's
+intensity is the search hazard for rate-mode searches and the unpartnered
+fertility hazard (zero during birth spacing) for on-demand searches and
+nonmarital father selection, which has its own weights. Weights depend only
+on the man's group, so they do not change the association between partners'
+characteristics. With one group the method equals female choice. When no
+exact weights exist, approximate weights are used with a warning.
 
 Default \code{matching_method = "two_sided"} adds alternate women to a
 temporary market after ego's male eligibility screening. Each fixed female

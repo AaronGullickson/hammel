@@ -4,6 +4,7 @@
 #include <cmath>
 #include <limits>
 #include <map>
+#include <memory>
 #include <vector>
 
 using namespace Rcpp;
@@ -509,7 +510,8 @@ std::vector<int> screen_male_candidates(const std::vector<int>& males,
 // Age(male)-age(female) equals birth_time(female)-birth_time(male).
 int select_partner(const std::vector<int>& males, const std::vector<int>& sample,
                    const std::vector<Person>& people, int woman, const List& matching,
-                   int* utility_rank = nullptr) {
+                   int* utility_rank = nullptr,
+                   const std::vector<double>* group_log_weights = nullptr) {
   if (sample.empty()) return -1;
   NumericVector gaps(sample.size());
   for (size_t j = 0; j < sample.size(); ++j)
@@ -521,7 +523,15 @@ int select_partner(const std::vector<int>& males, const std::vector<int>& sample
       male_groups[j] = people[males[sample[j]]].group;
   }
   const NumericVector utility = matching_utilities(gaps, matching, people[woman].group, male_groups);
-  const NumericVector probabilities = matching_probabilities(utility);
+  // weighted_choice adds each man's group log weight to selection scores only;
+  // diagnostic ranks keep using the preference utilities.
+  NumericVector scores = utility;
+  if (group_log_weights) {
+    scores = clone(utility);
+    for (size_t j = 0; j < sample.size(); ++j)
+      scores[j] += (*group_log_weights)[people[males[sample[j]]].group];
+  }
+  const NumericVector probabilities = matching_probabilities(scores);
   const int chosen = draw_partner_position(probabilities);
   if (utility_rank) {
     *utility_rank = 1;
@@ -564,6 +574,352 @@ IntegerVector sample_male_positions_cpp(int count, int requested) {
   if (count < 0 || requested < 0) stop("Sample sizes must be nonnegative.");
   std::vector<int> workspace;
   return wrap(sample_male_positions(count, requested, workspace));
+}
+
+// ---- weighted_choice: calibrated male-group weights (D066) -----------------
+// Counts of unpartnered people by group and birth-time bin change only at
+// events; ages are evaluated at the search time. Bin width is a numerical
+// tolerance, not a demographic parameter. Candidate selection uses exact ages.
+constexpr double kWeightBinWidth = 0.25;
+constexpr double kZeroTargetLogWeight = -1000; // effectively zero weight
+constexpr double kMaxLogWeight = 50;           // cap for unattainable targets
+
+double band_rate(const std::vector<Band>& bands, double age) {
+  for (const Band& band : bands)
+    if (age >= band.start && age < band.end) return band.rate;
+  return 0;
+}
+
+// Pair utilities on the fixed grid of bin-centre lags. Lag (female bin - male
+// bin) * width is male age minus female age, so the grid never changes during
+// a run and custom R formulas are evaluated once. Excluded pairs are -Inf.
+struct LagTable {
+  int groups = 0, span = 0;
+  std::vector<double> utility, weight; // weight = exp(utility - global maximum)
+  size_t index(int female, int male, int lag) const {
+    return (static_cast<size_t>(female) * groups + male) * span + lag;
+  }
+};
+
+LagTable build_lag_table(const List& model, int groups, int bins, double width) {
+  LagTable table;
+  table.groups = groups;
+  table.span = 2 * bins - 1;
+  const size_t n = static_cast<size_t>(groups) * groups * table.span;
+  NumericVector gaps(n);
+  IntegerVector female(n), male(n);
+  for (int f = 0; f < groups; ++f)
+    for (int m = 0; m < groups; ++m)
+      for (int lag = 0; lag < table.span; ++lag) {
+        const size_t i = table.index(f, m, lag);
+        gaps[i] = (lag - (bins - 1)) * width;
+        female[i] = f;
+        male[i] = m;
+      }
+  const NumericVector utility = matching_utilities(gaps, model, -1, male, female);
+  const bool prevent_all = as<bool>(model["prevent_exogamy_all"]);
+  LogicalMatrix blocked = model["blocked_pairs"];
+  table.utility.assign(utility.begin(), utility.end());
+  double maximum = R_NegInf;
+  for (int f = 0; f < groups; ++f)
+    for (int m = 0; m < groups; ++m) {
+      const bool excluded = (prevent_all && f != m) || (blocked.nrow() && blocked(f, m));
+      for (int lag = 0; lag < table.span; ++lag) {
+        double& value = table.utility[table.index(f, m, lag)];
+        if (excluded) value = R_NegInf;
+        else maximum = std::max(maximum, value);
+      }
+    }
+  table.weight.resize(n);
+  for (size_t i = 0; i < n; ++i)
+    table.weight[i] = table.utility[i] == R_NegInf ? 0 : std::exp(table.utility[i] - maximum);
+  return table;
+}
+
+// Solve a small dense system with partial pivoting; false if singular.
+bool solve_linear(std::vector<double> a, std::vector<double> b, int n,
+                  std::vector<double>& x) {
+  for (int c = 0; c < n; ++c) {
+    int pivot = c;
+    for (int r = c + 1; r < n; ++r)
+      if (std::abs(a[r * n + c]) > std::abs(a[pivot * n + c])) pivot = r;
+    if (!(std::abs(a[pivot * n + c]) > 1e-300)) return false;
+    if (pivot != c) {
+      for (int k = 0; k < n; ++k) std::swap(a[c * n + k], a[pivot * n + k]);
+      std::swap(b[c], b[pivot]);
+    }
+    for (int r = c + 1; r < n; ++r) {
+      const double factor = a[r * n + c] / a[c * n + c];
+      for (int k = c; k < n; ++k) a[r * n + k] -= factor * a[c * n + k];
+      b[r] -= factor * b[c];
+    }
+  }
+  x.assign(n, 0);
+  for (int r = n - 1; r >= 0; --r) {
+    double sum = b[r];
+    for (int k = r + 1; k < n; ++k) sum -= a[r * n + k] * x[k];
+    x[r] = sum / a[r * n + r];
+  }
+  return true;
+}
+
+struct WeightSolution {
+  std::vector<double> log_weights, target, flow;
+  bool infeasible = false;
+};
+
+class WeightCalibrator {
+  int groups_, bins_;
+  long long first_;
+  double width_, cutoff_;
+  std::vector<double> men_, women_, fertile_; // [group * bins + bin]
+  double centre(int k) const { return (static_cast<double>(first_ + k) + 0.5) * width_; }
+  size_t cell(int group, double born) const {
+    const long long k = static_cast<long long>(std::floor(born / width_)) - first_;
+    if (k < 0 || k >= bins_ || group < 0 || group >= groups_)
+      stop("Person is outside the weighted-choice calibration range.");
+    return static_cast<size_t>(group) * bins_ + static_cast<size_t>(k);
+  }
+
+ public:
+  WeightCalibrator(double min_birth, double max_birth, int groups, double width, double cutoff)
+      : groups_(groups), width_(width), cutoff_(cutoff) {
+    if (!(width > 0) || !R_finite(min_birth) || !R_finite(max_birth) || max_birth < min_birth)
+      stop("Invalid weighted-choice calibration range.");
+    first_ = static_cast<long long>(std::floor(min_birth / width));
+    const long long last = static_cast<long long>(std::floor(max_birth / width));
+    if (last - first_ + 1 > 50000000LL / std::max(1, groups))
+      stop("Weighted-choice calibration range is too large.");
+    bins_ = static_cast<int>(last - first_ + 1);
+    men_.assign(static_cast<size_t>(groups) * bins_, 0);
+    women_ = men_;
+    fertile_ = men_;
+  }
+  int bins() const { return bins_; }
+  void add_man(int group, double born, double delta) { men_[cell(group, born)] += delta; }
+  void add_woman(int group, double born, double delta) { women_[cell(group, born)] += delta; }
+  void add_fertile(int group, double born, double delta) { fertile_[cell(group, born)] += delta; }
+
+  // Expected male flow shares follow from each woman-bin's intensity and
+  // her group-level choice shares b[g] S[w,g] / sum_h b[h] S[w,h]. Find log
+  // weights so those shares meet the mirrored target (Newton on a convex
+  // objective, warm-started). Empty or uninformative states return b = 1.
+  WeightSolution solve(double now, const std::vector<const std::vector<Band>*>& hazards,
+                       bool fertility, const LagTable& table, double absorption,
+                       std::vector<double>& warm) const {
+    const int G = groups_;
+    WeightSolution s;
+    s.log_weights.assign(G, 0.0);
+    s.target.assign(G, 0.0);
+    s.flow.assign(G, 0.0);
+    std::vector<double> women_count(G, 0), men_count(G, 0), intensity(G, 0);
+    std::vector<std::vector<std::pair<int, double>>> men(G);
+    struct Row { int group, bin; double lambda; };
+    std::vector<Row> rows;
+    for (int g = 0; g < G; ++g) {
+      for (int k = 0; k < bins_; ++k) {
+        const double age = now - centre(k);
+        if (age < cutoff_) continue;
+        const size_t i = static_cast<size_t>(g) * bins_ + k;
+        if (men_[i] > 0) { men[g].push_back({k, men_[i]}); men_count[g] += men_[i]; }
+        if (women_[i] > 0) {
+          women_count[g] += women_[i];
+          const double at_risk = fertility ? fertile_[i] : women_[i];
+          if (at_risk > 0) {
+            const double hazard = band_rate(*hazards[g], age);
+            if (hazard > 0) { rows.push_back({g, k, at_risk * hazard}); intensity[g] += at_risk * hazard; }
+          }
+        }
+      }
+    }
+    double total_women = 0, total_intensity = 0, female_with_men = 0;
+    for (int g = 0; g < G; ++g) {
+      total_women += women_count[g];
+      total_intensity += intensity[g];
+      if (men_count[g] > 0) female_with_men += intensity[g];
+    }
+    if (rows.empty() || !(total_women > 0) || !(total_intensity > 0)) { warm = s.log_weights; return s; }
+    // Mirror: men of group g get the per-capita intensity of group-g women
+    // (population-wide rate if none are present). Absorption interpolates
+    // toward female group shares, restricted to groups with eligible men.
+    const double overall = total_intensity / total_women;
+    std::vector<double> mirror(G, 0);
+    double mirror_sum = 0;
+    for (int g = 0; g < G; ++g) {
+      mirror[g] = men_count[g] * (women_count[g] > 0 ? intensity[g] / women_count[g] : overall);
+      mirror_sum += mirror[g];
+    }
+    if (!(mirror_sum > 0)) { warm = s.log_weights; return s; }
+    for (int g = 0; g < G; ++g) {
+      const double female_share = female_with_men > 0 && men_count[g] > 0 ?
+        intensity[g] / female_with_men : 0;
+      s.target[g] = female_share + absorption * (mirror[g] / mirror_sum - female_share);
+    }
+    // Pool sums S[row, male group]; rescale a row in log space if it underflows.
+    const int R = static_cast<int>(rows.size());
+    std::vector<double> S(static_cast<size_t>(R) * G, 0);
+    for (int r = 0; r < R; ++r) {
+      double total = 0;
+      for (int m = 0; m < G; ++m) {
+        double sum = 0;
+        for (const auto& bin : men[m])
+          sum += bin.second * table.weight[table.index(rows[r].group, m, rows[r].bin - bin.first + bins_ - 1)];
+        S[static_cast<size_t>(r) * G + m] = sum;
+        total += sum;
+      }
+      if (total > 0) continue;
+      double maximum = R_NegInf;
+      for (int m = 0; m < G; ++m)
+        for (const auto& bin : men[m])
+          maximum = std::max(maximum, table.utility[table.index(rows[r].group, m, rows[r].bin - bin.first + bins_ - 1)]);
+      if (maximum == R_NegInf) continue;
+      for (int m = 0; m < G; ++m) {
+        double sum = 0;
+        for (const auto& bin : men[m]) {
+          const double u = table.utility[table.index(rows[r].group, m, rows[r].bin - bin.first + bins_ - 1)];
+          if (u != R_NegInf) sum += bin.second * std::exp(u - maximum);
+        }
+        S[static_cast<size_t>(r) * G + m] = sum;
+      }
+    }
+    std::vector<double> demand(G, 0);
+    for (int r = 0; r < R; ++r)
+      for (int m = 0; m < G; ++m) demand[m] += rows[r].lambda * S[static_cast<size_t>(r) * G + m];
+    std::vector<int> free_groups;
+    for (int g = 0; g < G; ++g) {
+      if (!(s.target[g] > 0)) s.log_weights[g] = kZeroTargetLogWeight;
+      else if (!(demand[g] > 0)) { s.log_weights[g] = kMaxLogWeight; s.infeasible = true; }
+      else free_groups.push_back(g);
+    }
+    const int n = static_cast<int>(free_groups.size());
+    if (n > 1) {
+      double target_sum = 0;
+      for (int g : free_groups) target_sum += s.target[g];
+      std::vector<double> tau(n), x(n, 0);
+      for (int j = 0; j < n; ++j) tau[j] = s.target[free_groups[j]] / target_sum;
+      if (static_cast<int>(warm.size()) == G) {
+        for (int j = 0; j < n; ++j) {
+          const double start = warm[free_groups[j]] - warm[free_groups[0]];
+          if (R_finite(start) && std::abs(start) < kMaxLogWeight) x[j] = start;
+        }
+      }
+      x[0] = 0;
+      std::vector<double> share(n), phi, hess, weights(n);
+      auto evaluate = [&](const std::vector<double>& point, std::vector<double>& out_phi,
+                          std::vector<double>& out_hess) {
+        out_phi.assign(n, 0);
+        out_hess.assign(static_cast<size_t>(n) * n, 0);
+        double objective = 0, lambda_total = 0;
+        for (int j = 0; j < n; ++j) weights[j] = std::exp(point[j]);
+        for (int r = 0; r < R; ++r) {
+          double denominator = 0;
+          for (int j = 0; j < n; ++j) {
+            share[j] = weights[j] * S[static_cast<size_t>(r) * G + free_groups[j]];
+            denominator += share[j];
+          }
+          if (!(denominator > 0)) continue;
+          const double lambda = rows[r].lambda;
+          lambda_total += lambda;
+          objective += lambda * std::log(denominator);
+          for (int j = 0; j < n; ++j) {
+            const double p = share[j] / denominator;
+            out_phi[j] += lambda * p;
+            for (int k = 0; k < n; ++k)
+              out_hess[static_cast<size_t>(j) * n + k] +=
+                lambda * ((j == k ? p : 0) - p * share[k] / denominator);
+          }
+        }
+        for (double& value : out_phi) value /= lambda_total;
+        for (double& value : out_hess) value /= lambda_total;
+        objective /= lambda_total;
+        for (int j = 0; j < n; ++j) objective -= tau[j] * point[j];
+        return objective;
+      };
+      bool converged = false;
+      std::vector<double> trial(n), trial_phi, trial_hess, step;
+      for (int iteration = 0; iteration < 100; ++iteration) {
+        const double objective = evaluate(x, phi, hess);
+        double error = 0;
+        for (int j = 0; j < n; ++j) error = std::max(error, std::abs(phi[j] - tau[j]));
+        if (error < 1e-10) { converged = true; break; }
+        // Newton step over the free log weights (the first is the reference).
+        const int m = n - 1;
+        std::vector<double> a(static_cast<size_t>(m) * m), b(m);
+        for (int j = 0; j < m; ++j) {
+          b[j] = -(phi[j + 1] - tau[j + 1]);
+          for (int k = 0; k < m; ++k)
+            a[static_cast<size_t>(j) * m + k] = hess[static_cast<size_t>(j + 1) * n + k + 1];
+          a[static_cast<size_t>(j) * m + j] += 1e-14;
+        }
+        if (!solve_linear(a, b, m, step)) break;
+        // Accept a step that lowers the convex objective or the target mismatch;
+        // near the solution, roundoff can hide the objective's decrease.
+        double length = 1;
+        bool moved = false;
+        while (length > 1e-12) {
+          trial[0] = 0;
+          for (int j = 0; j < m; ++j)
+            trial[j + 1] = std::max(-kMaxLogWeight, std::min(kMaxLogWeight, x[j + 1] + length * step[j]));
+          const double trial_objective = evaluate(trial, trial_phi, trial_hess);
+          double trial_error = 0;
+          for (int j = 0; j < n; ++j) trial_error = std::max(trial_error, std::abs(trial_phi[j] - tau[j]));
+          if (trial_objective < objective || trial_error < error) { moved = true; break; }
+          length /= 2;
+        }
+        if (!moved) break;
+        x = trial;
+      }
+      if (!converged) s.infeasible = true;
+      for (int j = 0; j < n; ++j) s.log_weights[free_groups[j]] = x[j];
+    }
+    // Expected flows under the final weights, for inspection.
+    double flow_total = 0;
+    for (int r = 0; r < R; ++r) {
+      double denominator = 0;
+      for (int m = 0; m < G; ++m)
+        denominator += std::exp(s.log_weights[m]) * S[static_cast<size_t>(r) * G + m];
+      if (!(denominator > 0)) continue;
+      flow_total += rows[r].lambda;
+      for (int m = 0; m < G; ++m)
+        s.flow[m] += rows[r].lambda * std::exp(s.log_weights[m]) * S[static_cast<size_t>(r) * G + m] / denominator;
+    }
+    if (flow_total > 0) for (double& value : s.flow) value /= flow_total;
+    warm = s.log_weights;
+    return s;
+  }
+};
+
+// Internal entry point: calibrate weights for a supplied unpartnered state.
+// [[Rcpp::export]]
+List inspect_weighted_calibration_cpp(NumericVector female_born, IntegerVector female_groups,
+                                      LogicalVector female_fertile, NumericVector male_born,
+                                      IntegerVector male_groups, DataFrame rates, List matching,
+                                      int group_count, double now, double cutoff, double width,
+                                      bool fertility) {
+  if (female_groups.size() != female_born.size() || female_fertile.size() != female_born.size() ||
+      male_groups.size() != male_born.size() || group_count < 1)
+    stop("Invalid weighted-calibration inputs.");
+  double lo = now, hi = now;
+  for (double born : female_born) { lo = std::min(lo, born); hi = std::max(hi, born); }
+  for (double born : male_born) { lo = std::min(lo, born); hi = std::max(hi, born); }
+  WeightCalibrator calibrator(lo, hi, group_count, width, cutoff);
+  for (R_xlen_t i = 0; i < male_born.size(); ++i) calibrator.add_man(male_groups[i], male_born[i], 1);
+  for (R_xlen_t i = 0; i < female_born.size(); ++i) {
+    calibrator.add_woman(female_groups[i], female_born[i], 1);
+    if (female_fertile[i]) calibrator.add_fertile(female_groups[i], female_born[i], 1);
+  }
+  std::vector<std::vector<Band>> bands(group_count);
+  std::vector<const std::vector<Band>*> hazards(group_count);
+  for (int g = 0; g < group_count; ++g) {
+    bands[g] = read_bands(rates, "", "", g);
+    hazards[g] = &bands[g];
+  }
+  const LagTable table = build_lag_table(matching, group_count, calibrator.bins(), width);
+  std::vector<double> warm;
+  const WeightSolution s = calibrator.solve(now, hazards, fertility, table,
+    as<double>(matching["imbalance_absorption"]), warm);
+  return List::create(_["log_weights"] = wrap(s.log_weights), _["target"] = wrap(s.target),
+                      _["flow"] = wrap(s.flow), _["infeasible"] = s.infeasible);
 }
 
 struct UnionRecord {
@@ -630,10 +986,16 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::vector<int> diagnostic_counts, diagnostic_ranks;
   std::vector<std::vector<int>> person_unions(people.size());
   std::vector<int> current_partner(people.size(), -1);
+  // weighted_choice state (D066). The calibrator exists only for grouped
+  // populations; until it is created below, pool hooks record nothing.
+  std::unique_ptr<WeightCalibrator> calibrator;
+  std::vector<char> counted_woman, counted_fertile;
+  std::multimap<double, int> spacing_entries;
   // Swap removal keeps pool updates constant-time and slots valid after moves.
   auto remove_male = [&](int man) {
     const int slot = people[man].male_slot;
     if (slot < 0) return; // Partnered men are already absent when they die.
+    if (calibrator) calibrator->add_man(people[man].group, people[man].born, -1);
     const int moved = males.back();
     males[slot] = moved;
     people[moved].male_slot = slot;
@@ -645,6 +1007,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         current_partner[man] >= 0 || people[man].male_slot >= 0) return;
     people[man].male_slot = static_cast<int>(males.size());
     males.push_back(man);
+    if (calibrator) calibrator->add_man(people[man].group, people[man].born, 1);
   };
   double next_union_id = 0;
   NumericVector uids = unions["union_id"], wives = unions["wife_id"];
@@ -704,10 +1067,56 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   if (two_sided) {
     for (int woman = 0; woman < static_cast<int>(people.size()); ++woman) add_female(woman, start);
   }
+  // weighted_choice counts living, unpartnered women; fertility-driven intensity
+  // also requires the birth-spacing interval to have ended (queued re-entry).
+  auto add_counted_woman = [&](int woman, double now) {
+    if (!calibrator || !people[woman].female || !NumericVector::is_na(people[woman].died) ||
+        current_partner[woman] >= 0 || counted_woman[woman]) return;
+    counted_woman[woman] = 1;
+    calibrator->add_woman(people[woman].group, people[woman].born, 1);
+    const double ready = people[woman].last_birth + birth_interval;
+    if (now >= ready) {
+      counted_fertile[woman] = 1;
+      calibrator->add_fertile(people[woman].group, people[woman].born, 1);
+    } else spacing_entries.emplace(ready, woman);
+  };
+  auto remove_counted_woman = [&](int woman) {
+    if (!calibrator || !counted_woman[woman]) return;
+    counted_woman[woman] = 0;
+    calibrator->add_woman(people[woman].group, people[woman].born, -1);
+    if (counted_fertile[woman]) {
+      counted_fertile[woman] = 0;
+      calibrator->add_fertile(people[woman].group, people[woman].born, -1);
+    }
+  };
+  auto counted_birth = [&](int woman, double now) {
+    if (!calibrator || !counted_woman[woman]) return;
+    if (counted_fertile[woman]) {
+      counted_fertile[woman] = 0;
+      calibrator->add_fertile(people[woman].group, people[woman].born, -1);
+    }
+    spacing_entries.emplace(now + birth_interval, woman);
+  };
+  auto release_spacing = [&](double now) {
+    while (!spacing_entries.empty() && spacing_entries.begin()->first <= now) {
+      const int woman = spacing_entries.begin()->second;
+      spacing_entries.erase(spacing_entries.begin());
+      if (counted_woman[woman] && !counted_fertile[woman] &&
+          now >= people[woman].last_birth + birth_interval) {
+        counted_fertile[woman] = 1;
+        calibrator->add_fertile(people[woman].group, people[woman].born, 1);
+      }
+    }
+  };
+  std::vector<const std::vector<Band>*> search_hazards, fertility_hazards;
+  LagTable union_table, father_table_storage;
+  const LagTable* father_table = &union_table;
+  std::vector<double> union_warm, father_warm;
+  double weighted_infeasible = 0;
   // All father and partner searches share sampling, eligibility and matching.
   // Only form_union changes partner state or removes the selected man.
   auto find_candidate = [&](int woman, double now, const List& choice_model,
-                            int* count = nullptr, int* rank = nullptr) {
+                            int* count = nullptr, int* rank = nullptr, bool father = false) {
     if (males.empty()) return -1;
     const int sample_size = as<int>(choice_model["sample_size"]);
     const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
@@ -725,6 +1134,19 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       }), eligible.end());
     }
     if (count) *count = static_cast<int>(eligible.size());
+    if (calibrator && !eligible.empty()) {
+      // Searches and on-demand unions use the union-formation calibration;
+      // rate-mode nonmarital fathers have their own, driven by fertility.
+      release_spacing(now);
+      const bool fertility_driven = !rate_initiation || father;
+      const WeightSolution weights = calibrator->solve(now,
+        fertility_driven ? fertility_hazards : search_hazards, fertility_driven,
+        father ? *father_table : union_table,
+        as<double>(choice_model["imbalance_absorption"]), father ? father_warm : union_warm);
+      if (weights.infeasible) ++weighted_infeasible;
+      return select_partner(males, eligible, people, woman, choice_model, rank,
+                            &weights.log_weights);
+    }
     if (!two_sided || eligible.empty())
       return select_partner(males, eligible, people, woman, choice_model, rank);
     // Promote age-eligible women before sampling, without adding execution steps.
@@ -802,6 +1224,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       current_partner[partner] = woman;
       remove_male(partner);
       remove_female(woman);
+      remove_counted_woman(woman);
     }
     return partner;
   };
@@ -826,6 +1249,30 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     rates.unpartnered = status_fertility ? adjusted_fertility(
       read_bands(fertility_rates, "", "unpartnered", group), birth_interval) : rates.partnered;
     if (rate_initiation) rates.search = read_bands(union_rates, "", "", group);
+  }
+  // weighted_choice needs schedules and group indices, so it starts here.
+  // One group means unit weights: the method then equals female choice.
+  if (matching.containsElementNamed("weighted") && as<bool>(matching["weighted"]) &&
+      group_count > 1) {
+    double min_birth = start;
+    for (const Person& person : people) min_birth = std::min(min_birth, person.born);
+    calibrator.reset(new WeightCalibrator(min_birth, start + years, group_count,
+                                          kWeightBinWidth, min_male_age));
+    for (int group = 0; group < group_count; ++group) {
+      search_hazards.push_back(&schedules[group].search);
+      fertility_hazards.push_back(&schedules[group].unpartnered);
+    }
+    union_table = build_lag_table(matching, group_count, calibrator->bins(), kWeightBinWidth);
+    if (SEXP(father_matching) != SEXP(matching)) {
+      father_table_storage = build_lag_table(father_matching, group_count, calibrator->bins(),
+                                             kWeightBinWidth);
+      father_table = &father_table_storage;
+    }
+    counted_woman.assign(people.size(), 0);
+    counted_fertile.assign(people.size(), 0);
+    for (int man : males) calibrator->add_man(people[man].group, people[man].born, 1);
+    for (int woman = 0; woman < static_cast<int>(people.size()); ++woman)
+      add_counted_woman(woman, start);
   }
   std::vector<unsigned long long> event_versions(people.size(), 0);
   // Continuous dates order events. Equivalent keys retain insertion order.
@@ -897,12 +1344,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         current_partner[relationship.husband] = -1;
         add_male(relationship.husband);
         add_female(relationship.wife, now);
+        add_counted_woman(relationship.wife, now);
         // Her old birth candidate is invalid once her husband has died.
         if (rate_initiation && i == relationship.husband)
           schedule(relationship.wife, now);
       }
       if (!people[i].female) remove_male(i);
-      else remove_female(i);
+      else { remove_female(i); remove_counted_woman(i); }
       ++death_count;
     } else if (event.type == EventType::search) {
       form_union(i, now);
@@ -913,7 +1361,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       if (!rate_initiation && partner < 0) partner = form_union(i, now);
       // A nonmarital father stays available: parentage alone is not a union.
       const int father_position = partner >= 0 ? partner :
-        (rate_initiation ? find_candidate(i, now, father_matching) : -1);
+        (rate_initiation ? find_candidate(i, now, father_matching, nullptr, nullptr, true) : -1);
       if (father_position < 0 && cancel_birth_if_no_match) {
         // No child was born: retain last_birth and redraw risks from this instant.
         schedule(i, now);
@@ -928,6 +1376,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       // sex; union formation above happens before the newborn exists.
       double mother = people[i].id;
       people[i].last_birth = now;
+      counted_birth(i, now);
       // Default ffab is 0.4886 - its the signature of Berkeley training!
       bool female = R::runif(0, 1) < ffab;
       int child = static_cast<int>(people.size());
@@ -1008,10 +1457,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       if (child_group < 0 || child_group >= group_count) stop("Invalid newborn group index.");
       people[child].group = child_group;
       kinship.append(i, father_position);
-      if (!female) males.push_back(child);
+      if (!female) {
+        males.push_back(child);
+        if (calibrator) calibrator->add_man(child_group, now, 1);
+      }
       person_unions.emplace_back();
       current_partner.push_back(-1);
       if (two_sided) { female_slots.push_back(-1); add_female(child, now); }
+      if (calibrator) {
+        counted_woman.push_back(0);
+        counted_fertile.push_back(0);
+        add_counted_woman(child, now);
+      }
       event_versions.push_back(0);
       ++birth_count;
       // Both newborn and mother need fresh candidates. The mother now has a
@@ -1082,5 +1539,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),
     _["groups"] = out_group, _["unions"] = out_unions, _["ancestry"] = out_ancestry,
-    _["births"] = birth_count, _["deaths"] = death_count);
+    _["births"] = birth_count, _["deaths"] = death_count,
+    _["weighted_infeasible"] = weighted_infeasible);
 }
