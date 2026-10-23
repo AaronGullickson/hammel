@@ -304,7 +304,7 @@ from separate runs before calling demographic extraction functions.
 # TODO: Set parameters and seeds; create baseline populations and scenario table.
 
 population_seed <- 42
-replication_seeds <- seq_len(100)
+replication_seeds <- seq_len(5)
 years <- 100
 
 # skip first 25 years for time
@@ -312,10 +312,10 @@ time_breaks <- seq(2025, 2100, 5)
 
 set.seed(population_seed)
 pop_baseline_uneven_2g <- create_baseline_population(
-  50000, max_age = 100, end_time = 2000, group_weights = c("A" = 2, "B" = 1)
+  10000, max_age = 100, end_time = 2000, group_weights = c("A" = 2, "B" = 1)
 )
 pop_baseline_uneven_3g <- create_baseline_population(
-  50000, max_age = 100, end_time = 2000, group_weights = c("A" = 5, "B" = 3, "C" = 1)
+  10000, max_age = 100, end_time = 2000, group_weights = c("A" = 5, "B" = 3, "C" = 1)
 )
 pop_baseline_even_3g <- create_baseline_population(
   50000, max_age = 100, end_time = 2000, group_weights = c("A" = 1, "B" = 1, "C" = 1)
@@ -339,10 +339,13 @@ model <- hammel_model() |>
     "rate",
     matching = create_age_gap_matching_model(
       0, 5, 
-      group_exogamy = c("A::B" = -2)
+      group_exogamy = c("A::B" = -2), sample_size = 250
     ),
-    rates = mar_rates_female_grouped
+    rates = mar_rates_female_grouped,
+    matching_method = "two_sided"
   )
+
+system.time(result <- simulate(model, years = years, seed = 1))
 
 results  <- map(replication_seeds, function(seed) {
   simulate(model, years = years, seed = seed)
@@ -943,6 +946,95 @@ mar_rates |>
 
 ### Group matching parameters
 
+```{r}
+#| label: run-intermarriage-sim-uneven
+
+model <- hammel_model() |>
+  set_population(pop_baseline_uneven_2g) |>
+  set_fertility(fertility_rates_overall_usa) |>
+  set_mortality(mortality_rates_usa2000) |>
+  set_union_formation(
+    "on_demand",
+    matching = create_age_gap_matching_model(
+      0, 5, 
+      group_exogamy = c("A::B" = -3), sample_size = 250
+    ),
+    matching_method = "two_sided"
+  )
+
+system.time(result <- simulate(model, years = years, seed = 1))
+
+results  <- map(replication_seeds, function(seed) {
+  simulate(model, years = years, seed = seed)
+})
+names(results) <- as.character(replication_seeds)
+```
+
+```{r}
+
+map(results, get_detailed_unions) |>
+  bind_rows(.id = "replication") |>
+  filter(start_time > 2050) |>
+  count(replication, group_w, group_h) |>
+  pivot_wider(id_cols = c(replication), names_from = c(group_w, group_h), values_from = n) |>
+  mutate(
+    log_odds = log(A_B) + log(B_A) - log(A_A) - log(B_B),
+    gender_ratio = A_B/B_A
+  ) |>
+  summarize(
+    log_odds_se = sd(log_odds) / sqrt(n()),
+    log_odds = mean(log_odds),
+    gender_ratio_se = sd(gender_ratio) / sqrt(n()),
+    gender_ratio = mean(gender_ratio)
+  )
+```
+
+
+```{r}
+#| label: fig-exogamy-uneven
+#| fig-cap: Mean log odds ratio of each group pairing by decade of the simulation, across 100 simulations using uneven group sizes. 95% confidence bands shown. Dotted horizontal line give the expected log odds ratio from iput.
+
+expected <- tribble(
+  ~pairing, ~log_odds,
+  "AB",     -6,
+  "BC",     -1.5,
+  "AC",     0
+)
+
+map(results, get_detailed_unions) |>
+  bind_rows(.id = "replication") |>
+  mutate(time_span = floor(start_time / 10) * 10) |> 
+  count(replication, time_span, group_w, group_h) |>
+  pivot_wider(id_cols = c(replication, time_span), names_from = c(group_w, group_h), values_from = n) |>
+  mutate(
+    log_odds_AB = log(A_B) + log(B_A) - log(A_A) - log(B_B),
+    log_odds_BC = log(B_C) + log(C_B) - log(B_B) - log(C_C),
+    log_odds_AC = log(A_C) + log(C_A) - log(A_A) - log(C_C)
+  ) |>
+  select(replication, time_span, starts_with("log_odds")) |>
+  pivot_longer(
+    cols = starts_with("log_odds_"), 
+    names_prefix = "log_odds_", 
+    names_to = "pairing", 
+    values_to = "log_odds"
+  ) |>
+  group_by(time_span, pairing) |>
+  summarize(
+    sd = sd(log_odds),
+    log_odds = mean(log_odds),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  ggplot(aes(x = time_span + 5, y = log_odds, group = pairing, color = pairing))+
+  geom_ribbon(aes(ymin = log_odds - 1.96 * se, ymax = log_odds + 1.96 * se, fill = pairing), 
+              color = NA, alpha = 0.3)+
+  geom_point()+
+  geom_hline(data = expected, aes(yintercept = log_odds, color = pairing), linetype = 2)+
+  labs(x = "year", y = "log odds ratio")+
+  theme_bw()
+```
+
 To test group matching parameters, I start with a three group population with uneven sizes. Group A and B are given a symmetric exogamy ratio while B and C have directed effects by gender, and there are no barriers between A and C. I use shared fertility and mortality rates across groups, since we are not concerned with that feature for this evaluation. I also use on demand union formation because we are focused on the matching model itself here and the on demand model runs faster. I then run 100 simulations.
 
 ```{r}
@@ -956,15 +1048,27 @@ model <- hammel_model() |>
     "on_demand",
     matching = create_age_gap_matching_model(
       0, 5, 
-      group_exogamy = c("A::B" = -3, "B:C" = -1, "C:B" = -0.5)
-    )
+      group_exogamy = c("A::B" = -3, "B:C" = -1, "C:B" = -0.5), sample_size = 250
+    ),
+    matching_method = "two_sided"
   )
+
+system.time(result <- simulate(model, years = years, seed = 1))
 
 results  <- map(replication_seeds, function(seed) {
   simulate(model, years = years, seed = seed)
 })
 names(results) <- as.character(replication_seeds)
 ```
+
+```{r}
+
+map(results, get_detailed_unions) |>
+  bind_rows(.id = "replication") |>
+  count(replication, group_w, group_h) |>
+  pivot_wider(id_cols = c(replication), names_from = c(group_w, group_h), values_from = n)
+```
+
 
 ```{r}
 #| label: fig-exogamy-uneven
@@ -1067,10 +1171,12 @@ choice_sets <- choice_sets |>
     ABsym = (group_w == "A" & group_h == "B") | (group_w == "B" & group_h == "A"),
     ACsym = (group_w == "A" & group_h == "C") | (group_w == "C" & group_h == "A"),
     BC = (group_w == "B" & group_h == "C"),
-    CB = (group_w == "C" & group_h == "B")
+    CB = (group_w == "C" & group_h == "B"),
+    AB = (group_w == "A" & group_h == "B"),
+    BA = (group_w == "B" & group_h == "A") 
   )
 
-model_clogit <- clogit(chosen ~ age_diff + I(age_diff^2) + ABsym + ACsym + BC + CB + strata(union_id), data = choice_sets)
+model_clogit <- clogit(chosen ~ age_diff + I(age_diff^2) + AB + BA  + strata(union_id), data = choice_sets)
 modelsummary(
   model_clogit, 
   estimate = "{estimate} [{conf.low}, {conf.high}]",
@@ -1210,7 +1316,8 @@ To evaluate the built-in methods, I will run simulations with two ueven groups (
 ```{r}
 #| label: setup-inheritance-model
 
-pop_baseline_inheritance <- create_baseline_population(50000, max_age = 100, 2000, group_weights = c("A" = 3, "B" = 1))
+pop_baseline_inheritance <- create_baseline_population(50000, max_age = 100, 2000,
+                                                       group_weights = c("A" = 3, "B" = 1))
 
 model_inheritance <- hammel_model() |>
   set_population(pop_baseline_inheritance) |>
@@ -1250,7 +1357,7 @@ df_inheritance <- map(inheritance_scenarios, function(scenario) {
     } else {
       model <- model_inheritance |>
         set_fertility(
-          fertility_rates_overall_usa, 
+          fertility_rates_overall_usa,
           inheritance = create_group_inheritance("hierarchy", order = c("B", "A"), passing = 0.05)
         )
     }
@@ -1262,6 +1369,13 @@ df_inheritance <- map(inheritance_scenarios, function(scenario) {
   results <- map(replication_seeds[1:20], function(seed) {
     simulate(model, years = years, seed = seed)
   })
+
+  results |>
+    map(get_parent_info) |>
+    bind_rows(.id = "replication") |>
+    filter(!is.na(mother_id), group_mother != group_father) |>
+    select(birth_time, group, group_mother, group_father) |>
+    count(group, group_mother, group_father)
   
   share <- results |>
     map(calculate_population_size, times = 2100, by_group = TRUE) |>
@@ -1305,6 +1419,15 @@ df_inheritance <- map(inheritance_scenarios, function(scenario) {
   full_join(share, ancestry, by = "group") |> mutate(scenario = scenario)
 }) |>
   bind_rows()
+
+df_inheritance <- df_inheritance |>
+  mutate(
+    scenario = factor(
+      scenario, 
+      levels = c("mother", "father", "random_parent", "same_sex",  "opposite_sex", "ancestry", 
+                 "hierarchy_passing", "hierarchy_strict")
+    )
+  )
 ```
 
 I have the following expectations by inheritance method:
@@ -1478,6 +1601,12 @@ result_custom$persons |>
 Compare runtime and memory with and without groups, ancestry, and custom
 inheritance on documented workloads. Record final population sizes alongside
 timings, and separate compilation/input preparation from simulation execution.
+
+What do I want to compare across:
+
+- stratified groups and prop hazards for cases of 1 group, 2 groups, and 3 groups
+- adding log-odds ratios to 2 group and 3 group cases
+- differences across inheritance models for 2 and 3 group cases
 
 ```{r}
 #| label: speed-tests
