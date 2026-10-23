@@ -32,7 +32,16 @@ library(ggplot2)
 library(gt)
 library(survival)
 library(modelsummary)
+library(furrr)
 ```
+
+```{r}
+#| label: set-up-parallel-processing
+
+future::plan(future::multicore, workers = 4)
+```
+
+
 
 ```{r}
 #| label: create-functions
@@ -304,7 +313,7 @@ from separate runs before calling demographic extraction functions.
 # TODO: Set parameters and seeds; create baseline populations and scenario table.
 
 population_seed <- 42
-replication_seeds <- seq_len(5)
+replication_seeds <- seq_len(100)
 years <- 100
 
 # skip first 25 years for time
@@ -312,10 +321,10 @@ time_breaks <- seq(2025, 2100, 5)
 
 set.seed(population_seed)
 pop_baseline_uneven_2g <- create_baseline_population(
-  10000, max_age = 100, end_time = 2000, group_weights = c("A" = 2, "B" = 1)
+  50000, max_age = 100, end_time = 2000, group_weights = c("A" = 2, "B" = 1)
 )
 pop_baseline_uneven_3g <- create_baseline_population(
-  10000, max_age = 100, end_time = 2000, group_weights = c("A" = 5, "B" = 3, "C" = 1)
+  50000, max_age = 100, end_time = 2000, group_weights = c("A" = 5, "B" = 3, "C" = 1)
 )
 pop_baseline_even_3g <- create_baseline_population(
   50000, max_age = 100, end_time = 2000, group_weights = c("A" = 1, "B" = 1, "C" = 1)
@@ -339,17 +348,20 @@ model <- hammel_model() |>
     "rate",
     matching = create_age_gap_matching_model(
       0, 5, 
-      group_exogamy = c("A::B" = -2), sample_size = 250
+      group_exogamy = c("A::B" = -2)
     ),
     rates = mar_rates_female_grouped,
-    matching_method = "two_sided"
+    # ok to do female choice here because we only care about the demographic rates
+    matching_method = "female_choice"
   )
 
-system.time(result <- simulate(model, years = years, seed = 1))
-
-results  <- map(replication_seeds, function(seed) {
-  simulate(model, years = years, seed = seed)
-})
+results  <- future_map(
+  replication_seeds, 
+  function(seed) {
+    simulate(model, years = years, seed = seed) 
+  },
+  .options = furrr_options(seed = NULL)
+)
 names(results) <- as.character(replication_seeds)
 ```
 
@@ -660,12 +672,18 @@ model <- hammel_model() |>
       group_exogamy = c("A::B" = -2)
     ),
     rates = mar_rates_female_usa,
-    group_prop_hazard = c("A" = ratio_mar_A, "B" = ratio_mar_B)
+    group_prop_hazard = c("A" = ratio_mar_A, "B" = ratio_mar_B),
+    # ok to use female choice here as we only want to compare demogrpahic rates
+    matching_method = "female_choice"
   )
 
-results  <- map(replication_seeds, function(seed) {
-  simulate(model, years = years, seed = seed)
-})
+results  <- future_map(
+  replication_seeds, 
+  function(seed) {
+    simulate(model, years = years, seed = seed) 
+  },
+  .options = furrr_options(seed = NULL)
+)
 names(results) <- as.character(replication_seeds)
 ```
 
