@@ -8,7 +8,8 @@ create_age_gap_matching_model(
   preferred_age_gap,
   half_weight_distance,
   group_exogamy = NULL,
-  prevent_exogamy = FALSE
+  prevent_exogamy = FALSE,
+  sample_size = 250
 )
 }
 \arguments{
@@ -22,6 +23,11 @@ preferred gap at which selection weight halves.}
 
 \item{prevent_exogamy}{Optional post-sampling group restrictions passed to
 \code{\link[=create_matching_model]{create_matching_model()}}. Defaults to \code{FALSE}.}
+
+\item{sample_size}{Nonnegative whole number of men to sample before
+pair-specific screening. Defaults to \code{250}; zero requests the whole
+available pool. Rejected candidates are not replaced. A separate
+\code{father_matching} model uses its own sample size.}
 }
 \value{
 A \code{hammel_matching_model} with linear and quadratic age-difference terms.

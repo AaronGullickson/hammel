@@ -44,6 +44,10 @@
 #'   without refilling. Empty samples follow existing failed-search and birth
 #'   cancellation rules. Restrictions override finite preferences, require
 #'   population identities, and do not invalidate existing partners.
+#' @param sample_size Nonnegative whole number of men to sample before
+#'   pair-specific screening. Defaults to `250`; zero requests the whole
+#'   available pool. Rejected candidates are not replaced. A separate
+#'   `father_matching` model uses its own sample size.
 #' @return An inspectable `hammel_matching_model` list containing `formula`
 #'   and `coefficients`. This specifies a model; it does not estimate one.
 #' @export
@@ -53,10 +57,10 @@
 #'   ~ age_difference + I(age_difference^2),
 #'   c(age_difference = 0.1, "I(age_difference^2)" = -0.02)
 #' )
-create_matching_model <- function(formula, coefficients, group_exogamy = NULL, group_levels = NULL, prevent_exogamy = FALSE) {
+create_matching_model <- function(formula, coefficients, group_exogamy = NULL, group_levels = NULL, prevent_exogamy = FALSE, sample_size = 250) {
   model <- structure(list(formula = formula, coefficients = coefficients,
                           group_exogamy = group_exogamy, group_levels = group_levels,
-                          prevent_exogamy = prevent_exogamy),
+                          prevent_exogamy = prevent_exogamy, sample_size = sample_size),
                      class = "hammel_matching_model")
   validate_matching_model(model)
   model
@@ -80,12 +84,13 @@ create_matching_model <- function(formula, coefficients, group_exogamy = NULL, g
 #'   [create_matching_model()]. Defaults to `FALSE`.
 #' @param half_weight_distance Finite positive numeric scalar in years from the
 #'   preferred gap at which selection weight halves.
+#' @inheritParams create_matching_model
 #' @return A `hammel_matching_model` with linear and quadratic age-difference terms.
 #' @export
 #' @examples
 #' # Illustrative preferences, not demographic defaults.
 #' matching <- create_age_gap_matching_model(3, 5)
-create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL, prevent_exogamy = FALSE) {
+create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL, prevent_exogamy = FALSE, sample_size = 250) {
   for (name in c("preferred_age_gap", "half_weight_distance")) {
     value <- get(name)
     if (!is.numeric(value) || length(value) != 1L || !is.null(dim(value)) ||
@@ -102,13 +107,24 @@ create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distanc
          call. = FALSE)
   create_matching_model(~ age_difference + I(age_difference^2),
     c(age_difference = unname(linear), "I(age_difference^2)" = unname(quadratic)),
-    group_exogamy = group_exogamy, prevent_exogamy = prevent_exogamy)
+    group_exogamy = group_exogamy, prevent_exogamy = prevent_exogamy,
+    sample_size = sample_size)
+}
+
+validate_sample_size <- function(n) {
+  if (!is.numeric(n) || is.complex(n) || length(n) != 1L || !is.null(dim(n)) ||
+      !is.finite(n) || n < 0 || n != floor(n) || n > .Machine$integer.max) {
+    stop("`sample_size` must be a nonnegative whole number within integer range.",
+         call. = FALSE)
+  }
+  invisible(NULL)
 }
 
 validate_matching_model <- function(model) {
   if (!inherits(model, "hammel_matching_model") || !is.list(model)) {
     stop("`matching` must be created with create_matching_model().", call. = FALSE)
   }
+  validate_sample_size(model$sample_size)
   formula <- model$formula
   if (!inherits(formula, "formula") || length(formula) != 2L ||
       any(!all.vars(formula) %in% c("age_difference", "female_group", "male_group", "same_group"))) {
@@ -248,7 +264,8 @@ prepare_matching_model <- function(matching, population_groups = NULL, two_sided
     }
   }
   group_formula <- matching_has_group_formula(matching)
-  list(two_sided = two_sided, prevent_exogamy_all = restrictions$all, blocked_pairs = blocked,
+  list(sample_size = as.integer(matching$sample_size),
+       two_sided = two_sided, prevent_exogamy_all = restrictions$all, blocked_pairs = blocked,
 quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
        group_formula = group_formula, needs_groups = group_formula || nrow(pairs) > 0,
        pair_offsets = offsets,
@@ -283,7 +300,8 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' cancel births by default. No previous-father preference is applied.
 #'
 #' Sampling is from the available male pool BEFORE pair-specific screening.
-#' `sample_size = 0` means the whole pool. Otherwise sample without replacement
+#' The matching model defaults to `sample_size = 250`; zero means the whole pool.
+#' Otherwise sample without replacement
 #' up to that many men. Age screening occurs afterward, without refilling the
 #' sample. Kinship screening follows the same ordering. Existing unions are
 #' retained even if a new-search restriction would exclude the partner.
@@ -311,10 +329,9 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' @param father_matching Optional matching specification for fathers of
 #'   unpartnered births in rate mode, created by [create_matching_model()].
 #'   Defaults to `NULL`, using the current general `matching` model. Union
-#'   searches always use `matching`. Not used by on-demand initiation. Sampling
-#'   and eligibility settings are shared by both models.
-#' @param sample_size Nonnegative whole number of men to sample before screening;
-#'   zero requests the whole pool. Defaults to `1000`.
+#'   searches always use `matching`. Not used by on-demand initiation. Process-level
+#'   age and kinship screening settings are shared; each matching model supplies its own
+#'   candidate sample size. NULL inherits the general model's sample size.
 #' @param min_male_age Minimum male age in continuous years at a new partner
 #'   search, default `15`. Finite nonnegative scalar; zero disables this age
 #'   exclusion. Existing unions are retained. No minimum is added for actual
@@ -363,14 +380,14 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   `set_union_formation()` returns an updated model. Rate tables are tibbles.
 #' @export
 union_formation <- function(initiation, matching = create_age_gap_matching_model(0, 5),
-                            sample_size = 1000, rates = NULL,
+                            rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
                             diagnostics = FALSE, group_prop_hazard = NULL,
                             matching_method = "two_sided") {
   process <- structure(list(
     name = "union_formation", initiation = initiation, matching = matching,
-    sample_size = sample_size, min_male_age = min_male_age,
+    min_male_age = min_male_age,
     kinship_generations = kinship_generations, father_matching = father_matching,
     cancel_birth_if_no_match = cancel_birth_if_no_match, diagnostics = diagnostics,
     rates = rates, rate_unit = "person_year", group_prop_hazard = group_prop_hazard,
@@ -387,12 +404,12 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
 #' @rdname union_formation
 #' @export
 set_union_formation <- function(model, initiation, matching = create_age_gap_matching_model(0, 5),
-                            sample_size = 1000, rates = NULL,
+                            rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
                             diagnostics = FALSE, group_prop_hazard = NULL,
                             matching_method = "two_sided") {
-  set_process(model, union_formation(initiation, matching, sample_size, rates,
+  set_process(model, union_formation(initiation, matching, rates,
                                      min_male_age, kinship_generations, father_matching,
                                      cancel_birth_if_no_match, diagnostics, group_prop_hazard, matching_method))
 }
@@ -413,12 +430,9 @@ validate_union_formation <- function(process) {
       is.na(process$initiation) || !process$initiation %in% c("rate", "on_demand")) {
     stop('`initiation` must be "rate" or "on_demand".', call. = FALSE)
   }
-  n <- process$sample_size
-  if (!is.numeric(n) || length(n) != 1L || !is.null(dim(n)) ||
-      !is.finite(n) || n < 0 || n != floor(n) || n > .Machine$integer.max) {
-    stop("`sample_size` must be a nonnegative whole number within integer range.",
+  if ("sample_size" %in% names(process))
+    stop("Set `sample_size` on the matching model, not union formation; rebuild this process.",
          call. = FALSE)
-  }
   age <- process$min_male_age
   if (!is.numeric(age) || length(age) != 1L || !is.null(dim(age)) ||
       !is.finite(age) || age < 0) {

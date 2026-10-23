@@ -29,6 +29,12 @@ both initiation modes, and legacy objects versus explicit female choice.
 Tests of one-sided analytical probabilities request female choice explicitly.
 This verifies the default change, not general demographic parameter recovery.
 
+The D065 matching-model sample-size change also passed the same full-suite
+command on October 22 after a clean optimized native build, with no failures
+or warnings and the live database test skipped. Checks cover the actual
+250-candidate default, independent general/father sizes, NULL inheritance,
+invalid edited specifications, and removal of the union-level argument.
+
 | Test file | Main evidence |
 | --- | --- |
 | `test-groups.R` | Group rate lookup, analytical survival, coverage errors, fallback warnings, maternal inheritance, cross-group unions, restarts, RNG equivalence, and weighted initialization |
@@ -37,6 +43,7 @@ This verifies the default change, not general demographic parameter recovery.
 | `test-group-inheritance.R` | All assignment rules/fallbacks, passing and ancestry probabilities, custom RNG, mixed identity rates, future-group coverage, restarts, and unchanged maternal defaults |
 | `test-ancestry.R` | Starting identities, supplied proportions and IDs, parental averaging across generations, unknown shares, restarts/deaths, numeric labels, empty tables, and RNG independence |
 | `test-group-matching.R` | Directed/symmetric offsets, analytical probabilities, fixed factor contrasts/interactions, native/custom score agreement, father overrides, final utility ranks, validation, and unchanged RNG |
+| `test-matching-sample-size.R` | Matching-model size validation, actual default-250 sampling, independent general/father sizes, NULL inheritance, and removed union-level API |
 | `test-prevent-exogamy.R` | Post-sampling restrictions, no refilling, scarcity/failure, direction/symmetry, father overrides, diagnostics, retained partners, and unchanged disabled RNG |
 | `test-detailed-unions.R` | Spouse-ID joins, repeated episodes, deaths, optional group types, empty tables, unchanged inputs, and name collisions |
 | `test-two-sided-matching.R` | Analytical and independent-rejection fixed-pool choices, native/R orientation, female-row callbacks, streamed/materialized equivalence, actual-state invariants, eligibility, father overrides, RNG and compatibility |

@@ -147,7 +147,6 @@ simulate <- function(model, years, seed = NULL) {
   engine_persons <- population$persons
   engine_persons$.hammel_group <- if (is.null(group_values)) rep(0L, nrow(engine_persons)) else
     match(as.character(engine_persons$group), as.character(group_values)) - 1L
-  sample_size <- as.integer(union_process$sample_size)
   if (!is.null(seed)) {
     if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
         seed != trunc(seed) || abs(seed) > .Machine$integer.max) {
@@ -171,7 +170,7 @@ simulate <- function(model, years, seed = NULL) {
       prepare_matching_model(union_process$father_matching, group_values, two_sided)
     native <- simulate_cpp(engine_persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
-                           sample_size, matching,
+                           matching,
                            union_process$min_male_age,
                            as.integer(union_process$kinship_generations),
                            union_process$initiation == "rate",

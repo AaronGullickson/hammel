@@ -576,7 +576,7 @@ struct UnionRecord {
 List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   DataFrame fertility_rates, double start, double years,
                   double birth_interval, DataFrame unions,
-                  int sample_size, List matching, double min_male_age,
+                  List matching, double min_male_age,
                   int kinship_generations, bool rate_initiation,
                   DataFrame union_rates, List father_matching,
                   bool cancel_birth_if_no_match, bool diagnostics,
@@ -709,6 +709,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   auto find_candidate = [&](int woman, double now, const List& choice_model,
                             int* count = nullptr, int* rank = nullptr) {
     if (males.empty()) return -1;
+    const int sample_size = as<int>(choice_model["sample_size"]);
     const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
                                              sampling_workspace);
     auto eligible = screen_male_candidates(males, sample, people, now, min_male_age,

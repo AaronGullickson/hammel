@@ -45,7 +45,8 @@ This retains the possibility that a minority woman samples no compatible men
 even when some exist in the full pool. With equally aged compatible A and
 incompatible B men, a one-man sample may fail; the full pool will find A.
 A finite penalty of -10 still selects B from a sample containing B alone,
-whereas prohibiting A:B makes that sample empty. Increasing `sample_size`
+whereas prohibiting A:B makes that sample empty. Increasing the matching
+model's `sample_size` (default 250)
 changes encounter coverage, not the restriction. No extra random draws occur
 in group screening; FALSE must retain the existing histories and RNG state.
 

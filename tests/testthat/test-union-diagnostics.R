@@ -17,7 +17,7 @@ test_that("diagnostics count screened candidates and rank utilities without chan
       make_model(5, birth_rate = 100, birth_interval = 0)
     model$population$persons$sex[1] <- "f"
     model$population$persons$birth_time <- c(-25, -20, -25, -30, -5)
-    model$processes$union_formation$sample_size <- 0
+    model$processes$union_formation$matching$sample_size <- 0
     for (tied in c(FALSE, TRUE)) {
       model$processes$union_formation$matching <- create_matching_model(
         ~ age_difference, c(age_difference = if (tied) 0 else 0.1))

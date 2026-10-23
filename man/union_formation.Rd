@@ -8,7 +8,6 @@
 union_formation(
   initiation,
   matching = create_age_gap_matching_model(0, 5),
-  sample_size = 1000,
   rates = NULL,
   min_male_age = 15,
   kinship_generations = 2,
@@ -23,7 +22,6 @@ set_union_formation(
   model,
   initiation,
   matching = create_age_gap_matching_model(0, 5),
-  sample_size = 1000,
   rates = NULL,
   min_male_age = 15,
   kinship_generations = 2,
@@ -41,9 +39,6 @@ set_union_formation(
 \item{matching}{A specification created by \code{\link[=create_matching_model]{create_matching_model()}}. Defaults
 to \code{create_age_gap_matching_model(0, 5)}: preferred age gap zero years,
 with selection weight halving five years on either side.}
-
-\item{sample_size}{Nonnegative whole number of men to sample before screening;
-zero requests the whole pool. Defaults to \code{1000}.}
 
 \item{rates}{For \code{"rate"} initiation, an age-specific female search-hazard
 table with \code{age_start}, \code{age_end}, and \code{rate}, in years and per person-year.
@@ -70,8 +65,9 @@ are retained. See \code{\link[=extract_kin]{extract_kin()}} for the shared dista
 \item{father_matching}{Optional matching specification for fathers of
 unpartnered births in rate mode, created by \code{\link[=create_matching_model]{create_matching_model()}}.
 Defaults to \code{NULL}, using the current general \code{matching} model. Union
-searches always use \code{matching}. Not used by on-demand initiation. Sampling
-and eligibility settings are shared by both models.}
+searches always use \code{matching}. Not used by on-demand initiation. Process-level
+age and kinship screening settings are shared; each matching model supplies its own
+candidate sample size. NULL inherits the general model's sample size.}
 
 \item{cancel_birth_if_no_match}{Logical, default \code{TRUE}. Cancel a birth when
 its on-demand partner search or rate-mode nonmarital father selection fails.
@@ -137,7 +133,8 @@ cancel births by default. No previous-father preference is applied.
 }
 \details{
 Sampling is from the available male pool BEFORE pair-specific screening.
-\code{sample_size = 0} means the whole pool. Otherwise sample without replacement
+The matching model defaults to \code{sample_size = 250}; zero means the whole pool.
+Otherwise sample without replacement
 up to that many men. Age screening occurs afterward, without refilling the
 sample. Kinship screening follows the same ordering. Existing unions are
 retained even if a new-search restriction would exclude the partner.

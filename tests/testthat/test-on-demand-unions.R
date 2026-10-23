@@ -1,8 +1,8 @@
-make_on_demand_model <- function(n = 2, sample_size = 1000) {
+make_on_demand_model <- function(n = 2, sample_size = 250) {
   model <- make_model(n, sex = "m", birth_rate = 20, birth_interval = 0)
   if (n) model$population$persons$sex[1] <- "f"
   set_union_formation(model, "on_demand",
-    create_matching_model(~ age_difference, c(age_difference = 100)), sample_size,
+    create_matching_model(~ age_difference, c(age_difference = 100), sample_size = sample_size),
     cancel_birth_if_no_match = FALSE)
 }
 
@@ -117,7 +117,7 @@ test_that("on-demand input and edited process errors are explicit", {
     transform(model$population$unions, union_id = 2, husband_id = 2))
   expect_error(simulate(model, 1), "multiple ongoing unions")
   model <- make_on_demand_model()
-  model$processes$union_formation$sample_size <- -1
+  model$processes$union_formation$matching$sample_size <- -1
   expect_error(simulate(model, 1), "sample_size")
 })
 
@@ -193,7 +193,7 @@ test_that("a surviving husband returns immediately after his wife's death", {
     age_start = c(0, 60.25, 0), age_end = c(60.25, Inf, Inf),
     rate = c(0, 1e8, 0)))
   # Use the full available pool so infant boys cannot mask the returned widower.
-  model$processes$union_formation$sample_size <- 0
+  model$processes$union_formation$matching$sample_size <- 0
   result <- simulate(model, 1, seed = 52)
   expect_equal(result$unions$husband_id, c(2, 2))
   expect_equal(result$unions$wife_id, c(1, 3))

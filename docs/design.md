@@ -195,6 +195,10 @@ callbacks that can bypass consistency checks.
 
 ## Experimental fixed-pool two-sided matching
 
+Matching models own `sample_size` (default 250; zero means the full male pool).
+Union formation does not take a sample-size argument. An explicit father model
+supplies its own size; NULL inherits the general matching model's size (D065).
+
 `union_formation()` and its setter default to `matching_method = "two_sided"`
 (D061/D062/D064); explicit `"female_choice"` remains available. Older objects
 without this field retain female choice. Both union formation and nonmarital

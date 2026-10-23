@@ -9,7 +9,8 @@ create_matching_model(
   coefficients,
   group_exogamy = NULL,
   group_levels = NULL,
-  prevent_exogamy = FALSE
+  prevent_exogamy = FALSE,
+  sample_size = 250
 )
 }
 \arguments{
@@ -43,6 +44,11 @@ Restrictions filter the original sample alongside age/kin eligibility,
 without refilling. Empty samples follow existing failed-search and birth
 cancellation rules. Restrictions override finite preferences, require
 population identities, and do not invalidate existing partners.}
+
+\item{sample_size}{Nonnegative whole number of men to sample before
+pair-specific screening. Defaults to \code{250}; zero requests the whole
+available pool. Rejected candidates are not replaced. A separate
+\code{father_matching} model uses its own sample size.}
 }
 \value{
 An inspectable \code{hammel_matching_model} list containing \code{formula}

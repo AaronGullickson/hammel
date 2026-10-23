@@ -28,7 +28,8 @@ directions as described below.
 ## Sampling and eligibility
 
 1. Sample men from the existing living, unpartnered male pool before screening,
-   using the existing `sample_size` (zero means the full pool).
+   using the selected matching model's `sample_size` (default 250; zero means
+   the full pool). A separate father model supplies its own size.
 2. Apply the existing minimum male age, ego kinship, and applicable hard group
    exclusions. If no men remain, use the existing failure behavior.
 3. The alternate-woman pool is all other living, unpartnered women whose age

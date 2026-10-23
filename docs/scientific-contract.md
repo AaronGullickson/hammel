@@ -255,9 +255,25 @@ or partner model, and do not invalidate existing partners. Eligibility counts
 and utility ranks use the final filtered set. Group restrictions require known
 population identities; exact group exclusions do not use NA or infinite scores.
 
+Candidate sample size belongs to the matching model. Both
+`create_matching_model()` and `create_age_gap_matching_model()` accept
+`sample_size = 250`: a nonnegative whole count of men, sampled uniformly
+without replacement before age, kinship, and group screening. Zero means the
+full available male pool. Rejected candidates are not replaced. The setting
+applies to both matching methods; two-sided market size can be smaller after
+screening or female shortage. A separate `father_matching` model uses its own
+sample size; NULL inherits the general matching model, including sampling.
+For example, a general model with size 250 and a father model with size 50
+sample up to 250 men for union searches and 50 for unpartnered rate-mode
+births. Existing partners need no search. Changing sampling can affect
+encounters, matches, birth cancellations, seeded histories, and runtime; it
+does not change initiation hazards or matching utilities. This default does
+not assert scientific convergence at a sample size of 250.
+
 With `union_formation(initiation = "on_demand", ...)`, use the woman's ongoing
 living male partner as father. If she has no partner, sample up to `sample_size`
-living, unpartnered men without replacement (default 1000; zero means the whole pool).
+living, unpartnered men without replacement (matching-model default 250;
+zero means the whole pool).
 Evaluate the matching formula on male-minus-female continuous age differences
 and multiply its non-intercept model-matrix columns by their named coefficients.
 With explicit `matching_method = "female_choice"`, sample candidate utilities V
@@ -323,8 +339,8 @@ Women face birth risk in both statuses: the current `union_status` selects
 fertility, or an overall schedule applies equally to both. With overall rates,
 warn once per simulation call that fertility does not depend on union status.
 Unpartnered births in rate mode select a father from living, currently
-unpartnered men using the same sample size, minimum age, known-kin screening
-and conditional-logit matching as union searches. This creates parentage only:
+unpartnered men using the selected matching model's sample size, with the same
+minimum age and known-kin screening as union searches. This creates parentage only:
 no union forms, the man remains available, and neither person's partner state
 changes. No qualifying sampled candidate cancels the birth by default; explicitly
 setting `cancel_birth_if_no_match = FALSE` retains it with unknown father. Paternal links are appended to the kinship graph before

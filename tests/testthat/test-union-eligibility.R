@@ -42,7 +42,7 @@ test_that("sampling precedes age screening and does not refill rejected samples"
   model <- make_model(3, birth_rate = 20, birth_interval = 0)
   model$population$persons$sex[1] <- "f"
   model$population$persons$birth_time <- c(-20, -1, -25)
-  model$processes$union_formation$sample_size <- 1
+  model$processes$union_formation$matching$sample_size <- 1
   results <- lapply(1:50, function(seed) simulate(model, 0.1, seed = seed))
   first_fathers <- vapply(results, function(result) {
     children <- result$persons[result$persons$mother_id %in% 1, ]

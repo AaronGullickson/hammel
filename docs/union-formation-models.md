@@ -58,7 +58,8 @@ availability and renewed female rate searches after widowhood are implemented. T
 ## Implemented construction interface
 
 `create_matching_model(formula, coefficients, group_exogamy = NULL,
-group_levels = NULL)` stores a one-sided R formula and finite named coefficients
+group_levels = NULL, prevent_exogamy = FALSE, sample_size = 250)` stores a
+one-sided R formula and finite named coefficients
 matching its non-intercept model-matrix columns. Predictors include
 `age_difference` (male minus female age in continuous years), `female_group`,
 `male_group`, and numeric `same_group`. Categorical group terms require explicit
@@ -74,7 +75,7 @@ estimation interface yet.
 ```r
 union_formation(
   initiation, matching = create_age_gap_matching_model(0, 5),
-  sample_size = 1000, rates = NULL, min_male_age = 15,
+  rates = NULL, min_male_age = 15,
   kinship_generations = 2, father_matching = NULL,
   cancel_birth_if_no_match = TRUE, diagnostics = FALSE
 )
@@ -87,7 +88,10 @@ a process; `set_union_formation(model, ...)` attaches it. Initiation is explicit
 zero years and a symmetric half-weight distance of five years. Explicit matching
 models override this default in both the constructor and setter. With
 `father_matching = NULL`, nonmarital father selection uses this same model.
-The user selected a default sample size of 1000. `sample_size = 0` means use the full available pool; a positive
+Both matching-model constructors default to `sample_size = 250` (D065).
+Set it on the matching model, not union formation. A separate `father_matching`
+model uses its own size; NULL inherits the general model including its size.
+`sample_size = 0` means use the full available pool; a positive
 integer requests up to that many men without replacement BEFORE pair-specific
 eligibility screening. Screening can leave no candidates. Rate-mode tables
 contain female search-attempt hazards by age (`age_start`, `age_end`, `rate`),
@@ -411,9 +415,9 @@ labels/incomplete tables, independent compensation and RNG isolation.
 ## Nonmarital father selection (D040)
 
 For a birth to an unpartnered woman in rate mode, select a father from the same
-living, currently unpartnered male vector used for union searches. Use the union
-process's sample size, sample-before-screening rule, minimum male age and known-kin
-exclusion. Use `father_matching` when provided, otherwise the general
+living, currently unpartnered male vector used for union searches. Use the
+selected matching model's sample size and the process's sample-before-screening
+rule, minimum male age and known-kin exclusion. Use `father_matching` when provided, otherwise the general
 conditional-logit matching formula/coefficients. Selection is at
 birth time, before the newborn enters the population. Empty or entirely rejected
 samples cancel the birth by default, or preserve it with unknown father when

@@ -105,8 +105,8 @@ make_two_sided_model <- function(mode = "on_demand", extra_women = 5L) {
   model$population$persons$birth_time <- c(-20, -25, -30, rep(-40, extra_women))
   # Only ego can actually have births/searches during this short run.
   model <- set_fertility(model, data.frame(age_start = 19, age_end = 21, rate = 100), birth_interval = 0)
-  set_union_formation(model, mode, matching = create_age_gap_matching_model(0, 5),
-    sample_size = 0, matching_method = "two_sided", diagnostics = TRUE,
+  set_union_formation(model, mode, matching = create_age_gap_matching_model(0, 5, sample_size = 0),
+    matching_method = "two_sided", diagnostics = TRUE,
     rates = if (mode == "rate") data.frame(age_start = 19, age_end = 21, rate = 100) else NULL)
 }
 

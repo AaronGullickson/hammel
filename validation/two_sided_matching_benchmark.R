@@ -54,7 +54,9 @@ for (sample_size in c(50L, 200L, 1000L)) {
   for (trial in 1:3) {
     methods <- if (trial %% 2) c("female_choice", "two_sided") else c("two_sided", "female_choice")
     for (method in methods) {
-      model <- set_union_formation(base, "on_demand", matching, sample_size = sample_size,
+      trial_matching <- matching
+      trial_matching$sample_size <- sample_size
+      model <- set_union_formation(base, "on_demand", trial_matching,
         matching_method = method)
       invisible(gc())
       elapsed <- system.time(result <- simulate(model, 20, seed = 750 + trial))[["elapsed"]]
@@ -77,9 +79,10 @@ rows <- list()
 for (sample_size in c(50L, 200L)) {
   for (trial in 1:3) {
     for (scorer in if (trial %% 2) c("native", "R_formula") else c("R_formula", "native")) {
-      model <- set_union_formation(base, "on_demand",
-        if (scorer == "native") matching else fallback,
-        sample_size = sample_size, matching_method = "two_sided")
+      trial_matching <- if (scorer == "native") matching else fallback
+      trial_matching$sample_size <- sample_size
+      model <- set_union_formation(base, "on_demand", trial_matching,
+        matching_method = "two_sided")
       invisible(gc())
       elapsed <- system.time(result <- simulate(model, 5, seed = 760 + trial))[["elapsed"]]
       rows[[length(rows) + 1L]] <- data.frame(sample_size, trial, scorer, years = 5,

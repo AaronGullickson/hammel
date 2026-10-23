@@ -1161,3 +1161,27 @@ matching specifications override this default. Initiation mode remains explicit.
   initiation modes for constructors and setters; explicit female choice agrees
   with legacy objects. `TZ=UTC Rscript -e 'devtools::test(reporter = "summary")'`
   passed with no failures or warnings; the opt-in live database test was skipped.
+
+## D065: Candidate sample size belongs to the matching model
+
+- **Status:** implemented at the user's request October 22, 2026.
+- **Decision:** both matching-model constructors accept `sample_size = 250`.
+  Remove the argument from union formation and its setter, without a deprecated
+  alias. The user prefers direct API changes while the package is unpublished.
+- **Semantics:** sample up to this many men without replacement before screening;
+  zero uses the full pool. Both matching methods use the selected model's size.
+  A separate nonmarital father model supplies its own sample size; NULL inherits
+  the general model. This supersedes the earlier shared process-level size and
+  default 1000. Initiation hazards and score formulas are unchanged.
+- **Examples and limits:** sizes 250 for general matching and 50 for father
+  matching apply to their respective searches. Screening does not refill samples;
+  female shortage can further reduce two-sided markets. Reducing the sample
+  changes encounters and seeded outcomes, not just runtime. No scientific
+  convergence at 250 is claimed. Rebuild older specifications using the new API.
+- **Validation:** constructor/edited-object validation, screening and full-pool
+  behavior, independent union/father sample sizes, NULL inheritance, and both
+  initiation/matching modes pass. After a clean optimized native build,
+  `TZ=UTC Rscript -e 'devtools::test(reporter = "summary")'` passed with no
+  failures or warnings; the opt-in live database test was skipped. The report's
+  three explicit size-250 settings were moved into its matching models without
+  executing the report or downloading rates.

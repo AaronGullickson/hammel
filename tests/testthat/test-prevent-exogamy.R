@@ -2,9 +2,9 @@ exogamy_test_model <- function(prevent = FALSE, group_exogamy = NULL) {
   model <- make_model(3, birth_rate = 20, birth_interval = 0)
   model$population$persons$sex <- c("f", "m", "m")
   model$population$persons$group <- c("A", "A", "B")
-  set_union_formation(model, "on_demand", sample_size = 0, diagnostics = TRUE,
+  set_union_formation(model, "on_demand", diagnostics = TRUE,
     matching = create_age_gap_matching_model(0, 5, group_exogamy = group_exogamy,
-                                             prevent_exogamy = prevent))
+                                             prevent_exogamy = prevent, sample_size = 0))
 }
 
 test_that("hard restrictions exclude candidates before scoring and diagnostics", {
@@ -56,10 +56,10 @@ test_that("empty filtered samples use existing birth cancellation and unknown-fa
 
 test_that("sampling remains broad with no refilling after group exclusions", {
   small <- exogamy_test_model(TRUE)
-  small$processes$union_formation$sample_size <- 1L
+  small$processes$union_formation$matching$sample_size <- 1L
   small$processes$union_formation$cancel_birth_if_no_match <- TRUE
   full <- small
-  full$processes$union_formation$sample_size <- 0L
+  full$processes$union_formation$matching$sample_size <- 0L
   # Some one-man encounter samples miss the compatible man although he exists.
   outcomes <- vapply(1:30, function(seed) {
     nrow(simulate(full, 0.1, seed = seed)$unions) > 0 &&
@@ -73,7 +73,7 @@ test_that("rate searches retry and father overrides carry independent restrictio
   model <- set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
     age_start = 15, age_end = 50, rate = c(0, 20)), 0)
   model <- set_union_formation(model, "rate", matching = model$processes$union_formation$matching,
-    rates = data.frame(age_start = 15, age_end = Inf, rate = 0), sample_size = 0,
+    rates = data.frame(age_start = 15, age_end = Inf, rate = 0),
     cancel_birth_if_no_match = FALSE, matching_method = "female_choice")
   result <- simulate(model, 0.3, seed = 52)
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 2))
