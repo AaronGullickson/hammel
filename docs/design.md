@@ -134,7 +134,7 @@ history and run metadata, not a saved model or pending queue.
 
 Users can replace rates between runs. This supports incremental workflows,
 but does not implement calendar-varying schedules inside one run. Restarting
-resamples candidates and is not guaranteed to match an uninterrupted fixed-seed
+redraws pending events and is not guaranteed to match an uninterrupted fixed-seed
 run. Fertility adjustment after changing rates ignores the previous schedule;
 that transition issue is [documented and deferred](scientific-contract.md#known-limitations-and-deferred-issues).
 
@@ -193,12 +193,19 @@ These remain proposals or unresolved requirements:
 Do not infer future demographic rules from SOCSIM or implement arbitrary
 callbacks that can bypass consistency checks.
 
-## Candidate sample size
+## Exact full-pool partner draws
 
-Matching models own `sample_size` (default 1000, D067; zero means the full
-male pool). Union formation does not take a sample-size argument. An explicit
-father model supplies its own size; NULL inherits the general matching
-model's size (D065).
+There is no candidate sample (D072). `MalePool` in `src/simulate.cpp` keeps
+living, unpartnered men in cells by group and quarter-year birth bin, with
+constant-time swap removal. Each matching model is prepared once as a
+`DrawModel`: the native linear/raw-quadratic age model has a closed-form
+maximum over any age-gap interval; custom formulas are tabulated on a
+1/32-year gap grid by one R evaluation. `draw_partner()` picks a cell in
+proportion to its size times its maximum weight for the woman, a member
+uniformly, accepts him with probability exp(U - maximum), and screens only him
+for age and kinship, enumerating the eligible pool after 200 rejections. Both
+matching methods and nonmarital fathers use it; female choice uses zero group
+weights. See the [scientific contract](scientific-contract.md#exact-full-pool-partner-draws-d072).
 
 ## Weighted-choice matching
 
@@ -206,8 +213,8 @@ Matching models carry `matching_method`, defaulting to `"weighted_choice"`
 (D066/D067/D068); `"female_choice"` remains available. A separate father model
 uses its own method and a NULL father model inherits the general one. The
 engine builds the calibrator when either model is weighted and grouped. The
-two-sided temporary-market method was removed (D067). `"weighted_choice"` keeps female choice among screened
-candidates and adds a log weight for each man's group to selection scores.
+two-sided temporary-market method was removed (D067). `"weighted_choice"` adds a
+log weight for each man's group to his selection score in the exact draw.
 `WeightCalibrator` in `src/simulate.cpp` keeps unpartnered counts by group and
 birth-time bin and incrementally maintained pool sums for each matching model's
 table of utilities over bin-centre lags, updated at events, and solves the
@@ -215,26 +222,24 @@ weights at each search from those sums. Matching models carry
 `imbalance_absorption` (default 1). One group gives unit weights and female
 choice exactly. See [weighted-choice matching](weighted-choice-matching.md).
 
-## Post-sampling group restrictions
+## Hard group restrictions
 
 Matching models support `prevent_exogamy`: all exogamy or selected directed/
-symmetric pairs are screened after sampling, alongside age and kin restrictions,
-without refilling. Compiled specifications carry either a same-group flag or
-blocked-pair matrix. Partner/father searches use their applicable model's
-restrictions; diagnostics count and rank only the final eligible set. See
-[group matching](group-matching.md).
+symmetric pairs are ineligible, alongside age and kin restrictions. Compiled
+specifications carry either a same-group flag or blocked-pair matrix; the
+exact draw skips restricted cells. Partner/father searches use their applicable
+model's restrictions. See [group matching](group-matching.md).
 
 ## Milestone 2 construction
 
 `create_matching_model()` accepts a formula with age and group predictors,
 named utility coefficients, and optional directed/symmetric additive pair effects.
 Categorical group formulas declare fixed `group_levels`; see
-[group matching](group-matching.md). `union_formation()` and `set_union_formation()` specify initiation,
-candidate sampling, and a matching specification. The current C++ on-demand
-increment creates unions at births using conditional-logit selection from
-sampled living men after minimum-male-age screening (default 15 continuous
-years) and known-kin screening (default two generations on each side of a
-common ancestor). Only living, unpartnered men enter the sampling pool. Group
+[group matching](group-matching.md). `union_formation()` and `set_union_formation()` specify initiation
+and a matching specification. The C++ on-demand path creates unions at births
+using conditional-logit selection over all living, unpartnered men who pass
+minimum-male-age screening (default 15 continuous years) and known-kin
+screening (default two generations on each side of a common ancestor). Group
 preferences alter utility after screening, without imposing group barriers. See the
 [union specification](union-formation-models.md) for worked examples and
 deferred extensions. Rate-based initiation schedules searches for unpartnered women.
@@ -246,7 +251,7 @@ reconstructs them from histories. This gives constant-time partner lookup at
 birth without adding redundant public `persons` columns. Multiple ongoing
 unions for either sex are rejected. Formation removes the selected man from
 the pool; widowhood returns a surviving husband. Pool updates use constant-time
-swap removal with per-person slot tracking.
+swap removal within each group and birth-bin cell.
 
 There is no union-enable flag or no-union execution path. Both initiation modes share the same partner and union state and search helper.
 Rate mode adds a search event type and per-person event versions to invalidate
@@ -255,26 +260,18 @@ applies to both statuses with one warning per simulation. On-demand requires
 overall fertility. Birth spacing persists across status transitions.
 Failed searches reschedule at attained age; age-band gaps have zero hazard.
 
-Candidate sampling uses a reusable array of male-pool positions and a partial
-Fisher–Yates shuffle, undoing swaps after each sample. This avoids repeated
-hash allocations while retaining distinct sampled candidates and the existing
-RNG draw sequence. Workspace is local to each simulation; it tracks positions
-in the current male vector rather than person identity.
-
 Matching uses the entered formula and named coefficients. R prepares an exact
 native linear/raw-quadratic evaluator where applicable; other formulas retain
 `model.matrix()` evaluation through an R callback receiving age differences and requested fixed group predictors.
 Additive pair effects use a matrix indexed by simulation group codes and are
-added after either formula evaluator; the native age scorer remains available. C++ computes stable softmax probabilities and samples one candidate. No
-formula callback receives mutable population state, and no candidate sets are
-retained. The native path avoids an R model-matrix call at every search for
-the common linear-plus-squared specification.
+added after either formula evaluator. No formula callback receives mutable
+population state. The native path needs no R call during simulation; custom
+formulas are evaluated once on the bound grid and then once per drawn man.
 
 `min_male_age` is stored in the union process and passed to native execution.
-A screening helper filters the temporary sample at the exact search time before
-matching. The male vector still contains all living, unpartnered men; age screening does not
-change the sampling frame or trigger refilling. Existing partner caches bypass
-new-search restrictions.
+The exact draw checks it for each drawn man at the search time; the youngest
+eligible birth bin can hold younger men, who are rejected individually.
+Existing partner caches bypass new-search restrictions.
 
 The shared `Kinship` module resolves parent IDs to positions, rejects cycles,
 and lazily caches distinct ancestors to the configured generation bound.
@@ -287,18 +284,18 @@ Newborn append leaves existing ancestry caches valid; restart rebuilds them.
 
 
 Nonmarital rate-mode births and union searches share a `find_candidate` helper
-covering sampling, screening and matching. Only `form_union` updates partner
+covering weights, the exact draw and screening. Only `form_union` updates partner
 caches and removes the man from the available pool. Parentage alone leaves
 both parties unpartnered; the newborn's father index is appended to kinship
-independently of current-partner state. No candidate sets or additional
-persistence state are retained. `father_matching = NULL` resolves to the general model at execution; an explicit
-model supplies a separately prepared scorer only for nonmarital father selection.
-Both scorers use the native evaluator or R formula fallback. Previous-father
+independently of current-partner state. No additional persistence state is
+retained. `father_matching = NULL` resolves to the general model at execution; an explicit
+model supplies a separately prepared draw model, method and weights for
+nonmarital father selection. Previous-father
 preference is deferred (D042).
 
 Omitting `matching` uses `create_age_gap_matching_model(0, 5)`. The helper
 converts a preferred age gap and half-weight distance in years to the existing
-quadratic utility model. `diagnostics = TRUE` adds `.n_eligible` and
-`.utility_rank` to new union records without retaining candidate sets or
-consuming additional random draws. Diagnostics default off; see the
+quadratic utility model. `diagnostics = TRUE` adds weighted choice's applied
+`.log_weight_<group>` columns to new union records in grouped populations,
+without consuming random draws. Diagnostics default off; see the
 [union specification](union-formation-models.md#optional-union-diagnostics).

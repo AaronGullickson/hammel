@@ -7,12 +7,12 @@
 #' fertility schedule. Rate mode uses either overall rates for all women (with
 #' a warning), or separate `union_status` schedules. A union-formation process is required. With on-demand
 #' union formation, use the woman's
-#' current partner, or sample men and choose one using conditional-logit
+#' current partner, or draw one from all eligible men using conditional-logit
 #' probabilities from the matching formula to form a union at the birth.
-#' Sampled men must meet the configured minimum age (default 15 years).
+#' Men must meet the configured minimum age (default 15 years).
 #' Known kin are excluded within the configured generation bound on each side
 #' of a common ancestor (default two). Hard group exclusions also apply.
-#' If no sampled men are eligible, cancel the birth by default. Explicitly set
+#' If no eligible man exists, cancel the birth by default. Explicitly set
 #' `cancel_birth_if_no_match = FALSE` to preserve it with unknown father.
 #' Rate initiation adds age-specific search events for unpartnered women only.
 #' Failed attempts draw another waiting time. Widowhood cancels pending births
@@ -209,12 +209,14 @@ simulate <- function(model, years, seed = NULL) {
                             "capped approximate weights were used."), as.integer(native$weighted_infeasible)),
               call. = FALSE)
     }
+    if (native$draw_approximate > 0) {
+      warning(sprintf(paste("A custom matching formula exceeded its within-bin bound in %d draw(s);",
+                            "partner draws were approximate. The formula varies faster than the",
+                            "1/32-year bound grid resolves."), as.integer(native$draw_approximate)),
+              call. = FALSE)
+    }
   }
   if (union_process$diagnostics) {
-    for (column in c(".n_eligible", ".utility_rank")) {
-      if (!column %in% names(result$unions))
-        result$unions[[column]] <- rep(NA_integer_, nrow(result$unions))
-    }
     # Weighted choice records the log group weights applied at each union's
     # search (0 = unit weight), one column per group; earlier unions are NA.
     if (identical(union_process$matching$matching_method, "weighted_choice") &&

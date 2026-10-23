@@ -54,7 +54,7 @@ test_that("shared and identical grouped schedules preserve fixed-seed histories"
   model <- set_fertility(model, group_status_rates(0.3, 0.2), 0.75)
   model <- set_union_formation(model, "rate", rates = data.frame(
     age_start = 15, age_end = Inf, rate = 1),
-    matching = create_age_gap_matching_model(0, 5, sample_size = 0))
+    matching = create_age_gap_matching_model(0, 5))
   model <- set_mortality(model, data.frame(sex = c("m", "f"),
     age_start = 0, age_end = Inf, rate = 0.01))
   original <- model
@@ -117,7 +117,7 @@ test_that("group search hazards allow intergroup unions", {
   model <- make_rate_model(2, search_rate = 0)
   model$population$persons$group <- c("B", "A")
   model <- set_union_formation(model, "rate",
-    matching = create_age_gap_matching_model(0, 5, sample_size = 0),
+    matching = create_age_gap_matching_model(0, 5),
     rates = group_rates(model$processes$union_formation$rates, b = 1e8))
   result <- simulate(model, 0.1, seed = 12)
   expect_equal(nrow(result$unions), 1)

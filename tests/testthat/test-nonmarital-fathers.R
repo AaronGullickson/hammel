@@ -146,8 +146,17 @@ test_that("father_matching supports the R formula fallback and is unused on dema
   native <- simulate(model, 1, seed = 72)
   model$processes$union_formation$father_matching <- create_matching_model(
     ~ I(age_difference^3), c("I(age_difference^3)" = -0.001))
-  # With available gaps 0 and 10 both utility specifications are identical.
-  expect_identical(simulate(model, 1, seed = 72), native)
+  custom <- simulate(model, 1, seed = 72)
+  # With available gaps 0 and 10 both specifications give utilities 0 and -1.
+  # Native and custom formulas use different within-bin bounds, so they agree
+  # in distribution rather than draw by draw.
+  expected <- exp(-1) / (1 + exp(-1))
+  for (result in list(native, custom)) {
+    children <- result$persons[result$persons$birth_time >= 0, ]
+    expect_true(all(children$father_id %in% c(2, 3)))
+    n <- nrow(children)
+    if (n) expect_lt(abs(mean(children$father_id == 3) - expected), 6 * sqrt(expected * (1 - expected) / n) + 1e-9)
+  }
   model$processes$union_formation$initiation <- "on_demand"
   model$processes$union_formation$rates <- NULL
   model <- set_fertility(model, data.frame(age_start = 15, age_end = 50, rate = 20), 0)

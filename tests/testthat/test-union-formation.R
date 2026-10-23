@@ -40,23 +40,17 @@ test_that("union processes construct and replace without modifying other process
   expect_identical(process$source, attr(rates, "source"))
   model <- set_fertility(hammel_model(), data.frame(age_start = 20, age_end = 30, rate = 0.1))
   updated <- set_process(model, process)
-  expect_equal(union_formation("on_demand", matching)$matching$sample_size, 1000)
-  expect_false("sample_size" %in% names(process))
+  expect_false("sample_size" %in% c(names(process), names(process$matching)))
   expect_identical(set_union_formation(model, "rate", matching, rates = rates),
                    set_process(model, process))
   expect_null(model$processes$union_formation)
   expect_identical(updated$processes$fertility, model$processes$fertility)
   expect_identical(updated, set_union_formation(model, "rate", matching, rates = rates))
-  full_pool <- matching
-  full_pool$sample_size <- 0
-  replaced <- set_union_formation(updated, "on_demand", full_pool)
+  replaced <- set_union_formation(updated, "on_demand", matching)
   expect_null(replaced$processes$union_formation$rates)
   expect_identical(replaced$processes$fertility, model$processes$fertility)
   edited <- process
   edited$matching$coefficients <- c(other = 1)
-  expect_error(set_process(model, edited))
-  edited <- process
-  edited$matching$sample_size <- -1
   expect_error(set_process(model, edited))
   edited <- process
   edited$rates$rate <- -1

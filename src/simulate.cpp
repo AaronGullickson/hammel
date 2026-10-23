@@ -4,6 +4,7 @@
 #include <cmath>
 #include <limits>
 #include <map>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -87,10 +88,10 @@ NumericVector hazard_wait_cpp(DataFrame rates, NumericVector ages,
 
 struct Person {
   // Public history fields plus working state. NA died means currently alive;
-  // last_birth enforces spacing. male_slot locates this person in available males.
+  // last_birth enforces spacing.
   double id, born, died, mother, father, last_birth;
   bool female;
-  int male_slot, group;
+  int group;
 };
 // person is a zero-based position in people, not the public person_id.
 // A version invalidates queued events after a change in union status.
@@ -150,37 +151,6 @@ DataFrame adjusted_fertility_cpp(DataFrame rates, double birth_interval) {
                           _["rate"] = values);
 }
 
-// Partial Fisher-Yates using reusable positions, restored after each sample.
-// This avoids allocating a hash node for each candidate at every search.
-// Workspace positions are always identity between calls, including when the
-// living-male pool grows or shrinks. They index males, not fixed person IDs.
-std::vector<int> sample_male_positions(int count, int requested,
-                                     std::vector<int>& workspace) {
-  const int take = requested == 0 ? count : std::min(count, requested);
-  std::vector<int> sample;
-  sample.reserve(take);
-  if (take == count) {
-    for (int j = 0; j < count; ++j) sample.push_back(j);
-    return sample;
-  }
-  while (workspace.size() < static_cast<size_t>(count))
-    workspace.push_back(static_cast<int>(workspace.size()));
-  std::vector<int> swaps;
-  swaps.reserve(take);
-  for (int j = 0; j < take; ++j) {
-    if (j % 1024 == 0) checkUserInterrupt();
-    const int selected = j + std::min(count - j - 1,
-      static_cast<int>(R::runif(0, 1) * (count - j)));
-    std::swap(workspace[j], workspace[selected]);
-    sample.push_back(workspace[j]);
-    swaps.push_back(selected);
-  }
-  // Undo in reverse so the next search starts with identity positions again.
-  for (int j = take - 1; j >= 0; --j)
-    std::swap(workspace[j], workspace[swaps[j]]);
-  return sample;
-}
-
 // Evaluate candidate utilities without rounding age differences. Common linear
 // and raw quadratic formulas use an exact native path; other formulas call the
 // R model-matrix evaluator with candidate data only, never mutable engine state.
@@ -226,120 +196,17 @@ NumericVector matching_utilities(const NumericVector& gaps, const List& matching
   return utility;
 }
 
-NumericVector matching_probabilities(const NumericVector& utility) {
-  if (utility.size() == 0) return NumericVector();
-  const double maximum = *std::max_element(utility.begin(), utility.end());
-  NumericVector probabilities(utility.size());
-  double total = 0;
-  for (R_xlen_t j = 0; j < utility.size(); ++j) {
-    probabilities[j] = std::exp(utility[j] - maximum);
-    total += probabilities[j];
-  }
-  for (double& probability : probabilities) probability /= total;
-  return probabilities;
-}
-
-// One uniform draw selects a candidate from the softmax cumulative distribution.
-int draw_partner_position(const NumericVector& probabilities) {
-  if (probabilities.size() == 0) return -1;
-  const double draw = R::runif(0, 1);
-  double cumulative = 0;
-  int last_positive = -1;
-  for (R_xlen_t j = 0; j < probabilities.size(); ++j) {
-    if (probabilities[j] > 0) last_positive = static_cast<int>(j);
-    cumulative += probabilities[j];
-    if (draw < cumulative) return static_cast<int>(j);
-  }
-  // Roundoff must not select a zero-weight tail candidate.
-  return last_positive;
-}
-
-// Apply search eligibility after sampling; retain positions in the male pool.
-// Further pair restrictions can be added here without changing sample size.
-std::vector<int> screen_male_candidates(const std::vector<int>& males,
-                                       const std::vector<int>& sample,
-                                       const std::vector<Person>& people,
-                                       double now, double min_male_age, int woman,
-                                       hammel::Kinship& kinship) {
-  std::vector<int> eligible;
-  eligible.reserve(sample.size());
-  const bool check_kinship = kinship.generations() > 0;
-  for (int position : sample) {
-    if (now - people[males[position]].born >= min_male_age &&
-        (!check_kinship || !kinship.known_related(woman, males[position])))
-      eligible.push_back(position);
-  }
-  return eligible;
-}
-
-// Select a partner from sampled positions in males, returning a people position.
-// Age(male)-age(female) equals birth_time(female)-birth_time(male).
-int select_partner(const std::vector<int>& males, const std::vector<int>& sample,
-                   const std::vector<Person>& people, int woman, const List& matching,
-                   int* utility_rank = nullptr,
-                   const std::vector<double>* group_log_weights = nullptr) {
-  if (sample.empty()) return -1;
-  NumericVector gaps(sample.size());
-  for (size_t j = 0; j < sample.size(); ++j)
-    gaps[j] = people[woman].born - people[males[sample[j]]].born;
-  IntegerVector male_groups;
-  if (as<bool>(matching["needs_groups"])) {
-    male_groups = IntegerVector(sample.size());
-    for (size_t j = 0; j < sample.size(); ++j)
-      male_groups[j] = people[males[sample[j]]].group;
-  }
-  const NumericVector utility = matching_utilities(gaps, matching, people[woman].group, male_groups);
-  // weighted_choice adds each man's group log weight to selection scores only;
-  // diagnostic ranks keep using the preference utilities.
-  NumericVector scores = utility;
-  if (group_log_weights) {
-    scores = clone(utility);
-    for (size_t j = 0; j < sample.size(); ++j)
-      scores[j] += (*group_log_weights)[people[males[sample[j]]].group];
-  }
-  const NumericVector probabilities = matching_probabilities(scores);
-  const int chosen = draw_partner_position(probabilities);
-  if (utility_rank) {
-    *utility_rank = 1;
-    for (double score : utility)
-      if (score > utility[chosen]) ++*utility_rank;
-  }
-  return males[sample[chosen]];
-}
-
-// Internal analytical/sampling diagnostics use the same scoring and draw helpers.
+// Internal analytical diagnostics use the same native/R scoring kernel.
 // [[Rcpp::export]]
-List inspect_matching_cpp(NumericVector age_difference, List matching, int draws) {
-  if (draws < 0) stop("Number of draws must be nonnegative.");
-  const NumericVector utility = matching_utilities(age_difference, matching);
-  const NumericVector probabilities = matching_probabilities(utility);
-  IntegerVector choices(draws);
-  for (int j = 0; j < draws; ++j) {
-    if (j % 1024 == 0) checkUserInterrupt();
-    const int selected = draw_partner_position(probabilities);
-    choices[j] = selected < 0 ? NA_INTEGER : selected + 1;
-  }
-  return List::create(_["utilities"] = utility, _["probabilities"] = probabilities,
-                      _["choices"] = choices);
+NumericVector inspect_matching_cpp(NumericVector age_difference, List matching) {
+  return matching_utilities(age_difference, matching);
 }
 
-// Analytical diagnostics for group-aware scoring use the same native kernel.
 // Group indices refer to the labels supplied to prepare_matching_model().
 // [[Rcpp::export]]
-List inspect_group_matching_cpp(NumericVector age_difference, List matching,
-                                int female_group, IntegerVector male_groups) {
-  const NumericVector utility = matching_utilities(age_difference, matching,
-                                                  female_group, male_groups);
-  return List::create(_["utilities"] = utility,
-                      _["probabilities"] = matching_probabilities(utility));
-}
-
-// Internal sampling entry point for checking size, uniqueness, and inclusion.
-// [[Rcpp::export]]
-IntegerVector sample_male_positions_cpp(int count, int requested) {
-  if (count < 0 || requested < 0) stop("Sample sizes must be nonnegative.");
-  std::vector<int> workspace;
-  return wrap(sample_male_positions(count, requested, workspace));
+NumericVector inspect_group_matching_cpp(NumericVector age_difference, List matching,
+                                         int female_group, IntegerVector male_groups) {
+  return matching_utilities(age_difference, matching, female_group, male_groups);
 }
 
 // ---- weighted_choice: calibrated male-group weights (D066) -----------------
@@ -780,6 +647,291 @@ List inspect_weighted_calibration_cpp(NumericVector female_born, IntegerVector f
                       _["flow"] = wrap(s.flow), _["infeasible"] = s.infeasible);
 }
 
+// ---- Exact full-pool partner draws (D072) ----------------------------------
+// Living, unpartnered men are kept in cells by group and birth-time bin. A draw
+// picks a cell with probability proportional to its size times the largest
+// weight any member could have for this woman, picks a member uniformly,
+// accepts him with probability exp(U - cell maximum), and screens only him.
+// This samples conditional-logit choice over the full eligible pool exactly,
+// without a candidate sample.
+class MalePool {
+  int groups_, bins_;
+  long long first_;
+  double width_;
+  std::vector<std::vector<int>> cells_;
+  std::vector<int> slot_, cell_;
+  size_t size_ = 0;
+
+ public:
+  MalePool(double min_birth, double max_birth, int groups, double width)
+      : groups_(groups), width_(width) {
+    if (!(width > 0) || !R_finite(min_birth) || !R_finite(max_birth) || max_birth < min_birth ||
+        groups < 1)
+      stop("Invalid male pool range.");
+    first_ = static_cast<long long>(std::floor(min_birth / width));
+    const long long last = static_cast<long long>(std::floor(max_birth / width));
+    if (last - first_ + 1 > 50000000LL / groups) stop("Male pool birth-time range is too large.");
+    bins_ = static_cast<int>(last - first_ + 1);
+    cells_.assign(static_cast<size_t>(groups) * bins_, std::vector<int>());
+  }
+  int groups() const { return groups_; }
+  int bins() const { return bins_; }
+  long long first() const { return first_; }
+  double width() const { return width_; }
+  bool empty() const { return size_ == 0; }
+  const std::vector<int>& members(int group, int bin) const {
+    return cells_[static_cast<size_t>(group) * bins_ + bin];
+  }
+  bool contains(int person) const {
+    return static_cast<size_t>(person) < slot_.size() && slot_[person] >= 0;
+  }
+  void add(int person, int group, double born) {
+    if (static_cast<size_t>(person) >= slot_.size()) {
+      slot_.resize(person + 1, -1);
+      cell_.resize(person + 1, -1);
+    }
+    if (slot_[person] >= 0) return;
+    const long long k = static_cast<long long>(std::floor(born / width_)) - first_;
+    if (k < 0 || k >= bins_ || group < 0 || group >= groups_)
+      stop("Person is outside the male pool range.");
+    const int c = group * bins_ + static_cast<int>(k);
+    slot_[person] = static_cast<int>(cells_[c].size());
+    cell_[person] = c;
+    cells_[c].push_back(person);
+    ++size_;
+  }
+  void remove(int person) {
+    if (!contains(person)) return;
+    std::vector<int>& members = cells_[cell_[person]];
+    const int moved = members.back();
+    members[slot_[person]] = moved;
+    slot_[moved] = slot_[person];
+    members.pop_back();
+    slot_[person] = -1;
+    --size_;
+  }
+  // Last bin whose oldest possible member is at least `cutoff` years old; the
+  // youngest such bin can hold younger men, who are rejected individually.
+  int last_bin(double now, double cutoff) const {
+    const double k = std::floor((now - cutoff) / width_) - static_cast<double>(first_);
+    return static_cast<int>(std::min(static_cast<double>(bins_ - 1), std::max(-1.0, k)));
+  }
+};
+
+// One matching model prepared for exact draws. The native linear/quadratic age
+// model has a closed-form maximum over any age-gap interval. Custom formulas
+// are bounded by their values on a fine gap grid (evaluated once); a drawn
+// man's utility is always evaluated exactly, and a bound found too low is
+// counted so simulation can report approximate draws.
+struct DrawModel {
+  List model;
+  bool native = false;
+  double linear = 0, quadratic = 0;
+  NumericMatrix offsets;
+  LogicalMatrix blocked;
+  bool prevent_all = false;
+  int groups = 0;
+  double grid_start = 0, grid_step = 0;
+  int grid_size = 0;
+  std::vector<double> grid; // [(female * groups + male) * grid_size + j]
+
+  double offset(int f, int m) const { return offsets.nrow() ? offsets(f, m) : 0.0; }
+  bool allowed(int f, int m) const {
+    return !(prevent_all && f != m) && !(blocked.nrow() && blocked(f, m));
+  }
+  double native_value(double gap) const { return linear * gap + quadratic * gap * gap; }
+  // Exact utilities, including pair effects, for one female/male group pair.
+  NumericVector utilities(int f, int m, const NumericVector& gaps) const {
+    if (native) {
+      NumericVector out(gaps.size());
+      for (R_xlen_t j = 0; j < gaps.size(); ++j) {
+        out[j] = native_value(gaps[j]) + offset(f, m);
+        if (!R_finite(out[j])) stop("Matching ages and utilities must be finite.");
+      }
+      return out;
+    }
+    return matching_utilities(gaps, model, -1, IntegerVector(gaps.size(), m),
+                              IntegerVector(gaps.size(), f));
+  }
+  // Upper bound on utility for male-minus-female age gaps in [lo, hi].
+  double bound(int f, int m, double lo, double hi) const {
+    if (native) {
+      double best = std::max(native_value(lo), native_value(hi));
+      if (quadratic < 0) {
+        const double vertex = -linear / (2 * quadratic);
+        if (vertex > lo && vertex < hi) best = native_value(vertex);
+      }
+      return best + offset(f, m);
+    }
+    const int j0 = std::max(0, static_cast<int>(std::floor((lo - grid_start) / grid_step)));
+    const int j1 = std::min(grid_size - 1, static_cast<int>(std::ceil((hi - grid_start) / grid_step)));
+    const double* values = &grid[(static_cast<size_t>(f) * groups + m) * grid_size];
+    double best = R_NegInf;
+    for (int j = j0; j <= j1; ++j) best = std::max(best, values[j]);
+    return best;
+  }
+};
+
+DrawModel make_draw_model(const List& model, int groups, double gap_range) {
+  DrawModel draw;
+  draw.model = model;
+  draw.groups = groups;
+  draw.offsets = as<NumericMatrix>(model["pair_offsets"]);
+  draw.blocked = as<LogicalMatrix>(model["blocked_pairs"]);
+  draw.prevent_all = as<bool>(model["prevent_exogamy_all"]);
+  NumericVector q = model["quadratic"];
+  draw.native = q.size() == 2;
+  if (draw.native) {
+    draw.linear = q[0];
+    draw.quadratic = as<bool>(model["has_squared"]) ? q[1] : 0.0;
+    return draw;
+  }
+  // Fine grid over every possible gap in the run: 1/32-year resolution.
+  draw.grid_step = kWeightBinWidth / 8;
+  const double reach = gap_range + 2 * kWeightBinWidth;
+  draw.grid_start = -reach;
+  draw.grid_size = static_cast<int>(std::ceil(2 * reach / draw.grid_step)) + 1;
+  const size_t n = static_cast<size_t>(groups) * groups * draw.grid_size;
+  NumericVector gaps(n);
+  IntegerVector female(n), male(n);
+  for (int f = 0; f < groups; ++f)
+    for (int m = 0; m < groups; ++m)
+      for (int j = 0; j < draw.grid_size; ++j) {
+        const size_t i = (static_cast<size_t>(f) * groups + m) * draw.grid_size + j;
+        gaps[i] = draw.grid_start + j * draw.grid_step;
+        female[i] = f;
+        male[i] = m;
+      }
+  const NumericVector values = matching_utilities(gaps, model, -1, male, female);
+  draw.grid.assign(values.begin(), values.end());
+  return draw;
+}
+
+struct DrawWorkspace {
+  std::vector<int> group, bin;
+  std::vector<double> top, cumulative;
+};
+
+// Draw one partner for a woman of group `female_group` born `female_born`.
+// Returns a person index, or -1 when no eligible man exists. `log_weights`
+// holds one log group weight per group (zeros for female choice).
+int draw_partner(const MalePool& pool, const DrawModel& draw, int female_group, double female_born,
+                 double now, double cutoff, const std::vector<double>& log_weights,
+                 const std::function<double(int)>& born_of,
+                 const std::function<bool(int)>& excluded, DrawWorkspace& ws,
+                 double& approximate) {
+  if (pool.empty()) return -1;
+  const int last = pool.last_bin(now, cutoff);
+  const double w = pool.width();
+  ws.group.clear(); ws.bin.clear(); ws.top.clear(); ws.cumulative.clear();
+  double peak = R_NegInf;
+  for (int g = 0; g < pool.groups(); ++g) {
+    if (!draw.allowed(female_group, g)) continue;
+    for (int k = 0; k <= last; ++k) {
+      const std::vector<int>& members = pool.members(g, k);
+      if (members.empty()) continue;
+      const double oldest_birth = static_cast<double>(pool.first() + k) * w;
+      const double top = draw.bound(female_group, g, female_born - oldest_birth - w,
+                                    female_born - oldest_birth);
+      const double value = log_weights[g] + top + std::log(static_cast<double>(members.size()));
+      ws.group.push_back(g); ws.bin.push_back(k); ws.top.push_back(top);
+      ws.cumulative.push_back(value);
+      peak = std::max(peak, value);
+    }
+  }
+  if (ws.group.empty() || peak == R_NegInf) return -1;
+  double total = 0;
+  for (double& value : ws.cumulative) { total += std::exp(value - peak); value = total; }
+  for (int attempt = 0; attempt < 200; ++attempt) {
+    const double u = R::runif(0, 1) * total;
+    const size_t c = std::min(static_cast<size_t>(std::upper_bound(ws.cumulative.begin(),
+      ws.cumulative.end(), u) - ws.cumulative.begin()), ws.group.size() - 1);
+    const std::vector<int>& members = pool.members(ws.group[c], ws.bin[c]);
+    const int man = members[std::min(static_cast<int>(members.size()) - 1,
+      static_cast<int>(R::runif(0, 1) * members.size()))];
+    const double utility = draw.utilities(female_group, ws.group[c],
+      NumericVector::create(female_born - born_of(man)))[0];
+    const double ratio = std::exp(utility - ws.top[c]);
+    if (ratio > 1 + 1e-9) approximate += 1; // custom-formula bound was too low
+    if (R::runif(0, 1) >= ratio) continue;
+    if (now - born_of(man) < cutoff || excluded(man)) continue;
+    return man;
+  }
+  // Many rejections (for example, most nearby men are kin): enumerate the
+  // eligible pool and draw exactly from it.
+  std::vector<int> candidates;
+  std::vector<double> scores;
+  for (int g = 0; g < pool.groups(); ++g) {
+    if (!draw.allowed(female_group, g)) continue;
+    std::vector<int> men;
+    for (int k = 0; k <= last; ++k)
+      for (int man : pool.members(g, k))
+        if (now - born_of(man) >= cutoff && !excluded(man)) men.push_back(man);
+    if (men.empty()) continue;
+    NumericVector gaps(men.size());
+    for (size_t j = 0; j < men.size(); ++j) gaps[j] = female_born - born_of(men[j]);
+    const NumericVector utility = draw.utilities(female_group, g, gaps);
+    for (size_t j = 0; j < men.size(); ++j) {
+      candidates.push_back(men[j]);
+      scores.push_back(log_weights[g] + utility[j]);
+    }
+  }
+  if (candidates.empty()) return -1;
+  const double best = *std::max_element(scores.begin(), scores.end());
+  double sum = 0;
+  for (double& score : scores) { sum += std::exp(score - best); score = sum; }
+  const double u = R::runif(0, 1) * sum;
+  const size_t j = std::min(static_cast<size_t>(std::upper_bound(scores.begin(), scores.end(), u) -
+    scores.begin()), candidates.size() - 1);
+  return candidates[j];
+}
+
+// Internal entry point: exact draws from a frozen pool, with the exact
+// full-pool conditional-logit probabilities for comparison.
+// [[Rcpp::export]]
+List inspect_exact_draw_cpp(NumericVector male_born, IntegerVector male_group,
+                            LogicalVector male_excluded, double female_born, int female_group,
+                            NumericVector log_weights, List matching, int groups, double now,
+                            double cutoff, int draws) {
+  if (male_group.size() != male_born.size() || male_excluded.size() != male_born.size() ||
+      log_weights.size() != groups || draws < 0)
+    stop("Invalid exact-draw inputs.");
+  double lo = std::min(female_born, now), hi = now;
+  for (double born : male_born) { lo = std::min(lo, born); hi = std::max(hi, born); }
+  MalePool pool(lo, hi, groups, kWeightBinWidth);
+  for (R_xlen_t i = 0; i < male_born.size(); ++i) pool.add(i, male_group[i], male_born[i]);
+  const DrawModel draw = make_draw_model(matching, groups, hi - lo);
+  const std::vector<double> weights(log_weights.begin(), log_weights.end());
+  auto born_of = [&](int man) { return male_born[man]; };
+  auto excluded = [&](int man) { return static_cast<bool>(male_excluded[man]); };
+  DrawWorkspace ws;
+  double approximate = 0;
+  IntegerVector counts(male_born.size());
+  int failures = 0;
+  for (int d = 0; d < draws; ++d) {
+    if (d % 4096 == 0) checkUserInterrupt();
+    const int man = draw_partner(pool, draw, female_group, female_born, now, cutoff, weights,
+                                 born_of, excluded, ws, approximate);
+    if (man < 0) ++failures; else ++counts[man];
+  }
+  NumericVector score(male_born.size(), R_NegInf);
+  double best = R_NegInf;
+  for (R_xlen_t i = 0; i < male_born.size(); ++i) {
+    const int g = male_group[i];
+    if (now - male_born[i] < cutoff || male_excluded[i] || !draw.allowed(female_group, g)) continue;
+    score[i] = weights[g] + draw.utilities(female_group, g,
+      NumericVector::create(female_born - male_born[i]))[0];
+    best = std::max(best, score[i]);
+  }
+  NumericVector probability(male_born.size());
+  double total = 0;
+  for (R_xlen_t i = 0; i < male_born.size(); ++i)
+    if (score[i] != R_NegInf) { probability[i] = std::exp(score[i] - best); total += probability[i]; }
+  if (total > 0) for (double& p : probability) p /= total;
+  return List::create(_["counts"] = counts, _["probability"] = probability,
+                      _["failures"] = failures, _["approximate"] = approximate);
+}
+
 // Internal entry point: apply a sequence of male pool changes at increasing
 // times, then compare incremental pool sums and weights with a full rebuild.
 // [[Rcpp::export]]
@@ -856,24 +1008,39 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   }
   IntegerVector person_groups(ids.size(), 0);
   if (persons.containsElementNamed(".hammel_group")) person_groups = persons[".hammel_group"];
-  // people retains every history, including deaths. males contains positions
-  // of living, unpartnered males for candidate sampling. index maps
+  // Group indices cover starting identities and every declared possible one.
+  int group_count = std::max(1, as<int>(inheritance["group_count"]));
+  for (int value : person_groups) group_count = std::max(group_count, value + 1);
+  // people retains every history, including deaths. pool holds living,
+  // unpartnered men by group and birth bin for exact partner draws. index maps
   // public IDs to positions while reconstructing initial maternal histories.
   std::vector<Person> people;
-  std::vector<int> males;
-  std::vector<int> sampling_workspace;
   std::map<double, int> index;
-  double next_id = 0;
+  double next_id = 0, min_birth = start;
   for (int i = 0; i < ids.size(); ++i) {
     bool female = as<std::string>(sexes[i]) == "f";
-    bool alive = NumericVector::is_na(deaths[i]);
-    int slot = (!female && alive) ? static_cast<int>(males.size()) : -1;
-    if (slot >= 0) males.push_back(i);
     people.push_back({ids[i], births[i], deaths[i], moms[i], dads[i],
-                      -std::numeric_limits<double>::infinity(), female, slot, person_groups[i]});
+                      -std::numeric_limits<double>::infinity(), female, person_groups[i]});
     index[ids[i]] = i;
     next_id = std::max(next_id, ids[i]);
+    min_birth = std::min(min_birth, births[i]);
   }
+  MalePool pool(min_birth, start + years, group_count, kWeightBinWidth);
+  for (int i = 0; i < static_cast<int>(people.size()); ++i)
+    if (!people[i].female && NumericVector::is_na(people[i].died))
+      pool.add(i, people[i].group, people[i].born);
+  // Draw models for the union and (if separate) father matching models.
+  // An empty population never draws; skip building custom-formula grids then.
+  const DrawModel union_draw = people.empty() ? DrawModel() :
+    make_draw_model(matching, group_count, start + years - min_birth);
+  DrawModel father_draw_storage;
+  const DrawModel* father_draw = &union_draw;
+  if (!people.empty() && SEXP(father_matching) != SEXP(matching)) {
+    father_draw_storage = make_draw_model(father_matching, group_count, start + years - min_birth);
+    father_draw = &father_draw_storage;
+  }
+  DrawWorkspace draw_workspace;
+  double draw_approximate = 0;
   std::vector<std::array<int, 2>> parent_links(people.size());
   for (int person = 0; person < static_cast<int>(people.size()); ++person) {
     parent_links[person] = {
@@ -883,7 +1050,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   }
   hammel::Kinship kinship(std::move(parent_links), kinship_generations);
   std::vector<UnionRecord> union_history;
-  std::vector<int> diagnostic_counts, diagnostic_ranks;
   // Log group weights applied at each union-forming search (empty = unit weights).
   std::vector<std::vector<double>> diagnostic_log_weights;
   std::vector<std::vector<int>> person_unions(people.size());
@@ -893,22 +1059,16 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::unique_ptr<WeightCalibrator> calibrator;
   std::vector<char> counted_woman, counted_fertile;
   std::multimap<double, int> spacing_entries;
-  // Swap removal keeps pool updates constant-time and slots valid after moves.
+  // Pool updates are constant-time (swap removal within a cell).
   auto remove_male = [&](int man) {
-    const int slot = people[man].male_slot;
-    if (slot < 0) return; // Partnered men are already absent when they die.
+    if (!pool.contains(man)) return; // Partnered men are already absent when they die.
+    pool.remove(man);
     if (calibrator) calibrator->add_man(people[man].group, people[man].born, -1);
-    const int moved = males.back();
-    males[slot] = moved;
-    people[moved].male_slot = slot;
-    males.pop_back();
-    people[man].male_slot = -1;
   };
   auto add_male = [&](int man) {
     if (people[man].female || !NumericVector::is_na(people[man].died) ||
-        current_partner[man] >= 0 || people[man].male_slot >= 0) return;
-    people[man].male_slot = static_cast<int>(males.size());
-    males.push_back(man);
+        current_partner[man] >= 0 || pool.contains(man)) return;
+    pool.add(man, people[man].group, people[man].born);
     if (calibrator) calibrator->add_man(people[man].group, people[man].born, 1);
   };
   double next_union_id = 0;
@@ -999,29 +1159,14 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   const bool father_weighted = applies_weights(father_matching);
   std::vector<double> union_warm, father_warm;
   double weighted_infeasible = 0;
-  // All father and partner searches share sampling, eligibility and matching.
-  // Only form_union changes partner state or removes the selected man.
+  // Partner and father searches share eligibility and the exact draw; only
+  // form_union changes partner state or removes the selected man.
   auto find_candidate = [&](int woman, double now, const List& choice_model,
-                            int* count = nullptr, int* rank = nullptr, bool father = false,
-                            std::vector<double>* applied = nullptr) {
-    if (males.empty()) return -1;
-    const int sample_size = as<int>(choice_model["sample_size"]);
-    const auto sample = sample_male_positions(static_cast<int>(males.size()), sample_size,
-                                             sampling_workspace);
-    auto eligible = screen_male_candidates(males, sample, people, now, min_male_age,
-                                           woman, kinship);
-    const bool prevent_all = choice_model["prevent_exogamy_all"];
-    LogicalMatrix blocked = choice_model["blocked_pairs"];
-    if (prevent_all || blocked.nrow()) {
-      const int female_group = people[woman].group;
-      eligible.erase(std::remove_if(eligible.begin(), eligible.end(), [&](int position) {
-        const int male_group = people[males[position]].group;
-        return (prevent_all && female_group != male_group) ||
-          (blocked.nrow() && blocked(female_group, male_group));
-      }), eligible.end());
-    }
-    if (count) *count = static_cast<int>(eligible.size());
-    if (calibrator && !eligible.empty() && (father ? father_weighted : union_weighted)) {
+                            const DrawModel& draw, bool father,
+                            std::vector<double>* applied) -> int {
+    if (pool.empty()) return -1;
+    std::vector<double> log_weights(group_count, 0.0);
+    if (calibrator && (father ? father_weighted : union_weighted)) {
       // Searches and on-demand unions use the union-formation calibration;
       // rate-mode nonmarital fathers have their own, driven by fertility.
       release_spacing(now);
@@ -1031,20 +1176,19 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         father ? father_table_id : union_table_id,
         as<double>(choice_model["imbalance_absorption"]), father ? father_warm : union_warm);
       if (weights.infeasible) ++weighted_infeasible;
-      if (applied) *applied = weights.log_weights;
-      return select_partner(males, eligible, people, woman, choice_model, rank,
-                            &weights.log_weights);
+      log_weights = weights.log_weights;
     }
-    return select_partner(males, eligible, people, woman, choice_model, rank);
+    if (applied) *applied = log_weights;
+    return draw_partner(pool, draw, people[woman].group, people[woman].born, now, min_male_age,
+      log_weights, [&](int person) { return people[person].born; },
+      [&](int man) { return kinship.generations() > 0 && kinship.known_related(woman, man); },
+      draw_workspace, draw_approximate);
   };
   auto form_union = [&](int woman, double now) {
     int partner = current_partner[woman];
     if (partner >= 0) return partner;
-    int count = NA_INTEGER, rank = NA_INTEGER;
     std::vector<double> applied;
-    partner = find_candidate(woman, now, matching,
-                             diagnostics ? &count : nullptr,
-                             diagnostics ? &rank : nullptr, false,
+    partner = find_candidate(woman, now, matching, union_draw, false,
                              diagnostics ? &applied : nullptr);
     if (partner >= 0) {
       if (next_union_id >= 9007199254740991.0 ||
@@ -1053,8 +1197,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       const int u = static_cast<int>(union_history.size());
       union_history.push_back({++next_union_id, now, NA_REAL, woman, partner});
       if (diagnostics) {
-        diagnostic_counts.push_back(count);
-        diagnostic_ranks.push_back(rank);
         diagnostic_log_weights.push_back(applied);
       }
       person_unions[woman].push_back(u);
@@ -1069,13 +1211,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   struct GroupSchedules {
     std::vector<Band> male, female, partnered, unpartnered, search;
   };
-  int group_count = std::max(1, as<int>(inheritance["group_count"]));
   const int inheritance_method = inheritance["method"];
   const double passing = inheritance["passing"];
   IntegerVector inheritance_ranks = inheritance["ranks"];
   IntegerVector ancestry_groups = inheritance["ancestry_groups"];
   Function inherit_custom = inheritance["custom"];
-  for (int value : person_groups) group_count = std::max(group_count, value + 1);
   std::vector<GroupSchedules> schedules(group_count);
   const bool status_fertility = fertility_rates.containsElementNamed("union_status");
   for (int group = 0; group < group_count; ++group) {
@@ -1110,7 +1250,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     }
     counted_woman.assign(people.size(), 0);
     counted_fertile.assign(people.size(), 0);
-    for (int man : males) calibrator->add_man(people[man].group, people[man].born, 1);
+    for (int man = 0; man < static_cast<int>(people.size()); ++man)
+      if (pool.contains(man)) calibrator->add_man(people[man].group, people[man].born, 1);
     for (int woman = 0; woman < static_cast<int>(people.size()); ++woman)
       add_counted_woman(woman, start);
   }
@@ -1200,7 +1341,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       if (!rate_initiation && partner < 0) partner = form_union(i, now);
       // A nonmarital father stays available: parentage alone is not a union.
       const int father_position = partner >= 0 ? partner :
-        (rate_initiation ? find_candidate(i, now, father_matching, nullptr, nullptr, true) : -1);
+        (rate_initiation ? find_candidate(i, now, father_matching, *father_draw, true, nullptr) : -1);
       if (father_position < 0 && cancel_birth_if_no_match) {
         // No child was born: retain last_birth and redraw risks from this instant.
         schedule(i, now);
@@ -1219,9 +1360,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       // Default ffab is 0.4886 - its the signature of Berkeley training!
       bool female = R::runif(0, 1) < ffab;
       int child = static_cast<int>(people.size());
-      int slot = female ? -1 : static_cast<int>(males.size());
       people.push_back({++next_id, now, NA_REAL, mother, father,
-                        -std::numeric_limits<double>::infinity(), female, slot, people[i].group});
+                        -std::numeric_limits<double>::infinity(), female, people[i].group});
       // Append ancestry before scheduling the child. Missing fathers contribute
       // their entire half to unknown; supplied parental unknown shares transmit
       // through the same deterministic averaging rule.
@@ -1297,7 +1437,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       people[child].group = child_group;
       kinship.append(i, father_position);
       if (!female) {
-        males.push_back(child);
+        pool.add(child, child_group, now);
         if (calibrator) calibrator->add_man(child_group, now, 1);
       }
       person_unions.emplace_back();
@@ -1356,29 +1496,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   DataFrame out_unions = DataFrame::create(_["union_id"] = out_uid,
     _["wife_id"] = out_wife, _["husband_id"] = out_husband,
     _["start_time"] = out_start, _["end_time"] = out_end, _["end_reason"] = out_reason);
-  if (diagnostics) {
-    IntegerVector counts(union_history.size(), NA_INTEGER), ranks(union_history.size(), NA_INTEGER);
-    for (int u = 0; u < unions.nrows(); ++u) {
-      if (unions.containsElementNamed(".n_eligible"))
-        counts[u] = as<IntegerVector>(unions[".n_eligible"])[u];
-      if (unions.containsElementNamed(".utility_rank"))
-        ranks[u] = as<IntegerVector>(unions[".utility_rank"])[u];
-    }
-    for (size_t j = 0; j < diagnostic_counts.size(); ++j) {
-      counts[unions.nrows() + j] = diagnostic_counts[j];
-      ranks[unions.nrows() + j] = diagnostic_ranks[j];
-    }
-    out_unions[".n_eligible"] = counts;
-    out_unions[".utility_rank"] = ranks;
-    out_unions.attr("class") = "data.frame";
-    out_unions.attr("row.names") = IntegerVector::create(NA_INTEGER, -static_cast<int>(union_history.size()));
-  }
   return List::create(_["persons"] = DataFrame::create(
     _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),
     _["groups"] = out_group, _["unions"] = out_unions, _["ancestry"] = out_ancestry,
     _["births"] = birth_count, _["deaths"] = death_count,
-    _["weighted_infeasible"] = weighted_infeasible,
+    _["weighted_infeasible"] = weighted_infeasible, _["draw_approximate"] = draw_approximate,
     _["diagnostic_log_weights"] = [&]() {
       // Rows are new unions in order; columns are group indices. Unions formed
       // without weights (unit weights) record zeros.

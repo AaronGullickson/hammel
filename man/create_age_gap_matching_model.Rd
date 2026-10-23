@@ -9,7 +9,6 @@ create_age_gap_matching_model(
   half_weight_distance,
   group_exogamy = NULL,
   prevent_exogamy = FALSE,
-  sample_size = 1000,
   imbalance_absorption = 1,
   matching_method = "weighted_choice"
 )
@@ -23,13 +22,8 @@ preferred gap at which selection weight halves.}
 \item{group_exogamy}{Optional additive group-pair effects passed to
 \code{\link[=create_matching_model]{create_matching_model()}}.}
 
-\item{prevent_exogamy}{Optional post-sampling group restrictions passed to
+\item{prevent_exogamy}{Optional hard group restrictions passed to
 \code{\link[=create_matching_model]{create_matching_model()}}. Defaults to \code{FALSE}.}
-
-\item{sample_size}{Nonnegative whole number of men to sample before
-pair-specific screening. Defaults to \code{1000}; zero requests the whole
-available pool. Rejected candidates are not replaced. A separate
-\code{father_matching} model uses its own sample size.}
 
 \item{imbalance_absorption}{Used only when \code{matching_method = "weighted_choice"}.
 Share, in \verb{[0, 1]}, of a group's sex imbalance among

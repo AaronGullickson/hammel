@@ -21,17 +21,18 @@ optional HMDHFDplus reader checks skip if it is unavailable, and mocked reader
 bindings restore on exit. The live database test skips unless explicitly enabled.
 The old top-level base-R test scripts have been converted and removed.
 
-On October 23, 2026, after D067 removed two-sided matching and made
-`weighted_choice` with `sample_size = 1000` the default,
+On October 23, 2026, after D072 replaced candidate sampling with exact
+full-pool draws and removed `sample_size`, `.n_eligible`, and `.utility_rank`,
 `TZ=UTC Rscript -e 'devtools::test(reporter = "summary")'` passed with no
-failures or warnings and the live database test skipped. Checks cover the
-actual 1000-candidate default in both methods, independent general/father
-sizes, NULL inheritance, the new default method through constructor and
-setter, rejection of stored `"two_sided"` objects, and legacy objects without
-a method field retaining female choice. Tests of one-sided analytical
-probabilities request female choice explicitly; tests whose fixtures leave
-male groups unreachable under hard exclusions expect the weighted-choice
-warning. This verifies software behavior, not demographic parameter recovery.
+failures or warnings and the live database test skipped. Exact-draw checks
+compare draw frequencies with exact full-pool conditional-logit probabilities
+(native and custom formulas, group weights and restrictions, men near the age
+cutoff, excluded kin, the enumeration fallback, empty pools). Tests that
+previously checked sampling semantics now check that an eligible man anywhere
+in the pool is found. Draw-by-draw identity is no longer expected between
+native and custom formulas or across very steep utilities, which use random
+numbers differently; those comparisons are distributional. This verifies
+software behavior, not demographic parameter recovery.
 
 | Test file | Main evidence |
 | --- | --- |
@@ -40,9 +41,8 @@ warning. This verifies software behavior, not demographic parameter recovery.
 | `test-group-prop-hazard.R` | Multiplier validation, explicit-schedule equivalence, compensation order, omitted/unit/zero factors, warnings, RNG preservation, restarts, numeric codes, empty populations, and overflow |
 | `test-group-inheritance.R` | All assignment rules/fallbacks, passing and ancestry probabilities, custom RNG, mixed identity rates, future-group coverage, restarts, and unchanged maternal defaults |
 | `test-ancestry.R` | Starting identities, supplied proportions and IDs, parental averaging across generations, unknown shares, restarts/deaths, numeric labels, empty tables, and RNG independence |
-| `test-group-matching.R` | Directed/symmetric offsets, analytical probabilities, fixed factor contrasts/interactions, native/custom score agreement, father overrides, final utility ranks, validation, and unchanged RNG |
-| `test-matching-sample-size.R` | Matching-model size validation, actual default-1000 sampling, independent general/father sizes, NULL inheritance, and removed union-level API |
-| `test-prevent-exogamy.R` | Post-sampling restrictions, no refilling, scarcity/failure, direction/symmetry, father overrides, diagnostics, retained partners, and unchanged disabled RNG |
+| `test-group-matching.R` | Directed/symmetric offsets, analytical probabilities, fixed factor contrasts/interactions, native/custom score agreement, father overrides, validation, and unchanged RNG |
+| `test-prevent-exogamy.R` | Restrictions on the whole pool, compatible men always found, failure/cancellation, direction/symmetry, father overrides, retained partners, and unchanged disabled RNG |
 | `test-detailed-unions.R` | Spouse-ID joins, repeated episodes, deaths, optional group types, empty tables, unchanged inputs, and name collisions |
 | `test-weighted-choice.R` | Analytical weights and absorption, binned versus exact calibration, three groups, zero/unattainable targets, incremental sums versus full rebuild, mid-run identities, strict endogamy, unmet-target detection, narrow and one-year rate bands, recorded log weights, construction and inheritance warnings, female-choice equality for one group, both modes, fathers, restarts, diagnostics, warning, validation |
 | `test-parent-info.R` | Parent-ID joins, ages at birth, deceased/unknown parents, optional groups, empty tables, unchanged inputs, and name collisions |
@@ -138,12 +138,12 @@ own scope; these are not outstanding conditions on the user's acceptance.
 
 | Test files | Main evidence |
 | --- | --- |
-| `test-union-formation.R`, `test-conditional-logit.R`, `test-age-gap-matching.R` | Constructors, defaults, named coefficients, analytical utilities/probabilities, native/R formula agreement and age-gap helper |
-| `test-on-demand-unions.R`, `test-union-eligibility.R`, `test-union-kinship.R` | Sampling, birth-time unions, age/kin screening, exclusivity, widowhood and restarts |
+| `test-union-formation.R`, `test-conditional-logit.R`, `test-age-gap-matching.R` | Constructors, defaults, named coefficients, analytical utilities/probabilities, exact-draw frequencies against full-pool probabilities, native/R formula agreement and age-gap helper |
+| `test-on-demand-unions.R`, `test-union-eligibility.R`, `test-union-kinship.R` | Birth-time unions, age/kin screening over the whole pool, exclusivity, widowhood and restarts |
 | `test-kinship.R` | Shared recorded-parent traversal, distance witnesses, incomplete ancestry and cycles |
 | `test-rate-unions.R`, `test-status-fertility.R` | Search hazards, retries, status-specific fertility, spacing and event invalidation |
 | `test-nonmarital-fathers.R`, `test-cancel-births.R` | Separate father matching, parentage without unions, failed-match cancellation and retry semantics |
-| `test-union-diagnostics.R` | Eligible counts, utility ranks, tied utilities, historical retention and unchanged RNG/results |
+| `test-union-diagnostics.R` | Diagnostics validation; no candidate-set columns; unchanged histories |
 
 These checks establish software behavior and analytical cases, not universal
 demographic accuracy. Use `devtools::test()` for ordinary verification, with
@@ -164,7 +164,7 @@ age-gap sensitivity, and conditional-logit recovery using 5,000 on-demand
 unions and 50 reconstructed alternatives per union. The user reports recovery
 of the generating linear/quadratic coefficients 0.072 and -0.014. Reconstruction
 uses each union's formation time, age, survival and partnership eligibility;
-it does not recover the actual sampled choice set or apply pair-specific kin
+it does not recover the actual choice set sampled at that time or apply pair-specific kin
 screening. See [matching validation](union-formation-models.md#rationale-and-matching-model-validation).
 
 ### Matching performance comparison

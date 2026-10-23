@@ -65,8 +65,8 @@ are retained. See \code{\link[=extract_kin]{extract_kin()}} for the shared dista
 unpartnered births in rate mode, created by \code{\link[=create_matching_model]{create_matching_model()}}.
 Defaults to \code{NULL}, using the current general \code{matching} model. Union
 searches always use \code{matching}. Not used by on-demand initiation. Process-level
-age and kinship screening settings are shared; each matching model supplies its own
-candidate sample size. NULL inherits the general model's sample size.}
+age and kinship screening settings are shared; NULL inherits the general
+model's method and settings.}
 
 \item{cancel_birth_if_no_match}{Logical, default \code{TRUE}. Cancel a birth when
 its on-demand partner search or rate-mode nonmarital father selection fails.
@@ -75,11 +75,9 @@ IDs are retained. A cancellation starts no new spacing interval and draws
 fresh waiting times from the failed attempt. Partner scarcity can reduce
 realized fertility below inputs.}
 
-\item{diagnostics}{Logical, default \code{FALSE}. Record \code{.n_eligible} (sampled men
-remaining after screening) and \code{.utility_rank} (1 = highest utility, ties
-share the minimum rank) on newly formed unions. Historical unknowns are NA.
-When the general matching model uses weighted choice in a grouped
-population, also record \verb{.log_weight_<group>} columns: the log group
+\item{diagnostics}{Logical, default \code{FALSE}. When the general matching model
+uses weighted choice in a grouped population, record \verb{.log_weight_<group>}
+columns on newly formed unions: the log group
 weights applied at the search that formed each union (0 for the reference
 group and for unweighted searches). Use the column for each alternative's
 group as a conditional-logit offset in wife-side choice sets.}
@@ -100,33 +98,37 @@ Matching utilities and input rate tables are unchanged.}
 \description{
 Construct or attach a union-formation specification without executing it.
 In on-demand mode, at a birth use
-the woman's current partner, or sample living, unpartnered men and choose a partner using
-conditional-logit probabilities from the matching formula to form a union.
-Sampled men below \code{min_male_age} are excluded. If no eligible sampled men
-remain, cancel the birth by default; \code{cancel_birth_if_no_match = FALSE}
+the woman's current partner, or choose a partner from all living, unpartnered
+men using conditional-logit probabilities from the matching formula to form
+a union. Men below \code{min_male_age} are excluded. If no eligible man exists,
+cancel the birth by default; \code{cancel_birth_if_no_match = FALSE}
 preserves it with unknown father. Known kin within
 \code{kinship_generations} on both sides of a common ancestor are excluded.
-Each person may have only one ongoing union. Partnered men are excluded
-before sampling; surviving husbands return to the pool at widowhood. Death ends affected
+Each person may have only one ongoing union. Partnered men are not
+available; surviving husbands return to the pool at widowhood. Death ends affected
 unions. In rate mode unpartnered women face competing search events and
 use their unpartnered fertility schedule and may give birth without initiating
 a search. Failed searches draw another waiting time; formation and widowhood
 switch fertility schedules while preserving spacing. An overall fertility
 schedule applies to both statuses, with a simulation warning. On-demand mode
 requires an overall fertility schedule. Unpartnered rate-mode births use the
-same candidate sampling and eligibility to assign a father, using
+same eligibility and exact draw to assign a father, using
 \code{father_matching} when supplied or otherwise \code{matching}, without
-forming a union or removing him from availability. Empty screened pools
-cancel births by default. No previous-father preference is applied.
+forming a union or removing him from availability. A search with no
+eligible man cancels the birth by default. No previous-father preference
+is applied.
 }
 \details{
-Sampling is from the available male pool BEFORE pair-specific screening.
-The matching model defaults to \code{sample_size = 1000}; zero means the whole pool.
-Otherwise sample without replacement
-up to that many men. Age screening occurs afterward, without refilling the
-sample. Kinship screening follows the same ordering. Existing unions are
-retained even if a new-search restriction would exclude the partner.
-Candidate sets will not be retained in simulation outputs.
+Partners are drawn exactly from the full conditional-logit distribution over
+all eligible men, without a candidate sample. Living, unpartnered men are
+grouped by group and quarter-year birth bin; a bin is chosen in proportion
+to its size times the largest weight any member could have, a member is
+accepted with the ratio of his weight to that maximum, and only he is
+screened for age and kinship. For the built-in linear/quadratic age model
+this is exact. Custom R formulas are bounded on a 1/32-year grid; if a drawn
+man's utility exceeds the bound, simulation warns that draws were
+approximate. Existing unions are retained even if a new-search restriction
+would exclude the partner.
 
 Matching models default to \code{matching_method = "weighted_choice"}, which keeps
 female choice among the screened candidates but multiplies each man's selection weight by a weight

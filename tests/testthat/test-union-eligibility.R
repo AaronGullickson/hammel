@@ -38,21 +38,20 @@ test_that("boys age into eligibility during a run", {
   expect_true(all(children$father_id[children$birth_time >= result$unions$start_time] == 2))
 })
 
-test_that("sampling precedes age screening and does not refill rejected samples", {
+test_that("an under-age man never blocks an eligible adult elsewhere in the pool", {
   model <- make_model(3, birth_rate = 20, birth_interval = 0)
   model$population$persons$sex[1] <- "f"
   model$population$persons$birth_time <- c(-20, -1, -25)
-  model$processes$union_formation$matching$sample_size <- 1
   results <- lapply(1:50, function(seed) simulate(model, 0.1, seed = seed))
   first_fathers <- vapply(results, function(result) {
     children <- result$persons[result$persons$mother_id %in% 1, ]
     if (!nrow(children)) return(-1)
     children$father_id[1]
   }, numeric(1))
-  # Missing fathers occur despite an eligible adult outside the drawn sample.
-  expect_true(anyNA(first_fathers))
-  expect_true(any(first_fathers == 3, na.rm = TRUE))
-  expect_true(all(is.na(first_fathers) | first_fathers %in% c(-1, 3)))
+  # Draws cover the whole pool, so the boy is skipped and the adult is found.
+  expect_false(anyNA(first_fathers))
+  expect_true(all(first_fathers %in% c(-1, 3)))
+  expect_true(any(first_fathers == 3))
 })
 
 test_that("existing partners are retained and women have no additional age restriction", {

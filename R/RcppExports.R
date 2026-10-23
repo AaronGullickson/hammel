@@ -21,20 +21,20 @@ adjusted_fertility_cpp <- function(rates, birth_interval) {
     .Call(`_hammel_adjusted_fertility_cpp`, rates, birth_interval)
 }
 
-inspect_matching_cpp <- function(age_difference, matching, draws) {
-    .Call(`_hammel_inspect_matching_cpp`, age_difference, matching, draws)
+inspect_matching_cpp <- function(age_difference, matching) {
+    .Call(`_hammel_inspect_matching_cpp`, age_difference, matching)
 }
 
 inspect_group_matching_cpp <- function(age_difference, matching, female_group, male_groups) {
     .Call(`_hammel_inspect_group_matching_cpp`, age_difference, matching, female_group, male_groups)
 }
 
-sample_male_positions_cpp <- function(count, requested) {
-    .Call(`_hammel_sample_male_positions_cpp`, count, requested)
-}
-
 inspect_weighted_calibration_cpp <- function(female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility) {
     .Call(`_hammel_inspect_weighted_calibration_cpp`, female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility)
+}
+
+inspect_exact_draw_cpp <- function(male_born, male_group, male_excluded, female_born, female_group, log_weights, matching, groups, now, cutoff, draws) {
+    .Call(`_hammel_inspect_exact_draw_cpp`, male_born, male_group, male_excluded, female_born, female_group, log_weights, matching, groups, now, cutoff, draws)
 }
 
 inspect_weighted_incremental_cpp <- function(female_born, female_groups, male_born, male_groups, op_times, op_men, op_deltas, rates, matching, group_count, cutoff) {

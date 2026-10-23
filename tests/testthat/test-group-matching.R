@@ -21,12 +21,13 @@ test_that("native pair offsets match analytical probabilities and R scores", {
     group_exogamy = c("A:B" = log(2), "A::C" = log(3)), matching_method = "female_choice")
   labels <- c("A", "B", "C")
   prepared <- prepare_matching_model(model, labels)
+  softmax <- function(u) exp(u - max(u)) / sum(exp(u - max(u)))
   result <- inspect_group_matching_cpp(c(0, 0, 0), prepared, 0L, 0:2)
-  expect_equal(result$utilities, log(c(1, 2, 3)))
-  expect_equal(result$probabilities, c(1, 2, 3)/6)
-  expect_equal(result$utilities, calculate_matching_utilities(model, c(0, 0, 0), "A", labels))
-  expect_equal(inspect_group_matching_cpp(c(0, 0), prepared, 1L, 0:1)$probabilities, c(0.5, 0.5))
-  expect_equal(inspect_group_matching_cpp(c(0, 0), prepared, 2L, 0:1)$probabilities, c(3, 1)/4)
+  expect_equal(result, log(c(1, 2, 3)))
+  expect_equal(softmax(result), c(1, 2, 3)/6)
+  expect_equal(result, calculate_matching_utilities(model, c(0, 0, 0), "A", labels))
+  expect_equal(softmax(inspect_group_matching_cpp(c(0, 0), prepared, 1L, 0:1)), c(0.5, 0.5))
+  expect_equal(softmax(inspect_group_matching_cpp(c(0, 0), prepared, 2L, 0:1)), c(3, 1)/4)
   only <- create_matching_model(~ 1, numeric(), group_exogamy = c("A:B" = log(2)), matching_method = "female_choice")
   expect_equal(calculate_matching_probabilities(only, c(0, 0), "A", c("A", "B")), c(1, 2)/3)
   helper <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1), matching_method = "female_choice")
@@ -40,9 +41,8 @@ test_that("same_group formula and additive effects combine for custom formulas",
   expected <- c(-0.2 + 0.3, -0.1 + 0.7, 0)
   result <- inspect_group_matching_cpp(gaps, prepare_matching_model(matching, c("A", "B", "C")),
                                        0L, 0:2)
-  expect_equal(result$utilities, expected)
-  expect_equal(result$utilities, calculate_matching_utilities(matching, gaps, "A", c("A", "B", "C")))
-  expect_equal(result$probabilities, exp(expected) / sum(exp(expected)))
+  expect_equal(result, expected)
+  expect_equal(result, calculate_matching_utilities(matching, gaps, "A", c("A", "B", "C")))
 })
 
 test_that("categorical group predictors have stable treatment contrasts and interactions", {
@@ -59,7 +59,7 @@ test_that("categorical group predictors have stable treatment contrasts and inte
     male_group = factor(c("A", "A"), levels = c("A", "B")))
   expected <- drop(stats::model.matrix(formula, supplied)[, -1, drop = FALSE] %*% beta)
   result <- inspect_group_matching_cpp(gaps, prepare_matching_model(matching, c("A", "B")), 1L, c(0L, 0L))
-  expect_equal(result$utilities, unname(expected))
+  expect_equal(result, unname(expected))
   # Session contrast settings must not change these specified coefficients.
   old <- options(contrasts = c("contr.sum", "contr.poly")); on.exit(options(old))
   expect_equal(calculate_matching_utilities(matching, gaps, "B", c("A", "A")), unname(expected))
@@ -77,10 +77,8 @@ group_choice_model <- function(initiation = "on_demand", matching, father_matchi
     model <- quiet_inheritance(set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
       age_start = 15, age_end = 50, rate = c(0, 20)), 0))
   }
-  matching$sample_size <- 0
   matching$matching_method <- "female_choice"
   if (!is.null(father_matching)) {
-    father_matching$sample_size <- 0
     father_matching$matching_method <- "female_choice"
   }
   quiet_inheritance(set_union_formation(model, initiation, matching,
@@ -88,11 +86,10 @@ group_choice_model <- function(initiation = "on_demand", matching, father_matchi
     father_matching = father_matching, diagnostics = TRUE))
 }
 
-test_that("pair effects drive both union modes, father choice, and final utility ranks", {
+test_that("pair effects drive both union modes and father choice", {
   matching <- create_matching_model(~ age_difference, c(age_difference = 0), group_exogamy = c("A:B" = 1000), matching_method = "female_choice")
   result <- simulate(group_choice_model(matching = matching), 0.3, seed = 52)
   expect_equal(result$unions$husband_id, 3)
-  expect_equal(result$unions$.utility_rank, 1L)
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 3))
   model <- group_choice_model("rate", matching)
   result <- simulate(model, 0.3, seed = 52)
@@ -138,9 +135,9 @@ test_that("custom group comparisons work with absent candidate levels", {
     c(age_difference = 0.1, "I(male_group == \"B\")TRUE" = log(2)),
     group_levels = c("A", "B"), matching_method = "female_choice")
   prepared <- prepare_matching_model(matching, c("A", "B"))
-  expect_equal(inspect_group_matching_cpp(c(1, 3), prepared, 0L, c(0L, 0L))$utilities,
+  expect_equal(inspect_group_matching_cpp(c(1, 3), prepared, 0L, c(0L, 0L)),
                c(0.1, 0.3))
-  expect_equal(inspect_group_matching_cpp(c(1, 3), prepared, 0L, c(0L, 1L))$utilities,
+  expect_equal(inspect_group_matching_cpp(c(1, 3), prepared, 0L, c(0L, 1L)),
                c(0.1, 0.3 + log(2)))
 })
 
@@ -148,10 +145,10 @@ test_that("pair tables support numeric and colon-containing group labels", {
   matching <- create_matching_model(~ same_group, c(same_group = 0.2),
     group_exogamy = data.frame(female_group = 20, male_group = 10, log_odds = log(2)), matching_method = "female_choice")
   prepared <- prepare_matching_model(matching, c(20, 10))
-  expect_equal(inspect_group_matching_cpp(c(0, 0), prepared, 0L, 0:1)$utilities, c(0.2, log(2)))
+  expect_equal(inspect_group_matching_cpp(c(0, 0), prepared, 0L, 0:1), c(0.2, log(2)))
   expect_equal(calculate_matching_utilities(matching, c(0, 0), 20, c(20, 10)), c(0.2, log(2)))
   matching <- create_matching_model(~ 1, numeric(), group_exogamy = data.frame(
     female_group = "A:B", male_group = "C::D", log_odds = -1), matching_method = "female_choice")
   prepared <- prepare_matching_model(matching, c("A:B", "C::D"))
-  expect_equal(inspect_group_matching_cpp(c(0, 0), prepared, 0L, 0:1)$utilities, c(0, -1))
+  expect_equal(inspect_group_matching_cpp(c(0, 0), prepared, 0L, 0:1), c(0, -1))
 })

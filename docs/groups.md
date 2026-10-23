@@ -101,8 +101,7 @@ including neonatal mortality. Possible identities include initial identities,
 positive reference ancestry groups, and explicitly declared outputs; grouped
 schedules and categorical matching must cover the full set before execution.
 The father need not share that group by default. Optional `prevent_exogamy`
-restrictions filter sampled candidates without refilling; the initial sampling
-pool remains unchanged. Group formula terms and directed/symmetric pair effects
+restrictions make men of prohibited groups ineligible. Group formula terms and directed/symmetric pair effects
 can change matching utilities; see [group matching](group-matching.md).
 Other eligibility rules remain.
 Group identity is fixed over life and retained across restarts. Ancestry

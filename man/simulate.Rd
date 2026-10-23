@@ -27,12 +27,12 @@ Events execute chronologically. In on-demand mode all living females face the
 fertility schedule. Rate mode uses either overall rates for all women (with
 a warning), or separate \code{union_status} schedules. A union-formation process is required. With on-demand
 union formation, use the woman's
-current partner, or sample men and choose one using conditional-logit
+current partner, or draw one from all eligible men using conditional-logit
 probabilities from the matching formula to form a union at the birth.
-Sampled men must meet the configured minimum age (default 15 years).
+Men must meet the configured minimum age (default 15 years).
 Known kin are excluded within the configured generation bound on each side
 of a common ancestor (default two). Hard group exclusions also apply.
-If no sampled men are eligible, cancel the birth by default. Explicitly set
+If no eligible man exists, cancel the birth by default. Explicitly set
 \code{cancel_birth_if_no_match = FALSE} to preserve it with unknown father.
 Rate initiation adds age-specific search events for unpartnered women only.
 Failed attempts draw another waiting time. Widowhood cancels pending births

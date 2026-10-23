@@ -594,7 +594,7 @@ reasons are retained. This supersedes generic death labels in earlier entries.
 ## D037: Exclusive ongoing unions and pre-sampling male availability
 
 **Current status:** Implemented; D043 supersedes the referenced birth-preservation
-default.
+default, and D072 replaces candidate sampling (exclusive unions are unchanged).
 
 - **Status:** accepted by the user October 15, 2026.
 - **Decision:** require at most one ongoing union per person. Sample from living,
@@ -991,7 +991,7 @@ matching specifications override this default. Initiation mode remains explicit.
 
 ## D057: Hard group exclusions after candidate sampling
 
-- **Status:** selected by the user October 20, 2026.
+- **Status:** selected by the user October 20, 2026; sampling semantics superseded by D072.
 - **Decision:** add `prevent_exogamy` to matching models: FALSE by default,
   TRUE to prohibit every different-group pairing, or a character vector of
   cross-group pairs with female-first `:` and symmetric `::` syntax. A
@@ -1168,7 +1168,7 @@ matching specifications override this default. Initiation mode remains explicit.
 ## D065: Candidate sample size belongs to the matching model
 
 - **Status:** implemented at the user's request October 22, 2026; the
-  default size of 250 is superseded by 1000 in D067.
+  default size of 250 is superseded by 1000 in D067; `sample_size` removed in D072.
 - **Decision:** both matching-model constructors accept `sample_size = 250`.
   Remove the argument from union formation and its setter, without a deprecated
   alias. The user prefers direct API changes while the package is unpublished.
@@ -1340,3 +1340,39 @@ matching specifications override this default. Initiation mode remains explicit.
   flagged; a 0.05-year band at a woman's age gives the analytical weight), plus
   one-year bands against an exact person-level reference. Full suite passed
   with no failures or warnings; the live database test skipped.
+
+## D072: Exact full-pool partner draws replace candidate sampling
+
+- **Status:** decided by the user October 23, 2026, after a prototype
+  benchmark and accuracy checks.
+- **Decision:** remove candidate sampling. Every partner and nonmarital father
+  search draws exactly from conditional-logit choice over all eligible men, for
+  both matching methods (female choice uses zero group weights). Remove
+  `sample_size` and its sampling code and test hooks, and remove the
+  `.n_eligible` and `.utility_rank` diagnostics; `.log_weight_<group>`
+  remains. Nonmarital fathers use the same draw with the father model's
+  settings.
+- **Method:** unpartnered men are kept in cells by group and quarter-year birth
+  bin. A cell is chosen in proportion to its size times the largest weight any
+  member could have for the woman, a member uniformly, and he is accepted with
+  probability exp(U - that maximum); only he is screened for age and kinship.
+  Rejection sampling makes the result exact; after 200 rejections the eligible
+  pool is enumerated. The native age model's within-bin maximum is exact.
+  Custom R formulas are bounded on a 1/32-year grid (accepted by the user for
+  now); bound violations are counted and warned about.
+- **Rationale:** the user's runs showed a 250-man sample attenuated pooled
+  associations; sampling was only a speed shortcut, so exact draws give the
+  intended model without a size to tune. A prototype matched exact full-pool
+  probabilities in frozen-pool tests and full-pool sampling over 40 seeds.
+- **Consequences:** a search fails only when no eligible man exists in the
+  whole pool; this supersedes the sample-then-screen semantics of D037 and
+  D057, the encounter-scarcity rationale, and D065/D067's sample sizes.
+  Seeded histories change. Random-number use depends on how steeply utility
+  varies within a bin. The user noted possible future options for a minimum
+  match threshold or a woman cancelling her search; none is implemented.
+- **Performance:** optimized builds, one seed: female choice 0.10 s and
+  weighted choice 0.25 s for 20,000 persons over 50 years (0.30 s and 0.47 s
+  with 1,000-man samples); 0.39 s and 1.12 s for 50,000 persons over 100 years
+  (1.39 s and 2.18 s before).
+- **Validation:** full suite passed with no failures or warnings; the live
+  database test skipped.

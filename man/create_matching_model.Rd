@@ -10,7 +10,6 @@ create_matching_model(
   group_exogamy = NULL,
   group_levels = NULL,
   prevent_exogamy = FALSE,
-  sample_size = 1000,
   imbalance_absorption = 1,
   matching_method = "weighted_choice"
 )
@@ -34,7 +33,7 @@ formula scores; they do not create a matching prohibition.}
 \item{group_levels}{Optional ordered vector of group labels (character or
 numeric codes). Required with at least two levels when the formula uses
 \code{female_group} or \code{male_group}; must cover population groups. Sets fixed
-treatment reference/columns, independent of candidate samples. Not required
+treatment reference/columns, independent of the available pool. Not required
 for \code{same_group} or pair effects alone.}
 
 \item{prevent_exogamy}{\code{FALSE} (default) for no group restrictions; \code{TRUE}
@@ -42,15 +41,11 @@ excludes all different-group candidates. A character vector such as
 \code{c("A::B", "A:C")} excludes selected pairs with female-first \code{:} and
 symmetric \code{::} notation. Alternatively supply a directional data frame
 with \code{female_group} and \code{male_group}. Pairs must join different groups.
-Restrictions filter the original sample alongside age/kin eligibility,
-without refilling. Empty samples follow existing failed-search and birth
-cancellation rules. Restrictions override finite preferences, require
-population identities, and do not invalidate existing partners.}
-
-\item{sample_size}{Nonnegative whole number of men to sample before
-pair-specific screening. Defaults to \code{1000}; zero requests the whole
-available pool. Rejected candidates are not replaced. A separate
-\code{father_matching} model uses its own sample size.}
+Restricted men are ineligible, alongside age and kinship exclusions. A
+search fails only when no eligible man exists in the whole pool, following
+existing failed-search and birth cancellation rules. Restrictions override
+finite preferences, require population identities, and do not invalidate
+existing partners.}
 
 \item{imbalance_absorption}{Used only when \code{matching_method = "weighted_choice"}.
 Share, in \verb{[0, 1]}, of a group's sex imbalance among

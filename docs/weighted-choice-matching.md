@@ -2,8 +2,9 @@
 
 Specified with the user and implemented October 23, 2026 on
 `experiment/two-sided-sequential-matching` (D066). The user made
-`matching_method = "weighted_choice"` the default, with matching-model
-`sample_size = 1000`, and removed additive two-sided matching (D067). The
+`matching_method = "weighted_choice"` the default and removed additive
+two-sided matching (D067); partners are now drawn exactly from the whole
+eligible pool (D072). The
 method is an argument of the matching-model constructors (D068), so a separate
 father model can use its own; `"female_choice"` remains available. This describes
 implemented behavior; no acceptance thresholds are set.
@@ -37,10 +38,10 @@ female-choice recovery in that analysis.
 
 ## Selection rule
 
-Union initiation, timing, candidate sampling, minimum male age, kinship
-screening, hard group exclusions, failure, cancellation, and spacing rules are
-unchanged. Only the probability of selecting among ego's screened candidates
-changes. For ego woman i with screened candidate set C,
+Union initiation, timing, minimum male age, kinship screening, hard group
+exclusions, failure, cancellation, and spacing rules are unchanged. Only the
+probability of selecting among ego's eligible men changes. For ego woman i
+with eligible pool C,
 
     P(j | i, C) = b[g(j)] exp(U[i,j]) / sum over k in C of b[g(k)] exp(U[i,k])
 
@@ -87,8 +88,7 @@ At each search time t, with no execution step and no random draws:
    men j of group g, with hard-excluded pairs contributing zero. Her expected
    choice share is pi[w,g] = b[g] S[w,g] / sum over h of b[h] S[w,h], and the
    expected male flow share is phi[g] = sum over w of lambda[w] pi[w,g] divided
-   by the summed intensity. Candidate subsampling and kinship screening are
-   ignored here.
+   by the summed intensity. Kinship screening is ignored here.
 4. **Solve** phi(b) = tau for the free log weights by Newton iterations on a
    convex objective, warm-started from the previous search's weights, until
    every share is within 1e-10. Expected flow shares rise monotonically with a
@@ -102,7 +102,7 @@ question that group-only weights avoid.
 ### Imbalance absorption
 
 `imbalance_absorption` (kappa) belongs to each matching model, like
-`sample_size`, defaulting to 1 (user, October 23, 2026). It sets the share of a
+`group_exogamy`, defaulting to 1 (user, October 23, 2026). It sets the share of a
 group's sex imbalance among unpartnered people absorbed through cross-group
 unions. At 1, men receive the full mirrored target. At 0, each male group's
 share of unions equals its female group's share, so the excess sex waits
@@ -219,10 +219,8 @@ direction) or `male_group` formula terms warns once (D069).
 
 ## Diagnostics and interpreting estimates
 
-`.n_eligible` and `.utility_rank` keep their meanings: rank uses U, not the
-weighted score. Weights consume no random draws. When the general matching
-model uses weighted choice in a grouped population, `diagnostics = TRUE` also
-records `.log_weight_<group>` on each new union: the log group weights applied
+Weights consume no random draws. When the general matching model uses
+weighted choice in a grouped population, `diagnostics = TRUE` records `.log_weight_<group>` on each new union: the log group weights applied
 at the search that formed it (October 23, 2026, D070). One group is the
 reference with log weight 0; only differences between groups matter, and
 unweighted searches record 0 for every group. Earlier unions and new groups'
@@ -261,6 +259,7 @@ results and assessment; they were not independently rerun for this document.
 | Weighted choice, 250 | -5.88 (0.015) | 1.01 (0.039) |
 | Female choice, 1,000 | -5.98 (0.017) | 0.615 (0.008) |
 | Weighted choice, 1,000 | -5.95 (0.0095) | 0.983 (0.023) |
+| Weighted choice, exact draws (D072) | -5.96 (0.0101) | 0.984 (0.021) |
 
 Wife-side conditional logit (inputs: linear 0, quadratic -0.0277, symmetric
 group -3):
@@ -273,11 +272,19 @@ group -3):
 | Weighted choice, 1,000, + male group | 0.0013 (0.0019) | -0.0277 (0.0004) | -3.02 (0.037) | 0.311 (0.038) |
 | Weighted choice, 1,000 | 0.0005 (0.0019) | -0.0274 (0.0004) | -3.03 (0.039) | |
 | Same, new choice-set draws | 0.0011 (0.0020) | -0.0283 (0.0003) | -3.00 (0.037) | |
+| Weighted choice, exact draws (D072) | -0.0002 (0.0019) | -0.0278 (0.0003) | -3.06 (0.034) | |
 
 With weighted choice at 250 men, husband-side sets alone gave a linear term
 of -0.0383 (0.0030), quadratic -0.0263 (0.0005), and directed terms AB -3.25
 and BA -2.57; combining husband- and wife-side sets gave linear -0.0233
 (0.0022), quadratic -0.0267 (0.0003), and ABsym -3.01 (0.031).
+
+Rows labelled 250 or 1,000 used candidate samples of that many men. After exact
+full-pool draws replaced sampling (D072), the user reran the scenario with 40
+replications (rows labelled exact draws): results match the 1,000-man runs,
+with direction balanced and the input preferences recovered in wife-side sets.
+In the user's setup a run took about 1.1 s, down from about 2.2 s with
+1,000-man samples.
 
 Findings from these runs and their discussion:
 
@@ -312,12 +319,17 @@ diagnostics without changed histories, the single warning, and input
 validation, and incremental pool sums against a full rebuild after thousands
 of pool changes and cutoff crossings.
 
-Timing, October 23, 2026 (optimized build; 20,000 starting persons in two
+Timing with candidate sampling, before D072, October 23, 2026 (optimized build; 20,000 starting persons in two
 groups, on-demand, 50 years, one seed; synthetic test mortality): female
 choice 0.13 s and 0.29 s at sample sizes 250 and 1,000; weighted choice 0.28 s
 and 0.44 s; additive two-sided (since removed) 1.05 s at 250. Before incremental sums,
 weighted choice took 1.1 s at 250. These are single-scenario measurements, not
 performance guarantees.
+
+With exact full-pool draws (D072; same scenario, optimized build): female
+choice 0.10 s and weighted choice 0.25 s at 20,000 persons over 50 years;
+0.39 s and 1.12 s at 50,000 persons over 100 years; weighted choice with
+three groups 0.40 s. Single-seed measurements.
 
 Scientific assessment (user): the milestone 3 group-matching scenarios, with
 directional counts, unpartnered pool composition by sex and group over time,

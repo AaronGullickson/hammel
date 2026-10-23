@@ -40,8 +40,7 @@ model <- hammel_model() |>
       c(age_difference = 0.072, "I(age_difference^2)" = -0.014)
     ),
     rates = marriage_rates,
-    kinship_generations = 2,
-    diagnostics = TRUE
+    kinship_generations = 2
   )
 
 timing <- system.time(result <- simulate(model, years = 100, seed = 42))
@@ -84,30 +83,10 @@ unions <- result$unions |>
     decade = floor(start_time / 10) * 10
   )
 
-temp <- unions |>
-  group_by(decade) |>
-  summarize(
-    age_diff = mean(age_diff),
-    n_eligible = mean(.n_eligible)
-  )
-
 ggplot(unions, aes(x = factor(decade), y = age_diff))+
   geom_boxplot()+
   geom_jitter(alpha = 0.02)+
   geom_hline(yintercept = 0.072 / (2 * 0.014), color = "red", linetype = 2)+
-  theme_bw()
-
-ggplot(temp, aes(x = decade, y = n_eligible))+
-  geom_line()+
-  geom_point()+
-  theme_bw()
-
-ggplot(unions, aes(x = factor(decade), y = .n_eligible))+
-  geom_boxplot()+
-  theme_bw()
-
-ggplot(unions, aes(x = factor(decade), y = .utility_rank))+
-  geom_boxplot()+
   theme_bw()
 
 # how many remain unmarried?

@@ -4,7 +4,7 @@ exogamy_test_model <- function(prevent = FALSE, group_exogamy = NULL) {
   model$population$persons$group <- c("A", "A", "B")
   quiet_inheritance(set_union_formation(model, "on_demand", diagnostics = TRUE,
     matching = create_age_gap_matching_model(0, 5, group_exogamy = group_exogamy,
-                                             prevent_exogamy = prevent, sample_size = 0,
+                                             prevent_exogamy = prevent,
                                              matching_method = "female_choice")))
 }
 
@@ -13,8 +13,6 @@ test_that("hard restrictions exclude candidates before scoring and diagnostics",
     model <- exogamy_test_model(prevent, c("A:B" = 1000))
     result <- simulate(model, 0.3, seed = 52)
     expect_equal(result$unions$husband_id, 2)
-    expect_equal(result$unions$.n_eligible, 1L)
-    expect_equal(result$unions$.utility_rank, 1L)
   }
   matching <- create_matching_model(~ age_difference, c(age_difference = 0),
     group_exogamy = c("A:B" = 1000), prevent_exogamy = TRUE, matching_method = "female_choice")
@@ -54,18 +52,15 @@ test_that("empty filtered samples use existing birth cancellation and unknown-fa
   expect_equal(nrow(simulate(model, 0.3, seed = 52)$unions), 1)
 })
 
-test_that("sampling remains broad with no refilling after group exclusions", {
-  small <- exogamy_test_model(TRUE)
-  small$processes$union_formation$matching$sample_size <- 1L
-  small$processes$union_formation$cancel_birth_if_no_match <- TRUE
-  full <- small
-  full$processes$union_formation$matching$sample_size <- 0L
-  # Some one-man encounter samples miss the compatible man although he exists.
-  outcomes <- vapply(1:30, function(seed) {
-    nrow(simulate(full, 0.1, seed = seed)$unions) > 0 &&
-      nrow(simulate(small, 0.1, seed = seed)$unions) == 0
-  }, logical(1))
-  expect_true(any(outcomes))
+test_that("a compatible man anywhere in the pool is always found under restrictions", {
+  model <- exogamy_test_model(TRUE)
+  model$processes$union_formation$cancel_birth_if_no_match <- TRUE
+  husbands <- vapply(1:30, function(seed) {
+    unions <- simulate(model, 0.1, seed = seed)$unions
+    if (nrow(unions)) unions$husband_id[1] else NA_real_
+  }, numeric(1))
+  births <- vapply(1:30, function(seed) simulate(model, 0.1, seed = seed)$simulation$births, numeric(1))
+  expect_true(all(husbands[births > 0] == 2))
 })
 
 test_that("rate searches retry and father overrides carry independent restrictions", {

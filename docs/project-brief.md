@@ -63,15 +63,15 @@ separate from conditional-logit matching, birth-triggered and scheduled search
 modes, initial age-difference matching, kinship screening, and partnered/unpartnered
 fertility in scheduled mode. Only death ends unions in this milestone. Parity-specific fertility is deferred
 to a later milestone.
-Candidate sampling now defaults to 1000 men on the matching model before pair
-screening (D065, D067; zero means the whole pool). Eligibility and basic fertility transitions are implemented; the
+Partners are now drawn exactly from the whole eligible pool, without a
+candidate sample (D072). Eligibility and basic fertility transitions are implemented; the
 failed-match birth cancellation is implemented (default TRUE); transition-aware fertility
 compensation remains deferred (D045), including after milestone acceptance (D050). The poor-pool wait alternative is deferred to a later milestone (D044). See [milestone 2 notes](union-formation-models.md)
 for implemented rules, deferred decisions, and validation. The on-demand C++ path now forms unions at births with formula-based
 conditional-logit selection and handles widowhood and restart histories.
 Minimum male age screening (default 15 years) and known-kin exclusion within
 two generations of each partner are implemented. `extract_kin()` shares the
-native kinship module. Exclusive ongoing unions are enforced before sampling; female rate-based searches and status-specific fertility schedules are implemented.
+native kinship module. Exclusive ongoing unions are enforced; female rate-based searches and status-specific fertility schedules are implemented.
 Overall fertility is also supported in rate mode with a warning. Previous-father
 continuity is deferred to a later milestone. The user-authored [milestone 2 report](../validation/milestone2.qmd) now includes
 USA circa 2000–2001 demographic comparisons, matching-parameter recovery, and

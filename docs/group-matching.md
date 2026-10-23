@@ -24,7 +24,8 @@ specified separately below.
 
 ## Hard group restrictions
 
-The user selected post-sampling restrictions on October 20, 2026.
+The user selected hard restrictions on October 20, 2026; since D072 they apply
+to the whole eligible pool rather than to a candidate sample.
 `prevent_exogamy = FALSE` on a matching model imposes none. TRUE excludes
 every different-group candidate. A character vector such as
 `c("A::B", "A:C")` excludes selected cross-group pairs, using the same
@@ -32,23 +33,19 @@ female-first and symmetric syntax as `group_exogamy`. A directional table with
 `female_group` and `male_group` is also accepted for colon-containing labels.
 Listed pairs must join different groups; overlapping entries are errors.
 
-Draw from the original living, unpartnered male pool, then apply age, kinship,
-and group screening to that sample without refilling. Group restrictions win
-over any finite utility preference. Do not rescore or replace existing partners.
-An empty eligible sample follows the existing search-retry/birth-cancellation
-rules, including births with unknown fathers only when explicitly allowed.
-Restrictions belong to the selected matching model: NULL `father_matching`
-inherits them, while an explicit father model has its own restrictions.
-Diagnostic eligible counts and utility ranks refer to the final eligible set.
+Restricted men are ineligible, alongside age and kinship exclusions; the exact
+draw skips restricted group cells. Group restrictions win over any finite
+utility preference. Do not rescore or replace existing partners. A search fails
+only when no eligible man exists anywhere in the pool, following the existing
+search-retry/birth-cancellation rules, including births with unknown fathers
+only when explicitly allowed. Restrictions belong to the selected matching
+model: NULL `father_matching` inherits them, while an explicit father model has
+its own restrictions.
 
-This retains the possibility that a minority woman samples no compatible men
-even when some exist in the full pool. With equally aged compatible A and
-incompatible B men, a one-man sample may fail; the full pool will find A.
-A finite penalty of -10 still selects B from a sample containing B alone,
-whereas prohibiting A:B makes that sample empty. Increasing the matching
-model's `sample_size` (default 1000)
-changes encounter coverage, not the restriction. No extra random draws occur
-in group screening; FALSE must retain the existing histories and RNG state.
+With equally aged compatible A and incompatible B men, an A woman under a
+prohibition always finds the A man. A finite penalty of -10 still selects B
+when B men are the only ones available, whereas prohibiting A:B makes the
+search fail. FALSE imposes no restriction.
 
 For labels containing colons, accept an alternative directional data frame
 with `female_group`, `male_group`, and `log_odds`. Duplicate directed pairs
@@ -88,8 +85,7 @@ and receive the same additive pair offsets afterward. Both on-demand and rate
 initiation use these scores. `father_matching = NULL` reuses the full matching
 model for nonmarital father choice; an explicit father model replaces it,
 including its pair effects. Current partners are retained without rematching.
-Diagnostic utility ranks use the final combined utility. Neither sampling,
-screening, event timing, nor the number of RNG draws changes.
+Neither screening nor event timing changes.
 
 Worked case: female A faces equally aged candidates in A, B, and C. Effects
 `c("A:B" = log(2), "A::C" = log(3))` and a zero formula give probabilities

@@ -259,7 +259,7 @@ test_that("new AB identities are available to categorical partner matching durin
   model <- set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
     age_start = 15, age_end = 50, rate = c(0, 20)), 0, inheritance = rule)
   matching <- create_matching_model(~ male_group,
-    c(male_groupB = 0, male_groupAB = 1000), group_levels = c("A", "B", "AB"), sample_size = 0, matching_method = "female_choice")
+    c(male_groupB = 0, male_groupAB = 1000), group_levels = c("A", "B", "AB"), matching_method = "female_choice")
   model <- set_union_formation(model, "rate", matching, rates = data.frame(
     age_start = 0, age_end = Inf, rate = 0), min_male_age = 0, kinship_generations = 0,
     cancel_birth_if_no_match = FALSE)

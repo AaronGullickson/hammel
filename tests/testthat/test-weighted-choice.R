@@ -222,9 +222,8 @@ test_that("grouped weighted choice runs in both modes, restarts, and is reproduc
                                          matching = matching, diagnostics = TRUE), 20, seed = 905)
     expect_identical(diagnosed$persons, first$persons)
     expect_identical(diagnosed$unions[names(first$unions)], first$unions)
-    added <- !is.na(diagnosed$unions$.n_eligible)
-    expect_true(any(added))
-    expect_true(all(diagnosed$unions$.utility_rank[added] >= 1))
+    expect_true(all(c(".log_weight_A", ".log_weight_B") %in% names(diagnosed$unions)))
+    expect_false(any(c(".n_eligible", ".utility_rank") %in% names(diagnosed$unions)))
   }
   # Rate mode: unpartnered births select fathers through their own calibration.
   father <- create_age_gap_matching_model(3, 4, group_exogamy = c("A::B" = -1))

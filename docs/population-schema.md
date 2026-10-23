@@ -57,9 +57,10 @@ required schema. Existing tables must be mapped by sex, not blindly renamed
 by column position. For example, an old row with male partner 1 and female
 partner 2 must place partner 2 in `wife_id` and partner 1 in `husband_id`. `unions = NULL` on person-table input denotes no supplied unions, as already accepted. NULL unions and zero-row, zero-column data frames are normalized to a typed empty union table. Other inputs must supply every schema column; extra columns and data-frame subclasses are preserved.
 
-Optional union diagnostics `.n_eligible` and `.utility_rank` are populated for
-new unions when the process sets `diagnostics = TRUE`; they are not required
-core columns. Historical unknowns remain NA. See
+Optional union diagnostics `.log_weight_<group>` are populated for new unions
+when the process sets `diagnostics = TRUE` and weighted choice runs in a
+grouped population; they are not required core columns. Historical unknowns
+remain NA. See
 [diagnostic semantics](union-formation-models.md#optional-union-diagnostics).
 
 ## Time representation

@@ -246,47 +246,43 @@ uses group effects. See [group matching](group-matching.md) for worked cases.
 
 Matching models also accept `prevent_exogamy = FALSE` (no restrictions), TRUE
 (only same-group candidates), or selected cross-group pairs with female-first
-`:` and symmetric `::` notation. Sample the original male pool first, then
-screen age, known kin, and these group restrictions without refilling. Thus
-minority-group encounter scarcity may make a sample empty even when compatible
-men exist elsewhere in the pool. Existing retry/cancellation rules apply to an
-empty result. Restrictions override finite scores, apply to the selected father
-or partner model, and do not invalidate existing partners. Eligibility counts
-and utility ranks use the final filtered set. Group restrictions require known
-population identities; exact group exclusions do not use NA or infinite scores.
+`:` and symmetric `::` notation. Restricted men are ineligible, alongside the
+age and kinship exclusions below. A search fails only when no eligible man
+exists in the whole pool; existing retry/cancellation rules then apply.
+Restrictions override finite scores, apply to the selected father or partner
+model, and do not invalidate existing partners. Group restrictions require
+known population identities; exact group exclusions do not use NA or infinite
+scores.
 
-Candidate sample size belongs to the matching model. Both
-`create_matching_model()` and `create_age_gap_matching_model()` accept
-`sample_size = 1000` (D067): a nonnegative whole count of men, sampled
-uniformly without replacement before age, kinship, and group screening. Zero
-means the full available male pool. Rejected candidates are not replaced. The
-setting applies to both matching methods. A separate `father_matching` model
-uses its own sample size; NULL inherits the general matching model, including
-sampling. For example, a general model with size 1000 and a father model with
-size 50 sample up to 1000 men for union searches and 50 for unpartnered
-rate-mode births. Existing partners need no search. Changing sampling can
-affect encounters, matches, birth cancellations, seeded histories, and runtime;
-it does not change initiation hazards or matching utilities. Sampling is a
-speed shortcut, not a model of encounters: small samples give each woman a
-noisy mix of men near her age, which attenuated pooled group associations at
-250 men in the user's runs. The default of 1000 does not assert convergence.
+### Exact full-pool partner draws (D072)
 
-With `union_formation(initiation = "on_demand", ...)`, use the woman's ongoing
-living male partner as father. If she has no partner, sample up to `sample_size`
-living, unpartnered men without replacement (matching-model default 1000;
-zero means the whole pool).
-Evaluate the matching formula on male-minus-female continuous age differences
-and multiply its non-intercept model-matrix columns by their named coefficients.
-With explicit `matching_method = "female_choice"`, sample candidate utilities V
-with probabilities proportional to `exp(V - max(V))`. The default
-`"weighted_choice"` method multiplies those weights by a calibrated weight for
-each man's group, as specified below. Form the union at the birth time and assign the partner as
-father. Nonfinite formula values/utilities are errors. Linear/raw quadratic
-terms have an exact native evaluator; other formulas use the R model matrix.
-After sampling and before scoring, exclude men younger than `min_male_age`
+There is no candidate sample. With `union_formation(initiation = "on_demand", ...)`,
+use the woman's ongoing living male partner as father. If she has no partner,
+draw a man from all eligible living, unpartnered men with probability
+proportional to `exp(V)`, where V is his utility: the matching formula on
+male-minus-female continuous age differences, multiplied by its named
+coefficients, plus pair effects, plus, under the default `"weighted_choice"`
+method, the log weight for his group (specified below). Explicit
+`"female_choice"` uses V without group weights. Form the union at the birth time
+and assign the partner as father. Nonfinite formula values/utilities are errors.
+
+The draw is exact. Unpartnered men are kept by group and quarter-year birth
+bin. A bin is chosen with probability proportional to its size times the
+largest value of `exp(V)` any member could have for this woman; a member is
+chosen uniformly and accepted with probability `exp(V - that maximum)`; only
+that man is then screened for age and kinship, and a rejected man leads to a
+fresh draw. Rejection sampling makes the accepted man's distribution the
+conditional logit over the eligible pool. After 200 rejections, the eligible
+pool is enumerated and drawn from directly. For the native linear/raw-quadratic
+age model the within-bin maximum is exact. Custom formulas are bounded by
+their values on a 1/32-year gap grid; if a drawn man's utility exceeds the
+bound, the draw is counted as approximate and simulation warns once. Very
+steep utilities reduce acceptance and may reach the enumeration fallback;
+outcomes are unchanged but random-number use differs.
+
+Exclude men younger than `min_male_age`
 (default 15 continuous years; finite nonnegative scalar, fractional values
-allowed). A man at exactly the threshold is eligible. Do not refill rejected
-samples. Also exclude a sampled man if he and the woman share a recorded
+allowed). A man at exactly the threshold is eligible. Also exclude a man if he and the woman share a recorded
 ancestor within `kinship_generations` parent steps of EACH (default 2), counting
 each person themself at distance zero. This includes known parents, grandparents,
 siblings, aunts/uncles and first cousins, including half kin; it does not impose
@@ -294,8 +290,8 @@ an unlimited direct-ancestor exclusion. Zero disables cross-person kin exclusion
 Only demonstrated links count: unknown parents do not imply unrelatedness and
 do not hide other known relationships. Age and kin search restrictions do not invalidate existing unions,
 and no extra minimum female age is imposed. Each person can have at most one ongoing union. Formation removes the man
-from the pool before the next sample; widowhood returns a surviving husband.
-If no sampled man is eligible, `cancel_birth_if_no_match = TRUE` (the default)
+from the pool; widowhood returns a surviving husband.
+If no eligible man exists, `cancel_birth_if_no_match = TRUE` (the default)
 cancels the birth. FALSE explicitly preserves it with unknown father and no
 union. A cancelled attempt creates no person, parentage, ID or birth count and
 does not update the last actual birth or start a spacing interval. Redraw risks
@@ -311,10 +307,10 @@ active histories are rejected. Supplied ended histories remain unchanged.
 Death closes all affected ongoing unions and clears both partners' current
 partner immediately. Her next birth may trigger another search in on-demand mode. In that mode fertility and
 mortality remain independent of union status, so surviving partners' pending
-events need no resampling merely because a union forms or ends. Candidate
-sets are temporary and are not returned. Optional `diagnostics = TRUE` records
-only eligible sample size and selected utility rank on newly formed unions;
-it defaults off and consumes no additional random draws. See [union formation](union-formation-models.md)
+events need no resampling merely because a union forms or ends. Optional
+`diagnostics = TRUE` records only weighted choice's applied log group weights
+(`.log_weight_<group>`) on newly formed unions in grouped populations; it
+defaults off and consumes no additional random draws. See [union formation](union-formation-models.md)
 for worked examples and implemented milestone 2 rules.
 
 Update the mother's latest birth and resample both newborn and mother. Newborns
@@ -331,7 +327,7 @@ With `initiation = "rate"`, only living unpartnered women face the supplied
 age-specific search hazard. Men never initiate searches. Gaps and ages outside
 search bands have zero hazard. Search waiting times use the same cumulative
 hazard sampler as deaths and births. Searches compete with death; death wins
-exact same-person ties. Search execution uses the same partner sampling,
+exact same-person ties. Search execution uses the same exact draw,
 screening, matching and formation code as on-demand mode. A failed search
 reschedules from the attempt time using the same attained-age schedule.
 All unpartnered women use that schedule regardless of prior union history.
@@ -340,10 +336,10 @@ Women face birth risk in both statuses: the current `union_status` selects
 fertility, or an overall schedule applies equally to both. With overall rates,
 warn once per simulation call that fertility does not depend on union status.
 Unpartnered births in rate mode select a father from living, currently
-unpartnered men using the selected matching model's sample size, with the same
-minimum age and known-kin screening as union searches. This creates parentage only:
+unpartnered men by the same exact draw, using the father matching model and its
+weights, with the same minimum age and known-kin screening as union searches. This creates parentage only:
 no union forms, the man remains available, and neither person's partner state
-changes. No qualifying sampled candidate cancels the birth by default; explicitly
+changes. No eligible man cancels the birth by default; explicitly
 setting `cancel_birth_if_no_match = FALSE` retains it with unknown father. Paternal links are appended to the kinship graph before
 subsequent events. Partnered births use the current husband. No special
 preference for an earlier child's father is implemented; it is deferred to a
