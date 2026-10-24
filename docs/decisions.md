@@ -26,6 +26,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Demographic extraction and function names | D020–D022 and missing-ASFR clarification |
 | Continuous execution | D024 |
 | Fertility spacing/compensation and finite age bands | D026, D028 (superseding D027's exact sampler) |
+| Two-sex union models and union API restructuring (deferred) | D073 |
 
 ## Recorded decisions
 
@@ -1376,3 +1377,30 @@ matching specifications override this default. Initiation mode remains explicit.
   (1.39 s and 2.18 s before).
 - **Validation:** full suite passed with no failures or warnings; the live
   database test skipped.
+
+## D073: Keep current union formation; defer two-sex models and API restructuring
+
+- **Status:** decided by the user October 24, 2026.
+- **Decision:** keep weighted-choice matching for the current milestone. Do
+  not add user-specified directional (gender-asymmetric) intermarriage ratios,
+  male-group union propensities or directional ratio targets to weighted
+  choice; users who need gender-asymmetric intermarriage should be served by a
+  future, fuller harmonic-mean approach. Leave the `union_formation()` and
+  `set_union_formation()` API unchanged until a single working implementation
+  incorporates all union-formation components.
+- **Rationale:** with balanced sexes, weighted choice forces equal directional
+  counts (AB - BA equals the difference between male and female group shares),
+  so asymmetry would require changing male-group targets, and female timing
+  still could not respond to male availability (no marriage squeeze). The user
+  distinguished models whose union event is independent of matching, which
+  preserve input rates, from full two-sex models, which allow composition
+  feedback without necessarily preserving rates. Cohabitation and nonmarital
+  father selection must be designed consistently with any two-sex model, so
+  restructuring the API now would be premature.
+- **Future work, not authorized:** a participation function giving the
+  probability that a woman forms a union under current market conditions; a
+  Schoen harmonic-mean model, possibly modified along Dagsvik's lines; possibly
+  Choo–Siow; a loose translation from log odds ratios to harmonic-mean
+  parameters; a union-model abstraction for `set_union_formation()`.
+- **Evidence:** discussion notes and calculations in
+  [two-sex union models](two-sex-union-models.md). No code changed.

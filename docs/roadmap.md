@@ -228,6 +228,21 @@ and callback contracts remain to be specified. Define permitted changes and even
 mutation. No distinction between categorical/continuous attributes or transition
 model has been fixed by these notes.
 
+## Two-sex union formation and union API
+
+Discussed October 24, 2026, without an assigned milestone; see
+[two-sex union models](two-sex-union-models.md) and D073. Possible
+extensions: a participation function making a woman's chance of forming a
+union depend on market conditions (overlapping D044); a Schoen harmonic-mean
+model with a market-level union clock, possibly modified along Dagsvik's
+lines; possibly Choo–Siow. These would let composition affect union timing
+and capture marriage squeezes, at the cost of not necessarily reproducing
+input rates; users may want either class. Cohabitation (milestone 4) and
+nonmarital father selection must be designed consistently with any two-sex
+model. The union-formation API stays unchanged until a single working
+implementation incorporates all union-formation components. No model,
+parameterization or API has been selected.
+
 ## Preparing input schedules
 
 Provide more helpers for building required input rates, including retrieving or

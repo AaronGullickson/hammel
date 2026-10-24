@@ -213,6 +213,12 @@ direction) or `male_group` formula terms warns once (D069).
   male and female group-B shares of unions. When exogamy is rare, small
   differences in the sexes' unpartnered group shares move AB/BA strongly.
   Directional balance should be assessed with those pool compositions.
+- **No user-specified directional ratios.** Because the weights fix both
+  sexes' group flows, a gender-asymmetric intermarriage pattern (for example
+  3:1 between the two cross-group directions) cannot be specified with
+  balanced sexes. The user declined adding directional targets (D073); see
+  [two-sex union models](two-sex-union-models.md) for the analysis and
+  future alternatives.
 - **Pooled cross-products.** These examples have no ages. With age preferences
   and group-specific age structures, a cross-tabulation pooled over ages need
   not equal the summed group utilities exactly, under any method.

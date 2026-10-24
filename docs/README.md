@@ -36,6 +36,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [Waiting-time sampling](waiting-time-sampling.md) | Explanation of the current shared hazard sampler |
 | [Union-formation models](union-formation-models.md) | Implemented milestone 2 rules, matching defaults, diagnostics, and deferred work |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
+| [Two-sex union models](two-sex-union-models.md) | Proposal notes: directional asymmetry, marriage squeeze, Schoen/Choo–Siow/Dagsvik models, API considerations (D073) |
 | [Future roadmap](roadmap.md) | User priorities beyond milestone 2; milestone 3 groups and open specifications |
 | [Decision log](decisions.md) | Accepted choices and supersession history |
 | [SOCSIM audit plan](socsim-audit.md) | Scope and remaining reference investigation |
