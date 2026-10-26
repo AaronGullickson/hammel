@@ -26,7 +26,7 @@ execute:
 
 library(here)
 # installing will lead to faster computation
-#devtools::install(here::here())
+devtools::install(here::here())
 library(hammel)
 library(dplyr)
 library(tidyr)
@@ -114,7 +114,9 @@ construct_choice_sets <- function(population, sample_size, set_size) {
 
   # half the choice sets are from wives and half from husbands
   choice_sets <- map(seq_len(nrow(union_sample)), function(i) {
-    ego_spouse <- if (i <= nrow(union_sample) %/% 2) "wife" else "husband"
+    #ego_spouse <- if (i <= nrow(union_sample) %/% 2) "wife" else "husband"
+    # the results will be correct for women
+    ego_spouse <- "wife"
     construct_choice_set(union_sample[i, ], population, ego_spouse, set_size)
   }) |>
     bind_rows()
@@ -731,10 +733,7 @@ model <- hammel_model() |>
   set_union_formation(
     "rate",
     matching = create_age_gap_matching_model(
-      0, 5, 
-      group_exogamy = c("A::B" = -2),
-      # ok to do female choice here because we only care about the demographic rates
-      matching_method = "female_choice"
+      0, 5, group_exogamy = c("A:B" = -2)
     ),
     rates = mar_rates_female_grouped,
   )
@@ -812,9 +811,9 @@ tfr_pooled <- counts |>
 asfr |>
   filter(union_status != "overall") |>
   ggplot(aes(x = age_start + 2.5, y = rate, group = group, color = group))+
-  geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
+  geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se), alpha = 0.8)+
   geom_line(linetype = 2)+
-  geom_point(data = fertility_rates_by_status_grouped)+
+  geom_point(data = fertility_rates_by_status_grouped, alpha = 0.8)+
   facet_wrap(~union_status)+
   labs(x = "age", y = "age-specific fertility rate")+
   theme_bw()
@@ -1052,10 +1051,7 @@ model <- hammel_model() |>
   set_union_formation(
     "rate",
     matching = create_age_gap_matching_model(
-      0, 5,
-      group_exogamy = c("A::B" = -2),
-      # ok to use female choice here as we only want to compare demogrpahic rates
-      matching_method = "female_choice"
+      0, 5, group_exogamy = c("A:B" = -2)
     ),
     rates = mar_rates_female_usa,
     group_prop_hazard = c("A" = ratio_mar_A, "B" = ratio_mar_B),
@@ -1333,7 +1329,6 @@ mar_input <- bind_rows(
 
 mar_rates |>
   filter(sex == "f") |>
-  mutate(age_start = if_else(age_start == 15 & group == "B", 16, age_start)) |>
   ggplot(aes(x = age_start + 2.5, y = rate, group = group, color = group))+
   geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
   geom_line(linetype = 2)+
@@ -1346,82 +1341,6 @@ mar_rates |>
 
 ## Evaluate Group Matching
 
-```{r}
-#| label: run-intermarriage-sim-test
-
-model <- hammel_model() |>
-  set_population(pop_baseline_uneven_2g) |>
-  set_fertility(fertility_rates_overall_usa) |>
-  set_mortality(mortality_rates_usa2000) |>
-  set_union_formation(
-    "on_demand",
-    matching = create_age_gap_matching_model(
-      0, 5, 
-      group_exogamy = c("A::B" = -3)
-    ),
-  )
-
-system.time(result <- simulate(model, years = years, seed = 1))
-
-results  <- future_map(
-  replication_seeds[1:40], 
-  function(seed) {
-    simulate(model, years = years, seed = seed) 
-  },
-  .options = furrr_options(seed = NULL)
-)
-```
-
-```{r}
-
-results |>
-  map(get_detailed_unions) |>
-  bind_rows(.id = "replication") |>
-  count(replication, group_w, group_h) |>
-  pivot_wider(id_cols = replication, names_from = c(group_w, group_h), values_from = n) |>
-  mutate(
-    log_odds = log(A_B) + log(B_A) - log(A_A) - log(B_B),
-    gender_ratio = A_B/B_A
-  ) |>
-  summarize(
-    se_log_odds = sd(log_odds) / sqrt(n()),
-    mean_log_odds = mean(log_odds),
-    se_gender_ratio = sd(gender_ratio) / sqrt(n()),
-    mean_gender_ratio = mean(gender_ratio)
-  )
-```
-
-```{r}
-models <- results |> map(function(result) {
-  choice_sets <- construct_choice_sets(result, 1000, 50) |>
-    filter(ego_spouse == "wife")
-
-  choice_sets <- choice_sets |>
-    mutate(
-      age_diff = birth_time_w - birth_time_h,
-      ABsym = (group_w == "A" & group_h == "B") | (group_w == "B" & group_h == "A"),
-      AB = (group_w == "A" & group_h == "B"),
-      BA = (group_w == "B" & group_h == "A") 
-    )
-
-  clogit(chosen ~ age_diff + I(age_diff^2) + ABsym + strata(union_id), data = choice_sets)
-})
-
-temp <- models |> map(coef) |>
-  bind_rows()
-temp |>
-  summarise(across(
-    everything(),
-    list(
-      mean = ~ mean(.x),
-      se = ~ sd(.x) / sqrt(length(.x))
-    )
-  ))
-
-
-colMeans(temp)
-
-```
 
 ```{r}
 
@@ -1460,7 +1379,7 @@ mar_rates |>
 ```
 ### Group matching parameters
 
-To test group matching parameters, I start with a three group population with uneven sizes. Group A and B are given a symmetric exogamy ratio while B and C have directed effects by gender, and there are no barriers between A and C. I use shared fertility and mortality rates across groups, since we are not concerned with that feature for this evaluation. I also use on demand union formation because we are focused on the matching model itself here and the on demand model runs faster. I then run 100 simulations.
+To test group matching parameters, I start with a three group population with uneven sizes. Group A and B has the lowest exogamy ratio of -3, while the exogamy ratio for B and C is half that (-1.5) and there is no barrier between A and C intermarriage. I also add a $\delta = 0.12$ for group C to create gender imbalance in intermarriages involving group C that favors more group C men. I use shared fertility and mortality rates across groups, since we are not concerned with that feature for this evaluation. I also use on demand union formation because we are focused on the matching model itself here and the on demand model runs faster. I then run 100 simulations.
 
 ```{r}
 #| label: run-intermarriage-sim-uneven
@@ -1472,145 +1391,206 @@ model <- hammel_model() |>
   set_union_formation(
     "on_demand",
     matching = create_age_gap_matching_model(
-      0, 5, 
-      group_exogamy = c("A::B" = -3, "B:C" = -1, "C:B" = -0.5)
+      0, 5, group_exogamy = c("A:B" = -3, "B:C" = -1.5), delta = c("C" = 0.12)
     ),
+    diagnostics = TRUE
   )
 
-results  <- map(replication_seeds, function(seed) {
-  simulate(model, years = years, seed = seed)
-})
+results  <- future_map(
+  replication_seeds, 
+  function(seed) {
+    simulate(model, years = years, seed = seed) 
+  },
+  .options = furrr_options(seed = NULL)
+)
 names(results) <- as.character(replication_seeds)
 ```
 
 ```{r}
+#| label: calculate-crosstabs-uneven
 
-map(results, get_detailed_unions) |>
+crosstabs <- results |>
+  map(get_detailed_unions) |>
   bind_rows(.id = "replication") |>
   count(replication, group_w, group_h) |>
-  pivot_wider(id_cols = c(replication), names_from = c(group_w, group_h), values_from = n)
+  pivot_wider(id_cols = replication, names_from = c(group_w, group_h), values_from = n) |>
+  mutate(
+    log_odds_A_B = log(A_B) + log(B_A) - log(A_A) - log(B_B),
+    log_odds_A_C = log(A_C) + log(C_A) - log(A_A) - log(C_C),
+    log_odds_B_C = log(B_C) + log(C_B) - log(B_B) - log(C_C),
+    gender_ratio_A_B = A_B/B_A,
+    gender_ratio_A_C = A_C/C_A,
+    gender_ratio_B_C = B_C/C_B
+  )
+```
+
+```{r}
+#| label: fig-log-odds-ratios-uneven
+#| fig-cap: Distribution of log-odds ratio by pairing and simulation across 100 simulations. Individual points are shown by semi-transparent dots.  
+
+crosstabs |>
+  select(replication, starts_with("log_odds")) |>
+  pivot_longer(
+    cols = starts_with("log_odds"), 
+    names_to = "pairing", 
+    values_to = "log_odds", 
+    names_prefix = "log_odds_"
+  ) |>
+  mutate(pairing = str_replace(pairing, "_", ":")) |>
+  ggplot(aes(x= pairing, y = log_odds))+
+#  scale_y_log10()+
+  geom_boxplot()+
+  geom_jitter(alpha = 0.2)+
+  labs(y = "log odds ratio")+
+  theme_bw()
+```
+
+```{r}
+#| label: tbl-log-odds-ratios-uneven
+#| tbl-cap: Mean log odds ratio and standard error by group pairing across 100 simulations.
+
+crosstabs |>
+  select(replication, starts_with("log_odds")) |>
+  pivot_longer(
+    cols = starts_with("log_odds"), 
+    names_to = "pairing", 
+    values_to = "log_odds", 
+    names_prefix = "log_odds_"
+  ) |>
+  mutate(pairing = str_replace(pairing, "_", ":")) |>
+  group_by(pairing) |>
+  summarize(
+    mean_log_odds = mean(log_odds),
+    se_log_odds = sd(log_odds) / sqrt(n()),
+  ) |>
+  gt() |>
+  fmt_number(ends_with("log_odds"), decimals = 4) |>
+  cols_label(
+    pairing  ~ "Pairing",
+    mean_log_odds ~ "Mean log odds",
+    se_log_odds ~ "Standard error"
+  )
+```
+
+```{r}
+#| label: fig-gender-ratios-uneven
+#| fig-cap: Distribution of gender ratio by pairing and simulation across 100 simulations. Individual points are shown by semi-transparent dots.
+
+crosstabs |>
+  select(replication, starts_with("gender_ratio")) |>
+  pivot_longer(
+    cols = starts_with("gender_ratio"), 
+    names_to = "pairing", 
+    values_to = "gender_ratio", 
+    names_prefix = "gender_ratio_"
+  ) |>
+  mutate(pairing = str_replace(pairing, "_", ":")) |>
+  ggplot(aes(x= pairing, y = gender_ratio))+
+  geom_boxplot()+
+  geom_jitter(alpha = 0.2)+
+  geom_hline(yintercept = 1, color = "red", linetype = 2)+
+  labs(y = "gender ratio")+
+  theme_bw()
+```
+
+```{r}
+#| label: tbl-gender-ratios-uneven
+#| tbl-cap: Mean gender ratio and standard error by group pairing across 100 simulations.
+
+crosstabs |>
+  select(replication, starts_with("gender_ratio")) |>
+  pivot_longer(
+    cols = starts_with("gender_ratio"), 
+    names_to = "pairing", 
+    values_to = "gender_ratio", 
+    names_prefix = "gender_ratio_"
+  ) |>
+  mutate(pairing = str_replace(pairing, "_", ":")) |>
+  group_by(pairing) |>
+  summarize(
+    mean_gender_ratio = mean(gender_ratio),
+    se_gender_ratio = sd(gender_ratio) / sqrt(n()),
+  ) |>
+  gt() |>
+  fmt_number(ends_with("gender_ratio"), decimals = 4) |>
+  cols_label(
+    pairing  ~ "Pairing",
+    mean_gender_ratio ~ "Mean gender ratio",
+    se_gender_ratio ~ "Standard error"
+  )
 ```
 
 
 ```{r}
-#| label: fig-exogamy-uneven
-#| fig-cap: Mean log odds ratio of each group pairing by decade of the simulation, across 100 simulations using uneven group sizes. 95% confidence bands shown. Dotted horizontal line give the expected log odds ratio from iput.
+#| label: estimate-clogit-models
 
-expected <- tribble(
-  ~pairing, ~log_odds,
-  "AB",     -6,
-  "BC",     -1.5,
-  "AC",     0
+models <- results |> future_map(
+  function(result) {
+    choice_sets <- construct_choice_sets(result, 1000, 50) |>
+      filter(ego_spouse == "wife") |>
+      mutate(
+        log_weight = case_when(
+          group_h == "A" ~ .log_weight_A,
+          group_h == "B" ~ .log_weight_B,
+          group_h == "C" ~ .log_weight_C
+        )
+      )
+
+    choice_sets <- choice_sets |>
+      mutate(
+        age_diff = birth_time_w - birth_time_h,
+        ABsym = (group_w == "A" & group_h == "B") | (group_w == "B" & group_h == "A"),
+        AB = (group_w == "A" & group_h == "B"),
+        BA = (group_w == "B" & group_h == "A"),
+        BC = (group_w == "B" & group_h == "C"),
+        CB = (group_w == "C" & group_h == "B"),
+        AC = (group_w == "A" & group_h == "C"),
+        CA = (group_w == "C" & group_h == "A")
+      )
+
+    clogit(
+      chosen ~ age_diff + I(age_diff^2) + 
+        # estimate as directed effects to confirm they are the same
+        AB + BA + BC + CB + AC + CA +
+        #offset by the log weights to get correct estimates
+        offset(log_weight) +
+        # add the choice set id
+        strata(union_id),
+      data = choice_sets
+    )
+  },
+  .options = furrr_options(seed = NULL)
 )
+```
 
-map(results, get_detailed_unions) |>
-  bind_rows(.id = "replication") |>
-  mutate(time_span = floor(start_time / 10) * 10) |> 
-  count(replication, time_span, group_w, group_h) |>
-  pivot_wider(id_cols = c(replication, time_span), names_from = c(group_w, group_h), values_from = n) |>
-  mutate(
-    log_odds_AB = log(A_B) + log(B_A) - log(A_A) - log(B_B),
-    log_odds_BC = log(B_C) + log(C_B) - log(B_B) - log(C_C),
-    log_odds_AC = log(A_C) + log(C_A) - log(A_A) - log(C_C)
-  ) |>
-  select(replication, time_span, starts_with("log_odds")) |>
+```{r}
+#| label: tbl-model-estimates
+#| tbl-cap: Mean estimated coefficient from conditional logit models across 100 simulations with monte carlo standard error. All models use an offset of the log-weight. Models sample 1000 women from each replication and assign 50 alternate partners.
+
+models |> 
+  map(coef) |>
+  bind_rows() |>
+  summarize(across(
+    everything(),
+    list(
+      mean = ~ mean(.x),
+      se = ~ sd(.x) / sqrt(length(.x))
+    )
+  )) |>
   pivot_longer(
-    cols = starts_with("log_odds_"), 
-    names_prefix = "log_odds_", 
-    names_to = "pairing", 
-    values_to = "log_odds"
+    everything(),
+    names_to = c("term", ".value"),
+    names_pattern = "^(.*)_(mean|se)$"
   ) |>
-  group_by(time_span, pairing) |>
-  summarize(
-    sd = sd(log_odds),
-    log_odds = mean(log_odds),
-    n = n(),
-    se = sd / sqrt(n),
-    .groups = "drop"
-  ) |>
-  ggplot(aes(x = time_span + 5, y = log_odds, group = pairing, color = pairing))+
-  geom_ribbon(aes(ymin = log_odds - 1.96 * se, ymax = log_odds + 1.96 * se, fill = pairing), 
-              color = NA, alpha = 0.3)+
-  geom_point()+
-  geom_hline(data = expected, aes(yintercept = log_odds, color = pairing), linetype = 2)+
-  labs(x = "year", y = "log odds ratio")+
-  theme_bw()
+  gt() |>
+  fmt_number(c(mean, se), decimals = 4)
 ```
 
 @fig-exogamy-uneven shows the estimated mean log odds ratio for each pairing in decade intervals. These log odds ratios should equal double the symmetric log odds ratio from the input and the sum of the separate ratios for gender-specific effects. The results show a tight correspondence between the expected odds ratios and those observed in the simulations.
 
 I can also test the values of the parameters by drawing a sample of unions from one of the simulations and constructing alternate union choice sets for a conditional logit model, using the same basic procedure as the milestone 2 report.
 
-```{r}
-#| label: construct-choice-sets
-
-set.seed(42)
-union_sample <- results[[1]] |>
-  get_detailed_unions() |>
-  slice_sample(n = 10000) |>
-  mutate(
-    age_mar_w = start_time - birth_time_w, 
-    age_mar_h = start_time - birth_time_h,
-    age_diff = age_mar_h - age_mar_w,
-  ) |>
-  select(union_id, husband_id, start_time, age_mar_w, age_mar_h, age_diff, group_w, group_h) |>
-  mutate(chosen = TRUE)
-
-choice_sets <- NULL
-
-for(i in 1:nrow(union_sample)) {
-  union_real <- union_sample[i,]
-
-  unions_fake <- get_eligible_bachelors(union_real$start_time, results[[1]]) |>
-    filter(person_id != union_real$husband_id) |>
-    slice_sample(n = 50) |>
-    rename(husband_id = person_id) |>
-    mutate(
-      union_id = union_real$union_id,
-      start_time = union_real$start_time,
-      age_mar_h = start_time - birth_time,
-      age_mar_w = union_real$age_mar_w,
-      age_diff = age_mar_h - age_mar_w,
-      group_w = union_real$group_w,
-      group_h = group,
-      chosen = FALSE
-    ) |>
-    select(union_id, husband_id, start_time, age_mar_w, age_mar_h, age_diff, group_w, group_h, chosen)
-
-  choice_set <- rbind(union_real, unions_fake)
-  choice_sets <- rbind(choice_sets, choice_set)
-}
-```
-
 Once, I have the choice sets, I can feed these into a conditional logit model where the true union is predicted by age difference and its square, symmetric exogamy dummies for AB and AC exogamy and directed exogamy dummies for BC exogamy.
-
-```{r}
-#| label: tbl-clogit
-#| tbl-cap: Conditional logit model predicting partner choice by partner age differences and group exogamy. Results are based on a random sample of 10000 unions from a single simulation with uneven group sizes with 50 alternate partners per union. 95% confidence intervals are shown in brackets.
-
-choice_sets <- choice_sets |>
-  mutate(
-    ABsym = (group_w == "A" & group_h == "B") | (group_w == "B" & group_h == "A"),
-    ACsym = (group_w == "A" & group_h == "C") | (group_w == "C" & group_h == "A"),
-    BC = (group_w == "B" & group_h == "C"),
-    CB = (group_w == "C" & group_h == "B"),
-    AB = (group_w == "A" & group_h == "B"),
-    BA = (group_w == "B" & group_h == "A") 
-  )
-
-model_clogit <- clogit(chosen ~ age_diff + I(age_diff^2) + AB + BA  + strata(union_id), data = choice_sets)
-modelsummary(
-  model_clogit, 
-  estimate = "{estimate} [{conf.low}, {conf.high}]",
-  statistic = NULL, 
-  fmt = 3, 
-  conf_level = 0.95,
-  coef_map = c("age_diff" = "age difference", "I(age_diff^2)" = "age difference sq.",
-               "ABsymTRUE" = "A::B", "ACsymTRUE" = "A::C", "BCTRUE" = "B:C", "CBTRUE" = "C:B"),
-  gof_map = c("nobs"), 
-  output = "gt",
-)
-```
 
 The results here match closely to the expectations from the input values. All of the exogamy terms are very close to the expectation from the input (A::B = -3, A::C = 0, B:C = -1, and C:B = -0.5) and fall well within the 95% confidence interval. The age difference parameters are also very close to their expectation (linear = 0, quadratic = -0.0277).
 
@@ -1632,7 +1612,7 @@ outmarriage_uneven <- results |>
   mutate(pop_share = "uneven")
 ```
 
-One feature of the log-odds ratio approach is that it should be indifferent to group size. So, the simulation will produce the same log-odds ratios under different shares of group size, whereas other measures like the outmarriage rate will vary by group size.^[This feature can break down when one group becomes very small because it is possible to sample zero members in the choice set of eligible partners which means that intermarriage will not be possible in some choice sets. This will bias exogamy log-odds ratios downward.] This allows users to distinguish likelihoods of intergroup unions that are separate from group size effects that may change over the simulation.
+One feature of the log-odds ratio approach is that it should be indifferent to group size. So, the simulation will produce the same log-odds ratios under different shares of group size, whereas other measures like the outmarriage rate will vary by group size.^[This feature can break down when one group becomes so small that members of that group are sometimes not available as partners.] This allows users to distinguish likelihoods of intergroup unions that are separate from group size effects that may change over the simulation.
 
 To demonstrate this, I will re-run the simulations with an even population share for the the three groups but holding everything else constant.
 
@@ -1642,48 +1622,80 @@ To demonstrate this, I will re-run the simulations with an even population share
 model <- model |>
   set_population(pop_baseline_even_3g)
 
-results  <- map(replication_seeds, function(seed) {
-  simulate(model, years = years, seed = seed)
-})
+results  <- future_map(
+  replication_seeds, 
+  function(seed) {
+    simulate(model, years = years, seed = seed) 
+  },
+  .options = furrr_options(seed = NULL)
+)
 names(results) <- as.character(replication_seeds)
 ```
 
 ```{r}
-#| label: fig-exogamy-even
-#| fig-cap: Mean log odds ratio of each group pairing by decade of the simulation, across 100 simulations using even group sizes. 95% confidence bands shown. Dotted horizontal line give the expected log odds ratio from iput.
+#| label: calculate-crosstabs-uneven
 
-map(results, get_detailed_unions) |>
+crosstabs <- results |>
+  map(get_detailed_unions) |>
   bind_rows(.id = "replication") |>
-  mutate(time_span = floor(start_time / 10) * 10) |> 
-  count(replication, time_span, group_w, group_h) |>
-  pivot_wider(id_cols = c(replication, time_span), names_from = c(group_w, group_h), values_from = n) |>
+  count(replication, group_w, group_h) |>
+  pivot_wider(id_cols = replication, names_from = c(group_w, group_h), values_from = n) |>
   mutate(
-    log_odds_AB = log(A_B) + log(B_A) - log(A_A) - log(B_B),
-    log_odds_BC = log(B_C) + log(C_B) - log(B_B) - log(C_C),
-    log_odds_AC = log(A_C) + log(C_A) - log(A_A) - log(C_C)
-  ) |>
-  select(replication, time_span, starts_with("log_odds")) |>
+    log_odds_A_B = log(A_B) + log(B_A) - log(A_A) - log(B_B),
+    log_odds_A_C = log(A_C) + log(C_A) - log(A_A) - log(C_C),
+    log_odds_B_C = log(B_C) + log(C_B) - log(B_B) - log(C_C),
+    gender_ratio_A_B = A_B/B_A,
+    gender_ratio_A_C = A_C/C_A,
+    gender_ratio_B_C = B_C/C_B
+  )
+```
+
+```{r}
+#| label: fig-log-odds-ratios-even
+#| fig-cap: Distribution of log-odds ratio by pairing and simulation across 100 simulations with even starting group sizes. Individual points are shown by semi-transparent dots.  
+
+crosstabs |>
+  select(replication, starts_with("log_odds")) |>
   pivot_longer(
-    cols = starts_with("log_odds_"), 
-    names_prefix = "log_odds_", 
+    cols = starts_with("log_odds"), 
     names_to = "pairing", 
-    values_to = "log_odds"
+    values_to = "log_odds", 
+    names_prefix = "log_odds_"
   ) |>
-  group_by(time_span, pairing) |>
-  summarize(
-    sd = sd(log_odds),
-    log_odds = mean(log_odds),
-    n = n(),
-    se = sd / sqrt(n),
-    .groups = "drop"
-  ) |>
-  ggplot(aes(x = time_span + 5, y = log_odds, group = pairing, color = pairing))+
-  geom_ribbon(aes(ymin = log_odds - 1.96 * se, ymax = log_odds + 1.96 * se, fill = pairing), 
-              color = NA, alpha = 0.3)+
-  geom_point()+
-  geom_hline(data = expected, aes(yintercept = log_odds, color = pairing), linetype = 2)+
-  labs(x = "year", y = "log odds ratio")+
+  mutate(pairing = str_replace(pairing, "_", ":")) |>
+  ggplot(aes(x= pairing, y = log_odds))+
+#  scale_y_log10()+
+  geom_boxplot()+
+  geom_jitter(alpha = 0.2)+
+  labs(y = "log odds ratio")+
   theme_bw()
+```
+
+```{r}
+#| label: tbl-log-odds-ratios-even
+#| tbl-cap: Mean log odds ratio and standard error by group pairing across 100 simulations with even starting group sizes.
+
+crosstabs |>
+  select(replication, starts_with("log_odds")) |>
+  pivot_longer(
+    cols = starts_with("log_odds"), 
+    names_to = "pairing", 
+    values_to = "log_odds", 
+    names_prefix = "log_odds_"
+  ) |>
+  mutate(pairing = str_replace(pairing, "_", ":")) |>
+  group_by(pairing) |>
+  summarize(
+    mean_log_odds = mean(log_odds),
+    se_log_odds = sd(log_odds) / sqrt(n()),
+  ) |>
+  gt() |>
+  fmt_number(ends_with("log_odds"), decimals = 4) |>
+  cols_label(
+    pairing  ~ "Pairing",
+    mean_log_odds ~ "Mean log odds",
+    se_log_odds ~ "Standard error"
+  )
 ```
 
 @fig-exogamy-even shows the same figure as @fig-exogamy-uneven but for an even starting population. As the figure shows, the estimated log-odds ratios are consistent with the uneven case and with the input values.
@@ -1719,6 +1731,8 @@ bind_rows(outmarriage_uneven, outmarriage_even) |>
 ```
 
 @fig-outmarriage-rate shows the mean outmarriage rates in the uneven and even starting group size cases across each year of the simulations. The outmarriage rate is simply the proportion of all unions formed in a given year that are between partners belonging to different groups. Notably, these rates are not the same across the cases even though everything else in the simulations is held constant and they have the same underlying log odds ratio of exogamy. In the even group case, the opportunities for intermarriage are greater because the groups are of similar size which leads to a much higher outmarriage ratio.
+
+**TODO: check gender ratios under different group mortality and fertility expectations.**
 
 ### Hard restrictions and candidate scarcity
 
