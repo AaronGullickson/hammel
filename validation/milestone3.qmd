@@ -1341,42 +1341,6 @@ mar_rates |>
 
 ## Evaluate Group Matching
 
-
-```{r}
-
-counts <- map(
-  results,
-  calculate_lexis_counts,
-  time_breaks = time_breaks,
-  age_breaks = seq(15, 70, 5), 
-  include_unions = TRUE,
-  by_group = TRUE
-)
-
-mar_rates <- counts |>
-  bind_rows(.id = "replication") |>
-  filter(union_status == "unpartnered") |>
-  group_by(age_start, sex, group) |>
-  summarize(
-    rate = mean(rate_marriage),
-    sd = sd(rate_marriage),
-    n = n(),
-    se = sd / sqrt(n),
-    .groups = "drop"
-  )
-```
-
-```{r}
-
-mar_rates |>
-  ggplot(aes(x = age_start + 2.5, y = rate, group = sex, color = sex))+
-  geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
-  geom_point()+
-  geom_line()+
-  facet_wrap(~group)+
-  labs(x = "age", y = "age-specific marital rate")+
-  theme_bw()
-```
 ### Group matching parameters
 
 To test group matching parameters, I start with a three group population with uneven sizes. Group A and B has the lowest exogamy ratio of -3, while the exogamy ratio for B and C is half that (-1.5) and there is no barrier between A and C intermarriage. I also add a $\delta = 0.12$ for group C to create gender imbalance in intermarriages involving group C that favors more group C men. I use shared fertility and mortality rates across groups, since we are not concerned with that feature for this evaluation. I also use on demand union formation because we are focused on the matching model itself here and the on demand model runs faster. I then run 100 simulations.
@@ -1426,7 +1390,7 @@ crosstabs <- results |>
 
 ```{r}
 #| label: fig-log-odds-ratios-uneven
-#| fig-cap: Distribution of log-odds ratio by pairing and simulation across 100 simulations. Individual points are shown by semi-transparent dots.  
+#| fig-cap: Distribution of log odds ratio by pairing and simulation across 100 simulations. Individual points are shown by semi-transparent dots.  
 
 crosstabs |>
   select(replication, starts_with("log_odds")) |>
@@ -1444,6 +1408,8 @@ crosstabs |>
   labs(y = "log odds ratio")+
   theme_bw()
 ```
+
+@fig-log-odds-ratios-uneven shows the log odds ratios estimated for each simulation with boxplots showing the distribution. Although there is some fluctuation across simulations, each pairing is very close to the expected $2\beta$ value from the inputs. 
 
 ```{r}
 #| label: tbl-log-odds-ratios-uneven
@@ -1472,6 +1438,8 @@ crosstabs |>
   )
 ```
 
+@tbl-log-odds-ratios-uneven shows the mean of these log odds ratios across the 100 simulations and the monte carlo standard error. All three estimates are very close the expected input value of $2\beta$ and well within the 95% confidence interval. 
+
 ```{r}
 #| label: fig-gender-ratios-uneven
 #| fig-cap: Distribution of gender ratio by pairing and simulation across 100 simulations. Individual points are shown by semi-transparent dots.
@@ -1492,6 +1460,8 @@ crosstabs |>
   labs(y = "gender ratio")+
   theme_bw()
 ```
+
+@fig-gender-ratios-uneven shows the estimated gender ratio between each gender combination for each pairing. Because there is no $\delta$ parameter for the A or B groups, we expect that the gender ratio should be 1. The estimated points of each simulation have substantial variance but the median looks very close to 1. For the other two pairings, the inclusion of the $\delta_C = 0.12$ means we don't have an exact expectation other than the gender ratio should be greater than 1, which it appears to be. 
 
 ```{r}
 #| label: tbl-gender-ratios-uneven
@@ -1520,11 +1490,14 @@ crosstabs |>
   )
 ```
 
+@tbl-gender-ratios-uneven shows the mean gender ratio across all simulations for each pairing, with monte carlo standard errors. As expected, the gender ratio for the AB pairing is very close to 1 and 1 lies within its 95% confidence interval. The other two gender ratios are clearly greater than 1, as expected.
+
+A more formal test is to construct conditional logit models from the simulated results and confirm that parameter estimates match those of the inputs. For each simulation, I sample 1000 women and then I sample 50 alternate partners for each woman to create 1000 choices sets of size 51. I then run a conditional logit model on these estimates with the age difference and age difference squared terms as well as dummies for each gender-specific exogamous group combination. I add the log of the weight used for each union as an offset which should cause the estimates to match those of the input, aside from sampling error. All of the pairing results should be symmetric after the inclusion of the offset (e.g. B == CB), but I include them separately to test for differences.
 
 ```{r}
 #| label: estimate-clogit-models
 
-models <- results |> future_map(
+models_clogit <- results |> future_map(
   function(result) {
     choice_sets <- construct_choice_sets(result, 1000, 50) |>
       filter(ego_spouse == "wife") |>
@@ -1563,11 +1536,13 @@ models <- results |> future_map(
 )
 ```
 
+@tbl-model-estimates shows the mean model estimate and monte carlo standard error across 100 simulations. 
+
 ```{r}
 #| label: tbl-model-estimates
 #| tbl-cap: Mean estimated coefficient from conditional logit models across 100 simulations with monte carlo standard error. All models use an offset of the log-weight. Models sample 1000 women from each replication and assign 50 alternate partners.
 
-models |> 
+models_clogit |> 
   map(coef) |>
   bind_rows() |>
   summarize(across(
@@ -1586,13 +1561,61 @@ models |>
   fmt_number(c(mean, se), decimals = 4)
 ```
 
-@fig-exogamy-uneven shows the estimated mean log odds ratio for each pairing in decade intervals. These log odds ratios should equal double the symmetric log odds ratio from the input and the sum of the separate ratios for gender-specific effects. The results show a tight correspondence between the expected odds ratios and those observed in the simulations.
+```{r}
+# |lael: models-gc
 
-I can also test the values of the parameters by drawing a sample of unions from one of the simulations and constructing alternate union choice sets for a conditional logit model, using the same basic procedure as the milestone 2 report.
+rm(models_clogit)
+```
 
-Once, I have the choice sets, I can feed these into a conditional logit model where the true union is predicted by age difference and its square, symmetric exogamy dummies for AB and AC exogamy and directed exogamy dummies for BC exogamy.
+All of the parameters are extremely close to their expected values from the input. All of the 95% confidence intervals for each term would fall within the expected value. Furthermore, the two directed effects for each pair are all statistically equivalent to one another at p < 0.05.
 
-The results here match closely to the expectations from the input values. All of the exogamy terms are very close to the expectation from the input (A::B = -3, A::C = 0, B:C = -1, and C:B = -0.5) and fall well within the 95% confidence interval. The age difference parameters are also very close to their expectation (linear = 0, quadratic = -0.0277).
+### Analysis of marriage rates
+
+Male marriage rates are not defined in the simulation but arise out of the choice model process. To help ensure that these male rates look reasonable, I calculate the age-specific marriage rates by gender and group across the simulations. 
+
+
+```{r}
+#| label: calculate-mar-rates-uneven
+
+counts <- map(
+  results,
+  calculate_lexis_counts,
+  time_breaks = time_breaks,
+  age_breaks = seq(15, 70, 5), 
+  include_unions = TRUE,
+  by_group = TRUE
+)
+
+mar_rates <- counts |>
+  bind_rows(.id = "replication") |>
+  filter(union_status == "unpartnered") |>
+  group_by(age_start, sex, group) |>
+  summarize(
+    rate = mean(rate_marriage),
+    sd = sd(rate_marriage),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: fig-mar-rates-uneven-groups
+#| fig-cap: Mean marriage rates by group and gender across 100 simulations
+
+mar_rates |>
+  ggplot(aes(x = age_start + 2.5, y = rate, group = sex, color = sex))+
+  geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
+  geom_point()+
+  geom_line()+
+  facet_wrap(~group)+
+  labs(x = "age", y = "age-specific marital rate")+
+  theme_bw()
+```
+
+@fig-mar-rates-uneven-groups shows this marriage rates by group and gender. Because we are using an on demand model of union formation, the female rates will be determined by fertility rates. The male rates look reasonable, with somewhat wider dispersion in age at marriage across all three groups.
+
+### Comparison of outmarriage ratios
 
 ```{r}
 #| label: calc-outmarriage-share-uneven
@@ -1698,7 +1721,7 @@ crosstabs |>
   )
 ```
 
-@fig-exogamy-even shows the same figure as @fig-exogamy-uneven but for an even starting population. As the figure shows, the estimated log-odds ratios are consistent with the uneven case and with the input values.
+@fig-log-odds-ratios-even and @tbl-log-odds-ratios-even show the estimated log odds ratios by pairing for the case with even starting population sizes. As expected these match the input values and the uneven starting group size case.
 
 ```{r}
 #| label: calc-outmarriage-share-even
@@ -1732,16 +1755,9 @@ bind_rows(outmarriage_uneven, outmarriage_even) |>
 
 @fig-outmarriage-rate shows the mean outmarriage rates in the uneven and even starting group size cases across each year of the simulations. The outmarriage rate is simply the proportion of all unions formed in a given year that are between partners belonging to different groups. Notably, these rates are not the same across the cases even though everything else in the simulations is held constant and they have the same underlying log odds ratio of exogamy. In the even group case, the opportunities for intermarriage are greater because the groups are of similar size which leads to a much higher outmarriage ratio.
 
+### Gender ratios under different group rates
+
 **TODO: check gender ratios under different group mortality and fertility expectations.**
-
-### Hard restrictions and candidate scarcity
-
-Check effects of candidate scarcity in small populations.
-
-```{r}
-#| label: group-matching-results
-# TODO: Pair tables, choice-model recovery, and restriction/availability checks.
-```
 
 ## Evaluate Group Inheritance
 
