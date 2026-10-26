@@ -18,6 +18,7 @@ execute:
 
 ```{r}
 #| label: setup
+#| eval: true
 #| include: false
 
 
@@ -27,6 +28,7 @@ devtools::install(here::here())
 library(hammel)
 library(dplyr)
 library(tidyr)
+library(tibble)
 library(readr)
 library(purrr)
 library(tibble)
@@ -216,7 +218,7 @@ The inverse cross product of @tbl-crosstab-clogit gives us the odds ratio of exo
 
 $$\frac{(0.25)(0.75)e^{\beta}D_B^{-1}(0.75)(0.25)e^{\beta}D_A^{-1}}{(0.75)(0.75)D_A^{-1}(0.25)(0.25)D_B^{-1}} = e^{2\beta}$$
 
-Everything cancels out except for the $\beta$ values. The log cross product is thus $2\beta$ which is consistent with conditional logit model estimates typically around half the log-odds ratio in empirical data. If we set $\beta = 0$ here, then $D_A = 1$ and $D_B = 1$ and @tbl-crosstab-clogit simplifies to @tbl-crosstab-simple.  
+Everything (cancels out except for the $\beta$ values. The log cross product is thus $2\beta$ which is consistent with conditional logit model estimates typically around half the log-odds ratio in empirical data. If we set $\beta = 0$ here, then $D_A = 1$ and $D_B = 1$ and @tbl-crosstab-clogit simplifies to @tbl-crosstab-simple.  
 
 We can generalize this approach by setting $F_i$ and $M_j$ as the share of women and men respectively belonging to a certain group (0.75 and 0.25 for goups A and B, respectively, in the example above) and setting utility $U_{ij}$ as:
 
@@ -281,6 +283,8 @@ In this simplified two group example, there is a closed form analytical solution
 | Wife Group B | $\frac{(1-f)pe^{\beta}}{pe^{\beta}+q\omega_B}$ | $\frac{(1-f)q\omega_B}{pe^{\beta}+q\omega_B}$          |
 
 
+: Joint distribution of unions by wife's group and husband's group as function of input parameters with weights {#tbl-crosstab-formula}
+
 The constraint is that $N_{AB}+N_{BB} = q$. Solving for that constraint gives a quadratic form:
 
 $$
@@ -300,6 +304,68 @@ Notably, this solutions forces the following equality:
 $$N_{AB} - N_{BA} = f - p$$
 
 When the groups have the same share within each gender, $f-p = 0$ and we will have symmetry in $N_{AB} - N_{BA}$. 
+
+```{r}
+#| label: tbl-scenario-two-groups-balanced
+#| tbl-cap: Joint distribution, log odds ratio, and ratio of AB/BA under different scenarios of input parameters
+#| eval: true
+
+get_weight <- function(f, p, q, beta) {
+  C <- p - f + (f - q) * exp(2 * beta)
+  (sqrt(C^2 + 4 * p * q * exp(2 * beta)) - C) / (2 * q * exp(beta))
+}
+
+show_scenario <- function(f, p, beta, apply_weights = TRUE) {
+  
+  q <- 1 - p
+  if (!apply_weights) {
+    omega <- 1
+  } else {
+    omega <- get_weight(f, p, q, beta)
+  }
+
+  tibble(
+    f = f,
+    p = p,
+    beta = beta,
+    weights = apply_weights,
+    N_aa = (f * p)/(p + q * omega * exp(beta)),
+    N_ab = (f * q * omega * exp(beta))/(p + q * omega * exp(beta)),
+    N_ba = ((1 - f) * p * exp(beta))/(p * exp(beta) + q * omega),
+    N_bb = ((1 - f) * q * omega)/(p * exp(beta) + q * omega),
+    log_odds = log(N_ab) + log(N_ba) - log(N_aa) - log(N_bb),
+    ratio = N_ab / N_ba
+  )
+}
+
+bind_rows(
+  show_scenario(0.5, 0.5, -3, FALSE),
+  show_scenario(0.5, 0.5, -3),
+  show_scenario(0.75, 0.75, -3, FALSE),
+  show_scenario(0.75, 0.75, -3),
+  show_scenario(0.5, 0.5, -4, FALSE),
+  show_scenario(0.5, 0.5, -4),
+  show_scenario(0.75, 0.75, -4, FALSE),
+  show_scenario(0.75, 0.75, -4),
+) |>
+  gt() |>
+  cols_label(
+    f ~ "A women",
+    p ~ "A men",
+    beta ~ "Beta",
+    weights ~ "Weighted?",
+    log_odds = "Log odds",
+    ratio = "AB/BA ratio"
+  ) |>
+  fmt_number(starts_with("N_"), decimals = 4) |>
+  fmt_number(c(log_odds, ratio), decimals = 2) |>
+  tab_spanner(c(f, p, beta, weights), label = "inputs") |>
+  tab_spanner(starts_with("N_"), label = "table frequencies") |>
+  tab_spanner(c(log_odds, ratio), label = "estimated properties")
+
+```
+
+@tbl-scenario-two-groups-balanced shows the cell counts, log odds ratio and AB/BA ratio under different input scenarios where the group share within each gender is the same. All scenarios produce a log odds ratio that is exactly double the input $\beta$. When A and B are equal shares of the population, the weighted and unweighted results are identical. When A is 75% of each gender, then the results diverge substantial. The unweighted results (i.e. $\omega_B = 1$) will produce almost a 3:1 ratio of B woman/A man pairings compared to A woman/B man pairings. The weighted results produce equal number of AB and BA pairings.
 
 
 ---
