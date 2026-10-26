@@ -24,7 +24,7 @@ execute:
 
 library(here)
 # installing will lead to faster computation
-devtools::install(here::here())
+#devtools::install(here::here())
 library(hammel)
 library(dplyr)
 library(tidyr)
@@ -307,7 +307,7 @@ When the groups have the same share within each gender, $f-p = 0$ and we will ha
 
 ```{r}
 #| label: tbl-scenario-two-groups-balanced
-#| tbl-cap: Joint distribution, log odds ratio, and ratio of AB/BA under different scenarios of input parameters
+#| tbl-cap: Joint distribution, log odds ratio, and ratio of AB/BA under different scenarios of input parameters where group size is balanced by gender
 #| eval: true
 
 get_weight <- function(f, p, q, beta) {
@@ -362,11 +362,128 @@ bind_rows(
   tab_spanner(c(f, p, beta, weights), label = "inputs") |>
   tab_spanner(starts_with("N_"), label = "table frequencies") |>
   tab_spanner(c(log_odds, ratio), label = "estimated properties")
-
 ```
 
 @tbl-scenario-two-groups-balanced shows the cell counts, log odds ratio and AB/BA ratio under different input scenarios where the group share within each gender is the same. All scenarios produce a log odds ratio that is exactly double the input $\beta$. When A and B are equal shares of the population, the weighted and unweighted results are identical. When A is 75% of each gender, then the results diverge substantial. The unweighted results (i.e. $\omega_B = 1$) will produce almost a 3:1 ratio of B woman/A man pairings compared to A woman/B man pairings. The weighted results produce equal number of AB and BA pairings.
 
+One limitation of this approach is that it does not allow for directional differences by gender in the ratio - the exogamy parameter $\beta$ must by symmetric with regard to sex. In many cases, this will be appropriate as a single marker of group boundaries, but some empirical cases may have a clear difference in intermarriage likelihood by gender, suggesting that men and women of that group are viewed differently as partners. For example, research has shown about a 3:1 disparity in black men/white women compared to white men/black women pairings in the US. 
+
+Another issue is demonstrated in @tbl-scenario-two-groups-unbalanced. When groups shares are not the same by gender, even fairly minor differences can produce even larger gender disparity than in the balanced approach. This is because of the equality $N_{AB} - N_{BA} = f - p$ This gender disparity must come out as a difference between the two cells. When intermarriages is less likely the ratio will be even larger.
+
+```{r}
+#| label: tbl-scenario-two-groups-unbalanced
+#| tbl-cap: Joint distribution, log odds ratio, and ratio of AB/BA under different scenarios of input parameters where group size is unbalanced by gender
+#| eval: true
+
+bind_rows(
+  show_scenario(0.75, 0.7, -3, FALSE),
+  show_scenario(0.75, 0.7, -3),
+  show_scenario(0.75, 0.7, -4, FALSE),
+  show_scenario(0.75, 0.7, -4),
+  show_scenario(0.7, 0.75, -3, FALSE),
+  show_scenario(0.7, 0.75, -3),
+  show_scenario(0.7, 0.75, -4, FALSE),
+  show_scenario(0.7, 0.75, -4),
+) |>
+  gt() |>
+  cols_label(
+    f ~ "A women",
+    p ~ "A men",
+    beta ~ "Beta",
+    weights ~ "Weighted?",
+    log_odds = "Log odds",
+    ratio = "AB/BA ratio"
+  ) |>
+  fmt_number(starts_with("N_"), decimals = 4) |>
+  fmt_number(c(log_odds, ratio), decimals = 2) |>
+  tab_spanner(c(f, p, beta, weights), label = "inputs") |>
+  tab_spanner(starts_with("N_"), label = "table frequencies") |>
+  tab_spanner(c(log_odds, ratio), label = "estimated properties")
+```
+
+One way to help users address both of these issues is to use a tuning parameter $\delta_g$ for each group. This parameter adjusts the general preference for husbands of this group relative to wives, such that $\delta_g > 0$ gives a relative preference for husbands and $\delta_g < 0$ gives a relative preference for wives. 
+
+This parameter will adjust the targeted constraint for $N_{AB} + N_{BB}$ from $q$ to:
+
+$$\tau_B = \frac{qe^{\delta_B}}{p+qe^{\delta_B}}$$
+
+Assuming $\delta_A = 0$, the closed form solution for $\omega_B$ becomes:
+
+$$
+\omega_B =
+\frac{p}{q}
+\frac{\sqrt{C^2 + 4\tau_B(1-\tau_B)e^{2\beta}} - C}
+{2(1-\tau_B)e^\beta},
+\qquad
+C = (f-\tau_B)e^{2\beta} + 1-f-\tau_B
+$$
+
+
+```{r}
+#| label: tbl-scenario-two-groups-delta
+#| tbl-cap: Joint distribution, log odds ratio, and ratio of AB/BA under different scenarios of input parameters including delta tuning parameter
+#| eval: true
+
+get_weight <- function(f, p, q, beta, delta = 0) {
+  # delta is delta_B relative to delta_A = 0
+  tau_b <- plogis(log(q / p) + delta)
+  C <- (f - tau_b) * exp(2 * beta) + 1 - f - tau_b
+
+  (p / q) *
+    (sqrt(C^2 + 4 * tau_b * (1 - tau_b) * exp(2 * beta)) - C) /
+    (2 * (1 - tau_b) * exp(beta))
+}
+
+show_scenario <- function(f, p, beta, delta = 0, apply_weights = TRUE) {
+  
+  q <- 1 - p
+  if (!apply_weights) {
+    omega <- 1
+  } else {
+    omega <- get_weight(f, p, q, beta, delta)
+  }
+
+  tibble(
+    f = f,
+    p = p,
+    beta = beta,
+    delta = delta,
+    weights = apply_weights,
+    N_aa = (f * p)/(p + q * omega * exp(beta)),
+    N_ab = (f * q * omega * exp(beta))/(p + q * omega * exp(beta)),
+    N_ba = ((1 - f) * p * exp(beta))/(p * exp(beta) + q * omega),
+    N_bb = ((1 - f) * q * omega)/(p * exp(beta) + q * omega),
+    log_odds = log(N_ab) + log(N_ba) - log(N_aa) - log(N_bb),
+    ratio = N_ab / N_ba
+  )
+}
+
+bind_rows(
+  show_scenario(0.75, 0.75, -3),
+  show_scenario(0.75, 0.75, -3, delta = 0.123),
+  show_scenario(0.75, 0.75, -3, delta = -0.123),
+  show_scenario(0.75, 0.7, -3),
+  show_scenario(0.75, 0.7, -3, delta = -0.25),
+  show_scenario(0.75, 0.7, -3, delta = -0.38)
+) |>
+  select(-weights) |>
+  gt() |>
+  cols_label(
+    f ~ "A women",
+    p ~ "A men",
+    beta ~ "Beta",
+    delta ~ "Delta",
+    log_odds = "Log odds",
+    ratio = "AB/BA ratio"
+  ) |>
+  fmt_number(starts_with("N_"), decimals = 4) |>
+  fmt_number(c(log_odds, ratio), decimals = 2) |>
+  tab_spanner(c(f, p, beta, delta), label = "inputs") |>
+  tab_spanner(starts_with("N_"), label = "table frequencies") |>
+  tab_spanner(c(log_odds, ratio), label = "estimated properties")
+```
+
+@tbl-scenario-two-groups-delta shows scenarios using the $\delta$ tuning parameter. The first three rows show a case with even group share by sex in which the tuning parameter is used to create either a roughly 3:1 or 1:3 ratio of AB to BA unions. The last three rows show using the tuning parameter to adjust the ratio from a case of uneven group share by sex to either 1:1 or 1:3. 
 
 ---
 
