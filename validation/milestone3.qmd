@@ -10,7 +10,7 @@ format:
     code-tools: true
     self-contained: true
 execute:
-  eval: true
+  eval: false
   echo: true
   warning: false
   error: false
@@ -20,8 +20,11 @@ execute:
 #| label: setup
 #| include: false
 
+
 library(here)
-devtools::load_all(here::here())
+# installing will lead to faster computation
+devtools::install(here::here())
+library(hammel)
 library(dplyr)
 library(tidyr)
 library(readr)
@@ -177,6 +180,72 @@ hammel_model() |>
 ```
 
 ### Group matching
+
+#### Technical description
+
+Imagine a population of A and B individuals where A is 75% of the population and B is 25% of the population. Lets assume that there was no group-specific preference for marriage partners. Then putting aside other assortative mating differences, we would expect the distribution of couple types by group to match that shown in @tbl-crosstab-simple.
+
+
+|              | Husband Group A | Husband Group B |
+|--------------|-----------------|-----------------|
+| Wife Group A | (0.75)(0.75)    | (0.75)(0.25)    |
+| Wife Group B | (0.25)(0.75)    | (0.25)(0.25)    |
+
+: Joint distribution of unions by wife's group and husband's group when group does not determine choice and where group A is 75% of the population and group B is 25% {#tbl-crosstab-simple}
+
+Now lets assume a conditional logit process where women choose from among available men with a log-odds discount of $\beta$ (where $\beta$ < 0) such that if she was comparing one man from the same group and one man from the other group the probability of an endogamous choice would be $1/(1+e^{\beta})$ and the probability of an exogamous choice would be $e^{\beta}/(1+e^{\beta})$. Considering that the woman will be presented with different distributions of men by group, the overall probabilities need to be adjusted by group size:
+
+$$P(\text{A woman chooses A man}) = \frac{0.75}{0.75 + 0.25e^{\beta}} =  \frac{0.75}{D_A}$$ 
+$$P(\text{A woman chooses B man}) = \frac{0.25e^{\beta}}{0.75 + 0.25e^{\beta}} = \frac{0.25e^{\beta}}{D_A}$$
+$$P(\text{B woman chooses A man}) = \frac{0.75e^{\beta}}{0.25 + 0.75e^{\beta}} =  \frac{0.75e^{\beta}}{D_B}$$ 
+$$P(\text{B woman chooses B man}) = \frac{0.25}{0.25 + 0.75e^{\beta}} = \frac{0.25}{D_B}$$
+
+Where, $D_A = 0.75 + 0.25 e^{\beta}$ and $D_B =  0.25 + 0.75e^{\beta}$. These denominators represent the sum of all of the exponentiated utilities for a given woman (i.e. the overall attractiveness of her pool) which is used to normalize the probabilities for each type of women across partner choices to sum to 1. 
+
+To get the value of each cell in the table correct we then multiply by the row share of A and B women as shown in @tbl-crosstab-clogit.
+
+
+|              |   Husband Group A                | Husband Group B               |
+|--------------|----------------------------------|-------------------------------|
+| Wife Group A | $(0.75)(0.75) / D_A$             | $(0.75)(0.25)e^{\beta} / D_A$ |
+| Wife Group B | $(0.25)(0.75)e^{\beta} / D_B$    | $(0.25)(0.25) / D_B$          |
+
+: Joint distribution of unions by wife's group and husband's group under a conditional logit model with group endogamy {#tbl-crosstab-clogit}
+
+The inverse cross product of @tbl-crosstab-clogit gives us the odds ratio of exogamy to endogamy often used in assortative mating studies:
+
+$$\frac{(0.25)(0.75)e^{\beta}D_B^{-1}(0.75)(0.25)e^{\beta}D_A^{-1}}{(0.75)(0.75)D_A^{-1}(0.25)(0.25)D_B^{-1}} = e^{2\beta}$$
+
+Everything cancels out except for the $\beta$ values. The log cross product is thus $2\beta$ which is consistent with conditional logit model estimates typically around half the log-odds ratio in empirical data. If we set $\beta = 0$ here, then $D_A = 1$ and $D_B = 1$ and @tbl-crosstab-clogit simplifies to @tbl-crosstab-simple.  
+
+Although the overall log-odds ratio matches expectation here, the AB and BA cells are not balanced despite gender balance within each group:
+
+$$\frac{N_{AB}}{N_{BA}} = \frac{(0.75)(0.25)e^{\beta}D_A^{-1}}{(0.25)(0.75)e^{\beta}D_B^{-1}} = \frac{D_B}{D_A} = \frac{0.25 + 0.75e^{\beta}}{0.75 + 0.25 e^{\beta}}$$
+
+A related issue is that while the row marginals will add up to the overall distribution for women:
+
+$$N_{A\cdot} = \frac{(0.75)(0.75)+(0.75)(0.25)e^{\beta}}{0.75 + 0.25 e^{\beta}} = \frac{(0.75)(0.75 + 0.25e^{\beta})}{0.75 + 0.25 e^{\beta}} = 0.75$$
+$$N_{B\cdot} = \frac{(0.25)(0.25) + (0.25)(0.75)e^{\beta}}{0.25 + 0.75e^{\beta}} = \frac{(0.25)(0.25 + 0.75e^{\beta})}{0.25 + 0.75e^{\beta}} = 0.25$$
+
+the column margins will not add up in the same way for men, because the two cells on each column do not share a single denominator. For example, the case with $\beta = -3$, group B men will only make up 0.2298 of husbands as opposed to the 0.25 for women. 
+
+The underlying issue is that because women drive the choices we don't observe a symmetric process. If we switched to having men do the choosing, we would observe the same issues but in the reverse direction.
+
+Its worth noting how this approach compares to the typically log-linear formulation:
+
+
+|              |   Husband Group A                | Husband Group B               |
+|--------------|----------------------------------|-------------------------------|
+| Wife Group A | $r_Ac_A$                         | $r_Ac_Be^{\beta}$             |
+| Wife Group B | $r_Bc_Ae^{\beta}$                | $r_Br_B$                      |
+
+: Log-linear formulation of the cross-tabulation of wife's group and husband's group {#tbl-log-linear}
+
+Where $r_i$ and $c_i$ are row and column scores estimated to ensure the correct marginal distributions. This approach will produce the same $\beta$ value but also $N_{AB} = N_{BA}$. We can reproduce this approach directly while maintaining the conditional logit model method by applying a group-specific weight to each man.
+
+Intuitively, 
+
+---
 
 Group exogamy levels are defined in the `matching_model` that is input into the union formation process. The user can use the `group_exogamy` argument to specify the log-odds of exogamy as a named vector for named pairings. These values are then added to the logit score/utility for each possible match using that pairing. Negative values will make exogamy rarer than endogamy, positive values will make it more common, and a value of zero (the default unless specified) means that exogamy is as likely as endogamy. 
 
@@ -395,11 +464,11 @@ model <- hammel_model() |>
     "rate",
     matching = create_age_gap_matching_model(
       0, 5, 
-      group_exogamy = c("A::B" = -2)
+      group_exogamy = c("A::B" = -2),
+      # ok to do female choice here because we only care about the demographic rates
+      matching_method = "female_choice"
     ),
     rates = mar_rates_female_grouped,
-    # ok to do female choice here because we only care about the demographic rates
-    matching_method = "female_choice"
   )
 
 results  <- future_map(
@@ -716,12 +785,12 @@ model <- hammel_model() |>
     "rate",
     matching = create_age_gap_matching_model(
       0, 5,
-      group_exogamy = c("A::B" = -2)
+      group_exogamy = c("A::B" = -2),
+      # ok to use female choice here as we only want to compare demogrpahic rates
+      matching_method = "female_choice"
     ),
     rates = mar_rates_female_usa,
     group_prop_hazard = c("A" = ratio_mar_A, "B" = ratio_mar_B),
-    # ok to use female choice here as we only want to compare demogrpahic rates
-    matching_method = "female_choice"
   )
 
 results  <- future_map(
@@ -1022,12 +1091,12 @@ model <- hammel_model() |>
       0, 5, 
       group_exogamy = c("A::B" = -3)
     ),
-    matching_method = "weighted_choice"
   )
 
+system.time(result <- simulate(model, years = years, seed = 1))
 
 results  <- future_map(
-  replication_seeds[1:20], 
+  replication_seeds[1:40], 
   function(seed) {
     simulate(model, years = years, seed = seed) 
   },
@@ -1086,6 +1155,41 @@ colMeans(temp)
 
 ```
 
+```{r}
+
+counts <- map(
+  results,
+  calculate_lexis_counts,
+  time_breaks = time_breaks,
+  age_breaks = seq(15, 70, 5), 
+  include_unions = TRUE,
+  by_group = TRUE
+)
+
+mar_rates <- counts |>
+  bind_rows(.id = "replication") |>
+  filter(union_status == "unpartnered") |>
+  group_by(age_start, sex, group) |>
+  summarize(
+    rate = mean(rate_marriage),
+    sd = sd(rate_marriage),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+```{r}
+
+mar_rates |>
+  ggplot(aes(x = age_start + 2.5, y = rate, group = sex, color = sex))+
+  geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
+  geom_point()+
+  geom_line()+
+  facet_wrap(~group)+
+  labs(x = "age", y = "age-specific marital rate")+
+  theme_bw()
+```
 ### Group matching parameters
 
 To test group matching parameters, I start with a three group population with uneven sizes. Group A and B are given a symmetric exogamy ratio while B and C have directed effects by gender, and there are no barriers between A and C. I use shared fertility and mortality rates across groups, since we are not concerned with that feature for this evaluation. I also use on demand union formation because we are focused on the matching model itself here and the on demand model runs faster. I then run 100 simulations.
@@ -1101,12 +1205,9 @@ model <- hammel_model() |>
     "on_demand",
     matching = create_age_gap_matching_model(
       0, 5, 
-      group_exogamy = c("A::B" = -3, "B:C" = -1, "C:B" = -0.5), sample_size = 250
+      group_exogamy = c("A::B" = -3, "B:C" = -1, "C:B" = -0.5)
     ),
-    matching_method = "two_sided"
   )
-
-system.time(result <- simulate(model, years = years, seed = 1))
 
 results  <- map(replication_seeds, function(seed) {
   simulate(model, years = years, seed = seed)
@@ -1386,8 +1487,9 @@ I will then try each of the built in methods. For the hierarchy case, I will use
 ```{r}
 #| label: set-inheritance-scenarios
 
-inheritance_scenarios <- c("mother", "father", "random_parent", "same_sex", "opposite_sex", "ancestry", 
-                           "hierarchy_strict", "hierarchy_passing")
+inheritance_scenarios <- c("mother", "father", "random_parent", "same_sex", 
+                           "opposite_sex", "ancestry", "hierarchy_strict", 
+                           "hierarchy_passing")
 ```
 
 To keep overall run time down, I will only run 20 simulations for each case. For each simulation, we will track two measures in the final simulated living population of each simulation: 
