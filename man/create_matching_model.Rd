@@ -10,7 +10,7 @@ create_matching_model(
   group_exogamy = NULL,
   group_levels = NULL,
   prevent_exogamy = FALSE,
-  imbalance_absorption = 1,
+  delta = NULL,
   matching_method = "weighted_choice"
 )
 }
@@ -47,14 +47,13 @@ existing failed-search and birth cancellation rules. Restrictions override
 finite preferences, require population identities, and do not invalidate
 existing partners.}
 
-\item{imbalance_absorption}{Used only when \code{matching_method = "weighted_choice"}.
-Share, in \verb{[0, 1]}, of a group's sex imbalance among
-unpartnered people that is absorbed through cross-group unions. Default \code{1}
-gives each unpartnered man the per-capita union intensity of an unpartnered
-woman of his group. \code{0} makes each male group's share of unions equal its
-female group's share, so the excess sex waits longer. Intermediate values
-interpolate the male group targets. Symmetric preferences with balanced sex
-composition give equal directional pairing counts at every value.}
+\item{delta}{Optional finite numeric vector with unique group names. Used
+only by weighted choice: multiply mirrored male targets by \code{exp(delta)}
+and normalize. Omitted groups have zero adjustment. Positive values raise
+the male target relative to baseline and other groups; negative values
+lower it. Only differences matter. Does not set pair-specific ratios or
+change female search rates. Names must belong to the population's identity
+registry (including declared future groups).}
 
 \item{matching_method}{\code{"weighted_choice"} (default) for female choice with
 calibrated male-group weights, or \code{"female_choice"} for unweighted ego-only

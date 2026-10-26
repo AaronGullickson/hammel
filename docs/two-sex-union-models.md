@@ -3,7 +3,8 @@
 Recorded October 24, 2026 from a discussion with the user. **Status: research
 notes and proposals only.** Nothing here is implemented, specified for
 implementation, or an accepted modeling decision, except the user decisions
-recorded in D073. The current union process remains as described in
+recorded in D073 and D074. D074 authorizes the male-target adjustment
+described below; the fuller two-sex proposals remain deferred. The current union process remains as described in
 [union-formation models](union-formation-models.md) and
 [weighted-choice matching](weighted-choice-matching.md).
 
@@ -18,10 +19,10 @@ can describe the association, but not this gender asymmetry. Could users
 supply a directional ratio that weighted choice preserves when each group's
 sexes are balanced?
 
-### Why weighted choice cannot produce it
+### Why zero-delta weighted choice cannot produce it
 
 With two groups, AB - BA equals the male group-B share of unions minus the
-female group-B share (A:B means female A, male B). With balanced sexes the
+female group-B share (A:B means female A, male B). With balanced sexes and zero delta the
 weighted-choice target sets those shares equal, so AB = BA however the
 preferences are written; directed pair effects are absorbed by the weights
 (see the weighted-choice consequences). A 3:1 ratio therefore means men of
@@ -31,10 +32,10 @@ about how often each male group forms unions, not about who prefers whom.
 
 ### Two mechanisms considered
 
-1. **Male union propensity.** A multiplier c[g] on each group's male
-   per-capita intensity in the target, applied before imbalance absorption so
-   kappa handles only sex imbalance. Simple and estimable from male/female
-   union rates by group, but the ratio is an outcome that moves with group
+1. **Male union propensity.** A multiplier c[g] on each group's mirrored
+   male target. D074 now implements c[g] = exp(delta[g]), followed by
+   normalization, replacing imbalance absorption. The directional
+   ratio is an outcome that moves with group
    sizes and preference strength. The c_B/c_A giving exactly AB/BA = 3 with
    balanced sexes:
 
@@ -47,8 +48,8 @@ about how often each male group forms unions, not about who prefers whom.
 
 2. **Directional ratio target.** The user supplies `c("A:B" = 3)`. At each
    search, solve for the male group shares giving expected AB/BA = R at the
-   current female intensities and utilities, then add kappa (M - F) for sex
-   imbalance. With two groups the ratio is monotone in log b_B, so the solve
+   current female intensities and utilities, with a separate rule needed for
+   how sex imbalance affects the target. With two groups the ratio is monotone in log b_B, so the solve
    is unique. R = 1 reproduces the current method. With K groups the weights
    have K - 1 degrees of freedom, so at most K - 1 non-cyclic pair ratios can
    be set; cyclic directional variation comes from directed preferences,
@@ -59,16 +60,14 @@ about how often each male group forms unions, not about who prefers whom.
 Women still form unions at their input hazards, so women's unpartnered pools
 do not respond. Group-B men partner faster than group-B women and group-A men
 slower than group-A women, so the unpartnered pools become sex-imbalanced
-within groups (B short of men, A with extra men). With kappa > 0 the
-imbalance correction then pulls the realized ratio back toward 1; at kappa = 0
-the ratio holds and the cost falls only on group-A men's waiting times. Fewer
+within groups (B short of men, A with extra men). The mirrored baseline responds to this imbalance and can pull the realized
+ratio back toward 1 despite a fixed delta. Fewer
 group-B men also raises group-B women's chance of choosing group-A men, which
 a per-search ratio solve would correct and a fixed propensity would not.
 
 The user noted research suggesting this asymmetry contributes to a marriage
 squeeze for black women. The current model cannot represent that squeeze:
-female union timing never responds to male availability (D073 declines both
-mechanisms above).
+female union timing never responds to male availability (full two-sex feedback remains deferred; D074 authorizes target adjustments).
 
 ## Two classes of union-formation models
 
@@ -97,6 +96,25 @@ Users may want one or the other for specific purposes.
 2. **Schoen harmonic-mean model**, possibly modified along the lines of
    Dagsvik's model (below).
 3. **Choo–Siow transferable-utility model**, as a later possibility.
+
+### Marriage squeeze (October 25, 2026)
+
+In the current model a squeeze never changes whether or when a woman forms a
+union, only whom she partners with: her search fails only when no eligible man
+exists. A female outside option (extension 1) would let women respond, but not
+symmetrically with men. A woman's union rate would be capped at her input
+search hazard and would respond through a choice parameter (V0), while men's
+rates respond mechanically and without a cap through being chosen more or
+less often, so the response depends on which sex is scarce. The user decided
+to defer marriage-squeeze modeling to a full two-sex choice model rather than
+approximate it with a one-sided outside option. Schoen's harmonic mean alone
+is probably insufficient: it lowers union rates under scarcity but has no
+spillovers, so squeezed women are not redirected toward other ages or groups,
+and it is a rate function rather than a choice model. Choo–Siow and Dagsvik
+are two-sex choice models with redirection through equilibrium accounting;
+Dagsvik avoids the type-splitting sensitivity noted below. Given the close
+algebraic relationship between Dagsvik's attraction parameter and Schoen's
+force of attraction, the user hopes to find a form between the two.
 
 ## Schoen's harmonic-mean model
 

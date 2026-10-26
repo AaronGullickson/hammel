@@ -135,7 +135,7 @@ female choice among the screened candidates but multiplies each man's selection 
 for his group. Weights are recalculated at every search, in continuous time,
 so that expected male union flows by group match a mirrored target: each
 unpartnered man has the per-capita intensity of an unpartnered woman of his
-group, adjusted by the matching model's \code{imbalance_absorption}. Women's
+group, adjusted by the matching model's \code{delta}. Women's
 intensity is the search hazard for rate-mode searches and the unpartnered
 fertility hazard (zero during birth spacing) for on-demand searches and
 nonmarital father selection, which has its own weights and uses the father

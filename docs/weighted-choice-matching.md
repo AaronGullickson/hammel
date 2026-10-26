@@ -14,7 +14,7 @@ implemented behavior; no acceptance thresholds are set.
 The user requires partner matching that (1) preserves age-specific female
 union timing from the inputs, (2) recovers the input matching preferences, and
 (3) yields equal female-A/male-B and female-B/male-A union counts when
-preferences are symmetric and each group's sexes are balanced.
+preferences are symmetric, delta is zero, and each group's sexes are balanced.
 
 | Method | Preferences recovered | Directional balance |
 | --- | --- | --- |
@@ -80,8 +80,8 @@ At each search time t, with no execution step and no random draws:
    no counted women, its men use the population-wide female per-capita
    intensity. F[g] is group g's share of female intensity among groups with
    counted men. The target is
-   tau[g] = F[g] + kappa (M[g] - F[g]),
-   where kappa is the matching model's `imbalance_absorption` (below). Women's
+   tau[g] = M[g] exp(delta[g]) / sum over h of M[h] exp(delta[h]),
+   where `delta` is the matching model's named vector of target adjustments (below). Women's
    timing still determines the total number of unions; the target only
    distributes them across male groups.
 3. **Expected male flows.** For woman w, S[w,g] sums exp(U[w,j]) over counted
@@ -94,29 +94,78 @@ At each search time t, with no execution step and no random draws:
    every share is within 1e-10. Expected flow shares rise monotonically with a
    group's own weight, so a solution is unique when it exists.
 
+### Objective and uniqueness
+
+With Lambda the summed intensity and the first group's log weight fixed at 0,
+the engine minimizes
+
+    L(log b) = (1/Lambda) sum over w of lambda[w] log sum over h of b[h] S[w,h]
+               - sum over g of tau[g] log b[g]
+
+(`WeightCalibrator::solve` in `src/simulate.cpp`). Its gradient with respect
+to log b[g] is phi[g] - tau[g], so the stationary point is exactly the target
+condition phi(b) = tau. The first term is an intensity-weighted sum of
+log-sum-exp functions of log b, which is convex, and the second is linear, so
+the minimum is unique when it exists. Newton steps use the analytical gradient
+and Hessian.
+
+### Why the weights leave the association unchanged
+
+Because b depends only on the man's group, it multiplies whole columns of the
+expected pairing table. In any two-by-two cross-product of female groups g, h
+and male groups k, l, each woman's normalizing denominator and each column
+weight appear once in the numerator and once in the denominator. For the
+group-only case below,
+
+    (AB x BA) / (AA x BB) = exp(U[A,B] + U[B,A] - U[A,A] - U[B,B])
+
+whatever b and the group sizes are. The weights therefore change how often
+each male group forms unions, not the association between partners'
+characteristics, and wife-side conditional-logit estimates of the input terms
+are unaffected apart from the directed group terms discussed below. When the
+weights have no work to do (one group, no recorded groups, or symmetric
+preferences with equal group compositions) b = 1 and the method is explicit
+female choice.
+
 Crude per-capita counts were selected by the user. Age standardization was not:
 it would require a male age-specific intensity (a woman's rate at the same or
 a shifted age), reintroducing the male age assumption and preferred-gap
 question that group-only weights avoid.
 
-### Imbalance absorption
+### Male target adjustments
 
-`imbalance_absorption` (kappa) belongs to each matching model, like
-`group_exogamy`, defaulting to 1 (user, October 23, 2026). It sets the share of a
-group's sex imbalance among unpartnered people absorbed through cross-group
-unions. At 1, men receive the full mirrored target. At 0, each male group's
-share of unions equals its female group's share, so the excess sex waits
-longer. With symmetric preferences and balanced sex composition, F = M and
-every value gives equal directional counts. With no group preferences, values
-below 1 still disfavor men of an over-represented group. Female-choice models
-ignore the argument.
+`delta` is an optional named finite numeric vector on each matching model.
+Omitted groups have delta 0. Targets are proportional to mirrored male flows
+multiplied by exp(delta); normalization preserves a total target of one.
+Only differences matter: adding the same constant to all group adjustments
+changes nothing. Positive values increase a group's male target relative to
+baseline and other groups; negative values decrease it. This is not an
+individual utility term, a pair-specific ratio, or an adjustment to women's
+search rates. Female-choice models ignore delta. Named groups must belong to
+the simulation's identity registry, including declared future identities.
+With no identities, nonempty delta is an error. Zero baseline targets remain
+zero; no available men or no positive search rates are not repaired by delta.
+Strict endogamy and other restrictions may make targets unattainable; existing
+approximate-weight diagnostics and warnings remain applicable.
+
+For a static 75/25 population of each sex with symmetric exogamy -3,
+delta A = 0 and delta B = 0.12274682836 produce expected shares AA =
+0.71443059512, AB = 0.03556940488, BA = 0.01185646829, BB = 0.23814353171.
+B men receive 0.27371293659 of unions; AB/BA = 3 and the log cross-product
+remains -6. This is an analytical illustration, not simulation evidence.
+Changing composition or preferences changes the ratio associated with delta.
+Delta can also offset composition imbalance. In a static group-only case with
+women 75/25 and men 70/30, delta_A = 0 and delta_B = log(7/9), approximately
+-0.2513144283, shift B men's target from 0.30 to 0.25. Symmetric preferences
+then give AB = BA. This matches female union shares at that composition;
+a fixed delta need not retain symmetry as composition or search rates change.
+The engine evaluates the normalized targets in log space to avoid overflow.
 
 ### Nonmarital fathers
 
 Rate-mode father selection has its own weights, calibrated from fertility
 intensity with the applicable father utilities (`father_matching`, or
-`matching` when NULL) and that model's `imbalance_absorption` (user, October
-23, 2026). Each model applies its own `matching_method`: for example, weighted
+`matching` when NULL) and that model's `delta` (D074). Each model applies its own `matching_method`: for example, weighted
 unions with female-choice fathers, or the reverse (D068). Union searches keep weights calibrated from search hazards. The
 male pool, target rule, and solver are shared. On-demand mode has one
 calibration, driven by fertility.
@@ -181,7 +230,7 @@ number of searches that used approximate weights.
 ## Worked examples
 
 Exact group-only expectations with equal per-woman intensities, zero
-within-group utility, and absorption 1 unless stated:
+within-group utility, and zero delta unless stated:
 
 | Case | b_B | AA | AB | BA | BB | Log cross-product | AB/BA |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -190,9 +239,33 @@ within-group utility, and absorption 1 unless stated:
 | 50/50, A::B = -3 | 1.000 | .47629 | .02371 | .02371 | .47629 | -6 | 1.000 |
 | 75/25, A:B = -1, B:A = -2 | 0.924 | .67368 | .07632 | .07632 | .17368 | -3 | 1.000 |
 | 75/25, A::B = -1.5 | 1.523 | .67368 | .07632 | .07632 | .17368 | -3 | 1.000 |
+| 75/25, A::B = -3, delta_B = .122747 | 3.000 | .71443 | .03557 | .01186 | .23814 | -6 | 3.000 |
+| Women 75/25, men 70/30, delta_B = log(7/9), A::B = -3 | 1.309 | .72962 | .02038 | .02038 | .22962 | -6 | 1.000 |
 | Women 75/25, men 70/30, A::B = -3 | 3.875 | .69272 | .05728 | .00728 | .24272 | -6 | 7.87 |
-| Same, absorption 0.5 | 2.400 | | .0365 | .0115 | | -6 | 3.17 |
-| Same, absorption 0 | 1.309 | | .0204 | .0204 | | -6 | 1.00 |
+
+These are analytical expectations, not simulation output. With equal
+per-woman intensities and no ages, every woman of a group has the same choice
+probabilities, so S[w,g] reduces to group g's male share times exp(U). With
+b_A = 1 and b_B = b, female shares F_A, F_B, male shares M_A, M_B and pair
+utilities U:
+
+    pi_AB = b M_B exp(U[A,B]) / (M_A exp(U[A,A]) + b M_B exp(U[A,B]))
+    pi_BA = M_A exp(U[B,A]) / (M_A exp(U[B,A]) + b M_B exp(U[B,B]))
+    AA = F_A (1 - pi_AB)    AB = F_A pi_AB
+    BA = F_B pi_BA          BB = F_B (1 - pi_BA)
+
+Female choice sets b = 1. Weighted choice solves AB + BB = tau_B, with
+tau_B = M_B exp(delta_B) / (M_A exp(delta_A) + M_B exp(delta_B)). For 75/25 groups and A::B = -3: at b = 1,
+AB = 0.01224 and BA = 0.03249, so group-B men receive AB + BB = 0.2298 of
+unions while group-B women form 0.25; scarce B women often choose A men, few
+A women choose B men. Solving for tau_B = 0.25 gives b = 1.683, which raises
+AB to 0.02038 and lowers BA to the same value. Equal groups give b = 1 by
+symmetry. With women 75/25 and men 70/30, zero delta targets B men at
+0.30. With balanced 75/25 composition and delta_B = 0.12274682836,
+the B target is 0.27371293659 and AB/BA = 3 (see target adjustments above).
+`validation/wc_table.R` reproduces these cases with a one-dimensional root
+solve. Tests check default weights, signed delta, a common shift, extreme
+adjustments, and the analytical 3:1 case.
 
 Consequences:
 
@@ -314,7 +387,7 @@ Findings from these runs and their discussion:
 ## Validation
 
 `tests/testthat/test-weighted-choice.R` covers the analytical examples above
-(including absorption 0, 0.5 and 1, and balanced symmetry at every absorption),
+(including default targets, signed delta adjustments and the analytical 3:1 case),
 binned calibration against an exact individual-level R reference for native
 and custom formulas in both intensity types, three-group convergence, zero and
 unattainable targets, a male group with no counted women, identities created

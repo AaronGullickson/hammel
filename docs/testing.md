@@ -44,7 +44,7 @@ software behavior, not demographic parameter recovery.
 | `test-group-matching.R` | Directed/symmetric offsets, analytical probabilities, fixed factor contrasts/interactions, native/custom score agreement, father overrides, validation, and unchanged RNG |
 | `test-prevent-exogamy.R` | Restrictions on the whole pool, compatible men always found, failure/cancellation, direction/symmetry, father overrides, retained partners, and unchanged disabled RNG |
 | `test-detailed-unions.R` | Spouse-ID joins, repeated episodes, deaths, optional group types, empty tables, unchanged inputs, and name collisions |
-| `test-weighted-choice.R` | Analytical weights and absorption, binned versus exact calibration, three groups, zero/unattainable targets, incremental sums versus full rebuild, mid-run identities, strict endogamy, unmet-target detection, narrow and one-year rate bands, recorded log weights, construction and inheritance warnings, female-choice equality for one group, both modes, fathers, restarts, diagnostics, warning, validation |
+| `test-weighted-choice.R` | Analytical weights and delta target adjustments, binned versus exact calibration, three groups, zero/unattainable targets, incremental sums versus full rebuild, mid-run identities, strict endogamy, unmet-target detection, narrow and one-year rate bands, recorded log weights, construction and inheritance warnings, female-choice equality for one group, both modes, fathers, restarts, diagnostics, warning, validation |
 | `test-parent-info.R` | Parent-ID joins, ages at birth, deceased/unknown parents, optional groups, empty tables, unchanged inputs, and name collisions |
 | `test-model-api.R` | Construction, replacement, schemas, history and metadata retention |
 | `test-baseline-population.R` | Reproducibility, bounds, known cases, distributions, empty populations |
@@ -65,6 +65,15 @@ They include default 0.75 years and nondefault 1.13 years across restarts.
 Historical suite counts and implementation-specific timings are available in
 Git history. They are execution records, not scientific acceptance criteria.
 Set `TZ=UTC` (or the local timezone) when sandbox timezone discovery is unavailable.
+
+On October 26, 2026, after D074 replaced imbalance absorption with named
+`delta` target adjustments, `TZ=UTC Rscript -e 'devtools::test(reporter =
+"summary")'` passed without failures or test warnings; the live database test
+was skipped. Analytical checks cover the 75/25, beta -3 case with delta_B =
+0.12274682836 (AB/BA = 3, log cross-product -6), signed and common-shift
+adjustments, extreme finite values, three groups and group-stratified hazards.
+Integration checks use nonzero deltas in both initiation modes, restarts and
+separate father matching. These are software checks, not demographic acceptance.
 
 ## Optional live database checks
 

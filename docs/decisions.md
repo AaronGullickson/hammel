@@ -1404,3 +1404,21 @@ matching specifications override this default. Initiation mode remains explicit.
   parameters; a union-model abstraction for `set_union_formation()`.
 - **Evidence:** discussion notes and calculations in
   [two-sex union models](two-sex-union-models.md). No code changed.
+
+
+## D074: Replace imbalance absorption with male target adjustments
+
+- **Status:** accepted by the user October 26, 2026.
+- **Decision:** remove `imbalance_absorption` from matching constructors and
+  execution. Always use the mirrored male baseline (formerly kappa = 1), then
+  normalize baseline[g] * exp(delta[g]). Expose `delta` as a named finite
+  numeric vector, omitted groups zero, on each matching model, including
+  separate father models. Zero adjustments retain the previous default.
+- **Rationale:** kappa cannot tune direction when female and mirrored male
+  shares match. Delta can represent systematic directional differences while
+  preserving static group-only cross-products. It does not guarantee a
+  pair-specific ratio or change female event timing.
+- **Supersession:** replaces D066's target interpolation and D068's absorption
+  argument, and supersedes D073's deferral of male-group propensities only.
+  Full two-sex models and participation feedback remain deferred.
+- **Specification:** [weighted-choice matching](weighted-choice-matching.md).

@@ -57,7 +57,7 @@ availability and renewed female rate searches after widowhood are implemented. T
 ## Implemented construction interface
 
 `create_matching_model(formula, coefficients, group_exogamy = NULL,
-group_levels = NULL, prevent_exogamy = FALSE, imbalance_absorption = 1,
+group_levels = NULL, prevent_exogamy = FALSE, delta = NULL,
 matching_method = "weighted_choice")` stores a
 one-sided R formula and finite named coefficients
 matching its non-intercept model-matrix columns. Predictors include

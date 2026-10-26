@@ -83,6 +83,9 @@ matching_pair_offsets <- function(matching, female_group, male_group) {
 }
 
 validate_matching_groups <- function(matching, population_groups) {
+  if (length(matching$delta) && (is.null(population_groups) ||
+      any(!names(matching$delta) %in% as.character(population_groups))))
+    stop("`delta` names must belong to the population group identity registry.", call. = FALSE)
   pairs <- expand_group_exogamy(matching$group_exogamy)
   restrictions <- expand_prevent_exogamy(matching$prevent_exogamy)
   if ((nrow(pairs) || matching_has_group_formula(matching) || restrictions$all ||

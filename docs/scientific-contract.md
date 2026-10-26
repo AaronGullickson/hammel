@@ -368,7 +368,10 @@ own method and a NULL father model inherits the general one. Ego still chooses a
 her screened candidates with probabilities proportional to exp(U), multiplied
 by a weight for each man's group. Weights are recalculated at every search so
 expected male union flows by group meet a target mirroring female per-capita
-intensity, adjusted by `imbalance_absorption`. Event initiation, eligibility,
+intensity, multiplied by exp(delta[g]) and normalized (D074). `delta` is a
+named, dimensionless finite numeric vector; omitted groups use zero. Adjustments
+can represent directional differences or offset composition imbalance, but do
+not guarantee a fixed pairwise ratio over time. Event initiation, eligibility,
 exclusions and timing are unchanged. Rules, examples, and consequences are in
 [weighted-choice matching](weighted-choice-matching.md).
 

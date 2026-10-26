@@ -219,7 +219,7 @@ log weight for each man's group to his selection score in the exact draw.
 birth-time bin and incrementally maintained pool sums for each matching model's
 table of utilities over bin-centre lags, updated at events, and solves the
 weights at each search from those sums. Matching models carry
-`imbalance_absorption` (default 1). One group gives unit weights and female
+`delta` (omitted groups default to zero). One group gives unit weights and female
 choice exactly. See [weighted-choice matching](weighted-choice-matching.md).
 
 ## Hard group restrictions

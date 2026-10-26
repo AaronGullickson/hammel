@@ -400,7 +400,7 @@ class WeightCalibrator {
   // weights so those shares meet the mirrored target (Newton on a convex
   // objective, warm-started). Empty or uninformative states return b = 1.
   WeightSolution solve(double now, const std::vector<const std::vector<Band>*>& hazards,
-                       bool fertility, int table_id, double absorption,
+                       bool fertility, int table_id, const std::vector<double>& delta,
                        std::vector<double>& warm) {
     advance(now);
     const LagTable& table = *tables_[table_id];
@@ -433,16 +433,14 @@ class WeightCalibrator {
         }
       }
     }
-    double total_women = 0, total_intensity = 0, female_with_men = 0;
+    double total_women = 0, total_intensity = 0;
     for (int g = 0; g < G; ++g) {
       total_women += women_count[g];
       total_intensity += intensity[g];
-      if (men_count[g] > 0) female_with_men += intensity[g];
     }
     if (rows.empty() || !(total_women > 0) || !(total_intensity > 0)) { warm = s.log_weights; return s; }
     // Mirror: men of group g get the per-capita intensity of group-g women
-    // (population-wide rate if none are present). Absorption interpolates
-    // toward female group shares, restricted to groups with eligible men.
+    // (population-wide rate if none are present), then apply target deltas.
     const double overall = total_intensity / total_women;
     std::vector<double> mirror(G, 0);
     double mirror_sum = 0;
@@ -451,11 +449,16 @@ class WeightCalibrator {
       mirror_sum += mirror[g];
     }
     if (!(mirror_sum > 0)) { warm = s.log_weights; return s; }
+    // Normalize log mirrored flows plus delta, preserving zero baseline targets.
+    double largest = -std::numeric_limits<double>::infinity();
+    for (int g = 0; g < G; ++g)
+      if (mirror[g] > 0) largest = std::max(largest, std::log(mirror[g]) + delta[g]);
+    double adjusted_sum = 0;
     for (int g = 0; g < G; ++g) {
-      const double female_share = female_with_men > 0 && men_count[g] > 0 ?
-        intensity[g] / female_with_men : 0;
-      s.target[g] = female_share + absorption * (mirror[g] / mirror_sum - female_share);
+      s.target[g] = mirror[g] > 0 ? std::exp(std::log(mirror[g]) + delta[g] - largest) : 0;
+      adjusted_sum += s.target[g];
     }
+    for (int g = 0; g < G; ++g) s.target[g] /= adjusted_sum;
     // Pool sums S[row, male group] come from the maintained sums. Entries below
     // the floor are recomputed exactly; a row that underflows is rescaled in
     // log space.
@@ -642,7 +645,7 @@ List inspect_weighted_calibration_cpp(NumericVector female_born, IntegerVector f
   }
   std::vector<double> warm;
   const WeightSolution s = calibrator.solve(now, hazards, fertility, 0,
-    as<double>(matching["imbalance_absorption"]), warm);
+    as<std::vector<double>>(matching["delta"]), warm);
   return List::create(_["log_weights"] = wrap(s.log_weights), _["target"] = wrap(s.target),
                       _["flow"] = wrap(s.flow), _["infeasible"] = s.infeasible);
 }
@@ -956,11 +959,11 @@ List inspect_weighted_incremental_cpp(NumericVector female_born, IntegerVector f
   std::vector<std::vector<Band>> bands(group_count);
   std::vector<const std::vector<Band>*> hazards(group_count);
   for (int g = 0; g < group_count; ++g) { bands[g] = read_bands(rates, "", "", g); hazards[g] = &bands[g]; }
-  const double absorption = as<double>(matching["imbalance_absorption"]);
+  const std::vector<double> delta = as<std::vector<double>>(matching["delta"]);
   std::vector<double> warm;
   for (R_xlen_t i = 0; i < op_times.size(); ++i) {
     if (i % 1024 == 0) checkUserInterrupt();
-    incremental.solve(op_times[i], hazards, false, 0, absorption, warm);
+    incremental.solve(op_times[i], hazards, false, 0, delta, warm);
     incremental.add_man(male_groups[op_men[i]], male_born[op_men[i]], op_deltas[i]);
   }
   const double end = op_times[op_times.size() - 1];
@@ -968,8 +971,8 @@ List inspect_weighted_incremental_cpp(NumericVector female_born, IntegerVector f
   rebuilt.refresh();
   const double difference = incremental.max_sum_difference(rebuilt, 0);
   std::vector<double> warm_a, warm_b;
-  const WeightSolution a = incremental.solve(end, hazards, false, 0, absorption, warm_a);
-  const WeightSolution b = rebuilt.solve(end, hazards, false, 0, absorption, warm_b);
+  const WeightSolution a = incremental.solve(end, hazards, false, 0, delta, warm_a);
+  const WeightSolution b = rebuilt.solve(end, hazards, false, 0, delta, warm_b);
   return List::create(_["max_sum_difference"] = difference,
                       _["incremental"] = wrap(a.log_weights), _["rebuilt"] = wrap(b.log_weights));
 }
@@ -1174,7 +1177,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       const WeightSolution weights = calibrator->solve(now,
         fertility_driven ? fertility_hazards : search_hazards, fertility_driven,
         father ? father_table_id : union_table_id,
-        as<double>(choice_model["imbalance_absorption"]), father ? father_warm : union_warm);
+        as<std::vector<double>>(choice_model["delta"]), father ? father_warm : union_warm);
       if (weights.infeasible) ++weighted_infeasible;
       log_weights = weights.log_weights;
     }

@@ -15,7 +15,7 @@ calibrate <- function(women, men, matching, rates, groups, now = 0, cutoff = 15,
 
 # Independent individual-level reference (two groups): exact ages, no bins.
 reference_weights <- function(women, men, matching, rates, groups, now = 0,
-                              cutoff = 15, fertility = FALSE, absorption = 1) {
+                              cutoff = 15, fertility = FALSE) {
   women <- women[now - women$born >= cutoff, ]
   men <- men[now - men$born >= cutoff, ]
   hazard <- function(age) {
@@ -29,7 +29,9 @@ reference_weights <- function(women, men, matching, rates, groups, now = 0,
   mirror <- men_n * intensity / women_n
   mirror <- mirror / sum(mirror)
   female_share <- intensity / sum(intensity)
-  target <- female_share + absorption * (mirror - female_share)
+  d <- vapply(groups, function(g) if (g %in% names(matching$delta)) matching$delta[[g]] else 0, numeric(1))
+  target <- mirror * exp(d - max(d))
+  target <- target / sum(target)
   U <- vapply(seq_len(nrow(men)), function(j) calculate_matching_utilities(matching,
     women$born - men$born[j], groups[women$group + 1L],
     rep(groups[men$group[j] + 1L], nrow(women))), numeric(nrow(women)))
@@ -43,11 +45,11 @@ reference_weights <- function(women, men, matching, rates, groups, now = 0,
   list(log_weights = c(0, root), target = as.numeric(target))
 }
 
-group_only <- function(women_share, men_share, effect, absorption = 1) {
+group_only <- function(women_share, men_share, effect, delta = NULL) {
   women <- data.frame(born = -30, group = rep(0:1, round(1000 * women_share)), fertile = TRUE)
   men <- data.frame(born = -30, group = rep(0:1, round(1000 * men_share)))
   matching <- create_matching_model(~ 1, numeric(), group_exogamy = c("A::B" = effect),
-                                    imbalance_absorption = absorption)
+                                    delta = delta)
   list(women = women, men = men, matching = matching,
        rates = data.frame(age_start = 15, age_end = 50, rate = 0.1))
 }
@@ -60,21 +62,36 @@ test_that("calibration reproduces the analytical group-only examples", {
   expect_equal(result$log_weights[1], 0)
   expect_equal(exp(result$log_weights[2]), 1.682979, tolerance = 1e-6)
   expect_equal(result$flow, c(0.75, 0.25), tolerance = 1e-9)
-  # Men 70/30: full absorption b_B = 3.875; zero absorption targets female shares.
-  for (case in list(list(1, 3.875051, c(0.70, 0.30)), list(0, 1.308984, c(0.75, 0.25)),
-                    list(0.5, 2.400323, c(0.725, 0.275)))) {
-    x <- group_only(c(0.75, 0.25), c(0.70, 0.30), -3, absorption = case[[1]])
-    result <- calibrate(x$women, x$men, x$matching, x$rates, c("A", "B"))
-    expect_equal(exp(result$log_weights[2]), case[[2]], tolerance = 1e-6)
-    expect_equal(result$target, case[[3]], tolerance = 1e-12)
-    expect_equal(result$flow, case[[3]], tolerance = 1e-9)
-  }
-  # Balanced composition is symmetric at every absorption value (weights equal).
-  for (absorption in c(0, 0.5, 1)) {
-    x <- group_only(c(0.5, 0.5), c(0.5, 0.5), -3, absorption)
-    expect_equal(calibrate(x$women, x$men, x$matching, x$rates, c("A", "B"))$log_weights,
-                 c(0, 0), tolerance = 1e-9)
-  }
+  x <- group_only(c(.75, .25), c(.70, .30), -3)
+  result <- calibrate(x$women, x$men, x$matching, x$rates, c("A", "B"))
+  expect_equal(exp(result$log_weights[2]), 3.875051, tolerance = 1e-6)
+  expect_equal(result$target, c(.7, .3), tolerance = 1e-12)
+  # Delta can offset a 70/30 male versus 75/25 female composition imbalance.
+  x <- group_only(c(.75, .25), c(.70, .30), -3, c(B = log(7/9)))
+  balanced <- calibrate(x$women, x$men, x$matching, x$rates, c("A", "B"))
+  expect_equal(balanced$target, c(.75, .25), tolerance = 1e-12)
+  expect_equal(exp(balanced$log_weights[2]), 1.308984, tolerance = 1e-6)
+  # Independently derived target for AB/BA = 3 at log cross-product -6.
+  x <- group_only(c(.75, .25), c(.75, .25), -3, c(B = .12274682836))
+  result <- calibrate(x$women, x$men, x$matching, x$rates, c("A", "B"))
+  expect_equal(result$target[2], .27371293659, tolerance = 1e-10)
+  w <- exp(result$log_weights[2]); t <- exp(-3)
+  AB <- .75 * .25 * w * t / (.75 + .25 * w * t)
+  BA <- .25 * .75 * t / (.75 * t + .25 * w)
+  expect_equal(AB / BA, 3, tolerance = 1e-7)
+  expect_equal(log(AB * BA / ((.75 - AB) * (.25 - BA))), -6)
+  x$matching$delta <- c(A = 2, B = 2 + .12274682836)
+  shifted <- calibrate(x$women, x$men, x$matching, x$rates, c("A", "B"))
+  expect_equal(shifted$target, result$target, tolerance = 1e-12)
+  expect_equal(shifted$log_weights, result$log_weights, tolerance = 1e-9)
+  x$matching$delta <- c(B = -.12274682836)
+  negative <- calibrate(x$women, x$men, x$matching, x$rates, c("A", "B"))
+  expect_lt(negative$target[2], .25)
+  x$matching$delta <- c(B = 1000)
+  extreme <- calibrate(x$women, x$men, x$matching, x$rates, c("A", "B"))
+  expect_true(all(is.finite(extreme$target)))
+  expect_equal(sum(extreme$target), 1)
+
 })
 
 test_that("binned calibration agrees with an exact individual-level reference", {
@@ -133,12 +150,20 @@ test_that("three-group calibration meets targets and handles zero and unattainab
   men <- data.frame(born = -runif(600, 15, 50), group = sample(0:2, 600, TRUE, c(4, 4, 1)))
   rates <- data.frame(age_start = 15, age_end = 50, rate = 0.1)
   expect_warning(matching <- create_age_gap_matching_model(0, 5,
-    group_exogamy = c("A::B" = -3, "B:C" = -1, "C:B" = -0.5), imbalance_absorption = 0.5),
+    group_exogamy = c("A::B" = -3, "B:C" = -1, "C:B" = -0.5), delta = c(B = .3, C = -.2)),
     "only the sum")
   result <- calibrate(women, men, matching, rates, c("A", "B", "C"))
   expect_false(result$infeasible)
   expect_equal(result$flow, result$target, tolerance = 1e-9)
   expect_equal(sum(result$target), 1)
+  expected <- tabulate(men$group + 1L, 3) * exp(c(0, .3, -.2))
+  expect_equal(result$target, expected / sum(expected), tolerance = 1e-12)
+  # Group-stratified search hazards also enter mirrored baseline targets.
+  stratified <- data.frame(.hammel_group = 0:2, age_start = 15, age_end = 50,
+                            rate = c(.1, .2, .05))
+  result_rates <- calibrate(women, men, matching, stratified, c("A", "B", "C"))
+  expected <- expected * stratified$rate
+  expect_equal(result_rates$target, expected / sum(expected), tolerance = 1e-12)
   # Men of a group with no eligible women still receive the population-wide
   # per-capita rate; with all exogamy prevented they cannot be reached.
   women$group <- 0L
@@ -146,12 +171,15 @@ test_that("three-group calibration meets targets and handles zero and unattainab
   result <- calibrate(women, men, blocked, rates, c("A", "B", "C"))
   expect_true(result$infeasible)
   expect_equal(result$log_weights[2:3], c(50, 50))
-  # With zero absorption those groups have zero target and effectively zero weight.
-  zero <- create_matching_model(~ 1, numeric(), prevent_exogamy = TRUE, imbalance_absorption = 0)
-  result <- calibrate(women, men, zero, rates, c("A", "B", "C"))
-  expect_false(result$infeasible)
-  expect_equal(result$target, c(1, 0, 0))
-  expect_true(all(result$log_weights[2:3] <= -1000))
+  # Zero baseline hazards remain zero even with positive target adjustments.
+  grouped_rates <- data.frame(.hammel_group = 0:2, age_start = 15,
+                              age_end = 50, rate = c(.1, 0, 0))
+  women_zero <- women
+  women_zero$group <- rep(0:2, length.out = nrow(women_zero))
+  zero <- create_matching_model(~ 1, numeric(), prevent_exogamy = TRUE,
+                                 delta = c(B = 10, C = 10))
+  result_zero <- calibrate(women_zero, men, zero, grouped_rates, c("A", "B", "C"))
+  expect_equal(result_zero$target, c(1, 0, 0))
   # No women at risk leaves unit weights.
   idle <- calibrate(women, men, matching, data.frame(age_start = 15, age_end = 50, rate = 0),
                     c("A", "B", "C"))
@@ -204,7 +232,7 @@ test_that("one group or no groups reproduce explicit female choice exactly", {
 
 test_that("grouped weighted choice runs in both modes, restarts, and is reproducible", {
   population <- weighted_population(600, c(A = 3, B = 1))
-  matching <- create_age_gap_matching_model(0, 5, group_exogamy = c("A::B" = -2))
+  matching <- create_age_gap_matching_model(0, 5, group_exogamy = c("A::B" = -2), delta = c(B = .2))
   for (initiation in c("on_demand", "rate")) {
     model <- weighted_model(population, "weighted_choice", initiation, matching = matching)
     first <- simulate(model, 20, seed = 905)
@@ -226,7 +254,7 @@ test_that("grouped weighted choice runs in both modes, restarts, and is reproduc
     expect_false(any(c(".n_eligible", ".utility_rank") %in% names(diagnosed$unions)))
   }
   # Rate mode: unpartnered births select fathers through their own calibration.
-  father <- create_age_gap_matching_model(3, 4, group_exogamy = c("A::B" = -1))
+  father <- create_age_gap_matching_model(3, 4, group_exogamy = c("A::B" = -1), delta = c(B = -.3))
   result <- simulate(weighted_model(population, "weighted_choice", "rate", matching = matching,
                                     father_matching = father), 20, seed = 907)
   persons <- result$persons
@@ -278,7 +306,7 @@ test_that("weighted choice warns once when weights must be approximated", {
   expect_length(grep("could not meet male-group targets", warnings), 1)
 })
 
-test_that("matching method and absorption inputs are validated on matching models", {
+test_that("matching method and delta inputs are validated on matching models", {
   expect_identical(create_matching_model(~ 1, numeric())$matching_method, "weighted_choice")
   expect_identical(create_age_gap_matching_model(0, 5)$matching_method, "weighted_choice")
   expect_identical(union_formation("on_demand")$matching$matching_method, "weighted_choice")
@@ -293,13 +321,18 @@ test_that("matching method and absorption inputs are validated on matching model
   edited$matching_method <- "two_sided"
   expect_error(union_formation("on_demand", edited), "matching_method")
   expect_error(union_formation("on_demand", father_matching = edited, rates = NULL), "matching_method")
-  for (bad in list(-0.1, 1.1, NA_real_, c(0.5, 0.5), "1", Inf, NULL))
-    expect_error(create_age_gap_matching_model(0, 5, imbalance_absorption = bad),
-                 "imbalance_absorption")
-  expect_identical(create_matching_model(~ 1, numeric())$imbalance_absorption, 1)
+  for (bad in list(1, NA_real_, c(B = Inf), c(B = NA_real_), c(B = "1"),
+                   c(B = 1, B = 2), setNames(1, ""), matrix(1)))
+    expect_error(create_age_gap_matching_model(0, 5, delta = bad), "delta")
+  expect_null(create_matching_model(~ 1, numeric())$delta)
+  expect_error(create_matching_model(~ 1, numeric(), imbalance_absorption = 1), "unused argument")
   edited <- create_age_gap_matching_model(0, 5)
-  edited$imbalance_absorption <- 2
-  expect_error(union_formation("on_demand", edited), "imbalance_absorption")
+  edited$delta <- c(B = Inf)
+  expect_error(union_formation("on_demand", edited), "delta")
+  expect_error(prepare_matching_model(create_matching_model(~ 1, numeric(), delta = c(X = 1)),
+                                      c("A", "B")), "delta")
+  expect_error(prepare_matching_model(create_matching_model(~ 1, numeric(), delta = c(A = 1))), "delta")
+
 })
 
 test_that("weighted choice warns at construction about absorbed group effects", {

@@ -61,14 +61,13 @@
 #'   only the sum of a directed pair affects pairing, and `male_group` main
 #'   effects have no effect. Building a grouped model that combines female
 #'   choice with a sex-specific inheritance rule also warns (see [fertility()]).
-#' @param imbalance_absorption Used only when `matching_method = "weighted_choice"`.
-#'   Share, in `[0, 1]`, of a group's sex imbalance among
-#'   unpartnered people that is absorbed through cross-group unions. Default `1`
-#'   gives each unpartnered man the per-capita union intensity of an unpartnered
-#'   woman of his group. `0` makes each male group's share of unions equal its
-#'   female group's share, so the excess sex waits longer. Intermediate values
-#'   interpolate the male group targets. Symmetric preferences with balanced sex
-#'   composition give equal directional pairing counts at every value.
+#' @param delta Optional finite numeric vector with unique group names. Used
+#'   only by weighted choice: multiply mirrored male targets by `exp(delta)`
+#'   and normalize. Omitted groups have zero adjustment. Positive values raise
+#'   the male target relative to baseline and other groups; negative values
+#'   lower it. Only differences matter. Does not set pair-specific ratios or
+#'   change female search rates. Names must belong to the population's identity
+#'   registry (including declared future groups).
 #' @return An inspectable `hammel_matching_model` list containing `formula`
 #'   and `coefficients`. This specifies a model; it does not estimate one.
 #' @export
@@ -79,11 +78,11 @@
 #'   c(age_difference = 0.1, "I(age_difference^2)" = -0.02)
 #' )
 create_matching_model <- function(formula, coefficients, group_exogamy = NULL, group_levels = NULL, prevent_exogamy = FALSE,
-                                  imbalance_absorption = 1, matching_method = "weighted_choice") {
+                                  delta = NULL, matching_method = "weighted_choice") {
   model <- structure(list(formula = formula, coefficients = coefficients,
                           group_exogamy = group_exogamy, group_levels = group_levels,
                           prevent_exogamy = prevent_exogamy,
-                          imbalance_absorption = imbalance_absorption,
+                          delta = delta,
                           matching_method = matching_method),
                      class = "hammel_matching_model")
   validate_matching_model(model)
@@ -141,7 +140,7 @@ warn_weighted_directed_effects <- function(model) {
 #' # Illustrative preferences, not demographic defaults.
 #' matching <- create_age_gap_matching_model(3, 5)
 create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL, prevent_exogamy = FALSE,
-                                          imbalance_absorption = 1, matching_method = "weighted_choice") {
+                                          delta = NULL, matching_method = "weighted_choice") {
   for (name in c("preferred_age_gap", "half_weight_distance")) {
     value <- get(name)
     if (!is.numeric(value) || length(value) != 1L || !is.null(dim(value)) ||
@@ -159,7 +158,7 @@ create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distanc
   create_matching_model(~ age_difference + I(age_difference^2),
     c(age_difference = unname(linear), "I(age_difference^2)" = unname(quadratic)),
     group_exogamy = group_exogamy, prevent_exogamy = prevent_exogamy,
-    imbalance_absorption = imbalance_absorption,
+    delta = delta,
     matching_method = matching_method)
 }
 
@@ -171,11 +170,12 @@ validate_matching_method <- function(method) {
   invisible(method)
 }
 
-validate_imbalance_absorption <- function(x) {
-  if (!is.numeric(x) || is.complex(x) || length(x) != 1L || !is.null(dim(x)) ||
-      !is.finite(x) || x < 0 || x > 1) {
-    stop("`imbalance_absorption` must be a finite number between 0 and 1.", call. = FALSE)
-  }
+validate_delta <- function(x) {
+  if (is.null(x)) return(invisible(x))
+  if (!is.numeric(x) || is.complex(x) || !is.null(dim(x)) || any(!is.finite(x)) ||
+      (length(x) && (is.null(names(x)) || anyNA(names(x)) ||
+       any(!nzchar(trimws(names(x)))) || anyDuplicated(names(x)))))
+    stop("`delta` must be a finite numeric vector with unique nonempty group names.", call. = FALSE)
   invisible(x)
 }
 
@@ -183,7 +183,7 @@ validate_matching_model <- function(model) {
   if (!inherits(model, "hammel_matching_model") || !is.list(model)) {
     stop("`matching` must be created with create_matching_model().", call. = FALSE)
   }
-  validate_imbalance_absorption(model$imbalance_absorption)
+  validate_delta(model$delta)
   validate_matching_method(model$matching_method)
   formula <- model$formula
   if (!inherits(formula, "formula") || length(formula) != 2L ||
@@ -325,7 +325,9 @@ prepare_matching_model <- function(matching, population_groups = NULL) {
   }
   group_formula <- matching_has_group_formula(matching)
   list(weighted = identical(matching$matching_method, "weighted_choice"),
-       imbalance_absorption = as.numeric(matching$imbalance_absorption),
+       delta = unname(vapply(labels, function(g) {
+         if (g %in% names(matching$delta)) matching$delta[[g]] else 0
+       }, numeric(1))),
        prevent_exogamy_all = restrictions$all, blocked_pairs = blocked,
 quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
        group_formula = group_formula, needs_groups = group_formula || nrow(pairs) > 0,
@@ -377,7 +379,7 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' for his group. Weights are recalculated at every search, in continuous time,
 #' so that expected male union flows by group match a mirrored target: each
 #' unpartnered man has the per-capita intensity of an unpartnered woman of his
-#' group, adjusted by the matching model's `imbalance_absorption`. Women's
+#' group, adjusted by the matching model's `delta`. Women's
 #' intensity is the search hazard for rate-mode searches and the unpartnered
 #' fertility hazard (zero during birth spacing) for on-demand searches and
 #' nonmarital father selection, which has its own weights and uses the father
