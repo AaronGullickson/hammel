@@ -5,6 +5,8 @@ date: today
 format:
   html:
     toc: true
+    toc-expand: 1
+    toc-depth: 4
     number-sections: true
     code-fold: true
     code-tools: true
@@ -141,28 +143,28 @@ replication design should be specified before interpreting results.
 
 ## Overview of Design
 
-Groups are intended to capture an immutable group identity that is assigned at birth (e.g. race, ethnicity), not characteristics that can change over time. The goal is to add such mutable characteristics as a later feature. The goal of this milestone is to allow for the following:
+Groups are intended to capture an immutable group identity that is assigned at birth (e.g. race, ethnicity), not characteristics that can change over time, although a later goal is to allow some ability to transition between groups. The goal of this milestone is to allow for the following:
 
 - Ability to specify different rate schedules for fertility, mortality, and marriage by group.
 - Allow users to control the degree of group exogamy allowed by gender symmetric and gender specific pairings.
 - Allow users to control inheritance rules for children born to parents of different groups, including custom R functions using exposed variables.
 
-Group dynamics are not defined by a separate process, but rather are inferred from other elements in the simulation. To use groups, the initial population must include a `group` column. How groups affect rate schedules, exogamy, and inheritance are determined by arguments that belong to each relevant process. 
+Group dynamics are not defined by a separate process, but rather are inferred from other elements in the simulation. To use groups, the initial population must include a `group` column. The names of the groups will be taken from this column. How groups affect rate schedules, exogamy, and inheritance is determined by arguments that belong to each relevant process. 
 
-This milestone distinguishes between **group identity** and **group ancestry** and both are tracked. **Group identity** is the currently assigned group of the person and affects their rate schedules and marriage choices. **Group ancestry** is the share of ancestry that comes from each group and is also tracked in a separate `ancestry` tibble that is now part of the simulation output in `hammel_population`. 
+This milestone distinguishes between **group identity** and **group ancestry** and both are tracked. **Group identity** is the currently assigned group of the person and affects their rate schedules and marriage choices. **Group ancestry** is the share of a person's ancestry that comes from each group and is also tracked in a separate `ancestry` tibble that is now part of the simulation output in `hammel_population` when groups are specified. 
 
-The simulation makes no special accomodation for mixed group identity (e.g. person identifies with both groups A and B) but it is possible for users to accomodate such mixed groups by specifying a specific mixed group (e.g. "AB") and using a custom function to control how inheritance assigns some births to that group.
+The simulation makes no special accomodation for mixed group identity (e.g. person identifies with both groups A and B) but it is possible for users to accomodate such mixed groups by specifying a specific mixed group (e.g. "AB") and using a custom function to control how inheritance assigns some births to that group (as explained below).
 
 ### Group-specific rates
 
 Group-specific rates can be defined in one of two ways. The first route is to supply rate objects that are stratified by group. These should include a `group` column that gives the appropriate age-specific rate for every group in the simulation. Hammel will recognize these as group-related and assign them to the correct group. If the rates input into a process are not stratified by group, then Hammel will use the same rates for each group. Users can mix and match these to, for example, provide shared mortality rates but group-specific fertility and marriage rates.
 
-using group stratified rate schedule provides the user a great deal of control over the simulation, but is also requires more demanding data and preparation. An alternative is to provide a general rate schedule and specify proportional hazard ratios for each group. The specific rates for each group will be derived by multiplying the base rate provided by the hazard ratio. So to increase, the mortality rates of group B compared to group A by 5%, the user could do:
+Using group stratified rate schedule provides the user a great deal of control over the simulation, but also requires more demanding data and preparation. An alternative is to provide a general rate schedule and specify proportional hazard ratios for each group. The specific rates for each group will be derived by multiplying the base rate provided by the hazard ratio. So to increase, the mortality rates of group B compared to group A by 5%, the user could do:
 
 ```r
 hammel_model() |>
   set_population(population) |>
-  set_mortality(rates = mortality_rates, group_prop_hazard = c("A" = 1.05))
+  set_mortality(rates = mortality_rates, group_prop_hazard = c("B" = 1.05))
 ```
 
 The `group_prop_hazard` function takes a named vector where the names correspond to groups. Groups left out are given an implict 1.0 multiplier. 
@@ -183,9 +185,47 @@ hammel_model() |>
 
 ### Group matching
 
-#### Technical description
+Initially, the plan was to define exogamy parameters for each group pairing for the conditional logit model that controls matching, with the intuition that an exogamy parameter of $\beta$ could roughly be benchmarked to a log odds ratio for the groups of $2\beta$. Additionally, the idea was to also allow directional effects by gender. However, detailed investigation revealed that the female sided nature of the conditional logit model formulation produced results inconsistent with expectation. Namely, even when the group distribution was the same within gender, a single symmetric $\beta$ would produce gender imbalance in AB vs BA union types.
 
-Imagine a population of A and B individuals where A is 75% of the population and B is 25% of the population. Lets assume that there was no group-specific preference for marriage partners. Then putting aside other assortative mating differences, we would expect the distribution of couple types by group to match that shown in @tbl-crosstab-simple.
+The solution to this problem was to use a weighted choice approach in which male-group specific weights are applied to the probabilities to reproduce the expectation of symmetry when group distribution is the same within gender. However, this approach has two limitations:
+
+- It does not allow for directed effects by gender that would lead to different ratios of intergroup unions by gender.
+- When there is a gender imbalance in group share (e.g. from mortality differences by sex and group), this can result in large gender imbalances.
+
+To allow users to adjust results for either of these issues, we include a group specific $\delta$ tuning parameter that allows for adjustment of those ratios. Implicitly this parameter indicates the dregree to which husbands from the given group are preferred relative to wives. $\delta = 0$ means equal preference and no adjustment (the default), while a $\delta > 0$ indicates a preference for husbands over wives, and $\delta < 0$ indicates a preference for wives over husbands.
+
+Users can specify the $\beta$ and $\delta$ parameters with the `group_exogamy` and `delta` arguments respectively. The `group_exogamy` argument takes a named vector of pairwise $\beta$ parameters where each name should equal the two group names separated by a `:`. So, 
+
+```r
+create_age_gap_matching_model(
+  0, 5,
+  group_exogamy = c("A:B" = -5, "A:C" = -0.5, "B:C" = -2)
+)
+```
+
+Would give all of the pairwise $\beta$ values for a three group simulation with groups A, B, and C. As a benchmark, the values provided here will generally produce $2\beta$ for the corresponding log cross-product of the paired groups from the contingency table of husband's group by wife's group.
+
+The `delta` parameter is a named vector of each group. So, 
+
+
+```r
+create_age_gap_matching_model(
+  0, 5,
+  group_exogamy = c("A:B" = -5, "A:C" = -0.5, "B:C" = -2),
+  delta = c("B" = 0.2, "C" = -0.2)
+)
+```
+
+will produce a preference for B husbands over B wives and C will do the reverse. The exact ratios vary by $\beta$ and group size, and age distribution so will need to be tuned in test simulations by users. Note also that the $\delta$ parameter is specific to a single group but not a pairing.
+
+Future plans include the creation of a full two-sex model that will allow users more direct control over a variety of these parameters, but the current approach allows us to keep the computationally cheap conditional logit approach. Under unusual situations of disparity in group size by gender, the simulations may produce unexpected results as they do not fully account for potential "marriage squeezes" in either direction.
+
+The section below provides a detailed mathematical justification for the use of the weighted approach and details on how it was implemented in the simulation. 
+
+
+#### Technical description of the weighted choice approach
+
+Imagine a population of A and B individuals where A is 75% of the population and B is 25% of the population and everyone is married at once in a large "marriage jubilee." Lets assume that there was no group-specific preference for marriage partners. We would expect the distribution of couple types by group to match that shown in @tbl-crosstab-simple.
 
 
 |              | Husband Group A | Husband Group B |
@@ -202,7 +242,7 @@ $$P(\text{A woman chooses B man}) = \frac{0.25e^{\beta}}{0.75 + 0.25e^{\beta}} =
 $$P(\text{B woman chooses A man}) = \frac{0.75e^{\beta}}{0.25 + 0.75e^{\beta}} =  \frac{0.75e^{\beta}}{D_B}$$ 
 $$P(\text{B woman chooses B man}) = \frac{0.25}{0.25 + 0.75e^{\beta}} = \frac{0.25}{D_B}$$
 
-Where, $D_A = 0.75 + 0.25 e^{\beta}$ and $D_B =  0.25 + 0.75e^{\beta}$. These denominators represent the sum of all of the exponentiated utilities for a given woman (i.e. the overall attractiveness of her pool) which is used to normalize the probabilities for each type of women across partner choices to sum to 1. 
+Where, $D_A = 0.75 + 0.25 e^{\beta}$ and $D_B =  0.25 + 0.75e^{\beta}$. These denominators represent the sum of all of the exponentiated utilities for a given woman (i.e. the overall attractiveness of her pool) which is used to normalize the probabilities for each type of woman across partner choices. 
 
 To get the value of each cell in the table correct we then multiply by the row share of A and B women as shown in @tbl-crosstab-clogit.
 
@@ -214,11 +254,11 @@ To get the value of each cell in the table correct we then multiply by the row s
 
 : Joint distribution of unions by wife's group and husband's group under a conditional logit model with group endogamy {#tbl-crosstab-clogit}
 
-The inverse cross product of @tbl-crosstab-clogit gives us the odds ratio of exogamy to endogamy often used in assortative mating studies:
+The inverse cross product of @tbl-crosstab-clogit gives us the association odds ratio often used in assortative mating studies:
 
 $$\frac{(0.25)(0.75)e^{\beta}D_B^{-1}(0.75)(0.25)e^{\beta}D_A^{-1}}{(0.75)(0.75)D_A^{-1}(0.25)(0.25)D_B^{-1}} = e^{2\beta}$$
 
-Everything (cancels out except for the $\beta$ values. The log cross product is thus $2\beta$ which is consistent with conditional logit model estimates typically around half the log-odds ratio in empirical data. If we set $\beta = 0$ here, then $D_A = 1$ and $D_B = 1$ and @tbl-crosstab-clogit simplifies to @tbl-crosstab-simple.  
+Everything cancels out except for the $\beta$ values. The log cross product is thus $2\beta$ which is consistent with conditional logit model estimates typically around half the log-odds ratio in empirical data. If we set $\beta = 0$ here, then $D_A = 1$ and $D_B = 1$ and @tbl-crosstab-clogit simplifies to @tbl-crosstab-simple.  
 
 We can generalize this approach by setting $F_i$ and $M_j$ as the share of women and men respectively belonging to a certain group (0.75 and 0.25 for goups A and B, respectively, in the example above) and setting utility $U_{ij}$ as:
 
@@ -238,18 +278,18 @@ Although the overall log-odds ratio matches expectation here, the AB and BA cell
 
 $$\frac{N_{AB}}{N_{BA}} = \frac{(0.75)(0.25)e^{\beta}D_A^{-1}}{(0.25)(0.75)e^{\beta}D_B^{-1}} = \frac{D_B}{D_A} = \frac{0.25 + 0.75e^{\beta}}{0.75 + 0.25 e^{\beta}}$$
 
-This ratio can be substantial. For example, at $\beta = -3$, the ratio is 0.377 AB unions for every one BA union. Given that the model here assumes that the exogamy parameter is symmetric with regard to sex, this discrepancy is large. 
+This ratio can be substantially different from one. For example, at $\beta = -3$, the ratio is 0.377 AB unions for every one BA union. Given that the model here assumes that the exogamy parameter is symmetric with regard to sex, this discrepancy is large. 
 
 The row marginals will add up to the overall distribution for women:
 
 $$N_{A+} = \frac{(0.75)(0.75)+(0.75)(0.25)e^{\beta}}{0.75 + 0.25 e^{\beta}} = \frac{(0.75)(0.75 + 0.25e^{\beta})}{0.75 + 0.25 e^{\beta}} = 0.75$$
 $$N_{B+} = \frac{(0.25)(0.25) + (0.25)(0.75)e^{\beta}}{0.25 + 0.75e^{\beta}} = \frac{(0.25)(0.25 + 0.75e^{\beta})}{0.25 + 0.75e^{\beta}} = 0.25$$
 
-However, the column margins will not add up in the same way for men, because the two cells on each column do not share a single denominator. For example, the case with $\beta = -3$, group B men will only make up 0.2298 of husbands as opposed to the 0.25 for women. 
+However, the column margins will not add up in the same way for men, because the two cells on each column do not share a single denominator. For example, in the case with $\beta = -3$, group B men will only make up 0.2298 of husbands as opposed to the 0.25 for women. 
 
 The underlying issue is that because women drive the choices we don't observe a symmetric process. If we switched to having men do the choosing, we would observe the same issues but in the reverse direction.
 
-Its worth noting how this approach compares to the typically log-linear formulation:
+Its will be helpful to note how this approach compares to the typically log-linear formulation:
 
 
 |              |   Husband Group A                | Husband Group B               |
@@ -275,7 +315,7 @@ This is exactly the log-linear form $r_i c_j e^{U_{ij}}$, with
 
 $$r_i = \frac{F_i}{D_i}, \qquad c_j = \omega_j M_j$$
 
-In this simplified two group example, there is a closed form analytical solution to solve for $\omega_j$. First, we set $\omega_A = 1$ as the reference weight. Then we define $f$ as the share of women in group A and $p$ as the share of men in group A, and $q = 1 - p$ as the share of men in group B.  
+In this simplified two group example, there is a closed form analytical solution to solve for $\omega_j$. First, we set $\omega_A = 1$ as the reference weight. Then we define $f$ as the share of women in group A, $p$ as the share of men in group A, and $q = 1 - p$ as the share of men in group B. @tbl-crosstab-formula shows the equations govering the joint distribution of spouses.
 
 |              |   Husband Group A                              | Husband Group B                                        |
 |--------------|------------------------------------------------|--------------------------------------------------------|
@@ -299,7 +339,7 @@ $$
 C = p - f + (f - q)e^{2\beta}.
 $$
 
-Notably, this solutions forces the following equality:
+Notably, this solution forces the following equality:
 
 $$N_{AB} - N_{BA} = f - p$$
 
@@ -368,7 +408,7 @@ bind_rows(
 
 One limitation of this approach is that it does not allow for directional differences by gender in the ratio - the exogamy parameter $\beta$ must by symmetric with regard to sex. In many cases, this will be appropriate as a single marker of group boundaries, but some empirical cases may have a clear difference in intermarriage likelihood by gender, suggesting that men and women of that group are viewed differently as partners. For example, research has shown about a 3:1 disparity in black men/white women compared to white men/black women pairings in the US. 
 
-Another issue is demonstrated in @tbl-scenario-two-groups-unbalanced. When groups shares are not the same by gender, even fairly minor differences can produce even larger gender disparity than in the balanced approach. This is because of the equality $N_{AB} - N_{BA} = f - p$ This gender disparity must come out as a difference between the two cells. When intermarriages is less likely the ratio will be even larger.
+Another issue is demonstrated in @tbl-scenario-two-groups-unbalanced. When groups shares are not the same by gender, even fairly minor differences can produce even larger gender disparity than in the u weighted approach. This is because of the equality $N_{AB} - N_{BA} = f - p$. This gender disparity must come out as a difference between the two cells. When intermarriage is less likely, the ratio will be even larger.
 
 ```{r}
 #| label: tbl-scenario-two-groups-unbalanced
@@ -485,37 +525,25 @@ bind_rows(
 
 @tbl-scenario-two-groups-delta shows scenarios using the $\delta$ tuning parameter. The first three rows show a case with even group share by sex in which the tuning parameter is used to create either a roughly 3:1 or 1:3 ratio of AB to BA unions. The last three rows show using the tuning parameter to adjust the ratio from a case of uneven group share by sex to either 1:1 or 1:3. 
 
----
+Together, the $\omega$ weights and the $\delta$ tuning parameters give us considerable control over intergroup exogamy while retaining the computationally efficient conditional logit approach. Implementing this approach in the simulation is, however, more complicated than the static two-group case developed here.
 
-Group exogamy levels are defined in the `matching_model` that is input into the union formation process. The user can use the `group_exogamy` argument to specify the log-odds of exogamy as a named vector for named pairings. These values are then added to the logit score/utility for each possible match using that pairing. Negative values will make exogamy rarer than endogamy, positive values will make it more common, and a value of zero (the default unless specified) means that exogamy is as likely as endogamy. 
+Women initiate partner searches individually at different times. At each search, we therefore need to determine the expected group distribution of women initiating searches and a corresponding target distribution for their male partners. We calculate the expected number of searches per year from the current numbers of unpartnered women in each group and small age bins, applying their specified search rates. This accounts for differences in both group-specific rates and age composition.
 
-The names for the vector should equal the two groups separated by either a `:` for gender specific effects or `::` for gender symmetric effects. For gender specific effects, the woman is listed first. So, `A:B` indicates pairings of A women and B men, `B:A` indicates pairings of B women and A men, and `A::B` indicates either type of A/B pairing regardless of gender. 
+Within each group, we divide this expected number of searches by the number of unpartnered women to obtain an average search rate per woman, $r_{g}$. We mirror this average rate for men of the same group. If $M_{g}$ is the number of available men in group g, their target share of matches is then
 
-So, a user could define the following:
+$$
+\tau_g=
+\frac{M_g r_g e^{\delta_g}}
+{\sum_h M_h r_h e^{\delta_h}}
+$$
 
-```r
-create_age_gap_matching_model(
-  0, 5,
-  group_exogamy = c("A::B" = -5, "A::C" = -0.5, "B:C" = -2, "C:B = -1")
-)
-```
+This supplies a target for how matches should be distributed across male groups, while female search rates continue to determine when searches occur. The $\delta_{g}$ parameters adjust these targets in the same way as in the simple example.
 
-In this case, unions between A and B individuals regardless of the gender combination are very rare, while unions between A and C individuals are much more common. For unions between B and C individuals, cases where the woman is B and the man is C are more common than cases where the woman is C and the man is B.
+To calculate the weights, we consider the partner-choice probabilities of all women currently at risk of initiating a search, weighting each woman’s contribution by her search rate. We numerically find the male-group $\omega$ weights that make the resulting expected male group shares match the targets $\tau_{g}$. We solve for these weights iteratively using Newton’s method, starting from the weights calculated at the previous search. The focal woman then selects a husband using the conditional logit probabilities with those calibrated weights. The calculation is repeated at each search as population composition changes.
 
-As a benchmark rule of thumb, a gender-symmetric score will be equal to half the log odds ratio from the cross-product derived from the contingency table between partners. To see this take the case of two groups, A and B, with a gender-symmetric $\beta$ score for exogamy. Under a multiplicatie model, the expected cell counts of the two-way table of wife's group by husband's group will approximately be:
+For searches triggered by marriage rates, the female marriage rates are used. For birth-triggered searches and nonmarital father selection, the relevant fertility rates supply the search rates. To reduce computation, calibration groups individuals into quarter-year birth cohorts and does not remove kin. It evaluates matching preferences at cohort-centre ages and averages search rates over each cohort’s age interval. Actual partner selection uses individual ages. 
 
-|          | Male A           | Male B              |
-|----------|------------------|---------------------|
-| Female A |$r_Ac_A$          |$r_Ac_Be^{\beta}$    |
-| Female B |$r_Bc_Ae^{\beta}$ |$r_Bc_B$             |
-
-where $r$ and $c$ represent the row and column scaling factors accounting for group size and availability, respectively.
-
-When calculating the log odds ratio for this 2x2 table, the row and column scaling factors will cancel, leaving:
-
-$$log(\frac{N_{AB}N_{BA}}{N_{AA}N_{BB}}) = log(e^{\beta}e^{\beta}) = 2\beta$$
-
-Observed counts will vary through sampling, and aggregation across ages or changing partner pools may introduce departures from this benchmark. Nonetheless, this can be useful benchmark to keep in mind when assigning exogamy values.
+To speed computation at each search, the simulation maintains these binned distributions and updates them based on relevant events rather than reconstructing them at each search. This approach also has a fringe benefit. Maintaining these bins supports efficient rejection sampling from the full available male pool rather than the use of a sample. A group-cohort bin is drawn using its size and an upper bound on candidate weights, then a man is drawn uniformly within it. He is accepted with a probability based on his exact utility and screened for age and kinship eligibility; otherwise, the draw is repeated. Hard group exclusions are applied before drawing. 
 
 ### Group inheritance of births
 
@@ -543,7 +571,7 @@ hammel_model() |>
   set_fertility(rates = fertility_rates, inheritance = "ancestry")
 ```
 
-The final two methods require a bit more explanation. The `hierarchy` method assigns the highest ordered group on a vector of group names provided in a separate `order` argument and can be used to simulate processes of hypodescent/hyperdescent (e.g. the one drop rule). The decision is based on parent's identified group membership, not ancestry. Additionally, this method can also take an argument called `passing` which provides a proportion. This proportion will be used as the probability that the hierarchy is inverted in any given case. So for example, to fit a model where group B is almost always assigned over group A and group A is almost always assigned over group B, but 5% of cases are inverted.
+The final two methods require a bit more explanation. The `hierarchy` method assigns the highest ordered group on a vector of group names provided in a separate `order` argument and can be used to simulate processes of hypodescent/hyperdescent (e.g. the one drop rule). The decision is based on parent's identified group membership, not ancestry. Additionally, this method can also take an argument called `passing` which provides a proportion. This proportion will be used as the probability that the hierarchy is inverted in any given case. So for example, to fit a model where group B is almost always assigned over group A and group A is almost always assigned over group B, but 5% of cases are inverted:
 
 ```r
 create_group_inheritance("hierarchy", order = c("B", "A", "C"), passing = 0.05)
@@ -588,7 +616,7 @@ inheritance <- create_group_inheritance(
 )
 ```
 
-Values from the multinomial logit are taken from Gullickson and Saperstein (TODO: CITE). 
+Values from the multinomial logit are taken from Gullickson and Saperstein (2026). 
 
 ## Inputs and simulation design
 
