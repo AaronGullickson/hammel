@@ -218,16 +218,32 @@ $$\frac{(0.25)(0.75)e^{\beta}D_B^{-1}(0.75)(0.25)e^{\beta}D_A^{-1}}{(0.75)(0.75)
 
 Everything cancels out except for the $\beta$ values. The log cross product is thus $2\beta$ which is consistent with conditional logit model estimates typically around half the log-odds ratio in empirical data. If we set $\beta = 0$ here, then $D_A = 1$ and $D_B = 1$ and @tbl-crosstab-clogit simplifies to @tbl-crosstab-simple.  
 
+We can generalize this approach by setting $F_i$ and $M_j$ as the share of women and men respectively belonging to a certain group (0.75 and 0.25 for goups A and B, respectively, in the example above) and setting utility $U_{ij}$ as:
+
+$$
+U_{ij} =
+\begin{cases}
+0 & \text{if } i = j \\
+\beta & \text{if } i \neq j
+\end{cases}
+$$
+
+Then, the value of $N_{ij}$ in cell $ij$ is given by:
+
+$$N_{ij} = F_i \cdot \frac{M_j e^{U_{ij}}}{D_i}, \qquad D_i = \sum_k M_k e^{U_{ik}}$$
+
 Although the overall log-odds ratio matches expectation here, the AB and BA cells are not balanced despite gender balance within each group:
 
 $$\frac{N_{AB}}{N_{BA}} = \frac{(0.75)(0.25)e^{\beta}D_A^{-1}}{(0.25)(0.75)e^{\beta}D_B^{-1}} = \frac{D_B}{D_A} = \frac{0.25 + 0.75e^{\beta}}{0.75 + 0.25 e^{\beta}}$$
 
-A related issue is that while the row marginals will add up to the overall distribution for women:
+This ratio can be substantial. For example, at $\beta = -3$, the ratio is 0.377 AB unions for every one BA union. Given that the model here assumes that the exogamy parameter is symmetric with regard to sex, this discrepancy is large. 
 
-$$N_{A\cdot} = \frac{(0.75)(0.75)+(0.75)(0.25)e^{\beta}}{0.75 + 0.25 e^{\beta}} = \frac{(0.75)(0.75 + 0.25e^{\beta})}{0.75 + 0.25 e^{\beta}} = 0.75$$
-$$N_{B\cdot} = \frac{(0.25)(0.25) + (0.25)(0.75)e^{\beta}}{0.25 + 0.75e^{\beta}} = \frac{(0.25)(0.25 + 0.75e^{\beta})}{0.25 + 0.75e^{\beta}} = 0.25$$
+The row marginals will add up to the overall distribution for women:
 
-the column margins will not add up in the same way for men, because the two cells on each column do not share a single denominator. For example, the case with $\beta = -3$, group B men will only make up 0.2298 of husbands as opposed to the 0.25 for women. 
+$$N_{A+} = \frac{(0.75)(0.75)+(0.75)(0.25)e^{\beta}}{0.75 + 0.25 e^{\beta}} = \frac{(0.75)(0.75 + 0.25e^{\beta})}{0.75 + 0.25 e^{\beta}} = 0.75$$
+$$N_{B+} = \frac{(0.25)(0.25) + (0.25)(0.75)e^{\beta}}{0.25 + 0.75e^{\beta}} = \frac{(0.25)(0.25 + 0.75e^{\beta})}{0.25 + 0.75e^{\beta}} = 0.25$$
+
+However, the column margins will not add up in the same way for men, because the two cells on each column do not share a single denominator. For example, the case with $\beta = -3$, group B men will only make up 0.2298 of husbands as opposed to the 0.25 for women. 
 
 The underlying issue is that because women drive the choices we don't observe a symmetric process. If we switched to having men do the choosing, we would observe the same issues but in the reverse direction.
 
@@ -237,13 +253,54 @@ Its worth noting how this approach compares to the typically log-linear formulat
 |              |   Husband Group A                | Husband Group B               |
 |--------------|----------------------------------|-------------------------------|
 | Wife Group A | $r_Ac_A$                         | $r_Ac_Be^{\beta}$             |
-| Wife Group B | $r_Bc_Ae^{\beta}$                | $r_Br_B$                      |
+| Wife Group B | $r_Bc_Ae^{\beta}$                | $r_Bc_B$                      |
 
 : Log-linear formulation of the cross-tabulation of wife's group and husband's group {#tbl-log-linear}
 
-Where $r_i$ and $c_i$ are row and column scores estimated to ensure the correct marginal distributions. This approach will produce the same $\beta$ value but also $N_{AB} = N_{BA}$. We can reproduce this approach directly while maintaining the conditional logit model method by applying a group-specific weight to each man.
+Where $r_i$ and $c_i$ are row and column scores estimated to ensure the correct marginal distributions. This approach will produce the same $\beta$ value and when the male and female group distributions are the same it will also produce $N_{AB} = N_{BA}$. We can reproduce this approach directly while maintaining the conditional logit model method by applying a group-specific weight to each man.
 
-Intuitively, 
+Intuitively, these weight act like a "price adjustment" to modify the attractiveness of group B men so their column share matches the desired 25%. It does not modify the odds ratio but rather just the ratio of $N_{AB}$ to $N_{BA}$. 
+
+With weights $\omega_j$ on men of group $j$, we can modify the previous formula for the cell counts to:
+
+$$N_{ij} = F_i \cdot \frac{\omega_j M_j e^{U_{ij}}}{D_i}, \qquad D_i = \sum_k \omega_k M_k e^{U_{ik}}$$
+
+A slight reformulation here gives us:
+
+$$N_{ij} = \frac{F_i}{D_i} \cdot \omega_j M_j \cdot e^{U_{ij}}$$
+
+This is exactly the log-linear form $r_i c_j e^{U_{ij}}$, with
+
+$$r_i = \frac{F_i}{D_i}, \qquad c_j = \omega_j M_j$$
+
+In this simplified two group example, there is a closed form analytical solution to solve for $\omega_j$. First, we set $\omega_A = 1$ as the reference weight. Then we define $f$ as the share of women in group A and $p$ as the share of men in group A, and $q = 1 - p$ as the share of men in group B.  
+
+|              |   Husband Group A                              | Husband Group B                                        |
+|--------------|------------------------------------------------|--------------------------------------------------------|
+| Wife Group A | $\frac{fp}{p+q \omega_B e^{\beta}}$            | $\frac{fq \omega_B e^{\beta}}{p+q \omega_B e^{\beta}}$ |
+| Wife Group B | $\frac{(1-f)pe^{\beta}}{pe^{\beta}+q\omega_B}$ | $\frac{(1-f)q\omega_B}{pe^{\beta}+q\omega_B}$          |
+
+
+The constraint is that $N_{AB}+N_{BB} = q$. Solving for that constraint gives a quadratic form:
+
+$$
+qe^{\beta}\omega_B^2+\underbrace{\left[p-f+(f-q)e^{2\beta}\right]}_{C}\omega_B-pe^{\beta}=0
+$$
+
+We can solve for the positive root of the quadratic to get the analytical solution for $\omega_B$:
+
+$$
+\omega_B = \frac{\sqrt{C^2 + 4pq\,e^{2\beta}} - C}{2q\,e^\beta},
+\qquad
+C = p - f + (f - q)e^{2\beta}.
+$$
+
+Notably, this solutions forces the following equality:
+
+$$N_{AB} - N_{BA} = f - p$$
+
+When the groups have the same share within each gender, $f-p = 0$ and we will have symmetry in $N_{AB} - N_{BA}$. 
+
 
 ---
 
