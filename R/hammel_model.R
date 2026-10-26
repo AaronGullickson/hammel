@@ -52,7 +52,6 @@ set_population <- function(model, population) {
   population$persons <- tibble::as_tibble(population$persons)
   population$unions <- tibble::as_tibble(population$unions)
   model$population <- population
-  warn_female_choice_inheritance(model)
   model
 }
 

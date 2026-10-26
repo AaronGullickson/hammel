@@ -40,12 +40,7 @@ defaulting to \code{0.75}. Must be finite and nonnegative.}
 or a method name requiring no additional parameters: \code{"mother"}, \code{"father"},
 \code{"random_parent"}, \code{"same_sex"}, \code{"opposite_sex"}, or \code{"ancestry"}.
 Applies to fertility and defaults to following the mother. Assignment is
-independent of recorded ancestry proportions.
-Building a grouped model that pairs \code{"mother"}, \code{"father"}, \code{"same_sex"},
-or \code{"opposite_sex"} with a female-choice matching model warns: female choice
-can pair groups directionally unevenly even under symmetry, and these rules
-turn that into group-composition change. Parent-symmetric and custom rules
-do not warn.}
+independent of recorded ancestry proportions.}
 
 \item{ffab}{Probability that a newborn is female, default \code{0.4886}.
 Must be a finite numeric scalar in \verb{[0, 1]}. Applies to fertility only.}

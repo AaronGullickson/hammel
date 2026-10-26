@@ -9,8 +9,7 @@ create_age_gap_matching_model(
   half_weight_distance,
   group_exogamy = NULL,
   prevent_exogamy = FALSE,
-  delta = NULL,
-  matching_method = "weighted_choice"
+  delta = NULL
 )
 }
 \arguments{
@@ -25,30 +24,13 @@ preferred gap at which selection weight halves.}
 \item{prevent_exogamy}{Optional hard group restrictions passed to
 \code{\link[=create_matching_model]{create_matching_model()}}. Defaults to \code{FALSE}.}
 
-\item{delta}{Optional finite numeric vector with unique group names. Used
-only by weighted choice: multiply mirrored male targets by \code{exp(delta)}
+\item{delta}{Optional finite numeric vector with unique group names.
+Multiply mirrored male targets by \code{exp(delta)}
 and normalize. Omitted groups have zero adjustment. Positive values raise
 the male target relative to baseline and other groups; negative values
 lower it. Only differences matter. Does not set pair-specific ratios or
 change female search rates. Names must belong to the population's identity
 registry (including declared future groups).}
-
-\item{matching_method}{\code{"weighted_choice"} (default) for female choice with
-calibrated male-group weights, or \code{"female_choice"} for unweighted ego-only
-choice. Female choice accounts for available men but leaves how often each
-male group forms unions unspecified. With unequal group sizes, symmetric
-group preferences can then produce unequal female-A/male-B and
-female-B/male-A pairing counts, which can systematically affect group
-inheritance and later group composition. Weighted choice adds the missing
-rule for men without changing the preference association; with one group
-it equals female choice. The method belongs to this model: a separate
-\code{father_matching} model in \code{\link[=union_formation]{union_formation()}} uses its own method, and a
-NULL father model inherits this one. Weighted choice warns at construction
-when directed group effects or \code{male_group} formula terms are present,
-because it pins how often each male group forms unions: with two groups
-only the sum of a directed pair affects pairing, and \code{male_group} main
-effects have no effect. Building a grouped model that combines female
-choice with a sex-specific inheritance rule also warns (see \code{\link[=fertility]{fertility()}}).}
 }
 \value{
 A \code{hammel_matching_model} with linear and quadratic age-difference terms.

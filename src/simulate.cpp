@@ -1150,13 +1150,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::vector<const std::vector<Band>*> search_hazards, fertility_hazards;
   LagTable union_table, father_table_storage;
   int union_table_id = 0, father_table_id = 0;
-  // Each matching model carries its own method; a NULL father model is the
-  // same object as the general model and shares its method and table. When a
+  // A NULL father model shares the general model and calibration table. When a
   // model prevents all exogamy, every woman sees only her own group's men, so
-  // a group weight cannot change her choice: skip calibration (female choice).
+  // a group weight cannot change her choice: skip calibration.
   auto applies_weights = [](const List& model) {
-    return model.containsElementNamed("weighted") && as<bool>(model["weighted"]) &&
-      !as<bool>(model["prevent_exogamy_all"]);
+    return !as<bool>(model["prevent_exogamy_all"]);
   };
   const bool union_weighted = applies_weights(matching);
   const bool father_weighted = applies_weights(father_matching);
@@ -1232,7 +1230,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (rate_initiation) rates.search = read_bands(union_rates, "", "", group);
   }
   // weighted_choice needs schedules and group indices, so it starts here.
-  // One group means unit weights: the method then equals female choice.
+  // One group means unit weights, so calibration is unnecessary.
   if ((union_weighted || father_weighted) && group_count > 1) {
     double min_birth = start;
     for (const Person& person : people) min_birth = std::min(min_birth, person.born);

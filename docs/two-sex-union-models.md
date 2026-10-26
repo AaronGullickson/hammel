@@ -4,7 +4,8 @@ Recorded October 24, 2026 from a discussion with the user. **Status: research
 notes and proposals only.** Nothing here is implemented, specified for
 implementation, or an accepted modeling decision, except the user decisions
 recorded in D073 and D074. D074 authorizes the male-target adjustment
-described below; the fuller two-sex proposals remain deferred. The current union process remains as described in
+described below; D075 subsequently removes unweighted matching and directed
+pair effects. The fuller two-sex proposals remain deferred. The current union process remains as described in
 [union-formation models](union-formation-models.md) and
 [weighted-choice matching](weighted-choice-matching.md).
 
@@ -24,7 +25,7 @@ sexes are balanced?
 With two groups, AB - BA equals the male group-B share of unions minus the
 female group-B share (A:B means female A, male B). With balanced sexes and zero delta the
 weighted-choice target sets those shares equal, so AB = BA however the
-preferences are written; directed pair effects are absorbed by the weights
+preferences are written; historically, directed pair effects were absorbed by the weights
 (see the weighted-choice consequences). A 3:1 ratio therefore means men of
 group B form more unions than women of group B. Because women's timing is an
 input, those extra unions are taken from men of group A. The asymmetry is
@@ -52,8 +53,9 @@ about how often each male group forms unions, not about who prefers whom.
    how sex imbalance affects the target. With two groups the ratio is monotone in log b_B, so the solve
    is unique. R = 1 reproduces the current method. With K groups the weights
    have K - 1 degrees of freedom, so at most K - 1 non-cyclic pair ratios can
-   be set; cyclic directional variation comes from directed preferences,
-   which do affect pairing with three or more groups.
+   be set. The historical directed-preference mechanism could also create
+   cyclic directional variation with three or more groups; D075 removes that
+   pair-effect option.
 
 ### Feedback through the male pools
 

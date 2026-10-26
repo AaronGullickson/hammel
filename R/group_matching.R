@@ -3,7 +3,7 @@ matching_group_labels <- function(x, name) {
   as.character(x)
 }
 
-expand_group_exogamy <- function(effects) {
+expand_matching_pairs <- function(effects, symmetric = FALSE) {
   empty <- tibble::tibble(female_group = character(), male_group = character(), log_odds = numeric())
   if (is.null(effects)) return(empty)
   if (is.data.frame(effects)) {
@@ -17,16 +17,18 @@ expand_group_exogamy <- function(effects) {
     if (!is.numeric(effects) || is.complex(effects) || !is.null(dim(effects)) ||
         any(!is.finite(effects)) || (length(effects) &&
         (is.null(labels) || anyNA(labels) || any(!nzchar(labels)))))
-      stop("`group_exogamy` must be a finite named numeric vector or a directional pair table.", call. = FALSE)
+      stop("`group_exogamy` must be a finite named numeric vector or a pair table.", call. = FALSE)
     tables <- lapply(seq_along(effects), function(i) {
       key <- labels[i]
-      if (!grepl("^[^:]+:{1,2}[^:]+$", key))
-        stop("Use 'female:male' or symmetric 'group::group' names in `group_exogamy`.", call. = FALSE)
+      pattern <- if (symmetric) "^[^:]+:[^:]+$" else "^[^:]+:{1,2}[^:]+$"
+      if (!grepl(pattern, key))
+        stop(if (symmetric) "Use single ':' unordered pair names in `group_exogamy`." else
+          "Use 'female:male' or symmetric 'group::group' names in `prevent_exogamy`.", call. = FALSE)
       pair <- strsplit(key, ":{1,2}")[[1]]
       if (any(!nzchar(trimws(pair)))) stop("Pair group labels must be nonempty.", call. = FALSE)
       table <- tibble::tibble(female_group = pair[1], male_group = pair[2],
                               log_odds = unname(effects[i]))
-      if (grepl("::", key, fixed = TRUE) && pair[1] != pair[2])
+      if (!symmetric && grepl("::", key, fixed = TRUE) && pair[1] != pair[2])
         table <- rbind(table, tibble::tibble(female_group = pair[2], male_group = pair[1],
                                             log_odds = unname(effects[i])))
       table
@@ -36,10 +38,18 @@ expand_group_exogamy <- function(effects) {
   if (!is.numeric(table$log_odds) || is.complex(table$log_odds) ||
       !is.null(dim(table$log_odds)) || any(!is.finite(table$log_odds)))
     stop("`group_exogamy` log odds must be finite numeric values.", call. = FALSE)
+  if (symmetric && nrow(table)) {
+    reversed <- table[table$female_group != table$male_group, , drop = FALSE]
+    reversed[c("female_group", "male_group")] <- reversed[c("male_group", "female_group")]
+    table <- rbind(table, reversed)
+  }
   if (anyDuplicated(table[c("female_group", "male_group")]))
-    stop("Conflicting or overlapping directed pairs in `group_exogamy`.", call. = FALSE)
+    stop(if (symmetric) "Conflicting or overlapping unordered pairs in `group_exogamy`." else
+      "Conflicting or overlapping directed pairs in `prevent_exogamy`.", call. = FALSE)
   table
 }
+
+expand_group_exogamy <- function(effects) expand_matching_pairs(effects, symmetric = TRUE)
 
 matching_has_group_formula <- function(matching) {
   any(all.vars(matching$formula) %in% c("female_group", "male_group", "same_group"))
@@ -98,18 +108,18 @@ validate_matching_groups <- function(matching, population_groups) {
 }
 
 expand_prevent_exogamy <- function(x) {
-  empty <- expand_group_exogamy(NULL)[c("female_group", "male_group")]
+  empty <- expand_matching_pairs(NULL)[c("female_group", "male_group")]
   if (is.null(x)) x <- FALSE
   if (is.logical(x) && length(x) == 1L && is.null(dim(x)) && !is.na(x))
     return(list(all = x, pairs = empty))
   pairs <- tryCatch({
     if (is.character(x) && is.null(dim(x)) && !anyNA(x)) {
-      expand_group_exogamy(stats::setNames(rep(0, length(x)), x))
+      expand_matching_pairs(stats::setNames(rep(0, length(x)), x))
     } else if (is.data.frame(x)) {
       check_columns(x, c("female_group", "male_group"), "prevent_exogamy")
       x$log_odds <- rep(0, nrow(x))
-      expand_group_exogamy(x)
-    } else stop("Use FALSE, TRUE, a character vector of pairs, or a directional pair table.")
+      expand_matching_pairs(x)
+    } else stop("Use FALSE, TRUE, a character vector of pairs, or a pair table.")
   }, error = function(e) stop("Invalid `prevent_exogamy`: ", conditionMessage(e), call. = FALSE))
   if (any(pairs$female_group == pairs$male_group))
     stop("`prevent_exogamy` pairs must join different groups.", call. = FALSE)

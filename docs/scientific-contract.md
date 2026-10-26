@@ -49,7 +49,7 @@ Population persons and mortality, fertility, and female union-search rate tables
 may contain `group`. Ungrouped rate tables apply to everyone; grouped tables
 must cover every population group. Without population groups, use each table's
 alphabetically first group and emit a simulation warning. Group does not affect
-matching eligibility. Optional group formula predictors and directed/symmetric
+matching eligibility. Optional group formula predictors and symmetric
 pair effects can change utility. Newborns follow their mother's group by default
 or the configured inheritance rule, entering the assigned group's mortality
 schedule immediately. Fertility
@@ -234,11 +234,11 @@ years, with relative weight halved five years either side. Explicit models
 override that default; it does not fix the realized age-gap distribution.
 
 Matching models optionally accept `group_exogamy`: a named vector using `A:B`
-for female A/male B and `A::B` for equal effects in both directions. Effects
+for equal effects on female A/male B and female B/male A (D075). Effects
 are finite log-scale additions after the full formula score. An omitted pair
 has odds ratio 1.0 (zero log effect). Within-group effects are allowed; overlaps
-after symmetric expansion are errors. A directional pair table is also accepted
-for labels containing colons. These are selection preferences, not hazards or
+after symmetric expansion are errors. A pair table is also accepted
+for labels containing colons; each row expands in both directions. These are selection preferences, not hazards or
 prohibitions. `female_group`, `male_group`, and numeric 0/1 `same_group` are
 available in formulas; categorical terms require fixed declared `group_levels`
 with treatment contrasts. Missing population identity data errors when a model
@@ -261,9 +261,8 @@ use the woman's ongoing living male partner as father. If she has no partner,
 draw a man from all eligible living, unpartnered men with probability
 proportional to `exp(V)`, where V is his utility: the matching formula on
 male-minus-female continuous age differences, multiplied by its named
-coefficients, plus pair effects, plus, under the default `"weighted_choice"`
-method, the log weight for his group (specified below). Explicit
-`"female_choice"` uses V without group weights. Form the union at the birth time
+coefficients, plus symmetric pair effects, plus the calibrated log weight for his group
+(specified below). Form the union at the birth time
 and assign the partner as father. Nonfinite formula values/utilities are errors.
 
 The draw is exact. Unpartnered men are kept by group and quarter-year birth
@@ -361,10 +360,10 @@ See [union fertility specification](union-formation-models.md#fertility-schedule
 
 ### Weighted choice
 
-D066 specifies `matching_method = "weighted_choice"`, the matching-model
-default since D067; `"female_choice"` remains available. The method belongs to
-each matching model (D068), so a separate `father_matching` model applies its
-own method and a NULL father model inherits the general one. Ego still chooses among
+All partner matching uses calibrated male-group weights (D075), with no
+method argument. A separate `father_matching` model retains its own preferences,
+restrictions and delta; a NULL father model inherits the general model.
+Ego chooses among
 her screened candidates with probabilities proportional to exp(U), multiplied
 by a weight for each man's group. Weights are recalculated at every search so
 expected male union flows by group meet a target mirroring female per-capita

@@ -45,12 +45,7 @@ or a method name requiring no additional parameters: \code{"mother"}, \code{"fat
 Fertility defaults to following the mother. Other parental, ancestry,
 hierarchy, and custom rules assign identity after child sex and ancestry
 are calculated. Possible identities are checked against grouped schedules
-and categorical matching levels before execution. Applies to fertility only.
-Building a grouped model that pairs \code{"mother"}, \code{"father"}, \code{"same_sex"},
-or \code{"opposite_sex"} with a female-choice matching model warns: female choice
-can pair groups directionally unevenly even under symmetry, and these rules
-turn that into group-composition change. Parent-symmetric and custom rules
-do not warn.}
+and categorical matching levels before execution. Applies to fertility only.}
 
 \item{ffab}{Probability that a newborn is female, default \code{0.4886}.
 Must be a finite numeric scalar in \verb{[0, 1]}. Applies to fertility only.}

@@ -111,20 +111,15 @@ custom multinomial-style assignment, new identities and rate/matching coverage,
 native/R RNG agreement, errors, empty populations, restarts, independent runs,
 unchanged default maternal histories, and conserved ancestry shares.
 
-## Female choice and sex-specific rules
+## Directional matching and sex-specific rules
 
-Explicit female-choice matching can pair groups directionally unevenly (for
-example, more female-B/male-A than female-A/male-B unions) even with symmetric
-preferences and balanced sexes when group sizes differ. The rules `mother`,
-`father`, `same_sex`, and `opposite_sex` depend on which parent is the mother,
-so they turn that imbalance into group-composition change. `random_parent`,
-`ancestry`, and `hierarchy` treat parents symmetrically and depend only on how
-many mixed unions form. When a model with fertility, union formation, and a
-population of at least two groups combines one of the four sex-specific rules
-with a female-choice union or father model, `set_process()` (and the setters)
-and `set_population()` warn (D069). `simulate()` does not repeat the warning.
-Custom rules are not checked. Weighted choice, the default, removes the
-directional imbalance under symmetric conditions.
+Matching always uses calibrated male-group weights (D075), with directional
+adjustments specified by delta (D074). The obsolete female-choice inheritance
+warning has been removed. The rules `mother`, `father`, `same_sex`, and
+`opposite_sex` depend on parental sex, so directional pairing differences can
+still affect identity composition. Inspect those differences alongside group
+preferences, delta, sex-specific pool composition and inheritance rules;
+weighted matching does not guarantee identical maternal and paternal outcomes.
 
 ## Open evaluation question
 

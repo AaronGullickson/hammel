@@ -194,7 +194,7 @@ test_that("future identities are checked against rates and categorical matching 
     edited$processes[[name]]$rates <- rbind(transform(rates, group = "A"), transform(rates, group = "B"))
     expect_error(simulate(edited, 0), "missing schedules.*AB")
   }
-  matching <- create_matching_model(~ male_group, c(male_groupB = 0), group_levels = c("A", "B"), matching_method = "female_choice")
+  expect_warning(matching <- create_matching_model(~ male_group, c(male_groupB = 0), group_levels = c("A", "B")), "male_group are absorbed")
   model$processes$union_formation$matching <- matching
   expect_error(simulate(model, 0), "covered.*group_levels")
   # Positive reference shares also infer identities; zero-only columns do not.
@@ -256,10 +256,14 @@ test_that("numeric identities remain numeric, and empty populations stay typed",
 test_that("new AB identities are available to categorical partner matching during the run", {
   rule <- create_group_inheritance("custom", groups = "AB", fun = function(...) "AB")
   model <- inheritance_test_model(rule)
+  # All newborns are male: until AB women enter the search ages, AB men's
+  # mirrored baseline uses the overall female rate rather than a zero rate
+  # averaged across newborn girls. The high delta makes their selection clear.
   model <- set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
-    age_start = 15, age_end = 50, rate = c(0, 20)), 0, inheritance = rule)
-  matching <- create_matching_model(~ male_group,
-    c(male_groupB = 0, male_groupAB = 1000), group_levels = c("A", "B", "AB"), matching_method = "female_choice")
+    age_start = 15, age_end = 50, rate = c(0, 20)), 0, inheritance = rule, ffab = 0)
+  expect_warning(matching <- create_matching_model(~ male_group,
+    c(male_groupB = 0, male_groupAB = .5), group_levels = c("A", "B", "AB"),
+    delta = c(AB = 20)), "male_group are absorbed")
   model <- set_union_formation(model, "rate", matching, rates = data.frame(
     age_start = 0, age_end = Inf, rate = 0), min_male_age = 0, kinship_generations = 0,
     cancel_birth_if_no_match = FALSE)

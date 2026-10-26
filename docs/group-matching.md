@@ -7,18 +7,19 @@ eligibility, search hazards, group identity, or ancestry inheritance.
 
 `create_matching_model(..., group_exogamy = NULL, group_levels = NULL)` accepts
 finite additive log-selection-weight effects as a named numeric vector.
-`"A:B"` means female A and male B; `"A::B"` supplies the same value in both
-directions. For example, `c("A:B" = -1, "B:A" = -0.5, "A::C" = -0.8)`.
+`"A:B"` supplies the same value for female A/male B and female B/male A.
+For example, `c("A:B" = -1, "A:C" = -0.8)`. Directional pair effects and
+`::` syntax are not supported (D075).
 Omitted pairs have odds ratio 1.0 and contribute zero on the log scale;
 within-group entries such as `"A:A"` are allowed.
 Effects are added after the formula is evaluated. An effect of -1 multiplies
 relative candidate weight by `exp(-1)`, holding other utility terms fixed.
 It is not a target intergroup union proportion or a marriage hazard multiplier.
 
-Reject overlaps after expanding symmetric entries, rather than applying
-precedence. `A:B` and `A::B`, or `A::B` and `B::A`, conflict. `A::A` describes
-only one within-group pair. Reject malformed separators, missing labels,
-nonfinite values, and unnamed vectors. Finite values do not prohibit matches;
+Reject repeated unordered pairs, including `A:B` with `B:A`, even with equal
+values. `A:A` describes one within-group pair. Reject malformed separators,
+missing labels, nonfinite values, and unnamed vectors. Finite values do not
+prohibit matches;
 multiple identities remain outside this increment. Hard group restrictions are
 specified separately below.
 
@@ -28,8 +29,8 @@ The user selected hard restrictions on October 20, 2026; since D072 they apply
 to the whole eligible pool rather than to a candidate sample.
 `prevent_exogamy = FALSE` on a matching model imposes none. TRUE excludes
 every different-group candidate. A character vector such as
-`c("A::B", "A:C")` excludes selected cross-group pairs, using the same
-female-first and symmetric syntax as `group_exogamy`. A directional table with
+`c("A::B", "A:C")` excludes selected cross-group pairs, using female-first `:` and symmetric `::` notation. Restrictions are
+eligibility rules and retain this distinct directional syntax. A directional table with
 `female_group` and `male_group` is also accepted for colon-containing labels.
 Listed pairs must join different groups; overlapping entries are errors.
 
@@ -47,9 +48,10 @@ prohibition always finds the A man. A finite penalty of -10 still selects B
 when B men are the only ones available, whereas prohibiting A:B makes the
 search fail. FALSE imposes no restriction.
 
-For labels containing colons, accept an alternative directional data frame
-with `female_group`, `male_group`, and `log_odds`. Duplicate directed pairs
-are errors; use two rows for a symmetric table effect. Numeric group codes
+For labels containing colons, accept a data frame with `female_group`,
+`male_group`, and `log_odds`. These column names are retained for compatibility,
+but each row denotes an unordered pair and supplies the effect in both
+directions. Duplicate unordered pairs are errors. Numeric group codes
 are compared through their character representation, as in group-rate lookup.
 `create_age_gap_matching_model(..., group_exogamy = NULL)` also accepts effects.
 Pair effects require population group identities; missing group data errors
@@ -72,9 +74,8 @@ Coefficient names must match all non-intercept design columns exactly. An
 intercept remains ignored, since it cancels in conditional selection. A formula
 `~ 1` with `numeric()` coefficients permits pair-effects-only matching. Formula
 functions remain deterministic; fixed group identity information is supplied
-as candidate data, never mutable state. Under explicit female choice,
-female-only terms are constant within a search and cancel; weighted choice
-keeps that property, since its weights depend only on the man's group. Group
+as candidate data, never mutable state. Female-only terms are constant within a search and cancel; calibrated
+weights depend only on the man's group. Group
 effects in both the formula and pair table intentionally add together.
 
 ## Execution and validation
@@ -87,33 +88,19 @@ model for nonmarital father choice; an explicit father model replaces it,
 including its pair effects. Current partners are retained without rematching.
 Neither screening nor event timing changes.
 
-Worked case: female A faces equally aged candidates in A, B, and C. Effects
-`c("A:B" = log(2), "A::C" = log(3))` and a zero formula give probabilities
-`c(1,2,3)/6`. A female B with A/B candidates has equal weights unless `B:A`
-is separately specified. A female C gives male A weight 3 from the symmetric
-entry. Tests cover these analytical scores/probabilities, stable factor designs
-and interactions, native/R agreement, malformed or conflicting specifications,
-matching modes and father overrides, diagnostic ranks, reproducibility,
+Worked score case: female A faces equally aged candidates in A, B, and C.
+Effects `c("A:B" = log(2), "A:C" = log(3))` and a zero formula give uncalibrated
+relative weights `c(1,2,3)`. Female B sees A/B weights 2/1; female C sees A/B
+weights 3/1. Actual selection also includes calibrated male-group weights.
+Tests cover these utilities, stable factor designs and interactions, native/R
+agreement, malformed/repeated unordered pairs, father overrides, reproducibility,
 empty populations, and unchanged behavior without group preferences.
 
-## Directional pairing and matching methods
+## Directional pairing
 
-Explicit female-choice selection normalizes scores within each initiating
-woman's candidate set. Symmetric group coefficients do not guarantee equal
-directional union or birth counts with unequal group sizes.
-
-**Inheritance warning:** `matching_method = "female_choice"` accounts for male
-availability but leaves how often each male group forms unions unspecified.
-With unequal group sizes, even symmetric preferences can produce unequal
-female-A/male-B and female-B/male-A pairing counts. The user's inheritance
-experiments identified these directional imbalances as a source of unexpected
-group-composition trajectories, especially when maternal and paternal group
-inheritance differ. Female choice remains available as an intentional
-one-sided behavioral assumption.
-
-The default `"weighted_choice"` (D066/D067) adds calibrated male-group weights
-that supply the missing rule for men while leaving the preference association
-unchanged; see [weighted-choice matching](weighted-choice-matching.md). It
-equalizes directional counts only when preferences are symmetric and each
-group's unpartnered sexes are balanced. The additive two-sided method (D061,
-D062, D064) was removed in D067 because it attenuated the input preferences.
+All matching uses calibrated male-group weights (D075), with target adjustments
+from `delta` (D074); see [weighted-choice matching](weighted-choice-matching.md).
+Symmetric preferences with zero delta and balanced group-specific sexes give
+balanced two-group directional flows in the static illustration. Delta changes
+male-group targets without changing static group-only cross-products. No
+separate unweighted female-choice execution mode remains.

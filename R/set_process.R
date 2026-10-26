@@ -25,11 +25,6 @@
 #'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
 #'   Applies to fertility and defaults to following the mother. Assignment is
 #'   independent of recorded ancestry proportions.
-#'   Building a grouped model that pairs `"mother"`, `"father"`, `"same_sex"`,
-#'   or `"opposite_sex"` with a female-choice matching model warns: female choice
-#'   can pair groups directionally unevenly even under symmetry, and these rules
-#'   turn that into group-composition change. Parent-symmetric and custom rules
-#'   do not warn.
 #'
 #' @return An updated `hammel_model`. The input model is not modified.
 #' @export
@@ -43,7 +38,6 @@
 #' model$processes
 set_process <- function(model, process) {
   model <- attach_process(model, process)
-  warn_female_choice_inheritance(model)
   model
 }
 
@@ -167,11 +161,6 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #'   hierarchy, and custom rules assign identity after child sex and ancestry
 #'   are calculated. Possible identities are checked against grouped schedules
 #'   and categorical matching levels before execution. Applies to fertility only.
-#'   Building a grouped model that pairs `"mother"`, `"father"`, `"same_sex"`,
-#'   or `"opposite_sex"` with a female-choice matching model warns: female choice
-#'   can pair groups directionally unevenly even under symmetry, and these rules
-#'   turn that into group-composition change. Parent-symmetric and custom rules
-#'   do not warn.
 #' @return A named list containing `name`, `rates`, and `rate_unit`, plus
 #'   `birth_interval` and `ffab` for fertility, inheriting
 #'   from `hammel_mortality` or `hammel_fertility` and `hammel_process`.

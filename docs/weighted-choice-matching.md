@@ -1,13 +1,11 @@
 # Weighted-choice matching
 
-Specified with the user and implemented October 23, 2026 on
-`experiment/two-sided-sequential-matching` (D066). The user made
-`matching_method = "weighted_choice"` the default and removed additive
-two-sided matching (D067); partners are now drawn exactly from the whole
-eligible pool (D072). The
-method is an argument of the matching-model constructors (D068), so a separate
-father model can use its own; `"female_choice"` remains available. This describes
-implemented behavior; no acceptance thresholds are set.
+Weighted choice is the sole matching mechanism (D075, October 26, 2026).
+There is no `matching_method` argument. Both partner and nonmarital father
+selection use calibrated male-group weights; separate father models retain
+independent preferences, restrictions and delta adjustments. Group pair effects
+use a single colon (`A:B`) for symmetric preferences. This describes implemented
+behavior, not scientific acceptance thresholds.
 
 ## Problem
 
@@ -18,7 +16,7 @@ preferences are symmetric, delta is zero, and each group's sexes are balanced.
 
 | Method | Preferences recovered | Directional balance |
 | --- | --- | --- |
-| Female choice | Yes | No: 75/25 groups, A::B = -3 give AB/BA = 0.377 |
+| Female choice | Yes | No: 75/25 groups, A:B = -3 give AB/BA = 0.377 |
 | Additive two-sided (D062; removed in D067) | No: same case gives cross-product -5.77, not -6 | Approximately |
 | Sinkhorn balancing of each temporary market | No: age and group effects attenuated | No: overcorrected |
 
@@ -78,8 +76,7 @@ At each search time t, with no execution step and no random draws:
    M[g] = N_M[g] r[g] / sum over h of N_M[h] r[h]: each unpartnered man has the
    per-capita intensity of an unpartnered woman of his group. If a group has
    no counted women, its men use the population-wide female per-capita
-   intensity. F[g] is group g's share of female intensity among groups with
-   counted men. The target is
+   intensity. The target is
    tau[g] = M[g] exp(delta[g]) / sum over h of M[h] exp(delta[h]),
    where `delta` is the matching model's named vector of target adjustments (below). Women's
    timing still determines the total number of unions; the target only
@@ -122,10 +119,8 @@ group-only case below,
 whatever b and the group sizes are. The weights therefore change how often
 each male group forms unions, not the association between partners'
 characteristics, and wife-side conditional-logit estimates of the input terms
-are unaffected apart from the directed group terms discussed below. When the
-weights have no work to do (one group, no recorded groups, or symmetric
-preferences with equal group compositions) b = 1 and the method is explicit
-female choice.
+use calibrated log group weights as offsets when reconstructing choice sets. When unweighted flows already meet their targets, b = 1; one or no
+recorded groups always use unit weights.
 
 Crude per-capita counts were selected by the user. Age standardization was not:
 it would require a male age-specific intensity (a woman's rate at the same or
@@ -141,7 +136,7 @@ Only differences matter: adding the same constant to all group adjustments
 changes nothing. Positive values increase a group's male target relative to
 baseline and other groups; negative values decrease it. This is not an
 individual utility term, a pair-specific ratio, or an adjustment to women's
-search rates. Female-choice models ignore delta. Named groups must belong to
+search rates. Named groups must belong to
 the simulation's identity registry, including declared future identities.
 With no identities, nonempty delta is an error. Zero baseline targets remain
 zero; no available men or no positive search rates are not repaired by delta.
@@ -165,8 +160,8 @@ The engine evaluates the normalized targets in log space to avoid overflow.
 
 Rate-mode father selection has its own weights, calibrated from fertility
 intensity with the applicable father utilities (`father_matching`, or
-`matching` when NULL) and that model's `delta` (D074). Each model applies its own `matching_method`: for example, weighted
-unions with female-choice fathers, or the reverse (D068). Union searches keep weights calibrated from search hazards. The
+`matching` when NULL) and that model's `delta` (D074). Both use calibrated
+weights. Union searches keep weights calibrated from search hazards. The
 male pool, target rule, and solver are shared. On-demand mode has one
 calibration, driven by fertility.
 
@@ -229,19 +224,20 @@ number of searches that used approximate weights.
 
 ## Worked examples
 
+Unweighted female choice below is a mathematical comparison, not an API option.
+
 Exact group-only expectations with equal per-woman intensities, zero
 within-group utility, and zero delta unless stated:
 
 | Case | b_B | AA | AB | BA | BB | Log cross-product | AB/BA |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 75/25, A::B = -3, female choice | 1 | .73776 | .01224 | .03249 | .21751 | -6 | 0.377 |
-| 75/25, A::B = -3 | 1.683 | .72962 | .02038 | .02038 | .22962 | -6 | 1.000 |
-| 50/50, A::B = -3 | 1.000 | .47629 | .02371 | .02371 | .47629 | -6 | 1.000 |
-| 75/25, A:B = -1, B:A = -2 | 0.924 | .67368 | .07632 | .07632 | .17368 | -3 | 1.000 |
-| 75/25, A::B = -1.5 | 1.523 | .67368 | .07632 | .07632 | .17368 | -3 | 1.000 |
-| 75/25, A::B = -3, delta_B = .122747 | 3.000 | .71443 | .03557 | .01186 | .23814 | -6 | 3.000 |
-| Women 75/25, men 70/30, delta_B = log(7/9), A::B = -3 | 1.309 | .72962 | .02038 | .02038 | .22962 | -6 | 1.000 |
-| Women 75/25, men 70/30, A::B = -3 | 3.875 | .69272 | .05728 | .00728 | .24272 | -6 | 7.87 |
+| 75/25, A:B = -3, female choice | 1 | .73776 | .01224 | .03249 | .21751 | -6 | 0.377 |
+| 75/25, A:B = -3 | 1.683 | .72962 | .02038 | .02038 | .22962 | -6 | 1.000 |
+| 50/50, A:B = -3 | 1.000 | .47629 | .02371 | .02371 | .47629 | -6 | 1.000 |
+| 75/25, A:B = -1.5 | 1.523 | .67368 | .07632 | .07632 | .17368 | -3 | 1.000 |
+| 75/25, A:B = -3, delta_B = .122747 | 3.000 | .71443 | .03557 | .01186 | .23814 | -6 | 3.000 |
+| Women 75/25, men 70/30, delta_B = log(7/9), A:B = -3 | 1.309 | .72962 | .02038 | .02038 | .22962 | -6 | 1.000 |
+| Women 75/25, men 70/30, A:B = -3 | 3.875 | .69272 | .05728 | .00728 | .24272 | -6 | 7.87 |
 
 These are analytical expectations, not simulation output. With equal
 per-woman intensities and no ages, every woman of a group has the same choice
@@ -255,7 +251,7 @@ utilities U:
     BA = F_B pi_BA          BB = F_B (1 - pi_BA)
 
 Female choice sets b = 1. Weighted choice solves AB + BB = tau_B, with
-tau_B = M_B exp(delta_B) / (M_A exp(delta_A) + M_B exp(delta_B)). For 75/25 groups and A::B = -3: at b = 1,
+tau_B = M_B exp(delta_B) / (M_A exp(delta_A) + M_B exp(delta_B)). For 75/25 groups and A:B = -3: at b = 1,
 AB = 0.01224 and BA = 0.03249, so group-B men receive AB + BB = 0.2298 of
 unions while group-B women form 0.25; scarce B women often choose A men, few
 A women choose B men. Solving for tau_B = 0.25 gives b = 1.683, which raises
@@ -269,49 +265,37 @@ adjustments, and the analytical 3:1 case.
 
 Consequences:
 
-Because of the first two points below, constructing a weighted-choice matching
-model with directed pair effects (two directions differing, including a single
-direction) or `male_group` formula terms warns once (D069).
-
-- **Directed effects in two groups.** A:B = -1 with B:A = -2 produces exactly
-  the same expected table as A::B = -1.5. With both sexes' group flows fixed,
-  a two-group table has one free quantity, its cross-product. Directed effects
-  change which weights are needed, not the flows. With more groups, only
-  combinations not absorbed by the group flows affect pairing. A
-  `male_group` main effect in the formula has no effect at all, since the
-  group weights absorb it. Under female choice directed effects do move group
-  flows, but they mix with female choice's directional bias when group sizes
-  differ (for example, AB/BA = 0.52 with symmetric -1.5 effects at 75/25).
+- **Formula group effects.** A `male_group` main effect is absorbed by
+  calibrated weights and does not change group flows; interactions can be
+  partly absorbed. Such formulas warn once at construction. Use `delta` to
+  adjust male-group targets. Pair effects are symmetric, specified once per
+  unordered pair with `A:B`; directional utility entries and `::` are errors.
 - **Sensitivity to composition.** AB - BA equals the difference between the
   male and female group-B shares of unions. When exogamy is rare, small
   differences in the sexes' unpartnered group shares move AB/BA strongly.
   Directional balance should be assessed with those pool compositions.
-- **No user-specified directional ratios.** Because the weights fix both
-  sexes' group flows, a gender-asymmetric intermarriage pattern (for example
-  3:1 between the two cross-group directions) cannot be specified with
-  balanced sexes. The user declined adding directional targets (D073); see
-  [two-sex union models](two-sex-union-models.md) for the analysis and
-  future alternatives.
+- **Directional tuning.** Delta adjusts total male-group targets and can
+  tune directional ratios or offset sex imbalance. It does not directly set
+  pair-specific ratios, which change as population composition changes.
 - **Pooled cross-products.** These examples have no ages. With age preferences
   and group-specific age structures, a cross-tabulation pooled over ages need
   not equal the summed group utilities exactly, under any method.
 
 ## Diagnostics and interpreting estimates
 
-Weights consume no random draws. When the general matching model uses
-weighted choice in a grouped population, `diagnostics = TRUE` records `.log_weight_<group>` on each new union: the log group weights applied
+Weights consume no random draws. In a grouped population, `diagnostics = TRUE` records `.log_weight_<group>` on each new union: the log group weights applied
 at the search that formed it (October 23, 2026, D070). One group is the
 reference with log weight 0; only differences between groups matter, and
-unweighted searches record 0 for every group. Earlier unions and new groups'
+searches where calibration cannot affect choice record 0 for every group. Earlier unions and new groups'
 columns for earlier rows are NA. In a wife-side choice set, using the column
 for each alternative's group as an offset gives the exact benchmark, in place
 of approximating the weights with a male-group main effect. Nonmarital father
 selections form no union and are not recorded.
 
-A conditional logit fitted to wife-side choice sets with the input terms only
-estimates separate directed group terms offset by log(b) differences, while
-their sum and the age terms are unaffected. Adding a male-group main effect
-absorbs the weights. In the static analysis, calibrated weights left the age
+A conditional logit fitted to reconstructed wife-side choice sets should
+include the recorded log group weights as offsets. A male-group main effect
+can approximate varying calibration weights but cannot reproduce each search
+exactly. In the static analysis, calibrated weights left the age
 term (-0.0278 against -0.0277) and symmetric group term (-2.87 to -2.91,
 against -2.92 to -2.96 for female choice) essentially unchanged.
 
@@ -326,7 +310,7 @@ so men's ages at union formation remain an outcome, not an input.
 
 The user ran these replicated comparisons in the milestone 3 report's uneven
 two-group scenario (on-demand formation, `create_age_gap_matching_model(0, 5)`
-with A::B = -3, 100 years). The 250-man runs of both methods and the
+with A:B = -3, 100 years). The 250-man runs of both methods and the
 1,000-man female-choice run used the same 20 seeds; the 1,000-man
 weighted-choice runs used 40 replications. Values are means across replications,
 with standard errors from between-replication variation. These are the user's
@@ -392,8 +376,8 @@ binned calibration against an exact individual-level R reference for native
 and custom formulas in both intensity types, three-group convergence, zero and
 unattainable targets, a male group with no counted women, identities created
 during a run (custom AB inheritance) and restarts with them, strict endogamy
-reproducing female choice, recorded log weights across restarts, exact equality with female choice for one or no groups
-in both initiation modes, reproducibility, restarts, separate father models,
+with unit weights, recorded log weights across restarts, one/no-group
+unit-weight shortcuts in both initiation modes, reproducibility, restarts, separate father models,
 diagnostics without changed histories, the single warning, and input
 validation, and incremental pool sums against a full rebuild after thousands
 of pool changes and cutoff crossings.

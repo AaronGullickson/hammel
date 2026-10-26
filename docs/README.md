@@ -19,8 +19,8 @@ future work.
 | [Groups](groups.md) | Group-specific schedules, fallback warnings, maternal inheritance, and baseline sampling |
 | [Ancestry](ancestry.md) | Starting proportions, parental averaging, unknown shares, and restarts |
 | [Group inheritance](group-inheritance.md) | Built-in/custom identity rules, passing, and possible groups |
-| [Weighted-choice matching](weighted-choice-matching.md) | Default female choice with calibrated male-group weights (D066/D067) |
-| [Group matching](group-matching.md) | Directed/symmetric pair effects and fixed group formula predictors |
+| [Weighted-choice matching](weighted-choice-matching.md) | Calibrated male-group weights and delta target adjustments (D074/D075) |
+| [Group matching](group-matching.md) | Symmetric pair effects and fixed group formula predictors |
 | [Demographic analysis](demographic-analysis.md) | Exposure, ASFR/ASMR, TFR, and life-table workflows |
 | [Testing and validation](testing.md) | Test commands, evidence, and remaining validation |
 | [Current handoff](session-handoff.md) | Recent findings, active work, and deferred issues |

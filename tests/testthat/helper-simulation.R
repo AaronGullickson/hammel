@@ -28,12 +28,3 @@ make_rate_model <- function(n = 2, search_rate = 1, birth_rate = 0, birth_interv
     rates = data.frame(age_start = 15, age_end = Inf, rate = search_rate),
     cancel_birth_if_no_match = FALSE)
 }
-
-# Some tests deliberately combine female choice with the default maternal
-# inheritance rule in grouped populations; silence only that advisory warning.
-quiet_inheritance <- function(expr) {
-  withCallingHandlers(expr, warning = function(w) {
-    if (grepl("sex-specific inheritance rule", conditionMessage(w), fixed = TRUE))
-      invokeRestart("muffleWarning")
-  })
-}

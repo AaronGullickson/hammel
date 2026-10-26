@@ -54,7 +54,7 @@ test_that("female-choice father selection uses the entered conditional-logit pro
   model <- make_nonmarital_model(3, birth_rate = 500)
   model$population$persons$birth_time[3] <- -30
   model$processes$union_formation$matching <- create_matching_model(
-    ~ age_difference, c(age_difference = log(3) / 10), matching_method = "female_choice")
+    ~ age_difference, c(age_difference = log(3) / 10))
   result <- simulate(model, 1, seed = 72)
   children <- result$persons[result$persons$birth_time >= 0, ]
   n <- nrow(children)
@@ -123,9 +123,9 @@ test_that("father_matching changes nonmarital fathers but not later union choice
   model <- make_nonmarital_model(3)
   model$population$persons$birth_time[3] <- -30
   model$processes$union_formation$matching <- create_matching_model(
-    ~ age_difference, c(age_difference = 100), matching_method = "female_choice")
+    ~ age_difference, c(age_difference = 100))
   model$processes$union_formation$father_matching <- create_matching_model(
-    ~ age_difference, c(age_difference = -100), matching_method = "female_choice")
+    ~ age_difference, c(age_difference = -100))
   model$processes$union_formation$rates <- data.frame(
     age_start = 20.5, age_end = Inf, rate = 100)
   result <- simulate(model, 1, seed = 52)

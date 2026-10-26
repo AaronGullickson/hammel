@@ -22,14 +22,14 @@
 #'   `male_group`, and/or `same_group`. Use `~ 1` and `numeric()` coefficients
 #'   for pair-effects-only matching.
 #' @param coefficients A finite named numeric vector of utility coefficients.
-#' @param group_exogamy Optional finite named numeric vector: `"A:B"` means
-#'   female A/male B; `"A::B"` supplies the same effect in both directions.
-#'   Omitted pairs have odds ratio 1.0 (zero log effect); within-group entries are
-#'   allowed. Overlapping
-#'   directed pairs after expansion are errors. Alternatively provide a data
-#'   frame with `female_group`, `male_group`, and `log_odds`, one directed pair
-#'   per row, including for group labels containing colons. Effects add to final
-#'   formula scores; they do not create a matching prohibition.
+#' @param group_exogamy Optional finite named numeric vector of symmetric
+#'   group-pair effects: `"A:B"` applies the same log-weight effect to female
+#'   A/male B and female B/male A. Specify each unordered pair once; reverse
+#'   duplicates and `::` syntax are errors. Omitted pairs have zero effect;
+#'   within-group entries are allowed. Alternatively provide a data frame with
+#'   `female_group`, `male_group`, and `log_odds`; each row specifies an unordered
+#'   pair and expands symmetrically, including for colon-containing labels.
+#'   Effects add to formula scores and do not prohibit matches.
 #' @param group_levels Optional ordered vector of group labels (character or
 #'   numeric codes). Required with at least two levels when the formula uses
 #'   `female_group` or `male_group`; must cover population groups. Sets fixed
@@ -45,24 +45,8 @@
 #'   existing failed-search and birth cancellation rules. Restrictions override
 #'   finite preferences, require population identities, and do not invalidate
 #'   existing partners.
-#' @param matching_method `"weighted_choice"` (default) for female choice with
-#'   calibrated male-group weights, or `"female_choice"` for unweighted ego-only
-#'   choice. Female choice accounts for available men but leaves how often each
-#'   male group forms unions unspecified. With unequal group sizes, symmetric
-#'   group preferences can then produce unequal female-A/male-B and
-#'   female-B/male-A pairing counts, which can systematically affect group
-#'   inheritance and later group composition. Weighted choice adds the missing
-#'   rule for men without changing the preference association; with one group
-#'   it equals female choice. The method belongs to this model: a separate
-#'   `father_matching` model in [union_formation()] uses its own method, and a
-#'   NULL father model inherits this one. Weighted choice warns at construction
-#'   when directed group effects or `male_group` formula terms are present,
-#'   because it pins how often each male group forms unions: with two groups
-#'   only the sum of a directed pair affects pairing, and `male_group` main
-#'   effects have no effect. Building a grouped model that combines female
-#'   choice with a sex-specific inheritance rule also warns (see [fertility()]).
-#' @param delta Optional finite numeric vector with unique group names. Used
-#'   only by weighted choice: multiply mirrored male targets by `exp(delta)`
+#' @param delta Optional finite numeric vector with unique group names.
+#'   Multiply mirrored male targets by `exp(delta)`
 #'   and normalize. Omitted groups have zero adjustment. Positive values raise
 #'   the male target relative to baseline and other groups; negative values
 #'   lower it. Only differences matter. Does not set pair-specific ratios or
@@ -78,40 +62,23 @@
 #'   c(age_difference = 0.1, "I(age_difference^2)" = -0.02)
 #' )
 create_matching_model <- function(formula, coefficients, group_exogamy = NULL, group_levels = NULL, prevent_exogamy = FALSE,
-                                  delta = NULL, matching_method = "weighted_choice") {
+                                  delta = NULL) {
   model <- structure(list(formula = formula, coefficients = coefficients,
                           group_exogamy = group_exogamy, group_levels = group_levels,
                           prevent_exogamy = prevent_exogamy,
-                          delta = delta,
-                          matching_method = matching_method),
+                          delta = delta),
                      class = "hammel_matching_model")
   validate_matching_model(model)
-  warn_weighted_directed_effects(model)
+  warn_absorbed_group_formula(model)
   model
 }
 
-# Weighted choice pins how often each male group forms unions, so group terms
-# that act only through male group flows lose some or all of their effect.
-# Warn once at construction rather than at every simulation.
-warn_weighted_directed_effects <- function(model) {
-  if (!identical(model$matching_method, "weighted_choice")) return(invisible(FALSE))
-  pairs <- expand_group_exogamy(model$group_exogamy)
-  cross <- pairs[pairs$female_group != pairs$male_group, , drop = FALSE]
-  value <- function(f, m) {
-    i <- which(pairs$female_group == f & pairs$male_group == m)
-    if (length(i)) pairs$log_odds[i] else 0
-  }
-  directed <- nrow(cross) > 0 && any(vapply(seq_len(nrow(cross)), function(i)
-    cross$log_odds[i] != value(cross$male_group[i], cross$female_group[i]), logical(1)))
-  male_terms <- "male_group" %in% all.vars(model$formula)
-  if (!directed && !male_terms) return(invisible(FALSE))
-  warning(paste(
-    "Under matching_method = \"weighted_choice\", group effects cannot change how often",
-    "each male group forms unions.",
-    if (directed) "With two groups, only the sum of each directed pair (e.g. A:B plus B:A) affects pairing; with more groups, directed effects are only partly reflected.",
-    if (male_terms) "Formula terms using male_group are absorbed: main effects have no effect and interactions are only partly reflected.",
-    "Use matching_method = \"female_choice\" if they should change male union rates,",
-    "noting its directional bias when group sizes differ."), call. = FALSE)
+# Male-group formula effects can be absorbed by calibrated target weights.
+warn_absorbed_group_formula <- function(model) {
+  if (!"male_group" %in% all.vars(model$formula)) return(invisible(FALSE))
+  warning(paste("Formula terms using male_group are absorbed by calibrated group weights:",
+    "main effects have no effect and interactions are only partly reflected.",
+    "Use delta to adjust male-group targets."), call. = FALSE)
   invisible(TRUE)
 }
 
@@ -140,7 +107,7 @@ warn_weighted_directed_effects <- function(model) {
 #' # Illustrative preferences, not demographic defaults.
 #' matching <- create_age_gap_matching_model(3, 5)
 create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL, prevent_exogamy = FALSE,
-                                          delta = NULL, matching_method = "weighted_choice") {
+                                          delta = NULL) {
   for (name in c("preferred_age_gap", "half_weight_distance")) {
     value <- get(name)
     if (!is.numeric(value) || length(value) != 1L || !is.null(dim(value)) ||
@@ -158,16 +125,7 @@ create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distanc
   create_matching_model(~ age_difference + I(age_difference^2),
     c(age_difference = unname(linear), "I(age_difference^2)" = unname(quadratic)),
     group_exogamy = group_exogamy, prevent_exogamy = prevent_exogamy,
-    delta = delta,
-    matching_method = matching_method)
-}
-
-validate_matching_method <- function(method) {
-  if (!is.character(method) || length(method) != 1L || !is.null(dim(method)) ||
-      is.na(method) || !method %in% c("weighted_choice", "female_choice")) {
-    stop('`matching_method` must be "weighted_choice" or "female_choice".', call. = FALSE)
-  }
-  invisible(method)
+    delta = delta)
 }
 
 validate_delta <- function(x) {
@@ -184,7 +142,6 @@ validate_matching_model <- function(model) {
     stop("`matching` must be created with create_matching_model().", call. = FALSE)
   }
   validate_delta(model$delta)
-  validate_matching_method(model$matching_method)
   formula <- model$formula
   if (!inherits(formula, "formula") || length(formula) != 2L ||
       any(!all.vars(formula) %in% c("age_difference", "female_group", "male_group", "same_group"))) {
@@ -324,8 +281,7 @@ prepare_matching_model <- function(matching, population_groups = NULL) {
     }
   }
   group_formula <- matching_has_group_formula(matching)
-  list(weighted = identical(matching$matching_method, "weighted_choice"),
-       delta = unname(vapply(labels, function(g) {
+  list(delta = unname(vapply(labels, function(g) {
          if (g %in% names(matching$delta)) matching$delta[[g]] else 0
        }, numeric(1))),
        prevent_exogamy_all = restrictions$all, blocked_pairs = blocked,
@@ -374,18 +330,19 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' approximate. Existing unions are retained even if a new-search restriction
 #' would exclude the partner.
 #'
-#' Matching models default to `matching_method = "weighted_choice"`, which keeps
-#' female choice among the screened candidates but multiplies each man's selection weight by a weight
-#' for his group. Weights are recalculated at every search, in continuous time,
+#' Matching always uses calibrated male-group weights: a woman chooses among
+#' screened candidates with each man's selection weight multiplied by a
+#' weight for his group. Weights are recalculated at every search, in continuous time,
 #' so that expected male union flows by group match a mirrored target: each
 #' unpartnered man has the per-capita intensity of an unpartnered woman of his
 #' group, adjusted by the matching model's `delta`. Women's
 #' intensity is the search hazard for rate-mode searches and the unpartnered
 #' fertility hazard (zero during birth spacing) for on-demand searches and
 #' nonmarital father selection, which has its own weights and uses the father
-#' model's method when one is supplied. Weights depend only
+#' model's preferences and delta when one is supplied. Weights depend only
 #' on the man's group, so they do not change the association between partners'
-#' characteristics. With one group the method equals female choice. When no
+#' characteristics in the static group-only illustration. With one group,
+#' all group weights are one. When no
 #' exact weights exist, approximate weights are used with a warning.
 #'
 #' @param initiation Either `"on_demand"` for birth-triggered searches or
@@ -404,7 +361,7 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   Defaults to `NULL`, using the current general `matching` model. Union
 #'   searches always use `matching`. Not used by on-demand initiation. Process-level
 #'   age and kinship screening settings are shared; NULL inherits the general
-#'   model's method and settings.
+#'   model's settings.
 #' @param min_male_age Minimum male age in continuous years at a new partner
 #'   search, default `15`. Finite nonnegative scalar; zero disables this age
 #'   exclusion. Existing unions are retained. No minimum is added for actual
@@ -429,7 +386,7 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   uses weighted choice in a grouped population, record `.log_weight_<group>`
 #'   columns on newly formed unions: the log group
 #'   weights applied at the search that formed each union (0 for the reference
-#'   group and for unweighted searches). Use the column for each alternative's
+#'   group and when calibration cannot affect choices). Use the column for each alternative's
 #'   group as a conditional-logit offset in wife-side choice sets.
 #' @param group_prop_hazard Optional named numeric vector of finite nonnegative
 #'   search-rate multipliers by the woman's group. Missing groups use 1.0;

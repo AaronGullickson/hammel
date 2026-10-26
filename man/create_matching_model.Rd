@@ -10,8 +10,7 @@ create_matching_model(
   group_exogamy = NULL,
   group_levels = NULL,
   prevent_exogamy = FALSE,
-  delta = NULL,
-  matching_method = "weighted_choice"
+  delta = NULL
 )
 }
 \arguments{
@@ -21,14 +20,14 @@ for pair-effects-only matching.}
 
 \item{coefficients}{A finite named numeric vector of utility coefficients.}
 
-\item{group_exogamy}{Optional finite named numeric vector: \code{"A:B"} means
-female A/male B; \code{"A::B"} supplies the same effect in both directions.
-Omitted pairs have odds ratio 1.0 (zero log effect); within-group entries are
-allowed. Overlapping
-directed pairs after expansion are errors. Alternatively provide a data
-frame with \code{female_group}, \code{male_group}, and \code{log_odds}, one directed pair
-per row, including for group labels containing colons. Effects add to final
-formula scores; they do not create a matching prohibition.}
+\item{group_exogamy}{Optional finite named numeric vector of symmetric
+group-pair effects: \code{"A:B"} applies the same log-weight effect to female
+A/male B and female B/male A. Specify each unordered pair once; reverse
+duplicates and \code{::} syntax are errors. Omitted pairs have zero effect;
+within-group entries are allowed. Alternatively provide a data frame with
+\code{female_group}, \code{male_group}, and \code{log_odds}; each row specifies an unordered
+pair and expands symmetrically, including for colon-containing labels.
+Effects add to formula scores and do not prohibit matches.}
 
 \item{group_levels}{Optional ordered vector of group labels (character or
 numeric codes). Required with at least two levels when the formula uses
@@ -47,30 +46,13 @@ existing failed-search and birth cancellation rules. Restrictions override
 finite preferences, require population identities, and do not invalidate
 existing partners.}
 
-\item{delta}{Optional finite numeric vector with unique group names. Used
-only by weighted choice: multiply mirrored male targets by \code{exp(delta)}
+\item{delta}{Optional finite numeric vector with unique group names.
+Multiply mirrored male targets by \code{exp(delta)}
 and normalize. Omitted groups have zero adjustment. Positive values raise
 the male target relative to baseline and other groups; negative values
 lower it. Only differences matter. Does not set pair-specific ratios or
 change female search rates. Names must belong to the population's identity
 registry (including declared future groups).}
-
-\item{matching_method}{\code{"weighted_choice"} (default) for female choice with
-calibrated male-group weights, or \code{"female_choice"} for unweighted ego-only
-choice. Female choice accounts for available men but leaves how often each
-male group forms unions unspecified. With unequal group sizes, symmetric
-group preferences can then produce unequal female-A/male-B and
-female-B/male-A pairing counts, which can systematically affect group
-inheritance and later group composition. Weighted choice adds the missing
-rule for men without changing the preference association; with one group
-it equals female choice. The method belongs to this model: a separate
-\code{father_matching} model in \code{\link[=union_formation]{union_formation()}} uses its own method, and a
-NULL father model inherits this one. Weighted choice warns at construction
-when directed group effects or \code{male_group} formula terms are present,
-because it pins how often each male group forms unions: with two groups
-only the sum of a directed pair affects pairing, and \code{male_group} main
-effects have no effect. Building a grouped model that combines female
-choice with a sex-specific inheritance rule also warns (see \code{\link[=fertility]{fertility()}}).}
 }
 \value{
 An inspectable \code{hammel_matching_model} list containing \code{formula}

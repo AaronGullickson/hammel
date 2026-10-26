@@ -41,10 +41,10 @@ software behavior, not demographic parameter recovery.
 | `test-group-prop-hazard.R` | Multiplier validation, explicit-schedule equivalence, compensation order, omitted/unit/zero factors, warnings, RNG preservation, restarts, numeric codes, empty populations, and overflow |
 | `test-group-inheritance.R` | All assignment rules/fallbacks, passing and ancestry probabilities, custom RNG, mixed identity rates, future-group coverage, restarts, and unchanged maternal defaults |
 | `test-ancestry.R` | Starting identities, supplied proportions and IDs, parental averaging across generations, unknown shares, restarts/deaths, numeric labels, empty tables, and RNG independence |
-| `test-group-matching.R` | Directed/symmetric offsets, analytical probabilities, fixed factor contrasts/interactions, native/custom score agreement, father overrides, validation, and unchanged RNG |
+| `test-group-matching.R` | Symmetric pair offsets and reverse-pair rejection, analytical probabilities, fixed factor contrasts/interactions, native/custom score agreement, father overrides, validation, and unchanged RNG |
 | `test-prevent-exogamy.R` | Restrictions on the whole pool, compatible men always found, failure/cancellation, direction/symmetry, father overrides, retained partners, and unchanged disabled RNG |
 | `test-detailed-unions.R` | Spouse-ID joins, repeated episodes, deaths, optional group types, empty tables, unchanged inputs, and name collisions |
-| `test-weighted-choice.R` | Analytical weights and delta target adjustments, binned versus exact calibration, three groups, zero/unattainable targets, incremental sums versus full rebuild, mid-run identities, strict endogamy, unmet-target detection, narrow and one-year rate bands, recorded log weights, construction and inheritance warnings, female-choice equality for one group, both modes, fathers, restarts, diagnostics, warning, validation |
+| `test-weighted-choice.R` | Analytical weights and delta target adjustments, binned versus exact calibration, three groups, zero/unattainable targets, incremental sums versus full rebuild, mid-run identities, strict endogamy, unmet-target detection, narrow and one-year rate bands, recorded log weights, absorbed-formula warnings, unit weights for one/no groups, both modes, fathers, restarts, diagnostics, warning, validation |
 | `test-parent-info.R` | Parent-ID joins, ages at birth, deceased/unknown parents, optional groups, empty tables, unchanged inputs, and name collisions |
 | `test-model-api.R` | Construction, replacement, schemas, history and metadata retention |
 | `test-baseline-population.R` | Reproducibility, bounds, known cases, distributions, empty populations |
@@ -74,6 +74,15 @@ was skipped. Analytical checks cover the 75/25, beta -3 case with delta_B =
 adjustments, extreme finite values, three groups and group-stratified hazards.
 Integration checks use nonzero deltas in both initiation modes, restarts and
 separate father matching. These are software checks, not demographic acceptance.
+
+After D075 removed method selection and made `group_exogamy` symmetric,
+`TZ=UTC Rscript -e 'devtools::test(reporter = "summary")'` passed on October
+26, 2026 with no failures or test warnings; the live database test was skipped.
+Checks cover single-colon symmetric vector/table effects, rejected reverse
+pairs and old syntax, native/R utilities, separate father delta, strict
+endogamy/unit weights, both initiation modes, reproducibility and restarts.
+The milestone 3 report was not rerendered: its prior female-choice and directed
+three-group experiments need revision before execution with this API.
 
 ## Optional live database checks
 

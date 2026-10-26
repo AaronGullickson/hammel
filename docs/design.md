@@ -203,18 +203,15 @@ maximum over any age-gap interval; custom formulas are tabulated on a
 1/32-year gap grid by one R evaluation. `draw_partner()` picks a cell in
 proportion to its size times its maximum weight for the woman, a member
 uniformly, accepts him with probability exp(U - maximum), and screens only him
-for age and kinship, enumerating the eligible pool after 200 rejections. Both
-matching methods and nonmarital fathers use it; female choice uses zero group
-weights. See the [scientific contract](scientific-contract.md#exact-full-pool-partner-draws-d072).
+for age and kinship, enumerating the eligible pool after 200 rejections. All partner and nonmarital father searches use it. See the [scientific contract](scientific-contract.md#exact-full-pool-partner-draws-d072).
 
 ## Weighted-choice matching
 
-Matching models carry `matching_method`, defaulting to `"weighted_choice"`
-(D066/D067/D068); `"female_choice"` remains available. A separate father model
-uses its own method and a NULL father model inherits the general one. The
-engine builds the calibrator when either model is weighted and grouped. The
-two-sided temporary-market method was removed (D067). `"weighted_choice"` adds a
-log weight for each man's group to his selection score in the exact draw.
+Matching always uses calibrated male-group weights (D075); constructors have
+no method argument. Separate father models have their own preferences,
+restrictions and delta. Grouped searches build the calibrator unless strict
+endogamy makes weighting irrelevant. Each man's group log weight is added to
+his selection score in the exact draw.
 `WeightCalibrator` in `src/simulate.cpp` keeps unpartnered counts by group and
 birth-time bin and incrementally maintained pool sums for each matching model's
 table of utilities over bin-centre lags, updated at events, and solves the
@@ -233,7 +230,7 @@ model's restrictions. See [group matching](group-matching.md).
 ## Milestone 2 construction
 
 `create_matching_model()` accepts a formula with age and group predictors,
-named utility coefficients, and optional directed/symmetric additive pair effects.
+named utility coefficients, and optional symmetric additive pair effects (`A:B` in both directions).
 Categorical group formulas declare fixed `group_levels`; see
 [group matching](group-matching.md). `union_formation()` and `set_union_formation()` specify initiation
 and a matching specification. The C++ on-demand path creates unions at births
@@ -289,7 +286,7 @@ caches and removes the man from the available pool. Parentage alone leaves
 both parties unpartnered; the newborn's father index is appended to kinship
 independently of current-partner state. No additional persistence state is
 retained. `father_matching = NULL` resolves to the general model at execution; an explicit
-model supplies a separately prepared draw model, method and weights for
+model supplies a separately prepared draw model and weights for
 nonmarital father selection. Previous-father
 preference is deferred (D042).
 

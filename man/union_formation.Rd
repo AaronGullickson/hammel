@@ -66,7 +66,7 @@ unpartnered births in rate mode, created by \code{\link[=create_matching_model]{
 Defaults to \code{NULL}, using the current general \code{matching} model. Union
 searches always use \code{matching}. Not used by on-demand initiation. Process-level
 age and kinship screening settings are shared; NULL inherits the general
-model's method and settings.}
+model's settings.}
 
 \item{cancel_birth_if_no_match}{Logical, default \code{TRUE}. Cancel a birth when
 its on-demand partner search or rate-mode nonmarital father selection fails.
@@ -79,7 +79,7 @@ realized fertility below inputs.}
 uses weighted choice in a grouped population, record \verb{.log_weight_<group>}
 columns on newly formed unions: the log group
 weights applied at the search that formed each union (0 for the reference
-group and for unweighted searches). Use the column for each alternative's
+group and when calibration cannot affect choices). Use the column for each alternative's
 group as a conditional-logit offset in wife-side choice sets.}
 
 \item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
@@ -130,17 +130,18 @@ man's utility exceeds the bound, simulation warns that draws were
 approximate. Existing unions are retained even if a new-search restriction
 would exclude the partner.
 
-Matching models default to \code{matching_method = "weighted_choice"}, which keeps
-female choice among the screened candidates but multiplies each man's selection weight by a weight
-for his group. Weights are recalculated at every search, in continuous time,
+Matching always uses calibrated male-group weights: a woman chooses among
+screened candidates with each man's selection weight multiplied by a
+weight for his group. Weights are recalculated at every search, in continuous time,
 so that expected male union flows by group match a mirrored target: each
 unpartnered man has the per-capita intensity of an unpartnered woman of his
 group, adjusted by the matching model's \code{delta}. Women's
 intensity is the search hazard for rate-mode searches and the unpartnered
 fertility hazard (zero during birth spacing) for on-demand searches and
 nonmarital father selection, which has its own weights and uses the father
-model's method when one is supplied. Weights depend only
+model's preferences and delta when one is supplied. Weights depend only
 on the man's group, so they do not change the association between partners'
-characteristics. With one group the method equals female choice. When no
+characteristics in the static group-only illustration. With one group,
+all group weights are one. When no
 exact weights exist, approximate weights are used with a warning.
 }

@@ -64,8 +64,8 @@ test_that("exact draws handle pools, age edges, kin, group weights and custom fo
   expect_equal(exact_draws(matching, gaps, 10, excluded = rep(TRUE, length(gaps)))$failures, 10L)
   expect_equal(exact_draws(matching, numeric(), 3)$failures, 3L)
   # Group weights and hard restrictions enter the exact probabilities.
-  pair <- create_age_gap_matching_model(0, 5, group_exogamy = c("A::B" = -1),
-    prevent_exogamy = "A:C", matching_method = "female_choice")
+  pair <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1),
+    prevent_exogamy = "A:C")
   groups <- rep(0:2, 100)
   result <- exact_draws(pair, gaps[1:300], 150000, groups = 3L, male_group = groups,
                         log_weights = c(0, 0.7, 0.2), labels = c("A", "B", "C"))
@@ -118,23 +118,21 @@ test_that("extreme utilities draw the best man and invalid scores are errors", {
   expect_error(inspect_matching_cpp(c(1, 2), bad), "wrong number")
 })
 
-test_that("female-choice birth-time selection uses formula scores and male-minus-female gap", {
+test_that("birth-time selection uses formula scores and male-minus-female gap", {
   model <- make_model(3, birth_rate = 20, birth_interval = 0)
   model$population$persons$sex[1] <- "f"
   model$population$persons$birth_time <- c(-20, -20, -30)
-  positive <- create_matching_model(~ age_difference, c(age_difference = 1000),
-    matching_method = "female_choice")
+  positive <- create_matching_model(~ age_difference, c(age_difference = 1000))
   model <- set_union_formation(model, "on_demand", positive)
   result <- simulate(model, 0.5, seed = 52)
   expect_equal(result$unions$husband_id, 3)
   expect_true(all(result$persons$father_id[result$persons$mother_id %in% 1] == 3))
   expect_identical(result, simulate(model, 0.5, seed = 52))
-  negative <- create_matching_model(~ age_difference, c(age_difference = -1000),
-    matching_method = "female_choice")
+  negative <- create_matching_model(~ age_difference, c(age_difference = -1000))
   changed <- simulate(set_union_formation(model, "on_demand", negative), 0.5, seed = 52)
   expect_equal(changed$unions$husband_id, 2)
   fallback <- create_matching_model(~ abs(age_difference - 10),
-    c("abs(age_difference - 10)" = -1000), matching_method = "female_choice")
+    c("abs(age_difference - 10)" = -1000))
   expect_equal(simulate(set_union_formation(model, "on_demand", fallback),
                         0.5, seed = 52)$unions$husband_id, 3)
 })

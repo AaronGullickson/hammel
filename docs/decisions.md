@@ -1422,3 +1422,26 @@ matching specifications override this default. Initiation mode remains explicit.
   argument, and supersedes D073's deferral of male-group propensities only.
   Full two-sex models and participation feedback remain deferred.
 - **Specification:** [weighted-choice matching](weighted-choice-matching.md).
+
+
+## D075: One matching mechanism and symmetric group-pair effects
+
+- **Status:** accepted by the user October 26, 2026.
+- **Decision:** remove `matching_method` and explicit female-choice execution.
+  All partner and father matching uses calibrated male-group weights with
+  `delta` target adjustments (D074). Preserve unit-weight shortcuts for one/no
+  groups and strict endogamy, where group weights cannot affect selection.
+- **Pair effects:** `group_exogamy = c("A:B" = beta)` applies beta in both
+  directions. Reject `::` syntax and repeated unordered pairs, even if their
+  values agree. A pair table retains `female_group`, `male_group`, `log_odds`
+  columns, but each row now specifies an unordered pair and expands both ways;
+  within-group entries expand once. Directed pair effects are removed.
+- **Scope:** formula predictors and hard eligibility restrictions retain their
+  existing contracts; directional hard exclusions are not preference effects.
+  Separate father models retain their own preferences, restrictions and delta.
+  No event timing, rates, inheritance, or demographic acceptance changes.
+- **Validation:** symmetric vector/table expansion, reverse-pair rejection,
+  native/R score agreement, unchanged delta analytical cases, both initiation
+  modes, father overrides, strict endogamy and RNG/restart invariants.
+- **Supersession:** replaces D068's method selection and D069's directed-pair
+  warning; symmetric pair effects replace D056's directed utility interface.

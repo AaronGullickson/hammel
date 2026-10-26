@@ -139,31 +139,3 @@ prepare_group_inheritance <- function(model, population) {
   list(values = values, group_count = length(values), method = match(model$method, inheritance_methods()) - 1L,
        passing = model$passing, ranks = ranks, ancestry_groups = ancestry_groups, custom = custom)
 }
-
-# Female choice can pair groups directionally unevenly (e.g. more female-B/
-# male-A than female-A/male-B unions) even with symmetric preferences and
-# balanced sexes when group sizes differ. Rules that depend on which parent is
-# the mother turn that imbalance into group-composition change. Rules that
-# treat parents symmetrically ("random_parent", "ancestry", "hierarchy") and
-# custom rules are not flagged. Checked when building a model, not per run.
-warn_female_choice_inheritance <- function(model) {
-  fertility <- model$processes$fertility
-  unions <- model$processes$union_formation
-  persons <- model$population$persons
-  if (is.null(fertility) || is.null(unions) || is.null(persons) ||
-      !"group" %in% names(persons) || length(unique(persons$group)) < 2L)
-    return(invisible(FALSE))
-  method <- normalize_group_inheritance(fertility$inheritance)$method
-  if (!method %in% c("mother", "father", "same_sex", "opposite_sex")) return(invisible(FALSE))
-  female_choice <- vapply(list(unions$matching, unions$father_matching), function(m)
-    !is.null(m) && identical(m$matching_method, "female_choice"), logical(1))
-  if (!any(female_choice)) return(invisible(FALSE))
-  warning(sprintf(paste(
-    "Under matching_method = \"female_choice\", unions can be directionally imbalanced",
-    "(e.g. more female-B/male-A than female-A/male-B unions) even with symmetric",
-    "preferences and balanced sexes when group sizes differ. With the sex-specific",
-    "inheritance rule \"%s\", that imbalance changes group composition. Consider",
-    "matching_method = \"weighted_choice\" or a parent-symmetric rule (\"random_parent\",",
-    "\"ancestry\", or \"hierarchy\")."), method), call. = FALSE)
-  invisible(TRUE)
-}

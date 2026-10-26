@@ -11,12 +11,9 @@ The user accepted milestone 2 as complete on October 19, 2026 (D050).**
 Every simulation requires a union-formation process. Current-partner lookup
 and union histories are common infrastructure for all initiation modes.
 
-The specification below describes female-choice selection. Matching models
-default to `matching_method = "weighted_choice"` (D066/D067/D068),
-which multiplies each candidate's selection weight by a calibrated weight for
-his group, with unchanged initiation and eligibility rules; see
-[weighted-choice matching](weighted-choice-matching.md). The two-sided
-temporary-market experiment was removed (D067).
+Matching always multiplies candidate selection weights by calibrated weights
+for men's groups, with unchanged initiation and eligibility (D075). There is
+no method argument; see [weighted-choice matching](weighted-choice-matching.md).
 
 ## Terminology
 
@@ -57,13 +54,12 @@ availability and renewed female rate searches after widowhood are implemented. T
 ## Implemented construction interface
 
 `create_matching_model(formula, coefficients, group_exogamy = NULL,
-group_levels = NULL, prevent_exogamy = FALSE, delta = NULL,
-matching_method = "weighted_choice")` stores a
+group_levels = NULL, prevent_exogamy = FALSE, delta = NULL)` stores a
 one-sided R formula and finite named coefficients
 matching its non-intercept model-matrix columns. Predictors include
 `age_difference` (male minus female age in continuous years), `female_group`,
 `male_group`, and numeric `same_group`. Categorical group terms require explicit
-fixed `group_levels`. Optional directed/symmetric pair effects add to the formula
+fixed `group_levels`. Optional symmetric pair effects (`A:B` in both directions) add to the formula
 score. See [group matching](group-matching.md) for syntax, factor contrasts, and
 worked probabilities. Ordinary R formula transformations are supported. An
 intercept is ignored because it cancels from partner-only choice probabilities;

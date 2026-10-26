@@ -24,11 +24,10 @@
 #' A failed match cancels the birth unless explicitly allowed by the union process.
 #' Cancellation starts no new birth-spacing interval. On-demand mode rejects
 #' status schedules.
-#' Matching models default to `matching_method = "weighted_choice"`: female
-#' choice with male-group weights recalibrated at each search; simulation warns
-#' once if any search needed approximate weights. `"female_choice"` uses
-#' unweighted selection. A separate father model uses its own method. Event
-#' initiation is unchanged.
+#' Matching uses male-group weights recalibrated at each search; simulation
+#' warns once if any search needed approximate weights. A separate father model
+#' has its own preferences and delta target adjustments. Event initiation is
+#' unchanged.
 #'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
 #' and uses recorded maternal births, including on restart.
@@ -219,8 +218,7 @@ simulate <- function(model, years, seed = NULL) {
   if (union_process$diagnostics) {
     # Weighted choice records the log group weights applied at each union's
     # search (0 = unit weight), one column per group; earlier unions are NA.
-    if (identical(union_process$matching$matching_method, "weighted_choice") &&
-        !is.null(group_values)) {
+    if (!is.null(group_values)) {
       added <- if (years > 0) native$diagnostic_log_weights else matrix(numeric(), 0, length(group_values))
       new_rows <- seq_len(nrow(added)) + nrow(population$unions)
       for (g in seq_along(group_values)) {
