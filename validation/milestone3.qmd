@@ -696,7 +696,6 @@ from separate runs before calling demographic extraction functions.
 
 ```{r}
 #| label: simulation-design
-# TODO: Set parameters and seeds; create baseline populations and scenario table.
 
 population_seed <- 42
 replication_seeds <- seq_len(100)
@@ -1018,6 +1017,7 @@ mar_rates |>
 ```
 
 @fig-mar-rates-strat-rates show the empirically estimated mean age-specific marriage rates compared to the input rates The match is extremely close.
+
 
 ### Proportional multipliers
 
@@ -1565,6 +1565,7 @@ models_clogit |>
 # |lael: models-gc
 
 rm(models_clogit)
+gc()
 ```
 
 All of the parameters are extremely close to their expected values from the input. All of the 95% confidence intervals for each term would fall within the expected value. Furthermore, the two directed effects for each pair are all statistically equivalent to one another at p < 0.05.
@@ -1656,7 +1657,7 @@ names(results) <- as.character(replication_seeds)
 ```
 
 ```{r}
-#| label: calculate-crosstabs-uneven
+#| label: calculate-crosstabs-even
 
 crosstabs <- results |>
   map(get_detailed_unions) |>
@@ -1765,18 +1766,18 @@ bind_rows(outmarriage_uneven, outmarriage_even) |>
 
 To evaluate the built-in methods, I will run simulations with two ueven groups (A = 75%; B = 25%). Groups will share all rate schedules such that their share should remain the same across the simulation, apart from differences in inheritance rules. Exogamy will be symmetric and somewhat low (-2.5). 
 
+Preliminary results indicated that starting population randomness had a substantial effect on these inheritance patterns, particularly for mother and father inheritance. Therefore, each simulation will generate its own starting population so that monte carlo standard errors incorporate this source of variance. 
+
 ```{r}
 #| label: setup-inheritance-model
 
-pop_baseline_inheritance <- create_baseline_population(50000, max_age = 100, 2000,
-                                                       group_weights = c("A" = 3, "B" = 1))
+gweights <- c("A" = 3, "B" = 1)
 
 model_inheritance <- hammel_model() |>
-  set_population(pop_baseline_inheritance) |>
   set_mortality(mortality_rates_usa2000) |>
   set_union_formation(
     "on_demand",
-    matching = create_age_gap_matching_model(0, 5, group_exogamy = c("A::B" = -2.5))
+    matching = create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2.5))
   )
 ```
 
@@ -1790,13 +1791,16 @@ inheritance_scenarios <- c("mother", "father", "random_parent", "same_sex",
                            "hierarchy_passing")
 ```
 
-To keep overall run time down, I will only run 20 simulations for each case. For each simulation, we will track two measures in the final simulated living population of each simulation: 
+I run 100 simulations over 100 years for each case. For each simulation, we will track two measures in the final simulated living population of each simulation: 
 
 - Mean group shares of the population
 - Mean ancestry shares conditional on group identity
 
 ```{r}
 #| label: run-inheritance-simulations
+
+# reduce workers so I don't blow up the computer
+future::plan(future::multisession, workers = 2)
 
 df_inheritance <- map(inheritance_scenarios, function(scenario) {
 
@@ -1819,16 +1823,19 @@ df_inheritance <- map(inheritance_scenarios, function(scenario) {
       set_fertility(fertility_rates_overall_usa, inheritance = scenario)
   }
 
-  results <- map(replication_seeds[1:20], function(seed) {
-    simulate(model, years = years, seed = seed)
-  })
-
-  results |>
-    map(get_parent_info) |>
-    bind_rows(.id = "replication") |>
-    filter(!is.na(mother_id), group_mother != group_father) |>
-    select(birth_time, group, group_mother, group_father) |>
-    count(group, group_mother, group_father)
+  results <- future_map(
+    replication_seeds, 
+    function(seed) {
+      # set the baseline population
+      set.seed(seed)
+      model_final <- model |>
+        set_population(
+          create_baseline_population(50000, 50, 2000, group_weights = gweights)
+        )
+      simulate(model_final, years = 100, seed = seed) 
+    },
+    .options = furrr_options(seed = NULL)
+  )
   
   share <- results |>
     map(calculate_population_size, times = 2100, by_group = TRUE) |>
@@ -1886,14 +1893,14 @@ df_inheritance <- df_inheritance |>
 I have the following expectations by inheritance method:
 
 - `mother`, `father`, `random_parent`, `same_sex`, and `different_sex` should all produce similar results with group size shares at the end that roughly match the start and similar ancestry shares where more A ancestry in group B than B ancestry in Group A.
-- strict `hierarchy` (B > A) should cause the B group to grow relative to A. A individuals will have no B ancestry but B individuals will have more A ancestry than in other rules. Somewhat similar results with passing but moderated and A individuals will have a little B ancestry.
-- I think ancestry based approach should favor the larger group A. A should become larger share and B individuals will contain more A ancestry than vice versa.
+- strict `hierarchy` (B > A) should cause the B group to grow relative to A. A individuals will have no B ancestry but B individuals will have more A ancestry than in other rules. I expect similar results with passing but the increase in B relative to A will be smaller  and A individuals will have a little B ancestry.
+- I think ancestry based approach should favor the larger group A because over time their ancestry will dominate among mixed individuals and thus more mixed individuals will identify with A than B. B individuals will contain more A ancestry than vice versa.
 
 ```{r}
 #| label: fig-ending-group-pop
 #| fig-cap: Mean proportion of group B in final simulated population across inheritance scenarios, with 20 simulations per scenario. 95% confidence intervals shown. Dotted line shows the share B in the starting population.
 
-start_share <- mean(pop_baseline_inheritance$persons$group == "B")
+start_share <- gweights["B"]/sum(gweights) 
 
 df_inheritance |>
   filter(group == "B") |>
@@ -1901,9 +1908,14 @@ df_inheritance |>
   geom_hline(yintercept = start_share, linetype = 2)+
   geom_point()+
   geom_linerange(aes(ymin = share_mean - 1.96 * share_se, ymax = share_mean + 1.96 * share_se))+
+  labs(y = "Proportion group B", x = NULL)+
   coord_flip()+
   theme_bw()
 ```
+
+@fig-ending-group-pop shows the mean proportion of the population belonging to group B at the end of each simulation by inheritance rule. The results show that all rules except the hierarchy case produce a group proportion consistent with the starting group share and the proportions are also statistically indistinguishable across those methods. The ancestry method does not shrink the size of the B group, contrary to expectation. 
+
+The hierarchy rules produce a higher share of group B than the other methods and relative to the baseline, as expected. Strict hierarchy increases the B share more than hierarchy with some passing, also as expected. 
 
 ```{r}
 #| label: fig-other-ancestry-share
@@ -1918,12 +1930,13 @@ df_inheritance |>
   geom_point()+
   geom_linerange(aes(ymin = ancestry_other - 1.96 * se, ymax = ancestry_other + 1.96 * se))+
   coord_flip()+
+  labs(x = NULL, y = "Proportion of ancestry from other group")+
   theme_bw()
 ```
 
-The results for hierarchy and ancestry match expectations, but there are differences between the other scenarios that I didn't expect. The same sex, random parent, and opposite sex methods all produce about the same ancestry shares but not the same group shares. Father and mother are different on all of them. What is going on here? Could this be a result of the female driven union formation process? Could the same and opposite sex differences be related to ffab? This needs further exploration.
+@fig-other-ancestry-share shows the share of ancestry that each group has from the other group at the end of each simulation, meaned across all simulations. All methods except for ancestry and hierarchy produce the same shares within each group. As expected The proportion of A ancestry among B individuals is higher than the proportion of B ancestry among A individuals, because group A was a larger share of the starting population. 
 
-One thing we could do is track share of births to B mothers and A fathers vs vice versa to see if there is a difference there.
+For the ancestry method, the share of cross-group ancestry is higher for both groups than in all other methods except for the hierarchy results, but the larger increase is for group B, as expected. For the hierarchy method, strict hierarchy produces a 0% share of B ancestry among group A members because it is effectively a strict one-drop rule. The share of A ancestry among B individuals, on the other hand, is higher than for any other method because all mixed ancestry gets absorbed into group B. Hierarchy with some passing shows exactly the same pattern but with some slight moderation, as expected.
 
 ### Custom rules and mixed identities
 
@@ -2083,7 +2096,7 @@ knitr::kable(
 
 ## Conclusions and unresolved limitations
 
-TODO: Assess each completion criterion against the evidence. Record remaining
+**TODO:** Assess each completion criterion against the evidence. Record remaining
 limitations and the status of the paternal-inheritance question. Milestone 3
 has not yet been accepted on the basis of this report. Multiple simultaneous
 identities and model diagnostic tools remain outside the agreed feature scope.
