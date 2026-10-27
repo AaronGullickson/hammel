@@ -134,14 +134,13 @@ replication design should be specified before interpreting results.
 
 | Measure | Comparison | Acceptance criterion |
 |---|---|---|
-| Group initialization | Observed group shares versus normalized input weights | To be specified |
-| Fertility, mortality, and union-search rates | Grouped output versus supplied schedules or multiplied input rates | To be specified; retain known fertility-transition and partner-scarcity limitations |
-| Group matching | Estimated choice effects versus configured effects | To be specified |
-| Hard exogamy restrictions | New unions and selected fathers versus prohibited pairs | No prohibited selections under the applicable matching model |
-| Ancestry | Child shares versus half of each parent's shares | Accounting identity, including unknown paternal contribution |
-| Group inheritance | Observed assignments versus deterministic rules or specified probabilities | Exact deterministic rules; probabilistic criteria to be specified |
-| Grouped summaries | Group totals versus pooled counts and exposure | Accounting identities |
-| Implementation | Automated tests, seed reproducibility, and restart checks | Record results and limitations |
+| Fertility, mortality, and union-search rates | Group specific output rates versus supplied schedules or multiplied input rates | Group specific output rates should match closely to input rates, adjusting for sampling variability |
+| Group matching | Log odds ratios of observed data to input `group_exogamy` values | Specified input values should be half the output log odds ratios between groups  |
+| Gender ratio in group matching | Observed gender ratio of intergroup unions to unity | When not using a `delta` parameter, ratio should be statistically equivalent to one; when using `delta`, the ratio should not be one and the direction should be consistent with `delta` |
+| Conditional logit parameters | Conditional logit model with .log-weight offset to matching model input | Model results should be statistically equivalent to the matching model input for all parameters (age and group exogamy) |
+| Group inheritance | Share of groups at end of simulation and proportion of cross-group ancestry | Results should match expectations for each inheritance method |
+| Custom inheritance | Probability of identity assignment by custom function parameters used | Probability should match the expectations of the custom inheritance method | 
+| Accounting and implementation | Existing tests | Successful unit tests |
 
 ## Overview of Design
 
@@ -155,7 +154,7 @@ Group dynamics are not defined by a separate process, but rather are inferred fr
 
 This milestone distinguishes between **group identity** and **group ancestry** and both are tracked. **Group identity** is the currently assigned group of the person and affects their rate schedules and marriage choices. **Group ancestry** is the share of a person's ancestry that comes from each group and is also tracked in a separate `ancestry` tibble that is now part of the simulation output in `hammel_population` when groups are specified. 
 
-The simulation makes no special accomodation for mixed group identity (e.g. person identifies with both groups A and B) but it is possible for users to accomodate such mixed groups by specifying a specific mixed group (e.g. "AB") and using a custom function to control how inheritance assigns some births to that group (as explained below).
+The simulation makes no special accommodation for mixed group identity (e.g. person identifies with both groups A and B) but it is possible for users to accommodate such mixed groups by specifying a specific mixed group (e.g. "AB") and using a custom function to control how inheritance assigns some births to that group (as explained below).
 
 ### Group-specific rates
 
@@ -169,7 +168,7 @@ hammel_model() |>
   set_mortality(rates = mortality_rates, group_prop_hazard = c("B" = 1.05))
 ```
 
-The `group_prop_hazard` function takes a named vector where the names correspond to groups. Groups left out are given an implict 1.0 multiplier. 
+The `group_prop_hazard` function takes a named vector where the names correspond to groups. Groups left out are given an implicit 1.0 multiplier. 
 
 The `group_prop_hazard` function can be used for all rate processes. For fertility processes where partnered and unpartnered fertility rates are both specified, the format is a little different and should correspond to a named list of "partnered" and "unpartnered" each containing a named vector. For example, 
 
@@ -194,7 +193,7 @@ The solution to this problem was to use a weighted choice approach in which male
 - It does not allow for directed effects by gender that would lead to different ratios of intergroup unions by gender.
 - When there is a gender imbalance in group share (e.g. from mortality differences by sex and group), this can result in large gender imbalances.
 
-To allow users to adjust results for either of these issues, we include a group specific $\delta$ tuning parameter that allows for adjustment of those ratios. Implicitly this parameter indicates the dregree to which husbands from the given group are preferred relative to wives. $\delta = 0$ means equal preference and no adjustment (the default), while a $\delta > 0$ indicates a preference for husbands over wives, and $\delta < 0$ indicates a preference for wives over husbands.
+To allow users to adjust results for either of these issues, we include a group specific $\delta$ tuning parameter that allows for adjustment of those ratios. Implicitly this parameter indicates the degree to which husbands from the given group are preferred relative to wives. $\delta = 0$ means equal preference and no adjustment (the default), while a $\delta > 0$ indicates a preference for husbands over wives, and $\delta < 0$ indicates a preference for wives over husbands.
 
 Users can specify the $\beta$ and $\delta$ parameters with the `group_exogamy` and `delta` arguments respectively. The `group_exogamy` argument takes a named vector of pairwise $\beta$ parameters where each name should equal the two group names separated by a `:`. So, 
 
@@ -262,7 +261,7 @@ $$\frac{(0.25)(0.75)e^{\beta}D_B^{-1}(0.75)(0.25)e^{\beta}D_A^{-1}}{(0.75)(0.75)
 
 Everything cancels out except for the $\beta$ values. The log cross product is thus $2\beta$ which is consistent with conditional logit model estimates typically around half the log-odds ratio in empirical data. If we set $\beta = 0$ here, then $D_A = 1$ and $D_B = 1$ and @tbl-crosstab-clogit simplifies to @tbl-crosstab-simple.  
 
-We can generalize this approach by setting $F_i$ and $M_j$ as the share of women and men respectively belonging to a certain group (0.75 and 0.25 for goups A and B, respectively, in the example above) and setting utility $U_{ij}$ as:
+We can generalize this approach by setting $F_i$ and $M_j$ as the share of women and men respectively belonging to a certain group (0.75 and 0.25 for groups A and B, respectively, in the example above) and setting utility $U_{ij}$ as:
 
 $$
 U_{ij} =
@@ -317,7 +316,7 @@ This is exactly the log-linear form $r_i c_j e^{U_{ij}}$, with
 
 $$r_i = \frac{F_i}{D_i}, \qquad c_j = \omega_j M_j$$
 
-In this simplified two group example, there is a closed form analytical solution to solve for $\omega_j$. First, we set $\omega_A = 1$ as the reference weight. Then we define $f$ as the share of women in group A, $p$ as the share of men in group A, and $q = 1 - p$ as the share of men in group B. @tbl-crosstab-formula shows the equations govering the joint distribution of spouses.
+In this simplified two group example, there is a closed form analytical solution to solve for $\omega_j$. First, we set $\omega_A = 1$ as the reference weight. Then we define $f$ as the share of women in group A, $p$ as the share of men in group A, and $q = 1 - p$ as the share of men in group B. @tbl-crosstab-formula shows the equations governing the joint distribution of spouses.
 
 |              |   Husband Group A                              | Husband Group B                                        |
 |--------------|------------------------------------------------|--------------------------------------------------------|
@@ -543,7 +542,7 @@ This supplies a target for how matches should be distributed across male groups,
 
 To calculate the weights, we consider the partner-choice probabilities of all women currently at risk of initiating a search, weighting each woman’s contribution by her search rate. We numerically find the male-group $\omega$ weights that make the resulting expected male group shares match the targets $\tau_{g}$. We solve for these weights iteratively using Newton’s method, starting from the weights calculated at the previous search. The focal woman then selects a husband using the conditional logit probabilities with those calibrated weights. The calculation is repeated at each search as population composition changes.
 
-For searches triggered by marriage rates, the female marriage rates are used. For birth-triggered searches and nonmarital father selection, the relevant fertility rates supply the search rates. To reduce computation, calibration groups individuals into quarter-year birth cohorts and does not remove kin. It evaluates matching preferences at cohort-centre ages and averages search rates over each cohort’s age interval. Actual partner selection uses individual ages. 
+For searches triggered by marriage rates, the female marriage rates are used. For birth-triggered searches and nonmarital father selection, the relevant fertility rates supply the search rates. To reduce computation, calibration groups individuals into quarter-year birth cohorts and does not remove kin. It evaluates matching preferences at cohort-center ages and averages search rates over each cohort’s age interval. Actual partner selection uses individual ages. 
 
 To speed computation at each search, the simulation maintains these binned distributions and updates them based on relevant events rather than reconstructing them at each search. This approach also has a fringe benefit. Maintaining these bins supports efficient rejection sampling from the full available male pool rather than the use of a sample. A group-cohort bin is drawn using its size and an upper bound on candidate weights, then a man is drawn uniformly within it. He is accepted with a probability based on his exact utility and screened for age and kinship eligibility; otherwise, the draw is repeated. Hard group exclusions are applied before drawing. 
 
@@ -752,7 +751,7 @@ names(results) <- as.character(replication_seeds)
 I calculate fertility rates in five year age brackets that match those of the input data and in five year periods across the 100 years of the simulation. Very low marriage rates for the youngest age bracket can create problems for generating enough person years of exposure for partnered fertility as I show below.
 
 ```{r}
-#| label: caclulate-fert-rates-strat-rates
+#| label: calculate-fert-rates-strat-rates
 
 counts <- map(
   results,
@@ -861,7 +860,7 @@ tfr_pooled |>
 
 ```{r}
 #| label: tbl-tfr-pooled-strat-rates
-#| tbl-cap: Total fertiity rate by union status and group, pooled across 100 simulations and time. Expected input TFR and difference also shown.
+#| tbl-cap: Total fertility rate by union status and group, pooled across 100 simulations and time. Expected input TFR and difference also shown.
 
 counts |>
   bind_rows() |>
@@ -896,7 +895,7 @@ counts |>
 
 #### Mortality
 
-Mortality is measured in 1-year age groups across 5 year time periods. The input mortality data extends to 100 years of age but at the highest ages, estimated mortality rates can fluctuate substantially due to a small number of person years lived at those ages, and can also be missing due to zero person years lived at a sepcific age. Therefore, I use an open ended age group of 85+. This may cause a slight discrepancy between the life expectancy estimated from the data and the life expectancy of the input data, but it is likely to be small. 
+Mortality is measured in 1-year age groups across 5 year time periods. The input mortality data extends to 100 years of age but at the highest ages, estimated mortality rates can fluctuate substantially due to a small number of person years lived at those ages, and can also be missing due to zero person years lived at a specific age. Therefore, I use an open ended age group of 85+. This may cause a slight discrepancy between the life expectancy estimated from the data and the life expectancy of the input data, but it is likely to be small. 
 
 ```{r}
 #| label: calculate-mort-rates-strat-rates
@@ -978,7 +977,7 @@ Overall, the evidence indicates that the observed mortality rates by group corre
 Age-specific marriage rates are calculated in five year age groups from 15 to age 70 in 5-year time increments.
 
 ```{r}
-#| label: caclulate-mar-rates-strat-rates
+#| label: calculate-mar-rates-strat-rates
 
 counts <- map(
   results,
@@ -1072,7 +1071,7 @@ names(results) <- as.character(replication_seeds)
 I calculate fertility rates in five year age brackets that match those of the input data and in five year periods across the 100 years of the simulation.
 
 ```{r}
-#| label: caclulate-fert-rates-prop-hazards
+#| label: calculate-fert-rates-prop-hazards
 
 counts <- map(
   results,
@@ -1160,7 +1159,7 @@ asfr |>
 
 ```{r}
 #| label: tbl-tfr-pooled-prop-hazards
-#| tbl-cap: Total fertiity rate by union status and group, pooled across 100 simulations and time. Expected input TFR and difference also shown.
+#| tbl-cap: Total fertility rate by union status and group, pooled across 100 simulations and time. Expected input TFR and difference also shown.
 
 tfr_input <- fert_input |> calculate_tfr()
 
@@ -1197,7 +1196,7 @@ counts |>
 
 #### Mortality
 
-Mortality is measured in 1-year age groups across 5 year time periods. The input mortality data extends to 100 years of age but at the highest ages, estimated mortality rates can fluctuate substantially due to a small number of person years lived at those ages, and can also be missing due to zero person years lived at a sepcific age. Therefore, I use an open ended age group of 85+. This may cause a slight discrepancy between the life expectancy estimated from the data and the life expectancy of the input data, but it is likely to be small. 
+Mortality is measured in 1-year age groups across 5 year time periods. The input mortality data extends to 100 years of age but at the highest ages, estimated mortality rates can fluctuate substantially due to a small number of person years lived at those ages, and can also be missing due to zero person years lived at a specific age. Therefore, I use an open ended age group of 85+. This may cause a slight discrepancy between the life expectancy estimated from the data and the life expectancy of the input data, but it is likely to be small. 
 
 ```{r}
 #| label: calculate-mort-rates-prop-hazards
@@ -1292,7 +1291,7 @@ Overall, the evidence indicates that the observed mortality rates by group corre
 Age-specific marriage rates are calculated in five year age groups from 15 to age 70 in 5-year time increments.
 
 ```{r}
-#| label: caclulate-mar-rates-prop-hazards
+#| label: calculate-mar-rates-prop-hazards
 
 counts <- map(
   results,
@@ -1562,7 +1561,7 @@ models_clogit |>
 ```
 
 ```{r}
-# |lael: models-gc
+# |label: models-gc
 
 rm(models_clogit)
 gc()
@@ -1866,7 +1865,7 @@ Overall, even under substantial differences in fertility and mortality, the effe
 
 ### Built-in methods
 
-To evaluate the built-in methods, I will run simulations with two ueven groups (A = 75%; B = 25%). Groups will share all rate schedules such that their share should remain the same across the simulation, apart from differences in inheritance rules. Exogamy will be symmetric and somewhat low (-2.5). 
+To evaluate the built-in methods, I will run simulations with two uneven groups (A = 75%; B = 25%). Groups will share all rate schedules such that their share should remain the same across the simulation, apart from differences in inheritance rules. Exogamy will be symmetric and somewhat low (-2.5). 
 
 Preliminary results indicated that starting population randomness had a substantial effect on these inheritance patterns, particularly for mother and father inheritance. Therefore, each simulation will generate its own starting population so that monte carlo standard errors incorporate this source of variance. 
 
@@ -1996,7 +1995,7 @@ I have the following expectations by inheritance method:
 
 - `mother`, `father`, `random_parent`, `same_sex`, and `different_sex` should all produce similar results with group size shares at the end that roughly match the start and similar ancestry shares where more A ancestry in group B than B ancestry in Group A.
 - strict `hierarchy` (B > A) should cause the B group to grow relative to A. A individuals will have no B ancestry but B individuals will have more A ancestry than in other rules. I expect similar results with passing but the increase in B relative to A will be smaller  and A individuals will have a little B ancestry.
-- I think ancestry based approach should favor the larger group A because over time their ancestry will dominate among mixed individuals and thus more mixed individuals will identify with A than B. B individuals will contain more A ancestry than vice versa.
+- I think ancestry based approach should favor the larger group A because over time their ancestry will dominate among mixed individuals and thus more mixed individuals will identify with A than B. B individuals will contain more A ancestry than vice verse.
 
 ```{r}
 #| label: fig-ending-group-pop
@@ -2374,6 +2373,7 @@ scenarios |>
 
 scenarios |>
   filter(n_groups > 1) |>
+  mutate(strat_method = if_else(strat_method == "rate", "stratified rate", "proportional hazards")) |>
   ggplot(aes(x = n_groups, y = elapsed_time, group = custom_inheritance, color = custom_inheritance))+
   geom_point()+
   geom_line()+
@@ -2385,14 +2385,13 @@ scenarios |>
 
 @tbl-time-tests and @fig-time-tests show the amount of time to process each simulation scenario. These numbers are not exact because other factors can affect total processing time. Adding groups in general increases processing time substantially. The single group simulation runs in about 0.28 seconds, while the two-group cases take at least five times as long. The slight curvature in the figure  suggests that computational time is increasing exponentially with the number of groups. 
 
-Using custom inheritance funtions in R increased processing time, but the increase seems to be independent of the number of groups. The inheritance function used here was quite simple. More complex functions could increase time further.
+Using custom inheritance functions in R increased processing time, but the increase seems to be independent of the number of groups. The inheritance function used here was quite simple. More complex functions could increase time further.
 
-The decision to use proportional hazards of stratified rates had no effect on computing time.
+The decision to use proportional hazards or stratified rates had no effect on computing time.
 
 ## Tests
 
-Run the ordinary suite explicitly when preparing the assessment. Live database
-tests remain opt-in; this chunk is disabled in the skeleton.
+The following tests have been constructed and are currently all passing.
 
 ```{r}
 #| label: test-results
