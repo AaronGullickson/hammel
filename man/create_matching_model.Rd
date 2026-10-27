@@ -4,12 +4,55 @@
 \alias{create_matching_model}
 \title{Specify a conditional-logit matching model}
 \usage{
-create_matching_model(formula, coefficients)
+create_matching_model(
+  formula,
+  coefficients,
+  group_exogamy = NULL,
+  group_levels = NULL,
+  prevent_exogamy = FALSE,
+  delta = NULL
+)
 }
 \arguments{
-\item{formula}{A one-sided R formula using only \code{age_difference}.}
+\item{formula}{A one-sided R formula using \code{age_difference}, \code{female_group},
+\code{male_group}, and/or \code{same_group}. Use \code{~ 1} and \code{numeric()} coefficients
+for pair-effects-only matching.}
 
 \item{coefficients}{A finite named numeric vector of utility coefficients.}
+
+\item{group_exogamy}{Optional finite named numeric vector of symmetric
+group-pair effects: \code{"A:B"} applies the same log-weight effect to female
+A/male B and female B/male A. Specify each unordered pair once; reverse
+duplicates and \code{::} syntax are errors. Omitted pairs have zero effect;
+within-group entries are allowed. Alternatively provide a data frame with
+\code{female_group}, \code{male_group}, and \code{log_odds}; each row specifies an unordered
+pair and expands symmetrically, including for colon-containing labels.
+Effects add to formula scores and do not prohibit matches.}
+
+\item{group_levels}{Optional ordered vector of group labels (character or
+numeric codes). Required with at least two levels when the formula uses
+\code{female_group} or \code{male_group}; must cover population groups. Sets fixed
+treatment reference/columns, independent of the available pool. Not required
+for \code{same_group} or pair effects alone.}
+
+\item{prevent_exogamy}{\code{FALSE} (default) for no group restrictions; \code{TRUE}
+excludes all different-group candidates. A character vector such as
+\code{c("A::B", "A:C")} excludes selected pairs with female-first \code{:} and
+symmetric \code{::} notation. Alternatively supply a directional data frame
+with \code{female_group} and \code{male_group}. Pairs must join different groups.
+Restricted men are ineligible, alongside age and kinship exclusions. A
+search fails only when no eligible man exists in the whole pool, following
+existing failed-search and birth cancellation rules. Restrictions override
+finite preferences, require population identities, and do not invalidate
+existing partners.}
+
+\item{delta}{Optional finite numeric vector with unique group names.
+Multiply mirrored male targets by \code{exp(delta)}
+and normalize. Omitted groups have zero adjustment. Positive values raise
+the male target relative to baseline and other groups; negative values
+lower it. Only differences matter. Does not set pair-specific ratios or
+change female search rates. Names must belong to the population's identity
+registry (including declared future groups).}
 }
 \value{
 An inspectable \code{hammel_matching_model} list containing \code{formula}
@@ -17,11 +60,16 @@ and \code{coefficients}. This specifies a model; it does not estimate one.
 }
 \description{
 Define relative partner utilities with an R formula and named coefficients.
-Currently the only predictor is \code{age_difference}: male age minus female age,
+Predictors include \code{age_difference}: male age minus female age,
 in continuous years at the search time. Formula transformations such as
 \code{I(age_difference^2)} and \code{abs(age_difference)} are supported through
 \code{\link[stats:model.matrix]{stats::model.matrix()}}. An intercept is ignored because it cancels from
 partner-only conditional-logit probabilities. No wait alternative is included.
+\code{female_group} and \code{male_group} are factors with explicit \code{group_levels} and
+fixed treatment contrasts (first level is reference). \code{same_group} is numeric
+1 for equal identities, 0 otherwise. Pair effects are added after the formula,
+including custom formulas. Group effects require population identities.
+These modify relative candidate weights, not search hazards or eligibility.
 }
 \details{
 Coefficient names must match the non-intercept model-matrix columns exactly.

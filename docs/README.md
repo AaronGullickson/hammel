@@ -1,10 +1,10 @@
 # Hammel documentation
 
-Updated October 19, 2026. The mortality/fertility engine is implemented;
-milestone 1 was accepted as complete by the user on October 15, 2026. Current behavior uses
+Updated October 27, 2026. Milestones 1 (mortality/fertility), 2 (union
+formation), and 3 (groups, matching, ancestry, and inheritance) are complete
+by user acceptance (D029, D050, D077). Current behavior uses
 continuous event times and midpoint fertility compensation, with no monthly
-time grid. The user accepted milestone 2 union formation as complete on
-October 19, 2026 (D050), based on the validation report and review.
+time grid. Acceptance is based on the user-authored validation reports.
 Transition-aware fertility compensation and other deferred mechanisms remain
 future work.
 
@@ -16,6 +16,11 @@ future work.
 | [Design](design.md) | Implemented architecture, API, and source locations |
 | [Scientific contract](scientific-contract.md) | Current demographic assumptions and event rules |
 | [Population schema](population-schema.md) | Person/union tables and structural validation |
+| [Groups](groups.md) | Group-specific schedules, multipliers, newborn identity, and baseline sampling |
+| [Ancestry](ancestry.md) | Starting proportions, parental averaging, unknown shares, and restarts |
+| [Group inheritance](group-inheritance.md) | Built-in/custom identity rules, passing, and possible groups |
+| [Weighted-choice matching](weighted-choice-matching.md) | Calibrated male-group weights and delta target adjustments (D074/D075) |
+| [Group matching](group-matching.md) | Symmetric pair effects and fixed group formula predictors |
 | [Demographic analysis](demographic-analysis.md) | Exposure, ASFR/ASMR, TFR, and life-table workflows |
 | [Testing and validation](testing.md) | Test commands, evidence, and remaining validation |
 | [Current handoff](session-handoff.md) | Recent findings, active work, and deferred issues |
@@ -31,7 +36,8 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [Waiting-time sampling](waiting-time-sampling.md) | Explanation of the current shared hazard sampler |
 | [Union-formation models](union-formation-models.md) | Implemented milestone 2 rules, matching defaults, diagnostics, and deferred work |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
-| [Future roadmap](roadmap.md) | User priorities beyond milestone 2; milestone 3 groups and open specifications |
+| [Two-sex union models](two-sex-union-models.md) | Proposal notes: directional asymmetry, marriage squeeze, Schoen/Choo–Siow/Dagsvik models, API considerations (D073) |
+| [Future roadmap](roadmap.md) | Accepted milestones and future priorities with unresolved specifications |
 | [Decision log](decisions.md) | Accepted choices and supersession history |
 | [SOCSIM audit plan](socsim-audit.md) | Scope and remaining reference investigation |
 | [SOCSIM rates](socsim-rate-audit.md) | Pinned static source findings |
@@ -58,10 +64,16 @@ To inspect prior versions, use `git log -- docs` and
   executes simulations and an HMD download. Deferred limitations remain documented.
 - [Union-formation example](../inst/examples/milestone2.R): current construction
   and execution workflow.
+- [Milestone 3 validation report](../validation/milestone3.qmd): user-authored
+  assessment accepted October 27, 2026 (D077), covering group-specific rates,
+  weighted matching and delta, conditional-logit recovery, ancestry, built-in
+  and custom inheritance, baseline sensitivity, and performance. Rendering
+  downloads HMD inputs and runs substantial simulations and the test suite.
 The former `milestone1.R` and `milestone1_bootstrap.R` examples have been
 removed from the current tree; use Git history for those historical workflows.
 
 `inst/examples/` ships with the installed R package. `validation/` and `docs/`
-are development material excluded from package builds. Local validation data
-and rendered output are Git-ignored; completed evidence needs a documented
-archive or sharing location.
+are development material excluded from package builds. Preserve the completed
+report sources and rendered artifacts. Some local inputs and generated files
+are Git-ignored; reproducible evidence needs its input provenance and software
+environment as well as a documented archive or sharing location.

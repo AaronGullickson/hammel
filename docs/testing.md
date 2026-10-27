@@ -1,8 +1,8 @@
 # Testing and milestone validation
 
-Updated October 19, 2026. The user accepted milestone 1 as complete after
-rendering the validation report. Software test history and the user's demographic
-assessment are distinct evidence; recording acceptance did not rerun either.
+Updated October 27, 2026. Milestones 1–3 are accepted as complete (D029,
+D050, D077). Software test history and the user's demographic assessment
+are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
 ## Run the suite
@@ -21,10 +21,34 @@ optional HMDHFDplus reader checks skip if it is unavailable, and mocked reader
 bindings restore on exit. The live database test skips unless explicitly enabled.
 The old top-level base-R test scripts have been converted and removed.
 
+On October 23, 2026, after D072 replaced candidate sampling with exact
+full-pool draws and removed `sample_size`, `.n_eligible`, and `.utility_rank`,
+`TZ=UTC Rscript -e 'devtools::test(reporter = "summary")'` passed with no
+failures or warnings and the live database test skipped. Exact-draw checks
+compare draw frequencies with exact full-pool conditional-logit probabilities
+(native and custom formulas, group weights and restrictions, men near the age
+cutoff, excluded kin, the enumeration fallback, empty pools). Tests that
+previously checked sampling semantics now check that an eligible man anywhere
+in the pool is found. Draw-by-draw identity is no longer expected between
+native and custom formulas or across very steep utilities, which use random
+numbers differently; those comparisons are distributional. This verifies
+software behavior, not demographic parameter recovery.
+
 | Test file | Main evidence |
 | --- | --- |
+| `test-groups.R` | Group rate lookup, analytical survival, coverage errors, fallback warnings, maternal inheritance, cross-group unions, restarts, RNG equivalence, and weighted initialization |
+| `test-group-demography.R` | Exact group exposure/counts, cross-group parent and spouse attribution, conservation, analytical group TFR/life tables, population sizes, validation, and typed empty tables |
+| `test-group-prop-hazard.R` | Multiplier validation, explicit-schedule equivalence, compensation order, omitted/unit/zero factors, warnings, RNG preservation, restarts, numeric codes, empty populations, and overflow |
+| `test-group-inheritance.R` | All assignment rules/fallbacks, passing and ancestry probabilities, custom RNG, mixed identity rates, future-group coverage, restarts, and random-parent defaults and explicit maternal inheritance |
+| `test-ancestry.R` | Starting identities, supplied proportions and IDs, parental averaging across generations, unknown shares, restarts/deaths, numeric labels, empty tables, and RNG independence |
+| `test-group-matching.R` | Symmetric pair offsets and reverse-pair rejection, analytical probabilities, fixed factor contrasts/interactions, native/custom score agreement, father overrides, validation, and unchanged RNG |
+| `test-prevent-exogamy.R` | Restrictions on the whole pool, compatible men always found, failure/cancellation, direction/symmetry, father overrides, retained partners, and unchanged disabled RNG |
+| `test-detailed-unions.R` | Spouse-ID joins, repeated episodes, deaths, optional group types, empty tables, unchanged inputs, and name collisions |
+| `test-weighted-choice.R` | Analytical weights and delta target adjustments, binned versus exact calibration, three groups, zero/unattainable targets, incremental sums versus full rebuild, mid-run identities, strict endogamy, unmet-target detection, narrow and one-year rate bands, recorded log weights, absorbed-formula warnings, unit weights for one/no groups, both modes, fathers, restarts, diagnostics, warning, validation |
+| `test-parent-info.R` | Parent-ID joins, ages at birth, deceased/unknown parents, optional groups, empty tables, unchanged inputs, and name collisions |
 | `test-model-api.R` | Construction, replacement, schemas, history and metadata retention |
 | `test-baseline-population.R` | Reproducibility, bounds, known cases, distributions, empty populations |
+| `test-ffab.R` | Female-birth probability validation, defaults, endpoint outcomes, RNG isolation, inheritance, independent runs, and restart settings |
 | `test-processes.R` | Rate validation, typed specifications, units, spacing, edited objects |
 | `test-hazard-sampler.R` | Deterministic hazard inversion and analytical survival |
 | `test-fertility-adjustment.R` | Annual/five-year midpoint overlaps, gaps, shared sampler, feasibility, open-age rejection, independent mortality |
@@ -41,6 +65,31 @@ They include default 0.75 years and nondefault 1.13 years across restarts.
 Historical suite counts and implementation-specific timings are available in
 Git history. They are execution records, not scientific acceptance criteria.
 Set `TZ=UTC` (or the local timezone) when sandbox timezone discovery is unavailable.
+
+On October 26, 2026, after D074 replaced imbalance absorption with named
+`delta` target adjustments, `TZ=UTC Rscript -e 'devtools::test(reporter =
+"summary")'` passed without failures or test warnings; the live database test
+was skipped. Analytical checks cover the 75/25, beta -3 case with delta_B =
+0.12274682836 (AB/BA = 3, log cross-product -6), signed and common-shift
+adjustments, extreme finite values, three groups and group-stratified hazards.
+Integration checks use nonzero deltas in both initiation modes, restarts and
+separate father matching. These are software checks, not demographic acceptance.
+
+After D075 removed method selection and made `group_exogamy` symmetric,
+`TZ=UTC Rscript -e 'devtools::test(reporter = "summary")'` passed on October
+26, 2026 with no failures or test warnings; the live database test was skipped.
+Checks cover single-colon symmetric vector/table effects, rejected reverse
+pairs and old syntax, native/R utilities, separate father delta, strict
+endogamy/unit weights, both initiation modes, reproducibility and restarts.
+The accepted milestone 3 report uses the current symmetric, weighted-choice
+API and exact full-pool draws.
+
+On October 27, 2026, after D076 changed the default inheritance to
+`random_parent` with maternal fallback, `TZ=UTC Rscript -e
+'devtools::test(reporter = "summary")'` passed without failures or test warnings;
+the live database test was skipped. Checks cover default/explicit/missing-field
+equivalence, missing-father fallback, ungrouped RNG equivalence, analytical
+random-parent probabilities, and explicit maternal assignment.
 
 ## Optional live database checks
 
@@ -67,7 +116,9 @@ The current executable example is [milestone2.R](../inst/examples/milestone2.R).
 The former milestone 1 single-run and replication scripts have been removed;
 Git history retains them. Analyze simulation replications separately before
 combining summaries; replication uncertainty does not resample the observed
-input data or imply uncertainty over initial populations.
+input data. With a fixed baseline, MCSEs condition on that baseline;
+independently generated baselines per replication include baseline variability.
+The milestone 3 inheritance assessment uses the latter design.
 
 The accepted [milestone 1 report](../validation/milestone1.qmd) contains the
 user's analysis and interpretation. Reproduce it from the acceptance commit
@@ -83,9 +134,9 @@ quarto render validation/milestone1.qmd
 Rate downloads should be saved explicitly with RDS and loaded for later renders;
 record source attributes, checksums, seeds/settings, R/package versions, and
 commit plus any uncommitted code changes. CSV does not preserve provenance
-attributes. Local validation data/rendered output are Git-ignored, and the
-validation directory is excluded from package builds. Preserve completed inputs
-and evidence in a documented archive when sharing the report.
+attributes. The validation directory is excluded from package builds. Preserve
+completed report sources, rendered artifacts and inputs; some local generated
+files are Git-ignored. Use a documented archive when sharing the report.
 
 ## Accepted milestone evidence and remaining limits
 
@@ -99,9 +150,9 @@ author; no new acceptance thresholds are imposed here.
 At acceptance, the clean working tree was at commit
 `dd02ac681ca2cb3c14f98b8b73a5b0f625637445`. The local HTML artifact had SHA-256
 `66d3cb3ba35f86f44031fc1044abc594b76f967c259f1e7162ad948c46622974`.
-This identifies the inspected artifact, not an independent replication. The
-HTML and local validation data remain Git-ignored; they have not been deposited
-in an external archive as part of completion.
+This identifies the inspected artifact, not an independent replication. No
+external archive was created as part of that acceptance; preserve the artifact
+and its local input data when reproducing the historical assessment.
 
 Limitations remain: initial fertility transients, sparse oldest-age cells and
 normal-interval reliability, and fertility compensation after rate changes.
@@ -114,12 +165,12 @@ own scope; these are not outstanding conditions on the user's acceptance.
 
 | Test files | Main evidence |
 | --- | --- |
-| `test-union-formation.R`, `test-conditional-logit.R`, `test-age-gap-matching.R` | Constructors, defaults, named coefficients, analytical utilities/probabilities, native/R formula agreement and age-gap helper |
-| `test-on-demand-unions.R`, `test-union-eligibility.R`, `test-union-kinship.R` | Sampling, birth-time unions, age/kin screening, exclusivity, widowhood and restarts |
+| `test-union-formation.R`, `test-conditional-logit.R`, `test-age-gap-matching.R` | Constructors, defaults, named coefficients, analytical utilities/probabilities, exact-draw frequencies against full-pool probabilities, native/R formula agreement and age-gap helper |
+| `test-on-demand-unions.R`, `test-union-eligibility.R`, `test-union-kinship.R` | Birth-time unions, age/kin screening over the whole pool, exclusivity, widowhood and restarts |
 | `test-kinship.R` | Shared recorded-parent traversal, distance witnesses, incomplete ancestry and cycles |
 | `test-rate-unions.R`, `test-status-fertility.R` | Search hazards, retries, status-specific fertility, spacing and event invalidation |
 | `test-nonmarital-fathers.R`, `test-cancel-births.R` | Separate father matching, parentage without unions, failed-match cancellation and retry semantics |
-| `test-union-diagnostics.R` | Eligible counts, utility ranks, tied utilities, historical retention and unchanged RNG/results |
+| `test-union-diagnostics.R` | Diagnostics validation; no candidate-set columns; unchanged histories |
 
 These checks establish software behavior and analytical cases, not universal
 demographic accuracy. Use `devtools::test()` for ordinary verification, with
@@ -140,7 +191,7 @@ age-gap sensitivity, and conditional-logit recovery using 5,000 on-demand
 unions and 50 reconstructed alternatives per union. The user reports recovery
 of the generating linear/quadratic coefficients 0.072 and -0.014. Reconstruction
 uses each union's formation time, age, survival and partnership eligibility;
-it does not recover the actual sampled choice set or apply pair-specific kin
+it does not recover the actual choice set sampled at that time or apply pair-specific kin
 screening. See [matching validation](union-formation-models.md#rationale-and-matching-model-validation).
 
 ### Matching performance comparison
@@ -161,3 +212,41 @@ artifact hash or acceptance commit is recorded here. Rendering executes an HMD
 download and substantial simulations. Transition-aware compensation remains
 deferred under D045; the report examines discrepancies, but no general
 correction or guarantee of conditional ASFR recovery exists.
+
+
+## Accepted milestone 3 demographic assessment
+
+The user accepted milestone 3 as complete October 27, 2026 (D077), after
+reviewing the source and rendered report and making revisions. The accepted
+[report](../validation/milestone3.qmd) includes:
+
+- Group-stratified fertility, mortality and female union-search rates, and
+  proportional-hazard alternatives including status-specific fertility factors.
+- Weighted group matching with symmetric pair effects and delta, even/uneven
+  group-size comparisons, and wife-side conditional-logit recovery with recorded
+  log-weight offsets; demographic scenarios vary fertility, mortality and age gaps.
+- Built-in inheritance and ancestry comparisons, independent starting populations
+  in the inheritance replications, and custom assignment to an emergent AB identity.
+- Runtime comparisons for ungrouped and two-, three-, and four-group populations,
+  explicit schedules versus multipliers, and native versus custom inheritance.
+- The testthat suite executed as part of rendering; live database tests require
+  their separate explicit opt-in.
+
+The report concludes that measured behavior meets the user's expectations,
+while retaining limitations of small/imbalanced partner pools and the absence
+of marriage-squeeze feedback. Other standing limitations, including conditional
+fertility transition bias (D045), sparse exposure cells, calibration binning and
+kinship omissions, remain. No new acceptance thresholds or universal accuracy
+claims are inferred. Baseline regeneration and reducing maximum starting age
+were changed together in the inheritance assessment; their effects were not
+isolated. Earlier fixed-baseline results remain conditional on their baselines.
+
+This documentation update does not independently rerender the report, download
+rates, or rerun simulations/tests, and does not assert every review suggestion
+was implemented. The source with the revised conclusion is recorded at commit
+`7514916bb8cf0c06faef24dad7fa013304093779`. This is a source reference,
+not a final rendered-artifact hash or a report-plus-documentation acceptance
+commit. The user handles final rendering; no final HTML hash is assigned here.
+Preserve both source and HTML. Reproduction requires the input preparation and
+software environment recorded in the report; rendering installs the package,
+accesses HMD, runs substantial parallel simulations, and executes the test suite.

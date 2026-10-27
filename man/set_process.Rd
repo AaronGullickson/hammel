@@ -8,9 +8,16 @@
 \usage{
 set_process(model, process)
 
-set_mortality(model, rates)
+set_mortality(model, rates, group_prop_hazard = NULL)
 
-set_fertility(model, rates, birth_interval = 0.75)
+set_fertility(
+  model,
+  rates,
+  birth_interval = 0.75,
+  group_prop_hazard = NULL,
+  inheritance = create_group_inheritance(),
+  ffab = 0.4886
+)
 }
 \arguments{
 \item{model}{A \code{hammel_model} object.}
@@ -19,8 +26,25 @@ set_fertility(model, rates, birth_interval = 0.75)
 
 \item{rates}{An age-specific rate table passed to \code{\link[=mortality]{mortality()}} or \code{\link[=fertility]{fertility()}}.}
 
+\item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
+rate multipliers by group. Missing groups use 1.0; values are not normalized.
+Scales shared or group-specific input rates before fertility birth-spacing
+compensation. Without population groups, simulation warns and ignores it.
+Fertility also accepts a named list of vectors for \code{partnered} and/or
+\code{unpartnered} when rates include \code{union_status}; omitted statuses use 1.0.}
+
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
 defaulting to \code{0.75}. Must be finite and nonnegative.}
+
+\item{inheritance}{A group identity model from \code{\link[=create_group_inheritance]{create_group_inheritance()}},
+or a method name requiring no additional parameters: \code{"mother"}, \code{"father"},
+\code{"random_parent"}, \code{"same_sex"}, \code{"opposite_sex"}, or \code{"ancestry"}.
+Applies to fertility and defaults to selecting either parent with equal
+probability, with maternal fallback. Assignment is independent of recorded
+ancestry proportions.}
+
+\item{ffab}{Probability that a newborn is female, default \code{0.4886}.
+Must be a finite numeric scalar in \verb{[0, 1]}. Applies to fertility only.}
 }
 \value{
 An updated \code{hammel_model}. The input model is not modified.

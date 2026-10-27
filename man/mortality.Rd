@@ -5,9 +5,15 @@
 \alias{fertility}
 \title{Specify age-specific demographic rates}
 \usage{
-mortality(rates)
+mortality(rates, group_prop_hazard = NULL)
 
-fertility(rates, birth_interval = 0.75)
+fertility(
+  rates,
+  birth_interval = 0.75,
+  group_prop_hazard = NULL,
+  inheritance = create_group_inheritance(),
+  ffab = 0.4886
+)
 }
 \arguments{
 \item{rates}{A nonempty data frame containing numeric \code{age_start}, \code{age_end},
@@ -16,13 +22,38 @@ and must be finite for fertility; mortality ends may be \code{Inf}. Rates must
 be finite and nonnegative. Mortality additionally
 requires character \code{sex} values \code{"m"} and \code{"f"}, with both represented.}
 
+\item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
+rate multipliers, with unique nonempty group names. Missing groups use 1.0;
+zero suppresses the risk. Values are not normalized. At execution, multiply
+the selected input schedule by the person's group factor, including all
+sex/status strata. Fertility multiplication precedes spacing compensation.
+Without population groups, warn and ignore multipliers. Stored rate tables
+and their source metadata are unchanged; rate-table summaries use those
+stored rates, without applying population-dependent multipliers.
+Fertility with \code{union_status} rates also accepts a named list such as
+\code{list(partnered = c(A = 1.1, B = 0.9), unpartnered = c(A = 1.05))}.
+An omitted status or group uses 1.0. A single vector applies to both
+statuses (or overall fertility). Status lists require \code{union_status} rates.}
+
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
 defaulting to \code{0.75}. Must be finite and nonnegative. Applies to fertility
 only; eligible hazards use midpoint birth-spacing compensation.}
+
+\item{inheritance}{A group identity model from \code{\link[=create_group_inheritance]{create_group_inheritance()}},
+or a method name requiring no additional parameters: \code{"mother"}, \code{"father"},
+\code{"random_parent"}, \code{"same_sex"}, \code{"opposite_sex"}, or \code{"ancestry"}.
+Fertility defaults to selecting either parent with equal probability,
+with maternal fallback. Other parental, ancestry,
+hierarchy, and custom rules assign identity after child sex and ancestry
+are calculated. Possible identities are checked against grouped schedules
+and categorical matching levels before execution. Applies to fertility only.}
+
+\item{ffab}{Probability that a newborn is female, default \code{0.4886}.
+Must be a finite numeric scalar in \verb{[0, 1]}. Applies to fertility only.}
 }
 \value{
 A named list containing \code{name}, \code{rates}, and \code{rate_unit}, plus
-\code{birth_interval} for fertility, inheriting
+\code{birth_interval} and \code{ffab} for fertility, inheriting
 from \code{hammel_mortality} or \code{hammel_fertility} and \code{hammel_process}.
 }
 \description{
@@ -34,6 +65,14 @@ schedules are returned as tibbles. A \code{source} attribute on the input table
 is copied to the process's \code{source} field.
 }
 \details{
+An optional \code{group} column supplies separate schedules by nonmissing character
+label or finite numeric code. Without it, rates apply to all groups. Each
+mortality group needs both sexes, and each conditional fertility group needs
+both statuses. Overlap and fertility compensation are checked within groups.
+Simulation requires schedules for every population group. Without population
+groups, simulation warns and uses the first group alphabetically (radix order
+of character representations, including numeric codes).
+
 Mortality requires separate schedules for both sexes. Gaps and uncovered
 ages are not filled or interpreted as zero rates. Coverage and fertility
 eligibility must be specified before simulation. Calendar-time-varying

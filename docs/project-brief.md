@@ -1,8 +1,9 @@
 # Hammel project brief
 
-Updated October 19, 2026. The user accepted milestone 1 (mortality/fertility)
-on October 15, 2026 (D029), and milestone 2 (union formation) on October 19,
-2026 (D050). See [testing](testing.md) for evidence and limits.
+Updated October 27, 2026. The user accepted milestone 1 (mortality/fertility)
+on October 15, 2026 (D029), milestone 2 (union formation) on October 19,
+2026 (D050), and milestone 3 (groups) on October 27, 2026 (D077).
+See [testing](testing.md) for evidence and limits.
 
 ## Purpose
 
@@ -63,15 +64,15 @@ separate from conditional-logit matching, birth-triggered and scheduled search
 modes, initial age-difference matching, kinship screening, and partnered/unpartnered
 fertility in scheduled mode. Only death ends unions in this milestone. Parity-specific fertility is deferred
 to a later milestone.
-Candidate sampling defaults to 1000 men before pair screening (zero means the
-whole pool). Eligibility and basic fertility transitions are implemented; the
+Partners are now drawn exactly from the whole eligible pool, without a
+candidate sample (D072). Eligibility and basic fertility transitions are implemented; the
 failed-match birth cancellation is implemented (default TRUE); transition-aware fertility
 compensation remains deferred (D045), including after milestone acceptance (D050). The poor-pool wait alternative is deferred to a later milestone (D044). See [milestone 2 notes](union-formation-models.md)
 for implemented rules, deferred decisions, and validation. The on-demand C++ path now forms unions at births with formula-based
 conditional-logit selection and handles widowhood and restart histories.
 Minimum male age screening (default 15 years) and known-kin exclusion within
 two generations of each partner are implemented. `extract_kin()` shares the
-native kinship module. Exclusive ongoing unions are enforced before sampling; female rate-based searches and status-specific fertility schedules are implemented.
+native kinship module. Exclusive ongoing unions are enforced; female rate-based searches and status-specific fertility schedules are implemented.
 Overall fertility is also supported in rate mode with a warning. Previous-father
 continuity is deferred to a later milestone. The user-authored [milestone 2 report](../validation/milestone2.qmd) now includes
 USA circa 2000–2001 demographic comparisons, matching-parameter recovery, and
@@ -79,17 +80,30 @@ R formula-fallback performance comparisons (D042). The user accepted milestone 2
 as complete on October 19, 2026 (D050), retaining the documented limitations.
 Matching defaults to
 `create_age_gap_matching_model(0, 5)`, and optional union diagnostics record
-eligible sample counts and selected utility ranks.
+the applied log male-group weights on new union records (D070/D072).
 
-## Beyond milestone 2
+## Milestone 3 completion and future scope
 
-The user selected groups as milestone 3's theme: intergroup matching, baseline
-rate multipliers, flexible child group identity and possible proportional group
-ancestry. Other future priorities are analysis helpers, input-rate preparation,
-fertility heterogeneity, inherited/life-course characteristics (such as education),
-and within-run immigration with generational status. Detailed demographic rules
-are not selected. See the [roadmap](roadmap.md); milestone 2 completion does
-not authorize unspecified future demographic behavior.
+The user accepted milestone 3 as complete on October 27, 2026 (D077), after
+reviewing and revising the [validation report](../validation/milestone3.qmd).
+Implemented features include group-specific schedules and proportional hazards,
+group-stratified observations, separate ancestry proportions, symmetric pair
+preferences, calibrated weighted choice with delta target adjustments, exact
+full-pool partner selection, and built-in/custom newborn identity assignment.
+Random-parent inheritance is the default, with maternal fallback (D076).
+
+The report assesses rate and preference recovery, directional pairing under
+different demographic conditions, inheritance and custom mixed identities,
+sensitivity to starting populations, and performance. Scientific acceptance
+belongs to the user; completion does not establish universal accuracy or remove
+sparse-cell, calibration, or fertility-transition limitations. Weighted matching
+does not model marriage squeezes; fuller two-sex models remain future work.
+
+The [roadmap](roadmap.md) records proposed dissolution/remarriage, parity,
+time-varying inputs, group transitions, summaries, and migration work. No future
+feature is authorized by milestone completion. Fixed newborn assignment was
+explicitly deferred to the group-transitions discussion; custom inheritance
+already supports assignment of mixed-parent births to a specified category.
 
 ## Boundaries and future work
 

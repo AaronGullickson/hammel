@@ -9,7 +9,7 @@ No genetic relatedness coefficient, social-kin inference, or legal-marital rule.
 
 Let D(x,a) be the minimum number of recorded parent steps from person x to
 ancestor a. Include the person themself at distance zero. At configured limit G,
-exclude a sampled candidate y for woman x if any recorded common ancestor a
+exclude a candidate man y for woman x if any recorded common ancestor a
 satisfies BOTH `D(x,a) <= G` and `D(y,a) <= G`. This is a pair of generation
 bounds, not a bound on their sum or an undirected family-graph distance.
 
@@ -38,13 +38,13 @@ still screened when a mother is unknown. No detected relationship does not
 prove unrelatedness. Unrelated co-parents do not become blood kin through a
 shared child. Death does not remove an ancestor or its recorded links.
 
-Screen minimum male age and kinship AFTER sampling and BEFORE matching-model
-scoring. Do not refill the sample. If no candidate passes, birth attempts are
+The exact partner draw (D072) checks minimum male age and kinship for each
+drawn man, redrawing when he fails. If no man in the pool passes, birth attempts are
 cancelled by default (D043); `cancel_birth_if_no_match = FALSE` retains a birth
 with unknown father and no new union. Failed rate searches reschedule. Supplied existing unions are retained;
 these are restrictions on new searches, not retrospective history corrections.
 Kinship adds no minimum female age. Independently, D037 requires exclusive
-ongoing unions and removes partnered men before sampling.
+ongoing unions; partnered men are not in the available pool.
 
 ## Shared native implementation contract
 

@@ -4,7 +4,7 @@
 \alias{calculate_population_size}
 \title{Calculate the living population at time points}
 \usage{
-calculate_population_size(population, times)
+calculate_population_size(population, times, by_group = FALSE)
 }
 \arguments{
 \item{population}{A \code{hammel_population} or persons data frame representing
@@ -13,9 +13,15 @@ through every requested time.}
 
 \item{times}{A numeric vector of finite time points in years. A population
 object cannot be queried beyond its known \code{end_time}.}
+
+\item{by_group}{Logical, default \code{FALSE}. With \code{TRUE}, require a persons
+\code{group} column and count separately by group. Groups retain their input type
+and first-occurrence order within each requested time. No pooled group row
+is added. Empty histories return a typed zero-row table.}
 }
 \value{
-A tibble with \code{time} and \code{population} columns.
+A tibble with \code{time} and \code{population} columns, plus \code{group} when
+\code{by_group = TRUE}.
 }
 \description{
 Count persons with \code{birth_time <= time} and missing \code{death_time} or

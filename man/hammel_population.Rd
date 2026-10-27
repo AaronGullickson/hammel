@@ -4,7 +4,7 @@
 \alias{hammel_population}
 \title{Create a Hammel population}
 \usage{
-hammel_population(persons, unions = NULL, end_time = NULL)
+hammel_population(persons, unions = NULL, end_time = NULL, ancestry = NULL)
 }
 \arguments{
 \item{persons}{A data frame with one row per person, including deceased
@@ -17,15 +17,29 @@ frame is normalized to the union schema.}
 
 \item{end_time}{Optional finite simulation endpoint in years. Its calendar origin is supplied by the user. \code{NULL} means
 that the endpoint is unknown.}
+
+\item{ancestry}{Optional data frame with exactly one row per person, keyed
+by \code{person_id}, known shares in \verb{group_<label>} columns, and an \code{unknown}
+share. Numeric shares must be finite, between zero and one, and sum to one
+per row (tolerance \code{1e-8}). Supplied shares are preserved, with rows aligned
+to persons. Without it, grouped persons start with 100\% ancestry in their
+recorded group, regardless of parent histories. Without groups, no ancestry
+table is created automatically. Newborns average parental shares; a missing
+parent contributes its half to \code{unknown}. Identity remains separate.}
 }
 \value{
 A named list of class \code{hammel_population} with components \code{persons},
-\code{unions}, and \code{end_time}.
+\code{unions}, and \code{end_time}, plus an \code{ancestry} tibble when supplied or when
+persons has groups. Ancestry is retained across restarts and deaths.
 }
 \description{
 Collect person and union histories in an inspectable population object.
 This constructor does not run a simulation. It validates
 consistent tables against the population schema. Custom columns are retained.
+An optional \code{group} column contains nonmissing character labels or finite
+numeric codes (character labels must be nonempty). Newborns inherit their
+group from either parent with equal probability by default, with maternal fallback,
+or use fertility's configured inheritance model.
 }
 \examples{
 sim <- hammel_population(

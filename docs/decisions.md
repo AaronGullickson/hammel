@@ -26,6 +26,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Demographic extraction and function names | D020–D022 and missing-ASFR clarification |
 | Continuous execution | D024 |
 | Fertility spacing/compensation and finite age bands | D026, D028 (superseding D027's exact sampler) |
+| Two-sex union models and union API restructuring (deferred) | D073 |
 
 ## Recorded decisions
 
@@ -254,8 +255,8 @@ Missing-ASFR handling was clarified subsequently.
 
 ## D021: Automatic open-age handling in demographic summaries
 
-**Current status:** Open-age summary/TFR behavior remains current. Missing ASFR
-contributions are now omitted, as recorded in the scientific-contract clarification.
+**Current status:** Open-age summary/TFR behavior remains current. D059
+supersedes the later clarification that omitted missing ASFR contributions.
 
 - **Status:** accepted October 12, 2026.
 - **Decision:** append Inf to summary age breaks when absent. For TFR, omit open-ended age rows and use all remaining finite age bands; remove the age_range argument.
@@ -557,6 +558,8 @@ history per call. See [demographic analysis](demographic-analysis.md).
 
 ### Missing-ASFR clarification
 
+**Superseded by D059:** missing ASFRs now propagate into TFR.
+
 At the user's direction, `calculate_tfr()` sums with `na.rm = TRUE`, omitting
 missing contributions; an all-missing retained age range therefore sums to zero.
 This supersedes the earlier missing-TFR statements in D020/D021 and the
@@ -592,7 +595,7 @@ reasons are retained. This supersedes generic death labels in earlier entries.
 ## D037: Exclusive ongoing unions and pre-sampling male availability
 
 **Current status:** Implemented; D043 supersedes the referenced birth-preservation
-default.
+default, and D072 replaces candidate sampling (exclusive unions are unchanged).
 
 - **Status:** accepted by the user October 15, 2026.
 - **Decision:** require at most one ongoing union per person. Sample from living,
@@ -834,3 +837,657 @@ matching specifications override this default. Initiation mode remains explicit.
 - **Next scope:** groups remain the selected milestone 3 theme. Detailed rules
   require user decisions; milestone completion does not authorize implementation
   of unspecified mechanisms or other roadmap proposals.
+
+## D051: Distribute group support and attach inheritance to fertility
+
+- **Status:** accepted by the user October 20, 2026; design direction only,
+  not implemented functionality.
+- **Decision:** store group data in the population and configure group effects
+  in the relevant demographic processes. Group-specific schedules and
+  proportional rate effects belong with their rate processes; group effects on
+  partner selection belong with matching. Do not introduce a separate general
+  group process for milestone 3.
+- **Inheritance:** attach a distinct inheritance model object to fertility to
+  specify newborn group assignment and, if supported, ancestry inheritance.
+  Allow simple rules through character-string modes rather than a boolean,
+  with following the mother, following the father, and random assignment as
+  examples. Richer model specifications may be supported through the same
+  object, analogous to matching models.
+- **Open details:** exact constructors and mode names, random assignment rules
+  and probabilities, richer model inputs, missing-parent handling, ancestry
+  semantics, and interactions among group effects and existing schedules
+  require specification before implementation. No default inheritance rule or
+  probability is selected by this decision.
+
+
+## D052: Initial group schedules, maternal inheritance, and baseline sampling
+
+- **Status:** requested and accepted by the user October 20, 2026.
+- **Decision:** permit optional `group` columns in population persons and
+  mortality, fertility, and female union-search rate tables. Ungrouped rate
+  tables apply to all groups. Grouped tables must cover every population group;
+  the user selected an error for missing group schedules.
+- **Fallback:** without population groups, select each grouped table's first
+  group alphabetically and issue a simulation warning. Do not create population
+  group identities from that fallback. Group values accept nonmissing character
+  labels or numeric codes; finite numeric codes and nonempty labels are required.
+  Alphabetical lookup uses radix order of character representations.
+- **Births and matching:** initially inherit each newborn's group from the
+  mother automatically. Group introduces no matching barriers or utility terms.
+  This is an explicitly requested initial rule, not the deferred configurable
+  inheritance model described in D051.
+- **Initialization:** add optional named numeric `group_weights` to
+  `create_baseline_population()`. Names give groups; normalize finite nonnegative
+  weights with at least one positive weight and independently sample every
+  person's identity. A named vector is the chosen interface; omitted weights
+  preserve the existing generator and its RNG draws.
+- **Scope:** group/status-specific fertility compensation uses the existing
+  midpoint method. No group transitions, ancestry, proportional multipliers,
+  inheritance model API, or group summary extension is included. See
+  [groups](groups.md) for rules and worked validation cases.
+
+## D053: Group-specific demographic observations
+
+- **Status:** requested by the user October 20, 2026.
+- **Decision:** add optional group counts to `calculate_lexis_counts()` and
+  `calculate_population_size()`. Automatically calculate TFR and life tables
+  separately by group whenever the rate input includes a `group` column.
+- **Interface:** `by_group = FALSE` preserves pooled counting; TRUE requires
+  group data and retains a group column in the output. Group labels retain
+  their type and first-occurrence order. No extra pooled group rows are added.
+  Lexis group counts combine with existing union-status summaries.
+- **Existing attribution rules:** births follow the mother (including her
+  group), exposure and deaths follow the individual, and union formation counts
+  follow each spouse. Unknown-mother births remain in the single period-level
+  attribute; no maternal group is inferred from the child. Full histories must
+  remain available for cross-group parent and partner references.
+- **Validation:** exact exposure and event boundaries, group and union-status
+  accounting identities, analytical TFR and exponential life tables, input
+  validation, label types, empty tibbles, and unchanged pooled defaults. See
+  [groups](groups.md) and [demographic analysis](demographic-analysis.md).
+
+## D054: Group rate multipliers, including conditional fertility
+
+- **Status:** requested and specified by the user October 20, 2026.
+- **Decision:** add optional `group_prop_hazard` to mortality, fertility, and
+  rate-based union-formation constructors and setters. Named vector entries
+  multiply the selected shared or group-specific rates; missing groups use 1.0.
+  Factors are dimensionless and not normalized. Require finite nonnegative
+  factors with unique, nonmissing, nonempty group names; zero suppresses risk.
+- **Fertility order:** the user selected multiplication of input ASFRs before
+  existing midpoint birth-spacing compensation. This is equivalent to explicitly
+  scaled input group schedules, rather than scaling adjusted eligible hazards.
+- **Conditional fertility:** the user requested either a shared named vector
+  or a named list of partnered/unpartnered group vectors. The user selected
+  1.0 for an omitted status, as for an omitted group. Status lists require
+  conditional fertility input rates; a shared vector applies to both statuses
+  or to overall fertility. Mortality and search processes accept vectors only.
+- **No population groups:** the user selected a simulation warning and ignoring
+  multipliers. Existing alphabetical fallback for grouped rate tables remains
+  separate. Factors do not create groups or supply missing schedules.
+- **Execution:** scale an execution copy of input schedules before native
+  construction; retain original tables and provenance in processes. Reject
+  nonfinite effective rates or infeasible effective fertility compensation.
+  Search factors apply to women and do not modify partner utilities; on-demand
+  formation has no search hazard and rejects non-NULL multipliers.
+- **Validation and scope:** require fixed-seed equivalence to explicit schedules,
+  omitted/unit/zero factors, conditional-status defaults, no-group warnings,
+  edited-object validation, RNG preservation, restarts, and empty populations.
+  Input-rate summaries still describe stored tables; population-dependent
+  factors are applied by simulation, not those summaries. See [groups](groups.md).
+
+## D055: Track ancestry shares at birth
+
+- **Status:** requested and specified by the user October 20, 2026.
+- **Decision:** track expected group ancestry separately from assigned identity
+  in an optional `ancestry` tibble on `hammel_population`. Without supplied
+  proportions, every starting person is 100% of their recorded group, even when
+  existing parent histories are present. Otherwise retain supplied proportions.
+  No ancestry table is created automatically without population groups.
+- **Births:** each component is half the mother's share plus half the father's.
+  Missing parental contributions enter an explicit unknown share; parental
+  unknown shares transmit by the same averaging rule. Group identity still
+  follows the mother. No stochastic genetic transmission is modeled.
+- **Restarts and state:** preserve existing proportions, including deceased
+  people. Store call-local ancestry state in the engine and append at birth,
+  with no genealogy traversal or additional RNG draws. Ancestry does not yet
+  affect rates or matching.
+- **Table representation:** `person_id`, known shares named `group_<label>`,
+  and `unknown`. Require exactly one row per person, finite shares in `[0,1]`,
+  and row sums within `1e-8` of one; do not renormalize. Reference groups may
+  differ from current identity groups. Align supplied rows to person order;
+  retain supplied ancestry even without current group identities.
+- **Validation:** worked pure/mixed parents and unknown fathers, multiple
+  generations, supplied values and shuffled IDs, restarts, deaths, empty
+  populations, numeric labels, run independence, and unchanged demographic RNG
+  consumption. See [ancestry](ancestry.md).
+
+## D056: Add group effects to matching scores
+
+- **Status:** requested and specified by the user October 20, 2026.
+- **Decision:** attach optional `group_exogamy` effects to matching models, adding their
+  log-scale value after all formula terms are evaluated. Named-vector syntax
+  `A:B` means female A/male B; `A::B` supplies the same effect in both directions.
+  The user clarified that omitted pairs have odds ratio 1.0, hence zero log
+  effect. Within-group effects are allowed. Reject overlapping directed entries
+  after expansion rather than choosing precedence. A directional table supports
+  group labels containing colons.
+- **Formula interface:** expose `female_group`, `male_group`, and numeric 0/1
+  `same_group` alongside continuous male-minus-female age difference. Categorical
+  formulas use explicitly supplied `group_levels` and fixed treatment contrasts;
+  group columns and coefficients must not vary with sampled availability.
+- **Execution:** pair effects apply after either native age scoring or custom
+  formula evaluation, before softmax and diagnostic utility ranking. Both
+  initiation modes and nonmarital father choice use the applicable full matching
+  model. An explicit `father_matching` replaces general preferences for father
+  choice; NULL reuses them. Group preferences require population identities.
+- **Scope and validation:** finite utility effects change preference, not
+  eligibility or search hazards. Validate analytical probabilities, direction,
+  symmetry, factor stability and interactions, native/R agreement, father
+  overrides, ranking, errors, empty populations and unchanged RNG consumption
+  for zero effects. Multiple identities and exact group prohibitions are not
+  introduced. The user requested later diagnostic tools to flag potential
+  omissions; these remain future work. See [group matching](group-matching.md).
+
+
+## D057: Hard group exclusions after candidate sampling
+
+- **Status:** selected by the user October 20, 2026; sampling semantics superseded by D072.
+- **Decision:** add `prevent_exogamy` to matching models: FALSE by default,
+  TRUE to prohibit every different-group pairing, or a character vector of
+  cross-group pairs with female-first `:` and symmetric `::` syntax. A
+  directional table also supports labels containing colons.
+- **Sampling:** draw from the unchanged male pool, then exclude prohibited
+  pairs alongside age/kin eligibility without refilling. The user selected this
+  to preserve encounter scarcity for minorities and the same encounter frame
+  used by finite penalties. Users may increase candidate sample size.
+- **Failure and scope:** empty eligible samples use existing retry and
+  cancellation rules. Restrictions override finite scores, but do not alter
+  existing partners. The applicable matching/father model owns its restrictions;
+  NULL father matching inherits the general specification. Diagnostics count
+  and rank the final eligible set. No NA or infinite utility effects are added.
+- **Validation:** direction/symmetry, no refilling, compatible partners outside
+  an unsuccessful sample, complete exclusion, finite-penalty contrast, father
+  overrides, retained partners, diagnostics and unchanged RNG when disabled.
+  See [group matching](group-matching.md).
+
+
+## D058: Configurable newborn identity inheritance on fertility
+
+- **Status:** specified and authorized by the user October 20, 2026; maternal
+  assignment remains the explicit default when users supply no rule.
+- **Decision:** attach a `create_group_inheritance()` object to fertility.
+  Parameter-free method names may also be supplied directly as strings to
+  fertility constructors/setters, which normalize them to the same model object
+  (user requested October 20, 2026).
+  Built-ins follow mother, father, random parent (0.5/0.5), same-sex parent,
+  opposite-sex parent, known child ancestry, or a strict hierarchy of parental
+  identities. Missing required information falls back to the mother's group,
+  including missing fathers and unranked parents. Ancestry sampling conditions
+  out unknown shares and falls back to mother if entirely unknown.
+- **Hierarchy:** highest first in `order`; optional `passing` is the per-birth
+  probability of reversing the hierarchy (default zero). Equal identities or
+  missing information retain the maternal fallback. Complex hierarchies/ties
+  use custom functions.
+- **Custom rules:** receive parental groups and ancestry, child ancestry, and
+  child sex and logical `parents_in_union` at birth (including on-demand
+  formation; FALSE for nonmarital/unknown-father births); return one valid
+  identity. The union-status input was requested October 20, 2026; callbacks
+  without the new argument or `...` remain supported. Ordinary R RNG draws share the native
+  stream. Only copied inputs are exposed; functions must not mutate simulation
+  state. Errors and invalid/undeclared returns fail explicitly.
+- **Possible groups:** infer starting identities plus reference groups with
+  positive ancestry; optional `groups` adds possible outputs. Validate all
+  grouped schedules and categorical matching levels before execution, and keep
+  a fixed registry during a run. All-zero ancestry columns add no identity.
+- **Timing:** calculate sex and ancestry, assign identity, then schedule newborn
+  hazards. Assignment does not change ancestry, existing people's identities,
+  or default maternal random-number consumption. Rules are reapplied only to
+  new births, with supplied proportions retained on restart.
+- **Mixed labels:** the user explicitly noted that custom rules can assign AB
+  from A/B parents and configure independent AB rates/matching. AB identity
+  need not introduce an AB ancestry component. Multiple simultaneous identities
+  remain deferred.
+- **Validation:** all rules/fallbacks, sampling probabilities, passing endpoints,
+  custom/native RNG agreement and error restoration, future identity rate and
+  matching coverage, AB neonatal mortality and within-run matching, numeric
+  labels, empty populations, and restarts. See [group inheritance](group-inheritance.md).
+
+
+## D059: Propagate missing ASFRs into TFR
+
+- **Status:** accepted by the user October 21, 2026.
+- **Decision:** `calculate_tfr()` returns `NA` if any ASFR in the included
+  finite age bands is missing, independently within each period/group/status.
+  All-missing bands also yield `NA`; known zero rates still contribute zero.
+  Open age bands remain excluded. This supersedes omission of missing ASFR
+  contributions from TFR sums.
+- **Rationale:** sparse partnered exposure for minority-group teenagers can
+  leave age-specific rates unobserved. Summing remaining bands produced
+  incomplete TFRs that looked complete and depressed replication means.
+  Returning `NA` exposes missing information; it does not remove variability
+  from tiny positive exposures. Summaries omitting missing TFRs describe only
+  complete estimates and should report their nonmissing count.
+- **Validation:** partial/all-missing schedules, zero rates, excluded open
+  bands, and isolation across period/group/status strata.
+
+
+## D060: Configurable female fraction at birth
+
+- **Status:** requested and accepted by the user October 22, 2026.
+- **Decision:** add `ffab` to `set_fertility()` and `fertility()`, defaulting
+  to the existing 0.4886. It is a finite scalar probability in `[0, 1]`,
+  applying to every actual birth under that process. Sex precedes group
+  inheritance and newborn scheduling; existing people are unchanged.
+- **Software contract:** append the argument to preserve positional calls;
+  validate at construction, attachment, and execution. Missing fields in older
+  process objects use the original default. Preserve one uniform draw per
+  birth at all probabilities, including endpoints, and record the effective
+  setting in simulation metadata. Default seeded histories remain unchanged.
+- **Scope:** no sex-specific fertility input or group/time-varying sex
+  probabilities are introduced. This does not establish a cause for the
+  inheritance trajectories under investigation.
+
+
+## D061: Prototype sequential two-sided temporary matching markets
+
+- **Status:** experiment authorized by the user October 22, 2026; superseded
+  by D062 and removed with the two-sided method in D067.
+- **Decision:** add optional `matching_method = "two_sided"` to union formation,
+  preserving `"female_choice"` as the default. Sample M - 1 alternate living,
+  unpartnered women with the same age cutoff as ego's M eligible sampled men.
+  Uniformly reduce men if too few women exist. Do not weight alternate women
+  by demographic hazards or apply kinship to their hypothetical pairs.
+- **Procedure:** repeatedly flip a fair sex coin, uniformly draw an initiator,
+  and select their partner with the existing conditional-logit pair utilities.
+  Remove hypothetical pairs locally and stop when ego matches. Enforce hard
+  group exclusions; an alternate woman with no allowed man leaves unmatched.
+  All scores retain female-first/male-second orientation.
+- **Scope:** shared selection for unions and nonmarital fathers, preserving
+  explicit father preferences, actual eligibility, and existing event timing.
+  No hypothetical pair changes population state. The user requested runtime
+  comparisons and will assess input benchmarks using milestone 3 analyses.
+- **Specification:** `docs/two-sided-matching.md`, removed in D067; see Git
+  history.
+
+
+## D062: Fixed-pool reciprocal probabilities for the two-sided experiment
+
+- **Status:** implementation authorized by the user October 22, 2026;
+  removed by the user October 23, 2026 (D067).
+- **Decision:** supersede D061's sequential temporary depletion. Retain its
+  sampling, eligibility, shortage, hard exclusion, and father-selection rules.
+  Score the fixed market, sum ego's row-normalized partner probabilities and
+  the men's column-normalized probabilities of choosing ego, normalize, and
+  draw once. This integrates the agreed fair-coin, uniform-initiator procedure
+  with replacement until ego participates.
+- **Custom formulas:** evaluate each woman's allowed male row once, then use
+  those fixed pair utilities for both normalizations. No column-specific
+  re-evaluation of data-dependent transforms occurs.
+- **Validation:** analytical probabilities, independent rejection simulation,
+  extreme utilities, exclusions, native/R parity, actual-state invariants,
+  default compatibility, and measured timing against the previous prototype.
+- **Specification:** `docs/two-sided-matching.md`, removed in D067; see Git
+  history.
+
+
+## D063: Geometric rescaling experiment removed
+
+- **Status:** tested and removed at the user's request October 22, 2026.
+- **Experiment:** replace D062's additive probabilities with exponentiated
+  pair scores divided by the square root of their row sum times column sum,
+  then normalize across ego's male candidates. Sampling and eligibility were
+  unchanged. Fixed-matrix cross-product odds were preserved analytically.
+- **User-reported assessment:** aggregate log odds -5.79 (SE 0.0165), against
+  -6, and directional ratio 0.943 (SE 0.0140), against 1. The fixed-matrix
+  property did not establish aggregate recovery or directional balance in
+  the simulation. The user requested removal and further consideration.
+- **Current behavior:** restore D062's additive fixed-pool selection. Its
+  documented limitations remain; no replacement mechanism is accepted.
+
+## D064: Two-sided matching is the default for new specifications
+
+- **Status:** implemented at the user's request October 22, 2026; superseded
+  by D067.
+- **Decision:** default `union_formation()` and `set_union_formation()` to
+  `matching_method = "two_sided"`, using D062's existing additive fixed-pool
+  probabilities. Retain explicit `"female_choice"` and its inheritance warning.
+- **Rationale:** preliminary user-reported conditional-logit parameter recovery
+  and improved directional pairing balance support using reciprocal competition
+  by default. Aggregate log cross-products need not equal twice symmetric input
+  coefficients. This default change does not establish general scientific
+  validation; further parameter-recovery and inheritance assessment remains open.
+- **Compatibility:** new calls omitting the argument use two-sided matching and
+  may change seeded histories and runtime. Existing specifications explicitly
+  storing a method retain it; older objects without the field retain female
+  choice. Initiation hazards, birth timing, and existing unions are unchanged.
+- **Validation:** omitted and explicit two-sided matching agree in both
+  initiation modes for constructors and setters; explicit female choice agrees
+  with legacy objects. `TZ=UTC Rscript -e 'devtools::test(reporter = "summary")'`
+  passed with no failures or warnings; the opt-in live database test was skipped.
+
+## D065: Candidate sample size belongs to the matching model
+
+- **Status:** implemented at the user's request October 22, 2026; the
+  default size of 250 is superseded by 1000 in D067; `sample_size` removed in D072.
+- **Decision:** both matching-model constructors accept `sample_size = 250`.
+  Remove the argument from union formation and its setter, without a deprecated
+  alias. The user prefers direct API changes while the package is unpublished.
+- **Semantics:** sample up to this many men without replacement before screening;
+  zero uses the full pool. Both matching methods use the selected model's size.
+  A separate nonmarital father model supplies its own sample size; NULL inherits
+  the general model. This supersedes the earlier shared process-level size and
+  default 1000. Initiation hazards and score formulas are unchanged.
+- **Examples and limits:** sizes 250 for general matching and 50 for father
+  matching apply to their respective searches. Screening does not refill samples;
+  female shortage can further reduce two-sided markets. Reducing the sample
+  changes encounters and seeded outcomes, not just runtime. No scientific
+  convergence at 250 is claimed. Rebuild older specifications using the new API.
+- **Validation:** constructor/edited-object validation, screening and full-pool
+  behavior, independent union/father sample sizes, NULL inheritance, and both
+  initiation/matching modes pass. After a clean optimized native build,
+  `TZ=UTC Rscript -e 'devtools::test(reporter = "summary")'` passed with no
+  failures or warnings; the opt-in live database test was skipped. The report's
+  three explicit size-250 settings were moved into its matching models without
+  executing the report or downloading rates.
+
+## D066: Experimental weighted-choice matching
+
+- **Status:** specified with and authorized by the user October 23, 2026;
+  made the default in D067, which also supersedes its retention of two-sided
+  matching.
+- **Decision:** add `matching_method = "weighted_choice"`: female choice among
+  screened candidates, with each man's selection weight multiplied by a weight
+  for his group. Weights are recalibrated at every search, in continuous time,
+  so expected male union flows by group meet a target: each unpartnered man
+  receives the per-capita intensity of an unpartnered woman of his group
+  (crude counts at or above `min_male_age`), interpolated toward female group
+  shares by the matching model's `imbalance_absorption` (default 1).
+- **Intensity:** search hazards for rate-mode searches; unpartnered fertility,
+  zero during birth spacing, for on-demand searches. Rate-mode nonmarital
+  fathers use separate fertility-driven weights with the father model.
+- **Rationale:** female choice leaves male group flows unspecified, producing
+  directional imbalance; additive two-sided probabilities (D062) attenuate
+  preferences; per-market Sinkhorn balancing attenuated age and group effects
+  in an exploratory static analysis. Group-only weights leave the preference
+  association unchanged. Age-standardized targets and male input marriage
+  rates were not selected: they would impose a male age pattern or targets
+  women's timing cannot meet.
+- **Retained:** additive two-sided matching remains available and the default;
+  explicit female choice is unchanged. With one group the new method equals
+  female choice exactly.
+- **Consequences:** in two-group populations directed effects change weights,
+  not expected group flows; directional counts are sensitive to the sexes'
+  group composition among unpartnered people. Approximate weights are used,
+  with one warning per simulation, when no exact solution exists.
+- **Specification:** [weighted-choice matching](weighted-choice-matching.md).
+- **Validation:** see that document; the full suite passed after
+  implementation. This also records the user's October 23 clarification that
+  candidate `sample_size` is a speed shortcut, not an encounter model, which
+  qualifies the encounter-scarcity rationale recorded under D057.
+
+## D067: Weighted choice is the default; two-sided matching removed
+
+- **Status:** decided and requested by the user October 23, 2026, after
+  reviewing the replicated results recorded in
+  [weighted-choice matching](weighted-choice-matching.md).
+- **Decision:** `union_formation()` and `set_union_formation()` default to
+  `matching_method = "weighted_choice"`, and both matching-model constructors
+  default to `sample_size = 1000`. Remove the additive two-sided method
+  (D061/D062/D064) entirely: its engine code, inspection functions, tests,
+  specification, and benchmark scripts and results. Explicit
+  `"female_choice"` remains available; older objects without a method field
+  retain it. Objects storing `"two_sided"` are rejected with an instruction to
+  rebuild, following the user's preference for direct API changes while the
+  package is unpublished.
+- **Rationale:** the user judged two-sided matching a dead end: its additive
+  probabilities attenuate the input association. Weighted choice balanced
+  directional pairing and recovered preferences in the user's runs. A
+  250-man sample attenuated pooled associations under both remaining methods;
+  1000 removed most of this at modest cost for weighted choice.
+- **Consequences:** default seeded histories change. With hard exclusions that
+  leave a male group unreachable, the default now warns that male-group
+  targets could not be met. The milestone 3 report's chunk using
+  `matching_method = "two_sided"` must be changed by the user.
+- **Validation:** full suite passed with no failures or warnings; the opt-in
+  live database test was skipped. See [testing](testing.md).
+
+## D068: Matching method belongs to the matching model
+
+- **Status:** requested by the user October 23, 2026.
+- **Decision:** move `matching_method` from `union_formation()` and
+  `set_union_formation()` to `create_matching_model()` and
+  `create_age_gap_matching_model()`, defaulting to `"weighted_choice"`. A
+  separate `father_matching` model applies its own method; NULL inherits the
+  general model's method, as for `sample_size` (D065) and
+  `imbalance_absorption`.
+- **Rationale:** the method describes how a matching model turns utilities
+  into choices, not how unions are initiated. It sits with the other
+  matching-model settings and allows, for example, weighted unions with
+  female-choice nonmarital fathers.
+- **No legacy handling:** at the user's direction, there are no compatibility
+  checks while the package is unpublished. Matching models lacking
+  `matching_method` or `imbalance_absorption` fail ordinary validation; a
+  `matching_method` field left on an old union process is ignored. The earlier
+  rule that process objects without a method retain female choice is removed.
+- **Engine:** the calibrator is built when either model is weighted in a
+  grouped population; each search applies weights only if its own model is
+  weighted.
+- **Validation:** constructor defaults and validation, removal of the union
+  argument, NULL father inheritance of the method, and mixed union/father
+  methods; the full suite passed with no failures or warnings, the live
+  database test skipped. The milestone 3 report's chunks passing
+  `matching_method` to `set_union_formation()` must be updated by the user.
+
+## D069: Advisory warnings for matching-method interactions
+
+- **Status:** requested by the user October 23, 2026.
+- **Weighted choice and directed effects:** constructing a weighted-choice
+  matching model warns once when `group_exogamy` contains directed pairs whose
+  two directions differ (including one-sided entries) or the formula uses
+  `male_group`. Weighted choice pins male group flows, so with two groups only
+  each pair's sum affects pairing, directed effects are partly reflected with
+  more groups, and `male_group` main effects are absorbed entirely. Symmetric,
+  equal-valued, within-group, and `same_group` terms do not warn.
+- **Female choice and inheritance:** a model with fertility, union formation,
+  and a population of at least two groups warns when a female-choice union or
+  father model is combined with the `mother`, `father`, `same_sex`, or
+  `opposite_sex` inheritance rule. The user proposed warning for every built-in
+  rule except `random_parent`; `ancestry` and `hierarchy` were excluded because
+  they treat mother and father symmetrically, so directional imbalance does
+  not change their outcomes. Custom rules are not checked. The check runs in
+  `set_process()` and `set_population()`, so it fires while building a model;
+  `simulate()` re-validates without repeating it.
+- **Validation:** warning and silent cases for both checks, each setter path,
+  father-only female choice, and no repetition at simulation; tests that
+  intentionally combine these settings silence only the relevant warning. The
+  full suite passed with no failures or warnings, the live database test
+  skipped.
+
+## D070: Weighted-choice refinements: strict endogamy and weight diagnostics
+
+- **Status:** requested by the user October 23, 2026.
+- **Strict endogamy:** a matching model with `prevent_exogamy = TRUE` skips
+  weighted-choice calibration, because a group weight cannot change a choice
+  among same-group candidates. It reproduces female choice exactly and no
+  longer raises target warnings for unreachable groups. Partial restrictions
+  still calibrate.
+- **Diagnostics:** with `diagnostics = TRUE`, a weighted general matching
+  model in a grouped population records `.log_weight_<group>` on new unions:
+  the applied log group weights (reference group 0; unweighted searches 0;
+  earlier rows NA). These serve as exact conditional-logit offsets.
+- **Coverage:** weighted choice with identities created during a run (custom
+  AB inheritance), previously tested only under female choice after D069, is
+  now tested directly, including a male group with no counted women.
+- **Validation:** full suite passed with no failures or warnings; the live
+  database test skipped.
+
+## D071: Weighted-choice calibration accuracy fixes
+
+- **Status:** accepted by the user October 23, 2026, after an external
+  review (Codex) reported two issues, both reproduced here.
+- **Unmet targets reported as success:** women whose only allowed men belonged
+  to zero-target groups (log weight -1000, underflowing to zero) dropped out
+  of the solve and final flows, so an impossible target was reported as met.
+  Final flows are now computed in log space including those women, and any
+  miss above 1e-8 marks the search approximate, triggering the warning.
+  Actual partner selection was already correct.
+- **Narrow rate bands:** bin intensities used the hazard at each bin's centre
+  age, so a band narrower than a quarter-year bin could be missed, silently
+  returning unit weights. Intensities now average the hazard over each bin's
+  age span. The whole-bin age cutoff and bin-centre pair utilities remain
+  documented approximations; measured sensitivity is in the specification.
+- **Validation:** both reported cases added as tests (the impossible target is
+  flagged; a 0.05-year band at a woman's age gives the analytical weight), plus
+  one-year bands against an exact person-level reference. Full suite passed
+  with no failures or warnings; the live database test skipped.
+
+## D072: Exact full-pool partner draws replace candidate sampling
+
+- **Status:** decided by the user October 23, 2026, after a prototype
+  benchmark and accuracy checks.
+- **Decision:** remove candidate sampling. Every partner and nonmarital father
+  search draws exactly from conditional-logit choice over all eligible men, for
+  both matching methods (female choice uses zero group weights). Remove
+  `sample_size` and its sampling code and test hooks, and remove the
+  `.n_eligible` and `.utility_rank` diagnostics; `.log_weight_<group>`
+  remains. Nonmarital fathers use the same draw with the father model's
+  settings.
+- **Method:** unpartnered men are kept in cells by group and quarter-year birth
+  bin. A cell is chosen in proportion to its size times the largest weight any
+  member could have for the woman, a member uniformly, and he is accepted with
+  probability exp(U - that maximum); only he is screened for age and kinship.
+  Rejection sampling makes the result exact; after 200 rejections the eligible
+  pool is enumerated. The native age model's within-bin maximum is exact.
+  Custom R formulas are bounded on a 1/32-year grid (accepted by the user for
+  now); bound violations are counted and warned about.
+- **Rationale:** the user's runs showed a 250-man sample attenuated pooled
+  associations; sampling was only a speed shortcut, so exact draws give the
+  intended model without a size to tune. A prototype matched exact full-pool
+  probabilities in frozen-pool tests and full-pool sampling over 40 seeds.
+- **Consequences:** a search fails only when no eligible man exists in the
+  whole pool; this supersedes the sample-then-screen semantics of D037 and
+  D057, the encounter-scarcity rationale, and D065/D067's sample sizes.
+  Seeded histories change. Random-number use depends on how steeply utility
+  varies within a bin. The user noted possible future options for a minimum
+  match threshold or a woman cancelling her search; none is implemented.
+- **Performance:** optimized builds, one seed: female choice 0.10 s and
+  weighted choice 0.25 s for 20,000 persons over 50 years (0.30 s and 0.47 s
+  with 1,000-man samples); 0.39 s and 1.12 s for 50,000 persons over 100 years
+  (1.39 s and 2.18 s before).
+- **Validation:** full suite passed with no failures or warnings; the live
+  database test skipped.
+
+## D073: Keep current union formation; defer two-sex models and API restructuring
+
+- **Status:** decided by the user October 24, 2026.
+- **Decision:** keep weighted-choice matching for the current milestone. Do
+  not add user-specified directional (gender-asymmetric) intermarriage ratios,
+  male-group union propensities or directional ratio targets to weighted
+  choice; users who need gender-asymmetric intermarriage should be served by a
+  future, fuller harmonic-mean approach. Leave the `union_formation()` and
+  `set_union_formation()` API unchanged until a single working implementation
+  incorporates all union-formation components.
+- **Rationale:** with balanced sexes, weighted choice forces equal directional
+  counts (AB - BA equals the difference between male and female group shares),
+  so asymmetry would require changing male-group targets, and female timing
+  still could not respond to male availability (no marriage squeeze). The user
+  distinguished models whose union event is independent of matching, which
+  preserve input rates, from full two-sex models, which allow composition
+  feedback without necessarily preserving rates. Cohabitation and nonmarital
+  father selection must be designed consistently with any two-sex model, so
+  restructuring the API now would be premature.
+- **Future work, not authorized:** a participation function giving the
+  probability that a woman forms a union under current market conditions; a
+  Schoen harmonic-mean model, possibly modified along Dagsvik's lines; possibly
+  Choo–Siow; a loose translation from log odds ratios to harmonic-mean
+  parameters; a union-model abstraction for `set_union_formation()`.
+- **Evidence:** discussion notes and calculations in
+  [two-sex union models](two-sex-union-models.md). No code changed.
+
+
+## D074: Replace imbalance absorption with male target adjustments
+
+- **Status:** accepted by the user October 26, 2026.
+- **Decision:** remove `imbalance_absorption` from matching constructors and
+  execution. Always use the mirrored male baseline (formerly kappa = 1), then
+  normalize baseline[g] * exp(delta[g]). Expose `delta` as a named finite
+  numeric vector, omitted groups zero, on each matching model, including
+  separate father models. Zero adjustments retain the previous default.
+- **Rationale:** kappa cannot tune direction when female and mirrored male
+  shares match. Delta can represent systematic directional differences while
+  preserving static group-only cross-products. It does not guarantee a
+  pair-specific ratio or change female event timing.
+- **Supersession:** replaces D066's target interpolation and D068's absorption
+  argument, and supersedes D073's deferral of male-group propensities only.
+  Full two-sex models and participation feedback remain deferred.
+- **Specification:** [weighted-choice matching](weighted-choice-matching.md).
+
+
+## D075: One matching mechanism and symmetric group-pair effects
+
+- **Status:** accepted by the user October 26, 2026.
+- **Decision:** remove `matching_method` and explicit female-choice execution.
+  All partner and father matching uses calibrated male-group weights with
+  `delta` target adjustments (D074). Preserve unit-weight shortcuts for one/no
+  groups and strict endogamy, where group weights cannot affect selection.
+- **Pair effects:** `group_exogamy = c("A:B" = beta)` applies beta in both
+  directions. Reject `::` syntax and repeated unordered pairs, even if their
+  values agree. A pair table retains `female_group`, `male_group`, `log_odds`
+  columns, but each row now specifies an unordered pair and expands both ways;
+  within-group entries expand once. Directed pair effects are removed.
+- **Scope:** formula predictors and hard eligibility restrictions retain their
+  existing contracts; directional hard exclusions are not preference effects.
+  Separate father models retain their own preferences, restrictions and delta.
+  No event timing, rates, inheritance, or demographic acceptance changes.
+- **Validation:** symmetric vector/table expansion, reverse-pair rejection,
+  native/R score agreement, unchanged delta analytical cases, both initiation
+  modes, father overrides, strict endogamy and RNG/restart invariants.
+- **Supersession:** replaces D068's method selection and D069's directed-pair
+  warning; symmetric pair effects replace D056's directed utility interface.
+
+
+## D076: Default to random-parent group inheritance
+
+- **Status:** accepted by the user October 27, 2026.
+- **Decision:** default newborn identity inheritance to `random_parent`, selecting
+  either parent's group with equal probability. Retain maternal fallback when
+  the father is unknown. Equal parental identities and fallback cases consume
+  no identity draw. Explicit `mother` remains available.
+- **Rationale:** the user selected the default after assessing inheritance
+  scenarios and sensitivity to shared starting populations. This choice does
+  not establish that random-parent inheritance eliminates baseline sensitivity.
+- **Compatibility:** missing inheritance fields use the new default; stored
+  explicit maternal rules remain maternal. Ungrouped simulations remain valid
+  and consume no additional identity draws. Grouped default histories can change.
+- **Specification:** [group inheritance](group-inheritance.md).
+
+
+## D077: Milestone 3 accepted as complete
+
+- **Status:** accepted by the user October 27, 2026, following report review,
+  user revisions and a closing request while the user rerenders the report.
+- **Decision:** close milestone 3 (groups), based on the user's assessment in
+  [milestone3.qmd](../validation/milestone3.qmd). Scope includes group-specific
+  schedules and multipliers, group observations, ancestry, weighted matching
+  with symmetric pair preferences and delta, exact full-pool draws, and
+  built-in/custom newborn inheritance, including emergent mixed identities.
+- **Evidence:** the report assesses rates, matching preferences and directional
+  ratios, inheritance and baseline sensitivity, custom probabilities, performance,
+  and the test suite. The user's conclusion is that measured behavior meets
+  expectations while computation remains fast. This documentation update is
+  not an independent rerun or a claim that every review suggestion was applied.
+- **Retained limitations:** small or imbalanced available pools can produce
+  unexpected directional ratios; delta does not fix pairwise ratios over time.
+  Calibration uses age bins and omits kinship; pooled cross-products need not
+  exactly equal group-only benchmarks. No marriage-squeeze feedback is present.
+  Fertility-transition bias (D045), sparse exposure and baseline sensitivity
+  remain documented. No new scientific acceptance thresholds are adopted.
+- **Next scope:** proposed dissolution/remarriage and full two-sex models remain
+  future work, requiring explicit specifications and user decisions. Fixed newborn
+  assignment is deferred to group transitions; mixed-parent assignment to a
+  chosen category remains possible through custom inheritance. No fixed method
+  is implemented or selected. Completion does not authorize future features.
+- **Provenance:** revised conclusion at source commit
+  `7514916bb8cf0c06faef24dad7fa013304093779`; final rendering is handled by the
+  user. No final HTML hash or combined acceptance commit is assigned here.

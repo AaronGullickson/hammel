@@ -8,7 +8,8 @@ create_baseline_population(
   size,
   max_age = 70,
   end_time = 0,
-  female_probability = 0.5
+  female_probability = 0.5,
+  group_weights = NULL
 )
 }
 \arguments{
@@ -21,6 +22,12 @@ minus the sampled ages. Defaults to a relative time origin of zero.}
 
 \item{female_probability}{Probability of assigning sex "f" (female).
 The other sex value is "m" (male). This does not enforce exact proportions.}
+
+\item{group_weights}{Optional named numeric vector of nonnegative, finite
+weights with at least one positive value. Unique, nonempty names give group
+labels. Weights are normalized and each person's group is sampled
+independently of age and sex. Realized group counts are random. \code{NULL}
+(the default) adds no group column and consumes no extra random draws.}
 }
 \value{
 A validated \code{hammel_population} object.

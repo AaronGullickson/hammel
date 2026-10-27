@@ -1,0 +1,2418 @@
+---
+title: "Hammel: Milestone 3 Validation"
+author: "Aaron Gullickson"
+date: today
+format:
+  html:
+    toc: true
+    toc-expand: 1
+    toc-depth: 4
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    self-contained: true
+execute:
+  eval: true
+  echo: true
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: setup
+#| eval: true
+#| include: false
+
+
+library(here)
+# installing will lead to faster computation
+devtools::install(here::here())
+library(hammel)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(purrr)
+library(tibble)
+library(stringr)
+library(ggplot2)
+library(gt)
+library(survival)
+library(modelsummary)
+library(furrr)
+```
+
+```{r}
+#| label: set-up-parallel-processing
+
+future::plan(future::multicore, workers = 4)
+```
+
+
+
+```{r}
+#| label: create-functions
+
+get_eligible_partners <- function(mar_time, pop, ego_spouse) {
+  ego_spouse <- match.arg(ego_spouse, c("wife", "husband"))
+
+  opposite_sex <- if (ego_spouse == "wife") "m" else "f"
+  partner_id <- if (ego_spouse == "wife") "husband_id" else "wife_id"
+
+  current_spouses <- pop$unions |>
+    filter(
+      start_time < .env$mar_time,
+      is.na(end_time) | end_time > .env$mar_time
+    ) |>
+    pull(all_of(partner_id)) |>
+    unique()
+
+  pop$persons |>
+    filter(
+      sex == .env$opposite_sex,
+      is.na(death_time) | death_time > .env$mar_time,
+      .env$mar_time - birth_time >= 15,
+      !(person_id %in% .env$current_spouses)
+    )
+}
+
+construct_choice_set <- function(union_real, population, ego_spouse, set_size) {
+  ego_spouse <- match.arg(ego_spouse, c("wife", "husband"))
+  suffix <- if (ego_spouse == "wife") "h" else "w"
+
+  partner_id <- if (ego_spouse == "wife") "husband_id" else "wife_id"
+  partner_birth <- paste0("birth_time_", suffix)
+  partner_group <- paste0("group_", suffix)
+
+  # draw candidates
+  candidates <- get_eligible_partners(
+    union_real$start_time, population, ego_spouse
+  ) |>
+    filter(person_id != .env$union_real[[partner_id]]) |>
+    slice_sample(n = set_size)
+
+  # Copy ego's information, then substitute each alternate partner.
+  unions_fake <- union_real[rep(1L, nrow(candidates)), ]
+  unions_fake[[partner_id]] <- candidates$person_id
+  unions_fake[[partner_birth]] <- candidates$birth_time
+  unions_fake[[partner_group]] <- candidates$group
+  unions_fake$chosen <- FALSE
+
+  bind_rows(union_real, unions_fake) |>
+    mutate(ego_spouse = .env$ego_spouse)
+}
+
+construct_choice_sets <- function(population, sample_size, set_size) {
+
+  # draw the sample
+  union_sample <- population |>
+    get_detailed_unions() |>
+    slice_sample(n = sample_size) |>
+    mutate(
+      chosen = TRUE
+    )
+
+  # half the choice sets are from wives and half from husbands
+  choice_sets <- map(seq_len(nrow(union_sample)), function(i) {
+    #ego_spouse <- if (i <= nrow(union_sample) %/% 2) "wife" else "husband"
+    # the results will be correct for women
+    ego_spouse <- "wife"
+    construct_choice_set(union_sample[i, ], population, ego_spouse, set_size)
+  }) |>
+    bind_rows()
+
+  return(choice_sets)
+}
+```
+
+## Purpose and completion criteria
+
+
+Assess whether the current simulation successfully handles multiple groups, including rates stratified by groups, intergroup union formation, and inheritance rules for the children of parents belonging to different groups.
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| Fertility, mortality, and union-search rates | Group specific output rates versus supplied schedules or multiplied input rates | Group specific output rates should match closely to input rates, adjusting for sampling variability |
+| Group matching | Log odds ratios of observed data to input `group_exogamy` values | Specified input values should be half the output log odds ratios between groups  |
+| Gender ratio in group matching | Observed gender ratio of intergroup unions to unity | When not using a `delta` parameter, ratio should be statistically equivalent to one; when using `delta`, the ratio should not be one and the direction should be consistent with `delta` |
+| Conditional logit parameters | Conditional logit model with .log-weight offset to matching model input | Model results should be statistically equivalent to the matching model input for all parameters (age and group exogamy) |
+| Group inheritance | Share of groups at end of simulation and proportion of cross-group ancestry | Results should match expectations for each inheritance method |
+| Custom inheritance | Probability of identity assignment by custom function parameters used | Probability should match the expectations of the custom inheritance method | 
+| Accounting and implementation | Existing tests | Successful unit tests |
+
+## Overview of Design
+
+Groups are intended to capture an immutable group identity that is assigned at birth (e.g. race, ethnicity), not characteristics that can change over time, although a later goal is to allow some ability to transition between groups. The goal of this milestone is to allow for the following:
+
+- Ability to specify different rate schedules for fertility, mortality, and marriage by group.
+- Allow users to control the degree of group exogamy allowed by gender symmetric and gender specific pairings.
+- Allow users to control inheritance rules for children born to parents of different groups, including custom R functions using exposed variables.
+
+Group dynamics are not defined by a separate process, but rather are inferred from other elements in the simulation. To use groups, the initial population must include a `group` column. The names of the groups will be taken from this column. How groups affect rate schedules, exogamy, and inheritance is determined by arguments that belong to each relevant process. 
+
+This milestone distinguishes between **group identity** and **group ancestry** and both are tracked. **Group identity** is the currently assigned group of the person and affects their rate schedules and marriage choices. **Group ancestry** is the share of a person's ancestry that comes from each group and is also tracked in a separate `ancestry` tibble that is now part of the simulation output in `hammel_population` when groups are specified. 
+
+The simulation makes no special accommodation for mixed group identity (e.g. person identifies with both groups A and B) but it is possible for users to accommodate such mixed groups by specifying a specific mixed group (e.g. "AB") and using a custom function to control how inheritance assigns some births to that group (as explained below).
+
+### Group-specific rates
+
+Group-specific rates can be defined in one of two ways. The first route is to supply rate objects that are stratified by group. These should include a `group` column that gives the appropriate age-specific rate for every group in the simulation. Hammel will recognize these as group-related and assign them to the correct group. If the rates input into a process are not stratified by group, then Hammel will use the same rates for each group. Users can mix and match these to, for example, provide shared mortality rates but group-specific fertility and marriage rates.
+
+Using group stratified rate schedule provides the user a great deal of control over the simulation, but also requires more demanding data and preparation. An alternative is to provide a general rate schedule and specify proportional hazard ratios for each group. The specific rates for each group will be derived by multiplying the base rate provided by the hazard ratio. So to increase, the mortality rates of group B compared to group A by 5%, the user could do:
+
+```r
+hammel_model() |>
+  set_population(population) |>
+  set_mortality(rates = mortality_rates, group_prop_hazard = c("B" = 1.05))
+```
+
+The `group_prop_hazard` function takes a named vector where the names correspond to groups. Groups left out are given an implicit 1.0 multiplier. 
+
+The `group_prop_hazard` function can be used for all rate processes. For fertility processes where partnered and unpartnered fertility rates are both specified, the format is a little different and should correspond to a named list of "partnered" and "unpartnered" each containing a named vector. For example, 
+
+```r
+hammel_model() |>
+  set_population(poulation) |>
+  set_fertility(
+    rates = rates_by_union_status, 
+    group_prop_hazard = list(
+      "partnered" = c("A" = 1.1, "B" = 0.9),
+      "unpartnered" = c("A" = 1.05, "B" = 0.95)
+    )
+  )
+```
+
+### Group matching
+
+Initially, the plan was to define exogamy parameters for each group pairing for the conditional logit model that controls matching, with the intuition that an exogamy parameter of $\beta$ could roughly be benchmarked to a log odds ratio for the groups of $2\beta$. Additionally, the idea was to also allow directional effects by gender. However, detailed investigation revealed that the female sided nature of the conditional logit model formulation produced results inconsistent with expectation. Namely, even when the group distribution was the same within gender, a single symmetric $\beta$ would produce gender imbalance in AB vs BA union types.
+
+The solution to this problem was to use a weighted choice approach in which male-group specific weights are applied to the probabilities to reproduce the expectation of symmetry when group distribution is the same within gender. However, this approach has two limitations:
+
+- It does not allow for directed effects by gender that would lead to different ratios of intergroup unions by gender.
+- When there is a gender imbalance in group share (e.g. from mortality differences by sex and group), this can result in large gender imbalances.
+
+To allow users to adjust results for either of these issues, we include a group specific $\delta$ tuning parameter that allows for adjustment of those ratios. Implicitly this parameter indicates the degree to which husbands from the given group are preferred relative to wives. $\delta = 0$ means equal preference and no adjustment (the default), while a $\delta > 0$ indicates a preference for husbands over wives, and $\delta < 0$ indicates a preference for wives over husbands.
+
+Users can specify the $\beta$ and $\delta$ parameters with the `group_exogamy` and `delta` arguments respectively. The `group_exogamy` argument takes a named vector of pairwise $\beta$ parameters where each name should equal the two group names separated by a `:`. So, 
+
+```r
+create_age_gap_matching_model(
+  0, 5,
+  group_exogamy = c("A:B" = -5, "A:C" = -0.5, "B:C" = -2)
+)
+```
+
+Would give all of the pairwise $\beta$ values for a three group simulation with groups A, B, and C. As a benchmark, the values provided here will generally produce $2\beta$ for the corresponding log cross-product of the paired groups from the contingency table of husband's group by wife's group.
+
+The `delta` parameter is a named vector of each group. So, 
+
+
+```r
+create_age_gap_matching_model(
+  0, 5,
+  group_exogamy = c("A:B" = -5, "A:C" = -0.5, "B:C" = -2),
+  delta = c("B" = 0.2, "C" = -0.2)
+)
+```
+
+will produce a preference for B husbands over B wives and C will do the reverse. The exact ratios vary by $\beta$ and group size, and age distribution so will need to be tuned in test simulations by users. Note also that the $\delta$ parameter is specific to a single group but not a pairing.
+
+Future plans include the creation of a full two-sex model that will allow users more direct control over a variety of these parameters, but the current approach allows us to keep the computationally cheap conditional logit approach. Under unusual situations of disparity in group size by gender, the simulations may produce unexpected results as they do not fully account for potential "marriage squeezes" in either direction.
+
+The section below provides a detailed mathematical justification for the use of the weighted approach and details on how it was implemented in the simulation. 
+
+
+#### Technical description of the weighted choice approach
+
+Imagine a population of A and B individuals where A is 75% of the population and B is 25% of the population and everyone is married at once in a large "marriage jubilee." Lets assume that there was no group-specific preference for marriage partners. We would expect the distribution of couple types by group to match that shown in @tbl-crosstab-simple.
+
+
+|              | Husband Group A | Husband Group B |
+|--------------|-----------------|-----------------|
+| Wife Group A | (0.75)(0.75)    | (0.75)(0.25)    |
+| Wife Group B | (0.25)(0.75)    | (0.25)(0.25)    |
+
+: Joint distribution of unions by wife's group and husband's group when group does not determine choice and where group A is 75% of the population and group B is 25% {#tbl-crosstab-simple}
+
+Now lets assume a conditional logit process where women choose from among available men with a log-odds discount of $\beta$ (where $\beta$ < 0) such that if she was comparing one man from the same group and one man from the other group the probability of an endogamous choice would be $1/(1+e^{\beta})$ and the probability of an exogamous choice would be $e^{\beta}/(1+e^{\beta})$. Considering that the woman will be presented with different distributions of men by group, the overall probabilities need to be adjusted by group size:
+
+$$P(\text{A woman chooses A man}) = \frac{0.75}{0.75 + 0.25e^{\beta}} =  \frac{0.75}{D_A}$$ 
+$$P(\text{A woman chooses B man}) = \frac{0.25e^{\beta}}{0.75 + 0.25e^{\beta}} = \frac{0.25e^{\beta}}{D_A}$$
+$$P(\text{B woman chooses A man}) = \frac{0.75e^{\beta}}{0.25 + 0.75e^{\beta}} =  \frac{0.75e^{\beta}}{D_B}$$ 
+$$P(\text{B woman chooses B man}) = \frac{0.25}{0.25 + 0.75e^{\beta}} = \frac{0.25}{D_B}$$
+
+Where, $D_A = 0.75 + 0.25 e^{\beta}$ and $D_B =  0.25 + 0.75e^{\beta}$. These denominators represent the sum of all of the exponentiated utilities for a given woman (i.e. the overall attractiveness of her pool) which is used to normalize the probabilities for each type of woman across partner choices. 
+
+To get the value of each cell in the table correct we then multiply by the row share of A and B women as shown in @tbl-crosstab-clogit.
+
+
+|              |   Husband Group A                | Husband Group B               |
+|--------------|----------------------------------|-------------------------------|
+| Wife Group A | $(0.75)(0.75) / D_A$             | $(0.75)(0.25)e^{\beta} / D_A$ |
+| Wife Group B | $(0.25)(0.75)e^{\beta} / D_B$    | $(0.25)(0.25) / D_B$          |
+
+: Joint distribution of unions by wife's group and husband's group under a conditional logit model with group endogamy {#tbl-crosstab-clogit}
+
+The inverse cross product of @tbl-crosstab-clogit gives us the association odds ratio often used in assortative mating studies:
+
+$$\frac{(0.25)(0.75)e^{\beta}D_B^{-1}(0.75)(0.25)e^{\beta}D_A^{-1}}{(0.75)(0.75)D_A^{-1}(0.25)(0.25)D_B^{-1}} = e^{2\beta}$$
+
+Everything cancels out except for the $\beta$ values. The log cross product is thus $2\beta$ which is consistent with conditional logit model estimates typically around half the log-odds ratio in empirical data. If we set $\beta = 0$ here, then $D_A = 1$ and $D_B = 1$ and @tbl-crosstab-clogit simplifies to @tbl-crosstab-simple.  
+
+We can generalize this approach by setting $F_i$ and $M_j$ as the share of women and men respectively belonging to a certain group (0.75 and 0.25 for groups A and B, respectively, in the example above) and setting utility $U_{ij}$ as:
+
+$$
+U_{ij} =
+\begin{cases}
+0 & \text{if } i = j \\
+\beta & \text{if } i \neq j
+\end{cases}
+$$
+
+Then, the value of $N_{ij}$ in cell $ij$ is given by:
+
+$$N_{ij} = F_i \cdot \frac{M_j e^{U_{ij}}}{D_i}, \qquad D_i = \sum_k M_k e^{U_{ik}}$$
+
+Although the overall log-odds ratio matches expectation here, the AB and BA cells are not balanced despite gender balance within each group:
+
+$$\frac{N_{AB}}{N_{BA}} = \frac{(0.75)(0.25)e^{\beta}D_A^{-1}}{(0.25)(0.75)e^{\beta}D_B^{-1}} = \frac{D_B}{D_A} = \frac{0.25 + 0.75e^{\beta}}{0.75 + 0.25 e^{\beta}}$$
+
+This ratio can be substantially different from one. For example, at $\beta = -3$, the ratio is 0.377 AB unions for every one BA union. Given that the model here assumes that the exogamy parameter is symmetric with regard to sex, this discrepancy is large. 
+
+The row marginals will add up to the overall distribution for women:
+
+$$N_{A+} = \frac{(0.75)(0.75)+(0.75)(0.25)e^{\beta}}{0.75 + 0.25 e^{\beta}} = \frac{(0.75)(0.75 + 0.25e^{\beta})}{0.75 + 0.25 e^{\beta}} = 0.75$$
+$$N_{B+} = \frac{(0.25)(0.25) + (0.25)(0.75)e^{\beta}}{0.25 + 0.75e^{\beta}} = \frac{(0.25)(0.25 + 0.75e^{\beta})}{0.25 + 0.75e^{\beta}} = 0.25$$
+
+However, the column margins will not add up in the same way for men, because the two cells on each column do not share a single denominator. For example, in the case with $\beta = -3$, group B men will only make up 0.2298 of husbands as opposed to the 0.25 for women. 
+
+The underlying issue is that because women drive the choices we don't observe a symmetric process. If we switched to having men do the choosing, we would observe the same issues but in the reverse direction.
+
+Its will be helpful to note how this approach compares to the typically log-linear formulation:
+
+
+|              |   Husband Group A                | Husband Group B               |
+|--------------|----------------------------------|-------------------------------|
+| Wife Group A | $r_Ac_A$                         | $r_Ac_Be^{\beta}$             |
+| Wife Group B | $r_Bc_Ae^{\beta}$                | $r_Bc_B$                      |
+
+: Log-linear formulation of the cross-tabulation of wife's group and husband's group {#tbl-log-linear}
+
+Where $r_i$ and $c_i$ are row and column scores estimated to ensure the correct marginal distributions. This approach will produce the same $\beta$ value and when the male and female group distributions are the same it will also produce $N_{AB} = N_{BA}$. We can reproduce this approach directly while maintaining the conditional logit model method by applying a group-specific weight to each man.
+
+Intuitively, these weight act like a "price adjustment" to modify the attractiveness of group B men so their column share matches the desired 25%. It does not modify the odds ratio but rather just the ratio of $N_{AB}$ to $N_{BA}$. 
+
+With weights $\omega_j$ on men of group $j$, we can modify the previous formula for the cell counts to:
+
+$$N_{ij} = F_i \cdot \frac{\omega_j M_j e^{U_{ij}}}{D_i}, \qquad D_i = \sum_k \omega_k M_k e^{U_{ik}}$$
+
+A slight reformulation here gives us:
+
+$$N_{ij} = \frac{F_i}{D_i} \cdot \omega_j M_j \cdot e^{U_{ij}}$$
+
+This is exactly the log-linear form $r_i c_j e^{U_{ij}}$, with
+
+$$r_i = \frac{F_i}{D_i}, \qquad c_j = \omega_j M_j$$
+
+In this simplified two group example, there is a closed form analytical solution to solve for $\omega_j$. First, we set $\omega_A = 1$ as the reference weight. Then we define $f$ as the share of women in group A, $p$ as the share of men in group A, and $q = 1 - p$ as the share of men in group B. @tbl-crosstab-formula shows the equations governing the joint distribution of spouses.
+
+|              |   Husband Group A                              | Husband Group B                                        |
+|--------------|------------------------------------------------|--------------------------------------------------------|
+| Wife Group A | $\frac{fp}{p+q \omega_B e^{\beta}}$            | $\frac{fq \omega_B e^{\beta}}{p+q \omega_B e^{\beta}}$ |
+| Wife Group B | $\frac{(1-f)pe^{\beta}}{pe^{\beta}+q\omega_B}$ | $\frac{(1-f)q\omega_B}{pe^{\beta}+q\omega_B}$          |
+
+
+: Joint distribution of unions by wife's group and husband's group as function of input parameters with weights {#tbl-crosstab-formula}
+
+The constraint is that $N_{AB}+N_{BB} = q$. Solving for that constraint gives a quadratic form:
+
+$$
+qe^{\beta}\omega_B^2+\underbrace{\left[p-f+(f-q)e^{2\beta}\right]}_{C}\omega_B-pe^{\beta}=0
+$$
+
+We can solve for the positive root of the quadratic to get the analytical solution for $\omega_B$:
+
+$$
+\omega_B = \frac{\sqrt{C^2 + 4pq\,e^{2\beta}} - C}{2q\,e^\beta},
+\qquad
+C = p - f + (f - q)e^{2\beta}.
+$$
+
+Notably, this solution forces the following equality:
+
+$$N_{AB} - N_{BA} = f - p$$
+
+When the groups have the same share within each gender, $f-p = 0$ and we will have symmetry in $N_{AB} - N_{BA}$. 
+
+```{r}
+#| label: tbl-scenario-two-groups-balanced
+#| tbl-cap: Joint distribution, log odds ratio, and ratio of AB/BA under different scenarios of input parameters where group size is balanced by gender
+#| eval: true
+
+get_weight <- function(f, p, q, beta) {
+  C <- p - f + (f - q) * exp(2 * beta)
+  (sqrt(C^2 + 4 * p * q * exp(2 * beta)) - C) / (2 * q * exp(beta))
+}
+
+show_scenario <- function(f, p, beta, apply_weights = TRUE) {
+  
+  q <- 1 - p
+  if (!apply_weights) {
+    omega <- 1
+  } else {
+    omega <- get_weight(f, p, q, beta)
+  }
+
+  tibble(
+    f = f,
+    p = p,
+    beta = beta,
+    weights = apply_weights,
+    N_aa = (f * p)/(p + q * omega * exp(beta)),
+    N_ab = (f * q * omega * exp(beta))/(p + q * omega * exp(beta)),
+    N_ba = ((1 - f) * p * exp(beta))/(p * exp(beta) + q * omega),
+    N_bb = ((1 - f) * q * omega)/(p * exp(beta) + q * omega),
+    log_odds = log(N_ab) + log(N_ba) - log(N_aa) - log(N_bb),
+    ratio = N_ab / N_ba
+  )
+}
+
+bind_rows(
+  show_scenario(0.5, 0.5, -3, FALSE),
+  show_scenario(0.5, 0.5, -3),
+  show_scenario(0.75, 0.75, -3, FALSE),
+  show_scenario(0.75, 0.75, -3),
+  show_scenario(0.5, 0.5, -4, FALSE),
+  show_scenario(0.5, 0.5, -4),
+  show_scenario(0.75, 0.75, -4, FALSE),
+  show_scenario(0.75, 0.75, -4),
+) |>
+  gt() |>
+  cols_label(
+    f ~ "A women",
+    p ~ "A men",
+    beta ~ "Beta",
+    weights ~ "Weighted?",
+    log_odds = "Log odds",
+    ratio = "AB/BA ratio"
+  ) |>
+  fmt_number(starts_with("N_"), decimals = 4) |>
+  fmt_number(c(log_odds, ratio), decimals = 2) |>
+  tab_spanner(c(f, p, beta, weights), label = "inputs") |>
+  tab_spanner(starts_with("N_"), label = "table frequencies") |>
+  tab_spanner(c(log_odds, ratio), label = "estimated properties")
+```
+
+@tbl-scenario-two-groups-balanced shows the cell counts, log odds ratio and AB/BA ratio under different input scenarios where the group share within each gender is the same. All scenarios produce a log odds ratio that is exactly double the input $\beta$. When A and B are equal shares of the population, the weighted and unweighted results are identical. When A is 75% of each gender, then the results diverge substantial. The unweighted results (i.e. $\omega_B = 1$) will produce almost a 3:1 ratio of B woman/A man pairings compared to A woman/B man pairings. The weighted results produce equal number of AB and BA pairings.
+
+One limitation of this approach is that it does not allow for directional differences by gender in the ratio - the exogamy parameter $\beta$ must by symmetric with regard to sex. In many cases, this will be appropriate as a single marker of group boundaries, but some empirical cases may have a clear difference in intermarriage likelihood by gender, suggesting that men and women of that group are viewed differently as partners. For example, research has shown about a 3:1 disparity in black men/white women compared to white men/black women pairings in the US. 
+
+Another issue is demonstrated in @tbl-scenario-two-groups-unbalanced. When groups shares are not the same by gender, even fairly minor differences can produce even larger gender disparity than in the u weighted approach. This is because of the equality $N_{AB} - N_{BA} = f - p$. This gender disparity must come out as a difference between the two cells. When intermarriage is less likely, the ratio will be even larger.
+
+```{r}
+#| label: tbl-scenario-two-groups-unbalanced
+#| tbl-cap: Joint distribution, log odds ratio, and ratio of AB/BA under different scenarios of input parameters where group size is unbalanced by gender
+#| eval: true
+
+bind_rows(
+  show_scenario(0.75, 0.7, -3, FALSE),
+  show_scenario(0.75, 0.7, -3),
+  show_scenario(0.75, 0.7, -4, FALSE),
+  show_scenario(0.75, 0.7, -4),
+  show_scenario(0.7, 0.75, -3, FALSE),
+  show_scenario(0.7, 0.75, -3),
+  show_scenario(0.7, 0.75, -4, FALSE),
+  show_scenario(0.7, 0.75, -4),
+) |>
+  gt() |>
+  cols_label(
+    f ~ "A women",
+    p ~ "A men",
+    beta ~ "Beta",
+    weights ~ "Weighted?",
+    log_odds = "Log odds",
+    ratio = "AB/BA ratio"
+  ) |>
+  fmt_number(starts_with("N_"), decimals = 4) |>
+  fmt_number(c(log_odds, ratio), decimals = 2) |>
+  tab_spanner(c(f, p, beta, weights), label = "inputs") |>
+  tab_spanner(starts_with("N_"), label = "table frequencies") |>
+  tab_spanner(c(log_odds, ratio), label = "estimated properties")
+```
+
+One way to help users address both of these issues is to use a tuning parameter $\delta_g$ for each group. This parameter adjusts the general preference for husbands of this group relative to wives, such that $\delta_g > 0$ gives a relative preference for husbands and $\delta_g < 0$ gives a relative preference for wives. 
+
+This parameter will adjust the targeted constraint for $N_{AB} + N_{BB}$ from $q$ to:
+
+$$\tau_B = \frac{qe^{\delta_B}}{p+qe^{\delta_B}}$$
+
+Assuming $\delta_A = 0$, the closed form solution for $\omega_B$ becomes:
+
+$$
+\omega_B =
+\frac{p}{q}
+\frac{\sqrt{C^2 + 4\tau_B(1-\tau_B)e^{2\beta}} - C}
+{2(1-\tau_B)e^\beta},
+\qquad
+C = (f-\tau_B)e^{2\beta} + 1-f-\tau_B
+$$
+
+
+```{r}
+#| label: tbl-scenario-two-groups-delta
+#| tbl-cap: Joint distribution, log odds ratio, and ratio of AB/BA under different scenarios of input parameters including delta tuning parameter
+#| eval: true
+
+get_weight <- function(f, p, q, beta, delta = 0) {
+  # delta is delta_B relative to delta_A = 0
+  tau_b <- plogis(log(q / p) + delta)
+  C <- (f - tau_b) * exp(2 * beta) + 1 - f - tau_b
+
+  (p / q) *
+    (sqrt(C^2 + 4 * tau_b * (1 - tau_b) * exp(2 * beta)) - C) /
+    (2 * (1 - tau_b) * exp(beta))
+}
+
+show_scenario <- function(f, p, beta, delta = 0, apply_weights = TRUE) {
+  
+  q <- 1 - p
+  if (!apply_weights) {
+    omega <- 1
+  } else {
+    omega <- get_weight(f, p, q, beta, delta)
+  }
+
+  tibble(
+    f = f,
+    p = p,
+    beta = beta,
+    delta = delta,
+    weights = apply_weights,
+    N_aa = (f * p)/(p + q * omega * exp(beta)),
+    N_ab = (f * q * omega * exp(beta))/(p + q * omega * exp(beta)),
+    N_ba = ((1 - f) * p * exp(beta))/(p * exp(beta) + q * omega),
+    N_bb = ((1 - f) * q * omega)/(p * exp(beta) + q * omega),
+    log_odds = log(N_ab) + log(N_ba) - log(N_aa) - log(N_bb),
+    ratio = N_ab / N_ba
+  )
+}
+
+bind_rows(
+  show_scenario(0.75, 0.75, -3),
+  show_scenario(0.75, 0.75, -3, delta = 0.123),
+  show_scenario(0.75, 0.75, -3, delta = -0.123),
+  show_scenario(0.75, 0.7, -3),
+  show_scenario(0.75, 0.7, -3, delta = -0.25),
+  show_scenario(0.75, 0.7, -3, delta = -0.38)
+) |>
+  select(-weights) |>
+  gt() |>
+  cols_label(
+    f ~ "A women",
+    p ~ "A men",
+    beta ~ "Beta",
+    delta ~ "Delta",
+    log_odds = "Log odds",
+    ratio = "AB/BA ratio"
+  ) |>
+  fmt_number(starts_with("N_"), decimals = 4) |>
+  fmt_number(c(log_odds, ratio), decimals = 2) |>
+  tab_spanner(c(f, p, beta, delta), label = "inputs") |>
+  tab_spanner(starts_with("N_"), label = "table frequencies") |>
+  tab_spanner(c(log_odds, ratio), label = "estimated properties")
+```
+
+@tbl-scenario-two-groups-delta shows scenarios using the $\delta$ tuning parameter. The first three rows show a case with even group share by sex in which the tuning parameter is used to create either a roughly 3:1 or 1:3 ratio of AB to BA unions. The last three rows show using the tuning parameter to adjust the ratio from a case of uneven group share by sex to either 1:1 or 1:3. 
+
+Together, the $\omega$ weights and the $\delta$ tuning parameters give us considerable control over intergroup exogamy while retaining the computationally efficient conditional logit approach. Implementing this approach in the simulation is, however, more complicated than the static two-group case developed here.
+
+Women initiate partner searches individually at different times. At each search, we therefore need to determine the expected group distribution of women initiating searches and a corresponding target distribution for their male partners. We calculate the expected number of searches per year from the current numbers of unpartnered women in each group and small age bins, applying their specified search rates. This accounts for differences in both group-specific rates and age composition.
+
+Within each group, we divide this expected number of searches by the number of unpartnered women to obtain an average search rate per woman, $r_{g}$. We mirror this average rate for men of the same group. If $M_{g}$ is the number of available men in group g, their target share of matches is then
+
+$$
+\tau_g=
+\frac{M_g r_g e^{\delta_g}}
+{\sum_h M_h r_h e^{\delta_h}}
+$$
+
+This supplies a target for how matches should be distributed across male groups, while female search rates continue to determine when searches occur. The $\delta_{g}$ parameters adjust these targets in the same way as in the simple example.
+
+To calculate the weights, we consider the partner-choice probabilities of all women currently at risk of initiating a search, weighting each woman’s contribution by her search rate. We numerically find the male-group $\omega$ weights that make the resulting expected male group shares match the targets $\tau_{g}$. We solve for these weights iteratively using Newton’s method, starting from the weights calculated at the previous search. The focal woman then selects a husband using the conditional logit probabilities with those calibrated weights. The calculation is repeated at each search as population composition changes.
+
+For searches triggered by marriage rates, the female marriage rates are used. For birth-triggered searches and nonmarital father selection, the relevant fertility rates supply the search rates. To reduce computation, calibration groups individuals into quarter-year birth cohorts and does not remove kin. It evaluates matching preferences at cohort-center ages and averages search rates over each cohort’s age interval. Actual partner selection uses individual ages. 
+
+To speed computation at each search, the simulation maintains these binned distributions and updates them based on relevant events rather than reconstructing them at each search. This approach also has a fringe benefit. Maintaining these bins supports efficient rejection sampling from the full available male pool rather than the use of a sample. A group-cohort bin is drawn using its size and an upper bound on candidate weights, then a man is drawn uniformly within it. He is accepted with a probability based on his exact utility and screened for age and kinship eligibility; otherwise, the draw is repeated. Hard group exclusions are applied before drawing. 
+
+### Group inheritance of births
+
+New births must be assigned a group. This is done in the simulation with a `group_inheritance` model that is now an argument to the fertility process and can be assigned via the `create_group_inheritance()` function. 
+
+The first argument to this model (and in most cases the only argument) provides the name of several out-of-the-box methods as well as a custom option. The available options are:
+
+
+| Method | Identity assignment |
+| --- | --- |
+| `mother` | Mother's group. Fallback method when others would fail. |
+| `father` | Father's group |
+| `random_parent` | Select mother or father's group with equal probability. The default method. |
+| `same_sex` | Mother's group for daughters, father's group for sons |
+| `opposite_sex` | Father's group for daughters, mother's group for sons |
+| `ancestry` | Sample a group using the child's known ancestry shares as weights |
+| `hierarchy` | Choose the higher-ranked parental identity in `order` |
+| `custom` | Use custom function defined in `fun` |
+
+For every case except `hierarchy` and `custom`, only the name needs to be supplied. In these cases, users can also just provide the name of the desired method to the `inheritance` argument in `set_fertility`. So, to use ancestry to determine group:
+
+```r
+hammel_model() |>
+  set_population() |>
+  set_fertility(rates = fertility_rates, inheritance = "ancestry")
+```
+
+The final two methods require a bit more explanation. The `hierarchy` method assigns the highest ordered group on a vector of group names provided in a separate `order` argument and can be used to simulate processes of hypodescent/hyperdescent (e.g. the one drop rule). The decision is based on parent's identified group membership, not ancestry. Additionally, this method can also take an argument called `passing` which provides a proportion. This proportion will be used as the probability that the hierarchy is inverted in any given case. So for example, to fit a model where group B is almost always assigned over group A and group A is almost always assigned over group C, but 5% of cases are inverted:
+
+```r
+create_group_inheritance("hierarchy", order = c("B", "A", "C"), passing = 0.05)
+```
+
+This method assumes that the order is transitive. For more complex formulations, use a custom function.
+
+When `custom` is defined, the user must supply a custom R function that will be used to determine inheritance. This function can take the following exposed variables as arguments: `mother_group`, `father_group`, `mother_ancestry`, `father_ancestry`, `child_ancestry`, `child_sex` (`"f"` or `"m"`), and `parents_in_union` (TRUE/FALSE). The ancestry variables are named vectors where each name is "group_{group_name}" as well as "unknown" for any unknown ancestry share. 
+
+The inheritance methods have no allowance for individuals that identify with multiple groups. However, users can build in "mixed" groups by using the custom function. When doing so, users should also define the `groups` object which is a vector of all the possible groups even if they don't currently exist in the population. This will allow users to add groups that emerge from the population but are not initially present. 
+
+For example, to allow for a mixed group from a two-group simulation using a multinomial logit model:
+
+```r
+inheritance <- create_group_inheritance(
+  "custom",
+  groups = c("A", "B", "AB"),
+  fun = function(child_ancestry, mother_group, father_group, ...) {
+    # Same identity or missing father: follow mother
+    if (is.na(father_group) || mother_group == father_group) {
+      return(mother_group)
+    }
+
+    # Entirely unknown ancestry: follow mother
+    known <- 1 - child_ancestry[["unknown"]]
+    if (known <= 0) return(mother_group)
+    
+    # if we are here then assign as a function of group A ancestry
+    # be sure to normalize proportions by removing unknown ancestry
+    prop_A <- child_ancestry[["group_A"]] / known
+
+    logits <- c(
+      A  = -5.138 + 11.88 * prop_A - 15.3 * prop_A^2 + 9.553 * prop_A^3,
+      B  = 0.949 - 9.39 * prop_A + 11.935 * prop_A^2 - 8.483 * prop_A^3,
+      AB = 0
+    )
+    # subtracting the max helps avoid overflow effects
+    weights <- exp(logits - max(logits))
+
+    sample(names(weights), size = 1, prob = weights)
+  }
+)
+```
+
+Values from the multinomial logit are taken from Gullickson and Saperstein (2026). 
+
+## Inputs and simulation design
+
+### Prepare inputs
+
+I will use mortality rates from the US in 1950 and 2000 as stratified rates by group. I will use fertility rates from the US and England to create stratified rates by group, and similarly marriage rates from the US and England to create stratified marriage rates. 
+
+```{r}
+#| label: prepare-inputs
+
+mortality_rates_usa2000 <- get_mortality_hmd("USA", year = 2000)
+mortality_rates_usa1950 <- get_mortality_hmd("USA", year = 1950)
+
+mortality_rates_grouped <- bind_rows(
+  mortality_rates_usa2000 |> mutate(group = "A"),
+  mortality_rates_usa1950 |> mutate(group = "B")
+)
+
+input_life_exp <- calculate_life_table(mortality_rates_grouped) |>
+  filter(age_start == 0) |>
+  select(sex, group, ex)
+
+fertility_rates_overall_usa <- read_csv(
+  here("validation", "data", "usa_2000_fertility_overall.csv")
+)
+fertility_rates_by_status_usa <- read_csv(
+  here("validation", "data", "usa_2000_fertility_by_union_status.csv")
+)
+fertility_rates_overall_england <- read_csv(
+  here("validation", "data", "england_wales_2015_overall_fertility.csv")
+) |>
+  # adjust earliest age group to match US - not necessary but makes validation easier
+  mutate(age_start = if_else(age_start == 16, 15, age_start))
+fertility_rates_by_status_england <- read_csv(
+  here("validation", "data", "england_wales_2015_fertility_by_union_status.csv")
+) |>
+  mutate(age_start = if_else(age_start == 16, 15, age_start))
+
+fertility_rates_overall_grouped <- bind_rows(
+  fertility_rates_overall_usa |> mutate(group = "A"),
+  fertility_rates_overall_england |> mutate(group = "B")
+)
+fertility_rates_by_status_grouped <- bind_rows(
+  fertility_rates_by_status_usa |> mutate(group = "A"),
+  fertility_rates_by_status_england |> mutate(group = "B")
+)
+
+fertility_rates_overall_grouped |> calculate_tfr()
+input_tfr_by_status <- fertility_rates_by_status_grouped |> calculate_tfr()
+
+mar_rates_female_usa <- read_csv(
+  here("validation", "data", "usa_2001_marriage_rates_female.csv")
+)
+mar_rates_female_england <- read_csv(
+  here("validation", "data", "england_wales_2015_female_union_rates.csv")
+) |>
+  mutate(age_start = if_else(age_start == 16, 15, age_start))
+
+mar_rates_female_grouped <- bind_rows(
+  mar_rates_female_usa |> mutate(group = "A"),
+  mar_rates_female_england |> mutate(group = "B")
+)
+```
+
+### Initialization, observation windows, and replications
+
+Simulations will run for 100 years and we will typically create 100 simulations. I will use a few different baseline populations:
+
+- two-group population with a 2:1 ratio of A:B.
+- three-group population with a 5:3:1 ratio of A:B:C.
+- three group population with an even ratio of A, B, and C.
+
+```{r}
+#| label: simulation-design
+
+population_seed <- 42
+replication_seeds <- seq_len(100)
+years <- 100
+
+# skip first 25 years for time
+time_breaks <- seq(2025, 2100, 5)
+
+set.seed(population_seed)
+pop_baseline_uneven_2g <- create_baseline_population(
+  50000, max_age = 100, end_time = 2000, group_weights = c("A" = 2, "B" = 1)
+)
+pop_baseline_uneven_3g <- create_baseline_population(
+  50000, max_age = 100, end_time = 2000, group_weights = c("A" = 5, "B" = 3, "C" = 1)
+)
+pop_baseline_even_3g <- create_baseline_population(
+  50000, max_age = 100, end_time = 2000, group_weights = c("A" = 1, "B" = 1, "C" = 1)
+)
+```
+
+## Evaluate Group-Specific Rates
+
+### Stratified schedules
+
+To evaluate the use of group stratified input schedules, I run the fullest possible simulation for two groups where all rates, including partnered and unpartnered fertility and marriage rates, are supplied and all rates vary by group. I run 100 simulations and then take average age-specific rates across all simulations and years and average life expectancy at birth and total fertility rates by five year time period.
+
+```{r}
+#| label: run-fully-stratified-sim
+
+model <- hammel_model() |>
+  set_population(pop_baseline_uneven_2g) |>
+  set_fertility(fertility_rates_by_status_grouped) |>
+  set_mortality(mortality_rates_grouped) |>
+  set_union_formation(
+    "rate",
+    matching = create_age_gap_matching_model(
+      0, 5, group_exogamy = c("A:B" = -2)
+    ),
+    rates = mar_rates_female_grouped,
+  )
+
+results  <- future_map(
+  replication_seeds, 
+  function(seed) {
+    simulate(model, years = years, seed = seed) 
+  },
+  .options = furrr_options(seed = NULL)
+)
+names(results) <- as.character(replication_seeds)
+```
+
+#### Fertility
+
+I calculate fertility rates in five year age brackets that match those of the input data and in five year periods across the 100 years of the simulation. Very low marriage rates for the youngest age bracket can create problems for generating enough person years of exposure for partnered fertility as I show below.
+
+```{r}
+#| label: calculate-fert-rates-strat-rates
+
+counts <- map(
+  results,
+  calculate_lexis_counts,
+  time_breaks = time_breaks, 
+  age_breaks = seq(15, 50, 5), 
+  include_unions = TRUE,
+  by_group = TRUE
+)
+
+asfr <- counts |> 
+  bind_rows(.id = "replication") |>
+  filter(sex == "f", age_start >= 15 & age_start < 50, person_years > 0) |>
+  group_by(union_status, age_start, group) |>
+  summarize(
+    rate = mean(rate_fertility),
+    sd = sd(rate_fertility),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+tfr <- map(counts, calculate_tfr) |>
+  bind_rows(.id = "replication") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, union_status, group) |>
+  summarize(
+    sd = sd(tfr),
+    tfr = mean(tfr),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+tfr_pooled <- counts |>
+  bind_rows() |>
+  filter(sex == "f") |>
+  group_by(time_start, time_end, union_status, group,
+           age_start, age_end) |>
+  summarize(
+    births = sum(births),
+    person_years = sum(person_years),
+    .groups = "drop"
+  ) |>
+  mutate(rate_fertility = if_else(
+    person_years > 0, births / person_years, NA_real_
+  )) |>
+  calculate_tfr()
+```
+
+```{r}
+#| label: fig-asfr-strat-rates
+#| fig-cap: Mean age-specific fertility rates by union status and group across 100 simulations and years compared to input rates. Mean rates are shown by dashed lines with a 95% confidence interval and input rates are shown by dots.
+
+asfr |>
+  filter(union_status != "overall") |>
+  ggplot(aes(x = age_start + 2.5, y = rate, group = group, color = group))+
+  geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se), alpha = 0.8)+
+  geom_line(linetype = 2)+
+  geom_point(data = fertility_rates_by_status_grouped, alpha = 0.8)+
+  facet_wrap(~union_status)+
+  labs(x = "age", y = "age-specific fertility rate")+
+  theme_bw()
+```
+
+@fig-asfr-strat-rates shows the mean age-specific fertility rates across time periods and simulations. For comparison, the expected input rates are shown by dotted lines. Unpartnered fertility matches extremely well. Unpartnered fertility also matches very well, except for the very first age group, but here it is within the 95% confidence interval which is particularly wide for group B. The reason for the wide confidence interval for Group B is that the marriage rate for this age group is very low (0.0011 marriages per person year), which means that rates are estimated off of very small person-year counts in each simulation. In some cases, the person year count here is zero leading to an NA for this age-specific rate.  
+
+```{r}
+#| label: fig-tfr-strat-rates
+#| fig-cap: Mean total fertility rate by five year time periods, union status, and group across 100 simulations. 95% confidence band shown on each estimate. Horizontal lines show the corresponding input total fertility rate by group and union status. 
+
+tfr |>
+  filter(union_status != "overall") |>
+  ggplot(aes(x = time_mid, color = group, group = group))+
+  geom_ribbon(aes(ymin = tfr - 1.96 * se, ymax = tfr + 1.96 *se, fill = group),
+              color = NA, alpha = 0.4)+
+  geom_point(aes(y = tfr))+
+  geom_line(aes(y = tfr), linetype = 2)+
+  geom_hline(data = input_tfr_by_status, aes(yintercept = tfr, color = group))+
+  facet_wrap(~union_status)+
+  labs(x = "age", y = "total fertility rate")+
+  theme_bw()
+```
+
+@fig-tfr-strat-rates shows the mean TFR across simulations estimated at five year intervals for each union status and group. The horizontal lines show the expected TFR from the input rates. As discussed in previous milestones, we expect a small positive bias for partnered fertility due to the birth interval adjustment across schedule transitions. As expected both groups unpartnered TFR closely matches the input rate expectation, and the partnered TFR for Group A is slightly higher than the input TFR, as expected. However, no values are plotted for the partnered TFR of group B. This is because of the sparsity problem with person-years in the youngest age group, which leads to NA in some ASFR and therefor NA for TFR.  
+
+I could restrict mean TFR to only non-missing cases, but the result would be massive confidence intervals that would make it difficult to see anything. Instead, I pool person-years and births across simulations first, and then calculate pooled ASFR and pooled TFR estimates. 
+
+```{r}
+#| label: fig-tfr-pooled-strat-rates
+#| fig-cap: Total fertility rate by five year time periods, union status, and group, pooled across 100 simulations.
+
+tfr_pooled |>
+  filter(union_status != "overall") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  ggplot(aes(x = time_mid, color = group, group = group))+
+  geom_point(aes(y = tfr))+
+  geom_line(aes(y = tfr), linetype = 2)+
+  geom_hline(data = input_tfr_by_status, aes(yintercept = tfr, color = group))+
+  facet_wrap(~union_status)+
+  labs(x = "age", y = "total fertility rate")+
+  theme_bw()
+```
+
+@fig-tfr-pooled-strat-rates shows the pooled TFRs by time period, union status, and group. The results for partnered TFR of group B look approximately correct but are still quite noisy due to the person year sparsity in the first age group. To further examine this issue, I pool across all time periods as well to produce a single pooled TFR for each group and union status.
+
+```{r}
+#| label: tbl-tfr-pooled-strat-rates
+#| tbl-cap: Total fertility rate by union status and group, pooled across 100 simulations and time. Expected input TFR and difference also shown.
+
+counts |>
+  bind_rows() |>
+  filter(sex == "f", union_status != "overall") |>
+  group_by(union_status, group, age_start, age_end) |>
+  summarize(
+    births = sum(births),
+    person_years = sum(person_years),
+    .groups = "drop"
+  ) |>
+  mutate(rate_fertility = if_else(
+    person_years > 0, births / person_years, NA_real_
+  )) |>
+  calculate_tfr() |>
+  rename(tfr_observed = tfr) |>
+  left_join(input_tfr_by_status, by = c("group", "union_status")) |>
+  select(-starts_with("age")) |>
+  mutate(diff = tfr_observed - tfr) |>
+  gt() |>
+  cols_label(
+    "group" ~ "Group",
+    "union_status" ~ "Union status",
+    "tfr_observed" ~ "Observed TFR",
+    "tfr" ~ "Input TFR",
+    "diff" ~ "Difference"
+  ) |>
+  fmt_number(starts_with("tfr"), decimals = 3) |>
+  fmt_number(diff, decimals = 4)
+```
+
+@tbl-tfr-pooled-strat-rates shows the pooled TFRs across simulations and time by group and union status. The results are quite close to the expected input rate for all cases. The partnered TFRs both show a slight positive bias as expected, but this bias is quite small. Overall, the fertility rates from the simulation match expectation.
+
+#### Mortality
+
+Mortality is measured in 1-year age groups across 5 year time periods. The input mortality data extends to 100 years of age but at the highest ages, estimated mortality rates can fluctuate substantially due to a small number of person years lived at those ages, and can also be missing due to zero person years lived at a specific age. Therefore, I use an open ended age group of 85+. This may cause a slight discrepancy between the life expectancy estimated from the data and the life expectancy of the input data, but it is likely to be small. 
+
+```{r}
+#| label: calculate-mort-rates-strat-rates
+
+counts <- map(
+  results,
+  calculate_lexis_counts,
+  time_breaks = time_breaks,
+  age_breaks = 0:85,
+  by_group = TRUE
+)
+
+asmr <- counts |>
+  bind_rows(.id = "replication") |>
+  group_by(age_start, sex, group) |>
+  summarize(
+    rate = mean(rate_mortality),
+    sd = sd(rate_mortality),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+life_exp <- map(counts, calculate_life_table) |>
+  bind_rows(.id = "replication") |>
+  filter(age_start == 0) |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, sex, group) |>
+  summarize(
+    sd = sd(ex),
+    ex = mean(ex),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: fig-asmr-strat-rates
+#| fig-cap: Mean age-specific mortality rates by sex and group across 100 simulations and years compared to input rates. Mean rates are shown by 95% confidence bands and input rates are shown by lines.
+
+asmr |>
+  filter(age_start < 85) |>
+  ggplot(aes(x = age_start+0.5, y = rate, group = group, color = group))+
+  geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se, fill = group),
+              color = NA, alpha = 0.4)+
+  #geom_line()+
+  geom_line(data = mortality_rates_grouped |> filter(age_start < 85), linetype = 1)+
+  scale_y_log10()+
+  facet_wrap(~sex)+
+  labs(x = "age", y = "age-specific mortality rate")+
+  theme_bw()
+```
+
+@fig-asmr-strat-rates shows mean age-specific mortality rates by sex and group, along with a 95% confidence band. Overall, the input rates fit well within the 95% confidence band of the estimated rates from the simulation.
+
+```{r}
+#| label: fig-life-exp-strat-rates
+#| fig-cap: Mean life expectancy at age zero by five-year time period, sex, and group across 100 simulations. 95% confidence bands shown for each estimate. Horizontal lines show the expected life expectancy from the input rates.
+
+life_exp |>
+  ggplot(aes(x = time_mid, color = group, group = group))+
+  geom_ribbon(aes(ymin = ex - 1.96 * se, ymax = ex + 1.96 *se, fill = group),
+              color = NA, alpha = 0.4)+
+  #geom_point(aes(y = ex))+
+  geom_line(aes(y = ex), linetype = 2)+
+  geom_hline(data = input_life_exp, aes(yintercept = ex, color = group))+
+  facet_wrap(~sex)+
+  labs(x = "time", y = "life expectany at birth")+
+  theme_bw()
+```
+
+@fig-life-exp-strat-rates show the mean life expectancy at birth along with a 95% confidence band. The true input life expectancy fits well within this band in most cases. The few exceptions are expected when comparing this many individual points. 
+
+Overall, the evidence indicates that the observed mortality rates by group correspond well to the input rates by group. 
+
+#### Marriage
+
+Age-specific marriage rates are calculated in five year age groups from 15 to age 70 in 5-year time increments.
+
+```{r}
+#| label: calculate-mar-rates-strat-rates
+
+counts <- map(
+  results,
+  calculate_lexis_counts,
+  time_breaks = time_breaks,
+  age_breaks = seq(15, 70, 5), 
+  include_unions = TRUE,
+  by_group = TRUE
+)
+
+mar_rates <- counts |>
+  bind_rows(.id = "replication") |>
+  filter(union_status == "unpartnered") |>
+  group_by(age_start, sex, group) |>
+  summarize(
+    rate = mean(rate_marriage),
+    sd = sd(rate_marriage),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: fig-mar-rates-strat-rates
+#| fig-cap: Mean age-specific female marriage rates by group across 100 simulations and years compared to input rates. Mean rates are shown by dashed lines with a 95% confidence interval and input rates are shown by dots.
+
+mar_rates |>
+  filter(sex == "f") |>
+  ggplot(aes(x = age_start + 2.5, y = rate, group = group, color = group))+
+  geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
+  geom_line(linetype = 2)+
+  geom_point(data = mar_rates_female_grouped)+
+  labs(x = "age", y = "age-specific marital rate")+
+  theme_bw()
+```
+
+@fig-mar-rates-strat-rates show the empirically estimated mean age-specific marriage rates compared to the input rates The match is extremely close.
+
+
+### Proportional multipliers
+
+To evaluate the use of proportional hazards on a shared input schedules, I run the fullest possible simulation for two groups where all rates, including partnered and unpartnered fertility and marriage rates, are supplied. I then apply a different proportional hazard for each group and each rate to produce differences in the observed rates as shown in the code below. I run 100 simulations and then take average age-specific rates across all simulations and years and average life expectancy at birth and total fertility rates by five year time period.
+
+```{r}
+#| label: run-prop-hazards-sim
+
+ratio_fert_partnered_A <- 1.2
+ratio_fert_partnered_B <- 0.8
+ratio_fert_unpartnered_A <- 0.9
+ratio_fert_unpartnered_B <- 1.1
+ratio_mort_A <- 1.1
+ratio_mort_B <- 0.9
+ratio_mar_A <- 0.95
+ratio_mar_B <- 1.1
+
+model <- hammel_model() |>
+  set_population(pop_baseline_uneven_2g) |>
+  set_fertility(
+    fertility_rates_by_status_usa,
+    group_prop_hazard = list(
+      "partnered" = c("A" = ratio_fert_partnered_A, "B" = ratio_fert_partnered_B),
+      "unpartnered" = c("A" = ratio_fert_unpartnered_A, "B" = ratio_fert_unpartnered_B)
+    )
+  ) |>
+  set_mortality(
+    mortality_rates_usa2000, 
+    group_prop_hazard = c("A" = ratio_mort_A, "B" = ratio_mort_B)
+  ) |>
+  set_union_formation(
+    "rate",
+    matching = create_age_gap_matching_model(
+      0, 5, group_exogamy = c("A:B" = -2)
+    ),
+    rates = mar_rates_female_usa,
+    group_prop_hazard = c("A" = ratio_mar_A, "B" = ratio_mar_B),
+  )
+
+results  <- future_map(
+  replication_seeds, 
+  function(seed) {
+    simulate(model, years = years, seed = seed) 
+  },
+  .options = furrr_options(seed = NULL)
+)
+names(results) <- as.character(replication_seeds)
+```
+
+#### Fertility
+
+I calculate fertility rates in five year age brackets that match those of the input data and in five year periods across the 100 years of the simulation.
+
+```{r}
+#| label: calculate-fert-rates-prop-hazards
+
+counts <- map(
+  results,
+  calculate_lexis_counts,
+  time_breaks = time_breaks, 
+  age_breaks = seq(15, 50, 5), 
+  include_unions = TRUE,
+  by_group = TRUE
+)
+
+asfr <- counts |> 
+  bind_rows(.id = "replication") |>
+  filter(sex == "f", age_start >= 15 & age_start < 50, person_years > 0) |>
+  group_by(union_status, age_start, group) |>
+  summarize(
+    rate = mean(rate_fertility),
+    sd = sd(rate_fertility),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+tfr <- map(counts, calculate_tfr) |>
+  bind_rows(.id = "replication") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, union_status, group) |>
+  summarize(
+    sd = sd(tfr),
+    tfr = mean(tfr),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+tfr_pooled <- counts |>
+  bind_rows() |>
+  filter(sex == "f") |>
+  group_by(time_start, time_end, union_status, group,
+           age_start, age_end) |>
+  summarize(
+    births = sum(births),
+    person_years = sum(person_years),
+    .groups = "drop"
+  ) |>
+  mutate(rate_fertility = if_else(
+    person_years > 0, births / person_years, NA_real_
+  )) |>
+  calculate_tfr()
+```
+
+```{r}
+#| label: fig-asfr-prop-hazards
+#| fig-cap: Mean age-specific fertility rates by union status and group across 100 simulations and years compared to input rates. Mean rates are shown by dashed lines with a 95% confidence interval and input rates are shown by dots.
+
+fert_input <- bind_rows(
+  fertility_rates_by_status_usa |>
+    mutate(
+      group = "A",
+      rate = rate * if_else(union_status == "partnered",
+                            ratio_fert_partnered_A,
+                            ratio_fert_unpartnered_A)
+  ),
+  fertility_rates_by_status_usa |>
+    mutate(
+      group = "B",
+      rate = rate * if_else(union_status == "partnered",
+                            ratio_fert_partnered_B,
+                            ratio_fert_unpartnered_B)
+  )
+)
+
+
+asfr |>
+  filter(union_status != "overall") |>
+  ggplot(aes(x = age_start + 2.5, y = rate, group = group, color = group))+
+  geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
+  geom_line(linetype = 2)+
+  geom_point(data = fert_input)+
+  facet_wrap(~union_status)+
+  labs(x = "age", y = "age-specific fertility rate")+
+  theme_bw()
+```
+
+@fig-asfr-prop-hazards shows the mean estimated age specific fertility rates from the simulations in comparison to the input rates. All of the observed mean rates fit very closely to the input rates across groups and union status. 
+
+```{r}
+#| label: tbl-tfr-pooled-prop-hazards
+#| tbl-cap: Total fertility rate by union status and group, pooled across 100 simulations and time. Expected input TFR and difference also shown.
+
+tfr_input <- fert_input |> calculate_tfr()
+
+counts |>
+  bind_rows() |>
+  filter(sex == "f", union_status != "overall") |>
+  group_by(union_status, group, age_start, age_end) |>
+  summarize(
+    births = sum(births),
+    person_years = sum(person_years),
+    .groups = "drop"
+  ) |>
+  mutate(rate_fertility = if_else(
+    person_years > 0, births / person_years, NA_real_
+  )) |>
+  calculate_tfr() |>
+  rename(tfr_observed = tfr) |>
+  left_join(tfr_input, by = c("group", "union_status")) |>
+  select(-starts_with("age")) |>
+  mutate(diff = tfr_observed - tfr) |>
+  gt() |>
+  cols_label(
+    "group" ~ "Group",
+    "union_status" ~ "Union status",
+    "tfr_observed" ~ "Observed TFR",
+    "tfr" ~ "Input TFR",
+    "diff" ~ "Difference"
+  ) |>
+  fmt_number(starts_with("tfr"), decimals = 3) |>
+  fmt_number(diff, decimals = 4)
+```
+
+@tbl-tfr-pooled-prop-hazards shows the TFR from the simulations by group and union status based on pooled person years and births across years and simulations. For reference, the input TFRs are also shown as well as the difference. The TFRs estimated from the data are very close to the expected TFRs. A slight positive bias is present for for the partnered fertility rates, as expected (see discussion above for @tbl-tfr-pooled-strat-rates).
+
+#### Mortality
+
+Mortality is measured in 1-year age groups across 5 year time periods. The input mortality data extends to 100 years of age but at the highest ages, estimated mortality rates can fluctuate substantially due to a small number of person years lived at those ages, and can also be missing due to zero person years lived at a specific age. Therefore, I use an open ended age group of 85+. This may cause a slight discrepancy between the life expectancy estimated from the data and the life expectancy of the input data, but it is likely to be small. 
+
+```{r}
+#| label: calculate-mort-rates-prop-hazards
+
+counts <- map(
+  results,
+  calculate_lexis_counts,
+  time_breaks = time_breaks,
+  age_breaks = 0:85,
+  by_group = TRUE
+)
+
+asmr <- counts |>
+  bind_rows(.id = "replication") |>
+  group_by(age_start, sex, group) |>
+  summarize(
+    rate = mean(rate_mortality),
+    sd = sd(rate_mortality),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+life_exp <- map(counts, calculate_life_table) |>
+  bind_rows(.id = "replication") |>
+  filter(age_start == 0) |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  group_by(time_mid, sex, group) |>
+  summarize(
+    sd = sd(ex),
+    ex = mean(ex),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: fig-asmr-prop-hazards
+#| fig-cap: Mean age-specific mortality rates by sex and group across 100 simulations and years compared to input rates. Mean rates are shown by 95% confidence bands and input rates are shown by lines.
+
+mort_input <- bind_rows(
+  mortality_rates_usa2000 |>
+    mutate(group = "A", rate = rate * ratio_mort_A),
+  mortality_rates_usa2000 |>
+    mutate(group = "B", rate = rate * ratio_mort_B)
+)
+
+asmr |>
+  filter(age_start < 85) |>
+  ggplot(aes(x = age_start+0.5, y = rate, group = group, color = group))+
+  geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se, fill = group),
+              color = NA, alpha = 0.4)+
+  #geom_line()+
+  geom_line(data = mort_input |> filter(age_start < 85), linetype = 1)+
+  scale_y_log10()+
+  facet_wrap(~sex)+
+  labs(x = "age", y = "age-specific mortality rate")+
+  theme_bw()
+```
+
+@fig-asmr-prop-hazards shows the mean age-specific mortality rates across simulations and years compared to the input rates. The estimated rates are shown by a 95% confidence band and the input rates are shown by a line. The figure shows that the input rates fall within the 95% confidence band for both sexes and groups across ages.
+
+```{r}
+#| label: fig-life-exp-prop-hazards
+#| fig-cap: Mean life expectancy at age zero by five-year time period, sex, and group across 100 simulations. 95% confidence bands shown for each estimate. Horizontal lines show the expected life expectancy from the input rates.
+
+ex_input <- mort_input |>
+  calculate_life_table() |>
+  filter(age_start == 0) |>
+  select(sex, group, ex)
+
+life_exp |>
+  ggplot(aes(x = time_mid, color = group, group = group))+
+  geom_ribbon(aes(ymin = ex - 1.96 * se, ymax = ex + 1.96 *se, fill = group),
+              color = NA, alpha = 0.4)+
+  #geom_point(aes(y = ex))+
+  geom_line(aes(y = ex), linetype = 2)+
+  geom_hline(data = ex_input, aes(yintercept = ex, color = group))+
+  facet_wrap(~sex)+
+  labs(x = "time", y = "life expectany at birth")+
+  theme_bw()
+```
+
+@fig-life-exp-prop-hazards show the mean life expectancy at birth along with a 95% confidence band. The true input life expectancy fits well within this band in most cases. The few exceptions are expected when comparing this many individual points. 
+
+Overall, the evidence indicates that the observed mortality rates by group correspond well to the input rates by group. 
+
+
+#### Marriage
+
+Age-specific marriage rates are calculated in five year age groups from 15 to age 70 in 5-year time increments.
+
+```{r}
+#| label: calculate-mar-rates-prop-hazards
+
+counts <- map(
+  results,
+  calculate_lexis_counts,
+  time_breaks = time_breaks,
+  age_breaks = seq(15, 70, 5), 
+  include_unions = TRUE,
+  by_group = TRUE
+)
+
+mar_rates <- counts |>
+  bind_rows(.id = "replication") |>
+  filter(union_status == "unpartnered") |>
+  group_by(age_start, sex, group) |>
+  summarize(
+    rate = mean(rate_marriage),
+    sd = sd(rate_marriage),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: fig-mar-rates-prop-hazards
+#| fig-cap: Mean age-specific female marriage rates by group across 100 simulations and years compared to input rates. Mean rates are shown by dashed lines with a 95% confidence interval and input rates are shown by dots.
+
+mar_input <- bind_rows(
+  mar_rates_female_usa  |>
+    mutate(group = "A", rate = rate * ratio_mar_A),
+  mar_rates_female_usa |>
+    mutate(group = "B", rate = rate * ratio_mar_B)
+)
+
+mar_rates |>
+  filter(sex == "f") |>
+  ggplot(aes(x = age_start + 2.5, y = rate, group = group, color = group))+
+  geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
+  geom_line(linetype = 2)+
+  geom_point(data = mar_input)+
+  labs(x = "age", y = "age-specific marital rate")+
+  theme_bw()
+```
+
+@fig-mar-rates-strat-rates show the empirically estimated mean age-specific marriage rates compared to the input rates The match is extremely close.
+
+## Evaluate Group Matching
+
+### Group matching parameters
+
+To test group matching parameters, I start with a three group population with uneven sizes. Group A and B has the lowest exogamy ratio of -3, while the exogamy ratio for B and C is half that (-1.5) and there is no barrier between A and C intermarriage. I also add a $\delta = 0.12$ for group C to create gender imbalance in intermarriages involving group C that favors more group C men. I use shared fertility and mortality rates across groups, since we are not concerned with that feature for this evaluation. I also use on demand union formation because we are focused on the matching model itself here and the on demand model runs faster. I then run 100 simulations.
+
+```{r}
+#| label: run-intermarriage-sim-uneven
+
+model <- hammel_model() |>
+  set_population(pop_baseline_uneven_3g) |>
+  set_fertility(fertility_rates_overall_usa) |>
+  set_mortality(mortality_rates_usa2000) |>
+  set_union_formation(
+    "on_demand",
+    matching = create_age_gap_matching_model(
+      0, 5, group_exogamy = c("A:B" = -3, "B:C" = -1.5), delta = c("C" = 0.12)
+    ),
+    diagnostics = TRUE
+  )
+
+results  <- future_map(
+  replication_seeds, 
+  function(seed) {
+    simulate(model, years = years, seed = seed) 
+  },
+  .options = furrr_options(seed = NULL)
+)
+names(results) <- as.character(replication_seeds)
+```
+
+```{r}
+#| label: calculate-crosstabs-uneven
+
+crosstabs <- results |>
+  map(get_detailed_unions) |>
+  bind_rows(.id = "replication") |>
+  count(replication, group_w, group_h) |>
+  pivot_wider(id_cols = replication, names_from = c(group_w, group_h), values_from = n) |>
+  mutate(
+    log_odds_A_B = log(A_B) + log(B_A) - log(A_A) - log(B_B),
+    log_odds_A_C = log(A_C) + log(C_A) - log(A_A) - log(C_C),
+    log_odds_B_C = log(B_C) + log(C_B) - log(B_B) - log(C_C),
+    gender_ratio_A_B = A_B/B_A,
+    gender_ratio_A_C = A_C/C_A,
+    gender_ratio_B_C = B_C/C_B
+  )
+```
+
+```{r}
+#| label: fig-log-odds-ratios-uneven
+#| fig-cap: Distribution of log odds ratio by pairing and simulation across 100 simulations. Individual points are shown by semi-transparent dots.  
+
+crosstabs |>
+  select(replication, starts_with("log_odds")) |>
+  pivot_longer(
+    cols = starts_with("log_odds"), 
+    names_to = "pairing", 
+    values_to = "log_odds", 
+    names_prefix = "log_odds_"
+  ) |>
+  mutate(pairing = str_replace(pairing, "_", ":")) |>
+  ggplot(aes(x= pairing, y = log_odds))+
+#  scale_y_log10()+
+  geom_boxplot()+
+  geom_jitter(alpha = 0.2)+
+  labs(y = "log odds ratio")+
+  theme_bw()
+```
+
+@fig-log-odds-ratios-uneven shows the log odds ratios estimated for each simulation with boxplots showing the distribution. Although there is some fluctuation across simulations, each pairing is very close to the expected $2\beta$ value from the inputs. 
+
+```{r}
+#| label: tbl-log-odds-ratios-uneven
+#| tbl-cap: Mean log odds ratio and standard error by group pairing across 100 simulations.
+
+crosstabs |>
+  select(replication, starts_with("log_odds")) |>
+  pivot_longer(
+    cols = starts_with("log_odds"), 
+    names_to = "pairing", 
+    values_to = "log_odds", 
+    names_prefix = "log_odds_"
+  ) |>
+  mutate(pairing = str_replace(pairing, "_", ":")) |>
+  group_by(pairing) |>
+  summarize(
+    mean_log_odds = mean(log_odds),
+    se_log_odds = sd(log_odds) / sqrt(n()),
+  ) |>
+  gt() |>
+  fmt_number(ends_with("log_odds"), decimals = 4) |>
+  cols_label(
+    pairing  ~ "Pairing",
+    mean_log_odds ~ "Mean log odds",
+    se_log_odds ~ "Standard error"
+  )
+```
+
+@tbl-log-odds-ratios-uneven shows the mean of these log odds ratios across the 100 simulations and the monte carlo standard error. All three estimates are very close the expected input value of $2\beta$ and well within the 95% confidence interval. 
+
+```{r}
+#| label: fig-gender-ratios-uneven
+#| fig-cap: Distribution of gender ratio by pairing and simulation across 100 simulations. Individual points are shown by semi-transparent dots.
+
+crosstabs |>
+  select(replication, starts_with("gender_ratio")) |>
+  pivot_longer(
+    cols = starts_with("gender_ratio"), 
+    names_to = "pairing", 
+    values_to = "gender_ratio", 
+    names_prefix = "gender_ratio_"
+  ) |>
+  mutate(pairing = str_replace(pairing, "_", ":")) |>
+  ggplot(aes(x= pairing, y = gender_ratio))+
+  geom_boxplot()+
+  geom_jitter(alpha = 0.2)+
+  geom_hline(yintercept = 1, color = "red", linetype = 2)+
+  labs(y = "gender ratio")+
+  theme_bw()
+```
+
+@fig-gender-ratios-uneven shows the estimated gender ratio between each gender combination for each pairing. Because there is no $\delta$ parameter for the A or B groups, we expect that the gender ratio should be 1. The estimated points of each simulation have substantial variance but the median looks very close to 1. For the other two pairings, the inclusion of the $\delta_C = 0.12$ means we don't have an exact expectation other than the gender ratio should be greater than 1, which it appears to be. 
+
+```{r}
+#| label: tbl-gender-ratios-uneven
+#| tbl-cap: Mean gender ratio and standard error by group pairing across 100 simulations.
+
+crosstabs |>
+  select(replication, starts_with("gender_ratio")) |>
+  pivot_longer(
+    cols = starts_with("gender_ratio"), 
+    names_to = "pairing", 
+    values_to = "gender_ratio", 
+    names_prefix = "gender_ratio_"
+  ) |>
+  mutate(pairing = str_replace(pairing, "_", ":")) |>
+  group_by(pairing) |>
+  summarize(
+    mean_gender_ratio = mean(gender_ratio),
+    se_gender_ratio = sd(gender_ratio) / sqrt(n()),
+  ) |>
+  gt() |>
+  fmt_number(ends_with("gender_ratio"), decimals = 4) |>
+  cols_label(
+    pairing  ~ "Pairing",
+    mean_gender_ratio ~ "Mean gender ratio",
+    se_gender_ratio ~ "Standard error"
+  )
+```
+
+@tbl-gender-ratios-uneven shows the mean gender ratio across all simulations for each pairing, with monte carlo standard errors. As expected, the gender ratio for the AB pairing is very close to 1 and 1 lies within its 95% confidence interval. The other two gender ratios are clearly greater than 1, as expected.
+
+A more formal test is to construct conditional logit models from the simulated results and confirm that parameter estimates match those of the inputs. For each simulation, I sample 1000 women and then I sample 50 alternate partners for each woman to create 1000 choices sets of size 51. I then run a conditional logit model on these estimates with the age difference and age difference squared terms as well as dummies for each gender-specific exogamous group combination. I add the log of the weight used for each union as an offset which should cause the estimates to match those of the input, aside from sampling error. All of the pairing results should be symmetric after the inclusion of the offset (e.g. B == CB), but I include them separately to test for differences.
+
+```{r}
+#| label: estimate-clogit-models
+
+models_clogit <- results |> future_map(
+  function(result) {
+    choice_sets <- construct_choice_sets(result, 1000, 50) |>
+      filter(ego_spouse == "wife") |>
+      mutate(
+        log_weight = case_when(
+          group_h == "A" ~ .log_weight_A,
+          group_h == "B" ~ .log_weight_B,
+          group_h == "C" ~ .log_weight_C
+        )
+      )
+
+    choice_sets <- choice_sets |>
+      mutate(
+        age_diff = birth_time_w - birth_time_h,
+        ABsym = (group_w == "A" & group_h == "B") | (group_w == "B" & group_h == "A"),
+        AB = (group_w == "A" & group_h == "B"),
+        BA = (group_w == "B" & group_h == "A"),
+        BC = (group_w == "B" & group_h == "C"),
+        CB = (group_w == "C" & group_h == "B"),
+        AC = (group_w == "A" & group_h == "C"),
+        CA = (group_w == "C" & group_h == "A")
+      )
+
+    clogit(
+      chosen ~ age_diff + I(age_diff^2) + 
+        # estimate as directed effects to confirm they are the same
+        AB + BA + BC + CB + AC + CA +
+        #offset by the log weights to get correct estimates
+        offset(log_weight) +
+        # add the choice set id
+        strata(union_id),
+      data = choice_sets
+    )
+  },
+  .options = furrr_options(seed = NULL)
+)
+```
+
+@tbl-model-estimates shows the mean model estimate and monte carlo standard error across 100 simulations. 
+
+```{r}
+#| label: tbl-model-estimates
+#| tbl-cap: Mean estimated coefficient from conditional logit models across 100 simulations with monte carlo standard error. All models use an offset of the log-weight. Models sample 1000 women from each replication and assign 50 alternate partners.
+
+models_clogit |> 
+  map(coef) |>
+  bind_rows() |>
+  summarize(across(
+    everything(),
+    list(
+      mean = ~ mean(.x),
+      se = ~ sd(.x) / sqrt(length(.x))
+    )
+  )) |>
+  pivot_longer(
+    everything(),
+    names_to = c("term", ".value"),
+    names_pattern = "^(.*)_(mean|se)$"
+  ) |>
+  gt() |>
+  fmt_number(c(mean, se), decimals = 4)
+```
+
+```{r}
+# |label: models-gc
+
+rm(models_clogit)
+gc()
+```
+
+All of the parameters are very close to their expected values from the input in substantive terms. All of the 95% confidence intervals for each term would fall within the expected value. Furthermore, the two directed effects for each pair are all statistically equivalent to one another at p < 0.05.
+
+### Analysis of marriage rates
+
+Male marriage rates are not defined in the simulation but arise out of the choice model process. To help ensure that these male rates look reasonable, I calculate the age-specific marriage rates by gender and group across the simulations. 
+
+
+```{r}
+#| label: calculate-mar-rates-uneven
+
+counts <- map(
+  results,
+  calculate_lexis_counts,
+  time_breaks = time_breaks,
+  age_breaks = seq(15, 70, 5), 
+  include_unions = TRUE,
+  by_group = TRUE
+)
+
+mar_rates <- counts |>
+  bind_rows(.id = "replication") |>
+  filter(union_status == "unpartnered") |>
+  group_by(age_start, sex, group) |>
+  summarize(
+    rate = mean(rate_marriage),
+    sd = sd(rate_marriage),
+    n = n(),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: fig-mar-rates-uneven-groups
+#| fig-cap: Mean marriage rates by group and gender across 100 simulations
+
+mar_rates |>
+  ggplot(aes(x = age_start + 2.5, y = rate, group = sex, color = sex))+
+  geom_linerange(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se))+
+  geom_point()+
+  geom_line()+
+  facet_wrap(~group)+
+  labs(x = "age", y = "age-specific marital rate")+
+  theme_bw()
+```
+
+@fig-mar-rates-uneven-groups shows this marriage rates by group and gender. Because we are using an on demand model of union formation, the female rates will be determined by fertility rates. The male rates look reasonable, with somewhat wider dispersion in age at marriage across all three groups.
+
+### Comparison of outmarriage ratios
+
+```{r}
+#| label: calc-outmarriage-share-uneven
+
+outmarriage_uneven <- results |>
+  map(get_detailed_unions) |>
+  bind_rows(.id = "replication") |>
+  mutate(outmarriage = group_w != group_h, year = floor(start_time)) |>
+  group_by(year) |>
+  summarize(
+    sd = sd(outmarriage),
+    outmarriage = mean(outmarriage),
+    n = n(),
+    se = sd/sqrt(n),
+    .groups = "drop"
+  ) |>
+  mutate(pop_share = "uneven")
+```
+
+One feature of the log-odds ratio approach is that it should be indifferent to group size. So, the simulation will produce the same log-odds ratios under different shares of group size, whereas other measures like the outmarriage rate will vary by group size.^[This feature can break down when one group becomes so small that members of that group are sometimes not available as partners.] This allows users to distinguish likelihoods of intergroup unions that are separate from group size effects that may change over the simulation.
+
+To demonstrate this, I will re-run the simulations with an even population share for the the three groups but holding everything else constant.
+
+```{r}
+#| label: run-intermarriage-sim-even
+
+model <- model |>
+  set_population(pop_baseline_even_3g)
+
+results  <- future_map(
+  replication_seeds, 
+  function(seed) {
+    simulate(model, years = years, seed = seed) 
+  },
+  .options = furrr_options(seed = NULL)
+)
+names(results) <- as.character(replication_seeds)
+```
+
+```{r}
+#| label: calculate-crosstabs-even
+
+crosstabs <- results |>
+  map(get_detailed_unions) |>
+  bind_rows(.id = "replication") |>
+  count(replication, group_w, group_h) |>
+  pivot_wider(id_cols = replication, names_from = c(group_w, group_h), values_from = n) |>
+  mutate(
+    log_odds_A_B = log(A_B) + log(B_A) - log(A_A) - log(B_B),
+    log_odds_A_C = log(A_C) + log(C_A) - log(A_A) - log(C_C),
+    log_odds_B_C = log(B_C) + log(C_B) - log(B_B) - log(C_C),
+    gender_ratio_A_B = A_B/B_A,
+    gender_ratio_A_C = A_C/C_A,
+    gender_ratio_B_C = B_C/C_B
+  )
+```
+
+```{r}
+#| label: fig-log-odds-ratios-even
+#| fig-cap: Distribution of log-odds ratio by pairing and simulation across 100 simulations with even starting group sizes. Individual points are shown by semi-transparent dots.  
+
+crosstabs |>
+  select(replication, starts_with("log_odds")) |>
+  pivot_longer(
+    cols = starts_with("log_odds"), 
+    names_to = "pairing", 
+    values_to = "log_odds", 
+    names_prefix = "log_odds_"
+  ) |>
+  mutate(pairing = str_replace(pairing, "_", ":")) |>
+  ggplot(aes(x= pairing, y = log_odds))+
+#  scale_y_log10()+
+  geom_boxplot()+
+  geom_jitter(alpha = 0.2)+
+  labs(y = "log odds ratio")+
+  theme_bw()
+```
+
+```{r}
+#| label: tbl-log-odds-ratios-even
+#| tbl-cap: Mean log odds ratio and standard error by group pairing across 100 simulations with even starting group sizes.
+
+crosstabs |>
+  select(replication, starts_with("log_odds")) |>
+  pivot_longer(
+    cols = starts_with("log_odds"), 
+    names_to = "pairing", 
+    values_to = "log_odds", 
+    names_prefix = "log_odds_"
+  ) |>
+  mutate(pairing = str_replace(pairing, "_", ":")) |>
+  group_by(pairing) |>
+  summarize(
+    mean_log_odds = mean(log_odds),
+    se_log_odds = sd(log_odds) / sqrt(n()),
+  ) |>
+  gt() |>
+  fmt_number(ends_with("log_odds"), decimals = 4) |>
+  cols_label(
+    pairing  ~ "Pairing",
+    mean_log_odds ~ "Mean log odds",
+    se_log_odds ~ "Standard error"
+  )
+```
+
+@fig-log-odds-ratios-even and @tbl-log-odds-ratios-even show the estimated log odds ratios by pairing for the case with even starting population sizes. As expected these match the input values and the uneven starting group size case.
+
+```{r}
+#| label: calc-outmarriage-share-even
+
+outmarriage_even <- results |>
+  map(get_detailed_unions) |>
+  bind_rows(.id = "replication") |>
+  mutate(outmarriage = group_w != group_h, year = floor(start_time)) |>
+  group_by(year) |>
+  summarize(
+    sd = sd(outmarriage),
+    outmarriage = mean(outmarriage),
+    n = n(),
+    se = sd/sqrt(n),
+    .groups = "drop"
+  ) |>
+  mutate(pop_share = "even")
+```
+
+```{r}
+#| label: fig-outmarriage-rate
+#| fig-cap: Mean outmarriage rates across 100 simulations by year of the simulation. Separate results shown for the cases with even and uneven group size in the starting population.
+
+bind_rows(outmarriage_uneven, outmarriage_even) |>
+  ggplot(aes(x = year, y = outmarriage, group = pop_share, color = pop_share))+
+  geom_line()+
+  labs(y = "outmarriage rate", color = "group share")+
+  scale_y_continuous(limits = c(0, NA))+
+  theme_bw()
+```
+
+@fig-outmarriage-rate shows the mean outmarriage rates in the uneven and even starting group size cases across each year of the simulations. The outmarriage rate is simply the proportion of all unions formed in a given year that are between partners belonging to different groups. Notably, these rates are not the same across the cases even though everything else in the simulations is held constant and they have the same underlying log odds ratio of exogamy. In the even group case, the opportunities for intermarriage are greater because the groups are of similar size which leads to a much higher outmarriage ratio.
+
+### Gender ratios under different group rates
+
+Different fertility and mortality schedules by group may produce differences in sex ratios by group, particularly if we reintroduce a preferred age difference into the models. To test this, I will first run two group simulations under different scenarios of group-specific mortality, group-specific fertility, and the preferred age gap. 
+
+```{r}
+#| label: run-changing-rate-scenarios
+
+scenarios <- tribble(
+  ~age_diff, ~mort_prop_hazard, ~fert_prop_hazard,
+  0,         1.0,               1.0,
+  0,         1.2,               1.0,
+  0,         1.0,               1.2,
+  0,         1.2,               1.2,
+  2,         1.0,               1.0,
+  2,         1.2,               1.0,
+  2,         1.0,               1.2,
+  2,         1.2,               1.2
+)
+
+scenario_results <- scenarios |>
+  pmap_dfr(function(age_diff, mort_prop_hazard, fert_prop_hazard) {
+
+    model <- hammel_model() |>
+      set_population(pop_baseline_uneven_2g) |>
+      set_fertility(
+        fertility_rates_overall_usa, 
+        group_prop_hazard = c("B" = fert_prop_hazard)
+      ) |>
+      set_mortality(
+        mortality_rates_usa2000, 
+        group_prop_hazard = c("B" = mort_prop_hazard)
+      ) |>
+      set_union_formation(
+        "on_demand",
+        matching = create_age_gap_matching_model(
+          age_diff, 5, group_exogamy = c("A:B" = -3)
+        )
+      )
+
+    # Return counts rather than retaining every simulation history.
+    counts <- future_map(
+      replication_seeds,
+      function(seed) {
+        simulate(model, years = years, seed = seed) |>
+          get_detailed_unions() |>
+          count(group_w, group_h)
+      },
+      .options = furrr_options(seed = NULL)
+    )
+
+    summary <- counts |>
+      bind_rows(.id = "replication") |>
+      pivot_wider(
+        id_cols = replication,
+        names_from = c(group_w, group_h),
+        values_from = n,
+        values_fill = 0
+      ) |>
+      mutate(
+        log_odds = log(A_B) + log(B_A) - log(A_A) - log(B_B),
+        gender_ratio = A_B / B_A
+      ) |>
+      summarize(
+        across(
+          c(log_odds, gender_ratio),
+          list(mean = mean, se = ~ sd(.x) / sqrt(length(.x)))
+        )
+      )
+
+    bind_cols(
+      tibble(
+        age_diff = age_diff,
+        mort_prop_hazard = mort_prop_hazard,
+        fert_prop_hazard = fert_prop_hazard
+      ),
+      summary
+    )
+  })
+```
+
+```{r}
+#| label: tbl-intermar-parameters-scenarios
+#| tbl-cap: Log odds ratio and gender ratio across scenarios with differing spousal age preferences, group-specific fertility rates, and group-specific mortality rates. Each scenario uses 100 simulations with the resulting mean and monte carlo standard error shown.
+
+scenario_results |>
+  gt() |>
+  cols_label(
+    age_diff ~ "Preferred age gap",
+    mort_prop_hazard ~ "Mortality",
+    fert_prop_hazard ~ "Fertility",
+    log_odds_mean ~ "Log odds",
+    log_odds_se ~ "Log odds SE",
+    gender_ratio_mean ~ "Gender ratio",
+    gender_ratio_se ~ "Gender ratio SE"
+  ) |>
+  tab_spanner(ends_with("prop_hazard"), label = "Proportional hazard") |>
+  fmt_number(c(starts_with("log_odds"), starts_with("gender_ratio")), decimals = 3)
+
+```
+
+@tbl-intermar-parameters-scenarios shows the results from these scenarios across 100 simulations with monte carlo standard errors. The first row provides a baseline with the same fertility and mortality schedules by group and no preference for an age difference. All scenarios produce a log odds ratio very close to the expected value of -6.
+
+The scenarios produce small but real differences in the gender ratios. Higher mortality for group B reduces the gender ratio to slightly below 1 and this affect is bigger for an age gap preference. Increasing fertility for group B has the opposite effect of raising the gender ratio somewhat above 1 and this effect is smaller with an age gap preference.
+
+Overall, even under substantial differences in fertility and mortality, the effect on the gender gap is relatively small. 
+
+## Evaluate Group Inheritance
+
+### Built-in methods
+
+To evaluate the built-in methods, I will run simulations with two uneven groups (A = 75%; B = 25%). Groups will share all rate schedules such that their share should remain the same across the simulation, apart from differences in inheritance rules. Exogamy will be symmetric and somewhat low (-2.5). 
+
+Preliminary results indicated that starting population randomness had a substantial effect on these inheritance patterns, particularly for mother and father inheritance. Therefore, each simulation will generate its own starting population so that monte carlo standard errors incorporate this source of variance. 
+
+```{r}
+#| label: setup-inheritance-model
+
+gweights <- c("A" = 3, "B" = 1)
+
+model_inheritance <- hammel_model() |>
+  set_mortality(mortality_rates_usa2000) |>
+  set_union_formation(
+    "on_demand",
+    matching = create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2.5))
+  )
+```
+
+I will then try each of the built in methods. For the hierarchy case, I will use a strict hierarchy where B > A and passing = 0 and a less strict hierarchy where passing = 0.05. 
+
+```{r}
+#| label: set-inheritance-scenarios
+
+inheritance_scenarios <- c("mother", "father", "random_parent", "same_sex", 
+                           "opposite_sex", "ancestry", "hierarchy_strict", 
+                           "hierarchy_passing")
+```
+
+I run 100 simulations over 100 years for each case. For each simulation, we will track two measures in the final simulated living population of each simulation: 
+
+- Mean group shares of the population
+- Mean ancestry shares conditional on group identity
+
+```{r}
+#| label: run-inheritance-simulations
+
+# reduce workers so I don't blow up the computer
+future::plan(future::multisession, workers = 2)
+
+df_inheritance <- map(inheritance_scenarios, function(scenario) {
+
+  if (str_detect(scenario, "^hierarchy")) {
+    if(scenario == "hierarchy_strict") {
+      model <- model_inheritance |>
+        set_fertility(
+          fertility_rates_overall_usa, 
+          inheritance = create_group_inheritance("hierarchy", order = c("B", "A"))
+        )
+    } else {
+      model <- model_inheritance |>
+        set_fertility(
+          fertility_rates_overall_usa,
+          inheritance = create_group_inheritance("hierarchy", order = c("B", "A"), passing = 0.05)
+        )
+    }
+  } else {
+    model <- model_inheritance |>
+      set_fertility(fertility_rates_overall_usa, inheritance = scenario)
+  }
+
+  results <- future_map(
+    replication_seeds, 
+    function(seed) {
+      # set the baseline population
+      set.seed(seed)
+      model_final <- model |>
+        set_population(
+          create_baseline_population(50000, 50, 2000, group_weights = gweights)
+        )
+      simulate(model_final, years = 100, seed = NULL) 
+    },
+    .options = furrr_options(seed = NULL)
+  )
+  
+  share <- results |>
+    map(calculate_population_size, times = 2100, by_group = TRUE) |>
+    bind_rows(.id = "replication") |>
+    group_by(replication) |>
+    mutate(prop = population / sum(population)) |>
+    ungroup() |>
+    group_by(group) |>
+    summarize(
+      share_mean = mean(prop),
+      share_sd = sd(prop),
+      share_n = n(),
+      share_se = share_sd / sqrt(share_n),
+      .groups = "drop"
+    ) |> 
+    select(group, share_mean, share_se)
+
+
+  ancestry <- results |>
+    map(function(result) {
+      result$persons |>
+        filter(is.na(death_time)) |>
+        left_join(result$ancestry, by = "person_id") |>
+        group_by(group) |>
+        summarize(ancestry_A = mean(group_A), ancestry_B = mean(group_B), .groups = "drop")
+    }) |>
+    bind_rows(.id = "replication") |>
+    group_by(group) |>
+    summarize(
+      n = n(),
+      ancestry_A_mean = mean(ancestry_A),
+      ancestry_A_sd = sd(ancestry_A),
+      ancestry_A_se = ancestry_A_sd / sqrt(n),
+      ancestry_B_mean = mean(ancestry_B),
+      ancestry_B_sd = sd(ancestry_B),
+      ancestry_B_se = ancestry_B_sd / sqrt(n),
+      .groups = "drop"
+    ) |>
+    select(group, ancestry_A_mean, ancestry_A_se, ancestry_B_mean, ancestry_B_se)
+
+  full_join(share, ancestry, by = "group") |> mutate(scenario = scenario)
+}) |>
+  bind_rows()
+
+df_inheritance <- df_inheritance |>
+  mutate(
+    scenario = factor(
+      scenario, 
+      levels = c("mother", "father", "random_parent", "same_sex",  "opposite_sex", "ancestry", 
+                 "hierarchy_passing", "hierarchy_strict")
+    )
+  )
+```
+
+I have the following expectations by inheritance method:
+
+- `mother`, `father`, `random_parent`, `same_sex`, and `opposite_sex` should all produce similar results with group size shares at the end that roughly match the start and similar ancestry shares where more A ancestry in group B than B ancestry in Group A.
+- strict `hierarchy` (B > A) should cause the B group to grow relative to A. A individuals will have no B ancestry but B individuals will have more A ancestry than in other rules. I expect similar results with passing but the increase in B relative to A will be smaller  and A individuals will have a little B ancestry.
+- I think ancestry based approach should favor the larger group A because over time their ancestry will dominate among mixed individuals and thus more mixed individuals will identify with A than B. B individuals will contain more A ancestry than vice verse.
+
+```{r}
+#| label: fig-ending-group-pop
+#| fig-cap: Mean proportion of group B in final simulated population across inheritance scenarios, with 100 simulations per scenario. 95% confidence intervals shown. Dotted line shows the share B in the starting population.
+
+start_share <- gweights["B"]/sum(gweights) 
+
+df_inheritance |>
+  filter(group == "B") |>
+  ggplot(aes(x = scenario, y = share_mean))+
+  geom_hline(yintercept = start_share, linetype = 2)+
+  geom_point()+
+  geom_linerange(aes(ymin = share_mean - 1.96 * share_se, ymax = share_mean + 1.96 * share_se))+
+  labs(y = "Proportion group B", x = NULL)+
+  coord_flip()+
+  theme_bw()
+```
+
+@fig-ending-group-pop shows the mean proportion of the population belonging to group B at the end of each simulation by inheritance rule. The results show that all rules except the hierarchy case produce a group proportion consistent with the starting group share and the proportions are also statistically indistinguishable across those methods. The ancestry method does not shrink the size of the B group, contrary to expectation. 
+
+The hierarchy rules produce a higher share of group B than the other methods and relative to the baseline, as expected. Strict hierarchy increases the B share more than hierarchy with some passing, also as expected. 
+
+```{r}
+#| label: fig-other-ancestry-share
+#| fig-cap: Mean share of non-identifying ancestry for Group A and B individuals in the final simulated population across inheritance scenarios. 95% confidence intervals shown.
+
+df_inheritance |>
+  mutate(
+    ancestry_other = if_else(group == "A", ancestry_B_mean, ancestry_A_mean),
+    se = if_else(group == "A", ancestry_B_se, ancestry_A_se)
+  ) |>
+  ggplot(aes(x = scenario, y = ancestry_other, group = group, color = group))+
+  geom_point()+
+  geom_linerange(aes(ymin = ancestry_other - 1.96 * se, ymax = ancestry_other + 1.96 * se))+
+  coord_flip()+
+  labs(x = NULL, y = "Proportion of ancestry from other group")+
+  theme_bw()
+```
+
+@fig-other-ancestry-share shows the share of ancestry that each group has from the other group at the end of each simulation, meaned across all simulations. All methods except for ancestry and hierarchy produce the same shares within each group. As expected The proportion of A ancestry among B individuals is higher than the proportion of B ancestry among A individuals, because group A was a larger share of the starting population. 
+
+For the ancestry method, the share of cross-group ancestry is higher for both groups than in all other methods except for the hierarchy results, but the larger increase is for group B, as expected. For the hierarchy method, strict hierarchy produces a 0% share of B ancestry among group A members because it is effectively a strict one-drop rule. The share of A ancestry among B individuals, on the other hand, is higher than for any other method because all mixed ancestry gets absorbed into group B. Hierarchy with some passing shows exactly the same pattern but with some slight moderation, as expected.
+
+### Custom rules and mixed identities
+
+To test out the custom rules and the emergence of mixed identities, I will use one of the multinomial logit models developed by Gullickson and Saperstein (2025) to assign births based on the share of A ancestry. This will only be applied to births whose parents differ in their own identities (otherwise assign the shared parental identity). The model will maximize the probability of identifying as AB at about 70% when the proportion of A ancestry is 50%. As that proportion moves toward either 0% or 100%, this probability will gradually decline and the probability of identifying with the dominant ancestry will increase.
+
+I will run one simulation with an even group distribution between A and B at the start for 200 years using this custom inheritance model.
+
+```{r}
+#| label: run-custom-inheritance
+
+# custom function
+custom_inheritance <- create_group_inheritance(
+  "custom",
+  groups = c("A", "B", "AB"),
+  fun = function(child_ancestry, mother_group, father_group, ...) {
+    # Same identity or missing father: follow mother
+    if (is.na(father_group) || mother_group == father_group) {
+      return(mother_group)
+    }
+
+    # Entirely unknown ancestry: follow mother
+    known <- 1 - child_ancestry[["unknown"]]
+    if (known <= 0) return(mother_group)
+
+    # if we are here then assign as a function of group A ancestry
+    prop_A <- child_ancestry[["group_A"]] / known
+
+    logits <- c(
+      A  = -5.138 + 11.88 * prop_A - 15.3 * prop_A^2 + 9.553 * prop_A^3,
+      B  = 0.949 - 9.39 * prop_A + 11.935 * prop_A^2 - 8.483 * prop_A^3,
+      AB = 0
+    )
+    weights <- exp(logits - max(logits))
+
+    sample(names(weights), size = 1, prob = weights)
+  }
+)
+
+pop_baseline_custom <- create_baseline_population(50000, max_age = 100, 2000, group_weights = c("A" = 1, "B" = 1))
+
+model_custom <- hammel_model() |>
+  set_population(pop_baseline_custom) |>
+  set_mortality(mortality_rates_usa2000) |>
+  set_fertility(fertility_rates_overall_usa, inheritance = custom_inheritance) |>
+  set_union_formation(
+    "on_demand",
+    matching = create_age_gap_matching_model(
+      0, 5, group_exogamy = c("A:B" = -2.5, "A:AB" = -1.25, "B:AB" = -1.25)
+    )
+  )
+
+result_custom <- simulate(model_custom, 200, seed = 42)
+```
+
+```{r}
+#| label: fig-group-share-custom-inheritance
+#| fig-cap: Group share across time in custom inheritance simulation
+
+result_custom |>
+  calculate_population_size(2000:2200, by_group = TRUE) |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ggplot(aes(x = time, y = prop, group = group, fill = group))+
+  geom_area()+
+  labs(x = "year", y = "share of population")+
+  theme_bw()
+```
+
+@fig-group-share-custom-inheritance shows the emergence of the mixed AB identity group over the simulation. Because the probability of mixed group identification is high, this population grows at the expense of both A and B. 
+
+```{r}
+#| label: fig-custom-inheritance-prob
+#| fig-cap: Probability of group assignment as a function of proportion A ancestry among births to parents belonging to different groups for all births in a single simulation. Proportion A ancestry is plotted in 10 percent bins by the midpoint of the bin. 95% confidence intervals shown. The dotted line shows the expected probability from the inheritance model.
+
+temp <- tibble(
+  prop_A = seq(0.005, 0.995, 0.005),
+  logit_A = -5.138 + 11.88 * prop_A - 15.3 * prop_A^2 + 9.553 * prop_A^3,
+  logit_B = 0.949 - 9.39 * prop_A + 11.935 * prop_A^2 - 8.483 * prop_A^3,
+  denom = exp(logit_A) + exp(logit_B) + exp(0),
+  prob_A = exp(logit_A)/denom,
+  prob_B = exp(logit_B)/denom,
+  prob_AB = exp(0)/denom
+) |>
+  select(prop_A, starts_with("prob_")) |>
+  pivot_longer(cols = starts_with("prob_"), names_prefix = "prob_", names_to = "group", values_to = "prop") |>
+  rename(prop_a_group = prop_A)
+
+result_custom$persons |>
+  left_join(result_custom$ancestry, by = "person_id") |>
+  left_join(
+    result_custom$persons |> 
+      select(person_id, group) |> 
+      rename(father_id = person_id, group_father = group),
+    by = "father_id"
+  ) |>
+  left_join(
+    result_custom$persons |> 
+      select(person_id, group) |> 
+      rename(mother_id = person_id, group_mother = group),
+    by = "mother_id"
+  ) |>
+  filter(!is.na(group_father) & !is.na(group_mother) &
+    group_father != group_mother) |>
+  mutate(
+    prop_a_group = cut(
+      group_A,
+      breaks = seq(0, 1, 0.1),
+      labels = FALSE,
+      include.lowest = TRUE
+    ) * 0.1 - 0.05
+  ) |>
+  group_by(prop_a_group, group) |>
+  summarize(n = n()) |>
+  mutate(prop = n / sum(n), se = sqrt(prop * (1 - prop) / sum(n))) |>
+  ungroup() |>
+  ggplot(aes(x = prop_a_group, y = prop, group = group, color = group))+
+  geom_line(data = temp, linetype = 2)+
+  geom_point(alpha = 0.8)+
+  geom_linerange(aes(ymin = prop - 1.96 * se, ymax = prop + 1.96 * se), alpha = 0.8)+
+  labs(x = "proportion A ancestry", y = "probability of group identity")+
+  theme_bw()
+```
+
+@fig-custom-inheritance-prob shows the observed probability of being assigned to a given group as a function of share of A ancestry for births to parents from different groups. The dotted line shows the expected probabilities from the model. The results line up closely to expectation and most 95% confidence intervals contain the expected value.
+
+## Speed Tests
+
+Compare runtime and memory with and without groups, ancestry, and custom
+inheritance on documented workloads. Record final population sizes alongside
+timings, and separate compilation/input preparation from simulation execution.
+
+What do I want to compare across:
+
+- stratified groups and prop hazards for cases of 1 group, 2 groups, and 3 groups
+- adding log-odds ratios to 2 group and 3 group cases
+- differences across inheritance models for 2 and 3 group cases
+
+```{r}
+#| label: run-time-tests
+
+scenarios <- tribble(
+  ~strat_method, ~n_groups, ~custom_inheritance,
+  NA,            1,         NA,
+  "rate",        2,         FALSE,
+  "rate",        3,         FALSE,
+  "rate",        4,         FALSE,
+  "prop_hazard", 2,         FALSE,
+  "prop_hazard", 3,         FALSE,
+  "prop_hazard", 4,         FALSE,
+  "rate",        2,         TRUE,
+  "rate",        3,         TRUE,
+  "rate",        4,         TRUE,
+  "prop_hazard", 2,         TRUE,
+  "prop_hazard", 3,         TRUE,
+  "prop_hazard", 4,         TRUE
+)
+
+
+population1 <- create_baseline_population(50000, max_age = 75, end_time = 2000)
+population2 <- create_baseline_population(50000, max_age = 75, end_time = 2000, 
+                                          group_weights = c("A" = 1, "B" = 1))
+population3 <- create_baseline_population(50000, max_age = 75, end_time = 2000, 
+                                          group_weights = c("A" = 1, "B" = 1, "C" = 1))
+population4 <- create_baseline_population(50000, max_age = 75, end_time = 2000, 
+                                          group_weights = c("A" = 1, "B" = 1, "C" = 1, "D" = 1))
+
+prop_hazards2 <- c("B" = 1.05)
+prop_hazards3 <- c("B" = 1.05, "C" = 0.95)
+prop_hazards4 <- c("B" = 1.05, "C" = 0.95, "D" = 1.1)
+
+fertility_rates2 <- bind_rows(
+  fertility_rates_overall_usa |> mutate(group ="A"),
+  fertility_rates_overall_usa |> mutate(group = "B", rate = 1.05 * rate)
+)
+fertility_rates3 <- bind_rows(
+  fertility_rates_overall_usa |> mutate(group ="A"),
+  fertility_rates_overall_usa |> mutate(group = "B", rate = 1.05 * rate),
+  fertility_rates_overall_usa |> mutate(group = "C", rate = 0.95 * rate)
+)
+fertility_rates4 <- bind_rows(
+  fertility_rates_overall_usa |> mutate(group ="A"),
+  fertility_rates_overall_usa |> mutate(group = "B", rate = 1.05 * rate),
+  fertility_rates_overall_usa |> mutate(group = "C", rate = 0.95 * rate),
+  fertility_rates_overall_usa |> mutate(group = "D", rate = 1.1 * rate)
+)
+mortality_rates2 <- bind_rows(
+  mortality_rates_usa2000 |> mutate(group ="A"),
+  mortality_rates_usa2000 |> mutate(group = "B", rate = 1.05 * rate)
+)
+mortality_rates3 <- bind_rows(
+  mortality_rates_usa2000 |> mutate(group ="A"),
+  mortality_rates_usa2000 |> mutate(group = "B", rate = 1.05 * rate),
+  mortality_rates_usa2000 |> mutate(group = "C", rate = 0.95 * rate)
+)
+mortality_rates4 <- bind_rows(
+  mortality_rates_usa2000 |> mutate(group ="A"),
+  mortality_rates_usa2000 |> mutate(group = "B", rate = 1.05 * rate),
+  mortality_rates_usa2000 |> mutate(group = "C", rate = 0.95 * rate),
+  mortality_rates_usa2000 |> mutate(group = "D", rate = 1.1 * rate)
+)
+
+matching1 <- create_age_gap_matching_model(0, 5)
+matching2 <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2))
+matching3 <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2, "B:C" = -1, "A:C" = -3))
+matching4 <- create_age_gap_matching_model(
+  0, 5, group_exogamy = c("A:B" = -2, "A:C" = -3, "A:D" = -2, "B:C" = -1, "B:D" = -0.5, "C:D" = -1)
+)
+
+# custom function for inheritance
+random_inheritance <- create_group_inheritance(
+  "custom",
+  fun = function(child_ancestry, mother_group, father_group, ...) {
+    # Same identity or missing father: follow mother
+    if (is.na(father_group) || mother_group == father_group) {
+      return(mother_group)
+    }
+
+    # Entirely unknown ancestry: follow mother
+    known <- 1 - child_ancestry[["unknown"]]
+    if (known <= 0) return(mother_group)
+    
+    # after all that just return randomly mother or father group
+    sample(c(mother_group, father_group), 1)
+  }
+)
+
+
+elapsed_time <- NULL
+for(i in seq_along(1:nrow(scenarios))) {
+
+  strat_method <- scenarios$strat_method[i]
+  n_groups <- scenarios$n_groups[i]
+  custom_inheritance <- scenarios$custom_inheritance[i]
+
+  model <- hammel_model()
+
+  if(!is.na(custom_inheritance) & custom_inheritance) {
+    model_inheritance <- random_inheritance
+  } else {
+    model_inheritance <- "random_parent"
+  }
+
+  if (n_groups == 1) {
+    model <- model |>
+      set_population(population1) |>
+      set_fertility(fertility_rates_overall_usa) |>
+      set_mortality(mortality_rates_usa2000) |>
+      set_union_formation("on_demand", matching1)
+  } else if (n_groups == 2) {
+    if (strat_method == "rate") {
+      model <- model |> 
+        set_population(population2) |>
+        set_mortality(mortality_rates2) |>
+        set_fertility(fertility_rates2, inheritance = model_inheritance) |>
+        set_union_formation("on_demand", matching2)
+    } else {
+      model <- model |> 
+        set_population(population2) |>
+        set_mortality(mortality_rates_usa2000, group_prop_hazard = prop_hazards2) |>
+        set_fertility(
+          fertility_rates_overall_usa, 
+          group_prop_hazard = prop_hazards2, 
+          inheritance = model_inheritance
+        ) |>
+        set_union_formation("on_demand", matching2)
+    }
+  } else if (n_groups == 3) {
+    if (strat_method == "rate") {
+      model <- model |> 
+        set_population(population3) |>
+        set_mortality(mortality_rates3) |>
+        set_fertility(fertility_rates3, inheritance = model_inheritance) |>
+        set_union_formation("on_demand", matching3)
+    } else {
+      model <- model |> 
+        set_population(population3) |>
+        set_mortality(mortality_rates_usa2000, group_prop_hazard = prop_hazards3) |>
+        set_fertility(
+          fertility_rates_overall_usa, 
+          group_prop_hazard = prop_hazards3,
+          inheritance = model_inheritance
+        ) |>
+        set_union_formation("on_demand", matching3)
+    }
+  } else {
+    if (strat_method == "rate") {
+      model <- model |> 
+        set_population(population4) |>
+        set_mortality(mortality_rates4) |>
+        set_fertility(fertility_rates4, inheritance = model_inheritance) |>
+        set_union_formation("on_demand", matching4)
+    } else {
+      model <- model |> 
+        set_population(population4) |>
+        set_mortality(mortality_rates_usa2000, group_prop_hazard = prop_hazards4) |>
+        set_fertility(
+          fertility_rates_overall_usa, 
+          group_prop_hazard = prop_hazards4,
+          inheritance = model_inheritance
+        ) |>
+        set_union_formation("on_demand", matching4)
+    }
+  }
+
+
+  timing <- system.time({result <- simulate(model, years = 100)})
+  elapsed_time <- c(elapsed_time, unname(timing[["elapsed"]]))
+  #cat(i)
+}
+
+scenarios$elapsed_time <- elapsed_time
+```
+
+```{r}
+#| label: tbl-time-tests
+#| tbl-cap: Time (in seconds) to run simulations with differing parameters. All simulations start with 50,000 individuals and are simulated for 100 years.
+
+scenarios |>
+  mutate(strat_method = if_else(strat_method == "rate", "stratified rate", "proportional hazards")) |>
+  gt() |>
+  cols_label(
+    strat_method ~ "Rate strat method",
+    n_groups ~ "Number of groups",
+    custom_inheritance ~ "Custom inheritance method",
+    elapsed_time ~ "Time (in seconds)"
+  ) |>
+  sub_missing(missing_text = "-")
+```
+
+```{r}
+#| label: fig-time-tests
+#| fig-cap: Time to run simulation by various factors. All simulations run for a 50K population over 100 years.
+
+scenarios |>
+  filter(n_groups > 1) |>
+  mutate(strat_method = if_else(strat_method == "rate", "stratified rate", "proportional hazards")) |>
+  ggplot(aes(x = n_groups, y = elapsed_time, group = custom_inheritance, color = custom_inheritance))+
+  geom_point()+
+  geom_line()+
+  facet_wrap(~strat_method)+
+  labs(x = "number of groups", y = "elapsed time in seconds", color = "custom inheritance")+
+  theme_bw()
+```
+
+
+@tbl-time-tests and @fig-time-tests show the amount of time to process each simulation scenario. These numbers are not exact because other factors can affect total processing time. Adding groups in general increases processing time substantially. The single group simulation runs in about 0.28 seconds, while the two-group cases take at least five times as long. The slight curvature in the figure  suggests that computational time may increase faster than a linear progression with the number of groups. 
+
+Using custom inheritance functions in R increased processing time, but the increase seems to be independent of the number of groups. The inheritance function used here was quite simple. More complex functions could increase time further.
+
+The decision to use proportional hazards or stratified rates had no effect on computing time.
+
+## Tests
+
+The following tests have been constructed and are currently all passing.
+
+```{r}
+#| label: test-results
+
+test_results <- devtools::test(pkg = here::here(), reporter = "silent")
+test_table <- as.data.frame(test_results)
+knitr::kable(
+  test_table[, c("test", "passed", "failed", "error", "skipped", "warning")]
+)
+```
+
+## Conclusions and unresolved limitations
+
+The simulation is now functioning as expected across all the measured indicators. Although the use of groups increases the computational time of the simulation, the overall simulation is still very fast. Furthermore, this simulation maintains speed while choosing among all available partners for each union rather than just a sample. 
+
+The intergroup union parameters are an imperfect approach to union formation and under certain conditions (like small group sizes) could lead to unexpected results. However, these parameters allow for quick computation, the preservation of input rates, and the ability to benchmark off of common measures like log odds ratios. The current paramters give users enough control to handle a variety of cases, but notably do not allow fo marriage squeeze adjustments. A future implementation will seek to add a full two-sex marriage model as an alternative to the current approach. 
+
+## Reproducibility record
+
+```{r}
+#| label: reproducibility
+system2("git", c("-C", shQuote(here::here()), "rev-parse", "HEAD"), stdout = TRUE)
+system2("git", c("-C", shQuote(here::here()), "status", "--short"), stdout = TRUE)
+sessionInfo()
+```
+
+## References
+
+Gullickson, Aaron, and Aliya Saperstein. 2026. "The Dynamics of Population Mixing: A Simulation Approach." Presented at the Annual Meeting of the Population Association of America, St. Louis, MO, May 8, 2026.

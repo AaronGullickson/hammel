@@ -33,27 +33,24 @@ test_that("union processes construct and replace without modifying other process
   matching <- create_matching_model(~ age_difference, c(age_difference = 0))
   rates <- data.frame(age_start = 18, age_end = Inf, rate = 0.1)
   attr(rates, "source") <- list(database = "synthetic")
-  process <- union_formation("rate", matching, 1000, rates)
+  process <- union_formation("rate", matching, rates = rates)
   expect_s3_class(process, "hammel_process")
   expect_s3_class(process, "hammel_union_formation")
   expect_s3_class(process$rates, "tbl_df")
   expect_identical(process$source, attr(rates, "source"))
   model <- set_fertility(hammel_model(), data.frame(age_start = 20, age_end = 30, rate = 0.1))
   updated <- set_process(model, process)
-  expect_equal(union_formation("on_demand", matching)$sample_size, 1000)
+  expect_false("sample_size" %in% c(names(process), names(process$matching)))
   expect_identical(set_union_formation(model, "rate", matching, rates = rates),
-                   set_union_formation(model, "rate", matching, 1000, rates))
+                   set_process(model, process))
   expect_null(model$processes$union_formation)
   expect_identical(updated$processes$fertility, model$processes$fertility)
-  expect_identical(updated, set_union_formation(model, "rate", matching, 1000, rates))
-  replaced <- set_union_formation(updated, "on_demand", matching, 0)
+  expect_identical(updated, set_union_formation(model, "rate", matching, rates = rates))
+  replaced <- set_union_formation(updated, "on_demand", matching)
   expect_null(replaced$processes$union_formation$rates)
   expect_identical(replaced$processes$fertility, model$processes$fertility)
   edited <- process
   edited$matching$coefficients <- c(other = 1)
-  expect_error(set_process(model, edited))
-  edited <- process
-  edited$sample_size <- -1
   expect_error(set_process(model, edited))
   edited <- process
   edited$rates$rate <- -1
@@ -63,19 +60,16 @@ test_that("union processes construct and replace without modifying other process
 test_that("union process validation and execution boundaries are explicit", {
   matching <- create_matching_model(~ age_difference, c(age_difference = 0))
   rates <- data.frame(age_start = 18, age_end = Inf, rate = 0.1)
-  expect_error(union_formation("other", matching, 10))
-  expect_error(union_formation("rate", matching, 10))
-  expect_error(union_formation("on_demand", matching, 10, rates))
-  for (size in list(-1, 0.5, Inf, NA_real_, "100", c(1, 2))) {
-    expect_error(union_formation("on_demand", matching, size))
-  }
-  expect_error(union_formation("rate", matching, 10, rbind(rates, rates)))
+  expect_error(union_formation("other", matching))
+  expect_error(union_formation("rate", matching))
+  expect_error(union_formation("on_demand", matching, rates = rates))
+  expect_error(union_formation("rate", matching, rates = rbind(rates, rates)))
   model <- hammel_model() |>
     set_population(create_baseline_population(0)) |>
     set_mortality(data.frame(sex = c("f", "m"), age_start = 0,
                             age_end = Inf, rate = 0.01)) |>
     set_fertility(data.frame(age_start = 20, age_end = 30, rate = 0.1)) |>
-    set_union_formation("rate", matching, 0, rates)
+    set_union_formation("rate", matching, rates = rates)
   expect_warning(result <- simulate(model, years = 1), "overall fertility schedule")
   expect_equal(nrow(result$unions), 0)
 })

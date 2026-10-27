@@ -27,12 +27,12 @@ Events execute chronologically. In on-demand mode all living females face the
 fertility schedule. Rate mode uses either overall rates for all women (with
 a warning), or separate \code{union_status} schedules. A union-formation process is required. With on-demand
 union formation, use the woman's
-current partner, or sample men and choose one using conditional-logit
+current partner, or draw one from all eligible men using conditional-logit
 probabilities from the matching formula to form a union at the birth.
-Sampled men must meet the configured minimum age (default 15 years).
+Men must meet the configured minimum age (default 15 years).
 Known kin are excluded within the configured generation bound on each side
-of a common ancestor (default two). Other eligibility rules remain pending.
-If no sampled men are eligible, cancel the birth by default. Explicitly set
+of a common ancestor (default two). Hard group exclusions also apply.
+If no eligible man exists, cancel the birth by default. Explicitly set
 \code{cancel_birth_if_no_match = FALSE} to preserve it with unknown father.
 Rate initiation adds age-specific search events for unpartnered women only.
 Failed attempts draw another waiting time. Widowhood cancels pending births
@@ -44,6 +44,10 @@ forming a union or reserving the man.
 A failed match cancels the birth unless explicitly allowed by the union process.
 Cancellation starts no new birth-spacing interval. On-demand mode rejects
 status schedules.
+Matching uses male-group weights recalibrated at each search; simulation
+warns once if any search needed approximate weights. A separate father model
+has its own preferences and delta target adjustments. Event initiation is
+unchanged.
 }
 \details{
 Minimum birth spacing is configured in \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}
@@ -56,9 +60,19 @@ This is not a guarantee of exact ASFR matching. Fertility outside supplied
 bands is zero. Mortality must cover all ages for both sexes, ending at \code{Inf}.
 
 Events are recorded at their sampled times in \verb{[start, start + years)}. Rates and all
-times remain in person-year and year units. Newborn custom columns are missing;
-existing custom columns and histories are preserved. Restarting samples new
+times remain in person-year and year units. Newborn group identity uses
+fertility's inheritance model (random parent by default, with maternal fallback), if groups are present;
+other newborn custom columns are missing. Grouped rate
+tables use each person's group (the woman's group for union searches).
+Ungrouped tables apply to everyone. Missing population groups in a grouped
+rate table are errors. Without population groups, each grouped table uses its
+first alphabetical group with a warning; this does not create group identities.
+Matching can use group predictors and pair effects. Existing custom columns and histories are preserved. Restarting samples new
 pending events and does not reproduce an uninterrupted run exactly.
+When ancestry is tracked, each newborn receives half of each parent's shares,
+with a missing parent contributing its half to unknown ancestry. Initial
+shares are retained, including on restart; grouped populations without shares
+initialize from recorded identities. No additional random draws are made.
 }
 \examples{
 population <- create_baseline_population(100, max_age = 50)

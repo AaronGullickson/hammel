@@ -21,8 +21,20 @@ One row per person, including deceased persons.
 | `death_time` | Death time in years; `NA` for a living person at the result endpoint |
 | `mother_id` | Mother's person ID; `NA` if unknown |
 | `father_id` | Father's person ID; `NA` if unknown |
+| `group` (optional) | Nonmissing character label or finite numeric code; newborn assignment uses fertility's inheritance model (random parent by default, with maternal fallback) |
 
-Omit marital status and latest-union pointers. Derive relationship state from `unions`; the engine may cache derived state for performance without requiring another user-facing column. Unknown earlier histories must not be silently interpreted as known lifetime singlehood. Group, fertility multipliers, sibling pointers, and last-born-child pointers are also omitted for now.
+Omit marital status and latest-union pointers. Derive relationship state from `unions`; the engine may cache derived state for performance without requiring another user-facing column. Unknown earlier histories must not be silently interpreted as known lifetime singlehood. Fertility multipliers, sibling pointers, and last-born-child pointers are also omitted for now. Group labels must be nonempty; their input type is preserved. See [groups](groups.md) for schedule lookup and inheritance rules.
+
+## Ancestry
+
+An optional `ancestry` tibble has one row per person, including deceased people,
+keyed by `person_id`. Known shares are in `group_<label>` columns; `unknown`
+records unknown ancestry. Shares are finite and in `[0,1]`, summing to one per
+person within `1e-8`. Supplied rows are aligned to persons; reference groups may
+differ from current identity groups. Without supplied shares, grouped populations
+initialize everyone at 100% of their recorded group. Without groups or supplied
+shares, no table is created. Newborns average parental shares; a missing parent
+contributes half to unknown. See [ancestry](ancestry.md) for examples and restarts.
 
 ## Unions
 
@@ -45,9 +57,10 @@ required schema. Existing tables must be mapped by sex, not blindly renamed
 by column position. For example, an old row with male partner 1 and female
 partner 2 must place partner 2 in `wife_id` and partner 1 in `husband_id`. `unions = NULL` on person-table input denotes no supplied unions, as already accepted. NULL unions and zero-row, zero-column data frames are normalized to a typed empty union table. Other inputs must supply every schema column; extra columns and data-frame subclasses are preserved.
 
-Optional union diagnostics `.n_eligible` and `.utility_rank` are populated for
-new unions when the process sets `diagnostics = TRUE`; they are not required
-core columns. Historical unknowns remain NA. See
+Optional union diagnostics `.log_weight_<group>` are populated for new unions
+when the process sets `diagnostics = TRUE` and weighted choice runs in a
+grouped population; they are not required core columns. Historical unknowns
+remain NA. See
 [diagnostic semantics](union-formation-models.md#optional-union-diagnostics).
 
 ## Time representation

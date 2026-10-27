@@ -1,0 +1,60 @@
+detailed_union_population <- function() {
+  persons <- data.frame(person_id = c(30, 10, 70), sex = c("m", "f", "m"),
+    birth_time = c(-30, -20, -25), death_time = c(1, NA, NA),
+    mother_id = NA_integer_, father_id = NA_integer_, group = c(20L, 10L, 30L))
+  unions <- data.frame(union_id = c(9, 4), wife_id = 10, husband_id = c(70, 30),
+    start_time = c(1.5, 0), end_time = c(NA, 1), end_reason = c(NA, "death_husband"),
+    note = c("current", "earlier"))
+  hammel_population(persons, unions, end_time = 2)
+}
+
+test_that("detailed unions attach spouses by ID and preserve episodes and input", {
+  population <- detailed_union_population()
+  original <- population
+  result <- get_detailed_unions(population)
+  expect_s3_class(result, "tbl_df")
+  expect_identical(result[names(population$unions)], population$unions)
+  expect_equal(result$birth_time_w, c(-20, -20))
+  expect_true(all(is.na(result$death_time_w)))
+  expect_equal(result$birth_time_h, c(-25, -30))
+  expect_equal(result$death_time_h, c(NA, 1))
+  expect_identical(result$group_w, c(10L, 10L))
+  expect_identical(result$group_h, c(30L, 20L))
+  expect_identical(population, original)
+  population["end_time"] <- list(NULL)
+  expect_identical(get_detailed_unions(population), result)
+})
+
+test_that("groups are optional and their labels retain their input types", {
+  population <- detailed_union_population()
+  population$persons$group <- c("B", "A", "C")
+  expect_identical(get_detailed_unions(population)$group_h, c("C", "B"))
+  population$persons$group <- NULL
+  expect_false(any(c("group_w", "group_h") %in% names(get_detailed_unions(population))))
+})
+
+test_that("empty union histories have the full typed enriched schema", {
+  population <- detailed_union_population()
+  population$unions <- population$unions[FALSE, ]
+  result <- get_detailed_unions(population)
+  expect_s3_class(result, "tbl_df")
+  expect_equal(nrow(result), 0)
+  expect_type(result$group_w, "integer")
+  expect_type(result$birth_time_h, "double")
+  expect_named(result, c(names(population$unions), "birth_time_w", "death_time_w", "group_w",
+                         "birth_time_h", "death_time_h", "group_h"))
+  population <- create_baseline_population(0)
+  expect_equal(nrow(get_detailed_unions(population)), 0)
+  expect_named(get_detailed_unions(population), c(names(population$unions),
+    "birth_time_w", "death_time_w", "birth_time_h", "death_time_h"))
+})
+
+test_that("detailed unions reject invalid histories and conflicting columns", {
+  population <- detailed_union_population()
+  expect_error(get_detailed_unions(population$persons), "hammel_population")
+  population$unions$birth_time_w <- 100
+  expect_error(get_detailed_unions(population), "conflict.*birth_time_w")
+  population <- detailed_union_population()
+  population$unions$husband_id[1] <- 99
+  expect_error(get_detailed_unions(population), "refer to two distinct persons")
+})

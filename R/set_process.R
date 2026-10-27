@@ -12,6 +12,20 @@
 #' @param rates An age-specific rate table passed to [mortality()] or [fertility()].
 #' @param birth_interval Minimum maternal birth-to-birth interval in years,
 #'   defaulting to `0.75`. Must be finite and nonnegative.
+#' @param group_prop_hazard Optional named numeric vector of finite nonnegative
+#'   rate multipliers by group. Missing groups use 1.0; values are not normalized.
+#'   Scales shared or group-specific input rates before fertility birth-spacing
+#'   compensation. Without population groups, simulation warns and ignores it.
+#'   Fertility also accepts a named list of vectors for `partnered` and/or
+#'   `unpartnered` when rates include `union_status`; omitted statuses use 1.0.
+#' @param ffab Probability that a newborn is female, default `0.4886`.
+#'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
+#' @param inheritance A group identity model from [create_group_inheritance()],
+#'   or a method name requiring no additional parameters: `"mother"`, `"father"`,
+#'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
+#'   Applies to fertility and defaults to selecting either parent with equal
+#'   probability, with maternal fallback. Assignment is independent of recorded
+#'   ancestry proportions.
 #'
 #' @return An updated `hammel_model`. The input model is not modified.
 #' @export
@@ -24,6 +38,13 @@
 #'   set_fertility(fertility_rates)
 #' model$processes
 set_process <- function(model, process) {
+  model <- attach_process(model, process)
+  model
+}
+
+# Validate and store a process without user-facing advisory warnings; used by
+# set_process() and by simulate()'s re-validation of edited specifications.
+attach_process <- function(model, process) {
   check_model(model)
   if (!inherits(process, "hammel_process") || !is.list(process)) {
     stop("`process` must be a hammel_process object.", call. = FALSE)
@@ -38,7 +59,17 @@ set_process <- function(model, process) {
       stop("Built-in process rates must use person-year units.", call. = FALSE)
     }
     validate_rates(process$rates, mortality = name == "mortality")
-    if (name == "fertility") validate_birth_interval(process$birth_interval)
+    if (name == "fertility") {
+      validate_fertility_group_prop_hazard(process$group_prop_hazard, process$rates)
+      process$inheritance <- normalize_group_inheritance(process$inheritance)
+    } else {
+      validate_group_prop_hazard(process$group_prop_hazard)
+    }
+    if (name == "fertility") {
+      validate_birth_interval(process$birth_interval)
+      if (!"ffab" %in% names(process)) process$ffab <- 0.4886
+      validate_ffab(process$ffab)
+    }
     process$rates <- tibble::as_tibble(process$rates)
   }
   if (name == "union_formation") {
@@ -51,14 +82,17 @@ set_process <- function(model, process) {
 
 #' @rdname set_process
 #' @export
-set_mortality <- function(model, rates) {
-  set_process(model, mortality(rates))
+set_mortality <- function(model, rates, group_prop_hazard = NULL) {
+  set_process(model, mortality(rates, group_prop_hazard = group_prop_hazard))
 }
 
 #' @rdname set_process
 #' @export
-set_fertility <- function(model, rates, birth_interval = 0.75) {
-  set_process(model, fertility(rates, birth_interval = birth_interval))
+set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard = NULL,
+                          inheritance = create_group_inheritance(), ffab = 0.4886) {
+  set_process(model, fertility(rates, birth_interval = birth_interval,
+                              group_prop_hazard = group_prop_hazard,
+                              inheritance = inheritance, ffab = ffab))
 }
 
 #' Specify age-specific demographic rates
@@ -69,6 +103,14 @@ set_fertility <- function(model, rates, birth_interval = 0.75) {
 #' intervals are allowed. Input order and custom columns are preserved; rate
 #' schedules are returned as tibbles. A `source` attribute on the input table
 #' is copied to the process's `source` field.
+#'
+#' An optional `group` column supplies separate schedules by nonmissing character
+#' label or finite numeric code. Without it, rates apply to all groups. Each
+#' mortality group needs both sexes, and each conditional fertility group needs
+#' both statuses. Overlap and fertility compensation are checked within groups.
+#' Simulation requires schedules for every population group. Without population
+#' groups, simulation warns and uses the first group alphabetically (radix order
+#' of character representations, including numeric codes).
 #'
 #' Mortality requires separate schedules for both sexes. Gaps and uncovered
 #' ages are not filled or interpreted as zero rates. Coverage and fertility
@@ -99,8 +141,30 @@ set_fertility <- function(model, rates, birth_interval = 0.75) {
 #' @param birth_interval Minimum maternal birth-to-birth interval in years,
 #'   defaulting to `0.75`. Must be finite and nonnegative. Applies to fertility
 #'   only; eligible hazards use midpoint birth-spacing compensation.
+#' @param group_prop_hazard Optional named numeric vector of finite nonnegative
+#'   rate multipliers, with unique nonempty group names. Missing groups use 1.0;
+#'   zero suppresses the risk. Values are not normalized. At execution, multiply
+#'   the selected input schedule by the person's group factor, including all
+#'   sex/status strata. Fertility multiplication precedes spacing compensation.
+#'   Without population groups, warn and ignore multipliers. Stored rate tables
+#'   and their source metadata are unchanged; rate-table summaries use those
+#'   stored rates, without applying population-dependent multipliers.
+#'   Fertility with `union_status` rates also accepts a named list such as
+#'   `list(partnered = c(A = 1.1, B = 0.9), unpartnered = c(A = 1.05))`.
+#'   An omitted status or group uses 1.0. A single vector applies to both
+#'   statuses (or overall fertility). Status lists require `union_status` rates.
+#' @param ffab Probability that a newborn is female, default `0.4886`.
+#'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
+#' @param inheritance A group identity model from [create_group_inheritance()],
+#'   or a method name requiring no additional parameters: `"mother"`, `"father"`,
+#'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
+#'   Fertility defaults to selecting either parent with equal probability,
+#'   with maternal fallback. Other parental, ancestry,
+#'   hierarchy, and custom rules assign identity after child sex and ancestry
+#'   are calculated. Possible identities are checked against grouped schedules
+#'   and categorical matching levels before execution. Applies to fertility only.
 #' @return A named list containing `name`, `rates`, and `rate_unit`, plus
-#'   `birth_interval` for fertility, inheriting
+#'   `birth_interval` and `ffab` for fertility, inheriting
 #'   from `hammel_mortality` or `hammel_fertility` and `hammel_process`.
 #' @export
 #' @examples
@@ -110,18 +174,28 @@ set_fertility <- function(model, rates, birth_interval = 0.75) {
 #' model <- hammel_model() |>
 #'   set_process(deaths) |>
 #'   set_process(births)
-mortality <- function(rates) {
+mortality <- function(rates, group_prop_hazard = NULL) {
   validate_rates(rates, mortality = TRUE)
-  new_rate_process("mortality", rates)
+  validate_group_prop_hazard(group_prop_hazard)
+  process <- new_rate_process("mortality", rates)
+  process$group_prop_hazard <- group_prop_hazard
+  process
 }
 
 #' @rdname mortality
 #' @export
-fertility <- function(rates, birth_interval = 0.75) {
+fertility <- function(rates, birth_interval = 0.75, group_prop_hazard = NULL,
+                      inheritance = create_group_inheritance(), ffab = 0.4886) {
   validate_rates(rates, mortality = FALSE)
+  validate_fertility_group_prop_hazard(group_prop_hazard, rates)
+  inheritance <- normalize_group_inheritance(inheritance)
   validate_birth_interval(birth_interval)
+  validate_ffab(ffab)
   process <- new_rate_process("fertility", rates)
+  process$inheritance <- if (is.null(inheritance)) create_group_inheritance() else inheritance
   process$birth_interval <- birth_interval
+  process$ffab <- ffab
+  process$group_prop_hazard <- group_prop_hazard
   process
 }
 
@@ -136,6 +210,14 @@ validate_rates <- function(rates, mortality) {
   columns <- c("age_start", "age_end", "rate")
   if (mortality) columns <- c("sex", columns)
   check_columns(rates, columns, "rates")
+  if ("group" %in% names(rates)) {
+    for (rows in split_rate_groups(rates)) {
+      schedule <- rates[rows, setdiff(names(rates), "group"), drop = FALSE]
+      validate_rates(schedule, mortality)
+    }
+    if (!nrow(rates)) stop("`rates` must contain at least one age interval.", call. = FALSE)
+    return(invisible(rates))
+  }
   if (nrow(rates) == 0L) {
     stop("`rates` must contain at least one age interval.", call. = FALSE)
   }
@@ -190,4 +272,13 @@ validate_rates <- function(rates, mortality) {
     }
   }
   invisible(rates)
+}
+
+validate_ffab <- function(probability) {
+  if (!is.numeric(probability) || !is.null(dim(probability)) ||
+      length(probability) != 1L || !is.finite(probability) ||
+      probability < 0 || probability > 1) {
+    stop("`ffab` must be a finite numeric probability in [0, 1].", call. = FALSE)
+  }
+  invisible(probability)
 }

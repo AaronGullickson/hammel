@@ -14,7 +14,7 @@ process object, or a data frame with \code{age_start}, \code{age_end}, and \code
 \item{radix}{Initial life-table survivors, a positive finite number.}
 }
 \value{
-A tibble with period, sex, and union-status identifiers (when supplied),
+A tibble with period, sex, group, and union-status identifiers (when supplied),
 \code{age_start}, \code{age_end}, \code{mx}, \code{n}, \code{ax}, \code{qx}, \code{lx}, \code{lx_end}, \code{dx},
 \code{Lx}, \code{Tx}, and \code{ex}. Summary counts and exposure columns are omitted.
 Life expectancy is \code{Tx / lx} in years.
@@ -25,7 +25,7 @@ is exponential, and person-years are integrated under that same assumption.
 This does not apply conventional HMD infant adjustments. Missing rates remain
 unknown. A zero terminal rate gives infinite remaining lifetime when terminal
 survivorship is positive. Require a final explicit open age interval.
-Tables are constructed separately for each period, sex, and union status
+Tables are constructed separately for each period, sex, group, and union status
 present. Status-specific tables hold that status fixed; they do not model
 transitions between statuses.
 }

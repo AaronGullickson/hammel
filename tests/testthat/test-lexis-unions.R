@@ -127,7 +127,8 @@ test_that("existing TFR and life-table grouping accepts long Lexis results", {
     c(0, 20, 30, 40, Inf), TRUE)
   tfr <- calculate_tfr(counts)
   expect_identical(tfr$union_status, c("overall", "partnered", "unpartnered"))
-  expect_equal(tfr$tfr, c(40/3, 40/3, 40/3))
+  # Unobserved finite age bands make each status-specific total incomplete.
+  expect_identical(tfr$tfr, rep(NA_real_, 3))
   expect_s3_class(tfr, "tbl_df")
   expect_identical(attr(tfr, "unassigned_births"), attr(counts, "unassigned_births"))
   life <- calculate_life_table(counts)

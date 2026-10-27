@@ -8,26 +8,26 @@
 union_formation(
   initiation,
   matching = create_age_gap_matching_model(0, 5),
-  sample_size = 1000,
   rates = NULL,
   min_male_age = 15,
   kinship_generations = 2,
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
-  diagnostics = FALSE
+  diagnostics = FALSE,
+  group_prop_hazard = NULL
 )
 
 set_union_formation(
   model,
   initiation,
   matching = create_age_gap_matching_model(0, 5),
-  sample_size = 1000,
   rates = NULL,
   min_male_age = 15,
   kinship_generations = 2,
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
-  diagnostics = FALSE
+  diagnostics = FALSE,
+  group_prop_hazard = NULL
 )
 }
 \arguments{
@@ -38,18 +38,21 @@ set_union_formation(
 to \code{create_age_gap_matching_model(0, 5)}: preferred age gap zero years,
 with selection weight halving five years on either side.}
 
-\item{sample_size}{Nonnegative whole number of men to sample before screening;
-zero requests the whole pool. Defaults to \code{1000}.}
-
 \item{rates}{For \code{"rate"} initiation, an age-specific female search-hazard
 table with \code{age_start}, \code{age_end}, and \code{rate}, in years and per person-year.
 These specify search attempts, not guaranteed realized union formation.
+An optional \code{group} column selects the woman's group. Without it, all groups
+share the schedule. Group does not restrict partner matching. With no
+population groups, simulation warns and selects the first alphabetical group.
+See \code{\link[=mortality]{mortality()}} for group-label and rate-coverage rules.
 Nonoverlapping bands may have gaps or an open end; gaps and ages outside
 support have zero hazard. Must be NULL for \code{"on_demand"}.}
 
 \item{min_male_age}{Minimum male age in continuous years at a new partner
 search, default \code{15}. Finite nonnegative scalar; zero disables this age
-exclusion. Existing unions are retained. No female minimum age is added.}
+exclusion. Existing unions are retained. No minimum is added for actual
+female event eligibility. Weighted choice counts unpartnered men and women
+at or above this same cutoff when calibrating its weights.}
 
 \item{kinship_generations}{Generation bound on both sides of a known common
 ancestor, default \code{2}. Excludes parents, grandparents, siblings, aunts/uncles,
@@ -61,8 +64,9 @@ are retained. See \code{\link[=extract_kin]{extract_kin()}} for the shared dista
 \item{father_matching}{Optional matching specification for fathers of
 unpartnered births in rate mode, created by \code{\link[=create_matching_model]{create_matching_model()}}.
 Defaults to \code{NULL}, using the current general \code{matching} model. Union
-searches always use \code{matching}. Not used by on-demand initiation. Sampling
-and eligibility settings are shared by both models.}
+searches always use \code{matching}. Not used by on-demand initiation. Process-level
+age and kinship screening settings are shared; NULL inherits the general
+model's settings.}
 
 \item{cancel_birth_if_no_match}{Logical, default \code{TRUE}. Cancel a birth when
 its on-demand partner search or rate-mode nonmarital father selection fails.
@@ -71,9 +75,19 @@ IDs are retained. A cancellation starts no new spacing interval and draws
 fresh waiting times from the failed attempt. Partner scarcity can reduce
 realized fertility below inputs.}
 
-\item{diagnostics}{Logical, default \code{FALSE}. Record \code{.n_eligible} (sampled men
-remaining after screening) and \code{.utility_rank} (1 = highest utility, ties
-share the minimum rank) on newly formed unions. Historical unknowns are NA.}
+\item{diagnostics}{Logical, default \code{FALSE}. When the general matching model
+uses weighted choice in a grouped population, record \verb{.log_weight_<group>}
+columns on newly formed unions: the log group
+weights applied at the search that formed each union (0 for the reference
+group and when calibration cannot affect choices). Use the column for each alternative's
+group as a conditional-logit offset in wife-side choice sets.}
+
+\item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
+search-rate multipliers by the woman's group. Missing groups use 1.0;
+zero suppresses searches. Applies to shared or group-specific input rates.
+Without population groups, simulation warns and ignores multipliers.
+Requires \code{initiation = "rate"}; on-demand formation has no search hazard.
+Matching utilities and input rate tables are unchanged.}
 
 \item{model}{A \code{hammel_model} object.}
 }
@@ -84,30 +98,50 @@ share the minimum rank) on newly formed unions. Historical unknowns are NA.}
 \description{
 Construct or attach a union-formation specification without executing it.
 In on-demand mode, at a birth use
-the woman's current partner, or sample living, unpartnered men and choose a partner using
-conditional-logit probabilities from the matching formula to form a union.
-Sampled men below \code{min_male_age} are excluded. If no eligible sampled men
-remain, cancel the birth by default; \code{cancel_birth_if_no_match = FALSE}
+the woman's current partner, or choose a partner from all living, unpartnered
+men using conditional-logit probabilities from the matching formula to form
+a union. Men below \code{min_male_age} are excluded. If no eligible man exists,
+cancel the birth by default; \code{cancel_birth_if_no_match = FALSE}
 preserves it with unknown father. Known kin within
 \code{kinship_generations} on both sides of a common ancestor are excluded.
-Each person may have only one ongoing union. Partnered men are excluded
-before sampling; surviving husbands return to the pool at widowhood. Death ends affected
+Each person may have only one ongoing union. Partnered men are not
+available; surviving husbands return to the pool at widowhood. Death ends affected
 unions. In rate mode unpartnered women face competing search events and
 use their unpartnered fertility schedule and may give birth without initiating
 a search. Failed searches draw another waiting time; formation and widowhood
 switch fertility schedules while preserving spacing. An overall fertility
 schedule applies to both statuses, with a simulation warning. On-demand mode
 requires an overall fertility schedule. Unpartnered rate-mode births use the
-same candidate sampling and eligibility to assign a father, using
+same eligibility and exact draw to assign a father, using
 \code{father_matching} when supplied or otherwise \code{matching}, without
-forming a union or removing him from availability. Empty screened pools
-cancel births by default. No previous-father preference is applied.
+forming a union or removing him from availability. A search with no
+eligible man cancels the birth by default. No previous-father preference
+is applied.
 }
 \details{
-Sampling is from the available male pool BEFORE pair-specific screening.
-\code{sample_size = 0} means the whole pool. Otherwise sample without replacement
-up to that many men. Age screening occurs afterward, without refilling the
-sample. Kinship screening follows the same ordering. Existing unions are
-retained even if a new-search restriction would exclude the partner.
-Candidate sets will not be retained in simulation outputs.
+Partners are drawn exactly from the full conditional-logit distribution over
+all eligible men, without a candidate sample. Living, unpartnered men are
+grouped by group and quarter-year birth bin; a bin is chosen in proportion
+to its size times the largest weight any member could have, a member is
+accepted with the ratio of his weight to that maximum, and only he is
+screened for age and kinship. For the built-in linear/quadratic age model
+this is exact. Custom R formulas are bounded on a 1/32-year grid; if a drawn
+man's utility exceeds the bound, simulation warns that draws were
+approximate. Existing unions are retained even if a new-search restriction
+would exclude the partner.
+
+Matching always uses calibrated male-group weights: a woman chooses among
+screened candidates with each man's selection weight multiplied by a
+weight for his group. Weights are recalculated at every search, in continuous time,
+so that expected male union flows by group match a mirrored target: each
+unpartnered man has the per-capita intensity of an unpartnered woman of his
+group, adjusted by the matching model's \code{delta}. Women's
+intensity is the search hazard for rate-mode searches and the unpartnered
+fertility hazard (zero during birth spacing) for on-demand searches and
+nonmarital father selection, which has its own weights and uses the father
+model's preferences and delta when one is supplied. Weights depend only
+on the man's group, so they do not change the association between partners'
+characteristics in the static group-only illustration. With one group,
+all group weights are one. When no
+exact weights exist, approximate weights are used with a warning.
 }

@@ -11,21 +11,23 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // demographic_counts_cpp
-List demographic_counts_cpp(DataFrame persons, NumericVector time_breaks, NumericVector age_breaks);
-RcppExport SEXP _hammel_demographic_counts_cpp(SEXP personsSEXP, SEXP time_breaksSEXP, SEXP age_breaksSEXP) {
+List demographic_counts_cpp(DataFrame persons, NumericVector time_breaks, NumericVector age_breaks, IntegerVector group_indices, int group_count);
+RcppExport SEXP _hammel_demographic_counts_cpp(SEXP personsSEXP, SEXP time_breaksSEXP, SEXP age_breaksSEXP, SEXP group_indicesSEXP, SEXP group_countSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< DataFrame >::type persons(personsSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type time_breaks(time_breaksSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type age_breaks(age_breaksSEXP);
-    rcpp_result_gen = Rcpp::wrap(demographic_counts_cpp(persons, time_breaks, age_breaks));
+    Rcpp::traits::input_parameter< IntegerVector >::type group_indices(group_indicesSEXP);
+    Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
+    rcpp_result_gen = Rcpp::wrap(demographic_counts_cpp(persons, time_breaks, age_breaks, group_indices, group_count));
     return rcpp_result_gen;
 END_RCPP
 }
 // union_counts_cpp
-List union_counts_cpp(DataFrame persons, DataFrame unions, NumericVector time_breaks, NumericVector age_breaks);
-RcppExport SEXP _hammel_union_counts_cpp(SEXP personsSEXP, SEXP unionsSEXP, SEXP time_breaksSEXP, SEXP age_breaksSEXP) {
+List union_counts_cpp(DataFrame persons, DataFrame unions, NumericVector time_breaks, NumericVector age_breaks, IntegerVector group_indices, int group_count);
+RcppExport SEXP _hammel_union_counts_cpp(SEXP personsSEXP, SEXP unionsSEXP, SEXP time_breaksSEXP, SEXP age_breaksSEXP, SEXP group_indicesSEXP, SEXP group_countSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -33,7 +35,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< DataFrame >::type unions(unionsSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type time_breaks(time_breaksSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type age_breaks(age_breaksSEXP);
-    rcpp_result_gen = Rcpp::wrap(union_counts_cpp(persons, unions, time_breaks, age_breaks));
+    Rcpp::traits::input_parameter< IntegerVector >::type group_indices(group_indicesSEXP);
+    Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
+    rcpp_result_gen = Rcpp::wrap(union_counts_cpp(persons, unions, time_breaks, age_breaks, group_indices, group_count));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -77,33 +81,98 @@ BEGIN_RCPP
 END_RCPP
 }
 // inspect_matching_cpp
-List inspect_matching_cpp(NumericVector age_difference, List matching, int draws);
-RcppExport SEXP _hammel_inspect_matching_cpp(SEXP age_differenceSEXP, SEXP matchingSEXP, SEXP drawsSEXP) {
+NumericVector inspect_matching_cpp(NumericVector age_difference, List matching);
+RcppExport SEXP _hammel_inspect_matching_cpp(SEXP age_differenceSEXP, SEXP matchingSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< NumericVector >::type age_difference(age_differenceSEXP);
     Rcpp::traits::input_parameter< List >::type matching(matchingSEXP);
-    Rcpp::traits::input_parameter< int >::type draws(drawsSEXP);
-    rcpp_result_gen = Rcpp::wrap(inspect_matching_cpp(age_difference, matching, draws));
+    rcpp_result_gen = Rcpp::wrap(inspect_matching_cpp(age_difference, matching));
     return rcpp_result_gen;
 END_RCPP
 }
-// sample_male_positions_cpp
-IntegerVector sample_male_positions_cpp(int count, int requested);
-RcppExport SEXP _hammel_sample_male_positions_cpp(SEXP countSEXP, SEXP requestedSEXP) {
+// inspect_group_matching_cpp
+NumericVector inspect_group_matching_cpp(NumericVector age_difference, List matching, int female_group, IntegerVector male_groups);
+RcppExport SEXP _hammel_inspect_group_matching_cpp(SEXP age_differenceSEXP, SEXP matchingSEXP, SEXP female_groupSEXP, SEXP male_groupsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< int >::type count(countSEXP);
-    Rcpp::traits::input_parameter< int >::type requested(requestedSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_male_positions_cpp(count, requested));
+    Rcpp::traits::input_parameter< NumericVector >::type age_difference(age_differenceSEXP);
+    Rcpp::traits::input_parameter< List >::type matching(matchingSEXP);
+    Rcpp::traits::input_parameter< int >::type female_group(female_groupSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type male_groups(male_groupsSEXP);
+    rcpp_result_gen = Rcpp::wrap(inspect_group_matching_cpp(age_difference, matching, female_group, male_groups));
+    return rcpp_result_gen;
+END_RCPP
+}
+// inspect_weighted_calibration_cpp
+List inspect_weighted_calibration_cpp(NumericVector female_born, IntegerVector female_groups, LogicalVector female_fertile, NumericVector male_born, IntegerVector male_groups, DataFrame rates, List matching, int group_count, double now, double cutoff, double width, bool fertility);
+RcppExport SEXP _hammel_inspect_weighted_calibration_cpp(SEXP female_bornSEXP, SEXP female_groupsSEXP, SEXP female_fertileSEXP, SEXP male_bornSEXP, SEXP male_groupsSEXP, SEXP ratesSEXP, SEXP matchingSEXP, SEXP group_countSEXP, SEXP nowSEXP, SEXP cutoffSEXP, SEXP widthSEXP, SEXP fertilitySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type female_born(female_bornSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type female_groups(female_groupsSEXP);
+    Rcpp::traits::input_parameter< LogicalVector >::type female_fertile(female_fertileSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type male_born(male_bornSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type male_groups(male_groupsSEXP);
+    Rcpp::traits::input_parameter< DataFrame >::type rates(ratesSEXP);
+    Rcpp::traits::input_parameter< List >::type matching(matchingSEXP);
+    Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
+    Rcpp::traits::input_parameter< double >::type now(nowSEXP);
+    Rcpp::traits::input_parameter< double >::type cutoff(cutoffSEXP);
+    Rcpp::traits::input_parameter< double >::type width(widthSEXP);
+    Rcpp::traits::input_parameter< bool >::type fertility(fertilitySEXP);
+    rcpp_result_gen = Rcpp::wrap(inspect_weighted_calibration_cpp(female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility));
+    return rcpp_result_gen;
+END_RCPP
+}
+// inspect_exact_draw_cpp
+List inspect_exact_draw_cpp(NumericVector male_born, IntegerVector male_group, LogicalVector male_excluded, double female_born, int female_group, NumericVector log_weights, List matching, int groups, double now, double cutoff, int draws);
+RcppExport SEXP _hammel_inspect_exact_draw_cpp(SEXP male_bornSEXP, SEXP male_groupSEXP, SEXP male_excludedSEXP, SEXP female_bornSEXP, SEXP female_groupSEXP, SEXP log_weightsSEXP, SEXP matchingSEXP, SEXP groupsSEXP, SEXP nowSEXP, SEXP cutoffSEXP, SEXP drawsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type male_born(male_bornSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type male_group(male_groupSEXP);
+    Rcpp::traits::input_parameter< LogicalVector >::type male_excluded(male_excludedSEXP);
+    Rcpp::traits::input_parameter< double >::type female_born(female_bornSEXP);
+    Rcpp::traits::input_parameter< int >::type female_group(female_groupSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type log_weights(log_weightsSEXP);
+    Rcpp::traits::input_parameter< List >::type matching(matchingSEXP);
+    Rcpp::traits::input_parameter< int >::type groups(groupsSEXP);
+    Rcpp::traits::input_parameter< double >::type now(nowSEXP);
+    Rcpp::traits::input_parameter< double >::type cutoff(cutoffSEXP);
+    Rcpp::traits::input_parameter< int >::type draws(drawsSEXP);
+    rcpp_result_gen = Rcpp::wrap(inspect_exact_draw_cpp(male_born, male_group, male_excluded, female_born, female_group, log_weights, matching, groups, now, cutoff, draws));
+    return rcpp_result_gen;
+END_RCPP
+}
+// inspect_weighted_incremental_cpp
+List inspect_weighted_incremental_cpp(NumericVector female_born, IntegerVector female_groups, NumericVector male_born, IntegerVector male_groups, NumericVector op_times, IntegerVector op_men, NumericVector op_deltas, DataFrame rates, List matching, int group_count, double cutoff);
+RcppExport SEXP _hammel_inspect_weighted_incremental_cpp(SEXP female_bornSEXP, SEXP female_groupsSEXP, SEXP male_bornSEXP, SEXP male_groupsSEXP, SEXP op_timesSEXP, SEXP op_menSEXP, SEXP op_deltasSEXP, SEXP ratesSEXP, SEXP matchingSEXP, SEXP group_countSEXP, SEXP cutoffSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type female_born(female_bornSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type female_groups(female_groupsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type male_born(male_bornSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type male_groups(male_groupsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type op_times(op_timesSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type op_men(op_menSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type op_deltas(op_deltasSEXP);
+    Rcpp::traits::input_parameter< DataFrame >::type rates(ratesSEXP);
+    Rcpp::traits::input_parameter< List >::type matching(matchingSEXP);
+    Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
+    Rcpp::traits::input_parameter< double >::type cutoff(cutoffSEXP);
+    rcpp_result_gen = Rcpp::wrap(inspect_weighted_incremental_cpp(female_born, female_groups, male_born, male_groups, op_times, op_men, op_deltas, rates, matching, group_count, cutoff));
     return rcpp_result_gen;
 END_RCPP
 }
 // simulate_cpp
-List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, DataFrame unions, int sample_size, List matching, double min_male_age, int kinship_generations, bool rate_initiation, DataFrame union_rates, List father_matching, bool cancel_birth_if_no_match, bool diagnostics);
-RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP unionsSEXP, SEXP sample_sizeSEXP, SEXP matchingSEXP, SEXP min_male_ageSEXP, SEXP kinship_generationsSEXP, SEXP rate_initiationSEXP, SEXP union_ratesSEXP, SEXP father_matchingSEXP, SEXP cancel_birth_if_no_matchSEXP, SEXP diagnosticsSEXP) {
+List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, DataFrame unions, List matching, double min_male_age, int kinship_generations, bool rate_initiation, DataFrame union_rates, List father_matching, bool cancel_birth_if_no_match, bool diagnostics, NumericMatrix initial_ancestry, List inheritance, double ffab);
+RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP unionsSEXP, SEXP matchingSEXP, SEXP min_male_ageSEXP, SEXP kinship_generationsSEXP, SEXP rate_initiationSEXP, SEXP union_ratesSEXP, SEXP father_matchingSEXP, SEXP cancel_birth_if_no_matchSEXP, SEXP diagnosticsSEXP, SEXP initial_ancestrySEXP, SEXP inheritanceSEXP, SEXP ffabSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -114,7 +183,6 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type years(yearsSEXP);
     Rcpp::traits::input_parameter< double >::type birth_interval(birth_intervalSEXP);
     Rcpp::traits::input_parameter< DataFrame >::type unions(unionsSEXP);
-    Rcpp::traits::input_parameter< int >::type sample_size(sample_sizeSEXP);
     Rcpp::traits::input_parameter< List >::type matching(matchingSEXP);
     Rcpp::traits::input_parameter< double >::type min_male_age(min_male_ageSEXP);
     Rcpp::traits::input_parameter< int >::type kinship_generations(kinship_generationsSEXP);
@@ -123,20 +191,26 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< List >::type father_matching(father_matchingSEXP);
     Rcpp::traits::input_parameter< bool >::type cancel_birth_if_no_match(cancel_birth_if_no_matchSEXP);
     Rcpp::traits::input_parameter< bool >::type diagnostics(diagnosticsSEXP);
-    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, sample_size, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics));
+    Rcpp::traits::input_parameter< NumericMatrix >::type initial_ancestry(initial_ancestrySEXP);
+    Rcpp::traits::input_parameter< List >::type inheritance(inheritanceSEXP);
+    Rcpp::traits::input_parameter< double >::type ffab(ffabSEXP);
+    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_hammel_demographic_counts_cpp", (DL_FUNC) &_hammel_demographic_counts_cpp, 3},
-    {"_hammel_union_counts_cpp", (DL_FUNC) &_hammel_union_counts_cpp, 4},
+    {"_hammel_demographic_counts_cpp", (DL_FUNC) &_hammel_demographic_counts_cpp, 5},
+    {"_hammel_union_counts_cpp", (DL_FUNC) &_hammel_union_counts_cpp, 6},
     {"_hammel_extract_kin_cpp", (DL_FUNC) &_hammel_extract_kin_cpp, 4},
     {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
     {"_hammel_adjusted_fertility_cpp", (DL_FUNC) &_hammel_adjusted_fertility_cpp, 2},
-    {"_hammel_inspect_matching_cpp", (DL_FUNC) &_hammel_inspect_matching_cpp, 3},
-    {"_hammel_sample_male_positions_cpp", (DL_FUNC) &_hammel_sample_male_positions_cpp, 2},
-    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 16},
+    {"_hammel_inspect_matching_cpp", (DL_FUNC) &_hammel_inspect_matching_cpp, 2},
+    {"_hammel_inspect_group_matching_cpp", (DL_FUNC) &_hammel_inspect_group_matching_cpp, 4},
+    {"_hammel_inspect_weighted_calibration_cpp", (DL_FUNC) &_hammel_inspect_weighted_calibration_cpp, 12},
+    {"_hammel_inspect_exact_draw_cpp", (DL_FUNC) &_hammel_inspect_exact_draw_cpp, 11},
+    {"_hammel_inspect_weighted_incremental_cpp", (DL_FUNC) &_hammel_inspect_weighted_incremental_cpp, 11},
+    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 18},
     {NULL, NULL, 0}
 };
 

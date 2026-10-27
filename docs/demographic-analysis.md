@@ -32,10 +32,33 @@ Birth counts and ASFR are `NA` for males. Female exposure includes the time
 excluded by birth spacing. Zero events with positive exposure give a zero rate;
 zero exposure gives `NA`. Keep those situations distinct.
 
-Births with unknown mothers cannot be assigned maternal age. Their period
+`by_group = TRUE` returns a separate grid for every group in the person
+history, preserving character labels or numeric codes. The default FALSE pools
+groups. TRUE requires a `group` column; no pooled group row is added. Exposure
+and deaths follow each person's group; births follow the mother's group, even
+when the child's group differs. It can be combined with `include_unions = TRUE`:
+each spouse's formations and exposure follow their own group. Complete histories
+are retained during extraction, so cross-group family links remain available.
+
+```r
+group_counts <- calculate_lexis_counts(
+  result, seq(2020, 2100, 20), 0:100,
+  by_group = TRUE, include_unions = TRUE
+)
+group_tfr <- calculate_tfr(group_counts)
+group_life_tables <- calculate_life_table(group_counts)
+```
+
+Groups appear in first-occurrence order, with all period/age/sex cells retained,
+including zero exposure. Empty grouped histories produce typed empty tables.
+See [groups](groups.md) for exact accounting examples and observation rules.
+
+Births with unknown mothers cannot be assigned maternal age or group. Their period
 counts are in `attr(summary, "unassigned_births")`, also a tibble. Initial
 persons born within the observation window can appear there if parents are
-unknown; a baseline is not complete historical birth follow-up.
+unknown; a baseline is not complete historical birth follow-up. The attribute
+remains one pooled count per period when `by_group = TRUE`; the child's group
+does not establish an unknown mother's group.
 
 ## Total fertility rate
 
@@ -48,10 +71,17 @@ output_tfr <- summary |> calculate_tfr()
 and sums ASFR times each finite band's actual width by period. There is no
 `age_range` argument; subset the summary to the desired age range first.
 Remaining bands must be contiguous. The output reports the finite range used.
+A `group` column automatically separates TFR calculations within each period
+and union status, preserving group labels and their type. This applies to
+process rates as well as Lexis summaries; groups are not averaged together.
 
-Missing ASFR contributions are omitted with `na.rm = TRUE`; an all-missing set
-sums to zero. That is the accepted calculation rule, not evidence of zero
-fertility in unobserved ages. Inspect exposure and missing rates alongside TFR.
+If any ASFR in the included finite age bands is missing, TFR is `NA` for
+that period/group/status, including when all ASFRs are missing. Known zero
+rates contribute zero. For example, two five-year bands with rates 0.1 and
+`NA` yield `NA`, not 0.5; rates 0.1 and zero yield 0.5. Missing rates in
+excluded open age bands do not affect TFR. Inspect exposure and missing rates
+alongside TFR; when summarizing with `na.rm = TRUE`, report the number of
+nonmissing TFRs because the summary includes only complete estimates.
 HFD input TFR excludes the omitted open endpoint rows, so do not compare it
 uncritically with the full published HFD TFR.
 
@@ -66,7 +96,7 @@ output_life_table |>
   dplyr::select(time_start, time_end, sex, ex)
 ```
 
-Each period/sex needs contiguous age bands from zero through an explicit open
+Each period/sex/group/status combination present needs contiguous age bands from zero through an explicit open
 interval. Lexis counts add that interval automatically; manually supplied rate
 tables must define it themselves. The function treats mortality as piecewise
 constant hazards, integrates exponential survival/person-years, and calculates
@@ -91,6 +121,12 @@ TFR uses `rate_fertility` or fertility `rate`; life tables use `mx`, `rate_morta
 `rate`. Typed processes prevent passing mortality to TFR or fertility to a life
 table. A bare `rate` column has no such type protection.
 
+Input-rate summaries, including those passed a process object, summarize its
+stored rate table. They do not apply `group_prop_hazard` settings or expand a
+shared table to population groups. Account for those factors when preparing
+effective input-rate comparisons; summaries of simulated histories already
+reflect the configured multipliers.
+
 ## Population size and observation boundaries
 
 ```r
@@ -100,6 +136,12 @@ population_sizes <- result |>
 
 This returns `time` and `population`. Counts include births and exclude deaths
 at the requested instant, preserving input order and repeated times.
+`calculate_population_size(result, times, by_group = TRUE)` adds `group` and
+counts each group separately. It requires group data, retains the group's input
+type, and lists groups in first-occurrence order within each requested time.
+Groups present in the history get zero counts where no members are alive.
+There is no extra pooled row. Empty time vectors and empty group histories
+return zero-row tibbles with the appropriate column types.
 
 Lexis exposure splits `[birth_time, death_time)` directly at period/age
 boundaries; fractional years and unequal bands are supported. Population
@@ -109,8 +151,9 @@ Missing death times are censored there.
 
 ## Replications and interpretation
 
-Analyze each independent history before combining summaries. There is no
-`groups` argument or automatic custom stratification. Stacking person tables
+Analyze each independent history before combining summaries. Group stratification
+is available through `by_group`; arbitrary custom stratification is not supported.
+Stacking person tables
 with repeated IDs would make parent references ambiguous and is rejected.
 Retain a replication ID when binding derived tables:
 
@@ -143,7 +186,55 @@ components of the overall TFR. Tables without status retain their existing
 behavior; default Lexis summaries use all female exposure, while
 `include_unions = TRUE` also returns status-specific exposure as described below.
 
+## Parent information
+
+`get_parent_info(population)` enriches the full persons table with
+`age_mother` and `age_father` at each person's birth, in years, and
+`group_mother` and `group_father` when the population records groups.
+Parents are matched by ID, including deceased parents. Unknown parents yield
+missing values; founder rows remain present. For example, birth in 2000.5
+and maternal birth in 1975.25 give `age_mother = 25.25`.
+
+```r
+parent_info <- get_parent_info(result)
+cross_group_births <- parent_info |>
+  dplyr::filter(!is.na(group_mother), !is.na(group_father),
+                group_mother != group_father)
+```
+
+All original person rows and columns are preserved, as are group types.
+Conflicting names cause an error. Empty populations return the enriched
+zero-row tibble. No endpoint is required and the population is not modified.
+Parent groups are recorded identities, not reconstructed past transitions.
+
 ## Union exposure and formation counts
+
+### Detailed union records
+
+`get_detailed_unions(population)` accepts a `hammel_population` and returns a
+separate tibble containing all union rows and columns, in their original order,
+with partner attributes matched through `wife_id` and `husband_id`. It adds
+`birth_time_w`, `death_time_w`, `birth_time_h`, and `death_time_h`, plus
+`group_w` and `group_h` when persons has a group column. Groups retain their
+input type. These are recorded person attributes, not inferred historical group
+transitions; current group identity is fixed over life. A surviving partner's
+death time remains NA. Dates remain in years and can be combined with union
+`start_time` to derive ages at formation and the age gap.
+
+An empty union table returns the same enriched zero-row schema. The input is
+unchanged, including its union table and custom columns. Existing columns with
+the names to be added cause an error rather than being overwritten. No known
+population endpoint is required merely to attach recorded partner information.
+
+For example, a union whose wife ID is 10 and husband ID is 30 receives birth
+dates from those IDs regardless of their row positions in persons; repeated
+unions reuse those attributes while retaining distinct episode records.
+
+```r
+detailed_unions <- get_detailed_unions(result)
+```
+
+### Status exposure and events
 
 `include_unions = TRUE` returns three adjacent rows per period/age/sex cell,
 identified by `union_status`: `overall`, `partnered`, and `unpartnered`. All use
