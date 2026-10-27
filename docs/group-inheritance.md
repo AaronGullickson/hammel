@@ -4,6 +4,10 @@ Requested and specified by the user October 20, 2026. This assigns one identity
 at birth, separately from deterministic ancestry averaging. Multiple simultaneous
 identities remain deferred.
 
+Milestone 3 was accepted by the user October 27, 2026 (D077). The
+[validation report](../validation/milestone3.qmd) records the assessment;
+acceptance retains the documented limitations.
+
 ## Interface and rules
 
 `create_group_inheritance(method = "random_parent", fun = NULL, groups = NULL,

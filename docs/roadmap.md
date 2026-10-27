@@ -1,9 +1,8 @@
 # Development roadmap
 
-Recorded October 15, 2026; expanded October 17 and October 20, 2026 from the
-user's planning notes. Milestone 2 was accepted October 19, 2026 (D050).
-Milestone 3's agreed group features are implemented; its validation report and
-acceptance remain pending. The user proposed the following sequence on
+Updated October 27, 2026. Milestones 1–3 are complete by user acceptance
+(D029, D050, D077). The group validation report is the accepted milestone 3
+assessment. The user proposed the following sequence on
 October 20, 2026. These are planning priorities, not authorization to implement
 unspecified demographic rules or a selected public API.
 
@@ -18,15 +17,22 @@ unspecified demographic rules or a selected public API.
 | 10 | Internal migration between regions, with unions restricted to the same region | Tentative |
 | 11 | Individual characteristics with custom inheritance and life-course change, affecting rates and union formation | Tentative |
 
-## Milestone 3: groups
+## Milestone 3: groups (complete)
 
-Initial group schedules, maternal inheritance, and weighted baseline sampling
-are specified in [groups](groups.md) under D052 (October 20, 2026). Group
+Accepted October 27, 2026 (D077); see the
+[validation report](../validation/milestone3.qmd) and [testing](testing.md).
+
+Group schedules and weighted baseline sampling originated under D052;
+see [groups](groups.md). Random-parent inheritance with maternal fallback
+is now the default (D076). Group
 observations (D053) and proportional input-rate multipliers, including separate
 partnered/unpartnered fertility factors (D054), are also implemented. Ancestry
 proportions are tracked separately with parental averaging (D055); see
-[ancestry](ancestry.md). Directed/symmetric pair effects and group matching
-formula terms are implemented under D056; see [group matching](group-matching.md).
+[ancestry](ancestry.md). Group matching formula terms and symmetric pair effects
+are implemented (D056/D075); calibrated male-group weights, delta adjustments,
+and exact full-pool selection follow D067–D075. Directed pair utilities and
+method selection are removed. See [group matching](group-matching.md) and
+[weighted-choice matching](weighted-choice-matching.md).
 Built-in/custom newborn identity assignment is implemented under D058; see
 [group inheritance](group-inheritance.md). Multiple simultaneous identities
 remain future work. Custom rules can already assign discrete mixed identities
@@ -173,6 +179,11 @@ scope: many applications should instead use separate individual characteristics
 (milestone 11), while location should use a dedicated region mechanism
 (milestone 10). Do not treat groups as a universal state variable. Conversion
 rules, timing, ancestry implications, and effects on pending events remain open.
+On October 27, 2026, the user deferred fixed newborn group assignment (for
+example, all children starting at a minimum education category) to this
+discussion. No `fixed` inheritance method or API was adopted. A custom
+inheritance function already handles assigning mixed-parent births to one
+specified category.
 
 ## Proposed milestone 8: summaries, diagnostics, and helpers
 

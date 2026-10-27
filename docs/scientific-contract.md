@@ -1,8 +1,8 @@
 # Scientific contract
 
-Updated October 19, 2026. This is the current mortality, fertility, union-formation,
-and observation contract. Milestone 2 was accepted as complete by the user on
-October 19, 2026 (D050), retaining the documented deferred limitations.
+Updated October 27, 2026. This is the current mortality, fertility, union-formation,
+group identity/ancestry, and observation contract. Milestones 1–3 are accepted
+as complete (D029, D050, D077), retaining documented limitations.
 Earlier monthly and exact
 age-varying compensation specifications are available in Git history; the
 [decision log](decisions.md) records their replacement. Acceptance
@@ -43,7 +43,7 @@ For a constant hazard `h` and elapsed years `d`, the event probability is
 `1 - exp(-h*d)`; multiplying a rate by duration gives cumulative hazard,
 not a probability. There is no requirement to convert to monthly units.
 
-## Group-specific schedules (initial milestone 3 support)
+## Group-specific schedules
 
 Population persons and mortality, fertility, and female union-search rate tables
 may contain `group`. Ungrouped rate tables apply to everyone; grouped tables
@@ -508,6 +508,23 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 | Union formation/dissolution | Conditional-logit on-demand formation, minimum male age, known-kin distance screening, and widowhood; exclusive ongoing unions enforced; female rate initiation implemented |
 | Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
 | Exact continuation | No saved queue/RNG checkpoint |
+
+Milestone 3 was accepted October 27, 2026 (D077), based on the user's
+[group validation report](../validation/milestone3.qmd). Its assessment covers
+group-specific rates, weighted matching, ancestry and identity inheritance,
+custom mixed identities, and performance. Small or imbalanced available pools
+can give unexpected directional pair ratios; delta adjusts male-group targets
+without guaranteeing fixed pairwise ratios. Group-only cross-product identities
+are analytical benchmarks, not exact guarantees after pooling changing age
+structures and markets. Kinship is omitted from weight calibration and
+quarter-year bins approximate calibration ages; actual partner draws use exact
+ages and screening. No marriage-squeeze feedback is implemented.
+
+Baseline generation is another source of Monte Carlo variation. Replications
+sharing one baseline condition on it; independently generated baselines include
+that variation. The user's inheritance comparison changed both baseline
+replication and maximum initial age, without isolating their contributions.
+Completion does not make either an initialization default or guarantee.
 
 For changed fertility rates, recently excluded women may reflect the previous
 schedule, so realized fertility can temporarily differ from the new target.

@@ -1,8 +1,9 @@
 # Hammel project brief
 
-Updated October 19, 2026. The user accepted milestone 1 (mortality/fertility)
-on October 15, 2026 (D029), and milestone 2 (union formation) on October 19,
-2026 (D050). See [testing](testing.md) for evidence and limits.
+Updated October 27, 2026. The user accepted milestone 1 (mortality/fertility)
+on October 15, 2026 (D029), milestone 2 (union formation) on October 19,
+2026 (D050), and milestone 3 (groups) on October 27, 2026 (D077).
+See [testing](testing.md) for evidence and limits.
 
 ## Purpose
 
@@ -79,21 +80,30 @@ R formula-fallback performance comparisons (D042). The user accepted milestone 2
 as complete on October 19, 2026 (D050), retaining the documented limitations.
 Matching defaults to
 `create_age_gap_matching_model(0, 5)`, and optional union diagnostics record
-eligible sample counts and selected utility ranks.
+the applied log male-group weights on new union records (D070/D072).
 
-## Beyond milestone 2
+## Milestone 3 completion and future scope
 
-The user selected groups as milestone 3's theme: intergroup matching, baseline
-rate multipliers, flexible child group identity and possible proportional group
-ancestry. Other future priorities are analysis helpers, input-rate preparation,
-fertility heterogeneity, inherited/life-course characteristics (such as education),
-and within-run immigration with generational status. Initial optional group schedules, maternal inheritance, and weighted baseline
-sampling are specified in [groups](groups.md) (D052). Newborn identity now has
-built-in/custom inheritance rules (D058), including declared mixed labels and
-independently configured schedules; see [group inheritance](group-inheritance.md).
-Multiple simultaneous identities and other richer demographic rules
-remain open. See the [roadmap](roadmap.md); milestone 2 completion does
-not authorize unspecified future demographic behavior.
+The user accepted milestone 3 as complete on October 27, 2026 (D077), after
+reviewing and revising the [validation report](../validation/milestone3.qmd).
+Implemented features include group-specific schedules and proportional hazards,
+group-stratified observations, separate ancestry proportions, symmetric pair
+preferences, calibrated weighted choice with delta target adjustments, exact
+full-pool partner selection, and built-in/custom newborn identity assignment.
+Random-parent inheritance is the default, with maternal fallback (D076).
+
+The report assesses rate and preference recovery, directional pairing under
+different demographic conditions, inheritance and custom mixed identities,
+sensitivity to starting populations, and performance. Scientific acceptance
+belongs to the user; completion does not establish universal accuracy or remove
+sparse-cell, calibration, or fertility-transition limitations. Weighted matching
+does not model marriage squeezes; fuller two-sex models remain future work.
+
+The [roadmap](roadmap.md) records proposed dissolution/remarriage, parity,
+time-varying inputs, group transitions, summaries, and migration work. No future
+feature is authorized by milestone completion. Fixed newborn assignment was
+explicitly deferred to the group-transitions discussion; custom inheritance
+already supports assignment of mixed-parent births to a specified category.
 
 ## Boundaries and future work
 

@@ -394,7 +394,17 @@ choice 0.10 s and weighted choice 0.25 s at 20,000 persons over 50 years;
 0.39 s and 1.12 s at 50,000 persons over 100 years; weighted choice with
 three groups 0.40 s. Single-seed measurements.
 
-Scientific assessment (user): the milestone 3 group-matching scenarios, with
-directional counts, unpartnered pool composition by sex and group over time,
-cross-tabulations, conditional logit with and without partner-group effects,
-and realized age gaps.
+## Accepted milestone 3 assessment
+
+The user accepted milestone 3 on October 27, 2026 (D077), after review and
+revision of the [validation report](../validation/milestone3.qmd). It assesses
+uneven and even three-group populations, pooled cross-products, directional
+union ratios with delta, wife-side conditional-logit recovery using recorded
+log-weight offsets, marriage rates, and two-group fertility/mortality/age-gap
+scenarios. These are the user's scientific findings, not independent reruns
+or guarantees of exact pooled odds ratios or fixed directional balance.
+
+The report retains limitations for small or sex-imbalanced markets and the
+absence of marriage-squeeze feedback. Starting-population sensitivity in the
+inheritance experiments did not establish a calibration bug or a systematic
+3:1 group-size effect. Full two-sex models remain deferred.

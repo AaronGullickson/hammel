@@ -74,17 +74,22 @@ the user's agreement.
   Do not make readers reconcile contradictory current rules with appended
   corrections.
 - Milestone 1 was accepted as complete on October 15, 2026 (D029). Milestone 2
-  union formation was accepted as complete on October 19, 2026 (D050);
-  distinguish its current specification from deferred mechanisms and future proposals.
+  union formation was accepted as complete on October 19, 2026 (D050). Milestone 3
+  groups was accepted as complete on October 27, 2026 (D077). Distinguish current
+  specifications from deferred mechanisms and future proposals.
 - `validation/milestone1.qmd` is the accepted historical assessment; reproduce it
   at its recorded commit because current execution requires a union process.
   `validation/milestone2.qmd` contains the user's accepted assessment, including
-  matching-parameter recovery and performance comparisons. Preserve both reports;
-  do not fabricate results or set scientific acceptance thresholds. Milestone
+  matching-parameter recovery and performance comparisons.
+  `validation/milestone3.qmd` contains the accepted group-rate, matching, ancestry,
+  inheritance, and performance assessment. Preserve all three reports and rendered
+  artifacts; do not fabricate results or set scientific acceptance thresholds. Milestone
   completion retains documented limitations and does not authorize future features.
 - Use `devtools::test()` for the testthat suite. Live database tests require
   explicit opt-in; ordinary verification must not download rates or expose
   credentials. See `docs/testing.md` for commands and evidence.
 - Treat session handoffs as dated status records, not standing pause instructions.
   The current user request controls work. Preserve the user's edits, including
-  explanatory source comments and the report under development.
+  explanatory source comments and the accepted reports. Fixed newborn assignment
+  is deferred to group transitions; custom inheritance already supports assigning
+  mixed-parent births to a specified category.

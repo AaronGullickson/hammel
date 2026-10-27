@@ -1,8 +1,8 @@
 # Testing and milestone validation
 
-Updated October 19, 2026. The user accepted milestone 1 as complete after
-rendering the validation report. Software test history and the user's demographic
-assessment are distinct evidence; recording acceptance did not rerun either.
+Updated October 27, 2026. Milestones 1–3 are accepted as complete (D029,
+D050, D077). Software test history and the user's demographic assessment
+are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
 ## Run the suite
@@ -81,8 +81,8 @@ After D075 removed method selection and made `group_exogamy` symmetric,
 Checks cover single-colon symmetric vector/table effects, rejected reverse
 pairs and old syntax, native/R utilities, separate father delta, strict
 endogamy/unit weights, both initiation modes, reproducibility and restarts.
-The milestone 3 report was not rerendered: its prior female-choice and directed
-three-group experiments need revision before execution with this API.
+The accepted milestone 3 report uses the current symmetric, weighted-choice
+API and exact full-pool draws.
 
 On October 27, 2026, after D076 changed the default inheritance to
 `random_parent` with maternal fallback, `TZ=UTC Rscript -e
@@ -116,7 +116,9 @@ The current executable example is [milestone2.R](../inst/examples/milestone2.R).
 The former milestone 1 single-run and replication scripts have been removed;
 Git history retains them. Analyze simulation replications separately before
 combining summaries; replication uncertainty does not resample the observed
-input data or imply uncertainty over initial populations.
+input data. With a fixed baseline, MCSEs condition on that baseline;
+independently generated baselines per replication include baseline variability.
+The milestone 3 inheritance assessment uses the latter design.
 
 The accepted [milestone 1 report](../validation/milestone1.qmd) contains the
 user's analysis and interpretation. Reproduce it from the acceptance commit
@@ -132,9 +134,9 @@ quarto render validation/milestone1.qmd
 Rate downloads should be saved explicitly with RDS and loaded for later renders;
 record source attributes, checksums, seeds/settings, R/package versions, and
 commit plus any uncommitted code changes. CSV does not preserve provenance
-attributes. Local validation data/rendered output are Git-ignored, and the
-validation directory is excluded from package builds. Preserve completed inputs
-and evidence in a documented archive when sharing the report.
+attributes. The validation directory is excluded from package builds. Preserve
+completed report sources, rendered artifacts and inputs; some local generated
+files are Git-ignored. Use a documented archive when sharing the report.
 
 ## Accepted milestone evidence and remaining limits
 
@@ -148,9 +150,9 @@ author; no new acceptance thresholds are imposed here.
 At acceptance, the clean working tree was at commit
 `dd02ac681ca2cb3c14f98b8b73a5b0f625637445`. The local HTML artifact had SHA-256
 `66d3cb3ba35f86f44031fc1044abc594b76f967c259f1e7162ad948c46622974`.
-This identifies the inspected artifact, not an independent replication. The
-HTML and local validation data remain Git-ignored; they have not been deposited
-in an external archive as part of completion.
+This identifies the inspected artifact, not an independent replication. No
+external archive was created as part of that acceptance; preserve the artifact
+and its local input data when reproducing the historical assessment.
 
 Limitations remain: initial fertility transients, sparse oldest-age cells and
 normal-interval reliability, and fertility compensation after rate changes.
@@ -210,3 +212,41 @@ artifact hash or acceptance commit is recorded here. Rendering executes an HMD
 download and substantial simulations. Transition-aware compensation remains
 deferred under D045; the report examines discrepancies, but no general
 correction or guarantee of conditional ASFR recovery exists.
+
+
+## Accepted milestone 3 demographic assessment
+
+The user accepted milestone 3 as complete October 27, 2026 (D077), after
+reviewing the source and rendered report and making revisions. The accepted
+[report](../validation/milestone3.qmd) includes:
+
+- Group-stratified fertility, mortality and female union-search rates, and
+  proportional-hazard alternatives including status-specific fertility factors.
+- Weighted group matching with symmetric pair effects and delta, even/uneven
+  group-size comparisons, and wife-side conditional-logit recovery with recorded
+  log-weight offsets; demographic scenarios vary fertility, mortality and age gaps.
+- Built-in inheritance and ancestry comparisons, independent starting populations
+  in the inheritance replications, and custom assignment to an emergent AB identity.
+- Runtime comparisons for ungrouped and two-, three-, and four-group populations,
+  explicit schedules versus multipliers, and native versus custom inheritance.
+- The testthat suite executed as part of rendering; live database tests require
+  their separate explicit opt-in.
+
+The report concludes that measured behavior meets the user's expectations,
+while retaining limitations of small/imbalanced partner pools and the absence
+of marriage-squeeze feedback. Other standing limitations, including conditional
+fertility transition bias (D045), sparse exposure cells, calibration binning and
+kinship omissions, remain. No new acceptance thresholds or universal accuracy
+claims are inferred. Baseline regeneration and reducing maximum starting age
+were changed together in the inheritance assessment; their effects were not
+isolated. Earlier fixed-baseline results remain conditional on their baselines.
+
+This documentation update does not independently rerender the report, download
+rates, or rerun simulations/tests, and does not assert every review suggestion
+was implemented. The source with the revised conclusion is recorded at commit
+`7514916bb8cf0c06faef24dad7fa013304093779`. This is a source reference,
+not a final rendered-artifact hash or a report-plus-documentation acceptance
+commit. The user handles final rendering; no final HTML hash is assigned here.
+Preserve both source and HTML. Reproduction requires the input preparation and
+software environment recorded in the report; rendering installs the package,
+accesses HMD, runs substantial parallel simulations, and executes the test suite.

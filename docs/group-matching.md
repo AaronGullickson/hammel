@@ -3,6 +3,10 @@
 Requested by the user October 20, 2026. This extends matching utility, not
 eligibility, search hazards, group identity, or ancestry inheritance.
 
+Milestone 3 was accepted by the user October 27, 2026 (D077). The
+[validation report](../validation/milestone3.qmd) records the assessment;
+acceptance retains the documented limitations.
+
 ## Pair effects
 
 `create_matching_model(..., group_exogamy = NULL, group_levels = NULL)` accepts

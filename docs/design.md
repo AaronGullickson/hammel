@@ -1,7 +1,7 @@
 # Design and implemented interface
 
-Updated October 19, 2026. Milestone 2 was accepted as complete by the user
-on this date (D050). This document describes implemented architecture.
+Updated October 27, 2026. Milestones 1–3 are complete by user acceptance
+(D029, D050, D077). This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
 The [scientific contract](scientific-contract.md) defines demographic semantics.
 
@@ -21,7 +21,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Continuous scheduling and events | `src/simulate.cpp` |
 | Demographic extraction and measures | `src/demography.cpp`, `R/calc_demographic_measures.R` |
 | Software and analytical validation | `tests/testthat/` |
-| Replication assessment | `validation/milestone1.qmd`, `validation/milestone2.qmd` |
+| Replication assessment | `validation/milestone1.qmd`, `validation/milestone2.qmd`, `validation/milestone3.qmd` |
 
 The engine is C++17 with Rcpp. R exposes ordinary list objects and tibbles.
 `Band` and `waiting_time()` are shared by mortality and adjusted fertility.

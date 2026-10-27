@@ -5,6 +5,10 @@ assigned group identity, without changing rates, matching, or configured identit
 assignment. It represents expected genealogical contributions, not stochastic
 realized genetic inheritance.
 
+Milestone 3 was accepted by the user October 27, 2026 (D077). The
+[validation report](../validation/milestone3.qmd) records the assessment;
+acceptance retains the documented limitations.
+
 ## Initialization and public table
 
 `hammel_population(persons, ..., ancestry = NULL)` accepts an optional ancestry

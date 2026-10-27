@@ -1461,3 +1461,33 @@ matching specifications override this default. Initiation mode remains explicit.
   explicit maternal rules remain maternal. Ungrouped simulations remain valid
   and consume no additional identity draws. Grouped default histories can change.
 - **Specification:** [group inheritance](group-inheritance.md).
+
+
+## D077: Milestone 3 accepted as complete
+
+- **Status:** accepted by the user October 27, 2026, following report review,
+  user revisions and a closing request while the user rerenders the report.
+- **Decision:** close milestone 3 (groups), based on the user's assessment in
+  [milestone3.qmd](../validation/milestone3.qmd). Scope includes group-specific
+  schedules and multipliers, group observations, ancestry, weighted matching
+  with symmetric pair preferences and delta, exact full-pool draws, and
+  built-in/custom newborn inheritance, including emergent mixed identities.
+- **Evidence:** the report assesses rates, matching preferences and directional
+  ratios, inheritance and baseline sensitivity, custom probabilities, performance,
+  and the test suite. The user's conclusion is that measured behavior meets
+  expectations while computation remains fast. This documentation update is
+  not an independent rerun or a claim that every review suggestion was applied.
+- **Retained limitations:** small or imbalanced available pools can produce
+  unexpected directional ratios; delta does not fix pairwise ratios over time.
+  Calibration uses age bins and omits kinship; pooled cross-products need not
+  exactly equal group-only benchmarks. No marriage-squeeze feedback is present.
+  Fertility-transition bias (D045), sparse exposure and baseline sensitivity
+  remain documented. No new scientific acceptance thresholds are adopted.
+- **Next scope:** proposed dissolution/remarriage and full two-sex models remain
+  future work, requiring explicit specifications and user decisions. Fixed newborn
+  assignment is deferred to group transitions; mixed-parent assignment to a
+  chosen category remains possible through custom inheritance. No fixed method
+  is implemented or selected. Completion does not authorize future features.
+- **Provenance:** revised conclusion at source commit
+  `7514916bb8cf0c06faef24dad7fa013304093779`; final rendering is handled by the
+  user. No final HTML hash or combined acceptance commit is assigned here.

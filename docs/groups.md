@@ -1,6 +1,7 @@
 # Group-specific demographic schedules
 
-Milestone 3 initial scope, requested October 20, 2026. Group data belongs in
+Milestone 3 was accepted October 27, 2026 (D077), following the
+[user-authored validation report](../validation/milestone3.qmd). Group data belongs in
 the population and its effects belong in the relevant processes (D051).
 Newborn identity rules are specified in [group inheritance](group-inheritance.md).
 
