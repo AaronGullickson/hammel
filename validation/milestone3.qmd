@@ -1758,7 +1758,109 @@ bind_rows(outmarriage_uneven, outmarriage_even) |>
 
 ### Gender ratios under different group rates
 
-**TODO: check gender ratios under different group mortality and fertility expectations.**
+Different fertility and mortality schedules by group may produce differences in sex ratios by group, particularly if we reintroduce a preferred age difference into the models. To test this, I will first run two group simulations under different scenarios of group-specific mortality, group-specific fertility, and the preferred age gap. 
+
+```{r}
+#| label: run-changing-rate-scenarios
+
+scenarios <- tribble(
+  ~age_diff, ~mort_prop_hazard, ~fert_prop_hazard,
+  0,         1.0,               1.0,
+  0,         1.2,               1.0,
+  0,         1.0,               1.2,
+  0,         1.2,               1.2,
+  2,         1.0,               1.0,
+  2,         1.2,               1.0,
+  2,         1.0,               1.2,
+  2,         1.2,               1.2
+)
+
+scenario_results <- scenarios |>
+  pmap_dfr(function(age_diff, mort_prop_hazard, fert_prop_hazard) {
+
+    model <- hammel_model() |>
+      set_population(pop_baseline_uneven_2g) |>
+      set_fertility(
+        fertility_rates_overall_usa, 
+        group_prop_hazard = c("B" = fert_prop_hazard)
+      ) |>
+      set_mortality(
+        mortality_rates_usa2000, 
+        group_prop_hazard = c("B" = mort_prop_hazard)
+      ) |>
+      set_union_formation(
+        "on_demand",
+        matching = create_age_gap_matching_model(
+          age_diff, 5, group_exogamy = c("A:B" = -3)
+        )
+      )
+
+    # Return counts rather than retaining every simulation history.
+    counts <- future_map(
+      replication_seeds,
+      function(seed) {
+        simulate(model, years = years, seed = seed) |>
+          get_detailed_unions() |>
+          count(group_w, group_h)
+      },
+      .options = furrr_options(seed = NULL)
+    )
+
+    summary <- counts |>
+      bind_rows(.id = "replication") |>
+      pivot_wider(
+        id_cols = replication,
+        names_from = c(group_w, group_h),
+        values_from = n,
+        values_fill = 0
+      ) |>
+      mutate(
+        log_odds = log(A_B) + log(B_A) - log(A_A) - log(B_B),
+        gender_ratio = A_B / B_A
+      ) |>
+      summarize(
+        across(
+          c(log_odds, gender_ratio),
+          list(mean = mean, se = ~ sd(.x) / sqrt(length(.x)))
+        )
+      )
+
+    bind_cols(
+      tibble(
+        age_diff = age_diff,
+        mort_prop_hazard = mort_prop_hazard,
+        fert_prop_hazard = fert_prop_hazard
+      ),
+      summary
+    )
+  })
+```
+
+```{r}
+#| label: tbl-intermar-parameters-scenarios
+#| tbl-cap: Log odds ratio and gender ratio across scenarios with differing spousal age preferences, group-specific fertility rates, and group-specific mortality rates. Each scenario uses 100 simulations with the resulting mean and monte carlo standard error shown.
+
+scenario_results |>
+  gt() |>
+  cols_label(
+    age_diff ~ "Preferred age gap",
+    mort_prop_hazard ~ "Mortality",
+    fert_prop_hazard ~ "Fertility",
+    log_odds_mean ~ "Log odds",
+    log_odds_se ~ "Log odds SE",
+    gender_ratio_mean ~ "Gender ratio",
+    gender_ratio_se ~ "Gender ratio SE"
+  ) |>
+  tab_spanner(ends_with("prop_hazard"), label = "Proportional hazard") |>
+  fmt_number(c(starts_with("log_odds"), starts_with("gender_ratio")), decimals = 3)
+
+```
+
+@tbl-intermar-parameters-scenarios shows the results from these scenarios across 100 simulations with monte carlo standard errors. The first row provides a baseline with the same fertility and mortality schedules by group and no preference for an age difference. All scenarios produce the expected log odds ratio of -6.
+
+The scenarios produce small but real differences in the gender ratios. Higher mortality for group B reduces the gender ratio to slightly below 1 and this affect is bigger for an age gap preference. Increasing fertility for group B has the opposite effect of raising the gender ratio somewhat above 1 and this effect is smaller with an age gap preference.
+
+Overall, even under substantial differences in fertility and mortality, the effect on the gender gap is relatively small. 
 
 ## Evaluate Group Inheritance
 
@@ -1984,7 +2086,7 @@ model_custom <- hammel_model() |>
   set_union_formation(
     "on_demand",
     matching = create_age_gap_matching_model(
-      0, 5, group_exogamy = c("A::B" = -2.5, "A::AB" = -1.25, "B::AB" = -1.25)
+      0, 5, group_exogamy = c("A:B" = -2.5, "A:AB" = -1.25, "B:AB" = -1.25)
     )
   )
 
@@ -2054,8 +2156,8 @@ result_custom$persons |>
   ungroup() |>
   ggplot(aes(x = prop_a_group, y = prop, group = group, color = group))+
   geom_line(data = temp, linetype = 2)+
-  geom_point()+
-  geom_linerange(aes(ymin = prop - 1.96 * se, ymax = prop + 1.96 * se))+
+  geom_point(alpha = 0.8)+
+  geom_linerange(aes(ymin = prop - 1.96 * se, ymax = prop + 1.96 * se), alpha = 0.8)+
   labs(x = "proportion A ancestry", y = "probability of group identity")+
   theme_bw()
 ```
