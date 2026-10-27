@@ -12,7 +12,7 @@ format:
     code-tools: true
     self-contained: true
 execute:
-  eval: false
+  eval: true
   echo: true
   warning: false
   error: false
@@ -570,7 +570,7 @@ hammel_model() |>
   set_fertility(rates = fertility_rates, inheritance = "ancestry")
 ```
 
-The final two methods require a bit more explanation. The `hierarchy` method assigns the highest ordered group on a vector of group names provided in a separate `order` argument and can be used to simulate processes of hypodescent/hyperdescent (e.g. the one drop rule). The decision is based on parent's identified group membership, not ancestry. Additionally, this method can also take an argument called `passing` which provides a proportion. This proportion will be used as the probability that the hierarchy is inverted in any given case. So for example, to fit a model where group B is almost always assigned over group A and group A is almost always assigned over group B, but 5% of cases are inverted:
+The final two methods require a bit more explanation. The `hierarchy` method assigns the highest ordered group on a vector of group names provided in a separate `order` argument and can be used to simulate processes of hypodescent/hyperdescent (e.g. the one drop rule). The decision is based on parent's identified group membership, not ancestry. Additionally, this method can also take an argument called `passing` which provides a proportion. This proportion will be used as the probability that the hierarchy is inverted in any given case. So for example, to fit a model where group B is almost always assigned over group A and group A is almost always assigned over group C, but 5% of cases are inverted:
 
 ```r
 create_group_inheritance("hierarchy", order = c("B", "A", "C"), passing = 0.05)
@@ -578,7 +578,7 @@ create_group_inheritance("hierarchy", order = c("B", "A", "C"), passing = 0.05)
 
 This method assumes that the order is transitive. For more complex formulations, use a custom function.
 
-When `custom` is defined, the user must supply a custom R function that will be used to determine inheritance. This function can take the following exposed variables as arguments: `mother_group`, `father_group`, `mother_ancestry`, `father_ancestry`, `child_ancestry`, `child_sex` (`"f"` or `"m"`), and `parents_in_union` (TRUE/FALSE). The ancestry variables are named lists where each name is "group_{group_name}" as well as "unknown" for any unknown ancestry share. 
+When `custom` is defined, the user must supply a custom R function that will be used to determine inheritance. This function can take the following exposed variables as arguments: `mother_group`, `father_group`, `mother_ancestry`, `father_ancestry`, `child_ancestry`, `child_sex` (`"f"` or `"m"`), and `parents_in_union` (TRUE/FALSE). The ancestry variables are named vectors where each name is "group_{group_name}" as well as "unknown" for any unknown ancestry share. 
 
 The inheritance methods have no allowance for individuals that identify with multiple groups. However, users can build in "mixed" groups by using the custom function. When doing so, users should also define the `groups` object which is a vector of all the possible groups even if they don't currently exist in the population. This will allow users to add groups that emerge from the population but are not initially present. 
 
@@ -621,10 +621,7 @@ Values from the multinomial logit are taken from Gullickson and Saperstein (2026
 
 ### Prepare inputs
 
-Record rate sources, years, units, retrieval dates, and any transformations.
-Use saved inputs for reproducibility; this skeleton does not download rates.
-The exploratory script `validation/milestone3_checks.R` is a source of candidate
-examples, not completed validation evidence.
+I will use mortality rates from the US in 1950 and 2000 as stratified rates by group. I will use fertility rates from the US and England to create stratified rates by group, and similarly marriage rates from the US and England to create stratified marriage rates. 
 
 ```{r}
 #| label: prepare-inputs
@@ -685,11 +682,11 @@ mar_rates_female_grouped <- bind_rows(
 
 ### Initialization, observation windows, and replications
 
-Specify initial size, age/sex composition, equal and unequal group weights,
-birth spacing, initiation modes, matching parameters, sample sizes, simulation
-duration, observation periods, and independent replication seeds. Distinguish
-initialization transients from later observations. Do not stack person histories
-from separate runs before calling demographic extraction functions.
+Simulations will run for 100 years and we will typically create 100 simulations. I will use a few different baseline populations:
+
+- two-group population with a 2:1 ratio of A:B.
+- three-group population with a 5:3:1 ratio of A:B:C.
+- three group population with an even ratio of A, B, and C.
 
 ```{r}
 #| label: simulation-design
@@ -802,7 +799,7 @@ tfr_pooled <- counts |>
 
 ```{r}
 #| label: fig-asfr-strat-rates
-#| fig-cap: Mean age-specific fertility rates by union status and group across 100 simulations and years compared to input rates. Mean rates are shown by dots with a 95% confidence interval and input rates are shown by dotted lines.
+#| fig-cap: Mean age-specific fertility rates by union status and group across 100 simulations and years compared to input rates. Mean rates are shown by dashed lines with a 95% confidence interval and input rates are shown by dots.
 
 asfr |>
   filter(union_status != "overall") |>
@@ -937,7 +934,7 @@ life_exp <- map(counts, calculate_life_table) |>
 
 asmr |>
   filter(age_start < 85) |>
-  ggplot(aes(x = age_start+2.5, y = rate, group = group, color = group))+
+  ggplot(aes(x = age_start+0.5, y = rate, group = group, color = group))+
   geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se, fill = group),
               color = NA, alpha = 0.4)+
   #geom_line()+
@@ -1001,7 +998,7 @@ mar_rates <- counts |>
 
 ```{r}
 #| label: fig-mar-rates-strat-rates
-#| fig-cap: Mean age-specific female marriage rates by group across 100 simulations and years compared to input rates. Mean rates are shown by dots with a 95% confidence interval and input rates are shown by dotted lines.
+#| fig-cap: Mean age-specific female marriage rates by group across 100 simulations and years compared to input rates. Mean rates are shown by dashed lines with a 95% confidence interval and input rates are shown by dots.
 
 mar_rates |>
   filter(sex == "f") |>
@@ -1122,7 +1119,7 @@ tfr_pooled <- counts |>
 
 ```{r}
 #| label: fig-asfr-prop-hazards
-#| fig-cap: Mean age-specific fertility rates by union status and group across 100 simulations and years compared to input rates. Mean rates are shown by dots with a 95% confidence interval and input rates are shown by dotted lines.
+#| fig-cap: Mean age-specific fertility rates by union status and group across 100 simulations and years compared to input rates. Mean rates are shown by dashed lines with a 95% confidence interval and input rates are shown by dots.
 
 fert_input <- bind_rows(
   fertility_rates_by_status_usa |>
@@ -1245,7 +1242,7 @@ mort_input <- bind_rows(
 
 asmr |>
   filter(age_start < 85) |>
-  ggplot(aes(x = age_start+2.5, y = rate, group = group, color = group))+
+  ggplot(aes(x = age_start+0.5, y = rate, group = group, color = group))+
   geom_ribbon(aes(ymin = rate - 1.96 * se, ymax = rate + 1.96 *se, fill = group),
               color = NA, alpha = 0.4)+
   #geom_line()+
@@ -1315,7 +1312,7 @@ mar_rates <- counts |>
 
 ```{r}
 #| label: fig-mar-rates-prop-hazards
-#| fig-cap: Mean age-specific female marriage rates by group across 100 simulations and years compared to input rates. Mean rates are shown by dots with a 95% confidence interval and input rates are shown by dotted lines.
+#| fig-cap: Mean age-specific female marriage rates by group across 100 simulations and years compared to input rates. Mean rates are shown by dashed lines with a 95% confidence interval and input rates are shown by dots.
 
 mar_input <- bind_rows(
   mar_rates_female_usa  |>
@@ -1565,7 +1562,7 @@ rm(models_clogit)
 gc()
 ```
 
-All of the parameters are extremely close to their expected values from the input. All of the 95% confidence intervals for each term would fall within the expected value. Furthermore, the two directed effects for each pair are all statistically equivalent to one another at p < 0.05.
+All of the parameters are very close to their expected values from the input in substantive terms. All of the 95% confidence intervals for each term would fall within the expected value. Furthermore, the two directed effects for each pair are all statistically equivalent to one another at p < 0.05.
 
 ### Analysis of marriage rates
 
@@ -1853,7 +1850,7 @@ scenario_results |>
 
 ```
 
-@tbl-intermar-parameters-scenarios shows the results from these scenarios across 100 simulations with monte carlo standard errors. The first row provides a baseline with the same fertility and mortality schedules by group and no preference for an age difference. All scenarios produce the expected log odds ratio of -6.
+@tbl-intermar-parameters-scenarios shows the results from these scenarios across 100 simulations with monte carlo standard errors. The first row provides a baseline with the same fertility and mortality schedules by group and no preference for an age difference. All scenarios produce a log odds ratio very close to the expected value of -6.
 
 The scenarios produce small but real differences in the gender ratios. Higher mortality for group B reduces the gender ratio to slightly below 1 and this affect is bigger for an age gap preference. Increasing fertility for group B has the opposite effect of raising the gender ratio somewhat above 1 and this effect is smaller with an age gap preference.
 
@@ -1931,7 +1928,7 @@ df_inheritance <- map(inheritance_scenarios, function(scenario) {
         set_population(
           create_baseline_population(50000, 50, 2000, group_weights = gweights)
         )
-      simulate(model_final, years = 100, seed = seed) 
+      simulate(model_final, years = 100, seed = NULL) 
     },
     .options = furrr_options(seed = NULL)
   )
@@ -1991,13 +1988,13 @@ df_inheritance <- df_inheritance |>
 
 I have the following expectations by inheritance method:
 
-- `mother`, `father`, `random_parent`, `same_sex`, and `different_sex` should all produce similar results with group size shares at the end that roughly match the start and similar ancestry shares where more A ancestry in group B than B ancestry in Group A.
+- `mother`, `father`, `random_parent`, `same_sex`, and `opposite_sex` should all produce similar results with group size shares at the end that roughly match the start and similar ancestry shares where more A ancestry in group B than B ancestry in Group A.
 - strict `hierarchy` (B > A) should cause the B group to grow relative to A. A individuals will have no B ancestry but B individuals will have more A ancestry than in other rules. I expect similar results with passing but the increase in B relative to A will be smaller  and A individuals will have a little B ancestry.
 - I think ancestry based approach should favor the larger group A because over time their ancestry will dominate among mixed individuals and thus more mixed individuals will identify with A than B. B individuals will contain more A ancestry than vice verse.
 
 ```{r}
 #| label: fig-ending-group-pop
-#| fig-cap: Mean proportion of group B in final simulated population across inheritance scenarios, with 20 simulations per scenario. 95% confidence intervals shown. Dotted line shows the share B in the starting population.
+#| fig-cap: Mean proportion of group B in final simulated population across inheritance scenarios, with 100 simulations per scenario. 95% confidence intervals shown. Dotted line shows the share B in the starting population.
 
 start_share <- gweights["B"]/sum(gweights) 
 
@@ -2149,7 +2146,7 @@ result_custom$persons |>
   ) |>
   group_by(prop_a_group, group) |>
   summarize(n = n()) |>
-  mutate(prop = n / sum(n), se = sqrt(prop * (1 - prop) / n)) |>
+  mutate(prop = n / sum(n), se = sqrt(prop * (1 - prop) / sum(n))) |>
   ungroup() |>
   ggplot(aes(x = prop_a_group, y = prop, group = group, color = group))+
   geom_line(data = temp, linetype = 2)+
@@ -2159,7 +2156,7 @@ result_custom$persons |>
   theme_bw()
 ```
 
-@fig-custom-inheritance-prob shows the observed probability of being assigned to a given group as a function of share of A ancestry for births to parents from different groups. The dotted line shows the expected probabilities from the model. The results line up closely to expectation and all 95% confidence intervals contain the expected value.
+@fig-custom-inheritance-prob shows the observed probability of being assigned to a given group as a function of share of A ancestry for births to parents from different groups. The dotted line shows the expected probabilities from the model. The results line up closely to expectation and most 95% confidence intervals contain the expected value.
 
 ## Speed Tests
 
@@ -2381,7 +2378,7 @@ scenarios |>
 ```
 
 
-@tbl-time-tests and @fig-time-tests show the amount of time to process each simulation scenario. These numbers are not exact because other factors can affect total processing time. Adding groups in general increases processing time substantially. The single group simulation runs in about 0.28 seconds, while the two-group cases take at least five times as long. The slight curvature in the figure  suggests that computational time is increasing exponentially with the number of groups. 
+@tbl-time-tests and @fig-time-tests show the amount of time to process each simulation scenario. These numbers are not exact because other factors can affect total processing time. Adding groups in general increases processing time substantially. The single group simulation runs in about 0.28 seconds, while the two-group cases take at least five times as long. The slight curvature in the figure  suggests that computational time may increase faster than a linear progression with the number of groups. 
 
 Using custom inheritance functions in R increased processing time, but the increase seems to be independent of the number of groups. The inheritance function used here was quite simple. More complex functions could increase time further.
 
