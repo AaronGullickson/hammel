@@ -2177,9 +2177,217 @@ What do I want to compare across:
 - differences across inheritance models for 2 and 3 group cases
 
 ```{r}
-#| label: speed-tests
-# TODO: Specify and run comparable workloads; summarize timing distributions.
+#| label: run-time-tests
+
+scenarios <- tribble(
+  ~strat_method, ~n_groups, ~custom_inheritance,
+  NA,            1,         NA,
+  "rate",        2,         FALSE,
+  "rate",        3,         FALSE,
+  "rate",        4,         FALSE,
+  "prop_hazard", 2,         FALSE,
+  "prop_hazard", 3,         FALSE,
+  "prop_hazard", 4,         FALSE,
+  "rate",        2,         TRUE,
+  "rate",        3,         TRUE,
+  "rate",        4,         TRUE,
+  "prop_hazard", 2,         TRUE,
+  "prop_hazard", 3,         TRUE,
+  "prop_hazard", 4,         TRUE
+)
+
+
+population1 <- create_baseline_population(50000, max_age = 75, end_time = 2000)
+population2 <- create_baseline_population(50000, max_age = 75, end_time = 2000, 
+                                          group_weights = c("A" = 1, "B" = 1))
+population3 <- create_baseline_population(50000, max_age = 75, end_time = 2000, 
+                                          group_weights = c("A" = 1, "B" = 1, "C" = 1))
+population4 <- create_baseline_population(50000, max_age = 75, end_time = 2000, 
+                                          group_weights = c("A" = 1, "B" = 1, "C" = 1, "D" = 1))
+
+prop_hazards2 <- c("B" = 1.05)
+prop_hazards3 <- c("B" = 1.05, "C" = 0.95)
+prop_hazards4 <- c("B" = 1.05, "C" = 0.95, "D" = 1.1)
+
+fertility_rates2 <- bind_rows(
+  fertility_rates_overall_usa |> mutate(group ="A"),
+  fertility_rates_overall_usa |> mutate(group = "B", rate = 1.05 * rate)
+)
+fertility_rates3 <- bind_rows(
+  fertility_rates_overall_usa |> mutate(group ="A"),
+  fertility_rates_overall_usa |> mutate(group = "B", rate = 1.05 * rate),
+  fertility_rates_overall_usa |> mutate(group = "C", rate = 0.95 * rate)
+)
+fertility_rates4 <- bind_rows(
+  fertility_rates_overall_usa |> mutate(group ="A"),
+  fertility_rates_overall_usa |> mutate(group = "B", rate = 1.05 * rate),
+  fertility_rates_overall_usa |> mutate(group = "C", rate = 0.95 * rate),
+  fertility_rates_overall_usa |> mutate(group = "D", rate = 1.1 * rate)
+)
+mortality_rates2 <- bind_rows(
+  mortality_rates_usa2000 |> mutate(group ="A"),
+  mortality_rates_usa2000 |> mutate(group = "B", rate = 1.05 * rate)
+)
+mortality_rates3 <- bind_rows(
+  mortality_rates_usa2000 |> mutate(group ="A"),
+  mortality_rates_usa2000 |> mutate(group = "B", rate = 1.05 * rate),
+  mortality_rates_usa2000 |> mutate(group = "C", rate = 0.95 * rate)
+)
+mortality_rates4 <- bind_rows(
+  mortality_rates_usa2000 |> mutate(group ="A"),
+  mortality_rates_usa2000 |> mutate(group = "B", rate = 1.05 * rate),
+  mortality_rates_usa2000 |> mutate(group = "C", rate = 0.95 * rate),
+  mortality_rates_usa2000 |> mutate(group = "D", rate = 1.1 * rate)
+)
+
+matching1 <- create_age_gap_matching_model(0, 5)
+matching2 <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2))
+matching3 <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2, "B:C" = -1, "A:C" = -3))
+matching4 <- create_age_gap_matching_model(
+  0, 5, group_exogamy = c("A:B" = -2, "A:C" = -3, "A:D" = -2, "B:C" = -1, "B:D" = -0.5, "C:D" = -1)
+)
+
+# custom function for inheritance
+random_inheritance <- create_group_inheritance(
+  "custom",
+  fun = function(child_ancestry, mother_group, father_group, ...) {
+    # Same identity or missing father: follow mother
+    if (is.na(father_group) || mother_group == father_group) {
+      return(mother_group)
+    }
+
+    # Entirely unknown ancestry: follow mother
+    known <- 1 - child_ancestry[["unknown"]]
+    if (known <= 0) return(mother_group)
+    
+    # after all that just return randomly mother or father group
+    sample(c(mother_group, father_group), 1)
+  }
+)
+
+
+elapsed_time <- NULL
+for(i in seq_along(1:nrow(scenarios))) {
+
+  strat_method <- scenarios$strat_method[i]
+  n_groups <- scenarios$n_groups[i]
+  custom_inheritance <- scenarios$custom_inheritance[i]
+
+  model <- hammel_model()
+
+  if(!is.na(custom_inheritance) & custom_inheritance) {
+    model_inheritance <- random_inheritance
+  } else {
+    model_inheritance <- "random_parent"
+  }
+
+  if (n_groups == 1) {
+    model <- model |>
+      set_population(population1) |>
+      set_fertility(fertility_rates_overall_usa) |>
+      set_mortality(mortality_rates_usa2000) |>
+      set_union_formation("on_demand", matching1)
+  } else if (n_groups == 2) {
+    if (strat_method == "rate") {
+      model <- model |> 
+        set_population(population2) |>
+        set_mortality(mortality_rates2) |>
+        set_fertility(fertility_rates2, inheritance = model_inheritance) |>
+        set_union_formation("on_demand", matching2)
+    } else {
+      model <- model |> 
+        set_population(population2) |>
+        set_mortality(mortality_rates_usa2000, group_prop_hazard = prop_hazards2) |>
+        set_fertility(
+          fertility_rates_overall_usa, 
+          group_prop_hazard = prop_hazards2, 
+          inheritance = model_inheritance
+        ) |>
+        set_union_formation("on_demand", matching2)
+    }
+  } else if (n_groups == 3) {
+    if (strat_method == "rate") {
+      model <- model |> 
+        set_population(population3) |>
+        set_mortality(mortality_rates3) |>
+        set_fertility(fertility_rates3, inheritance = model_inheritance) |>
+        set_union_formation("on_demand", matching3)
+    } else {
+      model <- model |> 
+        set_population(population3) |>
+        set_mortality(mortality_rates_usa2000, group_prop_hazard = prop_hazards3) |>
+        set_fertility(
+          fertility_rates_overall_usa, 
+          group_prop_hazard = prop_hazards3,
+          inheritance = model_inheritance
+        ) |>
+        set_union_formation("on_demand", matching3)
+    }
+  } else {
+    if (strat_method == "rate") {
+      model <- model |> 
+        set_population(population4) |>
+        set_mortality(mortality_rates4) |>
+        set_fertility(fertility_rates4, inheritance = model_inheritance) |>
+        set_union_formation("on_demand", matching4)
+    } else {
+      model <- model |> 
+        set_population(population4) |>
+        set_mortality(mortality_rates_usa2000, group_prop_hazard = prop_hazards4) |>
+        set_fertility(
+          fertility_rates_overall_usa, 
+          group_prop_hazard = prop_hazards4,
+          inheritance = model_inheritance
+        ) |>
+        set_union_formation("on_demand", matching4)
+    }
+  }
+
+
+  timing <- system.time({result <- simulate(model, years = 100)})
+  elapsed_time <- c(elapsed_time, unname(timing[["elapsed"]]))
+  #cat(i)
+}
+
+scenarios$elapsed_time <- elapsed_time
 ```
+
+```{r}
+#| label: tbl-time-tests
+#| tbl-cap: Time (in seconds) to run simulations with differing parameters. All simulations start with 50,000 individuals and are simulated for 100 years.
+
+scenarios |>
+  mutate(strat_method = if_else(strat_method == "rate", "stratified rate", "proportional hazards")) |>
+  gt() |>
+  cols_label(
+    strat_method ~ "Rate strat method",
+    n_groups ~ "Number of groups",
+    custom_inheritance ~ "Custom inheritance method",
+    elapsed_time ~ "Time (in seconds)"
+  ) |>
+  sub_missing(missing_text = "-")
+```
+
+```{r}
+#| label: fig-time-tests
+#| fig-cap: Time to run simulation by various factors. All simulations run for a 50K population over 100 years.
+
+scenarios |>
+  filter(n_groups > 1) |>
+  ggplot(aes(x = n_groups, y = elapsed_time, group = custom_inheritance, color = custom_inheritance))+
+  geom_point()+
+  geom_line()+
+  facet_wrap(~strat_method)+
+  labs(x = "number of groups", y = "elapsed time in seconds", color = "custom inheritance")+
+  theme_bw()
+```
+
+
+@tbl-time-tests and @fig-time-tests show the amount of time to process each simulation scenario. These numbers are not exact because other factors can affect total processing time. Adding groups in general increases processing time substantially. The single group simulation runs in about 0.28 seconds, while the two-group cases take at least five times as long. The slight curvature in the figure  suggests that computational time is increasing exponentially with the number of groups. 
+
+Using custom inheritance funtions in R increased processing time, but the increase seems to be independent of the number of groups. The inheritance function used here was quite simple. More complex functions could increase time further.
+
+The decision to use proportional hazards of stratified rates had no effect on computing time.
 
 ## Tests
 
