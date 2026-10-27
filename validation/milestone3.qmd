@@ -127,10 +127,8 @@ construct_choice_sets <- function(population, sample_size, set_size) {
 
 ## Purpose and completion criteria
 
-Assess group-specific demographic rates, partner selection, ancestry tracking,
-and newborn group identity assignment. This is a report skeleton; results and
-milestone acceptance remain pending. Numerical acceptance criteria and the
-replication design should be specified before interpreting results.
+
+Assess whether the current simulation successfully handles multiple groups, including rates stratified by groups, intergroup union formation, and inheritance rules for the children of parents belonging to different groups.
 
 | Measure | Comparison | Acceptance criterion |
 |---|---|---|
