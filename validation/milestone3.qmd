@@ -556,9 +556,9 @@ The first argument to this model (and in most cases the only argument) provides 
 
 | Method | Identity assignment |
 | --- | --- |
-| `mother` | Mother's group. This is the default and fallback method |
+| `mother` | Mother's group. Fallback method when others would fail. |
 | `father` | Father's group |
-| `random_parent` | Select mother or father's group with equal probability |
+| `random_parent` | Select mother or father's group with equal probability. The default method. |
 | `same_sex` | Mother's group for daughters, father's group for sons |
 | `opposite_sex` | Father's group for daughters, mother's group for sons |
 | `ancestry` | Sample a group using the child's known ancestry shares as weights |

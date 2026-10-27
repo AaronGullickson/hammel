@@ -41,7 +41,8 @@ half the father's share. A missing parent contributes its entire half to
 their unknown share by the same averaging rule. Existing engine births always
 have a known mother; an allowed unmatched birth may have an unknown father.
 Ancestry is appended at birth before the newborn enters risk, and is retained
-after death. Group identity follows the mother by default or the configured
+after death. Group identity selects either parent with equal probability by default (maternal
+fallback for unknown fathers), or follows the configured
 fertility inheritance model. Assignment does not change ancestry proportions;
 see [group inheritance](group-inheritance.md).
 

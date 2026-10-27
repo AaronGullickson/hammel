@@ -51,7 +51,7 @@ test_that("group schedules validate overlap and required strata independently", 
 
 test_that("shared and identical grouped schedules preserve fixed-seed histories", {
   model <- group_model()
-  model <- set_fertility(model, group_status_rates(0.3, 0.2), 0.75)
+  model <- set_fertility(model, group_status_rates(0.3, 0.2), 0.75, inheritance = "mother")
   model <- set_union_formation(model, "rate", rates = data.frame(
     age_start = 15, age_end = Inf, rate = 1),
     matching = create_age_gap_matching_model(0, 5))
@@ -100,7 +100,7 @@ test_that("fertility selects maternal groups and inheritance persists over resta
   model$population$persons$group <- c(20, 10, 10, 20)
   rates <- rbind(transform(group_status_rates(0, 20), group = 20),
                  transform(group_status_rates(), group = 10))
-  model <- set_fertility(model, rates, 0)
+  model <- set_fertility(model, rates, 0, inheritance = "mother")
   result <- simulate(model, 0.5, seed = 12)
   children <- result$persons[result$persons$birth_time >= 0, ]
   expect_gt(nrow(children), 0)
@@ -211,10 +211,11 @@ test_that("invalid baseline group weights fail without consuming RNG", {
   }
 })
 
-test_that("on-demand intergroup unions pass maternal identity to newborns", {
+test_that("on-demand intergroup unions support explicit maternal inheritance", {
   model <- make_model(2, birth_rate = 20, birth_interval = 0)
   model$population$persons$sex <- c("f", "m")
   model$population$persons$group <- c("B", "A")
+  model$processes$fertility$inheritance <- create_group_inheritance("mother")
   result <- simulate(model, 0.2, seed = 12)
   expect_equal(nrow(result$unions), 1)
   children <- result$persons[result$persons$birth_time >= 0, ]

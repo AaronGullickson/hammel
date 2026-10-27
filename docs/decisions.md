@@ -1445,3 +1445,19 @@ matching specifications override this default. Initiation mode remains explicit.
   modes, father overrides, strict endogamy and RNG/restart invariants.
 - **Supersession:** replaces D068's method selection and D069's directed-pair
   warning; symmetric pair effects replace D056's directed utility interface.
+
+
+## D076: Default to random-parent group inheritance
+
+- **Status:** accepted by the user October 27, 2026.
+- **Decision:** default newborn identity inheritance to `random_parent`, selecting
+  either parent's group with equal probability. Retain maternal fallback when
+  the father is unknown. Equal parental identities and fallback cases consume
+  no identity draw. Explicit `mother` remains available.
+- **Rationale:** the user selected the default after assessing inheritance
+  scenarios and sensitivity to shared starting populations. This choice does
+  not establish that random-parent inheritance eliminates baseline sensitivity.
+- **Compatibility:** missing inheritance fields use the new default; stored
+  explicit maternal rules remain maternal. Ungrouped simulations remain valid
+  and consume no additional identity draws. Grouped default histories can change.
+- **Specification:** [group inheritance](group-inheritance.md).

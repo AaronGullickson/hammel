@@ -40,7 +40,7 @@ The user selected the following directions for group support:
   fertility multiplier is 1.1 times the baseline, not a demographic default.
 - Support flexible child group assignment when parents have different groups.
   Parental, ancestry, hierarchy/passing, and custom rules are now implemented
-  under D058, with maternal assignment as the default.
+  under D058, with random-parent assignment as the default (D076).
 - Consider tracking each person's proportional ancestry by group separately
   from assigned group identity.
 

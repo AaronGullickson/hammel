@@ -39,7 +39,7 @@ software behavior, not demographic parameter recovery.
 | `test-groups.R` | Group rate lookup, analytical survival, coverage errors, fallback warnings, maternal inheritance, cross-group unions, restarts, RNG equivalence, and weighted initialization |
 | `test-group-demography.R` | Exact group exposure/counts, cross-group parent and spouse attribution, conservation, analytical group TFR/life tables, population sizes, validation, and typed empty tables |
 | `test-group-prop-hazard.R` | Multiplier validation, explicit-schedule equivalence, compensation order, omitted/unit/zero factors, warnings, RNG preservation, restarts, numeric codes, empty populations, and overflow |
-| `test-group-inheritance.R` | All assignment rules/fallbacks, passing and ancestry probabilities, custom RNG, mixed identity rates, future-group coverage, restarts, and unchanged maternal defaults |
+| `test-group-inheritance.R` | All assignment rules/fallbacks, passing and ancestry probabilities, custom RNG, mixed identity rates, future-group coverage, restarts, and random-parent defaults and explicit maternal inheritance |
 | `test-ancestry.R` | Starting identities, supplied proportions and IDs, parental averaging across generations, unknown shares, restarts/deaths, numeric labels, empty tables, and RNG independence |
 | `test-group-matching.R` | Symmetric pair offsets and reverse-pair rejection, analytical probabilities, fixed factor contrasts/interactions, native/custom score agreement, father overrides, validation, and unchanged RNG |
 | `test-prevent-exogamy.R` | Restrictions on the whole pool, compatible men always found, failure/cancellation, direction/symmetry, father overrides, retained partners, and unchanged disabled RNG |
@@ -83,6 +83,13 @@ pairs and old syntax, native/R utilities, separate father delta, strict
 endogamy/unit weights, both initiation modes, reproducibility and restarts.
 The milestone 3 report was not rerendered: its prior female-choice and directed
 three-group experiments need revision before execution with this API.
+
+On October 27, 2026, after D076 changed the default inheritance to
+`random_parent` with maternal fallback, `TZ=UTC Rscript -e
+'devtools::test(reporter = "summary")'` passed without failures or test warnings;
+the live database test was skipped. Checks cover default/explicit/missing-field
+equivalence, missing-father fallback, ungrouped RNG equivalence, analytical
+random-parent probabilities, and explicit maternal assignment.
 
 ## Optional live database checks
 

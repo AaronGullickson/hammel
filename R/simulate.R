@@ -40,7 +40,7 @@
 #'
 #' Events are recorded at their sampled times in `[start, start + years)`. Rates and all
 #' times remain in person-year and year units. Newborn group identity uses
-#' fertility's inheritance model (maternal by default), if groups are present;
+#' fertility's inheritance model (random parent by default, with maternal fallback), if groups are present;
 #' other newborn custom columns are missing. Grouped rate
 #' tables use each person's group (the woman's group for union searches).
 #' Ungrouped tables apply to everyone. Missing population groups in a grouped

@@ -23,8 +23,9 @@
 #' @param inheritance A group identity model from [create_group_inheritance()],
 #'   or a method name requiring no additional parameters: `"mother"`, `"father"`,
 #'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
-#'   Applies to fertility and defaults to following the mother. Assignment is
-#'   independent of recorded ancestry proportions.
+#'   Applies to fertility and defaults to selecting either parent with equal
+#'   probability, with maternal fallback. Assignment is independent of recorded
+#'   ancestry proportions.
 #'
 #' @return An updated `hammel_model`. The input model is not modified.
 #' @export
@@ -157,7 +158,8 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #' @param inheritance A group identity model from [create_group_inheritance()],
 #'   or a method name requiring no additional parameters: `"mother"`, `"father"`,
 #'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
-#'   Fertility defaults to following the mother. Other parental, ancestry,
+#'   Fertility defaults to selecting either parent with equal probability,
+#'   with maternal fallback. Other parental, ancestry,
 #'   hierarchy, and custom rules assign identity after child sex and ancestry
 #'   are calculated. Possible identities are checked against grouped schedules
 #'   and categorical matching levels before execution. Applies to fertility only.

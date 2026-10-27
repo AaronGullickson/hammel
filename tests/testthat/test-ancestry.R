@@ -47,8 +47,9 @@ test_that("supplied shares and ancestral groups survive normalization and restar
   expect_equal(rowSums(as.matrix(continued$ancestry[-1])), rep(1, nrow(continued$ancestry)))
 })
 
-test_that("cross-group newborns average parental ancestry without changing identity", {
+test_that("cross-group newborns average parental ancestry under explicit maternal inheritance", {
   model <- ancestry_birth_model()
+  model$processes$fertility$inheritance <- create_group_inheritance("mother")
   result <- simulate(model, 0.3, seed = 654)
   children <- result$persons$birth_time >= 0
   expect_true(any(children))

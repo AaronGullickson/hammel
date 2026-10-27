@@ -5,7 +5,7 @@
 \title{Specify newborn group identity inheritance}
 \usage{
 create_group_inheritance(
-  method = "mother",
+  method = "random_parent",
   fun = NULL,
   groups = NULL,
   order = NULL,
@@ -49,7 +49,8 @@ An inspectable \code{hammel_group_inheritance} object.
 }
 \description{
 Assign one group independently of genealogical ancestry shares. Attach this
-object with \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}. The default follows the mother.
+object with \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}. The default selects either
+parent with equal probability, with maternal fallback.
 Existing people are not reassigned, and ancestry is unchanged by assignment.
 }
 \examples{

@@ -5,7 +5,8 @@
 #' consistent tables against the population schema. Custom columns are retained.
 #' An optional `group` column contains nonmissing character labels or finite
 #' numeric codes (character labels must be nonempty). Newborns inherit their
-#' mother's group by default, or use fertility's configured inheritance model.
+#' group from either parent with equal probability by default, with maternal fallback,
+#' or use fertility's configured inheritance model.
 #'
 #' @param persons A data frame with one row per person, including deceased
 #'   persons. Columns are preserved and the table is returned as a tibble.

@@ -70,18 +70,31 @@ test_that("built-in inheritance uses parents and newborn sex", {
   }
 })
 
-test_that("default, explicit, and older maternal specifications preserve histories and RNG", {
+test_that("default, explicit, and missing inheritance specifications use random parent", {
   model <- inheritance_test_model()
   set.seed(654)
   original <- simulate(model, 1)
   after <- .Random.seed
-  expect_identical(model$processes$fertility$inheritance$method, "mother")
+  expect_identical(create_group_inheritance()$method, "random_parent")
+  expect_identical(model$processes$fertility$inheritance$method, "random_parent")
+  explicit <- inheritance_test_model("random_parent")
+  set.seed(654)
+  expect_identical(simulate(explicit, 1), original)
+  expect_identical(.Random.seed, after)
   model$processes$fertility$inheritance <- NULL
   set.seed(654)
   expect_identical(simulate(model, 1), original)
   expect_identical(.Random.seed, after)
   plain <- make_model(2)
   expect_no_error(simulate(plain, 0))
+  maternal <- plain
+  maternal$processes$fertility$inheritance <- create_group_inheritance("mother")
+  set.seed(654)
+  ungrouped <- simulate(plain, 1)
+  ungrouped_rng <- .Random.seed
+  set.seed(654)
+  expect_identical(simulate(maternal, 1), ungrouped)
+  expect_identical(.Random.seed, ungrouped_rng)
   plain$processes$fertility$inheritance <- create_group_inheritance("father")
   expect_error(simulate(plain, 0), "group identities")
 })
@@ -112,7 +125,7 @@ test_that("random-parent and hierarchy probabilities agree with analytical cases
       expect_lt(abs(mean(children$group == "B") - passing), 5 * sqrt(passing*(1-passing)/nrow(children)))
   }
   model <- inheritance_test_model(create_group_inheritance("hierarchy", order = "B", passing = 1))
-  expect_identical(simulate(model, 1, seed = 52), simulate(inheritance_test_model(), 1, seed = 52))
+  expect_identical(simulate(model, 1, seed = 52), simulate(inheritance_test_model("mother"), 1, seed = 52))
 })
 
 test_that("ancestry assignment conditions on known shares and handles all-unknown ancestry", {

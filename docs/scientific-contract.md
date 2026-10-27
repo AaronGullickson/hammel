@@ -50,7 +50,8 @@ may contain `group`. Ungrouped rate tables apply to everyone; grouped tables
 must cover every population group. Without population groups, use each table's
 alphabetically first group and emit a simulation warning. Group does not affect
 matching eligibility. Optional group formula predictors and symmetric
-pair effects can change utility. Newborns follow their mother's group by default
+pair effects can change utility. Newborns select either parent's group with equal probability by default
+(with maternal fallback for unknown fathers)
 or the configured inheritance rule, entering the assigned group's mortality
 schedule immediately. Fertility
 compensation is separate within each group/status schedule. Group values are
@@ -148,8 +149,8 @@ nonnegative intervals are allowed; there is no whole-month restriction.
 
 ### Newborn group identity
 
-Fertility holds a `create_group_inheritance()` object, defaulting to `mother`.
-Other built-in methods follow father, random parent, same/opposite-sex parent,
+Fertility holds a `create_group_inheritance()` object, defaulting to `random_parent`.
+Other built-in methods follow mother, father, same/opposite-sex parent,
 known ancestry shares, or a strict hierarchy of parental identities. Required
 missing inputs fall back to the mother. Ancestry sampling conditions out unknown
 shares; all-unknown ancestry falls back to the mother. Hierarchy `passing` is

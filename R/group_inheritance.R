@@ -1,7 +1,8 @@
 #' Specify newborn group identity inheritance
 #'
 #' Assign one group independently of genealogical ancestry shares. Attach this
-#' object with [fertility()] or [set_fertility()]. The default follows the mother.
+#' object with [fertility()] or [set_fertility()]. The default selects either
+#' parent with equal probability, with maternal fallback.
 #' Existing people are not reassigned, and ancestry is unchanged by assignment.
 #'
 #' @param method One of `"mother"`, `"father"`, `"random_parent"`, `"same_sex"`,
@@ -39,7 +40,7 @@
 #'   fun = function(mother_group, father_group, ...) {
 #'     if (is.na(father_group) || mother_group == father_group) mother_group else "mixed"
 #'   })
-create_group_inheritance <- function(method = "mother", fun = NULL, groups = NULL,
+create_group_inheritance <- function(method = "random_parent", fun = NULL, groups = NULL,
                                      order = NULL, passing = 0) {
   model <- structure(list(method = method, fun = fun, groups = groups,
                           order = order, passing = passing), class = "hammel_group_inheritance")
@@ -59,7 +60,7 @@ normalize_group_inheritance <- function(model) {
 }
 
 validate_group_inheritance <- function(model) {
-  if (is.null(model)) return(invisible(model)) # Older fertility objects default to mother.
+  if (is.null(model)) return(invisible(model)) # Missing inheritance fields use the current default.
   if (!inherits(model, "hammel_group_inheritance") || !is.list(model))
     stop("`inheritance` must be created with create_group_inheritance().", call. = FALSE)
   if (!is.character(model$method) || length(model$method) != 1L || is.na(model$method) ||
@@ -102,7 +103,7 @@ extend_identity_groups <- function(values, additions) {
 prepare_group_inheritance <- function(model, population) {
   model <- normalize_group_inheritance(model)
   if (!"group" %in% names(population$persons)) {
-    if (model$method != "mother" || length(model$groups))
+    if (!model$method %in% c("mother", "random_parent") || length(model$groups))
       stop("Group inheritance requires population group identities.", call. = FALSE)
     values <- NULL
   } else {

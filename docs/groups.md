@@ -94,7 +94,8 @@ schedule using the original finite bands and existing birth-spacing rules.
 
 ## Births and unions
 
-Newborns follow their mother's group by default. Fertility may attach a
+Newborns select either parent's group with equal probability by default,
+falling back to the mother when the father is unknown. Fertility may attach a
 `create_group_inheritance()` object for other parental, ancestry, hierarchy,
 or custom assignment rules. The child's assigned schedule applies from birth,
 including neonatal mortality. Possible identities include initial identities,

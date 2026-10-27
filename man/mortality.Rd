@@ -42,7 +42,8 @@ only; eligible hazards use midpoint birth-spacing compensation.}
 \item{inheritance}{A group identity model from \code{\link[=create_group_inheritance]{create_group_inheritance()}},
 or a method name requiring no additional parameters: \code{"mother"}, \code{"father"},
 \code{"random_parent"}, \code{"same_sex"}, \code{"opposite_sex"}, or \code{"ancestry"}.
-Fertility defaults to following the mother. Other parental, ancestry,
+Fertility defaults to selecting either parent with equal probability,
+with maternal fallback. Other parental, ancestry,
 hierarchy, and custom rules assign identity after child sex and ancestry
 are calculated. Possible identities are checked against grouped schedules
 and categorical matching levels before execution. Applies to fertility only.}

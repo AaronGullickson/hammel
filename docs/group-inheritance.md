@@ -6,11 +6,12 @@ identities remain deferred.
 
 ## Interface and rules
 
-`create_group_inheritance(method = "mother", fun = NULL, groups = NULL,
+`create_group_inheritance(method = "random_parent", fun = NULL, groups = NULL,
 order = NULL, passing = 0)` constructs an inspectable inheritance object.
 `fertility(..., inheritance = create_group_inheritance())` and its setter attach
 it. Unspecified inheritance, including older specifications without this field,
-retains maternal assignment and its RNG consumption. Configuration is validated
+uses random-parent assignment with maternal fallback when the father is unknown.
+Configuration is validated
 at construction, attachment, and execution.
 
 For rules requiring no additional parameters, `inheritance` also accepts a
@@ -47,7 +48,8 @@ Deterministic rules, identical-parent choices, and fallback cases consume no
 identity draw. Random-parent choice draws only for different known parental
 identities; ancestry draws only when more than one known component is positive;
 passing at 0 or 1 is deterministic. Grouped models use the new rule; without
-population identity data only unspecified/default maternal inheritance is valid.
+population identity data the default random-parent rule and explicit maternal
+inheritance are valid and have no effect on identity or random-number consumption.
 
 ## Possible identities and coverage
 
@@ -97,6 +99,8 @@ shares are unaffected by identity assignment. Existing people are not reassigned
 
 ## Worked cases and validation
 
+- Default rule, mother A/father B: A or B with probability 0.5 each. Unknown
+  father gives A without an identity draw; equal parental groups need no draw.
 - Mother A/father B: father method gives B; same-sex gives A for daughters and
   B for sons; opposite-sex reverses those outcomes. Missing father gives A.
 - Child A ancestry 0.35, B 0.15, unknown 0.5: ancestry probabilities are 0.7/0.3.
@@ -109,7 +113,7 @@ shares are unaffected by identity assignment. Existing people are not reassigned
 Tests cover each rule and fallback, analytical sampling probabilities, passing,
 custom multinomial-style assignment, new identities and rate/matching coverage,
 native/R RNG agreement, errors, empty populations, restarts, independent runs,
-unchanged default maternal histories, and conserved ancestry shares.
+default/explicit random-parent equivalence and explicit maternal histories, and conserved ancestry shares.
 
 ## Directional matching and sex-specific rules
 
@@ -121,17 +125,22 @@ still affect identity composition. Inspect those differences alongside group
 preferences, delta, sex-specific pool composition and inheritance rules;
 weighted matching does not guarantee identical maternal and paternal outcomes.
 
-## Open evaluation question
+## User-reported inheritance assessment (October 27, 2026)
 
-In exploratory 100-year runs discussed October 20, 2026, the minority B share
-ended near 0.333 under maternal inheritance and 0.310 under paternal inheritance
-(starting near 0.340). Off-identity ancestry also differed between the runs.
-These were separate unseeded runs, not a replicated comparison; sampling noise
-remains a possible explanation. No systematic effect or cause is established.
+The user completed the inheritance-methods section of the milestone 3 report.
+Replications sharing a baseline showed sensitivity to that baseline: directional
+union imbalances and corresponding cross-group birth imbalances varied with
+the baseline seed, including changes in direction. These observations do not
+establish a calibration bug or a systematic effect of the A:B size ratio.
 
-Minority status alone does not imply different availability of A partners for
-B men and B women. A causal explanation involving the birth sex ratio (`ffab`),
-partner availability, or female-initiated matching has not been demonstrated.
-Defer further interpretation until the full milestone evaluation, using
-replicated runs and, if differences persist, cross-group birth counts and
-sex-specific partnership availability to investigate them.
+With independently generated baselines per replication and maximum starting
+age reduced from 100 to 50, the user reported similar ending group and ancestry
+shares for mother, father, random-parent, same-sex, and opposite-sex inheritance.
+Both changes were made together, so their contributions were not isolated.
+Between-replication Monte Carlo standard errors in this design include baseline
+generation variability; fixed-baseline errors condition on that baseline.
+
+The user selected random-parent inheritance as the default with maternal
+fallback (D076). This is a default choice, not a guarantee of directional
+balance or absence of sensitivity to starting populations. See the
+[user-authored report](../validation/milestone3.qmd) for the assessment.

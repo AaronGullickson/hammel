@@ -21,7 +21,7 @@ One row per person, including deceased persons.
 | `death_time` | Death time in years; `NA` for a living person at the result endpoint |
 | `mother_id` | Mother's person ID; `NA` if unknown |
 | `father_id` | Father's person ID; `NA` if unknown |
-| `group` (optional) | Nonmissing character label or finite numeric code; newborn assignment uses fertility's inheritance model (maternal by default) |
+| `group` (optional) | Nonmissing character label or finite numeric code; newborn assignment uses fertility's inheritance model (random parent by default, with maternal fallback) |
 
 Omit marital status and latest-union pointers. Derive relationship state from `unions`; the engine may cache derived state for performance without requiring another user-facing column. Unknown earlier histories must not be silently interpreted as known lifetime singlehood. Fertility multipliers, sibling pointers, and last-born-child pointers are also omitted for now. Group labels must be nonempty; their input type is preserved. See [groups](groups.md) for schedule lookup and inheritance rules.
 

@@ -91,7 +91,7 @@ C++ constructs midpoint-adjusted fertility bands, samples cumulative-hazard
 thresholds, and processes the earliest event in a sparse ordered queue.
 R validates inputs and assembles the returned `hammel_population`, retaining
 histories and existing extra person columns. Newborn group identity follows
-the fertility inheritance model (maternal by default); other custom attributes are
+the fertility inheritance model (random parent by default, with maternal fallback); other custom attributes are
 missing. Group-specific schedules and baseline group sampling are documented in
 [groups](groups.md). The `simulation` component records `start_time`, `end_time`,
 `birth_interval`, `ffab`, `births`, and `deaths` for the latest run.
