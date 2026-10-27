@@ -2400,10 +2400,9 @@ knitr::kable(
 
 ## Conclusions and unresolved limitations
 
-**TODO:** Assess each completion criterion against the evidence. Record remaining
-limitations and the status of the paternal-inheritance question. Milestone 3
-has not yet been accepted on the basis of this report. Multiple simultaneous
-identities and model diagnostic tools remain outside the agreed feature scope.
+The simulation is now functioning as expected across all the measured indicators. Although the use of groups increases the computational time of the simulation, the overall simulation is still very fast. Furthermore, this simulation maintains speed while choosing among all available partners for each union rather than just a sample. 
+
+The intergroup union parameters are an imperfect approach to union formation and under certain conditions (like small group sizes) could lead to unexpected results. However, these parameters allow for quick computation, the preservation of input rates, and the ability to benchmark off of common measures like log odds ratios. The current paramters give users enough control to handle a variety of cases, but notably do not allow fo marriage squeeze adjustments. A future implementation will seek to add a full two-sex marriage model as an alternative to the current approach. 
 
 ## Reproducibility record
 
