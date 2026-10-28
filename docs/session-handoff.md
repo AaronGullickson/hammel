@@ -71,13 +71,14 @@ partner rescheduling, cohabitation histories and conditional former-partner
 exclusion. No reference simulation was run or source copied.
 
 After this audit, the user selected duration-dependent annual hazards with
-one female-carried clock per union, optional group schedules/multipliers by
-the woman's group, and death/birth/dissolution exact tie priority (D078).
+one female-carried clock per union and death/birth/dissolution exact tie
+priority (D078). D079 replaces woman-only grouping with symmetric group-pair
+schedules and multipliers using `group_pair` labels such as A:A, A:B, B:B.
 The optional dissolution process is the first implementation: `dur_start`/
 `dur_end` bands, one retained clock per union, status invalidation and availability
 updates, plus latest-run dissolution counts. `calculate_union_counts()` also
 returns period/duration dissolution rates with union-year exposure, optionally
-by the woman's group; each episode contributes once. Separate remarriage schedules and
+by symmetric group pair; each episode contributes once. Separate remarriage schedules and
 cohabitation remain deferred. Milestone 4 is not accepted as complete. See
 [union dissolution](union-dissolution.md).
 

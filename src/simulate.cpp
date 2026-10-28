@@ -1214,7 +1214,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     return partner;
   };
   struct GroupSchedules {
-    std::vector<Band> male, female, partnered, unpartnered, search, dissolution;
+    std::vector<Band> male, female, partnered, unpartnered, search;
   };
   const int inheritance_method = inheritance["method"];
   const double passing = inheritance["passing"];
@@ -1232,7 +1232,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     rates.unpartnered = status_fertility ? adjusted_fertility(
       read_bands(fertility_rates, "", "unpartnered", group), birth_interval) : rates.partnered;
     if (rate_initiation) rates.search = read_bands(union_rates, "", "", group);
-    rates.dissolution = read_bands(dissolution_rates, "", "", group);
   }
   // weighted_choice needs schedules and group indices, so it starts here.
   // One group means unit weights, so calibration is unnecessary.
@@ -1279,6 +1278,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     return value;
   };
   const bool has_dissolution = dissolution_rates.nrows() > 0;
+  std::vector<std::vector<Band>> dissolution_schedules;
+  if (has_dissolution) {
+    const int count = dissolution_rates.containsElementNamed(".hammel_group") ?
+      group_count * group_count : 1;
+    for (int pair = 0; pair < count; ++pair)
+      dissolution_schedules.push_back(read_bands(dissolution_rates, "", "", pair));
+  }
   auto schedule = [&](int i, double now) {
     const auto version = ++event_versions[i];
     const Person& p = people[i];
@@ -1301,7 +1307,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (has_dissolution && p.female && current_partner[i] >= 0) {
       UnionRecord& relationship = union_history[person_unions[i].back()];
       if (!relationship.dissolution_sampled) {
-        relationship.dissolution_time = candidate(waiting_time(rates.dissolution,
+        const int pair = dissolution_schedules.size() == 1 ? 0 :
+          p.group + group_count * people[current_partner[i]].group;
+        relationship.dissolution_time = candidate(waiting_time(dissolution_schedules[pair],
           now - relationship.start, threshold()), now);
         relationship.dissolution_sampled = true;
       }

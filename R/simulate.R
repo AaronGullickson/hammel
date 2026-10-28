@@ -28,7 +28,9 @@
 #' carried by the woman. It preserves the pending dissolution through births,
 #' ends the episode with `end_reason = "dissolution"`, and restores unpartnered
 #' availability and fertility/search eligibility. Exact same-person ties select
-#' death, birth, dissolution, then search. Separate remarriage rates are deferred.
+#' death, birth, dissolution, then search. Dissolution `group_pair` schedules and
+#' multipliers use symmetric pairings of both partners' groups. Separate
+#' remarriage rates are deferred.
 #' Matching uses male-group weights recalibrated at each search; simulation
 #' warns once if any search needed approximate weights. A separate father model
 #' has its own preferences and delta target adjustments. Event initiation is

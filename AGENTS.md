@@ -87,7 +87,8 @@ the user's agreement.
   completion retains documented limitations and does not authorize future features.
 - Milestone 4 starts with optional duration-dependent dissolution (D078): annual
   hazards on `dur_start`/`dur_end` bands, one female-carried clock per union,
-  schedules/multipliers by her group, and death/birth/dissolution tie order.
+  symmetric `group_pair` schedules/multipliers (D079), and death/birth/dissolution
+  tie order.
   This supersedes the earlier female-age-based direction. Separate remarriage
   schedules and cohabitation remain deferred; see `docs/union-dissolution.md`.
 - Use `devtools::test()` for the testthat suite. Live database tests require

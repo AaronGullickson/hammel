@@ -19,15 +19,18 @@ ensure complete follow-up through the requested endpoint.}
 \item{dur_breaks}{Strictly increasing nonnegative duration boundaries in years.
 If the last boundary is finite, append Inf for an open final band.}
 
-\item{by_group}{Logical, default FALSE. With TRUE, population inputs require
-person groups and attribute each episode to the woman's group. Bare union
-tables require a \code{group} column specifying her group. Groups retain input
-type and first-occurrence order, with a complete grid for each and no pooled
-row. Empty grouped histories return a typed zero-row tibble.}
+\item{by_group}{Logical, default FALSE. With TRUE, use unordered group pairs
+and return \code{group_pair} (e.g. \code{"A:A"}, \code{"A:B"}, \code{"B:B"}). Both directions
+of a cross-group union share one stratum. Population inputs require person
+groups and retain every unordered pair in the full period/duration grid.
+Bare union tables require \code{group_pair}; reversed labels are normalized.
+Pair labels use nonempty colon-free character representations of groups,
+ordered alphabetically (radix). Empty grouped inputs return a typed zero-row
+tibble; no pooled row is added.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, \code{dur_start}, \code{dur_end},
-\code{union_years}, \code{dissolutions}, and \code{rate_dissolution}, plus \code{group} when
+\code{union_years}, \code{dissolutions}, and \code{rate_dissolution}, plus \code{group_pair} when
 requested. Period varies fastest within duration bands and group blocks.
 }
 \description{

@@ -85,8 +85,8 @@ The detailed scientific specification and remaining choices below precede code.
 
 The user selected duration-dependent dissolution on October 27, 2026 (D078),
 superseding the earlier female-age-based direction. Use annual hazards and one
-clock per union carried by the woman, with shared schedules or schedules and
-multipliers by her group. Exact same-person ties prioritize death, birth, then
+clock per union carried by the woman, with shared schedules or symmetric
+group-pair schedules and multipliers (D079). Exact same-person ties prioritize death, birth, then
 dissolution. See the [dissolution specification](union-dissolution.md).
 
 The first implementation uses a separate optional `union_dissolution` process

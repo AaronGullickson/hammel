@@ -287,3 +287,14 @@ warnings; the opt-in live database test was skipped. Analytical union-year
 checks cover exact calendar/duration splitting, dissolution versus death
 endings, censoring, boundary events, repeated episodes, group attribution,
 zero-exposure rates, empty grids and pooled accounting identities.
+
+D079 changes dissolution schedules, multipliers and union observations to
+symmetric `group_pair` strata. The full suite found only an exact-equality
+assertion differing by floating-point rounding between a multiplied rate and
+a decimal literal; it was changed to a numerical-tolerance comparison. The
+subsequent `devtools::test(filter = "union-counts|union-dissolution", reporter =
+"summary")` passed. All other full-suite tests passed, with the opt-in live
+database test skipped. Checks include reversed pair equivalence, nonunit
+multipliers versus explicit rates, pair coverage (including future identities),
+canonical numeric/literal labels, pair-pooled accounting, empty grids and
+rejection of ambiguous or overlapping specifications.

@@ -108,8 +108,8 @@ already supports assignment of mixed-parent births to a specified category.
 ## Milestone 4 in progress
 
 The first component is optional duration-dependent dissolution (D078), with
-annual hazards and one female-carried clock per union, group schedules and
-multipliers by her group, and birth before dissolution on exact same-person
+annual hazards and one female-carried clock per union, symmetric group-pair
+schedules/multipliers (D079), and birth before dissolution on exact same-person
 ties. See [union dissolution](union-dissolution.md). Separate remarriage rates
 and cohabitation remain deferred; no milestone 4 acceptance is implied.
 

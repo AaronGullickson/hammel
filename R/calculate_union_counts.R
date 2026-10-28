@@ -23,13 +23,16 @@
 #' @param time_breaks Strictly increasing finite calendar boundaries in years.
 #' @param dur_breaks Strictly increasing nonnegative duration boundaries in years.
 #'   If the last boundary is finite, append Inf for an open final band.
-#' @param by_group Logical, default FALSE. With TRUE, population inputs require
-#'   person groups and attribute each episode to the woman's group. Bare union
-#'   tables require a `group` column specifying her group. Groups retain input
-#'   type and first-occurrence order, with a complete grid for each and no pooled
-#'   row. Empty grouped histories return a typed zero-row tibble.
+#' @param by_group Logical, default FALSE. With TRUE, use unordered group pairs
+#'   and return `group_pair` (e.g. `"A:A"`, `"A:B"`, `"B:B"`). Both directions
+#'   of a cross-group union share one stratum. Population inputs require person
+#'   groups and retain every unordered pair in the full period/duration grid.
+#'   Bare union tables require `group_pair`; reversed labels are normalized.
+#'   Pair labels use nonempty colon-free character representations of groups,
+#'   ordered alphabetically (radix). Empty grouped inputs return a typed zero-row
+#'   tibble; no pooled row is added.
 #' @return A tibble with `time_start`, `time_end`, `dur_start`, `dur_end`,
-#'   `union_years`, `dissolutions`, and `rate_dissolution`, plus `group` when
+#'   `union_years`, `dissolutions`, and `rate_dissolution`, plus `group_pair` when
 #'   requested. Period varies fastest within duration bands and group blocks.
 #' @export
 #' @examples
@@ -39,6 +42,10 @@
 #' calculate_union_counts(unions, c(0, 2, 5), c(0, 2, Inf))
 calculate_union_counts <- function(population, time_breaks, dur_breaks,
                                    by_group = FALSE) {
+  if (!is.logical(by_group) || length(by_group) != 1L ||
+      !is.null(dim(by_group)) || is.na(by_group))
+    stop("`by_group` must be TRUE or FALSE.", call. = FALSE)
+  groups <- NULL
   check_demographic_breaks(time_breaks, "time_breaks")
   check_demographic_breaks(dur_breaks, "dur_breaks", ages = TRUE)
   if (is.finite(tail(dur_breaks, 1))) dur_breaks <- c(dur_breaks, Inf)
@@ -47,10 +54,16 @@ calculate_union_counts <- function(population, time_breaks, dur_breaks,
     if (is.null(population$end_time) || tail(time_breaks, 1) > population$end_time)
       stop("Observation requires a known endpoint and cannot extend beyond it.", call. = FALSE)
     unions <- population$unions
-    groups <- observation_groups(population$persons, by_group)
-    group_indices <- if (by_group)
-      match(population$persons$group[match(unions$wife_id, population$persons$person_id)], groups) - 1L else
-      rep(0L, nrow(unions))
+    if (by_group) {
+      if (!"group" %in% names(population$persons))
+        stop("`by_group = TRUE` requires population group identities.", call. = FALSE)
+      persons <- population$persons
+      groups <- possible_union_pairs(unique(persons$group))
+      labels <- canonical_union_pairs(
+        persons$group[match(unions$wife_id, persons$person_id)],
+        persons$group[match(unions$husband_id, persons$person_id)])
+      group_indices <- match(labels, groups) - 1L
+    } else group_indices <- rep(0L, nrow(unions))
   } else {
     unions <- population
     check_columns(unions, c("union_id", "start_time", "end_time", "end_reason"), "unions")
@@ -66,11 +79,13 @@ calculate_union_counts <- function(population, time_breaks, dur_breaks,
         any(!is.na(reason) & !reason %in% c("dissolution", "death_husband", "death_wife")) ||
         any(is.na(reason) != is.na(unions$end_time)))
       stop("Ended unions require a valid end reason; ongoing unions require NA end and reason.", call. = FALSE)
-    check_groups(unions, "unions")
-    if (isTRUE(by_group) && !"group" %in% names(unions))
-      stop("`by_group = TRUE` requires a union `group` column specifying the woman's group.", call. = FALSE)
-    groups <- observation_groups(unions, by_group)
-    group_indices <- if (by_group) match(unions$group, groups) - 1L else rep(0L, nrow(unions))
+    if (by_group) {
+      if (!"group_pair" %in% names(unions))
+        stop("`by_group = TRUE` requires a union `group_pair` column.", call. = FALSE)
+      labels <- canonical_union_pairs(unions$group_pair)
+      groups <- sort(unique(labels), method = "radix")
+      group_indices <- match(labels, groups) - 1L
+    } else group_indices <- rep(0L, nrow(unions))
   }
   group_count <- if (by_group) length(groups) else 1L
   grid <- expand.grid(t = seq_len(length(time_breaks) - 1L),
@@ -79,7 +94,7 @@ calculate_union_counts <- function(population, time_breaks, dur_breaks,
   result <- tibble::tibble(time_start = time_breaks[grid$t],
     time_end = time_breaks[grid$t + 1L], dur_start = dur_breaks[grid$d],
     dur_end = dur_breaks[grid$d + 1L])
-  if (by_group) result$group <- groups[grid$g]
+  if (by_group) result$group_pair <- groups[grid$g]
   counts <- dissolution_counts_cpp(unions, time_breaks, dur_breaks,
                                    group_indices, group_count)
   result$union_years <- counts$union_years

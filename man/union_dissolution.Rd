@@ -13,15 +13,22 @@ set_union_dissolution(model, rates, group_prop_hazard = NULL)
 \item{rates}{A nonempty data frame with numeric \code{dur_start}, \code{dur_end}, and
 \code{rate}. Bands are half-open \verb{[dur_start, dur_end)} in years. Starts and
 rates must be finite and nonnegative; ends must exceed starts and may be
-\code{Inf}. Bands cannot overlap within a group. Gaps and durations outside
-support have zero hazard. Sex, age, union-status and calendar-time columns
+\code{Inf}. Bands cannot overlap within an unordered group pair. Gaps and
+durations outside support have zero hazard. Sex, age, union-status and calendar-time columns
 are not supported. Input order, custom columns and provenance are retained.
-An optional \code{group} column selects the woman's group; shared rates apply
-to all groups. Group coverage and ungrouped fallback follow \code{\link[=mortality]{mortality()}}.}
+An optional \code{group_pair} column selects an unordered pair such as \code{"A:A"},
+\code{"A:B"}, or \code{"B:B"}; \code{"A:B"} and \code{"B:A"} select the same schedule.
+Pair names require nonempty colon-free group labels. Pair-stratified tables
+must cover every unordered pair of possible identities, including future
+ones. Without population groups, warn and use the first canonical pair
+alphabetically. Omit \code{group_pair} for shared rates. \code{group}, \code{group_w} and
+\code{group_h} schedule columns are not supported.}
 
 \item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
-rate multipliers by the woman's group. Missing groups use 1; zero suppresses
-risk. With no population groups, simulation warns and ignores multipliers.}
+rate multipliers by unordered group pair, e.g. \code{c("A:B" = 1.2)} applies
+in both directions. Omitted pairs use 1; zero suppresses risk. Reversed
+duplicate keys are errors. With no population groups, simulation warns
+and ignores multipliers.}
 
 \item{model}{A \code{hammel_model} object.}
 }

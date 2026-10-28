@@ -13,9 +13,9 @@ years. Input `rate` is a continuous hazard per partnered woman-year, equivalentl
 per union-year under Hammel's exclusive unions. It is not an annual probability.
 There is no second male clock and no multiplication by two. Neither partner's
 age selects this baseline schedule. Shared schedules apply to all unions;
-optional group schedules and multipliers select the woman's group (D078).
-With identical couple hazards, choosing a carrier does not change the risk;
-with group-specific schedules, the carrier determines the group stratum.
+optional schedules and multipliers select an unordered group pair (D079).
+Thus A-wife/B-husband and B-wife/A-husband share the same dissolution risk;
+carrier sex does not determine the group stratum.
 
 Only living, currently partnered women carry risk. The man has no extra
 candidate. Existing ongoing unions start at their attained duration, not zero.
@@ -30,15 +30,28 @@ additional random draws. There is no demographic default dissolution rate.
 Rates are a nonempty data frame with `dur_start`, `dur_end`, and `rate`,
 returned/stored as a tibble. Duration bands are half-open `[dur_start, dur_end)`.
 Starts and rates are finite and nonnegative; ends exceed starts and may be
-`Inf`. Bands cannot overlap within a group. Gaps and durations outside supplied
+`Inf`. Bands cannot overlap within an unordered group pair. Gaps and durations outside supplied
 support have zero risk. Input order, custom columns and source provenance are
 preserved. Sex, age, union-status and calendar-time schedule columns are rejected
 rather than interpreted as additional risk strata.
 
-Group labels, coverage of every possible identity, ungrouped-population fallback
-warnings, and `group_prop_hazard` validation follow the other rate processes.
-Multipliers are dimensionless, finite and nonnegative, omitted groups use 1,
-and zero suppresses dissolution. The engine scales an execution-only copy.
+An optional `group_pair` column gives symmetric pair labels, e.g. `A:A`,
+`A:B`, `B:B`. Pair order is normalized using character labels in radix order,
+so `B:A` selects the same schedule as `A:B`. A pair-stratified table must cover
+all unordered pairs from the possible identity registry, including future
+identities. Missing pairs error, rather than silently imply zero risk. Within
+each pair, gaps still mean zero risk. Shared rates omit `group_pair`. Bare
+`group`, `group_w`, and `group_h` schedule columns are rejected. Pair names
+require two nonempty colon-free labels separated by a single colon.
+
+`group_prop_hazard` is a named numeric vector with the same unordered pair
+names, e.g. `c("A:B" = 1.2)`. Factors are dimensionless, finite and nonnegative;
+omitted pairs use 1, zero suppresses dissolution, and specifying both `A:B`
+and `B:A` is an error. Factors do not introduce identities. With population
+groups, preparation selects each couple's pair and scales an execution-only
+copy. Without population groups, warn and ignore multipliers; pair-stratified
+rates warn and use the first canonical pair alphabetically. The input table,
+its ordering and provenance remain unchanged.
 
 Illustrative input, not a demographic default:
 
@@ -105,8 +118,8 @@ dissolutions against union-year exposure.
 - Bands `[0,1)` at 0.1 and `[2,Inf)` at 0.2: threshold 0.3 from duration zero
   crosses the first year, a zero-risk gap, and one additional year, reaching
   duration three. From duration 2.5, threshold 0.1 gives a wait of 0.5 years.
-- Wife A/husband B with multiplier A = 2 and B = 0: the couple uses twice the
-  baseline, not zero and not the sum of the partners' factors.
+- With factor `"A:B" = 2`, both wife-A/husband-B and wife-B/husband-A
+  couples use twice the baseline; A:A and B:B use the baseline unless specified.
 - A birth and pending dissolution at time 1: record the partnered birth with
   that husband, then end the episode at 1. Count this birth as partnered in
   summaries;
@@ -142,12 +155,13 @@ Do not stack independent replications with repeated union IDs before extraction.
 Use one history per call, then combine the summaries. All grid cells are retained,
 including typed zero-exposure cells for empty ungrouped histories.
 
-With `by_group = TRUE`, population inputs use the woman's recorded group,
-including all person-history groups in their input type and first-occurrence
-order. Bare union tables instead require a `group` column specifying her group.
-Groups get separate full grids; no pooled row is added. Empty grouped inputs
-return a typed zero-row tibble. Optional grouping changes observation strata,
-not simulation or inheritance.
+With `by_group = TRUE`, population inputs use both partners' recorded groups
+and return `group_pair`, with a full period/duration grid for every unordered
+pair of population groups (including pairs without observed episodes). Labels
+are canonical character strings in radix order, not numeric group codes.
+Bare union tables require `group_pair`; reverse labels are normalized and
+combined. Empty grouped inputs return a typed zero-row tibble. This replaces
+the earlier woman-only grouping; no single-partner option is added (D079).
 
 Worked accounting: U1 starts at 0 and dissolves at 3; U2 starts at 1 and ends
 at 4 through death; U3 starts at 2 and remains ongoing at endpoint 5. Over

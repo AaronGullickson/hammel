@@ -86,12 +86,14 @@ Zero exposure gives an NA rate; zero dissolutions with positive exposure gives
 zero. This is a cause-specific rate, not a cumulative probability of dissolution
 when death can also end unions.
 
-`by_group = TRUE` uses the woman's group, following the dissolution process,
-and retains the complete period/duration grid for each population group.
+`by_group = TRUE` returns symmetric `group_pair` strata such as `A:A`, `A:B`,
+and `B:B` (D079), pooling A-wife/B-husband with B-wife/A-husband. A full
+period/duration grid is retained for every unordered pair of population groups.
 The function also accepts a bare union data frame with `union_id`, `start_time`,
 `end_time`, and `end_reason`; caller-provided follow-up must cover the window.
-Bare tables need a `group` column identifying the woman's group when grouping
-is requested. Summarize independent replications separately before binding
+Bare tables need a `group_pair` column when grouping is requested; reversed
+labels are normalized. Pair labels are canonical character strings in radix
+order, including when the underlying group identities are numeric. Summarize independent replications separately before binding
 results, as for person-level Lexis counts. See
 [union dissolution](union-dissolution.md#union-year-counts-and-dissolution-rates)
 for worked accounting and censoring rules.

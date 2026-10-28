@@ -115,7 +115,8 @@ run boundaries, parent assignment, and resampling.
 ## Union-history observations
 
 `calculate_union_counts()` returns union-years, dissolution counts and rates
-by calendar period and elapsed duration, optionally by the woman's group.
+by calendar period and elapsed duration, optionally by symmetric `group_pair`
+strata (A:B includes both partner directions).
 The native `dissolution_counts_cpp()` splits recorded episodes directly at
 period/duration boundaries. This counts each episode once rather than summing
 both partners' exposure. Death censors dissolution exposure without entering
@@ -126,7 +127,9 @@ its numerator. See [demographic analysis](demographic-analysis.md).
 `set_union_dissolution(model, rates, group_prop_hazard = NULL)` attaches the
 optional duration-hazard process (D078). Public bands use `dur_start` and
 `dur_end`; preparation maps a private copy to the shared `Band` sampler. The
-woman's group selects shared/group schedules and proportional multipliers.
+couple's unordered group pair selects schedules and proportional multipliers
+(D079). Public `group_pair` labels are normalized; private lookup uses both
+partners' identity indices.
 Each active union stores one sampled dissolution date, retained through births.
 Her next-event selection competes that date with death/birth; birth wins a tie,
 then dissolution can execute at the same instant. Death closes the union and

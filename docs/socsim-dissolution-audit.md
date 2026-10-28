@@ -210,8 +210,9 @@ but not all cohabitation codes; use the native constants for this audit.
 
 After the audit, the user selected duration-dependent annual hazards and one
 female-carried clock per union (D078), superseding the earlier female-age-based
-direction. The user also selected optional group effects by the woman's group
-and birth before dissolution at an exact same-person tie. See the
+direction. Group effects now use symmetric unordered pairs (D079), while the
+woman still carries the single union clock. Birth precedes dissolution at an
+exact same-person tie. See the
 [dissolution specification](union-dissolution.md). SOCSIM's duration baseline
 informed this decision; its monthly inputs and two-spouse option were not adopted.
 Separate remarriage schedules and cohabitation remain deferred.

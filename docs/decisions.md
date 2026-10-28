@@ -27,7 +27,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Continuous execution | D024 |
 | Fertility spacing/compensation and finite age bands | D026, D028 (superseding D027's exact sampler) |
 | Two-sex union models and union API restructuring (deferred) | D073 |
-| Duration-dependent union dissolution; separate remarriage deferred | D078 |
+| Duration-dependent dissolution, symmetric group pairs; remarriage deferred | D078–D079 |
 
 ## Recorded decisions
 
@@ -1501,7 +1501,8 @@ matching specifications override this default. Initiation mode remains explicit.
 - **Decision:** use a continuous annual dissolution hazard, indexed by elapsed
   union duration in years. One clock per union is carried by its female partner;
   there is no second male risk. Shared schedules and optional schedules and
-  proportional hazards by the woman's group are supported.
+  proportional hazards were initially by the woman's group; D079 supersedes
+  this with symmetric pair stratification.
 - **Ties:** death first, then birth, then dissolution for the same woman.
   A tied birth occurs while partnered; the pending dissolution follows if still
   scheduled. Births preserve the union's pending dissolution date. Births
@@ -1510,7 +1511,7 @@ matching specifications override this default. Initiation mode remains explicit.
 - **Rationale:** duration follows the SOCSIM baseline idea while retaining
   Hammel's person-year hazard units and female-driven organization. Under
   identical couple hazards carrier sex does not change risk; group-specific
-  schedules intentionally use the woman's group.
+  schedules now follow the unordered pair under D079.
 - **Supersession:** replaces the October 16 female-age-specific dissolution
   direction in the roadmap. Input duration bands use `dur_start` and `dur_end`
   (matching the existing `age_start`/`age_end` naming pattern).
@@ -1518,4 +1519,24 @@ matching specifications override this default. Initiation mode remains explicit.
   rules continue after dissolution; separate remarriage schedules, cohabitation,
   couple covariates and general transition-aware fertility compensation remain
   deferred. No demographic rates are defaulted.
+- **Specification:** [union dissolution](union-dissolution.md).
+
+
+## D079: Symmetric group-pair dissolution schedules and observations
+
+- **Status:** accepted by the user October 27, 2026, replacing the initial
+  request for separate partner axes with gender-symmetric pairings.
+- **Decision:** dissolution rate strata are unordered pairs such as A:A, A:B,
+  and B:B. A:B applies in both directions. Use `group_pair` on rate tables and
+  unordered pair names on `group_prop_hazard`. Omitted factors use 1; there is
+  still one annual duration-dependent hazard per union, carried by the woman.
+- **Observations:** `calculate_union_counts(by_group = TRUE)` returns the same
+  symmetric `group_pair` strata, counting each episode once. No partner-specific
+  strata or multiplier-list interface is introduced.
+- **Validation/coverage:** canonicalize reversed labels, reject conflicting
+  reverse multiplier keys and overlapping pair bands, and require schedules
+  for all possible unordered identity pairs. No missing-pair risk is invented.
+- **Supersession:** replaces D078's woman-only group schedule and multiplier
+  interpretation, and woman-only union-count grouping. Other process `group`
+  columns and their multiplier conventions are unchanged.
 - **Specification:** [union dissolution](union-dissolution.md).

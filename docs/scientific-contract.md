@@ -366,7 +366,8 @@ See [union fertility specification](union-formation-models.md#fertility-schedule
 
 An optional `union_dissolution` process adds one annual hazard per union,
 carried by its female partner and indexed by elapsed years since `start_time`.
-Shared rates or schedules/multipliers by her group use half-open duration bands;
+Shared rates or schedules/multipliers by unordered group pair (D079) use
+half-open duration bands;
 gaps and uncovered durations have zero hazard. New episodes start at duration
 zero; active input unions and restarts use attained duration. The union's
 sampled dissolution date is retained through births. Exact same-person ties
@@ -492,7 +493,8 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   not a dissolution event. Missing ends censor at the window endpoint. Duration
   uses each episode's start; boundaries are half-open and finite final duration
   breaks gain `Inf`. Return `rate_dissolution = dissolutions / union_years`,
-  with NA at zero exposure. Optional grouping uses the woman's group. Bare
+  with NA at zero exposure. Optional grouping returns symmetric `group_pair`
+  strata using both partners, with both cross-group directions pooled. Bare
   union tables require complete caller-verified follow-up. This cause-specific
   rate is not a cumulative probability with competing deaths.
 - `calculate_population_size()` includes births and excludes deaths at each

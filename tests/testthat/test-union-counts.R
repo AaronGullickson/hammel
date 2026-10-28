@@ -7,7 +7,7 @@ union_count_history <- function() {
 union_count_population <- function() {
   persons <- data.frame(person_id = 1:6, sex = rep(c("f", "m"), 3),
     birth_time = -30, death_time = c(NA, NA, NA, 4, NA, NA),
-    mother_id = NA_integer_, father_id = NA_integer_, group = c(20L, 10L, 10L, 20L, 20L, 10L))
+    mother_id = NA_integer_, father_id = NA_integer_, group = c(20L, 20L, 10L, 10L, 20L, 10L))
   unions <- union_count_history()
   unions$wife_id <- c(1L, 3L, 5L)
   unions$husband_id <- c(2L, 4L, 6L)
@@ -67,22 +67,25 @@ test_that("repeated and distinct overlapping union episodes each contribute once
   expect_equal(counts$dissolutions, 3)
 })
 
-test_that("grouped union counts follow women and preserve typed groups and totals", {
+test_that("grouped union counts use symmetric pairings and conserve totals", {
   population <- union_count_population()
   counts <- calculate_union_counts(population, c(0, 2, 5), c(0, 2, Inf), by_group = TRUE)
-  expect_identical(unique(counts$group), c(20L, 10L))
-  expect_type(counts$group, "integer")
-  expect_equal(sum(counts$union_years[counts$group == 20L]), 6)
-  expect_equal(sum(counts$union_years[counts$group == 10L]), 3)
-  expect_equal(sum(counts$dissolutions[counts$group == 20L]), 1)
-  expect_equal(sum(counts$dissolutions[counts$group == 10L]), 0)
+  expect_identical(unique(counts$group_pair), c("10:10", "10:20", "20:20"))
+  expect_equal(vapply(split(counts$union_years, counts$group_pair), sum, numeric(1)),
+               c("10:10" = 3, "10:20" = 3, "20:20" = 3))
+  expect_equal(vapply(split(counts$dissolutions, counts$group_pair), sum, numeric(1)),
+               c("10:10" = 0, "10:20" = 0, "20:20" = 1))
   pooled <- calculate_union_counts(population, c(0, 2, 5), c(0, 2, Inf))
-  expect_equal(unname(rowsum(counts$union_years, rep(1:4, 2))[, 1]), pooled$union_years)
+  expect_equal(unname(rowsum(counts$union_years, rep(1:4, 3))[, 1]), pooled$union_years)
   bare <- population$unions
-  bare$group <- population$persons$group[match(bare$wife_id, population$persons$person_id)]
+  bare$group_pair <- c("20:20", "10:10", "20:10")
   expect_identical(calculate_union_counts(bare, c(0, 2, 5), c(0, 2, Inf), TRUE), counts)
-  population$persons$group <- as.character(population$persons$group)
-  expect_type(calculate_union_counts(population, c(0, 5), c(0, Inf), TRUE)$group, "character")
+  # Both directions combine into one cross-pair stratum, including event counts.
+  bare$group_pair <- c("20:10", "10:20", "20:10")
+  grouped <- calculate_union_counts(bare, c(0, 5), c(0, Inf), TRUE)
+  expect_identical(grouped$group_pair, "10:20")
+  expect_equal(grouped$union_years, 9)
+  expect_equal(grouped$dissolutions, 1)
 })
 
 test_that("duration tails and empty grids follow Lexis conventions", {
@@ -96,17 +99,17 @@ test_that("duration tails and empty grids follow Lexis conventions", {
   expect_equal(counts$union_years, rep(0, 4))
   expect_equal(counts$dissolutions, rep(0, 4))
   expect_true(all(is.na(counts$rate_dissolution)))
-  empty$group <- integer()
+  empty$group_pair <- character()
   grouped <- calculate_union_counts(empty, c(0, 5), c(0, Inf), TRUE)
   expect_equal(nrow(grouped), 0)
-  expect_type(grouped$group, "integer")
+  expect_type(grouped$group_pair, "character")
   expect_type(grouped$dissolutions, "double")
   # Population groups without union episodes still have explicit empty cells.
   population <- union_count_population()
   population$unions <- population$unions[FALSE, ]
   grouped <- calculate_union_counts(population, c(0, 5), c(0, Inf), TRUE)
-  expect_equal(nrow(grouped), 2)
-  expect_equal(grouped$union_years, c(0, 0))
+  expect_equal(nrow(grouped), 3)
+  expect_equal(grouped$union_years, c(0, 0, 0))
 })
 
 test_that("union counts validate endpoints, breakpoints, histories and grouping", {
@@ -128,6 +131,6 @@ test_that("union counts validate endpoints, breakpoints, histories and grouping"
   expect_error(calculate_union_counts(bad, c(0, 5), c(0, Inf)), "precede")
   bad <- unions; bad$end_reason[1] <- NA_character_
   expect_error(calculate_union_counts(bad, c(0, 5), c(0, Inf)), "end reason")
-  bad <- unions; bad$group <- c("A", NA, "B")
+  bad <- unions; bad$group_pair <- c("A:A", NA, "B:B")
   expect_error(calculate_union_counts(bad, c(0, 5), c(0, Inf), TRUE), "group")
 })
