@@ -45,22 +45,23 @@ Union endings update state before the surviving woman is rescheduled. Death,
 birth, dissolution, and search retain their existing same-person priority.
 There is no new waiting period, duration clock, or former-spouse exclusion.
 
-Calibration maintains unpartnered female counts by group, birth-cohort bin,
-and previous category. Rate-mode intensity for a group/age bin is the sum of
-category count times that category's age-band-averaged hazard. Because matching
-utilities do not depend on previous category, these intensities can be summed
-before the existing expected-flow solver. Female denominators and male mirrored
-targets retain their existing definition; men are not assigned category-specific
-targets. Nonmarital father selection and on-demand formation retain their
-fertility-driven intensities. Shared schedules keep the existing calculation
-path and random-number policy.
+Calibration now maintains each unpartnered woman's actual current hazard
+contributions, summed by group/birth-cohort bin (D082). A common boundary-update
+queue refreshes marriage-search and fertility-driven totals at age bands and
+spacing releases, with state/pool changes replacing contributions. Previous
+categories select individual schedules but are not an extra calibration count
+dimension. Matching utilities and mirrored targets retain their definition.
+Individual event scheduling and random-number rules are unchanged; actual
+hazards replace bin-averaged calibration hazards. See
+[current-hazard contributions](calibration-intensity.md). Duration-dependent
+remarriage is still deferred.
 
 ## Validation
 
 Check category/group coverage and overlap; exact zero-hazard eligibility;
 repeated transitions and restart history; equal category rates against shared
 rates; analytical constant hazards with adequate candidates; calibration
-intensity against an explicit sum over category bins; and observation accounting
+intensity against an explicit sum over individuals; and observation accounting
 against pooled unpartnered exposure and formations. Test half-open time/age
 boundaries, histories predating the window, zero-duration and touching episodes,
 sex-specific widowhood, grouping, empty histories, and invalid histories.

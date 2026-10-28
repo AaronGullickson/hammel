@@ -19,6 +19,7 @@ future work.
 | [Groups](groups.md) | Group-specific schedules, multipliers, newborn identity, and baseline sampling |
 | [Ancestry](ancestry.md) | Starting proportions, parental averaging, unknown shares, and restarts |
 | [Group inheritance](group-inheritance.md) | Built-in/custom identity rules, passing, and possible groups |
+| [Calibration intensity updates](calibration-intensity.md) | Actual female hazards, aggregate cells, and bookkeeping boundary queue (D082) |
 | [Weighted-choice matching](weighted-choice-matching.md) | Calibrated male-group weights and delta target adjustments (D074/D075) |
 | [Group matching](group-matching.md) | Symmetric pair effects and fixed group formula predictors |
 | [Demographic analysis](demographic-analysis.md) | Exposure, ASFR/ASMR, TFR, and life-table workflows |

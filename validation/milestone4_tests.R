@@ -156,4 +156,5 @@ mar_counts |>
   filter(sex == "f") |>
   ggplot(aes(x = age_start + 2.5, y = rate_marriage, group = previous_union, color = previous_union))+
   geom_point()+
-  geom_line(data = mar_rates_by_prev, aes(y = rate), linetype = 2)
+  geom_line(data = mar_rates_by_prev, aes(y = rate), linetype = 2)+
+  theme_bw()

@@ -247,7 +247,12 @@ his selection score in the exact draw.
 `WeightCalibrator` in `src/simulate.cpp` keeps unpartnered counts by group and
 birth-time bin and incrementally maintained pool sums for each matching model's
 table of utilities over bin-centre lags, updated at events, and solves the
-weights at each search from those sums. Matching models carry
+weights at each search from those sums. `FemaleIntensityTracker` maintains
+individual current search/fertility contributions and their group/cohort totals,
+with one queued next age/spacing boundary per counted woman (D082). State
+changes replace contributions; searches do not scan all women or enumerate a
+cross-classification of rate predictors. See
+[current-hazard contributions](calibration-intensity.md). Matching models carry
 `delta` (omitted groups default to zero). One group gives unit weights and female
 choice exactly. See [weighted-choice matching](weighted-choice-matching.md).
 

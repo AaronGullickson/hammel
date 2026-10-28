@@ -82,7 +82,7 @@ by symmetric group pair; each episode contributes once. The user checked the
 dissolution demonstrations and moved on to age-specific remarriage (D080).
 Optional `previous_union` on search tables uses `none`, `dissolved`, `widowed`,
 with all categories required per group; absent columns share rates. Calibration
-sums category-specific intensities within group/age bins. State is recovered
+now uses per-woman current-hazard contributions summed by group/cohort (D082), with a common age/spacing boundary queue. State is recovered
 from complete exclusive histories and updated on endings.
 `calculate_marriage_rates()` now returns unpartnered exposure, starts and rates
 by sex, optionally by person group. `by_previous_union = TRUE` adds previous

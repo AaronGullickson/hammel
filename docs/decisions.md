@@ -29,6 +29,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Two-sex union models and union API restructuring (deferred) | D073 |
 | Duration-dependent dissolution and symmetric group pairs | D078–D079 |
 | Age-specific searches by previous union; separate marriage observations | D080 |
+| Actual-hazard intensity tracking and boundary updates | D082 |
 
 ## Recorded decisions
 
@@ -1594,3 +1595,31 @@ matching specifications override this default. Initiation mode remains explicit.
   the new names.
 - **Supersession:** updates public function names in D022, D046–D048,
   D079 and D080 without changing their demographic rules.
+
+
+## D082: Aggregate actual female hazards using contribution and boundary updates
+
+- **Status:** implementation/performance trial authorized October 28, 2026.
+  The user explicitly selected actual current hazards for calibration; no
+  milestone 4 scientific acceptance is inferred.
+- **Decision:** maintain individual current female search intensity and sum it
+  into group/birth-cohort calibration cells. Replace the previous category
+  count arrays and age-band averaging with contributions updated at age-band
+  boundaries, birth-spacing release and demographic state changes. Maintain
+  separate marriage-search and fertility-driven totals with one pending
+  bookkeeping update per available woman.
+- **Interpretation:** mirrored male targets still use actual group-level
+  female intensities. No reference male schedule or male previous-status strata
+  are introduced. Matching utility/cutoff bins and the exact partner draw remain.
+  Female hazard evaluation now uses actual age instead of bin averages.
+- **Scheduling:** bookkeeping consumes no RNG and does not resample individual
+  demographic events. New weights can alter partner selections and subsequent
+  grouped histories. Ungrouped/strict-endogamy paths skip the tracker. Pool exits
+  erase pending updates; restarts reconstruct contributions from histories.
+- **Scope:** apply to existing age schedules only and benchmark optimized old
+  and new builds. Duration-based remarriage, parity, region, custom state
+  mechanisms and transition-aware fertility compensation remain deferred.
+- **Supersession:** replaces D080's previous-category count representation and
+  the rate-bin averaging introduced under D071, while preserving their public
+  schedule inputs and all other calibration conventions.
+- **Specification:** [current-hazard calibration](calibration-intensity.md).

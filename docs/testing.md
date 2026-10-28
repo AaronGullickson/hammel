@@ -350,3 +350,82 @@ passed without failures or warnings; the opt-in live database test was skipped.
 Namespace checks confirm the new exports and removal of the old names.
 The shipped example and current milestone 4 script parse with the new calls.
 Arguments, output columns and demographic calculations are unchanged.
+
+## Actual female hazard contributions (D082, October 28, 2026)
+
+`devtools::test()` passed the full suite using `TZ=UTC`, with no failures or
+warnings; the opt-in live database test was skipped. Targeted validation first
+passed with `filter = "calibration-intensity|weighted-choice|remarriage|rate-unions|union-dissolution"`.
+The native code was built with `devtools::load_all(debug = FALSE, recompile = TRUE)`
+for these checks and separately installed with optimized flags for benchmarking.
+
+`test-calibration-intensity.R` compares every maintained cell/channel with an
+independent individual scan after age boundaries, narrow bands, gaps, terminal
+support, spacing releases, repeated readiness changes, removal and reactivation
+with another previous category. It checks RNG preservation, exact zero after
+all positive contributors leave, and at most one pending boundary per active
+woman. Existing matching, dissolution, fertility, restart and independent-run
+checks passed; snapshot calibration tests now use actual individual hazards,
+including different risks inside the same quarter-year bin.
+
+The offline optimized old/new comparison used the same saved models, 50,000
+starting persons and 100 years, with three seeds and alternating version order.
+The ungrouped seed-42 history was identical in full. Median grouped timings
+changed +2.3% for shared-rate searches, -8.1% for previous-union schedules and
++3.5% for on-demand searches. Grouped previous-status peak process RSS rose
+about 12.1 MiB. See [current-hazard calibration](calibration-intensity.md) for
+inputs, runtime environment, raw results, reproduction commands and limits.
+These are performance/implementation checks, not milestone 4 acceptance or
+validation of duration-dependent remarriage, which remains unimplemented.
+
+## Matching parameter recovery with the new tracker (October 28, 2026)
+
+Ran
+`TZ=UTC Rscript validation/validate-calibration-log-odds.R /tmp/hammel-calibration-newlib validation/calibration-log-odds 20 1500`
+using the same optimized D082 build as the performance comparison. The script
+uses offline synthetic schedules, 20 independently seeded initial populations
+of 20,000 persons (max age 50, 75/25 A/B), 60 years, duration-dependent
+*dissolution* and age-specific remarriage searches by previous status. Search
+rates differ across previous categories and B has a 1.2 search multiplier.
+Duration-dependent remarriage is not used. Both matching cases use A:B = -3,
+so the conditional cross-group log odds ratio target is -6. The age-dependent
+case additionally uses preferred male-minus-female gap 2 and half-weight
+distance 5 (linear .11090355, quadratic -.02772589).
+
+For each case/replication, sample 1,500 union events and 50 uniformly sampled
+eligible alternate men per event, plus the chosen man. Independently rebuild
+the available male pool immediately before formation from full person/union
+histories, enforcing living status, age >=15, and unpartnered status. Kin
+screening is explicitly disabled in these simulations, avoiding a mismatch
+between simulation and reconstructed choice sets. Fit wife-side conditional
+logit with the recorded per-event male-group log weights as offsets, separate
+AB/BA coefficients, and age/age-squared terms in the age-dependent case.
+Uniform sampled alternatives have the same set-selection probability for
+each possible chosen member, so no additional alternative-sampling offset is
+required. Efron and exact conditional likelihoods coincide with one event per
+stratum. Replication SEs below are sd(estimates)/sqrt(20), including simulation,
+baseline and choice-subsampling variation; they are not within-fit SEs.
+
+| Case | Target conditional log OR | Mean recovered | MCSE | Pooled cross-tab mean | Pooled MCSE |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Group only | -6 | -5.97493 | .05378 | -5.98500 | .01721 |
+| Age dependent | -6 | -5.98931 | .04935 | -5.96394 | .01439 |
+
+Directional coefficient means were -3.00624 (AB) and -2.96868 (BA) for group
+only, and -3.01641 and -2.97290 for age-dependent matching. Recovered age terms
+were .1117834 (MCSE .0017798) and -.0276966 (MCSE .0002403). The input
+conditional parameters lie within the corresponding approximate Monte Carlo
+uncertainty intervals. These results support parameter recovery for these
+workloads; no universal acceptance threshold or milestone completion is inferred.
+
+A pooled cross-tab is a different estimand: changing age distributions, pools
+and weights can move its cross-product away from the conditional target.
+In particular, do not claim the age-dependent pooled estimate is within two
+MCSEs of -6; preservation applies to the conditional utility association, not
+an exact constraint on the final pooled table.
+
+Reproduction: [validation script](../validation/validate-calibration-log-odds.R).
+Evidence: [replication estimates](../validation/calibration-log-odds-replications.csv),
+[summary](../validation/calibration-log-odds-summary.csv), and
+[estimates/session metadata](../validation/calibration-log-odds.rds). No package
+code changed for this recovery check. The run completed without warnings.

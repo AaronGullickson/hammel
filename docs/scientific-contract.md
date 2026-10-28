@@ -568,8 +568,10 @@ can give unexpected directional pair ratios; delta adjusts male-group targets
 without guaranteeing fixed pairwise ratios. Group-only cross-product identities
 are analytical benchmarks, not exact guarantees after pooling changing age
 structures and markets. Kinship is omitted from weight calibration and
-quarter-year bins approximate calibration ages; actual partner draws use exact
-ages and screening. No marriage-squeeze feedback is implemented.
+quarter-year bins approximate calibration matching utilities and cutoff
+eligibility, while female intensities sum actual current individual hazards
+(D082). Boundary updates consume no randomness and do not alter individual
+search scheduling. Actual partner draws use exact ages and screening. No marriage-squeeze feedback is implemented.
 
 Baseline generation is another source of Monte Carlo variation. Replications
 sharing one baseline condition on it; independently generated baselines include
