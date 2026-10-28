@@ -15,7 +15,7 @@
 #'   the male partner; these roles do not imply legal marriage. An empty data
 #'   frame is normalized to the union schema. Optional `union_type` is cohab or
 #'   marriage. A conversion closes cohab with `end_reason = "conversion"` and
-#'   links the same-time marriage through `converted_from_union_id`.
+#'   links the same-time marriage through `previous_cohab_id`.
 #' @param end_time Optional finite simulation endpoint in years. Its calendar origin is supplied by the user. `NULL` means
 #'   that the endpoint is unknown.
 #' @param ancestry Optional data frame with exactly one row per person, keyed

@@ -64,7 +64,7 @@ test_that("conversion preserves partners, resets dissolution duration and links 
   expect_equal(nrow(late$unions), 2)
   expect_equal(late$unions$end_reason[1], "conversion")
   expect_equal(late$unions$start_time[2], late$unions$end_time[1])
-  expect_equal(late$unions$converted_from_union_id[2], late$unions$union_id[1])
+  expect_equal(late$unions$previous_cohab_id[2], late$unions$union_id[1])
   expect_equal(late$unions$wife_id, c(1,1))
   expect_equal(late$unions$husband_id, c(2,2))
   expect_equal(late$simulation$conversions, 1)

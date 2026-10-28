@@ -5,7 +5,7 @@ typed_demog_history <- function() {
     group=c("A","B","B","B","B"))
   unions <- tibble::tibble(union_id=1:2,wife_id=1L,husband_id=2L,
     start_time=c(1,3),end_time=c(3,4),end_reason=c("conversion","dissolution"),
-    union_type=c("cohab","marriage"),converted_from_union_id=c(NA_integer_,1L))
+    union_type=c("cohab","marriage"),previous_cohab_id=c(NA_integer_,1L))
   hammel_population(persons,unions,end_time=5)
 }
 
@@ -68,6 +68,6 @@ test_that("typed overlapping histories are rejected", {
   pop <- typed_demog_history()
   pop$unions$start_time[2] <- 2
   pop$unions$end_reason[1] <- "dissolution"
-  pop$unions$converted_from_union_id[2] <- NA_integer_
+  pop$unions$previous_cohab_id[2] <- NA_integer_
   expect_error(calculate_demog_rates(pop,c(0,5),c(0,Inf),TRUE),"nonoverlapping")
 })

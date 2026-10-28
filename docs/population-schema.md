@@ -101,7 +101,7 @@ preserving extra components. Population construction/validation lives in
 ## Typed union episodes (D086)
 
 Cohabitation-enabled rate runs add union_type (cohab/marriage) and
-converted_from_union_id. Conversion closes cohab with end_reason conversion and
+previous_cohab_id. Conversion closes cohab with end_reason conversion and
 starts marriage with the same partners at the same time. The new row points
 to the cohab ID; links must be unique and consistent. Both episodes remain in
 history, with continuous partnered exposure. Untyped mode retains its six core

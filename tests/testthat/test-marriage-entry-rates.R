@@ -5,7 +5,7 @@ marriage_entry_history <- function() {
   unions <- tibble::tibble(union_id = 1:2, wife_id = 1L, husband_id = 2L,
     start_time = c(1, 3), end_time = c(3, NA),
     end_reason = c("conversion", NA), union_type = c("cohab", "marriage"),
-    converted_from_union_id = c(NA_integer_, 1L))
+    previous_cohab_id = c(NA_integer_, 1L))
   hammel_population(persons, unions, end_time = 5)
 }
 
@@ -50,12 +50,12 @@ test_that("marriage conversion boundaries and age cells are half open", {
 test_that("direct and legacy marriages retain existing exposure accounting", {
   pop <- marriage_entry_history()
   pop$unions <- pop$unions[2, ]
-  pop$unions$converted_from_union_id <- NA_integer_
+  pop$unions$previous_cohab_id <- NA_integer_
   direct <- calculate_marriage_rates(pop,c(0,5),c(0,Inf))
   expect_equal(direct$person_years,c(3,3))
   expect_equal(direct$marriages,c(1,1))
   pop$unions$union_type <- NULL
-  pop$unions$converted_from_union_id <- NULL
+  pop$unions$previous_cohab_id <- NULL
   expect_identical(calculate_marriage_rates(pop,c(0,5),c(0,Inf)),direct)
   pop$unions <- pop$unions[0, ]
   pop$persons$death_time <- c(2,NA)
@@ -91,7 +91,7 @@ test_that("marriage previous categories include cohabiting exposure and conversi
   prior$start_time <- -3
   prior$end_time <- -1
   prior$end_reason <- "dissolution"
-  prior$converted_from_union_id <- NA_integer_
+  prior$previous_cohab_id <- NA_integer_
   pop$unions <- rbind(prior, pop$unions)
   for (grouped in c(FALSE, TRUE)) {
     pooled <- calculate_marriage_rates(pop,c(0,5),c(0,Inf),by_group=grouped)

@@ -9,7 +9,7 @@ choice_data <- function(result,type,n=1500L) {
   p <- result$persons; u <- result$unions
   wife <- match(u$wife_id,p$person_id); husband <- match(u$husband_id,p$person_id)
   male <- which(p$sex=="m")
-  eligible_rows <- which(u$union_type==type & is.na(u$converted_from_union_id))
+  eligible_rows <- which(u$union_type==type & is.na(u$previous_cohab_id))
   selected <- eligible_rows[sample.int(length(eligible_rows),min(n,length(eligible_rows)))]
   do.call(rbind,lapply(seq_along(selected),function(k) {
     row <- selected[k]; now <- u$start_time[row]; chosen <- husband[row]

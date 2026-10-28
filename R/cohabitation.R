@@ -73,13 +73,13 @@ validate_union_types <- function(unions) {
   x <- unions$union_type
   if (!is.character(x) || !is.null(dim(x)) || anyNA(x) || any(!x %in% c("cohab", "marriage")))
     stop("`unions$union_type` must contain 'cohab' or 'marriage'.", call. = FALSE)
-  if (!"converted_from_union_id" %in% names(unions)) {
+  if (!"previous_cohab_id" %in% names(unions)) {
     if (any(unions$end_reason == "conversion", na.rm = TRUE))
-      stop("Conversion histories require `converted_from_union_id` links.", call. = FALSE)
+      stop("Conversion histories require `previous_cohab_id` links.", call. = FALSE)
     return(invisible(unions))
   }
-  links <- unions$converted_from_union_id
-  check_numeric_column(links, "converted_from_union_id", missing = TRUE, id = TRUE)
+  links <- unions$previous_cohab_id
+  check_numeric_column(links, "previous_cohab_id", missing = TRUE, id = TRUE)
   rows <- which(!is.na(links)); parent <- match(links[rows], unions$union_id)
   if (anyNA(parent) || anyDuplicated(parent) || any(unions$union_type[rows] != "marriage") ||
       any(unions$union_type[parent] != "cohab") ||

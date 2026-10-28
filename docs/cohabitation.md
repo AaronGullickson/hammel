@@ -56,7 +56,7 @@ One female conversion clock is sampled per cohab episode and retained through
 births. Same-person tie priority is death, birth, dissolution, conversion, search.
 Conversion closes the cohab episode with `end_reason = "conversion"`, then
 starts a marriage at exactly the same time with the same partners and a new ID.
-`converted_from_union_id` links the new marriage to its cohab episode. Both
+`previous_cohab_id` links the new marriage to its cohab episode. Both
 partners remain partnered and unavailable throughout; no matching or type draw
 occurs. Marriage dissolution duration resets to zero. Fertility changes to the
 marriage schedule while preserving the latest actual birth/spacing. No immediate

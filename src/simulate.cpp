@@ -1265,8 +1265,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       CharacterVector types = unions["union_type"];
       union_history.back().cohab = as<std::string>(types[u]) == "cohab";
     }
-    if (unions.containsElementNamed("converted_from_union_id")) {
-      NumericVector links = unions["converted_from_union_id"];
+    if (unions.containsElementNamed("previous_cohab_id")) {
+      NumericVector links = unions["previous_cohab_id"];
       union_history.back().converted_from = links[u];
     }
     next_union_id = std::max(next_union_id, uids[u]);
@@ -1807,7 +1807,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     out_unions = DataFrame::create(_["union_id"] = out_uid, _["wife_id"] = out_wife,
       _["husband_id"] = out_husband, _["start_time"] = out_start, _["end_time"] = out_end,
       _["end_reason"] = out_reason, _["union_type"] = out_type,
-      _["converted_from_union_id"] = out_from);
+      _["previous_cohab_id"] = out_from);
   return List::create(_["persons"] = DataFrame::create(
     _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),

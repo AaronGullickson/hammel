@@ -177,8 +177,8 @@ simulate <- function(model, years, seed = NULL) {
     validate_matching_groups(union_process$cohab_matching, group_values)
   if (cohab_enabled && !"union_type" %in% names(population$unions))
     population$unions$union_type <- rep("marriage", nrow(population$unions))
-  if (cohab_enabled && !"converted_from_union_id" %in% names(population$unions))
-    population$unions$converted_from_union_id <- rep(NA_real_, nrow(population$unions))
+  if (cohab_enabled && !"previous_cohab_id" %in% names(population$unions))
+    population$unions$previous_cohab_id <- rep(NA_real_, nrow(population$unions))
   engine_persons <- population$persons
   engine_persons$.hammel_group <- if (is.null(group_values)) rep(0L, nrow(engine_persons)) else
     match(as.character(engine_persons$group), as.character(group_values)) - 1L
