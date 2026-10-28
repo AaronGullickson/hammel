@@ -576,3 +576,14 @@ overlapping typed episodes. Migrated untyped cases retain merged overlap
 coverage, event boundaries and downstream TFR/life-table grouping. Pooled default
 observations remain covered by the demographic tests. This was targeted offline
 verification; no simulation scheduling or matching behavior changed.
+
+
+D091 conversion observation: `devtools::test(filter = "cohab|dissolution",
+reporter = "summary")` passed without failures or warnings after documentation
+and native exports were regenerated. Exact histories verify duration and woman's
+age, independent axis-cell boundary assignment, exposure/count conservation,
+woman-group labels (including numeric labels), conversion-only events,
+competing death/dissolution censoring, ongoing exposure, pre-window histories,
+finite last-break extension, zero exposure, empty tables and input validation.
+Existing dissolution tests verify unchanged behavior of the shared accumulator.
+This was offline targeted verification; no empirical rate downloads were used.

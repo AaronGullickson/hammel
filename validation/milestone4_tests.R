@@ -282,6 +282,8 @@ system.time(result <- simulate(model, 100, 42))
 
 table(result$unions$union_type, result$unions$end_reason)
 
+table(result$unions$union_type, !is.na(result$unions$previous_cohab_id))
+
 mar_counts <- calculate_marriage_rates(
   result,
   time_breaks = seq(2025, 2100, 75),
@@ -342,6 +344,16 @@ calculate_demog_rates(
   ggplot(aes(x = age_start, y = rate_fertility, group = union_type, color = union_type))+
   geom_point()+
   geom_line(data = fertility_rates_by_union_type, aes(y = rate), linetype = 2)+
+  theme_bw()
+
+calculate_cohab_convert_rate(
+  result,
+  time_breaks = seq(2025, 2100, 75),
+  dur_breaks = seq(0, 10, 5)
+) |>
+  ggplot(aes(x = dur_start, y = rate_cohab_convert))+
+  geom_point()+
+  geom_line(data = convert_rate, aes(y = rate), linetype = 2)+
   theme_bw()
 
 devtools::load_all(debug = FALSE, recompile = TRUE)

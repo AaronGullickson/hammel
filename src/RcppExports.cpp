@@ -42,8 +42,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // dissolution_counts_cpp
-List dissolution_counts_cpp(DataFrame unions, NumericVector time_breaks, NumericVector dur_breaks, IntegerVector group_indices, int group_count);
-RcppExport SEXP _hammel_dissolution_counts_cpp(SEXP unionsSEXP, SEXP time_breaksSEXP, SEXP dur_breaksSEXP, SEXP group_indicesSEXP, SEXP group_countSEXP) {
+List dissolution_counts_cpp(DataFrame unions, NumericVector time_breaks, NumericVector dur_breaks, IntegerVector group_indices, int group_count, Nullable<NumericVector> origins, std::string event_reason);
+RcppExport SEXP _hammel_dissolution_counts_cpp(SEXP unionsSEXP, SEXP time_breaksSEXP, SEXP dur_breaksSEXP, SEXP group_indicesSEXP, SEXP group_countSEXP, SEXP originsSEXP, SEXP event_reasonSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -52,7 +52,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericVector >::type dur_breaks(dur_breaksSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type group_indices(group_indicesSEXP);
     Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
-    rcpp_result_gen = Rcpp::wrap(dissolution_counts_cpp(unions, time_breaks, dur_breaks, group_indices, group_count));
+    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type origins(originsSEXP);
+    Rcpp::traits::input_parameter< std::string >::type event_reason(event_reasonSEXP);
+    rcpp_result_gen = Rcpp::wrap(dissolution_counts_cpp(unions, time_breaks, dur_breaks, group_indices, group_count, origins, event_reason));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -308,7 +310,7 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_hammel_demographic_counts_cpp", (DL_FUNC) &_hammel_demographic_counts_cpp, 5},
     {"_hammel_union_counts_cpp", (DL_FUNC) &_hammel_union_counts_cpp, 6},
-    {"_hammel_dissolution_counts_cpp", (DL_FUNC) &_hammel_dissolution_counts_cpp, 5},
+    {"_hammel_dissolution_counts_cpp", (DL_FUNC) &_hammel_dissolution_counts_cpp, 7},
     {"_hammel_previous_union_info_cpp", (DL_FUNC) &_hammel_previous_union_info_cpp, 3},
     {"_hammel_previous_union_state_cpp", (DL_FUNC) &_hammel_previous_union_state_cpp, 2},
     {"_hammel_marriage_counts_cpp", (DL_FUNC) &_hammel_marriage_counts_cpp, 10},

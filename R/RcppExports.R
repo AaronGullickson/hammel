@@ -9,8 +9,8 @@ union_counts_cpp <- function(persons, unions, time_breaks, age_breaks, group_ind
     .Call(`_hammel_union_counts_cpp`, persons, unions, time_breaks, age_breaks, group_indices, group_count)
 }
 
-dissolution_counts_cpp <- function(unions, time_breaks, dur_breaks, group_indices, group_count) {
-    .Call(`_hammel_dissolution_counts_cpp`, unions, time_breaks, dur_breaks, group_indices, group_count)
+dissolution_counts_cpp <- function(unions, time_breaks, dur_breaks, group_indices, group_count, origins = NULL, event_reason = "dissolution") {
+    .Call(`_hammel_dissolution_counts_cpp`, unions, time_breaks, dur_breaks, group_indices, group_count, origins, event_reason)
 }
 
 previous_union_info_cpp <- function(persons, unions, counts_cohab = FALSE) {

@@ -185,3 +185,22 @@ pooled totals. At conversion a tied birth remains cohabiting (birth first),
 while exposure moves into marriage at that instant. Dissolution-tied births
 retain the ending type; death uses the left-limit type. Ambiguous overlapping
 typed histories are rejected; untyped overlap merging remains supported.
+
+
+## Cohabitation conversion observations
+
+`calculate_cohab_convert_rate(population, time_breaks, dur_breaks = NULL,
+age_breaks = NULL, by_group = FALSE)` requires typed population histories and
+exactly one duration/age axis. Duration is elapsed years since each cohabitation
+began; age is the woman's attained age, matching the conversion input schedule.
+Each cohabitation contributes union-years once, ending at conversion,
+dissolution, either partner's death or observation censoring. Only end reason
+conversion contributes an event. Marriage episodes contribute neither exposure
+nor events. Rate is conversions per cohabitation union-year; zero exposure gives
+NA. Period and axis cells are half-open; the final finite axis break gains Inf.
+Optional groups refer to the woman, matching the input conversion schedule.
+Output has `union_years`, `conversions`, `rate_cohab_convert` and period/axis
+boundaries, plus optional `group`. Retain empty grid cells. Example: a cohab
+lasting two years then converting contributes two union-years and one conversion;
+a cohab lasting three years then dissolving contributes three union-years and
+zero conversions, for a pooled conversion rate of 1/5 per union-year.

@@ -399,3 +399,28 @@ union-years and dissolution counts; summing counts and exposure across types
 recovers pooled totals. Conversion ends cohabitation exposure without a
 dissolution event. Marriage duration starts at conversion. Typed union histories
 are required for splitting; the default pools types.
+
+
+## Cohabitation-to-marriage conversion rates
+
+```r
+calculate_cohab_convert_rate(result,
+  time_breaks = c(2025, 2100),
+  dur_breaks = c(0, 1, 2, 5, Inf)
+)
+calculate_cohab_convert_rate(result,
+  time_breaks = c(2025, 2100),
+  age_breaks = seq(15, 70, 5),
+  by_group = TRUE
+)
+```
+
+Supply exactly one axis. Duration is time since cohabitation entry; age is
+woman's age, matching conversion schedules. `by_group` uses the woman's group.
+Typed population histories are required. Output contains period and selected
+axis boundaries, `union_years`, `conversions`, and `rate_cohab_convert`.
+Exposure is cohabitation only, once per union episode. Only conversions count
+as events; dissolution and death censor exposure, and marriage episodes are
+excluded. This is a cause-specific rate per cohabitation union-year, not the
+probability of eventual conversion. Empty cells remain; zero exposure gives NA.
+Finite last axis breaks gain Inf, as with the other rate helpers.

@@ -1811,3 +1811,18 @@ cohabitation policy. Duration stratification is unchanged.
   tied to conversion or dissolution retains the ending type. Preserve existing
   formation-boundary birth classification. Unknown mothers retain the single
   period-level unassigned attribute. Derived measures keep type strata separate.
+
+
+## D091 — Conversion observation helper (October 28, 2026)
+
+- **Status:** requested by the user.
+- **Decision:** add `calculate_cohab_convert_rate()` with mutually exclusive
+  `dur_breaks` or `age_breaks`, using typed population histories. Conversion
+  events use cohabitation union-years as exposure. Duration is since cohabitation
+  entry; age uses the woman, matching input conversion hazards. Optional
+  `by_group` uses her group. Report `union_years`, `conversions`, and
+  `rate_cohab_convert`, keeping empty cells and NA at zero exposure. Dissolution
+  and death end exposure without conversion events; marriage is excluded.
+- **Implementation:** share the episode exposure accumulator with dissolution
+  observation, supplying the appropriate axis origin and event reason. No
+  simulation scheduling or demographic defaults change.

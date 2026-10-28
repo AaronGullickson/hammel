@@ -172,8 +172,10 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
 // [[Rcpp::export]]
 List dissolution_counts_cpp(DataFrame unions, NumericVector time_breaks,
                              NumericVector dur_breaks, IntegerVector group_indices,
-                             int group_count) {
+                             int group_count, Nullable<NumericVector> origins = R_NilValue,
+                             std::string event_reason = "dissolution") {
   NumericVector starts = unions["start_time"], ends = unions["end_time"];
+  const NumericVector axis_origins = origins.isNotNull() ? NumericVector(origins) : starts;
   CharacterVector reasons = unions["end_reason"];
   const int nt = time_breaks.size() - 1, nd = dur_breaks.size() - 1;
   const R_xlen_t stride = static_cast<R_xlen_t>(nt) * nd;
@@ -187,15 +189,15 @@ List dissolution_counts_cpp(DataFrame unions, NumericVector time_breaks,
       const double hi = std::min(end, time_breaks[t + 1]);
       if (hi <= lo) continue;
       for (int d = 0; d < nd; ++d) {
-        const double enter = std::max(lo, starts[u] + dur_breaks[d]);
-        const double exit = std::min(hi, starts[u] + dur_breaks[d + 1]);
+        const double enter = std::max(lo, axis_origins[u] + dur_breaks[d]);
+        const double exit = std::min(hi, axis_origins[u] + dur_breaks[d + 1]);
         if (exit > enter) exposure[offset + t + nt * d] += exit - enter;
       }
     }
     if (NumericVector::is_na(ends[u]) || CharacterVector::is_na(reasons[u]) ||
-        as<std::string>(reasons[u]) != "dissolution") continue;
+        as<std::string>(reasons[u]) != event_reason) continue;
     const int t = demographic_bin(ends[u], time_breaks);
-    const int d = demographic_bin(ends[u] - starts[u], dur_breaks);
+    const int d = demographic_bin(ends[u] - axis_origins[u], dur_breaks);
     if (t >= 0 && d >= 0) events[offset + t + nt * d] += 1;
   }
   return List::create(_["union_years"] = exposure, _["dissolutions"] = events);
