@@ -270,7 +270,8 @@ checks confirm that union closure shortens partnered person-years and later
 deaths preserve dissolved histories.
 
 These are software and analytical checks, not milestone 4 scientific acceptance.
-Separate remarriage schedules and cohabitation are deferred. D045's existing
+Age-specific previous-union search schedules are now implemented under D080;
+duration-dependent remarriage and cohabitation remain deferred. D045's existing
 fertility-transition limitation remains; no new demographic rates or acceptance
 thresholds are introduced.
 
@@ -298,3 +299,44 @@ database test skipped. Checks include reversed pair equivalence, nonunit
 multipliers versus explicit rates, pair coverage (including future identities),
 canonical numeric/literal labels, pair-pooled accounting, empty grids and
 rejection of ambiguous or overlapping specifications.
+
+## Age-specific remarriage and marriage observations (D080, October 28, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
+passed the full suite without test failures or warnings. The opt-in live
+HMD/HFD test was skipped; no rates were downloaded. UTC avoids the container's
+unavailable system timezone service. The first full run identified one remaining
+test using the removed Lexis formation column; it was migrated to the new helper
+before the successful full run.
+
+`test-remarriage.R` checks complete category/group schedules, invalid labels and
+overlap, recovery from unordered histories, latest-ending replacement, dissolution
+and widowhood rescheduling, analytical constant-hazard incidence for all three
+categories, reproducibility with shared/equal schedules, explicit group multiplier
+equivalence, and calibrated intensities against explicit effective group rates.
+`test-marriage-counts.R` checks exact exposure and starts, both sexes, latest
+category, pre-window history, half-open time/age boundaries, touching and
+zero-duration episodes, grouping and pooling, empty output types and invalid
+histories. Existing Lexis/dissolution tests retain birth/death exposure checks
+and now use the separate marriage helper for starts.
+
+The shipped milestone 2 example now calls `calculate_marriage_counts()` and
+pools category counts/exposure before calculating a combined marriage rate.
+Its source parses successfully; the complete empirical example was not run
+because it downloads rates. Accepted milestone 2/3 report sources and rendered
+artifacts are preserved. Their former Lexis marriage columns are intentionally
+removed in D080, so rerender historical assessments at their recorded versions
+or migrate those analysis chunks explicitly. The pre-D080 repository head was
+`a847d49313c68fec9b3506ba790bfa4f86ee7c5a`.
+
+These checks validate implementation and analytical cases, not milestone 4
+scientific acceptance. Duration-dependent remarriage and transition-aware
+fertility compensation remain deferred.
+
+
+The subsequent D080 pooling option passed
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(filter="marriage-counts|remarriage|union-dissolution", reporter="summary")'`
+without failures or warnings. Tests cover pooled counts/exposure and rates
+against summed previous-category cells, independently with and without group
+stratification, empty grouped/ungrouped outputs, and invalid option values.
+`by_previous_union` defaults to FALSE; stratified checks explicitly opt in.

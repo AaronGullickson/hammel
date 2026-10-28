@@ -215,7 +215,8 @@ woman still carries the single union clock. Birth precedes dissolution at an
 exact same-person tie. See the
 [dissolution specification](union-dissolution.md). SOCSIM's duration baseline
 informed this decision; its monthly inputs and two-spouse option were not adopted.
-Separate remarriage schedules and cohabitation remain deferred.
+Hammel now supports age-specific search schedules by previous union (D080);
+duration-dependent remarriage and cohabitation remain deferred.
 
 Remaining design areas beyond the accepted dissolution core include:
 

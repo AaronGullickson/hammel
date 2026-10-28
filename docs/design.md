@@ -1,6 +1,6 @@
 # Design and implemented interface
 
-Updated October 27, 2026. Milestones 1–3 are complete by user acceptance
+Updated October 28, 2026. Milestones 1–3 are complete by user acceptance
 (D029, D050, D077). This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
 The [scientific contract](scientific-contract.md) defines demographic semantics.
@@ -178,8 +178,12 @@ There is no automatic disk cache or rate refresh.
 [demographic analysis](demographic-analysis.md) for exposure, missing cells,
 replications, and age alignment. `calculate_lexis_counts(include_unions = TRUE)`
 returns overall/partnered/unpartnered rows with exposure, births, deaths, and
-rates. Union counts and marriage rates appear only on unpartnered rows,
-using the recorded union histories (D046/D047).
+fertility/mortality rates. `calculate_marriage_counts()` separately returns
+unpartnered exposure, union starts, and marriage rates by sex.
+`by_previous_union = TRUE` adds previous categories; `by_group = TRUE` independently
+adds individual groups. Both default to FALSE (D080). It requires exclusive union histories.
+Rate-mode input schedules optionally use the same `previous_union` categories;
+see [remarriage](remarriage.md) for initialization and calibration details.
 
 `get_detailed_unions(population)` returns a separate tibble preserving union
 records and appending each partner's birth/death time and optional group, with
@@ -211,7 +215,7 @@ TFR and life-table calculations automatically retain input group strata. See
 These remain proposals or unresolved requirements:
 
 - Custom process execution and permitted state mutations/invalidation.
-- Separate remarriage rates, cohabitation, poor-pool waiting, previous-father continuity,
+- Duration-dependent remarriage, cohabitation, poor-pool waiting, previous-father continuity,
   and transition-aware fertility compensation; see [union formation](union-formation-models.md)
   and the [roadmap](roadmap.md).
 - Heterogeneity, parity-specific fertility, and user-defined newborn attributes.

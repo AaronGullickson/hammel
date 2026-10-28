@@ -381,7 +381,11 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   population groups, simulation warns and selects the first alphabetical group.
 #'   See [mortality()] for group-label and rate-coverage rules.
 #'   Nonoverlapping bands may have gaps or an open end; gaps and ages outside
-#'   support have zero hazard. Must be NULL for `"on_demand"`.
+#'   support have zero hazard. Optional `previous_union` stratifies by `"none"`,
+#'   `"dissolved"`, and `"widowed"`; all three are required within each group.
+#'   Without it, the schedule applies to all previous union types. Categories
+#'   describe the most recent recorded episode; complete histories are required.
+#'   Must be NULL for `"on_demand"`.
 #' @param diagnostics Logical, default `FALSE`. When the general matching model
 #'   uses weighted choice in a grouped population, record `.log_weight_<group>`
 #'   columns on newly formed unions: the log group
@@ -478,7 +482,20 @@ validate_union_formation <- function(process) {
       stop("Use nonnegative female search rates in valid age bands, without sex or calendar columns.",
            call. = FALSE)
     }
-    for (rows in split_rate_groups(rates)) {
+    strata <- split_rate_groups(rates)
+    if ("previous_union" %in% names(rates)) {
+      previous <- rates$previous_union
+      categories <- c("none", "dissolved", "widowed")
+      if (!is.character(previous) || !is.null(dim(previous)) || anyNA(previous) ||
+          any(!previous %in% categories))
+        stop("`previous_union` must contain 'none', 'dissolved', or 'widowed'.", call. = FALSE)
+      if (any(vapply(strata, function(rows)
+          !setequal(previous[rows], categories), logical(1))))
+        stop("Union-search schedules require all three `previous_union` categories within each group.",
+             call. = FALSE)
+      strata <- unlist(lapply(strata, function(rows) split(rows, previous[rows])), recursive = FALSE)
+    }
+    for (rows in strata) {
       ordered <- rates[rows, , drop = FALSE]
       ordered <- ordered[order(ordered$age_start), , drop = FALSE]
       if (nrow(ordered) > 1L &&

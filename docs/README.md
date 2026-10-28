@@ -1,6 +1,6 @@
 # Hammel documentation
 
-Updated October 27, 2026. Milestones 1 (mortality/fertility), 2 (union
+Updated October 28, 2026. Milestones 1 (mortality/fertility), 2 (union
 formation), and 3 (groups, matching, ancestry, and inheritance) are complete
 by user acceptance (D029, D050, D077). Current behavior uses
 continuous event times and midpoint fertility compensation, with no monthly
@@ -35,6 +35,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | --- | --- |
 | [Waiting-time sampling](waiting-time-sampling.md) | Explanation of the current shared hazard sampler |
 | [Union-formation models](union-formation-models.md) | Implemented milestone 2 rules, matching defaults, diagnostics, and deferred work |
+| [Age-specific remarriage](remarriage.md) | Previous-union search strata, calibration, and separate marriage observations (D080) |
 | [Union dissolution](union-dissolution.md) | Milestone 4 duration hazards, female carrier, state changes, and worked examples (D078) |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
 | [Two-sex union models](two-sex-union-models.md) | Proposal notes: directional asymmetry, marriage squeeze, Schoen/Choo–Siow/Dagsvik models, API considerations (D073) |

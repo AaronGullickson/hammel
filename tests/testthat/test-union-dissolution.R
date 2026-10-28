@@ -219,7 +219,8 @@ test_that("dissolution histories conserve partnered exposure and survive later d
   expected <- sum(ifelse(is.na(result$unions$end_time), 1, result$unions$end_time))
   expect_equal(partnered$person_years, rep(expected, 2))
   expect_equal(partnered$person_years + unpartnered$person_years, rep(100, 2))
-  expect_equal(sum(unpartnered$unions), 200) # Input formations at the window start.
+  marriages <- calculate_marriage_counts(result, c(0, 1), c(0, Inf))
+  expect_equal(sum(marriages$unions), 200) # Input formations at the window start.
   # Follow-up deaths must not rewrite already dissolved records or count them again.
   continuation <- set_population(model, result)
   continuation <- set_mortality(continuation,

@@ -49,7 +49,8 @@ Births preserve the pending dissolution date. Exact same-person ties select
 death, then birth, then dissolution; a tied birth occurs while partnered.
 Dissolution ends the episode, restores both partners' availability, and
 reschedules the woman under her unpartnered fertility and existing search
-rules, retaining birth spacing. Separate remarriage rates are not introduced.
+rules, retaining birth spacing. Optional age-specific search schedules by
+previous union are specified through \code{\link[=union_formation]{union_formation()}}.
 Restarts resample at attained union duration rather than reset duration.
 }
 \examples{

@@ -29,10 +29,8 @@ union coverage, so births at formation are partnered. Births exactly at a
 dissolution end also count as partnered, matching birth-first event priority;
 exposure still ends at the boundary. Other ending births are unpartnered
 unless another episode covers that time. Deaths use status
-immediately before death, so union-ending deaths are partnered. Add \code{unions}
-and \code{rate_marriage} only on unpartnered rows (NA on other statuses): count
-each formation, including remarriages, at each spouse's age, and divide by
-unpartnered person-years. Rates with zero exposure are NA. Overlapping
+immediately before death, so union-ending deaths are partnered. For union
+starts and marriage rates, use \code{\link[=calculate_marriage_counts]{calculate_marriage_counts()}}. Overlapping
 episodes do not duplicate exposure. Complete union histories are required
 for historical status. Do not sum overall rows with their status components.}
 
@@ -40,15 +38,15 @@ for historical status. Do not sum overall rows with their status components.}
 \code{group} column and return the complete period/age/sex grid for each group
 appearing in the person history, in first-occurrence order. Labels retain
 their type. Exposure and deaths use the person's group; births use the
-mother's group, even when the child has a different group. Union counts
-use each spouse's own group. Combines with \code{include_unions}. No pooled
+mother's group, even when the child has a different group.
+Combines with \code{include_unions}. No pooled
 group row is added. Unknown-mother births remain in the single period-level
 \code{unassigned_births} attribute, without a group assignment.}
 }
 \value{
 A tibble with time_start, time_end, sex, age_start, age_end,
 person_years, deaths, births, rate_mortality, and rate_fertility. With \code{include_unions = TRUE},
-also union_status, unions, and rate_marriage. With \code{by_group = TRUE}, also
+also union_status. With \code{by_group = TRUE}, also
 group; groups form separate blocks of rows.
 }
 \description{

@@ -1,6 +1,6 @@
 # Scientific contract
 
-Updated October 27, 2026. This is the current mortality, fertility, union-formation,
+Updated October 28, 2026. This is the current mortality, fertility, union-formation,
 group identity/ancestry, and observation contract. Milestones 1–3 are accepted
 as complete (D029, D050, D077), retaining documented limitations.
 Earlier monthly and exact
@@ -380,8 +380,12 @@ and reschedules her unpartnered fertility and existing searches. Men's death
 hazards are status-independent, so their pending death events remain valid.
 Either partner's death cancels the episode's risk. Without this process,
 existing death-only behavior and random-number consumption are retained.
-Separate remarriage schedules, cohabitation and couple covariates are deferred;
-current search rules apply to newly unpartnered women. See the
+Age-specific search schedules may distinguish `previous_union` as `none`,
+`dissolved`, or `widowed` (D080). The most recent recorded episode determines
+state; complete histories are required. Without that column, all categories
+share the same rates. All three categories must be supplied per scheduled
+group when stratifying. Duration-dependent remarriage, cohabitation and couple
+covariates remain deferred. See the
 [dissolution specification](union-dissolution.md) for worked examples and limits.
 
 ### Weighted choice
@@ -457,10 +461,9 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   `[110, Inf)`. Zero exposure yields `NA` rates; zero events with positive
   exposure yields zero. Male birth counts/ASFR are `NA`.
 - With `include_unions = TRUE`, Lexis counts add exact partnered/unpartnered
-  exposure for both sexes, union starts at each spouse's age (including repeat
-  unions), and births/deaths by status, in separate `overall`, `partnered`, and
-  `unpartnered` rows. `unions` and `rate_marriage` are only defined for
-  unpartnered rows; the rate is formations per unpartnered person-year.
+  exposure for both sexes and births/deaths by status, in separate `overall`,
+  `partnered`, and `unpartnered` rows. Formation counts and marriage rates use
+  the separate `calculate_marriage_counts()` function (D080).
   Status components sum to overall counts/exposure; do not sum all three rows.
   Deaths use status immediately before death, so a union-ending death counts
   as partnered. Birth/exposure union coverage is half-open
@@ -487,6 +490,16 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   and `ex=T/l`. Missing rates propagate uncertainty; positive survivorship
   with zero terminal hazard gives infinite life expectancy; `ex` is undefined
   at zero survivorship. This is a synthetic period table, not cohort follow-up.
+- `calculate_marriage_counts()` returns unpartnered person-years, union starts
+  and `rate_marriage` by period, age and sex. Optional `by_previous_union = TRUE`
+  adds previous categories; `by_group = TRUE` independently adds individual
+  groups. Both default to FALSE, pooling counts and exposure before rates. The most recent episode determines category; starts
+  use the category immediately before formation. Empty categories remain, with
+  NA rates at zero exposure. Complete exclusive histories are required;
+  overlapping episodes are rejected. Touching and zero-duration episodes count
+  separately without adding time. Summing categories recovers pooled unpartnered
+  exposure and starts. Men describe matching outcomes, not male search inputs.
+  See [remarriage](remarriage.md) for input, restart and boundary conventions.
 - `calculate_union_counts()` splits each recorded union episode at calendar
   and duration boundaries, counting union-years once per episode and dissolution
   events only for `end_reason = "dissolution"`. Death also ends exposure but is
@@ -543,7 +556,7 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 | Midpoint approximation | Validate bias against supplied age schedules; no accuracy guarantee |
 | Rate changes between runs | Histories retain spacing, but compensation uses only the new schedule |
 | Sparse oldest ages | Missing cells remain missing; no automatic imputation or smoothing |
-| Union formation/dissolution | Exclusive conditional-logit on-demand or female rate-based formation, minimum male age and known-kin screening; widowhood plus optional duration-dependent dissolution; separate remarriage schedules deferred |
+| Union formation/dissolution | Exclusive conditional-logit on-demand or female rate-based formation, minimum male age and known-kin screening; widowhood plus optional duration-dependent dissolution; age-specific searches by previous union; duration-remarriage deferred |
 | Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
 | Exact continuation | No saved queue/RNG checkpoint |
 

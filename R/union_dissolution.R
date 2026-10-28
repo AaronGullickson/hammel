@@ -10,7 +10,8 @@
 #' death, then birth, then dissolution; a tied birth occurs while partnered.
 #' Dissolution ends the episode, restores both partners' availability, and
 #' reschedules the woman under her unpartnered fertility and existing search
-#' rules, retaining birth spacing. Separate remarriage rates are not introduced.
+#' rules, retaining birth spacing. Optional age-specific search schedules by
+#' previous union are specified through [union_formation()].
 #' Restarts resample at attained union duration rather than reset duration.
 #'
 #' @param rates A nonempty data frame with numeric `dur_start`, `dur_end`, and

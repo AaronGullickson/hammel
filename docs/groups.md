@@ -20,7 +20,8 @@ Each process owns its multipliers and preserves its supplied rate table and
 source metadata. Construction, attachment, and simulation validate edited
 vectors. Mortality factors apply to both sex schedules of a group, fertility
 factors apply to both union statuses where present, and search factors use
-the woman's group. Factors may modify an existing group-specific schedule
+the woman's group, across all `previous_union` categories when those are
+supplied (D080). Factors may modify an existing group-specific schedule
 or a shared schedule; they do not supply missing age bands or replace the
 requirement for an explicit matching schedule in grouped rate tables.
 
@@ -183,3 +184,11 @@ deaths, and maternal births recovers pooled cells; group population counts
 sum to pooled counts at every requested instant. Tests use these accounting
 identities, boundary examples, analytical group TFR/life expectancy, and empty
 outputs, as well as unchanged default results.
+
+
+Marriage observations now use `calculate_marriage_counts(..., by_group = TRUE)`
+(D080), grouping each spouse by their own identity. Set `by_previous_union = TRUE`
+to additionally split unpartnered exposure and union starts by previous category;
+the default FALSE pools counts and exposure before calculating rates. Search-rate multipliers apply
+across previous categories within each woman's group. See
+[remarriage](remarriage.md).

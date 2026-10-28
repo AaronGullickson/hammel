@@ -75,7 +75,7 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
   const int nt = time_breaks.size() - 1, na = age_breaks.size() - 1;
   const R_xlen_t stride = static_cast<R_xlen_t>(nt) * na * 2;
   const R_xlen_t cells = stride * group_count;
-  NumericVector partnered(cells), formations(cells);
+  NumericVector partnered(cells);
   std::map<double, int> index;
   std::vector<std::vector<std::pair<double, double>>> episodes(ids.size());
   // Dissolution follows a tied birth (D078). Keep these exact endpoints
@@ -90,12 +90,9 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
       dissolution_ends[index.at(wives[u])].push_back(ends[u]);
     for (double id : {wives[u], husbands[u]}) {
       const int i = index.at(id);
-      const int s = as<std::string>(sex[i]) == "m" ? 0 : 1;
       const double end = NumericVector::is_na(ends[u]) ? time_breaks[nt] : ends[u];
       episodes[i].push_back({starts[u], end});
-      const int t = demographic_bin(starts[u], time_breaks);
-      const int a = demographic_bin(starts[u] - born[i], age_breaks);
-      if (t >= 0 && a >= 0) formations[t + nt * (a + na * s) + stride * group_indices[i]] += 1;
+
     }
   }
   for (int i = 0; i < ids.size(); ++i) {
@@ -167,8 +164,7 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
                       _["deaths_unpartnered"] = deaths_unpartnered,
                       _["births_partnered"] = births_partnered,
                       _["births_unpartnered"] = births_unpartnered,
-                      _["person_years_partnered"] = partnered,
-                      _["unions"] = formations);
+                      _["person_years_partnered"] = partnered);
 }
 
 // Union episodes, rather than persons: each record contributes exposure once.
@@ -203,4 +199,95 @@ List dissolution_counts_cpp(DataFrame unions, NumericVector time_breaks,
     if (t >= 0 && d >= 0) events[offset + t + nt * d] += 1;
   }
   return List::create(_["union_years"] = exposure, _["dissolutions"] = events);
+}
+
+// Exclusive histories for previous-union state. Sort by time and union ID so
+// input row order never changes status, including touching/zero-length episodes.
+struct MarriageEpisode {
+  double start, end, id;
+  int after;
+};
+std::vector<std::vector<MarriageEpisode>> marriage_histories(DataFrame persons,
+                                                            DataFrame unions) {
+  NumericVector ids = persons["person_id"], died = persons["death_time"];
+  NumericVector wives = unions["wife_id"], husbands = unions["husband_id"];
+  NumericVector starts = unions["start_time"], ends = unions["end_time"], uids = unions["union_id"];
+  CharacterVector reasons = unions["end_reason"];
+  std::map<double, int> index;
+  for (int i = 0; i < ids.size(); ++i) index[ids[i]] = i;
+  std::vector<std::vector<MarriageEpisode>> histories(ids.size());
+  for (int u = 0; u < starts.size(); ++u) {
+    const bool ongoing = NumericVector::is_na(ends[u]);
+    const double end = ongoing ? R_PosInf : ends[u];
+    const int after = !ongoing && as<std::string>(reasons[u]) == "dissolution" ? 1 : 2;
+    for (double id : {wives[u], husbands[u]}) {
+      const int i = index.at(id);
+      if (!NumericVector::is_na(died[i]) && (starts[u] > died[i] || end > died[i]))
+        stop("Previous-union histories cannot contain union events after a partner's death.");
+      histories[i].push_back({starts[u], end, uids[u], after});
+    }
+  }
+  for (auto& history : histories) {
+    std::sort(history.begin(), history.end(), [](const MarriageEpisode& a, const MarriageEpisode& b) {
+      return a.start < b.start || (a.start == b.start && a.id < b.id);
+    });
+    for (size_t u = 1; u < history.size(); ++u)
+      if (history[u].start < history[u - 1].end)
+        stop("Previous-union stratification requires nonoverlapping union histories for each person.");
+  }
+  return histories;
+}
+
+// Execution-only cache: complete supplied history determines the latest ending.
+// [[Rcpp::export]]
+IntegerVector previous_union_state_cpp(DataFrame persons, DataFrame unions) {
+  const auto histories = marriage_histories(persons, unions);
+  IntegerVector state(histories.size(), 0);
+  for (size_t i = 0; i < histories.size(); ++i)
+    for (const auto& episode : histories[i])
+      if (R_finite(episode.end)) state[i] = episode.after;
+  return state;
+}
+
+// [[Rcpp::export]]
+List marriage_counts_cpp(DataFrame persons, DataFrame unions,
+                         NumericVector time_breaks, NumericVector age_breaks,
+                         IntegerVector group_indices, int group_count) {
+  const auto histories = marriage_histories(persons, unions);
+  NumericVector born = persons["birth_time"], died = persons["death_time"];
+  CharacterVector sex = persons["sex"];
+  const int nt = time_breaks.size() - 1, na = age_breaks.size() - 1;
+  const R_xlen_t stride = static_cast<R_xlen_t>(nt) * na * 2;
+  NumericVector exposure(stride * 3 * group_count), formations(exposure.size());
+  for (int i = 0; i < born.size(); ++i) {
+    if (i % 1024 == 0) checkUserInterrupt();
+    const int s = as<std::string>(sex[i]) == "m" ? 0 : 1;
+    const double life_end = NumericVector::is_na(died[i]) ? time_breaks[nt] : died[i];
+    auto add_exposure = [&](double lo, double hi, int previous) {
+      for (int t = 0; t < nt; ++t) {
+        const double start = std::max(lo, time_breaks[t]);
+        const double end = std::min({hi, life_end, time_breaks[t + 1]});
+        if (end <= start) continue;
+        for (int a = 0; a < na; ++a) {
+          const double enter = std::max(start, born[i] + age_breaks[a]);
+          const double exit = std::min(end, born[i] + age_breaks[a + 1]);
+          if (exit > enter)
+            exposure[t + nt * (a + na * s) + stride * (previous + 3 * group_indices[i])] += exit - enter;
+        }
+      }
+    };
+    int previous = 0;
+    double available = born[i];
+    for (const auto& episode : histories[i]) {
+      add_exposure(available, episode.start, previous);
+      const int t = demographic_bin(episode.start, time_breaks);
+      const int a = demographic_bin(episode.start - born[i], age_breaks);
+      if (t >= 0 && a >= 0)
+        formations[t + nt * (a + na * s) + stride * (previous + 3 * group_indices[i])] += 1;
+      available = episode.end;
+      previous = episode.after;
+    }
+    add_exposure(available, life_end, previous);
+  }
+  return List::create(_["person_years"] = exposure, _["unions"] = formations);
 }

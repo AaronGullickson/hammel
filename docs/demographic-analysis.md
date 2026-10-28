@@ -277,9 +277,9 @@ detailed_unions <- get_detailed_unions(result)
 `include_unions = TRUE` returns three adjacent rows per period/age/sex cell,
 identified by `union_status`: `overall`, `partnered`, and `unpartnered`. All use
 `person_years`, `deaths`, `births`, `rate_mortality`, and `rate_fertility`. Births and ASFR are NA
-for men. The option also adds `unions` and `rate_marriage`, populated only for
-`unpartnered`; both are NA on `overall` and `partnered` rows. The default FALSE
-preserves the original output and computation. A population object with union
+for men. Formation counts and marriage rates use the separate
+`calculate_marriage_counts()` helper (D080). The default FALSE preserves the
+original birth/death output and computation. A population object with union
 histories is required; bare person tables cannot establish status.
 
 Exposure is the overlap of recorded lifetimes, observation cells, and union
@@ -290,12 +290,6 @@ including widowhood and time between unions. These are current partnership
 statuses, not never-married/ever-married categories. Missing earlier histories
 cannot establish true historical status; select windows with complete union
 follow-up. Union records do not distinguish legal marriage.
-
-Each recorded union start counts once for each spouse at their own attained
-age and the formation time, using half-open age and period cells. Repeated
-unions count separately. Starts before the window contribute exposure but no
-formation; starts at its upper endpoint are excluded. All formation counts are
-reported on the unpartnered row, representing entry into a union.
 
 Birth status uses `[start_time, end_time)`: births at formation are partnered,
 including those triggering on-demand formation. Births exactly at an episode
@@ -316,16 +310,13 @@ classification still use the death time and usual half-open cells.
 
 Worked example: a woman aged 20 at time 0 enters a union at 0.5, becomes
 widowed at 1.5, and forms another union at 2.5. Across [0,3), her overall row
-has 3 person-years; partnered and unpartnered rows each have 1.5. Two union
-formations on the unpartnered row give `rate_marriage = 2 / 1.5`. Births at
+has 3 person-years; partnered and unpartnered rows each have 1.5. Births at
 0.25 and 1.5 are unpartnered; births at 0.5 and 2.5 are partnered, giving
 conditional ASFR 2 / 1.5 in each status and overall ASFR 4 / 3. Her first
-husband's death at 1.5 is partnered. Each husband has his own age-specific
-exposure and formation count.
+husband's death at 1.5 is partnered.
 
 All rates use each row's `person_years`: `rate_mortality = deaths / person_years`,
-`rate_fertility = births / person_years`, and, on unpartnered rows only,
-`rate_marriage = unions / person_years`. Rates are per person-year, with ASFR
+`rate_fertility = births / person_years`. Rates are per person-year, with ASFR
 per woman-year, and are NA when exposure is zero. Positive exposure with zero
 events gives rate zero. Exposure includes time excluded by birth spacing.
 
@@ -347,3 +338,43 @@ partnered plus unpartnered exposure, deaths, and maternal births equal overall.
 Validation covers exact overlap, boundaries, widowhood/remarriage, empty and
 overlapping histories, zero-duration episodes, count conservation, rate
 formulas, downstream grouping, and unchanged default output.
+
+
+## Marriage counts by previous union
+
+Use the separate helper for formations per unpartnered person-year:
+
+```r
+marriages <- calculate_marriage_counts(result, seq(2025, 2100, 5),
+                                      0:100, by_group = TRUE,
+                                      by_previous_union = TRUE)
+```
+
+By default, marriage counts pool previous categories and omit `previous_union`.
+Set `by_previous_union = TRUE` as above to stratify independently of `by_group`.
+The stratified output returns period, age, sex, `previous_union`, optional individual `group`,
+`person_years`, `unions`, and `rate_marriage`. Categories are `none`,
+`dissolved`, and `widowed`, determined by the most recent recorded episode.
+Each spouse contributes a start in their category immediately before formation.
+Partnered time contributes no exposure. Men's rates describe matching outcomes;
+female search inputs can exceed realized rates when searches fail.
+
+For the widowhood example above, the woman has 0.5 unpartnered years in `none`
+and 1 in `widowed`, with one formation in each category. The `dissolved` row has
+zero exposure and starts, with an NA rate. Pool counts and exposure before
+calculating a combined rate: `(1 + 1) / (0.5 + 1)`, rather than averaging the
+category rates. Summing counts/exposure also gives pooled results across groups
+or replications; Monte Carlo means and SEs across independent simulations should
+be calculated from their separate replication estimates.
+
+Histories before the window remain necessary to identify prior category.
+No recorded union means `none`, conditional on supplied history. Overlapping
+episodes are rejected for this helper because previous status is ambiguous;
+the existing Lexis exposure helper still merges overlaps. Touching episodes are
+allowed, and zero-duration episodes can contribute starts without exposure.
+All time and age bins are half-open. See [remarriage](remarriage.md) for worked
+examples, tie conventions, and schedule requirements.
+
+This replaces the former `unions` and `rate_marriage` columns from
+`calculate_lexis_counts(include_unions = TRUE)`, which retains current-status
+exposure, births, deaths, fertility and mortality summaries.

@@ -318,8 +318,9 @@ resumes search risk and switches fertility status with pending events
 invalidated; in on-demand mode, her next birth attempt can trigger a new search.
 Surviving men return to the available pool. The optional duration-dependent
 dissolution process is described in
-[union dissolution](union-dissolution.md). No separate remarriage process
-is included in milestone 2.
+[union dissolution](union-dissolution.md). Milestone 4 adds optional
+age-specific `previous_union` strata on search schedules (D080); see
+[remarriage](remarriage.md). Duration-dependent remarriage remains deferred.
 
 ## Deferred decisions and validation status
 

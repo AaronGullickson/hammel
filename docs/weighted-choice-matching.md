@@ -62,8 +62,8 @@ At each search time t, with no execution step and no random draws:
    are about to need a partner now. For each living, unpartnered woman w at or
    above `min_male_age`, lambda[w] is her current chance per year of
    triggering a partner search:
-   - union searches in rate mode: her search hazard at her current age, after
-     group multipliers;
+   - union searches in rate mode: her search hazard at her current age and, when supplied,
+     `previous_union` category, after group multipliers;
    - on-demand union formation: her adjusted unpartnered fertility hazard,
      because a birth triggers the search;
    - nonmarital father selection in rate mode: the same fertility hazard.
@@ -90,6 +90,15 @@ At each search time t, with no execution step and no random draws:
    convex objective, warm-started from the previous search's weights, until
    every share is within 1e-10. Expected flow shares rise monotonically with a
    group's own weight, so a solution is unique when it exists.
+
+With previous-union schedules (D080), the engine maintains female counts by
+previous category within each group/birth-cohort bin. Its search intensity is
+`sum_p N[g,bin,p] * average_rate[g,p,bin]`. Because matching utilities do not
+depend on previous category, these intensities combine into one solver row per
+group/bin. Total female counts and male-group target definitions stay the same;
+there are no male previous-category targets. Fertility-driven father searches
+continue to use spacing-eligible counts and fertility hazards. See
+[remarriage](remarriage.md) for state and restart rules.
 
 ### Objective and uniqueness
 

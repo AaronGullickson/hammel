@@ -8,7 +8,7 @@ unspecified demographic rules or a selected public API.
 
 | Milestone | Proposed scope | Status |
 | --- | --- | --- |
-| 4 | Union dissolution, separate remarriage rates, possibly cohabitation | Proposed; cohabitation undecided |
+| 4 | Union dissolution and age-specific remarriage; possibly cohabitation | In progress (D078–D080); cohabitation undecided |
 | 5 | Parity-specific fertility and fertility heterogeneity | Proposed |
 | 6 | Time-varying rates, matching, and inheritance within a simulation run | Proposed |
 | 7 | Group conversions | Provisional; distinguish identity from characteristics and region |
@@ -100,17 +100,13 @@ with large age differences. This is an extension to investigate, not an accepted
 effect or coefficient: the functional form, supported characteristics, and how
 effects relate to baseline duration-specific rates remain to be specified.
 
-Add separate remarriage rates, with the distinctions between first unions and
-subsequent unions, previous marital statuses, and any marriage-order dependence
-to be specified. Cohabitation is a possible addition, not yet a committed part
-of the milestone; its statuses, conversion to marriage, and dissolution rules
-would need explicit definitions.
-
-D078 specifies the dissolution units, duration baseline, carrier and tie order.
-Before separate remarriage implementation, specify its eligibility, timing and
-rate strata. The dissolution specification defines partner availability, fertility
-status and event invalidation under the current search rules; it does not adopt
-new remarriage schedules or demographic rates.
+Age-specific female search rates now optionally distinguish `previous_union`
+as `none`, `dissolved`, or `widowed` (D080), with all three strata required
+within each scheduled group. Separate marriage observations use the same
+categories. See [remarriage](remarriage.md). Duration dependence, marriage-order
+dependence and cohabitation remain deferred. Cohabitation's statuses, conversion
+to marriage and dissolution rules need explicit decisions. No milestone 4
+scientific completion is inferred from software implementation.
 
 ## Proposed milestone 5: parity-specific fertility and heterogeneity
 
@@ -211,8 +207,9 @@ Expand the existing extraction/summary functions into a coherent user toolkit
 for useful quantities from simulation histories. Existing functions cover Lexis
 counts, fertility, life tables, population sizes and recorded kin. Identify
 additional quantities and exposure/observation definitions from actual workflows.
-Status-specific exposure, fertility, mortality and formation summaries are
-implemented through `calculate_lexis_counts(include_unions = TRUE)` (D046–D048).
+Status-specific exposure, fertility and mortality summaries use
+`calculate_lexis_counts(include_unions = TRUE)`; formation counts and rates by
+previous union use `calculate_marriage_counts()` (D080).
 See [demographic analysis](demographic-analysis.md) for their observation rules.
 
 ## Tentative milestone 9: immigration from outside the system

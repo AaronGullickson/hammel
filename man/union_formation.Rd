@@ -46,7 +46,11 @@ share the schedule. Group does not restrict partner matching. With no
 population groups, simulation warns and selects the first alphabetical group.
 See \code{\link[=mortality]{mortality()}} for group-label and rate-coverage rules.
 Nonoverlapping bands may have gaps or an open end; gaps and ages outside
-support have zero hazard. Must be NULL for \code{"on_demand"}.}
+support have zero hazard. Optional \code{previous_union} stratifies by \code{"none"},
+\code{"dissolved"}, and \code{"widowed"}; all three are required within each group.
+Without it, the schedule applies to all previous union types. Categories
+describe the most recent recorded episode; complete histories are required.
+Must be NULL for \code{"on_demand"}.}
 
 \item{min_male_age}{Minimum male age in continuous years at a new partner
 search, default \code{15}. Finite nonnegative scalar; zero disables this age

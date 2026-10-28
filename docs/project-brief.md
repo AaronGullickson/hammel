@@ -1,6 +1,6 @@
 # Hammel project brief
 
-Updated October 27, 2026. The user accepted milestone 1 (mortality/fertility)
+Updated October 28, 2026. The user accepted milestone 1 (mortality/fertility)
 on October 15, 2026 (D029), milestone 2 (union formation) on October 19,
 2026 (D050), and milestone 3 (groups) on October 27, 2026 (D077).
 See [testing](testing.md) for evidence and limits.
@@ -110,8 +110,9 @@ already supports assignment of mixed-parent births to a specified category.
 The first component is optional duration-dependent dissolution (D078), with
 annual hazards and one female-carried clock per union, symmetric group-pair
 schedules/multipliers (D079), and birth before dissolution on exact same-person
-ties. See [union dissolution](union-dissolution.md). Separate remarriage rates
-and cohabitation remain deferred; no milestone 4 acceptance is implied.
+ties. See [union dissolution](union-dissolution.md). Age-specific search schedules now optionally stratify by `previous_union`
+(D080); see [remarriage](remarriage.md). Duration-dependent remarriage and
+cohabitation remain deferred; no milestone 4 acceptance is implied.
 
 ## Boundaries and future work
 
@@ -119,7 +120,7 @@ C++17/Rcpp is selected and implemented for the first engine (D019); tibble is
 used at the R boundary (D023). Package metadata and licensing are not yet ready
 for release. A universal simulation framework and legacy compatibility are not
 requirements. Union formation and matching are implemented and milestone 2 is complete. Custom
-process execution, separate remarriage schedules, cohabitation and richer initialization remain
+process execution, duration-dependent remarriage, cohabitation and richer initialization remain
 future work, not automatically authorized features.
 
 The user has postponed finding an African historical alternative to USA/2000.

@@ -85,23 +85,21 @@ calculate_population_size <- function(population, times, by_group = FALSE) {
 #'   dissolution end also count as partnered, matching birth-first event priority;
 #'   exposure still ends at the boundary. Other ending births are unpartnered
 #'   unless another episode covers that time. Deaths use status
-#'   immediately before death, so union-ending deaths are partnered. Add `unions`
-#'   and `rate_marriage` only on unpartnered rows (NA on other statuses): count
-#'   each formation, including remarriages, at each spouse's age, and divide by
-#'   unpartnered person-years. Rates with zero exposure are NA. Overlapping
+#'   immediately before death, so union-ending deaths are partnered. For union
+#'   starts and marriage rates, use [calculate_marriage_counts()]. Overlapping
 #'   episodes do not duplicate exposure. Complete union histories are required
 #'   for historical status. Do not sum overall rows with their status components.
 #' @param by_group Logical, default `FALSE`. With `TRUE`, require a persons
 #'   `group` column and return the complete period/age/sex grid for each group
 #'   appearing in the person history, in first-occurrence order. Labels retain
 #'   their type. Exposure and deaths use the person's group; births use the
-#'   mother's group, even when the child has a different group. Union counts
-#'   use each spouse's own group. Combines with `include_unions`. No pooled
+#'   mother's group, even when the child has a different group.
+#'   Combines with `include_unions`. No pooled
 #'   group row is added. Unknown-mother births remain in the single period-level
 #'   `unassigned_births` attribute, without a group assignment.
 #' @return A tibble with time_start, time_end, sex, age_start, age_end,
 #'   person_years, deaths, births, rate_mortality, and rate_fertility. With `include_unions = TRUE`,
-#'   also union_status, unions, and rate_marriage. With `by_group = TRUE`, also
+#'   also union_status. With `by_group = TRUE`, also
 #'   group; groups form separate blocks of rows.
 #' @export
 #' @examples
@@ -154,8 +152,6 @@ calculate_lexis_counts <- function(population, time_breaks, age_breaks,
                                group_indices, group_count)
     total <- table
     total$union_status <- "overall"
-    total$unions <- NA_real_
-    total$rate_marriage <- NA_real_
     partnered <- total
     partnered$union_status <- "partnered"
     partnered$person_years <- unions$person_years_partnered
@@ -166,9 +162,6 @@ calculate_lexis_counts <- function(population, time_breaks, age_breaks,
     unpartnered$person_years <- pmax(0, total$person_years - partnered$person_years)
     unpartnered$births <- unions$births_unpartnered
     unpartnered$deaths <- unions$deaths_unpartnered
-    unpartnered$unions <- unions$unions
-    unpartnered$rate_marriage <- as.numeric(ifelse(unpartnered$person_years > 0,
-      unpartnered$unions / unpartnered$person_years, NA_real_))
     table <- rbind(total, partnered, unpartnered)
     # Keep all three statuses adjacent for each original age/period/sex cell.
     table <- table[as.vector(rbind(seq_len(nrow(total)),
@@ -179,8 +172,7 @@ calculate_lexis_counts <- function(population, time_breaks, age_breaks,
     table$rate_fertility <- as.numeric(ifelse(table$person_years > 0,
       table$births / table$person_years, NA_real_))
     table <- table[c("time_start", "time_end", "sex", "age_start", "age_end",
-      if (by_group) "group", "union_status", "person_years", "deaths", "births", "unions", "rate_mortality", "rate_fertility",
-      "rate_marriage")]
+      if (by_group) "group", "union_status", "person_years", "deaths", "births", "rate_mortality", "rate_fertility")]
   }
   attr(table, "unassigned_births") <- tibble::tibble(time_start = head(time_breaks, -1),
     time_end = tail(time_breaks, -1), births = counts$unassigned_births)

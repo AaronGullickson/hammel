@@ -1,9 +1,9 @@
 # Duration-dependent union dissolution
 
 Core rules accepted by the user October 27, 2026 (D078). This specification
-covers dissolution first; separate remarriage schedules and cohabitation remain
-deferred. The implementation uses a separate optional process, without changing
-union formation's current search and eligibility rules.
+covers the separate optional dissolution process. Age-specific remarriage
+schedules are now described in [remarriage](remarriage.md) (D080);
+duration-dependent remarriage and cohabitation remain deferred.
 
 ## Risk, units and eligibility
 
@@ -94,8 +94,9 @@ When dissolution executes:
   woman must not execute a stale dissolution after widowhood, in either mode.
 
 Unpartnered rate-mode women use the currently supplied search rates; on-demand
-women may form another union at a later birth attempt. No separate remarriage
-rates, waiting period or former-partner exclusion are introduced by this change.
+women may form another union at a later birth attempt. Age-specific searches
+may now select the `dissolved` schedule under D080. No waiting period or
+former-partner exclusion is introduced.
 Current kinship/matching restrictions still apply. New union episodes have new
 IDs and their own duration clocks, even when the partners previously formed a
 union. Mortality, identity, and ancestry are not altered by dissolution itself.
@@ -183,7 +184,7 @@ absent-process history/RNG preservation. Use synthetic local inputs only.
 
 D045's fertility-transition compensation limitation remains: dissolution adds
 another status transition but no history-aware compensation. Cohabitation,
-separate remarriage rates, couple covariates and calendar-varying dissolution
+duration-dependent remarriage, couple covariates and calendar-varying dissolution
 require further specifications. These rules intentionally differ from SOCSIM's
 monthly probability inputs and potentially two-spouse candidate clocks, while
 sharing its duration-based baseline idea. No scientific validation threshold

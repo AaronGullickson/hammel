@@ -1,6 +1,6 @@
 # Current project handoff
 
-Updated October 27, 2026. This is a dated status record, not authorization for
+Updated October 28, 2026. This is a dated status record, not authorization for
 additional features. Start with the [documentation index](README.md); the
 current user request controls work.
 
@@ -78,9 +78,26 @@ The optional dissolution process is the first implementation: `dur_start`/
 `dur_end` bands, one retained clock per union, status invalidation and availability
 updates, plus latest-run dissolution counts. `calculate_union_counts()` also
 returns period/duration dissolution rates with union-year exposure, optionally
-by symmetric group pair; each episode contributes once. Separate remarriage schedules and
-cohabitation remain deferred. Milestone 4 is not accepted as complete. See
-[union dissolution](union-dissolution.md).
+by symmetric group pair; each episode contributes once. The user checked the
+dissolution demonstrations and moved on to age-specific remarriage (D080).
+Optional `previous_union` on search tables uses `none`, `dissolved`, `widowed`,
+with all categories required per group; absent columns share rates. Calibration
+sums category-specific intensities within group/age bins. State is recovered
+from complete exclusive histories and updated on endings.
+`calculate_marriage_counts()` now returns unpartnered exposure, starts and rates
+by sex, optionally by person group. `by_previous_union = TRUE` adds previous
+categories; the default FALSE pools counts and exposure and omits that column. The user requested moving
+`unions`/`rate_marriage` out of Lexis outputs entirely; current-status birth,
+death and exposure summaries remain. Duration-dependent remarriage and
+cohabitation stay deferred. Milestone 4 is not accepted as complete. See
+[union dissolution](union-dissolution.md) and [remarriage](remarriage.md).
+
+The reported grouped rate-mode slowdown was largely debug compilation:
+`devtools::load_all()` defaults to `debug = TRUE` (`-O0`). The user's optimized
+installed runs took 0.568 seconds without groups and 5.302 seconds with two
+groups and dissolution, for 50,000 initial persons over 100 years. Those are
+user-supplied timings, not a controlled performance study. For development
+timing use `devtools::load_all(debug = FALSE, recompile = TRUE)`.
 
 ## Retained limitations and next scope
 
@@ -93,7 +110,7 @@ ratios, and fixed delta does not guarantee pairwise ratios over time.
 
 The current female-driven model does not represent marriage-squeeze feedback.
 Full two-sex models remain a future alternative. The [roadmap](roadmap.md)
-records proposed dissolution/remarriage as milestone 4 and later parity,
+records active dissolution/remarriage work as milestone 4 and later parity,
 time-varying inputs, group transitions, summaries, migration and characteristics.
 None is authorized by closing milestone 3.
 

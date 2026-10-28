@@ -29,8 +29,9 @@
 #' ends the episode with `end_reason = "dissolution"`, and restores unpartnered
 #' availability and fertility/search eligibility. Exact same-person ties select
 #' death, birth, dissolution, then search. Dissolution `group_pair` schedules and
-#' multipliers use symmetric pairings of both partners' groups. Separate
-#' remarriage rates are deferred.
+#' multipliers use symmetric pairings of both partners' groups. Rate-based
+#' formation optionally selects age schedules using `previous_union`: none,
+#' dissolved, or widowed, recovered from recorded histories.
 #' Matching uses male-group weights recalibrated at each search; simulation
 #' warns once if any search needed approximate weights. A separate father model
 #' has its own preferences and delta target adjustments. Event initiation is
@@ -160,6 +161,9 @@ simulate <- function(model, years, seed = NULL) {
   engine_persons <- population$persons
   engine_persons$.hammel_group <- if (is.null(group_values)) rep(0L, nrow(engine_persons)) else
     match(as.character(engine_persons$group), as.character(group_values)) - 1L
+  if ("previous_union" %in% names(union_rates))
+    engine_persons$.hammel_previous_union <- previous_union_state_cpp(
+      population$persons, population$unions)
   if (!is.null(seed)) {
     if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
         seed != trunc(seed) || abs(seed) > .Machine$integer.max) {

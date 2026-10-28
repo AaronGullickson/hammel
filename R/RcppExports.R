@@ -13,6 +13,14 @@ dissolution_counts_cpp <- function(unions, time_breaks, dur_breaks, group_indice
     .Call(`_hammel_dissolution_counts_cpp`, unions, time_breaks, dur_breaks, group_indices, group_count)
 }
 
+previous_union_state_cpp <- function(persons, unions) {
+    .Call(`_hammel_previous_union_state_cpp`, persons, unions)
+}
+
+marriage_counts_cpp <- function(persons, unions, time_breaks, age_breaks, group_indices, group_count) {
+    .Call(`_hammel_marriage_counts_cpp`, persons, unions, time_breaks, age_breaks, group_indices, group_count)
+}
+
 extract_kin_cpp <- function(persons, ego_ids, relative_ids, generations) {
     .Call(`_hammel_extract_kin_cpp`, persons, ego_ids, relative_ids, generations)
 }
@@ -33,8 +41,8 @@ inspect_group_matching_cpp <- function(age_difference, matching, female_group, m
     .Call(`_hammel_inspect_group_matching_cpp`, age_difference, matching, female_group, male_groups)
 }
 
-inspect_weighted_calibration_cpp <- function(female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility) {
-    .Call(`_hammel_inspect_weighted_calibration_cpp`, female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility)
+inspect_weighted_calibration_cpp <- function(female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility, female_previous = NULL) {
+    .Call(`_hammel_inspect_weighted_calibration_cpp`, female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility, female_previous)
 }
 
 inspect_exact_draw_cpp <- function(male_born, male_group, male_excluded, female_born, female_group, log_weights, matching, groups, now, cutoff, draws) {

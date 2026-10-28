@@ -104,6 +104,11 @@ result$persons |>
 
 
 lexis <- calculate_lexis_counts(result, seq(2000, 2100, 5), seq(15, 65, 5), include_unions = TRUE)
+marriages <- calculate_marriage_counts(result, seq(2000, 2100, 5), seq(15, 65, 5)) |>
+  group_by(time_start, time_end, age_start, age_end, sex) |>
+  summarize(rate_marriage = if (sum(person_years) > 0)
+    sum(unions) / sum(person_years) else NA_real_, .groups = "drop")
+
 
 lexis |> calculate_tfr()
 
@@ -134,8 +139,8 @@ lexis |>
   geom_line(data = fertility_rates)+
   theme_bw()
 
-lexis |>
-  filter(sex == "f", union_status == "unpartnered") |>
+marriages |>
+  filter(sex == "f") |>
   group_by(age_start) |>
   summarize(rate = mean(rate_marriage), .groups = "drop") |>
   ggplot(aes(x = age_start, y = rate))+
@@ -144,8 +149,7 @@ lexis |>
   geom_line(data = marriage_rates)+
   theme_bw()
   
-lexis |>
-  filter(union_status == "unpartnered") |>
+marriages |>
   group_by(age_start, sex) |>
   summarize(rate = mean(rate_marriage), .groups = "drop") |>
   ggplot(aes(x = age_start, y = rate, group = sex, color = sex))+

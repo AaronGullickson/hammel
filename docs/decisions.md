@@ -27,7 +27,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Continuous execution | D024 |
 | Fertility spacing/compensation and finite age bands | D026, D028 (superseding D027's exact sampler) |
 | Two-sex union models and union API restructuring (deferred) | D073 |
-| Duration-dependent dissolution, symmetric group pairs; remarriage deferred | D078–D079 |
+| Duration-dependent dissolution and symmetric group pairs | D078–D079 |
+| Age-specific searches by previous union; separate marriage observations | D080 |
 
 ## Recorded decisions
 
@@ -1540,3 +1541,40 @@ matching specifications override this default. Initiation mode remains explicit.
   interpretation, and woman-only union-count grouping. Other process `group`
   columns and their multiplier conventions are unchanged.
 - **Specification:** [union dissolution](union-dissolution.md).
+
+
+## D080: Age-specific union searches by previous union and separate observations
+
+- **Status:** accepted by the user October 28, 2026. Duration-dependent
+  remarriage remains deferred.
+- **Decision:** add optional `previous_union` to age-specific female search
+  rate tables, using `none`, `dissolved`, and `widowed`. Require all three
+  categories within each scheduled group. Without the column, apply the same
+  rates to all previous types. Group multipliers retain their current form.
+- **State:** the most recent recorded episode determines the unpartnered
+  category. Cache state independently per simulation, recover it from complete
+  restart histories, and update it on endings. No public person column or male
+  search hazard is introduced. No recorded episode means `none`, conditional
+  on supplied history; missing histories cannot establish never-partnered status.
+- **Calibration:** maintain category counts within female group/age bins and
+  sum their category-specific intensities before the existing weighted-choice
+  solver. Matching preferences and mirrored male-group targets keep their
+  current definition; no separate male previous-status targets are added.
+- **Observation pooling clarification (October 28):** default `by_previous_union = FALSE`
+  pools counts and exposure and omits the category column. TRUE returns the three
+  categories, independently of `by_group`; input rate stratification does not
+  choose the observation setting.
+- **Observations:** add `calculate_marriage_counts()` for unpartnered
+  person-years, starts, and `rate_marriage` by sex and previous category, with
+  optional person group. The user explicitly requested removing `unions` and
+  `rate_marriage` from `calculate_lexis_counts()` rather than keeping compatibility
+  columns. Its status-specific birth, death and exposure summaries remain.
+- **Validation convention:** exclusive histories are required for previous
+  categories; reject overlaps rather than invent a preceding status. Touching
+  episodes are valid; tied starts follow union ID order. Historical absence
+  retains its documented interpretation, rather than imputing past unions.
+- **Supersession:** updates D046/D047's location of formation counts and
+  marriage rates and D078/D079's deferral of separate remarriage schedules.
+  No duration-remarriage clocks, cohabitation, cooldowns, former-partner exclusion,
+  or fertility-transition correction is added.
+- **Specification:** [age-specific remarriage](remarriage.md).
