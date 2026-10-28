@@ -41,6 +41,21 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// dissolution_counts_cpp
+List dissolution_counts_cpp(DataFrame unions, NumericVector time_breaks, NumericVector dur_breaks, IntegerVector group_indices, int group_count);
+RcppExport SEXP _hammel_dissolution_counts_cpp(SEXP unionsSEXP, SEXP time_breaksSEXP, SEXP dur_breaksSEXP, SEXP group_indicesSEXP, SEXP group_countSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< DataFrame >::type unions(unionsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type time_breaks(time_breaksSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type dur_breaks(dur_breaksSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type group_indices(group_indicesSEXP);
+    Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
+    rcpp_result_gen = Rcpp::wrap(dissolution_counts_cpp(unions, time_breaks, dur_breaks, group_indices, group_count));
+    return rcpp_result_gen;
+END_RCPP
+}
 // extract_kin_cpp
 DataFrame extract_kin_cpp(DataFrame persons, NumericVector ego_ids, NumericVector relative_ids, int generations);
 RcppExport SEXP _hammel_extract_kin_cpp(SEXP personsSEXP, SEXP ego_idsSEXP, SEXP relative_idsSEXP, SEXP generationsSEXP) {
@@ -171,8 +186,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // simulate_cpp
-List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, DataFrame unions, List matching, double min_male_age, int kinship_generations, bool rate_initiation, DataFrame union_rates, List father_matching, bool cancel_birth_if_no_match, bool diagnostics, NumericMatrix initial_ancestry, List inheritance, double ffab);
-RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP unionsSEXP, SEXP matchingSEXP, SEXP min_male_ageSEXP, SEXP kinship_generationsSEXP, SEXP rate_initiationSEXP, SEXP union_ratesSEXP, SEXP father_matchingSEXP, SEXP cancel_birth_if_no_matchSEXP, SEXP diagnosticsSEXP, SEXP initial_ancestrySEXP, SEXP inheritanceSEXP, SEXP ffabSEXP) {
+List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, DataFrame unions, List matching, double min_male_age, int kinship_generations, bool rate_initiation, DataFrame union_rates, List father_matching, bool cancel_birth_if_no_match, bool diagnostics, NumericMatrix initial_ancestry, List inheritance, double ffab, DataFrame dissolution_rates);
+RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP unionsSEXP, SEXP matchingSEXP, SEXP min_male_ageSEXP, SEXP kinship_generationsSEXP, SEXP rate_initiationSEXP, SEXP union_ratesSEXP, SEXP father_matchingSEXP, SEXP cancel_birth_if_no_matchSEXP, SEXP diagnosticsSEXP, SEXP initial_ancestrySEXP, SEXP inheritanceSEXP, SEXP ffabSEXP, SEXP dissolution_ratesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -194,7 +209,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericMatrix >::type initial_ancestry(initial_ancestrySEXP);
     Rcpp::traits::input_parameter< List >::type inheritance(inheritanceSEXP);
     Rcpp::traits::input_parameter< double >::type ffab(ffabSEXP);
-    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab));
+    Rcpp::traits::input_parameter< DataFrame >::type dissolution_rates(dissolution_ratesSEXP);
+    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab, dissolution_rates));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -202,6 +218,7 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_hammel_demographic_counts_cpp", (DL_FUNC) &_hammel_demographic_counts_cpp, 5},
     {"_hammel_union_counts_cpp", (DL_FUNC) &_hammel_union_counts_cpp, 6},
+    {"_hammel_dissolution_counts_cpp", (DL_FUNC) &_hammel_dissolution_counts_cpp, 5},
     {"_hammel_extract_kin_cpp", (DL_FUNC) &_hammel_extract_kin_cpp, 4},
     {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
     {"_hammel_adjusted_fertility_cpp", (DL_FUNC) &_hammel_adjusted_fertility_cpp, 2},
@@ -210,7 +227,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_inspect_weighted_calibration_cpp", (DL_FUNC) &_hammel_inspect_weighted_calibration_cpp, 12},
     {"_hammel_inspect_exact_draw_cpp", (DL_FUNC) &_hammel_inspect_exact_draw_cpp, 11},
     {"_hammel_inspect_weighted_incremental_cpp", (DL_FUNC) &_hammel_inspect_weighted_incremental_cpp, 11},
-    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 18},
+    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 19},
     {NULL, NULL, 0}
 };
 

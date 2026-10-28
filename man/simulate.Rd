@@ -2,13 +2,14 @@
 % Please edit documentation in R/simulate.R
 \name{simulate}
 \alias{simulate}
-\title{Run a fertility and mortality simulation}
+\title{Run a demographic simulation}
 \usage{
 simulate(model, years, seed = NULL)
 }
 \arguments{
 \item{model}{A \code{hammel_model} containing a population, mortality, fertility,
-and union-formation processes. The population must have a finite \code{end_time}.}
+and union-formation processes, optionally union dissolution. The population
+must have a finite \code{end_time}.}
 
 \item{years}{Nonnegative simulation duration in years.}
 
@@ -17,7 +18,8 @@ restored afterward. With \code{NULL}, the simulation advances the current RNG.}
 }
 \value{
 A \code{hammel_population} with updated histories and endpoint, plus a
-\code{simulation} component recording run settings and birth/death counts.
+\code{simulation} component recording run settings and birth/death counts, plus
+\code{dissolutions} when a dissolution process is configured.
 }
 \description{
 Advance a configured model and return a population that can initialize a
@@ -44,6 +46,11 @@ forming a union or reserving the man.
 A failed match cancels the birth unless explicitly allowed by the union process.
 Cancellation starts no new birth-spacing interval. On-demand mode rejects
 status schedules.
+Optional \code{\link[=union_dissolution]{union_dissolution()}} adds one duration-dependent annual union hazard
+carried by the woman. It preserves the pending dissolution through births,
+ends the episode with \code{end_reason = "dissolution"}, and restores unpartnered
+availability and fertility/search eligibility. Exact same-person ties select
+death, birth, dissolution, then search. Separate remarriage rates are deferred.
 Matching uses male-group weights recalibrated at each search; simulation
 warns once if any search needed approximate weights. A separate father model
 has its own preferences and delta target adjustments. Event initiation is

@@ -35,6 +35,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | --- | --- |
 | [Waiting-time sampling](waiting-time-sampling.md) | Explanation of the current shared hazard sampler |
 | [Union-formation models](union-formation-models.md) | Implemented milestone 2 rules, matching defaults, diagnostics, and deferred work |
+| [Union dissolution](union-dissolution.md) | Milestone 4 duration hazards, female carrier, state changes, and worked examples (D078) |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
 | [Two-sex union models](two-sex-union-models.md) | Proposal notes: directional asymmetry, marriage squeeze, Schoen/Choo–Siow/Dagsvik models, API considerations (D073) |
 | [Future roadmap](roadmap.md) | Accepted milestones and future priorities with unresolved specifications |
@@ -43,6 +44,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [SOCSIM rates](socsim-rate-audit.md) | Pinned static source findings |
 | [SOCSIM competing events](socsim-competing-events-audit.md) | Pinned static scheduling findings |
 | [SOCSIM union formation](socsim-union-formation-audit.md) | Pinned static search, matching, and eligibility findings |
+| [SOCSIM dissolution and remarriage](socsim-dissolution-audit.md) | Pinned static divorce clocks, remarriage schedules, state updates, and cohabitation findings |
 
 Git retains earlier specifications and verification records; do not keep
 snapshot copies in the docs tree. The decision log records rationale and

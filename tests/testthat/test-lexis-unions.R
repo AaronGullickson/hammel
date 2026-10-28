@@ -141,3 +141,28 @@ test_that("existing TFR and life-table grouping accepts long Lexis results", {
     expect_equal(observed, plain)
   }
 })
+
+
+test_that("births at dissolution ends are partnered without extending exposure", {
+  population <- make_lexis_union_history()
+  death_counts <- calculate_lexis_counts(population, c(0, 3), c(0, 20, 30, 40, Inf), TRUE)
+  population$unions$end_reason[1] <- "dissolution"
+  counts <- calculate_lexis_counts(population, c(0, 3), c(0, 20, 30, 40, Inf), TRUE)
+  women <- subset(counts, sex == "f" & age_start == 20)
+  expect_equal(women$births, c(4, 3, 1))
+  expect_identical(counts$person_years, death_counts$person_years)
+  expect_identical(counts$deaths, death_counts$deaths)
+  expect_identical(subset(counts, union_status == "overall"),
+                   subset(death_counts, union_status == "overall"))
+  # At the end boundary the tied birth is partnered but no exposure follows it.
+  boundary <- calculate_lexis_counts(population, c(1.5, 2.5), c(0, Inf), TRUE)
+  partnered <- subset(boundary, sex == "f" & union_status == "partnered")
+  expect_equal(partnered$births, 1)
+  expect_equal(partnered$person_years, 0)
+  expect_true(is.na(partnered$rate_fertility))
+  # Overlapping input episodes and duplicated endpoints cannot duplicate births.
+  population$unions <- rbind(population$unions, transform(population$unions[1, ],
+    union_id = 3, husband_id = 3, start_time = 1))
+  duplicate <- calculate_lexis_counts(population, c(0, 3), c(0, 20, 30, 40, Inf), TRUE)
+  expect_identical(duplicate$births, counts$births)
+})

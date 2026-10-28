@@ -105,13 +105,21 @@ feature is authorized by milestone completion. Fixed newborn assignment was
 explicitly deferred to the group-transitions discussion; custom inheritance
 already supports assignment of mixed-parent births to a specified category.
 
+## Milestone 4 in progress
+
+The first component is optional duration-dependent dissolution (D078), with
+annual hazards and one female-carried clock per union, group schedules and
+multipliers by her group, and birth before dissolution on exact same-person
+ties. See [union dissolution](union-dissolution.md). Separate remarriage rates
+and cohabitation remain deferred; no milestone 4 acceptance is implied.
+
 ## Boundaries and future work
 
 C++17/Rcpp is selected and implemented for the first engine (D019); tibble is
 used at the R boundary (D023). Package metadata and licensing are not yet ready
 for release. A universal simulation framework and legacy compatibility are not
 requirements. Union formation and matching are implemented and milestone 2 is complete. Custom
-process execution, non-death union dissolution, and richer initialization remain
+process execution, separate remarriage schedules, cohabitation and richer initialization remain
 future work, not automatically authorized features.
 
 The user has postponed finding an African historical alternative to USA/2000.

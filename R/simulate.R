@@ -1,4 +1,4 @@
-#' Run a fertility and mortality simulation
+#' Run a demographic simulation
 #'
 #' Advance a configured model and return a population that can initialize a
 #' later run. The C++ engine samples candidate waiting times across age bands,
@@ -24,6 +24,11 @@
 #' A failed match cancels the birth unless explicitly allowed by the union process.
 #' Cancellation starts no new birth-spacing interval. On-demand mode rejects
 #' status schedules.
+#' Optional [union_dissolution()] adds one duration-dependent annual union hazard
+#' carried by the woman. It preserves the pending dissolution through births,
+#' ends the episode with `end_reason = "dissolution"`, and restores unpartnered
+#' availability and fertility/search eligibility. Exact same-person ties select
+#' death, birth, dissolution, then search. Separate remarriage rates are deferred.
 #' Matching uses male-group weights recalibrated at each search; simulation
 #' warns once if any search needed approximate weights. A separate father model
 #' has its own preferences and delta target adjustments. Event initiation is
@@ -54,12 +59,14 @@
 #' initialize from recorded identities. No additional random draws are made.
 #'
 #' @param model A `hammel_model` containing a population, mortality, fertility,
-#'   and union-formation processes. The population must have a finite `end_time`.
+#'   and union-formation processes, optionally union dissolution. The population
+#'   must have a finite `end_time`.
 #' @param years Nonnegative simulation duration in years.
 #' @param seed Optional integer seed. With a seed, the caller's RNG state is
 #'   restored afterward. With `NULL`, the simulation advances the current RNG.
 #' @return A `hammel_population` with updated histories and endpoint, plus a
-#'   `simulation` component recording run settings and birth/death counts.
+#'   `simulation` component recording run settings and birth/death counts, plus
+#'   `dissolutions` when a dissolution process is configured.
 #' @export
 #' @examples
 #' population <- create_baseline_population(100, max_age = 50)
@@ -110,10 +117,12 @@ simulate <- function(model, years, seed = NULL) {
       }
     }
   }
-  if (any(!names(model$processes) %in% c("mortality", "fertility", "union_formation"))) {
-    stop("This engine supports mortality, fertility, and union formation only.",
+  if (any(!names(model$processes) %in% c("mortality", "fertility", "union_formation", "union_dissolution"))) {
+    stop("This engine supports mortality, fertility, union formation, and union dissolution only.",
          call. = FALSE)
   }
+  dissolution_process <- model$processes$union_dissolution
+  if (!is.null(dissolution_process)) attach_process(model, dissolution_process)
   union_process <- model$processes$union_formation
   attach_process(model, union_process)
   status_fertility <- "union_status" %in% names(birth_rates)
@@ -144,6 +153,8 @@ simulate <- function(model, years, seed = NULL) {
   validate_matching_groups(union_process$matching, group_values)
   if (!is.null(union_process$father_matching))
     validate_matching_groups(union_process$father_matching, group_values)
+  dissolution_rates <- prepare_dissolution_rates(dissolution_process,
+    population$persons, group_values)
   engine_persons <- population$persons
   engine_persons$.hammel_group <- if (is.null(group_values)) rep(0L, nrow(engine_persons)) else
     match(as.character(engine_persons$group), as.character(group_values)) - 1L
@@ -178,7 +189,7 @@ simulate <- function(model, years, seed = NULL) {
                            if (is.null(population[["ancestry"]]))
                              matrix(numeric(), nrow = nrow(engine_persons), ncol = 0L) else
                              as.matrix(population[["ancestry"]][setdiff(names(population[["ancestry"]]), "person_id")]),
-                           inheritance, ffab)
+                           inheritance, ffab, dissolution_rates)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {
@@ -233,6 +244,8 @@ simulate <- function(model, years, seed = NULL) {
   result$simulation <- list(start_time = start, end_time = result$end_time,
     birth_interval = birth_interval, ffab = ffab,
     births = births, deaths = deaths)
+  if (!is.null(dissolution_process))
+    result$simulation$dissolutions <- if (years > 0) native$dissolutions else 0
   result$persons <- tibble::as_tibble(result$persons)
   result$unions <- tibble::as_tibble(result$unions)
   validate_population(result)

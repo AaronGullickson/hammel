@@ -60,6 +60,42 @@ unknown; a baseline is not complete historical birth follow-up. The attribute
 remains one pooled count per period when `by_group = TRUE`; the child's group
 does not establish an unknown mother's group.
 
+## Union-years and dissolution rates
+
+Use `calculate_union_counts()` to observe union episodes rather than people:
+
+```r
+union_counts <- result |>
+  calculate_union_counts(
+    time_breaks = seq(2025, 2100, 5),
+    dur_breaks = c(0, 5, 10, 15, 20, Inf)
+  )
+```
+
+The tibble contains `time_start`, `time_end`, `dur_start`, `dur_end`,
+`union_years`, `dissolutions`, and `rate_dissolution`. The rate is dissolutions
+per union-year, directly comparable with duration-specific input hazards.
+Each recorded episode contributes once, even if both partners are present;
+repeat episodes are separate observations. Death stops exposure but does not
+count as dissolution. Missing ends are censored at the observation endpoint.
+
+Exposure is split exactly at calendar and duration boundaries. Events at an
+internal boundary belong to the period/band beginning there; the last time
+boundary is excluded. Finite final duration breaks automatically gain `Inf`.
+Zero exposure gives an NA rate; zero dissolutions with positive exposure gives
+zero. This is a cause-specific rate, not a cumulative probability of dissolution
+when death can also end unions.
+
+`by_group = TRUE` uses the woman's group, following the dissolution process,
+and retains the complete period/duration grid for each population group.
+The function also accepts a bare union data frame with `union_id`, `start_time`,
+`end_time`, and `end_reason`; caller-provided follow-up must cover the window.
+Bare tables need a `group` column identifying the woman's group when grouping
+is requested. Summarize independent replications separately before binding
+results, as for person-level Lexis counts. See
+[union dissolution](union-dissolution.md#union-year-counts-and-dissolution-rates)
+for worked accounting and censoring rules.
+
 ## Total fertility rate
 
 ```r
@@ -260,7 +296,10 @@ formation; starts at its upper endpoint are excluded. All formation counts are
 reported on the unpartnered row, representing entry into a union.
 
 Birth status uses `[start_time, end_time)`: births at formation are partnered,
-including those triggering on-demand formation. Births at ending are unpartnered
+including those triggering on-demand formation. Births exactly at an episode
+ending with `end_reason = "dissolution"`
+are partnered, consistent with birth-first tie priority (D078); exposure still
+ends at that time. Births at other endings are unpartnered
 unless another union covers that time. Unknown mothers remain in the
 `unassigned_births` attribute; their status is not inferred. That attribute
 remains one count per period, not repeated by status.

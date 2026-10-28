@@ -14,7 +14,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Ancestry schema and initialization | `R/ancestry.R` |
 | Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
 | Mortality/fertility specification and rate validation | `R/set_process.R` |
-| Union process construction and formula matching | `R/union_formation.R` |
+| Union formation/matching and dissolution specifications | `R/union_formation.R`, `R/union_dissolution.R` |
 | Shared kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/kinship.R` |
 | HMD/HFD downloads and preparation | `R/construct_demographic_rates.R` |
 | Simulation validation, RNG isolation, result assembly | `R/simulate.R` |
@@ -79,7 +79,8 @@ Mortality constructors permit partial nonoverlapping schedules, but simulation
 requires complete coverage. Fertility bands must be finite; gaps have zero risk
 at execution. Time-varying rate columns are rejected. Arbitrary named process
 specifications can be stored; execution supports mortality/fertility and the
-conditional-logit on-demand and rate-based union processes. Other processes are rejected.
+conditional-logit on-demand and rate-based union formation plus optional
+duration-dependent union dissolution. Other processes are rejected.
 
 ## Execution and output
 
@@ -94,7 +95,8 @@ histories and existing extra person columns. Newborn group identity follows
 the fertility inheritance model (random parent by default, with maternal fallback); other custom attributes are
 missing. Group-specific schedules and baseline group sampling are documented in
 [groups](groups.md). The `simulation` component records `start_time`, `end_time`,
-`birth_interval`, `ffab`, `births`, and `deaths` for the latest run.
+`birth_interval`, `ffab`, `births`, and `deaths` for the latest run, plus
+`dissolutions` when that optional process is configured.
 
 Grouped populations also have an `ancestry` tibble, or may supply it explicitly
 to `hammel_population(ancestry = ...)`. Initialization uses recorded identities
@@ -109,6 +111,29 @@ components; it does not traverse the genealogy or draw random numbers. See
 With an explicit seed, R's RNG state is restored after the call. With no seed,
 the current state advances normally. See the scientific contract for ties,
 run boundaries, parent assignment, and resampling.
+
+## Union-history observations
+
+`calculate_union_counts()` returns union-years, dissolution counts and rates
+by calendar period and elapsed duration, optionally by the woman's group.
+The native `dissolution_counts_cpp()` splits recorded episodes directly at
+period/duration boundaries. This counts each episode once rather than summing
+both partners' exposure. Death censors dissolution exposure without entering
+its numerator. See [demographic analysis](demographic-analysis.md).
+
+## Union dissolution
+
+`set_union_dissolution(model, rates, group_prop_hazard = NULL)` attaches the
+optional duration-hazard process (D078). Public bands use `dur_start` and
+`dur_end`; preparation maps a private copy to the shared `Band` sampler. The
+woman's group selects shared/group schedules and proportional multipliers.
+Each active union stores one sampled dissolution date, retained through births.
+Her next-event selection competes that date with death/birth; birth wins a tie,
+then dissolution can execute at the same instant. Death closes the union and
+invalidates that risk. Dissolution restores both partners' availability and
+reschedules her status-dependent hazards; the man's death event stays valid.
+The process is absent by default, consuming no additional random draws then.
+See [union dissolution](union-dissolution.md) for examples and deferred scope.
 
 ## Newborn identity configuration
 
@@ -183,7 +208,7 @@ TFR and life-table calculations automatically retain input group strata. See
 These remain proposals or unresolved requirements:
 
 - Custom process execution and permitted state mutations/invalidation.
-- Non-death union dissolution, poor-pool waiting, previous-father continuity,
+- Separate remarriage rates, cohabitation, poor-pool waiting, previous-father continuity,
   and transition-aware fertility compensation; see [union formation](union-formation-models.md)
   and the [roadmap](roadmap.md).
 - Heterogeneity, parity-specific fertility, and user-defined newborn attributes.

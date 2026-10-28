@@ -76,6 +76,10 @@ attach_process <- function(model, process) {
     validate_union_formation(process)
     if (!is.null(process$rates)) process$rates <- tibble::as_tibble(process$rates)
   }
+  if (name == "union_dissolution") {
+    validate_union_dissolution(process)
+    process$rates <- tibble::as_tibble(process$rates)
+  }
   model$processes[name] <- list(process)
   model
 }

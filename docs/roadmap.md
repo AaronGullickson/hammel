@@ -77,24 +77,28 @@ identity. They do not select a majority-ancestry identity classification.
 
 ## Proposed milestone 4: dissolution and remarriage
 
-The user proposes union dissolution after groups as the next step toward a
-fully functional simulator. On October 16, 2026, the user selected female
-age-specific divorce rates, maintaining the female-as-driver approach used
-elsewhere. Dissolution would have one clock per union, driven by the currently
-partnered woman's age, competing with the existing events. Do not add a second
-independent male divorce clock from male age-specific rates; both spouses'
-observed divorces describe the same union-ending event.
+Active investigation began October 27, 2026 at the user's request on branch
+`milestone4-union-dissolution`. The first
+[SOCSIM dissolution/remarriage audit](socsim-dissolution-audit.md) is a pinned
+static source trace, not executable validation or a new implementation decision.
+The detailed scientific specification and remaining choices below precede code.
 
-Prefer a separate optional process, provisionally `union_dissolution`, rather
-than adding dissolution to `union_formation`. Users would not be required to
-specify it; leaving it absent would retain the current death-only union endings.
-This is a proposed process design, not an implemented API.
+The user selected duration-dependent dissolution on October 27, 2026 (D078),
+superseding the earlier female-age-based direction. Use annual hazards and one
+clock per union carried by the woman, with shared schedules or schedules and
+multipliers by her group. Exact same-person ties prioritize death, birth, then
+dissolution. See the [dissolution specification](union-dissolution.md).
+
+The first implementation uses a separate optional `union_dissolution` process
+with `dur_start`/`dur_end` input bands. Leaving it absent retains death-only
+endings. See [union dissolution](union-dissolution.md) for the interface and
+worked examples. Milestone 4 remains in progress.
 
 Consider allowing dissolution risk to vary with couple characteristics in
-addition to female age. The user's example is higher divorce risk for couples
+addition to union duration. The user's example is higher divorce risk for couples
 with large age differences. This is an extension to investigate, not an accepted
 effect or coefficient: the functional form, supported characteristics, and how
-effects relate to baseline age-specific rates remain to be specified.
+effects relate to baseline duration-specific rates remain to be specified.
 
 Add separate remarriage rates, with the distinctions between first unions and
 subsequent unions, previous marital statuses, and any marriage-order dependence
@@ -102,11 +106,11 @@ to be specified. Cohabitation is a possible addition, not yet a committed part
 of the milestone; its statuses, conversion to marriage, and dissolution rules
 would need explicit definitions.
 
-Before implementation, specify the exposure/units of input rates, exact event
-ties, and eligibility for remarriage. Define the state updates and event
-invalidation for both former partners, including fertility status, search
-eligibility and male-pool membership. These details remain open; the proposed
-milestone does not select demographic defaults.
+D078 specifies the dissolution units, duration baseline, carrier and tie order.
+Before separate remarriage implementation, specify its eligibility, timing and
+rate strata. The dissolution specification defines partner availability, fertility
+status and event invalidation under the current search rules; it does not adopt
+new remarriage schedules or demographic rates.
 
 ## Proposed milestone 5: parity-specific fertility and heterogeneity
 

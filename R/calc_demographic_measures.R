@@ -81,7 +81,10 @@ calculate_population_size <- function(population, times, by_group = FALSE) {
 #'   with union histories and return three rows per period/age/sex cell, labeled
 #'   `overall`, `partnered`, and `unpartnered` in `union_status`. Exposure, births,
 #'   deaths, ASFR and ASMR use the corresponding status. Births use half-open
-#'   union coverage, so births at formation are partnered. Deaths use status
+#'   union coverage, so births at formation are partnered. Births exactly at a
+#'   dissolution end also count as partnered, matching birth-first event priority;
+#'   exposure still ends at the boundary. Other ending births are unpartnered
+#'   unless another episode covers that time. Deaths use status
 #'   immediately before death, so union-ending deaths are partnered. Add `unions`
 #'   and `rate_marriage` only on unpartnered rows (NA on other statuses): count
 #'   each formation, including remarriages, at each spouse's age, and divide by
@@ -342,11 +345,13 @@ calculate_life_table <- function(rates, radix = 1) {
 }
 
 check_demographic_breaks <- function(breaks, name, ages = FALSE) {
-  if (!is.numeric(breaks) || length(breaks) < 2L || anyNA(breaks) ||
+  if (!is.numeric(breaks) || !is.null(dim(breaks)) || length(breaks) < 2L || anyNA(breaks) ||
       any(!is.finite(head(breaks, -1))) || any(diff(breaks) <= 0) ||
       (!ages && !is.finite(tail(breaks, 1))) || (ages && breaks[1] < 0)) {
     stop(sprintf("`%s` must be strictly increasing %sboundaries.", name,
-                 if (ages) "nonnegative age " else "finite time "), call. = FALSE)
+                 if (ages) {
+                   if (name == "dur_breaks") "nonnegative duration " else "nonnegative age "
+                 } else "finite time "), call. = FALSE)
   }
 }
 

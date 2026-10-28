@@ -15,7 +15,10 @@ person-year and exposure is person-years. The user supplies the time origin.
 Execution is continuous: there is no month index, configurable execution step,
 time truncation, or rounding to birthdays.
 
-Rate tables contain `age_start`, `age_end`, and `rate`. Mortality also contains
+Mortality, fertility and union-search rate tables contain `age_start`,
+`age_end`, and `rate`. Dissolution uses `dur_start`/`dur_end` for years since
+union formation, with rates per partnered woman-year (equivalently union-year).
+Mortality also contains
 `sex`, with separate `"m"` and `"f"` schedules. Intervals are half-open
 `[age_start, age_end)`. Starts must be finite and nonnegative; ends must exceed
 starts. Rates must be finite and nonnegative, and may exceed one because they
@@ -359,6 +362,27 @@ The milestone 2 report examines conditional ASFR discrepancies; general
 recovery across status transitions is not established.
 See [union fertility specification](union-formation-models.md#fertility-schedules-by-union-status-d039).
 
+### Duration-dependent union dissolution (D078)
+
+An optional `union_dissolution` process adds one annual hazard per union,
+carried by its female partner and indexed by elapsed years since `start_time`.
+Shared rates or schedules/multipliers by her group use half-open duration bands;
+gaps and uncovered durations have zero hazard. New episodes start at duration
+zero; active input unions and restarts use attained duration. The union's
+sampled dissolution date is retained through births. Exact same-person ties
+select death, birth, dissolution, then search. A tied birth occurs before
+closure and retains that husband as father.
+
+Execution ends the episode with reason `dissolution`, clears partner links,
+restores male availability and female calibration counts with spacing preserved,
+and reschedules her unpartnered fertility and existing searches. Men's death
+hazards are status-independent, so their pending death events remain valid.
+Either partner's death cancels the episode's risk. Without this process,
+existing death-only behavior and random-number consumption are retained.
+Separate remarriage schedules, cohabitation and couple covariates are deferred;
+current search rules apply to newly unpartnered women. See the
+[dissolution specification](union-dissolution.md) for worked examples and limits.
+
 ### Weighted choice
 
 All partner matching uses calibrated male-group weights (D075), with no
@@ -393,8 +417,9 @@ Duration is finite and nonnegative; zero duration returns the population with
 updated run metadata. Times that cannot be represented at the chosen numeric
 scale are rejected. Candidates exactly at the run endpoint are excluded.
 
-Each person retains one selected next event. Death wins an exact same-person
-death/birth tie. Across people, exact ties follow queue insertion order:
+Each person retains one selected next event. Exact same-person ties select
+death, birth, dissolution, then search. A union retains its sampled dissolution
+date through births, so a tied dissolution can follow a birth at the same time. Across people, exact ties follow queue insertion order:
 initial row order; after birth, newborn before mother. Otherwise execute the
 earliest continuous candidate. Father availability changes immediately when
 births/deaths execute. For example, a birth at 0.02 precedes death at 0.06 even
@@ -439,6 +464,8 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   Deaths use status immediately before death, so a union-ending death counts
   as partnered. Birth/exposure union coverage is half-open
   `[start_time, end_time)`; births triggering on-demand formation are partnered.
+  Births exactly at a dissolution end also count as partnered, matching
+  birth-first tie priority (D078); this adds no exposure after the end.
   Overlapping records do not duplicate exposure. Complete union histories are
   needed: absence of a supplied episode is not evidence of historical singlehood.
   See the worked examples and rate denominators in demographic analysis.
@@ -459,6 +486,15 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   and `ex=T/l`. Missing rates propagate uncertainty; positive survivorship
   with zero terminal hazard gives infinite life expectancy; `ex` is undefined
   at zero survivorship. This is a synthetic period table, not cohort follow-up.
+- `calculate_union_counts()` splits each recorded union episode at calendar
+  and duration boundaries, counting union-years once per episode and dissolution
+  events only for `end_reason = "dissolution"`. Death also ends exposure but is
+  not a dissolution event. Missing ends censor at the window endpoint. Duration
+  uses each episode's start; boundaries are half-open and finite final duration
+  breaks gain `Inf`. Return `rate_dissolution = dissolutions / union_years`,
+  with NA at zero exposure. Optional grouping uses the woman's group. Bare
+  union tables require complete caller-verified follow-up. This cause-specific
+  rate is not a cumulative probability with competing deaths.
 - `calculate_population_size()` includes births and excludes deaths at each
   requested instant. It preserves requested order and repeated times.
 
@@ -505,7 +541,7 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 | Midpoint approximation | Validate bias against supplied age schedules; no accuracy guarantee |
 | Rate changes between runs | Histories retain spacing, but compensation uses only the new schedule |
 | Sparse oldest ages | Missing cells remain missing; no automatic imputation or smoothing |
-| Union formation/dissolution | Conditional-logit on-demand formation, minimum male age, known-kin distance screening, and widowhood; exclusive ongoing unions enforced; female rate initiation implemented |
+| Union formation/dissolution | Exclusive conditional-logit on-demand or female rate-based formation, minimum male age and known-kin screening; widowhood plus optional duration-dependent dissolution; separate remarriage schedules deferred |
 | Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
 | Exact continuation | No saved queue/RNG checkpoint |
 

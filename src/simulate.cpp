@@ -95,7 +95,7 @@ struct Person {
 };
 // person is a zero-based position in people, not the public person_id.
 // A version invalidates queued events after a change in union status.
-enum class EventType { death, birth, search };
+enum class EventType { death, birth, search, dissolution };
 struct Event { int person; EventType type; unsigned long long version; };
 
 double rate_integral(const std::vector<Band>& bands, double lo, double hi) {
@@ -981,6 +981,9 @@ struct UnionRecord {
   double id, start, end;
   int wife, husband;
   bool wife_died = false;
+  bool dissolved = false;
+  bool dissolution_sampled = false;
+  double dissolution_time = std::numeric_limits<double>::infinity();
 };
 
 // [[Rcpp::export]]
@@ -991,7 +994,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   int kinship_generations, bool rate_initiation,
                   DataFrame union_rates, List father_matching,
                   bool cancel_birth_if_no_match, bool diagnostics,
-                  NumericMatrix initial_ancestry, List inheritance, double ffab) {
+                  NumericMatrix initial_ancestry, List inheritance, double ffab,
+                  DataFrame dissolution_rates) {
   if (!R_finite(ffab) || ffab < 0 || ffab > 1)
     stop("ffab must be a finite probability in [0, 1].");
   // R performs input validation and seed handling. All engine state below is
@@ -1210,7 +1214,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     return partner;
   };
   struct GroupSchedules {
-    std::vector<Band> male, female, partnered, unpartnered, search;
+    std::vector<Band> male, female, partnered, unpartnered, search, dissolution;
   };
   const int inheritance_method = inheritance["method"];
   const double passing = inheritance["passing"];
@@ -1228,6 +1232,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     rates.unpartnered = status_fertility ? adjusted_fertility(
       read_bands(fertility_rates, "", "unpartnered", group), birth_interval) : rates.partnered;
     if (rate_initiation) rates.search = read_bands(union_rates, "", "", group);
+    rates.dissolution = read_bands(dissolution_rates, "", "", group);
   }
   // weighted_choice needs schedules and group indices, so it starts here.
   // One group means unit weights, so calibration is unnecessary.
@@ -1273,6 +1278,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     do { value = R::rexp(1.0); } while (value <= 0);
     return value;
   };
+  const bool has_dissolution = dissolution_rates.nrows() > 0;
   auto schedule = [&](int i, double now) {
     const auto version = ++event_versions[i];
     const Person& p = people[i];
@@ -1291,10 +1297,24 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     double search_time = std::numeric_limits<double>::infinity();
     if (rate_initiation && p.female && current_partner[i] < 0)
       search_time = candidate(waiting_time(rates.search, now - p.born, threshold()), now);
-    const double due = std::min(death_time, std::min(birth_time, search_time));
-    // Exact same-person ties select death, then birth, then search.
+    double dissolution_time = std::numeric_limits<double>::infinity();
+    if (has_dissolution && p.female && current_partner[i] >= 0) {
+      UnionRecord& relationship = union_history[person_unions[i].back()];
+      if (!relationship.dissolution_sampled) {
+        relationship.dissolution_time = candidate(waiting_time(rates.dissolution,
+          now - relationship.start, threshold()), now);
+        relationship.dissolution_sampled = true;
+      }
+      // Retain the union clock through births, including a dissolution due now
+      // after a tied partnered birth. It is not a new zero-wait random draw.
+      dissolution_time = relationship.dissolution_time;
+    }
+    const double due = std::min(std::min(death_time, birth_time),
+                                std::min(dissolution_time, search_time));
+    // Exact same-person ties: death, birth, dissolution, then search (D078).
     const auto type = death_time <= due ? EventType::death :
-      (birth_time <= search_time ? EventType::birth : EventType::search);
+      (birth_time <= due ? EventType::birth :
+       (dissolution_time <= due ? EventType::dissolution : EventType::search));
     if (due < end) queue.emplace(due, Event{i, type, version});
   };
   // Initialize one next event for each living person. Known age changes are
@@ -1303,7 +1323,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (i % 1024 == 0) checkUserInterrupt();
     schedule(i, start);
   }
-  double birth_count = 0, death_count = 0;
+  double birth_count = 0, death_count = 0, dissolution_count = 0;
   unsigned long long processed = 0;
   // Process events in chronological order until no scheduled events remain.
   while (!queue.empty()) {
@@ -1327,12 +1347,25 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         add_male(relationship.husband);
         add_counted_woman(relationship.wife, now);
         // Her old birth candidate is invalid once her husband has died.
-        if (rate_initiation && i == relationship.husband)
+        if ((rate_initiation || has_dissolution) && i == relationship.husband)
           schedule(relationship.wife, now);
       }
       if (!people[i].female) remove_male(i);
       else remove_counted_woman(i);
       ++death_count;
+    } else if (event.type == EventType::dissolution) {
+      const int partner = current_partner[i];
+      if (partner < 0) stop("Dissolution requires an ongoing union.");
+      UnionRecord& relationship = union_history[person_unions[i].back()];
+      relationship.end = now;
+      relationship.dissolved = true;
+      current_partner[i] = current_partner[partner] = -1;
+      add_male(partner);
+      add_counted_woman(i, now);
+      ++dissolution_count;
+      // Only her state-dependent birth/search hazards change. The man's death
+      // candidate remains valid, and the old episode no longer carries risk.
+      schedule(i, now);
     } else if (event.type == EventType::search) {
       form_union(i, now);
       schedule(i, now);
@@ -1488,6 +1521,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     out_start[u] = relationship.start;
     out_end[u] = relationship.end;
     if (NumericVector::is_na(relationship.end)) out_reason[u] = NA_STRING;
+    else if (relationship.dissolved) out_reason[u] = "dissolution";
     else if (u < static_cast<size_t>(unions.nrows())) {
       NumericVector input_ends = unions["end_time"];
       if (!NumericVector::is_na(input_ends[u])) out_reason[u] = input_reasons[u];
@@ -1502,6 +1536,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),
     _["groups"] = out_group, _["unions"] = out_unions, _["ancestry"] = out_ancestry,
     _["births"] = birth_count, _["deaths"] = death_count,
+    _["dissolutions"] = dissolution_count,
     _["weighted_infeasible"] = weighted_infeasible, _["draw_approximate"] = draw_approximate,
     _["diagnostic_log_weights"] = [&]() {
       // Rows are new unions in order; columns are group indices. Unions formed

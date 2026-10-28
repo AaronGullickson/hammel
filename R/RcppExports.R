@@ -9,6 +9,10 @@ union_counts_cpp <- function(persons, unions, time_breaks, age_breaks, group_ind
     .Call(`_hammel_union_counts_cpp`, persons, unions, time_breaks, age_breaks, group_indices, group_count)
 }
 
+dissolution_counts_cpp <- function(unions, time_breaks, dur_breaks, group_indices, group_count) {
+    .Call(`_hammel_dissolution_counts_cpp`, unions, time_breaks, dur_breaks, group_indices, group_count)
+}
+
 extract_kin_cpp <- function(persons, ego_ids, relative_ids, generations) {
     .Call(`_hammel_extract_kin_cpp`, persons, ego_ids, relative_ids, generations)
 }
@@ -41,7 +45,7 @@ inspect_weighted_incremental_cpp <- function(female_born, female_groups, male_bo
     .Call(`_hammel_inspect_weighted_incremental_cpp`, female_born, female_groups, male_born, male_groups, op_times, op_men, op_deltas, rates, matching, group_count, cutoff)
 }
 
-simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab) {
-    .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab)
+simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab, dissolution_rates) {
+    .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab, dissolution_rates)
 }
 

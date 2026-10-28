@@ -1,6 +1,10 @@
 # SOCSIM reference audit plan
 
-Updated October 19, 2026. Status: broader audit planned. An initial narrow source trace of rate conversion is recorded in [SOCSIM rate conversion](socsim-rate-audit.md); no executable reference validation or complete scheduling audit has been performed. References below are starting points recorded in the earlier conversation.
+Updated October 27, 2026. Static source audits cover rates, competing events,
+union formation, and now [dissolution and remarriage](socsim-dissolution-audit.md)
+for milestone 4. No executable reference validation or comprehensive audit of
+all variants has been performed. References below are starting points recorded
+in the earlier conversation.
 
 ## Establish the reference
 
@@ -28,6 +32,22 @@ A [static union-formation trace](socsim-union-formation-audit.md) now covers
 queue modes, matching, eligibility, and fertility interactions in the pinned
 non-ENHANCED source. It is not executable validation or a complete audit of
 all variants.
+
+## Milestone 4 investigation
+
+The user requested an audit of SOCSIM dissolution and remarriage after closing
+milestone 3 and creating `milestone4-union-dissolution`. The
+[new static trace](socsim-dissolution-audit.md) documents duration-based divorce,
+sex/group/status rate indexing, competing spouse candidates, shared-union
+closure and partner rescheduling, remarriage status and duration schedules,
+implicit rate defaults, cohabitation histories, and former-partner exclusions.
+It lists controlled reference experiments that have not yet been run.
+
+After this audit, the user selected duration-based annual hazards with one
+female-carried clock per union (D078); see [union dissolution](union-dissolution.md).
+SOCSIM still differs in its monthly probability inputs and ability to give both
+spouses a risk. Its rate defaults, reconciliation rules and cohabitation behavior
+were not adopted.
 
 ## Reference links
 

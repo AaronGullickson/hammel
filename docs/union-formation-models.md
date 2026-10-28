@@ -47,7 +47,7 @@ SOCSIM is an investigation reference, not an adopted matching algorithm.
 
 Scheduled-search mode must support partnered and unpartnered fertility inputs.
 Parity-specific fertility is deferred to a later milestone; milestone 2 does
-not add parity conditioning. Union dissolution is excluded except when a
+not add parity conditioning. For the accepted milestone 2 scope, dissolution was excluded except when a
 partner dies (widowhood). Exclusive ongoing unions, return of widowed men to
 availability and renewed female rate searches after widowhood are implemented. The construction interface below adds no major dependency.
 
@@ -316,7 +316,9 @@ account for prior-status rate history; correction is deferred under D045.
 A partner's death ends the ongoing union. In rate mode, a surviving woman
 resumes search risk and switches fertility status with pending events
 invalidated; in on-demand mode, her next birth attempt can trigger a new search.
-Surviving men return to the available pool. No non-death dissolution process
+Surviving men return to the available pool. The optional duration-dependent
+dissolution process is described in
+[union dissolution](union-dissolution.md). No separate remarriage process
 is included in milestone 2.
 
 ## Deferred decisions and validation status

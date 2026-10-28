@@ -27,6 +27,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Continuous execution | D024 |
 | Fertility spacing/compensation and finite age bands | D026, D028 (superseding D027's exact sampler) |
 | Two-sex union models and union API restructuring (deferred) | D073 |
+| Duration-dependent union dissolution; separate remarriage deferred | D078 |
 
 ## Recorded decisions
 
@@ -1491,3 +1492,30 @@ matching specifications override this default. Initiation mode remains explicit.
 - **Provenance:** revised conclusion at source commit
   `7514916bb8cf0c06faef24dad7fa013304093779`; final rendering is handled by the
   user. No final HTML hash or combined acceptance commit is assigned here.
+
+
+## D078: Duration-dependent dissolution carried by women
+
+- **Status:** accepted by the user October 27, 2026; dissolution precedes work
+  on separate remarriage rates.
+- **Decision:** use a continuous annual dissolution hazard, indexed by elapsed
+  union duration in years. One clock per union is carried by its female partner;
+  there is no second male risk. Shared schedules and optional schedules and
+  proportional hazards by the woman's group are supported.
+- **Ties:** death first, then birth, then dissolution for the same woman.
+  A tied birth occurs while partnered; the pending dissolution follows if still
+  scheduled. Births preserve the union's pending dissolution date. Births
+  exactly at a recorded dissolution end count as partnered in summaries;
+  exposure remains half-open and death-ending birth boundaries are unchanged.
+- **Rationale:** duration follows the SOCSIM baseline idea while retaining
+  Hammel's person-year hazard units and female-driven organization. Under
+  identical couple hazards carrier sex does not change risk; group-specific
+  schedules intentionally use the woman's group.
+- **Supersession:** replaces the October 16 female-age-specific dissolution
+  direction in the roadmap. Input duration bands use `dur_start` and `dur_end`
+  (matching the existing `age_start`/`age_end` naming pattern).
+- **Scope:** optional separate dissolution process. Existing unpartnered search
+  rules continue after dissolution; separate remarriage schedules, cohabitation,
+  couple covariates and general transition-aware fertility compensation remain
+  deferred. No demographic rates are defaulted.
+- **Specification:** [union dissolution](union-dissolution.md).

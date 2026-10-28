@@ -71,15 +71,23 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
   CharacterVector sex = persons["sex"];
   NumericVector wives = unions["wife_id"], husbands = unions["husband_id"];
   NumericVector starts = unions["start_time"], ends = unions["end_time"];
+  CharacterVector end_reasons = unions["end_reason"];
   const int nt = time_breaks.size() - 1, na = age_breaks.size() - 1;
   const R_xlen_t stride = static_cast<R_xlen_t>(nt) * na * 2;
   const R_xlen_t cells = stride * group_count;
   NumericVector partnered(cells), formations(cells);
   std::map<double, int> index;
   std::vector<std::vector<std::pair<double, double>>> episodes(ids.size());
+  // Dissolution follows a tied birth (D078). Keep these exact endpoints
+  // separately: merging intervals is correct for exposure, but loses reasons.
+  std::vector<std::vector<double>> dissolution_ends(ids.size());
   for (int i = 0; i < ids.size(); ++i) index[ids[i]] = i;
   for (int u = 0; u < starts.size(); ++u) {
     if (u % 1024 == 0) checkUserInterrupt();
+    if (!NumericVector::is_na(ends[u]) &&
+        !CharacterVector::is_na(end_reasons[u]) &&
+        as<std::string>(end_reasons[u]) == "dissolution")
+      dissolution_ends[index.at(wives[u])].push_back(ends[u]);
     for (double id : {wives[u], husbands[u]}) {
       const int i = index.at(id);
       const int s = as<std::string>(sex[i]) == "m" ? 0 : 1;
@@ -92,6 +100,8 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
   }
   for (int i = 0; i < ids.size(); ++i) {
     if (i % 1024 == 0) checkUserInterrupt();
+    auto& dissolution_times = dissolution_ends[i];
+    std::sort(dissolution_times.begin(), dissolution_times.end());
     auto& intervals = episodes[i];
     std::sort(intervals.begin(), intervals.end());
     std::vector<std::pair<double, double>> merged;
@@ -147,7 +157,9 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
       [](double time, const std::pair<double, double>& interval) {
         return time < interval.first;
       });
-    const bool in_union = after != intervals.begin() && born[child] < std::prev(after)->second;
+    const auto& dissolution_times = dissolution_ends[mother];
+    const bool in_union = (after != intervals.begin() && born[child] < std::prev(after)->second) ||
+      std::binary_search(dissolution_times.begin(), dissolution_times.end(), born[child]);
     if (in_union) births_partnered[t + nt * (a + na) + stride * group_indices[mother]] += 1;
     else births_unpartnered[t + nt * (a + na) + stride * group_indices[mother]] += 1;
   }
@@ -157,4 +169,38 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
                       _["births_unpartnered"] = births_unpartnered,
                       _["person_years_partnered"] = partnered,
                       _["unions"] = formations);
+}
+
+// Union episodes, rather than persons: each record contributes exposure once.
+// Death ends its exposure but only non-death dissolution enters the numerator.
+// [[Rcpp::export]]
+List dissolution_counts_cpp(DataFrame unions, NumericVector time_breaks,
+                             NumericVector dur_breaks, IntegerVector group_indices,
+                             int group_count) {
+  NumericVector starts = unions["start_time"], ends = unions["end_time"];
+  CharacterVector reasons = unions["end_reason"];
+  const int nt = time_breaks.size() - 1, nd = dur_breaks.size() - 1;
+  const R_xlen_t stride = static_cast<R_xlen_t>(nt) * nd;
+  NumericVector exposure(stride * group_count), events(stride * group_count);
+  for (int u = 0; u < starts.size(); ++u) {
+    if (u % 1024 == 0) checkUserInterrupt();
+    const R_xlen_t offset = stride * group_indices[u];
+    const double end = NumericVector::is_na(ends[u]) ? time_breaks[nt] : ends[u];
+    for (int t = 0; t < nt; ++t) {
+      const double lo = std::max(starts[u], time_breaks[t]);
+      const double hi = std::min(end, time_breaks[t + 1]);
+      if (hi <= lo) continue;
+      for (int d = 0; d < nd; ++d) {
+        const double enter = std::max(lo, starts[u] + dur_breaks[d]);
+        const double exit = std::min(hi, starts[u] + dur_breaks[d + 1]);
+        if (exit > enter) exposure[offset + t + nt * d] += exit - enter;
+      }
+    }
+    if (NumericVector::is_na(ends[u]) || CharacterVector::is_na(reasons[u]) ||
+        as<std::string>(reasons[u]) != "dissolution") continue;
+    const int t = demographic_bin(ends[u], time_breaks);
+    const int d = demographic_bin(ends[u] - starts[u], dur_breaks);
+    if (t >= 0 && d >= 0) events[offset + t + nt * d] += 1;
+  }
+  return List::create(_["union_years"] = exposure, _["dissolutions"] = events);
 }

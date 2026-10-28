@@ -85,15 +85,17 @@ Death (`xevents.c:178–260`) removes queue membership, ends ongoing union
 records, updates survivors' status, and reschedules their events. In one-queue
 mode widowed men are put back in the partner queue. Cohabitation has distinct
 end/status handling. SOCSIM also has non-death dissolution, outside Hammel's
-milestone 2 scope.
+milestone 2 scope; the subsequent
+[dissolution/remarriage audit](socsim-dissolution-audit.md) traces those paths.
 
 ## Consequences for Hammel
 
 This trace informed the accepted rules without adopting legacy architecture.
 Hammel's conditional-logit choice deliberately differs from maximum-score
-selection. Sampling before screening, demonstrated-kin exclusion, failed-search
-retries, default unmatched-birth cancellation, and partnered classification at
-union formation are now specified in the [scientific contract](scientific-contract.md).
+selection. Exact full-pool draws now replace candidate sampling (D072);
+demonstrated-kin exclusion, failed-search retries, default unmatched-birth
+cancellation, and partnered classification at union formation are specified
+in the [scientific contract](scientific-contract.md).
 SOCSIM's status-specific fertility is evidence of state-dependent rate selection,
 not proof that Hammel's midpoint compensation is valid across status changes.
 

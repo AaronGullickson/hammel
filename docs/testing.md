@@ -168,6 +168,8 @@ own scope; these are not outstanding conditions on the user's acceptance.
 | `test-union-formation.R`, `test-conditional-logit.R`, `test-age-gap-matching.R` | Constructors, defaults, named coefficients, analytical utilities/probabilities, exact-draw frequencies against full-pool probabilities, native/R formula agreement and age-gap helper |
 | `test-on-demand-unions.R`, `test-union-eligibility.R`, `test-union-kinship.R` | Birth-time unions, age/kin screening over the whole pool, exclusivity, widowhood and restarts |
 | `test-kinship.R` | Shared recorded-parent traversal, distance witnesses, incomplete ancestry and cycles |
+| `test-union-counts.R` | Exact union-year splitting, dissolution/death censoring, duration and period boundaries, repeat episodes, zero exposure, empty grids, group attribution, pooled conservation, endpoint and input validation |
+| `test-union-dissolution.R` | Annual duration-hazard survival, one risk per union, input/restart duration, birth/death ties, widowhood invalidation, repeat episodes, availability, group factors/coverage, exposure accounting and seed behavior |
 | `test-rate-unions.R`, `test-status-fertility.R` | Search hazards, retries, status-specific fertility, spacing and event invalidation |
 | `test-nonmarital-fathers.R`, `test-cancel-births.R` | Separate father matching, parentage without unions, failed-match cancellation and retry semantics |
 | `test-union-diagnostics.R` | Diagnostics validation; no candidate-set columns; unchanged histories |
@@ -250,3 +252,38 @@ commit. The user handles final rendering; no final HTML hash is assigned here.
 Preserve both source and HTML. Reproduction requires the input preparation and
 software environment recorded in the report; rendering installs the package,
 accesses HMD, runs substantial parallel simulations, and executes the test suite.
+
+
+## Milestone 4 dissolution implementation checks
+
+On October 27, 2026, `TZ=UTC Rscript -e 'devtools::test(reporter = "summary")'`
+passed with the optional duration-dependent dissolution process (D078), without
+failures or test warnings; the live database test was skipped. Targeted
+`devtools::test(filter = "union-dissolution", reporter = "summary")` checks
+constructor/edited-process validation and provenance, constant-hazard survival
+against `exp(-rate * duration)`, one risk per couple, duration bands and gaps,
+attained-duration restarts, retained dissolution through births, exact
+birth/dissolution and death ties, widowhood invalidation in both initiation
+modes, repeated formation and spacing, group-specific hazards, future-group
+coverage, empty/zero-duration runs, and seed isolation. Exposure accounting
+checks confirm that union closure shortens partnered person-years and later
+deaths preserve dissolved histories.
+
+These are software and analytical checks, not milestone 4 scientific acceptance.
+Separate remarriage schedules and cohabitation are deferred. D045's existing
+fertility-transition limitation remains; no new demographic rates or acceptance
+thresholds are introduced.
+
+The subsequent birth-status clarification in D078 is checked with
+`devtools::test(filter = "union-dissolution|lexis-unions|group-demography",
+reporter = "summary")`, which passed without failures or test warnings.
+Births exactly at dissolution ends count as partnered while exposure remains
+half-open; tests cover period boundaries, overlapping histories, unchanged
+death-ending classification and overall-count conservation.
+
+After adding `calculate_union_counts()` on October 27, 2026, the full
+`devtools::test(reporter = "summary")` suite passed without failures or test
+warnings; the opt-in live database test was skipped. Analytical union-year
+checks cover exact calendar/duration splitting, dissolution versus death
+endings, censoring, boundary events, repeated episodes, group attribution,
+zero-exposure rates, empty grids and pooled accounting identities.

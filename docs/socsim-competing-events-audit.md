@@ -19,6 +19,9 @@ Consequently equal-month candidates are resolved by evaluation order: death, bir
 - Birth reschedules both the mother and newborn (around lines 155–167).
 - Death removes a surviving spouse's queued event and reschedules that spouse after widowhood (around lines 222–257).
 - New marriage reschedules both partners (around lines 556–564).
+- Divorce removes the other partner's queued event and reschedules both after
+  union closure/status change (`xevents.c:273–340`); see the
+  [dissolution/remarriage audit](socsim-dissolution-audit.md).
 
 Because candidate scheduling can return the current month and the monthly loop drains the queue, the same person can undergo another event in that month after rescheduling. One retained next event does not imply a limit of one realized event per person per month. Birth spacing separately constrains subsequent births.
 

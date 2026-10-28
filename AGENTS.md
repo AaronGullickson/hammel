@@ -85,6 +85,11 @@ the user's agreement.
   inheritance, and performance assessment. Preserve all three reports and rendered
   artifacts; do not fabricate results or set scientific acceptance thresholds. Milestone
   completion retains documented limitations and does not authorize future features.
+- Milestone 4 starts with optional duration-dependent dissolution (D078): annual
+  hazards on `dur_start`/`dur_end` bands, one female-carried clock per union,
+  schedules/multipliers by her group, and death/birth/dissolution tie order.
+  This supersedes the earlier female-age-based direction. Separate remarriage
+  schedules and cohabitation remain deferred; see `docs/union-dissolution.md`.
 - Use `devtools::test()` for the testthat suite. Live database tests require
   explicit opt-in; ordinary verification must not download rates or expose
   credentials. See `docs/testing.md` for commands and evidence.
