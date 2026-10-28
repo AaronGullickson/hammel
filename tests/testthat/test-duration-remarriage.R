@@ -184,7 +184,7 @@ test_that("unpartnered births do not reset the remarriage duration clock", {
   rates$dur_start[2:3] <- 1
   model <- set_union_formation(model, "rate", rates = rates, kinship_generations = 0L)
   model <- set_fertility(model, data.frame(age_start = 15, age_end = 50,
-    union_status = c("partnered", "unpartnered"), rate = c(0, 20)), birth_interval = 0)
+    union_type = c("partnered", "unpartnered"), rate = c(0, 20)), birth_interval = 0)
   result <- simulate(model, 1.1, 317)
   children <- subset(result$persons, birth_time >= 0)
   expect_gt(nrow(children), 0)

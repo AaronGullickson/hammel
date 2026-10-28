@@ -105,8 +105,9 @@ as `none`, `dissolved`, or `widowed` (D080), with all three strata required
 within each scheduled group. Separate marriage observations use the same
 categories. Age or duration since the latest ending can be selected per
 previous category in the same table (D083); `none` remains age-specific. See
-[remarriage](remarriage.md). Marriage-order dependence and cohabitation remain deferred. Cohabitation's statuses, conversion
-to marriage and dissolution rules need explicit decisions. No milestone 4
+[remarriage](remarriage.md). Optional cohabitation is now implemented in rate mode under D086, with typed
+matching/rates and linked same-partner conversion. Marriage-order dependence
+and richer couple covariates remain deferred. No milestone 4
 scientific completion is inferred from software implementation.
 
 ## Proposed milestone 5: parity-specific fertility and heterogeneity
@@ -209,8 +210,8 @@ for useful quantities from simulation histories. Existing functions cover Lexis
 counts, fertility, life tables, population sizes and recorded kin. Identify
 additional quantities and exposure/observation definitions from actual workflows.
 Status-specific exposure, fertility and mortality summaries use
-`calculate_demog_rates(include_unions = TRUE)`; formation counts and rates by
-previous union use `calculate_marriage_rates()` (D080).
+`calculate_demog_rates(by_union_type = TRUE)`; formation counts and rates by
+previous union use `calculate_union_rates()` (D080).
 See [demographic analysis](demographic-analysis.md) for their observation rules.
 
 ## Tentative milestone 9: immigration from outside the system

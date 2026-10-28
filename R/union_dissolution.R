@@ -22,6 +22,8 @@
 #'   are not supported. Input order, custom columns and provenance are retained.
 #'   An optional `group_pair` column selects an unordered pair such as `"A:A"`,
 #'   `"A:B"`, or `"B:B"`; `"A:B"` and `"B:A"` select the same schedule.
+#'   Optional `union_type` supplies both `cohab` and `marriage` schedules within
+#'   each pair stratum; without it the same duration risk applies to either type.
 #'   Pair names require nonempty colon-free group labels. Pair-stratified tables
 #'   must cover every unordered pair of possible identities, including future
 #'   ones. Without population groups, warn and use the first canonical pair
@@ -74,7 +76,13 @@ validate_union_dissolution <- function(process) {
          call. = FALSE)
   pair_labels <- if ("group_pair" %in% names(rates))
     canonical_union_pairs(rates$group_pair) else rep("shared", nrow(rates))
-  for (rows in split(seq_len(nrow(rates)), pair_labels)) {
+  types <- if ("union_type" %in% names(rates)) rates$union_type else rep("shared", nrow(rates))
+  if ("union_type" %in% names(rates)) {
+    if (!is.character(types) || anyNA(types) || any(!types %in% c("cohab", "marriage")) ||
+        any(vapply(split(types, pair_labels), function(x) !setequal(x, c("cohab", "marriage")), logical(1))))
+      stop("Typed dissolution requires both cohab and marriage schedules in each pair stratum.", call. = FALSE)
+  }
+  for (rows in split(seq_len(nrow(rates)), paste(pair_labels, types, sep = "\r"))) {
     ordered <- rates[rows, , drop = FALSE]
     ordered <- ordered[order(ordered$dur_start), , drop = FALSE]
     if (nrow(ordered) > 1L &&

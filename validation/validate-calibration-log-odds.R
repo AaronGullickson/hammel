@@ -67,7 +67,7 @@ for (replication in seq_len(reps)) {
       set_population(population) |>
       set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .01)) |>
       set_fertility(data.frame(age_start = 15, age_end = 50,
-        union_status = c("partnered", "unpartnered"), rate = c(.12, .04))) |>
+        union_type = c("partnered", "unpartnered"), rate = c(.12, .04))) |>
       set_union_formation("rate", matching, rates = search, diagnostics = TRUE,
         kinship_generations = 0L, group_prop_hazard = c(B = 1.2)) |>
       set_union_dissolution(data.frame(dur_start = c(0, 5, 15),

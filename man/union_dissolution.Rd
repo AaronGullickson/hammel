@@ -18,6 +18,8 @@ durations outside support have zero hazard. Sex, age, union-status and calendar-
 are not supported. Input order, custom columns and provenance are retained.
 An optional \code{group_pair} column selects an unordered pair such as \code{"A:A"},
 \code{"A:B"}, or \code{"B:B"}; \code{"A:B"} and \code{"B:A"} select the same schedule.
+Optional \code{union_type} supplies both \code{cohab} and \code{marriage} schedules within
+each pair stratum; without it the same duration risk applies to either type.
 Pair names require nonempty colon-free group labels. Pair-stratified tables
 must cover every unordered pair of possible identities, including future
 ones. Without population groups, warn and use the first canonical pair

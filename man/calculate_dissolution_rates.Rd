@@ -8,14 +8,15 @@ calculate_dissolution_rates(
   population,
   time_breaks,
   dur_breaks,
-  by_group = FALSE
+  by_group = FALSE,
+  by_union_type = FALSE
 )
 }
 \arguments{
 \item{population}{A \code{hammel_population}, or a union data frame containing
 unique positive whole-number \code{union_id}, \code{start_time}, \code{end_time}, and
 \code{end_reason}. Ends and reasons are NA for ongoing episodes; ended reasons
-are \code{"dissolution"}, \code{"death_husband"}, or \code{"death_wife"}. Population objects
+are \code{"dissolution"}, \code{"death_husband"}, \code{"death_wife"}, or \code{"conversion"}. Population objects
 need a known endpoint; observation cannot extend beyond it. For bare tables,
 ensure complete follow-up through the requested endpoint.}
 
@@ -32,11 +33,16 @@ Bare union tables require \code{group_pair}; reversed labels are normalized.
 Pair labels use nonempty colon-free character representations of groups,
 ordered alphabetically (radix). Empty grouped inputs return a typed zero-row
 tibble; no pooled row is added.}
+
+\item{by_union_type}{Logical, default FALSE. Separate cohabitation and marriage
+episodes using each type's own exposure. Requires a valid \code{union_type} column.
+Conversion stops cohabitation exposure without counting as dissolution;
+duration resets at the start of the linked marriage episode.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, \code{dur_start}, \code{dur_end},
-\code{union_years}, \code{dissolutions}, and \code{rate_dissolution}, plus \code{group_pair} when
-requested. Period varies fastest within duration bands and group blocks.
+\code{union_years}, \code{dissolutions}, and \code{rate_dissolution}, plus \code{group_pair} and
+\code{union_type} when requested. Period varies fastest within duration bands and group blocks.
 }
 \description{
 Split each union episode across calendar periods and elapsed-duration bands,

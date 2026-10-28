@@ -10,7 +10,7 @@ make_duration_rate_history <- function() {
 
 test_that("duration breaks select the previous ending clock and enable stratification", {
   pop <- make_duration_rate_history()
-  result <- calculate_marriage_rates(pop, c(0, 6), c(0, 21, Inf),
+  result <- calculate_union_rates(pop, c(0, 6), c(0, 21, Inf),
     dur_breaks = c(0, .5, 1, 2, Inf))
   expect_s3_class(result, "tbl_df")
   expect_equal(nrow(result), 2 * (2 + 2 * 4))
@@ -24,18 +24,18 @@ test_that("duration breaks select the previous ending clock and enable stratific
     rows <- subset(women, previous_union == status)
     expect_equal(rows$person_years, c(.5, .5, 0, 0))
     expect_equal(rows$unions, c(0, 0, 1, 0))
-    expect_equal(rows$rate_marriage, c(0, 0, NA, NA))
+    expect_equal(rows$rate_union, c(0, 0, NA, NA))
   }
-  expect_identical(calculate_marriage_rates(pop, c(0, 6), c(0, 21, Inf),
+  expect_identical(calculate_union_rates(pop, c(0, 6), c(0, 21, Inf),
     by_previous_union = FALSE, dur_breaks = c(0, .5, 1, 2, Inf)), result)
   # Finite final duration bounds gain Inf.
-  expect_identical(calculate_marriage_rates(pop, c(0, 6), c(0, 21, Inf),
+  expect_identical(calculate_union_rates(pop, c(0, 6), c(0, 21, Inf),
     dur_breaks = c(0, .5, 1, 2)), result)
 })
 
 test_that("duration exposure uses history before the window and resets after each ending", {
   pop <- make_duration_rate_history()
-  result <- calculate_marriage_rates(pop, c(2.5, 3, 4, 4.5, 5, 6), c(0, Inf),
+  result <- calculate_union_rates(pop, c(2.5, 3, 4, 4.5, 5, 6), c(0, Inf),
     dur_breaks = c(0, .5, 1, Inf))
   dissolved <- subset(result, sex == "f" & previous_union == "dissolved")
   expect_equal(sum(dissolved$person_years), .5)
@@ -47,7 +47,7 @@ test_that("duration exposure uses history before the window and resets after eac
   expect_equal(sum(widowed$person_years), 1)
   expect_equal(widowed$dur_start[widowed$person_years > 0], c(0, .5))
   expect_equal(subset(widowed, unions > 0)$dur_start, 1)
-  before <- calculate_marriage_rates(pop, c(2.5, 3), c(0, Inf), dur_breaks = c(0, Inf))
+  before <- calculate_union_rates(pop, c(2.5, 3), c(0, Inf), dur_breaks = c(0, Inf))
   expect_equal(sum(before$unions), 0) # Last observation endpoint excludes events.
 })
 
@@ -55,9 +55,9 @@ test_that("group/sex/period duration cells preserve pooled counts and exposure",
   pop <- make_duration_rate_history()
   pop$persons$group <- c(10, 20, 10, 20)
   times <- c(0, 2, 4, 6)
-  result <- calculate_marriage_rates(pop, times, c(0, Inf), TRUE,
+  result <- calculate_union_rates(pop, times, c(0, Inf), TRUE,
     dur_breaks = c(0, .5, 1, 2, Inf))
-  age <- calculate_marriage_rates(pop, times, c(0, Inf), TRUE, TRUE)
+  age <- calculate_union_rates(pop, times, c(0, Inf), TRUE, TRUE)
   expect_type(result$group, "double")
   for (i in seq_len(nrow(age))) {
     rows <- result$group == age$group[i] & result$sex == age$sex[i] &
@@ -66,7 +66,7 @@ test_that("group/sex/period duration cells preserve pooled counts and exposure",
     expect_equal(sum(result$unions[rows]), age$unions[i])
   }
   # Age bounds apply only to 'none' rows; duration rows include all attained ages.
-  limited <- calculate_marriage_rates(pop, c(0, 6), c(50, Inf),
+  limited <- calculate_union_rates(pop, c(0, 6), c(50, Inf),
     dur_breaks = c(0, Inf))
   expect_equal(sum(subset(limited, previous_union == "none")$person_years), 0)
   expect_equal(sum(subset(limited, previous_union == "dissolved")$person_years), 5)
@@ -78,18 +78,18 @@ test_that("duration observation handles zero-duration episodes and empty outputs
   pop$unions$start_time <- c(1, 2, 2)
   pop$unions$end_time <- c(2, 2, NA)
   pop$unions$end_reason[2] <- "dissolution"
-  counts <- calculate_marriage_rates(pop, c(0, 6), c(0, Inf), dur_breaks = c(0, .5, Inf))
+  counts <- calculate_union_rates(pop, c(0, 6), c(0, Inf), dur_breaks = c(0, .5, Inf))
   women <- subset(counts, sex == "f" & previous_union == "dissolved")
   expect_equal(women$unions, c(2, 0))
   expect_equal(women$person_years, c(0, 0))
-  expect_true(all(is.na(women$rate_marriage)))
+  expect_true(all(is.na(women$rate_union)))
   pop$persons$group <- "A"
   empty <- hammel_population(pop$persons[FALSE, ], end_time = 6)
-  grouped <- calculate_marriage_rates(empty, c(0, 6), c(0, Inf), TRUE, dur_breaks = c(0, Inf))
+  grouped <- calculate_union_rates(empty, c(0, 6), c(0, Inf), TRUE, dur_breaks = c(0, Inf))
   expect_equal(nrow(grouped), 0)
   expect_type(grouped$dur_start, "double")
   expect_type(grouped$previous_union, "character")
-  pooled <- calculate_marriage_rates(empty, c(0, 6), c(0, Inf), dur_breaks = c(0, Inf))
+  pooled <- calculate_union_rates(empty, c(0, 6), c(0, Inf), dur_breaks = c(0, Inf))
   expect_equal(nrow(pooled), 6)
   expect_true(all(pooled$person_years == 0))
 })
@@ -97,10 +97,10 @@ test_that("duration observation handles zero-duration episodes and empty outputs
 test_that("invalid duration breaks fail and NULL preserves the age-only contract", {
   pop <- make_duration_rate_history()
   for (bad in list(NA, numeric(), c(1, 1), c(-1, 2), c(0, NA, 2), matrix(c(0, 2)), c(0, Inf, 3)))
-    expect_error(calculate_marriage_rates(pop, c(0, 6), c(0, Inf), dur_breaks = bad), "dur_breaks")
-  expect_identical(calculate_marriage_rates(pop, c(0, 6), c(0, Inf)),
-    calculate_marriage_rates(pop, c(0, 6), c(0, Inf), dur_breaks = NULL))
-  expect_false("dur_start" %in% names(calculate_marriage_rates(pop, c(0, 6), c(0, Inf))))
+    expect_error(calculate_union_rates(pop, c(0, 6), c(0, Inf), dur_breaks = bad), "dur_breaks")
+  expect_identical(calculate_union_rates(pop, c(0, 6), c(0, Inf)),
+    calculate_union_rates(pop, c(0, 6), c(0, Inf), dur_breaks = NULL))
+  expect_false("dur_start" %in% names(calculate_union_rates(pop, c(0, 6), c(0, Inf))))
 })
 
 test_that("observed duration rates recover known female search hazards", {
@@ -116,9 +116,9 @@ test_that("observed duration rates recover known female search hazards", {
     rate = c(0, .1, .3, .2, 0))
   model <- set_union_formation(model, "rate", rates = rates, kinship_generations = 0L)
   result <- simulate(model, 4, 771)
-  observed <- calculate_marriage_rates(result, c(0, 4), c(0, Inf), dur_breaks = c(0, 1, 2, Inf))
+  observed <- calculate_union_rates(result, c(0, 4), c(0, Inf), dur_breaks = c(0, 1, 2, Inf))
   women <- subset(observed, sex == "f" & previous_union == "dissolved")
   target <- c(.1, .3, .2)
-  expect_true(all(abs(women$rate_marriage - target) < 6 * sqrt(target / women$person_years)))
+  expect_true(all(abs(women$rate_union - target) < 6 * sqrt(target / women$person_years)))
   expect_equal(sum(women$unions), nrow(result$unions) - n)
 })

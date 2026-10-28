@@ -403,6 +403,23 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   Without population groups, simulation warns and ignores multipliers.
 #'   Requires `initiation = "rate"`; on-demand formation has no search hazard.
 #'   Matching utilities and input rate tables are unchanged.
+#' @param cohab_prob Optional age-specific probability table with `age_start`,
+#'   `age_end`, `prob`, optionally `group` and `previous_union`. Enables typed
+#'   unions only in rate mode. Probability gaps mean zero. Type is drawn before
+#'   matching; NULL retains untyped partnerships and their RNG path.
+#' @param cohab_matching Optional cohabitation matching model; NULL shares
+#'   `matching`. Marriage, cohabitation and unpartnered father searches calibrate
+#'   weights using their own intensities and share the available male pool.
+#' @param union_convert_rate Optional age- or duration-specific conversion table,
+#'   optionally by woman's group. Duration uses the current cohabitation start.
+#'   Uses `rate` and either age or duration boundaries, not both clocks, with no
+#'   previous-union axis. NULL gives no conversions and warns at simulation.
+#'   Conversion keeps partners, closes cohab with reason `conversion`, and starts
+#'   a linked marriage with a new dissolution-duration origin.
+#' @param cohabitation_counts_as_previous_union Logical, default FALSE. FALSE
+#'   restores previous legal-marriage category after a cohabitation ends; TRUE
+#'   classifies cohab breakup/death as dissolved/widowed. Search duration still
+#'   starts at the latest partnership ending. Only applies to typed unions.
 #' @param model A `hammel_model` object.
 #' @return `union_formation()` returns a `hammel_union_formation` process;
 #'   `set_union_formation()` returns an updated model. Rate tables are tibbles.
@@ -411,15 +428,21 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
                             rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
-                            diagnostics = FALSE, group_prop_hazard = NULL) {
+                            diagnostics = FALSE, group_prop_hazard = NULL,
+                            cohab_prob = NULL, cohab_matching = NULL, union_convert_rate = NULL,
+                            cohabitation_counts_as_previous_union = FALSE) {
   process <- structure(list(
     name = "union_formation", initiation = initiation, matching = matching,
     min_male_age = min_male_age,
     kinship_generations = kinship_generations, father_matching = father_matching,
     cancel_birth_if_no_match = cancel_birth_if_no_match, diagnostics = diagnostics,
-    rates = rates, rate_unit = "person_year", group_prop_hazard = group_prop_hazard
+    rates = rates, rate_unit = "person_year", group_prop_hazard = group_prop_hazard,
+    cohab_prob = cohab_prob, cohab_matching = cohab_matching, union_convert_rate = union_convert_rate,
+    cohabitation_counts_as_previous_union = cohabitation_counts_as_previous_union
   ), class = c("hammel_union_formation", "hammel_process"))
   validate_union_formation(process)
+  for (field in c("cohab_prob", "union_convert_rate"))
+    if (!is.null(process[[field]])) process[[field]] <- tibble::as_tibble(process[[field]])
   if (!is.null(rates)) {
     process$rates <- tibble::as_tibble(rates)
     if (!is.null(attr(rates, "source"))) process$source <- attr(rates, "source")
@@ -433,14 +456,19 @@ set_union_formation <- function(model, initiation, matching = create_age_gap_mat
                             rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
-                            diagnostics = FALSE, group_prop_hazard = NULL) {
+                            diagnostics = FALSE, group_prop_hazard = NULL,
+                            cohab_prob = NULL, cohab_matching = NULL, union_convert_rate = NULL,
+                            cohabitation_counts_as_previous_union = FALSE) {
   set_process(model, union_formation(initiation, matching, rates,
                                      min_male_age, kinship_generations, father_matching,
-                                     cancel_birth_if_no_match, diagnostics, group_prop_hazard))
+                                     cancel_birth_if_no_match, diagnostics, group_prop_hazard,
+                                     cohab_prob, cohab_matching, union_convert_rate,
+                                     cohabitation_counts_as_previous_union))
 }
 
 validate_union_formation <- function(process) {
   validate_group_prop_hazard(process$group_prop_hazard)
+  validate_cohabitation(process)
   if (!identical(process$name, "union_formation") ||
       !identical(process$rate_unit, "person_year")) {
     stop("Invalid union-formation specification or units.", call. = FALSE)
@@ -475,7 +503,13 @@ validate_union_formation <- function(process) {
       stop("On-demand union formation does not take rates.", call. = FALSE)
     }
   } else {
-    rates <- process$rates
+    validate_union_search_rates(process$rates)
+  }
+  invisible(process)
+}
+
+
+validate_union_search_rates <- function(rates) {
     check_columns(rates, c("age_start", "age_end", "rate"), "rates")
     check_numeric_column(rates$rate, "rates$rate")
     if (!nrow(rates) || any(rates$rate < 0) ||
@@ -538,6 +572,5 @@ validate_union_formation <- function(process) {
           any(tail(starts[rows], -1) < head(cummax(ends[rows]), -1)))
         stop("Union-search age or duration bands must not overlap.", call. = FALSE)
     }
-  }
-  invisible(process)
+  invisible(rates)
 }

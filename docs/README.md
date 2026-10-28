@@ -22,7 +22,7 @@ future work.
 | [Calibration intensity updates](calibration-intensity.md) | Actual female hazards, aggregate cells, and bookkeeping boundary queue (D082) |
 | [Weighted-choice matching](weighted-choice-matching.md) | Calibrated male-group weights and delta target adjustments (D074/D075) |
 | [Group matching](group-matching.md) | Symmetric pair effects and fixed group formula predictors |
-| [Demographic analysis](demographic-analysis.md) | Exposure, ASFR/ASMR, TFR, and life-table workflows |
+| [Demographic analysis](demographic-analysis.md) | Exposure, union/marriage/dissolution rates, TFR, and life tables |
 | [Testing and validation](testing.md) | Test commands, evidence, and remaining validation |
 | [Current handoff](session-handoff.md) | Recent findings, active work, and deferred issues |
 
@@ -36,6 +36,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | --- | --- |
 | [Waiting-time sampling](waiting-time-sampling.md) | Explanation of the current shared hazard sampler |
 | [Union-formation models](union-formation-models.md) | Implemented milestone 2 rules, matching defaults, diagnostics, and deferred work |
+| [Cohabitation](cohabitation.md) | Rate-mode type probabilities, type-specific matching/rates, conversion and histories (D085/D086) |
 | [Remarriage schedules](remarriage.md) | Age/duration previous-union search strata, calibration, and marriage observations (D080/D083) |
 | [Union dissolution](union-dissolution.md) | Milestone 4 duration hazards, female carrier, state changes, and worked examples (D078) |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
@@ -47,6 +48,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [SOCSIM competing events](socsim-competing-events-audit.md) | Pinned static scheduling findings |
 | [SOCSIM union formation](socsim-union-formation-audit.md) | Pinned static search, matching, and eligibility findings |
 | [SOCSIM dissolution and remarriage](socsim-dissolution-audit.md) | Pinned static divorce clocks, remarriage schedules, state updates, and cohabitation findings |
+| [SOCSIM cohabitation](socsim-cohabitation-audit.md) | Pinned static formation/type assignment, conversion, breakup, legal history and output trace |
 
 Git retains earlier specifications and verification records; do not keep
 snapshot copies in the docs tree. The decision log records rationale and

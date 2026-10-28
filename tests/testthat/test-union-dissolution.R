@@ -81,7 +81,7 @@ test_that("birth ties retain the pending dissolution and death wins same-person 
   set.seed(seed); draws <- rexp(4)
   model <- dissolution_model(rate = draws[3])
   model <- set_fertility(model, data.frame(age_start = 15, age_end = 50,
-    union_status = c("partnered", "unpartnered"), rate = c(draws[2], 0)), birth_interval = 0)
+    union_type = c("partnered", "unpartnered"), rate = c(draws[2], 0)), birth_interval = 0)
   tied <- simulate(model, 1.5, seed = seed)
   kids <- tied$persons[tied$persons$birth_time >= 0, ]
   expect_equal(nrow(kids), 1)
@@ -89,11 +89,11 @@ test_that("birth ties retain the pending dissolution and death wins same-person 
   expect_equal(kids$father_id, 2)
   expect_equal(tied$unions$end_time, 1, tolerance = 0)
   expect_identical(tied$unions$end_reason, "dissolution")
-  counts <- calculate_demog_rates(tied, c(0, 1, 1.5), c(0, Inf), include_unions = TRUE)
+  counts <- calculate_demog_rates(tied, c(0, 1, 1.5), c(0, Inf), by_union_type = TRUE)
   maternal <- subset(counts, sex == "f" & time_start == 1)
-  expect_equal(maternal$births[maternal$union_status == "partnered"], 1)
-  expect_equal(maternal$births[maternal$union_status == "unpartnered"], 0)
-  expect_equal(maternal$person_years[maternal$union_status == "partnered"], 0)
+  expect_equal(maternal$births[maternal$union_type == "partnered"], 1)
+  expect_equal(maternal$births[maternal$union_type == "unpartnered"], 0)
+  expect_equal(maternal$person_years[maternal$union_type == "partnered"], 0)
   # Observation endpoint is exclusive even for an exact tied event.
   endpoint <- simulate(model, 1, seed = seed)
   expect_equal(endpoint$simulation$births, 0)
@@ -126,7 +126,7 @@ test_that("widowhood invalidates pending dissolution in both initiation modes", 
 test_that("births do not reset the union dissolution clock", {
   model <- dissolution_model()
   busy <- set_fertility(model, data.frame(age_start = 15, age_end = 50,
-    union_status = c("partnered", "unpartnered"), rate = c(20, 0)), birth_interval = 0)
+    union_type = c("partnered", "unpartnered"), rate = c(20, 0)), birth_interval = 0)
   # Both models draw the initial dissolution after the same death/birth draws.
   quiet <- simulate(model, 10, seed = 52)
   result <- simulate(busy, 10, seed = 52)
@@ -213,13 +213,13 @@ test_that("optional process, zero-duration runs, empty populations and fallbacks
 test_that("dissolution histories conserve partnered exposure and survive later deaths", {
   model <- dissolution_model(100, rate = 2)
   result <- simulate(model, 1, seed = 52)
-  counts <- calculate_demog_rates(result, c(0, 1), c(0, Inf), include_unions = TRUE)
-  partnered <- subset(counts, union_status == "partnered")
-  unpartnered <- subset(counts, union_status == "unpartnered")
+  counts <- calculate_demog_rates(result, c(0, 1), c(0, Inf), by_union_type = TRUE)
+  partnered <- subset(counts, union_type == "partnered")
+  unpartnered <- subset(counts, union_type == "unpartnered")
   expected <- sum(ifelse(is.na(result$unions$end_time), 1, result$unions$end_time))
   expect_equal(partnered$person_years, rep(expected, 2))
   expect_equal(partnered$person_years + unpartnered$person_years, rep(100, 2))
-  marriages <- calculate_marriage_rates(result, c(0, 1), c(0, Inf))
+  marriages <- calculate_union_rates(result, c(0, 1), c(0, Inf))
   expect_equal(sum(marriages$unions), 200) # Input formations at the window start.
   # Follow-up deaths must not rewrite already dissolved records or count them again.
   continuation <- set_population(model, result)

@@ -57,14 +57,15 @@ BEGIN_RCPP
 END_RCPP
 }
 // previous_union_info_cpp
-List previous_union_info_cpp(DataFrame persons, DataFrame unions);
-RcppExport SEXP _hammel_previous_union_info_cpp(SEXP personsSEXP, SEXP unionsSEXP) {
+List previous_union_info_cpp(DataFrame persons, DataFrame unions, bool counts_cohab);
+RcppExport SEXP _hammel_previous_union_info_cpp(SEXP personsSEXP, SEXP unionsSEXP, SEXP counts_cohabSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< DataFrame >::type persons(personsSEXP);
     Rcpp::traits::input_parameter< DataFrame >::type unions(unionsSEXP);
-    rcpp_result_gen = Rcpp::wrap(previous_union_info_cpp(persons, unions));
+    Rcpp::traits::input_parameter< bool >::type counts_cohab(counts_cohabSEXP);
+    rcpp_result_gen = Rcpp::wrap(previous_union_info_cpp(persons, unions, counts_cohab));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -81,8 +82,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // marriage_counts_cpp
-List marriage_counts_cpp(DataFrame persons, DataFrame unions, NumericVector time_breaks, NumericVector age_breaks, IntegerVector group_indices, int group_count, Nullable<NumericVector> dur_breaks);
-RcppExport SEXP _hammel_marriage_counts_cpp(SEXP personsSEXP, SEXP unionsSEXP, SEXP time_breaksSEXP, SEXP age_breaksSEXP, SEXP group_indicesSEXP, SEXP group_countSEXP, SEXP dur_breaksSEXP) {
+List marriage_counts_cpp(DataFrame persons, DataFrame unions, NumericVector time_breaks, NumericVector age_breaks, IntegerVector group_indices, int group_count, Nullable<NumericVector> dur_breaks, bool counts_cohab, std::string entry_type, bool marriage_measure);
+RcppExport SEXP _hammel_marriage_counts_cpp(SEXP personsSEXP, SEXP unionsSEXP, SEXP time_breaksSEXP, SEXP age_breaksSEXP, SEXP group_indicesSEXP, SEXP group_countSEXP, SEXP dur_breaksSEXP, SEXP counts_cohabSEXP, SEXP entry_typeSEXP, SEXP marriage_measureSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -93,7 +94,27 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< IntegerVector >::type group_indices(group_indicesSEXP);
     Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
     Rcpp::traits::input_parameter< Nullable<NumericVector> >::type dur_breaks(dur_breaksSEXP);
-    rcpp_result_gen = Rcpp::wrap(marriage_counts_cpp(persons, unions, time_breaks, age_breaks, group_indices, group_count, dur_breaks));
+    Rcpp::traits::input_parameter< bool >::type counts_cohab(counts_cohabSEXP);
+    Rcpp::traits::input_parameter< std::string >::type entry_type(entry_typeSEXP);
+    Rcpp::traits::input_parameter< bool >::type marriage_measure(marriage_measureSEXP);
+    rcpp_result_gen = Rcpp::wrap(marriage_counts_cpp(persons, unions, time_breaks, age_breaks, group_indices, group_count, dur_breaks, counts_cohab, entry_type, marriage_measure));
+    return rcpp_result_gen;
+END_RCPP
+}
+// typed_demographic_counts_cpp
+List typed_demographic_counts_cpp(DataFrame persons, DataFrame unions, NumericVector time_breaks, NumericVector age_breaks, IntegerVector group_indices, int group_count, CharacterVector types);
+RcppExport SEXP _hammel_typed_demographic_counts_cpp(SEXP personsSEXP, SEXP unionsSEXP, SEXP time_breaksSEXP, SEXP age_breaksSEXP, SEXP group_indicesSEXP, SEXP group_countSEXP, SEXP typesSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< DataFrame >::type persons(personsSEXP);
+    Rcpp::traits::input_parameter< DataFrame >::type unions(unionsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type time_breaks(time_breaksSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type age_breaks(age_breaksSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type group_indices(group_indicesSEXP);
+    Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
+    Rcpp::traits::input_parameter< CharacterVector >::type types(typesSEXP);
+    rcpp_result_gen = Rcpp::wrap(typed_demographic_counts_cpp(persons, unions, time_breaks, age_breaks, group_indices, group_count, types));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -229,8 +250,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // simulate_cpp
-List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, DataFrame unions, List matching, double min_male_age, int kinship_generations, bool rate_initiation, DataFrame union_rates, List father_matching, bool cancel_birth_if_no_match, bool diagnostics, NumericMatrix initial_ancestry, List inheritance, double ffab, DataFrame dissolution_rates);
-RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP unionsSEXP, SEXP matchingSEXP, SEXP min_male_ageSEXP, SEXP kinship_generationsSEXP, SEXP rate_initiationSEXP, SEXP union_ratesSEXP, SEXP father_matchingSEXP, SEXP cancel_birth_if_no_matchSEXP, SEXP diagnosticsSEXP, SEXP initial_ancestrySEXP, SEXP inheritanceSEXP, SEXP ffabSEXP, SEXP dissolution_ratesSEXP) {
+List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, DataFrame unions, List matching, double min_male_age, int kinship_generations, bool rate_initiation, DataFrame union_rates, List father_matching, bool cancel_birth_if_no_match, bool diagnostics, NumericMatrix initial_ancestry, List inheritance, double ffab, DataFrame dissolution_rates, DataFrame cohab_prob, DataFrame conversion_rates, List cohab_matching, bool counts_cohab);
+RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP unionsSEXP, SEXP matchingSEXP, SEXP min_male_ageSEXP, SEXP kinship_generationsSEXP, SEXP rate_initiationSEXP, SEXP union_ratesSEXP, SEXP father_matchingSEXP, SEXP cancel_birth_if_no_matchSEXP, SEXP diagnosticsSEXP, SEXP initial_ancestrySEXP, SEXP inheritanceSEXP, SEXP ffabSEXP, SEXP dissolution_ratesSEXP, SEXP cohab_probSEXP, SEXP conversion_ratesSEXP, SEXP cohab_matchingSEXP, SEXP counts_cohabSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -253,13 +274,17 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< List >::type inheritance(inheritanceSEXP);
     Rcpp::traits::input_parameter< double >::type ffab(ffabSEXP);
     Rcpp::traits::input_parameter< DataFrame >::type dissolution_rates(dissolution_ratesSEXP);
-    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab, dissolution_rates));
+    Rcpp::traits::input_parameter< DataFrame >::type cohab_prob(cohab_probSEXP);
+    Rcpp::traits::input_parameter< DataFrame >::type conversion_rates(conversion_ratesSEXP);
+    Rcpp::traits::input_parameter< List >::type cohab_matching(cohab_matchingSEXP);
+    Rcpp::traits::input_parameter< bool >::type counts_cohab(counts_cohabSEXP);
+    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab, dissolution_rates, cohab_prob, conversion_rates, cohab_matching, counts_cohab));
     return rcpp_result_gen;
 END_RCPP
 }
 // inspect_intensity_tracker_cpp
-List inspect_intensity_tracker_cpp(NumericVector female_born, IntegerVector female_groups, DataFrame search_rates, DataFrame fertility_rates, NumericVector times, IntegerVector persons, CharacterVector actions, IntegerVector previous, NumericVector ready, int group_count, Nullable<NumericVector> search_origins);
-RcppExport SEXP _hammel_inspect_intensity_tracker_cpp(SEXP female_bornSEXP, SEXP female_groupsSEXP, SEXP search_ratesSEXP, SEXP fertility_ratesSEXP, SEXP timesSEXP, SEXP personsSEXP, SEXP actionsSEXP, SEXP previousSEXP, SEXP readySEXP, SEXP group_countSEXP, SEXP search_originsSEXP) {
+List inspect_intensity_tracker_cpp(NumericVector female_born, IntegerVector female_groups, DataFrame search_rates, DataFrame fertility_rates, NumericVector times, IntegerVector persons, CharacterVector actions, IntegerVector previous, NumericVector ready, int group_count, Nullable<NumericVector> search_origins, Nullable<DataFrame> probability_rates);
+RcppExport SEXP _hammel_inspect_intensity_tracker_cpp(SEXP female_bornSEXP, SEXP female_groupsSEXP, SEXP search_ratesSEXP, SEXP fertility_ratesSEXP, SEXP timesSEXP, SEXP personsSEXP, SEXP actionsSEXP, SEXP previousSEXP, SEXP readySEXP, SEXP group_countSEXP, SEXP search_originsSEXP, SEXP probability_ratesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -274,7 +299,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericVector >::type ready(readySEXP);
     Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
     Rcpp::traits::input_parameter< Nullable<NumericVector> >::type search_origins(search_originsSEXP);
-    rcpp_result_gen = Rcpp::wrap(inspect_intensity_tracker_cpp(female_born, female_groups, search_rates, fertility_rates, times, persons, actions, previous, ready, group_count, search_origins));
+    Rcpp::traits::input_parameter< Nullable<DataFrame> >::type probability_rates(probability_ratesSEXP);
+    rcpp_result_gen = Rcpp::wrap(inspect_intensity_tracker_cpp(female_born, female_groups, search_rates, fertility_rates, times, persons, actions, previous, ready, group_count, search_origins, probability_rates));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -283,9 +309,10 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_demographic_counts_cpp", (DL_FUNC) &_hammel_demographic_counts_cpp, 5},
     {"_hammel_union_counts_cpp", (DL_FUNC) &_hammel_union_counts_cpp, 6},
     {"_hammel_dissolution_counts_cpp", (DL_FUNC) &_hammel_dissolution_counts_cpp, 5},
-    {"_hammel_previous_union_info_cpp", (DL_FUNC) &_hammel_previous_union_info_cpp, 2},
+    {"_hammel_previous_union_info_cpp", (DL_FUNC) &_hammel_previous_union_info_cpp, 3},
     {"_hammel_previous_union_state_cpp", (DL_FUNC) &_hammel_previous_union_state_cpp, 2},
-    {"_hammel_marriage_counts_cpp", (DL_FUNC) &_hammel_marriage_counts_cpp, 7},
+    {"_hammel_marriage_counts_cpp", (DL_FUNC) &_hammel_marriage_counts_cpp, 10},
+    {"_hammel_typed_demographic_counts_cpp", (DL_FUNC) &_hammel_typed_demographic_counts_cpp, 7},
     {"_hammel_extract_kin_cpp", (DL_FUNC) &_hammel_extract_kin_cpp, 4},
     {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
     {"_hammel_adjusted_fertility_cpp", (DL_FUNC) &_hammel_adjusted_fertility_cpp, 2},
@@ -294,8 +321,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_inspect_weighted_calibration_cpp", (DL_FUNC) &_hammel_inspect_weighted_calibration_cpp, 14},
     {"_hammel_inspect_exact_draw_cpp", (DL_FUNC) &_hammel_inspect_exact_draw_cpp, 11},
     {"_hammel_inspect_weighted_incremental_cpp", (DL_FUNC) &_hammel_inspect_weighted_incremental_cpp, 11},
-    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 19},
-    {"_hammel_inspect_intensity_tracker_cpp", (DL_FUNC) &_hammel_inspect_intensity_tracker_cpp, 11},
+    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 23},
+    {"_hammel_inspect_intensity_tracker_cpp", (DL_FUNC) &_hammel_inspect_intensity_tracker_cpp, 12},
     {NULL, NULL, 0}
 };
 

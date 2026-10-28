@@ -75,7 +75,7 @@ explicit_prop_hazard_model <- function(model) {
       rates <- process$rates
       if ("group" %in% names(rates)) rates <- rates[as.character(rates$group) == group, , drop = FALSE]
       if (is.list(factors)) {
-        factor <- vapply(rates$union_status, function(status) {
+        factor <- vapply(rates$union_type, function(status) {
           vector <- factors[[status]]
           if (group %in% names(vector)) unname(vector[group]) else 1
         }, numeric(1), USE.NAMES = FALSE)

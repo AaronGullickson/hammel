@@ -1,6 +1,6 @@
 make_nonmarital_model <- function(n = 2, birth_rate = 20, search_rate = 0) {
   model <- make_rate_model(n, search_rate = search_rate)
-  set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
+  set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
     age_start = 15, age_end = 50, rate = c(birth_rate, birth_rate)), 0)
 }
 

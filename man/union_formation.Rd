@@ -14,7 +14,11 @@ union_formation(
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
   diagnostics = FALSE,
-  group_prop_hazard = NULL
+  group_prop_hazard = NULL,
+  cohab_prob = NULL,
+  cohab_matching = NULL,
+  union_convert_rate = NULL,
+  cohabitation_counts_as_previous_union = FALSE
 )
 
 set_union_formation(
@@ -27,7 +31,11 @@ set_union_formation(
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
   diagnostics = FALSE,
-  group_prop_hazard = NULL
+  group_prop_hazard = NULL,
+  cohab_prob = NULL,
+  cohab_matching = NULL,
+  union_convert_rate = NULL,
+  cohabitation_counts_as_previous_union = FALSE
 )
 }
 \arguments{
@@ -97,6 +105,27 @@ zero suppresses searches. Applies to shared or group-specific input rates.
 Without population groups, simulation warns and ignores multipliers.
 Requires \code{initiation = "rate"}; on-demand formation has no search hazard.
 Matching utilities and input rate tables are unchanged.}
+
+\item{cohab_prob}{Optional age-specific probability table with \code{age_start},
+\code{age_end}, \code{prob}, optionally \code{group} and \code{previous_union}. Enables typed
+unions only in rate mode. Probability gaps mean zero. Type is drawn before
+matching; NULL retains untyped partnerships and their RNG path.}
+
+\item{cohab_matching}{Optional cohabitation matching model; NULL shares
+\code{matching}. Marriage, cohabitation and unpartnered father searches calibrate
+weights using their own intensities and share the available male pool.}
+
+\item{union_convert_rate}{Optional age- or duration-specific conversion table,
+optionally by woman's group. Duration uses the current cohabitation start.
+Uses \code{rate} and either age or duration boundaries, not both clocks, with no
+previous-union axis. NULL gives no conversions and warns at simulation.
+Conversion keeps partners, closes cohab with reason \code{conversion}, and starts
+a linked marriage with a new dissolution-duration origin.}
+
+\item{cohabitation_counts_as_previous_union}{Logical, default FALSE. FALSE
+restores previous legal-marriage category after a cohabitation ends; TRUE
+classifies cohab breakup/death as dissolved/widowed. Search duration still
+starts at the latest partnership ending. Only applies to typed unions.}
 
 \item{model}{A \code{hammel_model} object.}
 }

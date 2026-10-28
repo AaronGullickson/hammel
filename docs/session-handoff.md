@@ -28,7 +28,8 @@ current user request controls work.
   inheritance support possible future identities and custom mixed categories.
   Default inheritance is `random_parent`, with maternal fallback (D076).
 - Shared native kinship screening and `extract_kin()`, parent/spouse extraction,
-  and Lexis summaries with group and overall/partnered/unpartnered observations.
+  and demographic summaries by group and discovered union type, without overall rows
+  when `by_union_type = TRUE` (D090).
 
 See [design](design.md), [scientific contract](scientific-contract.md),
 [group inheritance](group-inheritance.md), and
@@ -84,10 +85,10 @@ Optional `previous_union` on search tables uses `none`, `dissolved`, `widowed`,
 with all categories required per group; absent columns share rates. Calibration
 now uses per-woman current-hazard contributions summed by group/cohort (D082), with a common age/spacing boundary queue. State is recovered
 from complete exclusive histories and updated on endings.
-`calculate_marriage_rates()` now returns unpartnered exposure, starts and rates
+`calculate_union_rates()` now returns unpartnered exposure, starts and rates
 by sex, optionally by person group. `by_previous_union = TRUE` adds previous
 categories; the default FALSE pools counts and exposure and omits that column. The user requested moving
-`unions`/`rate_marriage` out of Lexis outputs entirely; current-status birth,
+`unions`/`rate_union` out of Lexis outputs entirely; current-status birth,
 death and exposure summaries remain. D083 adds age/duration remarriage
 selection per previous category in one rate data frame, with duration measured
 from the latest ending and recovered at restart. `none` must use age; the other
@@ -95,7 +96,10 @@ categories each select one clock across all bands/groups. The same contribution
 queue now uses a separate search origin. D084 adds optional `dur_breaks` to
 marriage observations: none remains age-based and dissolved/widowed use duration,
 with previous categories automatically separated and unused boundary pairs NA.
-Cohabitation stays deferred. Milestone 4 is not accepted as complete. See
+D086 implements optional rate-mode cohabitation, type-specific matching and
+rates, linked same-partner conversion, and legal-history recovery. Fertility
+inputs now use union_type; multiplier lists match the selected type labels.
+See [cohabitation](cohabitation.md). Milestone 4 is not accepted as complete. See
 [union dissolution](union-dissolution.md) and [remarriage](remarriage.md).
 
 The reported grouped rate-mode slowdown was largely debug compilation:

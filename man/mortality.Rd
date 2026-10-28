@@ -30,10 +30,13 @@ sex/status strata. Fertility multiplication precedes spacing compensation.
 Without population groups, warn and ignore multipliers. Stored rate tables
 and their source metadata are unchanged; rate-table summaries use those
 stored rates, without applying population-dependent multipliers.
-Fertility with \code{union_status} rates also accepts a named list such as
+Fertility with \code{union_type} rates also accepts a named list such as
 \code{list(partnered = c(A = 1.1, B = 0.9), unpartnered = c(A = 1.05))}.
-An omitted status or group uses 1.0. A single vector applies to both
-statuses (or overall fertility). Status lists require \code{union_status} rates.}
+An omitted status or group uses 1.0. A single vector applies to all
+types (or overall fertility). Type lists require \code{union_type} rates and
+their names must match the supplied schedule types. Three-type schedules
+accept lists named unpartnered/cohab/marriage; shared partnered schedules
+accept unpartnered/partnered. Omitted types and groups have multiplier 1.}
 
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
 defaulting to \code{0.75}. Must be finite and nonnegative. Applies to fertility
@@ -78,8 +81,10 @@ ages are not filled or interpreted as zero rates. Coverage and fertility
 eligibility must be specified before simulation. Calendar-time-varying
 schedules are not yet supported; time interval columns are rejected.
 
-Fertility optionally accepts \code{union_status} containing both \code{"partnered"}
-and \code{"unpartnered"}. Rates then use woman-years in the indicated status.
+Fertility optionally accepts \code{union_type} containing both \code{"partnered"}
+and \code{"unpartnered"}, or all three \code{"unpartnered"}, \code{"cohab"}, \code{"marriage"}.
+Shared partnered rates cover either partnership type. Rates use woman-years
+in the indicated type; the old fertility input \code{union_status} is rejected.
 Without that column, one overall schedule applies to all women. A partial
 status table or any other label is rejected; use explicit zero rates to
 suppress births in a status. Overlap is checked separately within each status.

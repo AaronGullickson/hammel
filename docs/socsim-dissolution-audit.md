@@ -186,6 +186,13 @@ one-queue pool. Cohabitation death uses `COCOHABDIES` (6) and restores previous
 legal status; legalization ends the cohabitation with `MARAFTERCOHAB` (5) and
 creates a new marriage record. The linked history preserves both episodes.
 
+The focused [October 28 cohabitation audit](socsim-cohabitation-audit.md) extends
+this trace. In particular, the death handler's cohabitation branch does not
+contain the immediate male-pool insertion present for legal-marriage widowhood;
+this possible one-queue omission is a static finding pending a reference run.
+That audit also documents type-probability precedence, birth-triggered
+legalization, parity-default nuances, and conversion/event-counter discrepancies.
+
 After cohabitation ends, `get_previous_mstatus()` walks backward to recover
 single/divorced/widowed status, or married if another ongoing record is found.
 The subsequent duration-specific search still uses the latest record's end,

@@ -8,7 +8,7 @@ calculate_demog_rates(
   population,
   time_breaks,
   age_breaks,
-  include_unions = FALSE,
+  by_union_type = FALSE,
   by_group = FALSE
 )
 }
@@ -21,32 +21,27 @@ calculate_demog_rates(
 If the final boundary is finite, Inf is appended to create an open-ended
 final age band starting at that boundary.}
 
-\item{include_unions}{Logical, default \code{FALSE}. Require a population object
-with union histories and return three rows per period/age/sex cell, labeled
-\code{overall}, \code{partnered}, and \code{unpartnered} in \code{union_status}. Exposure, births,
-deaths, ASFR and ASMR use the corresponding status. Births use half-open
-union coverage, so births at formation are partnered. Births exactly at a
-dissolution end also count as partnered, matching birth-first event priority;
-exposure still ends at the boundary. Other ending births are unpartnered
-unless another episode covers that time. Deaths use status
-immediately before death, so union-ending deaths are partnered. For union
-starts and marriage rates, use \code{\link[=calculate_marriage_rates]{calculate_marriage_rates()}}. Overlapping
-episodes do not duplicate exposure. Complete union histories are required
-for historical status. Do not sum overall rows with their status components.}
+\item{by_union_type}{Logical, default FALSE. Require population histories and
+return \code{union_type} rows for unpartnered and each discovered union type,
+without overall rows. Untyped histories use partnered/unpartnered. Births
+tied to dissolution or conversion retain the ending type; deaths use the
+type immediately before death. Typed overlapping histories are rejected;
+untyped overlapping coverage is merged. For formation rates use
+\code{\link[=calculate_union_rates]{calculate_union_rates()}} or \code{\link[=calculate_marriage_rates]{calculate_marriage_rates()}}.}
 
 \item{by_group}{Logical, default \code{FALSE}. With \code{TRUE}, require a persons
 \code{group} column and return the complete period/age/sex grid for each group
 appearing in the person history, in first-occurrence order. Labels retain
 their type. Exposure and deaths use the person's group; births use the
 mother's group, even when the child has a different group.
-Combines with \code{include_unions}. No pooled
+Combines with \code{by_union_type}. No pooled
 group row is added. Unknown-mother births remain in the single period-level
 \code{unassigned_births} attribute, without a group assignment.}
 }
 \value{
 A tibble with time_start, time_end, sex, age_start, age_end,
-person_years, deaths, births, rate_mortality, and rate_fertility. With \code{include_unions = TRUE},
-also union_status. With \code{by_group = TRUE}, also
+person_years, deaths, births, rate_mortality, and rate_fertility. With \code{by_union_type = TRUE},
+also union_type. With \code{by_group = TRUE}, also
 group; groups form separate blocks of rows.
 }
 \description{

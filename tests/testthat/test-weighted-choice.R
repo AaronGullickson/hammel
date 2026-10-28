@@ -201,7 +201,7 @@ weighted_model <- function(population, initiation = "on_demand",
   } else {
     model |>
       set_fertility(data.frame(age_start = 15, age_end = 45, rate = c(0.15, 0.05),
-                               union_status = c("partnered", "unpartnered"))) |>
+                               union_type = c("partnered", "unpartnered"))) |>
       set_union_formation("rate", matching, rates = data.frame(age_start = 15, age_end = 50, rate = 0.15),
                           father_matching = father_matching, ...)
   })

@@ -228,7 +228,11 @@ test_that("TFR separates union statuses in input tables and fertility processes"
   expected <- tibble::tibble(union_status = c("unpartnered", "partnered"),
     age_start = c(15, 20), age_end = c(25, 30), tfr = c(1.5, 3.5))
   expect_equal(calculate_tfr(rates), expected)
-  expect_equal(calculate_tfr(fertility(rates)), expected)
+  process_rates <- rates
+  names(process_rates)[names(process_rates) == "union_status"] <- "union_type"
+  expected_types <- expected
+  names(expected_types)[names(expected_types) == "union_status"] <- "union_type"
+  expect_equal(calculate_tfr(fertility(process_rates)), expected_types)
   later <- transform(rates, rate = rate * 2, time_start = 2005, time_end = 2010)
   first <- transform(rates, time_start = 2000, time_end = 2005)
   result <- calculate_tfr(rbind(first, later))

@@ -49,13 +49,13 @@ restarts.
 
 For conditional fertility, `group_prop_hazard` may instead be a named list of
 named vectors, for example `list(partnered = c(A = 1.1, B = 0.9),
-unpartnered = c(A = 1.05))`. Only `partnered` and `unpartnered` list names are
-allowed, without duplicates. The user selected factor 1.0 for an omitted
+unpartnered = c(A = 1.05))`. List names must occur in the supplied `union_type` rates: either
+`partnered`/`unpartnered` or `unpartnered`/`cohab`/`marriage`, without duplicates. The user selected factor 1.0 for an omitted
 status, as for an omitted group within a status. Each supplied list element
 must be a valid named numeric multiplier vector. A status list requires input
-fertility rates with `union_status`; overall fertility uses a single vector.
+fertility rates with `union_type`; overall fertility uses a single vector.
 Mortality and union formation accept only a single vector. A single fertility
-vector still applies to both statuses. For example, partnered A rate 0.1
+vector still applies to every supplied type. For example, partnered A rate 0.1
 becomes 0.11 and unpartnered A rate 0.02 becomes 0.021 with the list above;
 unpartnered B stays unchanged. Compensation then uses each effective
 group/status schedule independently. Without population groups, ignore the
@@ -159,8 +159,8 @@ the mother's group, even if an input child's group differs. Existing maternal
 age rules, half-open boundaries, and zero-exposure NA rates are unchanged.
 Unknown-mother births stay in the single period-level `unassigned_births`
 attribute and are not assigned a maternal group from the child. Combining
-`by_group = TRUE` and `include_unions = TRUE` returns the existing overall,
-partnered, and unpartnered rows within each group. Each spouse's formation and
+`by_group = TRUE` and `by_union_type = TRUE` returns unpartnered and discovered
+union-type rows within each group, without an overall row. Each spouse's formation and
 exposure belong to that spouse's group, including cross-group unions.
 
 `calculate_tfr()` and `calculate_life_table()` automatically treat an input
@@ -186,9 +186,17 @@ identities, boundary examples, analytical group TFR/life expectancy, and empty
 outputs, as well as unchanged default results.
 
 
-Marriage observations now use `calculate_marriage_rates(..., by_group = TRUE)`
+Marriage observations now use `calculate_union_rates(..., by_group = TRUE)`
 (D080), grouping each spouse by their own identity. Set `by_previous_union = TRUE`
 to additionally split unpartnered exposure and union starts by previous category;
 the default FALSE pools counts and exposure before calculating rates. Search-rate multipliers apply
 across previous categories within each woman's group. See
 [remarriage](remarriage.md).
+
+
+Cohabitation extends fertility input strata to union_type (D086). Lists of
+`group_prop_hazard` use names occurring in the rate table: unpartnered/partnered
+or unpartnered/cohab/marriage. Partial lists are valid and omitted entries use
+1; keys for an absent type are errors. A single group vector still applies
+across every type. Type selection probabilities and conversion schedules can
+stratify by the woman's group; dissolution retains symmetric group_pair strata.

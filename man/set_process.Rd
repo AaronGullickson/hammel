@@ -31,7 +31,8 @@ rate multipliers by group. Missing groups use 1.0; values are not normalized.
 Scales shared or group-specific input rates before fertility birth-spacing
 compensation. Without population groups, simulation warns and ignores it.
 Fertility also accepts a named list of vectors for \code{partnered} and/or
-\code{unpartnered} when rates include \code{union_status}; omitted statuses use 1.0.}
+\code{unpartnered}, or cohab/marriage when rates include those \code{union_type}
+strata. List names must occur in the schedules; omitted entries use 1.0.}
 
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
 defaulting to \code{0.75}. Must be finite and nonnegative.}

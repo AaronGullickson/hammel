@@ -5,7 +5,7 @@
 #' executes at continuous times, and prioritizes death over birth on exact ties.
 #' Events execute chronologically. In on-demand mode all living females face the
 #' fertility schedule. Rate mode uses either overall rates for all women (with
-#' a warning), or separate `union_status` schedules. A union-formation process is required. With on-demand
+#' a warning), or separate `union_type` schedules. A union-formation process is required. With on-demand
 #' union formation, use the woman's
 #' current partner, or draw one from all eligible men using conditional-logit
 #' probabilities from the matching formula to form a union at the birth.
@@ -38,7 +38,10 @@
 #' Matching uses male-group weights recalibrated at each search; simulation
 #' warns once if any search needed approximate weights. A separate father model
 #' has its own preferences and delta target adjustments. Event initiation is
-#' unchanged.
+#' unchanged. Optional cohabitation uses rate mode only: type is selected from
+#' `cohab_prob` before marriage/cohabitation-specific matching. Conversion retains
+#' partners and creates linked episodes, with same-person ties ordered death,
+#' birth, dissolution, conversion, search. Fertility input strata use `union_type`.
 #'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
 #' and uses recorded maternal births, including on restart.
@@ -131,15 +134,23 @@ simulate <- function(model, years, seed = NULL) {
   if (!is.null(dissolution_process)) attach_process(model, dissolution_process)
   union_process <- model$processes$union_formation
   attach_process(model, union_process)
-  status_fertility <- "union_status" %in% names(birth_rates)
+  cohab_enabled <- !is.null(union_process$cohab_prob)
+  counts_cohab <- isTRUE(union_process$cohabitation_counts_as_previous_union)
+  if (!cohab_enabled && "union_type" %in% names(population$unions) &&
+      any(population$unions$union_type == "cohab"))
+    stop("A cohabitation history requires cohab_prob to continue with union types enabled.", call. = FALSE)
+  if (!cohab_enabled && (("union_type" %in% names(birth_rates) && any(birth_rates$union_type %in% c("cohab", "marriage"))) ||
+      (!is.null(dissolution_process) && "union_type" %in% names(dissolution_process$rates))))
+    stop("Type-specific fertility/dissolution requires cohab_prob.", call. = FALSE)
+  status_fertility <- "union_type" %in% names(birth_rates)
   if (union_process$initiation == "on_demand" && status_fertility) {
-    stop('On-demand union formation requires an overall fertility schedule without `union_status`.',
+    stop('On-demand union formation requires an overall fertility schedule without `union_type`.',
          call. = FALSE)
   }
   if (union_process$initiation == "rate" && !status_fertility) {
     warning(paste("Rate-based union formation is using an overall fertility schedule for both",
                   "partnered and unpartnered women. To make fertility depend on union status,",
-                  "supply separate schedules using `union_status`."), call. = FALSE)
+                  "supply separate schedules using `union_type`."), call. = FALSE)
   }
   inheritance <- prepare_group_inheritance(model$processes$fertility$inheritance, population)
   group_values <- inheritance$values
@@ -161,13 +172,21 @@ simulate <- function(model, years, seed = NULL) {
     validate_matching_groups(union_process$father_matching, group_values)
   dissolution_rates <- prepare_dissolution_rates(dissolution_process,
     population$persons, group_values)
+  cohab <- prepare_cohabitation(union_process, population, group_values)
+  if (!is.null(union_process$cohab_matching))
+    validate_matching_groups(union_process$cohab_matching, group_values)
+  if (cohab_enabled && !"union_type" %in% names(population$unions))
+    population$unions$union_type <- rep("marriage", nrow(population$unions))
+  if (cohab_enabled && !"converted_from_union_id" %in% names(population$unions))
+    population$unions$converted_from_union_id <- rep(NA_real_, nrow(population$unions))
   engine_persons <- population$persons
   engine_persons$.hammel_group <- if (is.null(group_values)) rep(0L, nrow(engine_persons)) else
     match(as.character(engine_persons$group), as.character(group_values)) - 1L
-  if ("previous_union" %in% names(union_rates)) {
-    previous <- previous_union_info_cpp(population$persons, population$unions)
+  if ("previous_union" %in% names(union_rates) || cohab_enabled) {
+    previous <- previous_union_info_cpp(population$persons, population$unions, counts_cohab)
     engine_persons$.hammel_previous_union <- previous$previous_union
     engine_persons$.hammel_previous_union_end <- previous$end_time
+    engine_persons$.hammel_legal_previous <- previous$legal_previous
   }
   if (!is.null(seed)) {
     if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
@@ -200,7 +219,9 @@ simulate <- function(model, years, seed = NULL) {
                            if (is.null(population[["ancestry"]]))
                              matrix(numeric(), nrow = nrow(engine_persons), ncol = 0L) else
                              as.matrix(population[["ancestry"]][setdiff(names(population[["ancestry"]]), "person_id")]),
-                           inheritance, ffab, dissolution_rates)
+                           inheritance, ffab, dissolution_rates, cohab$prob, cohab$conversion,
+                           if (is.null(union_process$cohab_matching)) matching else
+                             prepare_matching_model(union_process$cohab_matching, group_values), counts_cohab)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {
@@ -255,6 +276,10 @@ simulate <- function(model, years, seed = NULL) {
   result$simulation <- list(start_time = start, end_time = result$end_time,
     birth_interval = birth_interval, ffab = ffab,
     births = births, deaths = deaths)
+  if (cohab_enabled) {
+    result$simulation$cohabitation_counts_as_previous_union <- counts_cohab
+    result$simulation$conversions <- if (years > 0) native$conversions else 0
+  }
   if (!is.null(dissolution_process))
     result$simulation$dissolutions <- if (years > 0) native$dissolutions else 0
   result$persons <- tibble::as_tibble(result$persons)

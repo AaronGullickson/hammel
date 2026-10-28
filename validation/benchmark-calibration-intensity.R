@@ -57,8 +57,8 @@ if (args[1] == "make") {
     rate = rep(.00015 * exp(.085 * ages), 2))
   overall <- data.frame(age_start = seq(15, 40, 5), age_end = seq(20, 45, 5),
     rate = c(.03, .09, .12, .1, .04, .008))
-  fertility <- rbind(transform(overall, union_status = "partnered", rate = rate * 1.5),
-    transform(overall, union_status = "unpartnered", rate = rate * .5))
+  fertility <- rbind(transform(overall, union_type = "partnered", rate = rate * 1.5),
+    transform(overall, union_type = "unpartnered", rate = rate * .5))
   search <- data.frame(age_start = seq(15, 65, 5), age_end = c(seq(20, 65, 5), Inf),
     rate = c(.02, .08, .14, .1, .05, .05, .04, .025, .01, .007, .002))
   previous <- rbind(transform(search, previous_union = "none"),

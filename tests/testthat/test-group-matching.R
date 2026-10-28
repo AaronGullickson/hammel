@@ -77,7 +77,7 @@ group_choice_model <- function(initiation = "on_demand", matching, father_matchi
   model$population$persons$sex <- c("f", "m", "m")
   model$population$persons$group <- c("A", "A", "B")
   if (initiation == "rate") {
-    model <- identity(set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
+    model <- identity(set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
       age_start = 15, age_end = 50, rate = c(0, 20)), 0))
   }
   identity(set_union_formation(model, initiation, matching,

@@ -40,8 +40,8 @@ test_that("ffab endpoints control newborn sex in both initiation modes", {
     model$population$persons$sex <- rep(c("f", "m"), 50)
     if (mode == "rate") {
       rates <- model$processes$fertility$rates
-      model <- set_fertility(model, rbind(transform(rates, union_status = "partnered"),
-        transform(rates, union_status = "unpartnered")), birth_interval = 0)
+      model <- set_fertility(model, rbind(transform(rates, union_type = "partnered"),
+        transform(rates, union_type = "unpartnered")), birth_interval = 0)
       model <- set_union_formation(model, "rate", rates = data.frame(
         age_start = 15, age_end = 50, rate = 1), cancel_birth_if_no_match = FALSE)
     }

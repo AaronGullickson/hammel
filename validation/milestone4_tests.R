@@ -19,7 +19,8 @@ fertility_rates_overall_usa <- read_csv(
 )
 fertility_rates_by_status_usa <- read_csv(
   here("validation", "data", "usa_2000_fertility_by_union_status.csv")
-)
+) |>
+  rename(union_type = union_status)
 mar_rates_female_usa <- read_csv(
   here("validation", "data", "usa_2001_marriage_rates_female.csv")
 )
@@ -220,3 +221,127 @@ mar_counts |>
   geom_line(data = mar_rates_by_dur |> filter(previous_union == "none"), 
             aes(y = rate), linetype = 2)+
   theme_bw()
+
+
+# Check Cohabitation -----------------------------------------------------------------------------------
+
+# what all do we need here?
+# - probablity schedule by age (and possibly previous_union and group) for cohabitations
+# - fertility rates with cohabs and marriages separated rather than a single partnered
+# - dissolution rates that are stratified by union_type
+# - conversion rates from cohabitation to marriage, duration or age dependent
+
+# make up some plausible probabilities for testing
+prob_cohab <- tribble(
+  ~age_start, ~age_end, ~prob,
+  15,         20,       0.4,
+  20,         25,       0.25,
+  25,         30,       0.15,
+  30,         35,       0.1,
+  35,         40,       0.05,
+  40,         Inf,      0.01
+)
+
+fertility_rates_by_union_type <- bind_rows(
+  # unpartnered is the same
+  fertility_rates_by_status_usa |> filter(union_type == "unpartnered"),
+  # married uses the partnered version
+  fertility_rates_by_status_usa |> filter(union_type == "partnered") |> mutate(union_type = "marriage"),
+  # cohab is half the married rate
+  fertility_rates_by_status_usa |> filter(union_type == "partnered") |> mutate(union_type = "cohab", rate = 0.5 * rate)
+)
+
+dissolution_rates_by_union_type <- bind_rows(
+  # double the rate of dissolution for cohabitations
+  dissolution_rates |> mutate(union_type = "cohab", rate = 2 * rate),
+  dissolution_rates |> mutate(union_type = "marriage")
+)
+
+# lets do duration dependent conversion rates from cohab to marriage
+convert_rate <- tribble(
+  ~dur_start, ~dur_end, ~rate,
+  0,          5,        0.15,
+  5,          10,       0.30,
+  10,         Inf,      0.05
+)
+
+
+model <- hammel_model() |>
+  set_population(pop_base) |>
+  set_mortality(mortality_rates_usa2000) |>
+  set_fertility(fertility_rates_by_union_type) |>
+  set_union_formation(
+    "rate", 
+    rates = mar_rates_by_prev, 
+    cohab_prob = prob_cohab, 
+    union_convert_rate = convert_rate
+  ) |>
+  set_union_dissolution(dissolution_rates_by_union_type)
+
+system.time(result <- simulate(model, 100, 42))
+
+table(result$unions$union_type, result$unions$end_reason)
+
+mar_counts <- calculate_marriage_rates(
+  result,
+  time_breaks = seq(2025, 2100, 75),
+  age_breaks = seq(15, 70, 5),
+  by_previous_union = TRUE
+)
+
+union_counts <- calculate_union_rates(
+  result,
+  time_breaks = seq(2025, 2100, 75),
+  age_breaks = seq(15, 70, 5),
+  by_union_type = TRUE, 
+  by_previous_union = TRUE
+)
+
+union_counts |>
+  filter(sex == "f") |>
+  ggplot(aes(x = age_start + 2.5, y = rate_union, color = union_type))+
+  geom_point()+
+  geom_line()+
+  facet_wrap(~previous_union)+
+  theme_bw()
+
+# input mar rates should match overall union rates
+calculate_union_rates(
+  result,
+  time_breaks = seq(2025, 2100, 75),
+  age_breaks = seq(15, 70, 5),
+  by_previous_union = TRUE 
+) |>
+  filter(sex == "f") |>
+  ggplot(aes(x = age_start + 2.5, y = rate_union, group = previous_union, color = previous_union))+
+  geom_point()+
+  geom_line(data = mar_rates_by_prev, aes(y = rate), linetype = 2)
+
+
+dissolution_counts <- result |>
+  calculate_dissolution_rates(
+    time_breaks = seq(2025, 2100, 75),
+    dur_breaks = c(0, 5, 10, 15, 20, Inf),
+    by_union_type = TRUE
+  )
+
+dissolution_counts |>
+  filter(dur_start < 20) |>
+  ggplot(aes(x = dur_start, y = rate_dissolution, group = union_type, color = union_type))+
+  geom_point()+
+  geom_line(data = dissolution_rates_by_union_type, aes(y = rate), linetype = 2)+
+  theme_bw()
+
+calculate_demog_rates(
+  result, 
+  time_breaks = seq(2025, 2100, 75), 
+  age_breaks = seq(15, 40, 5), 
+  by_union_type = TRUE
+) |>
+  filter(sex == "f") |>
+  ggplot(aes(x = age_start, y = rate_fertility, group = union_type, color = union_type))+
+  geom_point()+
+  geom_line(data = fertility_rates_by_union_type, aes(y = rate), linetype = 2)+
+  theme_bw()
+
+devtools::load_all(debug = FALSE, recompile = TRUE)

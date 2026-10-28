@@ -32,6 +32,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Actual-hazard intensity tracking and boundary updates | D082 |
 | Age/duration remarriage in one rate table | D083 |
 | Optional duration bands for marriage observations | D084 |
+| Cohabitation design and implementation | D085–D086 |
 
 ## Recorded decisions
 
@@ -1677,3 +1678,136 @@ matching specifications override this default. Initiation mode remains explicit.
 - **Supersession:** implements the duration-observation interface deferred in
   D083. No age-by-duration surface or simultaneous clock stratification is added.
 - **Specification:** [remarriage](remarriage.md).
+
+## D085: Cohabitation classification and accepted stretch-goal direction
+
+- **Status:** cohabitation design decisions accepted by the user October 28,
+  2026; not implemented. Remaining interface/history choices are unresolved.
+- **Entry:** retain overall partnership-search waiting times. At each attempt,
+  an age/group/previous-union probability table selects intended cohabitation
+  versus direct marriage before matching. Support matching roles for marriage,
+  cohabitation and unpartnered father selection, sharing a common default with
+  optional overrides. Type-specific calibration uses the corresponding female
+  intensities. A failed match leaves the woman unpartnered and reschedules an
+  attempt; its intended type is drawn anew when it occurs.
+- **Conversion:** an existing cohabiting couple may convert to marriage using
+  an age- or cohabitation-duration-specific annual hazard, optionally by group.
+  Keep the current partners; conversion does not invoke matching. The user
+  chose to omit previous-union stratification from conversion inputs.
+- **Previous category:** default to SOCSIM-style recovery of earlier legal
+  marital history when a cohabitation ends. Someone with no earlier marriage
+  returns to `none` after either breakup or cohabitant death. Earlier legal
+  divorce/dissolution restores `dissolved`; earlier legal spouse death restores
+  `widowed`.
+- **Toggle:** expose a boolean on `union_formation()`, working API name
+  `cohabitation_counts_as_previous_union = FALSE`. With TRUE, cohabitation breakup
+  assigns `dissolved` and cohabitant death assigns `widowed`, irrespective of
+  earlier legal history. This is classification policy, not a conversion-risk
+  stratum or an implicit choice of duration-clock origin. Conversion followed
+  by a marriage ending uses the marriage history under either setting.
+- **Bookkeeping:** preserve enough history to recover legal category and the
+  selected policy at initialization/restart; do not discard earlier marriage
+  history merely because conversion rates do not use it. Observation policy
+  must be made consistent with the chosen simulation classification.
+- **Still open:** exact type-probability and conversion APIs/coverage, shared
+  versus type-specific fertility/dissolution defaults, representation of type
+  changes and durations, and observation interfaces. SOCSIM's table fallback,
+  rate inheritance, birth-triggered legalization, counters and apparent queue
+  omission are not adopted. No cohabitation implementation or milestone closure
+  is implied by these partial decisions.
+- **Reference:** [static SOCSIM cohabitation audit](socsim-cohabitation-audit.md).
+
+
+## D086: Implement optional typed partnerships in existing union processes
+
+- **Status:** authorized October 28, 2026. Rate-mode only; on-demand remains the
+  simplified kinship mechanism without cohabitation. No milestone acceptance
+  or new empirical default is inferred.
+- **API:** union formation accepts age/group/previous-category `cohab_prob`
+  (prob, not rate), optional `cohab_matching`, `union_convert_rate` and the D085
+  classification toggle. Probability gaps mean zero, as explicitly selected
+  by the user. NULL probability preserves untyped execution/RNG. Conversion
+  uses age or current-cohab duration, optionally woman's group; missing schedule
+  warns and gives no conversions. The conversion argument corrects the prompt's
+  `union_covert_rate` typo to `union_convert_rate`.
+- **State/history:** typed histories use cohab/marriage and conversion creates
+  same-partner linked episodes, resetting dissolution duration. The user selected
+  dissolution before conversion on exact ties: death, birth, dissolution,
+  conversion, search. Cohabiting people remain unavailable for other matching;
+  genuine endings release both partners. Conversion preserves partnership,
+  parentage and birth spacing, without a new matching draw.
+- **Calibration:** split female search intensity by p/(1-p), with separate role
+  weights and probability-boundary updates in the common queue. Father intensity
+  stays fertility-driven. Models may share preference tables without sharing
+  role-specific intensity/weight solutions.
+- **Rates:** fertility input `union_status` is replaced by `union_type`, with
+  complete unpartnered/partnered or unpartnered/cohab/marriage coverage per group.
+  The user explicitly confirmed matching list names for fertility group hazards;
+  reject list keys not present in rates and retain omitted-entry multiplier 1.
+  Dissolution can supply both type schedules or one shared schedule, retaining
+  symmetric group-pair strata and multipliers. Generic partnered observation
+  labels remain union_status; typed fertility inputs/TFR retain union_type.
+- **Observation/restart:** exclude conversion from unpartnered entry counts,
+  preserve continuous partnered exposure and episode-duration clocks, and recover
+  legal category from typed histories. Record the classification policy with
+  simulation metadata for observation; changing policy reclassifies supplied
+  history rather than reconstructing old policy changes. Typed cohab histories
+  require enabled cohabitation for continuation.
+- **Specification:** [cohabitation](cohabitation.md). D085's implementation
+  deferral is superseded; unresolved general mechanisms remain out of scope.
+
+
+## D087 — Union entry rate naming and type-specific observation (October 28, 2026)
+
+- **Status:** accepted by the user.
+- **Decision:** rename `calculate_marriage_rates()` to `calculate_union_rates()`
+  and `rate_marriage` to `rate_union`. Add `by_union_type = FALSE`; TRUE separates
+  cohabitation and direct-marriage entries over the same unpartnered exposure.
+  Conversion is excluded. Type-specific rates sum to pooled rates at positive
+  exposure; exposure must not be summed over the repeated type rows. Untyped
+  histories support pooling; requesting a type split requires typed histories.
+- **Scope:** retain existing age/duration, previous-union and group options.
+  No compatibility alias is retained during pre-release development.
+
+
+## D088 — Separate marriage entry measure (October 28, 2026)
+
+- **Status:** accepted by the user.
+- **Decision:** add `calculate_marriage_rates()` alongside
+  `calculate_union_rates()`. Marriage starts include direct marriage and
+  cohabitation conversion; exposure includes unpartnered and cohabiting time,
+  excludes married time, and returns `marriages` and `rate_marriage`.
+  Initial interface supports age, period, sex and optional individual group.
+  Untyped histories represent marriages. Partnership-entry semantics are unchanged.
+
+
+D088 extension: the user requested `by_previous_union` on the marriage helper
+as well. Default FALSE pools; TRUE separates exposure and starts by the
+pre-entry category. During cohabitation and at conversion this remains the
+category held before the cohabitation began. Real endings follow the recorded
+cohabitation policy. Duration stratification is unchanged.
+
+
+## D089 — Dissolution observation by union type (October 28, 2026)
+
+- **Status:** accepted by the user.
+- **Decision:** `calculate_dissolution_rates()` gains `by_union_type = FALSE`.
+  TRUE separates cohabitation and marriage episodes, crossed with group pairs
+  when requested. Each type uses its own union-years and dissolution events.
+  Conversion stops cohabitation exposure, is not dissolution, and resets
+  duration at the linked marriage start. Require typed histories for splitting;
+  retain pooled behavior by default and NA rates at zero exposure.
+
+
+## D090 — Demographic observations by discovered union type (October 28, 2026)
+
+- **Status:** accepted by the user.
+- **Decision:** replace `calculate_demog_rates(include_unions = TRUE)` with
+  `by_union_type = TRUE`; return `union_type` strata for unpartnered and types
+  discovered in history, without an overall row. Default FALSE remains pooled.
+  Legacy untyped histories use partnered/unpartnered. Typed histories require
+  exclusive episodes; untyped overlapping coverage remains merged.
+- **Timing:** exposure is half-open, death uses the left-limit type, and a birth
+  tied to conversion or dissolution retains the ending type. Preserve existing
+  formation-boundary birth classification. Unknown mothers retain the single
+  period-level unassigned attribute. Derived measures keep type strata separate.

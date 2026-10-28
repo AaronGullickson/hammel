@@ -176,9 +176,10 @@ There is no automatic disk cache or rate refresh.
 `calculate_demog_rates()`, `calculate_tfr()`, `calculate_life_table()`, and
 `calculate_population_size()` operate on inspectable outputs. See
 [demographic analysis](demographic-analysis.md) for exposure, missing cells,
-replications, and age alignment. `calculate_demog_rates(include_unions = TRUE)`
-returns overall/partnered/unpartnered rows with exposure, births, deaths, and
-fertility/mortality rates. `calculate_marriage_rates()` separately returns
+replications, and age alignment. `calculate_demog_rates(by_union_type = TRUE)`
+returns unpartnered and discovered union-type rows with exposure, births,
+deaths, and fertility/mortality rates, without an overall row. Untyped histories
+use partnered/unpartnered. `calculate_union_rates()` separately returns
 unpartnered exposure, union starts, and marriage rates by sex.
 `by_previous_union = TRUE` adds previous categories; `by_group = TRUE` independently
 adds individual groups. Both default to FALSE (D080). Optional `dur_breaks`
@@ -217,7 +218,7 @@ TFR and life-table calculations automatically retain input group strata. See
 These remain proposals or unresolved requirements:
 
 - Custom process execution and permitted state mutations/invalidation.
-- Cohabitation, poor-pool waiting, previous-father continuity,
+- Poor-pool waiting, previous-father continuity,
   and transition-aware fertility compensation; see [union formation](union-formation-models.md)
   and the [roadmap](roadmap.md).
 - Heterogeneity, parity-specific fertility, and user-defined newborn attributes.
@@ -336,3 +337,14 @@ quadratic utility model. `diagnostics = TRUE` adds weighted choice's applied
 `.log_weight_<group>` columns to new union records in grouped populations,
 without consuming random draws. Diagnostics default off; see the
 [union specification](union-formation-models.md#optional-union-diagnostics).
+
+
+## Typed partnerships (D086)
+
+Optional cohab_prob on union formation enables cohab/marriage histories in rate
+mode. Cohab matching and conversion are part of that process; dissolution
+optionally stratifies by type. See [cohabitation](cohabitation.md) for complete
+inputs, chronology, linked episodes, legal-history recovery and observations.
+Fertility input strata are now union_type (the old input union_status errors).
+The contribution cache has marriage-search, father and cohab-search channels;
+preference tables may be shared, but role weights use each role's intensity.

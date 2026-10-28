@@ -70,7 +70,7 @@ test_that("a compatible man anywhere in the pool is always found under restricti
 
 test_that("rate searches retry and father overrides carry independent restrictions", {
   model <- exogamy_test_model(TRUE)
-  model <- identity(set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
+  model <- identity(set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
     age_start = 15, age_end = 50, rate = c(0, 20)), 0))
   matching <- model$processes$union_formation$matching
   model <- identity(set_union_formation(model, "rate", matching = matching,

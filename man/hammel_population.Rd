@@ -13,7 +13,9 @@ persons. Columns are preserved and the table is returned as a tibble.}
 \item{unions}{A data frame with one row per union episode, or \code{NULL}
 for no unions. \code{wife_id} references the female partner and \code{husband_id}
 the male partner; these roles do not imply legal marriage. An empty data
-frame is normalized to the union schema.}
+frame is normalized to the union schema. Optional \code{union_type} is cohab or
+marriage. A conversion closes cohab with \code{end_reason = "conversion"} and
+links the same-time marriage through \code{converted_from_union_id}.}
 
 \item{end_time}{Optional finite simulation endpoint in years. Its calendar origin is supplied by the user. \code{NULL} means
 that the endpoint is unknown.}

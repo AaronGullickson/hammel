@@ -112,9 +112,9 @@ sex-specific widowhood, grouping, empty histories, and invalid histories.
 
 ## Marriage observations
 
-`calculate_marriage_rates(population, time_breaks, age_breaks, by_group = FALSE,
+`calculate_union_rates(population, time_breaks, age_breaks, by_group = FALSE,
 by_previous_union = FALSE)`
-returns `person_years`, `unions`, and `rate_marriage`, split by period, age and sex. Set
+returns `person_years`, `unions`, and `rate_union`, split by period, age and sex. Set
 `by_previous_union = TRUE` to add the three previous-union categories; otherwise
 counts and exposure are pooled before calculating rates and that column is omitted. All exposure is unpartnered; no additional `union_status`
 column is needed. Optional `group` follows each individual's identity, including
@@ -129,9 +129,9 @@ contribute starts without positive exposure in the applicable category. To pool
 categories or replications, sum counts and exposure before dividing. A mean of
 category rates does not generally equal the pooled rate.
 
-Per the user's request, `calculate_demog_rates(include_unions = TRUE)` no longer
-returns `unions` or `rate_marriage`. Its overall/partnered/unpartnered exposure,
-births, deaths, fertility and mortality rates retain their existing semantics.
+Per the user's request, `calculate_demog_rates(by_union_type = TRUE)` no longer
+returns `unions` or `rate_union`. Its exposure, births, deaths, fertility and mortality rates are separated by
+unpartnered and discovered union types, without an overall row.
 This intentionally changes its output schema; use the separate marriage helper
 for formation counts and rates.
 
@@ -140,14 +140,14 @@ search_rates <- tibble::tibble(
   previous_union = c("none", "dissolved", "widowed"),
   age_start = 18, age_end = 80, rate = c(.1, .15, .08))
 model <- set_union_formation(model, "rate", rates = search_rates)
-marriages <- calculate_marriage_rates(result, seq(2025, 2100, 5), 0:100,
+marriages <- calculate_union_rates(result, seq(2025, 2100, 5), 0:100,
                                       by_group = TRUE, by_previous_union = TRUE)
 ```
 
 The rates above are illustrative inputs, not empirical estimates or defaults.
 
 
-Optional `dur_breaks` on `calculate_marriage_rates()` now measures dissolved
+Optional `dur_breaks` on `calculate_union_rates()` now measures dissolved
 and widowed exposure/events by duration since the latest ending (D084).
 Supplying it automatically enables previous-category stratification, including
 when `by_previous_union = FALSE`. `none` still uses required `age_breaks`.
@@ -166,7 +166,7 @@ required. Without dur_breaks the existing age-based pooling behavior and schema
 are unchanged.
 
 ```r
-marriages <- calculate_marriage_rates(result,
+marriages <- calculate_union_rates(result,
   time_breaks = c(2025, 2100), age_breaks = seq(15, 70, 5),
   dur_breaks = c(0, 1, 3, 5, 10, Inf), by_group = TRUE)
 ```

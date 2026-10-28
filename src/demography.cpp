@@ -206,6 +206,7 @@ List dissolution_counts_cpp(DataFrame unions, NumericVector time_breaks,
 struct MarriageEpisode {
   double start, end, id;
   int after;
+  bool cohab, conversion;
 };
 std::vector<std::vector<MarriageEpisode>> marriage_histories(DataFrame persons,
                                                             DataFrame unions) {
@@ -213,6 +214,9 @@ std::vector<std::vector<MarriageEpisode>> marriage_histories(DataFrame persons,
   NumericVector wives = unions["wife_id"], husbands = unions["husband_id"];
   NumericVector starts = unions["start_time"], ends = unions["end_time"], uids = unions["union_id"];
   CharacterVector reasons = unions["end_reason"];
+  const bool typed = unions.containsElementNamed("union_type");
+  CharacterVector types;
+  if (typed) types = unions["union_type"];
   std::map<double, int> index;
   for (int i = 0; i < ids.size(); ++i) index[ids[i]] = i;
   std::vector<std::vector<MarriageEpisode>> histories(ids.size());
@@ -224,7 +228,9 @@ std::vector<std::vector<MarriageEpisode>> marriage_histories(DataFrame persons,
       const int i = index.at(id);
       if (!NumericVector::is_na(died[i]) && (starts[u] > died[i] || end > died[i]))
         stop("Previous-union histories cannot contain union events after a partner's death.");
-      histories[i].push_back({starts[u], end, uids[u], after});
+      histories[i].push_back({starts[u], end, uids[u], after,
+        typed && as<std::string>(types[u]) == "cohab",
+        !ongoing && as<std::string>(reasons[u]) == "conversion"});
     }
   }
   for (auto& history : histories) {
@@ -240,14 +246,18 @@ std::vector<std::vector<MarriageEpisode>> marriage_histories(DataFrame persons,
 
 // Execution-only cache: complete supplied history determines the latest ending.
 // [[Rcpp::export]]
-List previous_union_info_cpp(DataFrame persons, DataFrame unions) {
+List previous_union_info_cpp(DataFrame persons, DataFrame unions, bool counts_cohab = false) {
   const auto histories = marriage_histories(persons, unions);
-  IntegerVector state(histories.size(), 0);
+  IntegerVector state(histories.size(), 0), legal(histories.size(), 0);
   NumericVector ended(histories.size(), NA_REAL);
   for (size_t i = 0; i < histories.size(); ++i)
     for (const auto& episode : histories[i])
-      if (R_finite(episode.end)) { state[i] = episode.after; ended[i] = episode.end; }
-  return List::create(_["previous_union"] = state, _["end_time"] = ended);
+      if (R_finite(episode.end) && !episode.conversion) {
+        if (!episode.cohab) legal[i] = episode.after;
+        state[i] = episode.cohab && !counts_cohab ? legal[i] : episode.after;
+        ended[i] = episode.end;
+      }
+  return List::create(_["previous_union"] = state, _["end_time"] = ended, _["legal_previous"] = legal);
 }
 
 // Existing internal snapshot interface for category-only validation.
@@ -260,7 +270,8 @@ IntegerVector previous_union_state_cpp(DataFrame persons, DataFrame unions) {
 List marriage_counts_cpp(DataFrame persons, DataFrame unions,
                          NumericVector time_breaks, NumericVector age_breaks,
                          IntegerVector group_indices, int group_count,
-                         Nullable<NumericVector> dur_breaks = R_NilValue) {
+                         Nullable<NumericVector> dur_breaks = R_NilValue, bool counts_cohab = false,
+                         std::string entry_type = "pooled", bool marriage_measure = false) {
   const auto histories = marriage_histories(persons, unions);
   NumericVector born = persons["birth_time"], died = persons["death_time"];
   CharacterVector sex = persons["sex"];
@@ -294,7 +305,8 @@ List marriage_counts_cpp(DataFrame persons, DataFrame unions,
         }
       }
     };
-    int previous = 0;
+    int previous = 0, legal = 0;
+    bool converted_entry = false;
     double available = born[i];
     for (const auto& episode : histories[i]) {
       add_exposure(available, episode.start, previous);
@@ -304,12 +316,78 @@ List marriage_counts_cpp(DataFrame persons, DataFrame unions,
       const int bands = breaks.size() - 1;
       const double origin = duration ? available : born[i];
       const int a = demographic_bin(episode.start - origin, breaks);
-      if (t >= 0 && a >= 0)
+      if ((marriage_measure ? !episode.cohab : !converted_entry) && t >= 0 && a >= 0 &&
+          (entry_type == "pooled" || (episode.cohab ? entry_type == "cohab" : entry_type == "marriage")))
         formations[t + nt * (a + bands * s) + offsets[previous] + stride * group_indices[i]] += 1;
+      if (marriage_measure && episode.cohab)
+        add_exposure(episode.start, episode.end, previous);
       available = episode.end;
-      previous = episode.after;
+      converted_entry = episode.conversion;
+      if (!episode.conversion) {
+        if (!episode.cohab) legal = episode.after;
+        previous = episode.cohab && !counts_cohab ? legal : episode.after;
+      }
     }
     add_exposure(available, life_end, previous);
   }
   return List::create(_["person_years"] = exposure, _["unions"] = formations);
+}
+
+// Disjoint current-type demographic strata. Typed histories must be exclusive.
+// [[Rcpp::export]]
+List typed_demographic_counts_cpp(DataFrame persons, DataFrame unions,
+    NumericVector time_breaks, NumericVector age_breaks,
+    IntegerVector group_indices, int group_count, CharacterVector types) {
+  const auto histories = marriage_histories(persons, unions);
+  const int nt = time_breaks.size() - 1, na = age_breaks.size() - 1;
+  const R_xlen_t stride = static_cast<R_xlen_t>(nt) * na * 2;
+  const R_xlen_t cells = stride * group_count;
+  NumericVector exposure(cells * types.size()), deaths(exposure.size()), births(exposure.size());
+  CharacterVector union_types = unions["union_type"];
+  Function subset("[.data.frame");
+  for (int k = 0; k < types.size(); ++k) {
+    LogicalVector rows(unions.nrows());
+    for (int u = 0; u < unions.nrows(); ++u) rows[u] = union_types[u] == types[k];
+    DataFrame selected = subset(unions, rows, R_MissingArg, Named("drop") = false);
+    List x = union_counts_cpp(persons, selected, time_breaks, age_breaks, group_indices, group_count);
+    NumericVector years = x["person_years_partnered"];
+    std::copy(years.begin(), years.end(), exposure.begin() + cells * k);
+  }
+  NumericVector ids = persons["person_id"], born = persons["birth_time"], died = persons["death_time"], mothers = persons["mother_id"];
+  CharacterVector sexes = persons["sex"];
+  std::map<double, int> index;
+  for (int i = 0; i < ids.size(); ++i) index[ids[i]] = i;
+  auto classify = [&](int person, double time, bool birth) {
+    const MarriageEpisode* active = nullptr;
+    for (const auto& e : histories[person]) {
+      // Birth precedes dissolution and conversion at exact ties.
+      if (birth && e.end == time && (e.conversion || e.after == 1)) {
+        active = &e;
+        break;
+      }
+      if (birth ? (e.start <= time && time < e.end) : (e.start < time && time <= e.end))
+        active = &e;
+    }
+    if (!active) return -1;
+    const std::string label = active->cohab ? "cohab" : "marriage";
+    for (int k = 0; k < types.size(); ++k) if (as<std::string>(types[k]) == label) return k;
+    return -1;
+  };
+  for (int i = 0; i < ids.size(); ++i) {
+    if (i % 1024 == 0) checkUserInterrupt();
+    int t = demographic_bin(died[i], time_breaks), a = demographic_bin(died[i] - born[i], age_breaks);
+    if (t >= 0 && a >= 0) {
+      const int k = classify(i, died[i], false);
+      const int sex = as<std::string>(sexes[i]) == "m" ? 0 : 1;
+      if (k >= 0) deaths[cells * k + t + nt * (a + na * sex) + stride * group_indices[i]] += 1;
+    }
+    t = demographic_bin(born[i], time_breaks);
+    if (t < 0 || NumericVector::is_na(mothers[i])) continue;
+    const int mother = index.at(mothers[i]);
+    a = demographic_bin(born[i] - born[mother], age_breaks);
+    if (a < 0) continue;
+    const int k = classify(mother, born[i], true);
+    if (k >= 0) births[cells * k + t + nt * (a + na) + stride * group_indices[mother]] += 1;
+  }
+  return List::create(_["person_years"] = exposure, _["births"] = births, _["deaths"] = deaths);
 }

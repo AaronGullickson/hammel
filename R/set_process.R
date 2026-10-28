@@ -17,7 +17,8 @@
 #'   Scales shared or group-specific input rates before fertility birth-spacing
 #'   compensation. Without population groups, simulation warns and ignores it.
 #'   Fertility also accepts a named list of vectors for `partnered` and/or
-#'   `unpartnered` when rates include `union_status`; omitted statuses use 1.0.
+#'   `unpartnered`, or cohab/marriage when rates include those `union_type`
+#'   strata. List names must occur in the schedules; omitted entries use 1.0.
 #' @param ffab Probability that a newborn is female, default `0.4886`.
 #'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
 #' @param inheritance A group identity model from [create_group_inheritance()],
@@ -121,8 +122,10 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #' eligibility must be specified before simulation. Calendar-time-varying
 #' schedules are not yet supported; time interval columns are rejected.
 #'
-#' Fertility optionally accepts `union_status` containing both `"partnered"`
-#' and `"unpartnered"`. Rates then use woman-years in the indicated status.
+#' Fertility optionally accepts `union_type` containing both `"partnered"`
+#' and `"unpartnered"`, or all three `"unpartnered"`, `"cohab"`, `"marriage"`.
+#' Shared partnered rates cover either partnership type. Rates use woman-years
+#' in the indicated type; the old fertility input `union_status` is rejected.
 #' Without that column, one overall schedule applies to all women. A partial
 #' status table or any other label is rejected; use explicit zero rates to
 #' suppress births in a status. Overlap is checked separately within each status.
@@ -153,10 +156,13 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #'   Without population groups, warn and ignore multipliers. Stored rate tables
 #'   and their source metadata are unchanged; rate-table summaries use those
 #'   stored rates, without applying population-dependent multipliers.
-#'   Fertility with `union_status` rates also accepts a named list such as
+#'   Fertility with `union_type` rates also accepts a named list such as
 #'   `list(partnered = c(A = 1.1, B = 0.9), unpartnered = c(A = 1.05))`.
-#'   An omitted status or group uses 1.0. A single vector applies to both
-#'   statuses (or overall fertility). Status lists require `union_status` rates.
+#'   An omitted status or group uses 1.0. A single vector applies to all
+#'   types (or overall fertility). Type lists require `union_type` rates and
+#'   their names must match the supplied schedule types. Three-type schedules
+#'   accept lists named unpartnered/cohab/marriage; shared partnered schedules
+#'   accept unpartnered/partnered. Omitted types and groups have multiplier 1.
 #' @param ffab Probability that a newborn is female, default `0.4886`.
 #'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
 #' @param inheritance A group identity model from [create_group_inheritance()],
@@ -255,11 +261,14 @@ validate_rates <- function(rates, mortality) {
       stop("Fertility schedules do not take a sex column in this initial interface.",
            call. = FALSE)
     }
-    if ("union_status" %in% names(rates)) {
-      status <- rates$union_status
+    if ("union_status" %in% names(rates))
+      stop("Fertility input `union_status` has been replaced by `union_type`.", call. = FALSE)
+    if ("union_type" %in% names(rates)) {
+      status <- rates$union_type
       if (!is.character(status) || !is.null(dim(status)) || anyNA(status) ||
-          !setequal(status, c("partnered", "unpartnered"))) {
-        stop('Fertility `union_status` must contain both "partnered" and "unpartnered", with no other or missing values.',
+          !(setequal(status, c("partnered", "unpartnered")) ||
+            setequal(status, c("unpartnered", "cohab", "marriage")))) {
+        stop('Fertility `union_type` must contain unpartnered/partnered or unpartnered/cohab/marriage, with no other or missing values.',
              call. = FALSE)
       }
       schedules <- split(seq_len(nrow(rates)), status)

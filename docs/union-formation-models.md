@@ -372,7 +372,7 @@ deferred to a later milestone (D044).
 
 ## Fertility schedules by union status (D039)
 
-An optional character `union_status` column in the fertility table must contain
+An optional character `union_type` column in the fertility table must contain
 both `partnered` and `unpartnered`, with no missing or other values. Without
 that column the table is one overall schedule. Mixing overall and conditional
 rows or providing only one status is an error; explicitly provide zero rates
@@ -508,3 +508,11 @@ guaranteed realized age-gap frequencies or a halving of utility itself.
 The helper returns an ordinary matching model and retains the native quadratic
 execution path. Inputs must be finite numeric scalars and yield representable
 finite coefficients with strictly negative quadratic curvature.
+
+
+D086 extends rate-mode partnership entry with optional cohabitation probabilities,
+type-specific matching/rates and linked same-partner conversion. See
+[cohabitation](cohabitation.md). Fertility input uses union_type and supports
+unpartnered/partnered or unpartnered/cohab/marriage per group. On-demand remains
+untyped and overall-fertility only. Historical milestone 2 reports retain their
+accepted source and original input terminology; current rates must migrate.

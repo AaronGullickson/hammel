@@ -3,7 +3,7 @@
 Core rules accepted by the user October 27, 2026 (D078). This specification
 covers the separate optional dissolution process. Age-specific remarriage
 schedules, including duration since the latest ending, are described in
-[remarriage](remarriage.md) (D080/D083). Cohabitation remains deferred.
+[remarriage](remarriage.md) (D080/D083). Optional cohabitation is implemented under [D086](cohabitation.md).
 
 ## Risk, units and eligibility
 
@@ -189,3 +189,9 @@ Duration-based remarriage observations are available via `dur_breaks` under D084
 monthly probability inputs and potentially two-spouse candidate clocks, while
 sharing its duration-based baseline idea. No scientific validation threshold
 or demographic rate is supplied by this implementation.
+
+
+D086 adds optional union_type cohab/marriage strata within each shared or
+symmetric group_pair schedule. Supply both when stratifying; without the column,
+each episode uses the same dissolution schedule. Conversion is not dissolution:
+it ends the cohab episode and starts marriage with a fresh duration clock.

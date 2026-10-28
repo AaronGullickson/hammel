@@ -27,7 +27,7 @@ later run. The C++ engine samples candidate waiting times across age bands,
 executes at continuous times, and prioritizes death over birth on exact ties.
 Events execute chronologically. In on-demand mode all living females face the
 fertility schedule. Rate mode uses either overall rates for all women (with
-a warning), or separate \code{union_status} schedules. A union-formation process is required. With on-demand
+a warning), or separate \code{union_type} schedules. A union-formation process is required. With on-demand
 union formation, use the woman's
 current partner, or draw one from all eligible men using conditional-logit
 probabilities from the matching formula to form a union at the birth.
@@ -60,7 +60,10 @@ from recorded histories.
 Matching uses male-group weights recalibrated at each search; simulation
 warns once if any search needed approximate weights. A separate father model
 has its own preferences and delta target adjustments. Event initiation is
-unchanged.
+unchanged. Optional cohabitation uses rate mode only: type is selected from
+\code{cohab_prob} before marriage/cohabitation-specific matching. Conversion retains
+partners and creates linked episodes, with same-person ties ordered death,
+birth, dissolution, conversion, search. Fertility input strata use \code{union_type}.
 }
 \details{
 Minimum birth spacing is configured in \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}

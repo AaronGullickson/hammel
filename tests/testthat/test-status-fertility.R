@@ -1,5 +1,5 @@
 status_rates <- function(partnered = 0, unpartnered = 0) {
-  data.frame(union_status = c("partnered", "unpartnered"),
+  data.frame(union_type = c("partnered", "unpartnered"),
     age_start = 15, age_end = 50, rate = c(partnered, unpartnered))
 }
 
@@ -11,10 +11,10 @@ test_that("conditional fertility validates labels, completeness and per-status b
                       c("partnered", "partnered"), c("married", "unmarried"),
                       factor(c("partnered", "unpartnered")))) {
     bad <- rates
-    bad$union_status <- labels
-    expect_error(fertility(bad), "union_status")
+    bad$union_type <- labels
+    expect_error(fertility(bad), "union_type")
   }
-  expect_error(fertility(rates[1, ]), "union_status")
+  expect_error(fertility(rates[1, ]), "union_type")
   expect_error(fertility(rbind(rates, rates[1, ])), "overlap")
   different <- rates
   different$age_start <- c(20, 15)
@@ -22,10 +22,10 @@ test_that("conditional fertility validates labels, completeness and per-status b
   expect_s3_class(fertility(different), "hammel_fertility")
   model <- make_model()
   edited <- fertility(rates)
-  edited$rates$union_status[2] <- "total"
-  expect_error(set_process(model, edited), "union_status")
+  edited$rates$union_type[2] <- "total"
+  expect_error(set_process(model, edited), "union_type")
   model$processes$fertility <- edited
-  expect_error(simulate(model, 0), "union_status")
+  expect_error(simulate(model, 0), "union_type")
 })
 
 test_that("on-demand rejects status schedules, rate overall warns exactly once", {
@@ -41,7 +41,7 @@ test_that("on-demand rejects status schedules, rate overall warns exactly once",
     invokeRestart("muffleWarning")
   })
   expect_length(warnings, 1)
-  expect_match(warnings, "overall fertility schedule.*union_status")
+  expect_match(warnings, "overall fertility schedule.*union_type")
   expect_gt(result$simulation$births, 0)
   expect_true(all(is.na(result$persons$father_id)))
   expect_equal(nrow(result$unions), 0)

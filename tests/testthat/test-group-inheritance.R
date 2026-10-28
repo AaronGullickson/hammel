@@ -39,7 +39,7 @@ test_that("custom inheritance receives parents' union status at birth", {
   expect_true(all(children$group == "partnered"))
   expect_gt(nrow(result$unions), 0)
 
-  model <- set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
+  model <- set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
     age_start = 15, age_end = 50, rate = c(0, 20)), 0, inheritance = rule)
   model <- set_union_formation(model, "rate", rates = data.frame(
     age_start = 0, age_end = Inf, rate = 0), cancel_birth_if_no_match = FALSE)
@@ -272,7 +272,7 @@ test_that("new AB identities are available to categorical partner matching durin
   # All newborns are male: until AB women enter the search ages, AB men's
   # mirrored baseline uses the overall female rate rather than a zero rate
   # averaged across newborn girls. The high delta makes their selection clear.
-  model <- set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
+  model <- set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
     age_start = 15, age_end = 50, rate = c(0, 20)), 0, inheritance = rule, ffab = 0)
   expect_warning(matching <- create_matching_model(~ male_group,
     c(male_groupB = 0, male_groupAB = .5), group_levels = c("A", "B", "AB"),
@@ -290,7 +290,7 @@ test_that("new AB identities are available to categorical partner matching durin
 test_that("future search schedules, group multipliers, and numeric declarations are supported", {
   rule <- create_group_inheritance("custom", groups = "AB", fun = function(...) "AB")
   model <- inheritance_test_model(rule)
-  model <- set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
+  model <- set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
     age_start = 15, age_end = 50, rate = c(0, 20)), 0, inheritance = rule)
   model <- set_union_formation(model, "rate", rates = data.frame(group = c("A", "B"),
     age_start = 0, age_end = Inf, rate = 0))

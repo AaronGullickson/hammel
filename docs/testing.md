@@ -320,7 +320,7 @@ zero-duration episodes, grouping and pooling, empty output types and invalid
 histories. Existing Lexis/dissolution tests retain birth/death exposure checks
 and now use the separate marriage helper for starts.
 
-The shipped milestone 2 example now calls `calculate_marriage_rates()` and
+The shipped milestone 2 example now calls `calculate_union_rates()` and
 pools category counts/exposure before calculating a combined marriage rate.
 Its source parses successfully; the complete empirical example was not run
 because it downloads rates. Accepted milestone 2/3 report sources and rendered
@@ -345,7 +345,7 @@ stratification, empty grouped/ungrouped outputs, and invalid option values.
 ## Observation helper names (D081, October 28, 2026)
 
 After renaming the public helpers to `calculate_demog_rates()`,
-`calculate_marriage_rates()` and `calculate_dissolution_rates()`,
+`calculate_union_rates()` and `calculate_dissolution_rates()`,
 `TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
 passed without failures or warnings; the opt-in live database test was skipped.
 Namespace checks confirm the new exports and removal of the old names.
@@ -509,3 +509,70 @@ helper under the analytical six-standard-error software check. Available men
 are sufficient and mortality/fertility are zero, so realized formations reflect
 search hazards in that test. This does not establish empirical validity or a
 new milestone acceptance threshold.
+
+
+## Typed cohabitation (D086, October 28, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
+passed the full suite without failures or warnings. The opt-in live database
+check was skipped; no rates were downloaded. New cohabitation checks cover
+probability gaps and strata, independent matching preferences, exclusive male
+availability, linked conversion episodes, exact event ties, restart history,
+legal previous-union recovery and its toggle, typed fertility/dissolution,
+pair multipliers, and fertility multiplier lists. Analytical conversion versus
+dissolution competition and calibration contribution sums at probability band
+boundaries are included. A saved pre-feature grouped age/previous-status run
+(50,000 initial people, 100 years, seed 42) retains identical complete output
+when cohabitation is disabled.
+
+`validation/validate-cohabitation-matching.R` was run for ten independently
+initialized 20,000-person populations over 60 years. Probability varied by age,
+group and previous union; conversion, typed fertility and typed dissolution
+were active. Conditional-choice fits used 1,500 entry events per type per
+replication, sampled available alternatives, age terms and applied group-weight
+offsets. Conversion episodes were excluded from new-partner choices. Combined
+conditional log odds averaged -2.0402 (MCSE .04280) for cohabitation against -2,
+and -6.0298 (MCSE .03625) for marriage against -6. These support parameter
+recovery in this synthetic case, not empirical validity or milestone acceptance.
+
+Evidence: [script](../validation/validate-cohabitation-matching.R),
+[replications](../validation/cohabitation-matching-replications.csv),
+[summary](../validation/cohabitation-matching-summary.csv), and
+[estimates/session metadata](../validation/cohabitation-matching.rds).
+
+
+## Union and marriage observation split (D087–D088, October 28, 2026)
+
+`TZ=UTC Rscript -e 'devtools::test(filter="marriage|cohabitation|lexis|group-demography", reporter="summary")'`
+passed without failures or warnings after regenerating documentation and native
+exports. This covers both renamed union entry observations and new marriage
+entry observations. Exact cases verify shared exposure and count/rate
+conservation for type-specific union rates, group/previous/duration combinations,
+conversion exclusion from union entry, conversion inclusion in marriage entry,
+cohabiting exposure, half-open age/period boundaries, death censoring,
+dissolution, direct and legacy marriage equivalence, zero exposure and empty
+histories. No simulation scheduling behavior changed in this split, and no
+empirical downloads were used. This is targeted verification, not a new full-suite
+or scientific milestone acceptance claim.
+
+
+D089 dissolution type observation: `devtools::test(filter =
+"dissolution|marriage-entry", reporter = "summary")` passed without failures or
+warnings. Tests cover separate type exposure/events, conservation against pooled
+totals, crossing with symmetric group pairs, conversion censoring and duration
+reset, empty inputs, zero-exposure NA rates, invalid type columns and logical
+flags. Documentation was regenerated; no native engine changes were needed.
+
+
+## Demographic current-type strata (D090, October 28, 2026)
+
+`devtools::test(filter = "demog|lexis|cohabitation|dissolution|marriage",
+reporter = "summary")` passed without failures or warnings after documentation
+and native exports were regenerated. Exact typed cases verify disjoint exposure,
+conservation against pooled births/deaths/person-years with and without groups,
+births at conversion and dissolution boundaries, left-limit death type,
+discovered single types, empty typed histories, and rejection of ambiguous
+overlapping typed episodes. Migrated untyped cases retain merged overlap
+coverage, event boundaries and downstream TFR/life-table grouping. Pooled default
+observations remain covered by the demographic tests. This was targeted offline
+verification; no simulation scheduling or matching behavior changed.

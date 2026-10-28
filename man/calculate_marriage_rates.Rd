@@ -2,15 +2,14 @@
 % Please edit documentation in R/calculate_marriage_rates.R
 \name{calculate_marriage_rates}
 \alias{calculate_marriage_rates}
-\title{Calculate marriage exposure and formation rates by previous union}
+\title{Calculate marriage entry rates including cohabitation conversions}
 \usage{
 calculate_marriage_rates(
   population,
   time_breaks,
   age_breaks,
   by_group = FALSE,
-  by_previous_union = FALSE,
-  dur_breaks = NULL
+  by_previous_union = FALSE
 )
 }
 \arguments{
@@ -29,36 +28,28 @@ return separate rows by each individual's group. No pooled row is added.}
 and starts by previous union category and include \code{previous_union}. Otherwise
 pool counts and exposure before calculating rates, and omit that column.
 Supplying \code{dur_breaks} automatically enables this option.}
-
-\item{dur_breaks}{Optional nonnegative duration boundaries in years. When
-supplied, dissolved/widowed rows use years since the latest union ending;
-none rows still use \code{age_breaks}. Automatically enables \code{by_previous_union}
-regardless of its supplied value. A finite final boundary gains Inf.
-Adds \code{dur_start}/\code{dur_end}, with NA in the unused age/duration pair.
-Duration rows include all ages; this is not an age-by-duration surface.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, \code{sex}, \code{age_start}, \code{age_end},
-\code{person_years}, \code{unions}, and \code{rate_marriage}, plus \code{group} and
-\code{previous_union} when requested, and duration columns when \code{dur_breaks} is
-supplied. Empty cells are retained.
+\code{person_years}, \code{marriages}, and \code{rate_marriage}, plus \code{group} and
+\code{previous_union} when requested.
+Empty cells are retained. Person-years include cohabiting time.
 }
 \description{
-Count union starts and unpartnered person-years by age, period, sex, and
-optionally \code{previous_union}: \code{"none"}, \code{"dissolved"}, or \code{"widowed"}. The most recent
-episode's ending determines the category; each start counts in the category
-immediately before formation. Partnered time contributes no exposure.
-Men describe realized matching outcomes, not a male search-rate input.
-With \code{dur_breaks}, only none rows use age; dissolved/widowed rows use
-duration since the most recent ending and always remain separate.
+Count direct marriages and conversions to marriage over nonmarried
+person-years: unpartnered and cohabiting time both contribute exposure.
+Married time contributes none. Each marriage episode counts once per spouse,
+including a marriage beginning at conversion. Untyped unions are interpreted
+as marriages. Men describe realized outcomes, not male search-rate inputs.
 }
 \details{
-Histories must be complete for the intended interpretation. \code{"none"} means
-no recorded earlier union; omitted history cannot establish never-partnered
-status. Overlapping episodes are rejected. Touching episodes are allowed;
-tied starts follow union ID order. Time and age cells are half-open, with
-events on internal boundaries assigned to the cell beginning there. Every
-episode counts, including zero-duration episodes. Rates are formations per
-unpartnered person-year, NA at zero exposure. Search attempts that fail to
-form unions are not counted, so these rates can differ from search hazards.
+Complete, nonoverlapping histories are required. Cells are half-open; starts
+on boundaries enter the cell beginning there. Exposure is censored at death
+and the observation endpoint. Rates are NA when exposure is zero. This
+age-specific measure does not provide duration strata. With
+\code{by_previous_union = TRUE}, cohabiting exposure and conversion retain the
+category held immediately before that cohabitation began. Ending categories
+follow the recorded cohabitation policy, as in \code{\link[=calculate_union_rates]{calculate_union_rates()}}.
+For entry into any partnership over unpartnered exposure, use
+\code{\link[=calculate_union_rates]{calculate_union_rates()}}.
 }
