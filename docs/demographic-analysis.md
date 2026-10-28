@@ -10,7 +10,7 @@ For a population simulated from 2000 through 2100:
 
 ```r
 summary <- result |>
-  calculate_lexis_counts(
+  calculate_demog_rates(
     time_breaks = seq(2020, 2100, by = 20),
     age_breaks = 0:100
   )
@@ -41,7 +41,7 @@ each spouse's formations and exposure follow their own group. Complete histories
 are retained during extraction, so cross-group family links remain available.
 
 ```r
-group_counts <- calculate_lexis_counts(
+group_counts <- calculate_demog_rates(
   result, seq(2020, 2100, 20), 0:100,
   by_group = TRUE, include_unions = TRUE
 )
@@ -62,11 +62,11 @@ does not establish an unknown mother's group.
 
 ## Union-years and dissolution rates
 
-Use `calculate_union_counts()` to observe union episodes rather than people:
+Use `calculate_dissolution_rates()` to observe union episodes rather than people:
 
 ```r
 union_counts <- result |>
-  calculate_union_counts(
+  calculate_dissolution_rates(
     time_breaks = seq(2025, 2100, 5),
     dur_breaks = c(0, 5, 10, 15, 20, Inf)
   )
@@ -278,7 +278,7 @@ detailed_unions <- get_detailed_unions(result)
 identified by `union_status`: `overall`, `partnered`, and `unpartnered`. All use
 `person_years`, `deaths`, `births`, `rate_mortality`, and `rate_fertility`. Births and ASFR are NA
 for men. Formation counts and marriage rates use the separate
-`calculate_marriage_counts()` helper (D080). The default FALSE preserves the
+`calculate_marriage_rates()` helper (D080). The default FALSE preserves the
 original birth/death output and computation. A population object with union
 histories is required; bare person tables cannot establish status.
 
@@ -321,7 +321,7 @@ per woman-year, and are NA when exposure is zero. Positive exposure with zero
 events gives rate zero. Exposure includes time excluded by birth spacing.
 
 ```r
-counts <- calculate_lexis_counts(result, seq(2020, 2100, 20), 0:100,
+counts <- calculate_demog_rates(result, seq(2020, 2100, 20), 0:100,
                                 include_unions = TRUE)
 # Existing TFR grouping reads union_status without a new option:
 tfr <- calculate_tfr(counts)
@@ -345,7 +345,7 @@ formulas, downstream grouping, and unchanged default output.
 Use the separate helper for formations per unpartnered person-year:
 
 ```r
-marriages <- calculate_marriage_counts(result, seq(2025, 2100, 5),
+marriages <- calculate_marriage_rates(result, seq(2025, 2100, 5),
                                       0:100, by_group = TRUE,
                                       by_previous_union = TRUE)
 ```
@@ -376,5 +376,5 @@ All time and age bins are half-open. See [remarriage](remarriage.md) for worked
 examples, tie conventions, and schedule requirements.
 
 This replaces the former `unions` and `rate_marriage` columns from
-`calculate_lexis_counts(include_unions = TRUE)`, which retains current-status
+`calculate_demog_rates(include_unions = TRUE)`, which retains current-status
 exposure, births, deaths, fertility and mortality summaries.

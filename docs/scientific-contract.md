@@ -455,7 +455,7 @@ Unknown-mother births remain in the period-level attribute without assigning a
 maternal group. Defaults pool groups; arbitrary custom strata are not supported.
 See [groups](groups.md) for output ordering, empty cases, and worked examples.
 
-- `calculate_lexis_counts()` splits recorded lifetimes at half-open period/age
+- `calculate_demog_rates()` splits recorded lifetimes at half-open period/age
   boundaries and reports exposure, deaths, births, ASMR, and ASFR. A finite last
   age breakpoint automatically gains `Inf`; for example `0:110` ends with
   `[110, Inf)`. Zero exposure yields `NA` rates; zero events with positive
@@ -463,7 +463,7 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
 - With `include_unions = TRUE`, Lexis counts add exact partnered/unpartnered
   exposure for both sexes and births/deaths by status, in separate `overall`,
   `partnered`, and `unpartnered` rows. Formation counts and marriage rates use
-  the separate `calculate_marriage_counts()` function (D080).
+  the separate `calculate_marriage_rates()` function (D080).
   Status components sum to overall counts/exposure; do not sum all three rows.
   Deaths use status immediately before death, so a union-ending death counts
   as partnered. Birth/exposure union coverage is half-open
@@ -490,7 +490,7 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   and `ex=T/l`. Missing rates propagate uncertainty; positive survivorship
   with zero terminal hazard gives infinite life expectancy; `ex` is undefined
   at zero survivorship. This is a synthetic period table, not cohort follow-up.
-- `calculate_marriage_counts()` returns unpartnered person-years, union starts
+- `calculate_marriage_rates()` returns unpartnered person-years, union starts
   and `rate_marriage` by period, age and sex. Optional `by_previous_union = TRUE`
   adds previous categories; `by_group = TRUE` independently adds individual
   groups. Both default to FALSE, pooling counts and exposure before rates. The most recent episode determines category; starts
@@ -500,7 +500,7 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   separately without adding time. Summing categories recovers pooled unpartnered
   exposure and starts. Men describe matching outcomes, not male search inputs.
   See [remarriage](remarriage.md) for input, restart and boundary conventions.
-- `calculate_union_counts()` splits each recorded union episode at calendar
+- `calculate_dissolution_rates()` splits each recorded union episode at calendar
   and duration boundaries, counting union-years once per episode and dissolution
   events only for `end_reason = "dissolution"`. Death also ends exposure but is
   not a dissolution event. Missing ends censor at the window endpoint. Duration

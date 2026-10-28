@@ -53,7 +53,7 @@ system.time(result <- simulate(model, 100, 42))
 table(result$unions$end_reason, exclude = NULL)
 
 union_counts <- result |>
-  calculate_union_counts(
+  calculate_dissolution_rates(
     time_breaks = seq(2025, 2100, 75),
     dur_breaks = c(0, 5, 10, 15, 20, Inf)
   )
@@ -80,7 +80,7 @@ system.time(result <- simulate(model, 100, 42))
 table(result$unions$end_reason, exclude = NULL)
 
 union_counts <- result |>
-  calculate_union_counts(
+  calculate_dissolution_rates(
     time_breaks = seq(2025, 2100, 75),
     dur_breaks = c(0, 5, 10, 15, 20, Inf),
     by_group = TRUE
@@ -112,7 +112,7 @@ system.time(result <- simulate(model, 100, 42))
 table(result$unions$end_reason, exclude = NULL)
 
 union_counts <- result |>
-  calculate_union_counts(
+  calculate_dissolution_rates(
     time_breaks = seq(2025, 2100, 75),
     dur_breaks = c(0, 5, 10, 15, 20, Inf),
     by_group = TRUE
@@ -145,7 +145,7 @@ system.time(result <- simulate(model, 100, 42))
 
 table(result$unions$end_reason, exclude = NULL)
 
-mar_counts <- calculate_marriage_counts(
+mar_counts <- calculate_marriage_rates(
   result,
   time_breaks = seq(2025, 2100, 75),
   age_breaks = seq(15, 70, 5), 

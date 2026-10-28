@@ -89,7 +89,7 @@ test_that("birth ties retain the pending dissolution and death wins same-person 
   expect_equal(kids$father_id, 2)
   expect_equal(tied$unions$end_time, 1, tolerance = 0)
   expect_identical(tied$unions$end_reason, "dissolution")
-  counts <- calculate_lexis_counts(tied, c(0, 1, 1.5), c(0, Inf), include_unions = TRUE)
+  counts <- calculate_demog_rates(tied, c(0, 1, 1.5), c(0, Inf), include_unions = TRUE)
   maternal <- subset(counts, sex == "f" & time_start == 1)
   expect_equal(maternal$births[maternal$union_status == "partnered"], 1)
   expect_equal(maternal$births[maternal$union_status == "unpartnered"], 0)
@@ -213,13 +213,13 @@ test_that("optional process, zero-duration runs, empty populations and fallbacks
 test_that("dissolution histories conserve partnered exposure and survive later deaths", {
   model <- dissolution_model(100, rate = 2)
   result <- simulate(model, 1, seed = 52)
-  counts <- calculate_lexis_counts(result, c(0, 1), c(0, Inf), include_unions = TRUE)
+  counts <- calculate_demog_rates(result, c(0, 1), c(0, Inf), include_unions = TRUE)
   partnered <- subset(counts, union_status == "partnered")
   unpartnered <- subset(counts, union_status == "unpartnered")
   expected <- sum(ifelse(is.na(result$unions$end_time), 1, result$unions$end_time))
   expect_equal(partnered$person_years, rep(expected, 2))
   expect_equal(partnered$person_years + unpartnered$person_years, rep(100, 2))
-  marriages <- calculate_marriage_counts(result, c(0, 1), c(0, Inf))
+  marriages <- calculate_marriage_rates(result, c(0, 1), c(0, Inf))
   expect_equal(sum(marriages$unions), 200) # Input formations at the window start.
   # Follow-up deaths must not rewrite already dissolved records or count them again.
   continuation <- set_population(model, result)

@@ -23,7 +23,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Population representation, sex labels, public tibbles | D012, D015, D016, D023 |
 | Process constructors/setters | D017, D026 |
 | Database rate products and reusable downloads | D018, D025 |
-| Demographic extraction and function names | D020–D022 and missing-ASFR clarification |
+| Demographic extraction and function names | D020–D022, D081 and missing-ASFR clarification |
 | Continuous execution | D024 |
 | Fertility spacing/compensation and finite age bands | D026, D028 (superseding D027's exact sampler) |
 | Two-sex union models and union API restructuring (deferred) | D073 |
@@ -1578,3 +1578,19 @@ matching specifications override this default. Initiation mode remains explicit.
   No duration-remarriage clocks, cohabitation, cooldowns, former-partner exclusion,
   or fertility-transition correction is added.
 - **Specification:** [age-specific remarriage](remarriage.md).
+
+
+## D081: Name demographic observation helpers for their returned rates
+
+- **Status:** accepted by the user October 28, 2026.
+- **Decision:** rename `calculate_lexis_counts()` to `calculate_demog_rates()`,
+  `calculate_marriage_counts()` to `calculate_marriage_rates()`, and
+  `calculate_union_counts()` to `calculate_dissolution_rates()`.
+- **Scope:** names change; arguments, exposure, event counts, rate definitions
+  and returned columns retain their existing contracts. Counts and exposure
+  remain available alongside rates. Old function names are removed, without
+  compatibility aliases. Historical decision entries and accepted validation
+  reports retain their original terminology; current docs and examples use
+  the new names.
+- **Supersession:** updates public function names in D022, D046–D048,
+  D079 and D080 without changing their demographic rules.

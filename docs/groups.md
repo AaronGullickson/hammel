@@ -145,7 +145,7 @@ objects, and unchanged behavior without group columns.
 
 ## Group observations
 
-`calculate_lexis_counts(..., by_group = TRUE)` and
+`calculate_demog_rates(..., by_group = TRUE)` and
 `calculate_population_size(..., by_group = TRUE)` return separate counts for
 each group appearing anywhere in the supplied person history. Both default to
 FALSE, preserving pooled output. TRUE requires a population/persons `group`
@@ -186,7 +186,7 @@ identities, boundary examples, analytical group TFR/life expectancy, and empty
 outputs, as well as unchanged default results.
 
 
-Marriage observations now use `calculate_marriage_counts(..., by_group = TRUE)`
+Marriage observations now use `calculate_marriage_rates(..., by_group = TRUE)`
 (D080), grouping each spouse by their own identity. Set `by_previous_union = TRUE`
 to additionally split unpartnered exposure and union starts by previous category;
 the default FALSE pools counts and exposure before calculating rates. Search-rate multipliers apply

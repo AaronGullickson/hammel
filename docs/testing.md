@@ -282,7 +282,7 @@ Births exactly at dissolution ends count as partnered while exposure remains
 half-open; tests cover period boundaries, overlapping histories, unchanged
 death-ending classification and overall-count conservation.
 
-After adding `calculate_union_counts()` on October 27, 2026, the full
+After adding `calculate_dissolution_rates()` on October 27, 2026, the full
 `devtools::test(reporter = "summary")` suite passed without failures or test
 warnings; the opt-in live database test was skipped. Analytical union-year
 checks cover exact calendar/duration splitting, dissolution versus death
@@ -320,7 +320,7 @@ zero-duration episodes, grouping and pooling, empty output types and invalid
 histories. Existing Lexis/dissolution tests retain birth/death exposure checks
 and now use the separate marriage helper for starts.
 
-The shipped milestone 2 example now calls `calculate_marriage_counts()` and
+The shipped milestone 2 example now calls `calculate_marriage_rates()` and
 pools category counts/exposure before calculating a combined marriage rate.
 Its source parses successfully; the complete empirical example was not run
 because it downloads rates. Accepted milestone 2/3 report sources and rendered
@@ -340,3 +340,13 @@ without failures or warnings. Tests cover pooled counts/exposure and rates
 against summed previous-category cells, independently with and without group
 stratification, empty grouped/ungrouped outputs, and invalid option values.
 `by_previous_union` defaults to FALSE; stratified checks explicitly opt in.
+
+## Observation helper names (D081, October 28, 2026)
+
+After renaming the public helpers to `calculate_demog_rates()`,
+`calculate_marriage_rates()` and `calculate_dissolution_rates()`,
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
+passed without failures or warnings; the opt-in live database test was skipped.
+Namespace checks confirm the new exports and removal of the old names.
+The shipped example and current milestone 4 script parse with the new calls.
+Arguments, output columns and demographic calculations are unchanged.

@@ -76,7 +76,7 @@ priority (D078). D079 replaces woman-only grouping with symmetric group-pair
 schedules and multipliers using `group_pair` labels such as A:A, A:B, B:B.
 The optional dissolution process is the first implementation: `dur_start`/
 `dur_end` bands, one retained clock per union, status invalidation and availability
-updates, plus latest-run dissolution counts. `calculate_union_counts()` also
+updates, plus latest-run dissolution counts. `calculate_dissolution_rates()` also
 returns period/duration dissolution rates with union-year exposure, optionally
 by symmetric group pair; each episode contributes once. The user checked the
 dissolution demonstrations and moved on to age-specific remarriage (D080).
@@ -84,7 +84,7 @@ Optional `previous_union` on search tables uses `none`, `dissolved`, `widowed`,
 with all categories required per group; absent columns share rates. Calibration
 sums category-specific intensities within group/age bins. State is recovered
 from complete exclusive histories and updated on endings.
-`calculate_marriage_counts()` now returns unpartnered exposure, starts and rates
+`calculate_marriage_rates()` now returns unpartnered exposure, starts and rates
 by sex, optionally by person group. `by_previous_union = TRUE` adds previous
 categories; the default FALSE pools counts and exposure and omits that column. The user requested moving
 `unions`/`rate_marriage` out of Lexis outputs entirely; current-status birth,

@@ -103,8 +103,8 @@ result$persons |>
   theme_bw()
 
 
-lexis <- calculate_lexis_counts(result, seq(2000, 2100, 5), seq(15, 65, 5), include_unions = TRUE)
-marriages <- calculate_marriage_counts(result, seq(2000, 2100, 5), seq(15, 65, 5)) |>
+lexis <- calculate_demog_rates(result, seq(2000, 2100, 5), seq(15, 65, 5), include_unions = TRUE)
+marriages <- calculate_marriage_rates(result, seq(2000, 2100, 5), seq(15, 65, 5)) |>
   group_by(time_start, time_end, age_start, age_end, sex) |>
   summarize(rate_marriage = if (sum(person_years) > 0)
     sum(unions) / sum(person_years) else NA_real_, .groups = "drop")

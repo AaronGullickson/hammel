@@ -15,7 +15,7 @@ make_group_history <- function() {
 
 test_that("group Lexis counts preserve exact maternal and spouse classification", {
   p <- make_group_history()
-  counts <- calculate_lexis_counts(p, c(0, 1), c(0, Inf),
+  counts <- calculate_demog_rates(p, c(0, 1), c(0, Inf),
                                    include_unions = TRUE, by_group = TRUE)
   expect_s3_class(counts, "tbl_df")
   expect_identical(unique(counts$group), c("A", "B"))
@@ -38,9 +38,9 @@ test_that("group Lexis counts preserve exact maternal and spouse classification"
 test_that("group exposure and events conserve pooled cells across boundaries", {
   p <- make_group_history()
   for (include_unions in c(FALSE, TRUE)) {
-    counts <- calculate_lexis_counts(p, c(0, 0.25, 0.5, 0.75, 1),
+    counts <- calculate_demog_rates(p, c(0, 0.25, 0.5, 0.75, 1),
       c(0, 0.5, 20, 20.5, 30, 40, Inf), include_unions, by_group = TRUE)
-    pooled <- calculate_lexis_counts(p, c(0, 0.25, 0.5, 0.75, 1),
+    pooled <- calculate_demog_rates(p, c(0, 0.25, 0.5, 0.75, 1),
       c(0, 0.5, 20, 20.5, 30, 40, Inf), include_unions)
     a <- subset(counts, group == "A")
     b <- subset(counts, group == "B")
@@ -50,7 +50,7 @@ test_that("group exposure and events conserve pooled cells across boundaries", {
     expect_equal(a$rate_mortality[a$person_years > 0],
                  a$deaths[a$person_years > 0] / a$person_years[a$person_years > 0])
     expect_true(all(is.na(counts$rate_mortality[counts$person_years == 0])))
-    expect_identical(calculate_lexis_counts(p, c(0, 0.25, 0.5, 0.75, 1),
+    expect_identical(calculate_demog_rates(p, c(0, 0.25, 0.5, 0.75, 1),
       c(0, 0.5, 20, 20.5, 30, 40, Inf), include_unions, by_group = FALSE), pooled)
     if (include_unions) {
       overall <- subset(counts, union_status == "overall")
@@ -82,7 +82,7 @@ test_that("population sizes preserve time order and count each person's group", 
 test_that("numeric group types persist and bare histories keep maternal links", {
   p <- make_group_history()
   p$persons$group <- ifelse(p$persons$group == "A", 20L, 10L)
-  counts <- calculate_lexis_counts(p$persons, c(0, 1), c(0, Inf), by_group = TRUE)
+  counts <- calculate_demog_rates(p$persons, c(0, 1), c(0, Inf), by_group = TRUE)
   expect_type(counts$group, "integer")
   expect_identical(unique(counts$group), c(20L, 10L))
   expect_equal(subset(counts, group == 20L & sex == "f")$births, 2)
@@ -146,7 +146,7 @@ test_that("group life tables follow analytical constant-hazard survival", {
 })
 
 test_that("Lexis group identifiers flow through derived measures", {
-  counts <- calculate_lexis_counts(make_group_history(), c(0, 1), c(0, 20, 40, Inf),
+  counts <- calculate_demog_rates(make_group_history(), c(0, 1), c(0, 20, 40, Inf),
                                    include_unions = TRUE, by_group = TRUE)
   tfr <- calculate_tfr(counts)
   expect_equal(nrow(tfr), 6)
@@ -160,14 +160,14 @@ test_that("Lexis group identifiers flow through derived measures", {
 test_that("group observations validate flags and required group data", {
   p <- make_group_history()
   for (bad in list(NULL, NA, 1, "yes", c(TRUE, FALSE), matrix(TRUE))) {
-    expect_error(calculate_lexis_counts(p, c(0, 1), c(0, Inf), by_group = bad), "by_group")
+    expect_error(calculate_demog_rates(p, c(0, 1), c(0, Inf), by_group = bad), "by_group")
     expect_error(calculate_population_size(p, 0, by_group = bad), "by_group")
   }
   p$persons$group <- NULL
-  expect_error(calculate_lexis_counts(p, c(0, 1), c(0, Inf), by_group = TRUE), "group.*column")
+  expect_error(calculate_demog_rates(p, c(0, 1), c(0, Inf), by_group = TRUE), "group.*column")
   expect_error(calculate_population_size(p, 0, by_group = TRUE), "group.*column")
   expect_error(calculate_population_size(make_group_history(), 2, TRUE), "endpoint")
-  expect_error(calculate_lexis_counts(make_group_history(), c(0, 2), c(0, Inf), by_group = TRUE), "endpoint")
+  expect_error(calculate_demog_rates(make_group_history(), c(0, 2), c(0, Inf), by_group = TRUE), "endpoint")
   rates <- data.frame(group = NA_character_, age_start = 0, age_end = Inf, rate = 0.1)
   expect_error(calculate_life_table(rates), "group")
   rates$age_end <- 5
@@ -186,7 +186,7 @@ test_that("group observations return typed empty outputs", {
   expect_equal(nrow(sizes), 0)
   expect_type(sizes$group, "character")
   for (include_unions in c(FALSE, TRUE)) {
-    counts <- calculate_lexis_counts(p, c(0, 1), c(0, Inf), include_unions, TRUE)
+    counts <- calculate_demog_rates(p, c(0, 1), c(0, Inf), include_unions, TRUE)
     expect_s3_class(counts, "tbl_df")
     expect_equal(nrow(counts), 0)
     expect_type(counts$group, "character")
@@ -203,7 +203,7 @@ test_that("groups with no survivors retain zero cells and boundary deaths", {
   p$persons$death_time[p$persons$group == "B"] <- 0.75
   sizes <- calculate_population_size(p, c(0.75, 1), TRUE)
   expect_equal(subset(sizes, group == "B")$population, c(0L, 0L))
-  counts <- calculate_lexis_counts(p, c(0.75, 1), c(0, Inf), by_group = TRUE)
+  counts <- calculate_demog_rates(p, c(0.75, 1), c(0, Inf), by_group = TRUE)
   b <- subset(counts, group == "B")
   expect_equal(b$person_years, c(0, 0))
   expect_equal(sum(b$deaths), 4)

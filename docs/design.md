@@ -114,7 +114,7 @@ run boundaries, parent assignment, and resampling.
 
 ## Union-history observations
 
-`calculate_union_counts()` returns union-years, dissolution counts and rates
+`calculate_dissolution_rates()` returns union-years, dissolution counts and rates
 by calendar period and elapsed duration, optionally by symmetric `group_pair`
 strata (A:B includes both partner directions).
 The native `dissolution_counts_cpp()` splits recorded episodes directly at
@@ -173,12 +173,12 @@ return rate tibbles, without configuring a model. Users can save/load them with
 RDS and reuse them without downloads. HMDHFDplus is optional for these helpers.
 There is no automatic disk cache or rate refresh.
 
-`calculate_lexis_counts()`, `calculate_tfr()`, `calculate_life_table()`, and
+`calculate_demog_rates()`, `calculate_tfr()`, `calculate_life_table()`, and
 `calculate_population_size()` operate on inspectable outputs. See
 [demographic analysis](demographic-analysis.md) for exposure, missing cells,
-replications, and age alignment. `calculate_lexis_counts(include_unions = TRUE)`
+replications, and age alignment. `calculate_demog_rates(include_unions = TRUE)`
 returns overall/partnered/unpartnered rows with exposure, births, deaths, and
-fertility/mortality rates. `calculate_marriage_counts()` separately returns
+fertility/mortality rates. `calculate_marriage_rates()` separately returns
 unpartnered exposure, union starts, and marriage rates by sex.
 `by_previous_union = TRUE` adds previous categories; `by_group = TRUE` independently
 adds individual groups. Both default to FALSE (D080). It requires exclusive union histories.
@@ -203,7 +203,7 @@ not reconstructions of past group transitions. Validation uses shuffled IDs,
 fractional ages, siblings, unknown/deceased parents, optional groups, empty
 tables, and unchanged inputs.
 
-`calculate_lexis_counts(by_group = TRUE)` and
+`calculate_demog_rates(by_group = TRUE)` and
 `calculate_population_size(by_group = TRUE)` optionally split observations by
 recorded group. The native count kernels retain full histories and add a group
 axis to their output arrays, preserving cross-group parent and spouse links.

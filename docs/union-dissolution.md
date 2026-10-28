@@ -131,7 +131,7 @@ dissolutions against union-year exposure.
 
 ## Union-year counts and dissolution rates
 
-Requested by the user October 27, 2026. `calculate_union_counts(population,
+Requested by the user October 27, 2026. `calculate_dissolution_rates(population,
 time_breaks, dur_breaks, by_group = FALSE)` returns a tibble with `time_start`,
 `time_end`, `dur_start`, `dur_end`, `union_years`, `dissolutions`, and
 `rate_dissolution`. There is no duplicated male/female row: one episode is one
@@ -146,7 +146,7 @@ boundary belongs to the cell beginning there; one at the final time boundary
 is excluded. Zero-duration episodes can contribute an event but no exposure.
 Zero exposure gives `NA` for the rate; positive exposure and zero dissolutions
 give zero. Duration boundaries use years and append `Inf` when the last supplied
-boundary is finite, as `calculate_lexis_counts()` does for age.
+boundary is finite, as `calculate_demog_rates()` does for age.
 
 Input may be a population object with a known endpoint or a union data frame
 with unique `union_id`, finite `start_time`, numeric `end_time` (NA if ongoing),

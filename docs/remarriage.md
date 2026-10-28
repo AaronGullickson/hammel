@@ -67,7 +67,7 @@ sex-specific widowhood, grouping, empty histories, and invalid histories.
 
 ## Marriage observations
 
-`calculate_marriage_counts(population, time_breaks, age_breaks, by_group = FALSE,
+`calculate_marriage_rates(population, time_breaks, age_breaks, by_group = FALSE,
 by_previous_union = FALSE)`
 returns `person_years`, `unions`, and `rate_marriage`, split by period, age and sex. Set
 `by_previous_union = TRUE` to add the three previous-union categories; otherwise
@@ -84,7 +84,7 @@ contribute starts without positive exposure in the applicable category. To pool
 categories or replications, sum counts and exposure before dividing. A mean of
 category rates does not generally equal the pooled rate.
 
-Per the user's request, `calculate_lexis_counts(include_unions = TRUE)` no longer
+Per the user's request, `calculate_demog_rates(include_unions = TRUE)` no longer
 returns `unions` or `rate_marriage`. Its overall/partnered/unpartnered exposure,
 births, deaths, fertility and mortality rates retain their existing semantics.
 This intentionally changes its output schema; use the separate marriage helper
@@ -95,7 +95,7 @@ search_rates <- tibble::tibble(
   previous_union = c("none", "dissolved", "widowed"),
   age_start = 18, age_end = 80, rate = c(.1, .15, .08))
 model <- set_union_formation(model, "rate", rates = search_rates)
-marriages <- calculate_marriage_counts(result, seq(2025, 2100, 5), 0:100,
+marriages <- calculate_marriage_rates(result, seq(2025, 2100, 5), 0:100,
                                       by_group = TRUE, by_previous_union = TRUE)
 ```
 

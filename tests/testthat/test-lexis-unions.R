@@ -12,7 +12,7 @@ make_lexis_union_history <- function() {
 
 test_that("long union counts match exact widowhood and remarriage examples", {
   population <- make_lexis_union_history()
-  counts <- calculate_lexis_counts(population, c(0, 3), c(0, 20, 30, 40, Inf), TRUE)
+  counts <- calculate_demog_rates(population, c(0, 3), c(0, 20, 30, 40, Inf), TRUE)
   expect_identical(counts$union_status, rep(c("overall", "partnered", "unpartnered"), 8))
   expect_false(any(c("unions", "rate_marriage") %in% names(counts)))
   women <- subset(counts, sex == "f" & age_start == 20)
@@ -30,20 +30,20 @@ test_that("long union counts match exact widowhood and remarriage examples", {
   unpartnered <- subset(counts, union_status == "unpartnered")
   for (column in c("person_years", "births", "deaths"))
     expect_equal(partnered[[column]] + unpartnered[[column]], total[[column]])
-  plain <- calculate_lexis_counts(population, c(0, 3), c(0, 20, 30, 40, Inf))
+  plain <- calculate_demog_rates(population, c(0, 3), c(0, 20, 30, 40, Inf))
   expect_identical(total[names(plain)], plain)
-  expect_identical(calculate_lexis_counts(population, c(0, 3),
+  expect_identical(calculate_demog_rates(population, c(0, 3),
     c(0, 20, 30, 40, Inf), FALSE), plain)
 })
 
 test_that("union exposure and events respect age and period boundaries", {
   population <- make_lexis_union_history()
-  counts <- calculate_lexis_counts(population, c(0, 0.5, 1.5, 2.5, 3),
+  counts <- calculate_demog_rates(population, c(0, 0.5, 1.5, 2.5, 3),
     c(0, 20, 20.5, 21.5, 22.5, 30, 40, Inf), TRUE)
   partnered <- subset(counts, union_status == "partnered")
   unpartnered <- subset(counts, union_status == "unpartnered")
   expect_equal(sum(partnered$person_years), 3)
-  marriages <- calculate_marriage_counts(population, c(0, 0.5, 1.5, 2.5, 3),
+  marriages <- calculate_marriage_rates(population, c(0, 0.5, 1.5, 2.5, 3),
     c(0, 20, 20.5, 21.5, 22.5, 30, 40, Inf))
   starts <- subset(marriages, sex == "f" & unions > 0)
   expect_equal(starts$time_start, c(0.5, 2.5))
@@ -55,7 +55,7 @@ test_that("union exposure and events respect age and period boundaries", {
   expect_equal(death$deaths, 1)
   expect_true(is.na(death$rate_mortality)) # No partnered exposure after the boundary death.
   expect_equal(attr(counts, "unassigned_births")$births, rep(0, 4))
-  window <- calculate_lexis_counts(population, c(1, 2.5), c(0, Inf), TRUE)
+  window <- calculate_demog_rates(population, c(1, 2.5), c(0, Inf), TRUE)
   expect_equal(sum(subset(window, union_status == "partnered")$person_years), 1)
 })
 
@@ -68,19 +68,19 @@ test_that("overlaps, touching episodes and zero durations do not duplicate time"
       end_reason = "dissolution"),
     transform(population$unions[2, ], union_id = 5, start_time = 1.75, end_time = 1.75,
       end_reason = "dissolution"))
-  counts <- calculate_lexis_counts(population, c(0, 3), c(0, Inf), TRUE)
+  counts <- calculate_demog_rates(population, c(0, 3), c(0, Inf), TRUE)
   expect_equal(subset(counts, union_status == "partnered")$person_years, c(2, 2))
 })
 
 test_that("optional summaries require histories and handle empty union tables", {
   population <- make_lexis_union_history()
-  expect_error(calculate_lexis_counts(population$persons, c(0, 3), c(0, Inf), TRUE),
+  expect_error(calculate_demog_rates(population$persons, c(0, 3), c(0, Inf), TRUE),
     "union histories")
   for (bad in list(NULL, NA, 1, "yes", c(TRUE, FALSE), matrix(TRUE)))
-    expect_error(calculate_lexis_counts(population, c(0, 3), c(0, Inf), bad),
+    expect_error(calculate_demog_rates(population, c(0, 3), c(0, Inf), bad),
       "include_unions")
   population$unions <- population$unions[FALSE, ]
-  counts <- calculate_lexis_counts(population, c(0, 3), c(0, Inf), TRUE)
+  counts <- calculate_demog_rates(population, c(0, 3), c(0, Inf), TRUE)
   total <- subset(counts, union_status == "overall")
   partnered <- subset(counts, union_status == "partnered")
   unpartnered <- subset(counts, union_status == "unpartnered")
@@ -91,7 +91,7 @@ test_that("optional summaries require histories and handle empty union tables", 
   expect_equal(unpartnered$births, total$births)
   expect_equal(unpartnered$deaths, total$deaths)
   population <- hammel_population(population$persons[FALSE, ], end_time = 3)
-  empty <- calculate_lexis_counts(population, c(0, 3), c(0, Inf), TRUE)
+  empty <- calculate_demog_rates(population, c(0, 3), c(0, Inf), TRUE)
   expect_s3_class(empty, "tbl_df")
   expect_equal(nrow(empty), 6)
   expect_equal(empty$person_years, rep(0, 6))
@@ -105,17 +105,17 @@ test_that("death status uses the left limit at union boundaries", {
   # Widow dies after her first union, before the second; remove that second union.
   population$unions <- population$unions[1, ]
   population$persons$death_time[1] <- 2
-  counts <- calculate_lexis_counts(population, c(0, 3), c(0, Inf), TRUE)
+  counts <- calculate_demog_rates(population, c(0, 3), c(0, Inf), TRUE)
   expect_equal(subset(counts, sex == "f")$deaths, c(1, 0, 1))
   expect_equal(subset(counts, sex == "m")$deaths, c(1, 1, 0))
   # A zero-duration union at death creates no preceding partnered status.
   population$unions$start_time <- 1.5
-  counts <- calculate_lexis_counts(population, c(0, 3), c(0, Inf), TRUE)
+  counts <- calculate_demog_rates(population, c(0, 3), c(0, Inf), TRUE)
   expect_equal(subset(counts, sex == "m")$deaths, c(1, 0, 1))
 })
 
 test_that("existing TFR and life-table grouping accepts long Lexis results", {
-  counts <- calculate_lexis_counts(make_lexis_union_history(), c(0, 3),
+  counts <- calculate_demog_rates(make_lexis_union_history(), c(0, 3),
     c(0, 20, 30, 40, Inf), TRUE)
   tfr <- calculate_tfr(counts)
   expect_identical(tfr$union_status, c("overall", "partnered", "unpartnered"))
@@ -137,9 +137,9 @@ test_that("existing TFR and life-table grouping accepts long Lexis results", {
 
 test_that("births at dissolution ends are partnered without extending exposure", {
   population <- make_lexis_union_history()
-  death_counts <- calculate_lexis_counts(population, c(0, 3), c(0, 20, 30, 40, Inf), TRUE)
+  death_counts <- calculate_demog_rates(population, c(0, 3), c(0, 20, 30, 40, Inf), TRUE)
   population$unions$end_reason[1] <- "dissolution"
-  counts <- calculate_lexis_counts(population, c(0, 3), c(0, 20, 30, 40, Inf), TRUE)
+  counts <- calculate_demog_rates(population, c(0, 3), c(0, 20, 30, 40, Inf), TRUE)
   women <- subset(counts, sex == "f" & age_start == 20)
   expect_equal(women$births, c(4, 3, 1))
   expect_identical(counts$person_years, death_counts$person_years)
@@ -147,7 +147,7 @@ test_that("births at dissolution ends are partnered without extending exposure",
   expect_identical(subset(counts, union_status == "overall"),
                    subset(death_counts, union_status == "overall"))
   # At the end boundary the tied birth is partnered but no exposure follows it.
-  boundary <- calculate_lexis_counts(population, c(1.5, 2.5), c(0, Inf), TRUE)
+  boundary <- calculate_demog_rates(population, c(1.5, 2.5), c(0, Inf), TRUE)
   partnered <- subset(boundary, sex == "f" & union_status == "partnered")
   expect_equal(partnered$births, 1)
   expect_equal(partnered$person_years, 0)
@@ -155,6 +155,6 @@ test_that("births at dissolution ends are partnered without extending exposure",
   # Overlapping input episodes and duplicated endpoints cannot duplicate births.
   population$unions <- rbind(population$unions, transform(population$unions[1, ],
     union_id = 3, husband_id = 3, start_time = 1))
-  duplicate <- calculate_lexis_counts(population, c(0, 3), c(0, 20, 30, 40, Inf), TRUE)
+  duplicate <- calculate_demog_rates(population, c(0, 3), c(0, 20, 30, 40, Inf), TRUE)
   expect_identical(duplicate$births, counts$births)
 })

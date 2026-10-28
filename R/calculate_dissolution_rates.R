@@ -39,8 +39,8 @@
 #' unions <- data.frame(union_id = 1:3, start_time = c(0, 1, 2),
 #'   end_time = c(3, 4, NA),
 #'   end_reason = c("dissolution", "death_husband", NA))
-#' calculate_union_counts(unions, c(0, 2, 5), c(0, 2, Inf))
-calculate_union_counts <- function(population, time_breaks, dur_breaks,
+#' calculate_dissolution_rates(unions, c(0, 2, 5), c(0, 2, Inf))
+calculate_dissolution_rates <- function(population, time_breaks, dur_breaks,
                                    by_group = FALSE) {
   if (!is.logical(by_group) || length(by_group) != 1L ||
       !is.null(dim(by_group)) || is.na(by_group))

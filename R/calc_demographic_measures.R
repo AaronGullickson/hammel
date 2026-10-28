@@ -86,7 +86,7 @@ calculate_population_size <- function(population, times, by_group = FALSE) {
 #'   exposure still ends at the boundary. Other ending births are unpartnered
 #'   unless another episode covers that time. Deaths use status
 #'   immediately before death, so union-ending deaths are partnered. For union
-#'   starts and marriage rates, use [calculate_marriage_counts()]. Overlapping
+#'   starts and marriage rates, use [calculate_marriage_rates()]. Overlapping
 #'   episodes do not duplicate exposure. Complete union histories are required
 #'   for historical status. Do not sum overall rows with their status components.
 #' @param by_group Logical, default `FALSE`. With `TRUE`, require a persons
@@ -104,8 +104,8 @@ calculate_population_size <- function(population, times, by_group = FALSE) {
 #' @export
 #' @examples
 #' population <- create_baseline_population(100, end_time = 0)
-#' calculate_lexis_counts(population, c(-1, 0), c(0, 20, 40, Inf))
-calculate_lexis_counts <- function(population, time_breaks, age_breaks,
+#' calculate_demog_rates(population, c(-1, 0), c(0, 20, 40, Inf))
+calculate_demog_rates <- function(population, time_breaks, age_breaks,
                                    include_unions = FALSE, by_group = FALSE) {
   if (!is.logical(include_unions) || length(include_unions) != 1L ||
       !is.null(dim(include_unions)) || is.na(include_unions))
@@ -200,7 +200,7 @@ summary_rows <- function(table, by_sex = FALSE, by_union_status = FALSE) {
 #' A `group` column automatically adds separate group strata, with its type and
 #' labels preserved; groups are not pooled. Age bands are checked independently
 #' within each period/group/status combination.
-#' @param rates A table returned by [calculate_lexis_counts()], a fertility
+#' @param rates A table returned by [calculate_demog_rates()], a fertility
 #'   process object, or a data frame with `age_start`, `age_end`, and `rate_fertility`
 #'   or `rate` in births per woman-year. Bare `rate` tables are interpreted as
 #'   fertility rates; mortality processes are not valid inputs.
@@ -260,7 +260,7 @@ calculate_tfr <- function(rates) {
 #' present. Status-specific tables hold that status fixed; they do not model
 #' transitions between statuses.
 #'
-#' @param rates A table returned by [calculate_lexis_counts()], a mortality
+#' @param rates A table returned by [calculate_demog_rates()], a mortality
 #'   process object, or a data frame with `age_start`, `age_end`, and `rate_mortality`,
 #'   `mx`, or `rate` per person-year.
 #' @param radix Initial life-table survivors, a positive finite number.

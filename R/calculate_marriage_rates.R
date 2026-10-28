@@ -29,7 +29,7 @@
 #'   `person_years`, `unions`, and `rate_marriage`, plus `group` and
 #'   `previous_union` when requested. Empty cells are retained.
 #' @export
-calculate_marriage_counts <- function(population, time_breaks, age_breaks,
+calculate_marriage_rates <- function(population, time_breaks, age_breaks,
                                      by_group = FALSE, by_previous_union = FALSE) {
   if (!inherits(population, "hammel_population"))
     stop("`population` must be a hammel_population with union histories.", call. = FALSE)

@@ -208,8 +208,8 @@ for useful quantities from simulation histories. Existing functions cover Lexis
 counts, fertility, life tables, population sizes and recorded kin. Identify
 additional quantities and exposure/observation definitions from actual workflows.
 Status-specific exposure, fertility and mortality summaries use
-`calculate_lexis_counts(include_unions = TRUE)`; formation counts and rates by
-previous union use `calculate_marriage_counts()` (D080).
+`calculate_demog_rates(include_unions = TRUE)`; formation counts and rates by
+previous union use `calculate_marriage_rates()` (D080).
 See [demographic analysis](demographic-analysis.md) for their observation rules.
 
 ## Tentative milestone 9: immigration from outside the system
