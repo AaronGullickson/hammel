@@ -1,5 +1,5 @@
 # D082 matching recovery. Offline synthetic inputs; run from repository root.
-# Rscript validation/validate-calibration-log-odds.R LIB OUTPUT_PREFIX [REPS] [CHOICES]
+# Rscript validation/validate-calibration-log-odds.R LIB OUTPUT_PREFIX [REPS] [CHOICES] [age|duration]
 # Uses recorded engine weight offsets and independently reconstructed male pools.
 args <- commandArgs(trailingOnly = TRUE)
 stopifnot(length(args) >= 2L)
@@ -8,6 +8,7 @@ stopifnot(requireNamespace("survival", quietly = TRUE))
 suppressPackageStartupMessages(library(survival))
 reps <- if (length(args) >= 3L) as.integer(args[3]) else 20L
 choices <- if (length(args) >= 4L) as.integer(args[4]) else 1500L
+clock <- if (length(args) >= 5L) match.arg(args[5], c("age", "duration")) else "age"
 
 # Uniform sampling of alternatives excludes the chosen man, then includes him
 # with certainty. Every possible chosen man has the same subset-selection
@@ -50,6 +51,14 @@ for (replication in seq_len(reps)) {
   search <- rbind(transform(raw, previous_union = "none"),
     transform(raw, previous_union = "dissolved", rate = rate * 1.4),
     transform(raw, previous_union = "widowed", rate = rate * .7))
+  if (clock == "duration") {
+    none <- transform(raw, previous_union = "none", dur_start = NA_real_, dur_end = NA_real_)
+    duration <- data.frame(age_start = NA_real_, age_end = NA_real_,
+      dur_start = c(0, 1, 3, 8), dur_end = c(1, 3, 8, Inf))
+    search <- rbind(none,
+      transform(duration, previous_union = "dissolved", rate = c(0, .15, .1, .05)),
+      transform(duration, previous_union = "widowed", rate = c(0, .07, .04, .02)))
+  }
   for (case in c("group_only", "age_dependent")) {
     matching <- if (case == "group_only")
       create_matching_model(~ 1, numeric(), group_exogamy = c("A:B" = -3)) else
@@ -81,7 +90,7 @@ for (replication in seq_len(reps)) {
     table <- table(factor(detailed$group_w, c("A", "B")),
                    factor(detailed$group_h, c("A", "B")))
     pooled_log_odds <- log(table[1, 2]) + log(table[2, 1]) - log(table[1, 1]) - log(table[2, 2])
-    rows[[length(rows) + 1L]] <- data.frame(replication, case,
+    rows[[length(rows) + 1L]] <- data.frame(replication, case, clock,
       choices = length(unique(data$set)), unions = nrow(result$unions),
       AB = unname(b["AB"]), BA = unname(b["BA"]), log_odds, log_odds_se,
       linear = if (case == "age_dependent") unname(b["age_diff"]) else NA_real_,

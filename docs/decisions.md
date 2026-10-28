@@ -30,6 +30,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Duration-dependent dissolution and symmetric group pairs | D078–D079 |
 | Age-specific searches by previous union; separate marriage observations | D080 |
 | Actual-hazard intensity tracking and boundary updates | D082 |
+| Age/duration remarriage in one rate table | D083 |
+| Optional duration bands for marriage observations | D084 |
 
 ## Recorded decisions
 
@@ -1623,3 +1625,55 @@ matching specifications override this default. Initiation mode remains explicit.
   the rate-bin averaging introduced under D071, while preserving their public
   schedule inputs and all other calibration conventions.
 - **Specification:** [current-hazard calibration](calibration-intensity.md).
+
+
+## D083: Age or duration remarriage schedules in one rate data frame
+
+- **Status:** accepted by the user October 28, 2026.
+- **Decision:** retain a single rate data frame; optional `dur_start`/`dur_end`
+  accompany required age columns. Each row uses one complete clock pair with
+  both unused boundaries NA. `none` must use age; `dissolved` and `widowed`
+  each independently choose age or duration, consistently for all bands and
+  groups within that category. No simultaneous age/duration risk surface and
+  no list-based schedule API are introduced. All-age tables may omit duration
+  columns. Existing three-category coverage and group multipliers remain.
+- **Origin/timing:** duration starts at the most recent union ending, whether
+  dissolution or partner death, and resets at every new ending. Reconstruct
+  origin and category from complete histories on restart. Search waiting times
+  integrate annual hazards on the chosen clock. Gaps have zero risk; zero-rate
+  bands can express delays, but no default delay or age constraint is invented.
+- **Calibration:** D082's per-woman contribution tracker evaluates the search
+  schedule using its own age/duration origin, independently of birth-cohort
+  matching cells and fertility ages. The same bounded queue handles duration
+  boundaries. Male targets, utilities, exact draws and event priority remain.
+- **Observations/scope:** current marriage summaries remain age-specific with
+  optional previous category. Duration-band observation denominators need a
+  separate interface decision; no age/duration surface or new observation
+  default is silently added. No cohabitation, former-spouse exclusion, parity,
+  calendar-varying rates or fertility-transition correction is introduced.
+- **Supersession:** implements the duration-remarriage portion deferred in
+  D080/D082 while preserving their other rules. The duration clock is based
+  on the latest ending, not first marriage or the beginning of the simulation.
+- **Specification:** [remarriage](remarriage.md).
+
+
+## D084: Duration-binned observations for previously partnered people
+
+- **Status:** accepted by the user October 28, 2026, including automatic
+  previous-category stratification when duration breaks are supplied.
+- **Decision:** add optional `dur_breaks = NULL` to `calculate_marriage_rates()`.
+  When supplied, `none` uses `age_breaks`, while `dissolved` and `widowed` use
+  duration since the latest ending. Automatically include/separate
+  `previous_union`, even when its flag is FALSE. Return both age and duration
+  boundary pairs with unused columns NA; do not pool unlike clocks.
+- **Semantics:** split unpartnered person-years and formation events across
+  half-open period and selected-clock bands, resetting duration at each ending
+  and using pre-window history. Duration rows include all ages. Preserve sex
+  and optional individual-group strata, censor at death/observation end,
+  count zero-duration starts, and return NA rates at zero exposure. Append Inf
+  after finite final duration breaks, matching existing observation conventions.
+- **Compatibility:** NULL preserves existing age-only output, pooling settings
+  and calculations. No automatic inference from the original model is needed.
+- **Supersession:** implements the duration-observation interface deferred in
+  D083. No age-by-duration surface or simultaneous clock stratification is added.
+- **Specification:** [remarriage](remarriage.md).

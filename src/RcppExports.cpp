@@ -56,6 +56,18 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// previous_union_info_cpp
+List previous_union_info_cpp(DataFrame persons, DataFrame unions);
+RcppExport SEXP _hammel_previous_union_info_cpp(SEXP personsSEXP, SEXP unionsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< DataFrame >::type persons(personsSEXP);
+    Rcpp::traits::input_parameter< DataFrame >::type unions(unionsSEXP);
+    rcpp_result_gen = Rcpp::wrap(previous_union_info_cpp(persons, unions));
+    return rcpp_result_gen;
+END_RCPP
+}
 // previous_union_state_cpp
 IntegerVector previous_union_state_cpp(DataFrame persons, DataFrame unions);
 RcppExport SEXP _hammel_previous_union_state_cpp(SEXP personsSEXP, SEXP unionsSEXP) {
@@ -69,8 +81,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // marriage_counts_cpp
-List marriage_counts_cpp(DataFrame persons, DataFrame unions, NumericVector time_breaks, NumericVector age_breaks, IntegerVector group_indices, int group_count);
-RcppExport SEXP _hammel_marriage_counts_cpp(SEXP personsSEXP, SEXP unionsSEXP, SEXP time_breaksSEXP, SEXP age_breaksSEXP, SEXP group_indicesSEXP, SEXP group_countSEXP) {
+List marriage_counts_cpp(DataFrame persons, DataFrame unions, NumericVector time_breaks, NumericVector age_breaks, IntegerVector group_indices, int group_count, Nullable<NumericVector> dur_breaks);
+RcppExport SEXP _hammel_marriage_counts_cpp(SEXP personsSEXP, SEXP unionsSEXP, SEXP time_breaksSEXP, SEXP age_breaksSEXP, SEXP group_indicesSEXP, SEXP group_countSEXP, SEXP dur_breaksSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -80,7 +92,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericVector >::type age_breaks(age_breaksSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type group_indices(group_indicesSEXP);
     Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
-    rcpp_result_gen = Rcpp::wrap(marriage_counts_cpp(persons, unions, time_breaks, age_breaks, group_indices, group_count));
+    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type dur_breaks(dur_breaksSEXP);
+    rcpp_result_gen = Rcpp::wrap(marriage_counts_cpp(persons, unions, time_breaks, age_breaks, group_indices, group_count, dur_breaks));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -150,8 +163,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // inspect_weighted_calibration_cpp
-List inspect_weighted_calibration_cpp(NumericVector female_born, IntegerVector female_groups, LogicalVector female_fertile, NumericVector male_born, IntegerVector male_groups, DataFrame rates, List matching, int group_count, double now, double cutoff, double width, bool fertility, Nullable<IntegerVector> female_previous);
-RcppExport SEXP _hammel_inspect_weighted_calibration_cpp(SEXP female_bornSEXP, SEXP female_groupsSEXP, SEXP female_fertileSEXP, SEXP male_bornSEXP, SEXP male_groupsSEXP, SEXP ratesSEXP, SEXP matchingSEXP, SEXP group_countSEXP, SEXP nowSEXP, SEXP cutoffSEXP, SEXP widthSEXP, SEXP fertilitySEXP, SEXP female_previousSEXP) {
+List inspect_weighted_calibration_cpp(NumericVector female_born, IntegerVector female_groups, LogicalVector female_fertile, NumericVector male_born, IntegerVector male_groups, DataFrame rates, List matching, int group_count, double now, double cutoff, double width, bool fertility, Nullable<IntegerVector> female_previous, Nullable<NumericVector> female_previous_ends);
+RcppExport SEXP _hammel_inspect_weighted_calibration_cpp(SEXP female_bornSEXP, SEXP female_groupsSEXP, SEXP female_fertileSEXP, SEXP male_bornSEXP, SEXP male_groupsSEXP, SEXP ratesSEXP, SEXP matchingSEXP, SEXP group_countSEXP, SEXP nowSEXP, SEXP cutoffSEXP, SEXP widthSEXP, SEXP fertilitySEXP, SEXP female_previousSEXP, SEXP female_previous_endsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -168,7 +181,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type width(widthSEXP);
     Rcpp::traits::input_parameter< bool >::type fertility(fertilitySEXP);
     Rcpp::traits::input_parameter< Nullable<IntegerVector> >::type female_previous(female_previousSEXP);
-    rcpp_result_gen = Rcpp::wrap(inspect_weighted_calibration_cpp(female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility, female_previous));
+    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type female_previous_ends(female_previous_endsSEXP);
+    rcpp_result_gen = Rcpp::wrap(inspect_weighted_calibration_cpp(female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility, female_previous, female_previous_ends));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -244,8 +258,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // inspect_intensity_tracker_cpp
-List inspect_intensity_tracker_cpp(NumericVector female_born, IntegerVector female_groups, DataFrame search_rates, DataFrame fertility_rates, NumericVector times, IntegerVector persons, CharacterVector actions, IntegerVector previous, NumericVector ready, int group_count);
-RcppExport SEXP _hammel_inspect_intensity_tracker_cpp(SEXP female_bornSEXP, SEXP female_groupsSEXP, SEXP search_ratesSEXP, SEXP fertility_ratesSEXP, SEXP timesSEXP, SEXP personsSEXP, SEXP actionsSEXP, SEXP previousSEXP, SEXP readySEXP, SEXP group_countSEXP) {
+List inspect_intensity_tracker_cpp(NumericVector female_born, IntegerVector female_groups, DataFrame search_rates, DataFrame fertility_rates, NumericVector times, IntegerVector persons, CharacterVector actions, IntegerVector previous, NumericVector ready, int group_count, Nullable<NumericVector> search_origins);
+RcppExport SEXP _hammel_inspect_intensity_tracker_cpp(SEXP female_bornSEXP, SEXP female_groupsSEXP, SEXP search_ratesSEXP, SEXP fertility_ratesSEXP, SEXP timesSEXP, SEXP personsSEXP, SEXP actionsSEXP, SEXP previousSEXP, SEXP readySEXP, SEXP group_countSEXP, SEXP search_originsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -259,7 +273,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< IntegerVector >::type previous(previousSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type ready(readySEXP);
     Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
-    rcpp_result_gen = Rcpp::wrap(inspect_intensity_tracker_cpp(female_born, female_groups, search_rates, fertility_rates, times, persons, actions, previous, ready, group_count));
+    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type search_origins(search_originsSEXP);
+    rcpp_result_gen = Rcpp::wrap(inspect_intensity_tracker_cpp(female_born, female_groups, search_rates, fertility_rates, times, persons, actions, previous, ready, group_count, search_origins));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -268,18 +283,19 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_demographic_counts_cpp", (DL_FUNC) &_hammel_demographic_counts_cpp, 5},
     {"_hammel_union_counts_cpp", (DL_FUNC) &_hammel_union_counts_cpp, 6},
     {"_hammel_dissolution_counts_cpp", (DL_FUNC) &_hammel_dissolution_counts_cpp, 5},
+    {"_hammel_previous_union_info_cpp", (DL_FUNC) &_hammel_previous_union_info_cpp, 2},
     {"_hammel_previous_union_state_cpp", (DL_FUNC) &_hammel_previous_union_state_cpp, 2},
-    {"_hammel_marriage_counts_cpp", (DL_FUNC) &_hammel_marriage_counts_cpp, 6},
+    {"_hammel_marriage_counts_cpp", (DL_FUNC) &_hammel_marriage_counts_cpp, 7},
     {"_hammel_extract_kin_cpp", (DL_FUNC) &_hammel_extract_kin_cpp, 4},
     {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
     {"_hammel_adjusted_fertility_cpp", (DL_FUNC) &_hammel_adjusted_fertility_cpp, 2},
     {"_hammel_inspect_matching_cpp", (DL_FUNC) &_hammel_inspect_matching_cpp, 2},
     {"_hammel_inspect_group_matching_cpp", (DL_FUNC) &_hammel_inspect_group_matching_cpp, 4},
-    {"_hammel_inspect_weighted_calibration_cpp", (DL_FUNC) &_hammel_inspect_weighted_calibration_cpp, 13},
+    {"_hammel_inspect_weighted_calibration_cpp", (DL_FUNC) &_hammel_inspect_weighted_calibration_cpp, 14},
     {"_hammel_inspect_exact_draw_cpp", (DL_FUNC) &_hammel_inspect_exact_draw_cpp, 11},
     {"_hammel_inspect_weighted_incremental_cpp", (DL_FUNC) &_hammel_inspect_weighted_incremental_cpp, 11},
     {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 19},
-    {"_hammel_inspect_intensity_tracker_cpp", (DL_FUNC) &_hammel_inspect_intensity_tracker_cpp, 10},
+    {"_hammel_inspect_intensity_tracker_cpp", (DL_FUNC) &_hammel_inspect_intensity_tracker_cpp, 11},
     {NULL, NULL, 0}
 };
 

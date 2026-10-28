@@ -1,19 +1,60 @@
-# Age-specific searches by previous union
+# Age- or duration-specific searches by previous union
 
-Milestone 4 specification, October 28, 2026. The user selected an optional
-`previous_union` column on rate-based union-formation schedules. Duration-based
-remarriage schedules remain deferred. These are annual female search hazards,
+Milestone 4 specification, October 28, 2026 (D080/D083). Rate-based union
+formation uses one rate data frame with optional `previous_union` strata and
+optional duration bands for previously partnered women. These are annual
+female search hazards,
 not probabilities or guaranteed formation rates. Men remain available for
 female-initiated matching; no male search clock is added.
 
 ## Schedules and state
 
-`age_start`, `age_end`, and `rate` retain their existing meaning. Optional
-`previous_union` takes exactly `none`, `dissolved`, or `widowed`. When supplied,
-all three categories are required within each scheduled group, with explicit
-zero rates allowed. Bands must not overlap within group/category; gaps have
-zero risk. Without the column, the same schedule applies to all unpartnered
-women. Existing woman-group multipliers apply to each category.
+The single rate data frame requires `age_start`, `age_end`, and `rate`.
+Optional `previous_union` takes exactly `none`, `dissolved`, or `widowed`.
+When supplied, all three categories are required within each scheduled group,
+with explicit zero rates allowed. Without it, the same age-specific schedule
+applies to all unpartnered women.
+
+Optionally include both `dur_start` and `dur_end`. Each row supplies exactly
+one complete pair of boundaries, with both unused boundaries NA. `none` must
+use age. `dissolved` and `widowed` each independently use age or duration, but a
+category must use the same clock in all its rows, including across groups.
+Age and duration cannot act simultaneously, and bands within a category cannot
+switch clocks. Supplying just one duration column, partial bands, both clocks,
+neither clock, or actual duration bands without `previous_union` is an error.
+All-age schedules may omit duration columns or supply them as all NA.
+
+Starts are finite nonnegative years, ends exceed starts and may be Inf, and
+rates are finite nonnegative annual search hazards. Bands must not overlap
+within each group/category on the selected clock; gaps have zero risk. Group
+multipliers retain their existing form and apply to every category.
+
+Duration is elapsed time since the **most recent union ended**, either by
+dissolution or partner death, not duration since the first such event, since
+simulation start, or since union formation. A new ending resets the origin.
+Restart histories recover both the category and its ending time; no missing
+origin is invented. While partnered there is no remarriage search risk.
+
+For example, a dissolution at 2005 and duration schedule `[0,1): 0`,
+`[1,5): .2`, `[5,Inf): .1` gives zero risk until 2006, .2 until 2010 and .1
+thereafter, irrespective of the woman's age. Restarting in 2008 begins at
+attained duration 3; it does not restart the one-year delay. A subsequent union
+ending in 2012 resets duration to zero. Individual search waiting times
+integrate across the selected bands using the same annual-hazard sampler.
+
+```r
+search_rates <- tibble::tribble(
+  ~previous_union, ~age_start, ~age_end, ~dur_start, ~dur_end, ~rate,
+  "none",          18,         80,       NA,          NA,       .10,
+  "dissolved",     NA,         NA,       0,           1,        0,
+  "dissolved",     NA,         NA,       1,           Inf,      .15,
+  "widowed",       NA,         NA,       0,           2,        0,
+  "widowed",       NA,         NA,       2,           Inf,      .08
+)
+model <- set_union_formation(model, "rate", rates = search_rates)
+```
+
+These example rates are illustrative, not empirical estimates or defaults.
 
 `none` means no recorded prior union. After an episode ends, dissolution gives
 `dissolved` to each living partner; partner death gives `widowed` to the survivor.
@@ -40,25 +81,28 @@ A later dissolution would replace `widowed` with `dissolved`.
 
 ## Timing and weighted choice
 
-The current woman's age and previous category select the search schedule.
+The woman's previous category selects an age- or duration-specific search schedule.
 Union endings update state before the surviving woman is rescheduled. Death,
 birth, dissolution, and search retain their existing same-person priority.
-There is no new waiting period, duration clock, or former-spouse exclusion.
+Any delay must be expressed as a zero-risk input band; no default waiting
+period or former-spouse exclusion is added.
 
 Calibration now maintains each unpartnered woman's actual current hazard
 contributions, summed by group/birth-cohort bin (D082). A common boundary-update
-queue refreshes marriage-search and fertility-driven totals at age bands and
-spacing releases, with state/pool changes replacing contributions. Previous
+queue refreshes marriage-search totals on the selected age/duration clock and
+fertility-driven totals at age bands and spacing releases, with state/pool
+changes replacing contributions. Previous
 categories select individual schedules but are not an extra calibration count
 dimension. Matching utilities and mirrored targets retain their definition.
 Individual event scheduling and random-number rules are unchanged; actual
 hazards replace bin-averaged calibration hazards. See
-[current-hazard contributions](calibration-intensity.md). Duration-dependent
-remarriage is still deferred.
+[current-hazard contributions](calibration-intensity.md). The search clock
+origin is separate from the birth-cohort cell used for matching.
 
 ## Validation
 
-Check category/group coverage and overlap; exact zero-hazard eligibility;
+Check category/group coverage, exclusive clock selection and overlap; duration
+reset/restart and age-independent waiting; exact zero-hazard eligibility;
 repeated transitions and restart history; equal category rates against shared
 rates; analytical constant hazards with adequate candidates; calibration
 intensity against an explicit sum over individuals; and observation accounting
@@ -101,3 +145,36 @@ marriages <- calculate_marriage_rates(result, seq(2025, 2100, 5), 0:100,
 ```
 
 The rates above are illustrative inputs, not empirical estimates or defaults.
+
+
+Optional `dur_breaks` on `calculate_marriage_rates()` now measures dissolved
+and widowed exposure/events by duration since the latest ending (D084).
+Supplying it automatically enables previous-category stratification, including
+when `by_previous_union = FALSE`. `none` still uses required `age_breaks`.
+The single returned tibble has `age_start`/`age_end` and `dur_start`/`dur_end`,
+with the unused pair NA. This selects a different clock per category, not an
+age-by-duration surface. Group/sex/period strata remain available.
+
+Both clocks use half-open bands; a finite final duration boundary gains Inf.
+Duration resets after each ending and does not reset at observation-window
+boundaries. Durations apply regardless of attained age; age_breaks restrict
+only `none` rows in this mode. Starts count using category and duration just
+before formation. Partnered time adds no exposure, deaths censor it, and ongoing
+unpartnered spells censor at the observation endpoint. Zero-duration/touching
+spells may add events with zero exposure. Complete exclusive histories are
+required. Without dur_breaks the existing age-based pooling behavior and schema
+are unchanged.
+
+```r
+marriages <- calculate_marriage_rates(result,
+  time_breaks = c(2025, 2100), age_breaks = seq(15, 70, 5),
+  dur_breaks = c(0, 1, 3, 5, 10, Inf), by_group = TRUE)
+```
+
+
+D083 software checks passed, including analytical duration hazards, restart and
+reset behavior, unchanged age-only histories, and grouped calibration equivalence.
+A ten-replication duration-schedule recovery check estimated combined conditional
+log odds ratios -5.9162 (MCSE .0784) and -6.0578 (MCSE .0724) for group-only and
+age-dependent matching against target -6. See [testing](testing.md#duration-specific-remarriage-d083-october-28-2026)
+for inputs, methods, artifacts and limitations. This is not milestone acceptance.

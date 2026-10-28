@@ -2,8 +2,8 @@
 
 Core rules accepted by the user October 27, 2026 (D078). This specification
 covers the separate optional dissolution process. Age-specific remarriage
-schedules are now described in [remarriage](remarriage.md) (D080);
-duration-dependent remarriage and cohabitation remain deferred.
+schedules, including duration since the latest ending, are described in
+[remarriage](remarriage.md) (D080/D083). Cohabitation remains deferred.
 
 ## Risk, units and eligibility
 
@@ -184,8 +184,8 @@ absent-process history/RNG preservation. Use synthetic local inputs only.
 
 D045's fertility-transition compensation limitation remains: dissolution adds
 another status transition but no history-aware compensation. Cohabitation,
-duration-dependent remarriage, couple covariates and calendar-varying dissolution
-require further specifications. These rules intentionally differ from SOCSIM's
+couple covariates and calendar-varying dissolution require further specifications.
+Duration-based remarriage observations are available via `dur_breaks` under D084. These rules intentionally differ from SOCSIM's
 monthly probability inputs and potentially two-spouse candidate clocks, while
 sharing its duration-based baseline idea. No scientific validation threshold
 or demographic rate is supplied by this implementation.

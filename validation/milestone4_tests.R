@@ -126,7 +126,9 @@ union_counts |>
   geom_line(data = dissolution_rates_grp2, aes(y = rate), linetype = 2)+
   theme_bw()
 
-# vary remarriage rates
+# Remarriage rates -----------------------------------------------------------
+
+# vary remarriage rates but all are age specific
 
 mar_rates_by_prev <- bind_rows(
   mar_rates_female_usa |> mutate(previous_union = "none"),
@@ -157,4 +159,64 @@ mar_counts |>
   ggplot(aes(x = age_start + 2.5, y = rate_marriage, group = previous_union, color = previous_union))+
   geom_point()+
   geom_line(data = mar_rates_by_prev, aes(y = rate), linetype = 2)+
+  theme_bw()
+
+# use duration specific rates - for testing make up some plausible values
+
+mar_rates_dissolved <- tribble(
+  ~dur_start, ~dur_end, ~rate,
+  0,          1,        0.005,
+  1,          5,        0.040,
+  5,          15,       0.070,
+  15,         Inf,      0.010
+)
+
+mar_rates_widowed <- tribble(
+  ~dur_start, ~dur_end, ~rate,
+  0,          1,        0.005,
+  1,          5,        0.060,
+  5,          15,       0.030,
+  15,         Inf,      0.010
+)
+
+mar_rates_by_dur <- bind_rows(
+  mar_rates_female_usa |> mutate(previous_union = "none"),
+  mar_rates_dissolved |> mutate(previous_union = "dissolved"),
+  mar_rates_widowed |> mutate(previous_union = "widowed")
+) |>
+  # don't have to resort them, but for human eyes its nice
+  select(previous_union, starts_with("age"), starts_with("dur"), rate)
+
+model <- hammel_model() |>
+  set_population(pop_base) |>
+  set_mortality(mortality_rates_usa2000) |>
+  set_fertility(fertility_rates_by_status_usa) |>
+  set_union_formation("rate", rates = mar_rates_by_dur) |>
+  set_union_dissolution(dissolution_rates)
+
+system.time(result <- simulate(model, 100, 42))
+
+table(result$unions$end_reason, exclude = NULL)
+
+mar_counts <- calculate_marriage_rates(
+  result,
+  time_breaks = seq(2025, 2100, 75),
+  age_breaks = seq(15, 70, 5),
+  dur_breaks = c(0, 1, 5, 15)
+)
+
+mar_counts |>
+  filter(sex == "f" & previous_union != "none") |>
+  ggplot(aes(x = dur_start + 2.5, y = rate_marriage, group = previous_union, color = previous_union))+
+  geom_point()+
+  geom_line(data = mar_rates_by_dur |> filter(previous_union != "none"), 
+            aes(y = rate), linetype = 2)+
+  theme_bw()
+
+mar_counts |>
+  filter(sex == "f" & previous_union == "none") |>
+  ggplot(aes(x = age_start + 2.5, y = rate_marriage))+
+  geom_point()+
+  geom_line(data = mar_rates_by_dur |> filter(previous_union == "none"), 
+            aes(y = rate), linetype = 2)+
   theme_bw()

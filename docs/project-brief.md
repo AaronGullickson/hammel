@@ -110,9 +110,10 @@ already supports assignment of mixed-parent births to a specified category.
 The first component is optional duration-dependent dissolution (D078), with
 annual hazards and one female-carried clock per union, symmetric group-pair
 schedules/multipliers (D079), and birth before dissolution on exact same-person
-ties. See [union dissolution](union-dissolution.md). Age-specific search schedules now optionally stratify by `previous_union`
-(D080); see [remarriage](remarriage.md). Duration-dependent remarriage and
-cohabitation remain deferred; no milestone 4 acceptance is implied.
+ties. See [union dissolution](union-dissolution.md). Search schedules optionally stratify by `previous_union`
+(D080) and select age or duration since the latest ending per category in one
+rate table (D083); see [remarriage](remarriage.md). Cohabitation remains deferred;
+no milestone 4 acceptance is implied.
 
 ## Boundaries and future work
 
@@ -120,7 +121,7 @@ C++17/Rcpp is selected and implemented for the first engine (D019); tibble is
 used at the R boundary (D023). Package metadata and licensing are not yet ready
 for release. A universal simulation framework and legacy compatibility are not
 requirements. Union formation and matching are implemented and milestone 2 is complete. Custom
-process execution, duration-dependent remarriage, cohabitation and richer initialization remain
+process execution, cohabitation and richer initialization remain
 future work, not automatically authorized features.
 
 The user has postponed finding an African historical alternative to USA/2000.

@@ -16,7 +16,8 @@ Execution is continuous: there is no month index, configurable execution step,
 time truncation, or rounding to birthdays.
 
 Mortality, fertility and union-search rate tables contain `age_start`,
-`age_end`, and `rate`. Dissolution uses `dur_start`/`dur_end` for years since
+`age_end`, and `rate`. Previously partnered union-search categories can instead
+use `dur_start`/`dur_end` with age boundaries NA (D083), as described below. Dissolution uses `dur_start`/`dur_end` for years since
 union formation, with rates per partnered woman-year (equivalently union-year).
 Mortality also contains
 `sex`, with separate `"m"` and `"f"` schedules. Intervals are half-open
@@ -380,12 +381,19 @@ and reschedules her unpartnered fertility and existing searches. Men's death
 hazards are status-independent, so their pending death events remain valid.
 Either partner's death cancels the episode's risk. Without this process,
 existing death-only behavior and random-number consumption are retained.
-Age-specific search schedules may distinguish `previous_union` as `none`,
+Search schedules may distinguish `previous_union` as `none`,
 `dissolved`, or `widowed` (D080). The most recent recorded episode determines
 state; complete histories are required. Without that column, all categories
 share the same rates. All three categories must be supplied per scheduled
-group when stratifying. Duration-dependent remarriage, cohabitation and couple
-covariates remain deferred. See the
+group when stratifying. `none` must use age; `dissolved` and `widowed` each
+select age or duration since the latest union ending (D083). Each category uses
+one clock in all bands/groups. Duration columns are optional for all-age tables;
+when included, each row supplies one complete boundary pair with the unused
+pair NA. No simultaneous age/duration hazards are permitted. Recover the latest
+ending origin on restart and reset it at each subsequent ending. The
+contribution queue handles the selected search clock independently of fertility
+ages and matching cohort bins. Cohabitation and couple covariates remain
+deferred. See [remarriage](remarriage.md) and the
 [dissolution specification](union-dissolution.md) for worked examples and limits.
 
 ### Weighted choice
@@ -497,8 +505,12 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   use the category immediately before formation. Empty categories remain, with
   NA rates at zero exposure. Complete exclusive histories are required;
   overlapping episodes are rejected. Touching and zero-duration episodes count
-  separately without adding time. Summing categories recovers pooled unpartnered
-  exposure and starts. Men describe matching outcomes, not male search inputs.
+  separately without adding time. With common age bands, summing categories
+  recovers pooled unpartnered exposure and starts. Men describe matching outcomes, not male search inputs.
+  Optional `dur_breaks` switches dissolved/widowed rows to duration since the
+  latest ending and automatically separates previous categories (D084). None
+  rows retain age bands; unused boundary pairs are NA. Duration rows include
+  all ages, and clocks are not crossed or pooled. NULL preserves age-only output.
   See [remarriage](remarriage.md) for input, restart and boundary conventions.
 - `calculate_dissolution_rates()` splits each recorded union episode at calendar
   and duration boundaries, counting union-years once per episode and dissolution
@@ -556,7 +568,7 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 | Midpoint approximation | Validate bias against supplied age schedules; no accuracy guarantee |
 | Rate changes between runs | Histories retain spacing, but compensation uses only the new schedule |
 | Sparse oldest ages | Missing cells remain missing; no automatic imputation or smoothing |
-| Union formation/dissolution | Exclusive conditional-logit on-demand or female rate-based formation, minimum male age and known-kin screening; widowhood plus optional duration-dependent dissolution; age-specific searches by previous union; duration-remarriage deferred |
+| Union formation/dissolution | Exclusive conditional-logit on-demand or female rate-based formation, minimum male age and known-kin screening; widowhood plus optional duration-dependent dissolution; age- or duration-specific searches by previous union |
 | Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
 | Exact continuation | No saved queue/RNG checkpoint |
 

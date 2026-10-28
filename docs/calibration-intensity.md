@@ -2,13 +2,15 @@
 
 User-approved implementation and performance trial, October 28, 2026. Replace
 age-band-averaged female intensities with actual current hazards and an internal
-boundary-update queue. No duration-dependent remarriage is introduced.
+boundary-update queue. D083 now extends the same mechanism to duration-specific
+remarriage without introducing another calibration dimension.
 
 ## Scientific behavior
 
 Each living unpartnered woman contributes her current female search hazard to
 her group/birth-cohort calibration cell. Rate-mode marriage searches select the
-woman's age/group/previous-union schedule after proportional multipliers.
+woman's group/previous-union schedule on its selected age/duration clock after
+proportional multipliers. The search origin is independent of fertility age.
 Fertility-driven searches use the existing midpoint-adjusted unpartnered
 fertility hazard and contribute zero during birth spacing. Keep separate totals
 for marriage searches and fertility-driven partner/father searches.
@@ -19,8 +21,8 @@ normalization, delta, matching utilities, kinship conventions, and the solver
 are unchanged. Quarter-year cohort bins still approximate matching utilities
 and cutoff eligibility for calibration; their center-based inclusion rule is
 retained. Actual female hazards, rather than bin-averaged hazards, are the
-intentional approximation change. Individual event scheduling already integrates
-actual age-specific schedules and is unchanged. Different calibrated weights
+intentional approximation change. Individual event scheduling integrates actual schedules on the selected
+age/duration search clock; D082 bookkeeping does not redraw demographic events. Different calibrated weights
 can change partner identities and downstream histories; identical seeds need
 not reproduce previous grouped outcomes. One/no-group paths and paths with
 all exogamy prohibited do not create the tracker or consume additional draws.
@@ -29,7 +31,7 @@ all exogamy prohibited do not create the tracker or consume additional draws.
 
 Maintain the current two hazard contributions per counted woman and at most
 one pending bookkeeping entry for her next relevant rate change. Boundaries
-include search/fertility band starts and ends, gaps and terminal support, and
+include search age/duration and fertility age band starts and ends, gaps and terminal support, and
 birth-spacing release. Rate schedules are piecewise constant, so no update is
 needed between changes. This is not a simulation step or a demographic event.
 The queue advances through every boundary up to a demographic event/search time
@@ -43,8 +45,9 @@ selected previous-union schedule. Birth updates fertility eligibility while
 retaining marriage-search intensity. Replace old pending entries when state
 changes, keeping queue size bounded by counted women rather than all past
 changes. Restarts rebuild contributions and spacing from supplied histories.
-The implementation provides a common update point for future state-dependent
-rates, without adding parity, region, custom state transitions, or new inputs.
+The same update interface now accepts a separate search clock origin for D083
+duration schedules. It provides a common update point for future state-dependent
+rates, without adding parity, region or custom state transitions.
 
 For example, a woman aged 19.9 with search hazards .1 below age 20 and .3
 thereafter contributes .1 now and .3 after 0.1 years, even if her cohort bin

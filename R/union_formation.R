@@ -385,6 +385,11 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   `"dissolved"`, and `"widowed"`; all three are required within each group.
 #'   Without it, the schedule applies to all previous union types. Categories
 #'   describe the most recent recorded episode; complete histories are required.
+#'   Optionally include both `dur_start` and `dur_end` for elapsed years since
+#'   the most recent union ended. Each row supplies either age or duration bands
+#'   with both unused boundaries NA. `none` must use age; each other category
+#'   uses one clock consistently across all its bands and groups. Age and duration
+#'   cannot apply together. All-age inputs may omit duration columns.
 #'   Must be NULL for `"on_demand"`.
 #' @param diagnostics Logical, default `FALSE`. When the general matching model
 #'   uses weighted choice in a grouped population, record `.log_weight_<group>`
@@ -472,16 +477,43 @@ validate_union_formation <- function(process) {
   } else {
     rates <- process$rates
     check_columns(rates, c("age_start", "age_end", "rate"), "rates")
-    check_numeric_column(rates$age_start, "rates$age_start")
     check_numeric_column(rates$rate, "rates$rate")
-    ends <- rates$age_end
-    if (!nrow(rates) || !is.numeric(ends) || !is.null(dim(ends)) ||
-        anyNA(ends) || any(ends <= rates$age_start) ||
-        any(rates$age_start < 0) || any(rates$rate < 0) ||
-        any(c("sex", "time_start", "time_end") %in% names(rates))) {
-      stop("Use nonnegative female search rates in valid age bands, without sex or calendar columns.",
+    if (!nrow(rates) || any(rates$rate < 0) ||
+        any(c("sex", "time_start", "time_end") %in% names(rates)))
+      stop("Use nonnegative female search rates in valid age or duration bands, without sex or calendar columns.",
            call. = FALSE)
+    duration_columns <- c("dur_start", "dur_end") %in% names(rates)
+    if (any(duration_columns) && !all(duration_columns))
+      stop("Supply both `dur_start` and `dur_end`, or neither.", call. = FALSE)
+    boundaries <- c("age_start", "age_end", if (all(duration_columns)) c("dur_start", "dur_end"))
+    for (column in boundaries) {
+      x <- rates[[column]]
+      # Bare NA is logical in R; permit all-NA placeholders for an unused axis.
+      if (!(is.numeric(x) || (is.logical(x) && all(is.na(x)))) ||
+          !is.null(dim(x)) || any(is.nan(x)))
+        stop(sprintf("`rates$%s` must contain numeric boundaries or NA for an unused clock.", column),
+             call. = FALSE)
     }
+    age <- !is.na(rates$age_start) & !is.na(rates$age_end)
+    duration <- if (all(duration_columns))
+      !is.na(rates$dur_start) & !is.na(rates$dur_end) else rep(FALSE, nrow(rates))
+    age_empty <- is.na(rates$age_start) & is.na(rates$age_end)
+    duration_empty <- if (all(duration_columns))
+      is.na(rates$dur_start) & is.na(rates$dur_end) else rep(TRUE, nrow(rates))
+    if (any(!((age & duration_empty) | (duration & age_empty))))
+      stop("Each row requires exactly one complete age or duration band; unused boundaries must both be NA.",
+           call. = FALSE)
+    starts <- rates$age_start
+    ends <- rates$age_end
+    if (any(duration)) {
+      if (!"previous_union" %in% names(rates))
+        stop("Duration search bands require `previous_union` ('dissolved' or 'widowed').", call. = FALSE)
+      starts[duration] <- rates$dur_start[duration]
+      ends[duration] <- rates$dur_end[duration]
+    }
+    if (any(!is.finite(starts)) || any(starts < 0) || any(ends <= starts))
+      stop("Use valid nonnegative age or duration bands with finite starts and ends greater than starts.",
+           call. = FALSE)
     strata <- split_rate_groups(rates)
     if ("previous_union" %in% names(rates)) {
       previous <- rates$previous_union
@@ -493,15 +525,18 @@ validate_union_formation <- function(process) {
           !setequal(previous[rows], categories), logical(1))))
         stop("Union-search schedules require all three `previous_union` categories within each group.",
              call. = FALSE)
+      if (any(duration & previous == "none"))
+        stop("`previous_union = 'none'` requires age-specific bands.", call. = FALSE)
+      if (any(vapply(split(duration, previous), function(x) length(unique(x)) != 1L, logical(1))))
+        stop("Each `previous_union` category must use the same age or duration clock for all bands and groups.",
+             call. = FALSE)
       strata <- unlist(lapply(strata, function(rows) split(rows, previous[rows])), recursive = FALSE)
     }
     for (rows in strata) {
-      ordered <- rates[rows, , drop = FALSE]
-      ordered <- ordered[order(ordered$age_start), , drop = FALSE]
-      if (nrow(ordered) > 1L &&
-          any(tail(ordered$age_start, -1) < head(cummax(ordered$age_end), -1))) {
-        stop("Union-search age bands must not overlap.", call. = FALSE)
-      }
+      rows <- rows[order(starts[rows])]
+      if (length(rows) > 1L &&
+          any(tail(starts[rows], -1) < head(cummax(ends[rows]), -1)))
+        stop("Union-search age or duration bands must not overlap.", call. = FALSE)
     }
   }
   invisible(process)

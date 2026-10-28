@@ -8,7 +8,7 @@ unspecified demographic rules or a selected public API.
 
 | Milestone | Proposed scope | Status |
 | --- | --- | --- |
-| 4 | Union dissolution and age-specific remarriage; possibly cohabitation | In progress (D078–D080); cohabitation undecided |
+| 4 | Union dissolution and age/duration remarriage; possibly cohabitation | In progress (D078–D083); cohabitation undecided |
 | 5 | Parity-specific fertility and fertility heterogeneity | Proposed |
 | 6 | Time-varying rates, matching, and inheritance within a simulation run | Proposed |
 | 7 | Group conversions | Provisional; distinguish identity from characteristics and region |
@@ -100,11 +100,12 @@ with large age differences. This is an extension to investigate, not an accepted
 effect or coefficient: the functional form, supported characteristics, and how
 effects relate to baseline duration-specific rates remain to be specified.
 
-Age-specific female search rates now optionally distinguish `previous_union`
+Female search rates now optionally distinguish `previous_union`
 as `none`, `dissolved`, or `widowed` (D080), with all three strata required
 within each scheduled group. Separate marriage observations use the same
-categories. See [remarriage](remarriage.md). Duration dependence, marriage-order
-dependence and cohabitation remain deferred. Cohabitation's statuses, conversion
+categories. Age or duration since the latest ending can be selected per
+previous category in the same table (D083); `none` remains age-specific. See
+[remarriage](remarriage.md). Marriage-order dependence and cohabitation remain deferred. Cohabitation's statuses, conversion
 to marriage and dissolution rules need explicit decisions. No milestone 4
 scientific completion is inferred from software implementation.
 

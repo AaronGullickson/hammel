@@ -240,39 +240,57 @@ std::vector<std::vector<MarriageEpisode>> marriage_histories(DataFrame persons,
 
 // Execution-only cache: complete supplied history determines the latest ending.
 // [[Rcpp::export]]
-IntegerVector previous_union_state_cpp(DataFrame persons, DataFrame unions) {
+List previous_union_info_cpp(DataFrame persons, DataFrame unions) {
   const auto histories = marriage_histories(persons, unions);
   IntegerVector state(histories.size(), 0);
+  NumericVector ended(histories.size(), NA_REAL);
   for (size_t i = 0; i < histories.size(); ++i)
     for (const auto& episode : histories[i])
-      if (R_finite(episode.end)) state[i] = episode.after;
-  return state;
+      if (R_finite(episode.end)) { state[i] = episode.after; ended[i] = episode.end; }
+  return List::create(_["previous_union"] = state, _["end_time"] = ended);
+}
+
+// Existing internal snapshot interface for category-only validation.
+// [[Rcpp::export]]
+IntegerVector previous_union_state_cpp(DataFrame persons, DataFrame unions) {
+  return as<IntegerVector>(previous_union_info_cpp(persons, unions)["previous_union"]);
 }
 
 // [[Rcpp::export]]
 List marriage_counts_cpp(DataFrame persons, DataFrame unions,
                          NumericVector time_breaks, NumericVector age_breaks,
-                         IntegerVector group_indices, int group_count) {
+                         IntegerVector group_indices, int group_count,
+                         Nullable<NumericVector> dur_breaks = R_NilValue) {
   const auto histories = marriage_histories(persons, unions);
   NumericVector born = persons["birth_time"], died = persons["death_time"];
   CharacterVector sex = persons["sex"];
   const int nt = time_breaks.size() - 1, na = age_breaks.size() - 1;
-  const R_xlen_t stride = static_cast<R_xlen_t>(nt) * na * 2;
-  NumericVector exposure(stride * 3 * group_count), formations(exposure.size());
+  const bool by_duration = dur_breaks.isNotNull();
+  const NumericVector durations = by_duration ? NumericVector(dur_breaks) : age_breaks;
+  const int nd = durations.size() - 1;
+  const R_xlen_t age_cells = static_cast<R_xlen_t>(nt) * na * 2;
+  const R_xlen_t dur_cells = static_cast<R_xlen_t>(nt) * nd * 2;
+  const R_xlen_t stride = age_cells + 2 * dur_cells;
+  const R_xlen_t offsets[] = {0, age_cells, age_cells + dur_cells};
+  NumericVector exposure(stride * group_count), formations(exposure.size());
   for (int i = 0; i < born.size(); ++i) {
     if (i % 1024 == 0) checkUserInterrupt();
     const int s = as<std::string>(sex[i]) == "m" ? 0 : 1;
     const double life_end = NumericVector::is_na(died[i]) ? time_breaks[nt] : died[i];
     auto add_exposure = [&](double lo, double hi, int previous) {
+      const bool duration = by_duration && previous > 0;
+      const NumericVector& breaks = duration ? durations : age_breaks;
+      const int bands = breaks.size() - 1;
+      const double origin = duration ? lo : born[i];
       for (int t = 0; t < nt; ++t) {
         const double start = std::max(lo, time_breaks[t]);
         const double end = std::min({hi, life_end, time_breaks[t + 1]});
         if (end <= start) continue;
-        for (int a = 0; a < na; ++a) {
-          const double enter = std::max(start, born[i] + age_breaks[a]);
-          const double exit = std::min(end, born[i] + age_breaks[a + 1]);
+        for (int a = 0; a < bands; ++a) {
+          const double enter = std::max(start, origin + breaks[a]);
+          const double exit = std::min(end, origin + breaks[a + 1]);
           if (exit > enter)
-            exposure[t + nt * (a + na * s) + stride * (previous + 3 * group_indices[i])] += exit - enter;
+            exposure[t + nt * (a + bands * s) + offsets[previous] + stride * group_indices[i]] += exit - enter;
         }
       }
     };
@@ -281,9 +299,13 @@ List marriage_counts_cpp(DataFrame persons, DataFrame unions,
     for (const auto& episode : histories[i]) {
       add_exposure(available, episode.start, previous);
       const int t = demographic_bin(episode.start, time_breaks);
-      const int a = demographic_bin(episode.start - born[i], age_breaks);
+      const bool duration = by_duration && previous > 0;
+      const NumericVector& breaks = duration ? durations : age_breaks;
+      const int bands = breaks.size() - 1;
+      const double origin = duration ? available : born[i];
+      const int a = demographic_bin(episode.start - origin, breaks);
       if (t >= 0 && a >= 0)
-        formations[t + nt * (a + na * s) + stride * (previous + 3 * group_indices[i])] += 1;
+        formations[t + nt * (a + bands * s) + offsets[previous] + stride * group_indices[i]] += 1;
       available = episode.end;
       previous = episode.after;
     }

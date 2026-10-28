@@ -14,7 +14,9 @@
 #' of a common ancestor (default two). Hard group exclusions also apply.
 #' If no eligible man exists, cancel the birth by default. Explicitly set
 #' `cancel_birth_if_no_match = FALSE` to preserve it with unknown father.
-#' Rate initiation adds age-specific search events for unpartnered women only.
+#' Rate initiation adds age- or duration-specific search events for unpartnered
+#' women only. Duration schedules for dissolved/widowed categories measure time
+#' since the most recent union ended; `none` remains age-specific.
 #' Failed attempts draw another waiting time. Widowhood cancels pending births
 #' and switches to unpartnered fertility; a new union switches to partnered
 #' fertility, preserving birth spacing. Unpartnered births do not trigger searches
@@ -30,8 +32,9 @@
 #' availability and fertility/search eligibility. Exact same-person ties select
 #' death, birth, dissolution, then search. Dissolution `group_pair` schedules and
 #' multipliers use symmetric pairings of both partners' groups. Rate-based
-#' formation optionally selects age schedules using `previous_union`: none,
-#' dissolved, or widowed, recovered from recorded histories.
+#' formation optionally selects age/duration schedules using `previous_union`:
+#' none, dissolved, or widowed. Duration origins and categories are recovered
+#' from recorded histories.
 #' Matching uses male-group weights recalibrated at each search; simulation
 #' warns once if any search needed approximate weights. A separate father model
 #' has its own preferences and delta target adjustments. Event initiation is
@@ -161,9 +164,11 @@ simulate <- function(model, years, seed = NULL) {
   engine_persons <- population$persons
   engine_persons$.hammel_group <- if (is.null(group_values)) rep(0L, nrow(engine_persons)) else
     match(as.character(engine_persons$group), as.character(group_values)) - 1L
-  if ("previous_union" %in% names(union_rates))
-    engine_persons$.hammel_previous_union <- previous_union_state_cpp(
-      population$persons, population$unions)
+  if ("previous_union" %in% names(union_rates)) {
+    previous <- previous_union_info_cpp(population$persons, population$unions)
+    engine_persons$.hammel_previous_union <- previous$previous_union
+    engine_persons$.hammel_previous_union_end <- previous$end_time
+  }
   if (!is.null(seed)) {
     if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
         seed != trunc(seed) || abs(seed) > .Machine$integer.max) {

@@ -378,3 +378,20 @@ examples, tie conventions, and schedule requirements.
 This replaces the former `unions` and `rate_marriage` columns from
 `calculate_demog_rates(include_unions = TRUE)`, which retains current-status
 exposure, births, deaths, fertility and mortality summaries.
+
+
+Optional `dur_breaks` on `calculate_marriage_rates()` measures dissolved and
+widowed rates since the latest union ending (D084). `none` still uses
+`age_breaks`. Supplying duration breaks automatically enables previous-category
+stratification, even if its flag is FALSE; unlike clocks are not pooled.
+The output has both boundary pairs, with NA in the unused pair. Age breaks
+restrict only none rows; duration rows include all attained ages. Duration
+origins use complete pre-window histories and reset after each ending.
+
+```r
+marriages <- calculate_marriage_rates(result, c(2025, 2100), seq(15, 70, 5),
+                                      dur_breaks = c(0, 1, 3, 5, 10, Inf))
+```
+
+Time/clock bands are half-open; finite final duration breaks gain Inf. With
+`dur_breaks = NULL`, the age-only schema and pooling behavior are unchanged.

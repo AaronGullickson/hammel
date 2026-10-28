@@ -50,6 +50,11 @@ support have zero hazard. Optional \code{previous_union} stratifies by \code{"no
 \code{"dissolved"}, and \code{"widowed"}; all three are required within each group.
 Without it, the schedule applies to all previous union types. Categories
 describe the most recent recorded episode; complete histories are required.
+Optionally include both \code{dur_start} and \code{dur_end} for elapsed years since
+the most recent union ended. Each row supplies either age or duration bands
+with both unused boundaries NA. \code{none} must use age; each other category
+uses one clock consistently across all its bands and groups. Age and duration
+cannot apply together. All-age inputs may omit duration columns.
 Must be NULL for \code{"on_demand"}.}
 
 \item{min_male_age}{Minimum male age in continuous years at a new partner

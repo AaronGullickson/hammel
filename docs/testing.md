@@ -271,9 +271,9 @@ deaths preserve dissolved histories.
 
 These are software and analytical checks, not milestone 4 scientific acceptance.
 Age-specific previous-union search schedules are now implemented under D080;
-duration-dependent remarriage and cohabitation remain deferred. D045's existing
-fertility-transition limitation remains; no new demographic rates or acceptance
-thresholds are introduced.
+duration-dependent remarriage was not covered by these checks (now D083 below).
+Cohabitation is still deferred and D045's fertility-transition limitation remains;
+no new demographic rates or acceptance thresholds are introduced.
 
 The subsequent birth-status clarification in D078 is checked with
 `devtools::test(filter = "union-dissolution|lexis-unions|group-demography",
@@ -330,8 +330,9 @@ or migrate those analysis chunks explicitly. The pre-D080 repository head was
 `a847d49313c68fec9b3506ba790bfa4f86ee7c5a`.
 
 These checks validate implementation and analytical cases, not milestone 4
-scientific acceptance. Duration-dependent remarriage and transition-aware
-fertility compensation remain deferred.
+scientific acceptance. Duration-dependent remarriage was outside that check;
+D083 below covers its implementation. Transition-aware fertility compensation
+remains deferred.
 
 
 The subsequent D080 pooling option passed
@@ -429,3 +430,82 @@ Evidence: [replication estimates](../validation/calibration-log-odds-replication
 [summary](../validation/calibration-log-odds-summary.csv), and
 [estimates/session metadata](../validation/calibration-log-odds.rds). No package
 code changed for this recovery check. The run completed without warnings.
+
+## Duration-specific remarriage (D083, October 28, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
+passed the full suite without failures or warnings; the live database test was
+skipped. Subsequent tests of births and failed searches preserving the duration
+origin passed with `devtools::test(filter = "duration-remarriage", reporter = "summary")`.
+The final duration test file passed all 51 expectations. No rates were fetched.
+
+`test-duration-remarriage.R` covers the single-table age/duration format,
+exclusive clock selection, all-category coverage, consistent clock per category
+across groups, invalid/partial/overlapping bands, required age clock for `none`,
+optional all-NA duration columns, duration gaps and analytical cumulative hazard,
+attained-duration restarts, unordered histories, age independence, repeated
+ending resets, widowhood origin, and preservation through births/failed searches.
+A grouped duration schedule and its mathematically equivalent age schedule
+produce identical full histories and weight diagnostics. Tracker tests use
+separate birth and search origins to verify duration boundaries independently
+of fertility ages and spacing. Missing previous-ending origins fail explicitly
+in deterministic calibration checks. Existing age-only grouped simulation
+(seed 42, 50,000 initial persons, 100 years, prior D082 benchmark input) was
+compared in full against the installed pre-D083 build and was identical.
+
+Additional parameter-recovery check:
+
+```sh
+TZ=UTC Rscript validation/validate-calibration-log-odds.R /tmp/hammel-duration-lib validation/duration-remarriage-log-odds 10 1500 duration
+```
+
+This uses ten independent 20,000-person baselines per matching case and the
+same 60-year synthetic setup and choice-set estimation method described above.
+`none` uses the original age schedule. Dissolved/widowed schedules now use
+durations [0,1), [1,3), [3,8), [8,Inf), with rates 0/.15/.10/.05 for dissolved
+and 0/.07/.04/.02 for widowed. Thus actual duration boundaries, delays,
+dissolution, widowhood, repeated remarriage and fertility all operate together.
+B retains its 1.2 search multiplier. Kinship screening is explicitly disabled
+for exact eligibility reconstruction. No convergence warnings were emitted.
+
+| Matching case | Target conditional log OR | Mean recovered | MCSE |
+| --- | ---: | ---: | ---: |
+| Group only | -6 | -5.91620 | .07840 |
+| Age dependent | -6 | -6.05778 | .07244 |
+
+Mean age coefficients were .1087908 (MCSE .0023092) and -.0280502
+(MCSE .0004512), against inputs .1109035 and -.0277259. Conditional combined
+log odds ratios are consistent with their target at this Monte Carlo precision.
+These checks support the implementation in these cases; ten replications do
+not establish universal scientific accuracy or milestone 4 acceptance. Pooled
+cross-tab means are retained in the raw results and are not exact target
+constraints under changing pools/age composition.
+
+Evidence: [replication estimates](../validation/duration-remarriage-log-odds-replications.csv),
+[summary](../validation/duration-remarriage-log-odds-summary.csv), and
+[estimates/session metadata](../validation/duration-remarriage-log-odds.rds).
+The public marriage-rate observation helper remains age-based; duration-band
+exposure summaries require a separate interface specification.
+
+## Duration marriage observations (D084, October 28, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
+passed the full suite without failures or warnings; the opt-in live database
+test was skipped. The earlier targeted `filter = "marriage"` checks also passed.
+No rates were downloaded and no simulation mechanisms were changed for D084.
+
+`test-marriage-duration-rates.R` verifies exact duration exposure and starts,
+automatic previous-category stratification even with an explicit FALSE flag,
+different numbers of age/duration bands, unused boundary NA columns, finite
+last-duration Inf extension, pre-window history, resetting after each ending,
+half-open age/duration/period event boundaries, death censoring, all-age duration
+exposure, grouping/type preservation, and conservation of exposure and counts
+against compatible age-only totals. Touching/zero-duration episodes, empty
+grouped/ungrouped results, invalid breaks and unchanged NULL output are covered.
+
+A 3,000-woman synthetic simulation with duration-specific hazards .1, .3 and .2
+on [0,1), [1,2), [2,Inf) recovers those female hazards with the new exposure
+helper under the analytical six-standard-error software check. Available men
+are sufficient and mortality/fertility are zero, so realized formations reflect
+search hazards in that test. This does not establish empirical validity or a
+new milestone acceptance threshold.

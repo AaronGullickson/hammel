@@ -319,8 +319,8 @@ invalidated; in on-demand mode, her next birth attempt can trigger a new search.
 Surviving men return to the available pool. The optional duration-dependent
 dissolution process is described in
 [union dissolution](union-dissolution.md). Milestone 4 adds optional
-age-specific `previous_union` strata on search schedules (D080); see
-[remarriage](remarriage.md). Duration-dependent remarriage remains deferred.
+`previous_union` strata on search schedules (D080), with age or duration
+clocks per category in a single table (D083); see [remarriage](remarriage.md).
 
 ## Deferred decisions and validation status
 

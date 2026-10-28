@@ -9,7 +9,8 @@ calculate_marriage_rates(
   time_breaks,
   age_breaks,
   by_group = FALSE,
-  by_previous_union = FALSE
+  by_previous_union = FALSE,
+  dur_breaks = NULL
 )
 }
 \arguments{
@@ -26,12 +27,21 @@ return separate rows by each individual's group. No pooled row is added.}
 
 \item{by_previous_union}{Logical, default FALSE. With TRUE, separate exposure
 and starts by previous union category and include \code{previous_union}. Otherwise
-pool counts and exposure before calculating rates, and omit that column.}
+pool counts and exposure before calculating rates, and omit that column.
+Supplying \code{dur_breaks} automatically enables this option.}
+
+\item{dur_breaks}{Optional nonnegative duration boundaries in years. When
+supplied, dissolved/widowed rows use years since the latest union ending;
+none rows still use \code{age_breaks}. Automatically enables \code{by_previous_union}
+regardless of its supplied value. A finite final boundary gains Inf.
+Adds \code{dur_start}/\code{dur_end}, with NA in the unused age/duration pair.
+Duration rows include all ages; this is not an age-by-duration surface.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, \code{sex}, \code{age_start}, \code{age_end},
 \code{person_years}, \code{unions}, and \code{rate_marriage}, plus \code{group} and
-\code{previous_union} when requested. Empty cells are retained.
+\code{previous_union} when requested, and duration columns when \code{dur_breaks} is
+supplied. Empty cells are retained.
 }
 \description{
 Count union starts and unpartnered person-years by age, period, sex, and
@@ -39,6 +49,8 @@ optionally \code{previous_union}: \code{"none"}, \code{"dissolved"}, or \code{"w
 episode's ending determines the category; each start counts in the category
 immediately before formation. Partnered time contributes no exposure.
 Men describe realized matching outcomes, not a male search-rate input.
+With \code{dur_breaks}, only none rows use age; dissolved/widowed rows use
+duration since the most recent ending and always remain separate.
 }
 \details{
 Histories must be complete for the intended interpretation. \code{"none"} means

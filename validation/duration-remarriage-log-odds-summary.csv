@@ -1,0 +1,13 @@
+"case","parameter","replications","mean","mcse"
+"age_dependent","AB",10,-3.09835196758097,0.0689482478497274
+"age_dependent","BA",10,-2.95942544493858,0.0627123323780271
+"age_dependent","log_odds",10,-6.05777741251955,0.0724435018212
+"age_dependent","linear",10,0.108790760099035,0.00230924114021761
+"age_dependent","quadratic",10,-0.0280501666133241,0.000451183662176357
+"age_dependent","pooled_log_odds",10,-5.96942897162567,0.0203288762008923
+"group_only","AB",10,-2.98965020887182,0.0803298479781372
+"group_only","BA",10,-2.92654642053831,0.03678247077913
+"group_only","log_odds",10,-5.91619662941013,0.0784037062188221
+"group_only","linear",0,NA,NA
+"group_only","quadratic",0,NA,NA
+"group_only","pooled_log_odds",10,-5.9619106142906,0.0175734111098801

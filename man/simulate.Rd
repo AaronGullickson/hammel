@@ -36,7 +36,9 @@ Known kin are excluded within the configured generation bound on each side
 of a common ancestor (default two). Hard group exclusions also apply.
 If no eligible man exists, cancel the birth by default. Explicitly set
 \code{cancel_birth_if_no_match = FALSE} to preserve it with unknown father.
-Rate initiation adds age-specific search events for unpartnered women only.
+Rate initiation adds age- or duration-specific search events for unpartnered
+women only. Duration schedules for dissolved/widowed categories measure time
+since the most recent union ended; \code{none} remains age-specific.
 Failed attempts draw another waiting time. Widowhood cancels pending births
 and switches to unpartnered fertility; a new union switches to partnered
 fertility, preserving birth spacing. Unpartnered births do not trigger searches
@@ -52,8 +54,9 @@ ends the episode with \code{end_reason = "dissolution"}, and restores unpartnere
 availability and fertility/search eligibility. Exact same-person ties select
 death, birth, dissolution, then search. Dissolution \code{group_pair} schedules and
 multipliers use symmetric pairings of both partners' groups. Rate-based
-formation optionally selects age schedules using \code{previous_union}: none,
-dissolved, or widowed, recovered from recorded histories.
+formation optionally selects age/duration schedules using \code{previous_union}:
+none, dissolved, or widowed. Duration origins and categories are recovered
+from recorded histories.
 Matching uses male-group weights recalibrated at each search; simulation
 warns once if any search needed approximate weights. A separate father model
 has its own preferences and delta target adjustments. Event initiation is

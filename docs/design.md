@@ -181,7 +181,9 @@ returns overall/partnered/unpartnered rows with exposure, births, deaths, and
 fertility/mortality rates. `calculate_marriage_rates()` separately returns
 unpartnered exposure, union starts, and marriage rates by sex.
 `by_previous_union = TRUE` adds previous categories; `by_group = TRUE` independently
-adds individual groups. Both default to FALSE (D080). It requires exclusive union histories.
+adds individual groups. Both default to FALSE (D080). Optional `dur_breaks`
+automatically separates previous categories and measures dissolved/widowed rows
+by duration, leaving none rows by age (D084). It requires exclusive union histories.
 Rate-mode input schedules optionally use the same `previous_union` categories;
 see [remarriage](remarriage.md) for initialization and calibration details.
 
@@ -215,7 +217,7 @@ TFR and life-table calculations automatically retain input group strata. See
 These remain proposals or unresolved requirements:
 
 - Custom process execution and permitted state mutations/invalidation.
-- Duration-dependent remarriage, cohabitation, poor-pool waiting, previous-father continuity,
+- Cohabitation, poor-pool waiting, previous-father continuity,
   and transition-aware fertility compensation; see [union formation](union-formation-models.md)
   and the [roadmap](roadmap.md).
 - Heterogeneity, parity-specific fertility, and user-defined newborn attributes.
@@ -249,7 +251,8 @@ birth-time bin and incrementally maintained pool sums for each matching model's
 table of utilities over bin-centre lags, updated at events, and solves the
 weights at each search from those sums. `FemaleIntensityTracker` maintains
 individual current search/fertility contributions and their group/cohort totals,
-with one queued next age/spacing boundary per counted woman (D082). State
+with one queued next age/duration/spacing boundary per counted woman
+(D082/D083). Search clock origins are separate from fertility birth times. State
 changes replace contributions; searches do not scan all women or enumerate a
 cross-classification of rate predictors. See
 [current-hazard contributions](calibration-intensity.md). Matching models carry
