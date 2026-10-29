@@ -32,8 +32,8 @@ rather than falling back to unconditional rates.}
 }
 \value{
 A fertility rate tibble with a \code{source} attribute. Total-rate tables
-are validated for execution. Parity tables may contain missing rates and
-currently support preparation/inspection only.
+are validated for execution. Parity tables currently support preparation/
+inspection only; unavailable conditional rates are zero-filled.
 }
 \description{
 Download total period age-specific fertility rates (\code{asfrRR}) through
@@ -42,7 +42,8 @@ and the schedule is constant over simulation time. Birth-order-specific
 columns are not used by default. Missing total rates are rejected.
 With \code{by_parity = TRUE}, request conditional age/parity rates (\code{mi}) instead:
 first births map to parity [0,1), through fifth-or-higher births at [4,Inf).
-Missing conditional cells remain NA with a warning, never zero or imputed.
+Missing conditional cells are replaced with zero; source metadata records
+that policy and the number of replacements in the selected year.
 Parity tables prepare data for milestone 5; parity-dependent execution is
 not yet implemented and fertility constructors reject parity columns.
 }

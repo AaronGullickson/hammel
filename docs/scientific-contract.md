@@ -589,8 +589,8 @@ revision requests the current release; it does not pin a historical revision.
 Synthetic/local-reader tests establish conversions; live requests are opt-in.
 For data preparation only, `get_fertility_hfd(..., by_parity = TRUE)` imports
 conditional mi rates with half-open current-parity bounds (D094). Endpoint
-rows use the D095 mapping above. Missing conditional cells remain NA with a warning,
-not zero risks; no parity-dependent simulation or compensation is implemented.
+rows use the D095 mapping above. Unavailable conditional cells are zero-filled under the user-selected D096
+preparation rule, with policy/count in source metadata; no parity-dependent simulation or compensation is implemented.
 Fertility constructors reject parity columns until execution is implemented.
 See [parity fertility](parity-fertility.md) for the birth-order/parity mapping.
 
@@ -605,7 +605,7 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 | Initialization transient | No correction or automatic burn-in; users choose observation windows |
 | Midpoint approximation | Validate bias against supplied age schedules; no accuracy guarantee |
 | Rate changes between runs | Histories retain spacing, but compensation uses only the new schedule |
-| Sparse oldest ages | Missing cells remain missing; no automatic imputation or smoothing |
+| Sparse oldest ages | Observed missing cells remain missing; HFD conditional import alone uses the user-selected zero-fill rule (D096) |
 | Union formation/dissolution | Exclusive conditional-logit on-demand or female rate-based formation, minimum male age and known-kin screening; widowhood plus optional duration-dependent dissolution; age- or duration-specific searches by previous union |
 | Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
 | Exact continuation | No saved queue/RNG checkpoint |

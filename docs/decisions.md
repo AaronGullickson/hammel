@@ -38,6 +38,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Milestone 4 completion and retained validation evidence | D093 |
 | Parity schedule bands and HFD preparation | D094 |
 | Open fertility age bands, HFD endpoints and TFR warnings | D095 |
+| Missing conditional HFD rates replaced with zero | D096 |
 
 ## Recorded decisions
 
@@ -1922,3 +1923,17 @@ cohabitation policy. Duration stratification is unchanged.
 - **Supersession:** replaces D028's blanket finite-age restriction and D094's
   earlier inherited omission of HFD open endpoints. Other timing/spacing,
   missing-data and parity-preparation decisions remain in force.
+
+
+## D096 — Zero-fill unavailable HFD conditional rates (October 29, 2026)
+
+- **Status:** accepted by the user after inspecting the conditional-rate import.
+- **Decision:** replace unavailable conditional HFD age/parity rates with zero
+  on import. Preserve explicit zero/nonmissing values and all selected cells;
+  no interpolation. Record the zero-fill policy and replacement count in source
+  metadata. Do not warn merely because this selected policy replaced missing
+  cells. Total HFD rates and arbitrary input validation retain their existing
+  missing-data rules. No parity-dependent engine or PATFR is implemented here.
+- **Supersedes:** D094's preserve-NA-with-warning rule for HFD conditional cells.
+  Zero fill is the user's modeling choice, not an empirical reclassification
+  of missing HFD observations as measured zero hazards.

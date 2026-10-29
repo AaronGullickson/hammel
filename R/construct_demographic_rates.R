@@ -83,7 +83,8 @@ database_source <- function(database, country, year, item, update = NULL) {
 #' columns are not used by default. Missing total rates are rejected.
 #' With `by_parity = TRUE`, request conditional age/parity rates (`mi`) instead:
 #' first births map to parity [0,1), through fifth-or-higher births at [4,Inf).
-#' Missing conditional cells remain NA with a warning, never zero or imputed.
+#' Missing conditional cells are replaced with zero; source metadata records
+#' that policy and the number of replacements in the selected year.
 #' Parity tables prepare data for milestone 5; parity-dependent execution is
 #' not yet implemented and fertility constructors reject parity columns.
 #'
@@ -103,8 +104,8 @@ database_source <- function(database, country, year, item, update = NULL) {
 #'   Requires the HFD conditional-rate product; unavailable products/years error
 #'   rather than falling back to unconditional rates.
 #' @return A fertility rate tibble with a `source` attribute. Total-rate tables
-#'   are validated for execution. Parity tables may contain missing rates and
-#'   currently support preparation/inspection only.
+#'   are validated for execution. Parity tables currently support preparation/
+#'   inspection only; unavailable conditional rates are zero-filled.
 #' @export
 #' @examples
 #' \dontrun{
@@ -136,7 +137,9 @@ get_fertility_hfd <- function(country, year, username = Sys.getenv("HFD_USERNAME
   if (by_parity) {
     attr(rates, "source")$rate_type <- "conditional_age_parity"
     attr(rates, "source")$parity_mapping <- "birth orders 1,2,3,4,5+ -> current parity 0,1,2,3,4+"
-    attr(rates, "source")$missing_rates <- "preserve_NA"
+    attr(rates, "source")$missing_rates <- "zero"
+    columns <- c(paste0("m", 1:4, "x"), "m5px")
+    attr(rates, "source")$missing_rates_replaced <- sum(is.na(data[data$Year == year, columns, drop = FALSE]))
   }
   attr(rates, "source")$open_ages <- "lower_as_single_year_upper_open"
   rates
@@ -160,12 +163,14 @@ fertility_from_hfd <- function(data, year) {
 }
 
 fertility_by_parity_from_hfd <- function(data, year) {
-  columns <- paste0("m", 1:5, "x")
+  columns <- c(paste0("m", 1:4, "x"), "m5px")
   data <- select_database_year(data, year, columns)
   ages <- hfd_age_intervals(data)
   starts <- ages$age_start
   for (column in columns) {
-    check_numeric_column(data[[column]], paste0("HFD ", column), missing = TRUE)
+    values <- data[[column]]
+    if (is.logical(values) && all(is.na(values))) values <- as.numeric(values)
+    check_numeric_column(values, paste0("HFD ", column), missing = TRUE)
     if (any(data[[column]] < 0, na.rm = TRUE))
       stop("HFD conditional fertility rates must be nonnegative.", call. = FALSE)
   }
@@ -174,10 +179,9 @@ fertility_by_parity_from_hfd <- function(data, year) {
     age_end = rep(ages$age_end, times = 5L),
     parity_start = rep(0:4, each = length(starts)),
     parity_end = rep(c(1:4, Inf), each = length(starts)),
-    rate = unlist(data[columns], use.names = FALSE)
+    rate = as.numeric(unlist(data[columns], use.names = FALSE))
   )
-  if (anyNA(rates$rate))
-    warning("HFD conditional fertility rates contain unavailable age/parity cells; retained as NA, not zero.", call. = FALSE)
+  rates$rate[is.na(rates$rate)] <- 0
   rates
 }
 

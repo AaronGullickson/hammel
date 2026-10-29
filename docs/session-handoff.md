@@ -97,8 +97,8 @@ not authorize those mechanisms. An African historical benchmark remains postpone
 The user confirmed the milestone 4 PR was merged and authorized documentation
 and HFD-helper work. D094 selects parity_start/parity_end, half-open bounds and
 Inf. `get_fertility_hfd(..., by_parity = TRUE)` prepares conditional mi rates in
-that format, mapping birth order 5+ to current parity 4+. Missing cells remain
-NA with a warning. Parity execution, initialization, compensation, observation
+that format, mapping birth order 5+ to current parity 4+. D096 replaces unavailable conditional cells with zero and records the policy
+and replacement count in source metadata. Parity execution, initialization, compensation, observation
 and heterogeneity are not implemented; constructors reject parity columns.
 See [parity fertility](parity-fertility.md). Preserve the user's new
 validation/milestone5.qmd; it is not part of the importer changes.

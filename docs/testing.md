@@ -658,3 +658,21 @@ female open-band rates, no such warning for zero/unknown rates, strata and
 empty results. Offline HFD fixtures verify 12- -> [12,13), 55+ -> [55,Inf),
 parity bounds, unchanged annual values, missing cells and provenance. No HFD
 rates were downloaded. The user's milestone5 report was not modified.
+
+
+HFD conditional header correction (October 29, 2026): the user's real USA mi
+file identifies the highest-order rate as m5px, not m5x. The importer and both
+mock/local-text fixtures now use m1x–m4x and m5px; mapping remains parity 0–4+.
+`devtools::test(filter = "hfd-parity|database-processes", reporter = "summary")`
+passed without failures or warnings. No live request or credentials were used.
+The earlier synthetic fixtures incorrectly mirrored the assumed m5x header;
+the user's download exposed that schema error.
+
+
+D096 zero-fill preparation (October 29, 2026):
+`devtools::test(filter = "hfd-parity|database-processes", reporter = "summary")`
+passed without failures or warnings. Tests cover missing cells mapped to zero,
+unchanged known/explicit-zero rates, all-missing logical columns from text
+parsing, endpoint retention, selected-year-only provenance counts and unchanged
+total-rate validation. No live data was downloaded. Historical D094 checks of
+NA preservation describe the superseded import policy.
