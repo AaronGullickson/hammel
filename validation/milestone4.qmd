@@ -888,13 +888,18 @@ crosstabs_summary |>
 
 ## Time tests
 
+@tbl-processing-time shows the mean processing time by scenario. The big difference is simulations with groups which take substantially longer. One-group simulations run extremeley fast even with a fully loaded set of stratified rate schedules.
+
 ```{r}
-#| label: observed-runtime
-measurements$timing |>
-  group_by(scenario) |>
-  summarize(replications = n(), mean_seconds = mean(elapsed),
-            min_seconds = min(elapsed), max_seconds = max(elapsed), .groups = "drop") |>
-  gt() |> fmt_number(columns = ends_with("seconds"), decimals = 3)
+#| label: tbl-processing-time
+#| tbl-cap: Mean processing time by simulation scenario
+
+time_scenario |>
+  gt() |>
+  cols_label(
+    scenario ~ "Scenario",
+    elapsed_time ~ "Mean processing time"
+  )
 ```
 
 ## Tests
