@@ -175,7 +175,7 @@ requires a valid `union_type` column, including for bare union tables.
 
 ## Demographic rates by current union type
 
-`calculate_demog_rates(..., by_union_type = TRUE)` replaces `include_unions`.
+`calculate_fertility_rates(..., by_union_type = TRUE)` replaces `include_unions`.
 It returns a disjoint partition labeled `union_type`: unpartnered plus the types
 discovered in union histories, without overall rows. Untyped histories retain
 partnered/unpartnered; typed empty histories have only unpartnered. FALSE keeps

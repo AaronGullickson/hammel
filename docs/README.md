@@ -22,7 +22,7 @@ future work.
 | [Calibration intensity updates](calibration-intensity.md) | Actual female hazards, aggregate cells, and bookkeeping boundary queue (D082) |
 | [Weighted-choice matching](weighted-choice-matching.md) | Calibrated male-group weights and delta target adjustments (D074/D075) |
 | [Group matching](group-matching.md) | Symmetric pair effects and fixed group formula predictors |
-| [Demographic analysis](demographic-analysis.md) | Exposure, union/marriage/dissolution rates, TFR, and life tables |
+| [Demographic analysis](demographic-analysis.md) | Separate mortality/fertility rates, parity ASFRs, union rates, TFR, and life tables |
 | [Testing and validation](testing.md) | Test commands, evidence, and remaining validation |
 | [Current handoff](session-handoff.md) | Recent findings, active work, and deferred issues |
 

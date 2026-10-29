@@ -183,12 +183,14 @@ D095: 12- becomes [12,13), and 55+ becomes [55,Inf).
 
 There is no automatic disk cache or rate refresh.
 
-`calculate_demog_rates()`, `calculate_tfr()`, `calculate_life_table()`, and
+`calculate_fertility_rates()`, `calculate_mortality_rates()`, `calculate_tfr()`, `calculate_life_table()`, and
 `calculate_population_size()` operate on inspectable outputs. See
 [demographic analysis](demographic-analysis.md) for exposure, missing cells,
-replications, and age alignment. `calculate_demog_rates(by_union_type = TRUE)`
-returns unpartnered and discovered union-type rows with exposure, births,
-deaths, and fertility/mortality rates, without an overall row. Untyped histories
+replications, and age alignment. `calculate_fertility_rates(by_union_type = TRUE)`
+returns female unpartnered and discovered union-type rows with exposure, births
+and fertility rates, without an overall row. The separate mortality helper
+returns exposure, deaths and mortality rates for both sexes. Optional
+`parity_breaks` on fertility splits observed current parity using birth histories. Untyped histories
 use partnered/unpartnered. `calculate_union_rates()` separately returns
 unpartnered exposure, union starts, and partnership-entry rates by sex,
 excluding conversions.
@@ -230,7 +232,7 @@ not reconstructions of past group transitions. Validation uses shuffled IDs,
 fractional ages, siblings, unknown/deceased parents, optional groups, empty
 tables, and unchanged inputs.
 
-`calculate_demog_rates(by_group = TRUE)` and
+`calculate_fertility_rates(by_group = TRUE)` and
 `calculate_population_size(by_group = TRUE)` optionally split observations by
 recorded group. The native count kernels retain full histories and add a group
 axis to their output arrays, preserving cross-group parent and spouse links.

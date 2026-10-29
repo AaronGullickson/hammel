@@ -146,7 +146,7 @@ objects, and unchanged behavior without group columns.
 
 ## Group observations
 
-`calculate_demog_rates(..., by_group = TRUE)` and
+`calculate_fertility_rates(..., by_group = TRUE)` and
 `calculate_population_size(..., by_group = TRUE)` return separate counts for
 each group appearing anywhere in the supplied person history. Both default to
 FALSE, preserving pooled output. TRUE requires a population/persons `group`

@@ -89,7 +89,7 @@ test_that("birth ties retain the pending dissolution and death wins same-person 
   expect_equal(kids$father_id, 2)
   expect_equal(tied$unions$end_time, 1, tolerance = 0)
   expect_identical(tied$unions$end_reason, "dissolution")
-  counts <- calculate_demog_rates(tied, c(0, 1, 1.5), c(0, Inf), by_union_type = TRUE)
+  counts <- collect_demographic_counts(tied, c(0, 1, 1.5), c(0, Inf), by_union_type = TRUE)
   maternal <- subset(counts, sex == "f" & time_start == 1)
   expect_equal(maternal$births[maternal$union_type == "partnered"], 1)
   expect_equal(maternal$births[maternal$union_type == "unpartnered"], 0)
@@ -213,7 +213,7 @@ test_that("optional process, zero-duration runs, empty populations and fallbacks
 test_that("dissolution histories conserve partnered exposure and survive later deaths", {
   model <- dissolution_model(100, rate = 2)
   result <- simulate(model, 1, seed = 52)
-  counts <- calculate_demog_rates(result, c(0, 1), c(0, Inf), by_union_type = TRUE)
+  counts <- collect_demographic_counts(result, c(0, 1), c(0, Inf), by_union_type = TRUE)
   partnered <- subset(counts, union_type == "partnered")
   unpartnered <- subset(counts, union_type == "unpartnered")
   expected <- sum(ifelse(is.na(result$unions$end_time), 1, result$unions$end_time))

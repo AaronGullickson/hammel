@@ -123,7 +123,8 @@ axes. The user selected initialization from recorded maternal birth histories
 (D098), with zero for women lacking recorded births and no overriding parity
 column. D099 selects preceding-parity spacing compensation, birth-driven schedule
 changes and calibration updates. The approximation requires demographic
-assessment; parity observations and heterogeneity remain later work.
+assessment. D100 adds parity observations via `calculate_fertility_rates()`;
+heterogeneity remains later work.
 
 Consider person-level fertility differences to represent persistent high- and
 low-fertility individuals and increase outcome variance beyond the current
@@ -218,7 +219,7 @@ for useful quantities from simulation histories. Existing functions cover Lexis
 counts, fertility, life tables, population sizes and recorded kin. Identify
 additional quantities and exposure/observation definitions from actual workflows.
 Status-specific exposure, fertility and mortality summaries use
-`calculate_demog_rates(by_union_type = TRUE)`; formation counts and rates by
+`calculate_fertility_rates(by_union_type = TRUE)`; formation counts and rates by
 previous union use `calculate_union_rates()` (D080).
 See [demographic analysis](demographic-analysis.md) for their observation rules.
 

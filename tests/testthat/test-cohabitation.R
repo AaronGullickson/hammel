@@ -71,7 +71,7 @@ test_that("conversion preserves partners, resets dissolution duration and links 
   # Current partnership is continuous and conversion is not a second entry.
   rates <- calculate_union_rates(late, c(0,3), c(0,Inf))
   expect_equal(sum(rates$unions), 2)
-  counts <- calculate_demog_rates(late, c(0,3), c(0,Inf), TRUE)
+  counts <- collect_demographic_counts(late, c(0,3), c(0,Inf), TRUE)
   expect_equal(sum(subset(counts, union_type != "unpartnered")$person_years), 6)
   schedule <- data.frame(union_type=c("cohab","marriage"),dur_start=c(0,1),dur_end=Inf,rate=c(0,1e5))
   model <- set_union_dissolution(model, schedule)

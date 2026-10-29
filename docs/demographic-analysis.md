@@ -9,14 +9,18 @@ See the [scientific contract](scientific-contract.md) for model assumptions.
 For a population simulated from 2000 through 2100:
 
 ```r
-summary <- result |>
-  calculate_demog_rates(
+fertility_summary <- result |>
+  calculate_fertility_rates(
     time_breaks = seq(2020, 2100, by = 20),
     age_breaks = 0:100
   )
 ```
 
-The function appends `Inf` to finite final age breaks. Thus `0:100` ends with
+`calculate_mortality_rates()` takes the same arguments and returns deaths and
+`rate_mortality` for both sexes; fertility returns female rows only.
+Neither function includes the other process's counts or rates.
+
+Both functions append `Inf` to finite final age breaks. Thus `0:100` ends with
 `[100, Inf)` and `0:110` ends with `[110, Inf)`; those ages are pooled, not
 removed. Existing `Inf` breaks are retained.
 
@@ -28,7 +32,7 @@ removed. Existing `Inf` breaks are retained.
 | `deaths`, `rate_mortality` | Deaths and deaths/person-years |
 | `births`, `rate_fertility` | Maternal births and births/all female person-years |
 
-Birth counts and ASFR are `NA` for males. Female exposure includes the time
+Fertility returns female rows only. Female exposure includes the time
 excluded by birth spacing. Zero events with positive exposure give a zero rate;
 zero exposure gives `NA`. Keep those situations distinct.
 
@@ -41,12 +45,15 @@ each spouse's formations and exposure follow their own group. Complete histories
 are retained during extraction, so cross-group family links remain available.
 
 ```r
-group_counts <- calculate_demog_rates(
+group_counts <- calculate_fertility_rates(
   result, seq(2020, 2100, 20), 0:100,
   by_group = TRUE, by_union_type = TRUE
 )
 group_tfr <- calculate_tfr(group_counts)
-group_life_tables <- calculate_life_table(group_counts)
+group_mortality <- calculate_mortality_rates(
+  result, seq(2020, 2100, 20), 0:100, by_group = TRUE
+)
+group_life_tables <- calculate_life_table(group_mortality)
 ```
 
 Groups appear in first-occurrence order, with all period/age/sex cells retained,
@@ -102,7 +109,7 @@ for worked accounting and censoring rules.
 
 ```r
 input_tfr <- model$processes$fertility |> calculate_tfr()
-output_tfr <- summary |> calculate_tfr()
+output_tfr <- fertility_summary |> calculate_tfr()
 ```
 
 `calculate_tfr()` selects female rows when sex is present, omits open age bands,
@@ -292,7 +299,7 @@ immediately before death, so union-ending deaths retain that type. Typed
 histories must not overlap; untyped overlapping coverage is merged.
 
 ```r
-counts <- calculate_demog_rates(result, seq(2020, 2100, 20), 0:100,
+counts <- calculate_fertility_rates(result, seq(2020, 2100, 20), 0:100,
                                 by_union_type = TRUE)
 tfr <- calculate_tfr(counts)
 ```
@@ -345,8 +352,8 @@ All time and age bins are half-open. See [remarriage](remarriage.md) for worked
 examples, tie conventions, and schedule requirements.
 
 This replaces the former `unions` and `rate_union` columns from
-`calculate_demog_rates(by_union_type = TRUE)`, which retains current-status
-exposure, births, deaths, fertility and mortality summaries.
+`calculate_fertility_rates()` and `calculate_mortality_rates()`, which provide
+current-status exposure and their respective event counts and rates.
 
 
 Optional `dur_breaks` on `calculate_union_rates()` measures dissolved and
@@ -476,3 +483,23 @@ open age rows, warning when known nonzero fertility is omitted. Report the finit
 age range used. The user's HFD zero-fill import choice and endpoint convention
 remain distinct from the summary's missing-data/upper-age rules. See
 [parity fertility](parity-fertility.md) for formulae, coverage and limitations.
+
+
+## Fertility rates by observed parity
+
+```r
+asfr <- calculate_fertility_rates(
+  result, time_breaks = c(2025, 2100), age_breaks = seq(15, 50, 5),
+  parity_breaks = c(0, 1, 2, 3, 4, Inf)
+)
+```
+
+`parity_breaks = NULL` pools parities. Otherwise, half-open integer bands start
+at zero; finite final breaks gain Inf. `parity_start`/`parity_end` label current
+parity before a birth. Exposure changes parity immediately after each birth,
+including births before the observation window and births of children who later
+died. Custom person parity columns are ignored. Complete maternal histories are
+required; absent births cannot be reconstructed. Minimum-spacing time remains
+in the denominator. Group and union-type options combine with parity bands.
+Sum births and exposure, then divide, to pool bands; do not average their rates.
+See [parity fertility](parity-fertility.md#observed-fertility-by-parity).

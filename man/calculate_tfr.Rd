@@ -7,7 +7,7 @@
 calculate_tfr(rates)
 }
 \arguments{
-\item{rates}{A table returned by \code{\link[=calculate_demog_rates]{calculate_demog_rates()}}, a fertility
+\item{rates}{A table returned by \code{\link[=calculate_fertility_rates]{calculate_fertility_rates()}}, a fertility
 process object, or a data frame with \code{age_start}, \code{age_end}, and \code{rate_fertility}
 or \code{rate} in births per woman-year. Bare \code{rate} tables are interpreted as
 fertility rates; mortality processes are not valid inputs.}

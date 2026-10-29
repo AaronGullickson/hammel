@@ -3,15 +3,15 @@ test_that("Lexis counts use exact exposure and maternal ages", {
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
   population <- hammel_population(persons, end_time = 1)
-  exposure <- calculate_demog_rates(population, c(0, 1), c(0, 1, Inf))
+  exposure <- collect_demographic_counts(population, c(0, 1), c(0, 1, Inf))
   expect_equal(exposure$person_years[exposure$sex == "f"], c(1, 0.25))
   expect_equal(exposure$person_years[exposure$sex == "m"], c(0.75, 0))
   expect_equal(sum(exposure$person_years), 2, tolerance = 0)
-  mx <- calculate_demog_rates(population, c(0, 1), c(0, 1, Inf))
+  mx <- collect_demographic_counts(population, c(0, 1), c(0, 1, Inf))
   expect_equal(mx$deaths[mx$sex == "f" & mx$age_start == 1], 1, tolerance = 0)
   expect_equal(mx$rate_mortality[mx$sex == "f" & mx$age_start == 1], 4, tolerance = 0)
   expect_true(is.na(mx$rate_mortality[mx$sex == "m" & mx$age_start == 1]))
-  rate_fertility <- calculate_demog_rates(population, c(0, 1), c(0, 1, 2))
+  rate_fertility <- collect_demographic_counts(population, c(0, 1), c(0, 1, 2))
   expect_identical(rate_fertility$births[rate_fertility$sex == "f"], c(0, 1, 0))
   expect_true(all(is.na(rate_fertility$births[rate_fertility$sex == "m"])))
   expect_true(all(is.na(rate_fertility$rate_fertility[rate_fertility$sex == "m"])))
@@ -24,8 +24,8 @@ test_that("fractional periods and ages conserve exposure", {
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
   population <- hammel_population(persons, end_time = 1)
-  exposure <- calculate_demog_rates(population, c(0, 1), c(0, 1, Inf))
-  split <- calculate_demog_rates(population, c(0, 0.5, 1), c(0, 0.5, 1, Inf))
+  exposure <- collect_demographic_counts(population, c(0, 1), c(0, 1, Inf))
+  split <- collect_demographic_counts(population, c(0, 0.5, 1), c(0, 0.5, 1, Inf))
   expect_equal(sum(split$person_years), sum(exposure$person_years))
 })
 
@@ -34,18 +34,18 @@ test_that("Lexis event boundaries are half open", {
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
   population <- hammel_population(persons, end_time = 1)
-  exposure <- calculate_demog_rates(population, c(0, 1), c(0, 1, Inf))
+  exposure <- collect_demographic_counts(population, c(0, 1), c(0, 1, Inf))
   p <- persons[1, ]
   p$birth_time <- 0
   p$death_time <- 1
-  boundary <- calculate_demog_rates(p, c(0, 1, 2), c(0, 1, Inf))
+  boundary <- collect_demographic_counts(p, c(0, 1, 2), c(0, 1, Inf))
   expect_equal(sum(boundary$deaths), 1, tolerance = 0)
   expect_equal(boundary$deaths[boundary$sex == "f" & boundary$time_start == 1 & boundary$age_start ==
     1], 1, tolerance = 0)
-  excluded <- calculate_demog_rates(p, c(0, 1), c(0, 1, Inf))
+  excluded <- collect_demographic_counts(p, c(0, 1), c(0, 1, Inf))
   expect_equal(sum(excluded$deaths), 0, tolerance = 0)
   expect_equal(sum(excluded$person_years), 1, tolerance = 0)
-  expect_error(calculate_demog_rates(population, c(0, 2), c(0, Inf)))
+  expect_error(collect_demographic_counts(population, c(0, 2), c(0, Inf)))
 })
 
 test_that("duplicate identities in stacked histories are rejected", {
@@ -53,9 +53,9 @@ test_that("duplicate identities in stacked histories are rejected", {
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
   population <- hammel_population(persons, end_time = 1)
-  exposure <- calculate_demog_rates(population, c(0, 1), c(0, 1, Inf))
+  exposure <- collect_demographic_counts(population, c(0, 1), c(0, 1, Inf))
   stacked <- rbind(persons, persons)
-  expect_error(calculate_demog_rates(stacked, c(0, 1), c(0, Inf)))
+  expect_error(collect_demographic_counts(stacked, c(0, 1), c(0, Inf)))
 })
 
 test_that("TFR uses band widths, propagates missing rates and groups periods", {
@@ -131,9 +131,9 @@ test_that("empty populations have zero exposure and missing mortality rates", {
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
   population <- hammel_population(persons, end_time = 1)
-  exposure <- calculate_demog_rates(population, c(0, 1), c(0, 1, Inf))
+  exposure <- collect_demographic_counts(population, c(0, 1), c(0, 1, Inf))
   empty <- hammel_population(persons[FALSE, ], end_time = 1)
-  empty_rates <- calculate_demog_rates(empty, c(0, 1), c(0, 1, Inf))
+  empty_rates <- collect_demographic_counts(empty, c(0, 1), c(0, 1, Inf))
   expect_true(all(empty_rates$person_years == 0))
   expect_true(all(empty_rates$deaths == 0))
   expect_true(all(is.na(empty_rates$rate_mortality)))
@@ -144,8 +144,8 @@ test_that("Lexis summaries feed TFR and life tables directly", {
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
   population <- hammel_population(persons, end_time = 1)
-  exposure <- calculate_demog_rates(population, c(0, 1), c(0, 1, Inf))
-  summary <- calculate_demog_rates(population, c(0, 1), c(0, 1, 2, Inf))
+  exposure <- collect_demographic_counts(population, c(0, 1), c(0, 1, Inf))
+  summary <- collect_demographic_counts(population, c(0, 1), c(0, 1, 2, Inf))
   expect_equal(calculate_tfr(summary)$tfr, 4, tolerance = 0)
   expect_equal(nrow(calculate_life_table(summary)), nrow(summary), tolerance = 0)
   expect_identical(names(calculate_life_table(summary)), c("time_start", "time_end", "sex",
@@ -160,8 +160,8 @@ test_that("finite age breaks append an open interval", {
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
   population <- hammel_population(persons, end_time = 1)
-  exposure <- calculate_demog_rates(population, c(0, 1), c(0, 1, Inf))
-  expect_identical(calculate_demog_rates(population, c(0, 1), c(0, 1)), calculate_demog_rates(population,
+  exposure <- collect_demographic_counts(population, c(0, 1), c(0, 1, Inf))
+  expect_identical(collect_demographic_counts(population, c(0, 1), c(0, 1)), collect_demographic_counts(population,
     c(0, 1), c(0, 1, Inf)))
 })
 
@@ -185,7 +185,7 @@ test_that("population counts include births and exclude deaths at each instant",
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
   population <- hammel_population(persons, end_time = 1)
-  exposure <- calculate_demog_rates(population, c(0, 1), c(0, 1, Inf))
+  exposure <- collect_demographic_counts(population, c(0, 1), c(0, 1, Inf))
   empty <- hammel_population(persons[FALSE, ], end_time = 1)
   counts <- calculate_population_size(population, c(0, 0.25, 0.5, 0.75, 1))
   expect_identical(counts$population, c(1L, 2L, 3L, 2L, 2L))
@@ -206,9 +206,9 @@ test_that("all public demographic tables are tibbles including empty outputs", {
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
   population <- hammel_population(persons, end_time = 1)
-  exposure <- calculate_demog_rates(population, c(0, 1), c(0, 1, Inf))
+  exposure <- collect_demographic_counts(population, c(0, 1), c(0, 1, Inf))
   empty <- hammel_population(persons[FALSE, ], end_time = 1)
-  summary <- calculate_demog_rates(population, c(0, 1), c(0, 1, 2, Inf))
+  summary <- collect_demographic_counts(population, c(0, 1), c(0, 1, 2, Inf))
   counts <- calculate_population_size(population, c(0, 0.25, 0.5, 0.75, 1))
   expect_true(tibble::is_tibble(counts))
   expect_true(tibble::is_tibble(summary))

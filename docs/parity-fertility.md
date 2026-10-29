@@ -66,9 +66,8 @@ or externally supplied parity values are inferred. This is the implemented initi
 
 ## Remaining scope
 
-Parity-stratified observed-rate summaries remain a separate observation extension;
-current demographic summaries do not yet expose a by_parity option. Raw person
-histories allow maternal parity and exposure reconstruction for validation.
+Parity-stratified observations use `calculate_fertility_rates(parity_breaks = ...)`
+(D100), described below.
 Heterogeneity distribution, persistence, association with other attributes and
 calibration remain unselected. The HFD-only zero-fill rule does not set
 missing-data defaults for arbitrary rate tables. The SOCSIM-style spacing
@@ -206,3 +205,21 @@ checks are therefore not scientific acceptance of its rate recovery. Do not
 silently add population-ratio corrections; a different compensation model needs
 user agreement. Replication estimates and the summary CSV are retained beside
 the diagnostic script. The main validation report remains under user development.
+
+## Observed fertility by parity
+
+`calculate_fertility_rates()` measures maternal births per woman-year. Optional
+`parity_breaks` defines half-open current-parity bands; a finite final boundary
+receives `Inf`. Bounds are nonnegative integers starting at zero. NULL pools
+parities. Reconstruct parity from every recorded maternal birth, including
+pre-window births and deceased children; do not use custom parity columns.
+Each birth counts at parity immediately before that birth and advances parity
+for subsequent exposure. Simultaneous births advance in person-row order.
+Exposure includes birth-spacing exclusions. Group and union-type options retain
+the existing maternal attribution and birth-first endpoint rules. Fertility
+outputs contain female rows only; mortality retains both sexes. Separate
+`calculate_mortality_rates()` reports deaths per person-year. Neither public
+function returns the other process's counts or rates. Unknown-mother births
+remain in the fertility table's period-level `unassigned_births` attribute.
+Summing parity counts and exposure recovers pooled female counts and exposure;
+zero exposure gives NA rates. These are conditional on complete supplied history.

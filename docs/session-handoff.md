@@ -46,8 +46,9 @@ its temporary files. No new scientific analysis is implied by closeout.
 
 ## Observation APIs
 
-- calculate_demog_rates(by_union_type = TRUE): unpartnered plus discovered types,
-  no overall row; FALSE pools demographic counts/exposure.
+- calculate_fertility_rates() and calculate_mortality_rates(): separate process
+  summaries; by_union_type = TRUE returns unpartnered plus discovered types,
+  without overall rows. Fertility accepts parity_breaks for current-parity ASFRs.
 - calculate_union_rates(): partnership entries over unpartnered years, excluding
   conversion. Optional by_union_type repeats shared unpartnered exposure;
   by_previous_union and optional dur_breaks retain mixed age/duration observations.
@@ -118,6 +119,6 @@ fertility contributions and scheduling after births, with no parity matching bin
 and 2+ rates .2665 and .3335 with .75-year spacing against inputs .3 and .4.
 Zero-spacing controls recover approximately .2992 and .4035. This is the selected
 approximation's limitation, not a scientific acceptance claim. Do not silently
-change to population-ratio compensation. Public parity-stratified observation
-options and fertility heterogeneity are not implemented. Preserve the user's
+change to population-ratio compensation. D100 adds `calculate_fertility_rates(parity_breaks = ...)` and separates
+`calculate_mortality_rates()`. Fertility heterogeneity is not implemented. Preserve the user's
 validation/milestone5.qmd, which is outside these implementation changes.

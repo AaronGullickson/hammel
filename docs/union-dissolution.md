@@ -149,7 +149,7 @@ boundary belongs to the cell beginning there; one at the final time boundary
 is excluded. Zero-duration episodes can contribute an event but no exposure.
 Zero exposure gives `NA` for the rate; positive exposure and zero dissolutions
 give zero. Duration boundaries use years and append `Inf` when the last supplied
-boundary is finite, as `calculate_demog_rates()` does for age.
+boundary is finite, as `calculate_fertility_rates() and calculate_mortality_rates()` does for age.
 
 Input may be a population object with a known endpoint or a union data frame
 with unique `union_id`, finite `start_time`, numeric `end_time` (NA if ongoing),

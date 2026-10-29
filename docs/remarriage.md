@@ -132,9 +132,10 @@ contribute starts without positive exposure in the applicable category. To pool
 categories or replications, sum counts and exposure before dividing. A mean of
 category rates does not generally equal the pooled rate.
 
-Per the user's request, `calculate_demog_rates(by_union_type = TRUE)` no longer
-returns `unions` or `rate_union`. Its exposure, births, deaths, fertility and mortality rates are separated by
-unpartnered and discovered union types, without an overall row.
+`calculate_fertility_rates(by_union_type = TRUE)` and the separate
+`calculate_mortality_rates()` partition their respective counts and exposure by
+unpartnered and discovered union types, without an overall row. Formation
+counts and rates use `calculate_union_rates()` or `calculate_marriage_rates()`.
 This intentionally changes its output schema; use the separate marriage helper
 for formation counts and rates.
 

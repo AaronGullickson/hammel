@@ -496,11 +496,11 @@ Unknown-mother births remain in the period-level attribute without assigning a
 maternal group. Defaults pool groups; arbitrary custom strata are not supported.
 See [groups](groups.md) for output ordering, empty cases, and worked examples.
 
-- `calculate_demog_rates()` splits recorded lifetimes at half-open period/age
+- `calculate_fertility_rates()` and `calculate_mortality_rates()` split recorded lifetimes at half-open period/age
   boundaries and reports exposure, deaths, births, ASMR, and ASFR. A finite last
   age breakpoint automatically gains `Inf`; for example `0:110` ends with
   `[110, Inf)`. Zero exposure yields `NA` rates; zero events with positive
-  exposure yields zero. Male birth counts/ASFR are `NA`.
+  exposure yields zero. Fertility summaries contain female rows only; mortality retains both sexes.
 - With `by_union_type = TRUE`, demographic rates partition exposure, births and
   deaths into `unpartnered` and discovered union types in `union_type`, without
   an overall row. Untyped histories use partnered/unpartnered. Components sum
@@ -711,3 +711,9 @@ controlled initialized-cohort check, .75-year spacing yields mean parity-1 and
 2+ rates .2665 and .3335 against inputs .3 and .4. The limitation is explicit;
 software correctness does not establish conditional-rate recovery or milestone 5
 acceptance. Alternative exposure-based compensation remains a future decision.
+
+Observed parity-specific ASFRs use `calculate_fertility_rates(parity_breaks = ...)`
+(D100). Bands begin at zero and contain integer parity boundaries, with Inf
+appended to a finite final boundary. All recorded maternal births determine
+parity; births count before advancing parity and subsequent exposure uses the
+new parity. Spacing-excluded time remains exposure. See [parity observations](parity-fertility.md#observed-fertility-by-parity).

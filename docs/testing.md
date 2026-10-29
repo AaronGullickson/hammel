@@ -727,3 +727,23 @@ acceptance from the passing software tests. The [parity specification](parity-fe
 records the limitation and remaining scope. [Replications](../validation/milestone5/parity-spacing-replications.csv)
 and [summary](../validation/milestone5/parity-spacing-summary.csv) retain the evidence.
 The user's validation/milestone5.qmd remains unmodified by this work.
+
+## Separate mortality/fertility observations and parity ASFRs (D100)
+
+`devtools::document(); devtools::test(reporter = "summary")` passed the full
+suite with no failures. The live database test remained opt-in/skipped. The
+local HMD reader test emitted an environment warning because `timedatectl`
+returned status 1; this was not a demographic assertion failure. The final
+focused `devtools::test(filter = "fertility-rate-parity", reporter = "summary")`
+passed all 29 assertions, including the subsequently added simultaneous-birth
+and final-endpoint checks.
+
+Checks cover process-specific output columns, female-only fertility, pre-window
+births including deceased children, ignored custom parity columns, pre-birth
+parity assignment, exact parity exposure, broad/open parity bands, zero-exposure
+NA rates, complete grouped/type/period/age pooling identities, conversion and
+dissolution birth-first ties, invalid boundaries, typed empty outputs, and
+successive parity progression for simultaneous recorded births. Existing pooled
+Lexis tests continue exercising the shared internal kernel. No simulation
+behavior or fertility compensation was changed. The user-authored milestone 5
+report was not edited by this work.

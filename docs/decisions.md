@@ -2015,3 +2015,16 @@ cohabitation policy. Duration stratification is unchanged.
 - **Specification:** [parity fertility](parity-fertility.md);
   [static SOCSIM trace](socsim-parity-spacing-audit.md). Milestone 5 scientific
   acceptance remains with the user.
+
+
+## D100 — Separate mortality and fertility observation APIs (October 29, 2026)
+
+Accepted by the user: replace the public combined `calculate_demog_rates()`
+with `calculate_mortality_rates()` and `calculate_fertility_rates()`. Both retain
+period/age splitting and optional group/union-type strata. Fertility additionally
+accepts optional `parity_breaks` defining half-open observed current-parity bands.
+The shared combined implementation remains internal; there is no exported
+compatibility alias. Fertility returns women only; mortality returns both sexes.
+Observed parity uses maternal birth history, with pre-birth event assignment
+and post-birth exposure progression; it does not change simulation calibration.
+See [demographic analysis](demographic-analysis.md#fertility-rates-by-observed-parity).
