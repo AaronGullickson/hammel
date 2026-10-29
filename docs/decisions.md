@@ -25,7 +25,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Database rate products and reusable downloads | D018, D025 |
 | Demographic extraction and function names | D020–D022, D081 and missing-ASFR clarification |
 | Continuous execution | D024 |
-| Fertility spacing/compensation and finite age bands | D026, D028 (superseding D027's exact sampler) |
+| Fertility spacing (cell accounting) | D026, D101 (superseding D027/D028/D099 compensation) |
 | Two-sex union models and union API restructuring (deferred) | D073 |
 | Duration-dependent dissolution and symmetric group pairs | D078–D079 |
 | Age-specific searches by previous union; separate marriage observations | D080 |
@@ -41,8 +41,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Missing conditional HFD rates replaced with zero | D096 |
 | PATFR helper and automatic TFR dispatch for parity tables | D097 |
 | History-authoritative parity initialization | D098 |
-| Parity execution and SOCSIM-style spacing compensation | D099 |
-| Cell-accounted spacing (opt-in `spacing_method = "cell"`) | D101 |
+| Parity schedule validation and history parity in execution | D099 (correction superseded by D101) |
+| Cell-accounted fertility, the only spacing method | D101 |
 
 ## Recorded decisions
 
@@ -344,8 +344,10 @@ D028. Year-valued fractional spacing remains current.
 
 ## D028: Midpoint approximation using the shared hazard sampler
 
-**Current status:** Finite-band midpoint compensation and the shared sampler
-remain current. D095 supersedes the prohibition on upper-open fertility inputs.
+**Current status:** Superseded by D101 on October 29, 2026: midpoint
+compensation was removed and births use cell-accounted fertility. The shared
+waiting-time sampler remains for other events. D095 had superseded the
+prohibition on upper-open fertility inputs.
 
 - **Status:** accepted October 13, 2026.
 - **Decision:** calculate one adjusted rate at each original fertility band's
@@ -744,9 +746,10 @@ includes performance comparisons; milestone 2 is complete (D050).
 
 ## D045: Defer transition-aware fertility compensation
 
-**Current status:** Compensation remains deferred; the report now assesses fertility
-discrepancies and performance. Milestone 2 was accepted as complete (D050);
-this deferral remains in force.
+**Current status:** Resolved by D101 (October 29, 2026): cell-accounted
+fertility uses the current population composition, including women who changed
+union type during spacing. Milestone 2 was accepted as complete (D050) under
+the earlier deferral.
 
 - **Status:** accepted by the user October 15, 2026; supersedes D042/D044's
   remaining implementation requirement.
@@ -1909,7 +1912,8 @@ cohabitation policy. Duration stratification is unchanged.
 
 ## D095 — Open fertility ages, HFD endpoints and truncated TFR (October 29, 2026)
 
-- **Status:** accepted by the user.
+- **Status:** accepted by the user. Upper-open bands remain allowed; their
+  interior-limit compensation was superseded by D101 cell accounting.
 - **Decision:** allow upper-open fertility age bands. Their birth-spacing
   compensation is the interior limit h=f/(1-b*f), with zero rate staying zero,
   zero spacing unchanged and nonpositive eligibility rejected. Finite bands
@@ -1989,6 +1993,9 @@ cohabitation policy. Duration stratification is unchanged.
 
 ## D099 — Execute parity fertility with SOCSIM-style compensation (October 29, 2026)
 
+- **Current status:** the preceding-parity correction was superseded by D101 on
+  October 29, 2026. Its parity partition validation, history-derived parity
+  counts and schedule switching at births remain current.
 - **Status:** accepted by the user after reviewing the pinned SOCSIM source trace.
 - **Decision:** implement age/current-parity fertility with D098 history-derived
   integer counts. Parity bands partition [0,Inf) within each group/type; age gaps
@@ -2033,9 +2040,13 @@ See [demographic analysis](demographic-analysis.md#fertility-rates-by-observed-p
 ## D101 — Cell-accounted fertility under birth spacing (October 29, 2026)
 
 - **Status:** accepted by the user as a specification; implemented October 29,
-  2026 as the opt-in `spacing_method = "cell"`. The default `"midpoint"`
-  retains D028/D099. The user revised decision (5) after validation showed
-  that input-band cells recover only band averages.
+  2026, first as the opt-in `spacing_method = "cell"`. After reviewing the
+  validation, the user made it the only method on October 29, 2026: midpoint
+  compensation (D028, D095's interior limit, D099's correction) and the
+  `spacing_method` argument were removed. Midpoint comparisons are reproducible
+  at commit `89d451b`. The user revised decision (5) after validation showed
+  that input-band cells recover only band averages, and later agreed to keep
+  low-rate upper-open bands as one cell (`birth_interval * rate < 0.001`).
 - **Decision:** generate births per fertility cell (age sub-band of at most one
   year x actual parity x union type x group, after group multipliers) at intensity
   `m_c * N_c`, where `N_c` counts all living members including those inside

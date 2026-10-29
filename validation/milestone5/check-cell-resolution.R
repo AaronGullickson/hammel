@@ -22,7 +22,7 @@ make <- function(width, split_parity) {
 }
 run <- function(width, split, seed) {
   m <- hammel_model() |> set_population(founders) |> set_mortality(mort) |>
-    set_fertility(make(width, split), spacing_method = "cell") |>
+    set_fertility(make(width, split)) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
   pop <- simulate(m, 100, seed)
   f <- function(ages, br) { r <- calculate_fertility_rates(pop, time_breaks = c(80, 100), age_breaks = ages, parity_breaks = br)

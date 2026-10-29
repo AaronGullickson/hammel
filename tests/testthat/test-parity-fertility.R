@@ -34,30 +34,6 @@ test_that("parity schedules require complete partitions in every stratum", {
   expect_s3_class(fertility(parity_rates(.2)),"hammel_process")
 })
 
-test_that("SOCSIM-style compensation uses unadjusted preceding actual parity", {
-  rates <- parity_rates(upper=Inf)
-  adjusted <- function(k,b=.75) hammel:::adjusted_parity_fertility_cpp(rates,k,b)$rate
-  expect_equal(adjusted(0),.2)
-  expect_equal(adjusted(1),.3/(1-.75*.2))
-  expect_equal(adjusted(2),.4/(1-.75*.3))
-  expect_equal(adjusted(3),.4/(1-.75*.4))
-  expect_equal(adjusted(100),adjusted(3))
-  expect_equal(adjusted(2,0),.4)
-  broad <- data.frame(age_start=15,age_end=50,parity_start=c(0,3),parity_end=c(3,Inf),rate=c(.1,.2))
-  expect_equal(hammel:::adjusted_parity_fertility_cpp(broad,0,.75)$rate,.1)
-  expect_equal(hammel:::adjusted_parity_fertility_cpp(broad,1,.75)$rate,.1/(1-.75*.1))
-  expect_equal(hammel:::adjusted_parity_fertility_cpp(broad,3,.75)$rate,.2/(1-.75*.1))
-  expect_equal(hammel:::adjusted_parity_fertility_cpp(broad,4,.75)$rate,.2/(1-.75*.2))
-  # Prior-parity input changes across age bands, not the current rate.
-  r <- tibble::tibble(age_start=c(24,25,25),age_end=c(25,26,26),
-    parity_start=c(0,0,1),parity_end=c(1,1,Inf),rate=c(.1,.2,.3))
-  expect_equal(hammel:::adjusted_parity_fertility_cpp(r,1,.75)$rate,.3/(1-.25*.1-.5*.2))
-  r <- parity_rates(c(2,.3))
-  expect_error(hammel:::adjusted_parity_fertility_cpp(r,1,1),"nonpositive eligibility")
-  r$rate[2] <- 0
-  expect_equal(hammel:::adjusted_parity_fertility_cpp(r,1,1)$rate,0)
-})
-
 test_that("birth history initializes parity without custom column overrides", {
   model <- parity_model(c(0,20,0),interval=0,n=2)
   people <- model$population$persons
@@ -104,10 +80,15 @@ test_that("cancelled births and initial nulliparity do not advance parity", {
   expect_true(all(table(y$persons$mother_id)<=1))
 })
 
-test_that("absent parity and zero-spacing equal-parity rates preserve histories", {
-  plain <- make_model(50,sex="f",birth_rate=.2,birth_interval=0)
+test_that("absent parity and zero-spacing equal-parity rates give the same fertility", {
+  # Actual-parity cells (D101) split the same total intensity into more clocks,
+  # so histories differ by seed but agree in distribution.
+  n <- 2000
+  plain <- make_model(n,sex="f",birth_rate=.2,birth_interval=0)
   strat <- set_fertility(plain,parity_rates(rep(.2,3)),birth_interval=0)
-  expect_identical(simulate(plain,8,42),simulate(strat,8,42))
+  founders <- function(x) sum(x$persons$mother_id %in% seq_len(n))
+  a <- founders(simulate(plain,4,42)); b <- founders(simulate(strat,4,43))
+  expect_lt(abs(a - b), 4 * sqrt(2 * .2 * 4 * n))
   expect_false("parity" %in% names(simulate(strat,1,42)$persons))
 })
 
@@ -138,7 +119,7 @@ test_that("parity composes with grouped typed fertility, conversion and multipli
   expect_false(anyNA(x$unions$wife_id))
 })
 
-test_that("grouped zero-spacing parity schedules match shared rates", {
+test_that("grouped zero-spacing parity schedules match shared rates in distribution", {
   set.seed(123)
   pop <- create_baseline_population(400,50,0,group_weights=c(A=1,B=1))
   base <- data.frame(age_start=15,age_end=50,union_type=c("unpartnered","partnered"),rate=.2)
@@ -147,7 +128,10 @@ test_that("grouped zero-spacing parity schedules match shared rates", {
     set_fertility(base,birth_interval=0) |>
     set_union_formation("rate",rates=data.frame(age_start=15,age_end=Inf,rate=.3),kinship_generations=0L)
   rates <- do.call(rbind,lapply(0:2,function(k) transform(base,parity_start=k,parity_end=if(k==2) Inf else k+1)))
-  expect_identical(simulate(set_fertility(model,rates,birth_interval=0),8,44),simulate(model,8,44))
+  # Different cell structure, same intensity: compare birth counts statistically.
+  a <- simulate(set_fertility(model,rates,birth_interval=0),8,44)$simulation$births
+  b <- simulate(model,8,45)$simulation$births
+  expect_lt(abs(a - b), 4 * sqrt(a + b))
 })
 
 test_that("history parity is recovered even when the preceding run was unstratified", {
@@ -165,11 +149,13 @@ test_that("history parity is recovered even when the preceding run was unstratif
   expect_true(all(as.character(mothers) %in% names(observed)[observed==1]))
 })
 
-test_that("edited parity schedules are revalidated and broad bands stay compact", {
+test_that("edited parity schedules are revalidated and broad bands run", {
   model <- parity_model()
   model$processes$fertility$rates <- model$processes$fertility$rates[-1, ]
   expect_error(simulate(model,0),"cover")
+  # Very broad parity bands need no per-parity storage until women reach them.
   rates <- data.frame(age_start=15,age_end=Inf,parity_start=c(0,1000000),
     parity_end=c(1000000,Inf),rate=c(.1,.2))
-  expect_equal(hammel:::adjusted_parity_fertility_cpp(rates,1000000,.75)$rate,.2/(1-.75*.1))
+  broad <- quiet_unreachable(set_fertility(make_model(20,sex="f",age=20),rates))
+  expect_gt(simulate(broad,5,3)$simulation$births,0)
 })

@@ -52,10 +52,12 @@ test_that("events at the run endpoint are excluded", {
 })
 
 test_that("birth precedes a later death within a former monthly bin", {
+  # The woman's fertility-cell clock draws its threshold before her death
+  # threshold; with one member the cell intensity equals her rate.
   set.seed(42)
   draws <- rexp(2)
-  ordered <- simulate(make_model(1, sex = "f", death_rate = draws[1]/0.06, birth_rate = draws[2]/0.02,
-    birth_interval = 0), 0.03, seed = 42)
+  ordered <- simulate(make_model(1, sex = "f", death_rate = draws[2]/0.06, birth_rate = draws[1]/0.02,
+    birth_interval = 0.05), 0.03, seed = 42) # spacing leaves room for one birth
   expect_equal(ordered$simulation$births, 1, tolerance = 0)
   expect_true(abs(ordered$persons$birth_time[2] - 0.02) < 1e-14)
 })
@@ -134,7 +136,7 @@ test_that("fractional run durations and tibble outputs are supported", {
   result <- simulate(make_model(), 0.123, seed = 42)
   expect_equal(result$end_time, 0.123, tolerance = 0)
   expect_identical(names(result$simulation), c("start_time", "end_time", "birth_interval",
-    "spacing_method", "ffab", "births", "deaths"))
+    "ffab", "births", "deaths", "unrealized_births"))
   expect_error(simulate(make_model(), -1))
   expect_error(simulate(make_model(), 1, step_duration = 1))
   expect_true(tibble::is_tibble(result$persons))

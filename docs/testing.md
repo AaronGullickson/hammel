@@ -796,7 +796,9 @@ full before and after the `BoundaryQueue` extraction and the cell integration
 grouped parity-specific) and are identical apart from the new
 `spacing_method` metadata field. The full suite passed.
 
-Offline engine evidence, 10 seeds per method:
+Midpoint compensation was later removed (D101 became the only method); the
+midpoint fixed-seed comparison above and the method comparisons below run at
+commit `89d451b`. Offline engine evidence, 10 seeds per method:
 `validation/milestone5/check-cell-spacing.R` (recovery across cohort,
 generational, restart, union-type and group scenarios),
 `check-cell-resolution.R` (supplied wide, single-year and per-parity bands

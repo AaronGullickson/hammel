@@ -12,8 +12,7 @@ fertility(
   birth_interval = 0.75,
   group_prop_hazard = NULL,
   inheritance = create_group_inheritance(),
-  ffab = 0.4886,
-  spacing_method = c("midpoint", "cell")
+  ffab = 0.4886
 )
 }
 \arguments{
@@ -27,7 +26,7 @@ requires character \code{sex} values \code{"m"} and \code{"f"}, with both repres
 rate multipliers, with unique nonempty group names. Missing groups use 1.0;
 zero suppresses the risk. Values are not normalized. At execution, multiply
 the selected input schedule by the person's group factor, including all
-sex/status strata. Fertility multiplication precedes spacing compensation.
+sex/status strata. Fertility multiplication precedes cell accounting.
 Without population groups, warn and ignore multipliers. Stored rate tables
 and their source metadata are unchanged; rate-table summaries use those
 stored rates, without applying population-dependent multipliers.
@@ -41,7 +40,7 @@ accept unpartnered/partnered. Omitted types and groups have multiplier 1.}
 
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
 defaulting to \code{0.75}. Must be finite and nonnegative. Applies to fertility
-only; eligible hazards use midpoint birth-spacing compensation.}
+only; see cell-accounted fertility below.}
 
 \item{inheritance}{A group identity model from \code{\link[=create_group_inheritance]{create_group_inheritance()}},
 or a method name requiring no additional parameters: \code{"mother"}, \code{"father"},
@@ -54,29 +53,6 @@ and categorical matching levels before execution. Applies to fertility only.}
 
 \item{ffab}{Probability that a newborn is female, default \code{0.4886}.
 Must be a finite numeric scalar in \verb{[0, 1]}. Applies to fertility only.}
-
-\item{spacing_method}{\code{"midpoint"} (default) or \code{"cell"}. Midpoint uses the
-compensation described above. \code{"cell"} (D101) instead groups women into
-cells: one-year (or shorter) age sub-bands of each group/union-type
-schedule after group multipliers, split at whole ages and band edges, and
-one actual parity when rates are parity-specific (a pooled parity band
-applies its rate to each contained parity). Each cell produces births at its input rate times
-all its living members, including those inside the birth interval, and
-each birth goes to a uniformly chosen eligible member. Observed rates then
-equal inputs in expectation for any population composition, while a cell
-has an eligible member. Intensity in cells with members but none eligible
-is dropped and reported in \code{simulation$unrealized_births}. Midpoint
-feasibility checks do not apply. An individual woman's hazard depends on
-recent births by others in her cell; this is a calibration device.
-
-For parity-specific schedules with a positive \code{birth_interval}, \code{fertility()}
-warns when positive rates fall in one-year age cells where no woman can be
-eligible under either method: births are singletons at least
-\code{birth_interval} apart, starting from the schedule's first positive rate,
-so parity k is first eligible at the age found by following each parity's
-first positive rate. Union types are pooled and groups checked separately.
-Partly reachable cells and higher actual parities within an open parity
-band (always unreachable at the youngest ages) are not reported.}
 }
 \value{
 A named list containing \code{name}, \code{rates}, and \code{rate_unit}, plus
@@ -95,14 +71,14 @@ is copied to the process's \code{source} field.
 An optional \code{group} column supplies separate schedules by nonmissing character
 label or finite numeric code. Without it, rates apply to all groups. Each
 mortality group needs both sexes, and each conditional fertility group needs
-both statuses. Overlap and fertility compensation are checked within groups.
+both statuses. Overlap is checked within groups.
 Simulation requires schedules for every population group. Without population
 groups, simulation warns and uses the first group alphabetically (radix order
 of character representations, including numeric codes).
 
 Mortality requires separate schedules for both sexes. Gaps and uncovered
-ages are not filled or interpreted as zero rates. Coverage and fertility
-eligibility must be specified before simulation. Calendar-time-varying
+ages are not filled or interpreted as zero rates. Coverage must be specified
+before simulation. Calendar-time-varying
 schedules are not yet supported; time interval columns are rejected.
 
 Fertility optionally accepts \code{union_type} containing both \code{"partnered"}
@@ -119,22 +95,31 @@ Optional \code{parity_start}/\code{parity_end} use half-open current maternal pa
 bands, covering zero through Inf without gaps or overlap in every group/type
 stratum. Parity is counted from recorded maternal births (including deceased
 children) and incremented only on successful births; no custom parity column
-overrides history. First-birth rates are unadjusted. Higher-parity spacing
-compensation uses the preceding actual parity's unadjusted schedule in the
-same group/type. In a final open parity band, entry and subsequent births
-can therefore have different adjusted hazards. This SOCSIM-style approximation
-does not guarantee exact recovery of arbitrary conditional rates.
+overrides history. A pooled parity band applies its rate to each contained
+actual parity.
 
-For finite fertility bands, one adjusted hazard is calculated at each original
-band's midpoint: the input rate divided by one minus the input fertility integral
-over the preceding \code{birth_interval}. The integral accounts for overlaps with
-other input bands within the same status schedule. Execution rejects
-nonpositive midpoint eligibility. Birth spacing persists across status changes;
-compensation for the prior status history is not implemented.
-Upper-open age bands use the interior-limit adjustment \code{f / (1 - b * f)}
-for input rate f and birth interval b, rejecting nonpositive eligibility.
-This approximates the first b years after entry, where preceding bands may
-matter. This approximates the age-varying adjustment; initialization is not calibrated.
+Birth spacing uses cell-accounted fertility (D101). Women are grouped into
+cells: one-year (or shorter) age sub-bands of each group/union-type schedule
+after group multipliers, split at whole ages and band edges, and one actual
+parity when rates are parity-specific. Each cell produces births at its input
+rate times all its living members, including those inside the birth
+interval, and each birth goes to a uniformly chosen eligible member. Observed
+rates then equal inputs in expectation for any population composition,
+including after restarts and union-type changes, while a cell has an eligible
+member. Intensity in cells with members but none eligible is dropped and
+reported in \code{simulation$unrealized_births}. An individual woman's hazard
+depends on recent births by others in her cell; this is a calibration
+device. Upper-open age bands stay one cell when \code{birth_interval * rate} is
+below 0.001 and are otherwise split yearly. Zero-rate bands form no cells.
+
+For parity-specific schedules with a positive \code{birth_interval}, \code{fertility()}
+warns when positive rates fall in one-year age cells where no woman can be
+eligible: births are singletons at least \code{birth_interval} apart, starting
+from the schedule's first positive rate, so parity k is first eligible at the
+age found by following each parity's first positive rate. Union types are
+pooled and groups checked separately. Partly reachable cells and higher
+actual parities within an open parity band (always unreachable at the
+youngest ages) are not reported.
 }
 \examples{
 deaths <- mortality(data.frame(sex = c("m", "f"), age_start = 0,

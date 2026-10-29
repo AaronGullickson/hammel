@@ -156,3 +156,26 @@ except structurally infeasible cells (for example parity 5+ at age 18), whose
 intensity is reported as unrealized. Midpoint remains the default and its
 histories are unchanged. Making cell mode the default needs the user's
 decision and re-validation of earlier milestones.
+
+Midpoint removed (October 29): at the user's direction, cell-accounted fertility
+(D101) is now the only birth-spacing method. The user committed the opt-in
+state as `89d451b` first; midpoint comparison scripts in `validation/milestone5/`
+run at that commit. `spacing_method` was removed (an old specification with
+`"midpoint"` warns and uses cells). The user's `validation/milestone5.qmd`
+still passes `spacing_method = "cell"` and needs that argument removed. D028,
+D045, D095's interior limit and D099's correction are marked superseded.
+
+
+## Fertility heterogeneity discussion recorded (October 29, 2026)
+
+The user requested written notes and a SOCSIM audit. Added
+[SOCSIM heterogeneity findings](socsim-fertility-heterogeneity-audit.md) and
+[distribution/inheritance design notes](fertility-heterogeneity-notes.md).
+The latter proposes mean-one lognormal weights parameterized by CV and latent
+normal inheritance with innovation coefficient sqrt(1-alpha^2). Distribution
+preservation assumes standard-normal latent values among reproducing mothers;
+reproductive selection is explicitly unresolved. No heterogeneity distribution,
+parameter default, initialization contract or engine implementation was accepted
+by this documentation request. The SOCSIM audit also verifies its alpha=0,
+betaT=1 defaults, non-normalizing power transformation, and first-supervisory-
+line loader quirk. Existing engine edits and the user's report were left alone.

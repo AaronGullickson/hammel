@@ -220,8 +220,8 @@ improve precision for calendar-constant inputs, but do not establish absence
 of age-specific bias.
 
 Use aligned ASFR/ASMR alongside aggregate TFR/life expectancy. Distinguish
-sampling variability from persistent differences due to midpoint compensation,
-initialization, or grouped ages. See [testing and validation](testing.md) and
+sampling variability from persistent differences due to unrealized births in
+sparse cells (D101), initialization, or grouped ages. See [testing and validation](testing.md) and
 the [accepted milestone 1 report](../validation/milestone1.qmd) and
 [accepted milestone 2 report](../validation/milestone2.qmd).
 
@@ -506,7 +506,7 @@ See [parity fertility](parity-fertility.md#observed-fertility-by-parity).
 
 ## Unrealized births under cell accounting
 
-For populations simulated with `spacing_method = "cell"` (D101),
+For populations returned by `simulate()` (D101),
 `calculate_fertility_rates(..., unrealized = TRUE)` adds `unrealized_births`
 and `rate_fertility_adjusted = (births + unrealized_births) / person_years`.
 Unrealized births are the expected births dropped from fertility cells that had
@@ -521,8 +521,9 @@ actual parities pool into broader parity bands and age years into wider age
 bands. Values are `NA`, rather than approximated, for periods before the most
 recent simulation's start (a restarted population keeps only its latest run's
 record), for time or age breaks that cut through a record, and for union-type or
-parity strata the fertility schedule did not use. Populations simulated with
-midpoint compensation are rejected.
+parity strata the fertility schedule did not use. Populations without an
+unrealized-births record (never simulated, or simulated before D101) are
+rejected.
 
 ```r
 asfr <- calculate_fertility_rates(result, time_breaks = c(2050, 2150),

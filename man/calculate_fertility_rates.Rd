@@ -45,7 +45,7 @@ integer boundaries starting at zero. Bands are half-open. A finite final
 boundary receives Inf, as for age breaks.}
 
 \item{unrealized}{Logical, default \code{FALSE}. With \code{TRUE}, the population must
-come from \code{simulate()} with \code{spacing_method = "cell"}; add
+come from \code{simulate()}; add
 \code{unrealized_births} (expected births dropped from fertility cells that had
 members but no eligible woman, from \code{simulation$unrealized_births}) and
 \code{rate_fertility_adjusted = (births + unrealized_births) / person_years}.

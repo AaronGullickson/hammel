@@ -14,16 +14,13 @@
 #'   defaulting to `0.75`. Must be finite and nonnegative.
 #' @param group_prop_hazard Optional named numeric vector of finite nonnegative
 #'   rate multipliers by group. Missing groups use 1.0; values are not normalized.
-#'   Scales shared or group-specific input rates before fertility birth-spacing
-#'   compensation. Without population groups, simulation warns and ignores it.
+#'   Scales shared or group-specific fertility input rates before cell
+#'   accounting. Without population groups, simulation warns and ignores it.
 #'   Fertility also accepts a named list of vectors for `partnered` and/or
 #'   `unpartnered`, or cohab/marriage when rates include those `union_type`
 #'   strata. List names must occur in the schedules; omitted entries use 1.0.
 #' @param ffab Probability that a newborn is female, default `0.4886`.
 #'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
-#' @param spacing_method How eligible fertility is adjusted for the birth
-#'   interval: `"midpoint"` (default) uses precomputed midpoint compensation;
-#'   `"cell"` uses cell-accounted fertility (D101), described in [fertility()].
 #' @param inheritance A group identity model from [create_group_inheritance()],
 #'   or a method name requiring no additional parameters: `"mother"`, `"father"`,
 #'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
@@ -73,8 +70,12 @@ attach_process <- function(model, process) {
       validate_birth_interval(process$birth_interval)
       if (!"ffab" %in% names(process)) process$ffab <- 0.4886
       validate_ffab(process$ffab)
-      if (!"spacing_method" %in% names(process)) process$spacing_method <- "midpoint"
-      validate_spacing_method(process$spacing_method)
+      # Specifications saved while midpoint compensation existed (before D101
+      # became the only method) may carry a spacing_method field.
+      if (identical(process$spacing_method, "midpoint"))
+        warning(paste('`spacing_method = "midpoint"` is no longer available;',
+                      "cell-accounted fertility is used."), call. = FALSE)
+      process$spacing_method <- NULL
     }
     process$rates <- tibble::as_tibble(process$rates)
   }
@@ -99,12 +100,10 @@ set_mortality <- function(model, rates, group_prop_hazard = NULL) {
 #' @rdname set_process
 #' @export
 set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard = NULL,
-                          inheritance = create_group_inheritance(), ffab = 0.4886,
-                          spacing_method = c("midpoint", "cell")) {
+                          inheritance = create_group_inheritance(), ffab = 0.4886) {
   set_process(model, fertility(rates, birth_interval = birth_interval,
                               group_prop_hazard = group_prop_hazard,
-                              inheritance = inheritance, ffab = ffab,
-                              spacing_method = spacing_method))
+                              inheritance = inheritance, ffab = ffab))
 }
 
 #' Specify age-specific demographic rates
@@ -119,14 +118,14 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #' An optional `group` column supplies separate schedules by nonmissing character
 #' label or finite numeric code. Without it, rates apply to all groups. Each
 #' mortality group needs both sexes, and each conditional fertility group needs
-#' both statuses. Overlap and fertility compensation are checked within groups.
+#' both statuses. Overlap is checked within groups.
 #' Simulation requires schedules for every population group. Without population
 #' groups, simulation warns and uses the first group alphabetically (radix order
 #' of character representations, including numeric codes).
 #'
 #' Mortality requires separate schedules for both sexes. Gaps and uncovered
-#' ages are not filled or interpreted as zero rates. Coverage and fertility
-#' eligibility must be specified before simulation. Calendar-time-varying
+#' ages are not filled or interpreted as zero rates. Coverage must be specified
+#' before simulation. Calendar-time-varying
 #' schedules are not yet supported; time interval columns are rejected.
 #'
 #' Fertility optionally accepts `union_type` containing both `"partnered"`
@@ -143,22 +142,31 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #' bands, covering zero through Inf without gaps or overlap in every group/type
 #' stratum. Parity is counted from recorded maternal births (including deceased
 #' children) and incremented only on successful births; no custom parity column
-#' overrides history. First-birth rates are unadjusted. Higher-parity spacing
-#' compensation uses the preceding actual parity's unadjusted schedule in the
-#' same group/type. In a final open parity band, entry and subsequent births
-#' can therefore have different adjusted hazards. This SOCSIM-style approximation
-#' does not guarantee exact recovery of arbitrary conditional rates.
+#' overrides history. A pooled parity band applies its rate to each contained
+#' actual parity.
 #'
-#' For finite fertility bands, one adjusted hazard is calculated at each original
-#' band's midpoint: the input rate divided by one minus the input fertility integral
-#' over the preceding `birth_interval`. The integral accounts for overlaps with
-#' other input bands within the same status schedule. Execution rejects
-#' nonpositive midpoint eligibility. Birth spacing persists across status changes;
-#' compensation for the prior status history is not implemented.
-#' Upper-open age bands use the interior-limit adjustment `f / (1 - b * f)`
-#' for input rate f and birth interval b, rejecting nonpositive eligibility.
-#' This approximates the first b years after entry, where preceding bands may
-#' matter. This approximates the age-varying adjustment; initialization is not calibrated.
+#' Birth spacing uses cell-accounted fertility (D101). Women are grouped into
+#' cells: one-year (or shorter) age sub-bands of each group/union-type schedule
+#' after group multipliers, split at whole ages and band edges, and one actual
+#' parity when rates are parity-specific. Each cell produces births at its input
+#' rate times all its living members, including those inside the birth
+#' interval, and each birth goes to a uniformly chosen eligible member. Observed
+#' rates then equal inputs in expectation for any population composition,
+#' including after restarts and union-type changes, while a cell has an eligible
+#' member. Intensity in cells with members but none eligible is dropped and
+#' reported in `simulation$unrealized_births`. An individual woman's hazard
+#' depends on recent births by others in her cell; this is a calibration
+#' device. Upper-open age bands stay one cell when `birth_interval * rate` is
+#' below 0.001 and are otherwise split yearly. Zero-rate bands form no cells.
+#'
+#' For parity-specific schedules with a positive `birth_interval`, `fertility()`
+#' warns when positive rates fall in one-year age cells where no woman can be
+#' eligible: births are singletons at least `birth_interval` apart, starting
+#' from the schedule's first positive rate, so parity k is first eligible at the
+#' age found by following each parity's first positive rate. Union types are
+#' pooled and groups checked separately. Partly reachable cells and higher
+#' actual parities within an open parity band (always unreachable at the
+#' youngest ages) are not reported.
 #'
 #' @param rates A nonempty data frame containing numeric `age_start`, `age_end`,
 #'   and `rate`. Starts must be finite and nonnegative; ends must exceed starts
@@ -167,12 +175,12 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #'   requires character `sex` values `"m"` and `"f"`, with both represented.
 #' @param birth_interval Minimum maternal birth-to-birth interval in years,
 #'   defaulting to `0.75`. Must be finite and nonnegative. Applies to fertility
-#'   only; eligible hazards use midpoint birth-spacing compensation.
+#'   only; see cell-accounted fertility below.
 #' @param group_prop_hazard Optional named numeric vector of finite nonnegative
 #'   rate multipliers, with unique nonempty group names. Missing groups use 1.0;
 #'   zero suppresses the risk. Values are not normalized. At execution, multiply
 #'   the selected input schedule by the person's group factor, including all
-#'   sex/status strata. Fertility multiplication precedes spacing compensation.
+#'   sex/status strata. Fertility multiplication precedes cell accounting.
 #'   Without population groups, warn and ignore multipliers. Stored rate tables
 #'   and their source metadata are unchanged; rate-table summaries use those
 #'   stored rates, without applying population-dependent multipliers.
@@ -185,28 +193,6 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #'   accept unpartnered/partnered. Omitted types and groups have multiplier 1.
 #' @param ffab Probability that a newborn is female, default `0.4886`.
 #'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
-#' @param spacing_method `"midpoint"` (default) or `"cell"`. Midpoint uses the
-#'   compensation described above. `"cell"` (D101) instead groups women into
-#'   cells: one-year (or shorter) age sub-bands of each group/union-type
-#'   schedule after group multipliers, split at whole ages and band edges, and
-#'   one actual parity when rates are parity-specific (a pooled parity band
-#'   applies its rate to each contained parity). Each cell produces births at its input rate times
-#'   all its living members, including those inside the birth interval, and
-#'   each birth goes to a uniformly chosen eligible member. Observed rates then
-#'   equal inputs in expectation for any population composition, while a cell
-#'   has an eligible member. Intensity in cells with members but none eligible
-#'   is dropped and reported in `simulation$unrealized_births`. Midpoint
-#'   feasibility checks do not apply. An individual woman's hazard depends on
-#'   recent births by others in her cell; this is a calibration device.
-#'
-#'   For parity-specific schedules with a positive `birth_interval`, `fertility()`
-#'   warns when positive rates fall in one-year age cells where no woman can be
-#'   eligible under either method: births are singletons at least
-#'   `birth_interval` apart, starting from the schedule's first positive rate,
-#'   so parity k is first eligible at the age found by following each parity's
-#'   first positive rate. Union types are pooled and groups checked separately.
-#'   Partly reachable cells and higher actual parities within an open parity
-#'   band (always unreachable at the youngest ages) are not reported.
 #' @param inheritance A group identity model from [create_group_inheritance()],
 #'   or a method name requiring no additional parameters: `"mother"`, `"father"`,
 #'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
@@ -237,10 +223,7 @@ mortality <- function(rates, group_prop_hazard = NULL) {
 #' @rdname mortality
 #' @export
 fertility <- function(rates, birth_interval = 0.75, group_prop_hazard = NULL,
-                      inheritance = create_group_inheritance(), ffab = 0.4886,
-                      spacing_method = c("midpoint", "cell")) {
-  if (identical(spacing_method, c("midpoint", "cell"))) spacing_method <- "midpoint"
-  validate_spacing_method(spacing_method)
+                      inheritance = create_group_inheritance(), ffab = 0.4886) {
   validate_rates(rates, mortality = FALSE)
   validate_fertility_group_prop_hazard(group_prop_hazard, rates)
   inheritance <- normalize_group_inheritance(inheritance)
@@ -249,60 +232,73 @@ fertility <- function(rates, birth_interval = 0.75, group_prop_hazard = NULL,
   process <- new_rate_process("fertility", rates)
   process$inheritance <- if (is.null(inheritance)) create_group_inheritance() else inheritance
   process$birth_interval <- birth_interval
-  process$spacing_method <- spacing_method
   process$ffab <- ffab
   process$group_prop_hazard <- group_prop_hazard
   warn_unreachable_parity_cells(process$rates, birth_interval)
   process
 }
 
-# Positive parity-specific rates in one-year age cells (the cells used by
-# spacing_method = "cell") that no woman can occupy while eligible, given the
+# Positive parity-specific rates in one-year age cells (the fertility cells of
+# D101) that no woman can occupy while eligible, given the
 # birth interval: singleton births, each at least `interval` apart, starting at
 # the schedule's first positive rate. Union types are pooled, because women move
-# between them; groups are checked separately. Open parity bands are checked at
-# their first parity only: higher actual parities in an open band always have
-# unreachable young cells. Cells reachable for part of the year are not
-# reported. Returns a data frame of unreachable cells (possibly empty).
+# between them; groups are checked separately. Pooled parity bands are checked
+# at their first parity only: higher actual parities in a pooled band reuse one
+# schedule and always have unreachable young cells. Cells reachable for part of
+# the year are not reported. Returns one row per unreachable age range.
 unreachable_parity_cells <- function(rates, interval) {
   empty <- data.frame(group = character(), parity = numeric(), age_start = numeric(),
                       age_end = numeric(), earliest_eligible = numeric())
   if (!all(c("parity_start", "parity_end") %in% names(rates)) || !(interval > 0)) return(empty)
   out <- list()
+  # Earliest next birth from eligibility age `e` given positive rows `r`.
+  next_birth <- function(r, e) {
+    ok <- r$age_end > e
+    if (any(ok)) min(pmax(r$age_start[ok], e)) else Inf
+  }
   for (rows in split_rate_groups(rates)) {
     r <- rates[rows, , drop = FALSE]
     r <- r[r$rate > 0, , drop = FALSE]
     if (!nrow(r)) next
     group <- if ("group" %in% names(r)) as.character(r$group[1]) else NA_character_
-    finite_ends <- r$parity_end[is.finite(r$parity_end)]
-    top <- max(c(r$parity_start, finite_ends - 1))
+    starts <- sort(unique(rates$parity_start[rows]))
+    ends <- vapply(starts, function(k) rates$parity_end[rows][match(k, rates$parity_start[rows])], 0)
     eligible <- 0 # earliest age at which a woman at the current parity is eligible
-    for (k in 0:top) {
-      at_k <- r[r$parity_start <= k & k < r$parity_end, , drop = FALSE]
+    for (b in seq_along(starts)) {
+      k <- starts[b]
+      at_k <- r[r$parity_start == k, , drop = FALSE]
       if (k > 0) {
+        # Report the band's first parity only (pooled bands apply one schedule).
         for (i in seq_len(nrow(at_k))) {
           lo <- at_k$age_start[i]
           if (!is.finite(eligible)) {
-            # Unreachable at every age (a lower parity has no positive rates):
-            # report the whole band, which may be upper-open.
             out[[length(out) + 1L]] <- data.frame(group = group, parity = k,
               age_start = lo, age_end = at_k$age_end[i], earliest_eligible = Inf)
             next
           }
-          stop_at <- min(at_k$age_end[i], eligible)
-          while (lo < stop_at) {
-            hi <- min(at_k$age_end[i], floor(lo) + 1)
-            if (hi <= eligible) out[[length(out) + 1L]] <- data.frame(group = group,
-              parity = k, age_start = lo, age_end = hi, earliest_eligible = eligible)
-            lo <- hi
-          }
+          # Cells split at whole ages; report the run of cells ending no later
+          # than the earliest eligible age as one range.
+          end <- if (at_k$age_end[i] <= eligible) at_k$age_end[i] else floor(eligible)
+          if (end > lo) out[[length(out) + 1L]] <- data.frame(group = group,
+            parity = k, age_start = lo, age_end = end, earliest_eligible = eligible)
         }
       }
-      # Earliest next birth: the first positive-rate age at parity k from the
-      # earliest eligible age onward; no such age makes later parities unreachable.
-      reachable <- at_k$age_end > eligible
-      eligible <- if (any(reachable))
-        min(pmax(at_k$age_start[reachable], eligible)) + interval else Inf
+      # Carry eligibility through every parity of this band to the next band.
+      if (b < length(starts)) {
+        steps <- ends[b] - k
+        while (steps > 0 && is.finite(eligible)) {
+          birth <- next_birth(at_k, eligible)
+          if (!is.finite(birth)) { eligible <- Inf; break }
+          inside <- at_k$age_start <= birth & birth < at_k$age_end
+          # Within an upper-open positive row every later step adds the interval.
+          if (any(inside & is.infinite(at_k$age_end))) {
+            eligible <- birth + steps * interval
+            break
+          }
+          eligible <- birth + interval
+          steps <- steps - 1
+        }
+      }
     }
   }
   if (length(out)) do.call(rbind, out) else empty
@@ -329,14 +325,6 @@ warn_unreachable_parity_cells <- function(rates, interval) {
     "those births cannot occur: %s."), interval, paste(shown, collapse = "; ")),
     call. = FALSE)
   invisible(cells)
-}
-
-validate_spacing_method <- function(method) {
-  if (!is.character(method) || length(method) != 1L || is.na(method) ||
-      !method %in% c("midpoint", "cell")) {
-    stop('`spacing_method` must be "midpoint" or "cell".', call. = FALSE)
-  }
-  invisible(method)
 }
 
 new_rate_process <- function(name, rates) {

@@ -16,8 +16,7 @@ set_fertility(
   birth_interval = 0.75,
   group_prop_hazard = NULL,
   inheritance = create_group_inheritance(),
-  ffab = 0.4886,
-  spacing_method = c("midpoint", "cell")
+  ffab = 0.4886
 )
 }
 \arguments{
@@ -29,8 +28,8 @@ set_fertility(
 
 \item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
 rate multipliers by group. Missing groups use 1.0; values are not normalized.
-Scales shared or group-specific input rates before fertility birth-spacing
-compensation. Without population groups, simulation warns and ignores it.
+Scales shared or group-specific fertility input rates before cell
+accounting. Without population groups, simulation warns and ignores it.
 Fertility also accepts a named list of vectors for \code{partnered} and/or
 \code{unpartnered}, or cohab/marriage when rates include those \code{union_type}
 strata. List names must occur in the schedules; omitted entries use 1.0.}
@@ -47,10 +46,6 @@ ancestry proportions.}
 
 \item{ffab}{Probability that a newborn is female, default \code{0.4886}.
 Must be a finite numeric scalar in \verb{[0, 1]}. Applies to fertility only.}
-
-\item{spacing_method}{How eligible fertility is adjusted for the birth
-interval: \code{"midpoint"} (default) uses precomputed midpoint compensation;
-\code{"cell"} uses cell-accounted fertility (D101), described in \code{\link[=fertility]{fertility()}}.}
 }
 \value{
 An updated \code{hammel_model}. The input model is not modified.

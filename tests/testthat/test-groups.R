@@ -50,6 +50,9 @@ test_that("group schedules validate overlap and required strata independently", 
 })
 
 test_that("shared and identical grouped schedules preserve fixed-seed histories", {
+  # Groups always have their own fertility cells (D101), so a grouped run and
+  # an ungrouped run with the same rates agree in distribution, not seed by
+  # seed. Shared and explicitly identical grouped schedules use the same cells.
   model <- group_model()
   model <- set_fertility(model, group_status_rates(0.3, 0.2), 0.75, inheritance = "mother")
   model <- set_union_formation(model, "rate", rates = data.frame(
@@ -68,9 +71,7 @@ test_that("shared and identical grouped schedules preserve fixed-seed histories"
   }
   grouped <- simulate(model, 5, seed = 123)
   expect_identical(grouped, shared)
-  shared$persons$group <- NULL
-  shared$ancestry <- NULL
-  expect_identical(shared, ungrouped)
+  expect_s3_class(ungrouped, "hammel_population")
 })
 
 test_that("group-specific mortality and newborn mortality use own group", {
@@ -158,12 +159,13 @@ test_that("missing group schedules fail and mortality coverage is per group", {
   expect_error(simulate(model, 0), "cover")
 })
 
-test_that("group fertility compensation stays within each group and status", {
+test_that("group fertility cells stay within each group and status", {
   model <- group_model()
   model <- set_fertility(model, group_rates(group_status_rates(), a = 0.2, b = 0.4), 0.75)
   expect_no_warning(simulate(model, 0.1, seed = 12))
+  # High rates need no feasibility check under cell accounting.
   model$processes$fertility$rates$rate[1] <- 2
-  expect_error(simulate(model, 0.1), "midpoint eligibility")
+  expect_no_error(simulate(model, 0.1, seed = 12))
 })
 
 test_that("empty grouped populations remain valid and preserve group type", {

@@ -1,12 +1,14 @@
 # Cell-accounted fertility under birth spacing
 
-**Status: accepted specification (D101, October 29, 2026), implemented as an
-opt-in: `set_fertility(..., spacing_method = "cell")`.** Written at the user's
-request after the [spacing investigation](parity-spacing-investigation.md). The
-default remains `"midpoint"` (D028/D099). After validation the user revised
-decision 5: cells are age sub-bands of at most one year and, for
-parity-specific schedules, single actual parities. See
-[implementation and validation](#implementation-and-validation).
+**Status: accepted and implemented (D101, October 29, 2026); the only
+birth-spacing method.** Written at the user's request after the
+[spacing investigation](parity-spacing-investigation.md). It was first an
+opt-in (`spacing_method = "cell"`) alongside midpoint compensation
+(D028/D099); after reviewing the validation below, the user removed midpoint
+and the argument. The midpoint comparisons in this document are reproducible at
+commit `89d451b`. After validation the user also revised decision 5: cells are
+age sub-bands of at most one year and, for parity-specific schedules, single
+actual parities. See [implementation and validation](#implementation-and-validation).
 
 ## Purpose
 
@@ -179,6 +181,10 @@ dissolution, matching, restarts and cancellation. The internal option
 `options(hammel.check_cells = TRUE)` rescans cell counts at every event and
 calibration totals at every fertility-driven search; the test suite runs a
 grouped rate-mode model and a grouped on-demand model with it.
+
+Comparisons with midpoint below were produced while both methods existed (commit
+`89d451b`; `validation/milestone5/check-cell-spacing.R` and
+`benchmark-cell-spacing.R` require that commit).
 
 **Recovery evidence** with 1-year, actual-parity cells (10 seeds per method;
 see [the summary CSV](../validation/milestone5/cell-spacing-summary.csv) and

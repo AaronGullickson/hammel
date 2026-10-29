@@ -59,3 +59,9 @@ Engine checks of cell-accounted fertility (D101, `spacing_method = "cell"`):
   writes `cell-spacing-benchmark.csv`.
 
 See [cell-accounted fertility](../../docs/fertility-cell-accounting.md#implementation-and-validation).
+
+Midpoint compensation was removed after these checks (D101 is the only
+method). `check-parity-spacing.R`, `check-cell-spacing.R` and
+`benchmark-cell-spacing.R` compare against midpoint and run only at commit
+`89d451b`; their CSVs are the recorded results. `check-cell-resolution.R`,
+`check-composition-spacing.R` and `check-runtime-spacing.R` still run.

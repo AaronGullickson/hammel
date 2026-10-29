@@ -12,10 +12,11 @@ test_that("minimum male age excludes boys while preserving births and unknown fa
 })
 
 test_that("exact and fractional age thresholds govern searches without rounding", {
-  # Set the first birth to a known time using the engine's exponential draws.
+  # Set the first birth to a known time using the engine's exponential draws:
+  # the woman's fertility-cell clock is drawn first (one member, her rate).
   set.seed(52)
   waits <- rexp(2)
-  model <- make_model(3, birth_rate = waits[2] / 0.25, birth_interval = 0)
+  model <- make_model(3, birth_rate = waits[1] / 0.25, birth_interval = 0)
   model$population$persons$sex[1] <- "f"
   model$population$persons$birth_time <- c(-20, -16.25, -16.249)
   model$processes$union_formation$min_male_age <- 16.5

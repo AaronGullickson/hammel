@@ -4,9 +4,10 @@ Updated October 29, 2026. This is the current mortality, fertility, union-format
 dissolution, remarriage, cohabitation/conversion, group identity/ancestry, and
 observation contract. Milestones 1–4 are accepted as complete
 (D029, D050, D077, D093), retaining documented limitations.
-Earlier monthly and exact
-age-varying compensation specifications are available in Git history; the
-[decision log](decisions.md) records their replacement. Acceptance
+Earlier monthly, exact
+age-varying and midpoint compensation specifications are available in Git
+history; the [decision log](decisions.md) records their replacement by
+cell-accounted fertility (D101). Acceptance
 of a model assumption is distinct from evidence of demographic accuracy.
 
 ## Units and inputs
@@ -32,15 +33,15 @@ input order and extra columns; native scheduling sorts its own copy.
 | --- | --- | --- |
 | Input interpretation | Piecewise constant age/sex hazard | Overall or status-specific ASFR, births per woman-year in the specified population |
 | Denominator for output rates | Living person-years by age/sex | Female person-years overall or in the indicated status, including spacing-excluded time |
-| Open-ended input band | Allowed; required at execution | Rejected, even with zero rates/spacing |
+| Open-ended input band | Allowed; required at execution | Allowed (D095) |
 | Coverage at execution | `[0, Inf)` for each sex, with no gaps | Zero outside supplied finite bands, including gaps |
 | Additional setting | None | `birth_interval`, finite nonnegative scalar years; default 0.75 |
 
 Mortality constructors validate structure without requiring full coverage;
 `simulate()` checks complete schedules. Specifying and attaching processes does
 not execute a simulation. Edited built-in specifications are revalidated at
-attachment and execution. Feasibility of fertility compensation is checked
-when building the native execution schedule for a positive-duration run.
+attachment and execution. Fertility schedules need no feasibility check under
+cell accounting; parity schedules with unreachable cells receive a warning.
 
 Treating empirical mortality central rates `mx` as hazards is an explicit
 assumption. It is not a universal identity, particularly for infant mortality.
@@ -58,8 +59,8 @@ matching eligibility. Optional group formula predictors and symmetric
 pair effects can change utility. Newborns select either parent's group with equal probability by default
 (with maternal fallback for unknown fathers)
 or the configured inheritance rule, entering the assigned group's mortality
-schedule immediately. Fertility
-compensation is separate within each group/status schedule. Group values are
+schedule immediately. Fertility cells are separate for each group/status
+schedule. Group values are
 nonmissing character labels or finite numeric codes, with nonempty labels.
 See [groups](groups.md) for full rules, ordering, examples, and validation scope.
 
@@ -67,16 +68,15 @@ Mortality, fertility, and rate-based union formation optionally accept
 `group_prop_hazard`, a named vector of dimensionless finite nonnegative factors.
 Multiply the selected input rates by the person's group factor (the woman's for
 searches), using 1.0 for omitted groups. Fertility multiplication precedes
-midpoint spacing compensation, making it equivalent to explicitly scaled input
-ASFRs. Zero suppresses that risk; factors are not normalized. Without population
+cell accounting, making it equivalent to explicitly scaled input ASFRs. Zero suppresses that risk; factors are not normalized. Without population
 groups, warn and ignore factors. Shared and stratified schedules are supported;
 factors do not supply missing grouped schedules. On-demand union formation has
 no search hazard and rejects this option. Stored input tables remain unchanged;
-overflow and infeasible effective fertility schedules fail explicitly.
+overflowing effective rates fail explicitly.
 Conditional fertility also accepts a named list of vectors for partnered and/or
 unpartnered rates. Omitted statuses and omitted groups within a status use 1.0.
 A single vector applies to both statuses; overall fertility requires the vector
-form. Each effective group/status schedule is compensated independently.
+form. Each effective group/status schedule has its own fertility cells.
 
 ## Initialization and population history
 
@@ -146,10 +146,10 @@ partial or mixed tables are errors. Check
 age overlap separately within each status; boundaries may differ and gaps are
 zero risk. Use explicit zeros to suppress births for a status. On-demand
 formation rejects status-specific fertility schedules, including at zero duration.
-Rate formation accepts overall rates with one warning per simulation call. After a recorded birth at time `t`, fertility sampling starts
-at `max(now, t + birth_interval)`. Mortality remains active throughout spacing.
+Rate formation accepts overall rates with one warning per simulation call. After a recorded birth at time `t`, a woman is
+ineligible until `t + birth_interval`. Mortality remains active throughout spacing.
 A birth at 1.03 with spacing 0.75 permits the next birth no earlier than 1.78.
-Zero spacing disables both the exclusion and compensation. Arbitrary finite
+Zero spacing makes every woman eligible at all times. Arbitrary finite
 nonnegative intervals are allowed; there is no whole-month restriction.
 
 ### Newborn group identity
@@ -173,78 +173,49 @@ the engine RNG stream and explicit seeds restore state even on errors. Identity
 does not alter ancestry: a custom AB identity may retain only A/B ancestry.
 See [group inheritance](group-inheritance.md) for rules and worked examples.
 
-### Cell-accounted fertility (D101, opt-in)
+### Cell-accounted fertility (D101)
 
-`set_fertility(..., spacing_method = "cell")` replaces midpoint compensation
-(the default `"midpoint"`) with accounting of the simulated population. Cells
-come from the effective schedules: group (after multipliers) and union type or
+Births are generated by accounting of the simulated population. Cells come
+from the effective schedules: group (after multipliers) and union type or
 overall. Input age bands are split at whole ages and band edges into sub-cells
-of at most one year (upper-open bands up to the oldest attainable age, then
-left open). Parity-specific schedules have one cell per actual parity, so a
-pooled band applies its rate to each contained parity; without parity columns
-cells pool all parities. A cell generates births at its
-input rate times all its living members, including women inside the birth
-interval, and assigns each birth to a uniformly chosen eligible member. The
-equivalent individual hazard is `rate * members / eligible members`. Observed
-rates equal inputs in expectation for any composition, at the resolution of the
-cells, while a cell has an eligible member. Intensity in a cell with members but
-none eligible is dropped and reported in `simulation$unrealized_births` (a
-tibble by one-year period from the run start and cell). Midpoint feasibility
-checks do not apply. Cancelled attempts keep their spent intensity. Union
-changes move a woman between cells; restarts rebuild cells from histories.
-Recovery holds at cell resolution; within a one-year cell, selection does not
-vary with exact age. An upper-open band stays one cell when
-`birth_interval * rate < 0.001` (numerical tolerance). At exact ties a pending
-death precedes a cell birth, which precedes other person events. See [cell-accounted fertility](fertility-cell-accounting.md).
+of at most one year; upper-open bands are split up to the oldest attainable age
+and then left open, except that an upper-open band stays one cell when
+`birth_interval * rate < 0.001` (a numerical tolerance). Zero-rate bands form no
+cells. Parity-specific schedules have one cell per actual parity, so a pooled
+band applies its rate to each contained parity; without parity columns cells
+pool all parities.
+
+A cell generates births at its input rate times all its living members,
+including women inside the birth interval, and assigns each birth to a
+uniformly chosen eligible member. The equivalent individual hazard is
+`rate * members / eligible members`. Observed rates equal inputs in expectation
+for any composition (initialization without histories, restarts with new
+schedules or intervals, union-type transitions), at cell resolution, while a
+cell has an eligible member. Within a one-year cell, selection does not vary
+with exact age. Intensity in a cell with members but none eligible is dropped
+and reported in `simulation$unrealized_births` (a tibble by one-year period
+from the run start and cell); `calculate_fertility_rates(unrealized = TRUE)`
+attributes it to observation rows. Cancelled attempts keep their spent
+intensity. Union changes move a woman between cells; restarts rebuild cells
+from histories. A woman's hazard depends on recent births by others in her cell;
+this is a calibration device rather than a behavioral model. Each cell keeps an
+Exp(1) threshold consumed at its current intensity, so count changes recompute
+firing times without new random draws. At exact ties a pending death precedes a
+cell birth, which precedes other person events. Individual weights for future
+heterogeneity are reserved: they will set selection probability within a cell,
+not the cell's rate. See [cell-accounted fertility](fertility-cell-accounting.md).
+
+For example, a cell with input rate .2 has 100 members, 15 of them within the
+birth interval. It produces 20 births per year, so each of the 85 eligible
+women has hazard 20/85 = .235. If a restart leaves only 5 women in spacing, the
+eligible hazard becomes 20/95 = .211.
 
 For parity-specific schedules with positive spacing, `fertility()` warns about
-positive rates in one-year age cells that no eligible woman can occupy (under
-either method). Parity k is first eligible after k singleton births at least
-`birth_interval` apart, beginning at the schedule's first positive rates. Union
-types are pooled; partly reachable cells and higher parities within an open
-parity band are not reported.
-
-### Midpoint compensation (D028)
-
-Calculate one adjusted hazard per original input band. Finite bands retain
-midpoint adjustment; an upper-open band uses the interior-limit rule (D095). For band `[L,U)`,
-midpoint `m = L + (U-L)/2`, input rate `f`, and spacing `b`:
-
-    eligibility_mid = 1 - integral from max(0, m-b) to m of input_ASFR(a) da
-    adjusted_rate = f / eligibility_mid
-
-Evaluate the integral using exact duration overlaps with the unadjusted input
-bands within the same status schedule. Gaps and ages outside the schedule contribute zero. Preserve the
-original boundaries and use the resulting constant rates in the shared sampler.
-Compute this schedule once per simulation call, not from the actual fraction
-eligible in the simulated population. Reject nonpositive midpoint eligibility
-and unrepresentable adjusted rates rather than clipping or imputing them.
-This checks the evaluated midpoints, not the entire age-varying eligibility curve.
-
-At midpoint 25.5, with spacing 0.75, input 0.1 on `[24,25)` and 0.2 on
-`[25,26)`, the excluded fraction is `0.25*0.1 + 0.5*0.2 = 0.125`.
-Eligibility is 0.875 and the adjusted rate for `[25,26)` is `0.2/0.875`.
-A longer spacing window may cross several bands and gaps; all overlaps count.
-
-For an upper-open band `[L, Inf)`, use eligibility `1 - b*f` and adjusted
-hazard `f/(1-b*f)` throughout the band. Zero rates remain zero and zero spacing
-leaves rates unchanged. Reject nonpositive eligibility. This is the limiting
-constant-rate adjustment once the preceding spacing window lies wholly within
-the open band; the first b years may overlap earlier bands and are approximated.
-There is no artificial midpoint and no finite age cap on a positive open-band rate.
-
-When the window lies wholly in a constant-rate region, adjustment is
-`h = f/(1-b*f)`. With `f=0.2` and `b=0.75`, eligibility is 0.85;
-mean interval `b + 1/h` is five years, so the long-run renewal rate is 0.2
-away from rate boundaries. A constant region with `b*f >= 1` at its midpoint
-is infeasible and rejected. For zero spacing, the original schedule is used.
-
-The underlying eligibility identity assumes cohorts experienced the target
-schedule during the preceding window. With age-only mortality shared by
-eligible and excluded women, survival cancels between recent births and living
-female exposure. Fertility-dependent mortality or heterogeneity would require
-another specification. Midpoint evaluation approximates the age-varying
-adjustment and does not guarantee exact ASFR or TFR recovery after burn-in.
+positive rates in one-year age cells that no eligible woman can occupy. Parity
+k is first eligible after k singleton births at least `birth_interval` apart,
+beginning at the schedule's first positive rates. Union types are pooled;
+partly reachable cells and higher parities within an open parity band are not
+reported.
 
 ### Birth transition and parent assignment
 
@@ -399,10 +370,10 @@ A new union or husband's death invalidates the woman's pending event and
 reschedules at attained age with the new fertility schedule, preserving her
 recorded birth spacing. Widowhood also restores search risk. Versioned queue
 entries prevent invalidated candidates executing. Surviving men's death hazards
-do not depend on union status. Midpoint compensation is computed independently
-within each schedule; it is not calibrated to the woman's prior-status history.
-The milestone 2 report examines conditional ASFR discrepancies; general
-recovery across status transitions is not established.
+do not depend on union status. A woman who changes type moves to the new
+type's fertility cell with her eligibility status, so that cell's births cover
+her spacing-excluded exposure (D101). The milestone 2 report's conditional
+ASFR discrepancies came from the earlier midpoint compensation.
 See [union fertility specification](union-formation-models.md#fertility-schedules-by-union-status-d039).
 
 ### Duration-dependent union dissolution (D078)
@@ -621,9 +592,9 @@ Synthetic/local-reader tests establish conversions; live requests are opt-in.
 `get_fertility_hfd(..., by_parity = TRUE)` imports
 conditional mi rates with half-open current-parity bounds (D094). Endpoint
 rows use the D095 mapping above. Unavailable conditional cells are zero-filled under the user-selected D096
-preparation rule, with policy/count in source metadata. D099 implements
-parity-dependent simulation with the selected preceding-parity correction.
-Fertility constructors accept complete parity partitions under D099.
+preparation rule, with policy/count in source metadata. Parity-dependent
+simulation uses actual-parity fertility cells (D101); fertility constructors
+accept complete parity partitions (D099 validation rules).
 See [parity fertility](parity-fertility.md) for the birth-order/parity mapping.
 
 Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDplus),
@@ -644,8 +615,8 @@ or birth-spacing dynamics. See [parity fertility](parity-fertility.md).
 | Issue | Current treatment |
 | --- | --- |
 | Initialization transient | No correction or automatic burn-in; users choose observation windows |
-| Midpoint approximation | Validate bias against supplied age schedules; no accuracy guarantee |
-| Rate changes between runs | Histories retain spacing, but compensation uses only the new schedule |
+| Cells without an eligible woman | Births dropped and reported as unrealized; concentrated in sparse young high-parity cells and initialization |
+| Rate changes between runs | Histories retain spacing; cell accounting uses the current population, so no transient correction is needed |
 | Sparse oldest ages | Observed missing cells remain missing; HFD conditional import alone uses the user-selected zero-fill rule (D096) |
 | Union formation/dissolution | Exclusive conditional-logit on-demand or female rate-based formation, minimum male age and known-kin screening; widowhood plus optional duration-dependent dissolution; age- or duration-specific searches by previous union |
 | Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
@@ -670,21 +641,16 @@ that variation. The user's inheritance comparison changed both baseline
 replication and maximum initial age, without isolating their contributions.
 Completion does not make either an initialization default or guarantee.
 
-For changed fertility rates, recently excluded women may reflect the previous
-schedule, so realized fertility can temporarily differ from the new target.
-The milestone reports examine particular rate-change and status-transition
-cases, but do not establish a general magnitude or duration; there is no
-guaranteed nine-month convergence deadline. A recent-schedule history and time-dependent
-adjustment were discussed as possible future treatments; the user explicitly
-deferred correction at that time. D045 defers transition-aware compensation again, including union-status
-transitions and rate changes between runs. The existing adjustment and
-actual-birth spacing are retained; see the user-authored reports for case-specific
-assessment rather than a general accuracy guarantee.
+Under the earlier midpoint compensation, recently excluded women after a rate
+change or status transition reflected the previous schedule, so realized
+fertility temporarily differed from the new target (milestone 1 and 2 reports;
+D045). Cell accounting (D101) uses the current composition and removes that
+transient in expectation; remaining losses are cells without an eligible woman.
 
 ## Validation requirements and future mechanism specifications
 
-Current checks cover analytical survival and waiting times, midpoint overlap
-examples, constant-rate fertility after burn-in, spacing through restarts,
+Current checks cover analytical survival and waiting times, cell accounting
+(counts, unrealized intensity, recovery), constant-rate fertility after burn-in, spacing through restarts,
 accounting, identities, father availability, seed behavior, and empty/zero-risk
 runs. [Testing](testing.md) separates these from broader demographic assessment.
 
@@ -711,12 +677,12 @@ not sufficient evidence of research readiness.
 The user accepted dissolution, age/duration remarriage, and optional rate-mode
 cohabitation/conversion on October 29, 2026 (D093), based on the
 [final report](../validation/milestone4.qmd) and its rendered assessment. This
-retains earlier limitations, including transition-aware fertility compensation
-(D045), thin-pool failures, initialization transients, and approximate calibration
+retained earlier limitations, including transition-aware fertility compensation
+(D045, since addressed by D101), thin-pool failures, initialization transients, and approximate calibration
 age bins. Reported recovery in these scenarios is not a universal exact pooled
 cross-tab constraint. Static SOCSIM audits remain distinct from executable
-reference comparisons. Parity-specific execution is implemented under D099; calendar-time schedules
-and fertility heterogeneity remain unimplemented.
+reference comparisons. Parity-specific execution is implemented (D099 schedules,
+D101 cells); calendar-time schedules and fertility heterogeneity remain unimplemented.
 
 
 ## Parity-specific fertility execution
@@ -728,20 +694,14 @@ from a custom persons parity column, and increment only on successful births.
 The count is not capped at the final band's lower bound. Newborns start at zero;
 restarts reconstruct retained histories. No prehistory is imputed.
 
-Actual parity zero uses unadjusted input fertility. Higher parities use their
-own rate divided by an eligibility approximation computed from the preceding
-actual parity's unadjusted age schedule. Retain finite-band midpoints, upper-
-open interior limits and actual-birth spacing. Current group/union type is held
-for this computation; earlier transitions are not reconstructed. Refresh current
-fertility/calibration contributions at birth. No new parity matching bins are
-introduced. See [parity fertility](parity-fertility.md) for validation, formulae
-and the highest-band distinction.
-
-This is a SOCSIM-style approximation, not an exact exposure adjustment. In the
-controlled initialized-cohort check, .75-year spacing yields mean parity-1 and
-2+ rates .2665 and .3335 against inputs .3 and .4. The limitation is explicit;
-software correctness does not establish conditional-rate recovery or milestone 5
-acceptance. Alternative exposure-based compensation remains a future decision.
+Births use one fertility cell per actual parity (D101), so a pooled input band
+applies its rate to each contained parity. Refresh calibration contributions at
+birth. No new parity matching bins are introduced. See
+[parity fertility](parity-fertility.md) and
+[cell-accounted fertility](fertility-cell-accounting.md). With the user's HFD
+2000 inputs, conditional rates are recovered at most ages and parities; young
+high-parity shortfalls equal the reported unrealized births (about 0.1% of
+births at 50,000 people) and shrink with population size.
 
 Observed parity-specific ASFRs use `calculate_fertility_rates(parity_breaks = ...)`
 (D100). Bands begin at zero and contain integer parity boundaries, with Inf
@@ -751,8 +711,6 @@ new parity. Spacing-excluded time remains exposure. See [parity observations](pa
 
 
 The [spacing-calibration investigation](parity-spacing-investigation.md) records
-user-reported later-window parity-rate failures and a controlled executable
-SOCSIM comparison. Positive-spacing compensation remains a known scientific
-limitation; passing software tests and zero-spacing recovery do not validate it.
-A general eligibility-calibration approach is under discussion, with no accepted
-replacement algorithm.
+the parity-rate failures of the earlier preceding-parity correction (D099), a
+controlled executable SOCSIM comparison showing the same limitation, and the
+evidence that led to cell accounting (D101).

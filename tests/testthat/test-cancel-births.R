@@ -42,18 +42,19 @@ test_that("both initiation modes cancel unmatched births unless explicitly allow
 
 test_that("cancelled attempts do not create spacing, IDs or kinship and can later succeed", {
   for (mode in c("on_demand", "rate")) {
-    model <- make_model(2, birth_rate = 1, birth_interval = 0.9)
+    model <- make_model(2, birth_rate = 10, birth_interval = 0.9)
     model$population$persons$sex[1] <- "f"
     model$population$persons$birth_time[2] <- -14.5
     if (mode == "rate") {
       model <- set_union_formation(model, "rate", model$processes$union_formation$matching,
         rates = data.frame(age_start = 0, age_end = Inf, rate = 0))
       model <- set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
-        age_start = 15, age_end = 50, rate = 1), 0.9)
+        age_start = 15, age_end = 50, rate = 10), 0.9)
     }
     model$processes$union_formation$cancel_birth_if_no_match <- TRUE
-    # Compensated birth hazard is 10/year. Many early failed attempts; the man
-    # becomes eligible at .5. Applying .9 spacing after failure would delay success.
+    # Birth hazard 10/year (an eligible woman alone in her cell faces the input
+    # rate). Many early failed attempts; the man becomes eligible at .5.
+    # Applying .9 spacing after failure would delay success.
     result <- simulate(model, 0.9, seed = 52)
     children <- result$persons[result$persons$birth_time >= 0, ]
     expect_equal(nrow(children), 1)

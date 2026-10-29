@@ -118,126 +118,6 @@ struct Person {
 enum class EventType { death, birth, search, dissolution, conversion };
 struct Event { int person; EventType type; unsigned long long version; };
 
-double rate_integral(const std::vector<Band>& bands, double lo, double hi) {
-  // Integrate the supplied annual rate over [lo, hi), accounting for bands
-  // that only partly overlap the interval. Uncovered fertility ages add zero.
-  double total = 0;
-  for (const Band& band : bands) {
-    if (band.end <= lo) continue;
-    if (band.start >= hi) break;
-    total += band.rate * std::max(0.0, std::min(hi, band.end) - std::max(lo, band.start));
-  }
-  return total;
-}
-
-// Calculate one constant eligible hazard per original band: finite midpoint
-// or interior constant-rate limit for an upper-open band.
-// Integrate the unadjusted rates across the preceding birth interval, including
-// overlaps with earlier bands and gaps. Event sampling uses the ordinary Band
-// representation and shared constant-hazard waiting_time() function.
-std::vector<Band> adjusted_fertility(const std::vector<Band>& raw,
-                                    double birth_interval) {
-  if (birth_interval == 0) return raw;
-  std::vector<Band> adjusted;
-  for (const Band& band : raw) {
-    checkUserInterrupt();
-    const bool open = !std::isfinite(band.end);
-    double excluded = birth_interval * band.rate;
-    if (!open) {
-      const double midpoint = band.start + (band.end - band.start) / 2;
-      excluded = rate_integral(raw, std::max(0.0, midpoint - birth_interval), midpoint);
-    }
-    const double eligible = 1 - excluded;
-    if (!(eligible > 0))
-      stop(open ? "Birth interval and fertility rates imply nonpositive open-band eligibility." :
-        "Birth interval and fertility rates imply nonpositive midpoint eligibility.");
-    const double rate = band.rate / eligible;
-    if (!std::isfinite(rate)) stop("Adjusted fertility rate cannot be represented.");
-    adjusted.push_back({band.start, band.end, rate});
-  }
-  return adjusted;
-}
-
-// Prepared schedules vary only at current/preceding parity band boundaries.
-// Storage scales with supplied bands, not with the maximum possible parity.
-struct FertilitySchedules {
-  std::vector<double> starts;
-  std::vector<std::vector<Band>> hazards;
-  const std::vector<Band>& at(int parity) const {
-    const size_t k = std::upper_bound(starts.begin(), starts.end(), parity) - starts.begin() - 1;
-    return hazards[k];
-  }
-};
-
-std::vector<Band> adjusted_parity_fertility(const std::vector<Band>& current,
-    const std::vector<Band>& previous, double interval, bool first) {
-  if (first || interval == 0) return current;
-  std::vector<Band> out;
-  for (const auto& band : current) {
-    if (band.rate == 0) { out.push_back(band); continue; }
-    double excluded = 0;
-    if (std::isfinite(band.end)) {
-      const double midpoint = band.start + (band.end - band.start)/2;
-      excluded = rate_integral(previous, std::max(0.0, midpoint-interval), midpoint);
-    } else if (!previous.empty() && !std::isfinite(previous.back().end)) {
-      excluded = interval * previous.back().rate;
-    }
-    if (!(excluded < 1)) stop("Birth interval and previous-parity fertility imply nonpositive eligibility.");
-    const double rate = band.rate/(1-excluded);
-    if (!std::isfinite(rate)) stop("Adjusted parity fertility rate cannot be represented.");
-    out.push_back({band.start, band.end, rate});
-  }
-  return out;
-}
-
-FertilitySchedules prepare_fertility_schedules(DataFrame rates, int group,
-    const std::string& status, double interval) {
-  FertilitySchedules out;
-  if (!rates.containsElementNamed("parity_start")) {
-    out.starts = {0};
-    out.hazards.push_back(adjusted_fertility(read_bands(rates, "", status, group), interval));
-    return out;
-  }
-  NumericVector starts = rates["parity_start"], ends = rates["parity_end"];
-  std::set<double> boundaries = {0,1};
-  for (double value : starts) { boundaries.insert(value); boundaries.insert(value+1); }
-  for (double value : ends) if (R_finite(value)) { boundaries.insert(value); boundaries.insert(value+1); }
-  out.starts.assign(boundaries.begin(), boundaries.end());
-  for (double parity : out.starts) {
-    const auto current = read_bands(rates, "", status, group, "", false, parity);
-    const auto previous = read_bands(rates, "", status, group, "", false, std::max(0.0,parity-1));
-    out.hazards.push_back(adjusted_parity_fertility(current, previous, interval, parity == 0));
-  }
-  return out;
-}
-
-// [[Rcpp::export]]
-DataFrame adjusted_parity_fertility_cpp(DataFrame rates, int parity, double birth_interval) {
-  if (parity < 0 || !R_finite(birth_interval) || birth_interval < 0)
-    stop("Invalid parity or birth interval.");
-  const auto prepared = prepare_fertility_schedules(rates, -1, "", birth_interval);
-  const auto& bands = prepared.at(parity);
-  NumericVector starts(bands.size()), ends(bands.size()), values(bands.size());
-  for (size_t i=0; i<bands.size(); ++i) { starts[i]=bands[i].start; ends[i]=bands[i].end; values[i]=bands[i].rate; }
-  return DataFrame::create(_["age_start"]=starts, _["age_end"]=ends, _["rate"]=values);
-}
-
-// Internal deterministic entry point to inspect adjustment in analytical tests.
-// [[Rcpp::export]]
-DataFrame adjusted_fertility_cpp(DataFrame rates, double birth_interval) {
-  if (!R_finite(birth_interval) || birth_interval < 0)
-    stop("Birth interval must be finite and nonnegative.");
-  const auto bands = adjusted_fertility(read_bands(rates), birth_interval);
-  NumericVector starts(bands.size()), ends(bands.size()), values(bands.size());
-  for (size_t i = 0; i < bands.size(); ++i) {
-    starts[i] = bands[i].start;
-    ends[i] = bands[i].end;
-    values[i] = bands[i].rate;
-  }
-  return DataFrame::create(_["age_start"] = starts, _["age_end"] = ends,
-                          _["rate"] = values);
-}
-
 // Evaluate candidate utilities without rounding age differences. Common linear
 // and raw quadratic formulas use an exact native path; other formulas call the
 // R model-matrix evaluator with candidate data only, never mutable engine state.
@@ -1704,8 +1584,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   bool cancel_birth_if_no_match, bool diagnostics,
                   NumericMatrix initial_ancestry, List inheritance, double ffab,
                   DataFrame dissolution_rates, DataFrame cohab_prob, DataFrame conversion_rates,
-                  List cohab_matching, bool counts_cohab, bool cell_spacing,
-                  bool check_cells = false) {
+                  List cohab_matching, bool counts_cohab, bool check_cells = false) {
   const bool cohab_enabled = cohab_prob.nrows() > 0;
   const bool parity_specific = fertility_rates.containsElementNamed("parity_start");
   if (!R_finite(ffab) || ffab < 0 || ffab > 1)
@@ -1794,10 +1673,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::unique_ptr<WeightCalibrator> calibrator;
   std::vector<char> counted_woman;
   std::unique_ptr<FemaleIntensityTracker> intensity_tracker;
-  // Cell-accounted spacing (D101); null under midpoint compensation.
+  // Cell-accounted fertility under birth spacing (D101).
   std::unique_ptr<FertilityCells> cells;
   std::vector<const std::vector<Band>*> search_hazards;
-  std::vector<const FertilitySchedules*> fertility_hazards;
   std::vector<bool> search_duration;
   std::vector<std::vector<Band>> probability_schedules(group_count * 3);
   if (cohab_enabled) {
@@ -1860,11 +1738,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       }
     }
   }
-  // Under cell accounting the fertility channel comes from cells, not women.
-  auto cells_mode_fertility_pointer = [&](int woman, int g) -> const std::vector<Band>* {
-    if (cell_spacing) return nullptr;
-    return &fertility_hazards[g]->at(parity_specific ? parity[woman] : 0);
-  };
   // weighted_choice counts living, unpartnered women; fertility-driven intensity
   // also requires the birth-spacing interval to have ended (queued re-entry).
   auto add_counted_woman = [&](int woman, double now) {
@@ -1878,8 +1751,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     const double origin = rate_initiation && search_duration[index] ?
       previous_union_end[woman] : people[woman].born;
     if (!R_finite(origin)) stop("Duration search risk requires a recorded previous union ending.");
-    intensity_tracker->activate(woman, g, people[woman].born, search,
-      cells_mode_fertility_pointer(woman, g),
+    // The fertility channel comes from cells (fill_calibration), not women.
+    intensity_tracker->activate(woman, g, people[woman].born, search, nullptr,
       people[woman].last_birth + birth_interval, now, origin,
       cohab_enabled ? &probability_schedules[g * 3 + previous_union[woman]] : nullptr);
   };
@@ -1974,7 +1847,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   };
   struct GroupSchedules {
     std::vector<Band> male, female, search, conversion;
-    FertilitySchedules partnered, cohab, unpartnered;
     bool duration_conversion = false;
     std::array<std::vector<Band>, 3> previous_search;
     std::array<bool, 3> duration_search = {false, false, false};
@@ -1991,23 +1863,15 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     CharacterVector types = fertility_rates["union_type"];
     for (auto type : types) if (as<std::string>(type) == "cohab") typed_fertility = true;
   }
-  // Cell accounting uses unadjusted input rates; midpoint compensation and its
-  // feasibility checks apply only to the midpoint method.
-  const double compensation_interval = cell_spacing ? 0 : birth_interval;
   for (int group = 0; group < group_count; ++group) {
     auto& rates = schedules[group];
     rates.male = read_bands(mortality_rates, "m", "", group);
     rates.female = read_bands(mortality_rates, "f", "", group);
-    rates.partnered = prepare_fertility_schedules(fertility_rates, group,
-      status_fertility ? (typed_fertility ? "marriage" : "partnered") : "", compensation_interval);
-    rates.cohab = typed_fertility ? prepare_fertility_schedules(fertility_rates, group, "cohab", compensation_interval) : rates.partnered;
     if (conversion_rates.nrows()) {
       NumericVector ages = conversion_rates["age_start"];
       rates.duration_conversion = NumericVector::is_na(ages[0]);
       rates.conversion = read_bands(conversion_rates, "", "", group, "", rates.duration_conversion);
     }
-    rates.unpartnered = status_fertility ? prepare_fertility_schedules(
-      fertility_rates, group, "unpartnered", compensation_interval) : rates.partnered;
     if (rate_initiation) {
       if (previous_specific) {
         const std::array<std::string, 3> labels = {"none", "dissolved", "widowed"};
@@ -2036,7 +1900,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         search_hazards.push_back(&schedules[group].search);
         search_duration.push_back(false);
       }
-      fertility_hazards.push_back(&schedules[group].unpartnered);
     }
     if (union_weighted) {
       union_table = build_lag_table(matching, group_count, calibrator->bins(), kWeightBinWidth);
@@ -2092,21 +1955,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   auto schedule = [&](int i, double now) {
     const auto version = ++event_versions[i];
     const Person& p = people[i];
-    if (cells && p.female) cells->refresh(i, now);
+    if (p.female) cells->refresh(i, now);
     if (!NumericVector::is_na(p.died)) return;
     const auto& rates = schedules[p.group];
     const auto& death_rates = p.female ? rates.female : rates.male;
     double death_time = candidate(waiting_time(death_rates, now - p.born, threshold()), now);
-    double birth_time = std::numeric_limits<double>::infinity();
-    if (p.female && !cells) {
-      const auto& fertility = current_partner[i] >= 0 ?
-        (union_history[person_unions[i].back()].cohab ? rates.cohab : rates.partnered) : rates.unpartnered;
-      const auto& birth_hazards = fertility.at(parity_specific ? parity[i] : 0);
-      double first = std::max(now, p.last_birth + birth_interval);
-      if (first < end)
-        birth_time = candidate(waiting_time(birth_hazards,
-          first - p.born, threshold()), first);
-    }
+    // Births come from fertility cells (D101), not per-person candidates.
+    const double birth_time = std::numeric_limits<double>::infinity();
     double search_time = std::numeric_limits<double>::infinity();
     if (rate_initiation && p.female && current_partner[i] < 0) {
       const bool duration = previous_specific && rates.duration_search[previous_union[i]];
@@ -2153,7 +2008,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   const std::vector<std::string> fertility_types = !status_fertility ? std::vector<std::string>{""} :
     (typed_fertility ? std::vector<std::string>{"unpartnered", "marriage", "cohab"} :
                        std::vector<std::string>{"unpartnered", "partnered"});
-  if (cell_spacing) {
+  {
     auto state = [&](int w) {
       FertilityCells::State st;
       const Person& p = people[w];

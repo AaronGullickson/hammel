@@ -3,10 +3,9 @@
 Updated October 29, 2026. Milestones 1 (mortality/fertility), 2 (union
 formation), 3 (groups/matching/inheritance), and 4 (dissolution/remarriage/
 cohabitation) are complete by user acceptance (D029, D050, D077, D093). Current behavior uses
-continuous event times and midpoint fertility compensation, with no monthly
-time grid. Acceptance is based on the user-authored validation reports.
-Transition-aware fertility compensation and other deferred mechanisms remain
-future work.
+continuous event times and cell-accounted fertility under birth spacing (D101),
+with no monthly time grid. Acceptance is based on the user-authored validation
+reports. Deferred mechanisms remain future work.
 
 ## Reading order
 
@@ -23,8 +22,8 @@ future work.
 | [Weighted-choice matching](weighted-choice-matching.md) | Calibrated male-group weights and delta target adjustments (D074/D075) |
 | [Group matching](group-matching.md) | Symmetric pair effects and fixed group formula predictors |
 | [Demographic analysis](demographic-analysis.md) | Separate mortality/fertility rates, parity ASFRs, union rates, TFR, and life tables |
-| [Parity spacing investigation](parity-spacing-investigation.md) | Current recovery evidence, SOCSIM reference and collaboration questions |
-| [Cell-accounted fertility](fertility-cell-accounting.md) | Spacing mechanism (D101), opt-in `spacing_method = "cell"` |
+| [Cell-accounted fertility](fertility-cell-accounting.md) | Birth-spacing mechanism (D101): cells, unrealized births, validation |
+| [Parity spacing investigation](parity-spacing-investigation.md) | Evidence that led to D101, including the SOCSIM reference |
 | [Testing and validation](testing.md) | Test commands, evidence, and remaining validation |
 | [Current handoff](session-handoff.md) | Recent findings, active work, and deferred issues |
 
@@ -40,13 +39,15 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [Union-formation models](union-formation-models.md) | Implemented milestone 2 rules, matching defaults, diagnostics, and deferred work |
 | [Cohabitation](cohabitation.md) | Rate-mode type probabilities, type-specific matching/rates, conversion and histories (D085/D086) |
 | [Remarriage schedules](remarriage.md) | Age/duration previous-union search strata, calibration, and marriage observations (D080/D083) |
-| [Parity fertility and PATFR](parity-fertility.md) | History-derived parity, schedules, SOCSIM-style spacing approximation and recovery limitations; milestone 5 in progress (D094–D099) |
+| [Fertility heterogeneity notes](fertility-heterogeneity-notes.md) | Proposal: separate dispersion and inheritance; latent-normal variance preservation and selection caveat |
+| [Parity fertility and PATFR](parity-fertility.md) | History-derived parity, schedules, HFD recovery and PATFR; milestone 5 in progress (D094–D101) |
 | [Union dissolution](union-dissolution.md) | Milestone 4 duration hazards, female carrier, state changes, and worked examples (D078) |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
 | [Two-sex union models](two-sex-union-models.md) | Proposal notes: directional asymmetry, marriage squeeze, Schoen/Choo–Siow/Dagsvik models, API considerations (D073) |
 | [Future roadmap](roadmap.md) | Accepted milestones and future priorities with unresolved specifications |
 | [Decision log](decisions.md) | Accepted choices and supersession history |
 | [SOCSIM audit plan](socsim-audit.md) | Scope and remaining reference investigation |
+| [SOCSIM fertility heterogeneity](socsim-fertility-heterogeneity-audit.md) | Pinned fmult distribution, inheritance, defaults, switch checks and loader caveat |
 | [SOCSIM rates](socsim-rate-audit.md) | Pinned static source findings |
 | [SOCSIM competing events](socsim-competing-events-audit.md) | Pinned static scheduling findings |
 | [SOCSIM union formation](socsim-union-formation-audit.md) | Pinned static search, matching, and eligibility findings |

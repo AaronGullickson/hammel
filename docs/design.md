@@ -68,7 +68,7 @@ Mortality, fertility, and rate-based union formation also accept optional
 `group_prop_hazard` vectors on constructors and setters. The process stores the
 vector separately from its input rates. Execution scales a private schedule
 copy, expanding shared schedules by population group where needed, before
-native schedule construction and fertility compensation. Omitted group factors
+native schedule and fertility-cell construction. Omitted group factors
 are 1.0; absent population groups cause a warning and the vector is ignored.
 Conditional fertility may instead store a named list of partnered/unpartnered
 vectors. Omitted statuses also use 1.0; a single vector scales both statuses.
@@ -88,8 +88,9 @@ duration-dependent union dissolution. Other processes are rejected.
 fertility, and an explicit union-formation process. It uses continuous years, with no `dt`, execution step, monthly
 compensation grid, or birth-spacing argument on the execution function.
 
-C++ constructs midpoint-adjusted fertility bands, samples cumulative-hazard
-thresholds, and processes the earliest event in a sparse ordered queue.
+C++ builds fertility cells from the input schedules (D101), samples
+cumulative-hazard thresholds, and processes the earliest of the next person
+event, the next fertility-cell clock and the next cell boundary.
 R validates inputs and assembles the returned `hammel_population`, retaining
 histories and existing extra person columns. Newborn group identity follows
 the fertility inheritance model (random parent by default, with maternal fallback); other custom attributes are
@@ -174,8 +175,8 @@ RDS and reuse them without downloads. HMDHFDplus is optional for these helpers.
 The HFD helper's `by_parity = TRUE` option imports conditional mi rates as
 age/parity interval rows for milestone 5 preparation. Unavailable
 conditional cells are zero-filled under D096, with policy/count metadata. The
-engine accepts complete parity partitions under D099 and initializes counts
-from recorded maternal births.
+engine accepts complete parity partitions under D099, initializes counts
+from recorded maternal births and uses one fertility cell per actual parity (D101).
 See [parity fertility](parity-fertility.md). The default remains total asfrRR. `calculate_patfr()` summarizes conditional
 parity schedules with a deterministic HFD-style fertility table; calculate_tfr()
 delegates when parity columns are present, returning patfr (D097). Both products preserve endpoint rows under
@@ -244,8 +245,7 @@ TFR and life-table calculations automatically retain input group strata. See
 These remain proposals or unresolved requirements:
 
 - Custom process execution and permitted state mutations/invalidation.
-- Poor-pool waiting, previous-father continuity,
-  and transition-aware fertility compensation; see [union formation](union-formation-models.md)
+- Poor-pool waiting and previous-father continuity; see [union formation](union-formation-models.md)
   and the [roadmap](roadmap.md).
 - Heterogeneity, parity-specific fertility, and user-defined newborn attributes.
 - Observation retention controls and exact stochastic checkpoints.
@@ -284,7 +284,7 @@ changes replace contributions; searches do not scan all women or enumerate a
 cross-classification of rate predictors. See
 [current-hazard contributions](calibration-intensity.md). Its boundary
 queue is the shared `BoundaryQueue` class, also used by `FertilityCells`
-(D101, `spacing_method = "cell"`), which keeps cell counts and eligible lists,
+(D101), which keeps cell counts and eligible lists,
 keeps one birth clock per cell in its own indexed heap (compared with the main
 event queue at each step), processes its boundaries in time order, and
 supplies calibration fertility totals at search time. `BoundaryQueue` is a

@@ -40,15 +40,14 @@ be made autonomously; record choices with substantial architectural consequences
 - Make time, rate units, random-number behavior, and observation semantics explicit.
   Public times/durations are years, exposure is person-years, and input rates are
   per person-year. The current engine executes continuously (D024), with no
-  monthly increment or execution-step parameter. Fertility uses midpoint
-  compensation on original finite age bands (D028), with the interior-limit
-  adjustment f/(1-b*f) for unstratified upper-open bands (D095), not a monthly
-  grid. Parity-specific execution (D099) leaves parity zero unadjusted and uses
-  the preceding actual parity's raw schedule for higher-parity correction.
-  Its known recovery limitations are documented in docs/parity-fertility.md.
-  Mortality and adjusted fertility share `Band` and `waiting_time()`. Do not
-  reintroduce superseded monthly timing or the specialized exact fertility sampler
-  without an explicit modeling decision.
+  monthly increment or execution-step parameter. Births use cell-accounted
+  fertility (D101): each one-year age x actual parity x union type x group cell
+  produces births at its input rate times all members, assigned to a random
+  eligible member; births in cells with no eligible woman are reported as
+  unrealized. See docs/fertility-cell-accounting.md. Midpoint compensation
+  (D028/D095/D099) was removed. Do not reintroduce superseded monthly timing,
+  midpoint compensation or the specialized exact fertility sampler without an
+  explicit modeling decision.
 - Design built-in and custom demographic mechanisms around a documented contract; arbitrary callbacks must not bypass state consistency or event invalidation rules.
 - Preserve scientifically relevant provenance. Before copying or adapting source, establish its version, license, and applicable obligations.
 - C++17/Rcpp is selected for the first engine (D019); tibble is the public table

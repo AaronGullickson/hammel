@@ -194,7 +194,7 @@ calculate_mortality_rates <- function(population, time_breaks, age_breaks,
 #'   integer boundaries starting at zero. Bands are half-open. A finite final
 #'   boundary receives Inf, as for age breaks.
 #' @param unrealized Logical, default `FALSE`. With `TRUE`, the population must
-#'   come from `simulate()` with `spacing_method = "cell"`; add
+#'   come from `simulate()`; add
 #'   `unrealized_births` (expected births dropped from fertility cells that had
 #'   members but no eligible woman, from `simulation$unrealized_births`) and
 #'   `rate_fertility_adjusted = (births + unrealized_births) / person_years`.
@@ -214,9 +214,9 @@ calculate_fertility_rates <- function(population, time_breaks, age_breaks,
     stop("`unrealized` must be TRUE or FALSE.", call. = FALSE)
   if (unrealized) {
     record <- if (inherits(population, "hammel_population")) population$simulation else NULL
-    if (!identical(record$spacing_method, "cell") || is.null(record$unrealized_births))
-      stop('`unrealized = TRUE` requires a population simulated with `spacing_method = "cell"`.',
-           call. = FALSE)
+    if (is.null(record$unrealized_births))
+      stop(paste("`unrealized = TRUE` requires a population returned by simulate()",
+                 "with an unrealized-births record."), call. = FALSE)
   }
   # Shared validation and pooled schema; retain complete family/union histories.
   pooled <- collect_demographic_counts(population, time_breaks, age_breaks,

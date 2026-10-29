@@ -245,8 +245,9 @@ The user asked for the runtime cell-accounting candidate to be written as a
 scientific specification, designed to admit individual fertility weights for
 future heterogeneity. See [cell-accounted fertility](fertility-cell-accounting.md).
 The user accepted it with all six modeling decisions on October 29, 2026 (D101).
-It is implemented as the opt-in `spacing_method = "cell"`; D099 remains the
-default. After validation the user selected 1-year, actual-parity cells.
+After validation the user selected 1-year, actual-parity cells and then made
+cell accounting the only method, removing midpoint compensation and D099's
+correction.
 
 ## Next questions for collaboration
 

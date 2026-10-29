@@ -83,7 +83,9 @@ test_that("rate searches retry and father overrides carry independent restrictio
   expect_warning(result <- simulate(model, .3, seed = 52), "could not meet male-group targets")
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 3))
   model$processes$union_formation$rates$rate <- 100
-  expect_warning(result <- simulate(model, .3, seed = 52), "could not meet male-group targets")
+  # The union may form before any unpartnered birth needs a father, so the
+  # father-calibration warning is incidental here.
+  result <- suppressWarnings(simulate(model, .3, seed = 52))
   expect_equal(result$unions$husband_id, 2)
   # No compatible men: repeated searches neither form unions nor reserve men.
   model$population$persons$group <- c("A", "B", "B")

@@ -1,13 +1,13 @@
 # Cell-accounted fertility under birth spacing (D101).
 
-cell_model <- function(n = 2000, rate = .2, spacing = .75, method = "cell", age = 20,
+cell_model <- function(n = 2000, rate = .2, spacing = .75, age = 20,
                        rates = data.frame(age_start = 15, age_end = 50, rate = rate)) {
   people <- data.frame(person_id = seq_len(n), sex = "f", birth_time = -age,
     death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
   hammel_model() |>
     set_population(hammel_population(people, end_time = 0)) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
-    set_fertility(rates, birth_interval = spacing, spacing_method = method) |>
+    set_fertility(rates, birth_interval = spacing) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
 }
 
@@ -17,33 +17,25 @@ founder_rate <- function(pop, n, years) {
   births / (n * years)
 }
 
-test_that("spacing_method is validated, defaults to midpoint and is recorded", {
-  rates <- data.frame(age_start = 15, age_end = 50, rate = .1)
-  expect_identical(fertility(rates)$spacing_method, "midpoint")
-  expect_identical(fertility(rates, spacing_method = "cell")$spacing_method, "cell")
-  for (bad in list("exact", NA_character_, c("cell", "midpoint"), 1))
-    expect_error(fertility(rates, spacing_method = bad), "spacing_method")
-  model <- cell_model(10, method = "midpoint")
-  older <- model
-  older$processes$fertility$spacing_method <- NULL
-  expect_identical(set_process(older, older$processes$fertility)$processes$fertility$spacing_method,
-                   "midpoint")
-  result <- simulate(model, 1, seed = 3)
-  expect_identical(result$simulation$spacing_method, "midpoint")
-  expect_null(result$simulation$unrealized_births)
-  explicit <- set_fertility(model, rates, spacing_method = "midpoint")
-  default <- set_fertility(model, rates)
-  expect_identical(simulate(explicit, 2, seed = 9), simulate(default, 2, seed = 9))
+test_that("older specifications carrying spacing_method are accepted", {
+  model <- cell_model(10)
+  old <- model
+  old$processes$fertility$spacing_method <- "cell"
+  expect_null(set_process(old, old$processes$fertility)$processes$fertility$spacing_method)
+  old$processes$fertility$spacing_method <- "midpoint"
+  expect_warning(attached <- set_process(old, old$processes$fertility), "no longer available")
+  expect_null(attached$processes$fertility$spacing_method)
+  expect_error(fertility(data.frame(age_start = 15, age_end = 50, rate = .1),
+                         spacing_method = "cell"), "unused argument")
 })
 
-test_that("cell mode reports unrealized births as a typed tibble", {
+test_that("simulations report unrealized births as a typed tibble", {
   result <- simulate(cell_model(20), 0, seed = 1)
   out <- result$simulation$unrealized_births
   expect_s3_class(out, "tbl_df")
   expect_identical(nrow(out), 0L)
   expect_identical(names(out), c("period_start", "period_end", "age_start", "age_end",
                                  "unrealized_births", "years_without_eligible"))
-  expect_identical(result$simulation$spacing_method, "cell")
 })
 
 test_that("a cell whose only member is in spacing accrues exact unrealized intensity", {
@@ -55,7 +47,7 @@ test_that("a cell whose only member is in spacing accrues exact unrealized inten
     set_population(hammel_population(people, end_time = 0)) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .5),
-                  birth_interval = 2, spacing_method = "cell") |>
+                  birth_interval = 2) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
   result <- simulate(model, 1.5, seed = 4)
   out <- result$simulation$unrealized_births
@@ -80,7 +72,7 @@ test_that("cells split ages at whole years and pooled parity bands by actual par
   model <- hammel_model() |>
     set_population(hammel_population(people, end_time = 0)) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
-    (\(m) quiet_unreachable(set_fertility(m, rates, birth_interval = 2, spacing_method = "cell")))() |>
+    (\(m) quiet_unreachable(set_fertility(m, rates, birth_interval = 2)))() |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
   expect_warning(fertility(rates, birth_interval = 2),
                  "parity 2 at ages \\[15, 19\\) \\(earliest eligible age 19\\)")
@@ -103,16 +95,12 @@ test_that("zero spacing generates births at the input rate", {
 })
 
 test_that("unstratified cell accounting recovers the input rate from a no-history start", {
-  # Midpoint compensation inflates first-year hazards although nobody is
-  # initially in spacing (expected first-year rate about .33 here); cell
-  # accounting uses the actual eligible share.
+  # Nobody is initially in spacing; cell accounting uses the actual eligible
+  # share from the first instant, so the first year is not inflated.
   n <- 10000
   first_year <- function(pop) sum(pop$persons$mother_id %in% seq_len(n)) / n
-  se <- sqrt(.3 / n)
-  cell <- first_year(simulate(cell_model(n, rate = .3), 1, seed = 31))
-  mid <- first_year(simulate(cell_model(n, rate = .3, method = "midpoint"), 1, seed = 31))
-  expect_lt(abs(cell - .3), 4 * se)
-  expect_gt(mid - cell, 2 * sqrt(2) * se)
+  expect_lt(abs(first_year(simulate(cell_model(n, rate = .3), 1, seed = 31)) - .3),
+            4 * sqrt(.3 / n))
   n <- 3000
   longer <- simulate(cell_model(n, rate = .3), 3, seed = 32)
   expect_lt(abs(founder_rate(longer, n, 3) - .3), 4 * sqrt(.3 / (3 * n)))
@@ -147,7 +135,7 @@ test_that("cell mode runs with groups, union types, cohabitation, matching and r
               transform(fert, union_type = "marriage"))
   mort <- data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .01)
   model <- hammel_model() |> set_population(base) |> set_mortality(mort) |>
-    set_fertility(sf, group_prop_hazard = c(A = 1, B = 1.4), spacing_method = "cell") |>
+    set_fertility(sf, group_prop_hazard = c(A = 1, B = 1.4)) |>
     set_union_formation("rate",
       create_matching_model(~ age_difference, c(age_difference = -.1), group_exogamy = c("A:B" = -1)),
       rates = data.frame(age_start = 15, age_end = Inf, rate = .15),
@@ -164,7 +152,7 @@ test_that("cell mode runs with groups, union types, cohabitation, matching and r
   expect_true(all(restarted$simulation$unrealized_births$period_start >= 5))
   # Grouped on-demand mode exercises cell-derived calibration totals.
   od <- hammel_model() |> set_population(base) |> set_mortality(mort) |>
-    set_fertility(fert, spacing_method = "cell") |>
+    set_fertility(fert) |>
     set_union_formation("on_demand",
       create_matching_model(~ age_difference, c(age_difference = -.1), group_exogamy = c("A:B" = -1)))
   expect_gt(simulate(od, 5, seed = 53)$simulation$births, 0)
@@ -220,7 +208,7 @@ test_that("upper-open bands stay one cell only when interval x rate is very smal
       set_population(hammel_population(people, end_time = 0)) |>
       set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
       set_fertility(data.frame(age_start = 15, age_end = Inf, rate = rate),
-                    birth_interval = 2, spacing_method = "cell") |>
+                    birth_interval = 2) |>
       set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
     simulate(model, 1.5, seed = 8)$simulation$unrealized_births
   }
@@ -244,7 +232,7 @@ test_that("released eligibility does not consume blocked time or force a birth",
     set_population(hammel_population(people, end_time = 0)) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .5),
-                  birth_interval = .75, spacing_method = "cell") |>
+                  birth_interval = .75) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
   out <- simulate(model, .9, seed = 2)$simulation$unrealized_births
   expect_equal(sum(out$unrealized_births), .5 * .65)
@@ -256,7 +244,7 @@ test_that("released eligibility does not consume blocked time or force a birth",
     set_population(hammel_population(one, end_time = 0)) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 1000, rate = 2),
-                  birth_interval = .75, spacing_method = "cell", ffab = 0) |>
+                  birth_interval = .75, ffab = 0) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
   pop <- simulate(long, 300, seed = 3)
   times <- sort(pop$persons$birth_time[pop$persons$mother_id %in% 1])
@@ -284,7 +272,7 @@ test_that("calculate_fertility_rates attributes unrealized births exactly or ret
     set_population(hammel_population(people, end_time = 0)) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .5),
-                  birth_interval = 2, spacing_method = "cell") |>
+                  birth_interval = 2) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
   pop <- simulate(model, 1.5, seed = 4)
   r <- calculate_fertility_rates(pop, c(0, 1, 1.5), c(15, 50), unrealized = TRUE)
@@ -310,9 +298,9 @@ test_that("calculate_fertility_rates attributes unrealized births exactly or ret
   typed <- calculate_fertility_rates(pop, c(0, 1.5), c(15, 50), by_union_type = TRUE,
                                      unrealized = TRUE)
   expect_true(all(is.na(typed$unrealized_births[typed$age_start == 15])))
-  # Midpoint populations have no unrealized record.
-  mid <- simulate(set_fertility(model, model$processes$fertility$rates, birth_interval = .75), .5, 1)
-  expect_error(calculate_fertility_rates(mid, c(0, .5), c(15, 50), unrealized = TRUE), "cell")
+  # A population that was never simulated has no unrealized record.
+  expect_error(calculate_fertility_rates(model$population, c(-1, 0), c(15, 50),
+                                         unrealized = TRUE), "unrealized-births record")
   expect_error(calculate_fertility_rates(pop, c(0, 1.5), c(15, 50), unrealized = NA), "TRUE or FALSE")
 })
 
@@ -326,7 +314,7 @@ test_that("unrealized births pool into observed parity bands and restore cohort 
   model <- hammel_model() |>
     set_population(hammel_population(people, end_time = 0)) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
-    (\(m) quiet_unreachable(set_fertility(m, rates, birth_interval = 2, spacing_method = "cell")))() |>
+    (\(m) quiet_unreachable(set_fertility(m, rates, birth_interval = 2)))() |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
   pop <- simulate(model, 1, seed = 7)
   r <- calculate_fertility_rates(pop, c(0, 1), c(15, Inf), parity_breaks = c(0, 2),

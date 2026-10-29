@@ -29,7 +29,7 @@ that milestone at acceptance, not the current mandatory-union engine (D032).
 | --- | --- |
 | Population/model construction | Implemented; public tables are tibbles |
 | Mortality | Piecewise constant age/sex hazards; continuous sampling |
-| Fertility | Population ASFR inputs; midpoint spacing compensation (D028) |
+| Fertility | Population ASFR inputs; cell-accounted fertility under spacing (D101) |
 | Birth spacing | Fertility-process setting, default 0.75 years |
 | Parent assignment | Uniformly sampled living male; unknown father if none exists |
 | Relationships | Parent histories retained; no new unions formed |
@@ -40,8 +40,8 @@ that milestone at acceptance, not the current mandatory-union engine (D032).
 D019 replaced the original basic-partnership requirement with random male
 parent assignment for the first executable milestone. D024 replaced monthly
 execution with continuous event times. D028 replaced monthly and exact
-age-varying fertility compensation with one adjusted rate per original age
-band, evaluated at its midpoint. Those older descriptions are historical.
+age-varying fertility compensation with midpoint compensation, which D101
+replaced with cell-accounted fertility. Those older descriptions are historical.
 
 ## Milestone 1 completion
 
