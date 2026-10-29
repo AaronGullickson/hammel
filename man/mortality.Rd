@@ -12,7 +12,8 @@ fertility(
   birth_interval = 0.75,
   group_prop_hazard = NULL,
   inheritance = create_group_inheritance(),
-  ffab = 0.4886
+  ffab = 0.4886,
+  spacing_method = c("midpoint", "cell")
 )
 }
 \arguments{
@@ -53,6 +54,29 @@ and categorical matching levels before execution. Applies to fertility only.}
 
 \item{ffab}{Probability that a newborn is female, default \code{0.4886}.
 Must be a finite numeric scalar in \verb{[0, 1]}. Applies to fertility only.}
+
+\item{spacing_method}{\code{"midpoint"} (default) or \code{"cell"}. Midpoint uses the
+compensation described above. \code{"cell"} (D101) instead groups women into
+cells: one-year (or shorter) age sub-bands of each group/union-type
+schedule after group multipliers, split at whole ages and band edges, and
+one actual parity when rates are parity-specific (a pooled parity band
+applies its rate to each contained parity). Each cell produces births at its input rate times
+all its living members, including those inside the birth interval, and
+each birth goes to a uniformly chosen eligible member. Observed rates then
+equal inputs in expectation for any population composition, while a cell
+has an eligible member. Intensity in cells with members but none eligible
+is dropped and reported in \code{simulation$unrealized_births}. Midpoint
+feasibility checks do not apply. An individual woman's hazard depends on
+recent births by others in her cell; this is a calibration device.
+
+For parity-specific schedules with a positive \code{birth_interval}, \code{fertility()}
+warns when positive rates fall in one-year age cells where no woman can be
+eligible under either method: births are singletons at least
+\code{birth_interval} apart, starting from the schedule's first positive rate,
+so parity k is first eligible at the age found by following each parity's
+first positive rate. Union types are pooled and groups checked separately.
+Partly reachable cells and higher actual parities within an open parity
+band (always unreachable at the youngest ages) are not reported.}
 }
 \value{
 A named list containing \code{name}, \code{rates}, and \code{rate_unit}, plus

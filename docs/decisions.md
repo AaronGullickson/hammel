@@ -42,6 +42,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | PATFR helper and automatic TFR dispatch for parity tables | D097 |
 | History-authoritative parity initialization | D098 |
 | Parity execution and SOCSIM-style spacing compensation | D099 |
+| Cell-accounted spacing (opt-in `spacing_method = "cell"`) | D101 |
 
 ## Recorded decisions
 
@@ -2028,3 +2029,51 @@ compatibility alias. Fertility returns women only; mortality returns both sexes.
 Observed parity uses maternal birth history, with pre-birth event assignment
 and post-birth exposure progression; it does not change simulation calibration.
 See [demographic analysis](demographic-analysis.md#fertility-rates-by-observed-parity).
+
+## D101 — Cell-accounted fertility under birth spacing (October 29, 2026)
+
+- **Status:** accepted by the user as a specification; implemented October 29,
+  2026 as the opt-in `spacing_method = "cell"`. The default `"midpoint"`
+  retains D028/D099. The user revised decision (5) after validation showed
+  that input-band cells recover only band averages.
+- **Decision:** generate births per fertility cell (age sub-band of at most one
+  year x actual parity x union type x group, after group multipliers) at intensity
+  `m_c * N_c`, where `N_c` counts all living members including those inside
+  their birth interval. Assign each birth to an eligible member with
+  probability proportional to an individual weight (all 1 until heterogeneity
+  is accepted). Equivalent individual hazard: `m_c * N_c * w_i / W_c^e`.
+- **Agreed choices:** (1) accept population-dependent individual hazards as a
+  calibration device; (2) drop intensity in cells with members but no eligible
+  weight and report unrealized expected births; (3) add as an option alongside
+  D028/D099 first, then make it the only rule once validated; (4) weights
+  determine selection probability within a cell, not a direct rate multiplier
+  (option A), so cell rates stay pinned to inputs; (5) revised after
+  validation: split age bands into sub-cells of at most one year at whole ages
+  and band edges, and split pooled parity bands by actual parity, so the rate
+  is recovered at every age and contained parity (input-band cells recovered
+  only band averages); (6) report
+  unrealized births per period and cell in run metadata as a tibble.
+- **Rationale:** input rates count all woman-years, including spacing-excluded
+  time. Precomputed corrections assume a mix of eligible and ineligible women
+  and fail when the simulated mix differs: young high-parity cells (milestone
+  5; also reproduced in SOCSIM), union-type transitions (milestone 2, D045),
+  restarts and start-up (milestone 1). Accounting of the simulated population
+  recovers inputs in expectation for any mix while eligible women exist.
+- **Alternatives:** a deterministic composition-based parity correction from
+  the target synthetic cohort (exact only when the simulated composition
+  matches it); weight-scaled rate multipliers (option B), which double-count
+  parity selection and move observed rates away from inputs.
+- **Implementation:** a `BoundaryQueue` class extracted from the calibration
+  tracker (no behavior change) serves both the tracker and the cells; each keeps
+  its own instance, and under cell mode the tracker no longer tracks fertility
+  boundaries. Calibration fertility totals come from cells at search time. Cell
+  clocks are kept in a separate indexed heap compared with the event queue, and
+  cell boundaries are processed in time order before events. Uniform selection;
+  weighted selection deferred to heterogeneity. Unrealized births are reported
+  in `simulation$unrealized_births` by one-year period from the run start.
+- **Evidence:** toy diagnostics in `validation/milestone5/`
+  (`check-composition-spacing.R`, `check-runtime-spacing.R`) and the SOCSIM
+  reference experiment. Engine validation follows the specification's plan.
+- **Specification:** [cell-accounted fertility](fertility-cell-accounting.md);
+  [investigation](parity-spacing-investigation.md). Heterogeneity distributions
+  and inputs remain unselected.

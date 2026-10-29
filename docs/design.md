@@ -282,7 +282,13 @@ with one queued next age/duration/spacing boundary per counted woman
 (D082/D083). Search clock origins are separate from fertility birth times. State
 changes replace contributions; searches do not scan all women or enumerate a
 cross-classification of rate predictors. See
-[current-hazard contributions](calibration-intensity.md). Matching models carry
+[current-hazard contributions](calibration-intensity.md). Its boundary
+queue is the shared `BoundaryQueue` class, also used by `FertilityCells`
+(D101, `spacing_method = "cell"`), which keeps cell counts and eligible lists,
+keeps one birth clock per cell in its own indexed heap (compared with the main
+event queue at each step), processes its boundaries in time order, and
+supplies calibration fertility totals at search time. `BoundaryQueue` is a
+lazy-deletion binary heap ordered by (time, person). See [cell-accounted fertility](fertility-cell-accounting.md). Matching models carry
 `delta` (omitted groups default to zero). One group gives unit weights and female
 choice exactly. See [weighted-choice matching](weighted-choice-matching.md).
 

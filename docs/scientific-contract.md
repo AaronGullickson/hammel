@@ -173,6 +173,37 @@ the engine RNG stream and explicit seeds restore state even on errors. Identity
 does not alter ancestry: a custom AB identity may retain only A/B ancestry.
 See [group inheritance](group-inheritance.md) for rules and worked examples.
 
+### Cell-accounted fertility (D101, opt-in)
+
+`set_fertility(..., spacing_method = "cell")` replaces midpoint compensation
+(the default `"midpoint"`) with accounting of the simulated population. Cells
+come from the effective schedules: group (after multipliers) and union type or
+overall. Input age bands are split at whole ages and band edges into sub-cells
+of at most one year (upper-open bands up to the oldest attainable age, then
+left open). Parity-specific schedules have one cell per actual parity, so a
+pooled band applies its rate to each contained parity; without parity columns
+cells pool all parities. A cell generates births at its
+input rate times all its living members, including women inside the birth
+interval, and assigns each birth to a uniformly chosen eligible member. The
+equivalent individual hazard is `rate * members / eligible members`. Observed
+rates equal inputs in expectation for any composition, at the resolution of the
+cells, while a cell has an eligible member. Intensity in a cell with members but
+none eligible is dropped and reported in `simulation$unrealized_births` (a
+tibble by one-year period from the run start and cell). Midpoint feasibility
+checks do not apply. Cancelled attempts keep their spent intensity. Union
+changes move a woman between cells; restarts rebuild cells from histories.
+Recovery holds at cell resolution; within a one-year cell, selection does not
+vary with exact age. An upper-open band stays one cell when
+`birth_interval * rate < 0.001` (numerical tolerance). At exact ties a pending
+death precedes a cell birth, which precedes other person events. See [cell-accounted fertility](fertility-cell-accounting.md).
+
+For parity-specific schedules with positive spacing, `fertility()` warns about
+positive rates in one-year age cells that no eligible woman can occupy (under
+either method). Parity k is first eligible after k singleton births at least
+`birth_interval` apart, beginning at the schedule's first positive rates. Union
+types are pooled; partly reachable cells and higher parities within an open
+parity band are not reported.
+
 ### Midpoint compensation (D028)
 
 Calculate one adjusted hazard per original input band. Finite bands retain

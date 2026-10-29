@@ -24,6 +24,7 @@ future work.
 | [Group matching](group-matching.md) | Symmetric pair effects and fixed group formula predictors |
 | [Demographic analysis](demographic-analysis.md) | Separate mortality/fertility rates, parity ASFRs, union rates, TFR, and life tables |
 | [Parity spacing investigation](parity-spacing-investigation.md) | Current recovery evidence, SOCSIM reference and collaboration questions |
+| [Cell-accounted fertility](fertility-cell-accounting.md) | Spacing mechanism (D101), opt-in `spacing_method = "cell"` |
 | [Testing and validation](testing.md) | Test commands, evidence, and remaining validation |
 | [Current handoff](session-handoff.md) | Recent findings, active work, and deferred issues |
 

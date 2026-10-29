@@ -483,6 +483,13 @@ class WeightCalibrator {
     }
   }
   void add_woman(int group, double born, double delta) { women_[cell(group, born)] += delta; }
+  size_t bin_index(int group, double born) const { return cell(group, born); }
+  size_t cells() const { return intensities_.size(); }
+  // Cell-accounted fertility (D101) supplies channel totals directly before a
+  // fertility-driven solve; per-woman contributions to that channel are zero.
+  void assign_channel(int channel, const std::vector<double>& values) {
+    for (size_t i = 0; i < intensities_.size(); ++i) intensities_[i][channel] = values[i];
+  }
   void replace_role_intensity(int group, double born, const std::array<double, 3>& old,
                          const std::array<double, 3>& value) {
     const size_t i = cell(group, born);
@@ -735,13 +742,73 @@ std::pair<double, double> current_hazard(const std::vector<Band>* bands,
   return {value, next};
 }
 
+// Ordered bookkeeping boundaries with at most one pending time per person.
+// Shared by the calibration tracker and fertility cells: entries are rate
+// changes (age bands, gaps, spacing release), not demographic events, and
+// consume no randomness. Ties are ordered by person index.
+class BoundaryQueue {
+  // Binary min-heap of (time, person) with lazy deletion: an entry is current
+  // only while it matches next_[person]. Pops follow (time, person) order.
+  std::vector<std::pair<double, int>> heap_;
+  std::vector<double> next_;
+  size_t live_ = 0;
+  struct Later {
+    bool operator()(const std::pair<double, int>& a, const std::pair<double, int>& b) const {
+      return a > b;
+    }
+  };
+  void discard_stale() {
+    while (!heap_.empty() && heap_.front().first != next_[heap_.front().second]) {
+      std::pop_heap(heap_.begin(), heap_.end(), Later());
+      heap_.pop_back();
+    }
+  }
+ public:
+  void set(int person, double time) {
+    if (person >= static_cast<int>(next_.size())) next_.resize(person + 1, R_PosInf);
+    if (next_[person] == time) return;
+    if (R_finite(next_[person])) --live_;
+    next_[person] = time;
+    if (R_finite(time)) {
+      ++live_;
+      heap_.push_back({time, person});
+      std::push_heap(heap_.begin(), heap_.end(), Later());
+    }
+    // Bound stale entries: rebuild from current times when they dominate.
+    if (heap_.size() > 64 && heap_.size() > 4 * live_) {
+      heap_.clear();
+      for (size_t p = 0; p < next_.size(); ++p)
+        if (R_finite(next_[p])) heap_.push_back({next_[p], static_cast<int>(p)});
+      std::make_heap(heap_.begin(), heap_.end(), Later());
+    }
+  }
+  void clear(int person) {
+    if (person < static_cast<int>(next_.size())) set(person, R_PosInf);
+  }
+  double top() {
+    discard_stale();
+    return heap_.empty() ? R_PosInf : heap_.front().first;
+  }
+  // Remove and return the earliest entry; the caller refreshes that person.
+  std::pair<double, int> pop() {
+    discard_stale();
+    const auto entry = heap_.front();
+    std::pop_heap(heap_.begin(), heap_.end(), Later());
+    heap_.pop_back();
+    next_[entry.second] = R_PosInf;
+    --live_;
+    return entry;
+  }
+  size_t size() const { return live_; }
+};
+
 // One pending boundary per active woman, replaced eagerly on state changes.
 // Separate channels share one queue and one state-update interface; no Cartesian
 // table of previous status, parity, region, etc. is needed by calibration.
 class FemaleIntensityTracker {
   struct Woman {
     int group = 0;
-    double born = 0, search_origin = 0, ready = 0, next = R_PosInf;
+    double born = 0, search_origin = 0, ready = 0;
     bool active = false;
     const std::vector<Band>* search = nullptr;
     const std::vector<Band>* fertility = nullptr;
@@ -750,11 +817,10 @@ class FemaleIntensityTracker {
   };
   WeightCalibrator& calibration_;
   std::vector<Woman> women_;
-  std::set<std::pair<double, int>> queue_;
+  BoundaryQueue queue_;
   unsigned long long updates_ = 0;
   void refresh(int person, double now) {
     Woman& w = women_[person];
-    if (R_finite(w.next)) queue_.erase({w.next, person});
     const auto search = current_hazard(w.search, w.search_origin, now);
     const auto fertility = now < w.ready ? std::make_pair(0.0, w.ready) :
       current_hazard(w.fertility, w.born, now);
@@ -763,8 +829,7 @@ class FemaleIntensityTracker {
     const std::array<double, 3> value = {search.first * (1 - p), fertility.first, search.first * p};
     calibration_.replace_role_intensity(w.group, w.born, w.value, value);
     w.value = value;
-    w.next = std::min(std::min(search.second, fertility.second), probability.second);
-    if (R_finite(w.next)) queue_.insert({w.next, person});
+    queue_.set(person, std::min(std::min(search.second, fertility.second), probability.second));
   }
  public:
   explicit FemaleIntensityTracker(WeightCalibrator& calibration) : calibration_(calibration) {}
@@ -782,9 +847,9 @@ class FemaleIntensityTracker {
   void remove(int person) {
     if (person >= static_cast<int>(women_.size()) || !women_[person].active) return;
     Woman& w = women_[person];
-    if (R_finite(w.next)) queue_.erase({w.next, person});
+    queue_.clear(person);
     calibration_.replace_role_intensity(w.group, w.born, w.value, {0, 0, 0});
-    w.active = false; w.value = {0, 0, 0}; w.next = R_PosInf;
+    w.active = false; w.value = {0, 0, 0};
   }
   void set_ready(int person, double ready, double now) {
     if (person >= static_cast<int>(women_.size()) || !women_[person].active) return;
@@ -792,16 +857,438 @@ class FemaleIntensityTracker {
     refresh(person, now);
   }
   void advance(double now) {
-    while (!queue_.empty() && queue_.begin()->first <= now) {
-      const auto entry = *queue_.begin();
-      queue_.erase(queue_.begin());
-      women_[entry.second].next = R_PosInf;
+    while (queue_.top() <= now) {
+      const auto entry = queue_.pop();
       refresh(entry.second, entry.first);
       if (++updates_ % 1024 == 0) checkUserInterrupt();
     }
   }
   size_t pending() const { return queue_.size(); }
 };
+
+// ---- Cell-accounted fertility under birth spacing (D101) -------------------
+// A cell is one age sub-band (at most one year, split at whole ages and input
+// band edges) of one effective fertility schedule (group, union type, and
+// actual parity when schedules are parity-specific; pooled bands are split by
+// actual parity). Each cell generates births at m_c * N_c, counting
+// all living members including those inside the birth interval, and assigns
+// each birth to a uniformly chosen eligible member. Individual weights are
+// reserved for heterogeneity (selection probability, not a rate multiplier);
+// all weights are currently one. A cell with members but no eligible member
+// cannot produce births: its intensity is dropped and recorded as unrealized.
+// Clocks keep an Exp(1) threshold consumed at the current intensity, so count
+// changes recompute firing times without drawing random numbers.
+// Upper-open fertility bands stay one cell when birth_interval * rate is below
+// this share (a numerical tolerance, not a demographic parameter).
+constexpr double kOpenBandSplitTolerance = 0.001;
+
+class FertilityCells {
+ public:
+  struct State {
+    int stratum = -1;          // -1: not a living woman
+    double born = 0, ready = 0;
+    bool unpartnered = false;
+  };
+  // An input schedule for one group/type and input parity band.
+  struct Source {
+    int group = 0, type = 0;
+    double parity_start = 0, parity_end = R_PosInf;
+    std::vector<Band> bands;
+  };
+  // Cells of one group/type and actual parity (or all parities when schedules
+  // are not parity-specific), with age bands split to at most one year.
+  struct Stratum {
+    int group = 0, type = 0;
+    double parity_start = 0, parity_end = R_PosInf;
+    std::vector<Band> bands;
+    int first_cell = 0;
+  };
+
+ private:
+  struct Cell {
+    int stratum = 0;
+    double rate = 0, age_start = 0, age_end = 0;
+    int members = 0;
+    std::vector<int> eligible;                 // swap-remove list of women
+    double lambda = 0, threshold = 0, last = 0, due = R_PosInf;
+    bool has_threshold = false, queued = false;
+    std::map<size_t, int> counted;             // unpartnered eligible by calibration bin
+  };
+  struct Member {
+    int cell = -1, slot = -1;
+    bool eligible = false, counted = false;
+    size_t bin = 0;
+  };
+  std::vector<Source> sources_;
+  std::vector<Stratum> strata_;
+  std::vector<Cell> cells_;
+  std::vector<Member> members_;
+  // lookup_[group * types + type][actual parity] -> stratum (-1 until created);
+  // without parity-specific schedules, index 0 serves every parity.
+  int types_;
+  bool split_parity_;
+  double max_age_, interval_;
+  std::vector<std::vector<int>> lookup_;
+  BoundaryQueue boundaries_;
+  // Cell birth clocks: an indexed binary min-heap of armed cells keyed by
+  // (due, cell), updated in place without allocation. The main loop compares
+  // its head with the person event queue.
+  std::vector<int> heap_, position_;
+  bool earlier(int a, int b) const {
+    const double da = cells_[a].due, db = cells_[b].due;
+    return da < db || (da == db && a < b);
+  }
+  void swap_nodes(size_t i, size_t j) {
+    std::swap(heap_[i], heap_[j]);
+    position_[heap_[i]] = static_cast<int>(i);
+    position_[heap_[j]] = static_cast<int>(j);
+  }
+  void sift_up(size_t i) {
+    while (i > 0) {
+      const size_t parent = (i - 1) / 2;
+      if (!earlier(heap_[i], heap_[parent])) break;
+      swap_nodes(i, parent);
+      i = parent;
+    }
+  }
+  void sift_down(size_t i) {
+    for (;;) {
+      size_t best = i;
+      const size_t left = 2 * i + 1, right = left + 1;
+      if (left < heap_.size() && earlier(heap_[left], heap_[best])) best = left;
+      if (right < heap_.size() && earlier(heap_[right], heap_[best])) best = right;
+      if (best == i) break;
+      swap_nodes(i, best);
+      i = best;
+    }
+  }
+  void unschedule(int c) {
+    const size_t i = static_cast<size_t>(position_[c]);
+    const size_t last = heap_.size() - 1;
+    if (i != last) swap_nodes(i, last);
+    heap_.pop_back();
+    position_[c] = -1;
+    if (i < heap_.size()) { sift_up(i); sift_down(i); }
+  }
+  void schedule_clock(int c) {
+    if (static_cast<size_t>(c) >= position_.size()) position_.resize(c + 1, -1);
+    position_[c] = static_cast<int>(heap_.size());
+    heap_.push_back(c);
+    sift_up(heap_.size() - 1);
+  }
+  std::function<State(int)> state_;
+  std::function<double()> draw_threshold_;
+  const WeightCalibrator* calibrator_;
+  double start_, end_;
+  // Unrealized expected births and member-years without eligible women, by
+  // one-year period from the simulation start and cell.
+  std::map<std::pair<long long, int>, std::array<double, 2>> unrealized_;
+  unsigned long long updates_ = 0;
+
+  void record_unrealized(int c, double from, double to, double lambda) {
+    while (from < to) {
+      long long k = static_cast<long long>(std::floor(from - start_));
+      if (start_ + static_cast<double>(k + 1) <= from) ++k; // roundoff at a boundary
+      const double stop = std::min(to, start_ + static_cast<double>(k + 1));
+      auto& value = unrealized_[{k, c}];
+      value[0] += lambda * (stop - from);
+      value[1] += stop - from;
+      from = stop;
+    }
+  }
+  // Account for the interval since the last update under the state that held
+  // during it. Must run before membership or eligibility changes.
+  void settle(int c, double now) {
+    Cell& x = cells_[c];
+    if (x.lambda > 0 && now > x.last) {
+      if (x.eligible.empty()) record_unrealized(c, x.last, now, x.lambda);
+      else if (x.has_threshold) x.threshold = std::max(0.0, x.threshold - x.lambda * (now - x.last));
+    }
+    x.last = now;
+  }
+  // Recompute the intensity and firing time from current counts (after settle).
+  void touch(int c, double now) {
+    Cell& x = cells_[c];
+    x.lambda = x.rate * x.members;
+    rearm(c, now);
+  }
+  void rearm(int c, double now) {
+    Cell& x = cells_[c];
+    if (x.queued) { unschedule(c); x.queued = false; }
+    if (!(x.lambda > 0) || x.eligible.empty()) return;
+    if (!x.has_threshold) { x.threshold = draw_threshold_(); x.has_threshold = true; }
+    const double due = now + x.threshold / x.lambda;
+    if (due < end_) {
+      x.due = due;
+      schedule_clock(c);
+      x.queued = true;
+    }
+  }
+  void leave(int woman, int& changed) {
+    Member& m = members_[woman];
+    if (m.cell < 0) return;
+    Cell& x = cells_[m.cell];
+    --x.members;
+    if (m.eligible) {
+      const int last = x.eligible.back();
+      x.eligible[m.slot] = last;
+      members_[last].slot = m.slot;
+      x.eligible.pop_back();
+    }
+    if (m.counted && --x.counted[m.bin] == 0) x.counted.erase(m.bin);
+    changed = m.cell;
+    m = Member();
+  }
+
+ public:
+  // Split input age bands at whole ages and band edges. An upper-open band is
+  // split up to the oldest attainable age in the run, then left open, unless
+  // interval * rate is below kOpenBandSplitTolerance: at most that share of its
+  // members can be in spacing, so splitting could not change recovery
+  // materially and would only add yearly membership updates.
+  static std::vector<Band> split_ages(const std::vector<Band>& bands, double max_age,
+                                      double interval) {
+    std::vector<Band> out;
+    for (const Band& band : bands) {
+      // Zero-rate bands generate no births and need no members: treat as gaps.
+      if (!(band.rate > 0)) continue;
+      double lo = band.start;
+      if (!std::isfinite(band.end) && interval * band.rate < kOpenBandSplitTolerance) {
+        out.push_back(band);
+        continue;
+      }
+      const double cap = std::isfinite(band.end) ? band.end : std::max(lo, std::ceil(max_age));
+      while (lo < cap) {
+        const double next = std::min(cap, std::floor(lo) + 1);
+        out.push_back({lo, next, band.rate});
+        lo = next;
+      }
+      if (!std::isfinite(band.end)) out.push_back({lo, band.end, band.rate});
+    }
+    return out;
+  }
+  int add_stratum(const Source& source, double parity_start, double parity_end) {
+    Stratum st;
+    st.group = source.group; st.type = source.type;
+    st.parity_start = parity_start; st.parity_end = parity_end;
+    st.bands = split_ages(source.bands, max_age_, interval_);
+    st.first_cell = static_cast<int>(cells_.size());
+    const int k = static_cast<int>(strata_.size());
+    for (const Band& band : st.bands) {
+      Cell x;
+      x.stratum = k;
+      x.rate = band.rate; x.age_start = band.start; x.age_end = band.end;
+      x.last = start_;
+      cells_.push_back(x);
+    }
+    strata_.push_back(st);
+    return k;
+  }
+
+ public:
+  FertilityCells(std::vector<Source> sources, int groups, int types, bool split_parity,
+                 double max_age, double interval,
+                 std::function<State(int)> state, std::function<double()> draw_threshold,
+                 const WeightCalibrator* calibrator, double start, double end)
+      : sources_(std::move(sources)), types_(types), split_parity_(split_parity),
+        max_age_(max_age), interval_(interval), lookup_(static_cast<size_t>(groups) * types),
+        state_(std::move(state)), draw_threshold_(std::move(draw_threshold)),
+        calibrator_(calibrator), start_(start), end_(end) {
+    if (!split_parity_)
+      for (const Source& source : sources_)
+        lookup_[static_cast<size_t>(source.group) * types_ + source.type] =
+          {add_stratum(source, source.parity_start, source.parity_end)};
+  }
+  // Input parity bands partition [0, Inf) within each group/type (validated in
+  // R). Actual-parity strata are created when a woman first reaches a parity.
+  int stratum(int group, int type, int parity) {
+    auto& list = lookup_[static_cast<size_t>(group) * types_ + type];
+    if (!split_parity_) return list.empty() ? -1 : list[0];
+    if (parity < 0) return -1;
+    if (parity < static_cast<int>(list.size()) && list[parity] >= 0) return list[parity];
+    for (const Source& source : sources_) {
+      if (source.group != group || source.type != type ||
+          !(source.parity_start <= parity && parity < source.parity_end)) continue;
+      if (parity >= static_cast<int>(list.size())) list.resize(parity + 1, -1);
+      list[parity] = add_stratum(source, parity, parity + 1.0);
+      return list[parity];
+    }
+    return -1;
+  }
+  // Recompute a woman's cell, eligibility and calibration bin from engine state.
+  void refresh(int woman, double now) {
+    if (woman >= static_cast<int>(members_.size())) members_.resize(woman + 1);
+    const State s = state_(woman);
+    int cell = -1;
+    double next = R_PosInf;
+    if (s.stratum >= 0) {
+      // Bands are sorted and disjoint: find the last band starting at or
+      // before now, using absolute times as in current_hazard().
+      const Stratum& st = strata_[s.stratum];
+      const auto& bands = st.bands;
+      size_t lo = 0, hi = bands.size();
+      while (lo < hi) {
+        const size_t mid = (lo + hi) / 2;
+        if (s.born + bands[mid].start <= now) lo = mid + 1; else hi = mid;
+      }
+      if (lo > 0 && now < s.born + bands[lo - 1].end) {
+        cell = st.first_cell + static_cast<int>(lo - 1);
+        next = s.born + bands[lo - 1].end;
+      } else if (lo < bands.size()) {
+        next = s.born + bands[lo].start;
+      }
+    }
+    const bool eligible = cell >= 0 && now >= s.ready;
+    if (cell >= 0 && !eligible) next = std::min(next, s.ready);
+    const bool counted = calibrator_ && eligible && s.unpartnered;
+    const size_t bin = counted ? calibrator_->bin_index(strata_[s.stratum].group, s.born) : 0;
+    Member& m = members_[woman];
+    if (m.cell != cell || m.eligible != eligible || m.counted != counted || (counted && m.bin != bin)) {
+      // Settle elapsed intensity under the old state before changing it.
+      if (m.cell >= 0) settle(m.cell, now);
+      if (cell >= 0 && cell != m.cell) settle(cell, now);
+      int old_cell = -1;
+      leave(woman, old_cell);
+      if (cell >= 0) {
+        Cell& x = cells_[cell];
+        ++x.members;
+        m.cell = cell; m.eligible = eligible; m.counted = counted; m.bin = bin;
+        if (eligible) { m.slot = static_cast<int>(x.eligible.size()); x.eligible.push_back(woman); }
+        if (counted) ++x.counted[bin];
+      }
+      if (old_cell >= 0) touch(old_cell, now);
+      if (cell >= 0 && cell != old_cell) touch(cell, now);
+    }
+    boundaries_.set(woman, next);
+  }
+  double next_boundary() { return boundaries_.top(); }
+  void advance_boundary() {
+    const auto entry = boundaries_.pop();
+    refresh(entry.second, entry.first);
+    if (++updates_ % 1024 == 0) checkUserInterrupt();
+  }
+  double next_clock() const { return heap_.empty() ? R_PosInf : cells_[heap_.front()].due; }
+  // The earliest cell clock fires: spend its threshold, pick a mother, re-arm.
+  int fire_next(double now) {
+    const int c = heap_.front();
+    unschedule(c);
+    Cell& x = cells_[c];
+    x.queued = false;
+    x.has_threshold = false;
+    x.last = now;
+    if (x.eligible.empty()) stop("A fertility cell fired without eligible women.");
+    const double n = static_cast<double>(x.eligible.size());
+    const size_t pick = std::min(x.eligible.size() - 1, static_cast<size_t>(std::floor(R::runif(0, 1) * n)));
+    const int woman = x.eligible[pick];
+    rearm(c, now);
+    return woman;
+  }
+  // Calibration fertility totals: each unpartnered eligible member contributes
+  // her equivalent hazard lambda / E in her calibration bin.
+  std::vector<double> fill_calibration(WeightCalibrator& calibrator) const {
+    std::vector<double> values(calibrator.cells(), 0.0);
+    for (const Cell& x : cells_) {
+      if (!(x.lambda > 0) || x.eligible.empty() || x.counted.empty()) continue;
+      const double hazard = x.lambda / static_cast<double>(x.eligible.size());
+      for (const auto& bin : x.counted) values[bin.first] += hazard * bin.second;
+    }
+    calibrator.assign_channel(1, values);
+    return values;
+  }
+  // A woman's equivalent individual hazard (rule 4): lambda / E when eligible.
+  double hazard(int woman) const {
+    if (woman >= static_cast<int>(members_.size())) return 0;
+    const Member& m = members_[woman];
+    if (m.cell < 0 || !m.eligible) return 0;
+    const Cell& x = cells_[m.cell];
+    return x.lambda / static_cast<double>(x.eligible.size());
+  }
+  // Close unrealized-intensity intervals at the end of the run.
+  void finish(double end) {
+    for (size_t c = 0; c < cells_.size(); ++c) {
+      Cell& x = cells_[c];
+      if (x.lambda > 0 && x.eligible.empty() && end > x.last)
+        record_unrealized(static_cast<int>(c), x.last, end, x.lambda);
+      x.last = end;
+    }
+  }
+  // Internal consistency check against an explicit scan of member records.
+  bool consistent() const {
+    std::vector<int> members(cells_.size(), 0), eligible(cells_.size(), 0);
+    for (size_t w = 0; w < members_.size(); ++w) {
+      const Member& m = members_[w];
+      if (m.cell < 0) continue;
+      ++members[m.cell];
+      if (m.eligible) {
+        ++eligible[m.cell];
+        if (cells_[m.cell].eligible[m.slot] != static_cast<int>(w)) return false;
+      }
+    }
+    for (size_t c = 0; c < cells_.size(); ++c)
+      if (members[c] != cells_[c].members || eligible[c] != static_cast<int>(cells_[c].eligible.size()))
+        return false;
+    return true;
+  }
+  DataFrame unrealized(const std::vector<std::string>& type_labels) const {
+    const size_t n = unrealized_.size();
+    NumericVector period_start(n), period_end(n), parity_start(n), parity_end(n),
+      age_start(n), age_end(n), births(n), years(n);
+    IntegerVector group(n);
+    CharacterVector type(n);
+    size_t r = 0;
+    for (const auto& entry : unrealized_) {
+      const Cell& x = cells_[entry.first.second];
+      const Stratum& st = strata_[x.stratum];
+      period_start[r] = start_ + static_cast<double>(entry.first.first);
+      period_end[r] = std::min(end_, period_start[r] + 1);
+      group[r] = st.group;
+      type[r] = type_labels[st.type];
+      parity_start[r] = st.parity_start; parity_end[r] = st.parity_end;
+      age_start[r] = x.age_start; age_end[r] = x.age_end;
+      births[r] = entry.second[0]; years[r] = entry.second[1];
+      ++r;
+    }
+    return DataFrame::create(_["period_start"] = period_start, _["period_end"] = period_end,
+      _["group"] = group, _["union_type"] = type, _["parity_start"] = parity_start,
+      _["parity_end"] = parity_end, _["age_start"] = age_start, _["age_end"] = age_end,
+      _["unrealized_births"] = births, _["years_without_eligible"] = years);
+  }
+};
+
+// Input schedules for cells from the effective (group-multiplied) fertility table.
+std::vector<FertilityCells::Source> fertility_strata(DataFrame rates, int groups,
+    const std::vector<std::string>& type_labels) {
+  std::vector<FertilityCells::Source> out;
+  const bool parity = rates.containsElementNamed("parity_start");
+  const bool grouped = rates.containsElementNamed(".hammel_group");
+  for (int g = 0; g < groups; ++g) {
+    for (int t = 0; t < static_cast<int>(type_labels.size()); ++t) {
+      const std::string label = type_labels[t];
+      std::map<double, double> bands = {{0, R_PosInf}};
+      if (parity) {
+        bands.clear();
+        NumericVector starts = rates["parity_start"], ends = rates["parity_end"];
+        IntegerVector row_groups;
+        if (grouped) row_groups = rates[".hammel_group"];
+        CharacterVector row_types;
+        if (!label.empty()) row_types = rates["union_type"];
+        for (int i = 0; i < starts.size(); ++i) {
+          if (grouped && row_groups[i] != g) continue;
+          if (!label.empty() && as<std::string>(row_types[i]) != label) continue;
+          bands[starts[i]] = ends[i];
+        }
+      }
+      for (const auto& band : bands) {
+        FertilityCells::Source st;
+        st.group = g; st.type = t;
+        st.parity_start = band.first; st.parity_end = band.second;
+        st.bands = read_bands(rates, "", label, g, "", false, parity ? band.first : -1);
+        out.push_back(st);
+      }
+    }
+  }
+  return out;
+}
 
 // Internal entry point: calibrate weights for a supplied unpartnered state.
 // [[Rcpp::export]]
@@ -1217,7 +1704,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   bool cancel_birth_if_no_match, bool diagnostics,
                   NumericMatrix initial_ancestry, List inheritance, double ffab,
                   DataFrame dissolution_rates, DataFrame cohab_prob, DataFrame conversion_rates,
-                  List cohab_matching, bool counts_cohab) {
+                  List cohab_matching, bool counts_cohab, bool cell_spacing,
+                  bool check_cells = false) {
   const bool cohab_enabled = cohab_prob.nrows() > 0;
   const bool parity_specific = fertility_rates.containsElementNamed("parity_start");
   if (!R_finite(ffab) || ffab < 0 || ffab > 1)
@@ -1306,6 +1794,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::unique_ptr<WeightCalibrator> calibrator;
   std::vector<char> counted_woman;
   std::unique_ptr<FemaleIntensityTracker> intensity_tracker;
+  // Cell-accounted spacing (D101); null under midpoint compensation.
+  std::unique_ptr<FertilityCells> cells;
   std::vector<const std::vector<Band>*> search_hazards;
   std::vector<const FertilitySchedules*> fertility_hazards;
   std::vector<bool> search_duration;
@@ -1370,6 +1860,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       }
     }
   }
+  // Under cell accounting the fertility channel comes from cells, not women.
+  auto cells_mode_fertility_pointer = [&](int woman, int g) -> const std::vector<Band>* {
+    if (cell_spacing) return nullptr;
+    return &fertility_hazards[g]->at(parity_specific ? parity[woman] : 0);
+  };
   // weighted_choice counts living, unpartnered women; fertility-driven intensity
   // also requires the birth-spacing interval to have ended (queued re-entry).
   auto add_counted_woman = [&](int woman, double now) {
@@ -1383,7 +1878,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     const double origin = rate_initiation && search_duration[index] ?
       previous_union_end[woman] : people[woman].born;
     if (!R_finite(origin)) stop("Duration search risk requires a recorded previous union ending.");
-    intensity_tracker->activate(woman, g, people[woman].born, search, &fertility_hazards[g]->at(parity_specific ? parity[woman] : 0),
+    intensity_tracker->activate(woman, g, people[woman].born, search,
+      cells_mode_fertility_pointer(woman, g),
       people[woman].last_birth + birth_interval, now, origin,
       cohab_enabled ? &probability_schedules[g * 3 + previous_union[woman]] : nullptr);
   };
@@ -1424,6 +1920,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       // rate-mode nonmarital fathers have their own, driven by fertility.
       intensity_tracker->advance(now);
       const bool fertility_driven = !rate_initiation || father;
+      if (cells && !cohab_role && fertility_driven) {
+        const std::vector<double> filled = cells->fill_calibration(*calibrator);
+        if (check_cells) {
+          // Explicit scan of counted women's individual hazards.
+          std::vector<double> scan(filled.size(), 0.0);
+          for (int w = 0; w < static_cast<int>(counted_woman.size()); ++w)
+            if (counted_woman[w]) scan[calibrator->bin_index(people[w].group, people[w].born)] += cells->hazard(w);
+          for (size_t k = 0; k < scan.size(); ++k)
+            if (std::abs(scan[k] - filled[k]) > 1e-9 * std::max(1.0, std::abs(scan[k])))
+              stop("Internal error: cell calibration totals differ from an explicit scan.");
+        }
+      }
       const WeightSolution weights = calibrator->solve(now, cohab_role ? 2 : (fertility_driven ? 1 : 0),
         cohab_role ? cohab_table_id : (father ? father_table_id : union_table_id),
         as<std::vector<double>>(choice_model["delta"]), cohab_role ? cohab_warm : (father ? father_warm : union_warm));
@@ -1478,25 +1986,28 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   Function inherit_custom = inheritance["custom"];
   std::vector<GroupSchedules> schedules(group_count);
   const bool status_fertility = fertility_rates.containsElementNamed("union_type");
+  bool typed_fertility = false;
+  if (status_fertility) {
+    CharacterVector types = fertility_rates["union_type"];
+    for (auto type : types) if (as<std::string>(type) == "cohab") typed_fertility = true;
+  }
+  // Cell accounting uses unadjusted input rates; midpoint compensation and its
+  // feasibility checks apply only to the midpoint method.
+  const double compensation_interval = cell_spacing ? 0 : birth_interval;
   for (int group = 0; group < group_count; ++group) {
     auto& rates = schedules[group];
     rates.male = read_bands(mortality_rates, "m", "", group);
     rates.female = read_bands(mortality_rates, "f", "", group);
-    bool typed_fertility = false;
-    if (status_fertility) {
-      CharacterVector types = fertility_rates["union_type"];
-      for (auto type : types) if (as<std::string>(type) == "cohab") typed_fertility = true;
-    }
     rates.partnered = prepare_fertility_schedules(fertility_rates, group,
-      status_fertility ? (typed_fertility ? "marriage" : "partnered") : "", birth_interval);
-    rates.cohab = typed_fertility ? prepare_fertility_schedules(fertility_rates, group, "cohab", birth_interval) : rates.partnered;
+      status_fertility ? (typed_fertility ? "marriage" : "partnered") : "", compensation_interval);
+    rates.cohab = typed_fertility ? prepare_fertility_schedules(fertility_rates, group, "cohab", compensation_interval) : rates.partnered;
     if (conversion_rates.nrows()) {
       NumericVector ages = conversion_rates["age_start"];
       rates.duration_conversion = NumericVector::is_na(ages[0]);
       rates.conversion = read_bands(conversion_rates, "", "", group, "", rates.duration_conversion);
     }
     rates.unpartnered = status_fertility ? prepare_fertility_schedules(
-      fertility_rates, group, "unpartnered", birth_interval) : rates.partnered;
+      fertility_rates, group, "unpartnered", compensation_interval) : rates.partnered;
     if (rate_initiation) {
       if (previous_specific) {
         const std::array<std::string, 3> labels = {"none", "dissolved", "widowed"};
@@ -1581,12 +2092,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   auto schedule = [&](int i, double now) {
     const auto version = ++event_versions[i];
     const Person& p = people[i];
+    if (cells && p.female) cells->refresh(i, now);
     if (!NumericVector::is_na(p.died)) return;
     const auto& rates = schedules[p.group];
     const auto& death_rates = p.female ? rates.female : rates.male;
     double death_time = candidate(waiting_time(death_rates, now - p.born, threshold()), now);
     double birth_time = std::numeric_limits<double>::infinity();
-    if (p.female) {
+    if (p.female && !cells) {
       const auto& fertility = current_partner[i] >= 0 ?
         (union_history[person_unions[i].back()].cohab ? rates.cohab : rates.partnered) : rates.unpartnered;
       const auto& birth_hazards = fertility.at(parity_specific ? parity[i] : 0);
@@ -1637,6 +2149,31 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         (conversion_time <= due ? EventType::conversion : EventType::search)));
     if (due < end) queue.emplace(due, Event{i, type, version});
   };
+  // Fertility type labels: overall, unpartnered/partnered, or three types.
+  const std::vector<std::string> fertility_types = !status_fertility ? std::vector<std::string>{""} :
+    (typed_fertility ? std::vector<std::string>{"unpartnered", "marriage", "cohab"} :
+                       std::vector<std::string>{"unpartnered", "partnered"});
+  if (cell_spacing) {
+    auto state = [&](int w) {
+      FertilityCells::State st;
+      const Person& p = people[w];
+      if (!p.female || !NumericVector::is_na(p.died)) return st;
+      int type = 0;
+      if (status_fertility && current_partner[w] >= 0)
+        type = typed_fertility && union_history[person_unions[w].back()].cohab ? 2 : 1;
+      st.stratum = cells->stratum(p.group, type, parity_specific ? parity[w] : 0);
+      if (st.stratum < 0) stop("No fertility schedule covers a woman's current parity.");
+      st.born = p.born;
+      st.ready = p.last_birth + birth_interval;
+      st.unpartnered = current_partner[w] < 0;
+      return st;
+    };
+    double oldest_birth = end;
+    for (const Person& person : people) oldest_birth = std::min(oldest_birth, person.born);
+    cells.reset(new FertilityCells(fertility_strata(fertility_rates, group_count, fertility_types),
+      group_count, static_cast<int>(fertility_types.size()), parity_specific, end - oldest_birth,
+      birth_interval, state, threshold, calibrator.get(), start, end));
+  }
   // Initialize one next event for each living person. Known age changes are
   // already incorporated, so birthdays alone do not trigger resampling.
   for (int i = 0; i < static_cast<int>(people.size()); ++i) {
@@ -1646,16 +2183,51 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   double birth_count = 0, death_count = 0, dissolution_count = 0, conversion_count = 0;
   unsigned long long processed = 0;
   // Process events in chronological order until no scheduled events remain.
-  while (!queue.empty()) {
+  while (true) {
+    // Cell clocks depend on current membership, so bookkeeping boundaries are
+    // processed in time order before any event at or after them.
+    if (cells) {
+      const double boundary = cells->next_boundary();
+      if (boundary < end && boundary <= cells->next_clock() &&
+          (queue.empty() || boundary <= queue.begin()->first)) {
+        cells->advance_boundary();
+        continue;
+      }
+    }
+    // Exact ties follow the event priority death, birth, dissolution,
+    // conversion, search: person events at the same time as a cell clock go
+    // first only while a current death is pending at that time.
+    const double clock = cells ? cells->next_clock() : R_PosInf;
+    if (queue.empty() && !(clock < end)) break;
     if (++processed % 1024 == 0) checkUserInterrupt();
-    auto next = queue.begin();
-    const double now = next->first;
-    const Event event = next->second;
-    queue.erase(next);
-    const int i = event.person;
-    if (event.version != event_versions[i]) continue;
+    double now;
+    EventType type;
+    int i;
+    auto death_at = [&](double time) {
+      const auto range = queue.equal_range(time);
+      for (auto it = range.first; it != range.second; ++it)
+        if (it->second.type == EventType::death && it->second.version == event_versions[it->second.person])
+          return true;
+      return false;
+    };
+    if (clock < end && (queue.empty() || clock < queue.begin()->first ||
+        (clock == queue.begin()->first && !death_at(clock)))) {
+      now = clock;
+      i = cells->fire_next(now);
+      type = EventType::birth;
+    } else {
+      auto next = queue.begin();
+      now = next->first;
+      const Event event = next->second;
+      queue.erase(next);
+      type = event.type;
+      i = event.person;
+      if (event.version != event_versions[i]) continue;
+    }
     if (intensity_tracker) intensity_tracker->advance(now);
-    if (event.type == EventType::death) {
+    if (check_cells && cells && !cells->consistent())
+      stop("Internal error: fertility cell counts differ from an explicit scan.");
+    if (type == EventType::death) {
       // Retain the person's history, record death, and stop their scheduling.
       people[i].died = now;
       for (int u : person_unions[i]) {
@@ -1671,14 +2243,16 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         previous_union_end[relationship.wife] = previous_union_end[relationship.husband] = now;
         add_male(relationship.husband);
         add_counted_woman(relationship.wife, now);
+        if (cells) cells->refresh(relationship.wife, now);
         // Her old birth candidate is invalid once her husband has died.
         if ((rate_initiation || has_dissolution) && i == relationship.husband)
           schedule(relationship.wife, now);
       }
       if (!people[i].female) remove_male(i);
       else remove_counted_woman(i);
+      if (cells && people[i].female) cells->refresh(i, now);
       ++death_count;
-    } else if (event.type == EventType::dissolution) {
+    } else if (type == EventType::dissolution) {
       const int partner = current_partner[i];
       if (partner < 0) stop("Dissolution requires an ongoing union.");
       UnionRecord& relationship = union_history[person_unions[i].back()];
@@ -1695,7 +2269,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       // Only her state-dependent birth/search hazards change. The man's death
       // candidate remains valid, and the old episode no longer carries risk.
       schedule(i, now);
-    } else if (event.type == EventType::conversion) {
+    } else if (type == EventType::conversion) {
       const int partner = current_partner[i];
       const int old = person_unions[i].back();
       if (partner < 0 || !union_history[old].cohab) stop("Conversion requires an ongoing cohabitation.");
@@ -1712,7 +2286,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       if (diagnostics) diagnostic_log_weights.emplace_back(group_count, NA_REAL);
       ++conversion_count;
       schedule(i, now);
-    } else if (event.type == EventType::search) {
+    } else if (type == EventType::search) {
       form_union(i, now);
       schedule(i, now);
     } else {
@@ -1839,6 +2413,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       schedule(i, now);
     }
   }
+  bool cells_consistent = true;
+  DataFrame unrealized;
+  if (cells) {
+    cells->finish(end);
+    cells_consistent = cells->consistent();
+    unrealized = cells->unrealized(fertility_types);
+  }
   // Materialize ordinary R columns from the C++ records. The R wrapper restores
   // custom columns, closes existing unions affected by deaths, and assembles the
   // final population and run metadata. Pending events are not saved as a checkpoint.
@@ -1897,6 +2478,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     _["births"] = birth_count, _["deaths"] = death_count,
     _["dissolutions"] = dissolution_count, _["conversions"] = conversion_count,
     _["weighted_infeasible"] = weighted_infeasible, _["draw_approximate"] = draw_approximate,
+    _["unrealized"] = unrealized, _["cells_consistent"] = cells_consistent,
     _["diagnostic_log_weights"] = [&]() {
       // Rows are new unions in order; columns are group indices. Unions formed
       // without weights (unit weights) record zeros.

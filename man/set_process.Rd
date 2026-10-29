@@ -16,7 +16,8 @@ set_fertility(
   birth_interval = 0.75,
   group_prop_hazard = NULL,
   inheritance = create_group_inheritance(),
-  ffab = 0.4886
+  ffab = 0.4886,
+  spacing_method = c("midpoint", "cell")
 )
 }
 \arguments{
@@ -46,6 +47,10 @@ ancestry proportions.}
 
 \item{ffab}{Probability that a newborn is female, default \code{0.4886}.
 Must be a finite numeric scalar in \verb{[0, 1]}. Applies to fertility only.}
+
+\item{spacing_method}{How eligible fertility is adjusted for the birth
+interval: \code{"midpoint"} (default) uses precomputed midpoint compensation;
+\code{"cell"} uses cell-accounted fertility (D101), described in \code{\link[=fertility]{fertility()}}.}
 }
 \value{
 An updated \code{hammel_model}. The input model is not modified.

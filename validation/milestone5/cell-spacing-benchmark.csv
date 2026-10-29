@@ -1,0 +1,13 @@
+"workload","seed","method","seconds","births"
+"single-year ages",42,"midpoint",0.637,34005
+"single-year ages",42,"cell",2.184,33640
+"single-year ages",71,"cell",2.102,33685
+"single-year ages",71,"midpoint",0.649,33964
+"single-year ages",105,"midpoint",0.652,34161
+"single-year ages",105,"cell",2.181,34174
+"single-year ages x 5 parities",42,"midpoint",0.59,30207
+"single-year ages x 5 parities",42,"cell",2.066,31098
+"single-year ages x 5 parities",71,"cell",2.111,30811
+"single-year ages x 5 parities",71,"midpoint",0.561,29493
+"single-year ages x 5 parities",105,"midpoint",0.573,29873
+"single-year ages x 5 parities",105,"cell",2.105,31004

@@ -28,3 +28,12 @@ make_rate_model <- function(n = 2, search_rate = 1, birth_rate = 0, birth_interv
     rates = data.frame(age_start = 15, age_end = Inf, rate = search_rate),
     cancel_birth_if_no_match = FALSE)
 }
+
+# Simple synthetic parity schedules often give positive rates in young cells
+# that no eligible woman can reach; silence only that advisory warning.
+quiet_unreachable <- function(expr) {
+  withCallingHandlers(expr, warning = function(w) {
+    if (grepl("no woman can be eligible", conditionMessage(w), fixed = TRUE))
+      invokeRestart("muffleWarning")
+  })
+}

@@ -34,3 +34,28 @@ repository root to regenerate `composition-spacing-summary.csv` (dt = .0025,
 seed 9601); pass a step size, e.g. `0.001`, to print a sensitivity rerun
 without writing. The candidate is not an accepted model; see
 [the investigation](../../docs/parity-spacing-investigation.md).
+
+`check-runtime-spacing.R` extends that toy to a schedule change at t = 5,
+comparing no spacing, the composition-based correction (table from the original
+schedule), and candidate runtime cell accounting (hazard m * N / N_eligible in
+each input parity cell). Run `Rscript validation/milestone5/check-runtime-spacing.R`
+to regenerate `runtime-spacing-summary.csv` (seed 7), which includes expected
+births lost in cells with no eligible women. Neither candidate is an accepted
+model.
+
+Engine checks of cell-accounted fertility (D101, `spacing_method = "cell"`):
+
+- `check-cell-spacing.R [cores]` compares cell and midpoint methods over ten
+  seeds in five synthetic scenarios (initialized cohort, generational young
+  ages, restart to a high-fertility schedule, union types, groups) and writes
+  `cell-spacing-replications.csv` and `cell-spacing-summary.csv`.
+- `check-cell-resolution.R` reruns the generational scenario with the same
+  rates supplied as one 25-year band, 1-year bands, 1-year actual-parity bands
+  and 0.25-year bands, writing `cell-resolution-summary.csv`. Cells are split
+  to at most one year and by actual parity, so the first three are identical;
+  supplied 0.25-year bands give 0.25-year cells.
+- `benchmark-cell-spacing.R LIB` times both methods in fresh processes using
+  an optimized build installed in LIB (`R CMD INSTALL --library=LIB .`) and
+  writes `cell-spacing-benchmark.csv`.
+
+See [cell-accounted fertility](../../docs/fertility-cell-accounting.md#implementation-and-validation).

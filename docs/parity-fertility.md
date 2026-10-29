@@ -232,6 +232,8 @@ shortfalls with positive spacing and close recovery with spacing disabled. See
 [the investigation and collaboration handoff](parity-spacing-investigation.md)
 for those reported numbers, the independent SOCSIM reference experiment, a
 composition diagnosis of the preceding-parity correction with a candidate
-cohort-based alternative, and unresolved questions. A general eligibility-calibration framework is proposed
+cohort-based alternative, and the general runtime cell accounting the user
+accepted as a specification (D101, [cell-accounted fertility](fertility-cell-accounting.md)),
+now available as the opt-in `spacing_method = "cell"` with 1-year, actual-parity cells. A general eligibility-calibration framework is proposed
 for investigation only; no replacement algorithm has been selected. D099
 remains the implemented approximation with a known rate-recovery limitation.

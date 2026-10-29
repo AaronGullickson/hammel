@@ -135,3 +135,24 @@ compensation method is accepted. Investigate a shared eligibility framework
 before choosing between pre-calibration and runtime accounting. Preserve the
 user-authored milestone 5 report and do not implement a replacement on the basis
 of the agent's proposals alone.
+
+Later on October 29 the user agreed to pursue a general runtime mechanism
+instead of a parity-only correction and requested its specification:
+[cell-accounted fertility](fertility-cell-accounting.md). Births are generated
+per fertility cell at m_c * N_c and assigned to an eligible woman, with
+reserved individual weights for future heterogeneity. Its six open decisions
+need the user's answers before any engine change; D028/D099 remain current.
+The user then agreed to all six decisions (D101): drop births in cells with no
+eligible women and report them; individual weights set selection probability
+within a cell rather than multiplying rates. Next step is the opt-in engine
+implementation sharing the matching-calibration tracker; D028/D099 remain the
+current behavior until it is validated.
+
+Implementation status (October 29): cell accounting is implemented as the
+opt-in `spacing_method = "cell"` with tests, internal scan checks, offline
+validation and a benchmark. After validation the user selected 1-year age cells
+split by actual parity (revised decision 5); young-age parity rates now recover
+except structurally infeasible cells (for example parity 5+ at age 18), whose
+intensity is reported as unrealized. Midpoint remains the default and its
+histories are unchanged. Making cell mode the default needs the user's
+decision and re-validation of earlier milestones.

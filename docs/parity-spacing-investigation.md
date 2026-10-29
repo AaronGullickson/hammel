@@ -148,6 +148,106 @@ not test later windows or other compositions.
 4. *Untested.* Later windows of a population with mortality and age structure,
    age-varying empirical schedules, upper-open age bands, and group multipliers.
 
+## General candidate: runtime cell accounting
+
+Analysis added October 29, 2026 at the user's request, after the composition
+diagnosis above. This records a candidate mechanism and toy evidence; it is not
+an accepted model or authorization to change the engine.
+
+**Why a general fix must use the population.** An input rate is births per
+woman-year over *all* women in a cell (age band x parity band x group x union
+type), including those inside their birth interval. That makes it a population
+quantity. Any correction based only on a woman's own history or a precomputed
+table (D028, D099, the composition-based correction) assumes some cell mix.
+Recovery under an arbitrary mix (non-stable populations, changing or restarted
+schedules, random baselines, stratified rates) requires the mix the simulation
+actually has.
+
+**Mechanism.** Give each cell c a total birth intensity m_c * N_c, where N_c
+counts all women currently in the cell, and assign each birth to a randomly
+chosen eligible woman in it. Equivalently, each eligible woman has hazard
+m_c * N_c / E_c, with E_c eligible women. Expected births per woman-year equal
+m_c by construction whenever E_c > 0, with no assumption about composition.
+Unstratified fertility is the special case in which cells are age bands, so
+this could replace both D028 and D099.
+
+**Toy evidence.** [check-runtime-spacing.R](../validation/milestone5/check-runtime-spacing.R)
+is an independent discrete-time toy, not engine code: an initialized cohort of
+40,000 women at parity zero, B = .75, no mortality, one replication (seed 7).
+Targets are .2/.3/.4 (2+) before t = 5 and 1.6 times those afterwards. The
+composition-based correction keeps its table from the original schedule, so its
+assumed mix is wrong after the change. Rates for parities 0 / 1 / 2+
+([summary CSV](../validation/milestone5/runtime-spacing-summary.csv)):
+
+| Window | Targets | No spacing (control) | Composition-based | Runtime accounting |
+| --- | --- | --- | --- | --- |
+| [0,5) | .20 / .30 / .40 | .202 / .296 / .401 | .200 / .300 / .386 | .201 / .284 / .390 |
+| [5,5.5) | .32 / .48 / .64 | .321 / .481 / .637 | .330 / .448 / .563 | .325 / .495 / .652 |
+| [5.5,6) | .32 / .48 / .64 | .317 / .471 / .651 | .311 / .429 / .498 | .324 / .475 / .629 |
+| [6,8) | .32 / .48 / .64 | .326 / .477 / .640 | .327 / .434 / .530 | .325 / .474 / .640 |
+
+Runtime accounting follows the schedule change within half a year; the
+composition-based correction does not. Single-replication differences in the
+third decimal are within Monte Carlo variation.
+
+Both methods' shortfalls in [0,5) come from targets that are infeasible early
+in an initialized cohort, not from the methods themselves:
+
+- During the first .75 years every parity-one woman has just given birth, and
+  before t = 1.5 no woman can be at parity 2+ *and* eligible (two births at
+  least .75 apart, then a further .75 years). A finer-step rerun of the
+  composition method (dt = .0005) gave a parity-2+ rate of 0 in [0,1.5) and
+  .4017 in [1.5,5); parity one was .2927 and .3018.
+- The runtime script records the intensity assigned to cells with no eligible
+  women as expected lost births: 645 at parity one and 224 at 2+ in [0,5).
+  Adding them back gives (13,520 + 645) / 47,601 = .298 and
+  (10,211 + 224) / 26,157 = .399.
+
+**Possible implementation (not selected).** The engine already maintains a
+similar structure for matching calibration ([current-hazard contributions](calibration-intensity.md)):
+counts by group and birth-time bin, with a boundary queue for age-band starts
+and ends and birth-spacing releases, rebuilt from histories at restart. A
+fertility tracker would hold N_c and E_c for each fertility-input cell and
+update them at births (mother moves to the next parity cell, ineligible),
+spacing releases, age-band crossings, deaths, group and union-type transitions,
+and schedule-period changes. Unlike the matching tracker, it would decide
+*when* births occur: each cell keeps one exponential waiting time at
+intensity m_c * N_c, redrawn when N_c or m_c changes (valid by
+memorylessness), replacing per-woman fertility waiting times. The matching
+tracker's eligible fertility contributions would then follow from the cell
+intensity.
+
+**Decisions this requires.**
+
+1. *Population dependence.* A woman's hazard would rise when others in her cell
+   recently gave birth. This is a calibration device rather than a behavioral
+   model, and it is noisy in small populations or finely stratified cells.
+2. *Cells with no eligible women.* Drop births and report a diagnostic, defer
+   them, or error. Temporary after initialization; persistent cases mean the
+   schedule cannot be met under the minimum interval (shared with the
+   composition-based correction).
+3. *Fertility heterogeneity.* Still unselected for milestone 5. Individual
+   multipliers would presumably weight the assignment among eligible women;
+   deciding both together avoids redoing either.
+4. *Scope.* Replace D028/D099 everywhere (changing milestone 1–4 behavior and
+   requiring re-validation) or offer it as an option. Fixed-seed histories
+   change either way.
+5. *Union-linked births.* Check cancellations, father choice and on-demand
+   search, where a birth can fail after assignment.
+
+Untested in the toy: mortality and age structure, later windows of a
+generational population (including the age-18 case), union-type transitions,
+small populations and sparse cells.
+
+## Proposed specification
+
+The user asked for the runtime cell-accounting candidate to be written as a
+scientific specification, designed to admit individual fertility weights for
+future heterogeneity. See [cell-accounted fertility](fertility-cell-accounting.md).
+The user accepted it with all six modeling decisions on October 29, 2026 (D101).
+It is implemented as the opt-in `spacing_method = "cell"`; D099 remains the
+default. After validation the user selected 1-year, actual-parity cells.
+
 ## Next questions for collaboration
 
 The user asked whether to seek a general solution or a parity-only patch. The

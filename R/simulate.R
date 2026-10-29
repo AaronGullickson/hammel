@@ -112,6 +112,7 @@ simulate <- function(model, years, seed = NULL) {
   death_rates <- model$processes$mortality$rates
   birth_rates <- model$processes$fertility$rates
   birth_interval <- model$processes$fertility$birth_interval
+  spacing_method <- model$processes$fertility$spacing_method
   ffab <- model$processes$fertility$ffab
   for (rows in split_rate_groups(death_rates)) {
     for (sex in c("m", "f")) {
@@ -221,7 +222,11 @@ simulate <- function(model, years, seed = NULL) {
                              as.matrix(population[["ancestry"]][setdiff(names(population[["ancestry"]]), "person_id")]),
                            inheritance, ffab, dissolution_rates, cohab$prob, cohab$conversion,
                            if (is.null(union_process$cohab_matching)) matching else
-                             prepare_matching_model(union_process$cohab_matching, group_values), counts_cohab)
+                             prepare_matching_model(union_process$cohab_matching, group_values), counts_cohab,
+                           spacing_method == "cell",
+                           isTRUE(getOption("hammel.check_cells", FALSE)))
+    if (!isTRUE(native$cells_consistent))
+      stop("Internal error: fertility cell counts are inconsistent.", call. = FALSE)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {
@@ -274,8 +279,11 @@ simulate <- function(model, years, seed = NULL) {
   }
   result$end_time <- start + years
   result$simulation <- list(start_time = start, end_time = result$end_time,
-    birth_interval = birth_interval, ffab = ffab,
+    birth_interval = birth_interval, spacing_method = spacing_method, ffab = ffab,
     births = births, deaths = deaths)
+  if (spacing_method == "cell")
+    result$simulation$unrealized_births <- format_unrealized_births(
+      if (years > 0) native$unrealized else NULL, birth_rates, group_values)
   if (cohab_enabled) {
     result$simulation$cohabitation_counts_as_previous_union <- counts_cohab
     result$simulation$conversions <- if (years > 0) native$conversions else 0
@@ -295,4 +303,29 @@ validate_birth_interval <- function(duration) {
          call. = FALSE)
   }
   invisible(duration)
+}
+
+# Unrealized expected births from cells with members but no eligible woman
+# (D101), by one-year period from the run start and cell. Columns mirror the
+# fertility table's strata: group, union_type and parity bounds appear only
+# when the schedules use them. Always a tibble, possibly with zero rows.
+format_unrealized_births <- function(native, rates, group_values) {
+  if (is.null(native) || !length(native$period_start)) {
+    native <- data.frame(period_start = numeric(), period_end = numeric(),
+      group = integer(), union_type = character(), parity_start = numeric(),
+      parity_end = numeric(), age_start = numeric(), age_end = numeric(),
+      unrealized_births = numeric(), years_without_eligible = numeric())
+  }
+  out <- tibble::tibble(period_start = native$period_start, period_end = native$period_end)
+  if (!is.null(group_values)) out$group <- group_values[native$group + 1L]
+  if ("union_type" %in% names(rates)) out$union_type <- as.character(native$union_type)
+  if ("parity_start" %in% names(rates)) {
+    out$parity_start <- native$parity_start
+    out$parity_end <- native$parity_end
+  }
+  out$age_start <- native$age_start
+  out$age_end <- native$age_end
+  out$unrealized_births <- native$unrealized_births
+  out$years_without_eligible <- native$years_without_eligible
+  out
 }

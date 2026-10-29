@@ -1,5 +1,5 @@
 ---
-title: "Hammel: Milestone 3 Validation"
+title: "Hammel: Milestone 5 Validation"
 author: "Aaron Gullickson"
 date: today
 format:
@@ -11,6 +11,11 @@ format:
     code-fold: true
     code-tools: true
     self-contained: true
+params:
+  n_replications: 100
+  initial_population: 50000
+  years: 150
+  burn_in: 50
 execute:
   eval: true
   echo: true
@@ -38,6 +43,7 @@ library(stringr)
 library(ggplot2)
 library(gt)
 library(furrr)
+set_theme(theme_bw())
 ```
 
 ```{r}
@@ -46,11 +52,17 @@ library(furrr)
 future::plan(future::multicore, workers = 4)
 ```
 
-
-
 ```{r}
 #| label: create-functions
 
+run_replication <- function(replication, model) {
+  set.seed(410000L + replication)
+  population <- create_baseline_population(params$initial_population, 60, 2000)
+  model <- model |> set_population(population)
+  time <- system.time(result <- simulate(model, params$years, 420000L + replication))[["elapsed"]]
+  result$runtime <- time
+  return(result)
+}
 ```
 
 ## Purpose and completion criteria
@@ -64,4 +76,378 @@ Assess whether the current simulation successfully handles parity-specific ferti
 
 ## Overview of Design
 
+### Redesign of fertility hazards
+
+The issue with birth intervals that was identified previous milestones 1 and 2 also became an issue in early tests of parity specific fertility. However, the effects of this bias are much larger, particuarly at low age, high parity births. For a woman to reach a high parity birth at a young age, she has experienced several back to back birth intervals, so fertility needs to be adjusted upwards much more than the existing adjustment model allows. The consequence is that fertility at younger ages is underestimated at parity > 0 and that underestimation increases with parity.
+
+Therefore, I decided this was a good time to try to fix the underlying problem with the adjustment technique which relies only on the input rates. However, the solution leads to a pretty significant change in how fertility operates and birth events are triggered.
+
+The basic idea is that to adjust fertlity rates correctly we need information about the population. Specifically, we need to know the number of eligible and ineligible women in each cell of our stratified fertility table. We can then adjust the rate in that cell to be:
+
+$$\lambda_i \frac{N_i}{E_i}$$
+
+Where $\lambda_i$ is the input hazard rate per woman year lived for all women in cell $i$ from the input schedule, $N_i$ is the number of women in that cell and $E_i$ is the number of eligible women (i.e. those that areeligible to give birth because they are not within `birth_interval` of a previous birth). $\lambda_i$ is always indexed by age, but depending on the input could also be indexed by parity, union type, and group. In our prior approach, we tried to approximate what $N_i/E_i$ would be based on fertility rates, but this approximation can fail in cases of changing fertility rates (e.g. across restarts, across union transitions) and it fails spectacularly for parity.
+
+So, the solution is to actually calculate $N_i/E_i$ exactly. We already have much of the machinery for doing this with the tracker we created for the weighted choice method in Milestone 3. This allows us to cheaply track the value of $\lambda_i (N_i/E_i)$ in continuous time by just updating cells based on events or hitting a band boundary.
+
+However, although we can track this value, we can't use it to assign individual waiting times to women because its constantly changing! So, the solution is to move the triggering of birth events away from the individual. Instead each cell of our tracker creates its own waiting time and when its event triggers, we sample a random woman within that cell and she gives birth. Waiting times are recalculated whenever a cell value changes.
+
+To avoid cells that are too coarse, we divide the age and parity bands into one year age and one year parity cells, even for the open-ended parity category. 
+
+When a cell has women but none are eligible, its births are dropped and reported in `simulation$unrealized_births`. This happens at start-up, and in cells that can't be reached at all, such as parity 5+ at age 18 when fertility starts at 15. Users also get a warning when they set up a schedule with unreachable cells.
+
+We also allow for the possibility of weights that could be applied to individual woman that will affect their probability of selection when their cell is sampled. This allows us to recreate the idea of fertility heterogeneity while implicitly rescaling weights to maintain our existing fertility schedule.
+
+Because we are redoing this engine, I will re-run several of the basic fertility checks form Milestone 1 to confirm that it is still working correctly, as well as checks to show if we have removed the bias from our previous approximation method.
+
+### Parity-specific fertility
+
+We add parity-specific fertility by allowing fertility rates to be stratified by parity using two additional columns: `parity_start` and `parity_end` that govern the half-open interval `[parity_start, parity_end)` with an option for an open-ended interval using `Inf` for `parity_end`.
+
+
+## Inputs and Simulation Design
+
+Parity specific rates are supplied from the USA in 2000 by the conditional age-specific fertility rates from the [Human Fertility Database](https://www.humanfertility.org/Country/Country?cntr=USA). These rates are statified by single parities up to parity 4+. For the fertility heterogeneity simulations, basic age-specific fertility rates for the USA in 2000 are also downloaded from the HFD. 
+
+Age-specific mortality rates are downloaded from the USA in 2000 using the Human Mortality Database. Union formation is set to "on_demand" for simplicity and requires no additional rates.
+
+```{r}
+#| label: get-input-rates
+
+fertility_rates_parity <- get_fertility_hfd("USA", 2000, by_parity = TRUE)
+fertility_rates_overall <- get_fertility_hfd("USA", 2000)
+fertility_rates_niger <- read_csv(here("validation", "data", "niger_2012_asfr_wpp2024.csv"))
+fertility_rates_split <- read_csv(here("validation", "data", "usa_2000_fertility_by_union_status.csv")) |>
+  rename(union_type = union_status)
+marriage_rates <- read_csv(here("validation", "data", "usa_2001_marriage_rates_female.csv"))
+mortality_rates <- get_mortality_hmd("USA", 2000)
+```
+
+The summary measures below show the TFR, parity and age adjusted TFR, and life expectancy for the input rate schedules.
+
+```{r}
+#| label: show-summary-input-measures
+
+calculate_tfr(fertility_rates_overall)
+calculate_tfr(fertility_rates_niger)
+calculate_tfr(fertility_rates_parity)
+calculate_life_table(mortality_rates) |>
+  filter(age_start == 0) |>
+  select(sex, age_start, ex)
+```
+
+For each scenario, `r params$n_replications` simulations of `r params$years` years will be run, and the mean values and Monte Carlo standard errors will be calculated for desired measures across simulations. The first `r params$burn_in` years will be ignored as the burn in. Each simulation will use a separate pre-defined seed. Each simulation will generate its own starting population so that randomness in starting population is incorporated into uncertainty estimates.
+
+```{r}
+#| set-sim-parameters
+
+# most are set in the yaml
+age_breaks <- 12:55
+time_breaks <- c(2000 + params$burn_in, 2000 + params$years)
+time_scenario <- tibble(scenario = character(), elapsed_time = double())
+```
+
+## Fertility Checks
+
+### Baseline fertility
+
+First I run a baseline fertility simulation without parity to confirm the new method is estimating fertility rates correctly. 
+
+```{r}
+#| label: run-simulations-basic
+
+model <- hammel_model() |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates_overall, spacing_method = "cell") |>
+  set_union_formation("on_demand")
+
+results <- future_map(seq_len(params$n_replications), run_replication, model = model, .options = furrr_options(seed = NULL))
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "basic fertility",
+    elapsed_time = mean(map_dbl(results, function(x) {x$runtime}))
+  )
+)
+
+fert_by_rep <- results |>
+  map(
+    calculate_fertility_rates,
+    time_breaks = time_breaks,
+    age_breaks = age_breaks
+  ) |>
+  bind_rows(.id = "replication")
+
+fert_summary <- fert_by_rep |>
+  filter(sex == "f") |>
+  group_by(time_start, time_end, age_start, age_end) |>
+  summarize(
+    n_valid = sum(!is.na(rate_fertility)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_fertility, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_fertility, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: fig-asfr-basic
+#| fig-cap: Mean estimated age-specific fertility rates across 100 simulations without parity-specific fertility. 95% confidence intervals shown on each rate. Dotted line shows the input rates.
+
+fert_summary |>
+  ggplot(aes(x = age_start + 0.5, y = rate_mean))+
+  geom_point()+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse))+
+  geom_line(data = fertility_rates_overall, aes(y = rate), linetype = 2)+
+  labs(x = "age", y = "age specific fertility rate")+
+  theme_bw()
+```
+
+### Fertility after restart
+
+
+```{r}
+#| label: run-simulation-niger
+
+results_ext_niger <- future_map2(
+  results, 
+  1:params$n_replications, 
+  function(result, seed) {
+    model <- model |>
+      set_population(result) |>
+      set_fertility(fertility_rates_niger, spacing_method = "cell")
+    simulate(model, years = 20, seed = seed)
+  },
+  .options = furrr_options(seed = NULL)
+)
+
+
+time_compare <- 2000 + c(params$years, params$years + 1, params$years + 20)
+
+tfr_pre_post <- results_ext_niger |>
+  map(
+    calculate_fertility_rates,
+    time_breaks = time_compare, 
+    age_breaks = age_breaks
+  ) |>
+  map(calculate_tfr) |>
+  bind_rows(.id = "replication") |>
+  group_by(time_start, time_end) |>
+  summarize(
+    n_valid = sum(!is.na(tfr)),
+    tfr_mean = if (n_valid > 0) {
+      mean(tfr, na.rm = TRUE)
+    } else NA_real_,
+    tfr_mcse = if (n_valid > 1) {
+      sd(tfr, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+```
+
+```{r}
+tfr_pre_post |>
+  gt()
+```
+
+
+
+### Partnered and unpartnered fertility
+
+```{r}
+#| label: run-simulation-partnered-rates
+
+model <- hammel_model() |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates_split, spacing_method = "cell") |>
+  set_union_formation("rate", rates = marriage_rates)
+
+results <- future_map(seq_len(params$n_replications), run_replication, model = model, .options = furrr_options(seed = NULL))
+
+fert_by_rep <- results |>
+  map(
+    calculate_fertility_rates,
+    time_breaks = time_breaks,
+    age_breaks = seq(15, 40, 5),
+    by_union_type = TRUE
+  ) |>
+  bind_rows(.id = "replication")
+
+fert_summary <- fert_by_rep |>
+  filter(sex == "f") |>
+  group_by(time_start, time_end, age_start, age_end, union_type) |>
+  summarize(
+    n_valid = sum(!is.na(rate_fertility)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_fertility, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_fertility, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: fig-asfr-split-rates
+#| fig-cap: Mean estimated age-specific fertility rates by union type across 100 simulation. 95% confidence intervals shown on each rate. Dotted line shows the input rates.
+
+fert_summary |>
+  ggplot(aes(x = age_start + 2.5, y = rate_mean, group = union_type, color = union_type))+
+  geom_point()+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse))+
+  geom_line(data = fertility_rates_split, aes(y = rate), linetype = 2)+
+  labs(x = "age", y = "age specific fertility rate")+
+  theme_bw()
+```
+
+
+
+## Parity-Specific Fertility
+
+```{r}
+#| label: run-simulations-parity-specific
+
+model <- hammel_model() |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates_parity, spacing_method = "cell") |>
+  set_union_formation("on_demand")
+
+results <- future_map(seq_len(params$n_replications), run_replication, model = model, .options = furrr_options(seed = NULL))
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "parity specific fertility", 
+    elapsed_time = mean(map_dbl(results, function(x) {x$runtime}))
+  )
+)
+
+fert_by_rep <- results |>
+  map(
+    calculate_fertility_rates,
+    time_breaks = time_breaks,
+    age_breaks = age_breaks,
+    parity_breaks = 0:4,
+    unrealized = TRUE
+  ) |>
+  bind_rows(.id = "replication")
+
+```
+
+```{r}
+#| label: fig-asfr-parity
+#| fig-cap: Mean estimated age-specific fertility rates across 100 simulations by parity. 95% confidence intervals shown on each rate. Dotted line shows the input rates.
+
+fert_summary <- fert_by_rep |>
+  filter(sex == "f") |>
+  group_by(time_start, time_end, age_start, age_end, parity_start, parity_end) |>
+  summarize(
+    n_valid = sum(!is.na(rate_fertility)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_fertility, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_fertility, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+
+fert_summary |>
+  ggplot(aes(x = age_start + 0.5, y = rate_mean))+
+  geom_point()+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse))+
+  geom_line(data = fertility_rates_parity, aes(y = rate), linetype = 2)+
+  labs(x = "age", y = "age specific fertility rate")+
+  facet_wrap(~parity_start)
+```
+
+```{r}
+#| label: fig-asfr-parity-adju
+#| fig-cap: Mean estimated age-specific fertility rates across 100 simulations by parity and adjusted for unrealized births. 95% confidence intervals shown on each rate. Dotted line shows the input rates.
+
+fert_summary <- fert_by_rep |>
+  filter(sex == "f") |>
+  group_by(time_start, time_end, age_start, age_end, parity_start, parity_end) |>
+  summarize(
+    n_valid = sum(!is.na(rate_fertility_adjusted)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_fertility_adjusted, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_fertility_adjusted, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+
+fert_summary |>
+  ggplot(aes(x = age_start + 0.5, y = rate_mean))+
+  geom_point()+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse))+
+  geom_line(data = fertility_rates_parity, aes(y = rate), linetype = 2)+
+  labs(x = "age", y = "age specific fertility rate")+
+  facet_wrap(~parity_start)
+```
+
+
+```{r}
+
+results |>
+  map(
+    calculate_fertility_rates,
+    time_breaks = time_breaks,
+    age_breaks = age_breaks
+  ) |>
+  map(calculate_tfr) |>
+  bind_rows() |>
+  summarize(
+    n_valid = sum(!is.na(tfr)),
+    tfr_mean = if (n_valid > 0) {
+      mean(tfr, na.rm = TRUE)
+    } else NA_real_,
+    tfr_mcse = if (n_valid > 1) {
+      sd(tfr, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_
+  )
+
+fertility_rates_parity |> calculate_tfr()
+```
+
+
+
+## Fertility Heterogeneity
+
+## Time Tests
+
+## Tests
+
+The following tests have been constructed and are currently all passing.
+
+```{r}
+#| label: test-results
+
+test_results <- devtools::test(pkg = here::here(), reporter = "silent")
+test_table <- as.data.frame(test_results)
+knitr::kable(
+  test_table[, c("test", "passed", "failed", "error", "skipped", "warning")]
+)
+```
+## Conclusions and Unresolved Limitations
+
+The simulation is now functioning as expected across all the measured indicators. Although the use of groups increases the computational time of the simulation, the overall simulation is still very fast. Furthermore, this simulation maintains speed while choosing among all available partners for each union rather than just a sample. 
+
+The intergroup union parameters are an imperfect approach to union formation and under certain conditions (like small group sizes) could lead to unexpected results. However, these parameters allow for quick computation, the preservation of input rates, and the ability to benchmark off of common measures like log odds ratios. The current paramters give users enough control to handle a variety of cases, but notably do not allow fo marriage squeeze adjustments. A future implementation will seek to add a full two-sex marriage model as an alternative to the current approach. 
+
+## Reproducibility record
+
+```{r}
+#| label: reproducibility
+system2("git", c("-C", shQuote(here::here()), "rev-parse", "HEAD"), stdout = TRUE)
+system2("git", c("-C", shQuote(here::here()), "status", "--short"), stdout = TRUE)
+sessionInfo()
+```
 

@@ -503,3 +503,28 @@ required; absent births cannot be reconstructed. Minimum-spacing time remains
 in the denominator. Group and union-type options combine with parity bands.
 Sum births and exposure, then divide, to pool bands; do not average their rates.
 See [parity fertility](parity-fertility.md#observed-fertility-by-parity).
+
+## Unrealized births under cell accounting
+
+For populations simulated with `spacing_method = "cell"` (D101),
+`calculate_fertility_rates(..., unrealized = TRUE)` adds `unrealized_births`
+and `rate_fertility_adjusted = (births + unrealized_births) / person_years`.
+Unrealized births are the expected births dropped from fertility cells that had
+members but no eligible woman (`simulation$unrealized_births`), so the adjusted
+rate shows what the input schedule would have produced without that loss. The
+observed `rate_fertility` remains the simulated outcome.
+
+Each record covers one one-year period from the run start and one fertility
+cell (an age year, actual parity when schedules are parity-specific, group and
+union type). A record is added to the observation row that contains it, so
+actual parities pool into broader parity bands and age years into wider age
+bands. Values are `NA`, rather than approximated, for periods before the most
+recent simulation's start (a restarted population keeps only its latest run's
+record), for time or age breaks that cut through a record, and for union-type or
+parity strata the fertility schedule did not use. Populations simulated with
+midpoint compensation are rejected.
+
+```r
+asfr <- calculate_fertility_rates(result, time_breaks = c(2050, 2150),
+  age_breaks = 12:56, parity_breaks = 0:4, unrealized = TRUE)
+```

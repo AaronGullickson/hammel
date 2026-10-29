@@ -4,13 +4,13 @@ parity_rates <- function(values=c(.2,.3,.4),lower=15,upper=50) {
 }
 
 parity_model <- function(values=c(.2,.3,.4),interval=.75,n=100) {
-  make_model(n,sex="f",age=20) |>
-    set_fertility(parity_rates(values),birth_interval=interval)
+  quiet_unreachable(make_model(n,sex="f",age=20) |>
+    set_fertility(parity_rates(values),birth_interval=interval))
 }
 
 test_that("parity schedules require complete partitions in every stratum", {
   rates <- parity_rates()
-  expect_s3_class(fertility(rates),"hammel_process")
+  expect_s3_class(quiet_unreachable(fertility(rates)),"hammel_process")
   expect_error(fertility(rates[-1, ]),"cover")
   expect_error(fertility(rates[-2, ]),"cover")
   expect_error(fertility(rates[-3, ]),"cover")
@@ -26,10 +26,10 @@ test_that("parity schedules require complete partitions in every stratum", {
   expect_error(fertility(bad),"cover")
   expect_error(fertility(rbind(rates,rates[1, ])),"Age intervals")
   grouped <- rbind(transform(rates,group="A"),transform(rates,group="B"))
-  expect_s3_class(fertility(grouped),"hammel_process")
+  expect_s3_class(quiet_unreachable(fertility(grouped)),"hammel_process")
   expect_error(fertility(grouped[-5, ]),"cover")
   typed <- rbind(transform(rates,union_type="partnered"),transform(rates,union_type="unpartnered"))
-  expect_s3_class(fertility(typed),"hammel_process")
+  expect_s3_class(quiet_unreachable(fertility(typed)),"hammel_process")
   expect_error(fertility(typed[-5, ]),"cover")
   expect_s3_class(fertility(parity_rates(.2)),"hammel_process")
 })
@@ -120,7 +120,8 @@ test_that("parity composes with grouped typed fertility, conversion and multipli
     transform(base,union_type="marriage",rate=rate*1.1))
   model <- hammel_model() |> set_population(pop) |>
     set_mortality(data.frame(sex=c("m","f"),age_start=0,age_end=Inf,rate=.01)) |>
-    set_fertility(rates,group_prop_hazard=list(unpartnered=c(B=1.1),cohab=c(B=.9),marriage=c(B=1.2))) |>
+    (\(m) quiet_unreachable(set_fertility(m,rates,
+      group_prop_hazard=list(unpartnered=c(B=1.1),cohab=c(B=.9),marriage=c(B=1.2)))))() |>
     set_union_formation("rate",rates=data.frame(age_start=15,age_end=Inf,rate=.4),
       cohab_prob=data.frame(age_start=15,age_end=Inf,prob=.5),
       union_convert_rate=data.frame(dur_start=0,dur_end=Inf,rate=.2),
@@ -129,7 +130,7 @@ test_that("parity composes with grouped typed fertility, conversion and multipli
   explicit <- rbind(transform(rates,group="A"),transform(rates,group="B"))
   factor <- c(unpartnered=1.1,cohab=.9,marriage=1.2)[explicit$union_type]
   explicit$rate <- explicit$rate * ifelse(explicit$group=="B",factor,1)
-  equivalent <- set_fertility(model,explicit)
+  equivalent <- quiet_unreachable(set_fertility(model,explicit))
   x <- simulate(model,8,44)
   expect_identical(simulate(equivalent,8,44),x)
   expect_gt(x$simulation$births,0)

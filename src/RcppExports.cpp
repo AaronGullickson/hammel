@@ -296,8 +296,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // simulate_cpp
-List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, DataFrame unions, List matching, double min_male_age, int kinship_generations, bool rate_initiation, DataFrame union_rates, List father_matching, bool cancel_birth_if_no_match, bool diagnostics, NumericMatrix initial_ancestry, List inheritance, double ffab, DataFrame dissolution_rates, DataFrame cohab_prob, DataFrame conversion_rates, List cohab_matching, bool counts_cohab);
-RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP unionsSEXP, SEXP matchingSEXP, SEXP min_male_ageSEXP, SEXP kinship_generationsSEXP, SEXP rate_initiationSEXP, SEXP union_ratesSEXP, SEXP father_matchingSEXP, SEXP cancel_birth_if_no_matchSEXP, SEXP diagnosticsSEXP, SEXP initial_ancestrySEXP, SEXP inheritanceSEXP, SEXP ffabSEXP, SEXP dissolution_ratesSEXP, SEXP cohab_probSEXP, SEXP conversion_ratesSEXP, SEXP cohab_matchingSEXP, SEXP counts_cohabSEXP) {
+List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, DataFrame unions, List matching, double min_male_age, int kinship_generations, bool rate_initiation, DataFrame union_rates, List father_matching, bool cancel_birth_if_no_match, bool diagnostics, NumericMatrix initial_ancestry, List inheritance, double ffab, DataFrame dissolution_rates, DataFrame cohab_prob, DataFrame conversion_rates, List cohab_matching, bool counts_cohab, bool cell_spacing, bool check_cells);
+RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP unionsSEXP, SEXP matchingSEXP, SEXP min_male_ageSEXP, SEXP kinship_generationsSEXP, SEXP rate_initiationSEXP, SEXP union_ratesSEXP, SEXP father_matchingSEXP, SEXP cancel_birth_if_no_matchSEXP, SEXP diagnosticsSEXP, SEXP initial_ancestrySEXP, SEXP inheritanceSEXP, SEXP ffabSEXP, SEXP dissolution_ratesSEXP, SEXP cohab_probSEXP, SEXP conversion_ratesSEXP, SEXP cohab_matchingSEXP, SEXP counts_cohabSEXP, SEXP cell_spacingSEXP, SEXP check_cellsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -324,7 +324,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< DataFrame >::type conversion_rates(conversion_ratesSEXP);
     Rcpp::traits::input_parameter< List >::type cohab_matching(cohab_matchingSEXP);
     Rcpp::traits::input_parameter< bool >::type counts_cohab(counts_cohabSEXP);
-    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab, dissolution_rates, cohab_prob, conversion_rates, cohab_matching, counts_cohab));
+    Rcpp::traits::input_parameter< bool >::type cell_spacing(cell_spacingSEXP);
+    Rcpp::traits::input_parameter< bool >::type check_cells(check_cellsSEXP);
+    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab, dissolution_rates, cohab_prob, conversion_rates, cohab_matching, counts_cohab, cell_spacing, check_cells));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -370,7 +372,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_inspect_weighted_calibration_cpp", (DL_FUNC) &_hammel_inspect_weighted_calibration_cpp, 14},
     {"_hammel_inspect_exact_draw_cpp", (DL_FUNC) &_hammel_inspect_exact_draw_cpp, 11},
     {"_hammel_inspect_weighted_incremental_cpp", (DL_FUNC) &_hammel_inspect_weighted_incremental_cpp, 11},
-    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 23},
+    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 25},
     {"_hammel_inspect_intensity_tracker_cpp", (DL_FUNC) &_hammel_inspect_intensity_tracker_cpp, 12},
     {NULL, NULL, 0}
 };

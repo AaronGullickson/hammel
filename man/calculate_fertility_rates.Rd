@@ -10,7 +10,8 @@ calculate_fertility_rates(
   age_breaks,
   by_union_type = FALSE,
   by_group = FALSE,
-  parity_breaks = NULL
+  parity_breaks = NULL,
+  unrealized = FALSE
 )
 }
 \arguments{
@@ -42,10 +43,21 @@ group row is added. Unknown-mother births remain in the single period-level
 \item{parity_breaks}{NULL to pool parities, or strictly increasing nonnegative
 integer boundaries starting at zero. Bands are half-open. A finite final
 boundary receives Inf, as for age breaks.}
+
+\item{unrealized}{Logical, default \code{FALSE}. With \code{TRUE}, the population must
+come from \code{simulate()} with \code{spacing_method = "cell"}; add
+\code{unrealized_births} (expected births dropped from fertility cells that had
+members but no eligible woman, from \code{simulation$unrealized_births}) and
+\code{rate_fertility_adjusted = (births + unrealized_births) / person_years}.
+Values are \code{NA} where they cannot be attributed exactly: periods before the
+most recent simulation's start (restarts keep only the latest run's
+record), breaks that cut through a recorded one-year period or fertility
+cell, and \code{union_type} or parity strata the fertility schedule did not use.}
 }
 \value{
 A tibble with period, age, sex (female), person_years, births and
-rate_fertility; optional parity_start/parity_end, group and union_type.
+rate_fertility; optional parity_start/parity_end, group and union_type, and
+with \code{unrealized = TRUE}, unrealized_births and rate_fertility_adjusted.
 Unknown-mother births are in the period-level unassigned_births attribute.
 }
 \description{

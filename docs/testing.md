@@ -772,3 +772,36 @@ parity. Earlier exploratory variable-multiplier runs were excluded, not pooled
 with controlled results. See [the collaboration investigation](parity-spacing-investigation.md)
 for user-reported empirical-schedule evidence and unresolved calibration choices.
 The user-authored milestone5.qmd was not edited by this work.
+
+## Cell-accounted fertility (D101, October 29, 2026)
+
+`tests/testthat/test-fertility-cells.R` covers `spacing_method` validation and
+defaults, metadata, exact unrealized-intensity cases (1-year age cells and an
+actual-parity cell inside a pooled band), zero spacing,
+unstratified recovery from a no-history start, pooled upper-parity recovery,
+groups, union types, cohabitation, dissolution, matching, restarts and
+cancellation. The grouped cases run with `options(hammel.check_cells = TRUE)`,
+which rescans cell counts at every event and calibration fertility totals at
+every fertility-driven search. A separate test covers the unreachable-cell
+warning (earliest eligible ages, partly reachable cells, zero spacing,
+unstratified schedules, delayed starts, zero intermediate parities, groups).
+Tests of `calculate_fertility_rates(unrealized = TRUE)` cover exact
+attribution, NA for breaks that cut a period or age year, restarts and
+overall schedules split by union type, pooling actual parities into observed
+bands, rejection of midpoint populations, and restored initialized-cohort
+rates. Synthetic parity fixtures elsewhere wrap construction in the test helper
+`quiet_unreachable()`, which silences only that advisory warning. Midpoint fixed-seed histories were compared in
+full before and after the `BoundaryQueue` extraction and the cell integration
+(grouped on-demand, grouped rate mode with cohabitation and dissolution,
+grouped parity-specific) and are identical apart from the new
+`spacing_method` metadata field. The full suite passed.
+
+Offline engine evidence, 10 seeds per method:
+`validation/milestone5/check-cell-spacing.R` (recovery across cohort,
+generational, restart, union-type and group scenarios),
+`check-cell-resolution.R` (supplied wide, single-year and per-parity bands
+give identical results; finer supplied bands give finer cells) and
+`benchmark-cell-spacing.R LIB` (timing of an optimized installed build in LIB;
+`load_all()` builds use `-O0` and are not representative). Results and the revised cell-resolution
+decision are in [cell-accounted fertility](fertility-cell-accounting.md#implementation-and-validation).
+No scientific acceptance threshold is set.
