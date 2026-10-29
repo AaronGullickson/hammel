@@ -32,8 +32,8 @@ rather than falling back to unconditional rates.}
 }
 \value{
 A fertility rate tibble with a \code{source} attribute. Total-rate tables
-are validated for execution. Parity tables currently support preparation/
-inspection only; unavailable conditional rates are zero-filled.
+are validated for execution. Parity tables use half-open age/parity bounds;
+unavailable conditional rates are zero-filled.
 }
 \description{
 Download total period age-specific fertility rates (\code{asfrRR}) through
@@ -44,8 +44,8 @@ With \code{by_parity = TRUE}, request conditional age/parity rates (\code{mi}) i
 first births map to parity [0,1), through fifth-or-higher births at [4,Inf).
 Missing conditional cells are replaced with zero; source metadata records
 that policy and the number of replacements in the selected year.
-Parity tables prepare data for milestone 5; parity-dependent execution is
-not yet implemented and fertility constructors reject parity columns.
+Parity tables can be supplied to fertility constructors for parity-dependent
+execution. Parity initializes from recorded maternal birth histories.
 }
 \details{
 HFD endpoint rows are retained: \verb{12-} is represented as \verb{[12,13)} using its

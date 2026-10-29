@@ -172,8 +172,10 @@ that transition issue is [documented and deferred](scientific-contract.md#known-
 return rate tibbles, without configuring a model. Users can save/load them with
 RDS and reuse them without downloads. HMDHFDplus is optional for these helpers.
 The HFD helper's `by_parity = TRUE` option imports conditional mi rates as
-age/parity interval rows for milestone 5 preparation. It preserves unavailable
-cells as NA with a warning; the current engine does not accept parity schedules.
+age/parity interval rows for milestone 5 preparation. Unavailable
+conditional cells are zero-filled under D096, with policy/count metadata. The
+engine accepts complete parity partitions under D099 and initializes counts
+from recorded maternal births.
 See [parity fertility](parity-fertility.md). The default remains total asfrRR. `calculate_patfr()` summarizes conditional
 parity schedules with a deterministic HFD-style fertility table; calculate_tfr()
 delegates when parity columns are present, returning patfr (D097). Both products preserve endpoint rows under

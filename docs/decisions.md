@@ -40,6 +40,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Open fertility age bands, HFD endpoints and TFR warnings | D095 |
 | Missing conditional HFD rates replaced with zero | D096 |
 | PATFR helper and automatic TFR dispatch for parity tables | D097 |
+| History-authoritative parity initialization | D098 |
+| Parity execution and SOCSIM-style spacing compensation | D099 |
 
 ## Recorded decisions
 
@@ -1965,3 +1967,51 @@ cohabitation policy. Duration stratification is unchanged.
   HFD zero filling (D096). Upper-age omission, source endpoints and missing-cell
   assumptions can prevent exact equality to HFD's full published PATFR. No
   parity-dependent simulation or heterogeneity is authorized by this helper.
+
+
+## D098 — Initialize parity from recorded maternal birth histories (October 29, 2026)
+
+- **Status:** accepted by the user during parity-execution design.
+- **Decision:** on detecting parity-specific fertility, initialize the internal
+  parity vector from recorded births by mother_id. Women with no recorded births
+  start at zero, including random baselines with no birth histories. An optional
+  parity column must not override observed history. Count children regardless
+  of survival or known father; retain actual counts beyond an open band's lower
+  bound. Successful births increment parity, cancelled attempts do not.
+- **Architecture:** per-simulation integer storage indexed by stable engine
+  person position, avoiding repeated joins. Restart reconstructs counts from
+  retained recorded histories; no additional authoritative public state is added.
+- **Limit:** incomplete histories understate parity under this explicit rule.
+  Birth-spacing compensation and remaining execution contracts are unresolved;
+  this decision does not itself implement the engine or fertility heterogeneity.
+
+
+## D099 — Execute parity fertility with SOCSIM-style compensation (October 29, 2026)
+
+- **Status:** accepted by the user after reviewing the pinned SOCSIM source trace.
+- **Decision:** implement age/current-parity fertility with D098 history-derived
+  integer counts. Parity bands partition [0,Inf) within each group/type; age gaps
+  retain existing zero-risk meaning. Increment only on successful births and
+  select the new schedule, retaining actual-birth spacing and refreshing any
+  unpartnered fertility contribution used for father matching. No new public
+  authoritative parity column or parity axis in matching bins is added.
+- **Correction:** no adjustment at actual parity zero. For higher parity, divide
+  its current input band rate by one minus the preceding actual parity's
+  unadjusted rate integral over the birth interval, evaluated at the current
+  age midpoint. Upper-open ages use the preceding schedule's tail rate times
+  spacing. Zero spacing and zero input hazards remain unchanged. Positive
+  rates require positive eligibility and representable adjustment. Group factors
+  apply before correction; prior group/union-type history is not reconstructed.
+- **Highest parity:** retain actual counts; entry to the final open category
+  corrects from the prior category, while subsequent births correct from its
+  own input schedule. Broad finite parity bands also use actual k and k-1.
+- **Intentional departure:** use annual inputs, continuous execution and existing
+  midpoint/interior-limit approximations rather than SOCSIM's monthly
+  probability-sum grid. This mathematical implementation copies no SOCSIM source.
+- **Limits:** the correction is not the exact current-parity eligible fraction
+  and does not guarantee input conditional-rate recovery. Synthetic checks must
+  report observed differences. No fertility heterogeneity, automatic prehistory
+  synthesis or parity-stratified public observation API is added in this change.
+- **Specification:** [parity fertility](parity-fertility.md);
+  [static SOCSIM trace](socsim-parity-spacing-audit.md). Milestone 5 scientific
+  acceptance remains with the user.

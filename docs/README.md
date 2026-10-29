@@ -38,7 +38,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [Union-formation models](union-formation-models.md) | Implemented milestone 2 rules, matching defaults, diagnostics, and deferred work |
 | [Cohabitation](cohabitation.md) | Rate-mode type probabilities, type-specific matching/rates, conversion and histories (D085/D086) |
 | [Remarriage schedules](remarriage.md) | Age/duration previous-union search strata, calibration, and marriage observations (D080/D083) |
-| [Parity fertility design/preparation](parity-fertility.md) | Selected parity bands and conditional HFD import; execution remains future milestone 5 work (D094) |
+| [Parity fertility and PATFR](parity-fertility.md) | History-derived parity, schedules, SOCSIM-style spacing approximation and recovery limitations; milestone 5 in progress (D094–D099) |
 | [Union dissolution](union-dissolution.md) | Milestone 4 duration hazards, female carrier, state changes, and worked examples (D078) |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
 | [Two-sex union models](two-sex-union-models.md) | Proposal notes: directional asymmetry, marriage squeeze, Schoen/Choo–Siow/Dagsvik models, API considerations (D073) |

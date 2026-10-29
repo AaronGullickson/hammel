@@ -92,27 +92,32 @@ arbitrary callbacks and exact checkpoints remain future scope. Acceptance does
 not authorize those mechanisms. An African historical benchmark remains postponed.
 
 
-## Milestone 5 preparation update
+## Milestone 5 current work
 
-The user confirmed the milestone 4 PR was merged and authorized documentation
-and HFD-helper work. D094 selects parity_start/parity_end, half-open bounds and
-Inf. `get_fertility_hfd(..., by_parity = TRUE)` prepares conditional mi rates in
-that format, mapping birth order 5+ to current parity 4+. D096 replaces unavailable conditional cells with zero and records the policy
-and replacement count in source metadata. Parity execution, initialization, compensation, observation
-and heterogeneity are not implemented; constructors reject parity columns.
-See [parity fertility](parity-fertility.md). Preserve the user's new
-validation/milestone5.qmd; it is not part of the importer changes.
+The user confirmed the milestone 4 PR was merged and authorized parity work.
+D094 selects half-open parity_start/parity_end, including Inf. HFD conditional
+mi rates map birth-order 5+ (m5px) to current parity 4+. D095 retains 12- as
+[12,13) and 55+ as [55,Inf), supports upper-open fertility ages with interior-
+limit spacing adjustment, and warns when TFR drops nonzero open-age rates.
+D096 zero-fills unavailable HFD conditional cells with policy/count provenance.
+D097 adds calculate_patfr(), with automatic calculate_tfr() delegation and all
+existing strata, missing included cells yielding NA and upper-age truncation.
 
+D098/D099 implement actual parity counts from recorded maternal births only.
+No optional persons parity column overrides history; deceased children and
+unknown fathers count. Initialize random baselines at zero if there are no
+recorded births. Increment only on successful births; reconstruct at restart.
+Complete parity partitions are required for every group/union-type schedule.
+Parity zero is unadjusted; higher parity uses the preceding actual parity's raw
+age schedule for the selected SOCSIM-style compensation. Entry to the open
+highest category differs from later births within it. Refresh father-matching
+fertility contributions and scheduling after births, with no parity matching bins.
 
-D095 additionally allows upper-open fertility age bands, with interior-limit
-birth-spacing adjustment f/(1-b*f), retaining finite-band midpoint behavior.
-TFR drops upper-open rows and warns on known nonzero omitted fertility. HFD
-helpers now retain 12- as [12,13) and 55+ as [55,Inf), superseding endpoint
-omission in D094. This still does not implement parity-dependent execution.
-
-
-D097 adds calculate_patfr() using the HFD midpoint fertility-table convention;
-calculate_tfr() delegates when parity columns are present and returns patfr.
-All existing TFR strata are preserved. The user selected omission of upper-open
-ages with nonzero-rate warning and NA propagation from included missing cells.
-This summary helper does not implement parity-dependent simulation.
+**Important limitation:** the offline initialized-cohort check at
+[validation/milestone5/](../validation/milestone5/README.md) finds mean parity-1
+and 2+ rates .2665 and .3335 with .75-year spacing against inputs .3 and .4.
+Zero-spacing controls recover approximately .2992 and .4035. This is the selected
+approximation's limitation, not a scientific acceptance claim. Do not silently
+change to population-ratio compensation. Public parity-stratified observation
+options and fertility heterogeneity are not implemented. Preserve the user's
+validation/milestone5.qmd, which is outside these implementation changes.

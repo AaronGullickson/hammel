@@ -15,6 +15,9 @@ contract; software checks and empirical assessment are different evidence.
   observation. The author is producing the final render at closeout.
 - `data/`: local rate inputs, source documents, metadata and preparation scripts
   used by the reports and shipped examples. Retain these for reproducibility.
+- `milestone5.qmd`: user-authored report under development; not accepted.
+- `milestone5/`: current parity-spacing diagnostics, including an explicit
+  initialized-cohort recovery limitation.
 - `milestone4/`: supplementary calibration benchmarks and conditional-choice
   recovery evidence cited by the current methods and testing documentation.
 

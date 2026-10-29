@@ -587,11 +587,12 @@ Record database, population, year, product, retrieval timestamp, and reader
 version. HFD records requested revision date and endpoint mapping. A null
 revision requests the current release; it does not pin a historical revision.
 Synthetic/local-reader tests establish conversions; live requests are opt-in.
-For data preparation only, `get_fertility_hfd(..., by_parity = TRUE)` imports
+`get_fertility_hfd(..., by_parity = TRUE)` imports
 conditional mi rates with half-open current-parity bounds (D094). Endpoint
 rows use the D095 mapping above. Unavailable conditional cells are zero-filled under the user-selected D096
-preparation rule, with policy/count in source metadata; no parity-dependent simulation or compensation is implemented.
-Fertility constructors reject parity columns until execution is implemented.
+preparation rule, with policy/count in source metadata. D099 implements
+parity-dependent simulation with the selected preceding-parity correction.
+Fertility constructors accept complete parity partitions under D099.
 See [parity fertility](parity-fertility.md) for the birth-order/parity mapping.
 
 Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDplus),
@@ -683,4 +684,30 @@ retains earlier limitations, including transition-aware fertility compensation
 (D045), thin-pool failures, initialization transients, and approximate calibration
 age bins. Reported recovery in these scenarios is not a universal exact pooled
 cross-tab constraint. Static SOCSIM audits remain distinct from executable
-reference comparisons. Later parity and calendar-time schedules remain unimplemented.
+reference comparisons. Parity-specific execution is implemented under D099; calendar-time schedules
+and fertility heterogeneity remain unimplemented.
+
+
+## Parity-specific fertility execution
+
+D099 permits parity_start/parity_end partitions covering [0,Inf) within each
+fertility group/union-type stratum, composed with existing age bands and
+multipliers. Counts initialize from recorded maternal births under D098, not
+from a custom persons parity column, and increment only on successful births.
+The count is not capped at the final band's lower bound. Newborns start at zero;
+restarts reconstruct retained histories. No prehistory is imputed.
+
+Actual parity zero uses unadjusted input fertility. Higher parities use their
+own rate divided by an eligibility approximation computed from the preceding
+actual parity's unadjusted age schedule. Retain finite-band midpoints, upper-
+open interior limits and actual-birth spacing. Current group/union type is held
+for this computation; earlier transitions are not reconstructed. Refresh current
+fertility/calibration contributions at birth. No new parity matching bins are
+introduced. See [parity fertility](parity-fertility.md) for validation, formulae
+and the highest-band distinction.
+
+This is a SOCSIM-style approximation, not an exact exposure adjustment. In the
+controlled initialized-cohort check, .75-year spacing yields mean parity-1 and
+2+ rates .2665 and .3335 against inputs .3 and .4. The limitation is explicit;
+software correctness does not establish conditional-rate recovery or milestone 5
+acceptance. Alternative exposure-based compensation remains a future decision.

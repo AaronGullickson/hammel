@@ -15,7 +15,7 @@ test_that("HFD conditional rates map birth order to half-open current parity", {
   expect_equal(rates$parity_start,rep(0:4,each=4))
   expect_equal(rates$parity_end,rep(c(1,2,3,4,Inf),each=4))
   expect_equal(rates$rate,c(.001,.12,.13,.001,0,.20,.21,.001,0,.15,.16,.001,0,.10,.11,.001,0,.08,.09,.001))
-  expect_error(fertility(rates),"not yet implemented")
+  expect_s3_class(fertility(rates),"hammel_process")
 })
 
 test_that("conditional preparation zero-fills unavailable cells and preserves known rates", {

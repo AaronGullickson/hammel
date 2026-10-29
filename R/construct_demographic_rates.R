@@ -85,8 +85,8 @@ database_source <- function(database, country, year, item, update = NULL) {
 #' first births map to parity [0,1), through fifth-or-higher births at [4,Inf).
 #' Missing conditional cells are replaced with zero; source metadata records
 #' that policy and the number of replacements in the selected year.
-#' Parity tables prepare data for milestone 5; parity-dependent execution is
-#' not yet implemented and fertility constructors reject parity columns.
+#' Parity tables can be supplied to fertility constructors for parity-dependent
+#' execution. Parity initializes from recorded maternal birth histories.
 #'
 #' HFD endpoint rows are retained: `12-` is represented as `[12,13)` using its
 #' supplied rate, and `55+` as `[55,Inf)`. TFR omits the upper-open band and warns
@@ -104,8 +104,8 @@ database_source <- function(database, country, year, item, update = NULL) {
 #'   Requires the HFD conditional-rate product; unavailable products/years error
 #'   rather than falling back to unconditional rates.
 #' @return A fertility rate tibble with a `source` attribute. Total-rate tables
-#'   are validated for execution. Parity tables currently support preparation/
-#'   inspection only; unavailable conditional rates are zero-filled.
+#'   are validated for execution. Parity tables use half-open age/parity bounds;
+#'   unavailable conditional rates are zero-filled.
 #' @export
 #' @examples
 #' \dontrun{

@@ -694,3 +694,36 @@ No empirical HFD download or comparison with its full published PATFR was run;
 source endpoint/zero-fill conventions can change that comparison. This is a
 summary helper, not parity-dependent engine execution. The user's milestone5
 report was left unchanged.
+
+
+## Parity-dependent fertility execution (D099, October 29, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
+passed the full suite without failures or test warnings; the opt-in live database
+case was skipped. Targeted integration checks and final parity tests passed.
+Coverage includes complete group/type parity partitions, edited-model validation,
+finite age overlap, first-birth exemption, unadjusted preceding-parity integrals,
+upper-age interior limits, top-category entry versus repeated births, broad
+parity bands without expanding to every possible parity, actual maternal history
+including deceased children, ignored custom parity columns, unknown fathers,
+cancellations, spacing, restarts, typed fertility/conversion, group multiplier
+versus explicit-schedule equivalence, and grouped zero-spacing controls.
+
+A saved pre-feature 50,000-person grouped/previous-status run over 100 years at
+seed 42 retained identical complete output without parity columns. No empirical
+rates were downloaded or SOCSIM reference simulations run. SOCSIM's source was
+inspected at the documented pinned commit; no source was copied/adapted.
+
+The independent [spacing diagnostic](../validation/milestone5/check-parity-spacing.R)
+uses 10 seeds, 3,000 initial women aged 20 at parity zero, no mortality and ten
+years of follow-up. With zero spacing, observed means for parities 0,1,2+ are
+.199760 (MCSE .001479), .299198 (.002280), .403456 (.001528), versus inputs
+.2,.3,.4. With .75-year spacing, they are .199760 (.001479), .266465 (.001925),
+.333460 (.000637). Exposure is reconstructed independently from birth histories.
+This initialized-cohort check demonstrates a rate-recovery limitation of the
+selected SOCSIM-style approximation, rather than successful scientific parity-
+rate validation. Do not claim exact eligibility adjustment or milestone 5
+acceptance from the passing software tests. The [parity specification](parity-fertility.md)
+records the limitation and remaining scope. [Replications](../validation/milestone5/parity-spacing-replications.csv)
+and [summary](../validation/milestone5/parity-spacing-summary.csv) retain the evidence.
+The user's validation/milestone5.qmd remains unmodified by this work.

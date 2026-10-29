@@ -132,6 +132,16 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #' On-demand union formation requires overall rates; rate-based formation accepts
 #' either form and warns when an overall schedule is used.
 #'
+#' Optional `parity_start`/`parity_end` use half-open current maternal parity
+#' bands, covering zero through Inf without gaps or overlap in every group/type
+#' stratum. Parity is counted from recorded maternal births (including deceased
+#' children) and incremented only on successful births; no custom parity column
+#' overrides history. First-birth rates are unadjusted. Higher-parity spacing
+#' compensation uses the preceding actual parity's unadjusted schedule in the
+#' same group/type. In a final open parity band, entry and subsequent births
+#' can therefore have different adjusted hazards. This SOCSIM-style approximation
+#' does not guarantee exact recovery of arbitrary conditional rates.
+#'
 #' For finite fertility bands, one adjusted hazard is calculated at each original
 #' band's midpoint: the input rate divided by one minus the input fertility integral
 #' over the preceding `birth_interval`. The integral accounts for overlaps with
@@ -261,8 +271,6 @@ validate_rates <- function(rates, mortality) {
       stop("Fertility schedules do not take a sex column in this initial interface.",
            call. = FALSE)
     }
-    if (any(c("parity_start", "parity_end") %in% names(rates)))
-      stop("Parity-specific fertility tables are for data preparation; parity-dependent simulation is not yet implemented.", call. = FALSE)
     if ("union_status" %in% names(rates))
       stop("Fertility input `union_status` has been replaced by `union_type`.", call. = FALSE)
     if ("union_type" %in% names(rates)) {
@@ -277,6 +285,27 @@ validate_rates <- function(rates, mortality) {
     } else {
       schedules <- list(seq_len(nrow(rates)))
     }
+  }
+  if (!mortality && any(c("parity_start", "parity_end") %in% names(rates))) {
+    check_columns(rates, c("parity_start", "parity_end"), "rates")
+    check_numeric_column(rates$parity_start, "rates$parity_start")
+    upper <- rates$parity_end
+    if (!is.numeric(upper) || !is.null(dim(upper)) || anyNA(upper) ||
+        any(rates$parity_start < 0 | rates$parity_start != floor(rates$parity_start)) ||
+        any(upper <= rates$parity_start) || any(is.finite(upper) & upper != floor(upper)) ||
+        any(rates$parity_start > .Machine$integer.max) ||
+        any(is.finite(upper) & upper > .Machine$integer.max))
+      stop("Parity bands need nonnegative integer starts and greater integer ends or Inf within engine count capacity.", call. = FALSE)
+    schedules <- unlist(lapply(schedules, function(rows) {
+      bands <- unique(rates[rows, c("parity_start", "parity_end"), drop = FALSE])
+      bands <- bands[order(bands$parity_start), , drop = FALSE]
+      if (bands$parity_start[1] != 0 || tail(bands$parity_end, 1) != Inf ||
+          (nrow(bands) > 1L && any(head(bands$parity_end, -1) != tail(bands$parity_start, -1))))
+        stop("Parity bands must cover [0, Inf) without gaps or overlaps in every group/union-type schedule.", call. = FALSE)
+      lapply(seq_len(nrow(bands)), function(i) rows[
+        rates$parity_start[rows] == bands$parity_start[i] &
+        rates$parity_end[rows] == bands$parity_end[i]])
+    }), recursive = FALSE)
   }
   for (rows in schedules) {
     rows <- rows[order(rates$age_start[rows])]

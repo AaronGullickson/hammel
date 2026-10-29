@@ -159,6 +159,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// adjusted_parity_fertility_cpp
+DataFrame adjusted_parity_fertility_cpp(DataFrame rates, int parity, double birth_interval);
+RcppExport SEXP _hammel_adjusted_parity_fertility_cpp(SEXP ratesSEXP, SEXP paritySEXP, SEXP birth_intervalSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< DataFrame >::type rates(ratesSEXP);
+    Rcpp::traits::input_parameter< int >::type parity(paritySEXP);
+    Rcpp::traits::input_parameter< double >::type birth_interval(birth_intervalSEXP);
+    rcpp_result_gen = Rcpp::wrap(adjusted_parity_fertility_cpp(rates, parity, birth_interval));
+    return rcpp_result_gen;
+END_RCPP
+}
 // adjusted_fertility_cpp
 DataFrame adjusted_fertility_cpp(DataFrame rates, double birth_interval);
 RcppExport SEXP _hammel_adjusted_fertility_cpp(SEXP ratesSEXP, SEXP birth_intervalSEXP) {
@@ -330,6 +343,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_unpartnered_birth_rows_cpp", (DL_FUNC) &_hammel_unpartnered_birth_rows_cpp, 2},
     {"_hammel_extract_kin_cpp", (DL_FUNC) &_hammel_extract_kin_cpp, 4},
     {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
+    {"_hammel_adjusted_parity_fertility_cpp", (DL_FUNC) &_hammel_adjusted_parity_fertility_cpp, 3},
     {"_hammel_adjusted_fertility_cpp", (DL_FUNC) &_hammel_adjusted_fertility_cpp, 2},
     {"_hammel_inspect_matching_cpp", (DL_FUNC) &_hammel_inspect_matching_cpp, 2},
     {"_hammel_inspect_group_matching_cpp", (DL_FUNC) &_hammel_inspect_group_matching_cpp, 4},

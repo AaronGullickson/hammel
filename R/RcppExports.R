@@ -41,6 +41,10 @@ hazard_wait_cpp <- function(rates, ages, thresholds) {
     .Call(`_hammel_hazard_wait_cpp`, rates, ages, thresholds)
 }
 
+adjusted_parity_fertility_cpp <- function(rates, parity, birth_interval) {
+    .Call(`_hammel_adjusted_parity_fertility_cpp`, rates, parity, birth_interval)
+}
+
 adjusted_fertility_cpp <- function(rates, birth_interval) {
     .Call(`_hammel_adjusted_fertility_cpp`, rates, birth_interval)
 }

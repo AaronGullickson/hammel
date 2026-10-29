@@ -66,6 +66,13 @@ the rate-mode design, and the user accepted milestone 4 on October 29, 2026
 (D093). Static reference findings and suggested experiments remain distinct
 from the accepted Hammel validation report.
 
+## Parity-specific birth-spacing investigation
+
+The [parity/spacing trace](socsim-parity-spacing-audit.md), inspected October 29,
+2026 at the same pinned commit, verifies SOCSIM's previous-parity adjustment,
+unadjusted parity zero, actual history-derived parity and highest-parity copy.
+It is a static trace, not executable evidence or an accepted Hammel correction.
+
 ## Reference links
 
 Starting references:

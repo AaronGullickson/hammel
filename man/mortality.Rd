@@ -91,6 +91,16 @@ suppress births in a status. Overlap is checked separately within each status.
 On-demand union formation requires overall rates; rate-based formation accepts
 either form and warns when an overall schedule is used.
 
+Optional \code{parity_start}/\code{parity_end} use half-open current maternal parity
+bands, covering zero through Inf without gaps or overlap in every group/type
+stratum. Parity is counted from recorded maternal births (including deceased
+children) and incremented only on successful births; no custom parity column
+overrides history. First-birth rates are unadjusted. Higher-parity spacing
+compensation uses the preceding actual parity's unadjusted schedule in the
+same group/type. In a final open parity band, entry and subsequent births
+can therefore have different adjusted hazards. This SOCSIM-style approximation
+does not guarantee exact recovery of arbitrary conditional rates.
+
 For finite fertility bands, one adjusted hazard is calculated at each original
 band's midpoint: the input rate divided by one minus the input fertility integral
 over the preceding \code{birth_interval}. The integral accounts for overlaps with

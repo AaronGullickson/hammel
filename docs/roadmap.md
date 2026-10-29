@@ -114,14 +114,16 @@ assessment of the report, distinct from software checks alone.
 ## Milestone 5 design: parity-specific fertility and heterogeneity
 
 The user selected optional half-open `parity_start`/`parity_end` bands with Inf
-for the open category (D094). The HFD helper now prepares conditional rates in
-that format via `by_parity = TRUE`; parity-dependent execution remains
-unimplemented. See [parity fertility](parity-fertility.md).
+for the open category (D094). The HFD helper prepares conditional rates in
+that format via `by_parity = TRUE`; D099 implements parity-specific execution
+with history-derived counts and SOCSIM-style spacing compensation. See [parity fertility](parity-fertility.md).
 
 Add fertility schedules that depend on parity as well as the existing schedule
-axes. Define parity from recorded births, initialization for incomplete histories,
-and how parity changes interact with spacing and pending events before
-implementation.
+axes. The user selected initialization from recorded maternal birth histories
+(D098), with zero for women lacking recorded births and no overriding parity
+column. D099 selects preceding-parity spacing compensation, birth-driven schedule
+changes and calibration updates. The approximation requires demographic
+assessment; parity observations and heterogeneity remain later work.
 
 Consider person-level fertility differences to represent persistent high- and
 low-fertility individuals and increase outcome variance beyond the current
@@ -219,6 +221,25 @@ Status-specific exposure, fertility and mortality summaries use
 `calculate_demog_rates(by_union_type = TRUE)`; formation counts and rates by
 previous union use `calculate_union_rates()` (D080).
 See [demographic analysis](demographic-analysis.md) for their observation rules.
+
+### Living-population extraction after burn-in
+
+On October 29, 2026, the user requested a future helper to truncate a simulated
+population to living individuals, so a burn-in run can provide a new starting
+population without retaining the full initialization history. The desired result
+preserves correct reproductive histories and parent–child relationships, while
+allowing the deeper ancestral kinship history to be discarded. This is a
+milestone 8 proposal; no function name or implementation is selected.
+
+Before implementation, specify how to preserve births to deceased children,
+parity and last-birth dates after removing deceased person records. Simply
+filtering living persons would lose some recorded births and conflict with
+history-derived parity initialization (D098). Also specify handling of removed
+parent IDs, retained parent–child links, ongoing unions, previous-union histories,
+ancestry, observation endpoints and restart validation. The helper must state
+which kinship information has been discarded; it cannot imply complete pedigree
+or historical exposure after truncation. The representation of minimal history
+needed for correct restarting remains to be designed.
 
 ## Tentative milestone 9: immigration from outside the system
 

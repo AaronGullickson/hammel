@@ -1,8 +1,9 @@
-# Parity-specific fertility: selected format and data preparation
+# Parity-specific fertility and PATFR
 
 Milestone 5 design, October 29, 2026 (D094). The user selected half-open parity
-bands and requested an HFD importer. This does not specify or implement parity-
-dependent simulation or fertility heterogeneity.
+bands and HFD preparation, then authorized history-derived parity and the
+SOCSIM-style birth-spacing correction (D098–D099). Parity-specific execution is
+implemented; fertility heterogeneity remains unselected.
 
 ## Selected representation
 
@@ -44,18 +45,34 @@ risk. Explicit zeros and known values remain unchanged; no interpolation is used
 Conditional rates are not transformed into probabilities or
 adjusted for birth spacing during import.
 
-The parity table is data preparation for milestone 5. `set_fertility()` and
-`fertility()` reject parity columns until the engine implements their meaning,
-rather than silently treating them as ordinary unstratified age rates.
+The prepared parity table can be supplied to `set_fertility()` or `fertility()`.
+D099 defines schedule coverage, actual parity tracking and spacing compensation.
 
-## Unresolved implementation choices
+## Selected simulation parity initialization (D098)
 
-Define parity state/initialization for incomplete birth histories, grouping and
-coverage validation, transitions after birth, interactions with birth spacing
-and compensation, calibration contributions, and parity-stratified observation
-before implementing execution. Heterogeneity distribution, persistence,
-association with other attributes and calibration remain unselected. The HFD-only zero-fill rule does not set missing-data defaults for arbitrary
-rate tables or select a parity maximum or heterogeneity distribution.
+When parity-specific fertility schedules are detected, initialize an internal
+integer parity vector from recorded maternal birth histories. Count every
+recorded child linked by mother_id, including children who have died and births
+with an unknown father. Women without recorded births start at zero, including
+all women in a random baseline without birth histories. Use stable engine person
+indices for storage, with the existing ID/index map for initialization. Do not
+use an optional persons parity column to override the observed history.
+
+Parity is the actual recorded count, not capped at the lower bound of an open
+schedule band. Update it only on successful births; cancelled attempts do not
+change it. Retained complete person histories reconstruct parity at restart.
+Incomplete earlier histories consequently understate parity; no hidden births
+or externally supplied parity values are inferred. This is the implemented initialization contract under D099.
+
+## Remaining scope
+
+Parity-stratified observed-rate summaries remain a separate observation extension;
+current demographic summaries do not yet expose a by_parity option. Raw person
+histories allow maternal parity and exposure reconstruction for validation.
+Heterogeneity distribution, persistence, association with other attributes and
+calibration remain unselected. The HFD-only zero-fill rule does not set
+missing-data defaults for arbitrary rate tables. The SOCSIM-style spacing
+correction is approximate; see the validation evidence below.
 
 ## PATFR calculation (D097)
 
@@ -103,3 +120,89 @@ finite result. Output includes the finite age_start/age_end used; absent finite
 rows return a typed empty tibble. The resulting index depends on the selected
 age range and the assumed parity-zero cohort at its beginning. No arbitrary
 finite upper age or replacement for missing included rates is inferred.
+
+## Parity-dependent execution (D099)
+
+The user authorized the SOCSIM-style correction on October 29, 2026. This
+implements parity-specific fertility, not fertility heterogeneity. Both parity
+bounds must be present or both absent. Within every group/union-type stratum,
+distinct parity bands must partition [0,Inf) without overlap or gaps. Finite
+bounds are nonnegative whole numbers within the engine's integer-count capacity.
+Age bands within each parity band follow existing rules: no overlaps, with
+uncovered ages having zero fertility. Parity partitions may differ between
+strata. Overall and two-/three-type fertility and group multipliers compose
+with parity; multipliers apply before compensation. On-demand still requires
+overall union-type fertility but may distinguish parity.
+
+Track actual counts internally by person index under D098. Infer from all
+recorded maternal births, ignoring any custom persons parity column. Each
+successful birth increments the mother once; newborn girls start at zero;
+cancellations, union changes and deaths do not increment parity. Retained
+histories reconstruct the state at restart. No new authoritative public parity
+column is added and no missing prehistory is inferred.
+
+For actual parity k=0, use the unadjusted age schedule. For k>0, let f_k be the
+current band's input rate after group multiplication. Evaluate the integral of
+the preceding actual parity's unadjusted schedule over the birth interval at
+the current age band's midpoint; adjusted hazard is
+f_k / (1 - integral(previous_parity_rate)). At an upper-open age band, use the
+preceding parity schedule's interior tail rate times the interval instead.
+A missing upper tail contributes zero. Zero input fertility remains zero;
+zero spacing leaves hazards unchanged. Reject nonpositive eligibility for a
+positive rate and nonrepresentable adjusted hazards. Do not recursively use
+already-adjusted rates. This is an approximation, not the exact current-parity
+eligible fraction and not a guarantee of arbitrary conditional-rate recovery.
+It retains the same group/union-type stratum for the preceding schedule; prior
+status transitions are not reconstructed in compensation (D045).
+
+Lookup uses actual k and k-1 even when input parity bands pool several counts.
+For [4,Inf), actual parity 4 uses the parity-3 schedule for correction; parity
+5 and above use the pooled schedule itself. A broad [0,Inf) parity input also
+leaves first births unadjusted; omission of parity columns retains legacy
+unstratified compensation. These are deliberately different interpretations.
+
+After birth, select the new schedule and retain the actual-birth spacing clock.
+Refresh any unpartnered woman's calibration contribution and future boundary
+entry using the new adjusted hazard, without adding parity dimensions to the
+calibration bins. Union-search intensities remain governed by search schedules;
+father-choice intensities use current parity fertility. Returned histories and
+ordinary schemas stay unchanged when parity columns are absent.
+
+Worked software checks: parity-0 rate .2 is unchanged with spacing .75;
+parity-1 rate .3 with prior .2 in a constant region becomes .3/(1-.75*.2).
+For a final [2,Inf) band at .4, actual parity 2 corrects from prior .3 while
+actual parity 3 corrects from .4. History-derived parity counts deceased
+children and ignores a conflicting custom column. Tests must verify age-band
+crossings, upper-open ages, spacing, cancellation, union types, groups, restarts,
+calibration updates and unstratified fixed-seed controls. Statistical checks
+report the approximation's recovery or bias rather than setting scientific
+acceptance thresholds.
+
+
+## Controlled recovery check and limitations
+
+The offline diagnostic at
+[validation/milestone5/check-parity-spacing.R](../validation/milestone5/check-parity-spacing.R)
+uses ten independent seeds, each with 3,000 women aged 20, all initially
+nulliparous, followed for ten years without mortality. Inputs are constant
+.2 at parity 0, .3 at parity 1 and .4 at parity 2+. Cohort parity exposure is
+reconstructed independently from recorded birth times. This is an initialized
+cohort check, not a stable-population or empirical HFD validation.
+
+| Birth interval | Parity | Mean observed rate | MCSE | Input |
+| --- | --- | --- | --- | --- |
+| 0 | 0 | .199760 | .001479 | .2 |
+| 0 | 1 | .299198 | .002280 | .3 |
+| 0 | 2+ | .403456 | .001528 | .4 |
+| .75 | 0 | .199760 | .001479 | .2 |
+| .75 | 1 | .266465 | .001925 | .3 |
+| .75 | 2+ | .333460 | .000637 | .4 |
+
+The zero-spacing control supports schedule switching and exposure accounting.
+The selected preceding-parity approximation does not recover the higher-parity
+inputs in this initialized-cohort case: actual ineligible fractions depend on
+parity composition, which this correction does not estimate. Successful software
+checks are therefore not scientific acceptance of its rate recovery. Do not
+silently add population-ratio corrections; a different compensation model needs
+user agreement. Replication estimates and the summary CSV are retained beside
+the diagnostic script. The main validation report remains under user development.
