@@ -131,7 +131,9 @@ low-fertility individuals and increase outcome variance beyond the current
 model. The user reports SOCSIM has a mechanism for this; its precise behavior
 has not been audited for this task. Distribution, persistence, association with
 other attributes, inheritance and calibration to aggregate rates are unselected.
-No heterogeneity parameter or demographic default is adopted here.
+No heterogeneity parameter or demographic default is adopted here. See the
+[distribution and inheritance discussion](fertility-heterogeneity-notes.md) and
+[pinned SOCSIM heterogeneity audit](socsim-fertility-heterogeneity-audit.md).
 
 ## Proposed milestone 6: time-varying inputs within a run
 

@@ -77,6 +77,18 @@ That trace was initially static. The subsequent [toy reference experiment](../va
 provides executable evidence for this narrow parity/spacing question; it is not
 a comprehensive SOCSIM validation or acceptance of a replacement correction.
 
+## Fertility heterogeneity investigation
+
+The [heterogeneity audit](socsim-fertility-heterogeneity-audit.md) traces the
+fixed cubic fresh-multiplier distribution, persistent hazard multiplication,
+maternal alpha/betaT inheritance, initial/restart handling and version-specific
+defaults. Four fresh-process switch checks confirm the hazard effect with a
+leading comment in the supervisory file; the audited loader otherwise skips
+the first line. This resolves the earlier apparently ineffective hetfert toggle
+without claiming the switch itself is broken. The [Hammel design notes](fertility-heterogeneity-notes.md)
+record a separate proposed lognormal distribution and variance-preserving
+latent inheritance, with reproductive selection explicitly unresolved.
+
 ## Reference links
 
 Starting references:
