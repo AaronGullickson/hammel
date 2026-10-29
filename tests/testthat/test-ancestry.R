@@ -83,7 +83,7 @@ test_that("missing fathers contribute an unknown half and known unknown shares t
 test_that("multiple generations inherit the live ancestry state at birth", {
   p <- ancestry_population()
   model <- ancestry_birth_model(p) |>
-    set_fertility(data.frame(union_status = c("partnered", "unpartnered"),
+    set_fertility(data.frame(union_type = c("partnered", "unpartnered"),
       age_start = 0, age_end = 100, rate = c(0, 2)), birth_interval = 0) |>
     set_union_formation("rate", rates = data.frame(age_start = 0, age_end = Inf, rate = 0),
       kinship_generations = 0, cancel_birth_if_no_match = FALSE)

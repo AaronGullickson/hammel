@@ -1,6 +1,10 @@
 # SOCSIM reference audit plan
 
-Updated October 19, 2026. Status: broader audit planned. An initial narrow source trace of rate conversion is recorded in [SOCSIM rate conversion](socsim-rate-audit.md); no executable reference validation or complete scheduling audit has been performed. References below are starting points recorded in the earlier conversation.
+Updated October 29, 2026. Static source audits cover rates, competing events,
+union formation, [dissolution and remarriage](socsim-dissolution-audit.md), and
+[cohabitation](socsim-cohabitation-audit.md) for milestone 4. No executable reference validation or comprehensive audit of
+all variants has been performed. References below are starting points recorded
+in the earlier conversation.
 
 ## Establish the reference
 
@@ -28,6 +32,39 @@ A [static union-formation trace](socsim-union-formation-audit.md) now covers
 queue modes, matching, eligibility, and fertility interactions in the pinned
 non-ENHANCED source. It is not executable validation or a complete audit of
 all variants.
+
+## Milestone 4 investigation
+
+The user requested an audit of SOCSIM dissolution and remarriage after closing
+milestone 3 and creating `milestone4-union-dissolution`. The
+[new static trace](socsim-dissolution-audit.md) documents duration-based divorce,
+sex/group/status rate indexing, competing spouse candidates, shared-union
+closure and partner rescheduling, remarriage status and duration schedules,
+implicit rate defaults, cohabitation histories, and former-partner exclusions.
+It lists controlled reference experiments that have not yet been run.
+
+After this audit, the user selected duration-based annual hazards with one
+female-carried clock per union (D078); see [union dissolution](union-dissolution.md).
+SOCSIM still differs in its monthly probability inputs and ability to give both
+spouses a risk. Its implicit rate defaults, reconciliation rules and queue
+quirks are not automatically adopted. The selected cohabitation behavior is
+specified separately under D085–D086.
+
+## Cohabitation stretch-goal investigation
+
+On October 28, after the user described milestone 4's required elements as
+wrapped up, a focused [cohabitation audit](socsim-cohabitation-audit.md) traced
+formation/type probabilities, same-partner legalization, age/duration conversion
+schedules, breakup/death and earlier legal-status recovery, fertility, implicit
+defaults, record types and counters in the same pinned source. Static caveats
+include a missing-looking one-queue male re-entry after cohabitant death and
+mixed/omitted legal-marriage event counters. Those need controlled reference
+runs before their population-level effects can be claimed. No reference
+simulation was executed, no code copied, and no Hammel cohabitation design
+was selected by the audit itself. Subsequent D085–D086 specify and implement
+the rate-mode design, and the user accepted milestone 4 on October 29, 2026
+(D093). Static reference findings and suggested experiments remain distinct
+from the accepted Hammel validation report.
 
 ## Reference links
 

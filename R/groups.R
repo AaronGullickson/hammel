@@ -17,14 +17,16 @@ validate_fertility_group_prop_hazard <- function(x, rates) {
   if (!is.list(x)) return(validate_group_prop_hazard(x))
   labels <- names(x)
   if (!length(x) || is.null(labels) || anyNA(labels) ||
-      anyDuplicated(labels) || any(!labels %in% c("partnered", "unpartnered"))) {
-    stop("A fertility `group_prop_hazard` list must have unique names 'partnered' and/or 'unpartnered'.",
+      anyDuplicated(labels) || any(!labels %in% c("partnered", "unpartnered", "cohab", "marriage"))) {
+    stop("A fertility `group_prop_hazard` list must have unique union_type names: unpartnered, partnered, cohab or marriage.",
          call. = FALSE)
   }
-  if (!"union_status" %in% names(rates)) {
-    stop("A fertility `group_prop_hazard` status list requires rates with `union_status`; use a named vector for overall fertility.",
+  if (!"union_type" %in% names(rates)) {
+    stop("A fertility `group_prop_hazard` status list requires rates with `union_type`; use a named vector for overall fertility.",
          call. = FALSE)
   }
+  if (any(!labels %in% rates$union_type))
+    stop("Fertility multiplier list names must occur in union_type schedules.", call. = FALSE)
   for (factors in x) {
     if (is.null(factors)) {
       stop("Each fertility `group_prop_hazard` list entry must be a named numeric vector; omit an unchanged status.",
@@ -97,7 +99,7 @@ apply_group_prop_hazard <- function(rates, persons, multipliers, process,
   if (is.list(multipliers)) {
     factors <- rep(1, nrow(rates))
     for (status in names(multipliers)) {
-      rows <- rates$union_status == status
+      rows <- rates$union_type == status
       vector <- multipliers[[status]]
       factors[rows] <- vector[match(labels[rows], names(vector))]
     }

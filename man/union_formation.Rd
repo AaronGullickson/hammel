@@ -14,7 +14,11 @@ union_formation(
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
   diagnostics = FALSE,
-  group_prop_hazard = NULL
+  group_prop_hazard = NULL,
+  cohab_prob = NULL,
+  cohab_matching = NULL,
+  union_convert_rate = NULL,
+  cohabitation_counts_as_previous_union = FALSE
 )
 
 set_union_formation(
@@ -27,7 +31,11 @@ set_union_formation(
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
   diagnostics = FALSE,
-  group_prop_hazard = NULL
+  group_prop_hazard = NULL,
+  cohab_prob = NULL,
+  cohab_matching = NULL,
+  union_convert_rate = NULL,
+  cohabitation_counts_as_previous_union = FALSE
 )
 }
 \arguments{
@@ -46,7 +54,16 @@ share the schedule. Group does not restrict partner matching. With no
 population groups, simulation warns and selects the first alphabetical group.
 See \code{\link[=mortality]{mortality()}} for group-label and rate-coverage rules.
 Nonoverlapping bands may have gaps or an open end; gaps and ages outside
-support have zero hazard. Must be NULL for \code{"on_demand"}.}
+support have zero hazard. Optional \code{previous_union} stratifies by \code{"none"},
+\code{"dissolved"}, and \code{"widowed"}; all three are required within each group.
+Without it, the schedule applies to all previous union types. Categories
+describe the most recent recorded episode; complete histories are required.
+Optionally include both \code{dur_start} and \code{dur_end} for elapsed years since
+the most recent union ended. Each row supplies either age or duration bands
+with both unused boundaries NA. \code{none} must use age; each other category
+uses one clock consistently across all its bands and groups. Age and duration
+cannot apply together. All-age inputs may omit duration columns.
+Must be NULL for \code{"on_demand"}.}
 
 \item{min_male_age}{Minimum male age in continuous years at a new partner
 search, default \code{15}. Finite nonnegative scalar; zero disables this age
@@ -88,6 +105,27 @@ zero suppresses searches. Applies to shared or group-specific input rates.
 Without population groups, simulation warns and ignores multipliers.
 Requires \code{initiation = "rate"}; on-demand formation has no search hazard.
 Matching utilities and input rate tables are unchanged.}
+
+\item{cohab_prob}{Optional age-specific probability table with \code{age_start},
+\code{age_end}, \code{prob}, optionally \code{group} and \code{previous_union}. Enables typed
+unions only in rate mode. Probability gaps mean zero. Type is drawn before
+matching; NULL retains untyped partnerships and their RNG path.}
+
+\item{cohab_matching}{Optional cohabitation matching model; NULL shares
+\code{matching}. Marriage, cohabitation and unpartnered father searches calibrate
+weights using their own intensities and share the available male pool.}
+
+\item{union_convert_rate}{Optional age- or duration-specific conversion table,
+optionally by woman's group. Duration uses the current cohabitation start.
+Uses \code{rate} and either age or duration boundaries, not both clocks, with no
+previous-union axis. NULL gives no conversions and warns at simulation.
+Conversion keeps partners, closes cohab with reason \code{conversion}, and starts
+a linked marriage with a new dissolution-duration origin.}
+
+\item{cohabitation_counts_as_previous_union}{Logical, default FALSE. FALSE
+restores previous legal-marriage category after a cohabitation ends; TRUE
+classifies cohab breakup/death as dissolved/widowed. Search duration still
+starts at the latest partnership ending. Only applies to typed unions.}
 
 \item{model}{A \code{hammel_model} object.}
 }

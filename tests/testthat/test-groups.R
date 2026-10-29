@@ -1,5 +1,5 @@
 group_status_rates <- function(partnered = 0, unpartnered = 0) {
-  data.frame(union_status = c("partnered", "unpartnered"),
+  data.frame(union_type = c("partnered", "unpartnered"),
     age_start = 15, age_end = 50, rate = c(partnered, unpartnered))
 }
 
@@ -37,7 +37,7 @@ test_that("group schedules validate overlap and required strata independently", 
   expect_error(mortality(mortality_rates[-1, ]), "both")
   births <- group_rates(group_status_rates())
   expect_s3_class(fertility(births), "hammel_fertility")
-  expect_error(fertility(births[-1, ]), "union_status")
+  expect_error(fertility(births[-1, ]), "union_type")
   searches <- group_rates(model$processes$union_formation$rates)
   expect_s3_class(set_union_formation(model, "rate", rates = searches), "hammel_model")
   expect_error(set_union_formation(model, "rate", rates = rbind(searches, searches[1, ])), "overlap")

@@ -1,9 +1,30 @@
 # Testing and milestone validation
 
-Updated October 27, 2026. Milestones 1–3 are accepted as complete (D029,
-D050, D077). Software test history and the user's demographic assessment
+Updated October 29, 2026. Milestones 1–4 are accepted as complete (D029,
+D050, D077, D093). Software test history and the user's demographic assessment
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
+
+## Milestone 4 accepted assessment
+
+The user accepted milestone 4 on October 29, 2026 (D093), after final report
+corrections and adding duration-dependent conversion. The
+[report source](../validation/milestone4.qmd) and
+[rendered assessment](../validation/milestone4.html) are the accepted scientific
+assessment. The author's final HTML render was active at documentation closeout;
+this edit does not independently rerender it, download HMD rates or rerun tests.
+The previously reviewed rendered report contained 322 test cases: 321 passed,
+one opt-in live database case skipped, no failures/errors/warnings. Treat the
+final report's own results as the record for that render.
+
+Supplementary benchmark and conditional-choice artifacts are retained under
+[validation/milestone4/](../validation/milestone4/README.md), with their original
+run provenance. Paths in reproduction commands below reflect that move.
+The final report supersedes the removed exploratory `milestone4_tests.R`.
+[Validation contents](../validation/README.md) lists retained inputs/evidence.
+Earlier dated entries below distinguish implementation checks from scientific
+acceptance at the time; D093 records the subsequent user acceptance. Completion
+retains sparse-cell, initialization, fertility-transition and calibration limits.
 
 ## Run the suite
 
@@ -168,6 +189,8 @@ own scope; these are not outstanding conditions on the user's acceptance.
 | `test-union-formation.R`, `test-conditional-logit.R`, `test-age-gap-matching.R` | Constructors, defaults, named coefficients, analytical utilities/probabilities, exact-draw frequencies against full-pool probabilities, native/R formula agreement and age-gap helper |
 | `test-on-demand-unions.R`, `test-union-eligibility.R`, `test-union-kinship.R` | Birth-time unions, age/kin screening over the whole pool, exclusivity, widowhood and restarts |
 | `test-kinship.R` | Shared recorded-parent traversal, distance witnesses, incomplete ancestry and cycles |
+| `test-union-counts.R` | Exact union-year splitting, dissolution/death censoring, duration and period boundaries, repeat episodes, zero exposure, empty grids, group attribution, pooled conservation, endpoint and input validation |
+| `test-union-dissolution.R` | Annual duration-hazard survival, one risk per union, input/restart duration, birth/death ties, widowhood invalidation, repeat episodes, availability, group factors/coverage, exposure accounting and seed behavior |
 | `test-rate-unions.R`, `test-status-fertility.R` | Search hazards, retries, status-specific fertility, spacing and event invalidation |
 | `test-nonmarital-fathers.R`, `test-cancel-births.R` | Separate father matching, parentage without unions, failed-match cancellation and retry semantics |
 | `test-union-diagnostics.R` | Diagnostics validation; no candidate-set columns; unchanged histories |
@@ -250,3 +273,358 @@ commit. The user handles final rendering; no final HTML hash is assigned here.
 Preserve both source and HTML. Reproduction requires the input preparation and
 software environment recorded in the report; rendering installs the package,
 accesses HMD, runs substantial parallel simulations, and executes the test suite.
+
+
+## Milestone 4 dissolution implementation checks
+
+On October 27, 2026, `TZ=UTC Rscript -e 'devtools::test(reporter = "summary")'`
+passed with the optional duration-dependent dissolution process (D078), without
+failures or test warnings; the live database test was skipped. Targeted
+`devtools::test(filter = "union-dissolution", reporter = "summary")` checks
+constructor/edited-process validation and provenance, constant-hazard survival
+against `exp(-rate * duration)`, one risk per couple, duration bands and gaps,
+attained-duration restarts, retained dissolution through births, exact
+birth/dissolution and death ties, widowhood invalidation in both initiation
+modes, repeated formation and spacing, group-specific hazards, future-group
+coverage, empty/zero-duration runs, and seed isolation. Exposure accounting
+checks confirm that union closure shortens partnered person-years and later
+deaths preserve dissolved histories.
+
+These are software and analytical checks, not milestone 4 scientific acceptance.
+Age-specific previous-union search schedules are now implemented under D080;
+duration-dependent remarriage was not covered by these checks (now D083 below).
+Cohabitation is still deferred and D045's fertility-transition limitation remains;
+no new demographic rates or acceptance thresholds are introduced.
+
+The subsequent birth-status clarification in D078 is checked with
+`devtools::test(filter = "union-dissolution|lexis-unions|group-demography",
+reporter = "summary")`, which passed without failures or test warnings.
+Births exactly at dissolution ends count as partnered while exposure remains
+half-open; tests cover period boundaries, overlapping histories, unchanged
+death-ending classification and overall-count conservation.
+
+After adding `calculate_dissolution_rates()` on October 27, 2026, the full
+`devtools::test(reporter = "summary")` suite passed without failures or test
+warnings; the opt-in live database test was skipped. Analytical union-year
+checks cover exact calendar/duration splitting, dissolution versus death
+endings, censoring, boundary events, repeated episodes, group attribution,
+zero-exposure rates, empty grids and pooled accounting identities.
+
+D079 changes dissolution schedules, multipliers and union observations to
+symmetric `group_pair` strata. The full suite found only an exact-equality
+assertion differing by floating-point rounding between a multiplied rate and
+a decimal literal; it was changed to a numerical-tolerance comparison. The
+subsequent `devtools::test(filter = "union-counts|union-dissolution", reporter =
+"summary")` passed. All other full-suite tests passed, with the opt-in live
+database test skipped. Checks include reversed pair equivalence, nonunit
+multipliers versus explicit rates, pair coverage (including future identities),
+canonical numeric/literal labels, pair-pooled accounting, empty grids and
+rejection of ambiguous or overlapping specifications.
+
+## Age-specific remarriage and marriage observations (D080, October 28, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
+passed the full suite without test failures or warnings. The opt-in live
+HMD/HFD test was skipped; no rates were downloaded. UTC avoids the container's
+unavailable system timezone service. The first full run identified one remaining
+test using the removed Lexis formation column; it was migrated to the new helper
+before the successful full run.
+
+`test-remarriage.R` checks complete category/group schedules, invalid labels and
+overlap, recovery from unordered histories, latest-ending replacement, dissolution
+and widowhood rescheduling, analytical constant-hazard incidence for all three
+categories, reproducibility with shared/equal schedules, explicit group multiplier
+equivalence, and calibrated intensities against explicit effective group rates.
+`test-marriage-counts.R` checks exact exposure and starts, both sexes, latest
+category, pre-window history, half-open time/age boundaries, touching and
+zero-duration episodes, grouping and pooling, empty output types and invalid
+histories. Existing Lexis/dissolution tests retain birth/death exposure checks
+and now use the separate marriage helper for starts.
+
+The shipped milestone 2 example now calls `calculate_union_rates()` and
+pools category counts/exposure before calculating a combined marriage rate.
+Its source parses successfully; the complete empirical example was not run
+because it downloads rates. Accepted milestone 2/3 report sources and rendered
+artifacts are preserved. Their former Lexis marriage columns are intentionally
+removed in D080, so rerender historical assessments at their recorded versions
+or migrate those analysis chunks explicitly. The pre-D080 repository head was
+`a847d49313c68fec9b3506ba790bfa4f86ee7c5a`.
+
+These checks validate implementation and analytical cases, not milestone 4
+scientific acceptance. Duration-dependent remarriage was outside that check;
+D083 below covers its implementation. Transition-aware fertility compensation
+remains deferred.
+
+
+The subsequent D080 pooling option passed
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(filter="marriage-counts|remarriage|union-dissolution", reporter="summary")'`
+without failures or warnings. Tests cover pooled counts/exposure and rates
+against summed previous-category cells, independently with and without group
+stratification, empty grouped/ungrouped outputs, and invalid option values.
+`by_previous_union` defaults to FALSE; stratified checks explicitly opt in.
+
+## Observation helper names (D081, October 28, 2026)
+
+After renaming the public helpers to `calculate_demog_rates()`,
+`calculate_union_rates()` and `calculate_dissolution_rates()`,
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
+passed without failures or warnings; the opt-in live database test was skipped.
+Namespace checks confirm the new exports and removal of the old names.
+The shipped example and current milestone 4 script parse with the new calls.
+Arguments, output columns and demographic calculations are unchanged.
+
+## Actual female hazard contributions (D082, October 28, 2026)
+
+`devtools::test()` passed the full suite using `TZ=UTC`, with no failures or
+warnings; the opt-in live database test was skipped. Targeted validation first
+passed with `filter = "calibration-intensity|weighted-choice|remarriage|rate-unions|union-dissolution"`.
+The native code was built with `devtools::load_all(debug = FALSE, recompile = TRUE)`
+for these checks and separately installed with optimized flags for benchmarking.
+
+`test-calibration-intensity.R` compares every maintained cell/channel with an
+independent individual scan after age boundaries, narrow bands, gaps, terminal
+support, spacing releases, repeated readiness changes, removal and reactivation
+with another previous category. It checks RNG preservation, exact zero after
+all positive contributors leave, and at most one pending boundary per active
+woman. Existing matching, dissolution, fertility, restart and independent-run
+checks passed; snapshot calibration tests now use actual individual hazards,
+including different risks inside the same quarter-year bin.
+
+The offline optimized old/new comparison used the same saved models, 50,000
+starting persons and 100 years, with three seeds and alternating version order.
+The ungrouped seed-42 history was identical in full. Median grouped timings
+changed +2.3% for shared-rate searches, -8.1% for previous-union schedules and
++3.5% for on-demand searches. Grouped previous-status peak process RSS rose
+about 12.1 MiB. See [current-hazard calibration](calibration-intensity.md) for
+inputs, runtime environment, raw results, reproduction commands and limits.
+These are performance/implementation checks, not milestone 4 acceptance or
+validation of duration-dependent remarriage, which remains unimplemented.
+
+## Matching parameter recovery with the new tracker (October 28, 2026)
+
+Ran
+`TZ=UTC Rscript validation/milestone4/validate-calibration-log-odds.R /tmp/hammel-calibration-newlib validation/milestone4/calibration-log-odds 20 1500`
+using the same optimized D082 build as the performance comparison. The script
+uses offline synthetic schedules, 20 independently seeded initial populations
+of 20,000 persons (max age 50, 75/25 A/B), 60 years, duration-dependent
+*dissolution* and age-specific remarriage searches by previous status. Search
+rates differ across previous categories and B has a 1.2 search multiplier.
+Duration-dependent remarriage is not used. Both matching cases use A:B = -3,
+so the conditional cross-group log odds ratio target is -6. The age-dependent
+case additionally uses preferred male-minus-female gap 2 and half-weight
+distance 5 (linear .11090355, quadratic -.02772589).
+
+For each case/replication, sample 1,500 union events and 50 uniformly sampled
+eligible alternate men per event, plus the chosen man. Independently rebuild
+the available male pool immediately before formation from full person/union
+histories, enforcing living status, age >=15, and unpartnered status. Kin
+screening is explicitly disabled in these simulations, avoiding a mismatch
+between simulation and reconstructed choice sets. Fit wife-side conditional
+logit with the recorded per-event male-group log weights as offsets, separate
+AB/BA coefficients, and age/age-squared terms in the age-dependent case.
+Uniform sampled alternatives have the same set-selection probability for
+each possible chosen member, so no additional alternative-sampling offset is
+required. Efron and exact conditional likelihoods coincide with one event per
+stratum. Replication SEs below are sd(estimates)/sqrt(20), including simulation,
+baseline and choice-subsampling variation; they are not within-fit SEs.
+
+| Case | Target conditional log OR | Mean recovered | MCSE | Pooled cross-tab mean | Pooled MCSE |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Group only | -6 | -5.97493 | .05378 | -5.98500 | .01721 |
+| Age dependent | -6 | -5.98931 | .04935 | -5.96394 | .01439 |
+
+Directional coefficient means were -3.00624 (AB) and -2.96868 (BA) for group
+only, and -3.01641 and -2.97290 for age-dependent matching. Recovered age terms
+were .1117834 (MCSE .0017798) and -.0276966 (MCSE .0002403). The input
+conditional parameters lie within the corresponding approximate Monte Carlo
+uncertainty intervals. These results support parameter recovery for these
+workloads; no universal acceptance threshold or milestone completion is inferred.
+
+A pooled cross-tab is a different estimand: changing age distributions, pools
+and weights can move its cross-product away from the conditional target.
+In particular, do not claim the age-dependent pooled estimate is within two
+MCSEs of -6; preservation applies to the conditional utility association, not
+an exact constraint on the final pooled table.
+
+Reproduction: [validation script](../validation/milestone4/validate-calibration-log-odds.R).
+Evidence: [replication estimates](../validation/milestone4/calibration-log-odds-replications.csv),
+[summary](../validation/milestone4/calibration-log-odds-summary.csv), and
+[estimates/session metadata](../validation/milestone4/calibration-log-odds.rds). No package
+code changed for this recovery check. The run completed without warnings.
+
+## Duration-specific remarriage (D083, October 28, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
+passed the full suite without failures or warnings; the live database test was
+skipped. Subsequent tests of births and failed searches preserving the duration
+origin passed with `devtools::test(filter = "duration-remarriage", reporter = "summary")`.
+The final duration test file passed all 51 expectations. No rates were fetched.
+
+`test-duration-remarriage.R` covers the single-table age/duration format,
+exclusive clock selection, all-category coverage, consistent clock per category
+across groups, invalid/partial/overlapping bands, required age clock for `none`,
+optional all-NA duration columns, duration gaps and analytical cumulative hazard,
+attained-duration restarts, unordered histories, age independence, repeated
+ending resets, widowhood origin, and preservation through births/failed searches.
+A grouped duration schedule and its mathematically equivalent age schedule
+produce identical full histories and weight diagnostics. Tracker tests use
+separate birth and search origins to verify duration boundaries independently
+of fertility ages and spacing. Missing previous-ending origins fail explicitly
+in deterministic calibration checks. Existing age-only grouped simulation
+(seed 42, 50,000 initial persons, 100 years, prior D082 benchmark input) was
+compared in full against the installed pre-D083 build and was identical.
+
+Additional parameter-recovery check:
+
+```sh
+TZ=UTC Rscript validation/milestone4/validate-calibration-log-odds.R /tmp/hammel-duration-lib validation/milestone4/duration-remarriage-log-odds 10 1500 duration
+```
+
+This uses ten independent 20,000-person baselines per matching case and the
+same 60-year synthetic setup and choice-set estimation method described above.
+`none` uses the original age schedule. Dissolved/widowed schedules now use
+durations [0,1), [1,3), [3,8), [8,Inf), with rates 0/.15/.10/.05 for dissolved
+and 0/.07/.04/.02 for widowed. Thus actual duration boundaries, delays,
+dissolution, widowhood, repeated remarriage and fertility all operate together.
+B retains its 1.2 search multiplier. Kinship screening is explicitly disabled
+for exact eligibility reconstruction. No convergence warnings were emitted.
+
+| Matching case | Target conditional log OR | Mean recovered | MCSE |
+| --- | ---: | ---: | ---: |
+| Group only | -6 | -5.91620 | .07840 |
+| Age dependent | -6 | -6.05778 | .07244 |
+
+Mean age coefficients were .1087908 (MCSE .0023092) and -.0280502
+(MCSE .0004512), against inputs .1109035 and -.0277259. Conditional combined
+log odds ratios are consistent with their target at this Monte Carlo precision.
+These checks support the implementation in these cases; ten replications do
+not establish universal scientific accuracy or milestone 4 acceptance. Pooled
+cross-tab means are retained in the raw results and are not exact target
+constraints under changing pools/age composition.
+
+Evidence: [replication estimates](../validation/milestone4/duration-remarriage-log-odds-replications.csv),
+[summary](../validation/milestone4/duration-remarriage-log-odds-summary.csv), and
+[estimates/session metadata](../validation/milestone4/duration-remarriage-log-odds.rds).
+The public marriage-rate observation helper remains age-based; duration-band
+exposure summaries require a separate interface specification.
+
+## Duration marriage observations (D084, October 28, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
+passed the full suite without failures or warnings; the opt-in live database
+test was skipped. The earlier targeted `filter = "marriage"` checks also passed.
+No rates were downloaded and no simulation mechanisms were changed for D084.
+
+`test-marriage-duration-rates.R` verifies exact duration exposure and starts,
+automatic previous-category stratification even with an explicit FALSE flag,
+different numbers of age/duration bands, unused boundary NA columns, finite
+last-duration Inf extension, pre-window history, resetting after each ending,
+half-open age/duration/period event boundaries, death censoring, all-age duration
+exposure, grouping/type preservation, and conservation of exposure and counts
+against compatible age-only totals. Touching/zero-duration episodes, empty
+grouped/ungrouped results, invalid breaks and unchanged NULL output are covered.
+
+A 3,000-woman synthetic simulation with duration-specific hazards .1, .3 and .2
+on [0,1), [1,2), [2,Inf) recovers those female hazards with the new exposure
+helper under the analytical six-standard-error software check. Available men
+are sufficient and mortality/fertility are zero, so realized formations reflect
+search hazards in that test. This does not establish empirical validity or a
+new milestone acceptance threshold.
+
+
+## Typed cohabitation (D086, October 28, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
+passed the full suite without failures or warnings. The opt-in live database
+check was skipped; no rates were downloaded. New cohabitation checks cover
+probability gaps and strata, independent matching preferences, exclusive male
+availability, linked conversion episodes, exact event ties, restart history,
+legal previous-union recovery and its toggle, typed fertility/dissolution,
+pair multipliers, and fertility multiplier lists. Analytical conversion versus
+dissolution competition and calibration contribution sums at probability band
+boundaries are included. A saved pre-feature grouped age/previous-status run
+(50,000 initial people, 100 years, seed 42) retains identical complete output
+when cohabitation is disabled.
+
+`validation/milestone4/validate-cohabitation-matching.R` was run for ten independently
+initialized 20,000-person populations over 60 years. Probability varied by age,
+group and previous union; conversion, typed fertility and typed dissolution
+were active. Conditional-choice fits used 1,500 entry events per type per
+replication, sampled available alternatives, age terms and applied group-weight
+offsets. Conversion episodes were excluded from new-partner choices. Combined
+conditional log odds averaged -2.0402 (MCSE .04280) for cohabitation against -2,
+and -6.0298 (MCSE .03625) for marriage against -6. These support parameter
+recovery in this synthetic case, not empirical validity or milestone acceptance.
+
+Evidence: [script](../validation/milestone4/validate-cohabitation-matching.R),
+[replications](../validation/milestone4/cohabitation-matching-replications.csv),
+[summary](../validation/milestone4/cohabitation-matching-summary.csv), and
+[estimates/session metadata](../validation/milestone4/cohabitation-matching.rds).
+
+
+## Union and marriage observation split (D087–D088, October 28, 2026)
+
+`TZ=UTC Rscript -e 'devtools::test(filter="marriage|cohabitation|lexis|group-demography", reporter="summary")'`
+passed without failures or warnings after regenerating documentation and native
+exports. This covers both renamed union entry observations and new marriage
+entry observations. Exact cases verify shared exposure and count/rate
+conservation for type-specific union rates, group/previous/duration combinations,
+conversion exclusion from union entry, conversion inclusion in marriage entry,
+cohabiting exposure, half-open age/period boundaries, death censoring,
+dissolution, direct and legacy marriage equivalence, zero exposure and empty
+histories. No simulation scheduling behavior changed in this split, and no
+empirical downloads were used. This is targeted verification, not a new full-suite
+or scientific milestone acceptance claim.
+
+
+D089 dissolution type observation: `devtools::test(filter =
+"dissolution|marriage-entry", reporter = "summary")` passed without failures or
+warnings. Tests cover separate type exposure/events, conservation against pooled
+totals, crossing with symmetric group pairs, conversion censoring and duration
+reset, empty inputs, zero-exposure NA rates, invalid type columns and logical
+flags. Documentation was regenerated; no native engine changes were needed.
+
+
+## Demographic current-type strata (D090, October 28, 2026)
+
+`devtools::test(filter = "demog|lexis|cohabitation|dissolution|marriage",
+reporter = "summary")` passed without failures or warnings after documentation
+and native exports were regenerated. Exact typed cases verify disjoint exposure,
+conservation against pooled births/deaths/person-years with and without groups,
+births at conversion and dissolution boundaries, left-limit death type,
+discovered single types, empty typed histories, and rejection of ambiguous
+overlapping typed episodes. Migrated untyped cases retain merged overlap
+coverage, event boundaries and downstream TFR/life-table grouping. Pooled default
+observations remain covered by the demographic tests. This was targeted offline
+verification; no simulation scheduling or matching behavior changed.
+
+
+D091 conversion observation: `devtools::test(filter = "cohab|dissolution",
+reporter = "summary")` passed without failures or warnings after documentation
+and native exports were regenerated. Exact histories verify duration and woman's
+age, independent axis-cell boundary assignment, exposure/count conservation,
+woman-group labels (including numeric labels), conversion-only events,
+competing death/dissolution censoring, ongoing exposure, pre-window histories,
+finite last-break extension, zero exposure, empty tables and input validation.
+Existing dissolution tests verify unchanged behavior of the shared accumulator.
+This was offline targeted verification; no empirical rate downloads were used.
+
+
+D092 extraction: `devtools::test(filter =
+"unpartnered-births|parent-info|demog-union-types", reporter = "summary")`
+passed without failures or warnings after documentation and native exports were
+regenerated. Exact histories cover marriage/cohabitation exclusion, formation,
+dissolution/conversion/death boundaries, repeated parental pairs, overlapping
+coverage, unknown parents, untyped unions, preserved custom columns/group types,
+row order and input independence, empty schemas and invalid references. No
+simulation scheduling or empirical inputs were changed.
+
+
+## Milestone 4 documentation and evidence closeout (October 29, 2026)
+
+All three scripts relocated to `validation/milestone4/` parse. The eleven CSV/RDS
+result files are byte-for-byte identical to their pre-move Git versions.
+Relative Markdown file targets in changed documentation and both new validation
+guides resolve, and `git diff --check` passes. No simulation, database request,
+report render or test suite was started for this documentation-only cleanup.
+The author's active render and final report source were left unchanged.

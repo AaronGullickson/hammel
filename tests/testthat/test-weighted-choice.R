@@ -201,7 +201,7 @@ weighted_model <- function(population, initiation = "on_demand",
   } else {
     model |>
       set_fertility(data.frame(age_start = 15, age_end = 45, rate = c(0.15, 0.05),
-                               union_status = c("partnered", "unpartnered"))) |>
+                               union_type = c("partnered", "unpartnered"))) |>
       set_union_formation("rate", matching, rates = data.frame(age_start = 15, age_end = 50, rate = 0.15),
                           father_matching = father_matching, ...)
   })
@@ -401,14 +401,19 @@ test_that("unmet targets hidden by near-zero weights are reported as approximate
   expect_equal(result$flow, c(0.75, 0.25, 0), tolerance = 1e-9)
 })
 
-test_that("bin intensities average hazards over each bin's age span", {
-  # A band much narrower than a bin, which a bin-centre age would miss.
+test_that("calibration uses actual hazards inside narrow age bands", {
+  # A band much narrower than a bin: actual age, not bin-average hazard, applies.
   x <- group_only(c(0.75, 0.25), c(0.75, 0.25), -3)
   x$women$born <- -30.01
   narrow <- data.frame(age_start = c(30, 30.05), age_end = c(30.05, 60), rate = c(1, 0))
   result <- calibrate(x$women, x$men, x$matching, narrow, c("A", "B"))
   expect_false(result$infeasible)
   expect_equal(exp(result$log_weights[2]), 1.682979, tolerance = 1e-6)
+  # Different exact ages in the same calibration bin can have different risks.
+  x$women$born[x$women$group == 1] <- -30.1
+  different <- calibrate(x$women, x$men, x$matching, narrow, c("A", "B"))
+  expect_equal(different$target, c(1, 0))
+  expect_equal(different$flow, c(1, 0), tolerance = 1e-9)
   # One-year bands put a band edge inside many bins; agreement with the exact
   # individual-level reference stays close at the default width.
   set.seed(918)

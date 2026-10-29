@@ -21,8 +21,8 @@ make_rate_model <- function(n = 2, search_rate = 1, birth_rate = 0, birth_interv
   if (n) model$population$persons$sex[1] <- "f"
   rates <- model$processes$fertility$rates
   model <- set_fertility(model, rbind(
-    transform(rates, union_status = "partnered"),
-    transform(rates, union_status = "unpartnered", rate = 0)), birth_interval)
+    transform(rates, union_type = "partnered"),
+    transform(rates, union_type = "unpartnered", rate = 0)), birth_interval)
   set_union_formation(model, "rate",
     create_matching_model(~ age_difference, c(age_difference = 0)),
     rates = data.frame(age_start = 15, age_end = Inf, rate = search_rate),

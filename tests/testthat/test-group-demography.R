@@ -15,22 +15,20 @@ make_group_history <- function() {
 
 test_that("group Lexis counts preserve exact maternal and spouse classification", {
   p <- make_group_history()
-  counts <- calculate_lexis_counts(p, c(0, 1), c(0, Inf),
-                                   include_unions = TRUE, by_group = TRUE)
+  counts <- calculate_demog_rates(p, c(0, 1), c(0, Inf),
+                                   by_union_type = TRUE, by_group = TRUE)
   expect_s3_class(counts, "tbl_df")
   expect_identical(unique(counts$group), c("A", "B"))
   a <- subset(counts, group == "A" & sex == "f")
-  expect_equal(a$person_years, c(1, 0.5, 0.5))
-  expect_equal(a$births, c(2, 1, 1))
-  expect_equal(a$rate_fertility, c(2, 2, 2))
-  expect_equal(a$unions, c(NA, NA, 1))
-  expect_equal(a$rate_marriage, c(NA, NA, 2))
+  expect_equal(a$person_years, c(0.5, 0.5))
+  expect_equal(a$births, c(1, 1))
+  expect_equal(a$rate_fertility, c(2, 2))
+  expect_false(any(c("unions", "rate_union") %in% names(a)))
   b <- subset(counts, group == "B" & sex == "m")
-  expect_equal(b$person_years, c(1.25, 0.5, 0.75))
-  expect_equal(b$deaths, c(2, 1, 1))
-  expect_equal(b$unions, c(NA, NA, 1))
+  expect_equal(b$person_years, c(0.75, 0.5))
+  expect_equal(b$deaths, c(1, 1))
   expect_true(all(is.na(b$births)))
-  expect_equal(subset(counts, group == "B" & sex == "f")$births, c(0, 0, 0))
+  expect_equal(subset(counts, group == "B" & sex == "f")$births, c(0, 0))
   unknown <- attr(counts, "unassigned_births")
   expect_s3_class(unknown, "tbl_df")
   expect_named(unknown, c("time_start", "time_end", "births"))
@@ -39,11 +37,11 @@ test_that("group Lexis counts preserve exact maternal and spouse classification"
 
 test_that("group exposure and events conserve pooled cells across boundaries", {
   p <- make_group_history()
-  for (include_unions in c(FALSE, TRUE)) {
-    counts <- calculate_lexis_counts(p, c(0, 0.25, 0.5, 0.75, 1),
-      c(0, 0.5, 20, 20.5, 30, 40, Inf), include_unions, by_group = TRUE)
-    pooled <- calculate_lexis_counts(p, c(0, 0.25, 0.5, 0.75, 1),
-      c(0, 0.5, 20, 20.5, 30, 40, Inf), include_unions)
+  for (by_union_type in c(FALSE, TRUE)) {
+    counts <- calculate_demog_rates(p, c(0, 0.25, 0.5, 0.75, 1),
+      c(0, 0.5, 20, 20.5, 30, 40, Inf), by_union_type, by_group = TRUE)
+    pooled <- calculate_demog_rates(p, c(0, 0.25, 0.5, 0.75, 1),
+      c(0, 0.5, 20, 20.5, 30, 40, Inf), by_union_type)
     a <- subset(counts, group == "A")
     b <- subset(counts, group == "B")
     for (column in intersect(c("person_years", "births", "deaths", "unions"), names(pooled)))
@@ -52,16 +50,17 @@ test_that("group exposure and events conserve pooled cells across boundaries", {
     expect_equal(a$rate_mortality[a$person_years > 0],
                  a$deaths[a$person_years > 0] / a$person_years[a$person_years > 0])
     expect_true(all(is.na(counts$rate_mortality[counts$person_years == 0])))
-    expect_identical(calculate_lexis_counts(p, c(0, 0.25, 0.5, 0.75, 1),
-      c(0, 0.5, 20, 20.5, 30, 40, Inf), include_unions, by_group = FALSE), pooled)
-    if (include_unions) {
-      overall <- subset(counts, union_status == "overall")
-      partnered <- subset(counts, union_status == "partnered")
-      unpartnered <- subset(counts, union_status == "unpartnered")
+    expect_identical(calculate_demog_rates(p, c(0, 0.25, 0.5, 0.75, 1),
+      c(0, 0.5, 20, 20.5, 30, 40, Inf), by_union_type, by_group = FALSE), pooled)
+    if (by_union_type) {
+      overall <- calculate_demog_rates(p, c(0, 0.25, 0.5, 0.75, 1),
+        c(0, 0.5, 20, 20.5, 30, 40, Inf), by_group = TRUE)
+      partnered <- subset(counts, union_type == "partnered")
+      unpartnered <- subset(counts, union_type == "unpartnered")
       for (column in c("person_years", "births", "deaths"))
         expect_equal(partnered[[column]] + unpartnered[[column]], overall[[column]])
-      expect_equal(subset(counts, group == "A" & union_status == "partnered" & births > 0)$time_start, 0.5)
-      expect_equal(subset(counts, group == "A" & union_status == "unpartnered" & births > 0)$time_start, 0.75)
+      expect_equal(subset(counts, group == "A" & union_type == "partnered" & births > 0)$time_start, 0.5)
+      expect_equal(subset(counts, group == "A" & union_type == "unpartnered" & births > 0)$time_start, 0.75)
     }
   }
 })
@@ -84,7 +83,7 @@ test_that("population sizes preserve time order and count each person's group", 
 test_that("numeric group types persist and bare histories keep maternal links", {
   p <- make_group_history()
   p$persons$group <- ifelse(p$persons$group == "A", 20L, 10L)
-  counts <- calculate_lexis_counts(p$persons, c(0, 1), c(0, Inf), by_group = TRUE)
+  counts <- calculate_demog_rates(p$persons, c(0, 1), c(0, Inf), by_group = TRUE)
   expect_type(counts$group, "integer")
   expect_identical(unique(counts$group), c(20L, 10L))
   expect_equal(subset(counts, group == 20L & sex == "f")$births, 2)
@@ -95,18 +94,19 @@ test_that("numeric group types persist and bare histories keep maternal links", 
 
 test_that("TFR separates groups jointly with periods and union statuses", {
   grid <- expand.grid(age_start = c(15, 20), group = c("B", "A"),
-    time_start = c(0, 1), union_status = c("overall", "partnered", "unpartnered"),
+    time_start = c(0, 1), union_type = c("overall", "partnered", "unpartnered"),
     stringsAsFactors = FALSE)
   grid$age_end <- grid$age_start + 5
   grid$time_end <- grid$time_start + 1
   grid$rate <- ifelse(grid$group == "A", 0.1, 0.2) *
-    (grid$time_start + 1) * match(grid$union_status, c("overall", "partnered", "unpartnered"))
+    (grid$time_start + 1) * match(grid$union_type, c("overall", "partnered", "unpartnered"))
   result <- calculate_tfr(grid)
   expect_equal(nrow(result), 12)
   expect_equal(result$tfr, ifelse(result$group == "A", 1, 2) *
-    (result$time_start + 1) * match(result$union_status, c("overall", "partnered", "unpartnered")))
-  process_rates <- subset(grid, time_start == 0 & union_status != "overall")
-  process_rates <- process_rates[c("age_start", "age_end", "group", "union_status", "rate")]
+    (result$time_start + 1) * match(result$union_type, c("overall", "partnered", "unpartnered")))
+  process_rates <- subset(grid, time_start == 0 & union_type != "overall")
+  process_rates <- process_rates[c("age_start", "age_end", "group", "union_type", "rate")]
+  names(process_rates)[names(process_rates) == "union_type"] <- "union_type"
   expect_equal(nrow(calculate_tfr(fertility(process_rates))), 4)
   grid$group <- ifelse(grid$group == "A", 20L, 10L)
   expect_type(calculate_tfr(grid)$group, "integer")
@@ -120,7 +120,7 @@ test_that("TFR separates groups jointly with periods and union statuses", {
   observed <- calculate_tfr(incomplete)
   affected <- observed$group == grid$group[1] &
     observed$time_start == grid$time_start[1] &
-    observed$union_status == grid$union_status[1]
+    observed$union_type == grid$union_type[1]
   expect_identical(is.na(observed$tfr), affected)
   expect_equal(observed$tfr[!affected], calculate_tfr(grid)$tfr[!affected])
 })
@@ -128,18 +128,18 @@ test_that("TFR separates groups jointly with periods and union statuses", {
 test_that("group life tables follow analytical constant-hazard survival", {
   grid <- expand.grid(age_start = c(0, 5), group = c("B", "A"),
     sex = c("m", "f"), time_start = c(0, 1),
-    union_status = c("overall", "partnered", "unpartnered"), stringsAsFactors = FALSE)
+    union_type = c("overall", "partnered", "unpartnered"), stringsAsFactors = FALSE)
   grid$age_end <- ifelse(grid$age_start == 0, 5, Inf)
   grid$mx <- ifelse(grid$group == "A", 0.1, 0.2) *
     (grid$time_start + 1) * ifelse(grid$sex == "m", 2, 1) *
-    match(grid$union_status, c("overall", "partnered", "unpartnered"))
+    match(grid$union_type, c("overall", "partnered", "unpartnered"))
   result <- calculate_life_table(grid, radix = 1000)
   expect_equal(nrow(result), nrow(grid))
   expect_equal(result$ex, 1/result$mx)
   expect_equal(result$lx[result$age_start == 0], rep(1000, 24))
   expect_equal(result$lx[result$age_start == 5],
                1000 * exp(-5 * result$mx[result$age_start == 5]))
-  process_rates <- subset(grid, time_start == 0 & union_status == "overall")
+  process_rates <- subset(grid, time_start == 0 & union_type == "overall")
   process_rates <- process_rates[c("age_start", "age_end", "group", "sex", "mx")]
   names(process_rates)[names(process_rates) == "mx"] <- "rate"
   expect_equal(nrow(calculate_life_table(mortality(process_rates))), 8)
@@ -148,10 +148,10 @@ test_that("group life tables follow analytical constant-hazard survival", {
 })
 
 test_that("Lexis group identifiers flow through derived measures", {
-  counts <- calculate_lexis_counts(make_group_history(), c(0, 1), c(0, 20, 40, Inf),
-                                   include_unions = TRUE, by_group = TRUE)
+  counts <- calculate_demog_rates(make_group_history(), c(0, 1), c(0, 20, 40, Inf),
+                                   by_union_type = TRUE, by_group = TRUE)
   tfr <- calculate_tfr(counts)
-  expect_equal(nrow(tfr), 6)
+  expect_equal(nrow(tfr), 4)
   expect_identical(unique(tfr$group), c("A", "B"))
   expect_identical(attr(tfr, "unassigned_births"), attr(counts, "unassigned_births"))
   life <- calculate_life_table(counts)
@@ -162,14 +162,14 @@ test_that("Lexis group identifiers flow through derived measures", {
 test_that("group observations validate flags and required group data", {
   p <- make_group_history()
   for (bad in list(NULL, NA, 1, "yes", c(TRUE, FALSE), matrix(TRUE))) {
-    expect_error(calculate_lexis_counts(p, c(0, 1), c(0, Inf), by_group = bad), "by_group")
+    expect_error(calculate_demog_rates(p, c(0, 1), c(0, Inf), by_group = bad), "by_group")
     expect_error(calculate_population_size(p, 0, by_group = bad), "by_group")
   }
   p$persons$group <- NULL
-  expect_error(calculate_lexis_counts(p, c(0, 1), c(0, Inf), by_group = TRUE), "group.*column")
+  expect_error(calculate_demog_rates(p, c(0, 1), c(0, Inf), by_group = TRUE), "group.*column")
   expect_error(calculate_population_size(p, 0, by_group = TRUE), "group.*column")
   expect_error(calculate_population_size(make_group_history(), 2, TRUE), "endpoint")
-  expect_error(calculate_lexis_counts(make_group_history(), c(0, 2), c(0, Inf), by_group = TRUE), "endpoint")
+  expect_error(calculate_demog_rates(make_group_history(), c(0, 2), c(0, Inf), by_group = TRUE), "endpoint")
   rates <- data.frame(group = NA_character_, age_start = 0, age_end = Inf, rate = 0.1)
   expect_error(calculate_life_table(rates), "group")
   rates$age_end <- 5
@@ -187,8 +187,8 @@ test_that("group observations return typed empty outputs", {
   sizes <- calculate_population_size(p, c(0, 1), TRUE)
   expect_equal(nrow(sizes), 0)
   expect_type(sizes$group, "character")
-  for (include_unions in c(FALSE, TRUE)) {
-    counts <- calculate_lexis_counts(p, c(0, 1), c(0, Inf), include_unions, TRUE)
+  for (by_union_type in c(FALSE, TRUE)) {
+    counts <- calculate_demog_rates(p, c(0, 1), c(0, Inf), by_union_type, TRUE)
     expect_s3_class(counts, "tbl_df")
     expect_equal(nrow(counts), 0)
     expect_type(counts$group, "character")
@@ -205,7 +205,7 @@ test_that("groups with no survivors retain zero cells and boundary deaths", {
   p$persons$death_time[p$persons$group == "B"] <- 0.75
   sizes <- calculate_population_size(p, c(0.75, 1), TRUE)
   expect_equal(subset(sizes, group == "B")$population, c(0L, 0L))
-  counts <- calculate_lexis_counts(p, c(0.75, 1), c(0, Inf), by_group = TRUE)
+  counts <- calculate_demog_rates(p, c(0.75, 1), c(0, Inf), by_group = TRUE)
   b <- subset(counts, group == "B")
   expect_equal(b$person_years, c(0, 0))
   expect_equal(sum(b$deaths), 4)

@@ -96,3 +96,13 @@ Normalization and validation are separate operations. `hammel_population()` norm
 its person/union tables to tibbles, and stores it as `model$population` while
 preserving extra components. Population construction/validation lives in
 `R/hammel_population.R`; the model setter lives in `R/hammel_model.R`.
+
+
+## Typed union episodes (D086)
+
+Cohabitation-enabled rate runs add union_type (cohab/marriage) and
+previous_cohab_id. Conversion closes cohab with end_reason conversion and
+starts marriage with the same partners at the same time. The new row points
+to the cohab ID; links must be unique and consistent. Both episodes remain in
+history, with continuous partnered exposure. Untyped mode retains its six core
+union columns. Enabling cohabitation treats legacy untyped history as marriage.

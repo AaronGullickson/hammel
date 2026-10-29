@@ -9,6 +9,30 @@ union_counts_cpp <- function(persons, unions, time_breaks, age_breaks, group_ind
     .Call(`_hammel_union_counts_cpp`, persons, unions, time_breaks, age_breaks, group_indices, group_count)
 }
 
+dissolution_counts_cpp <- function(unions, time_breaks, dur_breaks, group_indices, group_count, origins = NULL, event_reason = "dissolution") {
+    .Call(`_hammel_dissolution_counts_cpp`, unions, time_breaks, dur_breaks, group_indices, group_count, origins, event_reason)
+}
+
+previous_union_info_cpp <- function(persons, unions, counts_cohab = FALSE) {
+    .Call(`_hammel_previous_union_info_cpp`, persons, unions, counts_cohab)
+}
+
+previous_union_state_cpp <- function(persons, unions) {
+    .Call(`_hammel_previous_union_state_cpp`, persons, unions)
+}
+
+marriage_counts_cpp <- function(persons, unions, time_breaks, age_breaks, group_indices, group_count, dur_breaks = NULL, counts_cohab = FALSE, entry_type = "pooled", marriage_measure = FALSE) {
+    .Call(`_hammel_marriage_counts_cpp`, persons, unions, time_breaks, age_breaks, group_indices, group_count, dur_breaks, counts_cohab, entry_type, marriage_measure)
+}
+
+typed_demographic_counts_cpp <- function(persons, unions, time_breaks, age_breaks, group_indices, group_count, types) {
+    .Call(`_hammel_typed_demographic_counts_cpp`, persons, unions, time_breaks, age_breaks, group_indices, group_count, types)
+}
+
+unpartnered_birth_rows_cpp <- function(persons, unions) {
+    .Call(`_hammel_unpartnered_birth_rows_cpp`, persons, unions)
+}
+
 extract_kin_cpp <- function(persons, ego_ids, relative_ids, generations) {
     .Call(`_hammel_extract_kin_cpp`, persons, ego_ids, relative_ids, generations)
 }
@@ -29,8 +53,8 @@ inspect_group_matching_cpp <- function(age_difference, matching, female_group, m
     .Call(`_hammel_inspect_group_matching_cpp`, age_difference, matching, female_group, male_groups)
 }
 
-inspect_weighted_calibration_cpp <- function(female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility) {
-    .Call(`_hammel_inspect_weighted_calibration_cpp`, female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility)
+inspect_weighted_calibration_cpp <- function(female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility, female_previous = NULL, female_previous_ends = NULL) {
+    .Call(`_hammel_inspect_weighted_calibration_cpp`, female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility, female_previous, female_previous_ends)
 }
 
 inspect_exact_draw_cpp <- function(male_born, male_group, male_excluded, female_born, female_group, log_weights, matching, groups, now, cutoff, draws) {
@@ -41,7 +65,11 @@ inspect_weighted_incremental_cpp <- function(female_born, female_groups, male_bo
     .Call(`_hammel_inspect_weighted_incremental_cpp`, female_born, female_groups, male_born, male_groups, op_times, op_men, op_deltas, rates, matching, group_count, cutoff)
 }
 
-simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab) {
-    .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab)
+simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab, dissolution_rates, cohab_prob, conversion_rates, cohab_matching, counts_cohab) {
+    .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab, dissolution_rates, cohab_prob, conversion_rates, cohab_matching, counts_cohab)
+}
+
+inspect_intensity_tracker_cpp <- function(female_born, female_groups, search_rates, fertility_rates, times, persons, actions, previous, ready, group_count, search_origins = NULL, probability_rates = NULL) {
+    .Call(`_hammel_inspect_intensity_tracker_cpp`, female_born, female_groups, search_rates, fertility_rates, times, persons, actions, previous, ready, group_count, search_origins, probability_rates)
 }
 

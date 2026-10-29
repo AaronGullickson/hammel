@@ -6,6 +6,7 @@
 #include <map>
 #include <functional>
 #include <memory>
+#include <set>
 #include <vector>
 
 using namespace Rcpp;
@@ -19,13 +20,17 @@ struct Band {
 // Copy the R rate table into a growable C++ collection. Mortality selects
 // one sex; fertility uses all rows. Sort the copy without changing R inputs.
 std::vector<Band> read_bands(DataFrame rates, const std::string& sex = "",
-                             const std::string& status = "", int group = -1) {
-  NumericVector starts = rates["age_start"], ends = rates["age_end"];
+                             const std::string& status = "", int group = -1,
+                             const std::string& previous = "", bool duration = false) {
+  NumericVector starts = rates[duration ? "dur_start" : "age_start"],
+                ends = rates[duration ? "dur_end" : "age_end"];
   NumericVector values = rates["rate"];
   CharacterVector sexes;
   if (!sex.empty()) sexes = rates["sex"];
   CharacterVector statuses;
-  if (!status.empty()) statuses = rates["union_status"];
+  if (!status.empty()) statuses = rates["union_type"];
+  CharacterVector previous_types;
+  if (!previous.empty()) previous_types = rates["previous_union"];
   IntegerVector groups;
   const bool grouped = rates.containsElementNamed(".hammel_group");
   if (grouped) groups = rates[".hammel_group"];
@@ -33,13 +38,24 @@ std::vector<Band> read_bands(DataFrame rates, const std::string& sex = "",
   for (int i = 0; i < starts.size(); ++i) {
     if ((sex.empty() || as<std::string>(sexes[i]) == sex) &&
         (status.empty() || as<std::string>(statuses[i]) == status) &&
-        (!grouped || groups[i] == group))
+        (!grouped || groups[i] == group) &&
+        (previous.empty() || as<std::string>(previous_types[i]) == previous))
       bands.push_back({starts[i], ends[i], values[i]});
   }
   std::sort(bands.begin(), bands.end(), [](const Band& a, const Band& b) {
     return a.start < b.start;
   });
   return bands;
+}
+
+// R validation guarantees one clock per previous category across all groups.
+bool search_uses_duration(DataFrame rates, const std::string& previous) {
+  if (!rates.containsElementNamed("dur_start") || previous.empty()) return false;
+  CharacterVector labels = rates["previous_union"];
+  NumericVector ages = rates["age_start"];
+  for (int i = 0; i < labels.size(); ++i)
+    if (as<std::string>(labels[i]) == previous) return NumericVector::is_na(ages[i]);
+  return false;
 }
 
 // Calculate waiting time until the next event. The threshold is drawn
@@ -95,7 +111,7 @@ struct Person {
 };
 // person is a zero-based position in people, not the public person_id.
 // A version invalidates queued events after a change in union status.
-enum class EventType { death, birth, search };
+enum class EventType { death, birth, search, dissolution, conversion };
 struct Event { int person; EventType type; unsigned long long version; };
 
 double rate_integral(const std::vector<Band>& bands, double lo, double hi) {
@@ -309,7 +325,9 @@ class WeightCalibrator {
   int groups_, bins_;
   long long first_;
   double width_, cutoff_;
-  std::vector<double> men_, women_, fertile_; // [group * bins + bin]
+  std::vector<double> men_, women_; // [group * bins + bin]
+  std::vector<std::array<double, 3>> intensities_; // marriage, fertility
+  std::vector<std::array<int, 3>> positive_contributors_;
   // Per registered utility table: sums[(female group * G + male group) * bins
   // + female bin] of count * weight over included male bins. Male bins
   // [0, included_) have reached the age cutoff; older bins have lower indices.
@@ -356,7 +374,8 @@ class WeightCalibrator {
     bins_ = static_cast<int>(last - first_ + 1);
     men_.assign(static_cast<size_t>(groups) * bins_, 0);
     women_ = men_;
-    fertile_ = men_;
+    intensities_.resize(men_.size(), {0, 0});
+    positive_contributors_.resize(men_.size(), {0, 0});
   }
   int bins() const { return bins_; }
   // Register a utility table before counts are added; returns its index.
@@ -393,15 +412,35 @@ class WeightCalibrator {
     }
   }
   void add_woman(int group, double born, double delta) { women_[cell(group, born)] += delta; }
-  void add_fertile(int group, double born, double delta) { fertile_[cell(group, born)] += delta; }
+  void replace_role_intensity(int group, double born, const std::array<double, 3>& old,
+                         const std::array<double, 3>& value) {
+    const size_t i = cell(group, born);
+    for (int c = 0; c < 3; ++c) {
+      positive_contributors_[i][c] += (value[c] > 0) - (old[c] > 0);
+      intensities_[i][c] += value[c] - old[c];
+      // Exact zero when the last positive contribution leaves: subtraction
+      // roundoff must not create phantom searchers in zero-risk cells.
+      if (positive_contributors_[i][c] == 0) intensities_[i][c] = 0;
+    }
+  }
+  void replace_intensity(int group, double born, const std::array<double, 2>& old,
+                         const std::array<double, 2>& value) {
+    replace_role_intensity(group, born, {old[0], old[1], 0}, {value[0], value[1], 0});
+  }
+  NumericMatrix intensity_snapshot(bool all_roles = false) const {
+    const int channels = all_roles ? 3 : 2;
+    NumericMatrix out(intensities_.size(), channels);
+    for (size_t i = 0; i < intensities_.size(); ++i)
+      for (int c = 0; c < channels; ++c) out(i, c) = intensities_[i][c];
+    return out;
+  }
 
   // Expected male flow shares follow from each woman-bin's intensity and
   // her group-level choice shares b[g] S[w,g] / sum_h b[h] S[w,h]. Find log
   // weights so those shares meet the mirrored target (Newton on a convex
   // objective, warm-started). Empty or uninformative states return b = 1.
-  WeightSolution solve(double now, const std::vector<const std::vector<Band>*>& hazards,
-                       bool fertility, int table_id, const std::vector<double>& delta,
-                       std::vector<double>& warm) {
+  WeightSolution solve(double now, int channel, int table_id,
+                       const std::vector<double>& delta, std::vector<double>& warm) {
     advance(now);
     const LagTable& table = *tables_[table_id];
     const std::vector<double>& sums = sums_[table_id];
@@ -422,14 +461,8 @@ class WeightCalibrator {
         if (men_[i] > 0) { men[g].push_back({k, men_[i]}); men_count[g] += men_[i]; }
         if (women_[i] > 0) {
           women_count[g] += women_[i];
-          const double at_risk = fertility ? fertile_[i] : women_[i];
-          if (at_risk > 0) {
-            // Average hazard over the bin's whole age span, so narrow or
-            // misaligned rate bands are not missed by a single centre age.
-            const double oldest = now - static_cast<double>(first_ + k) * width_;
-            const double hazard = rate_integral(*hazards[g], oldest - width_, oldest) / width_;
-            if (hazard > 0) { rows.push_back({g, k, at_risk * hazard}); intensity[g] += at_risk * hazard; }
-          }
+          const double lambda = std::max(0.0, intensities_[i][channel]);
+          if (lambda > 0) { rows.push_back({g, k, lambda}); intensity[g] += lambda; }
         }
       }
     }
@@ -616,35 +649,142 @@ class WeightCalibrator {
   }
 };
 
+// Actual current hazard and next absolute age boundary, including schedule gaps.
+// Absolute comparisons make a queued boundary use the right-hand band even
+// when subtracting birth time would round the attained age just below its edge.
+std::pair<double, double> current_hazard(const std::vector<Band>* bands,
+                                         double born, double now) {
+  double value = 0, next = R_PosInf;
+  if (bands) for (const Band& band : *bands) {
+    const double start = born + band.start, end = born + band.end;
+    if (start <= now && now < end) value = band.rate;
+    if (start > now) next = std::min(next, start);
+    if (end > now) next = std::min(next, end);
+  }
+  return {value, next};
+}
+
+// One pending boundary per active woman, replaced eagerly on state changes.
+// Separate channels share one queue and one state-update interface; no Cartesian
+// table of previous status, parity, region, etc. is needed by calibration.
+class FemaleIntensityTracker {
+  struct Woman {
+    int group = 0;
+    double born = 0, search_origin = 0, ready = 0, next = R_PosInf;
+    bool active = false;
+    const std::vector<Band>* search = nullptr;
+    const std::vector<Band>* fertility = nullptr;
+    const std::vector<Band>* probability = nullptr;
+    std::array<double, 3> value = {0, 0, 0};
+  };
+  WeightCalibrator& calibration_;
+  std::vector<Woman> women_;
+  std::set<std::pair<double, int>> queue_;
+  unsigned long long updates_ = 0;
+  void refresh(int person, double now) {
+    Woman& w = women_[person];
+    if (R_finite(w.next)) queue_.erase({w.next, person});
+    const auto search = current_hazard(w.search, w.search_origin, now);
+    const auto fertility = now < w.ready ? std::make_pair(0.0, w.ready) :
+      current_hazard(w.fertility, w.born, now);
+    const auto probability = current_hazard(w.probability, w.born, now);
+    const double p = probability.first;
+    const std::array<double, 3> value = {search.first * (1 - p), fertility.first, search.first * p};
+    calibration_.replace_role_intensity(w.group, w.born, w.value, value);
+    w.value = value;
+    w.next = std::min(std::min(search.second, fertility.second), probability.second);
+    if (R_finite(w.next)) queue_.insert({w.next, person});
+  }
+ public:
+  explicit FemaleIntensityTracker(WeightCalibrator& calibration) : calibration_(calibration) {}
+  void activate(int person, int group, double born, const std::vector<Band>* search,
+                const std::vector<Band>* fertility, double ready, double now,
+                double search_origin = NA_REAL, const std::vector<Band>* probability = nullptr) {
+    if (person >= static_cast<int>(women_.size())) women_.resize(person + 1);
+    remove(person);
+    Woman& w = women_[person];
+    w.active = true; w.group = group; w.born = born;
+    w.search_origin = NumericVector::is_na(search_origin) ? born : search_origin;
+    w.search = search; w.fertility = fertility; w.ready = ready; w.probability = probability;
+    refresh(person, now);
+  }
+  void remove(int person) {
+    if (person >= static_cast<int>(women_.size()) || !women_[person].active) return;
+    Woman& w = women_[person];
+    if (R_finite(w.next)) queue_.erase({w.next, person});
+    calibration_.replace_role_intensity(w.group, w.born, w.value, {0, 0, 0});
+    w.active = false; w.value = {0, 0, 0}; w.next = R_PosInf;
+  }
+  void set_ready(int person, double ready, double now) {
+    if (person >= static_cast<int>(women_.size()) || !women_[person].active) return;
+    women_[person].ready = ready;
+    refresh(person, now);
+  }
+  void advance(double now) {
+    while (!queue_.empty() && queue_.begin()->first <= now) {
+      const auto entry = *queue_.begin();
+      queue_.erase(queue_.begin());
+      women_[entry.second].next = R_PosInf;
+      refresh(entry.second, entry.first);
+      if (++updates_ % 1024 == 0) checkUserInterrupt();
+    }
+  }
+  size_t pending() const { return queue_.size(); }
+};
+
 // Internal entry point: calibrate weights for a supplied unpartnered state.
 // [[Rcpp::export]]
 List inspect_weighted_calibration_cpp(NumericVector female_born, IntegerVector female_groups,
                                       LogicalVector female_fertile, NumericVector male_born,
                                       IntegerVector male_groups, DataFrame rates, List matching,
                                       int group_count, double now, double cutoff, double width,
-                                      bool fertility) {
+                                      bool fertility,
+                                      Nullable<IntegerVector> female_previous = R_NilValue,
+                                      Nullable<NumericVector> female_previous_ends = R_NilValue) {
   if (female_groups.size() != female_born.size() || female_fertile.size() != female_born.size() ||
       male_groups.size() != male_born.size() || group_count < 1)
     stop("Invalid weighted-calibration inputs.");
   double lo = now, hi = now;
   for (double born : female_born) { lo = std::min(lo, born); hi = std::max(hi, born); }
   for (double born : male_born) { lo = std::min(lo, born); hi = std::max(hi, born); }
+  const bool previous_specific = rates.containsElementNamed("previous_union") && !fertility;
+  IntegerVector previous(female_born.size(), 0);
+  if (female_previous.isNotNull()) previous = IntegerVector(female_previous);
+  if (previous.size() != female_born.size()) stop("Invalid previous-union calibration inputs.");
+  for (int p : previous) if (p < 0 || p > 2) stop("Invalid previous-union calibration category.");
   WeightCalibrator calibrator(lo, hi, group_count, width, cutoff);
   const LagTable table = build_lag_table(matching, group_count, calibrator.bins(), width);
   calibrator.add_table(&table);
   for (R_xlen_t i = 0; i < male_born.size(); ++i) calibrator.add_man(male_groups[i], male_born[i], 1);
   for (R_xlen_t i = 0; i < female_born.size(); ++i) {
     calibrator.add_woman(female_groups[i], female_born[i], 1);
-    if (female_fertile[i]) calibrator.add_fertile(female_groups[i], female_born[i], 1);
   }
-  std::vector<std::vector<Band>> bands(group_count);
-  std::vector<const std::vector<Band>*> hazards(group_count);
+  NumericVector previous_ends(female_born.size(), NA_REAL);
+  if (female_previous_ends.isNotNull()) previous_ends = NumericVector(female_previous_ends);
+  if (previous_ends.size() != female_born.size()) stop("Invalid previous ending times.");
+  const int categories = previous_specific ? 3 : 1;
+  std::vector<bool> duration_bands(group_count * categories, false);
+  std::vector<std::vector<Band>> bands(group_count * categories);
+  std::vector<const std::vector<Band>*> hazards(group_count * categories);
+  const std::array<std::string, 3> labels = {"none", "dissolved", "widowed"};
   for (int g = 0; g < group_count; ++g) {
-    bands[g] = read_bands(rates, "", "", g);
-    hazards[g] = &bands[g];
+    for (int p = 0; p < categories; ++p) {
+      const int i = g * categories + p;
+      duration_bands[i] = previous_specific && search_uses_duration(rates, labels[p]);
+      bands[i] = read_bands(rates, "", "", g, previous_specific ? labels[p] : "", duration_bands[i]);
+      hazards[i] = &bands[i];
+    }
+  }
+  for (R_xlen_t i = 0; i < female_born.size(); ++i) {
+    const int schedule = female_groups[i] * categories + (previous_specific ? previous[i] : 0);
+    const double origin = duration_bands[schedule] ? previous_ends[i] : female_born[i];
+    if (!R_finite(origin)) stop("Duration calibration requires a previous ending time.");
+    const double value = current_hazard(hazards[schedule], origin, now).first;
+    calibrator.replace_intensity(female_groups[i], female_born[i], {0, 0},
+      {value, female_fertile[i] ? value : 0});
   }
   std::vector<double> warm;
-  const WeightSolution s = calibrator.solve(now, hazards, fertility, 0,
+  const WeightSolution s = calibrator.solve(now, fertility, 0,
     as<std::vector<double>>(matching["delta"]), warm);
   return List::create(_["log_weights"] = wrap(s.log_weights), _["target"] = wrap(s.target),
                       _["flow"] = wrap(s.flow), _["infeasible"] = s.infeasible);
@@ -953,7 +1093,6 @@ List inspect_weighted_incremental_cpp(NumericVector female_born, IntegerVector f
   incremental.add_table(&table);
   for (R_xlen_t i = 0; i < female_born.size(); ++i) {
     incremental.add_woman(female_groups[i], female_born[i], 1);
-    incremental.add_fertile(female_groups[i], female_born[i], 1);
   }
   for (R_xlen_t i = 0; i < male_born.size(); ++i) incremental.add_man(male_groups[i], male_born[i], 1);
   std::vector<std::vector<Band>> bands(group_count);
@@ -961,9 +1100,18 @@ List inspect_weighted_incremental_cpp(NumericVector female_born, IntegerVector f
   for (int g = 0; g < group_count; ++g) { bands[g] = read_bands(rates, "", "", g); hazards[g] = &bands[g]; }
   const std::vector<double> delta = as<std::vector<double>>(matching["delta"]);
   std::vector<double> warm;
+  std::vector<double> prior(female_born.size(), 0);
+  auto update_intensities = [&](double now) {
+    for (R_xlen_t j = 0; j < female_born.size(); ++j) {
+      const double value = current_hazard(hazards[female_groups[j]], female_born[j], now).first;
+      incremental.replace_intensity(female_groups[j], female_born[j], {prior[j], prior[j]}, {value, value});
+      prior[j] = value;
+    }
+  };
   for (R_xlen_t i = 0; i < op_times.size(); ++i) {
     if (i % 1024 == 0) checkUserInterrupt();
-    incremental.solve(op_times[i], hazards, false, 0, delta, warm);
+    update_intensities(op_times[i]);
+    incremental.solve(op_times[i], false, 0, delta, warm);
     incremental.add_man(male_groups[op_men[i]], male_born[op_men[i]], op_deltas[i]);
   }
   const double end = op_times[op_times.size() - 1];
@@ -971,8 +1119,8 @@ List inspect_weighted_incremental_cpp(NumericVector female_born, IntegerVector f
   rebuilt.refresh();
   const double difference = incremental.max_sum_difference(rebuilt, 0);
   std::vector<double> warm_a, warm_b;
-  const WeightSolution a = incremental.solve(end, hazards, false, 0, delta, warm_a);
-  const WeightSolution b = rebuilt.solve(end, hazards, false, 0, delta, warm_b);
+  const WeightSolution a = incremental.solve(end, false, 0, delta, warm_a);
+  const WeightSolution b = rebuilt.solve(end, false, 0, delta, warm_b);
   return List::create(_["max_sum_difference"] = difference,
                       _["incremental"] = wrap(a.log_weights), _["rebuilt"] = wrap(b.log_weights));
 }
@@ -981,6 +1129,11 @@ struct UnionRecord {
   double id, start, end;
   int wife, husband;
   bool wife_died = false;
+  bool dissolved = false;
+  bool dissolution_sampled = false;
+  bool cohab = false, converted = false, conversion_sampled = false;
+  double converted_from = NA_REAL, conversion_time = R_PosInf;
+  double dissolution_time = std::numeric_limits<double>::infinity();
 };
 
 // [[Rcpp::export]]
@@ -991,7 +1144,10 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   int kinship_generations, bool rate_initiation,
                   DataFrame union_rates, List father_matching,
                   bool cancel_birth_if_no_match, bool diagnostics,
-                  NumericMatrix initial_ancestry, List inheritance, double ffab) {
+                  NumericMatrix initial_ancestry, List inheritance, double ffab,
+                  DataFrame dissolution_rates, DataFrame cohab_prob, DataFrame conversion_rates,
+                  List cohab_matching, bool counts_cohab) {
+  const bool cohab_enabled = cohab_prob.nrows() > 0;
   if (!R_finite(ffab) || ffab < 0 || ffab > 1)
     stop("ffab must be a finite probability in [0, 1].");
   // R performs input validation and seed handling. All engine state below is
@@ -1042,6 +1198,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     father_draw_storage = make_draw_model(father_matching, group_count, start + years - min_birth);
     father_draw = &father_draw_storage;
   }
+  DrawModel cohab_draw_storage;
+  const DrawModel* cohab_draw = &union_draw;
+  if (cohab_enabled && !people.empty() && SEXP(cohab_matching) != SEXP(matching)) {
+    cohab_draw_storage = make_draw_model(cohab_matching, group_count, start + years - min_birth);
+    cohab_draw = &cohab_draw_storage;
+  }
   DrawWorkspace draw_workspace;
   double draw_approximate = 0;
   std::vector<std::array<int, 2>> parent_links(people.size());
@@ -1057,11 +1219,29 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::vector<std::vector<double>> diagnostic_log_weights;
   std::vector<std::vector<int>> person_unions(people.size());
   std::vector<int> current_partner(people.size(), -1);
+  const bool previous_specific = union_rates.containsElementNamed("previous_union");
+  std::vector<int> previous_union(people.size(), 0), legal_previous(people.size(), 0);
+  std::vector<double> previous_union_end(people.size(), NA_REAL);
+  if (previous_specific || cohab_enabled) {
+    IntegerVector initial_previous = persons[".hammel_previous_union"];
+    previous_union = as<std::vector<int>>(initial_previous);
+    previous_union_end = as<std::vector<double>>(persons[".hammel_previous_union_end"]);
+    legal_previous = as<std::vector<int>>(persons[".hammel_legal_previous"]);
+  }
   // weighted_choice state (D066). The calibrator exists only for grouped
   // populations; until it is created below, pool hooks record nothing.
   std::unique_ptr<WeightCalibrator> calibrator;
-  std::vector<char> counted_woman, counted_fertile;
-  std::multimap<double, int> spacing_entries;
+  std::vector<char> counted_woman;
+  std::unique_ptr<FemaleIntensityTracker> intensity_tracker;
+  std::vector<const std::vector<Band>*> search_hazards, fertility_hazards;
+  std::vector<bool> search_duration;
+  std::vector<std::vector<Band>> probability_schedules(group_count * 3);
+  if (cohab_enabled) {
+    const bool previous_prob = cohab_prob.containsElementNamed("previous_union");
+    const std::array<std::string, 3> labels = {"none", "dissolved", "widowed"};
+    for (int g = 0; g < group_count; ++g) for (int p = 0; p < 3; ++p)
+      probability_schedules[g * 3 + p] = read_bands(cohab_prob, "", "", g, previous_prob ? labels[p] : "");
+  }
   // Pool updates are constant-time (swap removal within a cell).
   auto remove_male = [&](int man) {
     if (!pool.contains(man)) return; // Partnered men are already absent when they die.
@@ -1081,6 +1261,14 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   for (int u = 0; u < uids.size(); ++u) {
     const int woman = index.at(wives[u]), man = index.at(husbands[u]);
     union_history.push_back({uids[u], starts[u], ends[u], woman, man});
+    if (unions.containsElementNamed("union_type")) {
+      CharacterVector types = unions["union_type"];
+      union_history.back().cohab = as<std::string>(types[u]) == "cohab";
+    }
+    if (unions.containsElementNamed("previous_cohab_id")) {
+      NumericVector links = unions["previous_cohab_id"];
+      union_history.back().converted_from = links[u];
+    }
     next_union_id = std::max(next_union_id, uids[u]);
     if (!NumericVector::is_na(ends[u])) continue;
     if (!NumericVector::is_na(people[woman].died) ||
@@ -1113,43 +1301,28 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         current_partner[woman] >= 0 || counted_woman[woman]) return;
     counted_woman[woman] = 1;
     calibrator->add_woman(people[woman].group, people[woman].born, 1);
-    const double ready = people[woman].last_birth + birth_interval;
-    if (now >= ready) {
-      counted_fertile[woman] = 1;
-      calibrator->add_fertile(people[woman].group, people[woman].born, 1);
-    } else spacing_entries.emplace(ready, woman);
+    const int g = people[woman].group;
+    const int index = previous_specific ? g * 3 + previous_union[woman] : g;
+    const auto* search = !rate_initiation ? nullptr : search_hazards[index];
+    const double origin = rate_initiation && search_duration[index] ?
+      previous_union_end[woman] : people[woman].born;
+    if (!R_finite(origin)) stop("Duration search risk requires a recorded previous union ending.");
+    intensity_tracker->activate(woman, g, people[woman].born, search, fertility_hazards[g],
+      people[woman].last_birth + birth_interval, now, origin,
+      cohab_enabled ? &probability_schedules[g * 3 + previous_union[woman]] : nullptr);
   };
   auto remove_counted_woman = [&](int woman) {
     if (!calibrator || !counted_woman[woman]) return;
     counted_woman[woman] = 0;
+    intensity_tracker->remove(woman);
     calibrator->add_woman(people[woman].group, people[woman].born, -1);
-    if (counted_fertile[woman]) {
-      counted_fertile[woman] = 0;
-      calibrator->add_fertile(people[woman].group, people[woman].born, -1);
-    }
   };
   auto counted_birth = [&](int woman, double now) {
-    if (!calibrator || !counted_woman[woman]) return;
-    if (counted_fertile[woman]) {
-      counted_fertile[woman] = 0;
-      calibrator->add_fertile(people[woman].group, people[woman].born, -1);
-    }
-    spacing_entries.emplace(now + birth_interval, woman);
+    if (calibrator && counted_woman[woman])
+      intensity_tracker->set_ready(woman, now + birth_interval, now);
   };
-  auto release_spacing = [&](double now) {
-    while (!spacing_entries.empty() && spacing_entries.begin()->first <= now) {
-      const int woman = spacing_entries.begin()->second;
-      spacing_entries.erase(spacing_entries.begin());
-      if (counted_woman[woman] && !counted_fertile[woman] &&
-          now >= people[woman].last_birth + birth_interval) {
-        counted_fertile[woman] = 1;
-        calibrator->add_fertile(people[woman].group, people[woman].born, 1);
-      }
-    }
-  };
-  std::vector<const std::vector<Band>*> search_hazards, fertility_hazards;
-  LagTable union_table, father_table_storage;
-  int union_table_id = 0, father_table_id = 0;
+  LagTable union_table, father_table_storage, cohab_table;
+  int union_table_id = 0, father_table_id = 0, cohab_table_id = 0;
   // A NULL father model shares the general model and calibration table. When a
   // model prevents all exogamy, every woman sees only her own group's men, so
   // a group weight cannot change her choice: skip calibration.
@@ -1158,24 +1331,24 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   };
   const bool union_weighted = applies_weights(matching);
   const bool father_weighted = applies_weights(father_matching);
-  std::vector<double> union_warm, father_warm;
+  const bool cohab_weighted = cohab_enabled && applies_weights(cohab_matching);
+  std::vector<double> union_warm, father_warm, cohab_warm;
   double weighted_infeasible = 0;
   // Partner and father searches share eligibility and the exact draw; only
   // form_union changes partner state or removes the selected man.
   auto find_candidate = [&](int woman, double now, const List& choice_model,
                             const DrawModel& draw, bool father,
-                            std::vector<double>* applied) -> int {
+                            std::vector<double>* applied, bool cohab_role = false) -> int {
     if (pool.empty()) return -1;
     std::vector<double> log_weights(group_count, 0.0);
-    if (calibrator && (father ? father_weighted : union_weighted)) {
+    if (calibrator && (cohab_role ? cohab_weighted : (father ? father_weighted : union_weighted))) {
       // Searches and on-demand unions use the union-formation calibration;
       // rate-mode nonmarital fathers have their own, driven by fertility.
-      release_spacing(now);
+      intensity_tracker->advance(now);
       const bool fertility_driven = !rate_initiation || father;
-      const WeightSolution weights = calibrator->solve(now,
-        fertility_driven ? fertility_hazards : search_hazards, fertility_driven,
-        father ? father_table_id : union_table_id,
-        as<std::vector<double>>(choice_model["delta"]), father ? father_warm : union_warm);
+      const WeightSolution weights = calibrator->solve(now, cohab_role ? 2 : (fertility_driven ? 1 : 0),
+        cohab_role ? cohab_table_id : (father ? father_table_id : union_table_id),
+        as<std::vector<double>>(choice_model["delta"]), cohab_role ? cohab_warm : (father ? father_warm : union_warm));
       if (weights.infeasible) ++weighted_infeasible;
       log_weights = weights.log_weights;
     }
@@ -1189,14 +1362,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     int partner = current_partner[woman];
     if (partner >= 0) return partner;
     std::vector<double> applied;
-    partner = find_candidate(woman, now, matching, union_draw, false,
-                             diagnostics ? &applied : nullptr);
+    const double p = cohab_enabled ? current_hazard(
+      &probability_schedules[people[woman].group * 3 + previous_union[woman]], people[woman].born, now).first : 0;
+    const bool is_cohab = cohab_enabled && R::runif(0, 1) < p;
+    partner = find_candidate(woman, now, is_cohab ? cohab_matching : matching,
+      is_cohab ? *cohab_draw : union_draw, false, diagnostics ? &applied : nullptr, is_cohab);
     if (partner >= 0) {
       if (next_union_id >= 9007199254740991.0 ||
           union_history.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
         stop("Union history exceeds supported ID or row limits.");
       const int u = static_cast<int>(union_history.size());
       union_history.push_back({++next_union_id, now, NA_REAL, woman, partner});
+      union_history.back().cohab = is_cohab;
       if (diagnostics) {
         diagnostic_log_weights.push_back(applied);
       }
@@ -1210,7 +1387,10 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     return partner;
   };
   struct GroupSchedules {
-    std::vector<Band> male, female, partnered, unpartnered, search;
+    std::vector<Band> male, female, partnered, cohab, unpartnered, search, conversion;
+    bool duration_conversion = false;
+    std::array<std::vector<Band>, 3> previous_search;
+    std::array<bool, 3> duration_search = {false, false, false};
   };
   const int inheritance_method = inheritance["method"];
   const double passing = inheritance["passing"];
@@ -1218,26 +1398,54 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   IntegerVector ancestry_groups = inheritance["ancestry_groups"];
   Function inherit_custom = inheritance["custom"];
   std::vector<GroupSchedules> schedules(group_count);
-  const bool status_fertility = fertility_rates.containsElementNamed("union_status");
+  const bool status_fertility = fertility_rates.containsElementNamed("union_type");
   for (int group = 0; group < group_count; ++group) {
     auto& rates = schedules[group];
     rates.male = read_bands(mortality_rates, "m", "", group);
     rates.female = read_bands(mortality_rates, "f", "", group);
+    bool typed_fertility = false;
+    if (status_fertility) {
+      CharacterVector types = fertility_rates["union_type"];
+      for (auto type : types) if (as<std::string>(type) == "cohab") typed_fertility = true;
+    }
     rates.partnered = adjusted_fertility(read_bands(fertility_rates, "",
-      status_fertility ? "partnered" : "", group), birth_interval);
+      status_fertility ? (typed_fertility ? "marriage" : "partnered") : "", group), birth_interval);
+    rates.cohab = typed_fertility ? adjusted_fertility(read_bands(fertility_rates, "", "cohab", group), birth_interval) : rates.partnered;
+    if (conversion_rates.nrows()) {
+      NumericVector ages = conversion_rates["age_start"];
+      rates.duration_conversion = NumericVector::is_na(ages[0]);
+      rates.conversion = read_bands(conversion_rates, "", "", group, "", rates.duration_conversion);
+    }
     rates.unpartnered = status_fertility ? adjusted_fertility(
       read_bands(fertility_rates, "", "unpartnered", group), birth_interval) : rates.partnered;
-    if (rate_initiation) rates.search = read_bands(union_rates, "", "", group);
+    if (rate_initiation) {
+      if (previous_specific) {
+        const std::array<std::string, 3> labels = {"none", "dissolved", "widowed"};
+        for (int p = 0; p < 3; ++p) {
+          rates.duration_search[p] = search_uses_duration(union_rates, labels[p]);
+          rates.previous_search[p] = read_bands(union_rates, "", "", group, labels[p],
+            rates.duration_search[p]);
+        }
+      } else rates.search = read_bands(union_rates, "", "", group);
+    }
   }
   // weighted_choice needs schedules and group indices, so it starts here.
   // One group means unit weights, so calibration is unnecessary.
-  if ((union_weighted || father_weighted) && group_count > 1) {
+  if ((union_weighted || father_weighted || cohab_weighted) && group_count > 1) {
     double min_birth = start;
     for (const Person& person : people) min_birth = std::min(min_birth, person.born);
     calibrator.reset(new WeightCalibrator(min_birth, start + years, group_count,
                                           kWeightBinWidth, min_male_age));
     for (int group = 0; group < group_count; ++group) {
-      search_hazards.push_back(&schedules[group].search);
+      if (previous_specific) {
+        for (int p = 0; p < 3; ++p) {
+          search_hazards.push_back(&schedules[group].previous_search[p]);
+          search_duration.push_back(schedules[group].duration_search[p]);
+        }
+      } else {
+        search_hazards.push_back(&schedules[group].search);
+        search_duration.push_back(false);
+      }
       fertility_hazards.push_back(&schedules[group].unpartnered);
     }
     if (union_weighted) {
@@ -1249,8 +1457,15 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                                              kWeightBinWidth);
       father_table_id = calibrator->add_table(&father_table_storage);
     }
+    if (cohab_weighted) {
+      if (SEXP(cohab_matching) == SEXP(matching)) cohab_table_id = union_table_id;
+      else {
+        cohab_table = build_lag_table(cohab_matching, group_count, calibrator->bins(), kWeightBinWidth);
+        cohab_table_id = calibrator->add_table(&cohab_table);
+      }
+    }
     counted_woman.assign(people.size(), 0);
-    counted_fertile.assign(people.size(), 0);
+    intensity_tracker.reset(new FemaleIntensityTracker(*calibrator));
     for (int man = 0; man < static_cast<int>(people.size()); ++man)
       if (pool.contains(man)) calibrator->add_man(people[man].group, people[man].born, 1);
     for (int woman = 0; woman < static_cast<int>(people.size()); ++woman)
@@ -1273,6 +1488,17 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     do { value = R::rexp(1.0); } while (value <= 0);
     return value;
   };
+  const bool has_dissolution = dissolution_rates.nrows() > 0;
+  std::vector<std::vector<Band>> dissolution_schedules, cohab_dissolution_schedules;
+  if (has_dissolution) {
+    const int count = dissolution_rates.containsElementNamed(".hammel_group") ?
+      group_count * group_count : 1;
+    const bool typed = dissolution_rates.containsElementNamed("union_type");
+    for (int pair = 0; pair < count; ++pair) {
+      dissolution_schedules.push_back(read_bands(dissolution_rates, "", typed ? "marriage" : "", pair));
+      cohab_dissolution_schedules.push_back(read_bands(dissolution_rates, "", typed ? "cohab" : "", pair));
+    }
+  }
   auto schedule = [&](int i, double now) {
     const auto version = ++event_versions[i];
     const Person& p = people[i];
@@ -1282,19 +1508,53 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     double death_time = candidate(waiting_time(death_rates, now - p.born, threshold()), now);
     double birth_time = std::numeric_limits<double>::infinity();
     if (p.female) {
-      const auto& fertility = current_partner[i] >= 0 ? rates.partnered : rates.unpartnered;
+      const auto& fertility = current_partner[i] >= 0 ?
+        (union_history[person_unions[i].back()].cohab ? rates.cohab : rates.partnered) : rates.unpartnered;
       double first = std::max(now, p.last_birth + birth_interval);
       if (first < end)
         birth_time = candidate(waiting_time(fertility,
           first - p.born, threshold()), first);
     }
     double search_time = std::numeric_limits<double>::infinity();
-    if (rate_initiation && p.female && current_partner[i] < 0)
-      search_time = candidate(waiting_time(rates.search, now - p.born, threshold()), now);
-    const double due = std::min(death_time, std::min(birth_time, search_time));
-    // Exact same-person ties select death, then birth, then search.
+    if (rate_initiation && p.female && current_partner[i] < 0) {
+      const bool duration = previous_specific && rates.duration_search[previous_union[i]];
+      const double origin = duration ? previous_union_end[i] : p.born;
+      if (!R_finite(origin)) stop("Duration search risk requires a recorded previous union ending.");
+      search_time = candidate(waiting_time(previous_specific ? rates.previous_search[previous_union[i]] : rates.search,
+        now - origin, threshold()), now);
+    }
+    double dissolution_time = std::numeric_limits<double>::infinity();
+    if (has_dissolution && p.female && current_partner[i] >= 0) {
+      UnionRecord& relationship = union_history[person_unions[i].back()];
+      if (!relationship.dissolution_sampled) {
+        const int pair = dissolution_schedules.size() == 1 ? 0 :
+          p.group + group_count * people[current_partner[i]].group;
+        relationship.dissolution_time = candidate(waiting_time(relationship.cohab ? cohab_dissolution_schedules[pair] : dissolution_schedules[pair],
+          now - relationship.start, threshold()), now);
+        relationship.dissolution_sampled = true;
+      }
+      // Retain the union clock through births, including a dissolution due now
+      // after a tied partnered birth. It is not a new zero-wait random draw.
+      dissolution_time = relationship.dissolution_time;
+    }
+    double conversion_time = R_PosInf;
+    if (cohab_enabled && !rates.conversion.empty() && p.female && current_partner[i] >= 0) {
+      auto& relationship = union_history[person_unions[i].back()];
+      if (relationship.cohab) {
+        if (!relationship.conversion_sampled) {
+          relationship.conversion_time = candidate(waiting_time(rates.conversion,
+            now - (rates.duration_conversion ? relationship.start : p.born), threshold()), now);
+          relationship.conversion_sampled = true;
+        }
+        conversion_time = relationship.conversion_time;
+      }
+    }
+    const double due = std::min(std::min(death_time, birth_time),
+      std::min(std::min(dissolution_time, conversion_time), search_time));
     const auto type = death_time <= due ? EventType::death :
-      (birth_time <= search_time ? EventType::birth : EventType::search);
+      (birth_time <= due ? EventType::birth :
+       (dissolution_time <= due ? EventType::dissolution :
+        (conversion_time <= due ? EventType::conversion : EventType::search)));
     if (due < end) queue.emplace(due, Event{i, type, version});
   };
   // Initialize one next event for each living person. Known age changes are
@@ -1303,7 +1563,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (i % 1024 == 0) checkUserInterrupt();
     schedule(i, start);
   }
-  double birth_count = 0, death_count = 0;
+  double birth_count = 0, death_count = 0, dissolution_count = 0, conversion_count = 0;
   unsigned long long processed = 0;
   // Process events in chronological order until no scheduled events remain.
   while (!queue.empty()) {
@@ -1314,6 +1574,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     queue.erase(next);
     const int i = event.person;
     if (event.version != event_versions[i]) continue;
+    if (intensity_tracker) intensity_tracker->advance(now);
     if (event.type == EventType::death) {
       // Retain the person's history, record death, and stop their scheduling.
       people[i].died = now;
@@ -1324,15 +1585,53 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         relationship.wife_died = i == relationship.wife;
         current_partner[relationship.wife] = -1;
         current_partner[relationship.husband] = -1;
+        if (!relationship.cohab) legal_previous[relationship.wife] = legal_previous[relationship.husband] = 2;
+        previous_union[relationship.wife] = relationship.cohab && !counts_cohab ? legal_previous[relationship.wife] : 2;
+        previous_union[relationship.husband] = relationship.cohab && !counts_cohab ? legal_previous[relationship.husband] : 2;
+        previous_union_end[relationship.wife] = previous_union_end[relationship.husband] = now;
         add_male(relationship.husband);
         add_counted_woman(relationship.wife, now);
         // Her old birth candidate is invalid once her husband has died.
-        if (rate_initiation && i == relationship.husband)
+        if ((rate_initiation || has_dissolution) && i == relationship.husband)
           schedule(relationship.wife, now);
       }
       if (!people[i].female) remove_male(i);
       else remove_counted_woman(i);
       ++death_count;
+    } else if (event.type == EventType::dissolution) {
+      const int partner = current_partner[i];
+      if (partner < 0) stop("Dissolution requires an ongoing union.");
+      UnionRecord& relationship = union_history[person_unions[i].back()];
+      relationship.end = now;
+      relationship.dissolved = true;
+      current_partner[i] = current_partner[partner] = -1;
+      if (!relationship.cohab) legal_previous[i] = legal_previous[partner] = 1;
+      previous_union[i] = relationship.cohab && !counts_cohab ? legal_previous[i] : 1;
+      previous_union[partner] = relationship.cohab && !counts_cohab ? legal_previous[partner] : 1;
+      previous_union_end[i] = previous_union_end[partner] = now;
+      add_male(partner);
+      add_counted_woman(i, now);
+      ++dissolution_count;
+      // Only her state-dependent birth/search hazards change. The man's death
+      // candidate remains valid, and the old episode no longer carries risk.
+      schedule(i, now);
+    } else if (event.type == EventType::conversion) {
+      const int partner = current_partner[i];
+      const int old = person_unions[i].back();
+      if (partner < 0 || !union_history[old].cohab) stop("Conversion requires an ongoing cohabitation.");
+      union_history[old].end = now;
+      union_history[old].converted = true;
+      const double prior_id = union_history[old].id;
+      if (next_union_id >= 9007199254740991.0 || union_history.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
+        stop("Union history exceeds supported ID or row limits.");
+      const int next = union_history.size();
+      union_history.push_back({++next_union_id, now, NA_REAL, i, partner});
+      union_history.back().converted_from = prior_id;
+      person_unions[i].push_back(next);
+      person_unions[partner].push_back(next);
+      if (diagnostics) diagnostic_log_weights.emplace_back(group_count, NA_REAL);
+      ++conversion_count;
+      schedule(i, now);
     } else if (event.type == EventType::search) {
       form_union(i, now);
       schedule(i, now);
@@ -1443,9 +1742,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       }
       person_unions.emplace_back();
       current_partner.push_back(-1);
+      previous_union.push_back(0);
+      legal_previous.push_back(0);
+      previous_union_end.push_back(NA_REAL);
       if (calibrator) {
         counted_woman.push_back(0);
-        counted_fertile.push_back(0);
         add_counted_woman(child, now);
       }
       event_versions.push_back(0);
@@ -1478,16 +1779,21 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   NumericVector out_uid(union_history.size()), out_wife(union_history.size());
   NumericVector out_husband(union_history.size()), out_start(union_history.size());
   NumericVector out_end(union_history.size());
-  CharacterVector out_reason(union_history.size());
+  CharacterVector out_reason(union_history.size()), out_type(union_history.size());
+  NumericVector out_from(union_history.size());
   CharacterVector input_reasons = unions["end_reason"];
   for (size_t u = 0; u < union_history.size(); ++u) {
     const UnionRecord& relationship = union_history[u];
+    out_type[u] = relationship.cohab ? "cohab" : "marriage";
+    out_from[u] = relationship.converted_from;
     out_uid[u] = relationship.id;
     out_wife[u] = people[relationship.wife].id;
     out_husband[u] = people[relationship.husband].id;
     out_start[u] = relationship.start;
     out_end[u] = relationship.end;
     if (NumericVector::is_na(relationship.end)) out_reason[u] = NA_STRING;
+    else if (relationship.converted) out_reason[u] = "conversion";
+    else if (relationship.dissolved) out_reason[u] = "dissolution";
     else if (u < static_cast<size_t>(unions.nrows())) {
       NumericVector input_ends = unions["end_time"];
       if (!NumericVector::is_na(input_ends[u])) out_reason[u] = input_reasons[u];
@@ -1497,11 +1803,17 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   DataFrame out_unions = DataFrame::create(_["union_id"] = out_uid,
     _["wife_id"] = out_wife, _["husband_id"] = out_husband,
     _["start_time"] = out_start, _["end_time"] = out_end, _["end_reason"] = out_reason);
+  if (cohab_enabled || unions.containsElementNamed("union_type"))
+    out_unions = DataFrame::create(_["union_id"] = out_uid, _["wife_id"] = out_wife,
+      _["husband_id"] = out_husband, _["start_time"] = out_start, _["end_time"] = out_end,
+      _["end_reason"] = out_reason, _["union_type"] = out_type,
+      _["previous_cohab_id"] = out_from);
   return List::create(_["persons"] = DataFrame::create(
     _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),
     _["groups"] = out_group, _["unions"] = out_unions, _["ancestry"] = out_ancestry,
     _["births"] = birth_count, _["deaths"] = death_count,
+    _["dissolutions"] = dissolution_count, _["conversions"] = conversion_count,
     _["weighted_infeasible"] = weighted_infeasible, _["draw_approximate"] = draw_approximate,
     _["diagnostic_log_weights"] = [&]() {
       // Rows are new unions in order; columns are group indices. Unions formed
@@ -1512,4 +1824,73 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
           out(u, g) = diagnostic_log_weights[u].empty() ? 0 : diagnostic_log_weights[u][g];
       return out;
     }());
+}
+
+// Deterministic validation hook for contribution updates. Operations use zero-
+// based person indices; no demographic event or RNG is involved.
+// [[Rcpp::export]]
+List inspect_intensity_tracker_cpp(NumericVector female_born, IntegerVector female_groups,
+                                   DataFrame search_rates, DataFrame fertility_rates,
+                                   NumericVector times, IntegerVector persons,
+                                   CharacterVector actions, IntegerVector previous,
+                                   NumericVector ready, int group_count,
+                                   Nullable<NumericVector> search_origins = R_NilValue,
+                                   Nullable<DataFrame> probability_rates = R_NilValue) {
+  const int n = female_born.size(), ops = times.size();
+  if (!ops || female_groups.size() != n || persons.size() != ops || actions.size() != ops ||
+      previous.size() != ops || ready.size() != ops) stop("Invalid intensity-tracker inputs.");
+  double lo = times[0], hi = times[ops - 1];
+  for (double born : female_born) lo = std::min(lo, born);
+  WeightCalibrator calibration(lo, hi, group_count, kWeightBinWidth, 0);
+  FemaleIntensityTracker tracker(calibration);
+  const bool stratified = search_rates.containsElementNamed("previous_union");
+  const int categories = stratified ? 3 : 1;
+  const std::array<std::string, 3> labels = {"none", "dissolved", "widowed"};
+  std::vector<std::vector<Band>> searches(group_count * categories), fertility(group_count);
+  for (int g = 0; g < group_count; ++g) {
+    fertility[g] = read_bands(fertility_rates, "", "", g);
+    for (int p = 0; p < categories; ++p)
+      searches[g * categories + p] = read_bands(search_rates, "", "", g,
+        stratified ? labels[p] : "", stratified && search_uses_duration(search_rates, labels[p]));
+  }
+  const bool split_types = probability_rates.isNotNull();
+  std::vector<std::vector<Band>> probabilities(group_count * 3);
+  if (split_types) {
+    DataFrame table(probability_rates);
+    const bool by_previous = table.containsElementNamed("previous_union");
+    for (int g = 0; g < group_count; ++g) for (int p = 0; p < 3; ++p)
+      probabilities[g * 3 + p] = read_bands(table, "", "", g, by_previous ? labels[p] : "");
+  }
+  NumericVector origins(ops, NA_REAL);
+  if (search_origins.isNotNull()) origins = NumericVector(search_origins);
+  if (origins.size() != ops) stop("Invalid search origins.");
+  List snapshots(ops);
+  IntegerVector pending(ops);
+  std::vector<bool> active(n, false);
+  for (int k = 0; k < ops; ++k) {
+    if (!R_finite(times[k]) || (k && times[k] < times[k - 1])) stop("Unordered tracker times.");
+    tracker.advance(times[k]);
+    const std::string action = as<std::string>(actions[k]);
+    const int person = persons[k];
+    if (person < 0 || person >= n || previous[k] < 0 || previous[k] > 2)
+      stop("Invalid intensity-tracker person or category.");
+    if (action == "activate") {
+      const int g = female_groups[person];
+      if (!active[person]) calibration.add_woman(g, female_born[person], 1);
+      active[person] = true;
+      tracker.activate(person, g, female_born[person],
+        &searches[g * categories + (stratified ? previous[k] : 0)], &fertility[g], ready[k], times[k], origins[k],
+        split_types ? &probabilities[g * 3 + previous[k]] : nullptr);
+    } else if (action == "remove") {
+      tracker.remove(person);
+      if (active[person]) calibration.add_woman(female_groups[person], female_born[person], -1);
+      active[person] = false;
+    }
+    else if (action == "ready") tracker.set_ready(person, ready[k], times[k]);
+    else if (action != "inspect") stop("Unknown intensity-tracker operation.");
+    snapshots[k] = calibration.intensity_snapshot(split_types);
+    pending[k] = tracker.pending();
+  }
+  return List::create(_["intensities"] = snapshots, _["pending"] = pending,
+    _["bins"] = calibration.bins(), _["first"] = std::floor(lo / kWeightBinWidth));
 }

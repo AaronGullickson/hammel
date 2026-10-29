@@ -1,8 +1,8 @@
 # Hammel documentation
 
-Updated October 27, 2026. Milestones 1 (mortality/fertility), 2 (union
-formation), and 3 (groups, matching, ancestry, and inheritance) are complete
-by user acceptance (D029, D050, D077). Current behavior uses
+Updated October 29, 2026. Milestones 1 (mortality/fertility), 2 (union
+formation), 3 (groups/matching/inheritance), and 4 (dissolution/remarriage/
+cohabitation) are complete by user acceptance (D029, D050, D077, D093). Current behavior uses
 continuous event times and midpoint fertility compensation, with no monthly
 time grid. Acceptance is based on the user-authored validation reports.
 Transition-aware fertility compensation and other deferred mechanisms remain
@@ -19,9 +19,10 @@ future work.
 | [Groups](groups.md) | Group-specific schedules, multipliers, newborn identity, and baseline sampling |
 | [Ancestry](ancestry.md) | Starting proportions, parental averaging, unknown shares, and restarts |
 | [Group inheritance](group-inheritance.md) | Built-in/custom identity rules, passing, and possible groups |
+| [Calibration intensity updates](calibration-intensity.md) | Actual female hazards, aggregate cells, and bookkeeping boundary queue (D082) |
 | [Weighted-choice matching](weighted-choice-matching.md) | Calibrated male-group weights and delta target adjustments (D074/D075) |
 | [Group matching](group-matching.md) | Symmetric pair effects and fixed group formula predictors |
-| [Demographic analysis](demographic-analysis.md) | Exposure, ASFR/ASMR, TFR, and life-table workflows |
+| [Demographic analysis](demographic-analysis.md) | Exposure, union/marriage/dissolution rates, TFR, and life tables |
 | [Testing and validation](testing.md) | Test commands, evidence, and remaining validation |
 | [Current handoff](session-handoff.md) | Recent findings, active work, and deferred issues |
 
@@ -35,6 +36,9 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | --- | --- |
 | [Waiting-time sampling](waiting-time-sampling.md) | Explanation of the current shared hazard sampler |
 | [Union-formation models](union-formation-models.md) | Implemented milestone 2 rules, matching defaults, diagnostics, and deferred work |
+| [Cohabitation](cohabitation.md) | Rate-mode type probabilities, type-specific matching/rates, conversion and histories (D085/D086) |
+| [Remarriage schedules](remarriage.md) | Age/duration previous-union search strata, calibration, and marriage observations (D080/D083) |
+| [Union dissolution](union-dissolution.md) | Milestone 4 duration hazards, female carrier, state changes, and worked examples (D078) |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
 | [Two-sex union models](two-sex-union-models.md) | Proposal notes: directional asymmetry, marriage squeeze, Schoen/Choo–Siow/Dagsvik models, API considerations (D073) |
 | [Future roadmap](roadmap.md) | Accepted milestones and future priorities with unresolved specifications |
@@ -43,6 +47,8 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [SOCSIM rates](socsim-rate-audit.md) | Pinned static source findings |
 | [SOCSIM competing events](socsim-competing-events-audit.md) | Pinned static scheduling findings |
 | [SOCSIM union formation](socsim-union-formation-audit.md) | Pinned static search, matching, and eligibility findings |
+| [SOCSIM dissolution and remarriage](socsim-dissolution-audit.md) | Pinned static divorce clocks, remarriage schedules, state updates, and cohabitation findings |
+| [SOCSIM cohabitation](socsim-cohabitation-audit.md) | Pinned static formation/type assignment, conversion, breakup, legal history and output trace |
 
 Git retains earlier specifications and verification records; do not keep
 snapshot copies in the docs tree. The decision log records rationale and
@@ -69,6 +75,14 @@ To inspect prior versions, use `git log -- docs` and
   weighted matching and delta, conditional-logit recovery, ancestry, built-in
   and custom inheritance, baseline sensitivity, and performance. Rendering
   downloads HMD inputs and runs substantial simulations and the test suite.
+- [Milestone 4 validation report](../validation/milestone4.qmd) and
+  [rendered assessment](../validation/milestone4.html): user-authored assessment
+  accepted October 29, 2026 (D093), covering dissolution, age/duration remarriage,
+  cohabitation, age/duration conversion, fertility by type, separate matching
+  roles, and performance. Rendering downloads HMD mortality and runs 100
+  independent-baseline replications per scenario plus the offline test suite.
+- [Validation directory guide](../validation/README.md): retained reports,
+  rate provenance, and supporting benchmark/conditional-choice evidence.
 The former `milestone1.R` and `milestone1_bootstrap.R` examples have been
 removed from the current tree; use Git history for those historical workflows.
 

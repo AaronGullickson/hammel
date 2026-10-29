@@ -18,7 +18,8 @@ marriage_rates <- read_csv(
 )
 fertility_rates_status <- read_csv(
   here("validation", "data", "england_wales_2015_fertility_by_union_status.csv")
-)
+) |>
+  rename(union_type = union_status)
 fertility_rates <- read_csv(
   here("validation", "data", "england_wales_2015_overall_fertility.csv")
 )
@@ -103,29 +104,34 @@ result$persons |>
   theme_bw()
 
 
-lexis <- calculate_lexis_counts(result, seq(2000, 2100, 5), seq(15, 65, 5), include_unions = TRUE)
+lexis <- calculate_demog_rates(result, seq(2000, 2100, 5), seq(15, 65, 5), by_union_type = TRUE)
+marriages <- calculate_union_rates(result, seq(2000, 2100, 5), seq(15, 65, 5)) |>
+  group_by(time_start, time_end, age_start, age_end, sex) |>
+  summarize(rate_union = if (sum(person_years) > 0)
+    sum(unions) / sum(person_years) else NA_real_, .groups = "drop")
+
 
 lexis |> calculate_tfr()
 
 
 asfr <- lexis |>
-  filter(sex == "f", union_status != "total") |>
-  select(time_start, time_end, age_start, age_end, union_status,
+  filter(sex == "f") |>
+  select(time_start, time_end, age_start, age_end, union_type,
          rate = rate_fertility)
 
 
 asfr |>
   filter(age_start >= 15 & age_start <=45, time_start > 2020) |>
-  group_by(union_status, age_start) |>
+  group_by(union_type, age_start) |>
   summarize(rate = mean(rate), .groups = "drop") |>
-  ggplot(aes(x = age_start, y = rate, group = union_status, color = union_status))+
+  ggplot(aes(x = age_start, y = rate, group = union_type, color = union_type))+
   geom_point()+
   geom_line(linetype = 2)+
   geom_line(data = fertility_rates_status)+
   theme_bw()
 
 lexis |>
-  filter(sex == "f", union_status == "total", age_start <= 45) |>
+  filter(sex == "f", union_type == "total", age_start <= 45) |>
   group_by(age_start) |>
   summarize(rate = mean(rate_fertility, na.rm = TRUE), .groups = "drop") |>
   ggplot(aes(x = age_start, y = rate))+
@@ -134,20 +140,19 @@ lexis |>
   geom_line(data = fertility_rates)+
   theme_bw()
 
-lexis |>
-  filter(sex == "f", union_status == "unpartnered") |>
+marriages |>
+  filter(sex == "f") |>
   group_by(age_start) |>
-  summarize(rate = mean(rate_marriage), .groups = "drop") |>
+  summarize(rate = mean(rate_union), .groups = "drop") |>
   ggplot(aes(x = age_start, y = rate))+
   geom_point()+
   geom_line(linetype = 2)+
   geom_line(data = marriage_rates)+
   theme_bw()
   
-lexis |>
-  filter(union_status == "unpartnered") |>
+marriages |>
   group_by(age_start, sex) |>
-  summarize(rate = mean(rate_marriage), .groups = "drop") |>
+  summarize(rate = mean(rate_union), .groups = "drop") |>
   ggplot(aes(x = age_start, y = rate, group = sex, color = sex))+
   geom_point()+
   geom_line()+

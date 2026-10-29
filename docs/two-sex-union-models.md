@@ -340,7 +340,9 @@ placeholders.
 
 The user identified unresolved connections:
 
-- Cohabitation (possibly milestone 4) would add union types and transitions.
+- Rate-mode cohabitation and conversion are implemented in milestone 4 (D086,
+  D093); their separate matching roles would need integration with any new
+  two-sex formation model.
 - Nonmarital father selection: setting harmonic-mean alphas for unions and
   conditional-logit odds ratios for unpartnered fathers would be inconsistent,
   so father selection, cohabitation and unpartnered partnering must be designed

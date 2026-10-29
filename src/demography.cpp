@@ -71,27 +71,34 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
   CharacterVector sex = persons["sex"];
   NumericVector wives = unions["wife_id"], husbands = unions["husband_id"];
   NumericVector starts = unions["start_time"], ends = unions["end_time"];
+  CharacterVector end_reasons = unions["end_reason"];
   const int nt = time_breaks.size() - 1, na = age_breaks.size() - 1;
   const R_xlen_t stride = static_cast<R_xlen_t>(nt) * na * 2;
   const R_xlen_t cells = stride * group_count;
-  NumericVector partnered(cells), formations(cells);
+  NumericVector partnered(cells);
   std::map<double, int> index;
   std::vector<std::vector<std::pair<double, double>>> episodes(ids.size());
+  // Dissolution follows a tied birth (D078). Keep these exact endpoints
+  // separately: merging intervals is correct for exposure, but loses reasons.
+  std::vector<std::vector<double>> dissolution_ends(ids.size());
   for (int i = 0; i < ids.size(); ++i) index[ids[i]] = i;
   for (int u = 0; u < starts.size(); ++u) {
     if (u % 1024 == 0) checkUserInterrupt();
+    if (!NumericVector::is_na(ends[u]) &&
+        !CharacterVector::is_na(end_reasons[u]) &&
+        as<std::string>(end_reasons[u]) == "dissolution")
+      dissolution_ends[index.at(wives[u])].push_back(ends[u]);
     for (double id : {wives[u], husbands[u]}) {
       const int i = index.at(id);
-      const int s = as<std::string>(sex[i]) == "m" ? 0 : 1;
       const double end = NumericVector::is_na(ends[u]) ? time_breaks[nt] : ends[u];
       episodes[i].push_back({starts[u], end});
-      const int t = demographic_bin(starts[u], time_breaks);
-      const int a = demographic_bin(starts[u] - born[i], age_breaks);
-      if (t >= 0 && a >= 0) formations[t + nt * (a + na * s) + stride * group_indices[i]] += 1;
+
     }
   }
   for (int i = 0; i < ids.size(); ++i) {
     if (i % 1024 == 0) checkUserInterrupt();
+    auto& dissolution_times = dissolution_ends[i];
+    std::sort(dissolution_times.begin(), dissolution_times.end());
     auto& intervals = episodes[i];
     std::sort(intervals.begin(), intervals.end());
     std::vector<std::pair<double, double>> merged;
@@ -147,7 +154,9 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
       [](double time, const std::pair<double, double>& interval) {
         return time < interval.first;
       });
-    const bool in_union = after != intervals.begin() && born[child] < std::prev(after)->second;
+    const auto& dissolution_times = dissolution_ends[mother];
+    const bool in_union = (after != intervals.begin() && born[child] < std::prev(after)->second) ||
+      std::binary_search(dissolution_times.begin(), dissolution_times.end(), born[child]);
     if (in_union) births_partnered[t + nt * (a + na) + stride * group_indices[mother]] += 1;
     else births_unpartnered[t + nt * (a + na) + stride * group_indices[mother]] += 1;
   }
@@ -155,6 +164,280 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
                       _["deaths_unpartnered"] = deaths_unpartnered,
                       _["births_partnered"] = births_partnered,
                       _["births_unpartnered"] = births_unpartnered,
-                      _["person_years_partnered"] = partnered,
-                      _["unions"] = formations);
+                      _["person_years_partnered"] = partnered);
+}
+
+// Union episodes, rather than persons: each record contributes exposure once.
+// Death ends its exposure but only non-death dissolution enters the numerator.
+// [[Rcpp::export]]
+List dissolution_counts_cpp(DataFrame unions, NumericVector time_breaks,
+                             NumericVector dur_breaks, IntegerVector group_indices,
+                             int group_count, Nullable<NumericVector> origins = R_NilValue,
+                             std::string event_reason = "dissolution") {
+  NumericVector starts = unions["start_time"], ends = unions["end_time"];
+  const NumericVector axis_origins = origins.isNotNull() ? NumericVector(origins) : starts;
+  CharacterVector reasons = unions["end_reason"];
+  const int nt = time_breaks.size() - 1, nd = dur_breaks.size() - 1;
+  const R_xlen_t stride = static_cast<R_xlen_t>(nt) * nd;
+  NumericVector exposure(stride * group_count), events(stride * group_count);
+  for (int u = 0; u < starts.size(); ++u) {
+    if (u % 1024 == 0) checkUserInterrupt();
+    const R_xlen_t offset = stride * group_indices[u];
+    const double end = NumericVector::is_na(ends[u]) ? time_breaks[nt] : ends[u];
+    for (int t = 0; t < nt; ++t) {
+      const double lo = std::max(starts[u], time_breaks[t]);
+      const double hi = std::min(end, time_breaks[t + 1]);
+      if (hi <= lo) continue;
+      for (int d = 0; d < nd; ++d) {
+        const double enter = std::max(lo, axis_origins[u] + dur_breaks[d]);
+        const double exit = std::min(hi, axis_origins[u] + dur_breaks[d + 1]);
+        if (exit > enter) exposure[offset + t + nt * d] += exit - enter;
+      }
+    }
+    if (NumericVector::is_na(ends[u]) || CharacterVector::is_na(reasons[u]) ||
+        as<std::string>(reasons[u]) != event_reason) continue;
+    const int t = demographic_bin(ends[u], time_breaks);
+    const int d = demographic_bin(ends[u] - axis_origins[u], dur_breaks);
+    if (t >= 0 && d >= 0) events[offset + t + nt * d] += 1;
+  }
+  return List::create(_["union_years"] = exposure, _["dissolutions"] = events);
+}
+
+// Exclusive histories for previous-union state. Sort by time and union ID so
+// input row order never changes status, including touching/zero-length episodes.
+struct MarriageEpisode {
+  double start, end, id;
+  int after;
+  bool cohab, conversion;
+};
+std::vector<std::vector<MarriageEpisode>> marriage_histories(DataFrame persons,
+                                                            DataFrame unions) {
+  NumericVector ids = persons["person_id"], died = persons["death_time"];
+  NumericVector wives = unions["wife_id"], husbands = unions["husband_id"];
+  NumericVector starts = unions["start_time"], ends = unions["end_time"], uids = unions["union_id"];
+  CharacterVector reasons = unions["end_reason"];
+  const bool typed = unions.containsElementNamed("union_type");
+  CharacterVector types;
+  if (typed) types = unions["union_type"];
+  std::map<double, int> index;
+  for (int i = 0; i < ids.size(); ++i) index[ids[i]] = i;
+  std::vector<std::vector<MarriageEpisode>> histories(ids.size());
+  for (int u = 0; u < starts.size(); ++u) {
+    const bool ongoing = NumericVector::is_na(ends[u]);
+    const double end = ongoing ? R_PosInf : ends[u];
+    const int after = !ongoing && as<std::string>(reasons[u]) == "dissolution" ? 1 : 2;
+    for (double id : {wives[u], husbands[u]}) {
+      const int i = index.at(id);
+      if (!NumericVector::is_na(died[i]) && (starts[u] > died[i] || end > died[i]))
+        stop("Previous-union histories cannot contain union events after a partner's death.");
+      histories[i].push_back({starts[u], end, uids[u], after,
+        typed && as<std::string>(types[u]) == "cohab",
+        !ongoing && as<std::string>(reasons[u]) == "conversion"});
+    }
+  }
+  for (auto& history : histories) {
+    std::sort(history.begin(), history.end(), [](const MarriageEpisode& a, const MarriageEpisode& b) {
+      return a.start < b.start || (a.start == b.start && a.id < b.id);
+    });
+    for (size_t u = 1; u < history.size(); ++u)
+      if (history[u].start < history[u - 1].end)
+        stop("Previous-union stratification requires nonoverlapping union histories for each person.");
+  }
+  return histories;
+}
+
+// Execution-only cache: complete supplied history determines the latest ending.
+// [[Rcpp::export]]
+List previous_union_info_cpp(DataFrame persons, DataFrame unions, bool counts_cohab = false) {
+  const auto histories = marriage_histories(persons, unions);
+  IntegerVector state(histories.size(), 0), legal(histories.size(), 0);
+  NumericVector ended(histories.size(), NA_REAL);
+  for (size_t i = 0; i < histories.size(); ++i)
+    for (const auto& episode : histories[i])
+      if (R_finite(episode.end) && !episode.conversion) {
+        if (!episode.cohab) legal[i] = episode.after;
+        state[i] = episode.cohab && !counts_cohab ? legal[i] : episode.after;
+        ended[i] = episode.end;
+      }
+  return List::create(_["previous_union"] = state, _["end_time"] = ended, _["legal_previous"] = legal);
+}
+
+// Existing internal snapshot interface for category-only validation.
+// [[Rcpp::export]]
+IntegerVector previous_union_state_cpp(DataFrame persons, DataFrame unions) {
+  return as<IntegerVector>(previous_union_info_cpp(persons, unions)["previous_union"]);
+}
+
+// [[Rcpp::export]]
+List marriage_counts_cpp(DataFrame persons, DataFrame unions,
+                         NumericVector time_breaks, NumericVector age_breaks,
+                         IntegerVector group_indices, int group_count,
+                         Nullable<NumericVector> dur_breaks = R_NilValue, bool counts_cohab = false,
+                         std::string entry_type = "pooled", bool marriage_measure = false) {
+  const auto histories = marriage_histories(persons, unions);
+  NumericVector born = persons["birth_time"], died = persons["death_time"];
+  CharacterVector sex = persons["sex"];
+  const int nt = time_breaks.size() - 1, na = age_breaks.size() - 1;
+  const bool by_duration = dur_breaks.isNotNull();
+  const NumericVector durations = by_duration ? NumericVector(dur_breaks) : age_breaks;
+  const int nd = durations.size() - 1;
+  const R_xlen_t age_cells = static_cast<R_xlen_t>(nt) * na * 2;
+  const R_xlen_t dur_cells = static_cast<R_xlen_t>(nt) * nd * 2;
+  const R_xlen_t stride = age_cells + 2 * dur_cells;
+  const R_xlen_t offsets[] = {0, age_cells, age_cells + dur_cells};
+  NumericVector exposure(stride * group_count), formations(exposure.size());
+  for (int i = 0; i < born.size(); ++i) {
+    if (i % 1024 == 0) checkUserInterrupt();
+    const int s = as<std::string>(sex[i]) == "m" ? 0 : 1;
+    const double life_end = NumericVector::is_na(died[i]) ? time_breaks[nt] : died[i];
+    auto add_exposure = [&](double lo, double hi, int previous) {
+      const bool duration = by_duration && previous > 0;
+      const NumericVector& breaks = duration ? durations : age_breaks;
+      const int bands = breaks.size() - 1;
+      const double origin = duration ? lo : born[i];
+      for (int t = 0; t < nt; ++t) {
+        const double start = std::max(lo, time_breaks[t]);
+        const double end = std::min({hi, life_end, time_breaks[t + 1]});
+        if (end <= start) continue;
+        for (int a = 0; a < bands; ++a) {
+          const double enter = std::max(start, origin + breaks[a]);
+          const double exit = std::min(end, origin + breaks[a + 1]);
+          if (exit > enter)
+            exposure[t + nt * (a + bands * s) + offsets[previous] + stride * group_indices[i]] += exit - enter;
+        }
+      }
+    };
+    int previous = 0, legal = 0;
+    bool converted_entry = false;
+    double available = born[i];
+    for (const auto& episode : histories[i]) {
+      add_exposure(available, episode.start, previous);
+      const int t = demographic_bin(episode.start, time_breaks);
+      const bool duration = by_duration && previous > 0;
+      const NumericVector& breaks = duration ? durations : age_breaks;
+      const int bands = breaks.size() - 1;
+      const double origin = duration ? available : born[i];
+      const int a = demographic_bin(episode.start - origin, breaks);
+      if ((marriage_measure ? !episode.cohab : !converted_entry) && t >= 0 && a >= 0 &&
+          (entry_type == "pooled" || (episode.cohab ? entry_type == "cohab" : entry_type == "marriage")))
+        formations[t + nt * (a + bands * s) + offsets[previous] + stride * group_indices[i]] += 1;
+      if (marriage_measure && episode.cohab)
+        add_exposure(episode.start, episode.end, previous);
+      available = episode.end;
+      converted_entry = episode.conversion;
+      if (!episode.conversion) {
+        if (!episode.cohab) legal = episode.after;
+        previous = episode.cohab && !counts_cohab ? legal : episode.after;
+      }
+    }
+    add_exposure(available, life_end, previous);
+  }
+  return List::create(_["person_years"] = exposure, _["unions"] = formations);
+}
+
+// Disjoint current-type demographic strata. Typed histories must be exclusive.
+// [[Rcpp::export]]
+List typed_demographic_counts_cpp(DataFrame persons, DataFrame unions,
+    NumericVector time_breaks, NumericVector age_breaks,
+    IntegerVector group_indices, int group_count, CharacterVector types) {
+  const auto histories = marriage_histories(persons, unions);
+  const int nt = time_breaks.size() - 1, na = age_breaks.size() - 1;
+  const R_xlen_t stride = static_cast<R_xlen_t>(nt) * na * 2;
+  const R_xlen_t cells = stride * group_count;
+  NumericVector exposure(cells * types.size()), deaths(exposure.size()), births(exposure.size());
+  CharacterVector union_types = unions["union_type"];
+  Function subset("[.data.frame");
+  for (int k = 0; k < types.size(); ++k) {
+    LogicalVector rows(unions.nrows());
+    for (int u = 0; u < unions.nrows(); ++u) rows[u] = union_types[u] == types[k];
+    DataFrame selected = subset(unions, rows, R_MissingArg, Named("drop") = false);
+    List x = union_counts_cpp(persons, selected, time_breaks, age_breaks, group_indices, group_count);
+    NumericVector years = x["person_years_partnered"];
+    std::copy(years.begin(), years.end(), exposure.begin() + cells * k);
+  }
+  NumericVector ids = persons["person_id"], born = persons["birth_time"], died = persons["death_time"], mothers = persons["mother_id"];
+  CharacterVector sexes = persons["sex"];
+  std::map<double, int> index;
+  for (int i = 0; i < ids.size(); ++i) index[ids[i]] = i;
+  auto classify = [&](int person, double time, bool birth) {
+    const MarriageEpisode* active = nullptr;
+    for (const auto& e : histories[person]) {
+      // Birth precedes dissolution and conversion at exact ties.
+      if (birth && e.end == time && (e.conversion || e.after == 1)) {
+        active = &e;
+        break;
+      }
+      if (birth ? (e.start <= time && time < e.end) : (e.start < time && time <= e.end))
+        active = &e;
+    }
+    if (!active) return -1;
+    const std::string label = active->cohab ? "cohab" : "marriage";
+    for (int k = 0; k < types.size(); ++k) if (as<std::string>(types[k]) == label) return k;
+    return -1;
+  };
+  for (int i = 0; i < ids.size(); ++i) {
+    if (i % 1024 == 0) checkUserInterrupt();
+    int t = demographic_bin(died[i], time_breaks), a = demographic_bin(died[i] - born[i], age_breaks);
+    if (t >= 0 && a >= 0) {
+      const int k = classify(i, died[i], false);
+      const int sex = as<std::string>(sexes[i]) == "m" ? 0 : 1;
+      if (k >= 0) deaths[cells * k + t + nt * (a + na * sex) + stride * group_indices[i]] += 1;
+    }
+    t = demographic_bin(born[i], time_breaks);
+    if (t < 0 || NumericVector::is_na(mothers[i])) continue;
+    const int mother = index.at(mothers[i]);
+    a = demographic_bin(born[i] - born[mother], age_breaks);
+    if (a < 0) continue;
+    const int k = classify(mother, born[i], true);
+    if (k >= 0) births[cells * k + t + nt * (a + na) + stride * group_indices[mother]] += 1;
+  }
+  return List::create(_["person_years"] = exposure, _["births"] = births, _["deaths"] = deaths);
+}
+
+// Row selection for parent-enriched father-choice observations. Merge union
+// coverage so duplicate/overlapping episodes never duplicate births.
+// [[Rcpp::export]]
+IntegerVector unpartnered_birth_rows_cpp(DataFrame persons, DataFrame unions) {
+  NumericVector ids = persons["person_id"], born = persons["birth_time"],
+    mothers = persons["mother_id"], fathers = persons["father_id"];
+  NumericVector wives = unions["wife_id"], starts = unions["start_time"], ends = unions["end_time"];
+  CharacterVector reasons = unions["end_reason"];
+  std::map<double, int> index;
+  for (int i = 0; i < ids.size(); ++i) index[ids[i]] = i;
+  std::vector<std::vector<std::pair<double, double>>> coverage(ids.size());
+  std::vector<std::vector<double>> birth_first_ends(ids.size());
+  for (int u = 0; u < starts.size(); ++u) {
+    if (u % 1024 == 0) checkUserInterrupt();
+    const int mother = index.at(wives[u]);
+    coverage[mother].push_back({starts[u], NumericVector::is_na(ends[u]) ? R_PosInf : ends[u]});
+    if (!NumericVector::is_na(ends[u]) && !CharacterVector::is_na(reasons[u])) {
+      const std::string reason = as<std::string>(reasons[u]);
+      if (reason == "dissolution" || reason == "conversion") birth_first_ends[mother].push_back(ends[u]);
+    }
+  }
+  for (size_t i = 0; i < coverage.size(); ++i) {
+    auto& intervals = coverage[i];
+    std::sort(intervals.begin(), intervals.end());
+    std::vector<std::pair<double, double>> merged;
+    for (const auto& interval : intervals) {
+      if (merged.empty() || interval.first > merged.back().second) merged.push_back(interval);
+      else merged.back().second = std::max(merged.back().second, interval.second);
+    }
+    intervals = std::move(merged);
+    std::sort(birth_first_ends[i].begin(), birth_first_ends[i].end());
+  }
+  std::vector<int> rows;
+  for (int child = 0; child < ids.size(); ++child) {
+    if (child % 1024 == 0) checkUserInterrupt();
+    if (NumericVector::is_na(mothers[child]) || NumericVector::is_na(fathers[child])) continue;
+    const int mother = index.at(mothers[child]);
+    const auto& intervals = coverage[mother];
+    const auto after = std::upper_bound(intervals.begin(), intervals.end(), born[child],
+      [](double time, const std::pair<double, double>& interval) { return time < interval.first; });
+    const auto& ties = birth_first_ends[mother];
+    const bool partnered = (after != intervals.begin() && born[child] < std::prev(after)->second) ||
+      std::binary_search(ties.begin(), ties.end(), born[child]);
+    if (!partnered) rows.push_back(child + 1);
+  }
+  return wrap(rows);
 }

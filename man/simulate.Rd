@@ -2,13 +2,14 @@
 % Please edit documentation in R/simulate.R
 \name{simulate}
 \alias{simulate}
-\title{Run a fertility and mortality simulation}
+\title{Run a demographic simulation}
 \usage{
 simulate(model, years, seed = NULL)
 }
 \arguments{
 \item{model}{A \code{hammel_model} containing a population, mortality, fertility,
-and union-formation processes. The population must have a finite \code{end_time}.}
+and union-formation processes, optionally union dissolution. The population
+must have a finite \code{end_time}.}
 
 \item{years}{Nonnegative simulation duration in years.}
 
@@ -17,7 +18,8 @@ restored afterward. With \code{NULL}, the simulation advances the current RNG.}
 }
 \value{
 A \code{hammel_population} with updated histories and endpoint, plus a
-\code{simulation} component recording run settings and birth/death counts.
+\code{simulation} component recording run settings and birth/death counts, plus
+\code{dissolutions} when a dissolution process is configured.
 }
 \description{
 Advance a configured model and return a population that can initialize a
@@ -25,7 +27,7 @@ later run. The C++ engine samples candidate waiting times across age bands,
 executes at continuous times, and prioritizes death over birth on exact ties.
 Events execute chronologically. In on-demand mode all living females face the
 fertility schedule. Rate mode uses either overall rates for all women (with
-a warning), or separate \code{union_status} schedules. A union-formation process is required. With on-demand
+a warning), or separate \code{union_type} schedules. A union-formation process is required. With on-demand
 union formation, use the woman's
 current partner, or draw one from all eligible men using conditional-logit
 probabilities from the matching formula to form a union at the birth.
@@ -34,7 +36,9 @@ Known kin are excluded within the configured generation bound on each side
 of a common ancestor (default two). Hard group exclusions also apply.
 If no eligible man exists, cancel the birth by default. Explicitly set
 \code{cancel_birth_if_no_match = FALSE} to preserve it with unknown father.
-Rate initiation adds age-specific search events for unpartnered women only.
+Rate initiation adds age- or duration-specific search events for unpartnered
+women only. Duration schedules for dissolved/widowed categories measure time
+since the most recent union ended; \code{none} remains age-specific.
 Failed attempts draw another waiting time. Widowhood cancels pending births
 and switches to unpartnered fertility; a new union switches to partnered
 fertility, preserving birth spacing. Unpartnered births do not trigger searches
@@ -44,10 +48,22 @@ forming a union or reserving the man.
 A failed match cancels the birth unless explicitly allowed by the union process.
 Cancellation starts no new birth-spacing interval. On-demand mode rejects
 status schedules.
+Optional \code{\link[=union_dissolution]{union_dissolution()}} adds one duration-dependent annual union hazard
+carried by the woman. It preserves the pending dissolution through births,
+ends the episode with \code{end_reason = "dissolution"}, and restores unpartnered
+availability and fertility/search eligibility. Exact same-person ties select
+death, birth, dissolution, then search. Dissolution \code{group_pair} schedules and
+multipliers use symmetric pairings of both partners' groups. Rate-based
+formation optionally selects age/duration schedules using \code{previous_union}:
+none, dissolved, or widowed. Duration origins and categories are recovered
+from recorded histories.
 Matching uses male-group weights recalibrated at each search; simulation
 warns once if any search needed approximate weights. A separate father model
 has its own preferences and delta target adjustments. Event initiation is
-unchanged.
+unchanged. Optional cohabitation uses rate mode only: type is selected from
+\code{cohab_prob} before marriage/cohabitation-specific matching. Conversion retains
+partners and creates linked episodes, with same-person ties ordered death,
+birth, dissolution, conversion, search. Fertility input strata use \code{union_type}.
 }
 \details{
 Minimum birth spacing is configured in \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}

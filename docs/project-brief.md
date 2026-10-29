@@ -1,8 +1,9 @@
 # Hammel project brief
 
-Updated October 27, 2026. The user accepted milestone 1 (mortality/fertility)
+Updated October 29, 2026. The user accepted milestone 1 (mortality/fertility)
 on October 15, 2026 (D029), milestone 2 (union formation) on October 19,
-2026 (D050), and milestone 3 (groups) on October 27, 2026 (D077).
+2026 (D050), milestone 3 (groups) on October 27, 2026 (D077), and milestone 4
+(dissolution/remarriage/cohabitation) on October 29, 2026 (D093).
 See [testing](testing.md) for evidence and limits.
 
 ## Purpose
@@ -99,11 +100,28 @@ belongs to the user; completion does not establish universal accuracy or remove
 sparse-cell, calibration, or fertility-transition limitations. Weighted matching
 does not model marriage squeezes; fuller two-sex models remain future work.
 
-The [roadmap](roadmap.md) records proposed dissolution/remarriage, parity,
+The [roadmap](roadmap.md) records proposed parity,
 time-varying inputs, group transitions, summaries, and migration work. No future
 feature is authorized by milestone completion. Fixed newborn assignment was
 explicitly deferred to the group-transitions discussion; custom inheritance
 already supports assignment of mixed-parent births to a specified category.
+
+## Milestone 4 complete
+
+The user accepted milestone 4 on October 29, 2026 (D093), based on the
+[final validation report](../validation/milestone4.qmd). Its scope includes
+optional duration-dependent dissolution (D078), with
+annual hazards and one female-carried clock per union, symmetric group-pair
+schedules/multipliers (D079), and birth before dissolution on exact same-person
+ties. See [union dissolution](union-dissolution.md). Search schedules optionally stratify by `previous_union`
+(D080) and select age or duration since the latest ending per category in one
+rate table (D083); see [remarriage](remarriage.md). Optional rate-mode cohabitation adds type selection, separate matching,
+type-specific rates and same-partner conversion (D085/D086); see
+[cohabitation](cohabitation.md). Separate demographic, partnership-entry,
+marriage-entry, dissolution and conversion observations use their documented
+risk denominators. `get_unpartnered_births()` supports father-matching assessment.
+Acceptance retains the documented fertility-transition, sparse-pool,
+initialization, and calibration limitations; it does not authorize later work.
 
 ## Boundaries and future work
 
@@ -111,7 +129,7 @@ C++17/Rcpp is selected and implemented for the first engine (D019); tibble is
 used at the R boundary (D023). Package metadata and licensing are not yet ready
 for release. A universal simulation framework and legacy compatibility are not
 requirements. Union formation and matching are implemented and milestone 2 is complete. Custom
-process execution, non-death union dissolution, and richer initialization remain
+process execution and richer initialization remain
 future work, not automatically authorized features.
 
 The user has postponed finding an African historical alternative to USA/2000.

@@ -21,7 +21,7 @@ test_that("both initiation modes cancel unmatched births unless explicitly allow
     if (mode == "rate") {
       model <- set_union_formation(model, mode, model$processes$union_formation$matching,
         rates = data.frame(age_start = 15, age_end = Inf, rate = 1))
-      model <- set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
+      model <- set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
         age_start = 15, age_end = 50, rate = 20), 0)
     }
     model$processes$union_formation$cancel_birth_if_no_match <- TRUE
@@ -48,7 +48,7 @@ test_that("cancelled attempts do not create spacing, IDs or kinship and can late
     if (mode == "rate") {
       model <- set_union_formation(model, "rate", model$processes$union_formation$matching,
         rates = data.frame(age_start = 0, age_end = Inf, rate = 0))
-      model <- set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
+      model <- set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
         age_start = 15, age_end = 50, rate = 1), 0.9)
     }
     model$processes$union_formation$cancel_birth_if_no_match <- TRUE
@@ -87,7 +87,7 @@ test_that("default cancellation covers samples rejected by eligibility in both m
       if (mode == "rate") {
         model <- set_union_formation(model, "rate", matching,
           rates = data.frame(age_start = 0, age_end = Inf, rate = 0))
-        model <- set_fertility(model, data.frame(union_status = c("partnered", "unpartnered"),
+        model <- set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
           age_start = 15, age_end = 50, rate = 20), 0)
       } else model <- set_union_formation(model, "on_demand", matching)
       expect_true(model$processes$union_formation$cancel_birth_if_no_match)

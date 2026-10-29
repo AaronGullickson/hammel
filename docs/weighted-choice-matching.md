@@ -62,8 +62,8 @@ At each search time t, with no execution step and no random draws:
    are about to need a partner now. For each living, unpartnered woman w at or
    above `min_male_age`, lambda[w] is her current chance per year of
    triggering a partner search:
-   - union searches in rate mode: her search hazard at her current age, after
-     group multipliers;
+   - union searches in rate mode: her search hazard at her current age and, when supplied,
+     `previous_union` category, after group multipliers;
    - on-demand union formation: her adjusted unpartnered fertility hazard,
      because a birth triggers the search;
    - nonmarital father selection in rate mode: the same fertility hazard.
@@ -90,6 +90,15 @@ At each search time t, with no execution step and no random draws:
    convex objective, warm-started from the previous search's weights, until
    every share is within 1e-10. Expected flow shares rise monotonically with a
    group's own weight, so a solution is unique when it exists.
+
+The engine now maintains actual current hazard contributions per unpartnered
+woman (D082). These are summed into group/birth-cohort cells before solving;
+previous union and other rate predictors do not require separate matching
+rows. Separate marriage and fertility-driven totals share a boundary-update
+queue. Female counts and mirrored male targets keep their existing definition;
+there are no male previous-category targets. See
+[current-hazard contributions](calibration-intensity.md) for timing and state
+updates and [remarriage](remarriage.md) for schedule selection.
 
 ### Objective and uniqueness
 
@@ -168,14 +177,15 @@ calibration, driven by fertility.
 ### Numerical representation
 
 The engine keeps counts of unpartnered men and women by group and 0.25-year
-birth-time bin, and of women past their birth-spacing interval. Counts change
-only at events (birth, death, formation, widowhood) and when a queued spacing
-interval ends; restarts rebuild them from histories. At a search, each bin's
-centre age (current time minus centre birth time) determines whether the whole
-bin is at or above the age cutoff, for both sexes. A bin's intensity uses the
-average hazard over its full quarter-year age span, so rate bands narrower than
-a bin or edges inside it are not missed (D071); the only remaining
-approximation is how births are spread within a bin.
+birth-time bin. It maintains each woman's actual current search and eligible
+fertility hazards, summed into those cells. A boundary queue updates hazards at
+age-band starts/ends and birth-spacing releases; pool and state changes replace
+or remove contributions and pending entries. There is at most one pending
+entry per counted woman. Updates consume no randomness and do not reschedule
+individual demographic events. Restarts rebuild the state from histories.
+At each search, bin-centre age still determines whole-bin cutoff eligibility
+for both sexes. Female hazard contributions use actual ages, including within
+narrow bands and gaps, replacing the previous full-bin hazard averaging (D082).
 
 Pair utilities depend only on the lag between bin centres, which equals male
 age minus female age. A table over every lag in the run's birth-time range is
@@ -184,8 +194,8 @@ on that grid. The formula must therefore give finite values at every such lag.
 Bin width is a numerical tolerance, not a demographic parameter. Candidate
 selection itself uses exact ages. Remaining binning approximations are the
 whole-bin age cutoff and pair utilities at bin-centre ages (gap error up to
-about 0.25 years, which matters only for very sharp age preferences). With
-one-year rate bands and a 5-year half-weight distance, default bins gave B
+about 0.25 years, which matters only for very sharp age preferences). In the
+earlier age-band-averaged implementation, with one-year rate bands and a 5-year half-weight distance, default bins gave B
 log weights within 0.0001 to 0.0003 of an exact person-level calculation;
 0.01-year bins agreed to within 0.00001 (October 23, 2026).
 

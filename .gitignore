@@ -11,3 +11,7 @@ src/*.dll
 validation/*_files/
 validation/.cache/
 validation/.quarto/
+
+# Quarto execution intermediates; keep final QMD/HTML reports.
+validation/*.rmarkdown
+validation/*.knit.md

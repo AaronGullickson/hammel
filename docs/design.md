@@ -1,7 +1,7 @@
 # Design and implemented interface
 
-Updated October 27, 2026. Milestones 1–3 are complete by user acceptance
-(D029, D050, D077). This document describes implemented architecture.
+Updated October 29, 2026. Milestones 1–4 are complete by user acceptance
+(D029, D050, D077, D093). This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
 The [scientific contract](scientific-contract.md) defines demographic semantics.
 
@@ -14,7 +14,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Ancestry schema and initialization | `R/ancestry.R` |
 | Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
 | Mortality/fertility specification and rate validation | `R/set_process.R` |
-| Union process construction and formula matching | `R/union_formation.R` |
+| Union formation/matching and dissolution specifications | `R/union_formation.R`, `R/union_dissolution.R` |
 | Shared kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/kinship.R` |
 | HMD/HFD downloads and preparation | `R/construct_demographic_rates.R` |
 | Simulation validation, RNG isolation, result assembly | `R/simulate.R` |
@@ -79,7 +79,8 @@ Mortality constructors permit partial nonoverlapping schedules, but simulation
 requires complete coverage. Fertility bands must be finite; gaps have zero risk
 at execution. Time-varying rate columns are rejected. Arbitrary named process
 specifications can be stored; execution supports mortality/fertility and the
-conditional-logit on-demand and rate-based union processes. Other processes are rejected.
+conditional-logit on-demand and rate-based union formation plus optional
+duration-dependent union dissolution. Other processes are rejected.
 
 ## Execution and output
 
@@ -94,7 +95,8 @@ histories and existing extra person columns. Newborn group identity follows
 the fertility inheritance model (random parent by default, with maternal fallback); other custom attributes are
 missing. Group-specific schedules and baseline group sampling are documented in
 [groups](groups.md). The `simulation` component records `start_time`, `end_time`,
-`birth_interval`, `ffab`, `births`, and `deaths` for the latest run.
+`birth_interval`, `ffab`, `births`, and `deaths` for the latest run, plus
+`dissolutions` when that optional process is configured.
 
 Grouped populations also have an `ancestry` tibble, or may supply it explicitly
 to `hammel_population(ancestry = ...)`. Initialization uses recorded identities
@@ -109,6 +111,32 @@ components; it does not traverse the genealogy or draw random numbers. See
 With an explicit seed, R's RNG state is restored after the call. With no seed,
 the current state advances normally. See the scientific contract for ties,
 run boundaries, parent assignment, and resampling.
+
+## Union-history observations
+
+`calculate_dissolution_rates()` returns union-years, dissolution counts and rates
+by calendar period and elapsed duration, optionally by symmetric `group_pair`
+strata (A:B includes both partner directions).
+The native `dissolution_counts_cpp()` splits recorded episodes directly at
+period/duration boundaries. This counts each episode once rather than summing
+both partners' exposure. Death censors dissolution exposure without entering
+its numerator. See [demographic analysis](demographic-analysis.md).
+
+## Union dissolution
+
+`set_union_dissolution(model, rates, group_prop_hazard = NULL)` attaches the
+optional duration-hazard process (D078). Public bands use `dur_start` and
+`dur_end`; preparation maps a private copy to the shared `Band` sampler. The
+couple's unordered group pair selects schedules and proportional multipliers
+(D079). Public `group_pair` labels are normalized; private lookup uses both
+partners' identity indices.
+Each active union stores one sampled dissolution date, retained through births.
+Her next-event selection competes that date with death/birth; birth wins a tie,
+then dissolution can execute at the same instant. Death closes the union and
+invalidates that risk. Dissolution restores both partners' availability and
+reschedules her status-dependent hazards; the man's death event stays valid.
+The process is absent by default, consuming no additional random draws then.
+See [union dissolution](union-dissolution.md) for examples and deferred scope.
 
 ## Newborn identity configuration
 
@@ -145,13 +173,34 @@ return rate tibbles, without configuring a model. Users can save/load them with
 RDS and reuse them without downloads. HMDHFDplus is optional for these helpers.
 There is no automatic disk cache or rate refresh.
 
-`calculate_lexis_counts()`, `calculate_tfr()`, `calculate_life_table()`, and
+`calculate_demog_rates()`, `calculate_tfr()`, `calculate_life_table()`, and
 `calculate_population_size()` operate on inspectable outputs. See
 [demographic analysis](demographic-analysis.md) for exposure, missing cells,
-replications, and age alignment. `calculate_lexis_counts(include_unions = TRUE)`
-returns overall/partnered/unpartnered rows with exposure, births, deaths, and
-rates. Union counts and marriage rates appear only on unpartnered rows,
-using the recorded union histories (D046/D047).
+replications, and age alignment. `calculate_demog_rates(by_union_type = TRUE)`
+returns unpartnered and discovered union-type rows with exposure, births,
+deaths, and fertility/mortality rates, without an overall row. Untyped histories
+use partnered/unpartnered. `calculate_union_rates()` separately returns
+unpartnered exposure, union starts, and partnership-entry rates by sex,
+excluding conversions.
+`by_previous_union = TRUE` adds previous categories; `by_group = TRUE` independently
+adds individual groups. Both default to FALSE (D080). Optional `dur_breaks`
+automatically separates previous categories and measures dissolved/widowed rows
+by duration, leaving none rows by age (D084). It requires exclusive union histories.
+Rate-mode input schedules optionally use the same `previous_union` categories;
+see [remarriage](remarriage.md) for initialization and calibration details.
+
+`calculate_marriage_rates()` instead counts direct marriages and conversions
+against unpartnered plus cohabiting years. It supports age, group and previous
+categories, without duration bands. `calculate_dissolution_rates()` reports
+non-death dissolution per union-year, optionally by symmetric pair and union
+type. `calculate_cohab_convert_rate()` reports conversion per cohabitation
+year by duration or woman's age, optionally by woman's group. These risk
+sets differ and must not be treated as interchangeable search-rate estimates.
+
+`get_unpartnered_births()` extracts known-parent births outside either union
+type, adding parent ages/groups for father-matching assessment. Each birth is
+retained, including repeated parental pairs. Birth-first dissolution/conversion
+boundaries and half-open ordinary coverage match demographic observations.
 
 `get_detailed_unions(population)` returns a separate tibble preserving union
 records and appending each partner's birth/death time and optional group, with
@@ -171,7 +220,7 @@ not reconstructions of past group transitions. Validation uses shuffled IDs,
 fractional ages, siblings, unknown/deceased parents, optional groups, empty
 tables, and unchanged inputs.
 
-`calculate_lexis_counts(by_group = TRUE)` and
+`calculate_demog_rates(by_group = TRUE)` and
 `calculate_population_size(by_group = TRUE)` optionally split observations by
 recorded group. The native count kernels retain full histories and add a group
 axis to their output arrays, preserving cross-group parent and spouse links.
@@ -183,7 +232,7 @@ TFR and life-table calculations automatically retain input group strata. See
 These remain proposals or unresolved requirements:
 
 - Custom process execution and permitted state mutations/invalidation.
-- Non-death union dissolution, poor-pool waiting, previous-father continuity,
+- Poor-pool waiting, previous-father continuity,
   and transition-aware fertility compensation; see [union formation](union-formation-models.md)
   and the [roadmap](roadmap.md).
 - Heterogeneity, parity-specific fertility, and user-defined newborn attributes.
@@ -215,7 +264,13 @@ his selection score in the exact draw.
 `WeightCalibrator` in `src/simulate.cpp` keeps unpartnered counts by group and
 birth-time bin and incrementally maintained pool sums for each matching model's
 table of utilities over bin-centre lags, updated at events, and solves the
-weights at each search from those sums. Matching models carry
+weights at each search from those sums. `FemaleIntensityTracker` maintains
+individual current search/fertility contributions and their group/cohort totals,
+with one queued next age/duration/spacing boundary per counted woman
+(D082/D083). Search clock origins are separate from fertility birth times. State
+changes replace contributions; searches do not scan all women or enumerate a
+cross-classification of rate predictors. See
+[current-hazard contributions](calibration-intensity.md). Matching models carry
 `delta` (omitted groups default to zero). One group gives unit weights and female
 choice exactly. See [weighted-choice matching](weighted-choice-matching.md).
 
@@ -296,3 +351,14 @@ quadratic utility model. `diagnostics = TRUE` adds weighted choice's applied
 `.log_weight_<group>` columns to new union records in grouped populations,
 without consuming random draws. Diagnostics default off; see the
 [union specification](union-formation-models.md#optional-union-diagnostics).
+
+
+## Typed partnerships (D086)
+
+Optional cohab_prob on union formation enables cohab/marriage histories in rate
+mode. Cohab matching and conversion are part of that process; dissolution
+optionally stratifies by type. See [cohabitation](cohabitation.md) for complete
+inputs, chronology, linked episodes, legal-history recovery and observations.
+Fertility input strata are now union_type (the old input union_status errors).
+The contribution cache has marriage-search, father and cohab-search channels;
+preference tables may be shared, but role weights use each role's intensity.

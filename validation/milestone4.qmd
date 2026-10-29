@@ -1,0 +1,1002 @@
+---
+title: "Hammel: Milestone 4 Validation"
+author: "Aaron Gullickson"
+date: today
+format:
+  html:
+    toc: true
+    toc-expand: 1
+    toc-depth: 3
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    self-contained: true
+params:
+  n_replications: 100
+  initial_population: 50000
+  years: 100
+  burn_in: 25
+execute:
+  eval: true
+  echo: true
+  warning: true
+  error: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(here)
+# Optimized development build; rendering does not install the package.
+devtools::load_all(debug = FALSE, recompile = TRUE)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(purrr)
+library(ggplot2)
+library(gt)
+theme_set(theme_bw())
+stopifnot(params$n_replications >= 1, params$initial_population >= 2,
+          params$years > params$burn_in, params$burn_in >= 0)
+```
+
+```{r}
+#| label: functions
+
+run_replication <- function(replication, model, grouped = FALSE) {
+  set.seed(410000L + replication)
+  population <- if (grouped) {
+    create_baseline_population(params$initial_population, 50, 2000, group_weights = c(A = 1, B = 1))
+  } else {
+      create_baseline_population(params$initial_population, 50, 2000)
+    }
+  model <- model |> set_population(population)
+  time <- system.time(result <- simulate(model, params$years, 420000L + replication))[["elapsed"]]
+  result$runtime <- time
+  return(result)
+}
+```
+
+## Purpose and scope
+
+This report assesses milestone 4 which implements union dissolution, remarriage, and cohabitation.
+
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| Dissolution rates | Output mean rates, with and without groups, versus supplied schedules or multiplied input rates | Output rates should match closely to input rates, adjusting for sampling variability |
+| Remarriage rates | Output mean rates by age and duration versus supplied schedules | Output rates should match closely to input rates, adjusting for sampling variability  |
+| Share of cohabitations among unions | Observed share of cohabitations among unions over time | Share should stability over time |
+| Cohabitation conversion rates | Output mean rates by age and duration versus supplied schedules | Output rates should match closely to input rates, adjusting for sampling variability  |
+| ASFR | Output mean rates by age and union type versus supplied schedules | Output rates should match closely to input rates, adjusting for sampling variability |
+| Log odds ratios | Observed mean log odds ratio of intergroup unions by union type  vs. input exogamy values | log odds ratios should be double the input exogamy values|
+| Accounting and implementation | Existing tests | Successful unit tests |
+
+
+## Overview of design
+
+### Dissolution
+
+Union dissolution rates can be specified in the `set_union_dissolution()` function. These dissolution rates must be specified as duration dependent where duration is years since the beginning of the union. The `dur_start` and `dur_end` columns replace the `age_start` and `age_end` columns in the rate table but the table is otherwise identical in structure to other rate schedules. The table can also be stratified by symmetric group pairs (e.g. "A:B" for groups A and B).
+
+Union dissolution is a characteristic of the union rather than individuals. For convenience, we apply the dissolution waiting time to women and not men. Applying it to both partners would create a double jeopardy problem. If dissolution ties with a birth, the birth wins.
+
+For simulations with cohabitation, users can also stratify dissolution rates by the `union_type` where the two expected values are `cohab` and `marriage`. If not stratified, marriages and cohabitations of the same duration will share the same dissolution rate.
+
+### Remarriages
+
+Marriage rates can be stratified by a `previous_union` variable where the expected values are `none`, `dissolved`, and `widowed`.
+
+The dissolved and widowed cases can also be specified as duration dependent rather than age dependent using the same structure as for dissolution. These are all stacked into a single tibble/data.frame where the `dur` or `age` columns are NA when not in use.
+
+This approach complicated our existing technique for tracking female search intensity for the weighted choice method in union formation. To make this more efficient, we switched to tracking the current hazard rate of a search for every living woman in the simulation. This is updated at event changes and when a woman hits an age/duration boundary in the respective rates. This allows us to flexibly define that current hazard rate and then we just sum it up across the small ages and groups to get the bins we need to estimate the weights. Tests demonstrated that this change did not increase processing time.
+
+### Cohabitation
+
+Cohabitation is included using a technique similar to SOCSIM. Users can enter a data.frame into the `cohab_prob` in the `union_formation` process. This data.frame has the same structure as the rate data.frames. It is banded by `age_start` and `age_end` columns and can also be stratified by group and previous union if desired. The key column is the `prob` column which gives the probability that a union of this type will be a cohabitation instead of a marriage. Essentially, instead of creating a full competing cohabitation process, we just divide the overall union formation rate into its cohabitation and direct marriage rates.
+
+Cohabitations can be dissolved using the dissolution rules described above. For cohabitations that do not dissolve, we need some model to transition them to marriage. This is defined by the `union_convert_rate` argument where users can enter a rate table that is either banded by age or duration, and can be stratified by group. This defines rates that are used to create the event of transitioning from cohabitation to marriage.
+
+Users can also specify fertility rates that are fully stratified by union type using the `union_type` variable. Users should either use `unpartnered` and `partnered` (both marriages and cohabitations) or `unpartnered`, `cohab`, and `marriage`.
+
+For the purposes of dissolution, the duration of the union resets when it transitions from a cohabitation to a marriage.
+
+### Lexis diagram helpers
+
+Because of the number of events to track and the fact that some of them are on people and others on unions, I updated the lexis count function into a set of lexis diagram helpers for different kinds of events and exposure as the table below describes.
+
+| Helper | Events | Exposure |
+| --- | --- | --- |
+| `calculate_union_rates()` | Direct marriage plus cohabitation entry | Unpartnered years |
+| `calculate_union_rates(by_union_type = TRUE)` | Each direct entry type separately | Same unpartnered years repeated for each type |
+| `calculate_marriage_rates()` | Direct marriage plus conversion | Unpartnered plus cohabiting years |
+| `calculate_dissolution_rates()` | Dissolution | Union-years of the selected type, or pooled |
+| `calculate_cohab_convert_rate()` | Conversion | Cohabitation union-years |
+| `calculate_demog_rates(by_union_type = TRUE)` | Births and deaths | Person-years by current type; no overall row |
+
+## Inputs and replication design
+
+### Rates and provenance
+
+- I use US single year age specific US mortality rates downloaded from the Human Mortality Database.
+- I use fertility rates from the US in 2000 that are disaggregated by partnered/unpartnered. I separate marriage and cohabitation by assigning the partnered fertility rates to marriage and half those rates to cohabitation.
+-I use US 2001 age specific marriage rates for women. To split them by previous union, I use the base rates for never married individuals and multiply the rates by 1.1 and 0.9 for the dissolved and widowed cases, respectively.
+- For duration based marriage rates, I use values loosely derived from the [NSFG](https://www.cdc.gov/nchs/data/nhsr/nhsr049.pdf).
+- for dissolution rates, the probability of a cohabitation vs. marriage, and conversion rates, I derive some plausible estimates from scratch.
+
+```{r}
+#| label: input-rates
+
+mortality_rates <- get_mortality_hmd("USA", year = 2000)
+
+fertility_rates <- read_csv(
+  here("validation", "data", "usa_2000_fertility_by_union_status.csv"),
+  show_col_types = FALSE
+) |>
+  rename(union_type = union_status)
+fertility_rates_typed <- bind_rows(
+  filter(fertility_rates, union_type == "unpartnered"),
+  filter(fertility_rates, union_type == "partnered") |>
+    mutate(union_type = "marriage"),
+  filter(fertility_rates, union_type == "partnered") |>
+    mutate(union_type = "cohab", rate = rate * 0.5)
+)
+
+marriage_rates <- read_csv(
+  here("validation", "data", "usa_2001_marriage_rates_female.csv"),
+  show_col_types = FALSE
+)
+marriage_rates_typed_age <- bind_rows(
+  mutate(marriage_rates, previous_union = "none"),
+  mutate(marriage_rates, previous_union = "dissolved", rate = rate * 1.1),
+  mutate(marriage_rates, previous_union = "widowed", rate = rate * 0.9)
+)
+marriage_rates_typed_dur <- bind_rows(
+  mutate(marriage_rates, previous_union = "none"),
+  tibble(
+    previous_union = "dissolved",
+    dur_start = c(0, 1, 5, 15),
+    dur_end = c(1, 5, 15, Inf),
+    rate = c(.005, .04, .07, .01)
+  ),
+  tibble(
+    previous_union = "widowed",
+    dur_start = c(0, 1, 5, 15),
+    dur_end = c(1, 5, 15, Inf),
+    rate = c(.005, .06, .03, .01)
+  )
+)
+
+dissolution_rates <- tibble(
+  dur_start = c(0, 5, 10, 15),
+  dur_end = c(5, 10, 15, 20),
+  rate = -log(c(.80, .68, .60, .52) / c(1, .80, .68, .60)) / 5
+)
+dissolution_rates_typed <- bind_rows(
+  mutate(dissolution_rates, union_type = "cohab", rate = rate * 2),
+  mutate(dissolution_rates, union_type = "marriage")
+)
+
+cohab_probability <- tibble(
+  age_start = c(15, 20, 25, 30, 35, 40),
+  age_end = c(20, 25, 30, 35, 40, Inf),
+  prob = c(.4, .25, .15, .1, .05, .01)
+)
+
+conversion_rates_dur <- tibble(
+  dur_start = c(0, 5, 10),
+  dur_end = c(5, 10, Inf),
+  rate = c(.15, .30, .05)
+)
+conversion_rates_age <- tibble(
+  age_start = c(15, 25, 35, 50),
+  age_end = c(25, 35, 50, Inf),
+  rate = c(.08, .18, .25, .10)
+)
+
+time_breaks <- c(2000 + params$burn_in, 2000 + params$years)
+time_scenario <- tibble(scenario = character(), elapsed_time = double())
+```
+
+### Initialization, observation, and Monte Carlo uncertainty
+
+Each replication generates its own starting population, with maximum starting
+age 50, and uses a separate simulation seed. This incorporates starting-population
+variation into the Monte Carlo uncertainty. The same population seed is reused
+across scenarios for a replication; scenarios are therefore paired, although
+results below describe each scenario separately. Equal simulation seeds do not
+preserve event-by-event coupling when mechanisms change random-number use.
+
+The first `r params$burn_in` years are excluded from rate
+measurement; this does not establish that the population has reached stability.
+Sparse cells, especially young widows, can remain noisy after pooling periods.
+
+Means and MCSEs are calculated from replication-specific rates, not individual
+unions or births. Each table reports the number of finite replication estimates;
+zero-exposure rates are NA and omitted from the mean, so sparse-cell means are
+conditional on positive exposure. Pooled event/exposure rates are displayed
+separately.
+
+## Duration-dependent dissolution
+
+### Basic dissolution rates
+
+```{r}
+#| label: run-simulations-basic-dissolution
+model <- hammel_model() |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates) |>
+  set_union_formation("rate", rates = marriage_rates) |>
+  set_union_dissolution(dissolution_rates)
+
+results <- map(seq_len(params$n_replications), run_replication, model = model)
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "basic dissolution",
+    elapsed_time = mean(map_dbl(results, function(x) {x$runtime}))
+  )
+)
+
+dissolution_by_rep <- results |>
+  map(
+    calculate_dissolution_rates,
+    time_breaks = time_breaks,
+    dur_breaks = c(0, 5, 10, 15, 20)
+  ) |>
+  bind_rows(.id = "replication")
+
+dissolution_summary <- dissolution_by_rep |>
+  group_by(time_start, time_end, dur_start, dur_end) |>
+  summarize(
+    n_valid = sum(!is.na(rate_dissolution)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_dissolution, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_dissolution, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: fig-basic-dissolution-rates
+#| fig-cap: Comparison of mean union dissolution rate by duration across simulations. 95% confidence intervals are shown. Dotted line shows the input dissolution rate.
+
+dissolution_summary |>
+  filter(dur_start < 20) |>
+  ggplot(aes(x = dur_start + 2.5, y = rate_mean))+
+  geom_point()+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse))+
+  geom_line(data = dissolution_rates, aes(y = rate), linetype = 2)+
+  labs(x = "union duration", y = "dissolution rate")
+```
+
+```{r}
+#| label: tbl-basic-dissolution-rates
+#| tbl-cap: Mean union dissolution rates by duration across simulations with Monte Carlo standard errors and the target input dissolution rates.
+
+dissolution_summary |>
+  left_join(dissolution_rates, by = c("dur_start", "dur_end")) |>
+  filter(dur_start < 20) |>
+  select(-starts_with("time_")) |>
+  gt() |>
+  cols_label(
+    dur_start ~ "Dur. start",
+    dur_end ~ "Dur. end",
+    n_valid ~ "Valid cases",
+    rate_mean ~ "Mean rate",
+    rate_mcse ~ "MCSE",
+    rate ~ "Target rate"
+  ) |>
+  fmt_number(c("rate_mean", "rate"), decimals = 4) |>
+  fmt_number("rate_mcse", decimals = 5)
+```
+
+@fig-basic-dissolution-rates and @tbl-basic-dissolution-rates show the mean duration-specific dissolution rates observed across the simulations with a reported Monte Carlo standard error. These simulations have no groups and no adjustment for cohabitation or remarriage. The input dissolution rates are shown for comparison. The results are extremely close to the input dissolution rates and well within the 95% confidence intervals.
+
+### Group-pairing-specific dissolution rates
+
+To test group differences in the dissolution rate, I use a two group simulation where intergroup unions (i.e. A:B) have 10% higher dissolution rates than intragroup unions.
+
+```{r}
+#| label: run-simulations-grouped-dissolution
+
+dissolution_rates_grouped <- bind_rows(
+  mutate(dissolution_rates, group_pair = "A:A"),
+  mutate(dissolution_rates, group_pair = "A:B", rate = rate * 1.1),
+  mutate(dissolution_rates, group_pair = "B:B")
+)
+
+model <- hammel_model() |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates) |>
+  set_union_formation("rate", rates = marriage_rates) |>
+  set_union_dissolution(dissolution_rates_grouped)
+
+results <- map(seq_len(params$n_replications), run_replication, model = model, grouped = TRUE)
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "grouped dissolution",
+    elapsed_time = mean(map_dbl(results, function(x) {x$runtime}))
+  )
+)
+
+dissolution_by_rep <- results |>
+  map(
+    calculate_dissolution_rates,
+    time_breaks = time_breaks,
+    dur_breaks = c(0, 5, 10, 15, 20),
+    by_group = TRUE
+  ) |>
+  bind_rows(.id = "replication")
+
+dissolution_summary <- dissolution_by_rep |>
+  group_by(time_start, time_end, dur_start, dur_end, group_pair) |>
+  summarize(
+    n_valid = sum(!is.na(rate_dissolution)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_dissolution, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_dissolution, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: fig-grouped-dissolution-rates
+#| fig-cap: Comparison of mean union dissolution rate by duration and group across simulations. 95% confidence intervals are shown. Dotted line shows the input dissolution rate.
+
+dissolution_summary |>
+  filter(dur_start < 20) |>
+  ggplot(aes(x = dur_start + 2.5, y = rate_mean, group = group_pair, color = group_pair))+
+  geom_point(alpha = 0.7)+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse), alpha = 0.7)+
+  geom_line(data = dissolution_rates_grouped, aes(y = rate), linetype = 2, alpha = 0.7)+
+  labs(x = "union duration", y = "dissolution rate")
+```
+
+```{r}
+#| label: tbl-grouped-dissolution-rates
+#| tbl-cap: Mean union dissolution rates by duration and group across simulations with Monte Carlo standard errors and the target input dissolution rates.
+
+dissolution_summary |>
+  left_join(dissolution_rates_grouped, by = c("dur_start", "dur_end", "group_pair")) |>
+  filter(dur_start < 20) |>
+  select(-starts_with("time_")) |>
+  gt() |>
+  cols_label(
+    dur_start ~ "Dur. start",
+    dur_end ~ "Dur. end",
+    group_pair ~ "Group pairing",
+    n_valid ~ "Valid cases",
+    rate_mean ~ "Mean rate",
+    rate_mcse ~ "MCSE",
+    rate ~ "Target rate"
+  ) |>
+  fmt_number(c("rate_mean", "rate"), decimals = 4) |>
+  fmt_number("rate_mcse", decimals = 5)
+```
+
+@fig-grouped-dissolution-rates and @tbl-grouped-dissolution-rates show the mean duration-specific dissolution rates by group pairing observed across the simulations with a reported Monte Carlo standard error. These simulations have two  groups and no adjustment for cohabitation or remarriage or other group differences in input rates. The input dissolution rates are shown for comparison. The results are extremely close to the input dissolution rates and well within the 95% confidence intervals.
+
+## Remarriage
+
+### Age-specific marriage rate schedules by previous union
+
+I test the age specific remarriage rates first by specifying different age specific marriage rates for each previous union type.
+
+```{r}
+#| label: run-simulations-diff-remarriage-age
+
+model <- hammel_model() |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates) |>
+  set_union_formation("rate", rates = marriage_rates_typed_age) |>
+  set_union_dissolution(dissolution_rates)
+
+results <- map(seq_len(params$n_replications), run_replication, model = model)
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "remarriage by age",
+    elapsed_time = mean(map_dbl(results, function(x) {x$runtime}))
+  )
+)
+
+marriage_by_rep <- results |>
+  map(
+    calculate_marriage_rates,
+    time_breaks = time_breaks,
+    age_breaks = seq(15, 70, 5),
+    by_previous_union = TRUE
+  ) |>
+  bind_rows(.id = "replication")
+
+marriage_summary <- marriage_by_rep |>
+  filter(sex == "f") |>
+  group_by(time_start, time_end, age_start, age_end, previous_union) |>
+  summarize(
+    n_valid = sum(!is.na(rate_marriage)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_marriage, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_marriage, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+```
+
+
+```{r}
+#| label: fig-remarriage-rates-age
+#| fig-cap: Comparison of mean age specific marriage rate by previous union type across simulations. 95% confidence intervals are shown. Dotted line shows the input marriage rates.
+
+marriage_summary |>
+  ggplot(aes(x = age_start + 2.5, y = rate_mean, group = previous_union, color = previous_union))+
+  geom_point(alpha = 0.7)+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse), alpha = 0.7)+
+  geom_line(data = marriage_rates_typed_age, aes(y = rate), linetype = 2, alpha = 0.7)+
+  labs(x = "union duration", y = "marriage rate")
+```
+
+```{r}
+#| label: tbl-remarriage-rates-age
+#| tbl-cap: Mean age specific marriage rates by previous union type across simulations with Monte Carlo standard errors and the target input marriage rates.
+
+marriage_summary |>
+  left_join(marriage_rates_typed_age, by = c("age_start", "age_end", "previous_union")) |>
+  select(-starts_with("time_")) |>
+  gt() |>
+  cols_label(
+    age_start ~ "Age start",
+    age_end ~ "Age end",
+    previous_union ~ "Previous union",
+    n_valid ~ "Valid cases",
+    rate_mean ~ "Mean rate",
+    rate_mcse ~ "MCSE",
+    rate ~ "Target rate"
+  ) |>
+  fmt_number(c("rate_mean", "rate"), decimals = 4) |>
+  fmt_number("rate_mcse", decimals = 5)
+```
+
+@fig-remarriage-rates-age and @tbl-remarriage-rates-age show the mean age-specific marriage rates as well as Monte Carlo estimates of uncertainty and the target input rates. The estimated mean rates are extremely close to the expectation from the input rates.
+
+### Duration-specific marriage rate schedules for remarriages
+
+
+```{r}
+#| label: run-simulations-diff-remarriage-dur
+
+model <- hammel_model() |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates) |>
+  set_union_formation("rate", rates = marriage_rates_typed_dur) |>
+  set_union_dissolution(dissolution_rates)
+
+results <- map(seq_len(params$n_replications), run_replication, model = model)
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "remarriage by duration",
+    elapsed_time = mean(map_dbl(results, function(x) {x$runtime}))
+  )
+)
+
+marriage_by_rep <- results |>
+  map(
+    calculate_union_rates,
+    time_breaks = time_breaks,
+    age_breaks = seq(15, 70, 5),
+    dur_breaks = c(0, 1, 5, 15),
+    by_previous_union = TRUE
+  ) |>
+  bind_rows(.id = "replication")
+
+marriage_summary <- marriage_by_rep |>
+  filter(sex == "f", previous_union != "none") |>
+  group_by(time_start, time_end, dur_start, dur_end, previous_union) |>
+  summarize(
+    n_valid = sum(!is.na(rate_union)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_union, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_union, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+```
+
+
+```{r}
+#| label: fig-remarriage-rates-dur
+#| fig-cap: Comparison of mean duration specific remarriage rate by previous union type across simulations. 95% confidence intervals are shown. Dotted line shows the input remarriage rates.
+
+marriage_summary |>
+  ggplot(aes(x = dur_start, y = rate_mean, group = previous_union, color = previous_union))+
+  geom_point(alpha = 0.7)+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse), alpha = 0.7)+
+  geom_line(
+    data = marriage_rates_typed_dur |> filter(previous_union != "none"),
+    aes(y = rate),
+    linetype = 2,
+    alpha = 0.7
+  )+
+  labs(x = "time since previous union", y = "remarriage rate", color = "previous union")
+```
+
+```{r}
+#| label: tbl-remarriage-rates-dur
+#| tbl-cap: Mean duration specific remarriage rates by previous union type across simulations with Monte Carlo standard errors and the target input remarriage rates.
+
+marriage_summary |>
+  left_join(marriage_rates_typed_dur, by = c("dur_start", "dur_end", "previous_union")) |>
+  select(-starts_with("time_"), -starts_with("age_")) |>
+  gt() |>
+  cols_label(
+    dur_start ~ "Dur. start",
+    dur_end ~ "Dur. end",
+    previous_union ~ "Previous union",
+    n_valid ~ "Valid cases",
+    rate_mean ~ "Mean rate",
+    rate_mcse ~ "MCSE",
+    rate ~ "Target rate"
+  ) |>
+  fmt_number(c("rate_mean", "rate"), decimals = 4) |>
+  fmt_number("rate_mcse", decimals = 5)
+```
+
+@fig-remarriage-rates-dur and @tbl-remarriage-rates-dur show the mean duration-specific marriage rates as well as Monte Carlo estimates of uncertainty and the target input rates. The estimated mean rates are extremely close to the expectation from the input rates.
+
+## Cohabitation
+
+### Full cohabitation model without groups
+
+#### Age-specific conversion rates
+
+For cohabitation, I first run a one group simulation with a cohabitation probability, age-specific cohabitation conversion rates, marriage rates by age for each previous union group, differential fertility by union type, dissolution rates separately by cohabitation and marriage.
+
+```{r}
+#| label: run-simulations-cohabitation-age
+
+model <- hammel_model() |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates_typed) |>
+  set_union_formation(
+    "rate",
+    rates = marriage_rates_typed_age,
+    cohab_prob = cohab_probability,
+    union_convert_rate = conversion_rates_age
+  ) |>
+  set_union_dissolution(dissolution_rates_typed)
+
+
+results <- map(seq_len(params$n_replications), run_replication, model = model)
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "cohabitation with one group, age conversion",
+    elapsed_time = mean(map_dbl(results, function(x) {x$runtime}))
+  )
+)
+
+union_by_rep <- results |>
+  map(
+    calculate_union_rates,
+    time_breaks = time_breaks,
+    age_breaks = seq(15, 70, 5),
+    by_previous_union = TRUE
+  ) |>
+  bind_rows(.id = "replication")
+
+union_summary <- union_by_rep |>
+  filter(sex == "f") |>
+  group_by(time_start, time_end, age_start, age_end, previous_union) |>
+  summarize(
+    n_valid = sum(!is.na(rate_union)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_union, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_union, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+
+dissolution_by_rep <- results |>
+  map(
+    calculate_dissolution_rates,
+    time_breaks = time_breaks,
+    dur_breaks = c(0, 5, 10, 15, 20),
+    by_union_type = TRUE
+  ) |>
+  bind_rows(.id = "replication")
+
+dissolution_summary <- dissolution_by_rep |>
+  group_by(time_start, time_end, dur_start, dur_end, union_type) |>
+  summarize(
+    n_valid = sum(!is.na(rate_dissolution)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_dissolution, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_dissolution, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+
+cohab_convert_by_rep <- results |>
+  map(
+    calculate_cohab_convert_rate,
+    time_breaks = time_breaks,
+    age_breaks = c(15, 25, 35, 50)
+  ) |>
+  bind_rows(.id = "replication")
+
+cohab_convert_summary <- cohab_convert_by_rep |>
+  group_by(time_start, time_end, age_start, age_end) |>
+  summarize(
+    n_valid = sum(!is.na(rate_cohab_convert)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_cohab_convert, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_cohab_convert, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+
+demog_by_rep <- results |>
+  map(
+    calculate_demog_rates,
+    time_breaks = seq(2025, 2100, 75), 
+    age_breaks = seq(15, 45, 5), 
+    by_union_type = TRUE
+  ) |>
+  bind_rows(.id = "replication")
+
+demog_summary <- demog_by_rep |>
+  group_by(time_start, time_end, age_start, age_end, union_type) |>
+  summarize(
+    n_valid = sum(!is.na(rate_fertility)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_fertility, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_fertility, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+
+prob_cohab_summary <- results |> map(
+  function(result) {
+    result$unions |>
+      filter(is.na(previous_cohab_id)) |>
+      mutate(year = floor(start_time)) |>
+      group_by(year) |>
+      summarize(
+        prop_cohab = mean(union_type == "cohab"),
+        .groups = "drop"
+      )
+  }) |>
+  bind_rows(.id = "replication") |>
+  group_by(year) |>
+  summarize(prob_mean = mean(prop_cohab), mcse = sd(prop_cohab) / sqrt(n()))
+```
+
+```{r}
+#| label: fig-prob-cohab
+#| fig-cap: Mean proportion of cohabitors by year of the simulation across simulations. 95% confidence band shown.
+
+ggplot(prob_cohab_summary, aes(x = year, y = prob_mean))+
+  geom_ribbon(aes(ymin = prob_mean - 1.96 * mcse, ymax = prob_mean + 1.96 * mcse), 
+              color = NA, fill = "grey70")+
+  geom_line()+
+  labs(y = "cohabitations as proportion of all unions")
+```
+
+@fig-prob-cohab shows the proportion of all unions that were cohabitations by year of the simulation. This proportion fluctuated in the first part of the simulation due to non-stable population dynamics, but eventually settled down to a proportion of just over 14%.
+
+```{r}
+#| label: fig-cohab-union-rates
+#| fig-cap: Comparison of mean age specific union rate (direct marriage and cohabitation) by previous union type across simulations. 95% confidence intervals are shown. Dotted line shows the input marriage rates.
+
+union_summary |>
+  ggplot(aes(x = age_start + 2.5, y = rate_mean, color = previous_union, group = previous_union))+
+  geom_point()+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse), alpha = 0.7)+
+  geom_line(data = marriage_rates_typed_age, aes(y = rate), linetype = 2)+
+  labs(x = "age", y = "union rate (marriage and cohabitation)", color = "previous union")
+```
+
+Because cohabitation and marriage rates will vary as a function of the distribution of age groups, I don't have an apriori expectation to make comparisons. However, the overall union rate (cohabitation + direct marriage) should match the input union rate because cohabitations and direct marriages are split from that whole. @fig-cohab-union-rates shows these union rates by previous union status by age from the simulations in comparison to the input rates. The match is very close. @tbl-cohab-union-rates shows confirms that each value is very close.
+
+```{r}
+#| label: tbl-cohab-union-rates
+#| tbl-cap: Mean age specific union rates by previous union type across simulations with Monte Carlo standard errors and the target input union rates.
+
+union_summary |>
+  left_join(marriage_rates_typed_age, by = c("age_start", "age_end", "previous_union")) |>
+  select(-starts_with("time_"), -starts_with("dur_")) |>
+  gt() |>
+  cols_label(
+    age_start ~ "Age start",
+    age_end ~ "Age end",
+    previous_union ~ "Previous union",
+    n_valid ~ "Valid cases",
+    rate_mean ~ "Mean rate",
+    rate_mcse ~ "MCSE",
+    rate ~ "Target rate"
+  ) |>
+  fmt_number(c("rate_mean", "rate"), decimals = 4) |>
+  fmt_number("rate_mcse", decimals = 5)
+```
+
+```{r}
+#| label: fig-cohab-dissolution-rates
+#| fig-cap: Comparison of mean union dissolution rate by duration and union type across simulations. 95% confidence intervals are shown. Dotted line shows the input dissolution rates.
+
+dissolution_summary |>
+  filter(dur_start < 20) |>
+  ggplot(aes(x = dur_start + 2.5, y = rate_mean, group = union_type, color = union_type))+
+  geom_point(alpha = 0.7)+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse), alpha = 0.7)+
+  geom_line(data = dissolution_rates_typed, aes(y = rate), linetype = 2, alpha = 0.7)+
+  labs(x = "union duration", y = "dissolution rate", color = "union type")
+```
+
+@fig-cohab-dissolution-rates shows the empirically estimated duration specific dissolution rates by union type in comparison to the input rates. The fit is very good. @tbl-cohab-dissolution-rates shows each mean value along with its standard error in comparison to the target rate. All rates fit very well, although the 15-20 year duration for cohabitation is slightly outside the 95% confidence interval.
+
+```{r}
+#| label: tbl-cohab-dissolution-rates
+#| tbl-cap: Mean duration specific union dissolution rates by union type across simulations with Monte Carlo standard errors and the target input union dissolution rates.
+
+dissolution_summary |>
+  left_join(dissolution_rates_typed, by = c("dur_start", "dur_end", "union_type")) |>
+  select(-starts_with("time_")) |>
+  gt() |>
+  cols_label(
+    dur_start ~ "Dur. start",
+    dur_end ~ "Dur. end",
+    union_type ~ "Union type",
+    n_valid ~ "Valid cases",
+    rate_mean ~ "Mean rate",
+    rate_mcse ~ "MCSE",
+    rate ~ "Target rate"
+  ) |>
+  fmt_number(c("rate_mean", "rate"), decimals = 4) |>
+  fmt_number("rate_mcse", decimals = 5)
+```
+
+```{r}
+#| label: fig-cohab-conversion-rates
+#| fig-cap: Comparison of mean cohabitation conversion rate to marriage by age across simulations. 95% confidence intervals are shown. Dotted line shows the input conversion rates.
+
+cohab_convert_summary |>
+  ggplot(aes(x = age_start, y = rate_mean))+
+  geom_point(alpha = 0.7)+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse), alpha = 0.7)+
+  geom_line(data = conversion_rates_age, aes(y = rate), linetype = 2, alpha = 0.7)+
+  labs(x = "age", y = "cohabitation conversion rate")
+```
+
+@fig-cohab-conversion-rates show the mean cohabitation conversion rate into marriage by age group. The result fits very close to the input cohabitation conversion rate.
+
+```{r}
+#| label: fig-cohab-fertility-rates
+#| fig-cap: Comparison of mean age specific fertility rate by union type across simulations. 95% confidence intervals are shown. Dotted line shows the input fertility rates.
+
+demog_summary |>
+  filter(age_start < 45) |>
+  ggplot(aes(x = age_start + 2.5, y = rate_mean, group = union_type, color = union_type))+
+  geom_point()+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse), alpha = 0.7)+
+  geom_line(data = fertility_rates_typed, aes(y = rate), linetype = 2, alpha = 0.7)+
+  labs(x = "age", y = "fertility rate", color = "union type")
+```
+
+@fig-cohab-fertility-rates shows the mean age specific fertility rates by union type across simulations. The estimated rates fit very closely to the input age specific fertility rates.
+
+#### Duration-specific conversion rates
+
+I now run the same simulation but with duration-specific conversion rates.
+
+```{r}
+#| label: run-simulations-cohabitation-dur
+
+model <- hammel_model() |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates_typed) |>
+  set_union_formation(
+    "rate",
+    rates = marriage_rates_typed_age,
+    cohab_prob = cohab_probability,
+    union_convert_rate = conversion_rates_dur
+  ) |>
+  set_union_dissolution(dissolution_rates_typed)
+
+
+results <- map(seq_len(params$n_replications), run_replication, model = model)
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "cohabitation with one group, duration conversion",
+    elapsed_time = mean(map_dbl(results, function(x) {x$runtime}))
+  )
+)
+
+cohab_convert_by_rep <- results |>
+  map(
+    calculate_cohab_convert_rate,
+    time_breaks = time_breaks,
+    dur_breaks = seq(0, 10, 5)
+  ) |>
+  bind_rows(.id = "replication")
+
+cohab_convert_summary <- cohab_convert_by_rep |>
+  group_by(time_start, time_end, dur_start, dur_end) |>
+  summarize(
+    n_valid = sum(!is.na(rate_cohab_convert)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_cohab_convert, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_cohab_convert, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+```
+
+
+```{r}
+#| label: fig-cohab-conversion-rates-dur
+#| fig-cap: Comparison of mean cohabitation conversion rate to marriage by duration across simulations. 95% confidence intervals are shown. Dotted line shows the input conversion rates.
+
+cohab_convert_summary |>
+  ggplot(aes(x = dur_start, y = rate_mean))+
+  geom_point(alpha = 0.7)+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse), alpha = 0.7)+
+  geom_line(data = conversion_rates_dur, aes(y = rate), linetype = 2, alpha = 0.7)+
+  labs(x = "cohabitation duration", y = "cohabitation conversion rate")
+```
+
+@fig-cohab-conversion-rates-dur shows the estimated conversion rates by duration in comparison to the input rates. The fit is very close.
+
+### Group matching under cohabitation
+
+I now test a simulation with two groups where intergroup union formation has different likelihood across unpartnered fathering, cohabitation, and marriage. For simplicity, I won't vary any rates across groups.
+
+```{r}
+#| label: run-simulations-cohabitation-group
+
+model <- hammel_model() |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates_typed) |>
+  set_union_formation(
+    "rate",
+    rates = marriage_rates_typed_age,
+    cohab_prob = cohab_probability,
+    union_convert_rate = conversion_rates_age, 
+    matching = create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -3)),
+    cohab_matching = create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2)),
+    father_matching = create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1))
+  ) |>
+  set_union_dissolution(dissolution_rates_typed)
+
+
+results <- map(seq_len(params$n_replications), run_replication, model = model, grouped = TRUE)
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "cohabitation with two groups",
+    elapsed_time = mean(map_dbl(results, function(x) {x$runtime}))
+  )
+)
+
+count_unpartnered_by_rep <- results |>
+  map(get_unpartnered_births) |>
+  bind_rows(.id = "replication") |>
+  count(replication, group_mother, group_father) |>
+  mutate(union_type = "unpartnered") |>
+  rename(group_h =group_father, group_w = group_mother)
+
+crosstabs_by_rep <- results |>
+  map(get_detailed_unions) |>
+  bind_rows(.id = "replication") |>
+  # remove unions that transition from cohabitations
+  filter(is.na(previous_cohab_id)) |>
+  count(replication, union_type, group_w, group_h) |>
+  bind_rows(count_unpartnered_by_rep) |>
+  pivot_wider(id_cols = c(replication, union_type), names_from = c(group_w, group_h), values_from = n) |>
+  mutate(
+    log_odds = log(A_B) + log(B_A) - log(A_A) - log(B_B),
+    gender_ratio = A_B/B_A,
+  )
+
+crosstabs_summary <- crosstabs_by_rep |>
+  group_by(union_type) |>
+  summarize(
+    log_odds_mean = mean(log_odds),
+    log_odds_mcse = sd(log_odds) / sqrt(n()),
+    gender_ratio_mean = mean(gender_ratio),
+    gender_ratio_mcse = sd(gender_ratio) / sqrt(n())
+  )
+```
+
+```{r}
+#| label: tbl-crosstabs-cohabitation-groups
+#| tbl-cap: Mean group log odds ratio and gender ratio across simulations by union type. Monte Carlo standard errors are also shown.
+
+crosstabs_summary |>
+  gt() |>
+  cols_label(
+    union_type ~ "Union type",
+    log_odds_mean ~ "Mean",
+    log_odds_mcse ~ "MCSE",
+    gender_ratio_mean ~ "Mean",
+    gender_ratio_mcse ~ "MCSE"
+  ) |>
+  tab_spanner(starts_with("log_odds"), label = "Log odds ratio") |>
+  tab_spanner(starts_with("gender_ratio"), label = "Gender ratio") |>
+  fmt_number(c(starts_with("log_odds"), starts_with("gender_ratio")), decimals = 3)
+```
+
+@tbl-crosstabs-cohabitation-groups shows the mean estimated log odds ratio by union type across simulations, as well as the mean gender ratio of AB to BA unions. The log odds ratios match very closely in each case to the twice the input exogamy parameters as expected and the gender ratios are all very close to one. 
+
+## Time tests
+
+@tbl-processing-time shows the mean processing time by scenario. The big difference is simulations with groups which take substantially longer. One-group simulations run extremely fast even with a fully loaded set of stratified rate schedules.
+
+```{r}
+#| label: tbl-processing-time
+#| tbl-cap: Mean processing time by simulation scenario
+
+time_scenario |>
+  gt() |>
+  cols_label(
+    scenario ~ "Scenario",
+    elapsed_time ~ "Mean processing time"
+  )
+```
+
+## Tests
+
+The following tests have been constructed and are currently all passing.
+
+```{r}
+#| label: test-results
+
+test_results <- devtools::test(pkg = here::here(), reporter = "silent")
+test_table <- as.data.frame(test_results)
+knitr::kable(
+  test_table[, c("test", "passed", "failed", "error", "skipped", "warning")]
+)
+```
+
+## Conclusions and unresolved limitations
+
+All of the goals of this milestone have been met and the new features are behaving as intended.
+
+## Reproducibility record
+
+```{r}
+#| label: reproducibility
+system2("git", c("-C", shQuote(here::here()), "rev-parse", "HEAD"), stdout = TRUE)
+system2("git", c("-C", shQuote(here::here()), "status", "--short"), stdout = TRUE)
+sessionInfo()
+```

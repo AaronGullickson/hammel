@@ -13,7 +13,9 @@
 #' @param unions A data frame with one row per union episode, or `NULL`
 #'   for no unions. `wife_id` references the female partner and `husband_id`
 #'   the male partner; these roles do not imply legal marriage. An empty data
-#'   frame is normalized to the union schema.
+#'   frame is normalized to the union schema. Optional `union_type` is cohab or
+#'   marriage. A conversion closes cohab with `end_reason = "conversion"` and
+#'   links the same-time marriage through `previous_cohab_id`.
 #' @param end_time Optional finite simulation endpoint in years. Its calendar origin is supplied by the user. `NULL` means
 #'   that the endpoint is unknown.
 #' @param ancestry Optional data frame with exactly one row per person, keyed
@@ -128,11 +130,14 @@ validate_population <- function(results) {
   }
   reason <- unions$end_reason
   if (!is.character(reason) || !is.null(dim(reason)) ||
-      any(!is.na(reason) & !reason %in% c("death_husband", "death_wife", "dissolution")) ||
+      any(!is.na(reason) & !reason %in% c("death_husband", "death_wife", "dissolution", "conversion")) ||
       any(is.na(reason) != is.na(unions$end_time))) {
-    stop("`unions$end_reason` must be death_husband, death_wife, or dissolution for ended unions, and NA for ongoing unions.",
+    stop("`unions$end_reason` must be death_husband, death_wife, dissolution, or conversion for ended unions, and NA for ongoing unions.",
          call. = FALSE)
   }
+  validate_union_types(unions)
+  if (any(reason == "conversion", na.rm = TRUE) && !"union_type" %in% names(unions))
+    stop("Conversion records require union_type and conversion links.", call. = FALSE)
   for (partner in c("wife_id", "husband_id")) {
     born <- persons$birth_time[match(unions[[partner]], persons$person_id)]
     if (any(unions$start_time < born)) {

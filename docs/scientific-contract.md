@@ -1,8 +1,9 @@
 # Scientific contract
 
-Updated October 27, 2026. This is the current mortality, fertility, union-formation,
-group identity/ancestry, and observation contract. Milestones 1–3 are accepted
-as complete (D029, D050, D077), retaining documented limitations.
+Updated October 29, 2026. This is the current mortality, fertility, union-formation,
+dissolution, remarriage, cohabitation/conversion, group identity/ancestry, and
+observation contract. Milestones 1–4 are accepted as complete
+(D029, D050, D077, D093), retaining documented limitations.
 Earlier monthly and exact
 age-varying compensation specifications are available in Git history; the
 [decision log](decisions.md) records their replacement. Acceptance
@@ -15,7 +16,11 @@ person-year and exposure is person-years. The user supplies the time origin.
 Execution is continuous: there is no month index, configurable execution step,
 time truncation, or rounding to birthdays.
 
-Rate tables contain `age_start`, `age_end`, and `rate`. Mortality also contains
+Mortality, fertility and union-search rate tables contain `age_start`,
+`age_end`, and `rate`. Previously partnered union-search categories can instead
+use `dur_start`/`dur_end` with age boundaries NA (D083), as described below. Dissolution uses `dur_start`/`dur_end` for years since
+union formation, with rates per partnered woman-year (equivalently union-year).
+Mortality also contains
 `sex`, with separate `"m"` and `"f"` schedules. Intervals are half-open
 `[age_start, age_end)`. Starts must be finite and nonnegative; ends must exceed
 starts. Rates must be finite and nonnegative, and may exceed one because they
@@ -134,10 +139,10 @@ Months here are explanatory durations, not an execution grid.
 
 ## Fertility and birth spacing
 
-Without `union_status`, all living females face the supplied overall fertility
-schedule. With a `union_status` column, require both `partnered` and
-`unpartnered` schedules, interpreted per woman-year in that status. Only those
-two character labels are permitted; partial or mixed tables are errors. Check
+Without `union_type`, all living females face the supplied overall fertility
+schedule. With a `union_type` column, require both `partnered` and
+`unpartnered` schedules, interpreted per woman-year in that status. Alternatively supply all three labels unpartnered/cohab/marriage under D086;
+partial or mixed tables are errors. Check
 age overlap separately within each status; boundaries may differ and gaps are
 zero risk. Use explicit zeros to suppress births for a status. On-demand
 formation rejects status-specific fertility schedules, including at zero duration.
@@ -330,9 +335,11 @@ hazard sampler as deaths and births. Searches compete with death; death wins
 exact same-person ties. Search execution uses the same exact draw,
 screening, matching and formation code as on-demand mode. A failed search
 reschedules from the attempt time using the same attained-age schedule.
-All unpartnered women use that schedule regardless of prior union history.
+Without `previous_union` stratification, all unpartnered women use that schedule
+regardless of prior union history. Stratified schedules distinguish none,
+dissolved and widowed, with age or permitted duration clocks (D080–D083).
 
-Women face birth risk in both statuses: the current `union_status` selects
+Women face birth risk while unpartnered or partnered: the current `union_type` selects
 fertility, or an overall schedule applies equally to both. With overall rates,
 warn once per simulation call that fertility does not depend on union status.
 Unpartnered births in rate mode select a father from living, currently
@@ -358,6 +365,61 @@ within each schedule; it is not calibrated to the woman's prior-status history.
 The milestone 2 report examines conditional ASFR discrepancies; general
 recovery across status transitions is not established.
 See [union fertility specification](union-formation-models.md#fertility-schedules-by-union-status-d039).
+
+### Duration-dependent union dissolution (D078)
+
+An optional `union_dissolution` process adds one annual hazard per union,
+carried by its female partner and indexed by elapsed years since `start_time`.
+Shared rates or schedules/multipliers by unordered group pair (D079) use
+half-open duration bands;
+gaps and uncovered durations have zero hazard. New episodes start at duration
+zero; active input unions and restarts use attained duration. The union's
+sampled dissolution date is retained through births. Exact same-person ties
+select death, birth, dissolution, then search. A tied birth occurs before
+closure and retains that husband as father.
+
+Execution ends the episode with reason `dissolution`, clears partner links,
+restores male availability and female calibration counts with spacing preserved,
+and reschedules her unpartnered fertility and existing searches. Men's death
+hazards are status-independent, so their pending death events remain valid.
+Either partner's death cancels the episode's risk. Without this process,
+existing death-only behavior and random-number consumption are retained.
+Search schedules may distinguish `previous_union` as `none`,
+`dissolved`, or `widowed` (D080). The most recent recorded episode determines
+state; complete histories are required. Without that column, all categories
+share the same rates. All three categories must be supplied per scheduled
+group when stratifying. `none` must use age; `dissolved` and `widowed` each
+select age or duration since the latest union ending (D083). Each category uses
+one clock in all bands/groups. Duration columns are optional for all-age tables;
+when included, each row supplies one complete boundary pair with the unused
+pair NA. No simultaneous age/duration hazards are permitted. Recover the latest
+ending origin on restart and reset it at each subsequent ending. The
+contribution queue handles the selected search clock independently of fertility
+ages and matching cohort bins. Cohabitation is implemented under D086; richer couple covariates remain deferred. See [remarriage](remarriage.md) and the
+[dissolution specification](union-dissolution.md) for worked examples and limits.
+
+### Optional cohabitation (D085/D086)
+
+Rate formation accepts cohab_prob age/group/previous-category probabilities,
+with gaps zero. At each attempt, intended type is drawn before matching;
+cohab_matching optionally overrides general preferences. Unpartnered father
+matching remains separate. Calibration uses lambda*p for cohabitation,
+lambda*(1-p) for direct marriage, and fertility intensity for fathers.
+Probability boundaries update the common contribution queue. NULL probability
+keeps the untyped/no-extra-RNG path; on-demand rejects cohabitation inputs.
+
+Fertility input uses union_type: either unpartnered/partnered or
+unpartnered/cohab/marriage per group; old input union_status errors. Fertility
+multiplier-list keys must exist in those schedules, with omitted factors 1.
+Dissolution rates may supply both union types within each pair or share rates.
+Conversion uses a female age/cohab-duration clock, optional group, no previous
+axis; NULL warns and disables conversion. Pending clocks survive births. Ties
+select death, birth, dissolution, conversion, search. Conversion closes cohab,
+opens a linked marriage with the same partners and resets dissolution duration;
+neither partner enters availability. Typed histories preserve legal classification
+for the default D085 policy. All genuine endings reset search-duration origin.
+Conversion is excluded from unpartnered entry counts and is not dissolution;
+partnered exposure remains continuous. See [cohabitation](cohabitation.md).
 
 ### Weighted choice
 
@@ -393,8 +455,9 @@ Duration is finite and nonnegative; zero duration returns the population with
 updated run metadata. Times that cannot be represented at the chosen numeric
 scale are rejected. Candidates exactly at the run endpoint are excluded.
 
-Each person retains one selected next event. Death wins an exact same-person
-death/birth tie. Across people, exact ties follow queue insertion order:
+Each person retains one selected next event. Exact same-person ties select
+death, birth, dissolution, then search. A union retains its sampled dissolution
+date through births, so a tied dissolution can follow a birth at the same time. Across people, exact ties follow queue insertion order:
 initial row order; after birth, newborn before mother. Otherwise execute the
 earliest continuous candidate. Father availability changes immediately when
 births/deaths execute. For example, a birth at 0.02 precedes death at 0.06 even
@@ -425,23 +488,20 @@ Unknown-mother births remain in the period-level attribute without assigning a
 maternal group. Defaults pool groups; arbitrary custom strata are not supported.
 See [groups](groups.md) for output ordering, empty cases, and worked examples.
 
-- `calculate_lexis_counts()` splits recorded lifetimes at half-open period/age
+- `calculate_demog_rates()` splits recorded lifetimes at half-open period/age
   boundaries and reports exposure, deaths, births, ASMR, and ASFR. A finite last
   age breakpoint automatically gains `Inf`; for example `0:110` ends with
   `[110, Inf)`. Zero exposure yields `NA` rates; zero events with positive
   exposure yields zero. Male birth counts/ASFR are `NA`.
-- With `include_unions = TRUE`, Lexis counts add exact partnered/unpartnered
-  exposure for both sexes, union starts at each spouse's age (including repeat
-  unions), and births/deaths by status, in separate `overall`, `partnered`, and
-  `unpartnered` rows. `unions` and `rate_marriage` are only defined for
-  unpartnered rows; the rate is formations per unpartnered person-year.
-  Status components sum to overall counts/exposure; do not sum all three rows.
-  Deaths use status immediately before death, so a union-ending death counts
-  as partnered. Birth/exposure union coverage is half-open
-  `[start_time, end_time)`; births triggering on-demand formation are partnered.
-  Overlapping records do not duplicate exposure. Complete union histories are
-  needed: absence of a supplied episode is not evidence of historical singlehood.
-  See the worked examples and rate denominators in demographic analysis.
+- With `by_union_type = TRUE`, demographic rates partition exposure, births and
+  deaths into `unpartnered` and discovered union types in `union_type`, without
+  an overall row. Untyped histories use partnered/unpartnered. Components sum
+  to pooled counts/exposure obtained with FALSE. Deaths use the left-limit type;
+  births tied to dissolution or conversion use the ending type. Exposure is
+  half-open; births at formation use the new episode. Typed overlapping
+  histories are rejected; untyped coverage is merged. Formation observations
+  use `calculate_union_rates()` or `calculate_marriage_rates()` separately.
+  Complete histories are required; unknown history is not inferred.
 - Births use maternal age and all female exposure, including time excluded by
   spacing. Unknown mothers are counted by period in the tibble attribute
   `unassigned_births`; their births cannot be assigned an age-specific rate.
@@ -459,6 +519,30 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   and `ex=T/l`. Missing rates propagate uncertainty; positive survivorship
   with zero terminal hazard gives infinite life expectancy; `ex` is undefined
   at zero survivorship. This is a synthetic period table, not cohort follow-up.
+- `calculate_union_rates()` returns unpartnered person-years, union starts
+  and `rate_union` by period, age and sex. Optional `by_previous_union = TRUE`
+  adds previous categories; `by_group = TRUE` independently adds individual
+  groups. Both default to FALSE, pooling counts and exposure before rates. The most recent episode determines category; starts
+  use the category immediately before formation. Empty categories remain, with
+  NA rates at zero exposure. Complete exclusive histories are required;
+  overlapping episodes are rejected. Touching and zero-duration episodes count
+  separately without adding time. With common age bands, summing categories
+  recovers pooled unpartnered exposure and starts. Men describe matching outcomes, not male search inputs.
+  Optional `dur_breaks` switches dissolved/widowed rows to duration since the
+  latest ending and automatically separates previous categories (D084). None
+  rows retain age bands; unused boundary pairs are NA. Duration rows include
+  all ages, and clocks are not crossed or pooled. NULL preserves age-only output.
+  See [remarriage](remarriage.md) for input, restart and boundary conventions.
+- `calculate_dissolution_rates()` splits each recorded union episode at calendar
+  and duration boundaries, counting union-years once per episode and dissolution
+  events only for `end_reason = "dissolution"`. Death also ends exposure but is
+  not a dissolution event. Missing ends censor at the window endpoint. Duration
+  uses each episode's start; boundaries are half-open and finite final duration
+  breaks gain `Inf`. Return `rate_dissolution = dissolutions / union_years`,
+  with NA at zero exposure. Optional grouping returns symmetric `group_pair`
+  strata using both partners, with both cross-group directions pooled. Bare
+  union tables require complete caller-verified follow-up. This cause-specific
+  rate is not a cumulative probability with competing deaths.
 - `calculate_population_size()` includes births and excludes deaths at each
   requested instant. It preserves requested order and repeated times.
 
@@ -505,7 +589,7 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 | Midpoint approximation | Validate bias against supplied age schedules; no accuracy guarantee |
 | Rate changes between runs | Histories retain spacing, but compensation uses only the new schedule |
 | Sparse oldest ages | Missing cells remain missing; no automatic imputation or smoothing |
-| Union formation/dissolution | Conditional-logit on-demand formation, minimum male age, known-kin distance screening, and widowhood; exclusive ongoing unions enforced; female rate initiation implemented |
+| Union formation/dissolution | Exclusive conditional-logit on-demand or female rate-based formation, minimum male age and known-kin screening; widowhood plus optional duration-dependent dissolution; age- or duration-specific searches by previous union |
 | Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
 | Exact continuation | No saved queue/RNG checkpoint |
 
@@ -517,8 +601,10 @@ can give unexpected directional pair ratios; delta adjusts male-group targets
 without guaranteeing fixed pairwise ratios. Group-only cross-product identities
 are analytical benchmarks, not exact guarantees after pooling changing age
 structures and markets. Kinship is omitted from weight calibration and
-quarter-year bins approximate calibration ages; actual partner draws use exact
-ages and screening. No marriage-squeeze feedback is implemented.
+quarter-year bins approximate calibration matching utilities and cutoff
+eligibility, while female intensities sum actual current individual hazards
+(D082). Boundary updates consume no randomness and do not alter individual
+search scheduling. Actual partner draws use exact ages and screening. No marriage-squeeze feedback is implemented.
 
 Baseline generation is another source of Monte Carlo variation. Replications
 sharing one baseline condition on it; independently generated baselines include
@@ -560,3 +646,15 @@ status/scope, inputs/units, eligibility, timing/competition, state transitions
 and invalidation, observations, worked examples, validation, and unresolved
 choices. The user decides demographic assumptions. Passing software tests is
 not sufficient evidence of research readiness.
+
+
+## Milestone 4 acceptance
+
+The user accepted dissolution, age/duration remarriage, and optional rate-mode
+cohabitation/conversion on October 29, 2026 (D093), based on the
+[final report](../validation/milestone4.qmd) and its rendered assessment. This
+retains earlier limitations, including transition-aware fertility compensation
+(D045), thin-pool failures, initialization transients, and approximate calibration
+age bins. Reported recovery in these scenarios is not a universal exact pooled
+cross-tab constraint. Static SOCSIM audits remain distinct from executable
+reference comparisons. Later parity and calendar-time schedules remain unimplemented.

@@ -47,7 +47,7 @@ SOCSIM is an investigation reference, not an adopted matching algorithm.
 
 Scheduled-search mode must support partnered and unpartnered fertility inputs.
 Parity-specific fertility is deferred to a later milestone; milestone 2 does
-not add parity conditioning. Union dissolution is excluded except when a
+not add parity conditioning. For the accepted milestone 2 scope, dissolution was excluded except when a
 partner dies (widowhood). Exclusive ongoing unions, return of widowed men to
 availability and renewed female rate searches after widowhood are implemented. The construction interface below adds no major dependency.
 
@@ -316,8 +316,11 @@ account for prior-status rate history; correction is deferred under D045.
 A partner's death ends the ongoing union. In rate mode, a surviving woman
 resumes search risk and switches fertility status with pending events
 invalidated; in on-demand mode, her next birth attempt can trigger a new search.
-Surviving men return to the available pool. No non-death dissolution process
-is included in milestone 2.
+Surviving men return to the available pool. The optional duration-dependent
+dissolution process is described in
+[union dissolution](union-dissolution.md). Milestone 4 adds optional
+`previous_union` strata on search schedules (D080), with age or duration
+clocks per category in a single table (D083); see [remarriage](remarriage.md).
 
 ## Deferred decisions and validation status
 
@@ -369,7 +372,7 @@ deferred to a later milestone (D044).
 
 ## Fertility schedules by union status (D039)
 
-An optional character `union_status` column in the fertility table must contain
+An optional character `union_type` column in the fertility table must contain
 both `partnered` and `unpartnered`, with no missing or other values. Without
 that column the table is one overall schedule. Mixing overall and conditional
 rows or providing only one status is an error; explicitly provide zero rates
@@ -505,3 +508,11 @@ guaranteed realized age-gap frequencies or a halving of utility itself.
 The helper returns an ordinary matching model and retains the native quadratic
 execution path. Inputs must be finite numeric scalars and yield representable
 finite coefficients with strictly negative quadratic curvature.
+
+
+D086 extends rate-mode partnership entry with optional cohabitation probabilities,
+type-specific matching/rates and linked same-partner conversion. See
+[cohabitation](cohabitation.md). Fertility input uses union_type and supports
+unpartnered/partnered or unpartnered/cohab/marriage per group. On-demand remains
+untyped and overall-fertility only. Historical milestone 2 reports retain their
+accepted source and original input terminology; current rates must migrate.
