@@ -61,23 +61,37 @@ test_that("nonpositive midpoint eligibility is rejected", {
   expect_equal(hammel:::adjusted_fertility_cpp(rates, 0), rates)
 })
 
-test_that("open-ended fertility bands are rejected at construction and revalidation", {
-  model <- make_model()
-  for (rate in c(0, 0.2)) {
-    for (b in c(0, 0.75)) {
-      rates <- data.frame(age_start = 15, age_end = Inf, rate = rate)
-      expect_error(fertility(rates, birth_interval = b), "finite ends")
-      expect_error(set_fertility(model, rates, birth_interval = b), "finite ends")
-      expect_error(hammel:::adjusted_fertility_cpp(rates, b), "finite ends")
-      edited <- model$processes$fertility
-      edited$rates$age_end <- Inf
-      expect_error(set_process(model, edited), "finite ends")
-      invalid <- model
-      invalid$processes$fertility <- edited
-      expect_error(simulate(invalid, 0), "finite ends")
-    }
+test_that("open fertility bands use the interior limit and validate eligibility", {
+  model <- make_model(n=2)
+  for (rate in c(0,.2)) for (b in c(0,.75)) {
+    rates <- data.frame(age_start=15,age_end=Inf,rate=rate)
+    expect_s3_class(fertility(rates,birth_interval=b),"hammel_process")
+    updated <- set_fertility(model,rates,birth_interval=b)
+    expect_s3_class(simulate(updated,0,42),"hammel_population")
+    adjusted <- hammel:::adjusted_fertility_cpp(rates,b)
+    expect_equal(adjusted$rate,rate/(1-b*rate))
+    expect_equal(adjusted$age_end,Inf)
   }
-  expect_true(is.infinite(mortality(model$processes$mortality$rates)$rates$age_end[1]))
+  raw <- data.frame(age_start=c(20,25),age_end=c(25,Inf),rate=c(.9,.2))
+  # Open band uses its own interior limit, even at the entry boundary.
+  adjusted <- hammel:::adjusted_fertility_cpp(raw,.75)
+  expect_equal(adjusted$rate[2],.2/(1-.75*.2))
+  expect_equal(hammel:::hazard_wait_cpp(adjusted,25,.1),.1/adjusted$rate[2])
+  raw$rate[2] <- 1
+  expect_error(hammel:::adjusted_fertility_cpp(raw,1),"open-band eligibility")
+  raw$rate[2] <- 1.1
+  expect_error(hammel:::adjusted_fertility_cpp(raw,1),"open-band eligibility")
+})
+
+test_that("explicit zero fertility tails preserve histories and positive tails execute", {
+  model <- make_model(50,sex="f",age=45,birth_rate=.1)
+  rates <- model$processes$fertility$rates
+  zero <- set_fertility(model,rbind(rates,data.frame(age_start=50,age_end=Inf,rate=0)))
+  expect_identical(simulate(model,10,42),simulate(zero,10,42))
+  positive <- make_model(100,sex="f",age=60,birth_rate=0)
+  positive <- set_fertility(positive,data.frame(age_start=55,age_end=Inf,rate=.2))
+  result <- simulate(positive,2,42)
+  expect_gt(result$simulation$births,0)
 })
 
 test_that("independent mortality preserves constant fertility after burn-in", {

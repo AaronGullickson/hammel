@@ -41,7 +41,8 @@ be made autonomously; record choices with substantial architectural consequences
   Public times/durations are years, exposure is person-years, and input rates are
   per person-year. The current engine executes continuously (D024), with no
   monthly increment or execution-step parameter. Fertility uses midpoint
-  compensation on the original finite input age bands (D028), not a monthly grid.
+  compensation on original finite age bands (D028), with the interior-limit
+  adjustment f/(1-b*f) for upper-open bands (D095), not a monthly grid.
   Mortality and adjusted fertility share `Band` and `waiting_time()`. Do not
   reintroduce superseded monthly timing or the specialized exact fertility sampler
   without an explicit modeling decision.

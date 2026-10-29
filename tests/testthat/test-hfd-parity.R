@@ -1,20 +1,20 @@
 hfd_parity_fixture <- function() {
   data.frame(Year=c(1999,2000,2000,2000,2000),
     Age=c("20","12-","20","21","55+"),
-    m1x=c(.9,.001,.12,.13,.001),m2x=c(.8,NA,.20,.21,.001),
-    m3x=c(.7,NA,.15,.16,.001),m4x=c(.6,NA,.10,.11,.001),
-    m5x=c(.5,NA,.08,.09,.001))
+    m1x=c(.9,.001,.12,.13,.001),m2x=c(.8,0,.20,.21,.001),
+    m3x=c(.7,0,.15,.16,.001),m4x=c(.6,0,.10,.11,.001),
+    m5x=c(.5,0,.08,.09,.001))
 }
 
 test_that("HFD conditional rates map birth order to half-open current parity", {
   rates <- hammel:::fertility_by_parity_from_hfd(hfd_parity_fixture(),2000)
   expect_s3_class(rates,"tbl_df")
   expect_named(rates,c("age_start","age_end","parity_start","parity_end","rate"))
-  expect_equal(rates$age_start,rep(c(20,21),5))
-  expect_equal(rates$age_end,rep(c(21,22),5))
-  expect_equal(rates$parity_start,rep(0:4,each=2))
-  expect_equal(rates$parity_end,rep(c(1,2,3,4,Inf),each=2))
-  expect_equal(rates$rate,c(.12,.13,.20,.21,.15,.16,.10,.11,.08,.09))
+  expect_equal(rates$age_start,rep(c(12,20,21,55),5))
+  expect_equal(rates$age_end,rep(c(13,21,22,Inf),5))
+  expect_equal(rates$parity_start,rep(0:4,each=4))
+  expect_equal(rates$parity_end,rep(c(1,2,3,4,Inf),each=4))
+  expect_equal(rates$rate,c(.001,.12,.13,.001,0,.20,.21,.001,0,.15,.16,.001,0,.10,.11,.001,0,.08,.09,.001))
   expect_error(fertility(rates),"not yet implemented")
 })
 
@@ -22,9 +22,9 @@ test_that("conditional preparation retains missing cells and explicit zeros", {
   raw <- hfd_parity_fixture()
   raw$m4x[3] <- NA_real_; raw$m5x[3] <- 0
   expect_warning(rates <- hammel:::fertility_by_parity_from_hfd(raw,2000),"retained as NA")
-  expect_true(is.na(rates$rate[7]))
-  expect_equal(rates$rate[9],0)
-  expect_equal(nrow(rates),10)
+  expect_true(is.na(rates$rate[14]))
+  expect_equal(rates$rate[18],0)
+  expect_equal(nrow(rates),20)
 })
 
 test_that("conditional preparation rejects incompatible products and invalid values", {
@@ -42,7 +42,7 @@ test_that("conditional preparation rejects incompatible products and invalid val
   expect_error(hammel:::fertility_by_parity_from_hfd(bad,2000),"numeric")
   bad <- raw; bad$Age[3] <- "20-24"
   expect_error(hammel:::fertility_by_parity_from_hfd(bad,2000),"single-year")
-  expect_error(hammel:::fertility_by_parity_from_hfd(raw[c(2,5), ],2000),"No closed")
+  expect_equal(nrow(hammel:::fertility_by_parity_from_hfd(raw[c(2,5), ],2000)),10)
   expect_error(hammel:::fertility_by_parity_from_hfd(rbind(raw,raw[3, ]),2000),"duplicate")
   for (bad in list(NULL,NA,1,c(TRUE,FALSE),matrix(TRUE)))
     expect_error(get_fertility_hfd("USA",2000,"test","test",by_parity=bad),"by_parity")
@@ -65,7 +65,7 @@ test_that("conditional HFD reader preserves values, revision and safe provenance
     expect_equal(source$update,"20260702")
     expect_equal(source$rate_type,"conditional_age_parity")
     expect_equal(source$missing_rates,"preserve_NA")
-    expect_equal(source$open_ages,"omit")
+    expect_equal(source$open_ages,"lower_as_single_year_upper_open")
     expect_false(any(c("username","password") %in% names(source)))
     path <- tempfile(); on.exit(unlink(path),add=TRUE)
     saveRDS(rates,path)
@@ -80,8 +80,8 @@ test_that("local HFD parsing handles conditional headers and missing dots", {
   skip_if_not_installed("HMDHFDplus")
   path <- tempfile(fileext=".txt"); on.exit(unlink(path),add=TRUE)
   writeLines(c("Synthetic conditional HFD fixture","", "Year Age m1x m2x m3x m4x m5x",
-    "2000 12- 0.001 . . . .", "2000 20 0.12 0.20 0.15 0.10 0.08",
-    "2000 21 0.13 0.21 0.16 0.11 0.09", "2000 55+ 0.001 . . . ."),path)
+    "2000 12- 0.001 0 0 0 0", "2000 20 0.12 0.20 0.15 0.10 0.08",
+    "2000 21 0.13 0.21 0.16 0.11 0.09", "2000 55+ 0.001 0.001 0.001 0.001 0.001"),path)
   raw <- HMDHFDplus::readHFD(path,fixup=FALSE,item="mi")
   expect_equal(hammel:::fertility_by_parity_from_hfd(raw,2000),
     hammel:::fertility_by_parity_from_hfd(hfd_parity_fixture(),2000))

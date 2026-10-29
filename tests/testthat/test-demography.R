@@ -246,3 +246,24 @@ test_that("TFR separates union statuses in input tables and fertility processes"
   rates$rate[3] <- NA_real_
   expect_equal(calculate_tfr(rates)$tfr, c(NA_real_, 3.5))
 })
+
+test_that("TFR warns only for known nonzero female open-age rates", {
+  rates <- data.frame(age_start=c(15,20,50),age_end=c(20,50,Inf),rate=c(.1,.1,.01))
+  expect_warning(x <- calculate_tfr(rates),"TFR.*underestimated")
+  expect_equal(x$tfr,3.5)
+  expect_equal(x$age_end,50)
+  rates$rate[3] <- 0
+  expect_warning(calculate_tfr(rates),NA)
+  rates$rate[3] <- NA_real_
+  expect_warning(calculate_tfr(rates),NA)
+  rates$rate[3] <- .01
+  rates$sex <- "m"
+  expect_warning(calculate_tfr(rates),NA)
+  rates$sex <- "f"
+  rates$union_type <- "partnered"
+  expect_warning(calculate_tfr(rbind(rates,transform(rates,union_type="unpartnered"))),
+    "TFR.*underestimated")
+  only <- rates[3, ]
+  expect_warning(empty <- calculate_tfr(only),"TFR.*underestimated")
+  expect_equal(nrow(empty),0)
+})

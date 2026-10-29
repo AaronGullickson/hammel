@@ -87,9 +87,9 @@ database_source <- function(database, country, year, item, update = NULL) {
 #' Parity tables prepare data for milestone 5; parity-dependent execution is
 #' not yet implemented and fertility constructors reject parity columns.
 #'
-#' HFD open-age rows such as `12-` and `55+` are omitted. The resulting
-#' schedule covers only closed single-year age bands, so its TFR excludes those
-#' endpoint contributions. No rates are supplied outside the retained schedule.
+#' HFD endpoint rows are retained: `12-` is represented as `[12,13)` using its
+#' supplied rate, and `55+` as `[55,Inf)`. TFR omits the upper-open band and warns
+#' if its rate is nonzero. No rates are supplied outside the represented schedule.
 #' Credentials are never retained in the table.
 #'
 #' @param country A single HFD population code.
@@ -138,37 +138,32 @@ get_fertility_hfd <- function(country, year, username = Sys.getenv("HFD_USERNAME
     attr(rates, "source")$parity_mapping <- "birth orders 1,2,3,4,5+ -> current parity 0,1,2,3,4+"
     attr(rates, "source")$missing_rates <- "preserve_NA"
   }
-  attr(rates, "source")$open_ages <- "omit"
+  attr(rates, "source")$open_ages <- "lower_as_single_year_upper_open"
   rates
+}
+
+hfd_age_intervals <- function(data) {
+  ages <- trimws(as.character(data$Age))
+  if (anyNA(ages) || any(!grepl("^[0-9]+[-+]?$", ages)))
+    stop("Expected single-year HFD ages with optional endpoint signs.", call. = FALSE)
+  starts <- as.numeric(sub("[-+]$", "", ages))
+  if (anyDuplicated(starts)) stop("HFD rates have duplicate age bands.", call. = FALSE)
+  tibble::tibble(age_start = starts,
+    age_end = ifelse(grepl("[+]$", ages), Inf, starts + 1))
 }
 
 fertility_from_hfd <- function(data, year) {
   data <- select_database_year(data, year, "ASFR")
-  ages <- trimws(as.character(data$Age))
-  if (anyNA(ages) || any(!grepl("^[0-9]+[-+]?$", ages))) {
-    stop("Expected single-year HFD ages with optional endpoint signs.",
-         call. = FALSE)
-  }
-  open <- grepl("[-+]$", ages)
-  data <- data[!open, , drop = FALSE]
-  ages <- ages[!open]
-  starts <- as.numeric(sub("[-+]$", "", ages))
-  fertility(data.frame(age_start = starts, age_end = starts + 1,
+  ages <- hfd_age_intervals(data)
+  fertility(data.frame(age_start = ages$age_start, age_end = ages$age_end,
                        rate = data$ASFR))
 }
-
 
 fertility_by_parity_from_hfd <- function(data, year) {
   columns <- paste0("m", 1:5, "x")
   data <- select_database_year(data, year, columns)
-  ages <- trimws(as.character(data$Age))
-  if (anyNA(ages) || any(!grepl("^[0-9]+[-+]?$", ages)))
-    stop("Expected single-year HFD ages with optional endpoint signs.", call. = FALSE)
-  keep <- !grepl("[-+]$", ages)
-  data <- data[keep, , drop = FALSE]
-  starts <- as.numeric(ages[keep])
-  if (!length(starts)) stop("No closed single-year HFD age bands remain.", call. = FALSE)
-  if (anyDuplicated(starts)) stop("HFD conditional rates have duplicate age bands.", call. = FALSE)
+  ages <- hfd_age_intervals(data)
+  starts <- ages$age_start
   for (column in columns) {
     check_numeric_column(data[[column]], paste0("HFD ", column), missing = TRUE)
     if (any(data[[column]] < 0, na.rm = TRUE))
@@ -176,7 +171,7 @@ fertility_by_parity_from_hfd <- function(data, year) {
   }
   rates <- tibble::tibble(
     age_start = rep(starts, times = 5L),
-    age_end = rep(starts + 1, times = 5L),
+    age_end = rep(ages$age_end, times = 5L),
     parity_start = rep(0:4, each = length(starts)),
     parity_end = rep(c(1:4, Inf), each = length(starts)),
     rate = unlist(data[columns], use.names = FALSE)

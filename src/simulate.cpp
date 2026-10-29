@@ -126,24 +126,27 @@ double rate_integral(const std::vector<Band>& bands, double lo, double hi) {
   return total;
 }
 
-// Calculate one constant eligible hazard at each original band's midpoint.
+// Calculate one constant eligible hazard per original band: finite midpoint
+// or interior constant-rate limit for an upper-open band.
 // Integrate the unadjusted rates across the preceding birth interval, including
 // overlaps with earlier bands and gaps. Event sampling uses the ordinary Band
 // representation and shared constant-hazard waiting_time() function.
 std::vector<Band> adjusted_fertility(const std::vector<Band>& raw,
                                     double birth_interval) {
-  for (const Band& band : raw) {
-    if (!std::isfinite(band.end)) stop("Fertility age bands must have finite ends.");
-  }
   if (birth_interval == 0) return raw;
   std::vector<Band> adjusted;
   for (const Band& band : raw) {
     checkUserInterrupt();
-    const double midpoint = band.start + (band.end - band.start) / 2;
-    const double eligible = 1 - rate_integral(raw,
-      std::max(0.0, midpoint - birth_interval), midpoint);
+    const bool open = !std::isfinite(band.end);
+    double excluded = birth_interval * band.rate;
+    if (!open) {
+      const double midpoint = band.start + (band.end - band.start) / 2;
+      excluded = rate_integral(raw, std::max(0.0, midpoint - birth_interval), midpoint);
+    }
+    const double eligible = 1 - excluded;
     if (!(eligible > 0))
-      stop("Birth interval and fertility rates imply nonpositive midpoint eligibility.");
+      stop(open ? "Birth interval and fertility rates imply nonpositive open-band eligibility." :
+        "Birth interval and fertility rates imply nonpositive midpoint eligibility.");
     const double rate = band.rate / eligible;
     if (!std::isfinite(rate)) stop("Adjusted fertility rate cannot be represented.");
     adjusted.push_back({band.start, band.end, rate});

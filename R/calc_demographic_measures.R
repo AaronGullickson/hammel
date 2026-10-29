@@ -202,7 +202,9 @@ summary_rows <- function(table, by_sex = FALSE, by_union_status = FALSE) {
 #' Calculate total fertility rates
 #'
 #' Sum age-specific fertility rates times their actual interval widths.
-#' Open-ended age bands are omitted. The remaining finite, contiguous age range
+#' Open-ended age bands are omitted, warning if an omitted female rate is known
+#' and nonzero that TFR underestimates fertility over the full age range. Zero or
+#' missing omitted rates do not trigger that warning. The remaining finite, contiguous age range
 #' defines the TFR reported. Any missing ASFR in those bands makes the TFR missing.
 #' When `union_type` (or a legacy `union_status` column) is present, calculate
 #' a separate sum for each stratum
@@ -238,10 +240,12 @@ calculate_tfr <- function(rates) {
   check_numeric_column(rates$age_start, "rates$age_start")
   if (!is.numeric(rates$age_end) || anyNA(rates$age_end))
     stop("`age_end` must contain numeric age boundaries without missing values.", call. = FALSE)
-  rates <- rates[is.finite(rates$age_end), , drop = FALSE]
-  groups <- intersect(c("time_start", "time_end", "group", "union_status", "union_type"), names(rates))
   check_numeric_column(rates$rate_fertility, "rates$rate_fertility", missing = TRUE)
   if (any(rates$rate_fertility < 0, na.rm = TRUE)) stop("ASFRs must be nonnegative.", call. = FALSE)
+  if (any(!is.finite(rates$age_end) & rates$rate_fertility != 0, na.rm = TRUE))
+    warning("TFR omits an open age band with non-zero fertility; TFR is underestimated over the full age range.", call. = FALSE)
+  rates <- rates[is.finite(rates$age_end), , drop = FALSE]
+  groups <- intersect(c("time_start", "time_end", "group", "union_status", "union_type"), names(rates))
   if (!nrow(rates)) {
     result <- rates[FALSE, c(groups, "age_start", "age_end"), drop = FALSE]
     result$tfr <- numeric()

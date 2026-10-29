@@ -120,8 +120,11 @@ rates contribute zero. For example, two five-year bands with rates 0.1 and
 excluded open age bands do not affect TFR. Inspect exposure and missing rates
 alongside TFR; when summarizing with `na.rm = TRUE`, report the number of
 nonmissing TFRs because the summary includes only complete estimates.
-HFD input TFR excludes the omitted open endpoint rows, so do not compare it
-uncritically with the full published HFD TFR.
+TFR warns if it omits a known nonzero upper-open rate, since the finite-range
+result underestimates full-age fertility. Zero or missing omitted rates do not
+trigger this warning. HFD preparation now maps 12- to [12,13) and 55+ to
+[55,Inf), preserving their rates; TFR drops only the upper-open row and need
+not equal HFD's full published TFR.
 
 ## Life tables
 

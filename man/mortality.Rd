@@ -18,7 +18,7 @@ fertility(
 \arguments{
 \item{rates}{A nonempty data frame containing numeric \code{age_start}, \code{age_end},
 and \code{rate}. Starts must be finite and nonnegative; ends must exceed starts
-and must be finite for fertility; mortality ends may be \code{Inf}. Rates must
+and may be \code{Inf} for upper-open bands. Rates must
 be finite and nonnegative. Mortality additionally
 requires character \code{sex} values \code{"m"} and \code{"f"}, with both represented.}
 
@@ -91,13 +91,16 @@ suppress births in a status. Overlap is checked separately within each status.
 On-demand union formation requires overall rates; rate-based formation accepts
 either form and warns when an overall schedule is used.
 
-For fertility, one adjusted hazard is calculated at each original band's
-midpoint: the input rate divided by one minus the input fertility integral
+For finite fertility bands, one adjusted hazard is calculated at each original
+band's midpoint: the input rate divided by one minus the input fertility integral
 over the preceding \code{birth_interval}. The integral accounts for overlaps with
 other input bands within the same status schedule. Execution rejects
 nonpositive midpoint eligibility. Birth spacing persists across status changes;
 compensation for the prior status history is not implemented.
-This approximates the age-varying adjustment; initialization is not calibrated.
+Upper-open age bands use the interior-limit adjustment \code{f / (1 - b * f)}
+for input rate f and birth interval b, rejecting nonpositive eligibility.
+This approximates the first b years after entry, where preceding bands may
+matter. This approximates the age-varying adjustment; initialization is not calibrated.
 }
 \examples{
 deaths <- mortality(data.frame(sex = c("m", "f"), age_start = 0,

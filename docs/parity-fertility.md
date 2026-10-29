@@ -32,7 +32,9 @@ and unadjusted annual rates. The default FALSE retains the existing total-rate
 `asfrRR` import. An optional `update` pins the HFD revision; source metadata
 records the product and the birth-order/current-parity mapping without retaining
 credentials. Missing products or years are errors, with no fallback to totals.
-The existing omission of open age endpoints (12-, 55+) applies to both products.
+Under D095 both products retain endpoint rows: 12- maps to [12,13) and
+55+ maps to [55,Inf), preserving supplied rates. This supersedes their earlier
+omission; source metadata records the convention.
 
 HFD unavailable age/parity cells remain `NA`, with a warning; they are not zero
 rates and are not dropped or interpolated. This allows inspection and saving of

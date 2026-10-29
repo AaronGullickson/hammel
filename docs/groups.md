@@ -92,7 +92,8 @@ complete coverage of `[0, Inf)` at execution. Each conditional fertility group
 needs both statuses. Fertility and search gaps continue to mean zero risk.
 Units remain events per person-year and all times remain continuous years.
 Fertility midpoint compensation is computed independently for each group/status
-schedule using the original finite bands and existing birth-spacing rules.
+schedule using original bands and existing birth-spacing rules: finite
+bands use midpoints, while upper-open bands use the interior limit (D095).
 
 ## Births and unions
 

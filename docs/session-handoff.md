@@ -102,3 +102,10 @@ NA with a warning. Parity execution, initialization, compensation, observation
 and heterogeneity are not implemented; constructors reject parity columns.
 See [parity fertility](parity-fertility.md). Preserve the user's new
 validation/milestone5.qmd; it is not part of the importer changes.
+
+
+D095 additionally allows upper-open fertility age bands, with interior-limit
+birth-spacing adjustment f/(1-b*f), retaining finite-band midpoint behavior.
+TFR drops upper-open rows and warns on known nonzero omitted fertility. HFD
+helpers now retain 12- as [12,13) and 55+ as [55,Inf), superseding endpoint
+omission in D094. This still does not implement parity-dependent execution.

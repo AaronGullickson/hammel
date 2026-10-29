@@ -175,7 +175,8 @@ See [group inheritance](group-inheritance.md) for rules and worked examples.
 
 ### Midpoint compensation (D028)
 
-Calculate one adjusted hazard per original finite input band. For band `[L,U)`,
+Calculate one adjusted hazard per original input band. Finite bands retain
+midpoint adjustment; an upper-open band uses the interior-limit rule (D095). For band `[L,U)`,
 midpoint `m = L + (U-L)/2`, input rate `f`, and spacing `b`:
 
     eligibility_mid = 1 - integral from max(0, m-b) to m of input_ASFR(a) da
@@ -193,6 +194,13 @@ At midpoint 25.5, with spacing 0.75, input 0.1 on `[24,25)` and 0.2 on
 `[25,26)`, the excluded fraction is `0.25*0.1 + 0.5*0.2 = 0.125`.
 Eligibility is 0.875 and the adjusted rate for `[25,26)` is `0.2/0.875`.
 A longer spacing window may cross several bands and gaps; all overlaps count.
+
+For an upper-open band `[L, Inf)`, use eligibility `1 - b*f` and adjusted
+hazard `f/(1-b*f)` throughout the band. Zero rates remain zero and zero spacing
+leaves rates unchanged. Reject nonpositive eligibility. This is the limiting
+constant-rate adjustment once the preceding spacing window lies wholly within
+the open band; the first b years may overlap earlier bands and are approximated.
+There is no artificial midpoint and no finite age cap on a positive open-band rate.
 
 When the window lies wholly in a constant-rate region, adjustment is
 `h = f/(1-b*f)`. With `f=0.2` and `b=0.75`, eligibility is 0.85;
@@ -507,6 +515,8 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   `unassigned_births`; their births cannot be assigned an age-specific rate.
 - `calculate_tfr()` selects female rows, omits open age bands, and sums
   `rate_fertility * band_width` over the remaining contiguous finite bands by period.
+  Omit open age bands, warning once per call if an omitted female rate is known
+  and nonzero because the reported TFR underestimates full-age fertility.
   Any missing ASFR in the included finite bands makes the corresponding
   period/group/status TFR `NA`, including an all-missing set. Known zero rates
   contribute zero; missing rates in excluded open bands do not affect TFR. There is no `age_range` argument.
@@ -566,20 +576,20 @@ single-year ages become `[age,age+1)` and the open age becomes `[age,Inf)`.
 Respect both raw `+` labels and parsed `OpenInterval` indicators, including
 HMDHFDplus 2.0.8 behavior. Missing retained rates are rejected, not filled.
 
-By default HFD uses total `asfrRR` in births per woman-year without scaling. Omit open-age
-rows such as `12-` and `55+`; map retained closed ages to one-year intervals.
-No fertility is inferred outside them. Input-derived TFR excludes endpoint
-contributions and need not equal HFD's full published TFR. Open endpoint rates
-are aggregate categories, not evidence for an individual hazard at arbitrarily
-young or old ages.
+By default HFD uses total `asfrRR` in births per woman-year without scaling.
+D095 retains all endpoint rows: map 12- to [12,13) with its supplied rate,
+55+ to [55,Inf), and closed ages to one-year bands. This is the selected model
+representation of the source aggregates, not a re-estimation of their rates.
+TFR includes the lower represented band but drops the upper-open band, warning
+if its known rate is nonzero; it need not equal the full published HFD TFR.
 
 Record database, population, year, product, retrieval timestamp, and reader
-version. HFD records requested revision date and endpoint omission. A null
+version. HFD records requested revision date and endpoint mapping. A null
 revision requests the current release; it does not pin a historical revision.
 Synthetic/local-reader tests establish conversions; live requests are opt-in.
 For data preparation only, `get_fertility_hfd(..., by_parity = TRUE)` imports
-conditional mi rates with half-open current-parity bounds (D094). Open age
-endpoints remain omitted. Missing conditional cells remain NA with a warning,
+conditional mi rates with half-open current-parity bounds (D094). Endpoint
+rows use the D095 mapping above. Missing conditional cells remain NA with a warning,
 not zero risks; no parity-dependent simulation or compensation is implemented.
 Fertility constructors reject parity columns until execution is implemented.
 See [parity fertility](parity-fertility.md) for the birth-order/parity mapping.

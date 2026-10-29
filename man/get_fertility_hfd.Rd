@@ -47,9 +47,9 @@ Parity tables prepare data for milestone 5; parity-dependent execution is
 not yet implemented and fertility constructors reject parity columns.
 }
 \details{
-HFD open-age rows such as \verb{12-} and \verb{55+} are omitted. The resulting
-schedule covers only closed single-year age bands, so its TFR excludes those
-endpoint contributions. No rates are supplied outside the retained schedule.
+HFD endpoint rows are retained: \verb{12-} is represented as \verb{[12,13)} using its
+supplied rate, and \verb{55+} as \verb{[55,Inf)}. TFR omits the upper-open band and warns
+if its rate is nonzero. No rates are supplied outside the represented schedule.
 Credentials are never retained in the table.
 }
 \examples{

@@ -18,18 +18,18 @@ test_that("HMD conversion selects the year and preserves rates and open ages", {
   expect_error(get_mortality_hmd("USA", c(2000, 2001), "test", "test"))
 })
 
-test_that("HFD conversion omits open ages and rejects invalid retained rates", {
+test_that("HFD conversion represents both endpoints and rejects invalid rates", {
   hfd <- data.frame(Year = c(1999, rep(2000, 4)), Age = c("20", "12-", "13", "14", "55+"),
     ASFR = c(0.9, 0.003, 0.01, 0.02, 0.001))
   births <- hammel:::fertility_from_hfd(hfd, 2000)
-  expect_identical(births$rates$age_start, c(13, 14))
-  expect_identical(births$rates$age_end, c(14, 15))
-  expect_identical(births$rates$rate, c(0.01, 0.02))
+  expect_identical(births$rates$age_start, c(12, 13, 14, 55))
+  expect_identical(births$rates$age_end, c(13, 14, 15, Inf))
+  expect_identical(births$rates$rate, c(0.003, 0.01, 0.02, 0.001))
   expect_error(hammel:::fertility_from_hfd(hfd, 2001))
   bad <- hfd
   bad$ASFR[3] <- NA_real_
   expect_error(hammel:::fertility_from_hfd(bad, 2000))
-  expect_error(hammel:::fertility_from_hfd(hfd[c(2, 5), ], 2000))
+  expect_equal(nrow(hammel:::fertility_from_hfd(hfd[c(2, 5), ], 2000)$rates), 2)
   bad <- hfd
   bad$Age[3] <- "13-17"
   expect_error(hammel:::fertility_from_hfd(bad, 2000))
@@ -126,7 +126,7 @@ test_that("HFD downloads preserve revision metadata and rates can be reused with
         })
       imported <- model$processes$fertility
       expect_identical(imported$rates$rate, births$rates$rate)
-      expect_equal(imported$source$open_ages, "omit", tolerance = 0)
+      expect_equal(imported$source$open_ages, "lower_as_single_year_upper_open", tolerance = 0)
       expect_equal(imported$source$update, "20230328", tolerance = 0)
     })
   })

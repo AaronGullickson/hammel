@@ -37,6 +37,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Unpartnered birth extraction | D092 |
 | Milestone 4 completion and retained validation evidence | D093 |
 | Parity schedule bands and HFD preparation | D094 |
+| Open fertility age bands, HFD endpoints and TFR warnings | D095 |
 
 ## Recorded decisions
 
@@ -338,8 +339,8 @@ D028. Year-valued fractional spacing remains current.
 
 ## D028: Midpoint approximation using the shared hazard sampler
 
-**Current status:** Current midpoint compensation, shared sampler, and finite fertility
-inputs.
+**Current status:** Finite-band midpoint compensation and the shared sampler
+remain current. D095 supersedes the prohibition on upper-open fertility inputs.
 
 - **Status:** accepted October 13, 2026.
 - **Decision:** calculate one adjusted rate at each original fertility band's
@@ -1899,3 +1900,25 @@ cohabitation policy. Duration stratification is unchanged.
 - **Specification:** [parity fertility design/preparation](parity-fertility.md).
   Offline synthetic fixtures verify mapping and metadata; no live download or
   demographic validation is implied by those tests.
+
+
+## D095 — Open fertility ages, HFD endpoints and truncated TFR (October 29, 2026)
+
+- **Status:** accepted by the user.
+- **Decision:** allow upper-open fertility age bands. Their birth-spacing
+  compensation is the interior limit h=f/(1-b*f), with zero rate staying zero,
+  zero spacing unchanged and nonpositive eligibility rejected. Finite bands
+  retain D028's original midpoint calculation. The first b years in an open band
+  approximate the effect of preceding rates; no artificial midpoint is assigned.
+- **TFR:** omit upper-open age bands as before, warning when a known omitted
+  female rate is nonzero that the resulting TFR underestimates full-age fertility.
+  Zero omitted rates do not warn. Missing omitted rates remain unknown, not zero.
+- **HFD:** the user additionally selected preserving endpoint rows: map 12- to
+  [12,13) using its supplied rate, and 55+ to [55,Inf). This applies to total
+  asfrRR and conditional mi preparation. Record the changed endpoint convention
+  in source metadata. The lower-open value is represented at its labeled age,
+  not recomputed into a new empirical estimate. Missing conditional cells still
+  remain NA under D094. No parity engine execution is added.
+- **Supersession:** replaces D028's blanket finite-age restriction and D094's
+  earlier inherited omission of HFD open endpoints. Other timing/spacing,
+  missing-data and parity-preparation decisions remain in force.

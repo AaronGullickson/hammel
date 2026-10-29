@@ -20,7 +20,9 @@ If \code{sex} is present, only female rows are used.
 }
 \description{
 Sum age-specific fertility rates times their actual interval widths.
-Open-ended age bands are omitted. The remaining finite, contiguous age range
+Open-ended age bands are omitted, warning if an omitted female rate is known
+and nonzero that TFR underestimates fertility over the full age range. Zero or
+missing omitted rates do not trigger that warning. The remaining finite, contiguous age range
 defines the TFR reported. Any missing ASFR in those bands makes the TFR missing.
 When \code{union_type} (or a legacy \code{union_status} column) is present, calculate
 a separate sum for each stratum

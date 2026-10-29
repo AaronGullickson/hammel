@@ -643,3 +643,18 @@ provenance. Existing total-rate/database and status-fertility tests passed.
 Parity tables are rejected for simulation until engine support is implemented.
 No live HFD data or credentials were used and no engine changes were made.
 The user's validation/milestone5.qmd was left unchanged.
+
+
+## Upper-open fertility age bands (D095, October 29, 2026)
+
+`TZ=UTC Rscript -e 'devtools::test(reporter="summary")'` passed the full suite
+without failures or warnings; the opt-in live database test was skipped.
+Targeted fertility-adjustment, demographic and database checks also passed.
+Analytical tests cover the interior-limit adjustment f/(1-b*f), zero spacing,
+zero fertility and infeasible eligibility. Execution tests verify births above
+age 55 and complete fixed-seed history equality after adding a zero upper tail.
+TFR tests verify truncated finite-range results, warnings for nonzero omitted
+female open-band rates, no such warning for zero/unknown rates, strata and
+empty results. Offline HFD fixtures verify 12- -> [12,13), 55+ -> [55,Inf),
+parity bounds, unchanged annual values, missing cells and provenance. No HFD
+rates were downloaded. The user's milestone5 report was not modified.

@@ -132,17 +132,20 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #' On-demand union formation requires overall rates; rate-based formation accepts
 #' either form and warns when an overall schedule is used.
 #'
-#' For fertility, one adjusted hazard is calculated at each original band's
-#' midpoint: the input rate divided by one minus the input fertility integral
+#' For finite fertility bands, one adjusted hazard is calculated at each original
+#' band's midpoint: the input rate divided by one minus the input fertility integral
 #' over the preceding `birth_interval`. The integral accounts for overlaps with
 #' other input bands within the same status schedule. Execution rejects
 #' nonpositive midpoint eligibility. Birth spacing persists across status changes;
 #' compensation for the prior status history is not implemented.
-#' This approximates the age-varying adjustment; initialization is not calibrated.
+#' Upper-open age bands use the interior-limit adjustment `f / (1 - b * f)`
+#' for input rate f and birth interval b, rejecting nonpositive eligibility.
+#' This approximates the first b years after entry, where preceding bands may
+#' matter. This approximates the age-varying adjustment; initialization is not calibrated.
 #'
 #' @param rates A nonempty data frame containing numeric `age_start`, `age_end`,
 #'   and `rate`. Starts must be finite and nonnegative; ends must exceed starts
-#'   and must be finite for fertility; mortality ends may be `Inf`. Rates must
+#'   and may be `Inf` for upper-open bands. Rates must
 #'   be finite and nonnegative. Mortality additionally
 #'   requires character `sex` values `"m"` and `"f"`, with both represented.
 #' @param birth_interval Minimum maternal birth-to-birth interval in years,
@@ -241,9 +244,6 @@ validate_rates <- function(rates, mortality) {
       any(ends <= rates$age_start) || any(rates$age_start < 0)) {
     stop("Age intervals must have nonnegative starts and greater ends (possibly Inf).",
          call. = FALSE)
-  }
-  if (!mortality && any(!is.finite(ends))) {
-    stop("Fertility age bands must have finite ends.", call. = FALSE)
   }
   if (any(rates$rate < 0)) {
     stop("`rates$rate` must be nonnegative.", call. = FALSE)
