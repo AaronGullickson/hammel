@@ -23,6 +23,7 @@ future work.
 | [Weighted-choice matching](weighted-choice-matching.md) | Calibrated male-group weights and delta target adjustments (D074/D075) |
 | [Group matching](group-matching.md) | Symmetric pair effects and fixed group formula predictors |
 | [Demographic analysis](demographic-analysis.md) | Separate mortality/fertility rates, parity ASFRs, union rates, TFR, and life tables |
+| [Parity spacing investigation](parity-spacing-investigation.md) | Current recovery evidence, SOCSIM reference and collaboration questions |
 | [Testing and validation](testing.md) | Test commands, evidence, and remaining validation |
 | [Current handoff](session-handoff.md) | Recent findings, active work, and deferred issues |
 

@@ -717,3 +717,11 @@ Observed parity-specific ASFRs use `calculate_fertility_rates(parity_breaks = ..
 appended to a finite final boundary. All recorded maternal births determine
 parity; births count before advancing parity and subsequent exposure uses the
 new parity. Spacing-excluded time remains exposure. See [parity observations](parity-fertility.md#observed-fertility-by-parity).
+
+
+The [spacing-calibration investigation](parity-spacing-investigation.md) records
+user-reported later-window parity-rate failures and a controlled executable
+SOCSIM comparison. Positive-spacing compensation remains a known scientific
+limitation; passing software tests and zero-spacing recovery do not validate it.
+A general eligibility-calibration approach is under discussion, with no accepted
+replacement algorithm.

@@ -2,8 +2,10 @@
 
 Updated October 29, 2026. Static source audits cover rates, competing events,
 union formation, [dissolution and remarriage](socsim-dissolution-audit.md), and
-[cohabitation](socsim-cohabitation-audit.md) for milestone 4. No executable reference validation or comprehensive audit of
-all variants has been performed. References below are starting points recorded
+[cohabitation](socsim-cohabitation-audit.md) for milestone 4. A narrow
+[parity/spacing reference experiment](../validation/milestone5/socsim/README.md)
+now provides executable evidence. No comprehensive audit or validation of all
+variants has been performed. References below are starting points recorded
 in the earlier conversation.
 
 ## Establish the reference
@@ -71,7 +73,9 @@ from the accepted Hammel validation report.
 The [parity/spacing trace](socsim-parity-spacing-audit.md), inspected October 29,
 2026 at the same pinned commit, verifies SOCSIM's previous-parity adjustment,
 unadjusted parity zero, actual history-derived parity and highest-parity copy.
-It is a static trace, not executable evidence or an accepted Hammel correction.
+That trace was initially static. The subsequent [toy reference experiment](../validation/milestone5/socsim/README.md)
+provides executable evidence for this narrow parity/spacing question; it is not
+a comprehensive SOCSIM validation or acceptance of a replacement correction.
 
 ## Reference links
 

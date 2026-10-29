@@ -19,3 +19,18 @@ does not recover the higher-parity target rates in this case. See
 [the parity specification](../../docs/parity-fertility.md) and
 [testing](../../docs/testing.md) for the interpretation and limits. No empirical
 rates, credentials or live downloads are needed; no SOCSIM run is implied.
+
+
+The [SOCSIM reference experiment](socsim/README.md) adds independent executable
+evidence: initialized cohorts, later generational windows, and age-18 rates
+with/without spacing, including MCSEs and explicit zero-spacing limitations.
+
+
+`check-composition-spacing.R` is an independent toy simulation (not engine
+code) comparing no spacing, the D099/SOCSIM preceding-parity correction, and a
+candidate composition-based correction derived from the target synthetic
+cohort. Run `Rscript validation/milestone5/check-composition-spacing.R` from the
+repository root to regenerate `composition-spacing-summary.csv` (dt = .0025,
+seed 9601); pass a step size, e.g. `0.001`, to print a sensitivity rerun
+without writing. The candidate is not an accepted model; see
+[the investigation](../../docs/parity-spacing-investigation.md).

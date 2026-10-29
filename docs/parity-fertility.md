@@ -223,3 +223,15 @@ function returns the other process's counts or rates. Unknown-mother births
 remain in the fertility table's period-level `unassigned_births` attribute.
 Summing parity counts and exposure recovers pooled female counts and exposure;
 zero exposure gives NA rates. These are conditional on complete supplied history.
+
+
+## Current spacing-calibration investigation
+
+The user's later-window empirical-schedule checks also show large high-parity
+shortfalls with positive spacing and close recovery with spacing disabled. See
+[the investigation and collaboration handoff](parity-spacing-investigation.md)
+for those reported numbers, the independent SOCSIM reference experiment, a
+composition diagnosis of the preceding-parity correction with a candidate
+cohort-based alternative, and unresolved questions. A general eligibility-calibration framework is proposed
+for investigation only; no replacement algorithm has been selected. D099
+remains the implemented approximation with a known rate-recovery limitation.

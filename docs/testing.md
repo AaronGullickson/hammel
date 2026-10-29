@@ -747,3 +747,28 @@ successive parity progression for simultaneous recorded births. Existing pooled
 Lexis tests continue exercising the shared internal kernel. No simulation
 behavior or fertility compensation was changed. The user-authored milestone 5
 report was not edited by this work.
+
+
+## Executable SOCSIM parity/spacing reference (October 29, 2026)
+
+Built an unmodified scratch copy of MPIDR/rsocsim commit
+`125450cff968bb3ff762fa99d4c926a8136062a2` (GPLv3), installed only under /tmp.
+No engine source copied into Hammel, network rates downloaded, or Hammel engine
+changes made. Forty independent fresh-process reference jobs completed: ten
+seeds per birth-interval/experiment combination. Conditional maternal parity and
+monthly exposure were reconstructed independently from raw output. Saved
+[replications, summaries and reproduction scripts](../validation/milestone5/socsim/README.md)
+include initialized cohorts and 100-year generational runs. All 20 generational
+histories passed explicit unity-fertility-multiplier checks; output categories
+remained single. The cohort exposure/event accounting is checked in the runner.
+
+The initialized-cohort higher-parity shortfall is also present in SOCSIM. At
+age [18,19) in years [80,100), nine-month-spacing means for parities 1,2,3,4+
+are .272932,.284820,.186698,.054263 versus inputs .3,.4,.4,.4; all ten
+replications contribute. No-spacing controls are .302024,.413259,.428620,.435636.
+Both monthly-engine control offsets and composition sensitivity remain; the
+reference does not imply exact equivalence with Hammel or recovery at every
+parity. Earlier exploratory variable-multiplier runs were excluded, not pooled
+with controlled results. See [the collaboration investigation](parity-spacing-investigation.md)
+for user-reported empirical-schedule evidence and unresolved calibration choices.
+The user-authored milestone5.qmd was not edited by this work.

@@ -122,3 +122,16 @@ approximation's limitation, not a scientific acceptance claim. Do not silently
 change to population-ratio compensation. D100 adds `calculate_fertility_rates(parity_breaks = ...)` and separates
 `calculate_mortality_rates()`. Fertility heterogeneity is not implemented. Preserve the user's
 validation/milestone5.qmd, which is outside these implementation changes.
+
+
+## Current investigation for collaboration (October 29)
+
+The user confirmed persistent high-parity/young-age shortfalls after 50 years
+of burn-in, then close schedule recovery with `birth_interval = 0`. The user
+requested an executable SOCSIM toy comparison and documentation for collaboration
+with Claude. See [the investigation](parity-spacing-investigation.md) and
+[reference experiment](../validation/milestone5/socsim/README.md). No new
+compensation method is accepted. Investigate a shared eligibility framework
+before choosing between pre-calibration and runtime accounting. Preserve the
+user-authored milestone 5 report and do not implement a replacement on the basis
+of the agent's proposals alone.
