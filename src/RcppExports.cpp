@@ -120,6 +120,18 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// unpartnered_birth_rows_cpp
+IntegerVector unpartnered_birth_rows_cpp(DataFrame persons, DataFrame unions);
+RcppExport SEXP _hammel_unpartnered_birth_rows_cpp(SEXP personsSEXP, SEXP unionsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< DataFrame >::type persons(personsSEXP);
+    Rcpp::traits::input_parameter< DataFrame >::type unions(unionsSEXP);
+    rcpp_result_gen = Rcpp::wrap(unpartnered_birth_rows_cpp(persons, unions));
+    return rcpp_result_gen;
+END_RCPP
+}
 // extract_kin_cpp
 DataFrame extract_kin_cpp(DataFrame persons, NumericVector ego_ids, NumericVector relative_ids, int generations);
 RcppExport SEXP _hammel_extract_kin_cpp(SEXP personsSEXP, SEXP ego_idsSEXP, SEXP relative_idsSEXP, SEXP generationsSEXP) {
@@ -315,6 +327,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_previous_union_state_cpp", (DL_FUNC) &_hammel_previous_union_state_cpp, 2},
     {"_hammel_marriage_counts_cpp", (DL_FUNC) &_hammel_marriage_counts_cpp, 10},
     {"_hammel_typed_demographic_counts_cpp", (DL_FUNC) &_hammel_typed_demographic_counts_cpp, 7},
+    {"_hammel_unpartnered_birth_rows_cpp", (DL_FUNC) &_hammel_unpartnered_birth_rows_cpp, 2},
     {"_hammel_extract_kin_cpp", (DL_FUNC) &_hammel_extract_kin_cpp, 4},
     {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
     {"_hammel_adjusted_fertility_cpp", (DL_FUNC) &_hammel_adjusted_fertility_cpp, 2},

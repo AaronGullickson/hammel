@@ -600,3 +600,13 @@ The preview was moved to temporary storage. This verifies report execution,
 not demographic recovery at these small sample sizes, a default-parameter full
 run, or scientific milestone acceptance. The user's milestone4_tests.R was not
 modified. Final report parameters and conclusions remain for the author.
+
+
+D092 extraction: `devtools::test(filter =
+"unpartnered-births|parent-info|demog-union-types", reporter = "summary")`
+passed without failures or warnings after documentation and native exports were
+regenerated. Exact histories cover marriage/cohabitation exclusion, formation,
+dissolution/conversion/death boundaries, repeated parental pairs, overlapping
+coverage, unknown parents, untyped unions, preserved custom columns/group types,
+row order and input independence, empty schemas and invalid references. No
+simulation scheduling or empirical inputs were changed.

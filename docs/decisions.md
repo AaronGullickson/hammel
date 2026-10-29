@@ -1826,3 +1826,16 @@ cohabitation policy. Duration stratification is unchanged.
 - **Implementation:** share the episode exposure accumulator with dissolution
   observation, supplying the appropriate axis origin and event reason. No
   simulation scheduling or demographic defaults change.
+
+
+## D092 — Unpartnered birth extraction (October 28, 2026)
+
+- **Status:** requested by the user.
+- **Decision:** add `get_unpartnered_births()` using the previously discussed
+  known-parent birth filter, enriched with parent ages and optional groups.
+  Exclude marriage and cohabitation coverage, including births tied to
+  dissolution or conversion; ordinary coverage is half-open. Death-ending
+  births are unpartnered unless another episode covers the instant. Preserve
+  person order, custom columns and repeated parental pairs. Omit unknown-parent
+  records and founders. No time window is imposed; full histories determine
+  the interpretation. No simulation behavior changes.

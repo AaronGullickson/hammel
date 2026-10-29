@@ -393,3 +393,51 @@ List typed_demographic_counts_cpp(DataFrame persons, DataFrame unions,
   }
   return List::create(_["person_years"] = exposure, _["births"] = births, _["deaths"] = deaths);
 }
+
+// Row selection for parent-enriched father-choice observations. Merge union
+// coverage so duplicate/overlapping episodes never duplicate births.
+// [[Rcpp::export]]
+IntegerVector unpartnered_birth_rows_cpp(DataFrame persons, DataFrame unions) {
+  NumericVector ids = persons["person_id"], born = persons["birth_time"],
+    mothers = persons["mother_id"], fathers = persons["father_id"];
+  NumericVector wives = unions["wife_id"], starts = unions["start_time"], ends = unions["end_time"];
+  CharacterVector reasons = unions["end_reason"];
+  std::map<double, int> index;
+  for (int i = 0; i < ids.size(); ++i) index[ids[i]] = i;
+  std::vector<std::vector<std::pair<double, double>>> coverage(ids.size());
+  std::vector<std::vector<double>> birth_first_ends(ids.size());
+  for (int u = 0; u < starts.size(); ++u) {
+    if (u % 1024 == 0) checkUserInterrupt();
+    const int mother = index.at(wives[u]);
+    coverage[mother].push_back({starts[u], NumericVector::is_na(ends[u]) ? R_PosInf : ends[u]});
+    if (!NumericVector::is_na(ends[u]) && !CharacterVector::is_na(reasons[u])) {
+      const std::string reason = as<std::string>(reasons[u]);
+      if (reason == "dissolution" || reason == "conversion") birth_first_ends[mother].push_back(ends[u]);
+    }
+  }
+  for (size_t i = 0; i < coverage.size(); ++i) {
+    auto& intervals = coverage[i];
+    std::sort(intervals.begin(), intervals.end());
+    std::vector<std::pair<double, double>> merged;
+    for (const auto& interval : intervals) {
+      if (merged.empty() || interval.first > merged.back().second) merged.push_back(interval);
+      else merged.back().second = std::max(merged.back().second, interval.second);
+    }
+    intervals = std::move(merged);
+    std::sort(birth_first_ends[i].begin(), birth_first_ends[i].end());
+  }
+  std::vector<int> rows;
+  for (int child = 0; child < ids.size(); ++child) {
+    if (child % 1024 == 0) checkUserInterrupt();
+    if (NumericVector::is_na(mothers[child]) || NumericVector::is_na(fathers[child])) continue;
+    const int mother = index.at(mothers[child]);
+    const auto& intervals = coverage[mother];
+    const auto after = std::upper_bound(intervals.begin(), intervals.end(), born[child],
+      [](double time, const std::pair<double, double>& interval) { return time < interval.first; });
+    const auto& ties = birth_first_ends[mother];
+    const bool partnered = (after != intervals.begin() && born[child] < std::prev(after)->second) ||
+      std::binary_search(ties.begin(), ties.end(), born[child]);
+    if (!partnered) rows.push_back(child + 1);
+  }
+  return wrap(rows);
+}

@@ -424,3 +424,26 @@ as events; dissolution and death censor exposure, and marriage episodes are
 excluded. This is a cause-specific rate per cohabitation union-year, not the
 probability of eventual conversion. Empty cells remain; zero exposure gives NA.
 Finite last axis breaks gain Inf, as with the other rate helpers.
+
+
+## Births with fathers selected outside partnerships
+
+`get_unpartnered_births(population)` returns parent-enriched person rows for
+births with known mother and father where the mother had no active partnership.
+It excludes both marriage and cohabitation coverage, without deduplicating
+parental pairs: each birth is a father-selection event. All input person columns
+and the parent ages/groups from `get_parent_info()` are retained in person-row
+order. Founders and births missing either parent are omitted. Complete histories
+are needed; no recorded partnership is interpreted as unpartnered, not proof of
+never partnering. Formation coverage is half-open; exact dissolution/conversion
+ending births remain partnered (birth-first), while death-ending births are
+unpartnered unless another episode covers that instant. No observation window
+is imposed; users can filter birth_time afterward. The input is not modified.
+
+
+```r
+father_crosstabs <- results |>
+  purrr::map(get_unpartnered_births) |>
+  dplyr::bind_rows(.id = "replication") |>
+  dplyr::count(replication, group_mother, group_father)
+```
