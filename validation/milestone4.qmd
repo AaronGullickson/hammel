@@ -86,6 +86,35 @@ criteria before closing the milestone._
 
 ## Overview of design
 
+### Dissolution
+
+Union dissolution rates can be specified in the `set_union_dissolution()` function. These dissolution rates must be specified as duration dependent where duration is years since the beginning of the union. The `dur_start` and `dur_end` columns replace the `age_start` and `age_end` columns in the rate table but the table is otherwise identical in structure to other rate schedules. The table can also be stratified by group.
+
+Union dissolution is a characteristic of the union rather than individuals. For convenience, we apply the dissolution waiting time to women and not men. Applying it to both partners would create a double jeopardy problem. If dissolution ties with a birth, the birth wins.
+
+For simulations with cohabitation, users can also stratify dissolution rates by the `union_type` where the two expected values are `cohab` and `marriage`. If not stratified, marriges and cohabitations of the same duration will share the same dissolution rate.
+
+### Remarriages
+
+Marriage rates can be stratified by a `previous_union` variable where the expected values are `none`, `dissolved`, and `widowed`. Users can leave out the "widowed" value in which case, widows will default to the `dissolved` rates.
+
+The dissolved and widowed cases can also be specified as duration dependent rather than age dependent using the same structure as for dissolution. These are all stacked into a single tibble/data.frame where the `dur` or `age` columns are NA when not in use.
+
+This approach complicated our existing technique for tracking female search intensity for the weighted choice method in union formation. To make this more efficient, we switched to tracking the current hazard rate of a search for every living woman in the simulation. This is updated at event changes and when a woman hits an age/duration boundary in the respective rates. This allows us to flexibly define that current hazard rate and then we just sum it up across the small ages and groups to get the bins we need to estimate the weights. Tests demonstrated that this change did not increase processing time.
+
+### Cohabitation
+
+Cohabitation is included using a technique similar to SOCSIM. Users can enter a data.frame into the `prob_cohab` in the `union_formation` process. This data.frame has the same structure as the rate data.frames. It is banded by `age_start` and `age_end` columns and can also be stratified by group and previous union if desired. The key column is the `prob` column which gives the probability that a union of this type will be a cohabitation instead of a marriage. Essentially, instead of creating a full competing cohabitation process, we just divide the overall union formation rate into its cohabitation and direct marriage rates.
+
+Cohabitations can be dissolved using the dissolution rules described above. For cohabitations that do not dissolve, we need some model to transition themto marriage. This is defined by the `union_convert_rate` argument where users can enter a rate table that is either banded by age or duration, and can be stratified by group. This defines rates that are used to create the event of transitioning from cohabitation to marriage.
+
+Users can also specify fertility rates that are fully stratified by union type using the `union_type` variable. Users should either use `unpartnered` and `partnered` (both marriages and cohabitations) or `unpartnered`, `cohab`, and `marriage`.
+
+For the purposes of dissolution, the duration of the union resets when it transitions from a cohabitation to a marriage.
+
+### Lexis diagram helpers
+
+Because of the number of events to track and the fact that some of them are on people and others on unions, I updated the lexis count function into a set of lexis diagram helpers for different kinds of events and exposure as the table below describes.
 
 | Helper | Events | Exposure |
 | --- | --- | --- |
@@ -216,8 +245,6 @@ unions or births. Each table reports the number of finite replication estimates;
 zero-exposure rates are NA and omitted from the mean, so sparse-cell means are
 conditional on positive exposure. Pooled event/exposure rates are displayed
 separately. Neither measure is a confidence interval for empirical parameters.
-
-
 
 ## Duration-dependent dissolution
 
