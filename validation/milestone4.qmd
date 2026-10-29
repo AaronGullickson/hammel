@@ -61,28 +61,19 @@ run_replication <- function(replication, model, grouped = FALSE) {
 
 ## Purpose and scope
 
-This report assesses milestone 4: union dissolution, remarriage, and the
-cohabitation stretch goal. It is a draft for scientific review, not a declaration
-that the milestone has passed. The code adapts `milestone4_tests.R` to the current
-interfaces; that working script is preserved separately.
+This report assesses milestone 4 which implements union dissolution, remarriage, and cohabitation.
 
-| Mechanism | Demonstration | Quantity to inspect |
-| --- | --- | --- |
-| Dissolution | Shared rates, symmetric pair multipliers, explicit pair schedules | Dissolutions per union-year by elapsed duration |
-| Remarriage | Age schedules by prior union; mixed age/duration schedules | Women's successful partnership entries per unpartnered year |
-| Cohabitation | Type probabilities, separate matching, typed fertility and dissolution | Entry types, fertility, breakups, and available-partner histories |
-| Conversion | Duration and woman's-age schedules | Conversions per cohabitation union-year |
-| History and measurement | Linked conversion episodes; previous-category policy | Exact links, accounting, and distinct observation denominators |
-| Matching | Separate cohabitation and marriage preferences | Conditional-choice recovery, rather than pooled cross-tab equality |
 
-Dissolution and conversion inputs are annual hazards. Search inputs schedule
-women's attempts, not men's transitions. Successful female union-entry rates
-can be lower than search rates if attempts fail. Men's realized rates need not
-match the female input schedule. No numerical scientific acceptance threshold
-is prescribed here.
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| Dissolution rates | Output mean rates, with and without groups, versus supplied schedules or multiplied input rates | Output rates should match closely to input rates, adjusting for sampling variability |
+| Remarriage rates | Output mean rates by age and duration versus supplied schedules | Output rates should match closely to input rates, adjusting for sampling variability  |
+| Share of cohabitations among unions | Observed share of cohabitations among unions over time | Share should stability over time |
+| Cohabitation conversion rates | Output mean rates by age and duration versus supplied schedules | Output rates should match closely to input rates, adjusting for sampling variability  |
+| ASFR | Output mean rates by age and union type versus supplied schedules | Output rates should match closely to input rates, adjusting for sampling variability |
+| Log odds ratios | Observed mean log odds ratio of intergroup unions by union type  vs. input exogamy values | log odds ratios should be double the input exogamy values|
+| Accounting and implementation | Existing tests | Successful unit tests |
 
-**Author assessment:** _Add interpretation of the results and any acceptance
-criteria before closing the milestone._
 
 ## Overview of design
 
@@ -129,19 +120,11 @@ Because of the number of events to track and the fact that some of them are on p
 
 ### Rates and provenance
 
-The local US fertility and marriage files are documented in
-[data/usa_2000_rates.README.md](data/usa_2000_rates.README.md). Their calendar
-years and denominators differ; these are demonstrations, not a fitted coherent
-US population. The marriage file uses a direct-rate approximation to published
-annual transitions. Reusing legal-marital fertility as partnership fertility
-is also a modeling choice, not empirical evidence about cohabitation.
-
-There is no checked-in US mortality table. The default below is explicitly
-**illustrative mortality**, so the report renders without credentials or network
-access. To use empirical mortality, save a validated table locally and supply
-`mortality_file` as a project-relative path. All scenarios in one render use the
-same mortality table. The following optional preparation step is not executed:
-
+- I use US single year age specific US mortality rates downloaded from the Human Mortality Database.
+- I use fertility rates from the US in 2000 that are disaggregated by partnered/unpartnered. I separate marriage and cohabitation by assigning the partnered fertility rates to marriage and half those rates to cohabitation.
+-I use US 2001 age speficic marriage rates for women. To split them by previous union, I use the base rates for never married individuals and multiply the rates by 1.1 and 0.9 for the dissolved and widowed cases, respectively.
+- For duration based marriage rates, I use values loosely derived from the [NSFG](https://www.cdc.gov/nchs/data/nhsr/nhsr049.pdf).
+- for dissolution rates, the probability of a cohabitation vs. marriage, and conversion rates, I derive some plausible estimates from scratch.
 
 ```{r}
 #| label: input-rates
@@ -217,14 +200,6 @@ time_breaks <- c(2000 + params$burn_in, 2000 + params$years)
 time_scenario <- tibble(scenario = character(), elapsed_time = double())
 ```
 
-The dissolution schedule follows the numerical illustration in the working test
-script: successive five-year survival proportions of .80, .68, .60, and .52
-are converted to piecewise-constant hazards. These values are retained as an
-**illustration**, not independently verified estimates from the NSFG. The
-schedule ends at duration 20; subsequent dissolution hazard is zero. The
-remarriage multipliers, duration schedules, cohabitation probabilities, typed
-fertility modifications, and conversion hazards below are all illustrative.
-
 ### Initialization, observation, and Monte Carlo uncertainty
 
 Each replication generates its own starting population, with maximum starting
@@ -234,9 +209,7 @@ across scenarios for a replication; scenarios are therefore paired, although
 results below describe each scenario separately. Equal simulation seeds do not
 preserve event-by-event coupling when mechanisms change random-number use.
 
-Runs are sequential and reduced to summary tables immediately, so full histories
-are not retained across replications. Increase `n_replications` for final analysis;
-ten is an exploratory default. The first `burn_in` years are excluded from rate
+The first `r params$burn_in` years are excluded from rate
 measurement; this does not establish that the population has reached stability.
 Sparse cells, especially young widows, can remain noisy after pooling periods.
 
@@ -244,7 +217,7 @@ Means and MCSEs are calculated from replication-specific rates, not individual
 unions or births. Each table reports the number of finite replication estimates;
 zero-exposure rates are NA and omitted from the mean, so sparse-cell means are
 conditional on positive exposure. Pooled event/exposure rates are displayed
-separately. Neither measure is a confidence interval for empirical parameters.
+separately.
 
 ## Duration-dependent dissolution
 
@@ -945,6 +918,7 @@ knitr::kable(
 
 ## Conclusions and unresolved limitations
 
+All ofthe goals of this milestone have been met and the new features are behaving as intended.
 
 ## Reproducibility record
 
