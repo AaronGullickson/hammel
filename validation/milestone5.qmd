@@ -104,6 +104,9 @@ Because we are redoing this engine, I will re-run several of the basic fertility
 
 We add parity-specific fertility by allowing fertility rates to be stratified by parity using two additional columns: `parity_start` and `parity_end` that govern the half-open interval `[parity_start, parity_end)` with an option for an open-ended interval using `Inf` for `parity_end`.
 
+We also added a function `calculate_patfr`` to get parity and age adjusted TFR for parity-specific fertility schedules. The normal `calculate_tfr` function will delegate to this function if it detects parity-specific data.
+
+### Fertility Heterogeneity
 
 ## Inputs and Simulation Design
 
@@ -158,7 +161,7 @@ First I run a baseline fertility simulation without parity to confirm the new me
 
 model <- hammel_model() |>
   set_mortality(mortality_rates) |>
-  set_fertility(fertility_rates_overall, spacing_method = "cell") |>
+  set_fertility(fertility_rates_overall) |>
   set_union_formation("on_demand")
 
 results <- future_map(seq_len(params$n_replications), run_replication, model = model, .options = furrr_options(seed = NULL))
@@ -219,12 +222,11 @@ results_ext_niger <- future_map2(
   function(result, seed) {
     model <- model |>
       set_population(result) |>
-      set_fertility(fertility_rates_niger, spacing_method = "cell")
+      set_fertility(fertility_rates_niger)
     simulate(model, years = 20, seed = seed)
   },
   .options = furrr_options(seed = NULL)
 )
-
 
 time_compare <- 2000 + c(params$years, params$years + 1, params$years + 20)
 
@@ -263,7 +265,7 @@ tfr_pre_post |>
 
 model <- hammel_model() |>
   set_mortality(mortality_rates) |>
-  set_fertility(fertility_rates_split, spacing_method = "cell") |>
+  set_fertility(fertility_rates_split) |>
   set_union_formation("rate", rates = marriage_rates)
 
 results <- future_map(seq_len(params$n_replications), run_replication, model = model, .options = furrr_options(seed = NULL))
@@ -314,7 +316,7 @@ fert_summary |>
 
 model <- hammel_model() |>
   set_mortality(mortality_rates) |>
-  set_fertility(fertility_rates_parity, spacing_method = "cell") |>
+  set_fertility(fertility_rates_parity) |>
   set_union_formation("on_demand")
 
 results <- future_map(seq_len(params$n_replications), run_replication, model = model, .options = furrr_options(seed = NULL))
@@ -367,7 +369,7 @@ fert_summary |>
 ```
 
 ```{r}
-#| label: fig-asfr-parity-adju
+#| label: fig-asfr-parity-adjusted
 #| fig-cap: Mean estimated age-specific fertility rates across 100 simulations by parity and adjusted for unrealized births. 95% confidence intervals shown on each rate. Dotted line shows the input rates.
 
 fert_summary <- fert_by_rep |>
@@ -395,6 +397,8 @@ fert_summary |>
 
 
 ```{r}
+#| label: tbl-tfr-parity
+#| tbl-cap: Mean estimated TFR and MSCE across simulations using parity-specific fertility rates.
 
 results |>
   map(
@@ -412,12 +416,9 @@ results |>
     tfr_mcse = if (n_valid > 1) {
       sd(tfr, na.rm = TRUE) / sqrt(n_valid)
     } else NA_real_
-  )
-
-fertility_rates_parity |> calculate_tfr()
+  ) |>
+  gt()
 ```
-
-
 
 ## Fertility Heterogeneity
 
