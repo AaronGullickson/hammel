@@ -587,3 +587,16 @@ competing death/dissolution censoring, ongoing exposure, pre-window histories,
 finite last-break extension, zero exposure, empty tables and input validation.
 Existing dissolution tests verify unchanged behavior of the shared accumulator.
 This was offline targeted verification; no empirical rate downloads were used.
+
+
+## Milestone 4 report draft smoke render (October 28, 2026)
+
+`validation/milestone4.qmd` was rendered successfully from `validation/` with
+`quarto render milestone4.qmd -P n_replications:2 -P initial_population:1000
+-P years:40 -P burn_in:10 --output milestone4-preview.html`. All R chunks and
+HTML generation completed. This used the explicitly illustrative offline
+mortality default and local fertility/search inputs; no downloads occurred.
+The preview was moved to temporary storage. This verifies report execution,
+not demographic recovery at these small sample sizes, a default-parameter full
+run, or scientific milestone acceptance. The user's milestone4_tests.R was not
+modified. Final report parameters and conclusions remain for the author.

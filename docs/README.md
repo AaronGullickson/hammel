@@ -75,6 +75,11 @@ To inspect prior versions, use `git log -- docs` and
   weighted matching and delta, conditional-logit recovery, ancestry, built-in
   and custom inheritance, baseline sensitivity, and performance. Rendering
   downloads HMD inputs and runs substantial simulations and the test suite.
+- [Milestone 4 validation draft](../validation/milestone4.qmd): runnable
+  dissolution, remarriage and cohabitation assessment, with independent baseline
+  replications, rate/MCSE plots, history checks, and author interpretation slots.
+  Uses local fertility/search files and explicitly illustrative mortality by
+  default; optional local empirical mortality requires no download during render.
 The former `milestone1.R` and `milestone1_bootstrap.R` examples have been
 removed from the current tree; use Git history for those historical workflows.
 
