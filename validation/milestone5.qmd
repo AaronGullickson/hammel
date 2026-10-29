@@ -1,0 +1,67 @@
+---
+title: "Hammel: Milestone 3 Validation"
+author: "Aaron Gullickson"
+date: today
+format:
+  html:
+    toc: true
+    toc-expand: 1
+    toc-depth: 4
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    self-contained: true
+execute:
+  eval: true
+  echo: true
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: setup
+#| eval: true
+#| include: false
+
+
+library(here)
+# installing will lead to faster computation
+devtools::install(here::here())
+library(hammel)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(purrr)
+library(tibble)
+library(stringr)
+library(ggplot2)
+library(gt)
+library(furrr)
+```
+
+```{r}
+#| label: set-up-parallel-processing
+
+future::plan(future::multicore, workers = 4)
+```
+
+
+
+```{r}
+#| label: create-functions
+
+```
+
+## Purpose and completion criteria
+
+
+Assess whether the current simulation successfully handles parity-specific fertility rates and allows for more heterogeneous and inheritable fertility behavior. 
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| Accounting and implementation | Existing tests | Successful unit tests |
+
+## Overview of Design
+
+

@@ -171,6 +171,11 @@ that transition issue is [documented and deferred](scientific-contract.md#known-
 `get_mortality_hmd(country, year, ...)` and `get_fertility_hfd(country, year, ...)`
 return rate tibbles, without configuring a model. Users can save/load them with
 RDS and reuse them without downloads. HMDHFDplus is optional for these helpers.
+The HFD helper's `by_parity = TRUE` option imports conditional mi rates as
+age/parity interval rows for milestone 5 preparation. It preserves unavailable
+cells as NA with a warning; the current engine does not accept parity schedules.
+See [parity fertility](parity-fertility.md). The default remains total asfrRR.
+
 There is no automatic disk cache or rate refresh.
 
 `calculate_demog_rates()`, `calculate_tfr()`, `calculate_life_table()`, and

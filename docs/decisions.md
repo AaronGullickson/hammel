@@ -36,6 +36,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Union/marriage entry, dissolution and conversion observations | D087–D091 |
 | Unpartnered birth extraction | D092 |
 | Milestone 4 completion and retained validation evidence | D093 |
+| Parity schedule bands and HFD preparation | D094 |
 
 ## Recorded decisions
 
@@ -1875,3 +1876,26 @@ cohabitation policy. Duration stratification is unchanged.
   `validation/milestone4/`, updating links and reproduction commands. Keep
   rendered-report execution intermediates intact while the author's render is
   active; ignore them in version control. See the validation directory guide.
+
+
+## D094 — Half-open parity bands and conditional HFD import (October 29, 2026)
+
+- **Status:** the user selected parity_start/parity_end and authorized extending
+  the HFD helper after confirming the milestone 4 PR was merged.
+- **Representation:** current maternal parity uses half-open intervals and Inf
+  for the upper open category. HFD birth orders 1,2,3,4,5+ map to [0,1), [1,2),
+  [2,3), [3,4), [4,Inf). Rates are per woman-year in that current parity.
+- **Importer:** `get_fertility_hfd(..., by_parity = TRUE)` requests conditional
+  period product mi, retaining the default total asfrRR import when FALSE.
+  Select one year/revision, omit open age endpoints as before, preserve missing
+  conditional cells as NA with a warning, and record product/mapping provenance.
+  No interpolation, zero imputation, probability conversion or spacing adjustment
+  occurs in this data-preparation operation. Unavailable products/years do not
+  fall back to unconditional rates.
+- **Boundary:** parity-dependent execution is not yet implemented. Fertility
+  constructors reject parity columns rather than silently using them as pooled
+  age rates. Initialization, state transitions, rate coverage, compensation,
+  observations and heterogeneity remain to be specified before engine changes.
+- **Specification:** [parity fertility design/preparation](parity-fertility.md).
+  Offline synthetic fixtures verify mapping and metadata; no live download or
+  demographic validation is implied by those tests.

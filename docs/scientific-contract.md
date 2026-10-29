@@ -566,7 +566,7 @@ single-year ages become `[age,age+1)` and the open age becomes `[age,Inf)`.
 Respect both raw `+` labels and parsed `OpenInterval` indicators, including
 HMDHFDplus 2.0.8 behavior. Missing retained rates are rejected, not filled.
 
-HFD uses total `asfrRR` in births per woman-year without scaling. Omit open-age
+By default HFD uses total `asfrRR` in births per woman-year without scaling. Omit open-age
 rows such as `12-` and `55+`; map retained closed ages to one-year intervals.
 No fertility is inferred outside them. Input-derived TFR excludes endpoint
 contributions and need not equal HFD's full published TFR. Open endpoint rates
@@ -577,6 +577,13 @@ Record database, population, year, product, retrieval timestamp, and reader
 version. HFD records requested revision date and endpoint omission. A null
 revision requests the current release; it does not pin a historical revision.
 Synthetic/local-reader tests establish conversions; live requests are opt-in.
+For data preparation only, `get_fertility_hfd(..., by_parity = TRUE)` imports
+conditional mi rates with half-open current-parity bounds (D094). Open age
+endpoints remain omitted. Missing conditional cells remain NA with a warning,
+not zero risks; no parity-dependent simulation or compensation is implemented.
+Fertility constructors reject parity columns until execution is implemented.
+See [parity fertility](parity-fertility.md) for the birth-order/parity mapping.
+
 Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDplus),
 [HFD FAQ](https://www.humanfertility.org/Project/FAQ), and
 [HFD basic indicator methods](https://www.demogr.mpg.de/papers/technicalreports/tr-2011-001.pdf).

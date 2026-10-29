@@ -261,6 +261,8 @@ validate_rates <- function(rates, mortality) {
       stop("Fertility schedules do not take a sex column in this initial interface.",
            call. = FALSE)
     }
+    if (any(c("parity_start", "parity_end") %in% names(rates)))
+      stop("Parity-specific fertility tables are for data preparation; parity-dependent simulation is not yet implemented.", call. = FALSE)
     if ("union_status" %in% names(rates))
       stop("Fertility input `union_status` has been replaced by `union_type`.", call. = FALSE)
     if ("union_type" %in% names(rates)) {

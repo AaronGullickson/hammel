@@ -628,3 +628,18 @@ Relative Markdown file targets in changed documentation and both new validation
 guides resolve, and `git diff --check` passes. No simulation, database request,
 report render or test suite was started for this documentation-only cleanup.
 The author's active render and final report source were left unchanged.
+
+
+## Conditional HFD parity preparation (D094, October 29, 2026)
+
+`TZ=UTC Rscript -e 'devtools::test(filter =
+"hfd-parity|database-processes|status-fertility", reporter = "summary")'`
+passed without failures or warnings. Synthetic local HFD text and mocked web
+readers verify conditional product mi, revision/year selection, birth-order to
+current-parity mapping including [4,Inf), retained annual values, omission of
+open age endpoints, missing-versus-zero distinction, duplicate/invalid bands,
+invalid request flags, absent products/years, RDS reuse and credential-free
+provenance. Existing total-rate/database and status-fertility tests passed.
+Parity tables are rejected for simulation until engine support is implemented.
+No live HFD data or credentials were used and no engine changes were made.
+The user's validation/milestone5.qmd was left unchanged.

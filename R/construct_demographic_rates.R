@@ -80,7 +80,12 @@ database_source <- function(database, country, year, item, update = NULL) {
 #' Download total period age-specific fertility rates (`asfrRR`) through
 #' HMDHFDplus and select one explicit year. Rates remain births per woman-year
 #' and the schedule is constant over simulation time. Birth-order-specific
-#' columns are not used. Missing rates are rejected.
+#' columns are not used by default. Missing total rates are rejected.
+#' With `by_parity = TRUE`, request conditional age/parity rates (`mi`) instead:
+#' first births map to parity [0,1), through fifth-or-higher births at [4,Inf).
+#' Missing conditional cells remain NA with a warning, never zero or imputed.
+#' Parity tables prepare data for milestone 5; parity-dependent execution is
+#' not yet implemented and fertility constructors reject parity columns.
 #'
 #' HFD open-age rows such as `12-` and `55+` are omitted. The resulting
 #' schedule covers only closed single-year age bands, so its TFR excludes those
@@ -93,27 +98,46 @@ database_source <- function(database, country, year, item, update = NULL) {
 #' @param password HFD password, defaulting to `HFD_PASSWORD`.
 #' @param update Optional HFD revision date as `"YYYYMMDD"`, passed as `Update`
 #'   to HMDHFDplus. `NULL` requests its current revision.
-#' @return A validated fertility rate tibble with a `source` attribute.
+#' @param by_parity Logical, default FALSE. TRUE returns conditional rates with
+#'   `parity_start`/`parity_end` in addition to the age bounds and `rate`.
+#'   Requires the HFD conditional-rate product; unavailable products/years error
+#'   rather than falling back to unconditional rates.
+#' @return A fertility rate tibble with a `source` attribute. Total-rate tables
+#'   are validated for execution. Parity tables may contain missing rates and
+#'   currently support preparation/inspection only.
 #' @export
 #' @examples
 #' \dontrun{
 #' rates <- get_fertility_hfd("USA", 2000)
 #' saveRDS(rates, "rates.rds")
 #' model <- hammel_model() |> set_fertility(readRDS("rates.rds"))
+#' # Data preparation for future parity-dependent execution:
+#' parity_rates <- get_fertility_hfd("USA", 2000, by_parity = TRUE)
 #' }
 get_fertility_hfd <- function(country, year, username = Sys.getenv("HFD_USERNAME"),
-                          password = Sys.getenv("HFD_PASSWORD"), update = NULL) {
+                          password = Sys.getenv("HFD_PASSWORD"), update = NULL,
+                          by_parity = FALSE) {
+  if (!is.logical(by_parity) || length(by_parity) != 1L ||
+      !is.null(dim(by_parity)) || is.na(by_parity))
+    stop("`by_parity` must be TRUE or FALSE.", call. = FALSE)
   check_database_request(country, year, username, password)
   if (!is.null(update) &&
       (!is.character(update) || length(update) != 1L || is.na(update) ||
        !grepl("^[0-9]{8}$", update))) {
     stop("`update` must be NULL or a YYYYMMDD revision date.", call. = FALSE)
   }
-  data <- HMDHFDplus::readHFDweb(CNTRY = country, item = "asfrRR",
+  item <- if (by_parity) "mi" else "asfrRR"
+  data <- HMDHFDplus::readHFDweb(CNTRY = country, item = item,
                                username = username, password = password,
                                fixup = FALSE, Update = update)
-  rates <- fertility_from_hfd(data, year)$rates
-  attr(rates, "source") <- database_source("HFD", country, year, "asfrRR", update)
+  rates <- if (by_parity) fertility_by_parity_from_hfd(data, year) else
+    fertility_from_hfd(data, year)$rates
+  attr(rates, "source") <- database_source("HFD", country, year, item, update)
+  if (by_parity) {
+    attr(rates, "source")$rate_type <- "conditional_age_parity"
+    attr(rates, "source")$parity_mapping <- "birth orders 1,2,3,4,5+ -> current parity 0,1,2,3,4+"
+    attr(rates, "source")$missing_rates <- "preserve_NA"
+  }
   attr(rates, "source")$open_ages <- "omit"
   rates
 }
@@ -131,6 +155,35 @@ fertility_from_hfd <- function(data, year) {
   starts <- as.numeric(sub("[-+]$", "", ages))
   fertility(data.frame(age_start = starts, age_end = starts + 1,
                        rate = data$ASFR))
+}
+
+
+fertility_by_parity_from_hfd <- function(data, year) {
+  columns <- paste0("m", 1:5, "x")
+  data <- select_database_year(data, year, columns)
+  ages <- trimws(as.character(data$Age))
+  if (anyNA(ages) || any(!grepl("^[0-9]+[-+]?$", ages)))
+    stop("Expected single-year HFD ages with optional endpoint signs.", call. = FALSE)
+  keep <- !grepl("[-+]$", ages)
+  data <- data[keep, , drop = FALSE]
+  starts <- as.numeric(ages[keep])
+  if (!length(starts)) stop("No closed single-year HFD age bands remain.", call. = FALSE)
+  if (anyDuplicated(starts)) stop("HFD conditional rates have duplicate age bands.", call. = FALSE)
+  for (column in columns) {
+    check_numeric_column(data[[column]], paste0("HFD ", column), missing = TRUE)
+    if (any(data[[column]] < 0, na.rm = TRUE))
+      stop("HFD conditional fertility rates must be nonnegative.", call. = FALSE)
+  }
+  rates <- tibble::tibble(
+    age_start = rep(starts, times = 5L),
+    age_end = rep(starts + 1, times = 5L),
+    parity_start = rep(0:4, each = length(starts)),
+    parity_end = rep(c(1:4, Inf), each = length(starts)),
+    rate = unlist(data[columns], use.names = FALSE)
+  )
+  if (anyNA(rates$rate))
+    warning("HFD conditional fertility rates contain unavailable age/parity cells; retained as NA, not zero.", call. = FALSE)
+  rates
 }
 
 check_database_request <- function(country, year, username, password) {

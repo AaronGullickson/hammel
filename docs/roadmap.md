@@ -111,7 +111,12 @@ matching/rates and linked same-partner conversion. Marriage-order dependence
 and richer couple covariates remain deferred. Acceptance is the user’s
 assessment of the report, distinct from software checks alone.
 
-## Proposed milestone 5: parity-specific fertility and heterogeneity
+## Milestone 5 design: parity-specific fertility and heterogeneity
+
+The user selected optional half-open `parity_start`/`parity_end` bands with Inf
+for the open category (D094). The HFD helper now prepares conditional rates in
+that format via `by_parity = TRUE`; parity-dependent execution remains
+unimplemented. See [parity fertility](parity-fertility.md).
 
 Add fertility schedules that depend on parity as well as the existing schedule
 axes. Define parity from recorded births, initialization for incomplete histories,

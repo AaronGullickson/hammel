@@ -9,7 +9,8 @@ get_fertility_hfd(
   year,
   username = Sys.getenv("HFD_USERNAME"),
   password = Sys.getenv("HFD_PASSWORD"),
-  update = NULL
+  update = NULL,
+  by_parity = FALSE
 )
 }
 \arguments{
@@ -23,15 +24,27 @@ get_fertility_hfd(
 
 \item{update}{Optional HFD revision date as \code{"YYYYMMDD"}, passed as \code{Update}
 to HMDHFDplus. \code{NULL} requests its current revision.}
+
+\item{by_parity}{Logical, default FALSE. TRUE returns conditional rates with
+\code{parity_start}/\code{parity_end} in addition to the age bounds and \code{rate}.
+Requires the HFD conditional-rate product; unavailable products/years error
+rather than falling back to unconditional rates.}
 }
 \value{
-A validated fertility rate tibble with a \code{source} attribute.
+A fertility rate tibble with a \code{source} attribute. Total-rate tables
+are validated for execution. Parity tables may contain missing rates and
+currently support preparation/inspection only.
 }
 \description{
 Download total period age-specific fertility rates (\code{asfrRR}) through
 HMDHFDplus and select one explicit year. Rates remain births per woman-year
 and the schedule is constant over simulation time. Birth-order-specific
-columns are not used. Missing rates are rejected.
+columns are not used by default. Missing total rates are rejected.
+With \code{by_parity = TRUE}, request conditional age/parity rates (\code{mi}) instead:
+first births map to parity [0,1), through fifth-or-higher births at [4,Inf).
+Missing conditional cells remain NA with a warning, never zero or imputed.
+Parity tables prepare data for milestone 5; parity-dependent execution is
+not yet implemented and fertility constructors reject parity columns.
 }
 \details{
 HFD open-age rows such as \verb{12-} and \verb{55+} are omitted. The resulting
@@ -44,5 +57,7 @@ Credentials are never retained in the table.
 rates <- get_fertility_hfd("USA", 2000)
 saveRDS(rates, "rates.rds")
 model <- hammel_model() |> set_fertility(readRDS("rates.rds"))
+# Data preparation for future parity-dependent execution:
+parity_rates <- get_fertility_hfd("USA", 2000, by_parity = TRUE)
 }
 }
