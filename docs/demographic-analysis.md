@@ -450,3 +450,29 @@ father_crosstabs <- results |>
   dplyr::bind_rows(.id = "replication") |>
   dplyr::count(replication, group_mother, group_father)
 ```
+
+
+## Parity-adjusted fertility summaries
+
+`calculate_patfr(rates)` accepts conditional age/current-parity fertility rates.
+`calculate_tfr(rates)` automatically delegates when parity bounds are present;
+its output then has `patfr`, rather than `tfr`. Period, group, union_type and
+legacy union_status grouping are the same as for ordinary TFR, and only female
+rows are used when sex is present. Parity is progressed through, not grouped
+into separate raw hazard integrals. A conditional index for one group/union type
+holds that stratum fixed throughout the synthetic cohort's reproductive life.
+
+```r
+rates <- get_fertility_hfd("USA", 2000, by_parity = TRUE)
+calculate_patfr(rates)
+calculate_tfr(rates) # Same result, with patfr column.
+```
+
+The calculation uses HFD's period fertility-table midpoint convention, not
+microsimulation. Start at parity zero at the reported lower age, count births
+and move exposure through parity states; the terminal category admits repeated
+births. Return NA for a stratum with any missing included rate. Exclude upper-
+open age rows, warning when known nonzero fertility is omitted. Report the finite
+age range used. The user's HFD zero-fill import choice and endpoint convention
+remain distinct from the summary's missing-data/upper-age rules. See
+[parity fertility](parity-fertility.md) for formulae, coverage and limitations.

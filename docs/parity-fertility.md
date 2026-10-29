@@ -56,3 +56,50 @@ and compensation, calibration contributions, and parity-stratified observation
 before implementing execution. Heterogeneity distribution, persistence,
 association with other attributes and calibration remain unselected. The HFD-only zero-fill rule does not set missing-data defaults for arbitrary
 rate tables or select a parity maximum or heterogeneity distribution.
+
+## PATFR calculation (D097)
+
+`calculate_patfr(rates)` constructs a deterministic synthetic fertility cohort;
+`calculate_tfr()` delegates to it when either parity-bound column is present
+(and requires both). Output uses `patfr`, not `tfr`. Both accept `rate` or
+`rate_fertility`, select female rows when sex is present, and separate the same
+period, group, union_type and legacy union_status strata. They preserve group
+types and the unassigned_births attribute. Parity is integrated over, not an
+output grouping variable. Each group/union-type stratum has an independent
+cohort held in that stratum; transitions between groups or union types are not
+modeled by this conditional index. No engine initialization or mortality is involved.
+
+Use the HFD period fertility-table midpoint convention (Methods Protocol
+2015, sections 8.3–8.4), not a stochastic microsimulation or exact continuous-time
+matrix exponential. Start with unit mass at parity zero at the first included
+age. On a step of width d, use q = d*m/(1+d*m/2) for progression from each
+nonterminal parity. For starting masses l[k], interval exposure is:
+
+- k=0: d*l[0]*(1-q[0]/2);
+- interior k: d*l[k]*(1-q[k]/2) + d*l[k-1]*q[k-1]/2;
+- pooled upper parity P: d*l[P] + d*l[P-1]*q[P-1]/2.
+
+Births at each parity are its exposure times its supplied rate. Move those
+birth counts to the next parity, retaining women in the pooled final parity
+while counting its repeated births. Sum births per starting woman to get PATFR.
+Split at integer ages and every supplied age boundary, giving steps at most
+one year and unchanged results when constant five-year bands are expanded to
+single years. Reject progression probabilities above one rather than clipping
+invalid table calculations. This generalizes HFD's annual midpoint convention
+to fractional boundaries. Exact HFD agreement additionally requires identical
+age endpoints, source revision and missing-rate assumptions.
+
+Finite parity intervals have integer nonnegative boundaries; broader intervals
+apply the same rate to every contained parity. At each included age, coverage
+must run from zero through one final open parity interval, without overlap or
+gaps. All parity states must cover the same contiguous finite age range. Birth
+rates must be numeric/nonnegative; any missing included cell returns NA for its
+whole stratum. Import-time zero filling (D096) remains distinct from this rule.
+
+As selected by the user, upper-open age rows are excluded, with a warning if a
+known omitted female rate is nonzero, because the finite-range PATFR
+underestimates full-age fertility. Missing omitted rows do not invalidate the
+finite result. Output includes the finite age_start/age_end used; absent finite
+rows return a typed empty tibble. The resulting index depends on the selected
+age range and the assumed parity-zero cohort at its beginning. No arbitrary
+finite upper age or replacement for missing included rates is inferred.

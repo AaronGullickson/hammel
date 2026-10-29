@@ -174,7 +174,9 @@ RDS and reuse them without downloads. HMDHFDplus is optional for these helpers.
 The HFD helper's `by_parity = TRUE` option imports conditional mi rates as
 age/parity interval rows for milestone 5 preparation. It preserves unavailable
 cells as NA with a warning; the current engine does not accept parity schedules.
-See [parity fertility](parity-fertility.md). The default remains total asfrRR. Both products preserve endpoint rows under
+See [parity fertility](parity-fertility.md). The default remains total asfrRR. `calculate_patfr()` summarizes conditional
+parity schedules with a deterministic HFD-style fertility table; calculate_tfr()
+delegates when parity columns are present, returning patfr (D097). Both products preserve endpoint rows under
 D095: 12- becomes [12,13), and 55+ becomes [55,Inf).
 
 There is no automatic disk cache or rate refresh.

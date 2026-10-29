@@ -676,3 +676,21 @@ unchanged known/explicit-zero rates, all-missing logical columns from text
 parsing, endpoint retention, selected-year-only provenance counts and unchanged
 total-rate validation. No live data was downloaded. Historical D094 checks of
 NA preservation describe the superseded import policy.
+
+
+## PATFR summaries and automatic dispatch (D097, October 29, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(filter =
+"patfr|demography|lexis", reporter = "summary")'` passed without failures or
+warnings. An independent hand-worked one-year HFD midpoint example yields 12/55
+births per starting woman. Tests also verify first-birth survival under the table
+probabilities, constant-hazard exposure conservation, recurrent births in the
+open parity state, invariant constant one-/five-year schedules, fractional age
+steps, broader parity bands, all existing TFR strata, female-only selection,
+process inputs, typed empty outputs, metadata, included missing-cell propagation,
+upper-open age warnings, and rejection of incomplete/overlapping age/parity
+coverage or invalid progression probabilities. Direct and delegated calls agree.
+No empirical HFD download or comparison with its full published PATFR was run;
+source endpoint/zero-fill conventions can change that comparison. This is a
+summary helper, not parity-dependent engine execution. The user's milestone5
+report was left unchanged.

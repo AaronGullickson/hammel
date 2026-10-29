@@ -598,6 +598,15 @@ Reference documentation: [HMDHFDplus source](https://github.com/timriffe/HMDHFDp
 [HFD FAQ](https://www.humanfertility.org/Project/FAQ), and
 [HFD basic indicator methods](https://www.demogr.mpg.de/papers/technicalreports/tr-2011-001.pdf).
 
+`calculate_patfr()` constructs a synthetic cohort from conditional age/parity
+rates using HFD's midpoint fertility-table convention (D097). It shares TFR's
+period/group/union-type strata and female selection; calculate_tfr() delegates
+when parity columns are supplied and returns patfr. Missing included rates give
+NA within that stratum. Upper-open ages are omitted with nonzero-rate warning;
+finite age bounds are reported. The terminal parity state admits repeated births.
+This does not implement parity-dependent simulation, group/union-type transitions
+or birth-spacing dynamics. See [parity fertility](parity-fertility.md).
+
 ## Known limitations and deferred issues
 
 | Issue | Current treatment |

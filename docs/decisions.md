@@ -39,6 +39,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Parity schedule bands and HFD preparation | D094 |
 | Open fertility age bands, HFD endpoints and TFR warnings | D095 |
 | Missing conditional HFD rates replaced with zero | D096 |
+| PATFR helper and automatic TFR dispatch for parity tables | D097 |
 
 ## Recorded decisions
 
@@ -1937,3 +1938,30 @@ cohabitation policy. Duration stratification is unchanged.
 - **Supersedes:** D094's preserve-NA-with-warning rule for HFD conditional cells.
   Zero fill is the user's modeling choice, not an empirical reclassification
   of missing HFD observations as measured zero hazards.
+
+
+## D097 — PATFR and parity-aware TFR dispatch (October 29, 2026)
+
+- **Status:** the user authorized a separate calculate_patfr(), automatic
+  calculate_tfr() delegation for parity schedules, and the same stratification
+  as calculate_tfr(). They explicitly selected exclusion of upper-open age bands
+  with nonzero-rate warning, and NA results for missing included rates.
+- **Measure:** deterministic synthetic-cohort parity progression using the HFD
+  Methods Protocol (2015), sections 8.3–8.4, midpoint fertility-table convention.
+  Output is patfr, including when called through calculate_tfr(), to distinguish
+  it from ordinary TFR. Start at parity zero at the reported finite lower age;
+  count repeated births within the terminal open parity category. Each supplied
+  period/group/union-type stratum is calculated independently, selecting female
+  rows if sex is present. Hold other strata fixed; no mortality or explicit
+  birth-spacing state is included.
+- **Numerics:** use annual age boundaries plus input boundaries, with midpoint
+  entry/exit exposure and q=d*m/(1+d*m/2); fractional steps generalize the annual
+  convention. Reject invalid progression probabilities rather than clipping.
+  This is not the exact continuous-time hazard solution or a new engine time
+  grid. All age/parity cells require unique contiguous coverage; broader finite
+  parity bands apply their rate to each contained state. See the worked formula
+  in [parity fertility](parity-fertility.md).
+- **Limits:** distinguish raw missing rates (NA result) from earlier explicit
+  HFD zero filling (D096). Upper-age omission, source endpoints and missing-cell
+  assumptions can prevent exact equality to HFD's full published PATFR. No
+  parity-dependent simulation or heterogeneity is authorized by this helper.

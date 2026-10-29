@@ -13,13 +13,16 @@ or \code{rate} in births per woman-year. Bare \code{rate} tables are interpreted
 fertility rates; mortality processes are not valid inputs.}
 }
 \value{
-A tibble with period columns, \code{union_type} or legacy \code{union_status}
+With parity columns, the result of \code{\link[=calculate_patfr]{calculate_patfr()}} with \code{patfr}.
+Otherwise, a tibble with period columns, \code{union_type} or legacy \code{union_status}
 when supplied,
 \code{group} when supplied, \code{age_start}, \code{age_end}, and \code{tfr}.
 If \code{sex} is present, only female rows are used.
 }
 \description{
 Sum age-specific fertility rates times their actual interval widths.
+If parity-bound columns are present, delegate to \code{\link[=calculate_patfr]{calculate_patfr()}} instead
+and return its \code{patfr} column rather than \code{tfr}, with the same other strata.
 Open-ended age bands are omitted, warning if an omitted female rate is known
 and nonzero that TFR underestimates fertility over the full age range. Zero or
 missing omitted rates do not trigger that warning. The remaining finite, contiguous age range

@@ -202,6 +202,8 @@ summary_rows <- function(table, by_sex = FALSE, by_union_status = FALSE) {
 #' Calculate total fertility rates
 #'
 #' Sum age-specific fertility rates times their actual interval widths.
+#' If parity-bound columns are present, delegate to [calculate_patfr()] instead
+#' and return its `patfr` column rather than `tfr`, with the same other strata.
 #' Open-ended age bands are omitted, warning if an omitted female rate is known
 #' and nonzero that TFR underestimates fertility over the full age range. Zero or
 #' missing omitted rates do not trigger that warning. The remaining finite, contiguous age range
@@ -217,7 +219,8 @@ summary_rows <- function(table, by_sex = FALSE, by_union_status = FALSE) {
 #'   process object, or a data frame with `age_start`, `age_end`, and `rate_fertility`
 #'   or `rate` in births per woman-year. Bare `rate` tables are interpreted as
 #'   fertility rates; mortality processes are not valid inputs.
-#' @return A tibble with period columns, `union_type` or legacy `union_status`
+#' @return With parity columns, the result of [calculate_patfr()] with `patfr`.
+#'   Otherwise, a tibble with period columns, `union_type` or legacy `union_status`
 #'   when supplied,
 #'   `group` when supplied, `age_start`, `age_end`, and `tfr`.
 #'   If `sex` is present, only female rows are used.
@@ -229,6 +232,8 @@ calculate_tfr <- function(rates) {
       stop("TFR requires a fertility process with person-year rates.", call. = FALSE)
     rates <- rates$rates
   }
+  if (any(c("parity_start", "parity_end") %in% names(rates)))
+    return(calculate_patfr(rates))
   check_columns(rates, c("age_start", "age_end"), "rates")
   if (!"rate_fertility" %in% names(rates)) {
     if (!"rate" %in% names(rates)) stop("Supply `rate_fertility` or fertility `rate`.", call. = FALSE)

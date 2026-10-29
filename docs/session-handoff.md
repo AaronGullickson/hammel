@@ -109,3 +109,10 @@ birth-spacing adjustment f/(1-b*f), retaining finite-band midpoint behavior.
 TFR drops upper-open rows and warns on known nonzero omitted fertility. HFD
 helpers now retain 12- as [12,13) and 55+ as [55,Inf), superseding endpoint
 omission in D094. This still does not implement parity-dependent execution.
+
+
+D097 adds calculate_patfr() using the HFD midpoint fertility-table convention;
+calculate_tfr() delegates when parity columns are present and returns patfr.
+All existing TFR strata are preserved. The user selected omission of upper-open
+ages with nonzero-rate warning and NA propagation from included missing cells.
+This summary helper does not implement parity-dependent simulation.
