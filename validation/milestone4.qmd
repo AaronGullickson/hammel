@@ -392,53 +392,174 @@ dissolution_summary |>
 
 ## Age-specific marriage rate schedules by previous union
 
+I test the age specific remarriage rates first by specifying different age specific marriage rates for each previous union type.
+
 ```{r}
-#| label: age-remarriage-recovery
-union_summary |>
-  filter(scenario == "remarriage_age", sex == "f", age_start < 70) |>
-  ggplot(aes(age_start + 2.5, mean, color = previous_union, group = previous_union)) +
-  geom_point() + geom_errorbar(aes(ymin = mean - 1.96 * mcse, ymax = mean + 1.96 * mcse), width = .4) +
-  geom_line(data = search_age |> filter(age_start < 70), aes(y = rate), linetype = 2) +
-  labs(x = "Woman's age", y = "Successful union entries per unpartnered year")
+#| run-simulations-diff-remarriage-age
+
+model <- hammel_model() |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates) |>
+  set_union_formation("rate", rates = marriage_rates_typed_age) |>
+  set_union_dissolution(dissolution_rates)
+
+results <- map(seq_len(params$n_replications), run_replication, model = model)
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "remarriage by age",
+    elapsed_time = mean(map_dbl(results, function(x) {x$runtime}))
+  )
+)
+
+marriage_by_rep <- results |>
+  map(
+    calculate_marriage_rates,
+    time_breaks = time_breaks,
+    age_breaks = seq(15, 70, 5),
+    by_previous_union = TRUE
+  ) |>
+  bind_rows(.id = "replication")
+
+marriage_summary <- marriage_by_rep |>
+  filter(sex == "f") |>
+  group_by(time_start, time_end, age_start, age_end, previous_union) |>
+  summarize(
+    n_valid = sum(!is.na(rate_marriage)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_marriage, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_marriage, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+```
+
+
+```{r}
+#| label: fig-remarriage-rates-age
+#| fig-cap: Comparison of mean age specific marriage rate by previous union type across simulations. 95% confidence intervals are shown. Dotted line shows the input marriage rates.
+
+marriage_summary |>
+  ggplot(aes(x = age_start + 2.5, y = rate_mean, group = previous_union, color = previous_union))+
+  geom_point(alpha = 0.7)+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse), alpha = 0.7)+
+  geom_line(data = marriage_rates_typed_age, aes(y = rate), linetype = 2, alpha = 0.7)+
+  labs(x = "union duration", y = "dissolution rate")
 ```
 
 ```{r}
-#| label: sparse-remarriage-cells
-union_summary |>
-  filter(scenario == "remarriage_age", sex == "f", previous_union == "widowed") |>
-  select(age_start, age_end, n_replications, n_valid, exposure, events, mean, mcse, pooled_rate) |>
-  gt() |> fmt_number(columns = c(exposure, mean, mcse, pooled_rate), decimals = 4)
+#| label: tbl-remarriage-rates-age
+#| tbl-cap: Mean age specific marriage rates by previous union type across simulations with Monte Carlo standard errors and the target input marriage rates.
+
+marriage_summary |>
+  left_join(marriage_rates_typed_age, by = c("age_start", "age_end", "previous_union")) |>
+  select(-starts_with("time_")) |>
+  gt() |>
+  cols_label(
+    age_start ~ "Age start",
+    age_end ~ "Age end",
+    previous_union ~ "Previous union",
+    n_valid ~ "Valid cases",
+    rate_mean ~ "Mean rate",
+    rate_mcse ~ "MCSE",
+    rate ~ "Target rate"
+  ) |>
+  fmt_number(c("rate_mean", "rate"), decimals = 4) |>
+  fmt_number("rate_mcse", decimals = 5)
 ```
 
-## Duration-specific marraiage rate schedules for remarriages
+@fig-remarriage-rates-age and @tbl-remarriage-rates-age show the mean age-specific marriage rates as well as Monte Carlo estimates of uncertainty and the target input rates. The estimated mean rates are extremely close to the expectation from the input rates.
 
-The `none` schedule remains age-specific. The other categories use time since
-the latest actual ending. Providing `dur_breaks` automatically separates prior
-categories. Do not compare a broad age average with a duration hazard.
+## Duration-specific marriage rate schedules for remarriages
+
 
 ```{r}
-#| label: duration-remarriage-recovery
-union_summary |>
-  filter(scenario == "remarriage_duration", sex == "f", previous_union != "none",
-         is.finite(dur_end)) |>
-  ggplot(aes((dur_start + dur_end) / 2, mean, color = previous_union, group = previous_union)) +
-  geom_point() + geom_errorbar(aes(ymin = mean - 1.96 * mcse, ymax = mean + 1.96 * mcse), width = .25) +
-  geom_line(data = search_duration |> filter(previous_union != "none", is.finite(dur_end)),
-    aes(y = rate), linetype = 2) +
-  labs(x = "Years since latest ending", y = "Successful union entries per unpartnered year")
+#| run-simulations-diff-remarriage-dur
+
+model <- hammel_model() |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates) |>
+  set_union_formation("rate", rates = marriage_rates_typed_dur) |>
+  set_union_dissolution(dissolution_rates)
+
+results <- map(seq_len(params$n_replications), run_replication, model = model)
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "remarriage by duration",
+    elapsed_time = mean(map_dbl(results, function(x) {x$runtime}))
+  )
+)
+
+marriage_by_rep <- results |>
+  map(
+    calculate_union_rates,
+    time_breaks = time_breaks,
+    age_breaks = seq(15, 70, 5),
+    dur_breaks = c(0, 1, 5, 15),
+    by_previous_union = TRUE
+  ) |>
+  bind_rows(.id = "replication")
+
+marriage_summary <- marriage_by_rep |>
+  filter(sex == "f", previous_union != "none") |>
+  group_by(time_start, time_end, dur_start, dur_end, previous_union) |>
+  summarize(
+    n_valid = sum(!is.na(rate_union)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_union, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_union, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+```
+
+
+```{r}
+#| label: fig-remarriage-rates-dur
+#| fig-cap: Comparison of mean duration specific remarriage rate by previous union type across simulations. 95% confidence intervals are shown. Dotted line shows the input remarriage rates.
+
+marriage_summary |>
+  ggplot(aes(x = dur_start, y = rate_mean, group = previous_union, color = previous_union))+
+  geom_point(alpha = 0.7)+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse), alpha = 0.7)+
+  geom_line(
+    data = marriage_rates_typed_dur |> filter(previous_union != "none"),
+    aes(y = rate),
+    linetype = 2,
+    alpha = 0.7
+  )+
+  labs(x = "union duration", y = "dissolution rate", color = "previous union")
 ```
 
 ```{r}
-#| label: never-partnered-recovery
-union_summary |>
-  filter(scenario == "remarriage_duration", sex == "f", previous_union == "none", age_start < 70) |>
-  ggplot(aes(age_start + 2.5, mean)) + geom_point() +
-  geom_line(data = search_base |> filter(age_start < 70), aes(y = rate), linetype = 2) +
-  labs(x = "Woman's age", y = "Successful union entries per unpartnered year")
+#| label: tbl-remarriage-rates-dur
+#| tbl-cap: Mean duration specific remarriage rates by previous union type across simulations with Monte Carlo standard errors and the target input remarriage rates.
+
+marriage_summary |>
+  left_join(marriage_rates_typed_dur, by = c("dur_start", "dur_end", "previous_union")) |>
+  select(-starts_with("time_"), -starts_with("age_")) |>
+  gt() |>
+  cols_label(
+    dur_start ~ "Dur. start",
+    dur_end ~ "Dur. end",
+    previous_union ~ "Previous union",
+    n_valid ~ "Valid cases",
+    rate_mean ~ "Mean rate",
+    rate_mcse ~ "MCSE",
+    rate ~ "Target rate"
+  ) |>
+  fmt_number(c("rate_mean", "rate"), decimals = 4) |>
+  fmt_number("rate_mcse", decimals = 5)
 ```
 
-**Author assessment:** _Assess rate recovery and precision, including the open
-duration tail retained in `union_summary` but omitted from midpoint plots._
+@fig-remarriage-rates-dur and @tbl-remarriage-rates-dur show the mean duration-specific marriage rates as well as Monte Carlo estimates of uncertainty and the target input rates. The estimated mean rates are extremely close to the expectation from the input rates.
 
 # Cohabitation
 
