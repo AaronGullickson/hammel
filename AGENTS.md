@@ -75,22 +75,29 @@ the user's agreement.
   corrections.
 - Milestone 1 was accepted as complete on October 15, 2026 (D029). Milestone 2
   union formation was accepted as complete on October 19, 2026 (D050). Milestone 3
-  groups was accepted as complete on October 27, 2026 (D077). Distinguish current
+  groups was accepted as complete on October 27, 2026 (D077). Milestone 4
+  dissolution/remarriage/cohabitation was accepted October 29, 2026 (D093).
+  Distinguish current
   specifications from deferred mechanisms and future proposals.
 - `validation/milestone1.qmd` is the accepted historical assessment; reproduce it
   at its recorded commit because current execution requires a union process.
   `validation/milestone2.qmd` contains the user's accepted assessment, including
   matching-parameter recovery and performance comparisons.
   `validation/milestone3.qmd` contains the accepted group-rate, matching, ancestry,
-  inheritance, and performance assessment. Preserve all three reports and rendered
+  inheritance, and performance assessment. `validation/milestone4.qmd` is the
+  accepted dissolution/remarriage/cohabitation assessment. Preserve all four
+  reports and rendered
   artifacts; do not fabricate results or set scientific acceptance thresholds. Milestone
   completion retains documented limitations and does not authorize future features.
-- Milestone 4 starts with optional duration-dependent dissolution (D078): annual
-  hazards on `dur_start`/`dur_end` bands, one female-carried clock per union,
-  symmetric `group_pair` schedules/multipliers (D079), and death/birth/dissolution
-  tie order.
-  This supersedes the earlier female-age-based direction. Separate remarriage
-  schedules and cohabitation remain deferred; see `docs/union-dissolution.md`.
+- Milestone 4 includes duration-dependent dissolution, age/duration searches by
+  previous union, and optional rate-mode cohabitation with linked conversion
+  episodes and type-specific matching/rates (D078–D092). One woman carries each
+  union clock; exact ties prioritize death, birth, dissolution, conversion, search.
+  See `docs/union-dissolution.md`, `docs/remarriage.md`, and `docs/cohabitation.md`.
+  Supporting benchmarks/recovery evidence lives in `validation/milestone4/`;
+  top-level reports and `validation/data/` remain in place. Preserve active render
+  intermediates until rendering finishes. Parity and calendar-time schedules
+  remain future scope and require separate scientific specification.
 - Use `devtools::test()` for the testthat suite. Live database tests require
   explicit opt-in; ordinary verification must not download rates or expose
   credentials. See `docs/testing.md` for commands and evidence.

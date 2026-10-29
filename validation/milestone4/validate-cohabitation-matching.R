@@ -1,5 +1,5 @@
 # Offline D086 parameter recovery with different marriage/cohabitation models.
-# Rscript validation/validate-cohabitation-matching.R LIB_OR_dev PREFIX [REPS]
+# Rscript validation/milestone4/validate-cohabitation-matching.R LIB_OR_dev PREFIX [REPS]
 args <- commandArgs(trailingOnly=TRUE)
 stopifnot(length(args)>=2L)
 if (args[1]=="dev") pkgload::load_all(compile=FALSE,quiet=TRUE) else library(hammel,lib.loc=args[1])

@@ -1,9 +1,9 @@
 # Offline performance comparison for D082. Run from the repository root.
-# Rscript validation/benchmark-calibration-intensity.R make LIB INPUT.rds
-# Rscript validation/benchmark-calibration-intensity.R run LIB INPUT.rds OUTPUT.rds
+# Rscript validation/milestone4/benchmark-calibration-intensity.R make LIB INPUT.rds
+# Rscript validation/milestone4/benchmark-calibration-intensity.R run LIB INPUT.rds OUTPUT.rds
 # Install the baseline commit and working tree into separate optimized libraries.
-# Rscript validation/benchmark-calibration-intensity.R compare OLDLIB INPUT.rds NEWLIB OUTPUT.rds
-# Rscript validation/benchmark-calibration-intensity.R memory LIB INPUT.rds OUTPUT.rds
+# Rscript validation/milestone4/benchmark-calibration-intensity.R compare OLDLIB INPUT.rds NEWLIB OUTPUT.rds
+# Rscript validation/milestone4/benchmark-calibration-intensity.R memory LIB INPUT.rds OUTPUT.rds
 # All schedules below are synthetic workload inputs, not empirical estimates.
 args <- commandArgs(trailingOnly = TRUE)
 stopifnot(length(args) >= 3L)
@@ -19,7 +19,7 @@ if (args[1] == "compare") {
       output <- tempfile(fileext = ".rds")
       library_path <- if (version == "old") args[2] else args[4]
       status <- system2(file.path(R.home("bin"), "Rscript"),
-        shQuote(c("validation/benchmark-calibration-intensity.R", "run",
+        shQuote(c("validation/milestone4/benchmark-calibration-intensity.R", "run",
           library_path, input_file, output)))
       stopifnot(status == 0L)
       measured <- readRDS(output)

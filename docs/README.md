@@ -1,8 +1,8 @@
 # Hammel documentation
 
-Updated October 28, 2026. Milestones 1 (mortality/fertility), 2 (union
-formation), and 3 (groups, matching, ancestry, and inheritance) are complete
-by user acceptance (D029, D050, D077). Current behavior uses
+Updated October 29, 2026. Milestones 1 (mortality/fertility), 2 (union
+formation), 3 (groups/matching/inheritance), and 4 (dissolution/remarriage/
+cohabitation) are complete by user acceptance (D029, D050, D077, D093). Current behavior uses
 continuous event times and midpoint fertility compensation, with no monthly
 time grid. Acceptance is based on the user-authored validation reports.
 Transition-aware fertility compensation and other deferred mechanisms remain
@@ -75,11 +75,14 @@ To inspect prior versions, use `git log -- docs` and
   weighted matching and delta, conditional-logit recovery, ancestry, built-in
   and custom inheritance, baseline sensitivity, and performance. Rendering
   downloads HMD inputs and runs substantial simulations and the test suite.
-- [Milestone 4 validation draft](../validation/milestone4.qmd): runnable
-  dissolution, remarriage and cohabitation assessment, with independent baseline
-  replications, rate/MCSE plots, history checks, and author interpretation slots.
-  Uses local fertility/search files and explicitly illustrative mortality by
-  default; optional local empirical mortality requires no download during render.
+- [Milestone 4 validation report](../validation/milestone4.qmd) and
+  [rendered assessment](../validation/milestone4.html): user-authored assessment
+  accepted October 29, 2026 (D093), covering dissolution, age/duration remarriage,
+  cohabitation, age/duration conversion, fertility by type, separate matching
+  roles, and performance. Rendering downloads HMD mortality and runs 100
+  independent-baseline replications per scenario plus the offline test suite.
+- [Validation directory guide](../validation/README.md): retained reports,
+  rate provenance, and supporting benchmark/conditional-choice evidence.
 The former `milestone1.R` and `milestone1_bootstrap.R` examples have been
 removed from the current tree; use Git history for those historical workflows.
 

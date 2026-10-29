@@ -1,8 +1,7 @@
 # Cohabitation and marriage within partnerships
 
-Milestone 4 stretch-goal specification, October 28, 2026 (D085/D086).
-Implementation is authorized; the user selected the rules below. This is not
-milestone scientific acceptance. Cohabitation is supported only in rate mode.
+Implemented milestone 4 specification (D085/D086), accepted by the user
+October 29, 2026 (D093); see the [validation report](../validation/milestone4.qmd). Cohabitation is supported only in rate mode.
 
 ## Inputs and entry
 

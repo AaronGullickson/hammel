@@ -1,8 +1,9 @@
 # Scientific contract
 
-Updated October 28, 2026. This is the current mortality, fertility, union-formation,
-group identity/ancestry, and observation contract. Milestones 1–3 are accepted
-as complete (D029, D050, D077), retaining documented limitations.
+Updated October 29, 2026. This is the current mortality, fertility, union-formation,
+dissolution, remarriage, cohabitation/conversion, group identity/ancestry, and
+observation contract. Milestones 1–4 are accepted as complete
+(D029, D050, D077, D093), retaining documented limitations.
 Earlier monthly and exact
 age-varying compensation specifications are available in Git history; the
 [decision log](decisions.md) records their replacement. Acceptance
@@ -645,3 +646,15 @@ status/scope, inputs/units, eligibility, timing/competition, state transitions
 and invalidation, observations, worked examples, validation, and unresolved
 choices. The user decides demographic assumptions. Passing software tests is
 not sufficient evidence of research readiness.
+
+
+## Milestone 4 acceptance
+
+The user accepted dissolution, age/duration remarriage, and optional rate-mode
+cohabitation/conversion on October 29, 2026 (D093), based on the
+[final report](../validation/milestone4.qmd) and its rendered assessment. This
+retains earlier limitations, including transition-aware fertility compensation
+(D045), thin-pool failures, initialization transients, and approximate calibration
+age bins. Reported recovery in these scenarios is not a universal exact pooled
+cross-tab constraint. Static SOCSIM audits remain distinct from executable
+reference comparisons. Later parity and calendar-time schedules remain unimplemented.

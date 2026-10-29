@@ -1,9 +1,30 @@
 # Testing and milestone validation
 
-Updated October 27, 2026. Milestones 1–3 are accepted as complete (D029,
-D050, D077). Software test history and the user's demographic assessment
+Updated October 29, 2026. Milestones 1–4 are accepted as complete (D029,
+D050, D077, D093). Software test history and the user's demographic assessment
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
+
+## Milestone 4 accepted assessment
+
+The user accepted milestone 4 on October 29, 2026 (D093), after final report
+corrections and adding duration-dependent conversion. The
+[report source](../validation/milestone4.qmd) and
+[rendered assessment](../validation/milestone4.html) are the accepted scientific
+assessment. The author's final HTML render was active at documentation closeout;
+this edit does not independently rerender it, download HMD rates or rerun tests.
+The previously reviewed rendered report contained 322 test cases: 321 passed,
+one opt-in live database case skipped, no failures/errors/warnings. Treat the
+final report's own results as the record for that render.
+
+Supplementary benchmark and conditional-choice artifacts are retained under
+[validation/milestone4/](../validation/milestone4/README.md), with their original
+run provenance. Paths in reproduction commands below reflect that move.
+The final report supersedes the removed exploratory `milestone4_tests.R`.
+[Validation contents](../validation/README.md) lists retained inputs/evidence.
+Earlier dated entries below distinguish implementation checks from scientific
+acceptance at the time; D093 records the subsequent user acceptance. Completion
+retains sparse-cell, initialization, fertility-transition and calibration limits.
 
 ## Run the suite
 
@@ -382,7 +403,7 @@ validation of duration-dependent remarriage, which remains unimplemented.
 ## Matching parameter recovery with the new tracker (October 28, 2026)
 
 Ran
-`TZ=UTC Rscript validation/validate-calibration-log-odds.R /tmp/hammel-calibration-newlib validation/calibration-log-odds 20 1500`
+`TZ=UTC Rscript validation/milestone4/validate-calibration-log-odds.R /tmp/hammel-calibration-newlib validation/milestone4/calibration-log-odds 20 1500`
 using the same optimized D082 build as the performance comparison. The script
 uses offline synthetic schedules, 20 independently seeded initial populations
 of 20,000 persons (max age 50, 75/25 A/B), 60 years, duration-dependent
@@ -425,10 +446,10 @@ In particular, do not claim the age-dependent pooled estimate is within two
 MCSEs of -6; preservation applies to the conditional utility association, not
 an exact constraint on the final pooled table.
 
-Reproduction: [validation script](../validation/validate-calibration-log-odds.R).
-Evidence: [replication estimates](../validation/calibration-log-odds-replications.csv),
-[summary](../validation/calibration-log-odds-summary.csv), and
-[estimates/session metadata](../validation/calibration-log-odds.rds). No package
+Reproduction: [validation script](../validation/milestone4/validate-calibration-log-odds.R).
+Evidence: [replication estimates](../validation/milestone4/calibration-log-odds-replications.csv),
+[summary](../validation/milestone4/calibration-log-odds-summary.csv), and
+[estimates/session metadata](../validation/milestone4/calibration-log-odds.rds). No package
 code changed for this recovery check. The run completed without warnings.
 
 ## Duration-specific remarriage (D083, October 28, 2026)
@@ -456,7 +477,7 @@ compared in full against the installed pre-D083 build and was identical.
 Additional parameter-recovery check:
 
 ```sh
-TZ=UTC Rscript validation/validate-calibration-log-odds.R /tmp/hammel-duration-lib validation/duration-remarriage-log-odds 10 1500 duration
+TZ=UTC Rscript validation/milestone4/validate-calibration-log-odds.R /tmp/hammel-duration-lib validation/milestone4/duration-remarriage-log-odds 10 1500 duration
 ```
 
 This uses ten independent 20,000-person baselines per matching case and the
@@ -481,9 +502,9 @@ not establish universal scientific accuracy or milestone 4 acceptance. Pooled
 cross-tab means are retained in the raw results and are not exact target
 constraints under changing pools/age composition.
 
-Evidence: [replication estimates](../validation/duration-remarriage-log-odds-replications.csv),
-[summary](../validation/duration-remarriage-log-odds-summary.csv), and
-[estimates/session metadata](../validation/duration-remarriage-log-odds.rds).
+Evidence: [replication estimates](../validation/milestone4/duration-remarriage-log-odds-replications.csv),
+[summary](../validation/milestone4/duration-remarriage-log-odds-summary.csv), and
+[estimates/session metadata](../validation/milestone4/duration-remarriage-log-odds.rds).
 The public marriage-rate observation helper remains age-based; duration-band
 exposure summaries require a separate interface specification.
 
@@ -525,7 +546,7 @@ boundaries are included. A saved pre-feature grouped age/previous-status run
 (50,000 initial people, 100 years, seed 42) retains identical complete output
 when cohabitation is disabled.
 
-`validation/validate-cohabitation-matching.R` was run for ten independently
+`validation/milestone4/validate-cohabitation-matching.R` was run for ten independently
 initialized 20,000-person populations over 60 years. Probability varied by age,
 group and previous union; conversion, typed fertility and typed dissolution
 were active. Conditional-choice fits used 1,500 entry events per type per
@@ -535,10 +556,10 @@ conditional log odds averaged -2.0402 (MCSE .04280) for cohabitation against -2,
 and -6.0298 (MCSE .03625) for marriage against -6. These support parameter
 recovery in this synthetic case, not empirical validity or milestone acceptance.
 
-Evidence: [script](../validation/validate-cohabitation-matching.R),
-[replications](../validation/cohabitation-matching-replications.csv),
-[summary](../validation/cohabitation-matching-summary.csv), and
-[estimates/session metadata](../validation/cohabitation-matching.rds).
+Evidence: [script](../validation/milestone4/validate-cohabitation-matching.R),
+[replications](../validation/milestone4/cohabitation-matching-replications.csv),
+[summary](../validation/milestone4/cohabitation-matching-summary.csv), and
+[estimates/session metadata](../validation/milestone4/cohabitation-matching.rds).
 
 
 ## Union and marriage observation split (D087–D088, October 28, 2026)
@@ -589,19 +610,6 @@ Existing dissolution tests verify unchanged behavior of the shared accumulator.
 This was offline targeted verification; no empirical rate downloads were used.
 
 
-## Milestone 4 report draft smoke render (October 28, 2026)
-
-`validation/milestone4.qmd` was rendered successfully from `validation/` with
-`quarto render milestone4.qmd -P n_replications:2 -P initial_population:1000
--P years:40 -P burn_in:10 --output milestone4-preview.html`. All R chunks and
-HTML generation completed. This used the explicitly illustrative offline
-mortality default and local fertility/search inputs; no downloads occurred.
-The preview was moved to temporary storage. This verifies report execution,
-not demographic recovery at these small sample sizes, a default-parameter full
-run, or scientific milestone acceptance. The user's milestone4_tests.R was not
-modified. Final report parameters and conclusions remain for the author.
-
-
 D092 extraction: `devtools::test(filter =
 "unpartnered-births|parent-info|demog-union-types", reporter = "summary")`
 passed without failures or warnings after documentation and native exports were
@@ -610,3 +618,13 @@ dissolution/conversion/death boundaries, repeated parental pairs, overlapping
 coverage, unknown parents, untyped unions, preserved custom columns/group types,
 row order and input independence, empty schemas and invalid references. No
 simulation scheduling or empirical inputs were changed.
+
+
+## Milestone 4 documentation and evidence closeout (October 29, 2026)
+
+All three scripts relocated to `validation/milestone4/` parse. The eleven CSV/RDS
+result files are byte-for-byte identical to their pre-move Git versions.
+Relative Markdown file targets in changed documentation and both new validation
+guides resolve, and `git diff --check` passes. No simulation, database request,
+report render or test suite was started for this documentation-only cleanup.
+The author's active render and final report source were left unchanged.

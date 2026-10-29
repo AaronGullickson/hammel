@@ -222,24 +222,19 @@ woman still carries the single union clock. Birth precedes dissolution at an
 exact same-person tie. See the
 [dissolution specification](union-dissolution.md). SOCSIM's duration baseline
 informed this decision; its monthly inputs and two-spouse option were not adopted.
-Hammel now supports age- or duration-specific search schedules by previous
-union in one table (D080/D083); cohabitation remains deferred.
+Hammel supports age- or duration-specific search schedules by previous union
+in one table (D080/D083), and optional rate-mode cohabitation with type-specific
+matching/rates and same-partner conversion (D086). Milestone 4 was accepted
+October 29, 2026 (D093); see the [report](../validation/milestone4.qmd).
 
-Remaining design areas beyond the accepted dissolution core include:
-
-- Remarriage strata: first versus subsequent union, divorced versus widowed,
-  their rate coverage/defaults, and age versus elapsed-duration schedules.
-- Whether cohabitation belongs in milestone 4; its formation, conversion,
-  breakup and legal-history implications need a separate explicit contract.
-- Eligibility after dissolution, including reconciliation with a former partner
-  and any waiting interval; nothing in this audit selects a restriction.
-- State invalidation for each former partner, search/father pools, fertility
-  status, same-time ties, spacing, initial histories and restarts. On-demand
-  mode also needs an explicit relationship between birth-triggered reformation
-  and any separate remarriage schedule.
-- Observation rules: count one dissolution per union, with sex-specific exposure
-  and event attribution if requested, preserve end reasons and histories, and
-  distinguish input search rates from realized remarriages.
+The implemented contracts resolve rate coverage, previous categories, ending
+state updates, availability, exact ties, spacing and restart histories. See
+[remarriage](remarriage.md), [cohabitation](cohabitation.md), and
+[demographic observations](demographic-analysis.md). They do not adopt SOCSIM's
+implicit defaults, former-partner exclusion or a new mandatory waiting interval.
+Richer couple effects and marriage-order dependence remain future proposals.
+The audit remains a static source trace; suggested reference experiments below
+have not become executable reference evidence through milestone acceptance.
 
 ## Suggested validation, not yet executed
 

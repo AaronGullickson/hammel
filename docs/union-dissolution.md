@@ -5,6 +5,9 @@ covers the separate optional dissolution process. Age-specific remarriage
 schedules, including duration since the latest ending, are described in
 [remarriage](remarriage.md) (D080/D083). Optional cohabitation is implemented under [D086](cohabitation.md).
 
+Milestone 4 was accepted October 29, 2026 (D093); see the
+[validation report](../validation/milestone4.qmd).
+
 ## Risk, units and eligibility
 
 Each ongoing union has one dissolution clock, carried by its living female

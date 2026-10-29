@@ -1,132 +1,92 @@
 # Current project handoff
 
-Updated October 28, 2026. This is a dated status record, not authorization for
-additional features. Start with the [documentation index](README.md); the
-current user request controls work.
+Updated October 29, 2026. This is a dated status record, not authorization for
+additional features. The current user request controls work. Start with the
+[documentation index](README.md) and [scientific contract](scientific-contract.md).
+
+## Accepted milestones
+
+The user accepted milestones 1–4 on October 15, October 19, October 27 and
+October 29, 2026 (D029, D050, D077, D093). Preserve all four report sources,
+rendered assessments, rate provenance and the author's explanatory comments.
+Milestone 1 requires its recorded historical commit because current execution
+requires a union process. The final milestone 4 report was rendering when the
+user requested documentation closeout; do not interrupt that render or delete
+its temporary files. No new scientific analysis is implied by closeout.
 
 ## Implemented state
 
-- Call-local C++17/Rcpp continuous event scheduling, R RNG isolation, tibble
-  interfaces, and recorded population/union histories.
-- Mortality and fertility with shared hazard sampling, per-schedule midpoint
-  compensation, and actual-birth spacing preserved across restarts.
-- Mandatory union formation with on-demand or female rate-based initiation,
-  exact full-pool conditional-logit partner selection, minimum age and known-kin
-  screening, exclusive ongoing unions, widowhood, and status-event invalidation.
-- Overall or partnered/unpartnered fertility schedules. Rate-mode nonmarital
-  births select fathers without forming unions; a separate `father_matching`
-  model may override general matching. Failed matches cancel births by default.
-- Group-specific schedules and proportional hazard multipliers, including
-  separate fertility factors by union status, plus group-stratified observations.
-- Weighted choice calibrated to mirrored male-group per-capita targets with
-  optional delta adjustments. Symmetric pair effects use `A:B`; directed pair
-  utilities, `::`, candidate sample sizes and method selection are removed.
-  Default age-gap matching is `create_age_gap_matching_model(0, 5)`.
-- `diagnostics = TRUE` records applied `.log_weight_<group>` offsets on new
-  unions. There are no `.n_eligible` or `.utility_rank` columns.
-- Separate ancestry proportions and newborn identity. Built-in and custom
-  inheritance support possible future identities and custom mixed categories.
-  Default inheritance is `random_parent`, with maternal fallback (D076).
-- Shared native kinship screening and `extract_kin()`, parent/spouse extraction,
-  and demographic summaries by group and discovered union type, without overall rows
-  when `by_union_type = TRUE` (D090).
+- Independent C++17/Rcpp continuous-event simulations, isolated R RNG policy,
+  tibble population/union histories, shared known-kin screening and extraction.
+- Mortality and fertility with annual hazards and midpoint birth-spacing
+  compensation. Actual birth spacing persists through union transitions.
+- On-demand or female rate-based partnership searches, exact full-pool matching,
+  group schedules/multipliers, calibrated group weights and optional delta.
+  Current female hazards are summed by group/cohort; a common boundary queue
+  handles age, duration, spacing and cohabitation probability changes.
+- Duration-specific dissolution with one female-carried clock, symmetric group
+  pairs/multipliers, optional cohab/marriage schedules and retained end reasons.
+- Searches by previous_union none/dissolved/widowed, requiring all categories
+  when stratified. None uses age; each other category may use age or duration
+  since the latest actual ending. State is reconstructed from complete histories.
+- Rate-mode cohabitation: cohab_prob by woman's age and optional group/previous
+  category; optional separate cohab_matching; age/duration union_convert_rate
+  optionally by woman's group. Conversion creates same-partner linked episodes
+  with previous_cohab_id and resets dissolution duration. Exact ties prioritize
+  death, birth, dissolution, conversion, then search.
+- Fertility input union_type accepts unpartnered/partnered or
+  unpartnered/cohab/marriage; hazard-list names match supplied types. Father
+  matching at unpartnered births can use a separate model. Failed matches cancel
+  births by default. Cohabitors remain unavailable for new matching.
+- Cohabitation endings recover earlier legal status by default; the configured
+  toggle can count them as dissolved/widowed. Latest simulation metadata carries
+  the policy for observation. Changing policy reclassifies supplied histories.
+- Newborn identities and ancestry are separate; random_parent inheritance is
+  default with maternal fallback. Custom inheritance is supported.
 
-See [design](design.md), [scientific contract](scientific-contract.md),
-[group inheritance](group-inheritance.md), and
-[weighted choice](weighted-choice-matching.md) for current rules.
+## Observation APIs
 
-## Validation and ownership
+- calculate_demog_rates(by_union_type = TRUE): unpartnered plus discovered types,
+  no overall row; FALSE pools demographic counts/exposure.
+- calculate_union_rates(): partnership entries over unpartnered years, excluding
+  conversion. Optional by_union_type repeats shared unpartnered exposure;
+  by_previous_union and optional dur_breaks retain mixed age/duration observations.
+- calculate_marriage_rates(): direct marriages plus conversions over nonmarried
+  (unpartnered plus cohabiting) years; optional previous categories, age only.
+- calculate_dissolution_rates(): dissolutions per union-year, optionally by
+  symmetric group_pair and union_type.
+- calculate_cohab_convert_rate(): conversions per cohabitation union-year,
+  either woman's age or cohabitation duration, optionally woman's group.
+- get_unpartnered_births(): known-parent births outside partnerships, enriched
+  with parent ages/groups. Preserve repeated pairs; use to assess father choice.
 
-Milestones 1, 2, and 3 were accepted by the user on October 15, October 19,
-and October 27, 2026 respectively (D029, D050, D077). Preserve all three
-validation source reports, rendered artifacts, and the user's explanatory
-comments. Milestone 1 is historical and must be reproduced at its recorded
-commit because current execution requires a union process. See [testing](testing.md).
+## Validation and cleanup
 
-Milestone 3 covers group-specific and multiplied schedules, weighted matching
-and delta, wife-side conditional-logit recovery with log-weight offsets,
-ancestry and built-in/custom inheritance, starting-population sensitivity,
-and performance. Inheritance runs regenerate baselines per replication and
-reduce maximum starting age to 50; both changes were made together. Earlier
-fixed-baseline MCSEs condition on their shared populations. The experiments did
-not establish a calibration bug or a systematic 3:1 group-size effect.
+The accepted [milestone 4 report](../validation/milestone4.qmd) assesses rate
+recovery, separate matching contexts and performance over independently seeded
+baselines. Its final render includes the test suite. The earlier reviewed HTML
+had 321 passing tests and one opt-in live-database skip; final-render results
+remain the author's record. No new tests/downloads were run for docs cleanup.
 
-The user revised the report and added its conclusion, then requested closeout
-while rerendering. The revised source is at
-`7514916bb8cf0c06faef24dad7fa013304093779`. This documentation update does not
-independently rerender reports, download rates, or rerun simulations/tests.
-No final HTML hash or combined acceptance commit is recorded. Do not interfere
-with the user's rendering or modify the report as part of this closeout.
-Acceptance is the user's scientific assessment and does not imply that every
-review suggestion was implemented or establish universal accuracy guarantees.
+Reports remain at validation/ top level; the 14 supplementary benchmark/recovery
+files moved to [validation/milestone4/](../validation/milestone4/README.md), with
+links and script paths updated. Rate/source inputs remain in validation/data/.
+The author deleted milestone4_tests.R; the final report supersedes it. Quarto
+intermediates are ignored and disposable only after rendering finishes.
 
-## Active milestone 4 investigation
+## Retained limitations and future scope
 
-The user created `milestone4-union-dissolution` and requested an audit of SOCSIM
-union dissolution and remarriage. The
-[static audit](socsim-dissolution-audit.md) traces the same pinned clean rsocsim
-checkout used by earlier audits. It finds duration-based divorce candidates
-for either spouse, ordinary marriage-search schedules selected by divorced or
-widowed status, optional duration-based remarriage, inherited schedule defaults,
-partner rescheduling, cohabitation histories and conditional former-partner
-exclusion. No reference simulation was run or source copied.
+Transition-aware fertility compensation (D045), poor-pool waiting (D044), former-
+partner/father continuity (D042), sparse exposure, initialization transients and
+approximate calibration ages remain limitations. Pooled cross-tab log odds are
+not universal exact constraints; conditional-choice recovery is separate evidence.
+Static SOCSIM audits are not executable reference comparisons.
 
-After this audit, the user selected duration-dependent annual hazards with
-one female-carried clock per union and death/birth/dissolution exact tie
-priority (D078). D079 replaces woman-only grouping with symmetric group-pair
-schedules and multipliers using `group_pair` labels such as A:A, A:B, B:B.
-The optional dissolution process is the first implementation: `dur_start`/
-`dur_end` bands, one retained clock per union, status invalidation and availability
-updates, plus latest-run dissolution counts. `calculate_dissolution_rates()` also
-returns period/duration dissolution rates with union-year exposure, optionally
-by symmetric group pair; each episode contributes once. The user checked the
-dissolution demonstrations and moved on to age-specific remarriage (D080).
-Optional `previous_union` on search tables uses `none`, `dissolved`, `widowed`,
-with all categories required per group; absent columns share rates. Calibration
-now uses per-woman current-hazard contributions summed by group/cohort (D082), with a common age/spacing boundary queue. State is recovered
-from complete exclusive histories and updated on endings.
-`calculate_union_rates()` now returns unpartnered exposure, starts and rates
-by sex, optionally by person group. `by_previous_union = TRUE` adds previous
-categories; the default FALSE pools counts and exposure and omits that column. The user requested moving
-`unions`/`rate_union` out of Lexis outputs entirely; current-status birth,
-death and exposure summaries remain. D083 adds age/duration remarriage
-selection per previous category in one rate data frame, with duration measured
-from the latest ending and recovered at restart. `none` must use age; the other
-categories each select one clock across all bands/groups. The same contribution
-queue now uses a separate search origin. D084 adds optional `dur_breaks` to
-marriage observations: none remains age-based and dissolved/widowed use duration,
-with previous categories automatically separated and unused boundary pairs NA.
-D086 implements optional rate-mode cohabitation, type-specific matching and
-rates, linked same-partner conversion, and legal-history recovery. Fertility
-inputs now use union_type; multiplier lists match the selected type labels.
-See [cohabitation](cohabitation.md). Milestone 4 is not accepted as complete. See
-[union dissolution](union-dissolution.md) and [remarriage](remarriage.md).
-
-The reported grouped rate-mode slowdown was largely debug compilation:
-`devtools::load_all()` defaults to `debug = TRUE` (`-O0`). The user's optimized
-installed runs took 0.568 seconds without groups and 5.302 seconds with two
-groups and dissolution, for 50,000 initial persons over 100 years. Those are
-user-supplied timings, not a controlled performance study. For development
-timing use `devtools::load_all(debug = FALSE, recompile = TRUE)`.
-
-## Retained limitations and next scope
-
-Transition-aware fertility compensation (D045), poor-pool waiting (D044), and
-previous-father continuity (D042) remain deferred. Sparse exposure cells,
-initialization transients, approximate calibration ages and omitted calibration
-kinship remain documented. Exact partner draws still screen individual age and
-known kinship. Small or sex-imbalanced markets may yield unexpected directional
-ratios, and fixed delta does not guarantee pairwise ratios over time.
-
-The current female-driven model does not represent marriage-squeeze feedback.
-Full two-sex models remain a future alternative. The [roadmap](roadmap.md)
-records active dissolution/remarriage work as milestone 4 and later parity,
-time-varying inputs, group transitions, summaries, migration and characteristics.
-None is authorized by closing milestone 3.
-
-The user deferred fixed newborn assignment (for example, minimum educational
-category at birth) to the group-transitions discussion. No fixed inheritance
-method was added. Custom inheritance already permits mixed-parent births to
-receive a specified category. Multiple simultaneous identities, arbitrary state
-callbacks, exact checkpoints, and initialization correction remain future work.
-The African historical benchmark remains postponed.
+The roadmap proposes parity (milestone 5), calendar-time schedules (milestone 6),
+and later group transitions, summaries, migration and characteristics. The user
+has discussed adding calendar bounds alongside age/duration, but this does not
+authorize implementation or resolve gap/coverage and fertility-compensation rules.
+Fixed newborn assignment remains deferred to group transitions. Marriage-order
+effects, richer couple covariates, general two-sex models, API restructuring,
+arbitrary callbacks and exact checkpoints remain future scope. Acceptance does
+not authorize those mechanisms. An African historical benchmark remains postponed.

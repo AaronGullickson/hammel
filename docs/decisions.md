@@ -1,6 +1,6 @@
 # Decision log
 
-Updated October 19, 2026. Entries retain the choices made at their original
+Updated October 29, 2026. Entries retain the choices made at their original
 dates; each numbered entry now states whether and how it remains current.
 Read [the scientific contract](scientific-contract.md) for implemented behavior,
 not a superseded API or timing statement buried in a historical entry.
@@ -33,6 +33,9 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Age/duration remarriage in one rate table | D083 |
 | Optional duration bands for marriage observations | D084 |
 | Cohabitation design and implementation | D085–D086 |
+| Union/marriage entry, dissolution and conversion observations | D087–D091 |
+| Unpartnered birth extraction | D092 |
+| Milestone 4 completion and retained validation evidence | D093 |
 
 ## Recorded decisions
 
@@ -1839,3 +1842,36 @@ cohabitation policy. Duration stratification is unchanged.
   person order, custom columns and repeated parental pairs. Omit unknown-parent
   records and founders. No time window is imposed; full histories determine
   the interpretation. No simulation behavior changes.
+
+
+## D093 — Milestone 4 acceptance and closeout (October 29, 2026)
+
+- **Status:** accepted by the user. After correcting the report and adding a
+  duration-specific conversion assessment, the user designated it the final
+  report and requested milestone closeout while rendering it.
+- **Scope:** duration-based dissolution with symmetric group-pair effects;
+  age/duration search schedules by previous union; actual-hazard calibration
+  contributions; optional rate-mode cohabitation, separate matching roles,
+  typed fertility/dissolution, linked same-partner conversion and legal-history
+  recovery; demographic/entry/dissolution/conversion rate observations and
+  unpartnered-birth extraction (D078–D092).
+- **Evidence:** [final report source](../validation/milestone4.qmd) and
+  [rendered assessment](../validation/milestone4.html). It uses independent
+  seeded baselines and replication-level MCSEs to assess rates, group-pair
+  dissolution, age/duration remarriage and conversion, typed fertility,
+  separate matching contexts, and runtime. The report also executes the offline
+  test suite. The final HTML was still rendering when closeout began; no new
+  render, simulation or database download is implied by this documentation edit.
+- **Limits:** acceptance is the user's assessment, not a guarantee of universal
+  empirical accuracy or exact pooled cross-tab recovery. Transition-aware
+  fertility compensation (D045), thin-pool behavior, initialization transients,
+  and approximate calibration ages remain limitations. Richer couple covariates,
+  marriage order, former-partner/father continuity, parity and calendar-time
+  schedules are not implemented or authorized by closeout. No executable
+  SOCSIM comparison or source copying is claimed.
+- **Cleanup:** keep reports 1–4 and their rate/provenance inputs. The author
+  removed the exploratory `milestone4_tests.R`; the report supersedes it.
+  Move the 14 cited benchmark/recovery scripts and result files into
+  `validation/milestone4/`, updating links and reproduction commands. Keep
+  rendered-report execution intermediates intact while the author's render is
+  active; ignore them in version control. See the validation directory guide.

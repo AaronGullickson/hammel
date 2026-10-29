@@ -1,7 +1,7 @@
 # Development roadmap
 
-Updated October 27, 2026. Milestones 1–3 are complete by user acceptance
-(D029, D050, D077). The group validation report is the accepted milestone 3
+Updated October 29, 2026. Milestones 1–4 are complete by user acceptance
+(D029, D050, D077, D093). The group validation report is the accepted milestone 3
 assessment. The user proposed the following sequence on
 October 20, 2026. These are planning priorities, not authorization to implement
 unspecified demographic rules or a selected public API.
@@ -75,13 +75,14 @@ shares are provided, and missing parental contributions enter an unknown share.
 These are expected genealogical contributions, independent of discrete group
 identity. They do not select a majority-ancestry identity classification.
 
-## Proposed milestone 4: dissolution and remarriage
+## Milestone 4 complete: dissolution, remarriage and cohabitation
 
 Active investigation began October 27, 2026 at the user's request on branch
 `milestone4-union-dissolution`. The first
 [SOCSIM dissolution/remarriage audit](socsim-dissolution-audit.md) is a pinned
 static source trace, not executable validation or a new implementation decision.
-The detailed scientific specification and remaining choices below precede code.
+The user accepted milestone 4 on October 29, 2026 (D093), based on the
+[validation report](../validation/milestone4.qmd) and rendered assessment.
 
 The user selected duration-dependent dissolution on October 27, 2026 (D078),
 superseding the earlier female-age-based direction. Use annual hazards and one
@@ -92,7 +93,7 @@ dissolution. See the [dissolution specification](union-dissolution.md).
 The first implementation uses a separate optional `union_dissolution` process
 with `dur_start`/`dur_end` input bands. Leaving it absent retains death-only
 endings. See [union dissolution](union-dissolution.md) for the interface and
-worked examples. Milestone 4 remains in progress.
+worked examples. The accepted scope retains the limitations described below.
 
 Consider allowing dissolution risk to vary with couple characteristics in
 addition to union duration. The user's example is higher divorce risk for couples
@@ -107,8 +108,8 @@ categories. Age or duration since the latest ending can be selected per
 previous category in the same table (D083); `none` remains age-specific. See
 [remarriage](remarriage.md). Optional cohabitation is now implemented in rate mode under D086, with typed
 matching/rates and linked same-partner conversion. Marriage-order dependence
-and richer couple covariates remain deferred. No milestone 4
-scientific completion is inferred from software implementation.
+and richer couple covariates remain deferred. Acceptance is the user’s
+assessment of the report, distinct from software checks alone.
 
 ## Proposed milestone 5: parity-specific fertility and heterogeneity
 
@@ -251,7 +252,7 @@ union depend on market conditions (overlapping D044); a Schoen harmonic-mean
 model with a market-level union clock, possibly modified along Dagsvik's
 lines; possibly Choo–Siow. These would let composition affect union timing
 and capture marriage squeezes, at the cost of not necessarily reproducing
-input rates; users may want either class. Cohabitation (milestone 4) and
+input rates; users may want either class. Implemented rate-mode cohabitation (milestone 4) and
 nonmarital father selection must be designed consistently with any two-sex
 model. The union-formation API stays unchanged until a single working
 implementation incorporates all union-formation components. No model,
@@ -313,7 +314,7 @@ reference for investigation, not an adopted response rule or period length.
 - Declining poor nonempty candidate pools and waiting (D044).
 - Transition-aware fertility compensation for status/rate changes (D045).
 - Multiple concurrent unions remain unassigned. Parity-specific fertility is
-  proposed for milestone 5 and non-death union dissolution for milestone 4.
+  proposed for milestone 5; non-death dissolution is complete in milestone 4.
 
 R formula-fallback performance comparisons are now included in the user-authored
 milestone 2 validation report, accepted by the user on October 19, 2026 (D050).

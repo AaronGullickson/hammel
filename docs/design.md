@@ -1,7 +1,7 @@
 # Design and implemented interface
 
-Updated October 28, 2026. Milestones 1–3 are complete by user acceptance
-(D029, D050, D077). This document describes implemented architecture.
+Updated October 29, 2026. Milestones 1–4 are complete by user acceptance
+(D029, D050, D077, D093). This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
 The [scientific contract](scientific-contract.md) defines demographic semantics.
 
@@ -180,13 +180,27 @@ replications, and age alignment. `calculate_demog_rates(by_union_type = TRUE)`
 returns unpartnered and discovered union-type rows with exposure, births,
 deaths, and fertility/mortality rates, without an overall row. Untyped histories
 use partnered/unpartnered. `calculate_union_rates()` separately returns
-unpartnered exposure, union starts, and marriage rates by sex.
+unpartnered exposure, union starts, and partnership-entry rates by sex,
+excluding conversions.
 `by_previous_union = TRUE` adds previous categories; `by_group = TRUE` independently
 adds individual groups. Both default to FALSE (D080). Optional `dur_breaks`
 automatically separates previous categories and measures dissolved/widowed rows
 by duration, leaving none rows by age (D084). It requires exclusive union histories.
 Rate-mode input schedules optionally use the same `previous_union` categories;
 see [remarriage](remarriage.md) for initialization and calibration details.
+
+`calculate_marriage_rates()` instead counts direct marriages and conversions
+against unpartnered plus cohabiting years. It supports age, group and previous
+categories, without duration bands. `calculate_dissolution_rates()` reports
+non-death dissolution per union-year, optionally by symmetric pair and union
+type. `calculate_cohab_convert_rate()` reports conversion per cohabitation
+year by duration or woman's age, optionally by woman's group. These risk
+sets differ and must not be treated as interchangeable search-rate estimates.
+
+`get_unpartnered_births()` extracts known-parent births outside either union
+type, adding parent ages/groups for father-matching assessment. Each birth is
+retained, including repeated parental pairs. Birth-first dissolution/conversion
+boundaries and half-open ordinary coverage match demographic observations.
 
 `get_detailed_unions(population)` returns a separate tibble preserving union
 records and appending each partner's birth/death time and optional group, with

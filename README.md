@@ -8,11 +8,11 @@
 
 Hammel is a standalone demographic microsimulator with an R interface and a
 C++17 engine. It models continuous-time mortality, fertility, and union
-formation, with group-specific rates, partner matching, ancestry, and newborn
-identity inheritance. Results expose population and union histories as tibbles.
+formation, dissolution, remarriage, and optional cohabitation/conversion, with
+group-specific rates, partner matching, ancestry, and newborn identity inheritance. Results expose population and union histories as tibbles.
 
-Milestones 1–3 are complete by user acceptance: mortality/fertility, union
-formation, and groups. See the [documentation index](docs/README.md),
+Milestones 1–4 are complete by user acceptance: mortality/fertility, union
+formation, groups, and dissolution/remarriage/cohabitation. See the [documentation index](docs/README.md),
 [scientific contract](docs/scientific-contract.md), and
 [validation record](docs/testing.md) for implemented behavior and limitations.
 Future mechanisms are listed in the [roadmap](docs/roadmap.md).
@@ -35,3 +35,11 @@ matching, ancestry, inheritance, and performance. Rendering the report installs
 the package, retrieves HMD rates, and runs substantial simulations; ordinary
 package tests use offline inputs unless live database tests are explicitly enabled.
 
+
+The [milestone 4 report](validation/milestone4.qmd) and its
+[rendered assessment](validation/milestone4.html) cover dissolution, age/duration
+remarriage, cohabitation, conversion, separate matching roles, and performance.
+The user accepted milestone 4 on October 29, 2026 (D093). Rendering retrieves HMD
+mortality, runs 100 independently initialized replications per scenario, and
+executes the offline test suite. See [validation contents](validation/README.md)
+for retained reports, inputs, and supporting diagnostic evidence.

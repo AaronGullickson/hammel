@@ -262,10 +262,9 @@ with an optional toggle counting cohabitation endings as dissolved/widowed.
 D086 subsequently implements the authorized rate-mode subset in Hammel; see
 [cohabitation](cohabitation.md). Reference queue/counter/default quirks are not
 adopted. This audit itself remains a static reference trace.
-Milestone 4
-required elements were described by the user as wrapped up; cohabitation remains
-the stretch-goal design discussion. This audit does not mark milestone 4 accepted
-as complete.
+The user subsequently accepted milestone 4, including optional cohabitation,
+on October 29, 2026 (D093), based on the Hammel validation report. That does not
+turn this static audit into an executable SOCSIM comparison.
 
 ## Suggested reference experiments, not yet run
 

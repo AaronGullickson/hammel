@@ -1,5 +1,5 @@
 # D082 matching recovery. Offline synthetic inputs; run from repository root.
-# Rscript validation/validate-calibration-log-odds.R LIB OUTPUT_PREFIX [REPS] [CHOICES] [age|duration]
+# Rscript validation/milestone4/validate-calibration-log-odds.R LIB OUTPUT_PREFIX [REPS] [CHOICES] [age|duration]
 # Uses recorded engine weight offsets and independently reconstructed male pools.
 args <- commandArgs(trailingOnly = TRUE)
 stopifnot(length(args) >= 2L)

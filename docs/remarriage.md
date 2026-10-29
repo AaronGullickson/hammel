@@ -7,6 +7,9 @@ female search hazards,
 not probabilities or guaranteed formation rates. Men remain available for
 female-initiated matching; no male search clock is added.
 
+Milestone 4 was accepted October 29, 2026 (D093); see the
+[validation report](../validation/milestone4.qmd).
+
 ## Schedules and state
 
 The single rate data frame requires `age_start`, `age_end`, and `rate`.
@@ -177,4 +180,5 @@ reset behavior, unchanged age-only histories, and grouped calibration equivalenc
 A ten-replication duration-schedule recovery check estimated combined conditional
 log odds ratios -5.9162 (MCSE .0784) and -6.0578 (MCSE .0724) for group-only and
 age-dependent matching against target -6. See [testing](testing.md#duration-specific-remarriage-d083-october-28-2026)
-for inputs, methods, artifacts and limitations. This is not milestone acceptance.
+for inputs, methods, artifacts and limitations. Those checks are implementation
+evidence; subsequent user acceptance of milestone 4 is recorded in D093.
