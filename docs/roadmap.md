@@ -1,21 +1,22 @@
 # Development roadmap
 
 Updated October 29, 2026. Milestones 1–4 are complete by user acceptance
-(D029, D050, D077, D093). The group validation report is the accepted milestone 3
-assessment. The user proposed the following sequence on
-October 20, 2026. These are planning priorities, not authorization to implement
-unspecified demographic rules or a selected public API.
+(D029, D050, D077, D093). **Milestone 5 is the current milestone**, covering
+parity-specific fertility and fertility heterogeneity. Its scientific assessment
+is in progress; it has not been marked complete. The user revised the upcoming
+sequence under D103: group transitions next, then time-varying inputs. These
+are planning priorities, not authorization to implement unspecified demographic
+rules or a selected public API.
 
-| Milestone | Proposed scope | Status |
+| Milestone | Scope | Status |
 | --- | --- | --- |
-| 4 | Union dissolution and age/duration remarriage; possibly cohabitation | In progress (D078–D083); cohabitation undecided |
-| 5 | Parity-specific fertility and fertility heterogeneity | Proposed |
-| 6 | Time-varying rates, matching, and inheritance within a simulation run | Proposed |
-| 7 | Group conversions | Provisional; distinguish identity from characteristics and region |
+| 4 | Union dissolution, age/duration remarriage, and cohabitation | Complete (D093) |
+| 5 | Parity-specific fertility and fertility heterogeneity | Current; implementation and validation in progress (D094–D102) |
+| 6 | Group transitions, including categorical characteristics represented by groups | Planned (D103); detailed model and API remain to be specified |
+| 7 | Time-varying rates, matching, and inheritance within a simulation run | Planned (D103) |
 | 8 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed |
 | 9 | Immigration from outside the system, tracking generation | Tentative |
 | 10 | Internal migration between regions, with unions restricted to the same region | Tentative |
-| 11 | Individual characteristics with custom inheritance and life-course change, affecting rates and union formation | Tentative |
 
 ## Milestone 3: groups (complete)
 
@@ -111,43 +112,73 @@ matching/rates and linked same-partner conversion. Marriage-order dependence
 and richer couple covariates remain deferred. Acceptance is the user’s
 assessment of the report, distinct from software checks alone.
 
-## Milestone 5 design: parity-specific fertility and heterogeneity
+## Current milestone 5: parity-specific fertility and heterogeneity
 
 The user selected optional half-open `parity_start`/`parity_end` bands with Inf
-for the open category (D094). The HFD helper prepares conditional rates in
-that format via `by_parity = TRUE`; D099 implements parity-specific execution
-with history-derived counts and SOCSIM-style spacing compensation. See [parity fertility](parity-fertility.md).
-
-Add fertility schedules that depend on parity as well as the existing schedule
-axes. The user selected initialization from recorded maternal birth histories
+for the open category (D094). The HFD helper prepares conditional rates via
+`by_parity = TRUE`. Parity is initialized from recorded maternal birth histories
 (D098), with zero for women lacking recorded births and no overriding parity
-column. D099 selects preceding-parity spacing compensation, birth-driven schedule
-changes and calibration updates. The approximation requires demographic
-assessment. D100 adds parity observations via `calculate_fertility_rates()`;
-heterogeneity remains later work.
+column. D100 adds observed parity-specific rates through
+`calculate_fertility_rates(parity_breaks = ...)`.
 
-Consider person-level fertility differences to represent persistent high- and
-low-fertility individuals and increase outcome variance beyond the current
-model. The user reports SOCSIM has a mechanism for this; its precise behavior
-has not been audited for this task. Distribution, persistence, association with
-other attributes, inheritance and calibration to aggregate rates are unselected.
-No heterogeneity parameter or demographic default is adopted here. See the
-[distribution and inheritance discussion](fertility-heterogeneity-notes.md) and
-[pinned SOCSIM heterogeneity audit](socsim-fertility-heterogeneity-audit.md).
+D101 cell-accounted fertility replaces D099's preceding-parity spacing
+approximation: cells generate births at input rate times all their members,
+then select an eligible mother. This also handles composition changes during
+start-up, restarts and union-type transitions. Cells without eligible women
+report unrealized intensity. See [parity fertility](parity-fertility.md) and
+[cell accounting](fertility-cell-accounting.md) for the contract and limitations.
 
-## Proposed milestone 6: time-varying inputs within a run
+D102 implements persistent positive lognormal selection weights through
+`set_fertility(..., hetfert = het_fert(cv, alpha))`. Dispersion and maternal
+inheritance have separate inputs; supplied person weights persist, otherwise
+simulation draws them. Weights redistribute births within cells without
+changing their target intensities. Reproductive selection can change cohort
+weight distributions; no generational normalization is imposed. See the
+[heterogeneity specification](fertility-heterogeneity-notes.md) and
+[SOCSIM audit](socsim-fertility-heterogeneity-audit.md). User validation is
+ongoing; implementation and passing software checks do not close milestone 5.
+
+## Planned milestone 6: group transitions
+
+Allow group membership to change during life. Use **group transitions** for
+this feature, reserving conversion terminology for cohabitation becoming
+marriage. Most categorical characteristics can use groups and group-specific
+rates, matching and inheritance rather than a separate general individual-
+characteristics milestone. Education is one example: people could start in a
+minimum category and transition to higher categories over life.
+
+For applications needing more complexity, consider multiple types of groups
+that can represent different dimensions simultaneously. This is an optional
+design direction, not a selected schema or public API. How multiple group types
+interact in rate stratification, matching, newborn assignment, transitions and
+ancestry remains to be specified. The roadmap does not introduce an arbitrary
+attribute-mutation callback or a continuous-characteristic model.
+
+Transition schedules, age/duration dependence, eligibility, timing, effects on
+pending events and fertility/matching tracker updates, and implications for
+recorded identity and ancestry require a scientific specification before
+implementation. Region-specific migration remains in milestone 10; how it
+relates to any multiple-group representation is also open.
+
+Fixed newborn group assignment (for example all children starting in the minimum
+education category) was deferred to this discussion on October 27, 2026. No
+`fixed` inheritance method or API has yet been adopted. A custom inheritance
+function already handles assigning mixed-parent births to a specified category.
+
+## Planned milestone 7: time-varying inputs within a run
 
 Allow demographic schedules to change during a single simulation, rather than
 requiring population restarts. Specify calendar-time inputs, change boundaries,
 which processes may change, event ordering at boundaries, and invalidation of
 pending events. Preserve birth spacing from actual births and address the
-interaction with fertility compensation after rate changes (D045). No rate-change
+interaction with cell-accounted fertility and matching intensity updates (D101/D082). No rate-change
 API, interpolation rule, or demographic default is selected.
 
 ### Input representation proposal (October 21, 2026)
 
-The user requested retaining the following approach for milestone 6, allowing
-inputs to change without restarting the simulation:
+The user requested retaining the following approach for time-varying inputs,
+now scheduled for milestone 7, allowing inputs to change without restarting
+the simulation:
 
 - Keep rate schedules as flat tibbles, adding `time_start` and `time_end`
   alongside age, sex, group, union status, and other supported rate strata.
@@ -184,19 +215,6 @@ validation of all scheduled models, and interactions with pending events.
 Rate sampling must account for future rate boundaries rather than assume the
 rate at scheduling time persists indefinitely. This note records a future
 design direction, not implementation authorization or accepted timing rules.
-
-## Provisional milestone 7: group conversions
-
-Consider changes in group identity during life. The user is uncertain about the
-scope: many applications should instead use separate individual characteristics
-(milestone 11), while location should use a dedicated region mechanism
-(milestone 10). Do not treat groups as a universal state variable. Conversion
-rules, timing, ancestry implications, and effects on pending events remain open.
-On October 27, 2026, the user deferred fixed newborn group assignment (for
-example, all children starting at a minimum education category) to this
-discussion. No `fixed` inheritance method or API was adopted. A custom
-inheritance function already handles assigning mixed-parent births to one
-specified category.
 
 ## Proposed milestone 8: summaries, diagnostics, and helpers
 
@@ -262,16 +280,6 @@ clock and rate strata, individual versus household movement, and treatment of
 existing unions when partners move remain to be specified. No migration default
 or rule about relocating existing partners is selected.
 
-## Tentative milestone 11: individual characteristics
-
-Consider characteristics that can affect rates and matching without functioning
-as definitive group identities. Education is the user's example. Users would
-provide custom functions for inheritance and life-course change. Characteristics
-would be exposed to modify demographic rates and union formation. Initialization
-and callback contracts remain to be specified. Define permitted changes and event invalidation, not arbitrary state
-mutation. No distinction between categorical/continuous attributes or transition
-model has been fixed by these notes.
-
 ## Two-sex union formation and union API
 
 Discussed October 24, 2026, without an assigned milestone; see
@@ -327,7 +335,8 @@ Before implementation, specify the population signal and reference population,
 response function, any lag, first feedback time, boundary tie ordering, and
 which processes and individuals are affected. The response interval is a
 demographic assumption as well as a computational choice. Interaction with
-fertility compensation after rate changes remains an open issue (D045).
+cell-intensity updates, eligibility and matching calibration must be specified
+for any feedback mechanism (D101/D082).
 Any user-defined feedback mechanism must obey state consistency and event
 invalidation rules; arbitrary callbacks must not mutate simulation state.
 
@@ -341,11 +350,10 @@ reference for investigation, not an adopted response rule or period length.
 
 - Previous-father continuity at subsequent births or union formation (D042).
 - Declining poor nonempty candidate pools and waiting (D044).
-- Transition-aware fertility compensation for status/rate changes (D045).
 - Multiple concurrent unions remain unassigned. Parity-specific fertility is
-  proposed for milestone 5; non-death dissolution is complete in milestone 4.
+  part of current milestone 5; non-death dissolution is complete in milestone 4.
 
 R formula-fallback performance comparisons are now included in the user-authored
 milestone 2 validation report, accepted by the user on October 19, 2026 (D050).
 Initialization and exact checkpoints remain separate future topics. Calendar-varying
-schedules now fall under proposed milestone 6 above.
+schedules now fall under planned milestone 7 above.
