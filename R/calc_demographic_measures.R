@@ -38,13 +38,26 @@ calculate_population_size <- function(population, times, by_group = FALSE) {
   groups <- observation_groups(persons, by_group)
   if (by_group) {
     if (inherits(population, "hammel_population") && !is.null(population$transitions) && nrow(population$transitions)) {
-      counts <- lapply(times, function(time) {
-        alive <- which(persons$birth_time <= time & (is.na(persons$death_time) | persons$death_time > time))
-        identity <- groups_at(population, alive, rep(time, length(alive)))
-        tabulate(match(identity, groups), nbins = length(groups))
+      # Births enter the initial group, deaths leave the final group, and
+      # every transition adds one arrival and one departure. Count sorted
+      # event dates instead of rebuilding each person's identity per snapshot.
+      tx <- population$transitions
+      history <- attr(persons, ".hammel_group_history")
+      initial <- match(persons$group, groups)
+      ordered <- order(tx$time)
+      first <- ordered[!duplicated(history$row[ordered])]
+      initial[history$row[first] + 1L] <- history$from[first] + 1L
+      final <- match(persons$group, groups)
+      counts <- lapply(seq_along(groups), function(g) {
+        enter <- sort(c(persons$birth_time[initial == g], tx$time[history$to == g - 1L]))
+        exit <- sort(c(persons$death_time[final == g & !is.na(persons$death_time)],
+                       tx$time[history$from == g - 1L]))
+        findInterval(times, enter) - findInterval(times, exit)
       })
-      return(tibble::tibble(time = rep(times, each = length(groups)),
-        group = rep(groups, times = length(times)), population = as.integer(unlist(counts))))
+      grid <- expand.grid(g = seq_along(groups), t = seq_along(times), KEEP.OUT.ATTRS = FALSE)
+      indices <- grid$t + length(times) * (grid$g - 1L)
+      return(tibble::tibble(time = times[grid$t], group = groups[grid$g],
+        population = as.integer(unlist(counts, use.names = FALSE)[indices])))
     }
     grid <- expand.grid(g = seq_along(groups), t = seq_along(times),
                         KEEP.OUT.ATTRS = FALSE)

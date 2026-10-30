@@ -228,3 +228,31 @@ test_that("history-only restarts and absent transition processes preserve proven
   bad$processes$group_transition$rates$rate <- -1
   expect_error(simulate(bad, 0), "nonnegative")
 })
+
+test_that("snapshot event accounting handles repeated moves, deaths and arbitrary time order", {
+  persons <- data.frame(person_id = c(30, 10, 20), sex = c("f", "m", "f"),
+    birth_time = c(0, -1, 3), death_time = c(5, NA, NA),
+    mother_id = NA_real_, father_id = NA_real_, group = c("A", "B", "C"))
+  tx <- data.frame(person_id = c(30, 10, 30, 10), time = c(4, 2, 1, 4),
+    group_origin = c("B", "C", "A", "A"), group_dest = c("A", "A", "B", "B"))
+  pop <- hammel_population(persons, end_time = 6, transitions = tx)
+  times <- c(5, -2, 0, 4, 1, 3, 4, 2, 6)
+  out <- calculate_population_size(pop, times, by_group = TRUE)
+  # Independently reconstruct identity from each person's ordered history.
+  expected <- lapply(times, function(time) {
+    living <- which(persons$birth_time <= time & (is.na(persons$death_time) | persons$death_time > time))
+    labels <- vapply(living, function(i) {
+      h <- tx[tx$person_id == persons$person_id[i], ]
+      if (!nrow(h)) return(persons$group[i])
+      h <- h[order(h$time), ]
+      before <- which(h$time <= time)
+      if (length(before)) tail(h$group_dest[before], 1) else h$group_origin[1]
+    }, character(1))
+    tabulate(match(labels, c("A", "B", "C")), nbins = 3)
+  })
+  expect_equal(out$population, as.integer(unlist(expected)))
+  expect_identical(out$time, rep(times, each = 3))
+  expect_equal(as.vector(tapply(out$population, rep(seq_along(times), each = 3), sum)),
+    calculate_population_size(pop, times)$population)
+  expect_equal(nrow(calculate_population_size(pop, numeric(), by_group = TRUE)), 0)
+})
