@@ -16,6 +16,19 @@ or an unselected public API.
 | 9 | Immigration from outside the system, tracking generation | Tentative |
 | 10 | Internal migration between regions, with unions restricted to the same region | Tentative |
 
+Milestone 6's core scope is individual group transitions. Linked household
+moves are a stretch goal (D109), useful when groups represent regions; their
+membership and follower rules remain unspecified. Core completion does not
+require household moves. D106–D108 select annual hazards, directed competing
+age- or duration-specific schedules with optional strata,
+and no transition-count target adjustment. The remaining scientific contract
+and public API must be specified before implementation.
+D110 requires `group_origin`, `group_dest`, `rate`, and one common age or
+duration band type across the transition table, with optional `sex` and
+`union_type` columns; absent stratification columns apply universally.
+Grouped simulation output must always include a `transitions` history tibble,
+even with no configured transition process or no observed moves (D111).
+
 ## Milestone 3: groups (complete)
 
 Accepted October 27, 2026 (D077); see the

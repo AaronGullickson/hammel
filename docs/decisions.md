@@ -47,6 +47,12 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Milestone order and groups-based characteristics scope | D103 |
 | Disabled fertility heterogeneity removes output weights | D104 |
 | Milestone 5 acceptance; group transitions next | D105 |
+| Group-transition inputs are annual hazards | D106 |
+| Directed transition schedules, clocks and optional strata | D107 |
+| No transition-count target adjustment | D108 |
+| Individual transitions core; household moves stretch goal | D109 |
+| Transition rate-table columns and common band type | D110 |
+| Grouped output always includes transition history tibble | D111 |
 
 ## Recorded decisions
 
@@ -2171,3 +2177,101 @@ ordinary-custom-column treatment for disabled runs.
   ancestry effects and public API require specification before implementation.
   Milestone 7 remains time-varying inputs under D103. Completion does not
   authorize unspecified future demographic behavior.
+
+## D106 — Group-transition inputs use annual hazards (October 29, 2026)
+
+**Status:** accepted by the user; transition execution remains unimplemented.
+
+Group-transition inputs continue Hammel's rate convention: hazards per
+person-year, rather than SOCSIM's monthly probabilities. Users with an annual
+probability p can approximate a rate with `-log(1 - p)` (numerically,
+`-log1p(-p)` in R). This conversion is exact for a constant hazard over one
+year without competing exits; a cause-specific probability observed with
+competing events does not generally identify that hazard by this formula.
+
+The user explicitly selected rates following the SOCSIM transition audit.
+This settles input units and interpretation only. Eligibility, clocks,
+histories, linked moves, ancestry effects, event invalidation and the public
+API still require specification before implementation.
+
+## D107 — Directed transition schedules and optional strata (October 29, 2026)
+
+**Status:** accepted by the user; transition execution remains unimplemented.
+
+For n groups, up to n(n-1) directed origin-to-destination schedules are
+possible, excluding self-transitions. For a person in an origin group, the
+applicable outgoing schedules compete with each other and other applicable
+events. For example, A-to-B and A-to-C compete for a person currently in A;
+rates are annual hazards under D106 and need not sum to one.
+
+Each schedule can be age-specific or duration-specific. Schedules may
+optionally stratify by sex and marital status. An omitted sex dimension
+applies to all sexes; an omitted marital-status dimension applies to all
+marital statuses. Either dimension can be supplied independently.
+
+The duration origin and initialization, marital-status categories, treatment
+of missing directed schedules, and validation of overlapping universal and
+stratified inputs remain to be specified. This decision does not select a
+public API, joint age-by-duration surfaces, or household moves.
+
+## D108 — No transition-count target adjustment (October 29, 2026)
+
+**Status:** accepted by the user; transition execution remains unimplemented.
+
+Use supplied transition hazards directly, without scaling them to attain
+requested origin-to-destination event counts. Do not add SOCSIM-style
+`transittarget` adjustment. The user rejected this mechanism after reviewing
+its target/expected-count scaling in the reference audit. Realized counts
+follow the supplied hazards, changing exposure, competing events and random
+variation; this decision adds no count-calibration API.
+
+## D109 — Household transitions are a stretch goal (October 29, 2026)
+
+**Status:** accepted scope direction; execution remains unimplemented.
+
+Individual group transitions form milestone 6's core scope. Linked household
+moves are a stretch goal, potentially useful when groups represent regions.
+Core completion does not depend on delivering household moves.
+
+Household membership, follower eligibility, destination assignment and
+interactions with partners' pending events require a separate specification
+before implementation. This decision does not adopt SOCSIM's household rules
+or select a residence/custody schema.
+
+## D110 — Transition rate-table schema and common band type (October 29, 2026)
+
+**Status:** accepted by the user; transition execution remains unimplemented.
+
+Transition rate tables require `group_origin`, `group_dest`, and `rate`, plus
+either age bands or duration bands. All origin-to-destination pairs in the
+table must use the same band type: age-based or duration-based. Do not mix
+age-based and duration-based directed schedules in one transition rate table.
+Rates are hazards per person-year (D106).
+
+The optional stratification columns are `sex` and `union_type`. If a column
+is present, schedules apply by its categories; if absent, schedules apply
+universally across that dimension. Either column may be supplied independently.
+`union_type` replaces D107's preliminary marital-status wording; it does not
+introduce a separate marital-status stratification column. The common-band
+rule narrows D107's earlier per-schedule age/duration choice.
+
+Duration origin and initialization, category coverage and labels (including
+unpartnered people), absent directed-pair treatment, and detailed band
+validation remain to be specified before implementation. No within-table
+universal/category override scheme is selected.
+
+## D111 — Grouped output includes a transitions tibble (October 29, 2026)
+
+**Status:** accepted requirement; transition execution and output remain
+unimplemented.
+
+When groups are in use, simulation output must include a `transitions` tibble
+recording individual group changes, including an empty tibble when no changes
+occurred. Presence does not depend on configuring a transition process or
+observing a transition. Each change must retain the person, transition time,
+origin and destination so group membership can be reconstructed over time.
+An empty table must retain the defined column types.
+
+Exact history column names, initialization/restart validation and observation
+boundary semantics remain to be specified. This requirement does not select
+whether ungrouped output includes the component.
