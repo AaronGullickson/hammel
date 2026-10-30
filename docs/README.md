@@ -17,6 +17,7 @@ the regions milestone (D114); milestone 7 is time-varying inputs (D103).
 | [Project brief](project-brief.md) | Purpose, current scope, and milestone status |
 | [Design](design.md) | Implemented architecture, API, and source locations |
 | [Scientific contract](scientific-contract.md) | Current demographic assumptions and event rules |
+| [Rate input census](rate-inputs.md) | Existing rate schedules, age/duration bands, supported strata and multipliers |
 | [Population schema](population-schema.md) | Person/union tables and structural validation |
 | [Group transitions](group-transitions.md) | Individual transitions, histories, state updates and age/duration Lexis rates |
 | [Groups](groups.md) | Group-specific schedules, multipliers, newborn identity, and baseline sampling |
