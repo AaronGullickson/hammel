@@ -12,8 +12,8 @@ format:
     code-tools: true
     self-contained: true
 params:
-  n_replications: 50
-  initial_population: 50000
+  n_replications: 20
+  initial_population: 20000
   years: 100
   burn_in: 25
 execute:
