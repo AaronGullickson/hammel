@@ -80,3 +80,47 @@ result$transitions
 The model must already contain grouped population, mortality, fertility and
 union-formation specifications. Replacing age columns with `dur_start` and
 `dur_end` selects duration for the whole transition table.
+
+## Observed transition rates
+
+`calculate_transition_rates(population, time_breaks, age_breaks = NULL,
+dur_breaks = NULL, by_sex = FALSE, by_union_type = FALSE)` returns a tibble
+with directed `group_origin`/`group_dest`, calendar bounds, the selected age or
+duration bounds, `person_years`, `transitions`, and `rate_transition`.
+Supply exactly one age or duration axis. Finite final axis breaks gain Inf.
+Optional `sex` and `union_type` columns appear only when requested; default
+counts pool those dimensions before dividing. With typed union histories use
+unpartnered/cohab/marriage, otherwise unpartnered/partnered. Nonoverlapping
+union histories are required for union-type disaggregation.
+
+The group registry contains identities in persons and retained transition
+histories, preserving label types. Return every distinct directed pair in
+that registry, including zero-event cells. Unvisited identities absent from
+both tables cannot be inferred from population output alone. Fewer than two
+known groups gives a typed empty result. A known observation endpoint and a
+grouped population are required; absent transition histories mean no recorded
+moves, without imputing missing prehistory.
+
+Exposure is time alive in the origin group, split at calendar, age/duration,
+group-change and requested union-type boundaries. A-to-B and A-to-C share the
+same origin exposure; do not sum that duplicated denominator across
+destinations. Competing moves and death end an origin episode. Duration
+resets on each entry, including return moves, and uses age before the first
+recorded transition. Union changes do not reset group duration. Events use
+the exiting origin's age/duration and union type after any earlier same-time
+union event (transition priority is last). Exposure is half-open; an event on
+an internal Lexis boundary enters the cell beginning there and events at the
+final calendar boundary are excluded. An event can therefore have zero
+exposure in its cell. The rate is transitions/person-years, zero with positive
+exposure and no moves, NA at zero exposure, and is not a competing-risk
+probability.
+
+Worked case: a living person in A from birth at 0 moves to B at 2 and back to
+A at 5, observed through 6. A has 3 person-years and one A-to-B move; B has
+3 person-years and one B-to-A move. For duration [0,2) and [2,Inf), A has
+3 and 0 years, respectively, with its outgoing move at duration 2 in the
+second band; B has 2 and 1 years, with its outgoing move at duration 3 in the
+second band. Union-type components and sex components sum to pooled exposure
+and counts within each directed pair. Validation uses hand-calculated repeated
+moves, union changes and deaths, boundary cases, empty histories and
+analytical hazard recovery; no simulation state or randomness is changed.

@@ -54,6 +54,18 @@ retains sparse-cell, initialization, fertility-transition and calibration limits
 
 ## Run the suite
 
+October 30 transition-rate counter: the full offline `devtools::test()` suite
+passed after adding `calculate_transition_rates()`. The live database test was
+skipped and the existing environment `timedatectl` warning remained.
+`test-transition-rate.R` checks hand-calculated age/duration exposure with
+repeated moves and death, directional denominators, sex/type pooling, exact
+formation/conversion/dissolution boundaries, calendar endpoints, empty typed
+outputs, invalid inputs, and recovery of simulated competing annual hazards.
+A synthetic 50,000-person, 100,000-move period/duration/sex/type calculation
+took 1.63 seconds including population validation, recovering 100,000 events
+and 5,000,000 person-years (two groups, so one destination per origin).
+This timing is a development measurement, not a performance guarantee.
+
 October 30, 2026 group-transition implementation: `devtools::test()` passed
 the full offline suite with no failures. The live database case was skipped
 without opt-in; the local HMD reader test emitted an environment warning from

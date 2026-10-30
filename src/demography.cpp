@@ -531,3 +531,89 @@ List fertility_parity_counts_cpp(DataFrame persons, DataFrame unions,
   }
   return List::create(_["person_years"]=exposure,_["births"]=events);
 }
+
+// Directed transitions: origin exposure is stored once, not per destination.
+// [[Rcpp::export]]
+List transition_counts_cpp(DataFrame persons, DataFrame unions, DataFrame transitions,
+    IntegerVector final_groups, int group_count, NumericVector time_breaks,
+    NumericVector axis_breaks, bool duration, bool by_sex, bool by_union_type) {
+  NumericVector born = persons["birth_time"], died = persons["death_time"];
+  CharacterVector sexes = persons["sex"];
+  const int nt = time_breaks.size() - 1, na = axis_breaks.size() - 1;
+  const int ns = by_sex ? 2 : 1;
+  const bool typed = unions.containsElementNamed("union_type");
+  const int nk = !by_union_type ? 1 : (typed ? 3 : 2);
+  const R_xlen_t base = static_cast<R_xlen_t>(nt) * na;
+  NumericVector exposure(base * group_count * ns * nk);
+  NumericVector events(base * group_count * group_count * ns * nk);
+  struct Change { double time; int from, to; };
+  std::vector<std::vector<Change>> changes(persons.nrows());
+  IntegerVector row = transitions["row"], from = transitions["from"], to = transitions["to"];
+  NumericVector times = transitions["time"];
+  for (int j = 0; j < times.size(); ++j) changes[row[j]].push_back({times[j], from[j], to[j]});
+  std::vector<std::vector<MarriageEpisode>> unions_by_person;
+  if (by_union_type) unions_by_person = marriage_histories(persons, unions);
+  for (int i = 0; i < persons.nrows(); ++i) {
+    if (i % 1024 == 0) checkUserInterrupt();
+    auto& moves = changes[i];
+    std::sort(moves.begin(), moves.end(), [](const Change& a, const Change& b) { return a.time < b.time; });
+    const int sex = by_sex && sexes[i] == "f" ? 1 : 0;
+    auto union_type = [&](double time) {
+      if (!by_union_type) return 0;
+      const auto& episodes = unions_by_person[i];
+      auto next = std::upper_bound(episodes.begin(), episodes.end(), time,
+        [](double t, const MarriageEpisode& e) { return t < e.start; });
+      if (next == episodes.begin()) return 0;
+      const auto& active = *std::prev(next);
+      if (time >= active.end) return 0;
+      return typed ? (active.cohab ? 1 : 2) : 1;
+    };
+    auto exposure_cell = [&](int t, int a, int g, int k) -> R_xlen_t {
+      return t + static_cast<R_xlen_t>(nt) * a + base * (g + static_cast<R_xlen_t>(group_count) * (sex + ns * k));
+    };
+    auto event_cell = [&](int t, int a, int origin, int dest, int k) -> R_xlen_t {
+      return t + static_cast<R_xlen_t>(nt) * a + base * (dest + static_cast<R_xlen_t>(group_count) *
+        (origin + static_cast<R_xlen_t>(group_count) * (sex + ns * k)));
+    };
+    int origin = moves.empty() ? final_groups[i] : moves.front().from;
+    double entry = born[i];
+    const double life_end = NumericVector::is_na(died[i]) ? time_breaks[nt] : died[i];
+    for (size_t j = 0; j <= moves.size(); ++j) {
+      const double end = j < moves.size() ? moves[j].time : life_end;
+      const double lo = std::max(entry, time_breaks[0]);
+      const double hi = std::min({end, life_end, time_breaks[nt]});
+      const double axis_origin = duration ? entry : born[i];
+      if (hi > lo) {
+        std::vector<double> cuts = {lo, hi};
+        if (by_union_type) for (const auto& e : unions_by_person[i]) {
+          if (lo < e.start && e.start < hi) cuts.push_back(e.start);
+          if (lo < e.end && e.end < hi) cuts.push_back(e.end);
+        }
+        std::sort(cuts.begin(), cuts.end());
+        cuts.erase(std::unique(cuts.begin(), cuts.end()), cuts.end());
+        for (size_t c = 1; c < cuts.size(); ++c) {
+          const int k = union_type(cuts[c - 1]);
+          for (int t = 0; t < nt; ++t) {
+            const double start = std::max(cuts[c - 1], time_breaks[t]);
+            const double stop = std::min(cuts[c], time_breaks[t + 1]);
+            if (stop <= start) continue;
+            for (int a = 0; a < na; ++a) {
+              const double enter = std::max(start, axis_origin + axis_breaks[a]);
+              const double exit = std::min(stop, axis_origin + axis_breaks[a + 1]);
+              if (exit > enter) exposure[exposure_cell(t, a, origin, k)] += exit - enter;
+            }
+          }
+        }
+      }
+      if (j < moves.size()) {
+        const auto& move = moves[j];
+        const int t = demographic_bin(move.time, time_breaks);
+        const int a = demographic_bin(move.time - axis_origin, axis_breaks);
+        if (t >= 0 && a >= 0) events[event_cell(t, a, move.from, move.to, union_type(move.time))] += 1;
+        origin = move.to;
+        entry = move.time;
+      }
+    }
+  }
+  return List::create(_["person_years"] = exposure, _["transitions"] = events);
+}

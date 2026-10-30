@@ -523,6 +523,13 @@ Unknown-mother births remain in the period-level attribute without assigning a
 maternal group. Defaults pool groups; arbitrary custom strata are not supported.
 See [groups](groups.md) for output ordering, empty cases, and worked examples.
 
+- `calculate_transition_rates()` counts directed group changes over origin
+  person-years by calendar period and either attained age or duration since
+  latest group entry (age without earlier transitions). Optional `by_sex`
+  and `by_union_type` split both numerator and denominator. Each destination
+  shares its origin's exposure; denominator copies must not be summed across
+  destinations. Return `transitions`, `person_years`, and `rate_transition`,
+  with NA rates at zero exposure. See [transition observations](group-transitions.md#observed-transition-rates).
 - `calculate_fertility_rates()` and `calculate_mortality_rates()` split recorded lifetimes at half-open period/age
   boundaries and reports exposure, deaths, births, ASMR, and ASFR. A finite last
   age breakpoint automatically gains `Inf`; for example `0:110` ends with

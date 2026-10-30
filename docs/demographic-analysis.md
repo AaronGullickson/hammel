@@ -265,7 +265,7 @@ with partner attributes matched through `wife_id` and `husband_id`. It adds
 `birth_time_w`, `death_time_w`, `birth_time_h`, and `death_time_h`, plus
 `group_w` and `group_h` when persons has a group column. Groups retain their
 input type. These are recorded person attributes, not inferred historical group
-transitions; current group identity is fixed over life. A surviving partner's
+transitions; the appended groups are current recorded identities. A surviving partner's
 death time remains NA. Dates remain in years and can be combined with union
 `start_time` to derive ages at formation and the age gap.
 
@@ -529,3 +529,25 @@ rejected.
 asfr <- calculate_fertility_rates(result, time_breaks = c(2050, 2150),
   age_breaks = 12:56, parity_breaks = 0:4, unrealized = TRUE)
 ```
+
+## Directed group-transition Lexis rates
+
+Use `calculate_transition_rates()` with exactly one age or duration axis:
+
+```r
+calculate_transition_rates(result, time_breaks = seq(2000, 2100, 10),
+  age_breaks = seq(0, 100, 10), by_sex = TRUE, by_union_type = TRUE)
+calculate_transition_rates(result, time_breaks = seq(2000, 2100, 10),
+  dur_breaks = c(0, 1, 5, 10, Inf))
+```
+
+Output retains every directed pair among identities in the population and
+transition history, with `person_years`, `transitions`, and `rate_transition`.
+Age uses time since birth; duration uses time since latest group entry, or
+birth without earlier moves. Exposure splits at moves and, when requested,
+union-type boundaries. Directional event counts use the origin being exited;
+all destinations from one origin share its denominator. Pool sex/type counts
+and exposure before computing rates, and do not sum denominator copies across
+destinations. Zero exposure gives NA; a positive-exposure cell without moves
+has rate zero. See the [full contract](group-transitions.md#observed-transition-rates)
+for endpoint, empty-output and history-completeness rules.

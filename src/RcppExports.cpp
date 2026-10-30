@@ -151,6 +151,26 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// transition_counts_cpp
+List transition_counts_cpp(DataFrame persons, DataFrame unions, DataFrame transitions, IntegerVector final_groups, int group_count, NumericVector time_breaks, NumericVector axis_breaks, bool duration, bool by_sex, bool by_union_type);
+RcppExport SEXP _hammel_transition_counts_cpp(SEXP personsSEXP, SEXP unionsSEXP, SEXP transitionsSEXP, SEXP final_groupsSEXP, SEXP group_countSEXP, SEXP time_breaksSEXP, SEXP axis_breaksSEXP, SEXP durationSEXP, SEXP by_sexSEXP, SEXP by_union_typeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< DataFrame >::type persons(personsSEXP);
+    Rcpp::traits::input_parameter< DataFrame >::type unions(unionsSEXP);
+    Rcpp::traits::input_parameter< DataFrame >::type transitions(transitionsSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type final_groups(final_groupsSEXP);
+    Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type time_breaks(time_breaksSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type axis_breaks(axis_breaksSEXP);
+    Rcpp::traits::input_parameter< bool >::type duration(durationSEXP);
+    Rcpp::traits::input_parameter< bool >::type by_sex(by_sexSEXP);
+    Rcpp::traits::input_parameter< bool >::type by_union_type(by_union_typeSEXP);
+    rcpp_result_gen = Rcpp::wrap(transition_counts_cpp(persons, unions, transitions, final_groups, group_count, time_breaks, axis_breaks, duration, by_sex, by_union_type));
+    return rcpp_result_gen;
+END_RCPP
+}
 // extract_kin_cpp
 DataFrame extract_kin_cpp(DataFrame persons, NumericVector ego_ids, NumericVector relative_ids, int generations);
 RcppExport SEXP _hammel_extract_kin_cpp(SEXP personsSEXP, SEXP ego_idsSEXP, SEXP relative_idsSEXP, SEXP generationsSEXP) {
@@ -339,6 +359,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_typed_demographic_counts_cpp", (DL_FUNC) &_hammel_typed_demographic_counts_cpp, 7},
     {"_hammel_unpartnered_birth_rows_cpp", (DL_FUNC) &_hammel_unpartnered_birth_rows_cpp, 2},
     {"_hammel_fertility_parity_counts_cpp", (DL_FUNC) &_hammel_fertility_parity_counts_cpp, 9},
+    {"_hammel_transition_counts_cpp", (DL_FUNC) &_hammel_transition_counts_cpp, 10},
     {"_hammel_extract_kin_cpp", (DL_FUNC) &_hammel_extract_kin_cpp, 4},
     {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
     {"_hammel_inspect_matching_cpp", (DL_FUNC) &_hammel_inspect_matching_cpp, 2},

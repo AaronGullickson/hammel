@@ -37,6 +37,10 @@ fertility_parity_counts_cpp <- function(persons, unions, time_breaks, age_breaks
     .Call(`_hammel_fertility_parity_counts_cpp`, persons, unions, time_breaks, age_breaks, parity_breaks, group_indices, group_count, types, split_types)
 }
 
+transition_counts_cpp <- function(persons, unions, transitions, final_groups, group_count, time_breaks, axis_breaks, duration, by_sex, by_union_type) {
+    .Call(`_hammel_transition_counts_cpp`, persons, unions, transitions, final_groups, group_count, time_breaks, axis_breaks, duration, by_sex, by_union_type)
+}
+
 extract_kin_cpp <- function(persons, ego_ids, relative_ids, generations) {
     .Call(`_hammel_extract_kin_cpp`, persons, ego_ids, relative_ids, generations)
 }

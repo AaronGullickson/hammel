@@ -18,7 +18,7 @@ stretch goal; milestone 7 is time-varying inputs (D103).
 | [Design](design.md) | Implemented architecture, API, and source locations |
 | [Scientific contract](scientific-contract.md) | Current demographic assumptions and event rules |
 | [Population schema](population-schema.md) | Person/union tables and structural validation |
-| [Group transitions](group-transitions.md) | Individual competing transitions, duration/age schedules, histories and state updates |
+| [Group transitions](group-transitions.md) | Individual transitions, histories, state updates and age/duration Lexis rates |
 | [Groups](groups.md) | Group-specific schedules, multipliers, newborn identity, and baseline sampling |
 | [Ancestry](ancestry.md) | Starting proportions, parental averaging, unknown shares, and restarts |
 | [Group inheritance](group-inheritance.md) | Built-in/custom identity rules, passing, and possible groups |

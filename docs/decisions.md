@@ -54,6 +54,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Transition rate-table columns and common band type | D110 |
 | Grouped output always includes transition history tibble | D111 |
 | Individual transition implementation, duration and ancestry | D112 |
+| Directed transition Lexis counter | D113 |
 
 ## Recorded decisions
 
@@ -2301,3 +2302,17 @@ half-open bands, state/event invalidation, restarts and observations. Columns
 are `person_id`, `time`, `group_origin`, and `group_dest`; grouped populations
 retain a typed empty table when no moves occur. Software validation does not
 establish scientific acceptance or authorize household moves.
+
+## D113 — Directed transition Lexis counter (October 30, 2026)
+
+**Status:** user requested implementation; implemented under the
+[transition observation contract](group-transitions.md#observed-transition-rates).
+
+`calculate_transition_rates()` reports person-years, transition events and rates
+by directed origin/destination, calendar period and either age or group
+duration. The user requested optional sex and union-type disaggregation;
+`by_sex` and `by_union_type` follow the existing sex field and union-type
+conventions. Defaults pool both dimensions. Duration follows D112's latest
+entry/initial-age rule. Rates divide each directed event count by exposure
+in its origin, so outgoing destinations share denominators. This is an
+observation helper and changes neither event execution nor model assumptions.
