@@ -15,6 +15,7 @@ or an unselected public API.
 | 8 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed |
 | 9 | Immigration from outside the system, tracking generation | Tentative |
 | 10 | Internal migration between regions, with unions restricted to the same region | Tentative |
+| 11 | Two-sex marriage model | Tentative (D117); model and API unselected |
 
 Milestone 6's scope is individual group transitions. Household moves are
 now deferred to milestone 10, internal migration and regions (D114), superseding
@@ -351,9 +352,10 @@ following questions must be resolved for a concrete regions application.
   household accounting, linked-event invalidation and the chosen input-rate
   interpretation before assessing demographic performance.
 
-## Two-sex union formation and union API
+## Tentative milestone 11: two-sex marriage model
 
-Discussed October 24, 2026, without an assigned milestone; see
+Assigned tentative milestone 11 by the user on October 30, 2026 (D117),
+following the October 24 discussion; see
 [two-sex union models](two-sex-union-models.md) and D073. Possible
 extensions: a participation function making a woman's chance of forming a
 union depend on market conditions (overlapping D044); a Schoen harmonic-mean

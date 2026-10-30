@@ -107,7 +107,9 @@ sparse-cell, calibration, or fertility-transition limitations. Weighted matching
 does not model marriage squeezes; fuller two-sex models remain future work.
 
 The [roadmap](roadmap.md) records group transitions complete (milestone 6), then
-time-varying inputs next (milestone 7), summaries and migration work. No future
+time-varying inputs next (milestone 7), summaries and migration work. A two-sex
+marriage model is tentative milestone 11 (D117); its model and API remain
+unselected. No future
 feature is authorized by milestone completion. Fixed newborn assignment was
 explicitly deferred to the group-transitions discussion; custom inheritance
 already supports assignment of mixed-parent births to a specified category.

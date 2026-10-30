@@ -108,5 +108,7 @@ acceptance and do not establish universal accuracy or SOCSIM equivalence.
 Restarts are not exact checkpoints. Sparse-cell feasibility, incomplete
 histories, failed searches and matching-calibration approximations remain
 limitations. Poor-pool waiting (D044), previous-father continuity (D042),
-general two-sex squeeze models, custom process execution and the postponed
-African historical benchmark remain deferred.
+a two-sex marriage model (tentative milestone 11, D117), custom process
+execution and the postponed African historical benchmark remain deferred.
+Milestone 11 assigns a planning priority only; model and API selection remain
+open in the [two-sex research notes](two-sex-union-models.md).

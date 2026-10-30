@@ -58,6 +58,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Household moves deferred to the regions milestone | D114 |
 | Detailed union partner groups refer to formation | D115 |
 | Milestone 6 acceptance; time-varying inputs next | D116 |
+| Two-sex marriage model as tentative milestone 11 | D117 |
 
 ## Recorded decisions
 
@@ -2388,3 +2389,13 @@ completion documentation while compiling the final report.
   schedule boundaries, event invalidation and public API require specification
   before consequential implementation. Earlier proposals are not accepted
   design decisions or automatic implementation authorization.
+
+## D117 — Tentative milestone 11: two-sex marriage model (October 30, 2026)
+
+**Status:** user-selected tentative planning milestone.
+
+Add a two-sex marriage model as tentative milestone 11, following the regions
+milestone. Existing [two-sex research notes](two-sex-union-models.md) and D073
+provide the starting discussion. No particular model, parameterization, input
+semantics, cohabitation integration or public API is selected by assigning this
+milestone. Current union formation remains unchanged; milestone 7 remains next.
