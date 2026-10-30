@@ -1,0 +1,126 @@
+---
+title: "Hammel: Milestone 7 Validation"
+author: "Aaron Gullickson"
+date: today
+format:
+  html:
+    toc: true
+    toc-expand: 1
+    toc-depth: 4
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    self-contained: true
+params:
+  n_replications: 50
+  initial_population: 50000
+  years: 100
+  burn_in: 25
+execute:
+  eval: true
+  echo: true
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: setup
+#| eval: true
+#| include: false
+
+
+library(here)
+# installing will lead to faster computation
+devtools::install(here::here())
+library(hammel)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(purrr)
+library(tibble)
+library(stringr)
+library(ggplot2)
+library(gt)
+library(furrr)
+set_theme(theme_bw())
+```
+
+```{r}
+#| label: set-up-parallel-processing
+
+future::plan(future::multicore, workers = 4)
+```
+
+```{r}
+#| label: create-functions
+
+run_replication <- function(replication, model) {
+  set.seed(410000L + replication)
+  population <- create_baseline_population(params$initial_population, 60, 2000, 
+    group_weights = c("A" = 1, "B" = 1, "C" = 1))
+  model <- model |> set_population(population)
+  time <- system.time(result <- simulate(model, params$years, 420000L + replication))[["elapsed"]]
+  result$runtime <- time
+  return(result)
+}
+```
+
+## Purpose and completion criteria
+
+
+Assess whether the current simulation successfully handles time varying rate schedules and time varying model parameters. 
+
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| Accounting and implementation | Existing tests | Successful unit tests |
+
+## Overview of Design
+
+
+## Inputs and Simulation Design
+
+## Time Tests
+
+@tbl-processing-time shows the average processing time per simulation for different scenarios.
+
+
+```{r}
+#| label: tbl-processing-time
+#| tbl-cap: Mean processing time by simulation scenario
+
+time_scenario |>
+  gt() |>
+  cols_label(
+    scenario ~ "Scenario",
+    elapsed_time ~ "Mean processing time"
+  )
+```
+
+## Tests
+
+The following tests have been constructed and are currently all passing.
+
+```{r}
+#| label: test-results
+#| eval: true
+
+test_results <- devtools::test(pkg = here::here(), reporter = "silent")
+test_table <- as.data.frame(test_results)
+knitr::kable(
+  test_table[, c("test", "passed", "failed", "error", "skipped", "warning")]
+)
+```
+## Conclusions and Unresolved Limitations
+
+
+## Reproducibility record
+
+```{r}
+#| label: reproducibility
+system2("git", c("-C", shQuote(here::here()), "rev-parse", "HEAD"), stdout = TRUE)
+system2("git", c("-C", shQuote(here::here()), "status", "--short"), stdout = TRUE)
+sessionInfo()
+```
+
