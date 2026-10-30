@@ -18,9 +18,13 @@ test_that("dissolution constructors validate duration schedules and retain prove
   expect_identical(p$rates$dur_start, rates$dur_start)
   expect_identical(p$source, attr(rates, "source"))
   expect_identical(set_process(hammel_model(), p), set_union_dissolution(hammel_model(), rates))
-  for (column in c("sex", "age_start", "age_end", "union_status", "time_start", "time_end", "group", "group_w", "group_h")) {
+  for (column in c("sex", "age_start", "age_end", "union_status", "group", "group_w", "group_h")) {
     bad <- rates; bad[[column]] <- 0
     expect_error(union_dissolution(bad), "duration bands")
+  }
+  for (column in c("time_start", "time_end")) {
+    bad <- rates; bad[[column]] <- 0
+    expect_error(union_dissolution(bad), "missing columns")
   }
   for (value in list(-1, NA_real_, Inf, "0", matrix(0, 2, 1))) {
     bad <- rates; bad$dur_start <- value

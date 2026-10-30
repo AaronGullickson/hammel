@@ -82,8 +82,14 @@ of character representations, including numeric codes).
 
 Mortality requires separate schedules for both sexes. Gaps and uncovered
 ages are not filled or interpreted as zero rates. Coverage must be specified
-before simulation. Calendar-time-varying
-schedules are not yet supported; time interval columns are rejected.
+before simulation. Optional \code{time_start}/\code{time_end} columns select half-open
+calendar intervals in absolute years, including fractional years, on mortality
+and fertility tables. Both columns are required together; starts are finite
+and ends exceed starts (possibly Inf). Active slices must satisfy the existing
+strata/coverage rules and cover the requested run. Rates are constant within
+intervals, with no interpolation. Calendar changes precede same-time events,
+preserving histories, birth spacing, parity and duration origins. Other
+process arguments remain static.
 
 Fertility optionally accepts \code{union_type} containing both \code{"partnered"}
 and \code{"unpartnered"}, or all three \code{"unpartnered"}, \code{"cohab"}, \code{"marriage"}.

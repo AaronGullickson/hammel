@@ -35,8 +35,9 @@ returned/stored as a tibble. Duration bands are half-open `[dur_start, dur_end)`
 Starts and rates are finite and nonnegative; ends exceed starts and may be
 `Inf`. Bands cannot overlap within an unordered group pair. Gaps and durations outside supplied
 support have zero risk. Input order, custom columns and source provenance are
-preserved. Sex, age, union-status and calendar-time schedule columns are rejected
-rather than interpreted as additional risk strata.
+preserved. Sex, age and union-status columns are rejected. Optional
+`time_start`/`time_end` bands follow [the rate contract](time-varying-rates.md)
+(D118); calendar changes retain the union-duration origin.
 
 An optional `group_pair` column gives symmetric pair labels, e.g. `A:A`,
 `A:B`, `B:B`. Pair order is normalized using character labels in radix order,
@@ -189,8 +190,8 @@ D101 cell accounting, accepted in milestone 5 (D105), replaces the former
 D045 fertility-transition approximation: dissolution moves the woman between
 current fertility cells while retaining her spacing eligibility. Sparse cells
 without eligible women still report unrealized intensity. Cohabitation is
-implemented under D086; richer couple covariates and calendar-varying
-dissolution require further specifications.
+implemented under D086; richer couple covariates remain deferred. Calendar-varying
+dissolution is implemented under [D118](time-varying-rates.md).
 Duration-based remarriage observations are available via `dur_breaks` under D084. These rules intentionally differ from SOCSIM's
 monthly probability inputs and potentially two-spouse candidate clocks, while
 sharing its duration-based baseline idea. No scientific validation threshold

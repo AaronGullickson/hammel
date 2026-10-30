@@ -23,14 +23,14 @@ replication counts and population settings belong to the report. Acceptance
 is explicit, but final-render completion and numerical results are not
 independently certified by this documentation update.
 
-## Next milestone: 7, time-varying inputs
+## Milestone 7: calendar-varying rates
 
-Calendar-varying rates, matching and inheritance within a run are next under
-D103/D116. Specify input representation, period boundaries, update/invalidation
-rules, history and observation semantics, and the public API before consequential
-implementation. Existing flat time-banded table and whole-model schedule notes
-in [the roadmap](roadmap.md) remain proposals. Completion of milestone 6 does
-not accept those proposals or authorize unspecified execution behavior.
+The user approved calendar input semantics and authorized the six annual-rate
+inputs first (D118). Rates now accept flat `time_start`/`time_end` bands;
+[the contract](time-varying-rates.md) records coverage, fractional years,
+boundary precedence, resampling, histories and observations. Matching and
+inheritance schedules are deferred to a second step; other arguments remain
+static. This is implementation status, not scientific acceptance of milestone 7.
 
 Groups cover most categorical characteristics. Multiple independent group
 dimensions remain an optional direction with no selected schema. Fixed newborn

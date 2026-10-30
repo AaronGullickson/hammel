@@ -13,6 +13,7 @@ validate_cohabitation <- function(process) {
     if (!identical(process$initiation, "rate"))
       stop("Cohabitation is available only with rate-based initiation.", call. = FALSE)
     x <- process$cohab_prob
+    if (has_calendar_rates(x)) stop("cohab_prob remains static; calendar schedules currently apply to rates only.", call. = FALSE)
     check_columns(x, c("age_start", "age_end", "prob"), "cohab_prob")
     check_numeric_column(x$prob, "cohab_prob$prob")
     if (any(x$prob < 0 | x$prob > 1) ||
@@ -26,6 +27,13 @@ validate_cohabitation <- function(process) {
 }
 
 validate_conversion_rates <- function(rates) {
+  if (has_calendar_rates(rates)) {
+    if (all(c("age_start", "dur_start") %in% names(rates)) &&
+        length(unique(!is.na(rates$dur_start))) != 1L)
+      stop("Conversion rates must use one age or duration clock across calendar periods.", call. = FALSE)
+    validate_calendar_rates(rates, validate_conversion_rates)
+    return(invisible(rates))
+  }
   check_columns(rates, "rate", "union_convert_rate")
   if (any(c("previous_union", "sex", "time_start", "time_end", "union_type") %in% names(rates)))
     stop("Conversion rates allow age or duration and optional group, without previous_union, sex, type or calendar strata.", call. = FALSE)

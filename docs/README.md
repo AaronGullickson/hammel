@@ -6,7 +6,9 @@ cell-accounted birth spacing and persistent lognormal fertility weights.
 Current behavior uses continuous event times with no monthly grid. Acceptance
 is based on the user-authored validation reports and retains their limitations.
 **Milestone 6 is accepted complete** (D116); its final report render is active.
-**Next: milestone 7, time-varying inputs.** See the
+**Milestone 7: calendar-varying rates are implemented under D118; scientific
+assessment remains pending.** Matching and inheritance schedules are deferred.
+See the [rate contract](time-varying-rates.md) and
 [group-transition contract](group-transitions.md). Household moves are deferred to
 the regions milestone (D114); milestone 7 is time-varying inputs (D103).
 
@@ -17,6 +19,7 @@ the regions milestone (D114); milestone 7 is time-varying inputs (D103).
 | [Project brief](project-brief.md) | Purpose, current scope, and milestone status |
 | [Design](design.md) | Implemented architecture, API, and source locations |
 | [Scientific contract](scientific-contract.md) | Current demographic assumptions and event rules |
+| [Calendar-varying rates](time-varying-rates.md) | Calendar bands, coverage, boundary timing and retained histories (D118) |
 | [Rate input census](rate-inputs.md) | Existing rate schedules, age/duration bands, supported strata and multipliers |
 | [Population schema](population-schema.md) | Person/union tables and structural validation |
 | [Group transitions](group-transitions.md) | Individual transitions, histories, state updates and age/duration Lexis rates |
@@ -110,6 +113,9 @@ To inspect prior versions, use `git log -- docs` and
   rate provenance, and supporting benchmark/conditional-choice evidence.
 The former `milestone1.R` and `milestone1_bootstrap.R` examples have been
 removed from the current tree; use Git history for those historical workflows.
+
+- [Milestone 7 rate example](../inst/examples/milestone7-rates.R): synthetic
+  calendar-varying mortality/fertility with fractional dates and run duration.
 
 `inst/examples/` ships with the installed R package. `validation/` and `docs/`
 are development material excluded from package builds. Preserve the completed

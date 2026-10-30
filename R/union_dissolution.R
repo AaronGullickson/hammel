@@ -14,11 +14,17 @@
 #' previous union are specified through [union_formation()].
 #' Restarts resample at attained union duration rather than reset duration.
 #'
+#' @section Calendar rates:
+#' Optional `time_start`/`time_end` select half-open absolute calendar-year bands,
+#' including fractional years. Active slices retain the existing strata rules
+#' and must cover the requested run. Changes precede same-time events without
+#' resetting the union-duration origin. Other arguments remain static.
+#'
 #' @param rates A nonempty data frame with numeric `dur_start`, `dur_end`, and
 #'   `rate`. Bands are half-open `[dur_start, dur_end)` in years. Starts and
 #'   rates must be finite and nonnegative; ends must exceed starts and may be
 #'   `Inf`. Bands cannot overlap within an unordered group pair. Gaps and
-#'   durations outside support have zero hazard. Sex, age, union-status and calendar-time columns
+#'   durations outside support have zero hazard. Sex, age and union-status columns
 #'   are not supported. Input order, custom columns and provenance are retained.
 #'   An optional `group_pair` column selects an unordered pair such as `"A:A"`,
 #'   `"A:B"`, or `"B:B"`; `"A:B"` and `"B:A"` select the same schedule.
@@ -63,6 +69,9 @@ validate_union_dissolution <- function(process) {
     stop("Invalid union-dissolution specification or units.", call. = FALSE)
   validate_dissolution_multipliers(process$group_prop_hazard)
   rates <- process$rates
+  if (validate_calendar_rates(rates, function(x) {
+    copy <- process; copy$rates <- x; validate_union_dissolution(copy)
+  })) return(invisible(process))
   check_columns(rates, c("dur_start", "dur_end", "rate"), "rates")
   check_numeric_column(rates$dur_start, "rates$dur_start")
   check_numeric_column(rates$rate, "rates$rate")
@@ -106,6 +115,9 @@ prepare_dissolution_rates <- function(process, persons, group_values) {
   if (!"group" %in% names(persons)) {
     if (grouped) {
       first <- sort(unique(labels), method = "radix")[1L]
+      if (any(vapply(calendar_rate_slices(rates), function(x)
+          nrow(x) > 0L && !first %in% canonical_union_pairs(x$group_pair), logical(1))))
+        stop("Dissolution rates are missing schedules for the fallback pair in a calendar interval.", call. = FALSE)
       warning(sprintf("Pair rates were specified for union dissolution but no groups found in the population; using pair '%s' (first alphabetically).",
                       first), call. = FALSE)
       rates <- rates[labels == first, , drop = FALSE]
@@ -115,7 +127,8 @@ prepare_dissolution_rates <- function(process, persons, group_values) {
   } else if (grouped || !is.null(factors)) {
     pairs <- possible_union_pairs(group_values)
     if (grouped) {
-      missing <- setdiff(pairs, labels)
+      missing <- unique(unlist(lapply(calendar_rate_slices(rates), function(x)
+        if (nrow(x)) setdiff(pairs, canonical_union_pairs(x$group_pair)) else character())))
       if (length(missing))
         stop(sprintf("Union dissolution rates are missing schedules for group pair(s): %s.",
                      paste(missing, collapse = ", ")), call. = FALSE)

@@ -64,12 +64,17 @@ prepare_group_rates <- function(rates, persons, process,
   labels <- as.character(rates$group)
   if (!"group" %in% names(persons)) {
     first <- sort(unique(labels), method = "radix")[1L]
+    if (any(vapply(calendar_rate_slices(rates), function(x)
+        nrow(x) > 0L && !first %in% as.character(x$group), logical(1))))
+      stop(sprintf("%s rates are missing schedules for fallback group '%s' in a calendar interval.",
+                   process, first), call. = FALSE)
     warning(sprintf("Group rates were specified for %s but no groups found in the population; using group '%s' (first alphabetically).",
                     process, first), call. = FALSE)
     return(rates[labels == first, , drop = FALSE])
   }
   groups <- as.character(group_values)
-  missing <- setdiff(groups, labels)
+  missing <- unique(unlist(lapply(calendar_rate_slices(rates), function(x)
+    if (nrow(x)) setdiff(groups, as.character(x$group)) else character())))
   if (length(missing)) {
     stop(sprintf("%s rates are missing schedules for population group(s): %s.",
                  process, paste(missing, collapse = ", ")), call. = FALSE)

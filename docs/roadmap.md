@@ -1,8 +1,9 @@
 # Development roadmap
 
 Updated October 30, 2026. Milestones 1–6 are complete by user acceptance
-(D029, D050, D077, D093, D105, D116). **Next is milestone 7:
-time-varying inputs** (D103). Future entries record planning
+(D029, D050, D077, D093, D105, D116). **Milestone 7 calendar-varying rates
+are implemented under D118; scientific assessment and model schedules remain
+pending.** Future entries record planning
 priorities, not authorization to implement unspecified demographic behavior
 or an unselected public API.
 
@@ -11,7 +12,7 @@ or an unselected public API.
 | 4 | Union dissolution, age/duration remarriage, and cohabitation | Complete (D093) |
 | 5 | Parity-specific fertility and fertility heterogeneity | Complete (D105); limitations retained |
 | 6 | Group transitions, including categorical characteristics represented by groups | Complete October 30, 2026 (D116); final render active at acceptance |
-| 7 | Time-varying rates, matching, and inheritance within a simulation run | Next (D103); scientific specification and API first |
+| 7 | Time-varying rates, matching, and inheritance within a simulation run | Rates implemented (D118); scientific assessment pending; matching/inheritance schedules deferred |
 | 8 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed |
 | 9 | Immigration from outside the system, tracking generation | Tentative |
 | 10 | Internal migration between regions, with unions restricted to the same region | Tentative |
@@ -181,16 +182,22 @@ education category) was deferred to this discussion on October 27, 2026. No
 `fixed` inheritance method or API has yet been adopted. A custom inheritance
 function already handles assigning mixed-parent births to a specified category.
 
-## Next milestone 7: time-varying inputs within a run
+## Milestone 7: time-varying inputs within a run
 
-Allow demographic schedules to change during a single simulation, rather than
-requiring population restarts. Specify calendar-time inputs, change boundaries,
-which processes may change, event ordering at boundaries, and invalidation of
-pending events. Preserve birth spacing from actual births and address the
-interaction with cell-accounted fertility and matching intensity updates (D101/D082). No rate-change
-API, interpolation rule, or demographic default is selected.
+Calendar-varying rates are implemented under the user's D118 authorization;
+scientific assessment remains pending. Flat rate tables use optional half-open
+`time_start`/`time_end` bands, including fractional years. The engine updates
+pending risks, fertility cells and calibration while preserving histories,
+spacing and duration origins. See [the rate contract](time-varying-rates.md).
 
-### Input representation proposal (October 21, 2026)
+The user selected annual rates first. Matching and inheritance model schedules
+are deferred to the second step, along with their interface implementation.
+Non-rate arguments, including `cohab_prob` and multipliers, remain static.
+The representation and execution-time model selection below were approved in
+D118, but model-schedule constructors and public arguments remain to be designed.
+Flat rate representation and timing are specified by the implemented D118 contract.
+
+### Input representation (October 21 proposal; October 30 D118 selection)
 
 The user requested retaining the following approach for time-varying inputs,
 now scheduled for milestone 7, allowing inputs to change without restarting
@@ -223,14 +230,14 @@ tibble::tibble(
 
 An inheritance schedule would similarly hold complete inheritance models in
 a list column. Shared half-open calendar intervals `[time_start, time_end)`
-are a proposed convention. Selecting matching at search/father-selection
+are accepted under D118. Selecting matching at search/father-selection
 execution and inheritance at birth, without rewriting existing unions or
-identities, is a proposal requiring confirmation in the scientific specification.
-Before implementation, resolve coverage, gaps, overlaps, boundary ties,
-validation of all scheduled models, and interactions with pending events.
-Rate sampling must account for future rate boundaries rather than assume the
-rate at scheduling time persists indefinitely. This note records a future
-design direction, not implementation authorization or accepted timing rules.
+identities, is also approved; model-schedule implementation is deferred.
+Before that step, specify the public API and validation of all scheduled models
+and apply the approved coverage and boundary rules.
+Rate sampling now accounts for future rate boundaries under D118. The
+whole-model scheduling interface remains to be designed; the user explicitly
+deferred its implementation to the second step.
 
 ## Proposed milestone 8: summaries, diagnostics, and helpers
 

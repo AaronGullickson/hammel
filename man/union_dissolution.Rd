@@ -14,7 +14,7 @@ set_union_dissolution(model, rates, group_prop_hazard = NULL)
 \code{rate}. Bands are half-open \verb{[dur_start, dur_end)} in years. Starts and
 rates must be finite and nonnegative; ends must exceed starts and may be
 \code{Inf}. Bands cannot overlap within an unordered group pair. Gaps and
-durations outside support have zero hazard. Sex, age, union-status and calendar-time columns
+durations outside support have zero hazard. Sex, age and union-status columns
 are not supported. Input order, custom columns and provenance are retained.
 An optional \code{group_pair} column selects an unordered pair such as \code{"A:A"},
 \code{"A:B"}, or \code{"B:B"}; \code{"A:B"} and \code{"B:A"} select the same schedule.
@@ -55,6 +55,14 @@ rules, retaining birth spacing. Optional age-specific search schedules by
 previous union are specified through \code{\link[=union_formation]{union_formation()}}.
 Restarts resample at attained union duration rather than reset duration.
 }
+\section{Calendar rates}{
+
+Optional \code{time_start}/\code{time_end} select half-open absolute calendar-year bands,
+including fractional years. Active slices retain the existing strata rules
+and must cover the requested run. Changes precede same-time events without
+resetting the union-duration origin. Other arguments remain static.
+}
+
 \examples{
 # Illustrative rates, not demographic defaults.
 rates <- data.frame(dur_start = c(0, 5), dur_end = c(5, Inf),

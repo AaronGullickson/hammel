@@ -83,8 +83,11 @@ the user's agreement.
   dissolution/remarriage/cohabitation was accepted October 29, 2026 (D093).
   Milestone 5 parity-specific fertility, cell accounting and heterogeneity was
   accepted October 29, 2026 (D105). Individual group transitions (milestone 6)
-  were accepted October 30, 2026 (D116). Time-varying inputs (milestone 7) are
-  next; their detailed semantics and API need specification before implementation.
+  were accepted October 30, 2026 (D116). Milestone 7 calendar-varying rates are
+  implemented under the user-approved D118 contract in
+  `docs/time-varying-rates.md`; scientific assessment remains pending. Matching
+  and inheritance schedules are deferred to a second step; other arguments
+  remain static.
   Distinguish current
   specifications from deferred mechanisms and future proposals.
 - `validation/milestone1.qmd` is the accepted historical assessment; reproduce it
@@ -112,8 +115,8 @@ the user's agreement.
   render at closeout and milestone 6's active final render. Parity, fertility
   heterogeneity and individual group transitions are implemented and accepted.
   See `docs/group-transitions.md`; household moves are deferred to the regions
-  milestone (D114). Calendar-time schedules (milestone 7) still require their
-  own scientific specification. Most categorical characteristics should
+  milestone (D114). Calendar-time rates follow `docs/time-varying-rates.md`
+  (D118); model schedules remain deferred. Most categorical characteristics should
   use groups, with multiple types of groups an optional complexity direction.
 - Use `devtools::test()` for the testthat suite. Live database tests require
   explicit opt-in; ordinary verification must not download rates or expose

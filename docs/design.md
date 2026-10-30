@@ -2,7 +2,8 @@
 
 Updated October 30, 2026. Milestones 1–6 are complete by user acceptance
 (D029, D050, D077, D093, D105, D116). Individual group transitions are accepted
-under D116; time-varying inputs (milestone 7) are next. This document describes implemented architecture.
+under D116; milestone 7 calendar-varying rates are implemented under D118,
+with scientific assessment pending and model schedules deferred. This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
 The [scientific contract](scientific-contract.md) defines demographic semantics.
 
@@ -15,6 +16,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Ancestry schema and initialization | `R/ancestry.R` |
 | Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
 | Mortality/fertility specification and rate validation | `R/set_process.R` |
+| Shared calendar-rate validation | `R/calendar_rates.R`; boundaries and active slices in `src/simulate.cpp` |
 | Individual transition specification and history | `R/group_transition.R`; events in `src/simulate.cpp`; observation splitting in `src/group_history.h` |
 | Persistent fertility weights and specification | `R/het_fert.R`; cell weight trees in `src/simulate.cpp` |
 | Union formation/matching and dissolution specifications | `R/union_formation.R`, `R/union_dissolution.R` |
@@ -85,7 +87,8 @@ See [groups](groups.md) for effective-rate examples and validation rules.
 Setters validate built-in specifications again, including edited objects.
 Mortality constructors permit partial nonoverlapping schedules, but simulation
 requires complete coverage. Fertility bands must be finite; gaps have zero risk
-at execution. Time-varying rate columns are rejected. Arbitrary named process
+at execution. Optional `time_start`/`time_end` columns select half-open calendar
+bands on all six annual-rate inputs; static tables remain supported (D118). Arbitrary named process
 specifications can be stored; execution supports mortality/fertility and the
 conditional-logit on-demand and rate-based union formation plus optional
 duration-dependent union dissolution. Optional `group_transition()` is also supported. Other processes are rejected.
@@ -169,11 +172,19 @@ Reusing the original model retains its processes. Building a new model from
 `result` requires explicitly attaching processes; the output stores population
 history and run metadata, not a saved model or pending queue.
 
-Users can replace rates between runs. This supports incremental workflows,
-but does not implement calendar-varying schedules inside one run. Restarting
-redraws pending events and is not guaranteed to match an uninterrupted fixed-seed
-run. Fertility adjustment after changing rates ignores the previous schedule;
-that transition issue is [documented and deferred](scientific-contract.md#known-limitations-and-deferred-issues).
+Users can replace rates between runs or supply calendar bands inside one run.
+The engine selects active rate rows and processes calendar boundaries before
+same-time events. It redraws pending person/union candidates at each calendar
+boundary; fertility cells rebuild when fertility changes, preserving spacing,
+weights, parity and histories. Matching calibration contributions refresh under
+the current rates. Unrealized intensity is retained across fertility epochs.
+This stays within one native invocation with independent call-local state;
+matching and inheritance models remain static. See
+[calendar-varying rates](time-varying-rates.md).
+
+Restarting redraws pending events and is not guaranteed to match an uninterrupted
+fixed-seed run. Boundary processing also consumes random draws, so a redundant
+calendar boundary does not promise fixed-seed equality with a static table.
 
 ## Data and observation interfaces
 

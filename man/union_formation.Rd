@@ -183,3 +183,13 @@ characteristics in the static group-only illustration. With one group,
 all group weights are one. When no
 exact weights exist, approximate weights are used with a warning.
 }
+\section{Calendar rates}{
+
+Search \code{rates} and \code{union_convert_rate} optionally accept \code{time_start} and
+\code{time_end} for half-open absolute calendar-year bands, including fractional
+years. Both columns are required together, with finite starts and greater
+ends (possibly Inf). Every active slice must satisfy its existing rate rules
+and cover the requested run. Clock choices stay consistent across periods;
+changes precede same-time events and retain duration origins. \code{cohab_prob},
+matching models and all other arguments remain static.
+}

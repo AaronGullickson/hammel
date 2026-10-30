@@ -11,7 +11,8 @@ simulate(model, years, seed = NULL)
 and union-formation processes, optionally union dissolution and group transitions. The population
 must have a finite \code{end_time}.}
 
-\item{years}{Nonnegative simulation duration in years.}
+\item{years}{Nonnegative simulation duration in years; fractional years are
+supported, as are fractional population endpoints and calendar-rate bands.}
 
 \item{seed}{Optional integer seed. With a seed, the caller's RNG state is
 restored afterward. With \code{NULL}, the simulation advances the current RNG.}
@@ -101,6 +102,11 @@ When ancestry is tracked, each newborn receives half of each parent's shares,
 with a missing parent contributing its half to unknown ancestry. Initial
 shares are retained, including on restart; grouped populations without shares
 initialize from recorded identities. No additional random draws are made.
+
+Calendar-banded rates change within the same run at \code{time_start}/\code{time_end}
+boundaries, before same-time demographic events. Histories, birth spacing and
+duration origins persist. Pending candidates are resampled at boundaries;
+adding redundant boundaries need not preserve a fixed-seed trajectory.
 }
 \examples{
 population <- create_baseline_population(100, max_age = 50)

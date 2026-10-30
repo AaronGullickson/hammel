@@ -133,8 +133,14 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #'
 #' Mortality requires separate schedules for both sexes. Gaps and uncovered
 #' ages are not filled or interpreted as zero rates. Coverage must be specified
-#' before simulation. Calendar-time-varying
-#' schedules are not yet supported; time interval columns are rejected.
+#' before simulation. Optional `time_start`/`time_end` columns select half-open
+#' calendar intervals in absolute years, including fractional years, on mortality
+#' and fertility tables. Both columns are required together; starts are finite
+#' and ends exceed starts (possibly Inf). Active slices must satisfy the existing
+#' strata/coverage rules and cover the requested run. Rates are constant within
+#' intervals, with no interpolation. Calendar changes precede same-time events,
+#' preserving histories, birth spacing, parity and duration origins. Other
+#' process arguments remain static.
 #'
 #' Fertility optionally accepts `union_type` containing both `"partnered"`
 #' and `"unpartnered"`, or all three `"unpartnered"`, `"cohab"`, `"marriage"`.
@@ -319,6 +325,9 @@ unreachable_parity_cells <- function(rates, interval) {
 }
 
 warn_unreachable_parity_cells <- function(rates, interval) {
+  # The static reachability heuristic assumes the same schedules throughout a
+  # life. Applying it to calendar slices could falsely reject reachable histories.
+  if (has_calendar_rates(rates)) return(invisible(NULL))
   cells <- unreachable_parity_cells(rates, interval)
   if (!nrow(cells)) return(invisible(cells))
   keys <- unique(cells[c("group", "parity")])
@@ -349,6 +358,8 @@ new_rate_process <- function(name, rates) {
 }
 
 validate_rates <- function(rates, mortality) {
+  if (validate_calendar_rates(rates, function(x) validate_rates(x, mortality)))
+    return(invisible(rates))
   columns <- c("age_start", "age_end", "rate")
   if (mortality) columns <- c("sex", columns)
   check_columns(rates, columns, "rates")
@@ -362,9 +373,6 @@ validate_rates <- function(rates, mortality) {
   }
   if (nrow(rates) == 0L) {
     stop("`rates` must contain at least one age interval.", call. = FALSE)
-  }
-  if (any(c("time_start", "time_end") %in% names(rates))) {
-    stop("Calendar-time-varying rate schedules are not yet supported.", call. = FALSE)
   }
   check_numeric_column(rates$age_start, "rates$age_start")
   check_numeric_column(rates$rate, "rates$rate")

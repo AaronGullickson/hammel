@@ -52,6 +52,26 @@ std::vector<Band> read_bands(DataFrame rates, const std::string& sex = "",
   return bands;
 }
 
+// Select active flat-table rows at a calendar boundary. The public table is
+// never changed. R validation checks every active slice before execution.
+DataFrame calendar_slice(DataFrame rates, double now) {
+  if (!rates.containsElementNamed("time_start")) return rates;
+  NumericVector lo = rates["time_start"], hi = rates["time_end"];
+  std::vector<int> rows;
+  for (int i = 0; i < rates.nrows(); ++i)
+    if (lo[i] <= now && now < hi[i]) rows.push_back(i + 1);
+  Function subset = Environment::base_env()["["];
+  return as<DataFrame>(subset(rates, wrap(rows), R_MissingArg, _["drop"] = false));
+}
+
+bool calendar_changes_at(DataFrame rates, double now) {
+  if (!rates.containsElementNamed("time_start")) return false;
+  NumericVector lo = rates["time_start"], hi = rates["time_end"];
+  for (int i = 0; i < rates.nrows(); ++i)
+    if (lo[i] == now || hi[i] == now) return true;
+  return false;
+}
+
 // R validation guarantees one clock per previous category across all groups.
 bool search_uses_duration(DataFrame rates, const std::string& previous) {
   if (!rates.containsElementNamed("dur_start") || previous.empty()) return false;
@@ -1202,7 +1222,7 @@ class FertilityCells {
       if (std::abs(weights[c] - cells_[c].weights.sum()) > 1e-9 * std::max(weights[c], 1.0)) return false;
     return true;
   }
-  DataFrame unrealized(const std::vector<std::string>& type_labels) const {
+  DataFrame unrealized(const std::vector<std::string>& type_labels, double cutoff = R_PosInf) const {
     const size_t n = unrealized_.size();
     NumericVector period_start(n), period_end(n), parity_start(n), parity_end(n),
       age_start(n), age_end(n), births(n), years(n);
@@ -1213,7 +1233,7 @@ class FertilityCells {
       const Cell& x = cells_[entry.first.second];
       const Stratum& st = strata_[x.stratum];
       period_start[r] = start_ + static_cast<double>(entry.first.first);
-      period_end[r] = std::min(end_, period_start[r] + 1);
+      period_end[r] = std::min(std::min(end_, cutoff), period_start[r] + 1);
       group[r] = st.group;
       type[r] = type_labels[st.type];
       parity_start[r] = st.parity_start; parity_end[r] = st.parity_end;
@@ -1679,6 +1699,29 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   DataFrame dissolution_rates, DataFrame cohab_prob, DataFrame conversion_rates,
                   List cohab_matching, bool counts_cohab, bool check_cells = false,
                   Nullable<List> hetfert = R_NilValue, Nullable<DataFrame> transition_input = R_NilValue) {
+  // Keep all epochs in call-local tables; the population and its histories
+  // stay in this single engine invocation across every rate change.
+  const DataFrame all_mortality = mortality_rates, all_fertility = fertility_rates,
+    all_search = union_rates, all_dissolution = dissolution_rates,
+    all_conversion = conversion_rates;
+  const DataFrame all_transitions = transition_input.isNotNull() ?
+    DataFrame(transition_input.get()) : DataFrame::create();
+  DataFrame active_transitions = calendar_slice(all_transitions, start);
+  std::set<double> calendar_boundaries;
+  for (const DataFrame& table : {all_mortality, all_fertility, all_search,
+      all_dissolution, all_conversion, all_transitions}) {
+    if (!table.containsElementNamed("time_start")) continue;
+    for (const char* column : {"time_start", "time_end"}) {
+      NumericVector times = table[column];
+      for (double time : times)
+        if (start < time && time < start + years) calendar_boundaries.insert(time);
+    }
+  }
+  mortality_rates = calendar_slice(all_mortality, start);
+  fertility_rates = calendar_slice(all_fertility, start);
+  union_rates = calendar_slice(all_search, start);
+  dissolution_rates = calendar_slice(all_dissolution, start);
+  conversion_rates = calendar_slice(all_conversion, start);
   const List heterogeneity = hetfert.isNotNull() ? List(hetfert.get()) : List::create();
   const bool heterogeneous = heterogeneity.size() > 0;
   const double fertility_cv = heterogeneous ? as<double>(heterogeneity["cv"]) : 0;
@@ -1964,30 +2007,29 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::vector<GroupSchedules> schedules(group_count);
   const bool status_fertility = fertility_rates.containsElementNamed("union_type");
   bool typed_fertility = false;
-  if (status_fertility) {
-    CharacterVector types = fertility_rates["union_type"];
-    for (auto type : types) if (as<std::string>(type) == "cohab") typed_fertility = true;
-  }
-  for (int group = 0; group < group_count; ++group) {
-    auto& rates = schedules[group];
-    rates.male = read_bands(mortality_rates, "m", "", group);
-    rates.female = read_bands(mortality_rates, "f", "", group);
-    if (conversion_rates.nrows()) {
-      NumericVector ages = conversion_rates["age_start"];
-      rates.duration_conversion = NumericVector::is_na(ages[0]);
-      rates.conversion = read_bands(conversion_rates, "", "", group, "", rates.duration_conversion);
+  auto load_schedules = [&]() {
+    for (int group = 0; group < group_count; ++group) {
+      auto& rates = schedules[group];
+      rates.male = read_bands(mortality_rates, "m", "", group);
+      rates.female = read_bands(mortality_rates, "f", "", group);
+      if (conversion_rates.nrows()) {
+        NumericVector ages = conversion_rates["age_start"];
+        rates.duration_conversion = NumericVector::is_na(ages[0]);
+        rates.conversion = read_bands(conversion_rates, "", "", group, "", rates.duration_conversion);
+      }
+      if (rate_initiation) {
+        if (previous_specific) {
+          const std::array<std::string, 3> labels = {"none", "dissolved", "widowed"};
+          for (int p = 0; p < 3; ++p) {
+            rates.duration_search[p] = search_uses_duration(union_rates, labels[p]);
+            rates.previous_search[p] = read_bands(union_rates, "", "", group, labels[p],
+              rates.duration_search[p]);
+          }
+        } else rates.search = read_bands(union_rates, "", "", group);
+      }
     }
-    if (rate_initiation) {
-      if (previous_specific) {
-        const std::array<std::string, 3> labels = {"none", "dissolved", "widowed"};
-        for (int p = 0; p < 3; ++p) {
-          rates.duration_search[p] = search_uses_duration(union_rates, labels[p]);
-          rates.previous_search[p] = read_bands(union_rates, "", "", group, labels[p],
-            rates.duration_search[p]);
-        }
-      } else rates.search = read_bands(union_rates, "", "", group);
-    }
-  }
+  };
+  load_schedules();
   // weighted_choice needs schedules and group indices, so it starts here.
   // One group means unit weights, so calibration is unnecessary.
   if ((union_weighted || father_weighted || cohab_weighted) && group_count > 1) {
@@ -2048,44 +2090,52 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   };
   const bool has_dissolution = dissolution_rates.nrows() > 0;
   std::vector<std::vector<Band>> dissolution_schedules, cohab_dissolution_schedules;
-  if (has_dissolution) {
-    const int count = dissolution_rates.containsElementNamed(".hammel_group") ?
-      group_count * group_count : 1;
-    const bool typed = dissolution_rates.containsElementNamed("union_type");
-    for (int pair = 0; pair < count; ++pair) {
-      dissolution_schedules.push_back(read_bands(dissolution_rates, "", typed ? "marriage" : "", pair));
-      cohab_dissolution_schedules.push_back(read_bands(dissolution_rates, "", typed ? "cohab" : "", pair));
+  auto load_dissolution = [&]() {
+    dissolution_schedules.clear(); cohab_dissolution_schedules.clear();
+    if (has_dissolution) {
+      const int count = dissolution_rates.containsElementNamed(".hammel_group") ?
+        group_count * group_count : 1;
+      const bool typed = dissolution_rates.containsElementNamed("union_type");
+      for (int pair = 0; pair < count; ++pair) {
+        dissolution_schedules.push_back(read_bands(dissolution_rates, "", typed ? "marriage" : "", pair));
+        cohab_dissolution_schedules.push_back(read_bands(dissolution_rates, "", typed ? "cohab" : "", pair));
+      }
     }
-  }
+  };
+  load_dissolution();
   struct TransitionSchedule { int dest, sex; std::string type; std::vector<Band> bands; };
   std::vector<std::vector<TransitionSchedule>> transition_schedules(group_count);
   bool transition_duration = false;
   const bool has_transition = transition_input.isNotNull();
-  if (has_transition) {
-    DataFrame input(transition_input.get());
-    transition_duration = input.containsElementNamed("dur_start");
-    IntegerVector origins = input[".origin"], destinations = input[".dest"];
-    NumericVector lo = input[transition_duration ? "dur_start" : "age_start"];
-    NumericVector hi = input[transition_duration ? "dur_end" : "age_end"], values = input["rate"];
-    const bool sexed = input.containsElementNamed("sex"), typed = input.containsElementNamed("union_type");
-    CharacterVector sexes = sexed ? as<CharacterVector>(input["sex"]) : CharacterVector();
-    CharacterVector types = typed ? as<CharacterVector>(input["union_type"]) : CharacterVector();
-    for (int row = 0; row < input.nrows(); ++row) {
-      auto& schedules = transition_schedules[origins[row]];
-      const int sex = !sexed ? -1 : (as<std::string>(sexes[row]) == "f" ? 1 : 0);
-      const std::string type = typed ? as<std::string>(types[row]) : "";
-      auto found = std::find_if(schedules.begin(), schedules.end(), [&](const TransitionSchedule& x) {
-        return x.dest == destinations[row] && x.sex == sex && x.type == type;
-      });
-      if (found == schedules.end()) {
-        schedules.push_back({destinations[row], sex, type, {}});
-        found = std::prev(schedules.end());
+  auto load_transitions = [&]() {
+    for (auto& origin : transition_schedules) origin.clear();
+    if (has_transition) {
+      DataFrame input = active_transitions;
+      transition_duration = input.containsElementNamed("dur_start");
+      IntegerVector origins = input[".origin"], destinations = input[".dest"];
+      NumericVector lo = input[transition_duration ? "dur_start" : "age_start"];
+      NumericVector hi = input[transition_duration ? "dur_end" : "age_end"], values = input["rate"];
+      const bool sexed = input.containsElementNamed("sex"), typed = input.containsElementNamed("union_type");
+      CharacterVector sexes = sexed ? as<CharacterVector>(input["sex"]) : CharacterVector();
+      CharacterVector types = typed ? as<CharacterVector>(input["union_type"]) : CharacterVector();
+      for (int row = 0; row < input.nrows(); ++row) {
+        auto& schedules = transition_schedules[origins[row]];
+        const int sex = !sexed ? -1 : (as<std::string>(sexes[row]) == "f" ? 1 : 0);
+        const std::string type = typed ? as<std::string>(types[row]) : "";
+        auto found = std::find_if(schedules.begin(), schedules.end(), [&](const TransitionSchedule& x) {
+          return x.dest == destinations[row] && x.sex == sex && x.type == type;
+        });
+        if (found == schedules.end()) {
+          schedules.push_back({destinations[row], sex, type, {}});
+          found = std::prev(schedules.end());
+        }
+        found->bands.push_back({lo[row], hi[row], values[row]});
       }
-      found->bands.push_back({lo[row], hi[row], values[row]});
+      for (auto& origin : transition_schedules) for (auto& schedule : origin)
+        std::sort(schedule.bands.begin(), schedule.bands.end(), [](const Band& a, const Band& b) { return a.start < b.start; });
     }
-    for (auto& origin : transition_schedules) for (auto& schedule : origin)
-      std::sort(schedule.bands.begin(), schedule.bands.end(), [](const Band& a, const Band& b) { return a.start < b.start; });
-  }
+  };
+  load_transitions();
   std::vector<double> group_entry(people.size());
   if (has_transition) group_entry = as<std::vector<double>>(persons[".group_entry"]);
   std::vector<int> transition_destination(people.size(), -1);
@@ -2164,10 +2214,16 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (due < end) queue.emplace(due, Event{i, type, version});
   };
   // Fertility type labels: overall, unpartnered/partnered, or three types.
-  const std::vector<std::string> fertility_types = !status_fertility ? std::vector<std::string>{""} :
-    (typed_fertility ? std::vector<std::string>{"unpartnered", "marriage", "cohab"} :
-                       std::vector<std::string>{"unpartnered", "partnered"});
-  {
+  std::vector<std::string> fertility_types;
+  auto load_cells = [&](double now) {
+    typed_fertility = false;
+    if (status_fertility) {
+      CharacterVector types = fertility_rates["union_type"];
+      for (auto type : types) if (as<std::string>(type) == "cohab") typed_fertility = true;
+    }
+    fertility_types = !status_fertility ? std::vector<std::string>{""} :
+      (typed_fertility ? std::vector<std::string>{"unpartnered", "marriage", "cohab"} :
+                         std::vector<std::string>{"unpartnered", "partnered"});
     auto state = [&](int w) {
       FertilityCells::State st;
       const Person& p = people[w];
@@ -2187,8 +2243,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     for (const Person& person : people) oldest_birth = std::min(oldest_birth, person.born);
     cells.reset(new FertilityCells(fertility_strata(fertility_rates, group_count, fertility_types),
       group_count, static_cast<int>(fertility_types.size()), parity_specific, end - oldest_birth,
-      birth_interval, heterogeneous, state, threshold, calibrator.get(), start, end));
-  }
+      birth_interval, heterogeneous, state, threshold, calibrator.get(), now, end));
+  };
+  load_cells(start);
   // Initialize one next event for each living person. Known age changes are
   // already incorporated, so birthdays alone do not trigger resampling.
   for (int i = 0; i < static_cast<int>(people.size()); ++i) {
@@ -2197,8 +2254,52 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   }
   double birth_count = 0, death_count = 0, dissolution_count = 0, conversion_count = 0;
   unsigned long long processed = 0;
+  std::vector<DataFrame> unrealized_epochs;
+  bool cells_consistent = true;
   // Process events in chronological order until no scheduled events remain.
   while (true) {
+    // Calendar changes win exact ties with every cell/person boundary or event.
+    // Conditional Exp(1) resampling is valid after survival to the boundary.
+    // Candidates under the superseded rates never execute beyond it.
+    if (!calendar_boundaries.empty()) {
+      const double now = *calendar_boundaries.begin();
+      if (now <= cells->next_boundary() && now <= cells->next_clock() &&
+          (queue.empty() || now <= queue.begin()->first)) {
+        calendar_boundaries.erase(calendar_boundaries.begin());
+        checkUserInterrupt();
+        for (int w = 0; w < static_cast<int>(counted_woman.size()); ++w)
+          remove_counted_woman(w);
+        const bool fertility_change = calendar_changes_at(all_fertility, now);
+        if (fertility_change) {
+          cells->finish(now);
+          cells_consistent = cells_consistent && cells->consistent();
+          unrealized_epochs.push_back(cells->unrealized(fertility_types, now));
+        }
+        mortality_rates = calendar_slice(all_mortality, now);
+        fertility_rates = calendar_slice(all_fertility, now);
+        union_rates = calendar_slice(all_search, now);
+        dissolution_rates = calendar_slice(all_dissolution, now);
+        conversion_rates = calendar_slice(all_conversion, now);
+        active_transitions = calendar_slice(all_transitions, now);
+        load_schedules(); load_dissolution(); load_transitions();
+        if (fertility_change) load_cells(now);
+        for (auto& relationship : union_history) {
+          if (!NumericVector::is_na(relationship.end)) continue;
+          relationship.dissolution_sampled = false;
+          relationship.conversion_sampled = false;
+        }
+        // All table objects referenced by the tracker keep their addresses.
+        // Clock selection is fixed across calendar periods by R validation.
+        for (int w = 0; w < static_cast<int>(people.size()); ++w)
+          add_counted_woman(w, now);
+        queue.clear();
+        for (int i = 0; i < static_cast<int>(people.size()); ++i) {
+          if (i % 1024 == 0) checkUserInterrupt();
+          schedule(i, now);
+        }
+        continue;
+      }
+    }
     // Cell clocks depend on current membership, so bookkeeping boundaries are
     // processed in time order before any event at or after them.
     if (cells) {
@@ -2457,12 +2558,14 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       schedule(i, now);
     }
   }
-  bool cells_consistent = true;
   DataFrame unrealized;
   if (cells) {
     cells->finish(end);
-    cells_consistent = cells->consistent();
+    cells_consistent = cells_consistent && cells->consistent();
     unrealized = cells->unrealized(fertility_types);
+    Function bind = Environment::base_env()["rbind"];
+    for (auto it = unrealized_epochs.rbegin(); it != unrealized_epochs.rend(); ++it)
+      unrealized = as<DataFrame>(bind(*it, unrealized));
   }
   // Materialize ordinary R columns from the C++ records. The R wrapper restores
   // custom columns, closes existing unions affected by deaths, and assembles the

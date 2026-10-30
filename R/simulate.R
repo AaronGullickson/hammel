@@ -79,10 +79,16 @@
 #' shares are retained, including on restart; grouped populations without shares
 #' initialize from recorded identities. No additional random draws are made.
 #'
+#' Calendar-banded rates change within the same run at `time_start`/`time_end`
+#' boundaries, before same-time demographic events. Histories, birth spacing and
+#' duration origins persist. Pending candidates are resampled at boundaries;
+#' adding redundant boundaries need not preserve a fixed-seed trajectory.
+#'
 #' @param model A `hammel_model` containing a population, mortality, fertility,
 #'   and union-formation processes, optionally union dissolution and group transitions. The population
 #'   must have a finite `end_time`.
-#' @param years Nonnegative simulation duration in years.
+#' @param years Nonnegative simulation duration in years; fractional years are
+#'   supported, as are fractional population endpoints and calendar-rate bands.
 #' @param seed Optional integer seed. With a seed, the caller's RNG state is
 #'   restored afterward. With `NULL`, the simulation advances the current RNG.
 #' @return A `hammel_population` with updated histories and endpoint, plus a
@@ -128,16 +134,19 @@ simulate <- function(model, years, seed = NULL) {
   ffab <- model$processes$fertility$ffab
   hetfert <- model$processes$fertility$hetfert
   if (!is.null(hetfert)) validate_fertility_weights(population$persons)
-  for (rows in split_rate_groups(death_rates)) {
-    for (sex in c("m", "f")) {
-      schedule <- death_rates[rows, , drop = FALSE]
-      schedule <- schedule[schedule$sex == sex, , drop = FALSE]
-      schedule <- schedule[order(schedule$age_start), , drop = FALSE]
-      if (schedule$age_start[1] != 0 || tail(schedule$age_end, 1) != Inf ||
-          (nrow(schedule) > 1L &&
-           any(head(schedule$age_end, -1) != tail(schedule$age_start, -1)))) {
-        stop("Mortality schedules must cover [0, Inf) without gaps for each sex and group.",
-             call. = FALSE)
+  for (death_slice in calendar_rate_slices(death_rates)) {
+    if (!nrow(death_slice)) next
+    for (rows in split_rate_groups(death_slice)) {
+      for (sex in c("m", "f")) {
+        schedule <- death_slice[rows, , drop = FALSE]
+        schedule <- schedule[schedule$sex == sex, , drop = FALSE]
+        schedule <- schedule[order(schedule$age_start), , drop = FALSE]
+        if (schedule$age_start[1] != 0 || tail(schedule$age_end, 1) != Inf ||
+            (nrow(schedule) > 1L &&
+             any(head(schedule$age_end, -1) != tail(schedule$age_start, -1)))) {
+          stop("Mortality schedules must cover [0, Inf) without gaps for each sex and group.",
+               call. = FALSE)
+        }
       }
     }
   }
@@ -155,6 +164,11 @@ simulate <- function(model, years, seed = NULL) {
   if (!is.null(dissolution_process)) attach_process(model, dissolution_process)
   union_process <- model$processes$union_formation
   attach_process(model, union_process)
+  calendar_inputs <- list(mortality = death_rates, fertility = birth_rates,
+    search = union_process$rates, dissolution = dissolution_process$rates,
+    conversion = union_process$union_convert_rate, transition = transition_process$rates)
+  for (name in names(calendar_inputs))
+    check_calendar_coverage(calendar_inputs[[name]], start, start + years, name)
   cohab_enabled <- !is.null(union_process$cohab_prob)
   counts_cohab <- isTRUE(union_process$cohabitation_counts_as_previous_union)
   if (!cohab_enabled && "union_type" %in% names(population$unions) &&

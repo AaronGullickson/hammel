@@ -59,6 +59,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Detailed union partner groups refer to formation | D115 |
 | Milestone 6 acceptance; time-varying inputs next | D116 |
 | Two-sex marriage model as tentative milestone 11 | D117 |
+| Milestone 7 calendar-varying rates; model schedules deferred | D118 |
 
 ## Recorded decisions
 
@@ -2399,3 +2400,31 @@ milestone. Existing [two-sex research notes](two-sex-union-models.md) and D073
 provide the starting discussion. No particular model, parameterization, input
 semantics, cohabitation integration or public API is selected by assigning this
 milestone. Current union formation remains unchanged; milestone 7 remains next.
+
+
+## D118 — Calendar-varying rates within one run (October 30, 2026)
+
+**Status:** user-approved semantics and implementation authorization. Scientific
+acceptance of milestone 7 remains pending.
+
+The user approved flat rate tables with `time_start`/`time_end`, half-open
+calendar intervals, piecewise constant rates without interpolation, coverage
+checks, boundary changes before same-time events, and updates to pending risks,
+fertility cells and matching calibration while preserving demographic histories.
+The user narrowed this implementation step to the six existing annual-rate
+inputs: mortality, fertility, union search, dissolution, conversion and individual
+group transitions. Matching and inheritance model schedules are deferred to a
+second step. Other arguments, including `cohab_prob` and rate multipliers,
+remain static. Fractional calendar years and simulation durations are supported.
+
+For the deferred model-schedule step, the user also approved selecting matching
+at partner selection and inheritance at birth, without rewriting existing unions
+or identities. Complete-model schedule tibbles are the selected representation;
+constructor names and public arguments still need design. This step does not
+implement those schedules.
+
+See [the rate contract](time-varying-rates.md) for validation, worked examples,
+clock origins, observation semantics and scope. Conditional exponential
+resampling at calendar boundaries is the engine implementation choice; histories
+and duration origins do not restart. Static inputs remain supported. Neither
+implementation authorization nor software checks establish demographic acceptance.

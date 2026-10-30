@@ -373,6 +373,15 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   Zero imposes no cross-person kin exclusion. Missing ancestry is not proof of
 #'   unrelatedness; only demonstrated relationships are screened. Existing unions
 #'   are retained. See [extract_kin()] for the shared distance definitions.
+#' @section Calendar rates:
+#' Search `rates` and `union_convert_rate` optionally accept `time_start` and
+#' `time_end` for half-open absolute calendar-year bands, including fractional
+#' years. Both columns are required together, with finite starts and greater
+#' ends (possibly Inf). Every active slice must satisfy its existing rate rules
+#' and cover the requested run. Clock choices stay consistent across periods;
+#' changes precede same-time events and retain duration origins. `cohab_prob`,
+#' matching models and all other arguments remain static.
+#'
 #' @param rates For `"rate"` initiation, an age-specific female search-hazard
 #'   table with `age_start`, `age_end`, and `rate`, in years and per person-year.
 #'   These specify search attempts, not guaranteed realized union formation.
@@ -510,6 +519,14 @@ validate_union_formation <- function(process) {
 
 
 validate_union_search_rates <- function(rates) {
+    if (has_calendar_rates(rates)) {
+      if (all(c("previous_union", "dur_start") %in% names(rates)) &&
+          any(vapply(split(!is.na(rates$dur_start), rates$previous_union),
+            function(x) length(unique(x)) != 1L, logical(1))))
+        stop("Each previous_union category must use the same age or duration clock across calendar periods.", call. = FALSE)
+      validate_calendar_rates(rates, validate_union_search_rates)
+      return(invisible(rates))
+    }
     check_columns(rates, c("age_start", "age_end", "rate"), "rates")
     check_numeric_column(rates$rate, "rates$rate")
     if (!nrow(rates) || any(rates$rate < 0) ||

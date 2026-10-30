@@ -6,7 +6,9 @@ observation contract. Milestones 1–6 are accepted as complete
 (D029, D050, D077, D093, D105, D116), retaining documented limitations.
 Individual group transitions are accepted under the
 [transition contract](group-transitions.md). Milestone 7, time-varying inputs,
-is next and still requires its scientific specification and API.
+has implemented calendar-varying rates under the user-approved
+[rate contract](time-varying-rates.md) (D118). Scientific assessment remains
+pending; matching and inheritance schedules are deferred.
 Earlier monthly, exact
 age-varying and midpoint compensation specifications are available in Git
 history; the [decision log](decisions.md) records their replacement by
@@ -28,8 +30,11 @@ Mortality also contains
 `sex`, with separate `"m"` and `"f"` schedules. Intervals are half-open
 `[age_start, age_end)`. Starts must be finite and nonnegative; ends must exceed
 starts. Rates must be finite and nonnegative, and may exceed one because they
-are rates rather than probabilities. Overlapping bands, duplicate bands, and
-calendar columns `time_start`/`time_end` are rejected. Constructors preserve
+are rates rather than probabilities. Overlapping or duplicate risk bands are rejected within each active calendar
+slice. Optional `time_start`/`time_end` select half-open absolute-year calendar
+bands on all six annual-rate inputs (D118). Starts are finite, ends may be Inf,
+and fractional years are supported. Calendar changes precede same-time events;
+coverage is required during a run. See [calendar-varying rates](time-varying-rates.md). Constructors preserve
 input order and extra columns; native scheduling sorts its own copy.
 
 | Rule | Mortality | Fertility |
@@ -715,7 +720,7 @@ retained earlier limitations, including transition-aware fertility compensation
 age bins. Reported recovery in these scenarios is not a universal exact pooled
 cross-tab constraint. Static SOCSIM audits remain distinct from executable
 reference comparisons. Parity-specific execution is implemented (D099 schedules,
-D101 cells); calendar-time schedules remain unimplemented; D102 implements lognormal fertility weights.
+D101 cells); D118 implements calendar-time rate schedules; D102 implements lognormal fertility weights.
 
 
 ## Parity-specific fertility execution
@@ -769,8 +774,8 @@ strata. Group duration runs from latest entry, or birth without history;
 missing pairs and gaps mean zero risk. Moves preserve ancestry and refresh
 affected events, fertility cells, matching pools and calibration. Grouped
 outputs retain all moves in a `transitions` tibble, even when empty. Household
-moves are deferred to milestone 10, internal migration and regions (D114). Multiple group dimensions and calendar-time
-inputs (milestone 7) remain unimplemented. The user accepted milestone 6 on
+moves are deferred to milestone 10, internal migration and regions (D114). Multiple group dimensions remain unimplemented. Calendar-time rates are
+implemented under D118; matching and inheritance schedules are deferred. The user accepted milestone 6 on
 October 30, 2026 (D116) after reviewing the report and implementation. Its final
 render was active at acceptance; no final-render outcome is inferred.
 Acceptance retains documented limitations and does not authorize the next

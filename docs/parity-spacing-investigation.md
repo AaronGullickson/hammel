@@ -269,7 +269,7 @@ rates separately; its latter measure is an accounting diagnostic.
 
 Individual group transitions are now implemented and accepted under D116;
 see [their contract](group-transitions.md) for histories and state updates.
-Next is milestone 7, time-varying inputs, whose calendar schedules and event
-invalidation rules still require specification. The rejected
+Calendar-varying rates are implemented under [the D118 contract](time-varying-rates.md);
+scientific assessment and matching/inheritance schedules remain pending. The rejected
 composition-only correction and former midpoint implementation remain in Git
 history and supporting diagnostics, not current execution rules.

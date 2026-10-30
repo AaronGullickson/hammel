@@ -1,8 +1,10 @@
 # Census of existing rate inputs
 
 Updated October 30, 2026. This document describes implemented inputs through
-accepted milestone 6. Calendar-time schedules within a run are not yet
-implemented; milestone 7 will extend these interfaces.
+accepted milestone 6, extended by milestone 7 calendar bands under D118.
+All six annual-rate tables now optionally take `time_start`/`time_end`; see
+[calendar-varying rates](time-varying-rates.md). Matching, inheritance and
+non-rate arguments remain static in this step.
 
 ## Rates, bands and strata
 

@@ -5,6 +5,32 @@ D050, D077, D093, D105, D116). Software test history and the user's demographic 
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## Milestone 7 rate implementation checks
+
+October 30, 2026 (D118): the full offline `devtools::test(stop_on_failure = TRUE)`
+suite passed with 3,771 assertions, no failures or warnings, and one opt-in live
+DB test skipped. The run used `TZ=America/Los_Angeles` so optional database-reader
+dependencies did not need to query the unavailable sandbox system bus for a time
+zone. No rates were downloaded and no credentials were used.
+
+New calendar-rate checks cover malformed bounds, overlapping risks, calendar
+coverage and endpoints, fractional years, analytical integrated mortality,
+search/formation, dissolution, conversion and directed transition hazards,
+retained duration origins, birth spacing and persistent weights, exact
+unrealized-intensity accounting, changing parity/union-type fertility schedules,
+asynchronous process changes, calibration/cell consistency, exact calendar/event
+ties, reproducibility, RNG isolation, future group/pair coverage and empty runs.
+The fractional-year example in `inst/examples/milestone7-rates.R` executed
+successfully. Generated public help, local documentation links and
+`git diff --check` were also checked.
+
+This is software verification, not scientific acceptance of milestone 7 or a
+new demographic validation report. Calendar boundaries redraw person/union
+candidates and require work proportional to the population; redundant boundaries
+do not promise fixed-seed agreement with static inputs. Matching, inheritance
+and other non-rate arguments remain static. See
+[the rate contract](time-varying-rates.md).
+
 ## Milestone 6 accepted assessment and active final render
 
 The user accepted milestone 6 on October 30, 2026 (D116) after report and code
@@ -20,8 +46,9 @@ Software checks and prior developmental measurements below are separate
 records. Acceptance retains finite-sample and sparse-cell limits, complete
 history requirements, duration fallback to age without prehistory,
 non-checkpoint restarts and the documented life-table aggregation caveat.
-Household moves are deferred to milestone 10 (D114). Time-varying inputs are
-next in milestone 7 and still need their own contract and API.
+Household moves are deferred to milestone 10 (D114). Calendar-varying rates
+are now implemented under D118; matching and inheritance schedules are deferred
+to a second step, and milestone 7 scientific assessment remains pending.
 
 ## Milestone 5 accepted assessment and closeout
 

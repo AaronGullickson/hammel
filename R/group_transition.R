@@ -13,7 +13,10 @@
 #'   Self-transitions are invalid. Optional `sex` is m/f. Optional `union_type`
 #'   is unpartnered/partnered or unpartnered/cohab/marriage. Omitted columns
 #'   apply universally. Destinations may initially be empty; other configured
-#'   group-specific processes must cover all possible groups.
+#'   group-specific processes must cover all possible groups. Optional
+#'   `time_start`/`time_end` specify half-open absolute calendar-year bands,
+#'   including fractional years. Every active slice must be valid and the table
+#'   must cover the requested run. Rate changes do not reset group duration.
 #' @param model A `hammel_model`.
 #' @return `group_transition()` returns a process with a rates tibble;
 #'   `set_group_transition()` returns the updated model. Grouped simulation
@@ -37,6 +40,9 @@ validate_group_transition <- function(process) {
       !identical(process$rate_unit, "person_year"))
     stop("Invalid group-transition specification or units.", call. = FALSE)
   r <- process$rates
+  if (validate_calendar_rates(r, function(x) {
+    copy <- process; copy$rates <- x; validate_group_transition(copy)
+  })) return(invisible(process))
   check_columns(r, c("group_origin", "group_dest", "rate"), "rates")
   age <- all(c("age_start", "age_end") %in% names(r))
   dur <- all(c("dur_start", "dur_end") %in% names(r))

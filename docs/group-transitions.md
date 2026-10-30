@@ -13,8 +13,10 @@ under D114 and are excluded here.
 `dur_start`/`dur_end`. One band type applies to the entire table. Rates are
 finite nonnegative hazards per person-year. Bands are half-open, start at
 nonnegative finite values, have increasing ends (possibly Inf), and cannot
-overlap within a directed pair/sex/union-type stratum. Self-transitions and
-calendar-time schedules are rejected. Input tables and provenance are retained.
+overlap within a directed pair/sex/union-type stratum at a given calendar time.
+Self-transitions are rejected. Optional calendar bands are supported under
+[the rate contract](time-varying-rates.md) (D118), without resetting group
+duration. Input tables and provenance are retained.
 
 Optional `sex` uses m/f. Optional `union_type` follows existing conventions:
 unpartnered/partnered, or unpartnered/cohab/marriage, without mixing partnered
