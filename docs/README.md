@@ -1,13 +1,14 @@
 # Hammel documentation
 
-Updated October 29, 2026. Milestones 1–5 are complete by user acceptance
-(D029, D050, D077, D093, D105), including parity-specific fertility,
+Updated October 30, 2026. Milestones 1–6 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116), including individual group transitions, parity-specific fertility,
 cell-accounted birth spacing and persistent lognormal fertility weights.
 Current behavior uses continuous event times with no monthly grid. Acceptance
 is based on the user-authored validation reports and retains their limitations.
-**Next: milestone 6, group transitions.** Detailed transition semantics and the
-public API require specification before implementation; milestone 7 is
-time-varying inputs (D103).
+**Milestone 6 is accepted complete** (D116); its final report render is active.
+**Next: milestone 7, time-varying inputs.** See the
+[group-transition contract](group-transitions.md). Household moves are deferred to
+the regions milestone (D114); milestone 7 is time-varying inputs (D103).
 
 ## Reading order
 
@@ -17,6 +18,7 @@ time-varying inputs (D103).
 | [Design](design.md) | Implemented architecture, API, and source locations |
 | [Scientific contract](scientific-contract.md) | Current demographic assumptions and event rules |
 | [Population schema](population-schema.md) | Person/union tables and structural validation |
+| [Group transitions](group-transitions.md) | Individual transitions, histories, state updates and age/duration Lexis rates |
 | [Groups](groups.md) | Group-specific schedules, multipliers, newborn identity, and baseline sampling |
 | [Ancestry](ancestry.md) | Starting proportions, parental averaging, unknown shares, and restarts |
 | [Group inheritance](group-inheritance.md) | Built-in/custom identity rules, passing, and possible groups |
@@ -55,6 +57,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [SOCSIM union formation](socsim-union-formation-audit.md) | Pinned static search, matching, and eligibility findings |
 | [SOCSIM dissolution and remarriage](socsim-dissolution-audit.md) | Pinned static divorce clocks, remarriage schedules, state updates, and cohabitation findings |
 | [SOCSIM cohabitation](socsim-cohabitation-audit.md) | Pinned static formation/type assignment, conversion, breakup, legal history and output trace |
+| [SOCSIM group transitions](socsim-group-transitions-audit.md) | Pinned static transition clocks, household moves, histories, rescheduling and source caveats |
 
 Git retains earlier specifications and verification records; do not keep
 snapshot copies in the docs tree. The decision log records rationale and
@@ -94,6 +97,14 @@ To inspect prior versions, use `git log -- docs` and
   inheritance and performance. The final render was active at closeout;
   preserve all intermediates. Rendering installs the package, downloads HFD/HMD
   inputs and runs substantial replications and offline tests.
+- [Milestone 6 validation report](../validation/milestone6.qmd) and
+  [rendered assessment](../validation/milestone6.html): accepted October 30,
+  2026 (D116), covering directed age/duration transitions, sex/union-type
+  strata, demographic and matching recovery, population shares and performance.
+  The final render was active at acceptance; preserve all intermediates.
+  Rendering installs the package, retrieves HFD/HMD inputs and runs substantial
+  independently initialized replications. Use the report for actual settings
+  and completed-render results.
 - [Validation directory guide](../validation/README.md): retained reports,
   rate provenance, and supporting benchmark/conditional-choice evidence.
 The former `milestone1.R` and `milestone1_bootstrap.R` examples have been

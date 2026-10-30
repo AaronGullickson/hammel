@@ -1,8 +1,8 @@
 # Design and implemented interface
 
-Updated October 29, 2026. Milestones 1–5 are complete by user acceptance
-(D029, D050, D077, D093, D105). Group transitions (milestone 6) are next; their
-scientific specification and API remain to be selected. This document describes implemented architecture.
+Updated October 30, 2026. Milestones 1–6 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116). Individual group transitions are accepted
+under D116; time-varying inputs (milestone 7) are next. This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
 The [scientific contract](scientific-contract.md) defines demographic semantics.
 
@@ -15,6 +15,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Ancestry schema and initialization | `R/ancestry.R` |
 | Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
 | Mortality/fertility specification and rate validation | `R/set_process.R` |
+| Individual transition specification and history | `R/group_transition.R`; events in `src/simulate.cpp`; observation splitting in `src/group_history.h` |
 | Persistent fertility weights and specification | `R/het_fert.R`; cell weight trees in `src/simulate.cpp` |
 | Union formation/matching and dissolution specifications | `R/union_formation.R`, `R/union_dissolution.R` |
 | Shared kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/kinship.R` |
@@ -22,10 +23,15 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Simulation validation, RNG isolation, result assembly | `R/simulate.R` |
 | Continuous scheduling and events | `src/simulate.cpp` |
 | Demographic extraction and measures | `src/demography.cpp`, `R/calc_demographic_measures.R` |
+| Directed transition Lexis counts | `R/calculate_transition_rates.R`; `transition_counts_cpp()` in `src/demography.cpp` |
 | Software and analytical validation | `tests/testthat/` |
-| Replication assessment | `validation/milestone1.qmd`, `validation/milestone2.qmd`, `validation/milestone3.qmd`, `validation/milestone4.qmd`, `validation/milestone5.qmd` |
+| Replication assessment | `validation/milestone1.qmd`, `validation/milestone2.qmd`, `validation/milestone3.qmd`, `validation/milestone4.qmd`, `validation/milestone5.qmd`, `validation/milestone6.qmd` |
 
 The engine is C++17 with Rcpp. R exposes ordinary list objects and tibbles.
+Grouped dissolution and conversion observations build union-level group
+histories through `union_group_history_cpp()` using the shared `GroupHistory`
+index. Each union visits only its partners' transition histories; pair labels
+are mapped once before native traversal.
 `Band` and `waiting_time()` are shared by mortality and adjusted fertility.
 Every simulation owns its population, queue, and working state; there is no
 hidden process-wide engine population.
@@ -82,7 +88,7 @@ requires complete coverage. Fertility bands must be finite; gaps have zero risk
 at execution. Time-varying rate columns are rejected. Arbitrary named process
 specifications can be stored; execution supports mortality/fertility and the
 conditional-logit on-demand and rate-based union formation plus optional
-duration-dependent union dissolution. Other processes are rejected.
+duration-dependent union dissolution. Optional `group_transition()` is also supported. Other processes are rejected.
 
 ## Execution and output
 
@@ -218,8 +224,8 @@ retained, including repeated parental pairs. Birth-first dissolution/conversion
 boundaries and half-open ordinary coverage match demographic observations.
 
 `get_detailed_unions(population)` returns a separate tibble preserving union
-records and appending each partner's birth/death time and optional group, with
-`_w` and `_h` suffixes. It joins by partner IDs, preserves types and row order,
+records and appending each partner's birth/death time and optional group at
+union formation, reconstructed from transition histories, with `_w` and `_h` suffixes. It joins by partner IDs, preserves types and row order,
 and leaves the population unchanged. See [demographic analysis](demographic-analysis.md).
 
 `get_parent_info(population)` returns a separate tibble preserving all persons
@@ -401,3 +407,20 @@ per-bin compensated weight sums, and internal scan checks verify their totals.
 No tree is allocated on the uniform path. Daughter weights use independent
 normal innovations, except exact-copy or zero-innovation endpoints. No
 per-generation marginal normalization is imposed. See [the specification](fertility-heterogeneity-notes.md).
+
+## Individual group transitions
+
+`group_transition(rates)` and `set_group_transition(model, rates)` configure
+optional competing person-level moves. Required direction columns are
+`group_origin` and `group_dest`; one age or duration band type applies across
+the table, optionally stratified by `sex` and `union_type`. The transition
+registry includes initially empty groups and all other grouped specifications
+must cover it. Native events update pools, calibration, fertility cells and
+union clocks affected by either partner's identity. Duration uses latest entry,
+or age without history; ancestry is retained. No household moves or target
+adjustments are implemented.
+
+Grouped populations always include a `transitions` tibble, including empty
+histories. Restart retains the history and reconstructs duration. Observation
+kernels use private indexed history adapters to split group exposure at moves
+and attribute events at their occurrence. See [the contract](group-transitions.md).

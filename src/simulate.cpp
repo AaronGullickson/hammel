@@ -115,7 +115,7 @@ struct Person {
 };
 // person is a zero-based position in people, not the public person_id.
 // A version invalidates queued events after a change in union status.
-enum class EventType { death, birth, search, dissolution, conversion };
+enum class EventType { death, birth, search, dissolution, conversion, transition };
 struct Event { int person; EventType type; unsigned long long version; };
 
 // Evaluate candidate utilities without rounding age differences. Common linear
@@ -1678,7 +1678,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   NumericMatrix initial_ancestry, List inheritance, double ffab,
                   DataFrame dissolution_rates, DataFrame cohab_prob, DataFrame conversion_rates,
                   List cohab_matching, bool counts_cohab, bool check_cells = false,
-                  Nullable<List> hetfert = R_NilValue) {
+                  Nullable<List> hetfert = R_NilValue, Nullable<DataFrame> transition_input = R_NilValue) {
   const List heterogeneity = hetfert.isNotNull() ? List(hetfert.get()) : List::create();
   const bool heterogeneous = heterogeneity.size() > 0;
   const double fertility_cv = heterogeneous ? as<double>(heterogeneity["cv"]) : 0;
@@ -2057,6 +2057,40 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       cohab_dissolution_schedules.push_back(read_bands(dissolution_rates, "", typed ? "cohab" : "", pair));
     }
   }
+  struct TransitionSchedule { int dest, sex; std::string type; std::vector<Band> bands; };
+  std::vector<std::vector<TransitionSchedule>> transition_schedules(group_count);
+  bool transition_duration = false;
+  const bool has_transition = transition_input.isNotNull();
+  if (has_transition) {
+    DataFrame input(transition_input.get());
+    transition_duration = input.containsElementNamed("dur_start");
+    IntegerVector origins = input[".origin"], destinations = input[".dest"];
+    NumericVector lo = input[transition_duration ? "dur_start" : "age_start"];
+    NumericVector hi = input[transition_duration ? "dur_end" : "age_end"], values = input["rate"];
+    const bool sexed = input.containsElementNamed("sex"), typed = input.containsElementNamed("union_type");
+    CharacterVector sexes = sexed ? as<CharacterVector>(input["sex"]) : CharacterVector();
+    CharacterVector types = typed ? as<CharacterVector>(input["union_type"]) : CharacterVector();
+    for (int row = 0; row < input.nrows(); ++row) {
+      auto& schedules = transition_schedules[origins[row]];
+      const int sex = !sexed ? -1 : (as<std::string>(sexes[row]) == "f" ? 1 : 0);
+      const std::string type = typed ? as<std::string>(types[row]) : "";
+      auto found = std::find_if(schedules.begin(), schedules.end(), [&](const TransitionSchedule& x) {
+        return x.dest == destinations[row] && x.sex == sex && x.type == type;
+      });
+      if (found == schedules.end()) {
+        schedules.push_back({destinations[row], sex, type, {}});
+        found = std::prev(schedules.end());
+      }
+      found->bands.push_back({lo[row], hi[row], values[row]});
+    }
+    for (auto& origin : transition_schedules) for (auto& schedule : origin)
+      std::sort(schedule.bands.begin(), schedule.bands.end(), [](const Band& a, const Band& b) { return a.start < b.start; });
+  }
+  std::vector<double> group_entry(people.size());
+  if (has_transition) group_entry = as<std::vector<double>>(persons[".group_entry"]);
+  std::vector<int> transition_destination(people.size(), -1);
+  std::vector<double> tx_person, tx_time;
+  std::vector<int> tx_origin, tx_dest;
   auto schedule = [&](int i, double now) {
     const auto version = ++event_versions[i];
     const Person& p = people[i];
@@ -2101,12 +2135,32 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         conversion_time = relationship.conversion_time;
       }
     }
-    const double due = std::min(std::min(death_time, birth_time),
+    double transition_time = R_PosInf;
+    transition_destination[i] = -1;
+    if (has_transition) {
+      const int partner = current_partner[i];
+      const std::string type = partner < 0 ? "unpartnered" :
+        (union_history[person_unions[i].back()].cohab ? "cohab" : "marriage");
+      for (const auto& outgoing : transition_schedules[p.group]) {
+        if (outgoing.sex >= 0 && outgoing.sex != (p.female ? 1 : 0)) continue;
+        if (!outgoing.type.empty() && outgoing.type != type &&
+            !(outgoing.type == "partnered" && partner >= 0)) continue;
+        const double due = candidate(waiting_time(outgoing.bands,
+          now - (transition_duration ? group_entry[i] : p.born), threshold()), now);
+        if (due < transition_time) {
+          transition_time = due;
+          transition_destination[i] = outgoing.dest;
+        }
+      }
+    }
+    const double other_due = std::min(std::min(death_time, birth_time),
       std::min(std::min(dissolution_time, conversion_time), search_time));
+    const double due = std::min(other_due, transition_time);
     const auto type = death_time <= due ? EventType::death :
       (birth_time <= due ? EventType::birth :
        (dissolution_time <= due ? EventType::dissolution :
-        (conversion_time <= due ? EventType::conversion : EventType::search)));
+        (conversion_time <= due ? EventType::conversion :
+         (search_time <= due ? EventType::search : EventType::transition))));
     if (due < end) queue.emplace(due, Event{i, type, version});
   };
   // Fertility type labels: overall, unpartnered/partnered, or three types.
@@ -2188,7 +2242,25 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (intensity_tracker) intensity_tracker->advance(now);
     if (check_cells && cells && !cells->consistent())
       stop("Internal error: fertility cell counts differ from an explicit scan.");
-    if (type == EventType::death) {
+    if (type == EventType::transition) {
+      const int destination = transition_destination[i];
+      if (destination < 0 || destination == people[i].group) stop("Invalid transition destination.");
+      const int partner = current_partner[i];
+      if (people[i].female) remove_counted_woman(i); else remove_male(i);
+      tx_person.push_back(people[i].id); tx_time.push_back(now);
+      tx_origin.push_back(people[i].group); tx_dest.push_back(destination);
+      people[i].group = destination;
+      group_entry[i] = now;
+      if (people[i].female) add_counted_woman(i, now); else add_male(i);
+      if (partner >= 0) {
+        auto& relationship = union_history[person_unions[i].back()];
+        relationship.dissolution_sampled = false;
+        if (people[i].female) relationship.conversion_sampled = false;
+        // The woman carries the pair-dependent union clock even when he moves.
+        if (!people[i].female) schedule(partner, now);
+      }
+      schedule(i, now);
+    } else if (type == EventType::death) {
       // Retain the person's history, record death, and stop their scheduling.
       people[i].died = now;
       for (int u : person_unions[i]) {
@@ -2204,9 +2276,10 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         previous_union_end[relationship.wife] = previous_union_end[relationship.husband] = now;
         add_male(relationship.husband);
         add_counted_woman(relationship.wife, now);
+        if (has_transition && i == relationship.wife) schedule(relationship.husband, now);
         if (cells) cells->refresh(relationship.wife, now);
         // Her old birth candidate is invalid once her husband has died.
-        if ((rate_initiation || has_dissolution) && i == relationship.husband)
+        if ((rate_initiation || has_dissolution || has_transition) && i == relationship.husband)
           schedule(relationship.wife, now);
       }
       if (!people[i].female) remove_male(i);
@@ -2227,9 +2300,10 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       add_male(partner);
       add_counted_woman(i, now);
       ++dissolution_count;
-      // Only her state-dependent birth/search hazards change. The man's death
-      // candidate remains valid, and the old episode no longer carries risk.
+      // The woman's cell/search state changes. With transition risks enabled,
+      // both partners also need fresh union-type-dependent candidates.
       schedule(i, now);
+      if (has_transition) schedule(partner, now);
     } else if (type == EventType::conversion) {
       const int partner = current_partner[i];
       const int old = person_unions[i].back();
@@ -2247,13 +2321,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       if (diagnostics) diagnostic_log_weights.emplace_back(group_count, NA_REAL);
       ++conversion_count;
       schedule(i, now);
+      if (has_transition) schedule(partner, now);
     } else if (type == EventType::search) {
-      form_union(i, now);
+      const int partner = form_union(i, now);
       schedule(i, now);
+      if (has_transition && partner >= 0) schedule(partner, now);
     } else {
       double father = NA_REAL;
       int partner = current_partner[i];
-      if (!rate_initiation && partner < 0) partner = form_union(i, now);
+      if (!rate_initiation && partner < 0) {
+        partner = form_union(i, now);
+        if (has_transition && partner >= 0) schedule(partner, now);
+      }
       // A nonmarital father stays available: parentage alone is not a union.
       const int father_position = partner >= 0 ? partner :
         (rate_initiation ? find_candidate(i, now, father_matching, *father_draw, true, nullptr) : -1);
@@ -2294,7 +2373,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
           ancestry[static_cast<size_t>(i) * ancestry_components + g] + 0.5 * paternal;
       }
       // Sex and ancestry are now available; assign identity before any newborn
-      // hazard or matching lookup. Existing people's identities never change.
+      // hazard or matching lookup. Transitions separately update existing identities.
       const int maternal_group = people[i].group;
       const int paternal_group = father_position < 0 ? -1 : people[father_position].group;
       int child_group = maternal_group;
@@ -2369,6 +2448,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         add_counted_woman(child, now);
       }
       event_versions.push_back(0);
+      group_entry.push_back(now);
+      transition_destination.push_back(-1);
       ++birth_count;
       // Both newborn and mother need fresh candidates. The mother now has a
       // new last_birth; spacing delays her next birth, but not a possible death.
@@ -2437,6 +2518,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   return List::create(_["persons"] = DataFrame::create(
     _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),
+    _["transitions"] = DataFrame::create(_["person_id"] = wrap(tx_person), _["time"] = wrap(tx_time),
+      _["group_origin"] = wrap(tx_origin), _["group_dest"] = wrap(tx_dest)),
     _["groups"] = out_group, _["unions"] = out_unions, _["ancestry"] = out_ancestry,
     _["births"] = birth_count, _["deaths"] = death_count,
     _["dissolutions"] = dissolution_count, _["conversions"] = conversion_count,

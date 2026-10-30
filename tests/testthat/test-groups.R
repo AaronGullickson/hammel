@@ -194,6 +194,8 @@ test_that("baseline group weights are normalized, sampled and reproducible", {
   ungrouped <- create_baseline_population(10000)
   p$persons$group <- NULL
   p$ancestry <- NULL
+  # Grouped populations now also carry an empty transition history.
+  p$transitions <- NULL
   expect_identical(p, ungrouped)
   expect_identical(create_baseline_population(0, group_weights = c(A = 1))$persons$group,
                    character())

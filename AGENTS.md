@@ -82,8 +82,9 @@ the user's agreement.
   groups was accepted as complete on October 27, 2026 (D077). Milestone 4
   dissolution/remarriage/cohabitation was accepted October 29, 2026 (D093).
   Milestone 5 parity-specific fertility, cell accounting and heterogeneity was
-  accepted October 29, 2026 (D105). Group transitions (milestone 6) are next;
-  detailed semantics and API need specification before implementation.
+  accepted October 29, 2026 (D105). Individual group transitions (milestone 6)
+  were accepted October 30, 2026 (D116). Time-varying inputs (milestone 7) are
+  next; their detailed semantics and API need specification before implementation.
   Distinguish current
   specifications from deferred mechanisms and future proposals.
 - `validation/milestone1.qmd` is the accepted historical assessment; reproduce it
@@ -94,20 +95,25 @@ the user's agreement.
   inheritance, and performance assessment. `validation/milestone4.qmd` is the
   accepted dissolution/remarriage/cohabitation assessment.
   `validation/milestone5.qmd` is the accepted parity/spacing/heterogeneity
-  assessment. Preserve all five reports and rendered
-  artifacts; do not fabricate results or set scientific acceptance thresholds. Milestone
+  assessment. `validation/milestone6.qmd` is the accepted individual-transition
+  assessment (D116), with its final render active at acceptance. Preserve all
+  six reports, rendered artifacts and active render intermediates; do not
+  fabricate results or set scientific acceptance thresholds. Milestone
   completion retains documented limitations and does not authorize future features.
 - Milestone 4 includes duration-dependent dissolution, age/duration searches by
   previous union, and optional rate-mode cohabitation with linked conversion
   episodes and type-specific matching/rates (D078–D092). One woman carries each
-  union clock; exact ties prioritize death, birth, dissolution, conversion, search.
+  union clock; exact ties prioritize death, birth, dissolution, conversion,
+  search, then group transition.
   See `docs/union-dissolution.md`, `docs/remarriage.md`, and `docs/cohabitation.md`.
   Supporting benchmarks/recovery evidence lives in `validation/milestone4/`;
   top-level reports and `validation/data/` remain in place. Preserve active render
   intermediates until rendering finishes, including milestone 5's active final
-  render at closeout. Parity and fertility heterogeneity are implemented; group
-  transitions (milestone 6) and calendar-time schedules (milestone 7) require
-  their own scientific specifications. Most categorical characteristics should
+  render at closeout and milestone 6's active final render. Parity, fertility
+  heterogeneity and individual group transitions are implemented and accepted.
+  See `docs/group-transitions.md`; household moves are deferred to the regions
+  milestone (D114). Calendar-time schedules (milestone 7) still require their
+  own scientific specification. Most categorical characteristics should
   use groups, with multiple types of groups an optional complexity direction.
 - Use `devtools::test()` for the testthat suite. Live database tests require
   explicit opt-in; ordinary verification must not download rates or expose
@@ -115,5 +121,5 @@ the user's agreement.
 - Treat session handoffs as dated status records, not standing pause instructions.
   The current user request controls work. Preserve the user's edits, including
   explanatory source comments and the accepted reports. Fixed newborn assignment
-  is deferred to group transitions; custom inheritance already supports assigning
+  remains unselected future work beyond accepted milestone 6; custom inheritance already supports assigning
   mixed-parent births to a specified category.

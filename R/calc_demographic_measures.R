@@ -34,8 +34,31 @@ calculate_population_size <- function(population, times, by_group = FALSE) {
     persons <- population
     hammel_population(persons)
   }
+  persons <- prepare_group_observations(persons, population, by_group)
   groups <- observation_groups(persons, by_group)
   if (by_group) {
+    if (inherits(population, "hammel_population") && !is.null(population$transitions) && nrow(population$transitions)) {
+      # Births enter the initial group, deaths leave the final group, and
+      # every transition adds one arrival and one departure. Count sorted
+      # event dates instead of rebuilding each person's identity per snapshot.
+      tx <- population$transitions
+      history <- attr(persons, ".hammel_group_history")
+      initial <- match(persons$group, groups)
+      ordered <- order(tx$time)
+      first <- ordered[!duplicated(history$row[ordered])]
+      initial[history$row[first] + 1L] <- history$from[first] + 1L
+      final <- match(persons$group, groups)
+      counts <- lapply(seq_along(groups), function(g) {
+        enter <- sort(c(persons$birth_time[initial == g], tx$time[history$to == g - 1L]))
+        exit <- sort(c(persons$death_time[final == g & !is.na(persons$death_time)],
+                       tx$time[history$from == g - 1L]))
+        findInterval(times, enter) - findInterval(times, exit)
+      })
+      grid <- expand.grid(g = seq_along(groups), t = seq_along(times), KEEP.OUT.ATTRS = FALSE)
+      indices <- grid$t + length(times) * (grid$g - 1L)
+      return(tibble::tibble(time = times[grid$t], group = groups[grid$g],
+        population = as.integer(unlist(counts, use.names = FALSE)[indices])))
+    }
     grid <- expand.grid(g = seq_along(groups), t = seq_along(times),
                         KEEP.OUT.ATTRS = FALSE)
     counts <- lapply(seq_along(groups), function(g) {
@@ -79,6 +102,7 @@ collect_demographic_counts <- function(population, time_breaks, age_breaks,
     persons <- population
     hammel_population(persons)
   }
+  persons <- prepare_group_observations(persons, population, by_group)
   groups <- observation_groups(persons, by_group)
   group_count <- if (by_group) length(groups) else 1L
   group_indices <- if (by_group) match(persons$group, groups) - 1L else
@@ -235,6 +259,7 @@ calculate_fertility_rates <- function(population, time_breaks, age_breaks,
   if (is.finite(tail(parity_breaks, 1))) parity_breaks <- c(parity_breaks, Inf)
   if (is.finite(tail(age_breaks, 1))) age_breaks <- c(age_breaks, Inf)
   persons <- if (inherits(population, "hammel_population")) population$persons else population
+  persons <- prepare_group_observations(persons, population, by_group)
   groups <- observation_groups(persons, by_group)
   ng <- if (by_group) length(groups) else 1L
   gi <- if (by_group) match(persons$group, groups) - 1L else rep(0L, nrow(persons))
@@ -533,5 +558,6 @@ observation_groups <- function(persons, by_group) {
   if (!by_group) return(NULL)
   if (!"group" %in% names(persons))
     stop("`by_group = TRUE` requires a persons `group` column.", call. = FALSE)
-  unique(persons$group)
+  groups <- attr(persons, ".hammel_group_values")
+  if (is.null(groups)) unique(persons$group) else groups
 }

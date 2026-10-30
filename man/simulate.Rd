@@ -8,7 +8,7 @@ simulate(model, years, seed = NULL)
 }
 \arguments{
 \item{model}{A \code{hammel_model} containing a population, mortality, fertility,
-and union-formation processes, optionally union dissolution. The population
+and union-formation processes, optionally union dissolution and group transitions. The population
 must have a finite \code{end_time}.}
 
 \item{years}{Nonnegative simulation duration in years.}
@@ -67,6 +67,11 @@ partners and creates linked episodes, with same-person ties ordered death,
 birth, dissolution, conversion, search. Fertility input strata use \code{union_type}.
 }
 \details{
+Optional \code{\link[=group_transition]{group_transition()}} adds directed competing age- or duration-based
+moves, with optional sex and union-type strata. A move updates current group
+and affected event/pool/cell state, retaining ancestry. Grouped output always
+includes a transitions tibble; restarts preserve the full transition history.
+
 Optional fertility \code{hetfert = het_fert(cv, alpha)} weights eligible mother
 selection within fixed-intensity cells. Supplied positive female weights are
 retained; absent weights are drawn under the simulation seed, and daughters

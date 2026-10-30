@@ -108,6 +108,7 @@ prepare_group_inheritance <- function(model, population) {
     values <- NULL
   } else {
     values <- unique(population$persons$group)
+    values <- extend_identity_groups(values, population$.transition_groups)
     ancestry <- population[["ancestry"]]
     known <- setdiff(names(ancestry), c("person_id", "unknown"))
     positive <- known[vapply(ancestry[known], function(x) any(x > 0), logical(1))]

@@ -46,7 +46,18 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Persistent lognormal fertility weights and maternal inheritance | D102 |
 | Milestone order and groups-based characteristics scope | D103 |
 | Disabled fertility heterogeneity removes output weights | D104 |
-| Milestone 5 acceptance; group transitions next | D105 |
+| Milestone 5 acceptance | D105 |
+| Group-transition inputs are annual hazards | D106 |
+| Directed transition schedules, clocks and optional strata | D107 |
+| No transition-count target adjustment | D108 |
+| Individual transitions core; household moves deferred to regions | D109 as superseded by D114 |
+| Transition rate-table columns and common band type | D110 |
+| Grouped output always includes transition history tibble | D111 |
+| Individual transition implementation, duration and ancestry | D112 |
+| Directed transition Lexis counter | D113 |
+| Household moves deferred to the regions milestone | D114 |
+| Detailed union partner groups refer to formation | D115 |
+| Milestone 6 acceptance; time-varying inputs next | D116 |
 
 ## Recorded decisions
 
@@ -2171,3 +2182,209 @@ ordinary-custom-column treatment for disabled runs.
   ancestry effects and public API require specification before implementation.
   Milestone 7 remains time-varying inputs under D103. Completion does not
   authorize unspecified future demographic behavior.
+
+## D106 — Group-transition inputs use annual hazards (October 29, 2026)
+
+**Status:** accepted by the user; transition execution remains unimplemented.
+
+Group-transition inputs continue Hammel's rate convention: hazards per
+person-year, rather than SOCSIM's monthly probabilities. Users with an annual
+probability p can approximate a rate with `-log(1 - p)` (numerically,
+`-log1p(-p)` in R). This conversion is exact for a constant hazard over one
+year without competing exits; a cause-specific probability observed with
+competing events does not generally identify that hazard by this formula.
+
+The user explicitly selected rates following the SOCSIM transition audit.
+This settles input units and interpretation only. Eligibility, clocks,
+histories, linked moves, ancestry effects, event invalidation and the public
+API still require specification before implementation.
+
+## D107 — Directed transition schedules and optional strata (October 29, 2026)
+
+**Status:** accepted by the user; transition execution remains unimplemented.
+
+For n groups, up to n(n-1) directed origin-to-destination schedules are
+possible, excluding self-transitions. For a person in an origin group, the
+applicable outgoing schedules compete with each other and other applicable
+events. For example, A-to-B and A-to-C compete for a person currently in A;
+rates are annual hazards under D106 and need not sum to one.
+
+Each schedule can be age-specific or duration-specific. Schedules may
+optionally stratify by sex and marital status. An omitted sex dimension
+applies to all sexes; an omitted marital-status dimension applies to all
+marital statuses. Either dimension can be supplied independently.
+
+The duration origin and initialization, marital-status categories, treatment
+of missing directed schedules, and validation of overlapping universal and
+stratified inputs remain to be specified. This decision does not select a
+public API, joint age-by-duration surfaces, or household moves.
+
+## D108 — No transition-count target adjustment (October 29, 2026)
+
+**Status:** accepted by the user; transition execution remains unimplemented.
+
+Use supplied transition hazards directly, without scaling them to attain
+requested origin-to-destination event counts. Do not add SOCSIM-style
+`transittarget` adjustment. The user rejected this mechanism after reviewing
+its target/expected-count scaling in the reference audit. Realized counts
+follow the supplied hazards, changing exposure, competing events and random
+variation; this decision adds no count-calibration API.
+
+## D109 — Household transitions are a stretch goal (October 29, 2026)
+
+**Status:** original scope direction superseded by D114 on October 30:
+household moves are deferred to milestone 10, internal migration and regions.
+
+Individual group transitions form milestone 6's core scope. Linked household
+moves are a stretch goal, potentially useful when groups represent regions.
+Core completion does not depend on delivering household moves.
+
+Household membership, follower eligibility, destination assignment and
+interactions with partners' pending events require a separate specification
+before implementation. This decision does not adopt SOCSIM's household rules
+or select a residence/custody schema.
+
+## D110 — Transition rate-table schema and common band type (October 29, 2026)
+
+**Status:** accepted by the user; transition execution remains unimplemented.
+
+Transition rate tables require `group_origin`, `group_dest`, and `rate`, plus
+either age bands or duration bands. All origin-to-destination pairs in the
+table must use the same band type: age-based or duration-based. Do not mix
+age-based and duration-based directed schedules in one transition rate table.
+Rates are hazards per person-year (D106).
+
+The optional stratification columns are `sex` and `union_type`. If a column
+is present, schedules apply by its categories; if absent, schedules apply
+universally across that dimension. Either column may be supplied independently.
+`union_type` replaces D107's preliminary marital-status wording; it does not
+introduce a separate marital-status stratification column. The common-band
+rule narrows D107's earlier per-schedule age/duration choice.
+
+Duration origin and initialization, category coverage and labels (including
+unpartnered people), absent directed-pair treatment, and detailed band
+validation remain to be specified before implementation. No within-table
+universal/category override scheme is selected.
+
+## D111 — Grouped output includes a transitions tibble (October 29, 2026)
+
+**Status:** accepted requirement; transition execution and output remain
+unimplemented.
+
+When groups are in use, simulation output must include a `transitions` tibble
+recording individual group changes, including an empty tibble when no changes
+occurred. Presence does not depend on configuring a transition process or
+observing a transition. Each change must retain the person, transition time,
+origin and destination so group membership can be reconstructed over time.
+An empty table must retain the defined column types.
+
+Exact history column names, initialization/restart validation and observation
+boundary semantics remain to be specified. This requirement does not select
+whether ungrouped output includes the component.
+
+## D112 — Individual group-transition execution (October 30, 2026)
+
+**Status:** implementation authorized by the user and implemented; milestone 6
+subsequently accepted complete under D116.
+
+The user requested `group_transition(rates)` and pipeable
+`set_group_transition(model, rates)`, with person-level competing waiting times
+and updates to all state affected by a move. D106–D111 govern annual hazards,
+directed schedules, one common age/duration band type, optional sex and
+union-type strata, no count targeting, individual-only core scope and retained
+transition histories. Household switching is explicitly excluded from this
+implementation.
+
+The user confirmed duration since latest group entry, falling back to age
+without recorded transitions; omitted pairs and gaps mean zero risk. The user
+also confirmed ancestry proportions stay unchanged. Initial ancestry may be
+inferred from starting identities when shares are absent; newborn shares
+continue to follow parental ancestry independently of identity.
+
+The [implemented contract](group-transitions.md) specifies the history schema,
+half-open bands, state/event invalidation, restarts and observations. Columns
+are `person_id`, `time`, `group_origin`, and `group_dest`; grouped populations
+retain a typed empty table when no moves occur. Software validation does not
+establish scientific acceptance or authorize household moves.
+
+## D113 — Directed transition Lexis counter (October 30, 2026)
+
+**Status:** user requested implementation; implemented under the
+[transition observation contract](group-transitions.md#observed-transition-rates).
+
+`calculate_transition_rates()` reports person-years, transition events and rates
+by directed origin/destination, calendar period and either age or group
+duration. The user requested optional sex and union-type disaggregation;
+`by_sex` and `by_union_type` follow the existing sex field and union-type
+conventions. Defaults pool both dimensions. Duration follows D112's latest
+entry/initial-age rule. Rates divide each directed event count by exposure
+in its origin, so outgoing destinations share denominators. This is an
+observation helper and changes neither event execution nor model assumptions.
+
+## D114 — Defer household moves to the regions milestone (October 30, 2026)
+
+**Status:** accepted by the user; supersedes D109's milestone 6 stretch goal.
+
+Household moves are deferred to milestone 10, internal migration and regions.
+The user identified ambiguity between individual initiation hazards and total
+move hazards induced by household members, and questioned conditional
+rescheduling after externally triggered moves. Discussion also identified
+membership/custody, partial moves and mixed origins, changing households,
+atomic updates, shared dependence, and the distinction between household
+initiations and individual observed moves.
+
+The [regions milestone notes](roadmap.md#household-moves-deferred-design-questions-d114)
+record these issues and suggested validation. Correct conditional resampling
+is possible while retaining attained ages, durations and persistent state;
+it does not resolve the input-rate or household-definition questions. No
+household model, rate carrier, schema or implementation is selected.
+
+## D115 — Detailed union groups refer to formation (October 30, 2026)
+
+**Status:** correction requested by the user and implemented.
+
+The user identified that `get_detailed_unions()` joined final person groups,
+which relabeled earlier pairings after transitions and distorted formation
+cross-tabs. `group_w` and `group_h` now reconstruct partner identities at the
+union's start from retained histories. A same-time transition follows
+formation under the existing event priority, so its origin applies. Without
+transition history, use the recorded group. Dates, row order, custom columns
+and label types retain their existing behavior. The native indexed-history
+lookup avoids repeated per-union scans in R. Regression tests verify return
+moves, repeated episodes, exact-time moves, unchanged earlier pairings after
+later transitions, empty outputs and character/numeric labels. Correcting
+attribution does not independently establish matching-parameter recovery.
+
+## D116 — Milestone 6 accepted complete (October 30, 2026)
+
+**Status:** accepted complete by the user after report review, observation
+corrections and external code-review follow-up. The user explicitly requested
+completion documentation while compiling the final report.
+
+- **Scope:** individual directed group transitions using annual hazards,
+  common age or duration bands, optional sex/union-type strata, latest-entry
+  duration (age without earlier history), zero risk in omitted pairs/gaps,
+  unchanged ancestry, consistent event/pool/cell/union updates, retained
+  transition histories and restart reconstruction (D106–D112). Directed Lexis
+  rates and formation-time partner group extraction are included (D113/D115).
+- **Assessment:** the user's [report](../validation/milestone6.qmd) and
+  [rendered assessment](../validation/milestone6.html) examine transition-rate
+  recovery, demographic summaries, matching cross-tabs at formation,
+  population shares and performance. Scientific acceptance belongs to the
+  user; no numerical threshold is added by this closeout. The final render
+  was active at acceptance. Preserve all report artifacts and intermediates;
+  this entry does not certify render completion or invent final results.
+- **Retained limitations:** finite-sample/sparse-cell effects, complete
+  histories for historical observations, initial duration falling back to age
+  without earlier transitions, non-checkpoint restarts, and the documented
+  life-table age-aggregation caveat. An attached zero-rate process does not
+  promise fixed-seed equality with omitting it. Existing fertility, matching
+  and history limitations remain documented in their contracts.
+- **Deferred:** household moves belong to milestone 10, internal migration
+  and regions (D114). Multiple group dimensions and fixed newborn assignment
+  remain unselected future work; custom mixed-parent assignment remains
+  available. Completion does not authorize those mechanisms.
+- **Next:** milestone 7, time-varying inputs (D103). Its scientific contract,
+  schedule boundaries, event invalidation and public API require specification
+  before consequential implementation. Earlier proposals are not accepted
+  design decisions or automatic implementation authorization.

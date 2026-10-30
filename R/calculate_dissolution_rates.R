@@ -65,7 +65,8 @@ calculate_dissolution_rates <- function(population, time_breaks, dur_breaks,
       if (!"group" %in% names(population$persons))
         stop("`by_group = TRUE` requires population group identities.", call. = FALSE)
       persons <- population$persons
-      groups <- possible_union_pairs(unique(persons$group))
+      persons <- prepare_group_observations(persons, population, TRUE)
+      groups <- possible_union_pairs(observation_groups(persons, TRUE))
       labels <- canonical_union_pairs(
         persons$group[match(unions$wife_id, persons$person_id)],
         persons$group[match(unions$husband_id, persons$person_id)])
@@ -113,6 +114,8 @@ calculate_dissolution_rates <- function(population, time_breaks, dur_breaks,
     dur_end = dur_breaks[grid$d + 1L])
   if (by_group) result$group_pair <- groups[grid$g]
   if (by_union_type) result$union_type <- grid$type
+  if (by_group && inherits(population, "hammel_population"))
+    unions <- prepare_union_group_observations(unions, population, groups, pair = TRUE, typed = by_union_type)
   counts <- dissolution_counts_cpp(unions, time_breaks, dur_breaks,
                                    group_indices, group_count * if (by_union_type) 2L else 1L)
   result$union_years <- counts$union_years

@@ -44,6 +44,11 @@
 #' partners and creates linked episodes, with same-person ties ordered death,
 #' birth, dissolution, conversion, search. Fertility input strata use `union_type`.
 #'
+#' Optional [group_transition()] adds directed competing age- or duration-based
+#' moves, with optional sex and union-type strata. A move updates current group
+#' and affected event/pool/cell state, retaining ancestry. Grouped output always
+#' includes a transitions tibble; restarts preserve the full transition history.
+#'
 #' Optional fertility `hetfert = het_fert(cv, alpha)` weights eligible mother
 #' selection within fixed-intensity cells. Supplied positive female weights are
 #' retained; absent weights are drawn under the simulation seed, and daughters
@@ -75,7 +80,7 @@
 #' initialize from recorded identities. No additional random draws are made.
 #'
 #' @param model A `hammel_model` containing a population, mortality, fertility,
-#'   and union-formation processes, optionally union dissolution. The population
+#'   and union-formation processes, optionally union dissolution and group transitions. The population
 #'   must have a finite `end_time`.
 #' @param years Nonnegative simulation duration in years.
 #' @param seed Optional integer seed. With a seed, the caller's RNG state is
@@ -104,6 +109,7 @@ simulate <- function(model, years, seed = NULL) {
   }
   population <- model$population
   validate_population(population)
+  population <- normalize_population_transitions(population)
   population <- normalize_population_ancestry(population)
   start <- population$end_time
   if (is.null(start)) stop("The population needs a finite `end_time`.", call. = FALSE)
@@ -135,9 +141,15 @@ simulate <- function(model, years, seed = NULL) {
       }
     }
   }
-  if (any(!names(model$processes) %in% c("mortality", "fertility", "union_formation", "union_dissolution"))) {
-    stop("This engine supports mortality, fertility, union formation, and union dissolution only.",
+  if (any(!names(model$processes) %in% c("mortality", "fertility", "union_formation", "union_dissolution", "group_transition"))) {
+    stop("Unsupported demographic process for this engine.",
          call. = FALSE)
+  }
+  transition_process <- model$processes$group_transition
+  if (!is.null(transition_process)) {
+    attach_process(model, transition_process)
+    if (!"group" %in% names(population$persons))
+      stop("Group transitions require population group identities.", call. = FALSE)
   }
   dissolution_process <- model$processes$union_dissolution
   if (!is.null(dissolution_process)) attach_process(model, dissolution_process)
@@ -161,7 +173,11 @@ simulate <- function(model, years, seed = NULL) {
                   "partnered and unpartnered women. To make fertility depend on union status,",
                   "supply separate schedules using `union_type`."), call. = FALSE)
   }
-  inheritance <- prepare_group_inheritance(model$processes$fertility$inheritance, population)
+  registry_population <- population
+  registry_population$.transition_groups <- unique(c(
+    as.character(population$transitions$group_origin), as.character(population$transitions$group_dest),
+    as.character(transition_process$rates$group_origin), as.character(transition_process$rates$group_dest)))
+  inheritance <- prepare_group_inheritance(model$processes$fertility$inheritance, registry_population)
   group_values <- inheritance$values
   death_rates <- prepare_group_rates(death_rates, population$persons, "mortality", group_values)
   birth_rates <- prepare_group_rates(birth_rates, population$persons, "fertility", group_values)
@@ -191,6 +207,18 @@ simulate <- function(model, years, seed = NULL) {
   engine_persons <- population$persons
   engine_persons$.hammel_group <- if (is.null(group_values)) rep(0L, nrow(engine_persons)) else
     match(as.character(engine_persons$group), as.character(group_values)) - 1L
+  transition_rates <- if (is.null(transition_process)) NULL else transition_process$rates
+  if (!is.null(transition_rates)) {
+    transition_rates$.origin <- match(as.character(transition_rates$group_origin), as.character(group_values)) - 1L
+    transition_rates$.dest <- match(as.character(transition_rates$group_dest), as.character(group_values)) - 1L
+    engine_persons$.group_entry <- engine_persons$birth_time
+    tx <- population$transitions
+    if (nrow(tx)) {
+      latest <- tapply(tx$time, tx$person_id, max)
+      i <- match(names(latest), as.character(engine_persons$person_id))
+      engine_persons$.group_entry[i] <- as.numeric(latest)
+    }
+  }
   if ("previous_union" %in% names(union_rates) || cohab_enabled) {
     previous <- previous_union_info_cpp(population$persons, population$unions, counts_cohab)
     engine_persons$.hammel_previous_union <- previous$previous_union
@@ -234,7 +262,7 @@ simulate <- function(model, years, seed = NULL) {
                            if (is.null(union_process$cohab_matching)) matching else
                              prepare_matching_model(union_process$cohab_matching, group_values), counts_cohab,
                            isTRUE(getOption("hammel.check_cells", FALSE)),
-                           if (is.null(hetfert)) NULL else unclass(hetfert))
+                           if (is.null(hetfert)) NULL else unclass(hetfert), transition_rates)
     if (!isTRUE(native$cells_consistent))
       stop("Internal error: fertility cell counts are inconsistent.", call. = FALSE)
     persons <- population$persons
@@ -246,6 +274,12 @@ simulate <- function(model, years, seed = NULL) {
     if (!is.null(hetfert)) persons$hetfert <- native$hetfert
     if (!is.null(group_values)) persons$group <- group_values[native$groups + 1L]
     result$persons <- tibble::as_tibble(persons)
+    if (!is.null(group_values)) {
+      tx <- tibble::as_tibble(native$transitions)
+      tx$group_origin <- group_values[tx$group_origin + 1L]
+      tx$group_dest <- group_values[tx$group_dest + 1L]
+      result$transitions <- tibble::as_tibble(rbind(population$transitions, tx))
+    }
     if (!is.null(population[["ancestry"]])) {
       ancestry <- tibble::as_tibble(native$ancestry, .name_repair = "minimal")
       names(ancestry) <- setdiff(names(population[["ancestry"]]), "person_id")
@@ -299,6 +333,8 @@ simulate <- function(model, years, seed = NULL) {
     result$simulation$cohabitation_counts_as_previous_union <- counts_cohab
     result$simulation$conversions <- if (years > 0) native$conversions else 0
   }
+  if (!is.null(transition_process))
+    result$simulation$transitions <- if (years > 0) nrow(native$transitions) else 0L
   if (!is.null(dissolution_process))
     result$simulation$dissolutions <- if (years > 0) native$dissolutions else 0
   result$persons <- tibble::as_tibble(result$persons)

@@ -1,8 +1,9 @@
 # SOCSIM reference audit plan
 
 Updated October 29, 2026. Static source audits cover rates, competing events,
-union formation, [dissolution and remarriage](socsim-dissolution-audit.md), and
-[cohabitation](socsim-cohabitation-audit.md) for milestone 4. A narrow
+union formation, [dissolution and remarriage](socsim-dissolution-audit.md),
+[cohabitation](socsim-cohabitation-audit.md), and
+[group transitions](socsim-group-transitions-audit.md). A narrow
 [parity/spacing reference experiment](../validation/milestone5/socsim/README.md)
 now provides executable evidence. No comprehensive audit or validation of all
 variants has been performed. References below are starting points recorded
@@ -88,6 +89,18 @@ the first line. This resolves the earlier apparently ineffective hetfert toggle
 without claiming the switch itself is broken. The [Hammel design notes](fertility-heterogeneity-notes.md)
 record a separate proposed lognormal distribution and variance-preserving
 latent inheritance, with reproductive selection explicitly unresolved.
+
+## Group transitions investigation
+
+The October 29 [group transitions audit](socsim-group-transitions-audit.md)
+traces origin/destination schedules, age and latest-transition duration clocks,
+competing destinations, individual and optional household changes, history I/O,
+rescheduling, heterogeneity and target settings at the same pinned commit.
+Static caveats include the reversed child-age predicate, marriage-pool removal
+without explicit one-queue male re-entry, self-transition rescheduling, and a
+calculated target adjustment absent from the hazard path. Controlled reference
+runs are proposed but have not been performed. No engine code was copied and
+no milestone 6 modeling choices were accepted by this audit.
 
 ## Reference links
 

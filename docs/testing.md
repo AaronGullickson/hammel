@@ -1,9 +1,27 @@
 # Testing and milestone validation
 
-Updated October 29, 2026. Milestones 1–5 are accepted as complete (D029,
-D050, D077, D093, D105). Software test history and the user's demographic assessment
+Updated October 30, 2026. Milestones 1–6 are accepted as complete (D029,
+D050, D077, D093, D105, D116). Software test history and the user's demographic assessment
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
+
+## Milestone 6 accepted assessment and active final render
+
+The user accepted milestone 6 on October 30, 2026 (D116) after report and code
+review. The [report source](../validation/milestone6.qmd) and
+[rendered assessment](../validation/milestone6.html) are the user's scientific
+assessment of age/duration transition recovery, sex/union-type strata,
+fertility/mortality and formation-group summaries, population shares and
+performance. The final render is active at this closeout. Preserve the source,
+HTML and all intermediates; this documentation update neither reruns nor
+certifies completion of that render or its final numerical results.
+
+Software checks and prior developmental measurements below are separate
+records. Acceptance retains finite-sample and sparse-cell limits, complete
+history requirements, duration fallback to age without prehistory,
+non-checkpoint restarts and the documented life-table aggregation caveat.
+Household moves are deferred to milestone 10 (D114). Time-varying inputs are
+next in milestone 7 and still need their own contract and API.
 
 ## Milestone 5 accepted assessment and closeout
 
@@ -21,13 +39,14 @@ Its limitations include sparse or structurally infeasible cells, unrealized
 expected births (an accounting diagnostic rather than actual births),
 history completeness and selection-driven weight distributions. Accepted
 completion does not introduce numerical thresholds or universal rate-recovery
-claims. Group transitions (milestone 6) are next; their specification and API
-remain unresolved.
+claims. Individual group transitions (milestone 6) are now implemented
+under [their contract](group-transitions.md), accepted October 30 (D116).
 
 Earlier dated verification records below describe the versions tested at the
 time, including superseded corrections and intermediate proposal status.
-Current execution is D101–D104 and milestone status is D105. Closeout checked
-local Markdown links and whitespace; it made no engine or report edits.
+Current execution includes D101–D104 and D112; accepted milestone status includes
+D116. The October 29 milestone 5 closeout checked local Markdown links and
+whitespace; that closeout made no engine or report edits.
 Supporting evidence and reproduction-version notes are in [validation/milestone5/](../validation/milestone5/README.md).
 
 ## Milestone 4 accepted assessment
@@ -52,6 +71,55 @@ acceptance at the time; D093 records the subsequent user acceptance. Completion
 retains sparse-cell, initialization, fertility-transition and calibration limits.
 
 ## Run the suite
+
+October 30 external-review follow-up: `prepare_union_group_observations()` now
+uses native indexed partner histories for both grouped dissolution and
+conversion. On synthetic data with 40,000 people, 20,000 unions and 8,000
+moves, the old adapter took 8.016 seconds and the new one 0.032 seconds,
+producing identical adapted union histories. Full grouped dissolution and
+conversion calls took 0.299 and 0.211 seconds, respectively, including
+validation. These are local development timings, not performance guarantees.
+The full offline `devtools::test()` suite passed without failures or warnings;
+the opt-in live database test was skipped. New regressions cover simultaneous
+partner moves, typed numeric group pairs, conversion exposure, and contextual
+errors for missing groups and overlapping union histories. No event-generation
+or RNG behavior changed.
+
+October 30 PR #7 coverage follow-up: added tests for invalid transition units,
+history references/life dates, unsupported processes, unknown/nonmoving identity
+lookups, legacy populations without transition components, and union exposure
+when only an unrelated person moves. Targeted `devtools::test()` checks and a
+full `covr::package_coverage()` run passed. On the local ARM/GCC environment,
+overall line coverage increased from 97.5539% to 97.8234%; both
+`R/group_transition.R` and `R/calculate_transition_rates.R` reached 100%.
+GitHub's compiler/platform can produce slightly different totals. No engine
+behavior, coverage exclusions or thresholds changed; the native consistency
+error guard remains uncovered rather than forcing invalid internal state.
+
+October 30 transition-rate counter: the full offline `devtools::test()` suite
+passed after adding `calculate_transition_rates()`. The live database test was
+skipped and the existing environment `timedatectl` warning remained.
+`test-transition-rate.R` checks hand-calculated age/duration exposure with
+repeated moves and death, directional denominators, sex/type pooling, exact
+formation/conversion/dissolution boundaries, calendar endpoints, empty typed
+outputs, invalid inputs, and recovery of simulated competing annual hazards.
+A synthetic 50,000-person, 100,000-move period/duration/sex/type calculation
+took 1.63 seconds including population validation, recovering 100,000 events
+and 5,000,000 person-years (two groups, so one destination per origin).
+This timing is a development measurement, not a performance guarantee.
+
+October 30, 2026 group-transition implementation: `devtools::test()` passed
+the full offline suite with no failures. The live database case was skipped
+without opt-in; the local HMD reader test emitted an environment warning from
+`timedatectl` (status 1). Focused `devtools::test(filter = "group-transition")`
+checks cover analytical competing destination probabilities, age and duration
+support, duration across restarts, sex/union-type strata, initially empty
+destinations, malformed schedules, typed empty transition histories, ancestry
+retention, mortality after moving, matching-pool and fertility-cell updates,
+pair-dependent dissolution and cohabitation conversion, and historical group
+exposure/event attribution. Cell consistency diagnostics are enabled in the
+pool/fertility integration case. These are software and analytical checks;
+the user subsequently accepted milestone 6 under D116.
 
 The package uses testthat edition 3 with testthat >= 3.2.0 for scoped mocks.
 Tests live in `tests/testthat/`, with the standard runner `tests/testthat.R`.
@@ -875,3 +943,16 @@ missing sex, logical all-NA placeholders in male-only/empty histories, and
 incomplete female weights with explicit redraw guidance. Help and schema now
 consistently describe weighted selection and the disabled-output rule. Native
 weighted sampling and inheritance algorithms were not changed in this follow-up.
+
+October 30 detailed-union attribution correction: `devtools::test(filter =
+"detailed-unions|group-transition")` passed without warnings or failures.
+Partner groups now refer to union formation; regression cases cover later
+and return moves, exact-time priority, numeric and character labels, repeated
+unions, empty histories, unknown endpoints and unchanged inputs. Existing
+simulation outputs can be reanalyzed using their retained transition tables.
+
+For baseline comparisons, an attached all-zero transition process is not
+fixed-seed equivalent to omitting the process: outgoing schedule draws and
+partner rescheduling can change RNG consumption without changing the model's
+zero-transition distribution. Sharing a seed across scenarios therefore does
+not guarantee identical paths; compare replicated demographic quantities.

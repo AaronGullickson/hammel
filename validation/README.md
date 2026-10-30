@@ -1,6 +1,6 @@
 # Validation reports and supporting evidence
 
-Milestones 1–5 are accepted by the user (D029, D050, D077, D093, D105). Keep the
+Milestones 1–6 are accepted by the user (D029, D050, D077, D093, D105, D116). Keep the
 source reports, final rendered HTML, explanatory comments, and input provenance.
 Acceptance retains the limitations documented in each report and the scientific
 contract; software checks and empirical assessment are different evidence.
@@ -19,6 +19,11 @@ contract; software checks and empirical assessment are different evidence.
   fertility, cell-accounted birth spacing, lognormal fertility weights with
   maternal inheritance, and baseline/restart/union-type recovery checks. The
   final render was active at closeout; preserve all active intermediates.
+- `milestone6.qmd` / `.html`: accepted October 30, 2026 (D116); individual
+  age/duration group transitions, sex/union-type strata, demographic rate and
+  formation-group recovery, population shares and performance. The final render
+  is active at acceptance; preserve all intermediates. Actual replication and
+  population settings are in the report, not inferred from earlier drafts.
 - `milestone5/`: supporting method investigations and diagnostics, including
   superseded-correction evidence, runtime cell-accounting checks, reference
   SOCSIM experiments and version-specific reproduction instructions.

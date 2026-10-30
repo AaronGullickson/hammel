@@ -267,8 +267,9 @@ intensity, reconstruct missing histories or enforce a stationary inherited
 weight distribution. The accepted report shows realized and unrealized-adjusted
 rates separately; its latter measure is an accounting diagnostic.
 
-Next is milestone 6, group transitions, followed by time-varying inputs in
-milestone 7. Historical group histories, eligibility, tracker changes and event
-invalidation still require specification for those features. The rejected
+Individual group transitions are now implemented and accepted under D116;
+see [their contract](group-transitions.md) for histories and state updates.
+Next is milestone 7, time-varying inputs, whose calendar schedules and event
+invalidation rules still require specification. The rejected
 composition-only correction and former midpoint implementation remain in Git
 history and supporting diagnostics, not current execution rules.

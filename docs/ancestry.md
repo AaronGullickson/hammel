@@ -51,7 +51,8 @@ fertility inheritance model. Assignment does not change ancestry proportions;
 see [group inheritance](group-inheritance.md).
 
 Keep supplied/returned proportions across attachment, simulation, and restarts;
-do not reinitialize them from identity. If a grouped population lacks an ancestry
+do not reinitialize them from identity. Individual group transitions leave
+all ancestry shares unchanged; see [group transitions](group-transitions.md). If a grouped population lacks an ancestry
 component when attached or simulated, initialize it by the same starting-person
 rule. No ancestry draws are made and demographic histories/RNG consumption must
 remain unchanged. Each simulation owns its ancestry state, with work per birth

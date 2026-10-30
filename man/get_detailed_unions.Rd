@@ -18,15 +18,18 @@ husbands. Empty union histories retain the enriched column types.
 }
 \description{
 Match wives and husbands to the population's person table by ID and return
-their recorded birth times, death times, and optional groups alongside every
+their recorded birth times, death times, and optional groups at formation alongside every
 union record. Union row order and all existing columns are retained. The
 population and its union table are not modified. No known endpoint is needed.
 }
 \details{
 Dates remain in years. Missing death times denote people alive at the recorded
 endpoint. Group columns are omitted when persons has no \code{group} column;
-otherwise their types are preserved. These are recorded group identities,
-not reconstructions of historical group transitions. Existing columns whose
+otherwise their types are preserved. Groups are reconstructed at each union's
+start from retained transitions; later moves do not relabel earlier unions.
+A transition at the exact formation time follows formation, so its origin
+group applies. Without transition history, use recorded person groups.
+Existing columns whose
 names conflict with added partner fields cause an error.
 }
 \examples{
