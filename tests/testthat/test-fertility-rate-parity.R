@@ -46,11 +46,14 @@ test_that("parity pools across group, time, age and union type exactly", {
   pooled <- calculate_fertility_rates(pop,c(0,1,2,3),c(0,20,22,Inf),
     by_group=TRUE,by_union_type=TRUE)
   cols <- c("time_start","time_end","age_start","age_end","group","union_type")
-  observed <- dplyr::summarise(dplyr::group_by(x,dplyr::across(dplyr::all_of(cols))),
-    person_years=sum(person_years),births=sum(births),.groups="drop")
-  expected <- dplyr::select(pooled,dplyr::all_of(c(cols,"person_years","births")))
-  observed <- dplyr::arrange(observed,!!!rlang::syms(cols))
-  expected <- dplyr::arrange(expected,!!!rlang::syms(cols))
+  # Summing parity rows within each stratum recovers the pooled table (base R,
+  # so tests need no packages beyond those declared in DESCRIPTION).
+  observed <- aggregate(cbind(person_years,births) ~ time_start+time_end+age_start+age_end+group+union_type,
+    data=as.data.frame(x),FUN=sum)
+  expected <- as.data.frame(pooled)[c(cols,"person_years","births")]
+  observed <- observed[do.call(order,observed[cols]),]
+  expected <- expected[do.call(order,expected[cols]),]
+  rownames(observed) <- rownames(expected) <- NULL
   attr(expected,"unassigned_births") <- NULL
   expect_equal(observed,expected)
   expect_equal(sum(x$births[x$union_type=="cohab"]),1)

@@ -5,3 +5,4 @@
 ^validation$
 ^\.github$
 ^nvim\.log$
+^LICENSE\.md$
