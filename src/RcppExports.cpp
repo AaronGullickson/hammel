@@ -171,6 +171,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// union_start_groups_cpp
+IntegerMatrix union_start_groups_cpp(DataFrame persons, DataFrame unions, IntegerVector group_indices);
+RcppExport SEXP _hammel_union_start_groups_cpp(SEXP personsSEXP, SEXP unionsSEXP, SEXP group_indicesSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< DataFrame >::type persons(personsSEXP);
+    Rcpp::traits::input_parameter< DataFrame >::type unions(unionsSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type group_indices(group_indicesSEXP);
+    rcpp_result_gen = Rcpp::wrap(union_start_groups_cpp(persons, unions, group_indices));
+    return rcpp_result_gen;
+END_RCPP
+}
 // extract_kin_cpp
 DataFrame extract_kin_cpp(DataFrame persons, NumericVector ego_ids, NumericVector relative_ids, int generations);
 RcppExport SEXP _hammel_extract_kin_cpp(SEXP personsSEXP, SEXP ego_idsSEXP, SEXP relative_idsSEXP, SEXP generationsSEXP) {
@@ -360,6 +373,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_unpartnered_birth_rows_cpp", (DL_FUNC) &_hammel_unpartnered_birth_rows_cpp, 2},
     {"_hammel_fertility_parity_counts_cpp", (DL_FUNC) &_hammel_fertility_parity_counts_cpp, 9},
     {"_hammel_transition_counts_cpp", (DL_FUNC) &_hammel_transition_counts_cpp, 10},
+    {"_hammel_union_start_groups_cpp", (DL_FUNC) &_hammel_union_start_groups_cpp, 3},
     {"_hammel_extract_kin_cpp", (DL_FUNC) &_hammel_extract_kin_cpp, 4},
     {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
     {"_hammel_inspect_matching_cpp", (DL_FUNC) &_hammel_inspect_matching_cpp, 2},

@@ -264,8 +264,10 @@ separate tibble containing all union rows and columns, in their original order,
 with partner attributes matched through `wife_id` and `husband_id`. It adds
 `birth_time_w`, `death_time_w`, `birth_time_h`, and `death_time_h`, plus
 `group_w` and `group_h` when persons has a group column. Groups retain their
-input type. These are recorded person attributes, not inferred historical group
-transitions; the appended groups are current recorded identities. A surviving partner's
+input type. Partner groups are reconstructed at each union's start from
+transition histories; later moves do not relabel earlier unions. An exact-time
+transition follows formation, so its origin applies. Without transition
+history, use recorded person groups. A surviving partner's
 death time remains NA. Dates remain in years and can be combined with union
 `start_time` to derive ages at formation and the age gap.
 

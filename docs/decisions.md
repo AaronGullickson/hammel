@@ -56,6 +56,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Individual transition implementation, duration and ancestry | D112 |
 | Directed transition Lexis counter | D113 |
 | Household moves deferred to the regions milestone | D114 |
+| Detailed union partner groups refer to formation | D115 |
 
 ## Recorded decisions
 
@@ -2336,3 +2337,19 @@ record these issues and suggested validation. Correct conditional resampling
 is possible while retaining attained ages, durations and persistent state;
 it does not resolve the input-rate or household-definition questions. No
 household model, rate carrier, schema or implementation is selected.
+
+## D115 — Detailed union groups refer to formation (October 30, 2026)
+
+**Status:** correction requested by the user and implemented.
+
+The user identified that `get_detailed_unions()` joined final person groups,
+which relabeled earlier pairings after transitions and distorted formation
+cross-tabs. `group_w` and `group_h` now reconstruct partner identities at the
+union's start from retained histories. A same-time transition follows
+formation under the existing event priority, so its origin applies. Without
+transition history, use the recorded group. Dates, row order, custom columns
+and label types retain their existing behavior. The native indexed-history
+lookup avoids repeated per-union scans in R. Regression tests verify return
+moves, repeated episodes, exact-time moves, unchanged earlier pairings after
+later transitions, empty outputs and character/numeric labels. Correcting
+attribution does not independently establish matching-parameter recovery.

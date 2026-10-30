@@ -41,6 +41,10 @@ transition_counts_cpp <- function(persons, unions, transitions, final_groups, gr
     .Call(`_hammel_transition_counts_cpp`, persons, unions, transitions, final_groups, group_count, time_breaks, axis_breaks, duration, by_sex, by_union_type)
 }
 
+union_start_groups_cpp <- function(persons, unions, group_indices) {
+    .Call(`_hammel_union_start_groups_cpp`, persons, unions, group_indices)
+}
+
 extract_kin_cpp <- function(persons, ego_ids, relative_ids, generations) {
     .Call(`_hammel_extract_kin_cpp`, persons, ego_ids, relative_ids, generations)
 }

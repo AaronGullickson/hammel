@@ -901,3 +901,10 @@ missing sex, logical all-NA placeholders in male-only/empty histories, and
 incomplete female weights with explicit redraw guidance. Help and schema now
 consistently describe weighted selection and the disabled-output rule. Native
 weighted sampling and inheritance algorithms were not changed in this follow-up.
+
+October 30 detailed-union attribution correction: `devtools::test(filter =
+"detailed-unions|group-transition")` passed without warnings or failures.
+Partner groups now refer to union formation; regression cases cover later
+and return moves, exact-time priority, numeric and character labels, repeated
+unions, empty histories, unknown endpoints and unchanged inputs. Existing
+simulation outputs can be reanalyzed using their retained transition tables.

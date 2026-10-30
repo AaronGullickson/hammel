@@ -58,3 +58,38 @@ test_that("detailed unions reject invalid histories and conflicting columns", {
   population$unions$husband_id[1] <- 99
   expect_error(get_detailed_unions(population), "refer to two distinct persons")
 })
+
+test_that("partner groups describe formation rather than identity after later moves", {
+  population <- detailed_union_population()
+  # Current identities: husband 30 = 20, wife 10 = 10, husband 70 = 30.
+  # Unsorted moves include a return move and a move exactly at formation.
+  population$transitions <- tibble::tibble(person_id = c(10, 70, 10, 30),
+    time = c(1.75, 1.5, .5, .75), group_origin = c(40L, 50L, 10L, 60L),
+    group_dest = c(10L, 30L, 40L, 20L))
+  original <- population
+  out <- get_detailed_unions(population)
+  expect_identical(out$group_w, c(40L, 10L))
+  expect_identical(out$group_h, c(50L, 60L))
+  expect_identical(out[names(population$unions)], population$unions)
+  expect_identical(population, original)
+  # A subsequent restart/additional move cannot alter these earlier pairings.
+  population$persons$group[population$persons$person_id == 10] <- 80L
+  population$transitions <- rbind(population$transitions,
+    tibble::tibble(person_id = 10, time = 1.9, group_origin = 10L, group_dest = 80L))
+  expect_identical(get_detailed_unions(population)$group_w, out$group_w)
+  population$unions <- population$unions[0, ]
+  empty <- get_detailed_unions(population)
+  expect_identical(empty$group_w, integer())
+  expect_identical(empty$group_h, integer())
+})
+
+test_that("formation reconstruction preserves character labels and works without an endpoint", {
+  population <- detailed_union_population()
+  population$persons$group <- c("B", "A", "C")
+  population$transitions <- tibble::tibble(person_id = c(10, 70), time = c(1, 1.75),
+    group_origin = c("X", "Y"), group_dest = c("A", "C"))
+  population["end_time"] <- list(NULL)
+  out <- get_detailed_unions(population)
+  expect_identical(out$group_w, c("A", "X"))
+  expect_identical(out$group_h, c("Y", "B"))
+})

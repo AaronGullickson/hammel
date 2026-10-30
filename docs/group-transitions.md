@@ -53,6 +53,10 @@ Births/deaths and union events preceding a same-time transition use the origin;
 population snapshots at that time use the destination. No missing prehistory
 is imputed.
 
+`get_detailed_unions()` reconstructs `group_w` and `group_h` at each union's
+start, before a same-time transition, rather than joining final identities.
+Later moves therefore do not relabel the pairings used to assess formation.
+
 Worked examples: A-to-B hazard 0.2 and A-to-C hazard 0.3 give time to either
 move with total hazard 0.5, and destination shares 0.4/0.6 without other exits.
 A duration schedule zero on [0,2) prevents another move for two years after

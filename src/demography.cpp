@@ -617,3 +617,22 @@ List transition_counts_cpp(DataFrame persons, DataFrame unions, DataFrame transi
   }
   return List::create(_["person_years"] = exposure, _["transitions"] = events);
 }
+
+// Partner identity at formation, before a same-time group transition. Reuse
+// indexed histories to avoid repeated R scans and named-list lookups per union.
+// [[Rcpp::export]]
+IntegerMatrix union_start_groups_cpp(DataFrame persons, DataFrame unions,
+                                     IntegerVector group_indices) {
+  GroupHistory history(persons, group_indices);
+  NumericVector ids = persons["person_id"], wives = unions["wife_id"],
+    husbands = unions["husband_id"], starts = unions["start_time"];
+  std::map<double, int> index;
+  for (int i = 0; i < ids.size(); ++i) index[ids[i]] = i;
+  IntegerMatrix groups(unions.nrows(), 2);
+  for (int u = 0; u < unions.nrows(); ++u) {
+    if (u % 1024 == 0) checkUserInterrupt();
+    groups(u, 0) = history.at(index.at(wives[u]), starts[u], true);
+    groups(u, 1) = history.at(index.at(husbands[u]), starts[u], true);
+  }
+  return groups;
+}

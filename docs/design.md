@@ -220,8 +220,8 @@ retained, including repeated parental pairs. Birth-first dissolution/conversion
 boundaries and half-open ordinary coverage match demographic observations.
 
 `get_detailed_unions(population)` returns a separate tibble preserving union
-records and appending each partner's birth/death time and optional group, with
-`_w` and `_h` suffixes. It joins by partner IDs, preserves types and row order,
+records and appending each partner's birth/death time and optional group at
+union formation, reconstructed from transition histories, with `_w` and `_h` suffixes. It joins by partner IDs, preserves types and row order,
 and leaves the population unchanged. See [demographic analysis](demographic-analysis.md).
 
 `get_parent_info(population)` returns a separate tibble preserving all persons
