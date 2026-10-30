@@ -1,8 +1,8 @@
 # Design and implemented interface
 
-Updated October 30, 2026. Milestones 1–5 are complete by user acceptance
-(D029, D050, D077, D093, D105). Individual group transitions (milestone 6) are implemented; milestone
-scientific acceptance remains pending. This document describes implemented architecture.
+Updated October 30, 2026. Milestones 1–6 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116). Individual group transitions are accepted
+under D116; time-varying inputs (milestone 7) are next. This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
 The [scientific contract](scientific-contract.md) defines demographic semantics.
 
@@ -25,7 +25,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Demographic extraction and measures | `src/demography.cpp`, `R/calc_demographic_measures.R` |
 | Directed transition Lexis counts | `R/calculate_transition_rates.R`; `transition_counts_cpp()` in `src/demography.cpp` |
 | Software and analytical validation | `tests/testthat/` |
-| Replication assessment | `validation/milestone1.qmd`, `validation/milestone2.qmd`, `validation/milestone3.qmd`, `validation/milestone4.qmd`, `validation/milestone5.qmd` |
+| Replication assessment | `validation/milestone1.qmd`, `validation/milestone2.qmd`, `validation/milestone3.qmd`, `validation/milestone4.qmd`, `validation/milestone5.qmd`, `validation/milestone6.qmd` |
 
 The engine is C++17 with Rcpp. R exposes ordinary list objects and tibbles.
 Grouped dissolution and conversion observations build union-level group

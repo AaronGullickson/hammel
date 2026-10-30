@@ -7,7 +7,8 @@ actual parity (D101), which replaced D099's SOCSIM-style spacing correction.
 Persistent lognormal fertility weights and maternal inheritance are implemented
 under D102/D104; see [heterogeneity](fertility-heterogeneity-notes.md). The
 [accepted report](../validation/milestone5.qmd) retains sparse/unrealized-cell
-and reproductive-selection limitations; group transitions are next.
+and reproductive-selection limitations. Group transitions were accepted
+October 30, 2026 (D116); time-varying inputs are next.
 
 ## Selected representation
 

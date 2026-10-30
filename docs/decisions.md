@@ -46,7 +46,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Persistent lognormal fertility weights and maternal inheritance | D102 |
 | Milestone order and groups-based characteristics scope | D103 |
 | Disabled fertility heterogeneity removes output weights | D104 |
-| Milestone 5 acceptance; group transitions next | D105 |
+| Milestone 5 acceptance | D105 |
 | Group-transition inputs are annual hazards | D106 |
 | Directed transition schedules, clocks and optional strata | D107 |
 | No transition-count target adjustment | D108 |
@@ -57,6 +57,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Directed transition Lexis counter | D113 |
 | Household moves deferred to the regions milestone | D114 |
 | Detailed union partner groups refer to formation | D115 |
+| Milestone 6 acceptance; time-varying inputs next | D116 |
 
 ## Recorded decisions
 
@@ -2284,7 +2285,7 @@ whether ungrouped output includes the component.
 ## D112 — Individual group-transition execution (October 30, 2026)
 
 **Status:** implementation authorized by the user and implemented; milestone 6
-scientific acceptance remains pending.
+subsequently accepted complete under D116.
 
 The user requested `group_transition(rates)` and pipeable
 `set_group_transition(model, rates)`, with person-level competing waiting times
@@ -2353,3 +2354,37 @@ lookup avoids repeated per-union scans in R. Regression tests verify return
 moves, repeated episodes, exact-time moves, unchanged earlier pairings after
 later transitions, empty outputs and character/numeric labels. Correcting
 attribution does not independently establish matching-parameter recovery.
+
+## D116 — Milestone 6 accepted complete (October 30, 2026)
+
+**Status:** accepted complete by the user after report review, observation
+corrections and external code-review follow-up. The user explicitly requested
+completion documentation while compiling the final report.
+
+- **Scope:** individual directed group transitions using annual hazards,
+  common age or duration bands, optional sex/union-type strata, latest-entry
+  duration (age without earlier history), zero risk in omitted pairs/gaps,
+  unchanged ancestry, consistent event/pool/cell/union updates, retained
+  transition histories and restart reconstruction (D106–D112). Directed Lexis
+  rates and formation-time partner group extraction are included (D113/D115).
+- **Assessment:** the user's [report](../validation/milestone6.qmd) and
+  [rendered assessment](../validation/milestone6.html) examine transition-rate
+  recovery, demographic summaries, matching cross-tabs at formation,
+  population shares and performance. Scientific acceptance belongs to the
+  user; no numerical threshold is added by this closeout. The final render
+  was active at acceptance. Preserve all report artifacts and intermediates;
+  this entry does not certify render completion or invent final results.
+- **Retained limitations:** finite-sample/sparse-cell effects, complete
+  histories for historical observations, initial duration falling back to age
+  without earlier transitions, non-checkpoint restarts, and the documented
+  life-table age-aggregation caveat. An attached zero-rate process does not
+  promise fixed-seed equality with omitting it. Existing fertility, matching
+  and history limitations remain documented in their contracts.
+- **Deferred:** household moves belong to milestone 10, internal migration
+  and regions (D114). Multiple group dimensions and fixed newborn assignment
+  remain unselected future work; custom mixed-parent assignment remains
+  available. Completion does not authorize those mechanisms.
+- **Next:** milestone 7, time-varying inputs (D103). Its scientific contract,
+  schedule boundaries, event invalidation and public API require specification
+  before consequential implementation. Earlier proposals are not accepted
+  design decisions or automatic implementation authorization.

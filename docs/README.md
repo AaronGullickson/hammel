@@ -1,12 +1,12 @@
 # Hammel documentation
 
-Updated October 30, 2026. Milestones 1–5 are complete by user acceptance
-(D029, D050, D077, D093, D105), including parity-specific fertility,
+Updated October 30, 2026. Milestones 1–6 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116), including individual group transitions, parity-specific fertility,
 cell-accounted birth spacing and persistent lognormal fertility weights.
 Current behavior uses continuous event times with no monthly grid. Acceptance
 is based on the user-authored validation reports and retains their limitations.
-**Milestone 6 is in progress:** individual group transitions are implemented;
-scientific milestone acceptance remains pending. See the
+**Milestone 6 is accepted complete** (D116); its final report render is active.
+**Next: milestone 7, time-varying inputs.** See the
 [group-transition contract](group-transitions.md). Household moves are deferred to
 the regions milestone (D114); milestone 7 is time-varying inputs (D103).
 
@@ -97,6 +97,14 @@ To inspect prior versions, use `git log -- docs` and
   inheritance and performance. The final render was active at closeout;
   preserve all intermediates. Rendering installs the package, downloads HFD/HMD
   inputs and runs substantial replications and offline tests.
+- [Milestone 6 validation report](../validation/milestone6.qmd) and
+  [rendered assessment](../validation/milestone6.html): accepted October 30,
+  2026 (D116), covering directed age/duration transitions, sex/union-type
+  strata, demographic and matching recovery, population shares and performance.
+  The final render was active at acceptance; preserve all intermediates.
+  Rendering installs the package, retrieves HFD/HMD inputs and runs substantial
+  independently initialized replications. Use the report for actual settings
+  and completed-render results.
 - [Validation directory guide](../validation/README.md): retained reports,
   rate provenance, and supporting benchmark/conditional-choice evidence.
 The former `milestone1.R` and `milestone1_bootstrap.R` examples have been

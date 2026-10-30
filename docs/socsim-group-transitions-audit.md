@@ -205,7 +205,9 @@ and gaps, and unchanged ancestry. The implemented individual process updates
 events, pools, calibration, fertility cells, pair hazards and historical group
 observations. Household moves are deferred to the regions milestone (D114); fixed newborn assignment
 and multiple independent group dimensions remain separate future work.
-Scientific milestone acceptance is pending.
+The user accepted Hammel milestone 6 on October 30, 2026 (D116), based on
+the Hammel report and implementation review. This does not turn the static
+SOCSIM audit into executable reference validation.
 
 Useful future checks include constant one-way hazards against analytical
 survival; two outgoing destinations against competing-risk probabilities;

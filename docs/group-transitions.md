@@ -1,7 +1,9 @@
 # Individual group transitions
 
-Implemented contract, October 30, 2026. Authorized for implementation under D106–D111
-and the user's October 30 implementation request. Household moves are deferred to
+Accepted milestone 6 contract, October 30, 2026 (D116). Implementation follows
+D106–D115 and the user's October 30 request. The accepted
+[report](../validation/milestone6.qmd) was undergoing its final render at
+acceptance; preserve all active intermediates. Household moves are deferred to
 [milestone 10, internal migration and regions](roadmap.md#tentative-milestone-10-internal-migration-and-regions)
 under D114 and are excluded here.
 
@@ -68,7 +70,9 @@ Validation: analytical competing hazards, age/duration support, sex/type
 selection, absent schedules and malformed input, empty histories, repeated
 moves/restarts, RNG isolation, cell/calibration accounting, changed partner
 union hazards and historical group exposure/event totals. Software checks do
-not establish milestone scientific acceptance.
+not independently establish scientific acceptance. Milestone 6 acceptance
+comes from the user's explicit approval recorded in D116, retaining the
+report's limitations.
 
 Example (illustrative rates, not demographic defaults):
 

@@ -1,9 +1,8 @@
 # Development roadmap
 
-Updated October 30, 2026. Milestones 1–5 are complete by user acceptance
-(D029, D050, D077, D093, D105). **Milestone 6 is in progress: individual group transitions are implemented,
-with scientific acceptance pending.**
-Milestone 7 is time-varying inputs (D103). Future entries record planning
+Updated October 30, 2026. Milestones 1–6 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116). **Next is milestone 7:
+time-varying inputs** (D103). Future entries record planning
 priorities, not authorization to implement unspecified demographic behavior
 or an unselected public API.
 
@@ -11,8 +10,8 @@ or an unselected public API.
 | --- | --- | --- |
 | 4 | Union dissolution, age/duration remarriage, and cohabitation | Complete (D093) |
 | 5 | Parity-specific fertility and fertility heterogeneity | Complete (D105); limitations retained |
-| 6 | Group transitions, including categorical characteristics represented by groups | Individual process implemented; scientific acceptance pending |
-| 7 | Time-varying rates, matching, and inheritance within a simulation run | Planned (D103) |
+| 6 | Group transitions, including categorical characteristics represented by groups | Complete October 30, 2026 (D116); final render active at acceptance |
+| 7 | Time-varying rates, matching, and inheritance within a simulation run | Next (D103); scientific specification and API first |
 | 8 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed |
 | 9 | Immigration from outside the system, tracking generation | Tentative |
 | 10 | Internal migration between regions, with unions restricted to the same region | Tentative |
@@ -151,9 +150,9 @@ October 29, 2026 (D105). Unrealized-intensity/sparse-cell limitations, incomplet
 birth histories and reproductive selection remain explicit; completion does
 not imply universal rate recovery or stationary cohort weight distributions.
 
-## Milestone 6: group transitions (in progress)
+## Milestone 6: group transitions (complete)
 
-Allow group membership to change during life. Use **group transitions** for
+Group membership can change during life. Use **group transitions** for
 this feature, reserving conversion terminology for cohabitation becoming
 marriage. Most categorical characteristics can use groups and group-specific
 rates, matching and inheritance rather than a separate general individual-
@@ -170,7 +169,9 @@ attribute-mutation callback or a continuous-characteristic model.
 Individual transition schedules, age/duration dependence, eligibility, timing,
 event/tracker updates and retained ancestry are implemented under the
 [group-transition contract](group-transitions.md). Household moves are deferred
-to milestone 10 (D114), and milestone scientific acceptance is pending.
+to milestone 10 (D114). The user accepted milestone 6 on October 30, 2026
+(D116), based on the [report](../validation/milestone6.qmd); its final render
+was active at acceptance and must be preserved.
 Region-specific migration remains in milestone 10; how it
 relates to any multiple-group representation is also open.
 
@@ -179,7 +180,7 @@ education category) was deferred to this discussion on October 27, 2026. No
 `fixed` inheritance method or API has yet been adopted. A custom inheritance
 function already handles assigning mixed-parent births to a specified category.
 
-## Planned milestone 7: time-varying inputs within a run
+## Next milestone 7: time-varying inputs within a run
 
 Allow demographic schedules to change during a single simulation, rather than
 requiring population restarts. Specify calendar-time inputs, change boundaries,

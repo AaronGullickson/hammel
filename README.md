@@ -9,12 +9,14 @@
 Hammel is a standalone demographic microsimulator with an R interface and a
 C++17 engine. It models continuous-time mortality, fertility, and union
 formation, dissolution, remarriage, and optional cohabitation/conversion, with
-group-specific rates, partner matching, ancestry, and newborn identity inheritance. Results expose population and union histories as tibbles.
+group-specific rates, individual group transitions, partner matching, ancestry,
+and newborn identity inheritance. Results expose person, union, and transition
+histories as tibbles.
 
-Milestones 1–5 are complete by user acceptance: mortality/fertility, union
-formation, groups, dissolution/remarriage/cohabitation, and parity-specific
-fertility with persistent fertility heterogeneity. Milestone 6, group
-transitions, is next (D105). See the [documentation index](docs/README.md),
+Milestones 1–6 are complete by user acceptance: mortality/fertility, union
+formation, groups, dissolution/remarriage/cohabitation, parity-specific
+fertility with persistent fertility heterogeneity, and individual group
+transitions (D116). Milestone 7, time-varying inputs, is next. See the [documentation index](docs/README.md),
 [scientific contract](docs/scientific-contract.md), and
 [validation record](docs/testing.md) for implemented behavior and limitations.
 Future mechanisms are listed in the [roadmap](docs/roadmap.md).
@@ -54,3 +56,10 @@ fertility weights with maternal inheritance (D105). Completion retains the
 documented sparse-cell/unrealized-intensity and reproductive-selection
 limitations. Rendering installs the package, retrieves HFD/HMD inputs, runs
 replications and the offline tests; it is not an ordinary package check.
+
+The accepted [milestone 6 report](validation/milestone6.qmd) and
+[rendered assessment](validation/milestone6.html) cover age/duration transitions,
+sex/union-type strata, demographic rate and formation-group recovery, population
+shares and performance (D116, October 30, 2026). The final render was active
+at acceptance; preserve its intermediates until it finishes. Household moves
+are deferred to the regions milestone (D114).

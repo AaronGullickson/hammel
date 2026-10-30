@@ -1,9 +1,27 @@
 # Testing and milestone validation
 
-Updated October 30, 2026. Milestones 1–5 are accepted as complete (D029,
-D050, D077, D093, D105). Software test history and the user's demographic assessment
+Updated October 30, 2026. Milestones 1–6 are accepted as complete (D029,
+D050, D077, D093, D105, D116). Software test history and the user's demographic assessment
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
+
+## Milestone 6 accepted assessment and active final render
+
+The user accepted milestone 6 on October 30, 2026 (D116) after report and code
+review. The [report source](../validation/milestone6.qmd) and
+[rendered assessment](../validation/milestone6.html) are the user's scientific
+assessment of age/duration transition recovery, sex/union-type strata,
+fertility/mortality and formation-group summaries, population shares and
+performance. The final render is active at this closeout. Preserve the source,
+HTML and all intermediates; this documentation update neither reruns nor
+certifies completion of that render or its final numerical results.
+
+Software checks and prior developmental measurements below are separate
+records. Acceptance retains finite-sample and sparse-cell limits, complete
+history requirements, duration fallback to age without prehistory,
+non-checkpoint restarts and the documented life-table aggregation caveat.
+Household moves are deferred to milestone 10 (D114). Time-varying inputs are
+next in milestone 7 and still need their own contract and API.
 
 ## Milestone 5 accepted assessment and closeout
 
@@ -22,12 +40,12 @@ expected births (an accounting diagnostic rather than actual births),
 history completeness and selection-driven weight distributions. Accepted
 completion does not introduce numerical thresholds or universal rate-recovery
 claims. Individual group transitions (milestone 6) are now implemented
-under [their contract](group-transitions.md), with scientific acceptance pending.
+under [their contract](group-transitions.md), accepted October 30 (D116).
 
 Earlier dated verification records below describe the versions tested at the
 time, including superseded corrections and intermediate proposal status.
-Current execution includes D101–D104 and D112; accepted milestone status is
-D105. The October 29 milestone 5 closeout checked local Markdown links and
+Current execution includes D101–D104 and D112; accepted milestone status includes
+D116. The October 29 milestone 5 closeout checked local Markdown links and
 whitespace; that closeout made no engine or report edits.
 Supporting evidence and reproduction-version notes are in [validation/milestone5/](../validation/milestone5/README.md).
 
@@ -101,7 +119,7 @@ retention, mortality after moving, matching-pool and fertility-cell updates,
 pair-dependent dissolution and cohabitation conversion, and historical group
 exposure/event attribution. Cell consistency diagnostics are enabled in the
 pool/fertility integration case. These are software and analytical checks;
-milestone 6 scientific acceptance remains pending.
+the user subsequently accepted milestone 6 under D116.
 
 The package uses testthat edition 3 with testthat >= 3.2.0 for scoped mocks.
 Tests live in `tests/testthat/`, with the standard runner `tests/testthat.R`.

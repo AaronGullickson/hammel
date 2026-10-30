@@ -2,11 +2,11 @@
 
 Updated October 30, 2026. This is the current mortality, fertility, union-formation,
 dissolution, remarriage, cohabitation/conversion, group identity/ancestry, and
-observation contract. Milestones 1–5 are accepted as complete
-(D029, D050, D077, D093, D105), retaining documented limitations. Milestone 6
-individual group transitions are implemented under the
-[transition contract](group-transitions.md); scientific milestone acceptance
-remains pending.
+observation contract. Milestones 1–6 are accepted as complete
+(D029, D050, D077, D093, D105, D116), retaining documented limitations.
+Individual group transitions are accepted under the
+[transition contract](group-transitions.md). Milestone 7, time-varying inputs,
+is next and still requires its scientific specification and API.
 Earlier monthly, exact
 age-varying and midpoint compensation specifications are available in Git
 history; the [decision log](decisions.md) records their replacement by
@@ -770,5 +770,8 @@ missing pairs and gaps mean zero risk. Moves preserve ancestry and refresh
 affected events, fertility cells, matching pools and calibration. Grouped
 outputs retain all moves in a `transitions` tibble, even when empty. Household
 moves are deferred to milestone 10, internal migration and regions (D114). Multiple group dimensions and calendar-time
-inputs (milestone 7) remain unimplemented; scientific milestone acceptance
-is pending.
+inputs (milestone 7) remain unimplemented. The user accepted milestone 6 on
+October 30, 2026 (D116) after reviewing the report and implementation. Its final
+render was active at acceptance; no final-render outcome is inferred.
+Acceptance retains documented limitations and does not authorize the next
+mechanism or household moves.
