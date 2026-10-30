@@ -12,8 +12,8 @@ format:
     code-tools: true
     self-contained: true
 params:
-  n_replications: 20
-  initial_population: 20000
+  n_replications: 50
+  initial_population: 50000
   years: 100
   burn_in: 25
 execute:
@@ -432,6 +432,7 @@ Nonetheless, our estimated life expectancy results for each group and sex are ve
 crosstabs <- results_age |>
   map(get_detailed_unions) |>
   bind_rows(.id = "replication") |>
+  filter(start_time >= 2000 + params$burn_in) |>
   count(replication, group_w, group_h) |>
   pivot_wider(id_cols = replication, names_from = c(group_w, group_h), values_from = n) |>
   mutate(
@@ -544,7 +545,7 @@ trans_summary |>
   )
 ```
 
-@tbl-trans-rates-dur shows the mean duration-specific transition rates estimated across the simulations. The true input rate is also shown for reference. All of the estimated transition rates are extremely close to the input rates out to at least the fourth decimal place and the true rate falls within the 95% confidence interval of each estimate.
+@tbl-trans-rates-dur shows the mean duration-specific transition rates estimated across the simulations. The true input rate is also shown for reference. All of the estimated transition rates are extremely close to the input rates out to at least the fourth decimal place and the true rate falls within the 95% confidence interval of most estimates.
 
 ```{r}
 #| label: fig-pop-share-dur
@@ -578,6 +579,8 @@ bind_rows(share_base, share_dur) |>
 As a final test, I test whether transition rates stratified by both sex and union type continue to produce the correct transition rates from the data. I use age-banded transition rates for this exercise.
 
 ```{r}
+#| label: create-trans-rates-stratified
+
 trans_rates_age_strat <- bind_rows(
   trans_rates_age |> mutate(sex = "f", union_type = "unpartnered", rate = rate * 1.1),
   trans_rates_age |> mutate(sex = "m", union_type = "unpartnered", rate = rate * 1.05),
@@ -678,7 +681,7 @@ The following tests have been constructed and are currently all passing.
 
 ```{r}
 #| label: test-results
-#| eval: false
+#| eval: true
 
 test_results <- devtools::test(pkg = here::here(), reporter = "silent")
 test_table <- as.data.frame(test_results)
