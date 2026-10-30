@@ -54,6 +54,17 @@ retains sparse-cell, initialization, fertility-transition and calibration limits
 
 ## Run the suite
 
+October 30 PR #7 coverage follow-up: added tests for invalid transition units,
+history references/life dates, unsupported processes, unknown/nonmoving identity
+lookups, legacy populations without transition components, and union exposure
+when only an unrelated person moves. Targeted `devtools::test()` checks and a
+full `covr::package_coverage()` run passed. On the local ARM/GCC environment,
+overall line coverage increased from 97.5539% to 97.8234%; both
+`R/group_transition.R` and `R/calculate_transition_rates.R` reached 100%.
+GitHub's compiler/platform can produce slightly different totals. No engine
+behavior, coverage exclusions or thresholds changed; the native consistency
+error guard remains uncovered rather than forcing invalid internal state.
+
 October 30 transition-rate counter: the full offline `devtools::test()` suite
 passed after adding `calculate_transition_rates()`. The live database test was
 skipped and the existing environment `timedatectl` warning remained.

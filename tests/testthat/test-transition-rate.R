@@ -145,3 +145,13 @@ test_that("simulated competing hazards recover directed rates with shared origin
   # after removing the intentional denominator duplication by destination.
   expect_equal(sum(out$person_years) / 2, 20000)
 })
+
+test_that("transition counters accept legacy grouped populations without history components", {
+  pop <- transition_rate_population()
+  pop$transitions <- NULL
+  expected <- calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf))
+  expect_equal(expected$transitions, c(0, 0))
+  expect_equal(expected$person_years, c(6, 4))
+  expect_error(calculate_transition_rates(pop$persons, c(0, 6), age_breaks = c(0, Inf)),
+    "grouped hammel_population")
+})

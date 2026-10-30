@@ -256,3 +256,53 @@ test_that("snapshot event accounting handles repeated moves, deaths and arbitrar
     calculate_population_size(pop, times)$population)
   expect_equal(nrow(calculate_population_size(pop, numeric(), by_group = TRUE)), 0)
 })
+
+test_that("edited transition specifications reject incompatible units and unsupported processes", {
+  model <- set_group_transition(transition_model(), transition_rates())
+  model$processes$group_transition$rate_unit <- "annual_probability"
+  expect_error(simulate(model, 0), "specification or units")
+  model <- make_model(1)
+  model$processes$unimplemented <- structure(list(name = "unimplemented"), class = "hammel_process")
+  expect_error(simulate(model, 0), "Unsupported demographic process")
+})
+
+test_that("transition histories reject invalid references, life dates and missing identities", {
+  original <- transition_observation_population()
+  for (tx in list(
+    transform(original$transitions, person_id = c(999, 2)),
+    transform(original$transitions, time = c(-21, 1)),
+    transform(original$transitions, time = c(2, 4)),
+    transform(original$transitions, time = c(6, 1)),
+    transform(original$transitions, group_origin = group_dest)
+  )) {
+    pop <- original
+    pop$transitions <- tx
+    expect_error(validate_population(pop), "invalid people, dates or self-transitions")
+  }
+  original$persons$group <- NULL
+  expect_error(validate_population(original), "require person groups")
+})
+
+test_that("historical identity lookup retains unknown references and nonmoving people", {
+  pop <- transition_observation_population()
+  original <- pop
+  # At the first woman's move, a left-limit query sees A and a snapshot sees B.
+  expect_identical(hammel:::groups_at(pop, c(1, NA_integer_, 3, 2), c(2, 2, 2, 0)),
+    c("B", NA_character_, "A", "A"))
+  expect_identical(hammel:::groups_at(pop, 1, 2, left = TRUE), "A")
+  expect_identical(hammel:::groups_at(pop, integer(), numeric()), character())
+  pop$transitions <- pop$transitions[0, ]
+  expect_identical(hammel:::groups_at(pop, 1:3, rep(0, 3)), pop$persons$group)
+  expect_equal(nrow(original$transitions), 2)
+})
+
+test_that("dissolution observations retain unions whose partners never move", {
+  pop <- transition_observation_population()
+  # Only the child moves; neither partner in the recorded union changes group.
+  pop$transitions <- tibble::tibble(person_id = 3, time = 2,
+    group_origin = "B", group_dest = "A")
+  out <- calculate_dissolution_rates(pop, c(0, 5), c(0, Inf), by_group = TRUE)
+  expect_equal(out$union_years[out$group_pair == "B:B"], 3)
+  expect_equal(out$dissolutions[out$group_pair == "B:B"], 1)
+  expect_equal(sum(out$union_years), 3)
+})
