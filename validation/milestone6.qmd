@@ -1,0 +1,188 @@
+---
+title: "Hammel: Milestone 6 Validation"
+author: "Aaron Gullickson"
+date: today
+format:
+  html:
+    toc: true
+    toc-expand: 1
+    toc-depth: 4
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    self-contained: true
+params:
+  n_replications: 100
+  initial_population: 50000
+  years: 150
+  burn_in: 50
+execute:
+  eval: true
+  echo: true
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: setup
+#| eval: true
+#| include: false
+
+
+library(here)
+# installing will lead to faster computation
+devtools::install(here::here())
+library(hammel)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(purrr)
+library(tibble)
+library(stringr)
+library(ggplot2)
+library(gt)
+library(furrr)
+set_theme(theme_bw())
+```
+
+```{r}
+#| label: set-up-parallel-processing
+
+future::plan(future::multicore, workers = 4)
+```
+
+```{r}
+#| label: create-functions
+
+run_replication <- function(replication, model, n_groups) {
+  set.seed(410000L + replication)
+  if (n_groups == 2) {
+    population <- create_baseline_population(params$initial_population, 60, 2000, 
+      group_weights = c("A" = 1, "B" = 1))
+  } else if (n_groups == 3) {
+    population <- create_baseline_population(params$initial_population, 60, 2000, 
+      group_weights = c("A" = 1, "B" = 1, "C" = 1))
+  }
+  model <- model |> set_population(population)
+  time <- system.time(result <- simulate(model, params$years, 420000L + replication))[["elapsed"]]
+  result$runtime <- time
+  return(result)
+}
+```
+
+## Purpose and completion criteria
+
+
+Assess whether the current simulation successfully handles transitions between groups from a given schedule. 
+
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| Transition Rates | Output mean rates, across scenarios with varying groups, versus supplied schedules | Output rates should match closely to input rates, adjusting for sampling variability |
+| Accounting and implementation | Existing tests | Successful unit tests |
+
+## Overview of Design
+
+Transition rates between groups are defined in the `set_group_transition` function which takes a rate object similar to other rate objects. This rate object must be banded by either age or duration intervals (no mixing). It must also include a column for `group_origin` and `group_dest` to indicate the specific transition risk. Transition rates can also be stratified by sex and union type. If these are not included then the rates will apply globally across sexes or union types, respectively. Bands that are not specified (by age/duration or group direction) are treated as zero rates.
+
+For a given group origin, individuals can be subject to competing risks for entry into other groups. For example, in a three group situation with groups A, B, and C, if transitions A -> B and A -> C are both given, members of group A will have waiting times assigned for both transitions and the earlier transition will win.
+
+HELPER FUNCTION
+
+HOUSEHOLD MOVES
+
+## Inputs and Simulation Design
+
+```{r}
+#| label: get-input-rates
+
+fertility_rates_overall <- get_fertility_hfd("USA", 2000)
+mortality_rates <- get_mortality_hmd("USA", 2000)
+```
+
+Lets set some basic group transition rates for a two-group population. There will be no transition to age 20, and then a constant low risk until age 50, when the risk will be cut in half. We can leave out the under 20 band and it will default to zero.
+
+```{r}
+#| label: set-transition-rates
+
+trans_rates_2grp <- tribble(
+  ~group_origin, ~group_dest, ~age_start, ~age_end, ~rate,
+  "A",           "B",         20,         50,       0.01,
+  "B",           "A",         20,         50,       0.02,
+  "A",           "B",         50,         Inf,      0.005,
+  "B",           "A",         50,         Inf,      0.01
+)
+
+```
+
+
+
+For each scenario, `r params$n_replications` simulations of `r params$years` years will be run, and the mean values and Monte Carlo standard errors will be calculated for desired measures across simulations. The first `r params$burn_in` years will be ignored as the burn in. Each simulation will use a separate pre-defined seed. Each simulation will generate its own starting population so that randomness in starting population is incorporated into uncertainty estimates.
+
+```{r}
+#| label: set-sim-parameters
+
+# most are set in the yaml
+age_breaks <- 12:55
+time_breaks <- c(2000 + params$burn_in, 2000 + params$years)
+time_scenario <- tibble(scenario = character(), elapsed_time = double())
+```
+## Transition Rates
+
+### Two Groups
+
+```{r}
+model <- hammel_model() |>
+  set_fertility(fertility_rates_overall) |>
+  set_mortality(mortality_rates) |>
+  set_union_formation(
+    "on_demand",
+    matching = create_age_gap_matching_model(2, 5, group_exogamy = c("A:B" = -2))
+  ) |>
+  set_group_transition(trans_rates_2grp)
+
+population <- create_baseline_population(params$initial_population, 60, 2000, 
+  group_weights = c("A" = 1, "B" = 1))
+
+results <- simulate(model |> set_population(population), 100, 1)
+
+# B > A transitions are higher rate than A > B transitions, so group A should grow as 
+# share of population
+
+results |> calculate_population_size(seq(2000, 2100, 10), by_group = TRUE)
+```
+
+
+
+
+## Time Tests
+
+
+## Tests
+
+The following tests have been constructed and are currently all passing.
+
+```{r}
+#| label: test-results
+
+test_results <- devtools::test(pkg = here::here(), reporter = "silent")
+test_table <- as.data.frame(test_results)
+knitr::kable(
+  test_table[, c("test", "passed", "failed", "error", "skipped", "warning")]
+)
+```
+## Conclusions and Unresolved Limitations
+
+This milestone meets all expectations and we have finally resolved the issue with birth intervals in a satisfactory way with minimal effect on computation time. One remaining issue is the potential for unrealized births in certain cases. However, in most cases, unrealized births will occur because relatively few women travel into those cells and thus the overall impact on fertility will be low. 
+
+
+## Reproducibility record
+
+```{r}
+#| label: reproducibility
+system2("git", c("-C", shQuote(here::here()), "rev-parse", "HEAD"), stdout = TRUE)
+system2("git", c("-C", shQuote(here::here()), "status", "--short"), stdout = TRUE)
+sessionInfo()
+```
+
