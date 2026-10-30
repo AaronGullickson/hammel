@@ -153,7 +153,7 @@ Milestone 6 individual transitions are implemented following the user's October
 process uses annual hazards, common age or duration bands, directed pair
 columns and optional sex/union-type strata. Group histories are retained and
 affected risks, cells and matching state update at moves. Ancestry stays
-unchanged. Household moves remain a stretch goal, multiple group dimensions
+unchanged. Household moves are deferred to the regions milestone (D114), multiple group dimensions
 remain optional future work, and milestone scientific acceptance is pending.
 Calendar-time inputs follow in milestone 7.
 

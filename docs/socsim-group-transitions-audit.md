@@ -150,8 +150,9 @@ Three important static caveats need controlled reference tests:
   an ordinary harmless competing event; queue consequences need testing.
 
 These quirks are findings about the pinned version, not requirements for Hammel.
-Under D109, Hammel's core scope is individual transitions; linked household
-moves are a stretch goal whose membership and follower rules remain open.
+Hammel implements individual transitions. D114 defers household moves to
+milestone 10, internal migration and regions, superseding D109's earlier
+stretch-goal placement; membership and follower rules remain open.
 ENHANCED builds have before/after hooks and can alter behavior; those extensions
 were not audited.
 
@@ -202,7 +203,7 @@ universally. The October 30 implementation request and follow-up decisions
 select latest-entry duration (age without history), zero risk for missing pairs
 and gaps, and unchanged ancestry. The implemented individual process updates
 events, pools, calibration, fertility cells, pair hazards and historical group
-observations. Household moves remain a stretch goal; fixed newborn assignment
+observations. Household moves are deferred to the regions milestone (D114); fixed newborn assignment
 and multiple independent group dimensions remain separate future work.
 Scientific milestone acceptance is pending.
 

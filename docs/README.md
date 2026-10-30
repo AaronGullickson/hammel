@@ -7,8 +7,8 @@ Current behavior uses continuous event times with no monthly grid. Acceptance
 is based on the user-authored validation reports and retains their limitations.
 **Milestone 6 is in progress:** individual group transitions are implemented;
 scientific milestone acceptance remains pending. See the
-[group-transition contract](group-transitions.md). Household moves remain a
-stretch goal; milestone 7 is time-varying inputs (D103).
+[group-transition contract](group-transitions.md). Household moves are deferred to
+the regions milestone (D114); milestone 7 is time-varying inputs (D103).
 
 ## Reading order
 

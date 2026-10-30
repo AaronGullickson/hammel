@@ -50,11 +50,12 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Group-transition inputs are annual hazards | D106 |
 | Directed transition schedules, clocks and optional strata | D107 |
 | No transition-count target adjustment | D108 |
-| Individual transitions core; household moves stretch goal | D109 |
+| Individual transitions core; household moves deferred to regions | D109 as superseded by D114 |
 | Transition rate-table columns and common band type | D110 |
 | Grouped output always includes transition history tibble | D111 |
 | Individual transition implementation, duration and ancestry | D112 |
 | Directed transition Lexis counter | D113 |
+| Household moves deferred to the regions milestone | D114 |
 
 ## Recorded decisions
 
@@ -2229,7 +2230,8 @@ variation; this decision adds no count-calibration API.
 
 ## D109 — Household transitions are a stretch goal (October 29, 2026)
 
-**Status:** accepted scope direction; execution remains unimplemented.
+**Status:** original scope direction superseded by D114 on October 30:
+household moves are deferred to milestone 10, internal migration and regions.
 
 Individual group transitions form milestone 6's core scope. Linked household
 moves are a stretch goal, potentially useful when groups represent regions.
@@ -2316,3 +2318,21 @@ conventions. Defaults pool both dimensions. Duration follows D112's latest
 entry/initial-age rule. Rates divide each directed event count by exposure
 in its origin, so outgoing destinations share denominators. This is an
 observation helper and changes neither event execution nor model assumptions.
+
+## D114 — Defer household moves to the regions milestone (October 30, 2026)
+
+**Status:** accepted by the user; supersedes D109's milestone 6 stretch goal.
+
+Household moves are deferred to milestone 10, internal migration and regions.
+The user identified ambiguity between individual initiation hazards and total
+move hazards induced by household members, and questioned conditional
+rescheduling after externally triggered moves. Discussion also identified
+membership/custody, partial moves and mixed origins, changing households,
+atomic updates, shared dependence, and the distinction between household
+initiations and individual observed moves.
+
+The [regions milestone notes](roadmap.md#household-moves-deferred-design-questions-d114)
+record these issues and suggested validation. Correct conditional resampling
+is possible while retaining attained ages, durations and persistent state;
+it does not resolve the input-rate or household-definition questions. No
+household model, rate carrier, schema or implementation is selected.

@@ -1,8 +1,9 @@
 # Individual group transitions
 
 Implemented contract, October 30, 2026. Authorized for implementation under D106–D111
-and the user's October 30 implementation request. Household moves remain a
-stretch goal and are excluded here.
+and the user's October 30 implementation request. Household moves are deferred to
+[milestone 10, internal migration and regions](roadmap.md#tentative-milestone-10-internal-migration-and-regions)
+under D114 and are excluded here.
 
 `group_transition(rates)` constructs an optional process;
 `set_group_transition(model, rates)` attaches it. Required columns are

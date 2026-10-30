@@ -17,10 +17,9 @@ or an unselected public API.
 | 9 | Immigration from outside the system, tracking generation | Tentative |
 | 10 | Internal migration between regions, with unions restricted to the same region | Tentative |
 
-Milestone 6's core scope is individual group transitions. Linked household
-moves are a stretch goal (D109), useful when groups represent regions; their
-membership and follower rules remain unspecified. Core completion does not
-require household moves. D106–D108 select annual hazards, directed competing
+Milestone 6's scope is individual group transitions. Household moves are
+now deferred to milestone 10, internal migration and regions (D114), superseding
+D109's milestone 6 stretch-goal placement. D106–D108 select annual hazards, directed competing
 age- or duration-specific schedules with optional strata,
 and no transition-count target adjustment. The implemented contract is in [group transitions](group-transitions.md).
 D110 requires `group_origin`, `group_dest`, `rate`, and one common age or
@@ -170,8 +169,9 @@ attribute-mutation callback or a continuous-characteristic model.
 
 Individual transition schedules, age/duration dependence, eligibility, timing,
 event/tracker updates and retained ancestry are implemented under the
-[group-transition contract](group-transitions.md). Household moves remain a
-stretch goal and milestone scientific acceptance is pending. Region-specific migration remains in milestone 10; how it
+[group-transition contract](group-transitions.md). Household moves are deferred
+to milestone 10 (D114), and milestone scientific acceptance is pending.
+Region-specific migration remains in milestone 10; how it
 relates to any multiple-group representation is also open.
 
 Fixed newborn group assignment (for example all children starting in the minimum
@@ -293,6 +293,62 @@ union formation to partners within the same region. The region schema, migration
 clock and rate strata, individual versus household movement, and treatment of
 existing unions when partners move remain to be specified. No migration default
 or rule about relocating existing partners is selected.
+
+### Household moves: deferred design questions (D114)
+
+On October 30 the user deferred household moves to this milestone, rather
+than treating them as a milestone 6 stretch goal. This authorizes recording
+requirements and concerns, not implementing a household mechanism. The
+following questions must be resolved for a concrete regions application.
+
+- **Meaning of input rates.** An individual's total move hazard includes
+  initiation by that person and moves induced by others. For two partners who
+  always move together to the same destination, independent initiation hazards
+  a and b give each partner total hazard a+b while that arrangement holds.
+  Observed individual migration rates generally include accompanying moves;
+  treating them as initiation rates for every member would overpredict moves.
+  Setting one partner's initiation risk and children's risk to zero can avoid
+  double counting in a restricted household arrangement, but imposes an
+  initiator rule and becomes awkward with age-specific rates, mixed origins,
+  household changes and different destination choices. A household-level clock
+  is a candidate alternative; no rate unit, carrier, calibration or API is
+  selected. Individual data do not automatically identify household hazards.
+- **Conditional rescheduling.** A move triggered by another member can
+  legitimately resample a person's pending hazards from the current state,
+  conditional on survival/event-free history up to that time. The algorithm
+  must integrate forward from attained age and retained durations, not restart
+  age, union duration or birth spacing. In integrated-hazard terms a fresh
+  exponential threshold has the correct conditional law when the modeled
+  state captures the relevant dependence; age/duration-dependent waiting times
+  themselves are not generally memoryless. Preserve persistent heterogeneity.
+  Unmodeled shared frailty or dependence between moving and another event
+  would need an explicit model; resampling does not supply it. See
+  [Anderson's integrated-intensity simulation method](https://arxiv.org/abs/0708.0370).
+- **Household membership and eligibility.** Partner and parent links do not
+  establish coresidence or custody. Specify cohabiting partners, children of
+  earlier unions, adult children, multiple residences, and members joining or
+  leaving. Formation, dissolution, death and eligibility-age boundaries change
+  who can initiate a joint move and who can follow, and may invalidate clocks.
+- **Origins, destinations and partial moves.** Partners can start in different
+  regions; an A-to-B initiation may cause a C-to-B follower move, or no change
+  for a follower already in B. Specify whether following is mandatory, whether
+  members may stay, and what happens to existing unions when partners separate
+  geographically. Residence duration resets only for actual changes of region.
+- **Atomic state updates.** Apply one linked move as a single state change
+  before scheduling further events. Update all affected fertility cells,
+  matching pools/calibration, region restrictions and union hazards; preserve
+  parity, birth histories and ancestry. Invalidate displaced candidates so an
+  old follower clock cannot execute a second move or trigger an accidental
+  cascade. Fertility uses cell accounting, not an individual birth-clock redraw.
+- **Histories, estimands and validation.** Consider a shared move identifier,
+  initiator and follower roles alongside individual origin/destination rows.
+  Separate initiating household events from individual moves. Individual Lexis
+  rates count all moves, so they need not recover input initiation hazards;
+  household hazards require a household exposure denominator. Joint moves also
+  correlate individual outcomes. Validate conditional rescheduling against
+  analytical unchanged-hazard cases, duration preservation and reset rules,
+  household accounting, linked-event invalidation and the chosen input-rate
+  interpretation before assessing demographic performance.
 
 ## Two-sex union formation and union API
 

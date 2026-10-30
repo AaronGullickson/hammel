@@ -769,6 +769,6 @@ strata. Group duration runs from latest entry, or birth without history;
 missing pairs and gaps mean zero risk. Moves preserve ancestry and refresh
 affected events, fertility cells, matching pools and calibration. Grouped
 outputs retain all moves in a `transitions` tibble, even when empty. Household
-moves remain a stretch goal. Multiple group dimensions and calendar-time
+moves are deferred to milestone 10, internal migration and regions (D114). Multiple group dimensions and calendar-time
 inputs (milestone 7) remain unimplemented; scientific milestone acceptance
 is pending.
