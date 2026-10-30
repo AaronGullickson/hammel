@@ -1,13 +1,14 @@
 # Hammel documentation
 
-Updated October 29, 2026. Milestones 1–5 are complete by user acceptance
+Updated October 30, 2026. Milestones 1–5 are complete by user acceptance
 (D029, D050, D077, D093, D105), including parity-specific fertility,
 cell-accounted birth spacing and persistent lognormal fertility weights.
 Current behavior uses continuous event times with no monthly grid. Acceptance
 is based on the user-authored validation reports and retains their limitations.
-**Next: milestone 6, group transitions.** Detailed transition semantics and the
-public API require specification before implementation; milestone 7 is
-time-varying inputs (D103).
+**Milestone 6 is in progress:** individual group transitions are implemented;
+scientific milestone acceptance remains pending. See the
+[group-transition contract](group-transitions.md). Household moves remain a
+stretch goal; milestone 7 is time-varying inputs (D103).
 
 ## Reading order
 
@@ -17,6 +18,7 @@ time-varying inputs (D103).
 | [Design](design.md) | Implemented architecture, API, and source locations |
 | [Scientific contract](scientific-contract.md) | Current demographic assumptions and event rules |
 | [Population schema](population-schema.md) | Person/union tables and structural validation |
+| [Group transitions](group-transitions.md) | Individual competing transitions, duration/age schedules, histories and state updates |
 | [Groups](groups.md) | Group-specific schedules, multipliers, newborn identity, and baseline sampling |
 | [Ancestry](ancestry.md) | Starting proportions, parental averaging, unknown shares, and restarts |
 | [Group inheritance](group-inheritance.md) | Built-in/custom identity rules, passing, and possible groups |

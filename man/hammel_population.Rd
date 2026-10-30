@@ -4,7 +4,13 @@
 \alias{hammel_population}
 \title{Create a Hammel population}
 \usage{
-hammel_population(persons, unions = NULL, end_time = NULL, ancestry = NULL)
+hammel_population(
+  persons,
+  unions = NULL,
+  end_time = NULL,
+  ancestry = NULL,
+  transitions = NULL
+)
 }
 \arguments{
 \item{persons}{A data frame with one row per person, including deceased
@@ -28,11 +34,16 @@ to persons. Without it, grouped persons start with 100\% ancestry in their
 recorded group, regardless of parent histories. Without groups, no ancestry
 table is created automatically. Newborns average parental shares; a missing
 parent contributes its half to \code{unknown}. Identity remains separate.}
+
+\item{transitions}{Optional data frame of individual group changes with
+\code{person_id}, \code{time}, \code{group_origin}, and \code{group_dest}. Histories must chain
+to current person groups and lie within life dates and the known endpoint.
+Grouped populations always include this tibble, even when empty.}
 }
 \value{
 A named list of class \code{hammel_population} with components \code{persons},
 \code{unions}, and \code{end_time}, plus an \code{ancestry} tibble when supplied or when
-persons has groups. Ancestry is retained across restarts and deaths.
+persons has groups, and a \code{transitions} tibble when groups are present. Ancestry is retained across restarts and deaths.
 }
 \description{
 Collect person and union histories in an inspectable population object.

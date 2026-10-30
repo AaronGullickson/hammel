@@ -53,6 +53,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Individual transitions core; household moves stretch goal | D109 |
 | Transition rate-table columns and common band type | D110 |
 | Grouped output always includes transition history tibble | D111 |
+| Individual transition implementation, duration and ancestry | D112 |
 
 ## Recorded decisions
 
@@ -2275,3 +2276,28 @@ An empty table must retain the defined column types.
 Exact history column names, initialization/restart validation and observation
 boundary semantics remain to be specified. This requirement does not select
 whether ungrouped output includes the component.
+
+## D112 — Individual group-transition execution (October 30, 2026)
+
+**Status:** implementation authorized by the user and implemented; milestone 6
+scientific acceptance remains pending.
+
+The user requested `group_transition(rates)` and pipeable
+`set_group_transition(model, rates)`, with person-level competing waiting times
+and updates to all state affected by a move. D106–D111 govern annual hazards,
+directed schedules, one common age/duration band type, optional sex and
+union-type strata, no count targeting, individual-only core scope and retained
+transition histories. Household switching is explicitly excluded from this
+implementation.
+
+The user confirmed duration since latest group entry, falling back to age
+without recorded transitions; omitted pairs and gaps mean zero risk. The user
+also confirmed ancestry proportions stay unchanged. Initial ancestry may be
+inferred from starting identities when shares are absent; newborn shares
+continue to follow parental ancestry independently of identity.
+
+The [implemented contract](group-transitions.md) specifies the history schema,
+half-open bands, state/event invalidation, restarts and observations. Columns
+are `person_id`, `time`, `group_origin`, and `group_dest`; grouped populations
+retain a typed empty table when no moves occur. Software validation does not
+establish scientific acceptance or authorize household moves.

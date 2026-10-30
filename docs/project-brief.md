@@ -5,7 +5,7 @@ on October 15, 2026 (D029), milestone 2 (union formation) on October 19,
 2026 (D050), milestone 3 (groups) on October 27, 2026 (D077), and milestone 4
 (dissolution/remarriage/cohabitation) on October 29, 2026 (D093). Milestone 5
 (parity-specific fertility, cell-accounted spacing and fertility heterogeneity)
-was accepted October 29, 2026 (D105). Group transitions, milestone 6, are next.
+was accepted October 29, 2026 (D105). Individual group transitions, milestone 6, are implemented; scientific acceptance is pending.
 See [testing](testing.md) for evidence and limits.
 
 ## Purpose
@@ -105,7 +105,7 @@ belongs to the user; completion does not establish universal accuracy or remove
 sparse-cell, calibration, or fertility-transition limitations. Weighted matching
 does not model marriage squeezes; fuller two-sex models remain future work.
 
-The [roadmap](roadmap.md) records group transitions next (milestone 6), then
+The [roadmap](roadmap.md) records group transitions in progress (milestone 6), then
 time-varying inputs (milestone 7), summaries and migration work. No future
 feature is authorized by milestone completion. Fixed newborn assignment was
 explicitly deferred to the group-transitions discussion; custom inheritance
@@ -128,7 +128,7 @@ risk denominators. `get_unpartnered_births()` supports father-matching assessmen
 Acceptance retains the documented fertility-transition, sparse-pool,
 initialization, and calibration limitations; it does not authorize later work.
 
-## Milestone 5 complete; group transitions next
+## Milestone 5 complete; group transitions in progress
 
 The user accepted milestone 5 on October 29, 2026 (D105), based on the
 [report](../validation/milestone5.qmd) and its rendered assessment. Its final
@@ -148,11 +148,14 @@ can change inherited weight distributions, and restarts are not exact
 checkpoints. Completion retains these limitations rather than asserting
 universal rate recovery.
 
-Next is milestone 6, group transitions (D103/D105). Rates, clocks, histories,
-ancestry implications and event/tracker invalidation require a scientific
-specification before implementation. Groups should cover most categorical
-characteristics, with multiple types of groups an optional complexity direction;
-no schema or API is selected yet. Calendar-time inputs follow in milestone 7.
+Milestone 6 individual transitions are implemented following the user's October
+30 authorization; see [the transition contract](group-transitions.md). The
+process uses annual hazards, common age or duration bands, directed pair
+columns and optional sex/union-type strata. Group histories are retained and
+affected risks, cells and matching state update at moves. Ancestry stays
+unchanged. Household moves remain a stretch goal, multiple group dimensions
+remain optional future work, and milestone scientific acceptance is pending.
+Calendar-time inputs follow in milestone 7.
 
 ## Boundaries and future work
 

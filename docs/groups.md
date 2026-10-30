@@ -67,7 +67,7 @@ summaries measure the resulting histories normally.
 
 ## Lookup and timing
 
-An optional `group` column identifies each person's fixed group. Values must be
+An optional `group` column identifies each person's current group. Values must be
 nonmissing character labels or finite numeric codes; character labels must be
 nonempty. Types are preserved in population results. Comparisons use character
 representations, including when numeric codes are matched to labels. Alphabetical
@@ -99,13 +99,13 @@ falling back to the mother when the father is unknown. Fertility may attach a
 `create_group_inheritance()` object for other parental, ancestry, hierarchy,
 or custom assignment rules. The child's assigned schedule applies from birth,
 including neonatal mortality. Possible identities include initial identities,
-positive reference ancestry groups, and explicitly declared outputs; grouped
+positive reference ancestry groups, transition origins/destinations, and explicitly declared outputs; grouped
 schedules and categorical matching must cover the full set before execution.
 The father need not share that group by default. Optional `prevent_exogamy`
 restrictions make men of prohibited groups ineligible. Group formula terms and symmetric pair effects
 can change matching utilities; see [group matching](group-matching.md).
 Other eligibility rules remain.
-Group identity is fixed over life and retained across restarts. Ancestry
+Group identity changes only through the optional [group-transition process](group-transitions.md); current identity and transition history are retained across restarts. Ancestry
 proportions are tracked separately in the population's `ancestry` tibble;
 see [ancestry](ancestry.md) for initialization, averaging, and unknown shares.
 See [group inheritance](group-inheritance.md) for fallbacks, passing, and custom
@@ -145,21 +145,22 @@ objects, and unchanged behavior without group columns.
 
 `calculate_fertility_rates(..., by_group = TRUE)` and
 `calculate_population_size(..., by_group = TRUE)` return separate counts for
-each group appearing anywhere in the supplied person history. Both default to
+each group appearing in current person identities or the retained transition history. Both default to
 FALSE, preserving pooled output. TRUE requires a population/persons `group`
 column; no group identity is inferred when that column is absent. Labels retain
-their input type and groups appear in first-occurrence order. No extra pooled
+their input type; current groups appear in first-occurrence order, followed by any historical groups absent from current identities. No extra pooled
 group rows or groups absent from the history are added.
 
 Lexis counts retain the full period/age/sex grid in every group, including
-zero-exposure cells. Exposure and deaths use the person's group; births use
-the mother's group, even if an input child's group differs. Existing maternal
+zero-exposure cells. Exposure is split at group transitions, deaths use the
+person's group at death, and births use the mother's group at birth, even if
+an input child's group differs. Existing maternal
 age rules, half-open boundaries, and zero-exposure NA rates are unchanged.
 Unknown-mother births stay in the single period-level `unassigned_births`
 attribute and are not assigned a maternal group from the child. Combining
 `by_group = TRUE` and `by_union_type = TRUE` returns unpartnered and discovered
 union-type rows within each group, without an overall row. Each spouse's formation and
-exposure belong to that spouse's group, including cross-group unions.
+exposure belong to that spouse's group at the event or exposure time, including cross-group unions.
 
 `calculate_tfr()` and `calculate_life_table()` automatically treat an input
 `group` column as an additional stratum alongside periods and union status

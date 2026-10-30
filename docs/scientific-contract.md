@@ -1,10 +1,12 @@
 # Scientific contract
 
-Updated October 29, 2026. This is the current mortality, fertility, union-formation,
+Updated October 30, 2026. This is the current mortality, fertility, union-formation,
 dissolution, remarriage, cohabitation/conversion, group identity/ancestry, and
 observation contract. Milestones 1–5 are accepted as complete
 (D029, D050, D077, D093, D105), retaining documented limitations. Milestone 6
-group transitions are next and require a separate scientific specification.
+individual group transitions are implemented under the
+[transition contract](group-transitions.md); scientific milestone acceptance
+remains pending.
 Earlier monthly, exact
 age-varying and midpoint compensation specifications are available in Git
 history; the [decision log](decisions.md) records their replacement by
@@ -407,7 +409,7 @@ half-open duration bands;
 gaps and uncovered durations have zero hazard. New episodes start at duration
 zero; active input unions and restarts use attained duration. The union's
 sampled dissolution date is retained through births. Exact same-person ties
-select death, birth, dissolution, then search. A tied birth occurs before
+select death, birth, dissolution, conversion, search, then group transition. A tied birth occurs before
 closure and retains that husband as father.
 
 Execution ends the episode with reason `dissolution`, clears partner links,
@@ -488,7 +490,7 @@ updated run metadata. Times that cannot be represented at the chosen numeric
 scale are rejected. Candidates exactly at the run endpoint are excluded.
 
 Each person retains one selected next event. Exact same-person ties select
-death, birth, dissolution, then search. A union retains its sampled dissolution
+death, birth, dissolution, conversion, search, then group transition. A union retains its sampled dissolution
 date through births, so a tied dissolution can follow a birth at the same time. Across people, exact ties follow queue insertion order:
 initial row order; after birth, newborn before mother. Otherwise execute the
 earliest continuous candidate. Father availability changes immediately when
@@ -513,9 +515,10 @@ with `set_population(result)` to retain its process specifications.
 See [demographic analysis](demographic-analysis.md) for worked workflows.
 Analyze one independent history per call; duplicated IDs from stacked
 replications are invalid. `by_group = TRUE` optionally separates Lexis and
-population-size counts by the recorded group. TFR and life tables automatically
+population-size counts by group at the observation time, splitting exposure
+at recorded transitions. TFR and life tables automatically
 preserve group strata in input tables. Exposure/deaths use the person's group,
-births use the mother's group, and union formations use each spouse's own group.
+births use the mother's group at birth, and union formations use each spouse's group at formation.
 Unknown-mother births remain in the period-level attribute without assigning a
 maternal group. Defaults pool groups; arbitrary custom strata are not supported.
 See [groups](groups.md) for output ordering, empty cases, and worked examples.
@@ -751,8 +754,14 @@ non-checkpoint restarts. Adjusted rates that include unrealized expected births
 are accounting diagnostics, not realized fertility. No universal scientific
 accuracy claim or new acceptance threshold is inferred.
 
-Group transitions (milestone 6) are the next design task. Transition eligibility,
-clocks, identity/ancestry histories, and event and tracker updates need an
-explicit contract before execution changes. Multiple types of groups remain an
-option for more complex applications. Time-varying inputs remain milestone 7;
-neither mechanism is implemented or authorized by milestone 5 completion.
+Individual group transitions (milestone 6) are implemented under the
+[group-transition contract](group-transitions.md), following explicit user
+implementation authorization on October 30. Rates are annual hazards for
+directed pairs with a common age or duration axis and optional sex/union-type
+strata. Group duration runs from latest entry, or birth without history;
+missing pairs and gaps mean zero risk. Moves preserve ancestry and refresh
+affected events, fertility cells, matching pools and calibration. Grouped
+outputs retain all moves in a `transitions` tibble, even when empty. Household
+moves remain a stretch goal. Multiple group dimensions and calendar-time
+inputs (milestone 7) remain unimplemented; scientific milestone acceptance
+is pending.

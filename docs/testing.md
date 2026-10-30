@@ -1,6 +1,6 @@
 # Testing and milestone validation
 
-Updated October 29, 2026. Milestones 1–5 are accepted as complete (D029,
+Updated October 30, 2026. Milestones 1–5 are accepted as complete (D029,
 D050, D077, D093, D105). Software test history and the user's demographic assessment
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
@@ -21,13 +21,14 @@ Its limitations include sparse or structurally infeasible cells, unrealized
 expected births (an accounting diagnostic rather than actual births),
 history completeness and selection-driven weight distributions. Accepted
 completion does not introduce numerical thresholds or universal rate-recovery
-claims. Group transitions (milestone 6) are next; their specification and API
-remain unresolved.
+claims. Individual group transitions (milestone 6) are now implemented
+under [their contract](group-transitions.md), with scientific acceptance pending.
 
 Earlier dated verification records below describe the versions tested at the
 time, including superseded corrections and intermediate proposal status.
-Current execution is D101–D104 and milestone status is D105. Closeout checked
-local Markdown links and whitespace; it made no engine or report edits.
+Current execution includes D101–D104 and D112; accepted milestone status is
+D105. The October 29 milestone 5 closeout checked local Markdown links and
+whitespace; that closeout made no engine or report edits.
 Supporting evidence and reproduction-version notes are in [validation/milestone5/](../validation/milestone5/README.md).
 
 ## Milestone 4 accepted assessment
@@ -52,6 +53,19 @@ acceptance at the time; D093 records the subsequent user acceptance. Completion
 retains sparse-cell, initialization, fertility-transition and calibration limits.
 
 ## Run the suite
+
+October 30, 2026 group-transition implementation: `devtools::test()` passed
+the full offline suite with no failures. The live database case was skipped
+without opt-in; the local HMD reader test emitted an environment warning from
+`timedatectl` (status 1). Focused `devtools::test(filter = "group-transition")`
+checks cover analytical competing destination probabilities, age and duration
+support, duration across restarts, sex/union-type strata, initially empty
+destinations, malformed schedules, typed empty transition histories, ancestry
+retention, mortality after moving, matching-pool and fertility-cell updates,
+pair-dependent dissolution and cohabitation conversion, and historical group
+exposure/event attribution. Cell consistency diagnostics are enabled in the
+pool/fertility integration case. These are software and analytical checks;
+milestone 6 scientific acceptance remains pending.
 
 The package uses testthat edition 3 with testthat >= 3.2.0 for scoped mocks.
 Tests live in `tests/testthat/`, with the standard runner `tests/testthat.R`.

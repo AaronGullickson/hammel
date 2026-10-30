@@ -41,6 +41,7 @@ calculate_cohab_convert_rate <- function(population, time_breaks,
   if (is.null(population$end_time) || tail(time_breaks, 1) > population$end_time)
     stop("Observation requires a known endpoint and cannot extend beyond it.", call. = FALSE)
   persons <- population$persons
+  persons <- prepare_group_observations(persons, population, by_group)
   groups <- observation_groups(persons, by_group)
   group_count <- if (by_group) length(groups) else 1L
   unions <- population$unions[population$unions$union_type == "cohab", ]
@@ -54,6 +55,7 @@ calculate_cohab_convert_rate <- function(population, time_breaks,
   result[[paste0(axis, "_start")]] <- breaks[grid$a]
   result[[paste0(axis, "_end")]] <- breaks[grid$a + 1L]
   if (by_group) result$group <- groups[grid$g]
+  if (by_group) unions <- prepare_union_group_observations(unions, population, groups)
   counts <- dissolution_counts_cpp(unions, time_breaks, breaks, indices, group_count,
     origins = origins, event_reason = "conversion")
   result$union_years <- counts$union_years

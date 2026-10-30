@@ -1,7 +1,8 @@
 # Development roadmap
 
-Updated October 29, 2026. Milestones 1–5 are complete by user acceptance
-(D029, D050, D077, D093, D105). **The next milestone is 6: group transitions.**
+Updated October 30, 2026. Milestones 1–5 are complete by user acceptance
+(D029, D050, D077, D093, D105). **Milestone 6 is in progress: individual group transitions are implemented,
+with scientific acceptance pending.**
 Milestone 7 is time-varying inputs (D103). Future entries record planning
 priorities, not authorization to implement unspecified demographic behavior
 or an unselected public API.
@@ -10,7 +11,7 @@ or an unselected public API.
 | --- | --- | --- |
 | 4 | Union dissolution, age/duration remarriage, and cohabitation | Complete (D093) |
 | 5 | Parity-specific fertility and fertility heterogeneity | Complete (D105); limitations retained |
-| 6 | Group transitions, including categorical characteristics represented by groups | Next (D103/D105); scientific specification and API first |
+| 6 | Group transitions, including categorical characteristics represented by groups | Individual process implemented; scientific acceptance pending |
 | 7 | Time-varying rates, matching, and inheritance within a simulation run | Planned (D103) |
 | 8 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed |
 | 9 | Immigration from outside the system, tracking generation | Tentative |
@@ -21,8 +22,7 @@ moves are a stretch goal (D109), useful when groups represent regions; their
 membership and follower rules remain unspecified. Core completion does not
 require household moves. D106–D108 select annual hazards, directed competing
 age- or duration-specific schedules with optional strata,
-and no transition-count target adjustment. The remaining scientific contract
-and public API must be specified before implementation.
+and no transition-count target adjustment. The implemented contract is in [group transitions](group-transitions.md).
 D110 requires `group_origin`, `group_dest`, `rate`, and one common age or
 duration band type across the transition table, with optional `sex` and
 `union_type` columns; absent stratification columns apply universally.
@@ -152,7 +152,7 @@ October 29, 2026 (D105). Unrealized-intensity/sparse-cell limitations, incomplet
 birth histories and reproductive selection remain explicit; completion does
 not imply universal rate recovery or stationary cohort weight distributions.
 
-## Next milestone 6: group transitions
+## Milestone 6: group transitions (in progress)
 
 Allow group membership to change during life. Use **group transitions** for
 this feature, reserving conversion terminology for cohabitation becoming
@@ -168,10 +168,10 @@ interact in rate stratification, matching, newborn assignment, transitions and
 ancestry remains to be specified. The roadmap does not introduce an arbitrary
 attribute-mutation callback or a continuous-characteristic model.
 
-Transition schedules, age/duration dependence, eligibility, timing, effects on
-pending events and fertility/matching tracker updates, and implications for
-recorded identity and ancestry require a scientific specification before
-implementation. Region-specific migration remains in milestone 10; how it
+Individual transition schedules, age/duration dependence, eligibility, timing,
+event/tracker updates and retained ancestry are implemented under the
+[group-transition contract](group-transitions.md). Household moves remain a
+stretch goal and milestone scientific acceptance is pending. Region-specific migration remains in milestone 10; how it
 relates to any multiple-group representation is also open.
 
 Fixed newborn group assignment (for example all children starting in the minimum

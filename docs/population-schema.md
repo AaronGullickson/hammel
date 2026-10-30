@@ -119,3 +119,14 @@ restart. Newly drawn male entries are NA, and existing male values are unused.
 When the feature is disabled, output omits the column even if supplied (D104).
 Re-enabling from that output draws fresh weights for every woman. See
 [heterogeneity](fertility-heterogeneity-notes.md) for assignment and inheritance.
+
+## Group-transition histories
+
+Grouped populations always include `transitions`, a tibble with columns
+`person_id`, `time` (years), `group_origin`, and `group_dest`. It contains one
+row per individual move, preserves all earlier rows across restarts, and has
+the same schema when empty. Group labels use the persons group type. Histories
+are validated against life dates, the known endpoint, chronological chaining
+and current group identity. `hammel_population(..., transitions = ...)` accepts
+base data frames. See [group transitions](group-transitions.md) for event and
+observation semantics. Ancestry proportions are unaffected by moves.

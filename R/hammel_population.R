@@ -18,6 +18,10 @@
 #'   links the same-time marriage through `previous_cohab_id`.
 #' @param end_time Optional finite simulation endpoint in years. Its calendar origin is supplied by the user. `NULL` means
 #'   that the endpoint is unknown.
+#' @param transitions Optional data frame of individual group changes with
+#'   `person_id`, `time`, `group_origin`, and `group_dest`. Histories must chain
+#'   to current person groups and lie within life dates and the known endpoint.
+#'   Grouped populations always include this tibble, even when empty.
 #' @param ancestry Optional data frame with exactly one row per person, keyed
 #'   by `person_id`, known shares in `group_<label>` columns, and an `unknown`
 #'   share. Numeric shares must be finite, between zero and one, and sum to one
@@ -29,7 +33,7 @@
 #'
 #' @return A named list of class `hammel_population` with components `persons`,
 #'   `unions`, and `end_time`, plus an `ancestry` tibble when supplied or when
-#'   persons has groups. Ancestry is retained across restarts and deaths.
+#'   persons has groups, and a `transitions` tibble when groups are present. Ancestry is retained across restarts and deaths.
 #' @export
 #'
 #' @examples
@@ -41,11 +45,13 @@
 #' )
 #' sim$persons
 #' sim$unions
-hammel_population <- function(persons, unions = NULL, end_time = NULL, ancestry = NULL) {
+hammel_population <- function(persons, unions = NULL, end_time = NULL, ancestry = NULL, transitions = NULL) {
   results <- structure(
     list(persons = persons, unions = normalize_unions(unions), end_time = end_time),
     class = "hammel_population"
   )
+  if (!is.null(transitions)) results$transitions <- transitions
+  results <- normalize_population_transitions(results)
   if (!is.null(ancestry)) results$ancestry <- ancestry
   validate_population(results)
   results <- normalize_population_ancestry(results)
@@ -82,6 +88,7 @@ validate_population <- function(results) {
   check_columns(persons, c("person_id", "sex", "birth_time", "death_time",
                           "mother_id", "father_id"), "persons")
   check_groups(persons, "persons")
+  validate_transition_history(results)
   check_columns(unions, names(empty_unions()), "unions")
   check_numeric_column(persons$person_id, "persons$person_id", id = TRUE)
   if (anyDuplicated(persons$person_id)) {

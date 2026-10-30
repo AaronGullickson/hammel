@@ -1,6 +1,7 @@
 #include <Rcpp.h>
 #include <algorithm>
 #include <map>
+#include "group_history.h"
 
 using namespace Rcpp;
 
@@ -15,6 +16,7 @@ int demographic_bin(double value, const NumericVector& breaks) {
 List demographic_counts_cpp(DataFrame persons, NumericVector time_breaks,
                              NumericVector age_breaks, IntegerVector group_indices,
                              int group_count) {
+  GroupHistory group_history(persons, group_indices);
   NumericVector ids = persons["person_id"], born = persons["birth_time"];
   NumericVector died = persons["death_time"], mothers = persons["mother_id"];
   CharacterVector sex = persons["sex"];
@@ -36,12 +38,14 @@ List demographic_counts_cpp(DataFrame persons, NumericVector time_breaks,
       for (int a = 0; a < na; ++a) {
         double enter = std::max(lo, born[i] + age_breaks[a]);
         double exit = std::min(hi, born[i] + age_breaks[a + 1]);
-        if (exit > enter) exposure[t + nt * (a + na * s) + stride * group_indices[i]] += exit - enter;
+        group_history.split(i, enter, exit, [&](int g, double lo, double hi) {
+          exposure[t + nt * (a + na * s) + stride * g] += hi - lo;
+        });
       }
     }
     int t = demographic_bin(died[i], time_breaks);
     int a = demographic_bin(died[i] - born[i], age_breaks);
-    if (t >= 0 && a >= 0) deaths[t + nt * (a + na * s) + stride * group_indices[i]] += 1;
+    if (t >= 0 && a >= 0) deaths[t + nt * (a + na * s) + stride * group_history.at(i, died[i], true)] += 1;
 
     t = demographic_bin(born[i], time_breaks);
     if (t < 0) continue;
@@ -54,7 +58,7 @@ List demographic_counts_cpp(DataFrame persons, NumericVector time_breaks,
     if (as<std::string>(sex[mother->second]) != "f")
       stop("Birth-rate extraction requires female maternal records.");
     a = demographic_bin(born[i] - born[mother->second], age_breaks);
-    if (a >= 0) births[t + nt * (a + na) + stride * group_indices[mother->second]] += 1;
+    if (a >= 0) births[t + nt * (a + na) + stride * group_history.at(mother->second, born[i], true)] += 1;
   }
   return List::create(_["person_years"] = exposure, _["deaths"] = deaths,
                        _["births"] = births, _["unassigned_births"] = unknown);
@@ -66,6 +70,7 @@ List demographic_counts_cpp(DataFrame persons, NumericVector time_breaks,
 List union_counts_cpp(DataFrame persons, DataFrame unions,
                       NumericVector time_breaks, NumericVector age_breaks, IntegerVector group_indices,
                              int group_count) {
+  GroupHistory group_history(persons, group_indices);
   NumericVector ids = persons["person_id"], born = persons["birth_time"];
   NumericVector died = persons["death_time"];
   CharacterVector sex = persons["sex"];
@@ -118,7 +123,9 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
         for (int a = 0; a < na; ++a) {
           const double enter = std::max(lo, born[i] + age_breaks[a]);
           const double exit = std::min(hi, born[i] + age_breaks[a + 1]);
-          if (exit > enter) partnered[t + nt * (a + na * s) + stride * group_indices[i]] += exit - enter;
+          group_history.split(i, enter, exit, [&](int g, double lo, double hi) {
+            partnered[t + nt * (a + na * s) + stride * g] += hi - lo;
+          });
         }
       }
     }
@@ -137,8 +144,8 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
         return interval.first < time;
       });
     const bool in_union = after != intervals.begin() && died[i] <= std::prev(after)->second;
-    if (in_union) deaths_partnered[t + nt * (a + na * s) + stride * group_indices[i]] += 1;
-    else deaths_unpartnered[t + nt * (a + na * s) + stride * group_indices[i]] += 1;
+    if (in_union) deaths_partnered[t + nt * (a + na * s) + stride * group_history.at(i, died[i], true)] += 1;
+    else deaths_unpartnered[t + nt * (a + na * s) + stride * group_history.at(i, died[i], true)] += 1;
   }
   NumericVector births_partnered(cells), births_unpartnered(cells);
   NumericVector mothers = persons["mother_id"];
@@ -157,8 +164,8 @@ List union_counts_cpp(DataFrame persons, DataFrame unions,
     const auto& dissolution_times = dissolution_ends[mother];
     const bool in_union = (after != intervals.begin() && born[child] < std::prev(after)->second) ||
       std::binary_search(dissolution_times.begin(), dissolution_times.end(), born[child]);
-    if (in_union) births_partnered[t + nt * (a + na) + stride * group_indices[mother]] += 1;
-    else births_unpartnered[t + nt * (a + na) + stride * group_indices[mother]] += 1;
+    if (in_union) births_partnered[t + nt * (a + na) + stride * group_history.at(mother, born[child], true)] += 1;
+    else births_unpartnered[t + nt * (a + na) + stride * group_history.at(mother, born[child], true)] += 1;
   }
   return List::create(_["deaths_partnered"] = deaths_partnered,
                       _["deaths_unpartnered"] = deaths_unpartnered,
@@ -174,6 +181,7 @@ List dissolution_counts_cpp(DataFrame unions, NumericVector time_breaks,
                              NumericVector dur_breaks, IntegerVector group_indices,
                              int group_count, Nullable<NumericVector> origins = R_NilValue,
                              std::string event_reason = "dissolution") {
+  GroupHistory group_history(unions, group_indices);
   NumericVector starts = unions["start_time"], ends = unions["end_time"];
   const NumericVector axis_origins = origins.isNotNull() ? NumericVector(origins) : starts;
   CharacterVector reasons = unions["end_reason"];
@@ -182,7 +190,6 @@ List dissolution_counts_cpp(DataFrame unions, NumericVector time_breaks,
   NumericVector exposure(stride * group_count), events(stride * group_count);
   for (int u = 0; u < starts.size(); ++u) {
     if (u % 1024 == 0) checkUserInterrupt();
-    const R_xlen_t offset = stride * group_indices[u];
     const double end = NumericVector::is_na(ends[u]) ? time_breaks[nt] : ends[u];
     for (int t = 0; t < nt; ++t) {
       const double lo = std::max(starts[u], time_breaks[t]);
@@ -191,14 +198,16 @@ List dissolution_counts_cpp(DataFrame unions, NumericVector time_breaks,
       for (int d = 0; d < nd; ++d) {
         const double enter = std::max(lo, axis_origins[u] + dur_breaks[d]);
         const double exit = std::min(hi, axis_origins[u] + dur_breaks[d + 1]);
-        if (exit > enter) exposure[offset + t + nt * d] += exit - enter;
+        group_history.split(u, enter, exit, [&](int g, double lo, double hi) {
+          exposure[stride * g + t + nt * d] += hi - lo;
+        });
       }
     }
     if (NumericVector::is_na(ends[u]) || CharacterVector::is_na(reasons[u]) ||
         as<std::string>(reasons[u]) != event_reason) continue;
     const int t = demographic_bin(ends[u], time_breaks);
     const int d = demographic_bin(ends[u] - axis_origins[u], dur_breaks);
-    if (t >= 0 && d >= 0) events[offset + t + nt * d] += 1;
+    if (t >= 0 && d >= 0) events[stride * group_history.at(u, ends[u], true) + t + nt * d] += 1;
   }
   return List::create(_["union_years"] = exposure, _["dissolutions"] = events);
 }
@@ -274,6 +283,7 @@ List marriage_counts_cpp(DataFrame persons, DataFrame unions,
                          IntegerVector group_indices, int group_count,
                          Nullable<NumericVector> dur_breaks = R_NilValue, bool counts_cohab = false,
                          std::string entry_type = "pooled", bool marriage_measure = false) {
+  GroupHistory group_history(persons, group_indices);
   const auto histories = marriage_histories(persons, unions);
   NumericVector born = persons["birth_time"], died = persons["death_time"];
   CharacterVector sex = persons["sex"];
@@ -302,8 +312,9 @@ List marriage_counts_cpp(DataFrame persons, DataFrame unions,
         for (int a = 0; a < bands; ++a) {
           const double enter = std::max(start, origin + breaks[a]);
           const double exit = std::min(end, origin + breaks[a + 1]);
-          if (exit > enter)
-            exposure[t + nt * (a + bands * s) + offsets[previous] + stride * group_indices[i]] += exit - enter;
+          group_history.split(i, enter, exit, [&](int g, double lo, double hi) {
+            exposure[t + nt * (a + bands * s) + offsets[previous] + stride * g] += hi - lo;
+          });
         }
       }
     };
@@ -320,7 +331,7 @@ List marriage_counts_cpp(DataFrame persons, DataFrame unions,
       const int a = demographic_bin(episode.start - origin, breaks);
       if ((marriage_measure ? !episode.cohab : !converted_entry) && t >= 0 && a >= 0 &&
           (entry_type == "pooled" || (episode.cohab ? entry_type == "cohab" : entry_type == "marriage")))
-        formations[t + nt * (a + bands * s) + offsets[previous] + stride * group_indices[i]] += 1;
+        formations[t + nt * (a + bands * s) + offsets[previous] + stride * group_history.at(i, episode.start, true)] += 1;
       if (marriage_measure && episode.cohab)
         add_exposure(episode.start, episode.end, previous);
       available = episode.end;
@@ -340,6 +351,7 @@ List marriage_counts_cpp(DataFrame persons, DataFrame unions,
 List typed_demographic_counts_cpp(DataFrame persons, DataFrame unions,
     NumericVector time_breaks, NumericVector age_breaks,
     IntegerVector group_indices, int group_count, CharacterVector types) {
+  GroupHistory group_history(persons, group_indices);
   const auto histories = marriage_histories(persons, unions);
   const int nt = time_breaks.size() - 1, na = age_breaks.size() - 1;
   const R_xlen_t stride = static_cast<R_xlen_t>(nt) * na * 2;
@@ -381,7 +393,7 @@ List typed_demographic_counts_cpp(DataFrame persons, DataFrame unions,
     if (t >= 0 && a >= 0) {
       const int k = classify(i, died[i], false);
       const int sex = as<std::string>(sexes[i]) == "m" ? 0 : 1;
-      if (k >= 0) deaths[cells * k + t + nt * (a + na * sex) + stride * group_indices[i]] += 1;
+      if (k >= 0) deaths[cells * k + t + nt * (a + na * sex) + stride * group_history.at(i, died[i], true)] += 1;
     }
     t = demographic_bin(born[i], time_breaks);
     if (t < 0 || NumericVector::is_na(mothers[i])) continue;
@@ -389,7 +401,7 @@ List typed_demographic_counts_cpp(DataFrame persons, DataFrame unions,
     a = demographic_bin(born[i] - born[mother], age_breaks);
     if (a < 0) continue;
     const int k = classify(mother, born[i], true);
-    if (k >= 0) births[cells * k + t + nt * (a + na) + stride * group_indices[mother]] += 1;
+    if (k >= 0) births[cells * k + t + nt * (a + na) + stride * group_history.at(mother, born[i], true)] += 1;
   }
   return List::create(_["person_years"] = exposure, _["births"] = births, _["deaths"] = deaths);
 }
@@ -447,6 +459,7 @@ IntegerVector unpartnered_birth_rows_cpp(DataFrame persons, DataFrame unions) {
 List fertility_parity_counts_cpp(DataFrame persons, DataFrame unions,
     NumericVector time_breaks, NumericVector age_breaks, NumericVector parity_breaks,
     IntegerVector group_indices, int group_count, CharacterVector types, bool split_types) {
+  GroupHistory group_history(persons, group_indices);
   NumericVector ids=persons["person_id"], born=persons["birth_time"],
     died=persons["death_time"], mothers=persons["mother_id"];
   CharacterVector sexes=persons["sex"];
@@ -487,7 +500,7 @@ List fertility_parity_counts_cpp(DataFrame persons, DataFrame unions,
         coverage.back().end=std::max(coverage.back().end,e.end);
       else coverage.push_back(e);
     }
-    auto cell=[&](int t,int a,int p,int k){return t+nt*a+static_cast<R_xlen_t>(nt)*na*group_indices[i]+base*(p+np*k);};
+    auto cell=[&](int t,int a,int p,int k,int g){return t+nt*a+static_cast<R_xlen_t>(nt)*na*g+base*(p+np*k);};
     double life_end=NumericVector::is_na(died[i])?time_breaks[nt]:died[i];
     for(size_t j=0;j<=b.size();++j) {
       int p=demographic_bin(static_cast<double>(j),parity_breaks);
@@ -497,12 +510,14 @@ List fertility_parity_counts_cpp(DataFrame persons, DataFrame unions,
         double lo=std::max({left,born[i],time_breaks[t],born[i]+age_breaks[a]});
         double hi=std::min({right,life_end,time_breaks[t+1],born[i]+age_breaks[a+1]});
         if(hi<=lo) continue;
-        double remaining=hi-lo;
-        if(split_types) for(const auto&e:coverage) {
-          double years=std::max(0.0,std::min(hi,e.end)-std::max(lo,e.start));
-          exposure[cell(t,a,p,e.type)]+=years; remaining-=years;
-        }
-        exposure[cell(t,a,p,0)]+=std::max(0.0,remaining);
+        group_history.split(i, lo, hi, [&](int g, double lo, double hi) {
+          double remaining=hi-lo;
+          if(split_types) for(const auto&e:coverage) {
+            double years=std::max(0.0,std::min(hi,e.end)-std::max(lo,e.start));
+            exposure[cell(t,a,p,e.type,g)]+=years; remaining-=years;
+          }
+          exposure[cell(t,a,p,0,g)]+=std::max(0.0,remaining);
+        });
       }
       if(j<b.size()) {
         int t=demographic_bin(b[j],time_breaks), a=demographic_bin(b[j]-born[i],age_breaks), k=0;
@@ -510,7 +525,7 @@ List fertility_parity_counts_cpp(DataFrame persons, DataFrame unions,
           for(const auto&e:h) if(e.start<=b[j] && b[j]<e.end) k=e.type;
           for(const auto&e:h) if(e.end==b[j] && e.birth_first) { k=e.type; break; }
         }
-        if(t>=0 && a>=0) events[cell(t,a,p,k)]+=1;
+        if(t>=0 && a>=0) events[cell(t,a,p,k,group_history.at(i,b[j],true))]+=1;
       }
     }
   }

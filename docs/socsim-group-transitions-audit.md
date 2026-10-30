@@ -191,25 +191,20 @@ The user selected annual person-year hazards for Hammel's transition inputs
 (D106), continuing its existing rate convention. An annual probability p can
 be converted with `-log(1-p)` under a constant-hazard, no-competing-exit
 interpretation; observed cause-specific probabilities need additional care.
-Transition execution remains unimplemented.
+Individual transition execution is now implemented in Hammel; see the
+[transition contract](group-transitions.md).
 
 D107/D110 select directed competing schedules and one common age or duration
 band type across the transition rate table. Required columns are
 `group_origin`, `group_dest`, and `rate`, alongside the bands. Optional `sex`
 and `union_type` columns stratify schedules; omitted dimensions apply
-universally. Duration origin and initial entry histories, category coverage
-and missing-pair rules still need specification.
-
-The user still needs to select remaining eligibility rules, individual versus linked household moves,
-identity versus ancestry effects, newborn fixed assignment, and observation
-boundary/tie semantics. A single group dimension versus multiple independent
-categorical dimensions also remains open under D103/D105.
-
-Implementation would need to update group-specific event clocks, male pools,
-matching calibration, female-intensity contributions, fertility cells, union
-pair hazards, and observations consistently. In particular, Hammel cannot
-reuse its current immutable-group observation assumptions after adding moves.
-These are dependencies to specify, not authorization to change the engine.
+universally. The October 30 implementation request and follow-up decisions
+select latest-entry duration (age without history), zero risk for missing pairs
+and gaps, and unchanged ancestry. The implemented individual process updates
+events, pools, calibration, fertility cells, pair hazards and historical group
+observations. Household moves remain a stretch goal; fixed newborn assignment
+and multiple independent group dimensions remain separate future work.
+Scientific milestone acceptance is pending.
 
 Useful future checks include constant one-way hazards against analytical
 survival; two outgoing destinations against competing-risk probabilities;

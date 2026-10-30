@@ -77,6 +77,7 @@ calculate_entry_rates <- function(population, time_breaks, age_breaks,
   if (is.null(population$end_time) || tail(time_breaks, 1) > population$end_time)
     stop("Observation requires a known endpoint and cannot extend beyond it.", call. = FALSE)
   persons <- population$persons
+  persons <- prepare_group_observations(persons, population, by_group)
   groups <- observation_groups(persons, by_group)
   group_count <- if (by_group) length(groups) else 1L
   indices <- if (by_group) match(persons$group, groups) - 1L else rep(0L, nrow(persons))

@@ -48,6 +48,7 @@ hammel_model <- function() {
 set_population <- function(model, population) {
   check_model(model)
   validate_population(population)
+  population <- normalize_population_transitions(population)
   population <- normalize_population_ancestry(population)
   population$persons <- tibble::as_tibble(population$persons)
   population$unions <- tibble::as_tibble(population$unions)
