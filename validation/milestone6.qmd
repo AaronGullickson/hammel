@@ -74,7 +74,11 @@ Assess whether the current simulation successfully handles transitions between g
 
 | Measure | Comparison | Acceptance criterion |
 |---|---|---|
-| Transition Rates | Output mean rates, across scenarios with varying groups, versus supplied schedules | Output rates should match closely to input rates, adjusting for sampling variability |
+| Transition Rates | Output mean rates versus supplied schedules | Output rates should match closely to input rates, adjusting for sampling variability |
+| Total Fertility Rates | Output mean rates by group versus supplied schedules | Output rates should match closely to input rates, adjusting for sampling variability |
+| Life Expectancy at Birth | Output measures by group versus supplied schedules | Output measures should match closely to input rates, adjusting for sampling variability |
+| Log odds ratios and gender ratios for intergroup unions | Output measures versus supplied parameters | Output measures should match closely to expectations from input values |
+| Population share by group over time | Shares with simulations with transition rates to those with no transitions  | Shares should shift in directions expected by the transition rates provided | 
 | Accounting and implementation | Existing tests | Successful unit tests |
 
 ## Overview of Design
@@ -152,7 +156,7 @@ trans_rates_age <- tribble(
 Duration dependence will be zero for all groups between duration 0 to 10 years. Between 10 and 30 years duration, the rate will be the same as for age 20-50, and then will be halved after 30 years.
 
 ```{r}
-#| label: set-transition-rates-age
+#| label: set-transition-rates-dur
 
 trans_rates_dur <- tribble(
   ~group_origin, ~group_dest, ~dur_start, ~dur_end, ~rate,
@@ -241,14 +245,14 @@ time_scenario <- bind_rows(
   time_scenario,
   tibble(
     scenario = "Transition model, age",
-    elapsed_time = mean(map_dbl(results_base, function(x) {x$runtime}))
+    elapsed_time = mean(map_dbl(results_age, function(x) {x$runtime}))
   )
 )
 ```
 
 ```{r}
 #| label: tbl-trans-rates-age
-#| tbl-cap: Mean transition rates across three groups estimated from all simulations with MCSE. Input transition rates are shown for comparison.
+#| tbl-cap: Mean age-based transition rates across three groups estimated from all simulations with MCSE. Input transition rates are shown for comparison.
 
 trans_by_rep <- results_age |>
   map(
@@ -419,7 +423,7 @@ lifeexp_by_rep |>
 
 @tbl-lifeexp-age shows the mean estimated life expectancy at birth from all simulations by group in comparison to the input life expectancy at birth. There are some discrepancies in how these are estimated. The HMD age-specific mortality rates extend to the open ended age group of 110. However, in the simulations, individual person-years at very advanced age can be small or even zero, creating estimation problems. So, for the estimated life expectancy we use an open ended age of 85. This could cause some deviation in the comparison of life expectancy even if the underlying rates are correct.
 
-Nonethelss, our estimated life expectancy results for each group and sex are very close to those expected from the input data.
+Nonetheless, our estimated life expectancy results for each group and sex are very close to those expected from the input data.
 
 ```{r}
 #| label: tbl-intermar-param-age
@@ -475,8 +479,198 @@ crosstabs |>
 
 ### Duration-based transitions
 
+For the duration-based transitions, I will only examine whether the transition rates match the expected input rates and how they affect population shares. The nature of duration or age in the transitions should not affect the calculation of other rates.
+
+```{r}
+#| label: run-dur-transition-sims
+
+model_dur <- model_base |> set_group_transition(trans_rates_dur)
+
+results_dur <- future_map(
+  seq_len(params$n_replications),
+  run_replication,
+  model = model_dur,
+  .options = furrr_options(seed = NULL)
+)
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "Transition model, duration",
+    elapsed_time = mean(map_dbl(results_dur, function(x) {x$runtime}))
+  )
+)
+```
+
+```{r}
+#| label: tbl-trans-rates-dur
+#| tbl-cap: Mean duration-based transition rates across three groups estimated from all simulations with MCSE. Input transition rates are shown for comparison.
+
+trans_by_rep <- results_dur |>
+  map(
+    calculate_transition_rates,
+    time_breaks = time_breaks,
+    dur_breaks = dur_breaks
+  ) |>
+  bind_rows(.id = "replication")
+
+trans_summary <- trans_by_rep |>
+  group_by(dur_start, dur_end, group_origin, group_dest) |>
+  summarize(
+    n_valid = sum(!is.na(rate_transition)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_transition, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_transition, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+
+trans_summary |>
+  left_join(trans_rates_dur, by = c("dur_start", "dur_end", "group_origin", "group_dest")) |>
+  gt() |>
+  fmt_number(rate_mean, decimals = 4) |>
+  fmt_number(rate_mcse, decimals = 5) |>
+  cols_label(
+    dur_start ~ "Dur. start",
+    dur_end ~ "Dur. end",
+    group_origin ~ "Origin group",
+    group_dest ~ "Destination group",
+    n_valid ~ "Valid cases",
+    rate_mean ~ "Mean rate",
+    rate_mcse ~ "MCSE",
+    rate ~ "Input rate"
+  )
+```
+
+@tbl-trans-rates-dur shows the mean duration-specific transition rates estimated across the simulations. The true input rate is also shown for reference. All of the estimated transition rates are extremely close to the input rates out to at least the fourth decimal place and the true rate falls within the 95% confidence interval of each estimate.
+
+```{r}
+#| label: fig-pop-share-dur
+#| fig-cap: Mean share of population by group over time across all simulations using either no transitions or duration transitions.
+
+share_dur <- results_dur |>
+  map(
+    function(result) {
+      calculate_population_size(result, seq(2000, 2100, 10), TRUE) |>
+        group_by(time) |>
+        mutate(prop = population / sum(population))
+    }
+  ) |> bind_rows() |>
+  group_by(time, group) |>
+  summarize(
+    prop_mean = mean(prop),
+    prop_mcse = sd(prop) / sqrt(n()),
+    .groups = "drop"
+  ) |>
+  mutate(sim = "transitions by dur")
+
+bind_rows(share_base, share_dur) |>
+  ggplot(aes(x = time, y = prop_mean, color = group, linetype = sim))+
+  geom_line()
+```
+
+@fig-pop-share-dur shows a figure comparable to @fig-pop-share-age but for duration-based transitions. The relative values of the transitions are similar but different timing of duration compared with age will lead to different results. We see the same patterns in this figure as we saw in the earlier figure and everything is consistent with expectation.
+
+### Group-stratified transition rates
+
+As a final test, I test whether transition rates stratified by both sex and union type continue to produce the correct transition rates from the data. I use age-banded transition rates for this exercise.
+
+```{r}
+trans_rates_age_strat <- bind_rows(
+  trans_rates_age |> mutate(sex = "f", union_type = "unpartnered", rate = rate * 1.1),
+  trans_rates_age |> mutate(sex = "m", union_type = "unpartnered", rate = rate * 1.05),
+  trans_rates_age |> mutate(sex = "f", union_type = "partnered", rate = rate * 0.8),
+  trans_rates_age |> mutate(sex = "m", union_type = "partnered", rate = rate * 0.7),
+)
+```
+
+```{r}
+#| label: run-stratified-transition-sims
+
+model_strat <- model_base |> set_group_transition(trans_rates_age_strat)
+
+results_strat <- future_map(
+  seq_len(params$n_replications),
+  run_replication,
+  model = model_strat,
+  .options = furrr_options(seed = NULL)
+)
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "Transition model, age and stratified",
+    elapsed_time = mean(map_dbl(results_strat, function(x) {x$runtime}))
+  )
+)
+```
+
+```{r}
+#| label: tbl-trans-rates-age-strat
+#| tbl-cap: Mean age-based transition rates across three groups estimated from all simulations with MCSE. Input transition rates are shown for comparison.
+
+trans_by_rep <- results_strat |>
+  map(
+    calculate_transition_rates,
+    time_breaks = time_breaks,
+    age_breaks = age_breaks,
+    by_sex = TRUE,
+    by_union_type = TRUE
+  ) |>
+  bind_rows(.id = "replication")
+
+trans_summary <- trans_by_rep |>
+  group_by(age_start, age_end, group_origin, group_dest, sex, union_type) |>
+  summarize(
+    n_valid = sum(!is.na(rate_transition)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_transition, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_transition, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+
+trans_summary |>
+  left_join(trans_rates_age_strat, by = c("age_start", "age_end", "group_origin", "group_dest", "sex", "union_type")) |>
+  gt() |>
+  fmt_number(rate_mean, decimals = 4) |>
+  fmt_number(rate_mcse, decimals = 5) |>
+  cols_label(
+    age_start ~ "Age start",
+    age_end ~ "Age end",
+    group_origin ~ "Origin group",
+    group_dest ~ "Destination group",
+    sex ~ "Sex",
+    union_type ~ "Union type",
+    n_valid ~ "Valid cases",
+    rate_mean ~ "Mean rate",
+    rate_mcse ~ "MCSE",
+    rate ~ "Input rate"
+  )
+```
+
+@tbl-trans-rates-age-strat shows the estimated transition rates in comparison to the input rates. The estimated transition rates are very close to the input rates.
+
 ## Time Tests
 
+@tbl-processing-time shows the average processing time per simulation for different scenarios. Adding transitions increases processing time by a small amount.
+
+
+```{r}
+#| label: tbl-processing-time
+#| tbl-cap: Mean processing time by simulation scenario
+
+time_scenario |>
+  gt() |>
+  cols_label(
+    scenario ~ "Scenario",
+    elapsed_time ~ "Mean processing time"
+  )
+```
 
 ## Tests
 
@@ -484,6 +678,7 @@ The following tests have been constructed and are currently all passing.
 
 ```{r}
 #| label: test-results
+#| eval: false
 
 test_results <- devtools::test(pkg = here::here(), reporter = "silent")
 test_table <- as.data.frame(test_results)
@@ -493,8 +688,7 @@ knitr::kable(
 ```
 ## Conclusions and Unresolved Limitations
 
-This milestone meets all expectations and we have finally resolved the issue with birth intervals in a satisfactory way with minimal effect on computation time. One remaining issue is the potential for unrealized births in certain cases. However, in most cases, unrealized births will occur because relatively few women travel into those cells and thus the overall impact on fertility will be low. 
-
+All of the acceptance criteria for this milestone have been reached. I have deferred the issue of household transitions to a later milestone. Currently only individuals transition between groups on a transition event.
 
 ## Reproducibility record
 
