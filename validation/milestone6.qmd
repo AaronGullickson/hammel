@@ -12,10 +12,10 @@ format:
     code-tools: true
     self-contained: true
 params:
-  n_replications: 100
-  initial_population: 50000
-  years: 150
-  burn_in: 50
+  n_replications: 20
+  initial_population: 20000
+  years: 100
+  burn_in: 25
 execute:
   eval: true
   echo: true
@@ -55,15 +55,10 @@ future::plan(future::multicore, workers = 4)
 ```{r}
 #| label: create-functions
 
-run_replication <- function(replication, model, n_groups) {
+run_replication <- function(replication, model) {
   set.seed(410000L + replication)
-  if (n_groups == 2) {
-    population <- create_baseline_population(params$initial_population, 60, 2000, 
-      group_weights = c("A" = 1, "B" = 1))
-  } else if (n_groups == 3) {
-    population <- create_baseline_population(params$initial_population, 60, 2000, 
-      group_weights = c("A" = 1, "B" = 1, "C" = 1))
-  }
+  population <- create_baseline_population(params$initial_population, 60, 2000, 
+    group_weights = c("A" = 1, "B" = 1, "C" = 1))
   model <- model |> set_population(population)
   time <- system.time(result <- simulate(model, params$years, 420000L + replication))[["elapsed"]]
   result$runtime <- time
@@ -101,6 +96,36 @@ fertility_rates_overall <- get_fertility_hfd("USA", 2000)
 mortality_rates <- get_mortality_hmd("USA", 2000)
 ```
 
+I will use a three group format for all of the simulations (A, B, C). I will set up an age-based transition matrix as follows:
+
+- Under age 20, there are no transitions. This age band does not need to be included as it will default to zero.
+- between age 20 and 50, the following directed transitions will apply:
+  - Transitions involving group C will be symmetric (same rate in both directions) and low at 0.005 per person-year.
+  - Transitions from A > B will be 0.01 per person-year and transitions to B > A will be double that at 0.02 per person-year. Over  time this should lead to an increasing share of A relative to B.
+- From age 50 on, all transition rates from the 20 to 50 range apply but are cut in half.
+
+```{r}
+#| label: set-transition-rates-age
+
+trans_rates_age <- tribble(
+  ~group_origin, ~group_dest, ~age_start, ~age_end, ~rate,
+  "A",           "B",         20,         50,       0.01,
+  "A",           "C",         20,         50,       0.005,
+  "B",           "A",         20,         50,       0.02,
+  "B",           "C",         20,         50,       0.005,
+  "C",           "A",         20,         50,       0.005,
+  "C",           "B",         20,         50,       0.005,
+  "A",           "B",         50,         Inf,      0.01 / 2,
+  "A",           "C",         50,         Inf,      0.005 /2,
+  "B",           "A",         50,         Inf,      0.02 / 2,
+  "B",           "C",         50,         Inf,      0.005 / 2,
+  "C",           "A",         50,         Inf,      0.005 / 2,
+  "C",           "B",         50,         Inf,      0.005 / 2,
+
+)
+
+```
+
 For each scenario, `r params$n_replications` simulations of `r params$years` years will be run, and the mean values and Monte Carlo standard errors will be calculated for desired measures across simulations. The first `r params$burn_in` years will be ignored as the burn in. Each simulation will use a separate pre-defined seed. Each simulation will generate its own starting population so that randomness in starting population is incorporated into uncertainty estimates.
 
 ```{r}
@@ -111,66 +136,78 @@ age_breaks <- c(0, 20, 50)
 time_breaks <- c(2000 + params$burn_in, 2000 + params$years)
 time_scenario <- tibble(scenario = character(), elapsed_time = double())
 ```
-## Transition Rates
 
-### Two Groups
+## Baseline Scenario
 
-Lets set some basic group transition rates for a two-group population. There will be no transition to age 20, and then a constant low risk until age 50, when the risk will be cut in half. We can leave out the under 20 band and it will default to zero.
+First I create a baseline scenario without transitions, so I can compare it to the results with transitions. 
 
-```{r}
-#| label: set-transition-rates
-
-trans_rates_2grp <- tribble(
-  ~group_origin, ~group_dest, ~age_start, ~age_end, ~rate,
-  "A",           "B",         20,         50,       0.01,
-  "B",           "A",         20,         50,       0.02,
-  "A",           "B",         50,         Inf,      0.005,
-  "B",           "A",         50,         Inf,      0.01
-)
-
-```
+For all transitions, I will apply group proportional hazards to mortality and fertility to ensure that group transitions don't affect those underlying group-specific rates. I will also apply some exogamy ratios on all groups and ensure that these come out the expected value in the log odds ratio.
 
 ```{r}
-model <- hammel_model() |>
-  set_fertility(fertility_rates_overall) |>
-  set_mortality(mortality_rates) |>
+#| label: run-baseline-scenario
+
+model_base <- hammel_model() |>
+  set_fertility(fertility_rates_overall, group_prop_hazard = c("B" = 0.9, "C" = 1.1)) |>
+  set_mortality(mortality_rates, group_prop_hazard = c("B" = 1.1, "C" = 0.9)) |>
   set_union_formation(
     "on_demand",
-    matching = create_age_gap_matching_model(2, 5, group_exogamy = c("A:B" = -2))
-  ) |>
-  set_group_transition(trans_rates_2grp)
+    matching = create_age_gap_matching_model(
+      2, 5, group_exogamy = c("A:B" = -2, "A:C" = -0.5, "B:C" = -1)
+    )
+  )
 
-# population <- create_baseline_population(params$initial_population, 60, 2000, 
-#   group_weights = c("A" = 1, "B" = 1))
-#
-# system.time(results <- simulate(model |> set_population(population), 100, 1))
-#
-# # B > A transitions are higher rate than A > B transitions, so group A should grow as 
-# # share of population
-#
-# results |> calculate_population_size(seq(2000, 2100, 10), by_group = TRUE) |>
-#   group_by(time) |>
-#   mutate(share = population / sum(population)) |>
-#   ggplot(aes(x = time, y = share, group = group, color = group))+
-#   geom_line()
-
-results <- future_map(
+results_base <- future_map(
   seq_len(params$n_replications),
   run_replication,
-  model = model,
-  n_groups = 2,
+  model = model_base,
   .options = furrr_options(seed = NULL)
 )
 
 time_scenario <- bind_rows(
   time_scenario,
   tibble(
-    scenario = "transition, 2 groups",
-    elapsed_time = mean(map_dbl(results, function(x) {x$runtime}))
+    scenario = "Baseline, no transition",
+    elapsed_time = mean(map_dbl(results_base, function(x) {x$runtime}))
+  )
+)
+```
+
+## Transition Rates
+
+- Maybe just test on a consistent three group case. 
+- Use group prop hazards for fertility and mortality to make sure the transitions don't screw up those rates.
+- Ensure that log odds ratios of union formation are still correct. 
+- Test duration and age dependence.
+
+
+### Age-based transitions
+
+
+```{r}
+
+model_age <- model_base |> set_group_transition(trans_rates_age)
+
+results_age <- future_map(
+  seq_len(params$n_replications),
+  run_replication,
+  model = model_age,
+  .options = furrr_options(seed = NULL)
+)
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "Transition model, age",
+    elapsed_time = mean(map_dbl(results_base, function(x) {x$runtime}))
   )
 )
 
-trans_by_rep <- results |>
+
+```
+
+```{r}
+
+trans_by_rep <- results_age |>
   map(
     calculate_transition_rates,
     time_breaks = time_breaks,
@@ -179,19 +216,65 @@ trans_by_rep <- results |>
   bind_rows(.id = "replication")
 
 trans_summary <- trans_by_rep |>
-  filter(sex == "f") |>
-  group_by(time_start, time_end, age_start, age_end) |>
+  group_by(age_start, age_end, group_origin, group_dest) |>
   summarize(
-    n_valid = sum(!is.na(rate_fertility)),
+    n_valid = sum(!is.na(rate_transition)),
     rate_mean = if (n_valid > 0) {
-      mean(rate_fertility, na.rm = TRUE)
+      mean(rate_transition, na.rm = TRUE)
     } else NA_real_,
     rate_mcse = if (n_valid > 1) {
-      sd(rate_fertility, na.rm = TRUE) / sqrt(n_valid)
+      sd(rate_transition, na.rm = TRUE) / sqrt(n_valid)
     } else NA_real_,
     .groups = "drop"
   )
+
+trans_summary |>
+  left_join(trans_rates_age, by = c("age_start", "age_end", "group_origin", "group_dest")) |>
+  gt() |>
+  fmt_number(rate_mean, decimals = 4) |>
+  fmt_number(rate_mcse, decimals = 5)
 ```
+
+```{r}
+share_base <- results_base |>
+  map(
+    function(result) {
+      calculate_population_size(result, seq(2000, 2100, 10), TRUE) |>
+        group_by(time) |>
+        mutate(prop = population / sum(population))
+    }
+  ) |> bind_rows() |>
+  group_by(time, group) |>
+  summarize(
+    prop_mean = mean(prop),
+    prop_mcse = sd(prop) / sqrt(n()),
+    .groups = "drop"
+  ) |>
+  mutate(sim = "no transitions")
+
+
+share_age <- results_age |>
+  map(
+    function(result) {
+      calculate_population_size(result, seq(2000, 2100, 10), TRUE) |>
+        group_by(time) |>
+        mutate(prop = population / sum(population))
+    }
+  ) |> bind_rows() |>
+  group_by(time, group) |>
+  summarize(
+    prop_mean = mean(prop),
+    prop_mcse = sd(prop) / sqrt(n()),
+    .groups = "drop"
+  ) |>
+  mutate(sim = "transitions by age")
+
+bind_rows(share_base, share_age) |>
+  ggplot(aes(x = time, y = prop_mean, color = group, linetype = sim))+
+  geom_line()
+
+```
+
 
 
 
