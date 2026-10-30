@@ -92,8 +92,23 @@ HOUSEHOLD MOVES
 ```{r}
 #| label: get-input-rates
 
-fertility_rates_overall <- get_fertility_hfd("USA", 2000)
+fertility_rates <- get_fertility_hfd("USA", 2000)
+fertility_rates_grouped <- bind_rows(
+  fertility_rates |> mutate(group = "A"),
+  fertility_rates |> mutate(group = "B", rate = rate * 0.9),
+  fertility_rates |> mutate(group = "C", rate = rate * 1.1)
+)
+input_tfr <- fertility_rates_grouped |> calculate_tfr()
+
 mortality_rates <- get_mortality_hmd("USA", 2000)
+mortality_rates_grouped <- bind_rows(
+  mortality_rates |> mutate(group = "A"),
+  mortality_rates |> mutate(group = "B", rate = rate * 1.1),
+  mortality_rates |> mutate(group = "C", rate = rate * 0.9)
+)
+input_lifeexp <- mortality_rates_grouped |> calculate_life_table() |>
+  filter(age_start == 0) |>
+  select(group, sex, ex)
 ```
 
 I will use a three group format for all of the simulations (A, B, C). I will set up an age-based transition matrix as follows:
@@ -147,8 +162,8 @@ For all transitions, I will apply group proportional hazards to mortality and fe
 #| label: run-baseline-scenario
 
 model_base <- hammel_model() |>
-  set_fertility(fertility_rates_overall, group_prop_hazard = c("B" = 0.9, "C" = 1.1)) |>
-  set_mortality(mortality_rates, group_prop_hazard = c("B" = 1.1, "C" = 0.9)) |>
+  set_fertility(fertility_rates_grouped) |>
+  set_mortality(mortality_rates_grouped) |>
   set_union_formation(
     "on_demand",
     matching = create_age_gap_matching_model(
@@ -275,9 +290,66 @@ bind_rows(share_base, share_age) |>
 
 ```
 
+```{r}
 
 
+tfr_by_rep <- results_age |>
+  map(
+    function(result) {
+      calculate_fertility_rates(result, time_breaks = time_breaks, age_breaks = 12:55, by_group = TRUE) |>
+        calculate_tfr()
+    }
+  ) |>
+  bind_rows(.id = "replication")
 
+
+tfr_by_rep |>
+  group_by(group) |>
+  summarize(
+    n_valid = sum(!is.na(tfr)),
+    tfr_mean = if (n_valid > 0) {
+      mean(tfr, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(tfr, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  ) |>
+  left_join(input_tfr, by = c("group")) |>
+  gt()
+```
+
+
+```{r}
+
+
+lifeexp_by_rep <- results_age |>
+  map(
+    function(result) {
+      calculate_mortality_rates(result, time_breaks = time_breaks, age_breaks = 0:85, by_group = TRUE) |>
+        calculate_life_table() |>
+        filter(age_start == 0) |>
+        select(group, sex, ex)
+    }
+  ) |>
+  bind_rows(.id = "replication")
+
+
+lifeexp_by_rep |>
+  group_by(group, sex) |>
+  summarize(
+    n_valid = sum(!is.na(ex)),
+    ex_mean = if (n_valid > 0) {
+      mean(ex, na.rm = TRUE)
+    } else NA_real_,
+    ex_mcse = if (n_valid > 1) {
+      sd(ex, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  ) |>
+  left_join(input_lifeexp, by = c("group", "sex")) |>
+  gt()
+```
 
 ## Time Tests
 
