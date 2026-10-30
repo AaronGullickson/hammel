@@ -149,7 +149,7 @@ boundary belongs to the cell beginning there; one at the final time boundary
 is excluded. Zero-duration episodes can contribute an event but no exposure.
 Zero exposure gives `NA` for the rate; positive exposure and zero dissolutions
 give zero. Duration boundaries use years and append `Inf` when the last supplied
-boundary is finite, as `calculate_demog_rates()` does for age.
+boundary is finite, as `calculate_fertility_rates() and calculate_mortality_rates()` does for age.
 
 Input may be a population object with a known endpoint or a union data frame
 with unique `union_id`, finite `start_time`, numeric `end_time` (NA if ongoing),
@@ -185,9 +185,12 @@ birth/dissolution ties, spacing and status fertility, availability/calibration
 updates, group coverage/multipliers, seed isolation and independent runs, and
 absent-process history/RNG preservation. Use synthetic local inputs only.
 
-D045's fertility-transition compensation limitation remains: dissolution adds
-another status transition but no history-aware compensation. Cohabitation,
-couple covariates and calendar-varying dissolution require further specifications.
+D101 cell accounting, accepted in milestone 5 (D105), replaces the former
+D045 fertility-transition approximation: dissolution moves the woman between
+current fertility cells while retaining her spacing eligibility. Sparse cells
+without eligible women still report unrealized intensity. Cohabitation is
+implemented under D086; richer couple covariates and calendar-varying
+dissolution require further specifications.
 Duration-based remarriage observations are available via `dur_breaks` under D084. These rules intentionally differ from SOCSIM's
 monthly probability inputs and potentially two-spouse candidate clocks, while
 sharing its duration-based baseline idea. No scientific validation threshold

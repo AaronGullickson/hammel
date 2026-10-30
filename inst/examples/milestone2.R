@@ -104,7 +104,7 @@ result$persons |>
   theme_bw()
 
 
-lexis <- calculate_demog_rates(result, seq(2000, 2100, 5), seq(15, 65, 5), by_union_type = TRUE)
+lexis <- calculate_fertility_rates(result, seq(2000, 2100, 5), seq(15, 65, 5), by_union_type = TRUE)
 marriages <- calculate_union_rates(result, seq(2000, 2100, 5), seq(15, 65, 5)) |>
   group_by(time_start, time_end, age_start, age_end, sex) |>
   summarize(rate_union = if (sum(person_years) > 0)

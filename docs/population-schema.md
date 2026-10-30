@@ -23,7 +23,8 @@ One row per person, including deceased persons.
 | `father_id` | Father's person ID; `NA` if unknown |
 | `group` (optional) | Nonmissing character label or finite numeric code; newborn assignment uses fertility's inheritance model (random parent by default, with maternal fallback) |
 
-Omit marital status and latest-union pointers. Derive relationship state from `unions`; the engine may cache derived state for performance without requiring another user-facing column. Unknown earlier histories must not be silently interpreted as known lifetime singlehood. Fertility multipliers, sibling pointers, and last-born-child pointers are also omitted for now. Group labels must be nonempty; their input type is preserved. See [groups](groups.md) for schedule lookup and inheritance rules.
+Omit marital status and latest-union pointers. Derive relationship state from `unions`; the engine may cache derived state for performance without requiring another user-facing column. Unknown earlier histories must not be silently interpreted as known lifetime singlehood. Optional persistent fertility selection weights use `hetfert` under D102;
+sibling and last-born-child pointers are omitted. Group labels must be nonempty; their input type is preserved. See [groups](groups.md) for schedule lookup and inheritance rules.
 
 ## Ancestry
 
@@ -106,3 +107,15 @@ starts marriage with the same partners at the same time. The new row points
 to the cohab ID; links must be unique and consistent. Both episodes remain in
 history, with continuous partnered exposure. Untyped mode retains its six core
 union columns. Enabling cohabitation treats legacy untyped history as marriage.
+
+
+## Optional fertility weight column
+
+With `hetfert = het_fert(cv, alpha)` on fertility (D102), `persons$hetfert` stores
+persistent dimensionless positive female selection weights. The simulator draws
+values if the entire column is absent; a supplied column requires complete,
+finite, strictly positive female values. Existing values are retained on
+restart. Newly drawn male entries are NA, and existing male values are unused.
+When the feature is disabled, output omits the column even if supplied (D104).
+Re-enabling from that output draws fresh weights for every woman. See
+[heterogeneity](fertility-heterogeneity-notes.md) for assignment and inheritance.

@@ -1,9 +1,34 @@
 # Testing and milestone validation
 
-Updated October 29, 2026. Milestones 1–4 are accepted as complete (D029,
-D050, D077, D093). Software test history and the user's demographic assessment
+Updated October 29, 2026. Milestones 1–5 are accepted as complete (D029,
+D050, D077, D093, D105). Software test history and the user's demographic assessment
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
+
+## Milestone 5 accepted assessment and closeout
+
+The user accepted milestone 5 on October 29, 2026 (D105) after revising and
+reviewing the [report source](../validation/milestone5.qmd). The final
+[rendered assessment](../validation/milestone5.html) was being produced when
+closeout was requested. This documentation update does not rerun simulations,
+download HFD/HMD data, execute tests or certify final-render completion. Preserve
+report sources, artifacts and active intermediates.
+
+The assessment covers parity-specific conditional fertility, cell-accounted
+spacing and revisited baseline/restart/union-type checks, inherited lognormal
+weights, childbearing dispersion, mother–daughter association and performance.
+Its limitations include sparse or structurally infeasible cells, unrealized
+expected births (an accounting diagnostic rather than actual births),
+history completeness and selection-driven weight distributions. Accepted
+completion does not introduce numerical thresholds or universal rate-recovery
+claims. Group transitions (milestone 6) are next; their specification and API
+remain unresolved.
+
+Earlier dated verification records below describe the versions tested at the
+time, including superseded corrections and intermediate proposal status.
+Current execution is D101–D104 and milestone status is D105. Closeout checked
+local Markdown links and whitespace; it made no engine or report edits.
+Supporting evidence and reproduction-version notes are in [validation/milestone5/](../validation/milestone5/README.md).
 
 ## Milestone 4 accepted assessment
 
@@ -628,3 +653,225 @@ Relative Markdown file targets in changed documentation and both new validation
 guides resolve, and `git diff --check` passes. No simulation, database request,
 report render or test suite was started for this documentation-only cleanup.
 The author's active render and final report source were left unchanged.
+
+
+## Conditional HFD parity preparation (D094, October 29, 2026)
+
+`TZ=UTC Rscript -e 'devtools::test(filter =
+"hfd-parity|database-processes|status-fertility", reporter = "summary")'`
+passed without failures or warnings. Synthetic local HFD text and mocked web
+readers verify conditional product mi, revision/year selection, birth-order to
+current-parity mapping including [4,Inf), retained annual values, omission of
+open age endpoints, missing-versus-zero distinction, duplicate/invalid bands,
+invalid request flags, absent products/years, RDS reuse and credential-free
+provenance. Existing total-rate/database and status-fertility tests passed.
+Parity tables are rejected for simulation until engine support is implemented.
+No live HFD data or credentials were used and no engine changes were made.
+The user's validation/milestone5.qmd was left unchanged.
+
+
+## Upper-open fertility age bands (D095, October 29, 2026)
+
+`TZ=UTC Rscript -e 'devtools::test(reporter="summary")'` passed the full suite
+without failures or warnings; the opt-in live database test was skipped.
+Targeted fertility-adjustment, demographic and database checks also passed.
+Analytical tests cover the interior-limit adjustment f/(1-b*f), zero spacing,
+zero fertility and infeasible eligibility. Execution tests verify births above
+age 55 and complete fixed-seed history equality after adding a zero upper tail.
+TFR tests verify truncated finite-range results, warnings for nonzero omitted
+female open-band rates, no such warning for zero/unknown rates, strata and
+empty results. Offline HFD fixtures verify 12- -> [12,13), 55+ -> [55,Inf),
+parity bounds, unchanged annual values, missing cells and provenance. No HFD
+rates were downloaded. The user's milestone5 report was not modified.
+
+
+HFD conditional header correction (October 29, 2026): the user's real USA mi
+file identifies the highest-order rate as m5px, not m5x. The importer and both
+mock/local-text fixtures now use m1x–m4x and m5px; mapping remains parity 0–4+.
+`devtools::test(filter = "hfd-parity|database-processes", reporter = "summary")`
+passed without failures or warnings. No live request or credentials were used.
+The earlier synthetic fixtures incorrectly mirrored the assumed m5x header;
+the user's download exposed that schema error.
+
+
+D096 zero-fill preparation (October 29, 2026):
+`devtools::test(filter = "hfd-parity|database-processes", reporter = "summary")`
+passed without failures or warnings. Tests cover missing cells mapped to zero,
+unchanged known/explicit-zero rates, all-missing logical columns from text
+parsing, endpoint retention, selected-year-only provenance counts and unchanged
+total-rate validation. No live data was downloaded. Historical D094 checks of
+NA preservation describe the superseded import policy.
+
+
+## PATFR summaries and automatic dispatch (D097, October 29, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(filter =
+"patfr|demography|lexis", reporter = "summary")'` passed without failures or
+warnings. An independent hand-worked one-year HFD midpoint example yields 12/55
+births per starting woman. Tests also verify first-birth survival under the table
+probabilities, constant-hazard exposure conservation, recurrent births in the
+open parity state, invariant constant one-/five-year schedules, fractional age
+steps, broader parity bands, all existing TFR strata, female-only selection,
+process inputs, typed empty outputs, metadata, included missing-cell propagation,
+upper-open age warnings, and rejection of incomplete/overlapping age/parity
+coverage or invalid progression probabilities. Direct and delegated calls agree.
+No empirical HFD download or comparison with its full published PATFR was run;
+source endpoint/zero-fill conventions can change that comparison. This is a
+summary helper, not parity-dependent engine execution. The user's milestone5
+report was left unchanged.
+
+
+## Parity-dependent fertility execution (D099, October 29, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
+passed the full suite without failures or test warnings; the opt-in live database
+case was skipped. Targeted integration checks and final parity tests passed.
+Coverage includes complete group/type parity partitions, edited-model validation,
+finite age overlap, first-birth exemption, unadjusted preceding-parity integrals,
+upper-age interior limits, top-category entry versus repeated births, broad
+parity bands without expanding to every possible parity, actual maternal history
+including deceased children, ignored custom parity columns, unknown fathers,
+cancellations, spacing, restarts, typed fertility/conversion, group multiplier
+versus explicit-schedule equivalence, and grouped zero-spacing controls.
+
+A saved pre-feature 50,000-person grouped/previous-status run over 100 years at
+seed 42 retained identical complete output without parity columns. No empirical
+rates were downloaded or SOCSIM reference simulations run. SOCSIM's source was
+inspected at the documented pinned commit; no source was copied/adapted.
+
+The independent [spacing diagnostic](../validation/milestone5/check-parity-spacing.R)
+uses 10 seeds, 3,000 initial women aged 20 at parity zero, no mortality and ten
+years of follow-up. With zero spacing, observed means for parities 0,1,2+ are
+.199760 (MCSE .001479), .299198 (.002280), .403456 (.001528), versus inputs
+.2,.3,.4. With .75-year spacing, they are .199760 (.001479), .266465 (.001925),
+.333460 (.000637). Exposure is reconstructed independently from birth histories.
+This initialized-cohort check demonstrates a rate-recovery limitation of the
+selected SOCSIM-style approximation, rather than successful scientific parity-
+rate validation. Do not claim exact eligibility adjustment or milestone 5
+acceptance from the passing software tests. The [parity specification](parity-fertility.md)
+records the limitation and remaining scope. [Replications](../validation/milestone5/parity-spacing-replications.csv)
+and [summary](../validation/milestone5/parity-spacing-summary.csv) retain the evidence.
+The user's validation/milestone5.qmd remains unmodified by this work.
+
+## Separate mortality/fertility observations and parity ASFRs (D100)
+
+`devtools::document(); devtools::test(reporter = "summary")` passed the full
+suite with no failures. The live database test remained opt-in/skipped. The
+local HMD reader test emitted an environment warning because `timedatectl`
+returned status 1; this was not a demographic assertion failure. The final
+focused `devtools::test(filter = "fertility-rate-parity", reporter = "summary")`
+passed all 29 assertions, including the subsequently added simultaneous-birth
+and final-endpoint checks.
+
+Checks cover process-specific output columns, female-only fertility, pre-window
+births including deceased children, ignored custom parity columns, pre-birth
+parity assignment, exact parity exposure, broad/open parity bands, zero-exposure
+NA rates, complete grouped/type/period/age pooling identities, conversion and
+dissolution birth-first ties, invalid boundaries, typed empty outputs, and
+successive parity progression for simultaneous recorded births. Existing pooled
+Lexis tests continue exercising the shared internal kernel. No simulation
+behavior or fertility compensation was changed. The user-authored milestone 5
+report was not edited by this work.
+
+
+## Executable SOCSIM parity/spacing reference (October 29, 2026)
+
+Built an unmodified scratch copy of MPIDR/rsocsim commit
+`125450cff968bb3ff762fa99d4c926a8136062a2` (GPLv3), installed only under /tmp.
+No engine source copied into Hammel, network rates downloaded, or Hammel engine
+changes made. Forty independent fresh-process reference jobs completed: ten
+seeds per birth-interval/experiment combination. Conditional maternal parity and
+monthly exposure were reconstructed independently from raw output. Saved
+[replications, summaries and reproduction scripts](../validation/milestone5/socsim/README.md)
+include initialized cohorts and 100-year generational runs. All 20 generational
+histories passed explicit unity-fertility-multiplier checks; output categories
+remained single. The cohort exposure/event accounting is checked in the runner.
+
+The initialized-cohort higher-parity shortfall is also present in SOCSIM. At
+age [18,19) in years [80,100), nine-month-spacing means for parities 1,2,3,4+
+are .272932,.284820,.186698,.054263 versus inputs .3,.4,.4,.4; all ten
+replications contribute. No-spacing controls are .302024,.413259,.428620,.435636.
+Both monthly-engine control offsets and composition sensitivity remain; the
+reference does not imply exact equivalence with Hammel or recovery at every
+parity. Earlier exploratory variable-multiplier runs were excluded, not pooled
+with controlled results. See [the collaboration investigation](parity-spacing-investigation.md)
+for user-reported empirical-schedule evidence and unresolved calibration choices.
+The user-authored milestone5.qmd was not edited by this work.
+
+## Cell-accounted fertility (D101, October 29, 2026)
+
+`tests/testthat/test-fertility-cells.R` covers `spacing_method` validation and
+defaults, metadata, exact unrealized-intensity cases (1-year age cells and an
+actual-parity cell inside a pooled band), zero spacing,
+unstratified recovery from a no-history start, pooled upper-parity recovery,
+groups, union types, cohabitation, dissolution, matching, restarts and
+cancellation. The grouped cases run with `options(hammel.check_cells = TRUE)`,
+which rescans cell counts at every event and calibration fertility totals at
+every fertility-driven search. A separate test covers the unreachable-cell
+warning (earliest eligible ages, partly reachable cells, zero spacing,
+unstratified schedules, delayed starts, zero intermediate parities, groups).
+Tests of `calculate_fertility_rates(unrealized = TRUE)` cover exact
+attribution, NA for breaks that cut a period or age year, restarts and
+overall schedules split by union type, pooling actual parities into observed
+bands, rejection of midpoint populations, and restored initialized-cohort
+rates. Synthetic parity fixtures elsewhere wrap construction in the test helper
+`quiet_unreachable()`, which silences only that advisory warning. Midpoint fixed-seed histories were compared in
+full before and after the `BoundaryQueue` extraction and the cell integration
+(grouped on-demand, grouped rate mode with cohabitation and dissolution,
+grouped parity-specific) and are identical apart from the new
+`spacing_method` metadata field. The full suite passed.
+
+Midpoint compensation was later removed (D101 became the only method); the
+midpoint fixed-seed comparison above and the method comparisons below run at
+commit `89d451b`. Offline engine evidence, 10 seeds per method:
+`validation/milestone5/check-cell-spacing.R` (recovery across cohort,
+generational, restart, union-type and group scenarios),
+`check-cell-resolution.R` (supplied wide, single-year and per-parity bands
+give identical results; finer supplied bands give finer cells) and
+`benchmark-cell-spacing.R LIB` (timing of an optimized installed build in LIB;
+`load_all()` builds use `-O0` and are not representative). Results and the revised cell-resolution
+decision are in [cell-accounted fertility](fertility-cell-accounting.md#implementation-and-validation).
+No scientific acceptance threshold is set.
+
+## Persistent fertility heterogeneity (D102, October 29, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
+passed the full suite with no test failures; the live database test stayed
+opt-in/skipped. Final targeted verification after the native optional-argument
+cleanup passed `hetfert|fertility-cells|simulation|calibration-intensity` without
+warnings. The heterogeneity file has 62 assertions, including subsequent
+extreme-weight removal and failed-initialization RNG checks.
+
+Checks cover constructor/edited-model validation, independent mean-one draws
+at the requested CV, zero-year/empty results, retained supplied weights,
+strict-positive female validation, unused male entries, seed restoration and
+unseeded advancement, exact alpha endpoints, intermediate normal innovations,
+fixed-intensity weighted sampling, spacing/re-entry, restarts, deceased women,
+and grouped parity/type/cohabitation/dissolution with explicit weighted
+calibration scans. A dominant 1e100 weight can leave eligibility without losing
+a remaining 1e-100 weight; no arbitrary clipping is introduced.
+
+An independently built HEAD control in /tmp used 2,000 initial persons, two
+groups, ten years of grouped on-demand formation (seed 92) and rate/cohabitation
+formation with dissolution (seed 93), from baseline seed 91. Complete population
+histories and metadata were identical to current execution with hetfert NULL.
+CV-zero unit weights also retained identical output to the uniform path after
+removing only the new weight column/specification metadata.
+
+These are software and distribution checks, not an empirical acceptance claim
+or a guarantee of a stationary inherited weight distribution under reproductive
+selection. No online rates were downloaded; the user's milestone 5 report was
+not edited.
+
+## Disabled heterogeneity lifecycle and validation follow-up (D104)
+
+`TZ=UTC Rscript -e 'devtools::test(filter="hetfert|simulation|fertility-cells", reporter="summary")'`
+passed without failures or warnings after the D104 change. The enabled ->
+disabled -> enabled regression creates daughters during the disabled interval,
+checks that disabled results omit the weight column, verifies the original
+population is unchanged, and confirms positive fresh weights on re-enabling.
+Zero-year and empty disabled runs also omit the column. Validator checks cover
+missing sex, logical all-NA placeholders in male-only/empty histories, and
+incomplete female weights with explicit redraw guidance. Help and schema now
+consistently describe weighted selection and the disabled-output rule. Native
+weighted sampling and inheritance algorithms were not changed in this follow-up.

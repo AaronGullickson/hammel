@@ -1,7 +1,8 @@
 # Design and implemented interface
 
-Updated October 29, 2026. Milestones 1–4 are complete by user acceptance
-(D029, D050, D077, D093). This document describes implemented architecture.
+Updated October 29, 2026. Milestones 1–5 are complete by user acceptance
+(D029, D050, D077, D093, D105). Group transitions (milestone 6) are next; their
+scientific specification and API remain to be selected. This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
 The [scientific contract](scientific-contract.md) defines demographic semantics.
 
@@ -14,6 +15,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Ancestry schema and initialization | `R/ancestry.R` |
 | Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
 | Mortality/fertility specification and rate validation | `R/set_process.R` |
+| Persistent fertility weights and specification | `R/het_fert.R`; cell weight trees in `src/simulate.cpp` |
 | Union formation/matching and dissolution specifications | `R/union_formation.R`, `R/union_dissolution.R` |
 | Shared kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/kinship.R` |
 | HMD/HFD downloads and preparation | `R/construct_demographic_rates.R` |
@@ -21,7 +23,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Continuous scheduling and events | `src/simulate.cpp` |
 | Demographic extraction and measures | `src/demography.cpp`, `R/calc_demographic_measures.R` |
 | Software and analytical validation | `tests/testthat/` |
-| Replication assessment | `validation/milestone1.qmd`, `validation/milestone2.qmd`, `validation/milestone3.qmd` |
+| Replication assessment | `validation/milestone1.qmd`, `validation/milestone2.qmd`, `validation/milestone3.qmd`, `validation/milestone4.qmd`, `validation/milestone5.qmd` |
 
 The engine is C++17 with Rcpp. R exposes ordinary list objects and tibbles.
 `Band` and `waiting_time()` are shared by mortality and adjusted fertility.
@@ -68,7 +70,7 @@ Mortality, fertility, and rate-based union formation also accept optional
 `group_prop_hazard` vectors on constructors and setters. The process stores the
 vector separately from its input rates. Execution scales a private schedule
 copy, expanding shared schedules by population group where needed, before
-native schedule construction and fertility compensation. Omitted group factors
+native schedule and fertility-cell construction. Omitted group factors
 are 1.0; absent population groups cause a warning and the vector is ignored.
 Conditional fertility may instead store a named list of partnered/unpartnered
 vectors. Omitted statuses also use 1.0; a single vector scales both statuses.
@@ -88,8 +90,9 @@ duration-dependent union dissolution. Other processes are rejected.
 fertility, and an explicit union-formation process. It uses continuous years, with no `dt`, execution step, monthly
 compensation grid, or birth-spacing argument on the execution function.
 
-C++ constructs midpoint-adjusted fertility bands, samples cumulative-hazard
-thresholds, and processes the earliest event in a sparse ordered queue.
+C++ builds fertility cells from the input schedules (D101), samples
+cumulative-hazard thresholds, and processes the earliest of the next person
+event, the next fertility-cell clock and the next cell boundary.
 R validates inputs and assembles the returned `hammel_population`, retaining
 histories and existing extra person columns. Newborn group identity follows
 the fertility inheritance model (random parent by default, with maternal fallback); other custom attributes are
@@ -171,14 +174,26 @@ that transition issue is [documented and deferred](scientific-contract.md#known-
 `get_mortality_hmd(country, year, ...)` and `get_fertility_hfd(country, year, ...)`
 return rate tibbles, without configuring a model. Users can save/load them with
 RDS and reuse them without downloads. HMDHFDplus is optional for these helpers.
+The HFD helper's `by_parity = TRUE` option imports conditional mi rates as
+age/parity interval rows for parity-specific fertility (milestone 5, accepted under D105). Unavailable
+conditional cells are zero-filled under D096, with policy/count metadata. The
+engine accepts complete parity partitions under D099, initializes counts
+from recorded maternal births and uses one fertility cell per actual parity (D101).
+See [parity fertility](parity-fertility.md). The default remains total asfrRR. `calculate_patfr()` summarizes conditional
+parity schedules with a deterministic HFD-style fertility table; calculate_tfr()
+delegates when parity columns are present, returning patfr (D097). Both products preserve endpoint rows under
+D095: 12- becomes [12,13), and 55+ becomes [55,Inf).
+
 There is no automatic disk cache or rate refresh.
 
-`calculate_demog_rates()`, `calculate_tfr()`, `calculate_life_table()`, and
+`calculate_fertility_rates()`, `calculate_mortality_rates()`, `calculate_tfr()`, `calculate_life_table()`, and
 `calculate_population_size()` operate on inspectable outputs. See
 [demographic analysis](demographic-analysis.md) for exposure, missing cells,
-replications, and age alignment. `calculate_demog_rates(by_union_type = TRUE)`
-returns unpartnered and discovered union-type rows with exposure, births,
-deaths, and fertility/mortality rates, without an overall row. Untyped histories
+replications, and age alignment. `calculate_fertility_rates(by_union_type = TRUE)`
+returns female unpartnered and discovered union-type rows with exposure, births
+and fertility rates, without an overall row. The separate mortality helper
+returns exposure, deaths and mortality rates for both sexes. Optional
+`parity_breaks` on fertility splits observed current parity using birth histories. Untyped histories
 use partnered/unpartnered. `calculate_union_rates()` separately returns
 unpartnered exposure, union starts, and partnership-entry rates by sex,
 excluding conversions.
@@ -220,7 +235,7 @@ not reconstructions of past group transitions. Validation uses shuffled IDs,
 fractional ages, siblings, unknown/deceased parents, optional groups, empty
 tables, and unchanged inputs.
 
-`calculate_demog_rates(by_group = TRUE)` and
+`calculate_fertility_rates(by_group = TRUE)` and
 `calculate_population_size(by_group = TRUE)` optionally split observations by
 recorded group. The native count kernels retain full histories and add a group
 axis to their output arrays, preserving cross-group parent and spouse links.
@@ -232,8 +247,7 @@ TFR and life-table calculations automatically retain input group strata. See
 These remain proposals or unresolved requirements:
 
 - Custom process execution and permitted state mutations/invalidation.
-- Poor-pool waiting, previous-father continuity,
-  and transition-aware fertility compensation; see [union formation](union-formation-models.md)
+- Poor-pool waiting and previous-father continuity; see [union formation](union-formation-models.md)
   and the [roadmap](roadmap.md).
 - Heterogeneity, parity-specific fertility, and user-defined newborn attributes.
 - Observation retention controls and exact stochastic checkpoints.
@@ -270,7 +284,13 @@ with one queued next age/duration/spacing boundary per counted woman
 (D082/D083). Search clock origins are separate from fertility birth times. State
 changes replace contributions; searches do not scan all women or enumerate a
 cross-classification of rate predictors. See
-[current-hazard contributions](calibration-intensity.md). Matching models carry
+[current-hazard contributions](calibration-intensity.md). Its boundary
+queue is the shared `BoundaryQueue` class, also used by `FertilityCells`
+(D101), which keeps cell counts and eligible lists,
+keeps one birth clock per cell in its own indexed heap (compared with the main
+event queue at each step), processes its boundaries in time order, and
+supplies calibration fertility totals at search time. `BoundaryQueue` is a
+lazy-deletion binary heap ordered by (time, person). See [cell-accounted fertility](fertility-cell-accounting.md). Matching models carry
 `delta` (omitted groups default to zero). One group gives unit weights and female
 choice exactly. See [weighted-choice matching](weighted-choice-matching.md).
 
@@ -362,3 +382,22 @@ inputs, chronology, linked episodes, legal-history recovery and observations.
 Fertility input strata are now union_type (the old input union_status errors).
 The contribution cache has marriage-search, father and cohab-search channels;
 preference tables may be shared, but role weights use each role's intensity.
+
+
+## Persistent fertility weights (D102)
+
+`het_fert(cv, alpha)` describes mean-one lognormal founder draws and maternal
+inheritance on the log scale. `set_fertility(..., hetfert = NULL)` keeps the
+uniform path. Enabled simulations initialize missing weight columns after seed
+setup, preserve supplied positive female weights, and return weights for all
+women in `persons$hetfert`. Sons receive NA. Zero-year runs initialize weights
+without entering the engine. Existing weights survive enabled restarts. Disabled output omits the weight
+column, including when it was supplied, so re-enabling draws fresh weights.
+
+`FertilityWeightTree` stores eligible weights by swap-remove slot with geometric
+capacity growth and logarithmic updates/draws. Cell intensity uses member count,
+not weights. Matching calibration aggregates the same individual hazards using
+per-bin compensated weight sums, and internal scan checks verify their totals.
+No tree is allocated on the uniform path. Daughter weights use independent
+normal innovations, except exact-copy or zero-innovation endpoints. No
+per-generation marginal normalization is imposed. See [the specification](fertility-heterogeneity-notes.md).

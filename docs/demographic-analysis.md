@@ -9,14 +9,18 @@ See the [scientific contract](scientific-contract.md) for model assumptions.
 For a population simulated from 2000 through 2100:
 
 ```r
-summary <- result |>
-  calculate_demog_rates(
+fertility_summary <- result |>
+  calculate_fertility_rates(
     time_breaks = seq(2020, 2100, by = 20),
     age_breaks = 0:100
   )
 ```
 
-The function appends `Inf` to finite final age breaks. Thus `0:100` ends with
+`calculate_mortality_rates()` takes the same arguments and returns deaths and
+`rate_mortality` for both sexes; fertility returns female rows only.
+Neither function includes the other process's counts or rates.
+
+Both functions append `Inf` to finite final age breaks. Thus `0:100` ends with
 `[100, Inf)` and `0:110` ends with `[110, Inf)`; those ages are pooled, not
 removed. Existing `Inf` breaks are retained.
 
@@ -28,7 +32,7 @@ removed. Existing `Inf` breaks are retained.
 | `deaths`, `rate_mortality` | Deaths and deaths/person-years |
 | `births`, `rate_fertility` | Maternal births and births/all female person-years |
 
-Birth counts and ASFR are `NA` for males. Female exposure includes the time
+Fertility returns female rows only. Female exposure includes the time
 excluded by birth spacing. Zero events with positive exposure give a zero rate;
 zero exposure gives `NA`. Keep those situations distinct.
 
@@ -41,12 +45,15 @@ each spouse's formations and exposure follow their own group. Complete histories
 are retained during extraction, so cross-group family links remain available.
 
 ```r
-group_counts <- calculate_demog_rates(
+group_counts <- calculate_fertility_rates(
   result, seq(2020, 2100, 20), 0:100,
   by_group = TRUE, by_union_type = TRUE
 )
 group_tfr <- calculate_tfr(group_counts)
-group_life_tables <- calculate_life_table(group_counts)
+group_mortality <- calculate_mortality_rates(
+  result, seq(2020, 2100, 20), 0:100, by_group = TRUE
+)
+group_life_tables <- calculate_life_table(group_mortality)
 ```
 
 Groups appear in first-occurrence order, with all period/age/sex cells retained,
@@ -102,7 +109,7 @@ for worked accounting and censoring rules.
 
 ```r
 input_tfr <- model$processes$fertility |> calculate_tfr()
-output_tfr <- summary |> calculate_tfr()
+output_tfr <- fertility_summary |> calculate_tfr()
 ```
 
 `calculate_tfr()` selects female rows when sex is present, omits open age bands,
@@ -120,8 +127,11 @@ rates contribute zero. For example, two five-year bands with rates 0.1 and
 excluded open age bands do not affect TFR. Inspect exposure and missing rates
 alongside TFR; when summarizing with `na.rm = TRUE`, report the number of
 nonmissing TFRs because the summary includes only complete estimates.
-HFD input TFR excludes the omitted open endpoint rows, so do not compare it
-uncritically with the full published HFD TFR.
+TFR warns if it omits a known nonzero upper-open rate, since the finite-range
+result underestimates full-age fertility. Zero or missing omitted rates do not
+trigger this warning. HFD preparation now maps 12- to [12,13) and 55+ to
+[55,Inf), preserving their rates; TFR drops only the upper-open row and need
+not equal HFD's full published TFR.
 
 ## Life tables
 
@@ -210,8 +220,8 @@ improve precision for calendar-constant inputs, but do not establish absence
 of age-specific bias.
 
 Use aligned ASFR/ASMR alongside aggregate TFR/life expectancy. Distinguish
-sampling variability from persistent differences due to midpoint compensation,
-initialization, or grouped ages. See [testing and validation](testing.md) and
+sampling variability from persistent differences due to unrealized births in
+sparse cells (D101), initialization, or grouped ages. See [testing and validation](testing.md) and
 the [accepted milestone 1 report](../validation/milestone1.qmd) and
 [accepted milestone 2 report](../validation/milestone2.qmd).
 
@@ -289,7 +299,7 @@ immediately before death, so union-ending deaths retain that type. Typed
 histories must not overlap; untyped overlapping coverage is merged.
 
 ```r
-counts <- calculate_demog_rates(result, seq(2020, 2100, 20), 0:100,
+counts <- calculate_fertility_rates(result, seq(2020, 2100, 20), 0:100,
                                 by_union_type = TRUE)
 tfr <- calculate_tfr(counts)
 ```
@@ -342,8 +352,8 @@ All time and age bins are half-open. See [remarriage](remarriage.md) for worked
 examples, tie conventions, and schedule requirements.
 
 This replaces the former `unions` and `rate_union` columns from
-`calculate_demog_rates(by_union_type = TRUE)`, which retains current-status
-exposure, births, deaths, fertility and mortality summaries.
+`calculate_fertility_rates()` and `calculate_mortality_rates()`, which provide
+current-status exposure and their respective event counts and rates.
 
 
 Optional `dur_breaks` on `calculate_union_rates()` measures dissolved and
@@ -446,4 +456,76 @@ father_crosstabs <- results |>
   purrr::map(get_unpartnered_births) |>
   dplyr::bind_rows(.id = "replication") |>
   dplyr::count(replication, group_mother, group_father)
+```
+
+
+## Parity-adjusted fertility summaries
+
+`calculate_patfr(rates)` accepts conditional age/current-parity fertility rates.
+`calculate_tfr(rates)` automatically delegates when parity bounds are present;
+its output then has `patfr`, rather than `tfr`. Period, group, union_type and
+legacy union_status grouping are the same as for ordinary TFR, and only female
+rows are used when sex is present. Parity is progressed through, not grouped
+into separate raw hazard integrals. A conditional index for one group/union type
+holds that stratum fixed throughout the synthetic cohort's reproductive life.
+
+```r
+rates <- get_fertility_hfd("USA", 2000, by_parity = TRUE)
+calculate_patfr(rates)
+calculate_tfr(rates) # Same result, with patfr column.
+```
+
+The calculation uses HFD's period fertility-table midpoint convention, not
+microsimulation. Start at parity zero at the reported lower age, count births
+and move exposure through parity states; the terminal category admits repeated
+births. Return NA for a stratum with any missing included rate. Exclude upper-
+open age rows, warning when known nonzero fertility is omitted. Report the finite
+age range used. The user's HFD zero-fill import choice and endpoint convention
+remain distinct from the summary's missing-data/upper-age rules. See
+[parity fertility](parity-fertility.md) for formulae, coverage and limitations.
+
+
+## Fertility rates by observed parity
+
+```r
+asfr <- calculate_fertility_rates(
+  result, time_breaks = c(2025, 2100), age_breaks = seq(15, 50, 5),
+  parity_breaks = c(0, 1, 2, 3, 4, Inf)
+)
+```
+
+`parity_breaks = NULL` pools parities. Otherwise, half-open integer bands start
+at zero; finite final breaks gain Inf. `parity_start`/`parity_end` label current
+parity before a birth. Exposure changes parity immediately after each birth,
+including births before the observation window and births of children who later
+died. Custom person parity columns are ignored. Complete maternal histories are
+required; absent births cannot be reconstructed. Minimum-spacing time remains
+in the denominator. Group and union-type options combine with parity bands.
+Sum births and exposure, then divide, to pool bands; do not average their rates.
+See [parity fertility](parity-fertility.md#observed-fertility-by-parity).
+
+## Unrealized births under cell accounting
+
+For populations returned by `simulate()` (D101),
+`calculate_fertility_rates(..., unrealized = TRUE)` adds `unrealized_births`
+and `rate_fertility_adjusted = (births + unrealized_births) / person_years`.
+Unrealized births are the expected births dropped from fertility cells that had
+members but no eligible woman (`simulation$unrealized_births`), so the adjusted
+rate shows what the input schedule would have produced without that loss. The
+observed `rate_fertility` remains the simulated outcome.
+
+Each record covers one one-year period from the run start and one fertility
+cell (an age year, actual parity when schedules are parity-specific, group and
+union type). A record is added to the observation row that contains it, so
+actual parities pool into broader parity bands and age years into wider age
+bands. Values are `NA`, rather than approximated, for periods before the most
+recent simulation's start (a restarted population keeps only its latest run's
+record), for time or age breaks that cut through a record, and for union-type or
+parity strata the fertility schedule did not use. Populations without an
+unrealized-births record (never simulated, or simulated before D101) are
+rejected.
+
+```r
+asfr <- calculate_fertility_rates(result, time_breaks = c(2050, 2150),
+  age_breaks = 12:56, parity_breaks = 0:4, unrealized = TRUE)
 ```

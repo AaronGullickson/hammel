@@ -33,8 +33,8 @@ Accepted complete sets per group are {unpartnered,partnered} or
 {unpartnered,cohab,marriage}; no mixed or partial set. Shared partnered rates
 apply to both types. Omission means overall fertility as before. The old input
 column errors with migration guidance. Demographic observation strata use
-`union_type` with `by_union_type = TRUE`. Compensation remains separate per effective fertility schedule and
-actual birth spacing persists across all transitions (D045 limitation retained).
+`union_type` with `by_union_type = TRUE`. Fertility cells are separate per effective schedule and
+actual birth spacing persists across all transitions; cell accounting covers them (D101).
 Type-specific fertility requires cohabitation mode. On-demand stays overall-only.
 
 Dissolution can omit `union_type` for a common duration hazard or supply both
@@ -175,7 +175,7 @@ requires a valid `union_type` column, including for bare union tables.
 
 ## Demographic rates by current union type
 
-`calculate_demog_rates(..., by_union_type = TRUE)` replaces `include_unions`.
+`calculate_fertility_rates(..., by_union_type = TRUE)` replaces `include_unions`.
 It returns a disjoint partition labeled `union_type`: unpartnered plus the types
 discovered in union histories, without overall rows. Untyped histories retain
 partnered/unpartnered; typed empty histories have only unpartnered. FALSE keeps

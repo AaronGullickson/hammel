@@ -8,6 +8,8 @@ nvim.log
 src/*.o
 src/*.so
 src/*.dll
+src/*.gcda
+src/*.gcno
 validation/*_files/
 validation/.cache/
 validation/.quarto/

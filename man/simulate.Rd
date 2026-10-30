@@ -23,8 +23,9 @@ A \code{hammel_population} with updated histories and endpoint, plus a
 }
 \description{
 Advance a configured model and return a population that can initialize a
-later run. The C++ engine samples candidate waiting times across age bands,
-executes at continuous times, and prioritizes death over birth on exact ties.
+later run. The C++ engine samples candidate waiting times across age bands
+(fertility cell clocks for births), executes at continuous times, and
+prioritizes death over birth on exact ties.
 Events execute chronologically. In on-demand mode all living females face the
 fertility schedule. Rate mode uses either overall rates for all women (with
 a warning), or separate \code{union_type} schedules. A union-formation process is required. With on-demand
@@ -66,14 +67,20 @@ partners and creates linked episodes, with same-person ties ordered death,
 birth, dissolution, conversion, search. Fertility input strata use \code{union_type}.
 }
 \details{
+Optional fertility \code{hetfert = het_fert(cv, alpha)} weights eligible mother
+selection within fixed-intensity cells. Supplied positive female weights are
+retained; absent weights are drawn under the simulation seed, and daughters
+inherit on the log scale. Output persons includes \code{hetfert} whenever enabled,
+and omits it whenever disabled, even if the input supplied weights.
+
 Minimum birth spacing is configured in \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}
-and uses recorded maternal births, including on restart.
-Midpoint eligible-risk adjustment uses the input fertility integral over
-the preceding birth interval at each original age band's midpoint. Each band
-has one adjusted hazard and shares the mortality waiting-time sampler.
-Initial eligibility is not calibrated.
-This is not a guarantee of exact ASFR matching. Fertility outside supplied
-bands is zero. Mortality must cover all ages for both sexes, ending at \code{Inf}.
+and uses recorded maternal births, including on restart. Births are generated
+by cell-accounted fertility (D101; see \code{\link[=fertility]{fertility()}}): each one-year
+age/parity/union-type/group cell produces births at its input rate times all
+its members, assigned to an eligible member uniformly or proportionally to
+\code{hetfert} weights when enabled. Births that
+cannot occur because a cell has no eligible member are reported in
+\code{simulation$unrealized_births}. Fertility outside supplied bands is zero. Mortality must cover all ages for both sexes, ending at \code{Inf}.
 
 Events are recorded at their sampled times in \verb{[start, start + years)}. Rates and all
 times remain in person-year and year units. Newborn group identity uses

@@ -1,8 +1,9 @@
 #' Run a demographic simulation
 #'
 #' Advance a configured model and return a population that can initialize a
-#' later run. The C++ engine samples candidate waiting times across age bands,
-#' executes at continuous times, and prioritizes death over birth on exact ties.
+#' later run. The C++ engine samples candidate waiting times across age bands
+#' (fertility cell clocks for births), executes at continuous times, and
+#' prioritizes death over birth on exact ties.
 #' Events execute chronologically. In on-demand mode all living females face the
 #' fertility schedule. Rate mode uses either overall rates for all women (with
 #' a warning), or separate `union_type` schedules. A union-formation process is required. With on-demand
@@ -43,14 +44,20 @@
 #' partners and creates linked episodes, with same-person ties ordered death,
 #' birth, dissolution, conversion, search. Fertility input strata use `union_type`.
 #'
+#' Optional fertility `hetfert = het_fert(cv, alpha)` weights eligible mother
+#' selection within fixed-intensity cells. Supplied positive female weights are
+#' retained; absent weights are drawn under the simulation seed, and daughters
+#' inherit on the log scale. Output persons includes `hetfert` whenever enabled,
+#' and omits it whenever disabled, even if the input supplied weights.
+#'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
-#' and uses recorded maternal births, including on restart.
-#' Midpoint eligible-risk adjustment uses the input fertility integral over
-#' the preceding birth interval at each original age band's midpoint. Each band
-#' has one adjusted hazard and shares the mortality waiting-time sampler.
-#' Initial eligibility is not calibrated.
-#' This is not a guarantee of exact ASFR matching. Fertility outside supplied
-#' bands is zero. Mortality must cover all ages for both sexes, ending at `Inf`.
+#' and uses recorded maternal births, including on restart. Births are generated
+#' by cell-accounted fertility (D101; see [fertility()]): each one-year
+#' age/parity/union-type/group cell produces births at its input rate times all
+#' its members, assigned to an eligible member uniformly or proportionally to
+#' `hetfert` weights when enabled. Births that
+#' cannot occur because a cell has no eligible member are reported in
+#' `simulation$unrealized_births`. Fertility outside supplied bands is zero. Mortality must cover all ages for both sexes, ending at `Inf`.
 #'
 #' Events are recorded at their sampled times in `[start, start + years)`. Rates and all
 #' times remain in person-year and year units. Newborn group identity uses
@@ -113,6 +120,8 @@ simulate <- function(model, years, seed = NULL) {
   birth_rates <- model$processes$fertility$rates
   birth_interval <- model$processes$fertility$birth_interval
   ffab <- model$processes$fertility$ffab
+  hetfert <- model$processes$fertility$hetfert
+  if (!is.null(hetfert)) validate_fertility_weights(population$persons)
   for (rows in split_rate_groups(death_rates)) {
     for (sex in c("m", "f")) {
       schedule <- death_rates[rows, , drop = FALSE]
@@ -202,6 +211,8 @@ simulate <- function(model, years, seed = NULL) {
     }, add = TRUE)
     set.seed(seed)
   }
+  population$persons <- initialize_fertility_weights(population$persons, hetfert)
+  engine_persons[["hetfert"]] <- population$persons[["hetfert"]]
   result <- population
   births <- deaths <- 0
   if (years > 0) {
@@ -221,13 +232,18 @@ simulate <- function(model, years, seed = NULL) {
                              as.matrix(population[["ancestry"]][setdiff(names(population[["ancestry"]]), "person_id")]),
                            inheritance, ffab, dissolution_rates, cohab$prob, cohab$conversion,
                            if (is.null(union_process$cohab_matching)) matching else
-                             prepare_matching_model(union_process$cohab_matching, group_values), counts_cohab)
+                             prepare_matching_model(union_process$cohab_matching, group_values), counts_cohab,
+                           isTRUE(getOption("hammel.check_cells", FALSE)),
+                           if (is.null(hetfert)) NULL else unclass(hetfert))
+    if (!isTRUE(native$cells_consistent))
+      stop("Internal error: fertility cell counts are inconsistent.", call. = FALSE)
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {
       persons <- rbind(persons, persons[rep(NA_integer_, added), , drop = FALSE])
     }
     for (column in names(native$persons)) persons[[column]] <- native$persons[[column]]
+    if (!is.null(hetfert)) persons$hetfert <- native$hetfert
     if (!is.null(group_values)) persons$group <- group_values[native$groups + 1L]
     result$persons <- tibble::as_tibble(persons)
     if (!is.null(population[["ancestry"]])) {
@@ -276,6 +292,9 @@ simulate <- function(model, years, seed = NULL) {
   result$simulation <- list(start_time = start, end_time = result$end_time,
     birth_interval = birth_interval, ffab = ffab,
     births = births, deaths = deaths)
+  if (!is.null(hetfert)) result$simulation$hetfert <- hetfert
+  result$simulation$unrealized_births <- format_unrealized_births(
+    if (years > 0) native$unrealized else NULL, birth_rates, group_values)
   if (cohab_enabled) {
     result$simulation$cohabitation_counts_as_previous_union <- counts_cohab
     result$simulation$conversions <- if (years > 0) native$conversions else 0
@@ -295,4 +314,29 @@ validate_birth_interval <- function(duration) {
          call. = FALSE)
   }
   invisible(duration)
+}
+
+# Unrealized expected births from cells with members but no eligible woman
+# (D101), by one-year period from the run start and cell. Columns mirror the
+# fertility table's strata: group, union_type and parity bounds appear only
+# when the schedules use them. Always a tibble, possibly with zero rows.
+format_unrealized_births <- function(native, rates, group_values) {
+  if (is.null(native) || !length(native$period_start)) {
+    native <- data.frame(period_start = numeric(), period_end = numeric(),
+      group = integer(), union_type = character(), parity_start = numeric(),
+      parity_end = numeric(), age_start = numeric(), age_end = numeric(),
+      unrealized_births = numeric(), years_without_eligible = numeric())
+  }
+  out <- tibble::tibble(period_start = native$period_start, period_end = native$period_end)
+  if (!is.null(group_values)) out$group <- group_values[native$group + 1L]
+  if ("union_type" %in% names(rates)) out$union_type <- as.character(native$union_type)
+  if ("parity_start" %in% names(rates)) {
+    out$parity_start <- native$parity_start
+    out$parity_end <- native$parity_end
+  }
+  out$age_start <- native$age_start
+  out$age_end <- native$age_end
+  out$unrealized_births <- native$unrealized_births
+  out$years_without_eligible <- native$years_without_eligible
+  out
 }

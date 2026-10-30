@@ -135,18 +135,20 @@ test_that("unit and absent multipliers leave RNG consumption and histories uncha
   }
 })
 
-test_that("fertility scaling precedes compensation, including zero and infeasibility", {
+test_that("fertility scaling precedes cell accounting, including zero and high rates", {
   model <- make_model(2, sex = "f", birth_rate = 2, birth_interval = 0.75)
   model$population$persons$group <- c("A", "B")
-  # Raw 2 is infeasible; reducing to .2 makes the effective schedules feasible.
+  # Zero suppresses group A; B is scaled to .2.
   model$processes$fertility$group_prop_hazard <- c(A = 0, B = 0.1)
   result <- simulate(model, 20, seed = 654)
   expect_gt(result$simulation$births, 0)
-  expect_true(all(result$persons$mother_id[result$persons$birth_time >= 0] == 2))
+  # Woman 1 (factor 0) never gives birth; daughters of woman 2 may, later.
+  expect_false(any(result$persons$mother_id %in% 1))
+  expect_gt(sum(result$persons$mother_id %in% 2), 0)
   expect_identical(result, simulate(explicit_prop_hazard_model(model), 20, seed = 654))
   model$processes$fertility$rates$rate <- 0.2
   model$processes$fertility$group_prop_hazard <- c(B = 10)
-  expect_error(simulate(model, 1), "midpoint eligibility")
+  expect_no_error(simulate(model, 1, seed = 654))
 })
 
 test_that("zero mortality and search multipliers suppress only the selected risk", {
@@ -283,7 +285,7 @@ test_that("fertility multiplier lists validate status names and nested vectors",
   expect_error(set_process(model, model$processes$fertility), "group_prop_hazard")
   expect_error(simulate(model, 0), "group_prop_hazard")
   model$processes$fertility$group_prop_hazard <- list(partnered = c(A = 10))
-  expect_error(simulate(model, 1), "midpoint eligibility")
+  expect_no_error(simulate(model, 1, seed = 654))
 })
 
 test_that("fertility status lists without population groups warn once and are ignored", {

@@ -5,8 +5,9 @@ accepted the milestone as complete on this date (D050).
 **Status: core milestone implementation is in place: both search modes,
 conditional-logit matching, age/kin/exclusivity restrictions, status-specific
 fertility, widowhood, and separate optional nonmarital father matching. The
-failed-match birth cancellation is implemented (default TRUE); transition-aware fertility
-compensation (D045) and poor-pool waiting (D044) remain deferred.
+failed-match birth cancellation is implemented (default TRUE); poor-pool waiting
+(D044) remains deferred. Transition-aware fertility (D045) is now handled by
+cell-accounted fertility (D101).
 The user accepted milestone 2 as complete on October 19, 2026 (D050).**
 Every simulation requires a union-formation process. Current-partner lookup
 and union histories are common infrastructure for all initiation modes.
@@ -46,8 +47,8 @@ accepted age, generation-distance kin and exclusivity restrictions below.
 SOCSIM is an investigation reference, not an adopted matching algorithm.
 
 Scheduled-search mode must support partnered and unpartnered fertility inputs.
-Parity-specific fertility is deferred to a later milestone; milestone 2 does
-not add parity conditioning. For the accepted milestone 2 scope, dissolution was excluded except when a
+Parity-specific fertility was outside milestone 2 and is now implemented
+and accepted in milestone 5 (D105). For the accepted milestone 2 scope, dissolution was excluded except when a
 partner dies (widowhood). Exclusive ongoing unions, return of widowed men to
 availability and renewed female rate searches after widowhood are implemented. The construction interface below adds no major dependency.
 
@@ -310,8 +311,8 @@ a match allows partner availability to reduce realized fertility.
 
 Partnered and unpartnered fertility rates use woman-years in the current union
 status; the implemented schedule and transition rules are specified under D039
-below. Midpoint compensation is computed independently per status. It does not
-account for prior-status rate history; correction is deferred under D045.
+below. Fertility cells are separate per status, and a woman who changes status
+during spacing carries her ineligibility into the new status's cell (D101).
 
 A partner's death ends the ongoing union. In rate mode, a surviving woman
 resumes search risk and switches fertility status with pending events
@@ -324,9 +325,8 @@ clocks per category in a single table (D083); see [remarriage](remarriage.md).
 
 ## Deferred decisions and validation status
 
-Poor-pool waiting, previous-father continuity, transition-aware fertility
-compensation, parity conditioning and additional matching characteristics are
-future work. Their detailed rules remain open; see the [roadmap](roadmap.md).
+Poor-pool waiting, previous-father continuity and additional matching
+characteristics are future work. Their detailed rules remain open; see the [roadmap](roadmap.md).
 Current initiation, eligibility, retries, birth cancellation, status fertility,
 event priorities and birth-time classification are implemented, not open choices.
 
@@ -356,8 +356,8 @@ husband's death also restores search risk immediately. Birth spacing is preserve
 Death wins exact same-person event ties. Cross-person ties retain queue order.
 Pending events invalidated by a status change must never execute. Surviving
 women are rescheduled from the transition time using their attained age.
-Midpoint fertility adjustment operates independently within each schedule,
-without a claim of calibrated conditional ASFRs across status transitions.
+Status changes move the woman between fertility cells (D101), so conditional
+ASFRs are recovered in expectation across transitions.
 
 Worked cases: zero search hazards and no initial union yield no unions; births then follow
 the unpartnered schedule. With explicit zero unpartnered rates, there are no births. With zero mortality and a constant search hazard
@@ -395,11 +395,9 @@ shared across statuses and survives transitions/restarts. Failed searches retain
 unpartnered fertility. Death wins exact ties; birth precedes search on an exact
 same-person birth/search tie. Cross-person ties retain queue insertion order.
 
-Apply existing midpoint compensation independently within each schedule; do not
-integrate across statuses or claim calibrated status-specific ASFR recovery
-around transitions. Transition-aware compensation is deferred under D045;
-the report examines case-specific discrepancies, but no general bias bound or
-corrective algorithm has been established.
+Fertility cells are separate within each schedule; a woman's eligibility moves
+with her across statuses (D101). The milestone 2 report's case-specific
+discrepancies came from the earlier midpoint compensation (D045).
 
 Worked cases: overall rate 0.1 applies to both statuses with a rate-mode warning.
 Unpartnered rate zero and partnered rate 0.2 reproduces the former gate explicitly.
@@ -407,7 +405,7 @@ If union formation occurs within a birth-spacing interval, no birth can occur
 before that interval ends, regardless of the new schedule. A widow switches to
 unpartnered fertility, so a previously scheduled partnered birth is invalidated.
 Validate these cases alongside different age bands, rejection of invalid status
-labels/incomplete tables, independent compensation and RNG isolation.
+labels/incomplete tables, per-status fertility cells and RNG isolation.
 
 ## Nonmarital father selection (D040)
 
@@ -475,7 +473,7 @@ father birth behavior. Partnered births and successful matches are unaffected.
 Input persons with missing historical father IDs remain unchanged; this controls
 new births only. Search events without births retain their existing retry policy.
 Cancellation allows partner scarcity to depress realized fertility below inputs;
-fertility compensation must not silently restore those suppressed births.
+cell accounting must not silently restore those suppressed births.
 
 After cancellation redraw competing event waiting times from the failed attempt,
 using attained age and current status. Do not change last_birth or start a new

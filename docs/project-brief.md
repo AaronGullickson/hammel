@@ -3,7 +3,9 @@
 Updated October 29, 2026. The user accepted milestone 1 (mortality/fertility)
 on October 15, 2026 (D029), milestone 2 (union formation) on October 19,
 2026 (D050), milestone 3 (groups) on October 27, 2026 (D077), and milestone 4
-(dissolution/remarriage/cohabitation) on October 29, 2026 (D093).
+(dissolution/remarriage/cohabitation) on October 29, 2026 (D093). Milestone 5
+(parity-specific fertility, cell-accounted spacing and fertility heterogeneity)
+was accepted October 29, 2026 (D105). Group transitions, milestone 6, are next.
 See [testing](testing.md) for evidence and limits.
 
 ## Purpose
@@ -29,7 +31,7 @@ that milestone at acceptance, not the current mandatory-union engine (D032).
 | --- | --- |
 | Population/model construction | Implemented; public tables are tibbles |
 | Mortality | Piecewise constant age/sex hazards; continuous sampling |
-| Fertility | Population ASFR inputs; midpoint spacing compensation (D028) |
+| Fertility | Population ASFR inputs; midpoint compensation under spacing (D028, later superseded by D101) |
 | Birth spacing | Fertility-process setting, default 0.75 years |
 | Parent assignment | Uniformly sampled living male; unknown father if none exists |
 | Relationships | Parent histories retained; no new unions formed |
@@ -40,8 +42,8 @@ that milestone at acceptance, not the current mandatory-union engine (D032).
 D019 replaced the original basic-partnership requirement with random male
 parent assignment for the first executable milestone. D024 replaced monthly
 execution with continuous event times. D028 replaced monthly and exact
-age-varying fertility compensation with one adjusted rate per original age
-band, evaluated at its midpoint. Those older descriptions are historical.
+age-varying fertility compensation with midpoint compensation, which D101
+replaced with cell-accounted fertility. Those older descriptions are historical.
 
 ## Milestone 1 completion
 
@@ -51,9 +53,11 @@ and stable age structure against a two-sex Leslie projection, restart behavior,
 and performance. Its conclusions and the user's explicit acceptance establish
 milestone completion; no additional numerical acceptance thresholds are inferred.
 
-Sparse oldest-age rates, initial fertility transients, and fertility compensation
-after rate changes remain limitations. The restart issue is deferred beyond this
-milestone. A controlled SOCSIM comparison has not been performed. Completion
+At milestone 1 acceptance, sparse oldest-age rates, initial fertility transients
+and compensation after rate changes remained limitations. Milestone 5 later
+replaced that correction with cell accounting and revisited the restart case.
+No broad SOCSIM equivalence comparison was part of milestone 1; the later
+parity/spacing reference experiment addresses a narrower question. Completion
 does not claim accuracy for every schedule or authorize new mechanisms.
 Union formation, calendar-varying rates, and initialization correction remain
 outside milestone 1's scope. Milestone 2 now targets union formation (D030), as specified below.
@@ -63,12 +67,13 @@ outside milestone 1's scope. Milestone 2 now targets union formation (D030), as 
 The user selected union formation for milestone 2: female search initiation
 separate from conditional-logit matching, birth-triggered and scheduled search
 modes, initial age-difference matching, kinship screening, and partnered/unpartnered
-fertility in scheduled mode. Only death ends unions in this milestone. Parity-specific fertility is deferred
-to a later milestone.
+fertility in scheduled mode. Only death ended unions in the milestone 2 acceptance scope. Parity-specific
+fertility was subsequently added in milestone 5.
 Partners are now drawn exactly from the whole eligible pool, without a
 candidate sample (D072). Eligibility and basic fertility transitions are implemented; the
 failed-match birth cancellation is implemented (default TRUE); transition-aware fertility
-compensation remains deferred (D045), including after milestone acceptance (D050). The poor-pool wait alternative is deferred to a later milestone (D044). See [milestone 2 notes](union-formation-models.md)
+compensation was deferred at milestone 2 acceptance (D045/D050), then replaced
+by cell accounting in milestone 5 (D101). The poor-pool wait alternative is deferred to a later milestone (D044). See [milestone 2 notes](union-formation-models.md)
 for implemented rules, deferred decisions, and validation. The on-demand C++ path now forms unions at births with formula-based
 conditional-logit selection and handles widowhood and restart histories.
 Minimum male age screening (default 15 years) and known-kin exclusion within
@@ -100,8 +105,8 @@ belongs to the user; completion does not establish universal accuracy or remove
 sparse-cell, calibration, or fertility-transition limitations. Weighted matching
 does not model marriage squeezes; fuller two-sex models remain future work.
 
-The [roadmap](roadmap.md) records proposed parity,
-time-varying inputs, group transitions, summaries, and migration work. No future
+The [roadmap](roadmap.md) records group transitions next (milestone 6), then
+time-varying inputs (milestone 7), summaries and migration work. No future
 feature is authorized by milestone completion. Fixed newborn assignment was
 explicitly deferred to the group-transitions discussion; custom inheritance
 already supports assignment of mixed-parent births to a specified category.
@@ -122,6 +127,32 @@ marriage-entry, dissolution and conversion observations use their documented
 risk denominators. `get_unpartnered_births()` supports father-matching assessment.
 Acceptance retains the documented fertility-transition, sparse-pool,
 initialization, and calibration limitations; it does not authorize later work.
+
+## Milestone 5 complete; group transitions next
+
+The user accepted milestone 5 on October 29, 2026 (D105), based on the
+[report](../validation/milestone5.qmd) and its rendered assessment. Its final
+render was running at closeout and is preserved. The milestone implements
+conditional parity schedules and HFD preparation, history-derived actual parity,
+PATFR/TFR dispatch, parity-specific observations, cell-accounted fertility and
+persistent lognormal fertility weights with maternal inheritance (D094–D104).
+The report revisits baseline, restart and partnered/unpartnered fertility,
+then assesses parity rates, heterogeneity and performance.
+
+Cell accounting is the only birth-spacing mechanism. Cells with no eligible
+women report unrealized intensity; adding it to an analysis is an accounting
+diagnostic, not actual births. Sparse and structurally infeasible young/high-
+parity cells can still fall below input rates. Retained histories determine
+parity and spacing; missing prehistory is not imputed. Reproductive selection
+can change inherited weight distributions, and restarts are not exact
+checkpoints. Completion retains these limitations rather than asserting
+universal rate recovery.
+
+Next is milestone 6, group transitions (D103/D105). Rates, clocks, histories,
+ancestry implications and event/tracker invalidation require a scientific
+specification before implementation. Groups should cover most categorical
+characteristics, with multiple types of groups an optional complexity direction;
+no schema or API is selected yet. Calendar-time inputs follow in milestone 7.
 
 ## Boundaries and future work
 

@@ -25,10 +25,10 @@ supplied (D080). Factors may modify an existing group-specific schedule
 or a shared schedule; they do not supply missing age bands or replace the
 requirement for an explicit matching schedule in grouped rate tables.
 
-The user selected multiplication of input rates before fertility birth-spacing
-compensation. For a group with input ASFR 0.1 and factor 1.1, the effective ASFR
-is 0.11. With spacing 0.75 in a constant-rate band, its adjusted eligible hazard
-is `0.11 / (1 - 0.75 * 0.11)`, exactly as for an explicit group schedule of 0.11.
+The user selected multiplication of input rates before fertility cell
+accounting. For a group with input ASFR 0.1 and factor 1.1, the effective ASFR
+is 0.11, and the group's cells generate births at 0.11 times their members,
+exactly as for an explicit group schedule of 0.11.
 Mortality 0.02 with factor 0.9 becomes 0.018 per person-year. Search rate 0.2
 with factor zero suppresses searches for that group without altering fertility
 or partner matching. Unspecified groups retain their original rates.
@@ -41,8 +41,7 @@ On-demand formation has no search hazard to multiply; non-NULL multipliers are
 rejected for that mode. The option does not change matching utility.
 
 At execution, scale a private rate-table copy before constructing native
-schedules. Reject nonfinite products rather than clipping them; effective
-fertility must pass the existing midpoint-eligibility check. No new random
+schedules. Reject nonfinite products rather than clipping them. No new random
 draws are introduced. Multipliers of one or equivalent explicit schedules must
 reproduce the same histories under the same seed, including newborns and
 restarts.
@@ -57,8 +56,8 @@ fertility rates with `union_type`; overall fertility uses a single vector.
 Mortality and union formation accept only a single vector. A single fertility
 vector still applies to every supplied type. For example, partnered A rate 0.1
 becomes 0.11 and unpartnered A rate 0.02 becomes 0.021 with the list above;
-unpartnered B stays unchanged. Compensation then uses each effective
-group/status schedule independently. Without population groups, ignore the
+unpartnered B stays unchanged. Each effective group/status schedule then has
+its own fertility cells. Without population groups, ignore the
 entire vector/list and warn once for fertility.
 
 Rate-table summaries (`calculate_tfr()` and `calculate_life_table()`,
@@ -91,8 +90,7 @@ fertility and searches. Each mortality group needs both sex schedules, with
 complete coverage of `[0, Inf)` at execution. Each conditional fertility group
 needs both statuses. Fertility and search gaps continue to mean zero risk.
 Units remain events per person-year and all times remain continuous years.
-Fertility midpoint compensation is computed independently for each group/status
-schedule using the original finite bands and existing birth-spacing rules.
+Fertility cells are built separately for each group/status schedule (D101).
 
 ## Births and unions
 
@@ -139,13 +137,13 @@ does not associate group with age or sex.
 - Identical group schedules must reproduce the ungrouped demographic histories
   with the same seed; adding group labels consumes no random draws.
 
-Validation covers these cases, group/status compensation, search selection,
+Validation covers these cases, group/status fertility cells, search selection,
 newborn schedule selection, empty populations, restart persistence, edited
 objects, and unchanged behavior without group columns.
 
 ## Group observations
 
-`calculate_demog_rates(..., by_group = TRUE)` and
+`calculate_fertility_rates(..., by_group = TRUE)` and
 `calculate_population_size(..., by_group = TRUE)` return separate counts for
 each group appearing anywhere in the supplied person history. Both default to
 FALSE, preserving pooled output. TRUE requires a population/persons `group`

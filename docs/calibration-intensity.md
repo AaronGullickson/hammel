@@ -11,8 +11,9 @@ Each living unpartnered woman contributes her current female search hazard to
 her group/birth-cohort calibration cell. Rate-mode marriage searches select the
 woman's group/previous-union schedule on its selected age/duration clock after
 proportional multipliers. The search origin is independent of fertility age.
-Fertility-driven searches use the existing midpoint-adjusted unpartnered
-fertility hazard and contribute zero during birth spacing. Keep separate totals
+Fertility-driven searches use each unpartnered eligible woman's cell-derived
+hazard (D101: cell intensity divided by eligible members), formed from the
+fertility cells at search time, and contribute zero during birth spacing. Keep separate totals
 for marriage searches and fertility-driven partner/father searches.
 
 Sum individual contributions into the existing group/cohort cells. Derive male

@@ -1,0 +1,581 @@
+"scenario","method","seed","measure","window","ages","stratum","target","value","births","exposure","unrealized"
+"cohort","midpoint",9701,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.206822163134028,2624,12687.2282942886,NA
+"cohort","midpoint",9701,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.275377479520746,2132,7742.10005738461,NA
+"cohort","midpoint",9701,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.338220776863226,3237,9570.67164832698,NA
+"young","midpoint",9701,"rate","[80,100)","[18,19)","parity 0",0.2,0.198614217751304,1500,7552.32942023432,NA
+"young","midpoint",9701,"rate","[80,100)","[18,19)","parity 1",0.3,0.282278317659738,1499,5310.3618174702,NA
+"young","midpoint",9701,"rate","[80,100)","[18,19)","parity 2+",0.4,0.240150100639093,625,2602.53898847735,NA
+"young","midpoint",9701,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.198614217751304,1500,7552.32942023432,NA
+"young","midpoint",9701,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.282278317659738,1499,5310.3618174702,NA
+"young","midpoint",9701,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.262343725586557,564,2149.85130190932,NA
+"young","midpoint",9701,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.141611902831639,61,430.754751403363,NA
+"young","midpoint",9701,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0,0,21.9329351646711,NA
+"young","midpoint",9701,"rate","[80,100)","[20,35)","parity 0",0.2,0.201071007783297,4110,20440.5401122251,NA
+"young","midpoint",9701,"rate","[80,100)","[20,35)","parity 1",0.3,0.305913127046291,7420,24255.2520437516,NA
+"young","midpoint",9701,"rate","[80,100)","[20,35)","parity 2+",0.4,0.377348123980514,40188,106501.125740525,NA
+"restart","midpoint",9701,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,1.10630904086398,72,NA,NA
+"restart","midpoint",9701,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,1.06487782149295,69,NA,NA
+"restart","midpoint",9701,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,1.17182941829536,75,NA,NA
+"restart","midpoint",9701,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,1.02580787166537,65,NA,NA
+"restart","midpoint",9701,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,1.01223900081562,64,NA,NA
+"restart","midpoint",9701,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.10187928291991,273,NA,NA
+"restart","midpoint",9701,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,1.06407296835156,264,NA,NA
+"restart","midpoint",9701,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,1.0003887165758,249,NA,NA
+"restart","midpoint",9701,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,0.99181059175574,245,NA,NA
+"restart","midpoint",9701,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,0.900707257971698,220,NA,NA
+"restart","midpoint",9701,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,1.03713324652181,252,NA,NA
+"union","midpoint",9701,"recovery ratio","[40,60)","[15,50)","partnered",1,1.00303702692674,2000,NA,NA
+"union","midpoint",9701,"recovery ratio","[40,60)","[15,50)","unpartnered",1,1.04033028651621,157,NA,NA
+"groups","midpoint",9701,"recovery ratio","[40,60)","[15,50)","group A",1,1.00223016515523,777,NA,NA
+"groups","midpoint",9701,"recovery ratio","[40,60)","[15,50)","group B",1,0.969183018671094,1433,NA,NA
+"cohort","cell",9701,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.197386677361273,2569,13015.0627911833,0
+"cohort","cell",9701,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.304425231193955,2089,6862.11189462498,47.1062825708788
+"cohort","cell",9701,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.393269653129233,3981,10122.8253141917,18.7840829677524
+"young","cell",9701,"rate","[80,100)","[18,19)","parity 0",0.2,0.20736294558802,1951,9408.62406476498,NA
+"young","cell",9701,"rate","[80,100)","[18,19)","parity 1",0.3,0.296317182336433,1624,5480.61366942989,NA
+"young","cell",9701,"rate","[80,100)","[18,19)","parity 2+",0.4,0.392301498739762,1572,4007.12208607391,NA
+"young","cell",9701,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.20736294558802,1951,9408.62406476498,NA
+"young","cell",9701,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.296317182336433,1624,5480.61366942989,NA
+"young","cell",9701,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.395236501903451,993,2512.41976694393,NA
+"young","cell",9701,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.405479193440171,441,1087.60204502348,NA
+"young","cell",9701,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.338982822605258,138,407.100274106513,NA
+"young","cell",9701,"rate","[80,100)","[20,35)","parity 0",0.2,0.197819584377105,4948,25012.6903035424,NA
+"young","cell",9701,"rate","[80,100)","[20,35)","parity 1",0.3,0.300719866808765,8372,27839.8633547013,NA
+"young","cell",9701,"rate","[80,100)","[20,35)","parity 2+",0.4,0.399430560301873,51339,128530.475888475,NA
+"restart","cell",9701,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,0.926684311528055,60,NA,NA
+"restart","cell",9701,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,1.0814946288717,70,NA,NA
+"restart","cell",9701,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,0.804417666292491,52,NA,NA
+"restart","cell",9701,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,1.00826819059491,65,NA,NA
+"restart","cell",9701,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,0.995488648418005,64,NA,NA
+"restart","cell",9701,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,0.992626661863377,249,NA,NA
+"restart","cell",9701,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,1.04575482986695,265,NA,NA
+"restart","cell",9701,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,0.965058391424785,244,NA,NA
+"restart","cell",9701,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,0.944834901566082,237,NA,NA
+"restart","cell",9701,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,0.952468180713659,238,NA,NA
+"restart","cell",9701,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,0.894017373449238,222,NA,NA
+"union","cell",9701,"recovery ratio","[40,60)","[15,50)","partnered",1,1.00244830164653,2100,NA,NA
+"union","cell",9701,"recovery ratio","[40,60)","[15,50)","unpartnered",1,0.97616040235317,154,NA,NA
+"groups","cell",9701,"recovery ratio","[40,60)","[15,50)","group A",1,0.995688999001309,755,NA,NA
+"groups","cell",9701,"recovery ratio","[40,60)","[15,50)","group B",1,0.994137336493246,1396,NA,NA
+"cohort","midpoint",9702,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.197448799748209,2569,13010.9679232087,NA
+"cohort","midpoint",9702,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.268549276037023,2057,7659.6743448916,NA
+"cohort","midpoint",9702,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.334856920462818,3124,9329.35773189995,NA
+"young","midpoint",9702,"rate","[80,100)","[18,19)","parity 0",0.2,0.192319911233073,1527,7939.89551164791,NA
+"young","midpoint",9702,"rate","[80,100)","[18,19)","parity 1",0.3,0.273083901326132,1416,5185.21960878584,NA
+"young","midpoint",9702,"rate","[80,100)","[18,19)","parity 2+",0.4,0.237563142490997,616,2592.99482883102,NA
+"young","midpoint",9702,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.192319911233073,1527,7939.89551164791,NA
+"young","midpoint",9702,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.273083901326132,1416,5185.21960878584,NA
+"young","midpoint",9702,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.255738444801231,539,2107.6221074971,NA
+"young","midpoint",9702,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.162889485865258,74,454.295742950609,NA
+"young","midpoint",9702,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.096534481666701,3,31.0769783833089,NA
+"young","midpoint",9702,"rate","[80,100)","[20,35)","parity 0",0.2,0.195674712200857,4289,21919.0305776324,NA
+"young","midpoint",9702,"rate","[80,100)","[20,35)","parity 1",0.3,0.310028614294152,7509,24220.345006205,NA
+"young","midpoint",9702,"rate","[80,100)","[20,35)","parity 2+",0.4,0.37485272248662,39931,106524.503103816,NA
+"restart","midpoint",9702,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,1.0022975619085,69,NA,NA
+"restart","midpoint",9702,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,1.08075942736079,75,NA,NA
+"restart","midpoint",9702,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,0.935896450550105,65,NA,NA
+"restart","midpoint",9702,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,0.958405849699951,67,NA,NA
+"restart","midpoint",9702,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,1.00354169202732,70,NA,NA
+"restart","midpoint",9702,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.15299282358422,312,NA,NA
+"restart","midpoint",9702,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,1.07410631476293,291,NA,NA
+"restart","midpoint",9702,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,0.963750622239819,259,NA,NA
+"restart","midpoint",9702,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,1.01047019292427,269,NA,NA
+"restart","midpoint",9702,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,1.02955061668901,275,NA,NA
+"restart","midpoint",9702,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,0.949228865452185,253,NA,NA
+"union","midpoint",9702,"recovery ratio","[40,60)","[15,50)","partnered",1,0.986228799501539,1831,NA,NA
+"union","midpoint",9702,"recovery ratio","[40,60)","[15,50)","unpartnered",1,1.00142296076337,139,NA,NA
+"groups","midpoint",9702,"recovery ratio","[40,60)","[15,50)","group A",1,1.02903363772677,857,NA,NA
+"groups","midpoint",9702,"recovery ratio","[40,60)","[15,50)","group B",1,1.03358811052816,1434,NA,NA
+"cohort","cell",9702,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.202202011068589,2579,12754.5714623243,0
+"cohort","cell",9702,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.296490087820897,2079,7012.0388012967,50.323928990239
+"cohort","cell",9702,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.3937111850316,4029,10233.389736379,18.0846458064612
+"young","cell",9702,"rate","[80,100)","[18,19)","parity 0",0.2,0.202441768142463,2075,10249.861078766,NA
+"young","cell",9702,"rate","[80,100)","[18,19)","parity 1",0.3,0.299727238966713,1789,5968.76015062041,NA
+"young","cell",9702,"rate","[80,100)","[18,19)","parity 2+",0.4,0.397869885200255,1744,4383.34255713326,NA
+"young","cell",9702,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.202441768142463,2075,10249.861078766,NA
+"young","cell",9702,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.299727238966713,1789,5968.76015062041,NA
+"young","cell",9702,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.406372976502407,1114,2741.324016149,NA
+"young","cell",9702,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.395688391630228,477,1205.49404554116,NA
+"young","cell",9702,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.350495794845837,153,436.52449544308,NA
+"young","cell",9702,"rate","[80,100)","[20,35)","parity 0",0.2,0.204736862354539,5492,26824.6760101736,NA
+"young","cell",9702,"rate","[80,100)","[20,35)","parity 1",0.3,0.293715427276269,9113,31026.6303833891,NA
+"young","cell",9702,"rate","[80,100)","[20,35)","parity 2+",0.4,0.399823893570592,56224,140621.911056632,NA
+"restart","cell",9702,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,0.907353631808265,61,NA,NA
+"restart","cell",9702,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,0.917780701582988,62,NA,NA
+"restart","cell",9702,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,1.14597038614801,77,NA,NA
+"restart","cell",9702,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,0.776734283528091,52,NA,NA
+"restart","cell",9702,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,1.212046483246,81,NA,NA
+"restart","cell",9702,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.10113633080512,283,NA,NA
+"restart","cell",9702,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,1.02546218477281,262,NA,NA
+"restart","cell",9702,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,0.907875814604432,230,NA,NA
+"restart","cell",9702,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,0.940238047717335,236,NA,NA
+"restart","cell",9702,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,0.940636811104002,237,NA,NA
+"restart","cell",9702,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,1.05216208998218,263,NA,NA
+"union","cell",9702,"recovery ratio","[40,60)","[15,50)","partnered",1,0.985743823918627,1891,NA,NA
+"union","cell",9702,"recovery ratio","[40,60)","[15,50)","unpartnered",1,0.969919695341275,148,NA,NA
+"groups","cell",9702,"recovery ratio","[40,60)","[15,50)","group A",1,0.989877687035367,777,NA,NA
+"groups","cell",9702,"recovery ratio","[40,60)","[15,50)","group B",1,1.02477472975918,1366,NA,NA
+"cohort","midpoint",9703,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.201106080238633,2610,12978.2252078254,NA
+"cohort","midpoint",9703,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.26289204280063,2078,7904.38530532434,NA
+"cohort","midpoint",9703,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.337706314339286,3079,9117.3894868504,NA
+"young","midpoint",9703,"rate","[80,100)","[18,19)","parity 0",0.2,0.203681070098873,1593,7821.05081845215,NA
+"young","midpoint",9703,"rate","[80,100)","[18,19)","parity 1",0.3,0.275292423263553,1463,5314.34894813428,NA
+"young","midpoint",9703,"rate","[80,100)","[18,19)","parity 2+",0.4,0.245458398718511,644,2623.66251618276,NA
+"young","midpoint",9703,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.203681070098873,1593,7821.05081845215,NA
+"young","midpoint",9703,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.275292423263553,1463,5314.34894813428,NA
+"young","midpoint",9703,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.262677355866936,563,2143.31379323461,NA
+"young","midpoint",9703,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.178571469648674,81,453.599895657248,NA
+"young","midpoint",9703,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0,0,26.7488272909067,NA
+"young","midpoint",9703,"rate","[80,100)","[20,35)","parity 0",0.2,0.203480929578172,4188,20581.7813427626,NA
+"young","midpoint",9703,"rate","[80,100)","[20,35)","parity 1",0.3,0.301357032779001,7427,24645.1855843914,NA
+"young","midpoint",9703,"rate","[80,100)","[20,35)","parity 2+",0.4,0.374869367464397,40052,106842.552302713,NA
+"restart","midpoint",9703,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,1.02655357635485,67,NA,NA
+"restart","midpoint",9703,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,1.01440192791543,66,NA,NA
+"restart","midpoint",9703,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,0.944959711405091,62,NA,NA
+"restart","midpoint",9703,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,0.8938463650135,59,NA,NA
+"restart","midpoint",9703,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,0.917516019472957,60,NA,NA
+"restart","midpoint",9703,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.25829929649178,321,NA,NA
+"restart","midpoint",9703,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,0.995536011179203,251,NA,NA
+"restart","midpoint",9703,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,0.986980089352935,249,NA,NA
+"restart","midpoint",9703,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,0.976309103682134,245,NA,NA
+"restart","midpoint",9703,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,0.994934454175516,249,NA,NA
+"restart","midpoint",9703,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,0.993416212156921,247,NA,NA
+"union","midpoint",9703,"recovery ratio","[40,60)","[15,50)","partnered",1,0.968407801271269,1967,NA,NA
+"union","midpoint",9703,"recovery ratio","[40,60)","[15,50)","unpartnered",1,0.974541166460508,155,NA,NA
+"groups","midpoint",9703,"recovery ratio","[40,60)","[15,50)","group A",1,1.02208977595875,817,NA,NA
+"groups","midpoint",9703,"recovery ratio","[40,60)","[15,50)","group B",1,1.00775236176277,1470,NA,NA
+"cohort","cell",9703,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.207873305970396,2632,12661.5583839073,0
+"cohort","cell",9703,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.285918524711554,2117,7404.20720250887,51.6102477346881
+"cohort","cell",9703,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.393387133552666,3908,9934.23441358384,16.6093301025306
+"young","cell",9703,"rate","[80,100)","[18,19)","parity 0",0.2,0.202326145925576,2073,10245.8334809705,NA
+"young","cell",9703,"rate","[80,100)","[18,19)","parity 1",0.3,0.304543289745298,1805,5926.90780187473,NA
+"young","cell",9703,"rate","[80,100)","[18,19)","parity 2+",0.4,0.401290265153195,1713,4268.73051442215,NA
+"young","cell",9703,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.202326145925576,2073,10245.8334809705,NA
+"young","cell",9703,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.304543289745298,1805,5926.90780187473,NA
+"young","cell",9703,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.403519431817376,1055,2614.49614767863,NA
+"young","cell",9703,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.417057634720774,497,1191.6818171492,NA
+"young","cell",9703,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.348068560299164,161,462.552549594313,NA
+"young","cell",9703,"rate","[80,100)","[20,35)","parity 0",0.2,0.200408590993114,5521,27548.7192073004,NA
+"young","cell",9703,"rate","[80,100)","[20,35)","parity 1",0.3,0.299336580181774,9113,30443.9904887872,NA
+"young","cell",9703,"rate","[80,100)","[20,35)","parity 2+",0.4,0.399736521734883,56014,140127.301245569,NA
+"restart","cell",9703,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,0.99882262496592,66,NA,NA
+"restart","cell",9703,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,1.03529148592708,69,NA,NA
+"restart","cell",9703,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,0.947839334386967,64,NA,NA
+"restart","cell",9703,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,1.05729160665326,71,NA,NA
+"restart","cell",9703,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,0.889273194937208,60,NA,NA
+"restart","cell",9703,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.01127460090565,263,NA,NA
+"restart","cell",9703,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,1.00203024745461,258,NA,NA
+"restart","cell",9703,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,1.01437678555311,262,NA,NA
+"restart","cell",9703,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,0.914872699567839,235,NA,NA
+"restart","cell",9703,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,1.06536627566277,274,NA,NA
+"restart","cell",9703,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,1.11638080521865,286,NA,NA
+"union","cell",9703,"recovery ratio","[40,60)","[15,50)","partnered",1,0.999803154648984,1973,NA,NA
+"union","cell",9703,"recovery ratio","[40,60)","[15,50)","unpartnered",1,1.14096357789682,177,NA,NA
+"groups","cell",9703,"recovery ratio","[40,60)","[15,50)","group A",1,0.997624521201263,773,NA,NA
+"groups","cell",9703,"recovery ratio","[40,60)","[15,50)","group B",1,0.992297717407527,1524,NA,NA
+"cohort","midpoint",9704,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.20545719131283,2618,12742.3137796809,NA
+"cohort","midpoint",9704,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.264579114436782,2081,7865.32226638482,NA
+"cohort","midpoint",9704,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.335059417994733,3147,9392.36395393448,NA
+"young","midpoint",9704,"rate","[80,100)","[18,19)","parity 0",0.2,0.201256091806802,1689,8392.29255043557,NA
+"young","midpoint",9704,"rate","[80,100)","[18,19)","parity 1",0.3,0.281275012945223,1611,5727.49062610027,NA
+"young","midpoint",9704,"rate","[80,100)","[18,19)","parity 2+",0.4,0.255876720612411,711,2778.68185233227,NA
+"young","midpoint",9704,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.201256091806802,1689,8392.29255043557,NA
+"young","midpoint",9704,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.281275012945223,1611,5727.49062610027,NA
+"young","midpoint",9704,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.279824207320118,633,2262.1345238936,NA
+"young","midpoint",9704,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.152344251612694,74,485.741990371457,NA
+"young","midpoint",9704,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.129847625475619,4,30.805338067203,NA
+"young","midpoint",9704,"rate","[80,100)","[20,35)","parity 0",0.2,0.195462967510197,4390,22459.497345813,NA
+"young","midpoint",9704,"rate","[80,100)","[20,35)","parity 1",0.3,0.30426033887132,8042,26431.3121776979,NA
+"young","midpoint",9704,"rate","[80,100)","[20,35)","parity 2+",0.4,0.375888516424187,43069,114579.185365155,NA
+"restart","midpoint",9704,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,0.95280064653057,62,NA,NA
+"restart","midpoint",9704,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,1.07130587756718,70,NA,NA
+"restart","midpoint",9704,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,0.670281988017285,43,NA,NA
+"restart","midpoint",9704,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,0.915457808910736,58,NA,NA
+"restart","midpoint",9704,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,1.29400636616848,81,NA,NA
+"restart","midpoint",9704,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.20780369558113,299,NA,NA
+"restart","midpoint",9704,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,0.932165629986602,232,NA,NA
+"restart","midpoint",9704,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,0.928104217713384,229,NA,NA
+"restart","midpoint",9704,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,1.05250338867145,260,NA,NA
+"restart","midpoint",9704,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,0.969613336670315,241,NA,NA
+"restart","midpoint",9704,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,0.974028795708531,244,NA,NA
+"union","midpoint",9704,"recovery ratio","[40,60)","[15,50)","partnered",1,0.983587715531044,1901,NA,NA
+"union","midpoint",9704,"recovery ratio","[40,60)","[15,50)","unpartnered",1,0.901511974421618,142,NA,NA
+"groups","midpoint",9704,"recovery ratio","[40,60)","[15,50)","group A",1,1.00191582280278,752,NA,NA
+"groups","midpoint",9704,"recovery ratio","[40,60)","[15,50)","group B",1,1.00312408558269,1428,NA,NA
+"cohort","cell",9704,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.196554994041422,2594,13197.3243043285,0
+"cohort","cell",9704,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.294876023279151,2061,6989.37803447283,44.7320066697075
+"cohort","cell",9704,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.398235143264027,3908,9813.29766119869,16.7919390408541
+"young","cell",9704,"rate","[80,100)","[18,19)","parity 0",0.2,0.205191475091452,1967,9586.16823200539,NA
+"young","cell",9704,"rate","[80,100)","[18,19)","parity 1",0.3,0.297463358159639,1718,5775.50126048804,NA
+"young","cell",9704,"rate","[80,100)","[18,19)","parity 2+",0.4,0.389219354634609,1591,4087.66928225755,NA
+"young","cell",9704,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.205191475091452,1967,9586.16823200539,NA
+"young","cell",9704,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.297463358159639,1718,5775.50126048804,NA
+"young","cell",9704,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.389688426980958,991,2543.05730267023,NA
+"young","cell",9704,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.40422586336741,443,1095.92195885137,NA
+"young","cell",9704,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.349907492354053,157,448.690020735938,NA
+"young","cell",9704,"rate","[80,100)","[20,35)","parity 0",0.2,0.199890072598373,5031,25168.8337224655,NA
+"young","cell",9704,"rate","[80,100)","[20,35)","parity 1",0.3,0.301047046017198,8590,28533.7461823468,NA
+"young","cell",9704,"rate","[80,100)","[20,35)","parity 2+",0.4,0.398283582809053,52248,131182.911511191,NA
+"restart","cell",9704,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,0.806404213407773,50,NA,NA
+"restart","cell",9704,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,0.956484728571291,59,NA,NA
+"restart","cell",9704,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,0.967499333016959,59,NA,NA
+"restart","cell",9704,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,0.967891522301986,59,NA,NA
+"restart","cell",9704,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,0.794521787681468,48,NA,NA
+"restart","cell",9704,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.01221895689066,244,NA,NA
+"restart","cell",9704,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,0.947547163820273,230,NA,NA
+"restart","cell",9704,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,0.937113601805967,229,NA,NA
+"restart","cell",9704,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,0.897012281175147,217,NA,NA
+"restart","cell",9704,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,0.997990659823837,239,NA,NA
+"restart","cell",9704,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,0.814539418726557,194,NA,NA
+"union","cell",9704,"recovery ratio","[40,60)","[15,50)","partnered",1,1.01705357025132,1845,NA,NA
+"union","cell",9704,"recovery ratio","[40,60)","[15,50)","unpartnered",1,0.98764217536585,143,NA,NA
+"groups","cell",9704,"recovery ratio","[40,60)","[15,50)","group A",1,0.964789038206432,753,NA,NA
+"groups","cell",9704,"recovery ratio","[40,60)","[15,50)","group B",1,1.00693177528416,1411,NA,NA
+"cohort","midpoint",9705,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.191045682752901,2562,13410.4051087807,NA
+"cohort","midpoint",9705,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.267669754886627,2019,7542.8768590428,NA
+"cohort","midpoint",9705,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.33548077758203,3035,9046.71803217666,NA
+"young","midpoint",9705,"rate","[80,100)","[18,19)","parity 0",0.2,0.200318823033622,1567,7822.52998629587,NA
+"young","midpoint",9705,"rate","[80,100)","[18,19)","parity 1",0.3,0.266077010554065,1455,5468.34165405791,NA
+"young","midpoint",9705,"rate","[80,100)","[18,19)","parity 2+",0.4,0.245582283196074,654,2663.05855409709,NA
+"young","midpoint",9705,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.200318823033622,1567,7822.52998629587,NA
+"young","midpoint",9705,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.266077010554065,1455,5468.34165405791,NA
+"young","midpoint",9705,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.266794529066892,585,2192.69863608533,NA
+"young","midpoint",9705,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.15186520732349,67,441.180710057456,NA
+"young","midpoint",9705,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.0685419564208883,2,29.1792079543048,NA
+"young","midpoint",9705,"rate","[80,100)","[20,35)","parity 0",0.2,0.195972091316049,4177,21314.2594537283,NA
+"young","midpoint",9705,"rate","[80,100)","[20,35)","parity 1",0.3,0.306782909115416,7598,24766.6991029853,NA
+"young","midpoint",9705,"rate","[80,100)","[20,35)","parity 2+",0.4,0.377227807174719,40794,108141.550607126,NA
+"restart","midpoint",9705,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,1.17679808771752,74,NA,NA
+"restart","midpoint",9705,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,1.00069403925698,62,NA,NA
+"restart","midpoint",9705,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,1.12273234713604,68,NA,NA
+"restart","midpoint",9705,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,0.972631121100853,58,NA,NA
+"restart","midpoint",9705,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,0.888728254214286,53,NA,NA
+"restart","midpoint",9705,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.22527618721778,283,NA,NA
+"restart","midpoint",9705,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,0.942217883649864,217,NA,NA
+"restart","midpoint",9705,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,1.19308345889754,274,NA,NA
+"restart","midpoint",9705,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,0.977146807735718,223,NA,NA
+"restart","midpoint",9705,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,0.917626259483021,209,NA,NA
+"restart","midpoint",9705,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,1.02316694867372,231,NA,NA
+"union","midpoint",9705,"recovery ratio","[40,60)","[15,50)","partnered",1,0.970269567859987,1802,NA,NA
+"union","midpoint",9705,"recovery ratio","[40,60)","[15,50)","unpartnered",1,1.07679518526493,152,NA,NA
+"groups","midpoint",9705,"recovery ratio","[40,60)","[15,50)","group A",1,1.00158928128549,756,NA,NA
+"groups","midpoint",9705,"recovery ratio","[40,60)","[15,50)","group B",1,1.01216224734546,1484,NA,NA
+"cohort","cell",9705,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.202688301516113,2610,12876.9148514105,0
+"cohort","cell",9705,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.291372227161215,2085,7155.79525308147,49.1573223019282
+"cohort","cell",9705,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.39719924287385,3959,9967.28989550811,21.0362833285356
+"young","cell",9705,"rate","[80,100)","[18,19)","parity 0",0.2,0.207665604285113,1978,9524.92834241496,NA
+"young","cell",9705,"rate","[80,100)","[18,19)","parity 1",0.3,0.296500360328734,1693,5709.94247063629,NA
+"young","cell",9705,"rate","[80,100)","[18,19)","parity 2+",0.4,0.382449057752776,1586,4146.9575302895,NA
+"young","cell",9705,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.207665604285113,1978,9524.92834241496,NA
+"young","cell",9705,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.296500360328734,1693,5709.94247063629,NA
+"young","cell",9705,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.387884159279307,1001,2580.66738755166,NA
+"young","cell",9705,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.396708487391644,444,1119.20973236367,NA
+"young","cell",9705,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.315379508312597,141,447.08041037417,NA
+"young","cell",9705,"rate","[80,100)","[20,35)","parity 0",0.2,0.203121038950923,5047,24847.2537658663,NA
+"young","cell",9705,"rate","[80,100)","[20,35)","parity 1",0.3,0.30727938351786,8509,27691.4119736427,NA
+"young","cell",9705,"rate","[80,100)","[20,35)","parity 2+",0.4,0.398398067539499,52858,132676.346364957,NA
+"restart","cell",9705,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,1.03878379439832,64,NA,NA
+"restart","cell",9705,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,0.959551828397341,59,NA,NA
+"restart","cell",9705,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,1.35251242262029,81,NA,NA
+"restart","cell",9705,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,0.812301913029372,48,NA,NA
+"restart","cell",9705,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,1.08500755899927,63,NA,NA
+"restart","cell",9705,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,0.983960296999522,226,NA,NA
+"restart","cell",9705,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,1.03163732501679,239,NA,NA
+"restart","cell",9705,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,1.05799232744689,242,NA,NA
+"restart","cell",9705,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,1.0757017585569,243,NA,NA
+"restart","cell",9705,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,1.11770179994194,252,NA,NA
+"restart","cell",9705,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,0.94356649029541,216,NA,NA
+"union","cell",9705,"recovery ratio","[40,60)","[15,50)","partnered",1,1.012069795679,1809,NA,NA
+"union","cell",9705,"recovery ratio","[40,60)","[15,50)","unpartnered",1,0.936562662738572,139,NA,NA
+"groups","cell",9705,"recovery ratio","[40,60)","[15,50)","group A",1,0.940454369939336,733,NA,NA
+"groups","cell",9705,"recovery ratio","[40,60)","[15,50)","group B",1,0.992236138148432,1428,NA,NA
+"cohort","midpoint",9706,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.203609953948734,2603,12784.2472802454,NA
+"cohort","midpoint",9706,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.266866192251649,2098,7861.61777293107,NA
+"cohort","midpoint",9706,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.331083528044636,3097,9354.13494682367,NA
+"young","midpoint",9706,"rate","[80,100)","[18,19)","parity 0",0.2,0.210107060818357,1530,7282.00182345477,NA
+"young","midpoint",9706,"rate","[80,100)","[18,19)","parity 1",0.3,0.266757908728691,1372,5143.24020059479,NA
+"young","midpoint",9706,"rate","[80,100)","[18,19)","parity 2+",0.4,0.244932286150806,603,2461.90491860566,NA
+"young","midpoint",9706,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.210107060818357,1530,7282.00182345477,NA
+"young","midpoint",9706,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.266757908728691,1372,5143.24020059479,NA
+"young","midpoint",9706,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.274429719595584,556,2026.01963380408,NA
+"young","midpoint",9706,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.106019051806476,44,415.019746453838,NA
+"young","midpoint",9706,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.143777742515042,3,20.8655383477463,NA
+"young","midpoint",9706,"rate","[80,100)","[20,35)","parity 0",0.2,0.197587448484813,3957,20026.575728084,NA
+"young","midpoint",9706,"rate","[80,100)","[20,35)","parity 1",0.3,0.304174386639928,7060,23210.3698078872,NA
+"young","midpoint",9706,"rate","[80,100)","[20,35)","parity 2+",0.4,0.372453676532371,37807,101507.925366697,NA
+"restart","midpoint",9706,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,1.16822756167426,74,NA,NA
+"restart","midpoint",9706,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,1.09745561321155,69,NA,NA
+"restart","midpoint",9706,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,1.38917860801865,87,NA,NA
+"restart","midpoint",9706,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,0.968242831393742,61,NA,NA
+"restart","midpoint",9706,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,1.14165622805512,72,NA,NA
+"restart","midpoint",9706,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.15023863757622,284,NA,NA
+"restart","midpoint",9706,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,1.02243064433705,253,NA,NA
+"restart","midpoint",9706,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,1.04592100559348,259,NA,NA
+"restart","midpoint",9706,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,0.899593046777763,223,NA,NA
+"restart","midpoint",9706,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,1.0743486629557,267,NA,NA
+"restart","midpoint",9706,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,1.08508672553754,268,NA,NA
+"union","midpoint",9706,"recovery ratio","[40,60)","[15,50)","partnered",1,1.01248076782225,1861,NA,NA
+"union","midpoint",9706,"recovery ratio","[40,60)","[15,50)","unpartnered",1,1.05691648783663,157,NA,NA
+"groups","midpoint",9706,"recovery ratio","[40,60)","[15,50)","group A",1,0.969807226200805,818,NA,NA
+"groups","midpoint",9706,"recovery ratio","[40,60)","[15,50)","group B",1,0.988679631644995,1397,NA,NA
+"cohort","cell",9706,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.194991397558013,2585,13256.9950899035,0
+"cohort","cell",9706,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.290323461540439,2052,7067.97855437591,42.8692854479328
+"cohort","cell",9706,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.398241809204151,3853,9675.02635572055,13.8358196574203
+"young","cell",9706,"rate","[80,100)","[18,19)","parity 0",0.2,0.203776583469552,1914,9392.63956344616,NA
+"young","cell",9706,"rate","[80,100)","[18,19)","parity 1",0.3,0.28902096327042,1613,5580.91005492502,NA
+"young","cell",9706,"rate","[80,100)","[18,19)","parity 2+",0.4,0.392727948567792,1572,4002.77088944853,NA
+"young","cell",9706,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.203776583469552,1914,9392.63956344616,NA
+"young","cell",9706,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.28902096327042,1613,5580.91005492502,NA
+"young","cell",9706,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.405559884725217,1011,2492.85010198923,NA
+"young","cell",9706,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.386007829855653,425,1101.01393580262,NA
+"young","cell",9706,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.332594084567179,136,408.906851656677,NA
+"young","cell",9706,"rate","[80,100)","[20,35)","parity 0",0.2,0.202300805607281,4950,24468.5135342924,NA
+"young","cell",9706,"rate","[80,100)","[20,35)","parity 1",0.3,0.300316143299051,8436,28090.3980296508,NA
+"young","cell",9706,"rate","[80,100)","[20,35)","parity 2+",0.4,0.399876651695104,51807,129557.451730144,NA
+"restart","cell",9706,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,0.931909619772106,58,NA,NA
+"restart","cell",9706,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,1.16123979653602,71,NA,NA
+"restart","cell",9706,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,1.28637606999604,78,NA,NA
+"restart","cell",9706,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,0.957778781988114,58,NA,NA
+"restart","cell",9706,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,0.977735067696135,59,NA,NA
+"restart","cell",9706,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.17320183879105,279,NA,NA
+"restart","cell",9706,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,1.04054269647262,248,NA,NA
+"restart","cell",9706,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,1.06223821665052,257,NA,NA
+"restart","cell",9706,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,1.07440343567236,260,NA,NA
+"restart","cell",9706,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,0.958454435664223,231,NA,NA
+"restart","cell",9706,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,1.00355671568198,241,NA,NA
+"union","cell",9706,"recovery ratio","[40,60)","[15,50)","partnered",1,1.00237004296302,1928,NA,NA
+"union","cell",9706,"recovery ratio","[40,60)","[15,50)","unpartnered",1,0.87011468684363,124,NA,NA
+"groups","cell",9706,"recovery ratio","[40,60)","[15,50)","group A",1,0.954581454211565,729,NA,NA
+"groups","cell",9706,"recovery ratio","[40,60)","[15,50)","group B",1,1.05814730980586,1390,NA,NA
+"cohort","midpoint",9707,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.194637021449669,2574,13224.6166778996,NA
+"cohort","midpoint",9707,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.276743502946756,2042,7378.67367528722,NA
+"cohort","midpoint",9707,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.339586953299355,3191,9396.70964681335,NA
+"young","midpoint",9707,"rate","[80,100)","[18,19)","parity 0",0.2,0.199612787518147,1582,7925.34396052245,NA
+"young","midpoint",9707,"rate","[80,100)","[18,19)","parity 1",0.3,0.274537817114793,1451,5285.24636514207,NA
+"young","midpoint",9707,"rate","[80,100)","[18,19)","parity 2+",0.4,0.244533673090183,652,2666.29945790551,NA
+"young","midpoint",9707,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.199612787518147,1582,7925.34396052245,NA
+"young","midpoint",9707,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.274537817114793,1451,5285.24636514207,NA
+"young","midpoint",9707,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.268992591120511,587,2182.21623708966,NA
+"young","midpoint",9707,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.142758943907394,65,455.312978794272,NA
+"young","midpoint",9707,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0,0,28.7702420215853,NA
+"young","midpoint",9707,"rate","[80,100)","[20,35)","parity 0",0.2,0.199505215454381,4210,21102.2052251194,NA
+"young","midpoint",9707,"rate","[80,100)","[20,35)","parity 1",0.3,0.304251906940316,7586,24933.2866186048,NA
+"young","midpoint",9707,"rate","[80,100)","[20,35)","parity 2+",0.4,0.376389757254813,40742,108244.17831439,NA
+"restart","midpoint",9707,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,0.878780556625239,56,NA,NA
+"restart","midpoint",9707,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,0.884585490966129,56,NA,NA
+"restart","midpoint",9707,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,1.07022627678714,67,NA,NA
+"restart","midpoint",9707,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,1.04077650780945,65,NA,NA
+"restart","midpoint",9707,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,1.02705372192332,64,NA,NA
+"restart","midpoint",9707,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.16216497443295,277,NA,NA
+"restart","midpoint",9707,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,0.983715750661133,234,NA,NA
+"restart","midpoint",9707,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,0.988694446537968,233,NA,NA
+"restart","midpoint",9707,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,1.1115055952136,262,NA,NA
+"restart","midpoint",9707,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,0.983593104444429,231,NA,NA
+"restart","midpoint",9707,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,1.02664843928816,238,NA,NA
+"union","midpoint",9707,"recovery ratio","[40,60)","[15,50)","partnered",1,1.02809312200154,1898,NA,NA
+"union","midpoint",9707,"recovery ratio","[40,60)","[15,50)","unpartnered",1,0.865873029817429,124,NA,NA
+"groups","midpoint",9707,"recovery ratio","[40,60)","[15,50)","group A",1,0.993347180622304,745,NA,NA
+"groups","midpoint",9707,"recovery ratio","[40,60)","[15,50)","group B",1,1.0081360805046,1524,NA,NA
+"cohort","cell",9707,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.200005730735134,2591,12954.6288022679,0
+"cohort","cell",9707,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.295571412945676,2086,7057.51608117592,49.1189648957467
+"cohort","cell",9707,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.400886872433985,4004,9987.85511655622,17.1285463707986
+"young","cell",9707,"rate","[80,100)","[18,19)","parity 0",0.2,0.204353848463715,1875,9175.26150887695,NA
+"young","cell",9707,"rate","[80,100)","[18,19)","parity 1",0.3,0.285761811121579,1582,5536.07913454513,NA
+"young","cell",9707,"rate","[80,100)","[18,19)","parity 2+",0.4,0.390190591065049,1518,3890.40646996773,NA
+"young","cell",9707,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.204353848463715,1875,9175.26150887695,NA
+"young","cell",9707,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.285761811121579,1582,5536.07913454513,NA
+"young","cell",9707,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.389312873438122,948,2435.05947190487,NA
+"young","cell",9707,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.397581308553461,420,1056.3876896731,NA
+"young","cell",9707,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.375978193378707,150,398.959308389759,NA
+"young","cell",9707,"rate","[80,100)","[20,35)","parity 0",0.2,0.200495375016517,4869,24284.8494614845,NA
+"young","cell",9707,"rate","[80,100)","[20,35)","parity 1",0.3,0.302911444975848,8149,26902.2519127653,NA
+"young","cell",9707,"rate","[80,100)","[20,35)","parity 2+",0.4,0.399097521069113,50565,126698.356493283,NA
+"restart","cell",9707,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,1.08589172964949,70,NA,NA
+"restart","cell",9707,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,1.05285892306305,68,NA,NA
+"restart","cell",9707,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,1.08832654695092,70,NA,NA
+"restart","cell",9707,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,0.999204448852512,64,NA,NA
+"restart","cell",9707,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,0.840550076078568,53,NA,NA
+"restart","cell",9707,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.04682676347481,254,NA,NA
+"restart","cell",9707,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,1.03327593281873,249,NA,NA
+"restart","cell",9707,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,0.998933919035868,241,NA,NA
+"restart","cell",9707,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,1.02498083288348,248,NA,NA
+"restart","cell",9707,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,0.975523736151061,235,NA,NA
+"restart","cell",9707,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,0.989269139567263,238,NA,NA
+"union","cell",9707,"recovery ratio","[40,60)","[15,50)","partnered",1,0.992401802319077,1798,NA,NA
+"union","cell",9707,"recovery ratio","[40,60)","[15,50)","unpartnered",1,1.04111081473326,158,NA,NA
+"groups","cell",9707,"recovery ratio","[40,60)","[15,50)","group A",1,0.991654690675085,707,NA,NA
+"groups","cell",9707,"recovery ratio","[40,60)","[15,50)","group B",1,0.96965449725324,1383,NA,NA
+"cohort","midpoint",9708,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.197320471289132,2591,13130.9234316769,NA
+"cohort","midpoint",9708,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.263152643327628,2038,7744.55454533538,NA
+"cohort","midpoint",9708,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.335908006170427,3065,9124.52202298785,NA
+"young","midpoint",9708,"rate","[80,100)","[18,19)","parity 0",0.2,0.207786880361401,1567,7541.38084788864,NA
+"young","midpoint",9708,"rate","[80,100)","[18,19)","parity 1",0.3,0.262948807012735,1389,5282.3970406252,NA
+"young","midpoint",9708,"rate","[80,100)","[18,19)","parity 2+",0.4,0.236119382738235,608,2574.96861523662,NA
+"young","midpoint",9708,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.207786880361401,1567,7541.38084788864,NA
+"young","midpoint",9708,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.262948807012735,1389,5282.3970406252,NA
+"young","midpoint",9708,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.252747393606979,533,2108.82491167768,NA
+"young","midpoint",9708,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.1737089263872,75,431.756741348016,NA
+"young","midpoint",9708,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0,0,34.3869622109327,NA
+"young","midpoint",9708,"rate","[80,100)","[20,35)","parity 0",0.2,0.198713107652043,3997,20114.4255013059,NA
+"young","midpoint",9708,"rate","[80,100)","[20,35)","parity 1",0.3,0.301374618086699,7256,24076.3473913805,NA
+"young","midpoint",9708,"rate","[80,100)","[20,35)","parity 2+",0.4,0.378321911951171,39203,103623.392570134,NA
+"restart","midpoint",9708,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,1.01737325990472,64,NA,NA
+"restart","midpoint",9708,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,1.05726203287354,66,NA,NA
+"restart","midpoint",9708,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,0.979721493672948,61,NA,NA
+"restart","midpoint",9708,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,0.967511060707575,60,NA,NA
+"restart","midpoint",9708,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,0.884076030054076,55,NA,NA
+"restart","midpoint",9708,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.18247334439826,284,NA,NA
+"restart","midpoint",9708,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,0.927286951441106,221,NA,NA
+"restart","midpoint",9708,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,0.979901611827967,231,NA,NA
+"restart","midpoint",9708,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,1.02014198222849,242,NA,NA
+"restart","midpoint",9708,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,1.00047787413184,238,NA,NA
+"restart","midpoint",9708,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,1.01841823886811,241,NA,NA
+"union","midpoint",9708,"recovery ratio","[40,60)","[15,50)","partnered",1,0.98513338534377,1865,NA,NA
+"union","midpoint",9708,"recovery ratio","[40,60)","[15,50)","unpartnered",1,0.992267510939748,150,NA,NA
+"groups","midpoint",9708,"recovery ratio","[40,60)","[15,50)","group A",1,1.02027731244537,771,NA,NA
+"groups","midpoint",9708,"recovery ratio","[40,60)","[15,50)","group B",1,0.97401745943132,1481,NA,NA
+"cohort","cell",9708,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.195286686166933,2588,13252.311515941,0
+"cohort","cell",9708,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.294504728325624,2042,6933.67475493375,44.4758746917555
+"cohort","cell",9708,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.393315121268337,3860,9814.01372912519,17.0083134517283
+"young","cell",9708,"rate","[80,100)","[18,19)","parity 0",0.2,0.197924919935073,1932,9761.277158196,NA
+"young","cell",9708,"rate","[80,100)","[18,19)","parity 1",0.3,0.285520489687882,1650,5778.91976090298,NA
+"young","cell",9708,"rate","[80,100)","[18,19)","parity 2+",0.4,0.399170664851428,1648,4128.55989959429,NA
+"young","cell",9708,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.197924919935073,1932,9761.277158196,NA
+"young","cell",9708,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.285520489687882,1650,5778.91976090298,NA
+"young","cell",9708,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.407918666605158,1038,2544.62490927076,NA
+"young","cell",9708,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.396016248195906,454,1146.41760803564,NA
+"young","cell",9708,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.356557262214908,156,437.517382287881,NA
+"young","cell",9708,"rate","[80,100)","[20,35)","parity 0",0.2,0.202145386069175,5209,25768.582213484,NA
+"young","cell",9708,"rate","[80,100)","[20,35)","parity 1",0.3,0.301035011200205,8766,29119.5365118847,NA
+"young","cell",9708,"rate","[80,100)","[20,35)","parity 2+",0.4,0.4017700008116,53811,133934.838069787,NA
+"restart","cell",9708,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,0.905169939934823,58,NA,NA
+"restart","cell",9708,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,0.915368199634585,59,NA,NA
+"restart","cell",9708,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,0.917867071633694,59,NA,NA
+"restart","cell",9708,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,1.14579405378591,74,NA,NA
+"restart","cell",9708,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,1.13009991265688,73,NA,NA
+"restart","cell",9708,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.05574798456911,265,NA,NA
+"restart","cell",9708,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,1.00246318537927,252,NA,NA
+"restart","cell",9708,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,1.11878825106989,281,NA,NA
+"restart","cell",9708,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,1.05545901424499,264,NA,NA
+"restart","cell",9708,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,0.904777564373625,224,NA,NA
+"restart","cell",9708,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,1.11007459855148,275,NA,NA
+"union","cell",9708,"recovery ratio","[40,60)","[15,50)","partnered",1,1.03448628150386,1923,NA,NA
+"union","cell",9708,"recovery ratio","[40,60)","[15,50)","unpartnered",1,0.893653644459533,127,NA,NA
+"groups","cell",9708,"recovery ratio","[40,60)","[15,50)","group A",1,1.02603544736157,793,NA,NA
+"groups","cell",9708,"recovery ratio","[40,60)","[15,50)","group B",1,1.02682675614061,1541,NA,NA
+"cohort","midpoint",9709,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.201964118617548,2586,12804.2546255308,NA
+"cohort","midpoint",9709,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.260235383036377,2057,7904.38247097422,NA
+"cohort","midpoint",9709,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.332674552926704,3091,9291.36290349512,NA
+"young","midpoint",9709,"rate","[80,100)","[18,19)","parity 0",0.2,0.193955490158297,1498,7723.4214859162,NA
+"young","midpoint",9709,"rate","[80,100)","[18,19)","parity 1",0.3,0.256035008575955,1361,5315.67931889379,NA
+"young","midpoint",9709,"rate","[80,100)","[18,19)","parity 2+",0.4,0.252873174353534,656,2594.1858074786,NA
+"young","midpoint",9709,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.193955490158297,1498,7723.4214859162,NA
+"young","midpoint",9709,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.256035008575955,1361,5315.67931889379,NA
+"young","midpoint",9709,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.273505846477555,586,2142.55017780064,NA
+"young","midpoint",9709,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.160792691598762,69,429.123981406947,NA
+"young","midpoint",9709,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.0444214474196245,1,22.5116482710156,NA
+"young","midpoint",9709,"rate","[80,100)","[20,35)","parity 0",0.2,0.199648657826082,4126,20666.3047221397,NA
+"young","midpoint",9709,"rate","[80,100)","[20,35)","parity 1",0.3,0.306438402458011,7419,24210.4120778941,NA
+"young","midpoint",9709,"rate","[80,100)","[20,35)","parity 2+",0.4,0.374818918455079,40075,106918.29581383,NA
+"restart","midpoint",9709,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,0.936162169008684,58,NA,NA
+"restart","midpoint",9709,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,0.875302135291632,54,NA,NA
+"restart","midpoint",9709,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,1.05473930000382,65,NA,NA
+"restart","midpoint",9709,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,0.998853428034201,61,NA,NA
+"restart","midpoint",9709,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,1.29184448496276,78,NA,NA
+"restart","midpoint",9709,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.07306617619918,255,NA,NA
+"restart","midpoint",9709,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,0.976218705332239,229,NA,NA
+"restart","midpoint",9709,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,0.954545898048689,223,NA,NA
+"restart","midpoint",9709,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,0.973544302787948,223,NA,NA
+"restart","midpoint",9709,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,1.04061182199203,237,NA,NA
+"restart","midpoint",9709,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,0.967662740253899,222,NA,NA
+"union","midpoint",9709,"recovery ratio","[40,60)","[15,50)","partnered",1,0.989803330674933,1940,NA,NA
+"union","midpoint",9709,"recovery ratio","[40,60)","[15,50)","unpartnered",1,1.03318154579457,159,NA,NA
+"groups","midpoint",9709,"recovery ratio","[40,60)","[15,50)","group A",1,1.02418306626849,818,NA,NA
+"groups","midpoint",9709,"recovery ratio","[40,60)","[15,50)","group B",1,0.998782181460305,1535,NA,NA
+"cohort","cell",9709,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.203571085017068,2604,12791.600534927,0
+"cohort","cell",9709,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.289811889699203,2089,7208.12387017034,51.1444949404843
+"cohort","cell",9709,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.403188888319757,4032,10000.2755949027,18.7653515258812
+"young","cell",9709,"rate","[80,100)","[18,19)","parity 0",0.2,0.202324229210085,1842,9104.19877634798,NA
+"young","cell",9709,"rate","[80,100)","[18,19)","parity 1",0.3,0.311628403880382,1711,5490.51363320772,NA
+"young","cell",9709,"rate","[80,100)","[18,19)","parity 2+",0.4,0.411249291239721,1603,3897.87905814431,NA
+"young","cell",9709,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.202324229210085,1842,9104.19877634798,NA
+"young","cell",9709,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.311628403880382,1711,5490.51363320772,NA
+"young","cell",9709,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.416395076365099,1005,2413.5732073806,NA
+"young","cell",9709,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.421562950137513,452,1072.20048595959,NA
+"young","cell",9709,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.354278328964231,146,412.105364804124,NA
+"young","cell",9709,"rate","[80,100)","[20,35)","parity 0",0.2,0.202377951275869,4795,23693.2925240644,NA
+"young","cell",9709,"rate","[80,100)","[20,35)","parity 1",0.3,0.294856402319522,8066,27355.6888592137,NA
+"young","cell",9709,"rate","[80,100)","[20,35)","parity 2+",0.4,0.39911462773512,50344,126139.200373813,NA
+"restart","cell",9709,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,0.940576784129172,57,NA,NA
+"restart","cell",9709,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,1.075588211134,65,NA,NA
+"restart","cell",9709,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,0.947247836484788,57,NA,NA
+"restart","cell",9709,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,1.05440439919974,64,NA,NA
+"restart","cell",9709,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,0.8847265780401,54,NA,NA
+"restart","cell",9709,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,0.958453431233577,233,NA,NA
+"restart","cell",9709,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,1.0573853580625,256,NA,NA
+"restart","cell",9709,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,0.958274821710723,232,NA,NA
+"restart","cell",9709,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,1.0368624321083,250,NA,NA
+"restart","cell",9709,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,0.908555514232069,220,NA,NA
+"restart","cell",9709,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,0.984420233127325,239,NA,NA
+"union","cell",9709,"recovery ratio","[40,60)","[15,50)","partnered",1,0.995010782511789,2006,NA,NA
+"union","cell",9709,"recovery ratio","[40,60)","[15,50)","unpartnered",1,1.00222829935247,153,NA,NA
+"groups","cell",9709,"recovery ratio","[40,60)","[15,50)","group A",1,0.968345609691663,761,NA,NA
+"groups","cell",9709,"recovery ratio","[40,60)","[15,50)","group B",1,0.979186566227751,1541,NA,NA
+"cohort","midpoint",9710,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.201520172065052,2591,12857.2736587562,NA
+"cohort","midpoint",9710,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.267761302263904,2062,7700.888748919,NA
+"cohort","midpoint",9710,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.333939232609019,3153,9441.837592325,NA
+"young","midpoint",9710,"rate","[80,100)","[18,19)","parity 0",0.2,0.194727157519701,1642,8432.31124469053,NA
+"young","midpoint",9710,"rate","[80,100)","[18,19)","parity 1",0.3,0.261245185926299,1464,5603.93101526094,NA
+"young","midpoint",9710,"rate","[80,100)","[18,19)","parity 2+",0.4,0.252977128850794,689,2723.56636795563,NA
+"young","midpoint",9710,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.194727157519701,1642,8432.31124469053,NA
+"young","midpoint",9710,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.261245185926299,1464,5603.93101526094,NA
+"young","midpoint",9710,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.281555559574518,623,2212.70715073596,NA
+"young","midpoint",9710,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.133820886591457,65,485.723878055294,NA
+"young","midpoint",9710,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.0397846232931344,1,25.1353391643794,NA
+"young","midpoint",9710,"rate","[80,100)","[20,35)","parity 0",0.2,0.202800932346052,4620,22780.9603563193,NA
+"young","midpoint",9710,"rate","[80,100)","[20,35)","parity 1",0.3,0.302493524456235,8052,26618.7516393098,NA
+"young","midpoint",9710,"rate","[80,100)","[20,35)","parity 2+",0.4,0.37330288374309,42403,113588.728741732,NA
+"restart","midpoint",9710,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,0.94799150640967,59,NA,NA
+"restart","midpoint",9710,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,0.858101653012145,53,NA,NA
+"restart","midpoint",9710,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,1.14482849400078,71,NA,NA
+"restart","midpoint",9710,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,0.817277458890966,50,NA,NA
+"restart","midpoint",9710,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,0.967352207263756,59,NA,NA
+"restart","midpoint",9710,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,1.10510504844901,266,NA,NA
+"restart","midpoint",9710,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,1.04371815734689,251,NA,NA
+"restart","midpoint",9710,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,0.956792030230838,231,NA,NA
+"restart","midpoint",9710,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,1.07033975216273,258,NA,NA
+"restart","midpoint",9710,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,0.987254818947152,238,NA,NA
+"restart","midpoint",9710,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,1.01206169574159,244,NA,NA
+"union","midpoint",9710,"recovery ratio","[40,60)","[15,50)","partnered",1,0.974937336291196,1791,NA,NA
+"union","midpoint",9710,"recovery ratio","[40,60)","[15,50)","unpartnered",1,0.970190963956043,144,NA,NA
+"groups","midpoint",9710,"recovery ratio","[40,60)","[15,50)","group A",1,1.04770274298259,865,NA,NA
+"groups","midpoint",9710,"recovery ratio","[40,60)","[15,50)","group B",1,1.03390892083954,1638,NA,NA
+"cohort","cell",9710,"rate","[0,10)","[15,Inf)","parity 0",0.2,0.197827559855028,2570,12991.1120669099,0
+"cohort","cell",9710,"rate","[0,10)","[15,Inf)","parity 1",0.3,0.287108389035879,2072,7216.78668797472,47.3759736509726
+"cohort","cell",9710,"rate","[0,10)","[15,Inf)","parity 2+",0.4,0.402671490142824,3943,9792.10124511536,17.1427544748408
+"young","cell",9710,"rate","[80,100)","[18,19)","parity 0",0.2,0.197295659375905,1755,8895.2793262229,NA
+"young","cell",9710,"rate","[80,100)","[18,19)","parity 1",0.3,0.297300038946414,1552,5220.31549508049,NA
+"young","cell",9710,"rate","[80,100)","[18,19)","parity 2+",0.4,0.390617065541519,1484,3799.11716847984,NA
+"young","cell",9710,"rate","[80,100)","[18,19)","actual parity 0",0.2,0.197295659375905,1755,8895.2793262229,NA
+"young","cell",9710,"rate","[80,100)","[18,19)","actual parity 1",0.3,0.297300038946414,1552,5220.31549508049,NA
+"young","cell",9710,"rate","[80,100)","[18,19)","actual parity 2",0.4,0.387839690486843,907,2338.59510062384,NA
+"young","cell",9710,"rate","[80,100)","[18,19)","actual parity 3",0.4,0.421587611554167,441,1046.04591765462,NA
+"young","cell",9710,"rate","[80,100)","[18,19)","actual parity 4+",0.4,0.32812503188404,136,414.476150201374,NA
+"young","cell",9710,"rate","[80,100)","[20,35)","parity 0",0.2,0.19868354774812,4733,23821.8013199575,NA
+"young","cell",9710,"rate","[80,100)","[20,35)","parity 1",0.3,0.301606554796128,7867,26083.6506199865,NA
+"young","cell",9710,"rate","[80,100)","[20,35)","parity 2+",0.4,0.401615818081577,48457,120655.108236193,NA
+"restart","cell",9710,"recovery ratio","[35,36)","[15,50)","TFR ~2 schedule",1,0.988919994163085,66,NA,NA
+"restart","cell",9710,"recovery ratio","[36,37)","[15,50)","TFR ~2 schedule",1,1.22414214828088,81,NA,NA
+"restart","cell",9710,"recovery ratio","[37,38)","[15,50)","TFR ~2 schedule",1,1.0253427899309,67,NA,NA
+"restart","cell",9710,"recovery ratio","[38,39)","[15,50)","TFR ~2 schedule",1,0.85896053850306,56,NA,NA
+"restart","cell",9710,"recovery ratio","[39,40)","[15,50)","TFR ~2 schedule",1,1.19164730300827,77,NA,NA
+"restart","cell",9710,"recovery ratio","[40,41)","[15,50)","TFR ~7.7, spacing 1.25",1,0.999532142776051,250,NA,NA
+"restart","cell",9710,"recovery ratio","[41,42)","[15,50)","TFR ~7.7, spacing 1.25",1,0.962864458624658,241,NA,NA
+"restart","cell",9710,"recovery ratio","[42,43)","[15,50)","TFR ~7.7, spacing 1.25",1,1.09536917243038,273,NA,NA
+"restart","cell",9710,"recovery ratio","[43,44)","[15,50)","TFR ~7.7, spacing 1.25",1,0.975478257565647,244,NA,NA
+"restart","cell",9710,"recovery ratio","[44,45)","[15,50)","TFR ~7.7, spacing 1.25",1,1.02638158454302,255,NA,NA
+"restart","cell",9710,"recovery ratio","[45,46)","[15,50)","TFR ~7.7, spacing 1.25",1,1.06777001621985,263,NA,NA
+"union","cell",9710,"recovery ratio","[40,60)","[15,50)","partnered",1,1.00368658000841,2132,NA,NA
+"union","cell",9710,"recovery ratio","[40,60)","[15,50)","unpartnered",1,1.14107833198371,184,NA,NA
+"groups","cell",9710,"recovery ratio","[40,60)","[15,50)","group A",1,0.96864435696594,791,NA,NA
+"groups","cell",9710,"recovery ratio","[40,60)","[15,50)","group B",1,0.962816335217168,1480,NA,NA

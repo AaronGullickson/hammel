@@ -22,7 +22,7 @@ test_that("marriage counts assign exact exposure and starts by latest episode", 
   expect_equal(men$unions, c(3, 0, 0))
   expect_equal(men$rate_union, c(1/3, 0, NA))
   # Pooling categories reproduces unpartnered exposure by sex.
-  pooled <- calculate_demog_rates(pop, c(0, 6), c(0, Inf), by_union_type = TRUE)
+  pooled <- collect_demographic_counts(pop, c(0, 6), c(0, Inf), by_union_type = TRUE)
   for (sex_value in c("m", "f"))
     expect_equal(sum(counts$person_years[counts$sex == sex_value]),
       subset(pooled, union_type == "unpartnered" & sex == sex_value)$person_years)

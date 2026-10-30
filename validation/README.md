@@ -1,6 +1,6 @@
 # Validation reports and supporting evidence
 
-Milestones 1–4 are accepted by the user (D029, D050, D077, D093). Keep the
+Milestones 1–5 are accepted by the user (D029, D050, D077, D093, D105). Keep the
 source reports, final rendered HTML, explanatory comments, and input provenance.
 Acceptance retains the limitations documented in each report and the scientific
 contract; software checks and empirical assessment are different evidence.
@@ -12,9 +12,16 @@ contract; software checks and empirical assessment are different evidence.
   ancestry and inheritance.
 - `milestone4.qmd` / `.html`: accepted October 29, 2026; dissolution,
   age/duration remarriage, cohabitation, conversion, matching roles and rate
-  observation. The author is producing the final render at closeout.
+  observation.
 - `data/`: local rate inputs, source documents, metadata and preparation scripts
   used by the reports and shipped examples. Retain these for reproducibility.
+- `milestone5.qmd` / `.html`: accepted October 29, 2026 (D105); parity-specific
+  fertility, cell-accounted birth spacing, lognormal fertility weights with
+  maternal inheritance, and baseline/restart/union-type recovery checks. The
+  final render was active at closeout; preserve all active intermediates.
+- `milestone5/`: supporting method investigations and diagnostics, including
+  superseded-correction evidence, runtime cell-accounting checks, reference
+  SOCSIM experiments and version-specific reproduction instructions.
 - `milestone4/`: supplementary calibration benchmarks and conditional-choice
   recovery evidence cited by the current methods and testing documentation.
 
@@ -22,7 +29,11 @@ Render the final milestone 4 report from this directory with
 `quarto render milestone4.qmd`. It downloads HMD mortality using configured
 access, runs 100 independent starting populations per scenario, and executes
 the offline test suite. It is a substantial analysis, not an ordinary package
-check. Do not run it merely to verify documentation edits.
+check. Do not run it merely to verify documentation edits. Milestone 5 renders
+with `quarto render milestone5.qmd`; it installs the package, downloads HFD/HMD
+inputs, runs 100 independently initialized replications per scenario and the
+offline tests. Its assessment uses 150-year runs and a 50-year burn-in, with
+additional restart follow-up. Reproduction settings remain in the report.
 
 Quarto intermediates (`*.rmarkdown`, `*.knit.md`, `*_files/`, `.quarto/` and
 `.cache/`) are disposable after rendering finishes. Never remove them during

@@ -25,7 +25,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Database rate products and reusable downloads | D018, D025 |
 | Demographic extraction and function names | D020–D022, D081 and missing-ASFR clarification |
 | Continuous execution | D024 |
-| Fertility spacing/compensation and finite age bands | D026, D028 (superseding D027's exact sampler) |
+| Fertility spacing (cell accounting) | D026, D101 (superseding D027/D028/D099 compensation) |
 | Two-sex union models and union API restructuring (deferred) | D073 |
 | Duration-dependent dissolution and symmetric group pairs | D078–D079 |
 | Age-specific searches by previous union; separate marriage observations | D080 |
@@ -36,6 +36,17 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Union/marriage entry, dissolution and conversion observations | D087–D091 |
 | Unpartnered birth extraction | D092 |
 | Milestone 4 completion and retained validation evidence | D093 |
+| Parity schedule bands and HFD preparation | D094 |
+| Open fertility age bands, HFD endpoints and TFR warnings | D095 |
+| Missing conditional HFD rates replaced with zero | D096 |
+| PATFR helper and automatic TFR dispatch for parity tables | D097 |
+| History-authoritative parity initialization | D098 |
+| Parity schedule validation and history parity in execution | D099 (correction superseded by D101) |
+| Cell-accounted fertility, the only spacing method | D101 |
+| Persistent lognormal fertility weights and maternal inheritance | D102 |
+| Milestone order and groups-based characteristics scope | D103 |
+| Disabled fertility heterogeneity removes output weights | D104 |
+| Milestone 5 acceptance; group transitions next | D105 |
 
 ## Recorded decisions
 
@@ -337,8 +348,10 @@ D028. Year-valued fractional spacing remains current.
 
 ## D028: Midpoint approximation using the shared hazard sampler
 
-**Current status:** Current midpoint compensation, shared sampler, and finite fertility
-inputs.
+**Current status:** Superseded by D101 on October 29, 2026: midpoint
+compensation was removed and births use cell-accounted fertility. The shared
+waiting-time sampler remains for other events. D095 had superseded the
+prohibition on upper-open fertility inputs.
 
 - **Status:** accepted October 13, 2026.
 - **Decision:** calculate one adjusted rate at each original fertility band's
@@ -737,9 +750,10 @@ includes performance comparisons; milestone 2 is complete (D050).
 
 ## D045: Defer transition-aware fertility compensation
 
-**Current status:** Compensation remains deferred; the report now assesses fertility
-discrepancies and performance. Milestone 2 was accepted as complete (D050);
-this deferral remains in force.
+**Current status:** Resolved by D101 (October 29, 2026): cell-accounted
+fertility uses the current population composition, including women who changed
+union type during spacing. Milestone 2 was accepted as complete (D050) under
+the earlier deferral.
 
 - **Status:** accepted by the user October 15, 2026; supersedes D042/D044's
   remaining implementation requirement.
@@ -1875,3 +1889,285 @@ cohabitation policy. Duration stratification is unchanged.
   `validation/milestone4/`, updating links and reproduction commands. Keep
   rendered-report execution intermediates intact while the author's render is
   active; ignore them in version control. See the validation directory guide.
+
+
+## D094 — Half-open parity bands and conditional HFD import (October 29, 2026)
+
+- **Status:** the user selected parity_start/parity_end and authorized extending
+  the HFD helper after confirming the milestone 4 PR was merged.
+- **Representation:** current maternal parity uses half-open intervals and Inf
+  for the upper open category. HFD birth orders 1,2,3,4,5+ map to [0,1), [1,2),
+  [2,3), [3,4), [4,Inf). Rates are per woman-year in that current parity.
+- **Importer:** `get_fertility_hfd(..., by_parity = TRUE)` requests conditional
+  period product mi, retaining the default total asfrRR import when FALSE.
+  Select one year/revision, omit open age endpoints as before, preserve missing
+  conditional cells as NA with a warning, and record product/mapping provenance.
+  No interpolation, zero imputation, probability conversion or spacing adjustment
+  occurs in this data-preparation operation. Unavailable products/years do not
+  fall back to unconditional rates.
+- **Boundary:** parity-dependent execution is not yet implemented. Fertility
+  constructors reject parity columns rather than silently using them as pooled
+  age rates. Initialization, state transitions, rate coverage, compensation,
+  observations and heterogeneity remain to be specified before engine changes.
+- **Specification:** [parity fertility design/preparation](parity-fertility.md).
+  Offline synthetic fixtures verify mapping and metadata; no live download or
+  demographic validation is implied by those tests.
+
+
+## D095 — Open fertility ages, HFD endpoints and truncated TFR (October 29, 2026)
+
+- **Status:** accepted by the user. Upper-open bands remain allowed; their
+  interior-limit compensation was superseded by D101 cell accounting.
+- **Decision:** allow upper-open fertility age bands. Their birth-spacing
+  compensation is the interior limit h=f/(1-b*f), with zero rate staying zero,
+  zero spacing unchanged and nonpositive eligibility rejected. Finite bands
+  retain D028's original midpoint calculation. The first b years in an open band
+  approximate the effect of preceding rates; no artificial midpoint is assigned.
+- **TFR:** omit upper-open age bands as before, warning when a known omitted
+  female rate is nonzero that the resulting TFR underestimates full-age fertility.
+  Zero omitted rates do not warn. Missing omitted rates remain unknown, not zero.
+- **HFD:** the user additionally selected preserving endpoint rows: map 12- to
+  [12,13) using its supplied rate, and 55+ to [55,Inf). This applies to total
+  asfrRR and conditional mi preparation. Record the changed endpoint convention
+  in source metadata. The lower-open value is represented at its labeled age,
+  not recomputed into a new empirical estimate. Missing conditional cells still
+  remain NA under D094. No parity engine execution is added.
+- **Supersession:** replaces D028's blanket finite-age restriction and D094's
+  earlier inherited omission of HFD open endpoints. Other timing/spacing,
+  missing-data and parity-preparation decisions remain in force.
+
+
+## D096 — Zero-fill unavailable HFD conditional rates (October 29, 2026)
+
+- **Status:** accepted by the user after inspecting the conditional-rate import.
+- **Decision:** replace unavailable conditional HFD age/parity rates with zero
+  on import. Preserve explicit zero/nonmissing values and all selected cells;
+  no interpolation. Record the zero-fill policy and replacement count in source
+  metadata. Do not warn merely because this selected policy replaced missing
+  cells. Total HFD rates and arbitrary input validation retain their existing
+  missing-data rules. No parity-dependent engine or PATFR is implemented here.
+- **Supersedes:** D094's preserve-NA-with-warning rule for HFD conditional cells.
+  Zero fill is the user's modeling choice, not an empirical reclassification
+  of missing HFD observations as measured zero hazards.
+
+
+## D097 — PATFR and parity-aware TFR dispatch (October 29, 2026)
+
+- **Status:** the user authorized a separate calculate_patfr(), automatic
+  calculate_tfr() delegation for parity schedules, and the same stratification
+  as calculate_tfr(). They explicitly selected exclusion of upper-open age bands
+  with nonzero-rate warning, and NA results for missing included rates.
+- **Measure:** deterministic synthetic-cohort parity progression using the HFD
+  Methods Protocol (2015), sections 8.3–8.4, midpoint fertility-table convention.
+  Output is patfr, including when called through calculate_tfr(), to distinguish
+  it from ordinary TFR. Start at parity zero at the reported finite lower age;
+  count repeated births within the terminal open parity category. Each supplied
+  period/group/union-type stratum is calculated independently, selecting female
+  rows if sex is present. Hold other strata fixed; no mortality or explicit
+  birth-spacing state is included.
+- **Numerics:** use annual age boundaries plus input boundaries, with midpoint
+  entry/exit exposure and q=d*m/(1+d*m/2); fractional steps generalize the annual
+  convention. Reject invalid progression probabilities rather than clipping.
+  This is not the exact continuous-time hazard solution or a new engine time
+  grid. All age/parity cells require unique contiguous coverage; broader finite
+  parity bands apply their rate to each contained state. See the worked formula
+  in [parity fertility](parity-fertility.md).
+- **Limits:** distinguish raw missing rates (NA result) from earlier explicit
+  HFD zero filling (D096). Upper-age omission, source endpoints and missing-cell
+  assumptions can prevent exact equality to HFD's full published PATFR. No
+  parity-dependent simulation or heterogeneity is authorized by this helper.
+
+
+## D098 — Initialize parity from recorded maternal birth histories (October 29, 2026)
+
+- **Status:** accepted by the user during parity-execution design.
+- **Decision:** on detecting parity-specific fertility, initialize the internal
+  parity vector from recorded births by mother_id. Women with no recorded births
+  start at zero, including random baselines with no birth histories. An optional
+  parity column must not override observed history. Count children regardless
+  of survival or known father; retain actual counts beyond an open band's lower
+  bound. Successful births increment parity, cancelled attempts do not.
+- **Architecture:** per-simulation integer storage indexed by stable engine
+  person position, avoiding repeated joins. Restart reconstructs counts from
+  retained recorded histories; no additional authoritative public state is added.
+- **Limit:** incomplete histories understate parity under this explicit rule.
+  Birth-spacing compensation and remaining execution contracts are unresolved;
+  this decision does not itself implement the engine or fertility heterogeneity.
+
+
+## D099 — Execute parity fertility with SOCSIM-style compensation (October 29, 2026)
+
+- **Current status:** the preceding-parity correction was superseded by D101 on
+  October 29, 2026. Its parity partition validation, history-derived parity
+  counts and schedule switching at births remain current.
+- **Status:** accepted by the user after reviewing the pinned SOCSIM source trace.
+- **Decision:** implement age/current-parity fertility with D098 history-derived
+  integer counts. Parity bands partition [0,Inf) within each group/type; age gaps
+  retain existing zero-risk meaning. Increment only on successful births and
+  select the new schedule, retaining actual-birth spacing and refreshing any
+  unpartnered fertility contribution used for father matching. No new public
+  authoritative parity column or parity axis in matching bins is added.
+- **Correction:** no adjustment at actual parity zero. For higher parity, divide
+  its current input band rate by one minus the preceding actual parity's
+  unadjusted rate integral over the birth interval, evaluated at the current
+  age midpoint. Upper-open ages use the preceding schedule's tail rate times
+  spacing. Zero spacing and zero input hazards remain unchanged. Positive
+  rates require positive eligibility and representable adjustment. Group factors
+  apply before correction; prior group/union-type history is not reconstructed.
+- **Highest parity:** retain actual counts; entry to the final open category
+  corrects from the prior category, while subsequent births correct from its
+  own input schedule. Broad finite parity bands also use actual k and k-1.
+- **Intentional departure:** use annual inputs, continuous execution and existing
+  midpoint/interior-limit approximations rather than SOCSIM's monthly
+  probability-sum grid. This mathematical implementation copies no SOCSIM source.
+- **Limits:** the correction is not the exact current-parity eligible fraction
+  and does not guarantee input conditional-rate recovery. Synthetic checks must
+  report observed differences. No fertility heterogeneity, automatic prehistory
+  synthesis or parity-stratified public observation API is added in this change.
+- **Specification:** [parity fertility](parity-fertility.md);
+  [static SOCSIM trace](socsim-parity-spacing-audit.md). Milestone 5 scientific
+  acceptance remains with the user.
+
+
+## D100 — Separate mortality and fertility observation APIs (October 29, 2026)
+
+Accepted by the user: replace the public combined `calculate_demog_rates()`
+with `calculate_mortality_rates()` and `calculate_fertility_rates()`. Both retain
+period/age splitting and optional group/union-type strata. Fertility additionally
+accepts optional `parity_breaks` defining half-open observed current-parity bands.
+The shared combined implementation remains internal; there is no exported
+compatibility alias. Fertility returns women only; mortality returns both sexes.
+Observed parity uses maternal birth history, with pre-birth event assignment
+and post-birth exposure progression; it does not change simulation calibration.
+See [demographic analysis](demographic-analysis.md#fertility-rates-by-observed-parity).
+
+## D101 — Cell-accounted fertility under birth spacing (October 29, 2026)
+
+- **Status:** accepted by the user as a specification; implemented October 29,
+  2026, first as the opt-in `spacing_method = "cell"`. After reviewing the
+  validation, the user made it the only method on October 29, 2026: midpoint
+  compensation (D028, D095's interior limit, D099's correction) and the
+  `spacing_method` argument were removed. Midpoint comparisons are reproducible
+  at commit `89d451b`. The user revised decision (5) after validation showed
+  that input-band cells recover only band averages, and later agreed to keep
+  low-rate upper-open bands as one cell (`birth_interval * rate < 0.001`).
+- **Decision:** generate births per fertility cell (age sub-band of at most one
+  year x actual parity x union type x group, after group multipliers) at intensity
+  `m_c * N_c`, where `N_c` counts all living members including those inside
+  their birth interval. Assign each birth to an eligible member with
+  probability proportional to an individual weight (all 1 until heterogeneity
+  is accepted). Equivalent individual hazard: `m_c * N_c * w_i / W_c^e`.
+- **Agreed choices:** (1) accept population-dependent individual hazards as a
+  calibration device; (2) drop intensity in cells with members but no eligible
+  weight and report unrealized expected births; (3) add as an option alongside
+  D028/D099 first, then make it the only rule once validated; (4) weights
+  determine selection probability within a cell, not a direct rate multiplier
+  (option A), so cell rates stay pinned to inputs; (5) revised after
+  validation: split age bands into sub-cells of at most one year at whole ages
+  and band edges, and split pooled parity bands by actual parity, so the rate
+  is recovered at every age and contained parity (input-band cells recovered
+  only band averages); (6) report
+  unrealized births per period and cell in run metadata as a tibble.
+- **Rationale:** input rates count all woman-years, including spacing-excluded
+  time. Precomputed corrections assume a mix of eligible and ineligible women
+  and fail when the simulated mix differs: young high-parity cells (milestone
+  5; also reproduced in SOCSIM), union-type transitions (milestone 2, D045),
+  restarts and start-up (milestone 1). Accounting of the simulated population
+  recovers inputs in expectation for any mix while eligible women exist.
+- **Alternatives:** a deterministic composition-based parity correction from
+  the target synthetic cohort (exact only when the simulated composition
+  matches it); weight-scaled rate multipliers (option B), which double-count
+  parity selection and move observed rates away from inputs.
+- **Implementation:** a `BoundaryQueue` class extracted from the calibration
+  tracker (no behavior change) serves both the tracker and the cells; each keeps
+  its own instance, and under cell mode the tracker no longer tracks fertility
+  boundaries. Calibration fertility totals come from cells at search time. Cell
+  clocks are kept in a separate indexed heap compared with the event queue, and
+  cell boundaries are processed in time order before events. Uniform selection;
+  D102 adds weighted selection for persistent lognormal heterogeneity. Unrealized births are reported
+  in `simulation$unrealized_births` by one-year period from the run start.
+- **Evidence:** toy diagnostics in `validation/milestone5/`
+  (`check-composition-spacing.R`, `check-runtime-spacing.R`) and the SOCSIM
+  reference experiment. Engine validation follows the specification's plan.
+- **Specification:** [cell-accounted fertility](fertility-cell-accounting.md);
+  [investigation](parity-spacing-investigation.md). D102 subsequently selects lognormal weights and maternal inheritance.
+
+
+## D102 — Persistent lognormal fertility weights and maternal inheritance (October 29, 2026)
+
+The user selected the API and lognormal inheritance construction:
+`set_fertility(..., hetfert = het_fert(cv, alpha))` enables
+mean-one lognormal weights with requested CV and maternal inheritance on the
+latent normal scale. `hetfert = NULL` retains uniform sampling. The population's
+existing female `persons$hetfert` values are retained; if the column is absent,
+simulation draws values for women. Daughters use maternal alpha plus independent
+innovation scaled by sqrt(1-alpha^2); no generational normalization is applied.
+Weights determine eligible-mother selection within fixed-intensity cells, not
+direct rate multipliers. Output always includes the column when enabled.
+
+The [heterogeneity specification](fertility-heterogeneity-notes.md) records
+units, strict-positive supplied female weights, seed handling, zero CV, endpoint
+inheritance, restarts and the reproductive-selection caveat. Distribution
+preservation is conditional on the reproducing mothers' distribution, not a
+universal guarantee. The source audit of SOCSIM does not select its cubic
+distribution or betaT transformation for Hammel.
+
+
+## D103 — Milestone order and groups-based characteristics scope (October 29, 2026)
+
+The user confirmed milestone 4 is complete and milestone 5 is current. Move
+group transitions to milestone 6 and time-varying inputs to milestone 7. Use
+"group transitions" rather than "group conversions"; this does not rename
+cohabitation-to-marriage conversion. Remove the separate individual-
+characteristics milestone: most categorical applications should use groups,
+with multiple types of groups as an option for more complex applications.
+
+This selects planning order and design direction only. Transition semantics,
+multiple-group representation and public APIs remain to be specified; it does
+not authorize arbitrary state mutation or mark milestone 5 complete. See the
+[current roadmap](roadmap.md). Milestones 8–10 retain their existing numbering.
+
+
+## D104 — Disabled fertility heterogeneity removes output weights (October 29, 2026)
+
+The user selected that `hetfert = NULL` produces no `persons$hetfert` column,
+even if the starting population includes one. This applies to zero-year and
+empty runs as well. The input population is not mutated. A subsequent enabled
+run therefore draws fresh weights for all recorded women when using that
+output; it does not silently assign unit weights to daughters born while the
+feature was disabled. Weight persistence is guaranteed across enabled restarts,
+not across an explicit disabled interval. This replaces D102's original
+ordinary-custom-column treatment for disabled runs.
+
+
+## D105 — Milestone 5 accepted complete (October 29, 2026)
+
+- **Status:** accepted complete by the user after reviewing and revising the
+  milestone 5 report. Its final HTML render was running when the user requested
+  documentation closeout; preserve the source, rendered artifact and active
+  intermediates. Closeout does not independently rerun or certify that render.
+- **Scope:** parity-specific conditional fertility inputs and history-derived
+  parity (D094–D099), HFD preparation and PATFR/TFR dispatch, separate mortality
+  and fertility observations with parity bands (D100), cell-accounted fertility
+  replacing precomputed spacing compensation (D101), persistent lognormal
+  fertility weights with maternal inheritance (D102), and the disabled-weight
+  lifecycle (D104). The report revisits baseline, restart and union-type
+  fertility, and assesses parity rates, heterogeneity and performance.
+- **Evidence:** the user-authored [report](../validation/milestone5.qmd), its
+  [rendered assessment](../validation/milestone5.html), and supporting
+  [diagnostics/provenance](../validation/milestone5/README.md). Acceptance is the
+  user's scientific assessment, not a new agent-defined numerical threshold.
+- **Retained limitations:** cells with members but no eligible women lose
+  intensity, reported as unrealized expected births. Adding it back is an
+  accounting diagnostic, not realized births. Sparse or structurally infeasible
+  young/high-parity cells need not recover their target. Missing birth
+  histories cannot be reconstructed. Inherited weight distributions may change
+  under reproductive selection; alpha and raw mother–daughter correlations
+  are not generally identical. Restarts are not exact checkpoints, and failed
+  partner searches retain their existing cancellation behavior.
+- **Next:** milestone 6 is group transitions, using that term for life-course
+  group changes. Multiple types of groups remain an optional complexity
+  direction; transition semantics, histories, tracker/event invalidation,
+  ancestry effects and public API require specification before implementation.
+  Milestone 7 remains time-varying inputs under D103. Completion does not
+  authorize unspecified future demographic behavior.

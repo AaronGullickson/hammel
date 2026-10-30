@@ -441,3 +441,78 @@ IntegerVector unpartnered_birth_rows_cpp(DataFrame persons, DataFrame unions) {
   }
   return wrap(rows);
 }
+
+// Observed maternal fertility: split lifetimes at births before Lexis clipping.
+// [[Rcpp::export]]
+List fertility_parity_counts_cpp(DataFrame persons, DataFrame unions,
+    NumericVector time_breaks, NumericVector age_breaks, NumericVector parity_breaks,
+    IntegerVector group_indices, int group_count, CharacterVector types, bool split_types) {
+  NumericVector ids=persons["person_id"], born=persons["birth_time"],
+    died=persons["death_time"], mothers=persons["mother_id"];
+  CharacterVector sexes=persons["sex"];
+  int nt=time_breaks.size()-1, na=age_breaks.size()-1, np=parity_breaks.size()-1;
+  int nk=types.size();
+  R_xlen_t base=static_cast<R_xlen_t>(nt)*na*group_count;
+  NumericVector exposure(base*np*nk), events(exposure.size());
+  std::map<double,int> index;
+  for(int i=0;i<ids.size();++i) index[ids[i]]=i;
+  std::vector<std::vector<double>> births(ids.size());
+  for(int i=0;i<ids.size();++i) if(!NumericVector::is_na(mothers[i]))
+    births[index.at(mothers[i])].push_back(born[i]);
+  struct Episode { double start,end; int type; bool birth_first; };
+  std::vector<std::vector<Episode>> histories(ids.size());
+  if(split_types) {
+    NumericVector wife=unions["wife_id"], starts=unions["start_time"], ends=unions["end_time"];
+    CharacterVector reasons=unions["end_reason"];
+    bool typed=unions.containsElementNamed("union_type");
+    CharacterVector labels=typed ? as<CharacterVector>(unions["union_type"]) : CharacterVector(unions.nrows(),"partnered");
+    for(int u=0;u<unions.nrows();++u) {
+      int k=1;
+      for(;k<nk;++k) if(types[k]==labels[u]) break;
+      bool first=!CharacterVector::is_na(reasons[u]) &&
+        (reasons[u]=="dissolution" || reasons[u]=="conversion");
+      histories[index.at(wife[u])].push_back({starts[u],NumericVector::is_na(ends[u])?R_PosInf:ends[u],k,first});
+    }
+  }
+  for(int i=0;i<ids.size();++i) {
+    if(i%1024==0) checkUserInterrupt();
+    if(sexes[i]!="f") continue;
+    auto &b=births[i]; std::stable_sort(b.begin(),b.end());
+    auto &h=histories[i];
+    std::sort(h.begin(),h.end(),[](const Episode&a,const Episode&b){return a.start<b.start;});
+    // Merge same-type coverage for legacy overlapping episodes.
+    std::vector<Episode> coverage;
+    for(auto e:h) {
+      if(!coverage.empty() && e.type==coverage.back().type && e.start<=coverage.back().end)
+        coverage.back().end=std::max(coverage.back().end,e.end);
+      else coverage.push_back(e);
+    }
+    auto cell=[&](int t,int a,int p,int k){return t+nt*a+static_cast<R_xlen_t>(nt)*na*group_indices[i]+base*(p+np*k);};
+    double life_end=NumericVector::is_na(died[i])?time_breaks[nt]:died[i];
+    for(size_t j=0;j<=b.size();++j) {
+      int p=demographic_bin(static_cast<double>(j),parity_breaks);
+      double left=j?b[j-1]:born[i], right=j<b.size()?b[j]:life_end;
+      if(p<0) continue;
+      for(int t=0;t<nt;++t) for(int a=0;a<na;++a) {
+        double lo=std::max({left,born[i],time_breaks[t],born[i]+age_breaks[a]});
+        double hi=std::min({right,life_end,time_breaks[t+1],born[i]+age_breaks[a+1]});
+        if(hi<=lo) continue;
+        double remaining=hi-lo;
+        if(split_types) for(const auto&e:coverage) {
+          double years=std::max(0.0,std::min(hi,e.end)-std::max(lo,e.start));
+          exposure[cell(t,a,p,e.type)]+=years; remaining-=years;
+        }
+        exposure[cell(t,a,p,0)]+=std::max(0.0,remaining);
+      }
+      if(j<b.size()) {
+        int t=demographic_bin(b[j],time_breaks), a=demographic_bin(b[j]-born[i],age_breaks), k=0;
+        if(split_types) {
+          for(const auto&e:h) if(e.start<=b[j] && b[j]<e.end) k=e.type;
+          for(const auto&e:h) if(e.end==b[j] && e.birth_first) { k=e.type; break; }
+        }
+        if(t>=0 && a>=0) events[cell(t,a,p,k)]+=1;
+      }
+    }
+  }
+  return List::create(_["person_years"]=exposure,_["births"]=events);
+}

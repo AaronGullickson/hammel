@@ -2,8 +2,10 @@
 
 Updated October 29, 2026. Static source audits cover rates, competing events,
 union formation, [dissolution and remarriage](socsim-dissolution-audit.md), and
-[cohabitation](socsim-cohabitation-audit.md) for milestone 4. No executable reference validation or comprehensive audit of
-all variants has been performed. References below are starting points recorded
+[cohabitation](socsim-cohabitation-audit.md) for milestone 4. A narrow
+[parity/spacing reference experiment](../validation/milestone5/socsim/README.md)
+now provides executable evidence. No comprehensive audit or validation of all
+variants has been performed. References below are starting points recorded
 in the earlier conversation.
 
 ## Establish the reference
@@ -65,6 +67,27 @@ was selected by the audit itself. Subsequent D085–D086 specify and implement
 the rate-mode design, and the user accepted milestone 4 on October 29, 2026
 (D093). Static reference findings and suggested experiments remain distinct
 from the accepted Hammel validation report.
+
+## Parity-specific birth-spacing investigation
+
+The [parity/spacing trace](socsim-parity-spacing-audit.md), inspected October 29,
+2026 at the same pinned commit, verifies SOCSIM's previous-parity adjustment,
+unadjusted parity zero, actual history-derived parity and highest-parity copy.
+That trace was initially static. The subsequent [toy reference experiment](../validation/milestone5/socsim/README.md)
+provides executable evidence for this narrow parity/spacing question; it is not
+a comprehensive SOCSIM validation or acceptance of a replacement correction.
+
+## Fertility heterogeneity investigation
+
+The [heterogeneity audit](socsim-fertility-heterogeneity-audit.md) traces the
+fixed cubic fresh-multiplier distribution, persistent hazard multiplication,
+maternal alpha/betaT inheritance, initial/restart handling and version-specific
+defaults. Four fresh-process switch checks confirm the hazard effect with a
+leading comment in the supervisory file; the audited loader otherwise skips
+the first line. This resolves the earlier apparently ineffective hetfert toggle
+without claiming the switch itself is broken. The [Hammel design notes](fertility-heterogeneity-notes.md)
+record a separate proposed lognormal distribution and variance-preserving
+latent inheritance, with reproductive selection explicitly unresolved.
 
 ## Reference links
 
