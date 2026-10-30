@@ -63,6 +63,80 @@ run_replication <- function(replication, model) {
   result$runtime <- time
   return(result)
 }
+
+get_cor <- function(cv, alpha) {
+  ((1 + cv^2)^alpha - 1) / (cv^2)
+}
+
+childbearing <- function(result) {
+  births <- result$persons |>
+    filter(!is.na(mother_id)) |>
+    count(mother_id, name = "children")
+
+  result$persons |>
+    filter(sex == "f") |>
+    left_join(births, by = c("person_id" = "mother_id")) |>
+    mutate(children = coalesce(children, 0L))
+}
+
+summarize_childbearing <- function(result) {
+  childbearing(result) |>
+    filter(
+      birth_time >= result$simulation$start_time,
+      birth_time + 50 <= result$end_time,
+      is.na(death_time) | death_time >= birth_time + 50
+    ) |>
+    summarize(
+      n_women = n(),
+      mean_children = mean(children),
+      variance_children = var(children),
+      share_childless = mean(children == 0)
+    )
+}
+
+summarize_het <- function(results, cv, alpha) {
+
+  if ("hetfert" %in% colnames(results[[1]]$persons)) {
+    cors <- map_dbl(
+      results,
+      function(result) {
+        daughters <- result$persons |>
+          filter(sex == "f", !is.na(mother_id)) |>
+          select(mother_id, hetfert) |>
+          rename(person_id = mother_id, hetfert_daughter = hetfert)
+
+        temp <- result$persons |>
+          filter(sex == "f") |>
+          left_join(daughters, by = "person_id") |>
+          filter(!is.na(hetfert_daughter))
+
+        cor(temp$hetfert, temp$hetfert_daughter)
+      }
+    )
+  } else {
+    cors <- NA
+  }
+
+  summary <- results |>
+    map(summarize_childbearing) |>
+    bind_rows(.id = "replication") |>
+    summarize(
+      var_children_mean = mean(variance_children),
+      var_children_mcse = sd(variance_children) / sqrt(n()),
+      share_childless_mean = mean(share_childless),
+      share_childless_mcse = sd(share_childless) / sqrt(n())
+    )
+
+  bind_cols(
+    summary,
+    tibble(
+      cor_mean = mean(cors),
+      cor_mcse = sd(cors) / sqrt(length(cors)),
+      cor_true = get_cor(cv, alpha)
+    )
+  )
+
+}
 ```
 
 ## Purpose and completion criteria
@@ -70,27 +144,31 @@ run_replication <- function(replication, model) {
 
 Assess whether the current simulation successfully handles parity-specific fertility rates and allows for more heterogeneous and inheritable fertility behavior. 
 
+
 | Measure | Comparison | Acceptance criterion |
 |---|---|---|
+| Fertlity rates (TFR, ASFR) | Output mean rates, across scenarios, versus supplied schedules | Output rates should match closely to input rates, adjusting for sampling variability |
+| Variance in completed childbearing | Compare across scenarios using fertility heterogeneity | Variance should increase in scenarios with greater $c$ |
+| Correlation between mother and daughter heterogeneity scores | Compare across scenarios using fertility heterogeneity | Correlation coefficients should be close to theoretical expectation  |
 | Accounting and implementation | Existing tests | Successful unit tests |
 
 ## Overview of Design
 
 ### Redesign of fertility hazards
 
-The issue with birth intervals that was identified previous milestones 1 and 2 also became an issue in early tests of parity specific fertility. However, the effects of this bias are much larger, particuarly at low age, high parity births. For a woman to reach a high parity birth at a young age, she has experienced several back to back birth intervals, so fertility needs to be adjusted upwards much more than the existing adjustment model allows. The consequence is that fertility at younger ages is underestimated at parity > 0 and that underestimation increases with parity.
+The issue with birth intervals that was identified previous milestones 1 and 2 also became an issue in early tests of parity specific fertility. However, the effects of this bias are much larger, particularly at low age, high parity births. For a woman to reach a high parity birth at a young age, she has experienced several back to back birth intervals, so fertility needs to be adjusted upwards much more than the existing adjustment model allows. The consequence is that fertility at younger ages is underestimated at parity > 0 and that underestimation increases with parity.
 
 Therefore, I decided this was a good time to try to fix the underlying problem with the adjustment technique which relies only on the input rates. However, the solution leads to a pretty significant change in how fertility operates and birth events are triggered.
 
-The basic idea is that to adjust fertlity rates correctly we need information about the population. Specifically, we need to know the number of eligible and ineligible women in each cell of our stratified fertility table. We can then adjust the rate in that cell to be:
+The basic idea is that to adjust fertility rates correctly we need information about the population. Specifically, we need to know the number of eligible and ineligible women in each cell of our stratified fertility table. We can then adjust the rate in that cell to be:
 
 $$\lambda_i \frac{N_i}{E_i}$$
 
-Where $\lambda_i$ is the input hazard rate per woman year lived for all women in cell $i$ from the input schedule, $N_i$ is the number of women in that cell and $E_i$ is the number of eligible women (i.e. those that areeligible to give birth because they are not within `birth_interval` of a previous birth). $\lambda_i$ is always indexed by age, but depending on the input could also be indexed by parity, union type, and group. In our prior approach, we tried to approximate what $N_i/E_i$ would be based on fertility rates, but this approximation can fail in cases of changing fertility rates (e.g. across restarts, across union transitions) and it fails spectacularly for parity.
+Where $\lambda_i$ is the input hazard rate per woman year lived for all women in cell $i$ from the input schedule, $N_i$ is the number of women in that cell and $E_i$ is the number of eligible women (i.e. those that are eligible to give birth because they are not within `birth_interval` of a previous birth). $\lambda_i$ is always indexed by age, but depending on the input could also be indexed by parity, union type, and group. In our prior approach, we tried to approximate what $N_i/E_i$ would be based on fertility rates, but this approximation can fail in cases of changing fertility rates (e.g. across restarts, across union transitions) and it fails spectacularly for parity.
 
 So, the solution is to actually calculate $N_i/E_i$ exactly. We already have much of the machinery for doing this with the tracker we created for the weighted choice method in Milestone 3. This allows us to cheaply track the value of $\lambda_i (N_i/E_i)$ in continuous time by just updating cells based on events or hitting a band boundary.
 
-However, although we can track this value, we can't use it to assign individual waiting times to women because its constantly changing! So, the solution is to move the triggering of birth events away from the individual. Instead each cell of our tracker creates its own waiting time and when its event triggers, we sample a random woman within that cell and she gives birth. Waiting times are recalculated whenever a cell value changes.
+However, although we can track this value, we can't use it to assign individual waiting times to women because its constantly changing! So, the solution is to move the triggering of birth events away from the individual. Instead each cell of our tracker creates its own waiting time based on cell intensity $\lambda_iN_i$ and when its event triggers, we sample a random woman within that cell and she gives birth. Waiting times are recalculated whenever a cell value changes.
 
 To avoid cells that are too coarse, we divide the age and parity bands into one year age and one year parity cells, even for the open-ended parity category. 
 
@@ -104,13 +182,41 @@ Because we are redoing this engine, I will re-run several of the basic fertility
 
 We add parity-specific fertility by allowing fertility rates to be stratified by parity using two additional columns: `parity_start` and `parity_end` that govern the half-open interval `[parity_start, parity_end)` with an option for an open-ended interval using `Inf` for `parity_end`.
 
-We also added a function `calculate_patfr`` to get parity and age adjusted TFR for parity-specific fertility schedules. The normal `calculate_tfr` function will delegate to this function if it detects parity-specific data.
+We also added a function `calculate_patfr` to get parity and age adjusted TFR for parity-specific fertility schedules. The normal `calculate_tfr` function will delegate to this function if it detects parity-specific data.
 
 ### Fertility Heterogeneity
 
+As noted above, the new fertility engine gives us a relatively easy way to apply heterogeneous weights. Individual weights on a woman just affect her probability of being sampled from the appropriate cell when that cell needs to sample a woman. This allows for greater heterogeneity in realized fertility while we can be assured that the heterogeneity does not affect overall fertility rates. This differs somewhat from SOCSIM which applies the heterogeneity score as a rate multiplier. Our approach is the same, but more bounded in that we preserve the overall rate schedule.
+
+Two parameters define heterogeneous fertility. The $c$ parameter defines the coefficient of variation for a lognormal distribution. This $c$ weight can be used to control the level of variance where $c = 0$ corresponds to no variance in weights. To determine a random score for a woman, we first draw from the standard normal distribution:
+
+$$Z \sim N(0, 1)$$
+
+Then we calculate the score $W$ as:
+
+$$W = e^{-\sigma^2 / 2 + \sigma Z},\qquad\sigma^2 = log(1 + c^2)$$
+
+W will have a lognormal distribution with $E(W)=1$ and $SD(W)=c$. 
+
+We allow some of this score to be determined by inheritance with the $\alpha$ parameter. When $\alpha = 0$, there is no inheritance and everyone's score is purely random. When $\alpha = 1$, daughters inherit their mother's score exactly. First, we can recover the mother's latent normal score is $Z_m$, 
+
+$$Z_m=\frac{\log(W_m)+\sigma^2/2}{\sigma},\qquad\sigma=\sqrt{\log(1+c^2)}$$
+
+Then the daughter's latent normal score $Z_d$ is determined by her own draw from the standard normal distribution $Z_a$ and the mother's score as follows:
+
+$$Z_d = \alpha Z_m + \sqrt{1-\alpha^2}Z_a$$
+
+This can then be converted to a weight $W_d$ following the equation above. If reproducing mothers’ latent scores follow a standard normal distribution, daughters retain the same lognormal weight distribution. Reproductive selection can change the maternal distribution, so this does not guarantee constant weight variance across generations.
+
+The correlation coefficient between mother's and daughter's weights is given by: 
+
+$$\r(W_m, W_d)=\frac{(1+c^2)^\alpha-1}{c^2}$$
+
+Because we need access to this score across restarts, we record each women's score in a `hetfert` column.
+
 ## Inputs and Simulation Design
 
-Parity specific rates are supplied from the USA in 2000 by the conditional age-specific fertility rates from the [Human Fertility Database](https://www.humanfertility.org/Country/Country?cntr=USA). These rates are statified by single parities up to parity 4+. For the fertility heterogeneity simulations, basic age-specific fertility rates for the USA in 2000 are also downloaded from the HFD. 
+Parity specific rates are supplied from the USA in 2000 by the conditional age-specific fertility rates from the [Human Fertility Database](https://www.humanfertility.org/Country/Country?cntr=USA). These rates are stratified by single parities up to parity 4+. For the fertility heterogeneity simulations, basic age-specific fertility rates for the USA in 2000 are also downloaded from the HFD. 
 
 Age-specific mortality rates are downloaded from the USA in 2000 using the Human Mortality Database. Union formation is set to "on_demand" for simplicity and requires no additional rates.
 
@@ -142,7 +248,7 @@ calculate_life_table(mortality_rates) |>
 For each scenario, `r params$n_replications` simulations of `r params$years` years will be run, and the mean values and Monte Carlo standard errors will be calculated for desired measures across simulations. The first `r params$burn_in` years will be ignored as the burn in. Each simulation will use a separate pre-defined seed. Each simulation will generate its own starting population so that randomness in starting population is incorporated into uncertainty estimates.
 
 ```{r}
-#| set-sim-parameters
+#| label: set-sim-parameters
 
 # most are set in the yaml
 age_breaks <- 12:55
@@ -173,6 +279,8 @@ time_scenario <- bind_rows(
     elapsed_time = mean(map_dbl(results, function(x) {x$runtime}))
   )
 )
+
+sum_het_basic <- summarize_het(results, 1, 0)
 
 fert_by_rep <- results |>
   map(
@@ -210,8 +318,11 @@ fert_summary |>
   theme_bw()
 ```
 
+@fig-asfr-basic shows that the simple age-specific fertility rates are reproduced accurately by the simulation.
+
 ### Fertility after restart
 
+I now check how stable the fertility rates are after a restart. In the Milestone 1 report, I showed that after a restart switching to Niger's fertility rates there was a brief spike in the TFR due to the issue with birth interval fertility adjustment. This should now be corrected using the new fertility engine, so I re-run this example.
 
 ```{r}
 #| label: run-simulation-niger
@@ -252,13 +363,25 @@ tfr_pre_post <- results_ext_niger |>
 ```
 
 ```{r}
+#| label: tbl-tfr-niger
+#| tbl-cap: TFR in year after restart compared to the next 19 years when fertility rates switched from low to high fertility on restart
+
 tfr_pre_post |>
-  gt()
+  gt() |>
+  cols_label(
+    time_start ~ "Time start",
+    time_end ~ "Time end",
+    n_valid ~ "Valid cases",
+    tfr_mean ~ "Mean TFR",
+    tfr_mcse ~ "MCSE"
+  )
 ```
 
-
+@tbl-tfr-niger shows the TFR in the year immediately after the restart compared to the next 19 years, meaned across 100 simulations. The results show that the TFR in the first year is very close to the next 19 years. The blip observed in Milestone 1 is no longer present.
 
 ### Partnered and unpartnered fertility
+
+The next check is partnered and unpartnered fertility rates. In Milestone 2, I found that the partnered fertility rates were a little higher than expected at younger ages due to the birth interval issue. I replicate this analysis as the issue should now be resolved.
 
 ```{r}
 #| label: run-simulation-partnered-rates
@@ -274,7 +397,7 @@ fert_by_rep <- results |>
   map(
     calculate_fertility_rates,
     time_breaks = time_breaks,
-    age_breaks = seq(15, 40, 5),
+    age_breaks = seq(15, 45, 5),
     by_union_type = TRUE
   ) |>
   bind_rows(.id = "replication")
@@ -307,9 +430,11 @@ fert_summary |>
   theme_bw()
 ```
 
-
+@fig-asfr-split-rates shows that the partnered fertility rates now match the input rates at all ages including the youngest ages.
 
 ## Parity-Specific Fertility
+
+I now test the accuracy of the parity specific fertility rates in a simulation.
 
 ```{r}
 #| label: run-simulations-parity-specific
@@ -368,6 +493,12 @@ fert_summary |>
   facet_wrap(~parity_start)
 ```
 
+@fig-asfr-parity shows the age-specific fertility rates by parity. The results fit very well for parity 0, and decently for parity 1, but for all other parities, there is a wide discrepancy between the actual rates at young ages and the expected rates. This divergence is especially pronounced at the highest parities.
+
+One possible reason for this is that because those high parity low fertility are likely to be populated by few women, many of whom are within a birth interval of a previous birth, we are likely to run into problems of unrealized births in those cells when those cells should sample a woman because no woman is available.
+
+To test this hypothesis, I adjust the fertility rates by adding the unrealized births back in. @fig-asfr-parity-adjusted shows the results. The figure shows that once we add back in the unrealized births, the rates fit very closely at all parities, although we are missing some cells entirely due to a lack of person years lived in those cells.
+
 ```{r}
 #| label: fig-asfr-parity-adjusted
 #| fig-cap: Mean estimated age-specific fertility rates across 100 simulations by parity and adjusted for unrealized births. 95% confidence intervals shown on each rate. Dotted line shows the input rates.
@@ -395,6 +526,7 @@ fert_summary |>
   facet_wrap(~parity_start)
 ```
 
+These results indicate that the simulation is working as expected. Some fertility is lost due to this unrealized birth, but, the loss of fertility here is very small because very few people make it into these cells. To demonstrate this I show the estimated TFR from the simulations in @tbl-tfr-parity. The results here very closely match the expected TFR of 2.04 from the input rates.
 
 ```{r}
 #| label: tbl-tfr-parity
@@ -417,12 +549,150 @@ results |>
       sd(tfr, na.rm = TRUE) / sqrt(n_valid)
     } else NA_real_
   ) |>
-  gt()
+  gt() |>
+  cols_label(
+    n_valid ~ "Valid cases",
+    tfr_mean ~ "Mean TFR",
+    tfr_mcse ~ "MCSE"
+  )
 ```
 
 ## Fertility Heterogeneity
 
+To test fertility heterogeneity, I test four cases of that differ by high/low variance ($c = 1$ vs. $c = 0.5$) and high.low heritability ($\alpha = 0.5$ vs. $\alpha = 0.2$).
+
+```{r}
+#| label: run-simulations-hetfert
+
+model <- hammel_model() |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates_overall, hetfert = het_fert(cv = 0.5, alpha = 0.2)) |>
+  set_union_formation("on_demand")
+
+results <- future_map(seq_len(params$n_replications), run_replication, model = model, .options = furrr_options(seed = NULL))
+
+time_scenario <- bind_rows(
+  time_scenario,
+  tibble(
+    scenario = "fertility w/heterogeneity",
+    elapsed_time = mean(map_dbl(results, function(x) {x$runtime}))
+  )
+)
+
+fert_by_rep <- results |>
+  map(
+    calculate_fertility_rates,
+    time_breaks = time_breaks,
+    age_breaks = age_breaks
+  ) |>
+  bind_rows(.id = "replication")
+
+sum_het_lowc_lowa <- summarize_het(results, 0.5, 0.2)
+
+sum_het_lowc_higha  <- future_map(
+  seq_len(params$n_replications), 
+  run_replication, 
+  model = model |> set_fertility(fertility_rates_overall, hetfert = het_fert(0.5, 0.5)), 
+  .options = furrr_options(seed = NULL)
+) |> summarize_het(0.5, 0.5)
+
+sum_het_highc_higha  <- future_map(
+  seq_len(params$n_replications), 
+  run_replication, 
+  model = model |> set_fertility(fertility_rates_overall, hetfert = het_fert(1, 0.5)), 
+  .options = furrr_options(seed = NULL)
+) |> summarize_het(1, 0.5)
+
+sum_het_highc_lowa  <- future_map(
+  seq_len(params$n_replications), 
+  run_replication, 
+  model = model |> set_fertility(fertility_rates_overall, hetfert = het_fert(1.0, 0.2)), 
+  .options = furrr_options(seed = NULL)
+) |> summarize_het(1, 0.2)
+```
+
+```{r}
+#| label: fig-asfr-het
+#| fig-cap: Mean estimated age-specific fertility rates across 100 simulations with heterogeneous fertility. 95% confidence intervals shown on each rate. Dotted line shows the input rates.
+
+fert_summary <- fert_by_rep |>
+  filter(sex == "f") |>
+  group_by(time_start, time_end, age_start, age_end) |>
+  summarize(
+    n_valid = sum(!is.na(rate_fertility)),
+    rate_mean = if (n_valid > 0) {
+      mean(rate_fertility, na.rm = TRUE)
+    } else NA_real_,
+    rate_mcse = if (n_valid > 1) {
+      sd(rate_fertility, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+
+fert_summary |>
+  ggplot(aes(x = age_start + 0.5, y = rate_mean))+
+  geom_point()+
+  geom_linerange(aes(ymin = rate_mean - 1.96 * rate_mcse, ymax = rate_mean + 1.96 * rate_mcse))+
+  geom_line(data = fertility_rates_overall, aes(y = rate), linetype = 2)+
+  labs(x = "age", y = "age specific fertility rate")
+```
+
+@fig-asfr-het shows the age-specific fertility rates from the first of the heterogeneous fertility simulations. They match the input rates exactly showing that the introduction of heterogeneity has not affected the preservation of the input rates.
+
+```{r}
+#| label: tbl-hetfert
+#| tbl-cap: Variance in childbearing by age 50 and correlation in het fert score across scenarios with differing values of CV and alpha values
+
+tribble(
+  ~CV, ~alpha,
+  NA,  NA,
+  0.5, 0.2,
+  0.5, 0.5,
+  1,   0.2,
+  1,   0.5
+) |> bind_cols(
+    bind_rows(
+      sum_het_basic,
+      sum_het_lowc_lowa,
+      sum_het_lowc_higha,
+      sum_het_highc_lowa,
+      sum_het_highc_higha
+    )
+  ) |> 
+  gt() |>
+  cols_label(
+    var_children_mean ~ "Mean",
+    var_children_mcse ~ "MCSE",
+    share_childless_mean ~ "Mean",
+    share_childless_mcse ~ "MCSE",
+    cor_mean ~ "Mean",
+    cor_mcse ~ "MCSE",
+    cor_true ~ "Theoretical"
+  ) |>
+  tab_spanner(starts_with("var_children"), label = "V(Children ever born)") |>
+  tab_spanner(starts_with("share_childless"), label = "Prop. Women Childless") |>
+  tab_spanner(starts_with("cor_"), label = "cor(mother score, daughter score)") |>
+  fmt_number(c(starts_with("var_children"), starts_with("share_childless"), starts_with("cor_")), decimals = 3)
+```
+
+@tbl-hetfert shows the variance of completed childbearing across women who reached age 50 and the estimated correlation between mother and daughter scores. The results are as expected. Variance is higher when the $c$ parameter is higher and the lowest in the simulation with no heterogeneous fertility. The correlation coefficients are very close to the theoretical expectation.
+
 ## Time Tests
+
+@tbl-processing-time shows the average processing time per simulation for three types of simulations. Each simulation is still quite fast under the new fertility engine. The heterogeneity terms add slightly to the computational time.
+
+
+```{r}
+#| label: tbl-processing-time
+#| tbl-cap: Mean processing time by simulation scenario
+
+time_scenario |>
+  gt() |>
+  cols_label(
+    scenario ~ "Scenario",
+    elapsed_time ~ "Mean processing time"
+  )
+```
 
 ## Tests
 
@@ -439,9 +709,8 @@ knitr::kable(
 ```
 ## Conclusions and Unresolved Limitations
 
-The simulation is now functioning as expected across all the measured indicators. Although the use of groups increases the computational time of the simulation, the overall simulation is still very fast. Furthermore, this simulation maintains speed while choosing among all available partners for each union rather than just a sample. 
+This milestone meets all expectations and we have finally resolved the issue with birth intervals in a satisfactory way with minimal effect on computation time. One remaining issue is the potential for unrealized births in certain cases. However, in most cases, unrealized births will occur because relatively few women travel into those cells and thus the overall impact on fertility will be low. 
 
-The intergroup union parameters are an imperfect approach to union formation and under certain conditions (like small group sizes) could lead to unexpected results. However, these parameters allow for quick computation, the preservation of input rates, and the ability to benchmark off of common measures like log odds ratios. The current paramters give users enough control to handle a variety of cases, but notably do not allow fo marriage squeeze adjustments. A future implementation will seek to add a full two-sex marriage model as an alternative to the current approach. 
 
 ## Reproducibility record
 
