@@ -44,11 +44,18 @@
 #' partners and creates linked episodes, with same-person ties ordered death,
 #' birth, dissolution, conversion, search. Fertility input strata use `union_type`.
 #'
+#' Optional fertility `hetfert = het_fert(cv, alpha)` weights eligible mother
+#' selection within fixed-intensity cells. Supplied positive female weights are
+#' retained; absent weights are drawn under the simulation seed, and daughters
+#' inherit on the log scale. Output persons includes `hetfert` whenever enabled,
+#' and omits it whenever disabled, even if the input supplied weights.
+#'
 #' Minimum birth spacing is configured in [fertility()] or [set_fertility()]
 #' and uses recorded maternal births, including on restart. Births are generated
 #' by cell-accounted fertility (D101; see [fertility()]): each one-year
 #' age/parity/union-type/group cell produces births at its input rate times all
-#' its members, assigned to a uniformly chosen eligible member. Births that
+#' its members, assigned to an eligible member uniformly or proportionally to
+#' `hetfert` weights when enabled. Births that
 #' cannot occur because a cell has no eligible member are reported in
 #' `simulation$unrealized_births`. Fertility outside supplied bands is zero. Mortality must cover all ages for both sexes, ending at `Inf`.
 #'
@@ -113,6 +120,8 @@ simulate <- function(model, years, seed = NULL) {
   birth_rates <- model$processes$fertility$rates
   birth_interval <- model$processes$fertility$birth_interval
   ffab <- model$processes$fertility$ffab
+  hetfert <- model$processes$fertility$hetfert
+  if (!is.null(hetfert)) validate_fertility_weights(population$persons)
   for (rows in split_rate_groups(death_rates)) {
     for (sex in c("m", "f")) {
       schedule <- death_rates[rows, , drop = FALSE]
@@ -202,6 +211,8 @@ simulate <- function(model, years, seed = NULL) {
     }, add = TRUE)
     set.seed(seed)
   }
+  population$persons <- initialize_fertility_weights(population$persons, hetfert)
+  engine_persons[["hetfert"]] <- population$persons[["hetfert"]]
   result <- population
   births <- deaths <- 0
   if (years > 0) {
@@ -222,7 +233,8 @@ simulate <- function(model, years, seed = NULL) {
                            inheritance, ffab, dissolution_rates, cohab$prob, cohab$conversion,
                            if (is.null(union_process$cohab_matching)) matching else
                              prepare_matching_model(union_process$cohab_matching, group_values), counts_cohab,
-                           isTRUE(getOption("hammel.check_cells", FALSE)))
+                           isTRUE(getOption("hammel.check_cells", FALSE)),
+                           if (is.null(hetfert)) NULL else unclass(hetfert))
     if (!isTRUE(native$cells_consistent))
       stop("Internal error: fertility cell counts are inconsistent.", call. = FALSE)
     persons <- population$persons
@@ -231,6 +243,7 @@ simulate <- function(model, years, seed = NULL) {
       persons <- rbind(persons, persons[rep(NA_integer_, added), , drop = FALSE])
     }
     for (column in names(native$persons)) persons[[column]] <- native$persons[[column]]
+    if (!is.null(hetfert)) persons$hetfert <- native$hetfert
     if (!is.null(group_values)) persons$group <- group_values[native$groups + 1L]
     result$persons <- tibble::as_tibble(persons)
     if (!is.null(population[["ancestry"]])) {
@@ -279,6 +292,7 @@ simulate <- function(model, years, seed = NULL) {
   result$simulation <- list(start_time = start, end_time = result$end_time,
     birth_interval = birth_interval, ffab = ffab,
     births = births, deaths = deaths)
+  if (!is.null(hetfert)) result$simulation$hetfert <- hetfert
   result$simulation$unrealized_births <- format_unrealized_births(
     if (years > 0) native$unrealized else NULL, birth_rates, group_values)
   if (cohab_enabled) {

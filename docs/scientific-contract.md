@@ -187,8 +187,9 @@ pool all parities.
 
 A cell generates births at its input rate times all its living members,
 including women inside the birth interval, and assigns each birth to a
-uniformly chosen eligible member. The equivalent individual hazard is
-`rate * members / eligible members`. Observed rates equal inputs in expectation
+chosen eligible member, uniformly by default or proportional to persistent
+`hetfert` weights under D102. The equivalent individual hazard is
+`rate * members * individual_weight / eligible_weight_sum`. Observed rates equal inputs in expectation
 for any composition (initialization without histories, restarts with new
 schedules or intervals, union-type transitions), at cell resolution, while a
 cell has an eligible member. Within a one-year cell, selection does not vary
@@ -201,9 +202,8 @@ from histories. A woman's hazard depends on recent births by others in her cell;
 this is a calibration device rather than a behavioral model. Each cell keeps an
 Exp(1) threshold consumed at its current intensity, so count changes recompute
 firing times without new random draws. At exact ties a pending death precedes a
-cell birth, which precedes other person events. Individual weights for future
-heterogeneity are reserved: they will set selection probability within a cell,
-not the cell's rate. See [cell-accounted fertility](fertility-cell-accounting.md).
+cell birth, which precedes other person events. Individual weights set selection
+probability within a cell, not the cell's rate. See [cell-accounted fertility](fertility-cell-accounting.md).
 
 For example, a cell with input rate .2 has 100 members, 15 of them within the
 birth interval. It produces 20 births per year, so each of the 85 eligible
@@ -216,6 +216,27 @@ k is first eligible after k singleton births at least `birth_interval` apart,
 beginning at the schedule's first positive rates. Union types are pooled;
 partly reachable cells and higher parities within an open parity band are not
 reported.
+
+### Persistent fertility weights (D102)
+
+`set_fertility(..., hetfert = het_fert(cv, alpha))` enables positive persistent
+lognormal weights, with fresh mean one and requested CV. If persons lacks
+`hetfert`, simulation draws values for every recorded woman under its seed;
+otherwise supplied female values must be finite and strictly positive and are
+retained. Male values are unused; newly generated male entries are NA. Output
+always contains numeric `hetfert` when enabled, including zero-year runs.
+
+Daughters inherit on the log scale with coefficient alpha and independent
+normal innovation scaled by sqrt(1-alpha^2). Alpha zero gives independent
+weights, alpha one exact maternal copies. Reproducing mothers are selected, so
+marginal cohort variance is not guaranteed to remain constant. Existing weights
+persist through restarts; changing CV does not rescale them. `hetfert = NULL`
+retains uniform selection and removes any existing weight column from output,
+including zero-year runs (D104). Re-enabling from a disabled output draws fresh
+weights for all recorded women. Input populations are not mutated.
+The [heterogeneity specification](fertility-heterogeneity-notes.md) defines
+zero CV, missing/invalid supplied weights, RNG handling, weighted calibration
+and remaining scope. Cell targets, spacing and failed-search rules are unchanged.
 
 ### Birth transition and parent assignment
 
@@ -682,7 +703,7 @@ retained earlier limitations, including transition-aware fertility compensation
 age bins. Reported recovery in these scenarios is not a universal exact pooled
 cross-tab constraint. Static SOCSIM audits remain distinct from executable
 reference comparisons. Parity-specific execution is implemented (D099 schedules,
-D101 cells); calendar-time schedules and fertility heterogeneity remain unimplemented.
+D101 cells); calendar-time schedules remain unimplemented; D102 implements lognormal fertility weights.
 
 
 ## Parity-specific fertility execution

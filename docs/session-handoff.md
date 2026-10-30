@@ -83,8 +83,10 @@ approximate calibration ages remain limitations. Pooled cross-tab log odds are
 not universal exact constraints; conditional-choice recovery is separate evidence.
 Static SOCSIM audits are not executable reference comparisons.
 
-The roadmap proposes parity (milestone 5), calendar-time schedules (milestone 6),
-and later group transitions, summaries, migration and characteristics. The user
+The roadmap tracks current parity/heterogeneity work (milestone 5), group
+transitions (milestone 6), calendar-time schedules (milestone 7), and later
+summaries, immigration and internal migration. Multiple types of groups are
+an option for more complex categorical characteristics. The user
 has discussed adding calendar bounds alongside age/duration, but this does not
 authorize implementation or resolve gap/coverage and fertility-compensation rules.
 Fixed newborn assignment remains deferred to group transitions. Marriage-order
@@ -179,3 +181,43 @@ parameter default, initialization contract or engine implementation was accepted
 by this documentation request. The SOCSIM audit also verifies its alpha=0,
 betaT=1 defaults, non-normalizing power transformation, and first-supervisory-
 line loader quirk. Existing engine edits and the user's report were left alone.
+
+## Persistent fertility weights implemented (D102, October 29, 2026)
+
+The user selected `set_fertility(..., hetfert = het_fert(cv, alpha))`. Fresh
+weights are positive mean-one lognormal draws at the requested CV; daughters
+inherit on the latent normal/log scale with independent innovation scaled by
+sqrt(1-alpha^2). Supplied female persons$hetfert values are authoritative and
+must be finite/positive; an absent column is drawn under the simulation seed,
+including in zero-year runs. Output retains weights on restarts and includes
+NA for newly generated males. Alpha one copies exactly; alpha zero is fresh.
+No normalization against reproductive selection is added.
+
+Cell mother selection uses eligible weight-sum trees; rate times member count
+remains unchanged. Grouped partner/father calibration uses the same weighted
+hazards and passes explicit scan checks. Full tests and final targeted tests
+passed; hetfert NULL retained identical complete histories against a pre-change
+HEAD control. See [the specification](fertility-heterogeneity-notes.md) and
+[verification](testing.md). No report edits or milestone acceptance are implied.
+
+
+## Roadmap order updated (D103, October 29, 2026)
+
+Milestone 4 is complete; milestone 5 is current and awaiting user acceptance.
+Group transitions are milestone 6, ahead of time-varying inputs in milestone 7.
+The separate individual-characteristics milestone is removed: groups should
+cover most categorical applications, with multiple types of groups available
+as a future option for more complexity. Detailed semantics and APIs remain
+open. Milestones 8–10 keep their numbers. See [the roadmap](roadmap.md).
+
+## Disabled weight lifecycle revised (D104, October 29, 2026)
+
+The user selected that disabling fertility heterogeneity removes persons$hetfert
+from output even when it exists in the starting population. This applies to
+zero-year/empty runs, leaves input histories unchanged and makes subsequent
+re-enabling draw fresh weights for all recorded women. It replaces the original
+disabled-as-custom-column behavior. Missing-sex and logical-NA-placeholder
+validation, weighted-selection help, and the schema omission statement were
+also corrected. Focused heterogeneity, simulation and cell suites passed without
+warnings. D102 records the requested API/inheritance construction, not a claim
+of scientific acceptance or stationary cohort variance under selection.

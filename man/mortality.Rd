@@ -12,7 +12,8 @@ fertility(
   birth_interval = 0.75,
   group_prop_hazard = NULL,
   inheritance = create_group_inheritance(),
-  ffab = 0.4886
+  ffab = 0.4886,
+  hetfert = NULL
 )
 }
 \arguments{
@@ -53,6 +54,9 @@ and categorical matching levels before execution. Applies to fertility only.}
 
 \item{ffab}{Probability that a newborn is female, default \code{0.4886}.
 Must be a finite numeric scalar in \verb{[0, 1]}. Applies to fertility only.}
+
+\item{hetfert}{NULL (default) for uniform mother selection, or a
+\code{\link[=het_fert]{het_fert()}} specification for persistent lognormal selection weights.}
 }
 \value{
 A named list containing \code{name}, \code{rates}, and \code{rate_unit}, plus
@@ -103,7 +107,8 @@ cells: one-year (or shorter) age sub-bands of each group/union-type schedule
 after group multipliers, split at whole ages and band edges, and one actual
 parity when rates are parity-specific. Each cell produces births at its input
 rate times all its living members, including those inside the birth
-interval, and each birth goes to a uniformly chosen eligible member. Observed
+interval, and each birth goes to an eligible member, uniformly by default
+or proportional to persistent weights when \code{hetfert} is enabled. Observed
 rates then equal inputs in expectation for any population composition,
 including after restarts and union-type changes, while a cell has an eligible
 member. Intensity in cells with members but none eligible is dropped and

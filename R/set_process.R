@@ -19,6 +19,8 @@
 #'   Fertility also accepts a named list of vectors for `partnered` and/or
 #'   `unpartnered`, or cohab/marriage when rates include those `union_type`
 #'   strata. List names must occur in the schedules; omitted entries use 1.0.
+#' @param hetfert NULL (default) for uniform mother selection, or a
+#'   [het_fert()] specification for persistent lognormal selection weights.
 #' @param ffab Probability that a newborn is female, default `0.4886`.
 #'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
 #' @param inheritance A group identity model from [create_group_inheritance()],
@@ -70,6 +72,7 @@ attach_process <- function(model, process) {
       validate_birth_interval(process$birth_interval)
       if (!"ffab" %in% names(process)) process$ffab <- 0.4886
       validate_ffab(process$ffab)
+      validate_het_fert(process$hetfert)
       # Specifications saved while midpoint compensation existed (before D101
       # became the only method) may carry a spacing_method field.
       if (identical(process$spacing_method, "midpoint"))
@@ -100,10 +103,11 @@ set_mortality <- function(model, rates, group_prop_hazard = NULL) {
 #' @rdname set_process
 #' @export
 set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard = NULL,
-                          inheritance = create_group_inheritance(), ffab = 0.4886) {
+                          inheritance = create_group_inheritance(), ffab = 0.4886,
+                          hetfert = NULL) {
   set_process(model, fertility(rates, birth_interval = birth_interval,
                               group_prop_hazard = group_prop_hazard,
-                              inheritance = inheritance, ffab = ffab))
+                              inheritance = inheritance, ffab = ffab, hetfert = hetfert))
 }
 
 #' Specify age-specific demographic rates
@@ -150,7 +154,8 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #' after group multipliers, split at whole ages and band edges, and one actual
 #' parity when rates are parity-specific. Each cell produces births at its input
 #' rate times all its living members, including those inside the birth
-#' interval, and each birth goes to a uniformly chosen eligible member. Observed
+#' interval, and each birth goes to an eligible member, uniformly by default
+#' or proportional to persistent weights when `hetfert` is enabled. Observed
 #' rates then equal inputs in expectation for any population composition,
 #' including after restarts and union-type changes, while a cell has an eligible
 #' member. Intensity in cells with members but none eligible is dropped and
@@ -191,6 +196,8 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #'   their names must match the supplied schedule types. Three-type schedules
 #'   accept lists named unpartnered/cohab/marriage; shared partnered schedules
 #'   accept unpartnered/partnered. Omitted types and groups have multiplier 1.
+#' @param hetfert NULL (default) for uniform mother selection, or a
+#'   [het_fert()] specification for persistent lognormal selection weights.
 #' @param ffab Probability that a newborn is female, default `0.4886`.
 #'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
 #' @param inheritance A group identity model from [create_group_inheritance()],
@@ -223,16 +230,19 @@ mortality <- function(rates, group_prop_hazard = NULL) {
 #' @rdname mortality
 #' @export
 fertility <- function(rates, birth_interval = 0.75, group_prop_hazard = NULL,
-                      inheritance = create_group_inheritance(), ffab = 0.4886) {
+                      inheritance = create_group_inheritance(), ffab = 0.4886,
+                          hetfert = NULL) {
   validate_rates(rates, mortality = FALSE)
   validate_fertility_group_prop_hazard(group_prop_hazard, rates)
   inheritance <- normalize_group_inheritance(inheritance)
   validate_birth_interval(birth_interval)
   validate_ffab(ffab)
+  validate_het_fert(hetfert)
   process <- new_rate_process("fertility", rates)
   process$inheritance <- if (is.null(inheritance)) create_group_inheritance() else inheritance
   process$birth_interval <- birth_interval
   process$ffab <- ffab
+  process$hetfert <- hetfert
   process$group_prop_hazard <- group_prop_hazard
   warn_unreachable_parity_cells(process$rates, birth_interval)
   process

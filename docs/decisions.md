@@ -43,6 +43,9 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | History-authoritative parity initialization | D098 |
 | Parity schedule validation and history parity in execution | D099 (correction superseded by D101) |
 | Cell-accounted fertility, the only spacing method | D101 |
+| Persistent lognormal fertility weights and maternal inheritance | D102 |
+| Milestone order and groups-based characteristics scope | D103 |
+| Disabled fertility heterogeneity removes output weights | D104 |
 
 ## Recorded decisions
 
@@ -2080,11 +2083,57 @@ See [demographic analysis](demographic-analysis.md#fertility-rates-by-observed-p
   boundaries. Calibration fertility totals come from cells at search time. Cell
   clocks are kept in a separate indexed heap compared with the event queue, and
   cell boundaries are processed in time order before events. Uniform selection;
-  weighted selection deferred to heterogeneity. Unrealized births are reported
+  D102 adds weighted selection for persistent lognormal heterogeneity. Unrealized births are reported
   in `simulation$unrealized_births` by one-year period from the run start.
 - **Evidence:** toy diagnostics in `validation/milestone5/`
   (`check-composition-spacing.R`, `check-runtime-spacing.R`) and the SOCSIM
   reference experiment. Engine validation follows the specification's plan.
 - **Specification:** [cell-accounted fertility](fertility-cell-accounting.md);
-  [investigation](parity-spacing-investigation.md). Heterogeneity distributions
-  and inputs remain unselected.
+  [investigation](parity-spacing-investigation.md). D102 subsequently selects lognormal weights and maternal inheritance.
+
+
+## D102 — Persistent lognormal fertility weights and maternal inheritance (October 29, 2026)
+
+The user selected the API and lognormal inheritance construction:
+`set_fertility(..., hetfert = het_fert(cv, alpha))` enables
+mean-one lognormal weights with requested CV and maternal inheritance on the
+latent normal scale. `hetfert = NULL` retains uniform sampling. The population's
+existing female `persons$hetfert` values are retained; if the column is absent,
+simulation draws values for women. Daughters use maternal alpha plus independent
+innovation scaled by sqrt(1-alpha^2); no generational normalization is applied.
+Weights determine eligible-mother selection within fixed-intensity cells, not
+direct rate multipliers. Output always includes the column when enabled.
+
+The [heterogeneity specification](fertility-heterogeneity-notes.md) records
+units, strict-positive supplied female weights, seed handling, zero CV, endpoint
+inheritance, restarts and the reproductive-selection caveat. Distribution
+preservation is conditional on the reproducing mothers' distribution, not a
+universal guarantee. The source audit of SOCSIM does not select its cubic
+distribution or betaT transformation for Hammel.
+
+
+## D103 — Milestone order and groups-based characteristics scope (October 29, 2026)
+
+The user confirmed milestone 4 is complete and milestone 5 is current. Move
+group transitions to milestone 6 and time-varying inputs to milestone 7. Use
+"group transitions" rather than "group conversions"; this does not rename
+cohabitation-to-marriage conversion. Remove the separate individual-
+characteristics milestone: most categorical applications should use groups,
+with multiple types of groups as an option for more complex applications.
+
+This selects planning order and design direction only. Transition semantics,
+multiple-group representation and public APIs remain to be specified; it does
+not authorize arbitrary state mutation or mark milestone 5 complete. See the
+[current roadmap](roadmap.md). Milestones 8–10 retain their existing numbering.
+
+
+## D104 — Disabled fertility heterogeneity removes output weights (October 29, 2026)
+
+The user selected that `hetfert = NULL` produces no `persons$hetfert` column,
+even if the starting population includes one. This applies to zero-year and
+empty runs as well. The input population is not mutated. A subsequent enabled
+run therefore draws fresh weights for all recorded women when using that
+output; it does not silently assign unit weights to daughters born while the
+feature was disabled. Weight persistence is guaranteed across enabled restarts,
+not across an explicit disabled interval. This replaces D102's original
+ordinary-custom-column treatment for disabled runs.

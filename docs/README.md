@@ -39,7 +39,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [Union-formation models](union-formation-models.md) | Implemented milestone 2 rules, matching defaults, diagnostics, and deferred work |
 | [Cohabitation](cohabitation.md) | Rate-mode type probabilities, type-specific matching/rates, conversion and histories (D085/D086) |
 | [Remarriage schedules](remarriage.md) | Age/duration previous-union search strata, calibration, and marriage observations (D080/D083) |
-| [Fertility heterogeneity notes](fertility-heterogeneity-notes.md) | Proposal: separate dispersion and inheritance; latent-normal variance preservation and selection caveat |
+| [Fertility heterogeneity](fertility-heterogeneity-notes.md) | D102: persistent lognormal weights, maternal inheritance, validation and selection caveat |
 | [Parity fertility and PATFR](parity-fertility.md) | History-derived parity, schedules, HFD recovery and PATFR; milestone 5 in progress (D094–D101) |
 | [Union dissolution](union-dissolution.md) | Milestone 4 duration hazards, female carrier, state changes, and worked examples (D078) |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |

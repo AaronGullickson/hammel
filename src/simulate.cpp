@@ -752,9 +752,9 @@ class FemaleIntensityTracker {
 // actual parity when schedules are parity-specific; pooled bands are split by
 // actual parity). Each cell generates births at m_c * N_c, counting
 // all living members including those inside the birth interval, and assigns
-// each birth to a uniformly chosen eligible member. Individual weights are
-// reserved for heterogeneity (selection probability, not a rate multiplier);
-// all weights are currently one. A cell with members but no eligible member
+// each birth to an eligible member, weighted by persistent hetfert when
+// enabled (selection probability, not a rate multiplier). Without hetfert,
+// selection is uniform and no weight tree is allocated. A cell with members but no eligible member
 // cannot produce births: its intensity is dropped and recorded as unrealized.
 // Clocks keep an Exp(1) threshold consumed at the current intensity, so count
 // changes recompute firing times without drawing random numbers.
@@ -762,11 +762,81 @@ class FemaleIntensityTracker {
 // this share (a numerical tolerance, not a demographic parameter).
 constexpr double kOpenBandSplitTolerance = 0.001;
 
+// Positive eligible weights in swap-remove slots. Recompute sums from children
+// rather than subtracting from a running total, so removing a dominant weight
+// restores the small weights accurately. Capacity grows geometrically.
+class FertilityWeightTree {
+  size_t size_ = 0, capacity_ = 0;
+  std::vector<double> tree_;
+  void set(size_t slot, double value) {
+    size_t node = capacity_ + slot;
+    tree_[node] = value;
+    while (node > 1) {
+      node /= 2;
+      tree_[node] = tree_[2 * node] + tree_[2 * node + 1];
+      if (!R_finite(tree_[node])) stop("Eligible hetfert weight sum is not representable.");
+    }
+  }
+ public:
+  double sum() const { return tree_.empty() ? 0 : tree_[1]; }
+  void add(double value) {
+    if (size_ == capacity_) {
+      const size_t next = capacity_ ? 2 * capacity_ : 1;
+      std::vector<double> grown(2 * next, 0);
+      for (size_t i = 0; i < size_; ++i) grown[next + i] = tree_[capacity_ + i];
+      for (size_t i = next - 1; i > 0; --i) grown[i] = grown[2 * i] + grown[2 * i + 1];
+      capacity_ = next;
+      tree_.swap(grown);
+    }
+    set(size_++, value);
+  }
+  void remove(size_t slot) {
+    const size_t last = size_ - 1;
+    const double moved = tree_[capacity_ + last];
+    set(slot, 0);
+    if (slot != last) { set(last, 0); set(slot, moved); }
+    --size_;
+  }
+  size_t choose(double uniform) const {
+    double value = std::min(uniform * sum(), std::nextafter(sum(), 0.0));
+    size_t node = 1;
+    while (node < capacity_) {
+      const double left = tree_[2 * node];
+      if (value < left) node *= 2;
+      else { value -= left; node = 2 * node + 1; }
+    }
+    return std::min(node - capacity_, size_ - 1);
+  }
+};
+
+// Log-space form of the accepted latent-normal inheritance; valid also at
+// sigma=0 for supplied nonunit weights. Endpoints avoid needless RNG draws.
+double inherit_fertility_weight(double maternal, double variance, double alpha) {
+  if (alpha == 1) return maternal;
+  const double mu = -variance / 2;
+  double log_weight = mu + alpha * (std::log(maternal) - mu);
+  if (variance > 0) log_weight += std::sqrt(variance) * std::sqrt(1 - alpha * alpha) * R::rnorm(0, 1);
+  const double weight = std::exp(log_weight);
+  if (!(weight > 0) || !R_finite(weight)) stop("Generated hetfert weight is not finite and strictly positive.");
+  return weight;
+}
+
+// Compensated bin sums retain small weights when a dominant woman leaves.
+struct FertilityWeightSum {
+  double sum = 0, correction = 0;
+  void add(double value) {
+    const double next = sum + value;
+    correction += std::abs(sum) >= std::abs(value) ? (sum - next) + value : (value - next) + sum;
+    sum = next;
+  }
+  double value() const { return sum + correction; }
+};
+
 class FertilityCells {
  public:
   struct State {
     int stratum = -1;          // -1: not a living woman
-    double born = 0, ready = 0;
+    double born = 0, ready = 0, weight = 1;
     bool unpartnered = false;
   };
   // An input schedule for one group/type and input parity band.
@@ -790,14 +860,16 @@ class FertilityCells {
     double rate = 0, age_start = 0, age_end = 0;
     int members = 0;
     std::vector<int> eligible;                 // swap-remove list of women
+    FertilityWeightTree weights;
     double lambda = 0, threshold = 0, last = 0, due = R_PosInf;
     bool has_threshold = false, queued = false;
-    std::map<size_t, int> counted;             // unpartnered eligible by calibration bin
+    std::map<size_t, std::pair<int, FertilityWeightSum>> counted; // count and weight per unpartnered calibration bin
   };
   struct Member {
     int cell = -1, slot = -1;
     bool eligible = false, counted = false;
     size_t bin = 0;
+    double weight = 1;
   };
   std::vector<Source> sources_;
   std::vector<Stratum> strata_;
@@ -806,7 +878,7 @@ class FertilityCells {
   // lookup_[group * types + type][actual parity] -> stratum (-1 until created);
   // without parity-specific schedules, index 0 serves every parity.
   int types_;
-  bool split_parity_;
+  bool split_parity_, weighted_;
   double max_age_, interval_;
   std::vector<std::vector<int>> lookup_;
   BoundaryQueue boundaries_;
@@ -914,8 +986,13 @@ class FertilityCells {
       x.eligible[m.slot] = last;
       members_[last].slot = m.slot;
       x.eligible.pop_back();
+      if (weighted_) x.weights.remove(m.slot);
     }
-    if (m.counted && --x.counted[m.bin] == 0) x.counted.erase(m.bin);
+    if (m.counted) {
+      auto& bin = x.counted[m.bin];
+      if (weighted_) bin.second.add(-m.weight);
+      if (--bin.first == 0) x.counted.erase(m.bin);
+    }
     changed = m.cell;
     m = Member();
   }
@@ -967,10 +1044,10 @@ class FertilityCells {
 
  public:
   FertilityCells(std::vector<Source> sources, int groups, int types, bool split_parity,
-                 double max_age, double interval,
+                 double max_age, double interval, bool weighted,
                  std::function<State(int)> state, std::function<double()> draw_threshold,
                  const WeightCalibrator* calibrator, double start, double end)
-      : sources_(std::move(sources)), types_(types), split_parity_(split_parity),
+      : sources_(std::move(sources)), types_(types), split_parity_(split_parity), weighted_(weighted),
         max_age_(max_age), interval_(interval), lookup_(static_cast<size_t>(groups) * types),
         state_(std::move(state)), draw_threshold_(std::move(draw_threshold)),
         calibrator_(calibrator), start_(start), end_(end) {
@@ -1032,9 +1109,12 @@ class FertilityCells {
       if (cell >= 0) {
         Cell& x = cells_[cell];
         ++x.members;
-        m.cell = cell; m.eligible = eligible; m.counted = counted; m.bin = bin;
-        if (eligible) { m.slot = static_cast<int>(x.eligible.size()); x.eligible.push_back(woman); }
-        if (counted) ++x.counted[bin];
+        m.cell = cell; m.eligible = eligible; m.counted = counted; m.bin = bin; m.weight = s.weight;
+        if (eligible) {
+          m.slot = static_cast<int>(x.eligible.size()); x.eligible.push_back(woman);
+          if (weighted_) x.weights.add(m.weight);
+        }
+        if (counted) { ++x.counted[bin].first; if (weighted_) x.counted[bin].second.add(m.weight); }
       }
       if (old_cell >= 0) touch(old_cell, now);
       if (cell >= 0 && cell != old_cell) touch(cell, now);
@@ -1058,30 +1138,39 @@ class FertilityCells {
     x.last = now;
     if (x.eligible.empty()) stop("A fertility cell fired without eligible women.");
     const double n = static_cast<double>(x.eligible.size());
-    const size_t pick = std::min(x.eligible.size() - 1, static_cast<size_t>(std::floor(R::runif(0, 1) * n)));
+    const double uniform = R::runif(0, 1);
+    const size_t pick = weighted_ ? x.weights.choose(uniform) :
+      std::min(x.eligible.size() - 1, static_cast<size_t>(std::floor(uniform * n)));
     const int woman = x.eligible[pick];
     rearm(c, now);
     return woman;
   }
   // Calibration fertility totals: each unpartnered eligible member contributes
-  // her equivalent hazard lambda / E in her calibration bin.
+  // her equivalent weighted hazard in her calibration bin.
   std::vector<double> fill_calibration(WeightCalibrator& calibrator) const {
     std::vector<double> values(calibrator.cells(), 0.0);
     for (const Cell& x : cells_) {
       if (!(x.lambda > 0) || x.eligible.empty() || x.counted.empty()) continue;
-      const double hazard = x.lambda / static_cast<double>(x.eligible.size());
-      for (const auto& bin : x.counted) values[bin.first] += hazard * bin.second;
+      if (weighted_) {
+        const double total = x.weights.sum();
+        for (const auto& bin : x.counted)
+          values[bin.first] += x.lambda * (bin.second.second.value() / total);
+      } else {
+        const double hazard = x.lambda / static_cast<double>(x.eligible.size());
+        for (const auto& bin : x.counted) values[bin.first] += hazard * bin.second.first;
+      }
     }
     calibrator.assign_channel(1, values);
     return values;
   }
-  // A woman's equivalent individual hazard (rule 4): lambda / E when eligible.
+  // A woman's equivalent individual hazard (rule 4), zero inside spacing.
   double hazard(int woman) const {
     if (woman >= static_cast<int>(members_.size())) return 0;
     const Member& m = members_[woman];
     if (m.cell < 0 || !m.eligible) return 0;
     const Cell& x = cells_[m.cell];
-    return x.lambda / static_cast<double>(x.eligible.size());
+    return weighted_ ? x.lambda * (m.weight / x.weights.sum()) :
+      x.lambda / static_cast<double>(x.eligible.size());
   }
   // Close unrealized-intensity intervals at the end of the run.
   void finish(double end) {
@@ -1095,18 +1184,22 @@ class FertilityCells {
   // Internal consistency check against an explicit scan of member records.
   bool consistent() const {
     std::vector<int> members(cells_.size(), 0), eligible(cells_.size(), 0);
+    std::vector<double> weights(cells_.size(), 0);
     for (size_t w = 0; w < members_.size(); ++w) {
       const Member& m = members_[w];
       if (m.cell < 0) continue;
       ++members[m.cell];
       if (m.eligible) {
         ++eligible[m.cell];
+        weights[m.cell] += m.weight;
         if (cells_[m.cell].eligible[m.slot] != static_cast<int>(w)) return false;
       }
     }
     for (size_t c = 0; c < cells_.size(); ++c)
       if (members[c] != cells_[c].members || eligible[c] != static_cast<int>(cells_[c].eligible.size()))
         return false;
+    if (weighted_) for (size_t c = 0; c < cells_.size(); ++c)
+      if (std::abs(weights[c] - cells_[c].weights.sum()) > 1e-9 * std::max(weights[c], 1.0)) return false;
     return true;
   }
   DataFrame unrealized(const std::vector<std::string>& type_labels) const {
@@ -1584,7 +1677,19 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   bool cancel_birth_if_no_match, bool diagnostics,
                   NumericMatrix initial_ancestry, List inheritance, double ffab,
                   DataFrame dissolution_rates, DataFrame cohab_prob, DataFrame conversion_rates,
-                  List cohab_matching, bool counts_cohab, bool check_cells = false) {
+                  List cohab_matching, bool counts_cohab, bool check_cells = false,
+                  Nullable<List> hetfert = R_NilValue) {
+  const List heterogeneity = hetfert.isNotNull() ? List(hetfert.get()) : List::create();
+  const bool heterogeneous = heterogeneity.size() > 0;
+  const double fertility_cv = heterogeneous ? as<double>(heterogeneity["cv"]) : 0;
+  const double fertility_alpha = heterogeneous ? as<double>(heterogeneity["alpha"]) : 0;
+  const double fertility_variance = fertility_cv <= 1 ? std::log1p(fertility_cv * fertility_cv) :
+    2 * std::log(fertility_cv) + std::log1p((1 / fertility_cv) * (1 / fertility_cv));
+  std::vector<double> fertility_weights;
+  if (heterogeneous) {
+    NumericVector supplied = persons["hetfert"];
+    fertility_weights.assign(supplied.begin(), supplied.end());
+  }
   const bool cohab_enabled = cohab_prob.nrows() > 0;
   const bool parity_specific = fertility_rates.containsElementNamed("parity_start");
   if (!R_finite(ffab) || ffab < 0 || ffab > 1)
@@ -2018,6 +2123,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         type = typed_fertility && union_history[person_unions[w].back()].cohab ? 2 : 1;
       st.stratum = cells->stratum(p.group, type, parity_specific ? parity[w] : 0);
       if (st.stratum < 0) stop("No fertility schedule covers a woman's current parity.");
+      st.weight = heterogeneous ? fertility_weights[w] : 1;
       st.born = p.born;
       st.ready = p.last_birth + birth_interval;
       st.unpartnered = current_partner[w] < 0;
@@ -2027,7 +2133,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     for (const Person& person : people) oldest_birth = std::min(oldest_birth, person.born);
     cells.reset(new FertilityCells(fertility_strata(fertility_rates, group_count, fertility_types),
       group_count, static_cast<int>(fertility_types.size()), parity_specific, end - oldest_birth,
-      birth_interval, state, threshold, calibrator.get(), start, end));
+      birth_interval, heterogeneous, state, threshold, calibrator.get(), start, end));
   }
   // Initialize one next event for each living person. Known age changes are
   // already incorporated, so birthdays alone do not trigger resampling.
@@ -2173,6 +2279,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       people.push_back({++next_id, now, NA_REAL, mother, father,
                         -std::numeric_limits<double>::infinity(), female, people[i].group});
       if (parity_specific) parity.push_back(0);
+      if (heterogeneous) fertility_weights.push_back(female ?
+        inherit_fertility_weight(fertility_weights[i], fertility_variance, fertility_alpha) : NA_REAL);
       // Append ancestry before scheduling the child. Missing fathers contribute
       // their entire half to unknown; supplied parental unknown shares transmit
       // through the same deterministic averaging rule.
@@ -2334,6 +2442,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     _["dissolutions"] = dissolution_count, _["conversions"] = conversion_count,
     _["weighted_infeasible"] = weighted_infeasible, _["draw_approximate"] = draw_approximate,
     _["unrealized"] = unrealized, _["cells_consistent"] = cells_consistent,
+    _["hetfert"] = wrap(fertility_weights),
     _["diagnostic_log_weights"] = [&]() {
       // Rows are new unions in order; columns are group indices. Unions formed
       // without weights (unit weights) record zeros.

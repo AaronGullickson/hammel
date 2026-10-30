@@ -807,3 +807,46 @@ give identical results; finer supplied bands give finer cells) and
 `load_all()` builds use `-O0` and are not representative). Results and the revised cell-resolution
 decision are in [cell-accounted fertility](fertility-cell-accounting.md#implementation-and-validation).
 No scientific acceptance threshold is set.
+
+## Persistent fertility heterogeneity (D102, October 29, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test(reporter="summary")'`
+passed the full suite with no test failures; the live database test stayed
+opt-in/skipped. Final targeted verification after the native optional-argument
+cleanup passed `hetfert|fertility-cells|simulation|calibration-intensity` without
+warnings. The heterogeneity file has 62 assertions, including subsequent
+extreme-weight removal and failed-initialization RNG checks.
+
+Checks cover constructor/edited-model validation, independent mean-one draws
+at the requested CV, zero-year/empty results, retained supplied weights,
+strict-positive female validation, unused male entries, seed restoration and
+unseeded advancement, exact alpha endpoints, intermediate normal innovations,
+fixed-intensity weighted sampling, spacing/re-entry, restarts, deceased women,
+and grouped parity/type/cohabitation/dissolution with explicit weighted
+calibration scans. A dominant 1e100 weight can leave eligibility without losing
+a remaining 1e-100 weight; no arbitrary clipping is introduced.
+
+An independently built HEAD control in /tmp used 2,000 initial persons, two
+groups, ten years of grouped on-demand formation (seed 92) and rate/cohabitation
+formation with dissolution (seed 93), from baseline seed 91. Complete population
+histories and metadata were identical to current execution with hetfert NULL.
+CV-zero unit weights also retained identical output to the uniform path after
+removing only the new weight column/specification metadata.
+
+These are software and distribution checks, not an empirical acceptance claim
+or a guarantee of a stationary inherited weight distribution under reproductive
+selection. No online rates were downloaded; the user's milestone 5 report was
+not edited.
+
+## Disabled heterogeneity lifecycle and validation follow-up (D104)
+
+`TZ=UTC Rscript -e 'devtools::test(filter="hetfert|simulation|fertility-cells", reporter="summary")'`
+passed without failures or warnings after the D104 change. The enabled ->
+disabled -> enabled regression creates daughters during the disabled interval,
+checks that disabled results omit the weight column, verifies the original
+population is unchanged, and confirms positive fresh weights on re-enabling.
+Zero-year and empty disabled runs also omit the column. Validator checks cover
+missing sex, logical all-NA placeholders in male-only/empty histories, and
+incomplete female weights with explicit redraw guidance. Help and schema now
+consistently describe weighted selection and the disabled-output rule. Native
+weighted sampling and inheritance algorithms were not changed in this follow-up.

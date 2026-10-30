@@ -14,6 +14,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Ancestry schema and initialization | `R/ancestry.R` |
 | Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
 | Mortality/fertility specification and rate validation | `R/set_process.R` |
+| Persistent fertility weights and specification | `R/het_fert.R`; cell weight trees in `src/simulate.cpp` |
 | Union formation/matching and dissolution specifications | `R/union_formation.R`, `R/union_dissolution.R` |
 | Shared kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/kinship.R` |
 | HMD/HFD downloads and preparation | `R/construct_demographic_rates.R` |
@@ -380,3 +381,22 @@ inputs, chronology, linked episodes, legal-history recovery and observations.
 Fertility input strata are now union_type (the old input union_status errors).
 The contribution cache has marriage-search, father and cohab-search channels;
 preference tables may be shared, but role weights use each role's intensity.
+
+
+## Persistent fertility weights (D102)
+
+`het_fert(cv, alpha)` describes mean-one lognormal founder draws and maternal
+inheritance on the log scale. `set_fertility(..., hetfert = NULL)` keeps the
+uniform path. Enabled simulations initialize missing weight columns after seed
+setup, preserve supplied positive female weights, and return weights for all
+women in `persons$hetfert`. Sons receive NA. Zero-year runs initialize weights
+without entering the engine. Existing weights survive enabled restarts. Disabled output omits the weight
+column, including when it was supplied, so re-enabling draws fresh weights.
+
+`FertilityWeightTree` stores eligible weights by swap-remove slot with geometric
+capacity growth and logarithmic updates/draws. Cell intensity uses member count,
+not weights. Matching calibration aggregates the same individual hazards using
+per-bin compensated weight sums, and internal scan checks verify their totals.
+No tree is allocated on the uniform path. Daughter weights use independent
+normal innovations, except exact-copy or zero-innovation endpoints. No
+per-generation marginal normalization is imposed. See [the specification](fertility-heterogeneity-notes.md).
