@@ -6,3 +6,5 @@
 ^\.github$
 ^nvim\.log$
 ^LICENSE\.md$
+^src/.*\.gcda$
+^src/.*\.gcno$
