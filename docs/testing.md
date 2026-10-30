@@ -1,9 +1,34 @@
 # Testing and milestone validation
 
-Updated October 29, 2026. Milestones 1–4 are accepted as complete (D029,
-D050, D077, D093). Software test history and the user's demographic assessment
+Updated October 29, 2026. Milestones 1–5 are accepted as complete (D029,
+D050, D077, D093, D105). Software test history and the user's demographic assessment
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
+
+## Milestone 5 accepted assessment and closeout
+
+The user accepted milestone 5 on October 29, 2026 (D105) after revising and
+reviewing the [report source](../validation/milestone5.qmd). The final
+[rendered assessment](../validation/milestone5.html) was being produced when
+closeout was requested. This documentation update does not rerun simulations,
+download HFD/HMD data, execute tests or certify final-render completion. Preserve
+report sources, artifacts and active intermediates.
+
+The assessment covers parity-specific conditional fertility, cell-accounted
+spacing and revisited baseline/restart/union-type checks, inherited lognormal
+weights, childbearing dispersion, mother–daughter association and performance.
+Its limitations include sparse or structurally infeasible cells, unrealized
+expected births (an accounting diagnostic rather than actual births),
+history completeness and selection-driven weight distributions. Accepted
+completion does not introduce numerical thresholds or universal rate-recovery
+claims. Group transitions (milestone 6) are next; their specification and API
+remain unresolved.
+
+Earlier dated verification records below describe the versions tested at the
+time, including superseded corrections and intermediate proposal status.
+Current execution is D101–D104 and milestone status is D105. Closeout checked
+local Markdown links and whitespace; it made no engine or report edits.
+Supporting evidence and reproduction-version notes are in [validation/milestone5/](../validation/milestone5/README.md).
 
 ## Milestone 4 accepted assessment
 

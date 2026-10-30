@@ -43,7 +43,9 @@ The internal actual-parity count can distinguish entry to the highest open band
 from repeated births within it without changing the public input format. The user selected this approximation under D099; the Hammel implementation
 is independent code. Its synthetic recovery check reports higher-parity bias
 in the initialized-cohort case. This static audit itself remains separate from
-executable SOCSIM comparison or scientific acceptance.
+executable SOCSIM comparison. D101 subsequently replaced this correction with
+cell accounting; milestone 5 acceptance is recorded in D105 and does not
+validate the superseded correction.
 
 
 ## Executable follow-up

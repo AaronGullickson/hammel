@@ -3,9 +3,10 @@
 October 29, 2026. The user selected mean-one lognormal fertility weights and
 maternal inheritance on the normal/log-weight scale, exposed as
 `set_fertility(..., hetfert = het_fert(cv, alpha))`. This specifies the accepted
-behavior below; implementation and validation accompany it. Milestone 5
-acceptance remains with the user. The reproductive-selection qualification
-remains part of the contract: no per-generation distribution correction is used.
+behavior below; implementation and validation accompany it. The user accepted
+milestone 5 under D105 on October 29, 2026, based on
+[the validation report](../validation/milestone5.qmd). The reproductive-selection
+qualification remains part of the contract: no per-generation distribution correction is used.
 
 ## Execution, inputs and observations
 
@@ -160,4 +161,6 @@ Gamma weights, permanent zero-weight infertility, cohort-distribution
 normalization, paternal inheritance, heterogeneity distributions varying across
 strata and runtime weight changes are not included. None is implied by the
 selected maternal lognormal model. Validation of weights and conditional rates
-does not by itself establish demographic plausibility or milestone acceptance.
+does not by itself establish universal demographic plausibility. Milestone
+acceptance rests on the user's report assessment (D105), with these limitations
+retained.

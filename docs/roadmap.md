@@ -1,18 +1,16 @@
 # Development roadmap
 
-Updated October 29, 2026. Milestones 1–4 are complete by user acceptance
-(D029, D050, D077, D093). **Milestone 5 is the current milestone**, covering
-parity-specific fertility and fertility heterogeneity. Its scientific assessment
-is in progress; it has not been marked complete. The user revised the upcoming
-sequence under D103: group transitions next, then time-varying inputs. These
-are planning priorities, not authorization to implement unspecified demographic
-rules or a selected public API.
+Updated October 29, 2026. Milestones 1–5 are complete by user acceptance
+(D029, D050, D077, D093, D105). **The next milestone is 6: group transitions.**
+Milestone 7 is time-varying inputs (D103). Future entries record planning
+priorities, not authorization to implement unspecified demographic behavior
+or an unselected public API.
 
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | 4 | Union dissolution, age/duration remarriage, and cohabitation | Complete (D093) |
-| 5 | Parity-specific fertility and fertility heterogeneity | Current; implementation and validation in progress (D094–D102) |
-| 6 | Group transitions, including categorical characteristics represented by groups | Planned (D103); detailed model and API remain to be specified |
+| 5 | Parity-specific fertility and fertility heterogeneity | Complete (D105); limitations retained |
+| 6 | Group transitions, including categorical characteristics represented by groups | Next (D103/D105); scientific specification and API first |
 | 7 | Time-varying rates, matching, and inheritance within a simulation run | Planned (D103) |
 | 8 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed |
 | 9 | Immigration from outside the system, tracking generation | Tentative |
@@ -112,7 +110,7 @@ matching/rates and linked same-partner conversion. Marriage-order dependence
 and richer couple covariates remain deferred. Acceptance is the user’s
 assessment of the report, distinct from software checks alone.
 
-## Current milestone 5: parity-specific fertility and heterogeneity
+## Milestone 5 complete: parity-specific fertility and heterogeneity
 
 The user selected optional half-open `parity_start`/`parity_end` bands with Inf
 for the open category (D094). The HFD helper prepares conditional rates via
@@ -135,10 +133,13 @@ simulation draws them. Weights redistribute births within cells without
 changing their target intensities. Reproductive selection can change cohort
 weight distributions; no generational normalization is imposed. See the
 [heterogeneity specification](fertility-heterogeneity-notes.md) and
-[SOCSIM audit](socsim-fertility-heterogeneity-audit.md). User validation is
-ongoing; implementation and passing software checks do not close milestone 5.
+[SOCSIM audit](socsim-fertility-heterogeneity-audit.md). The user accepted
+[the milestone 5 report](../validation/milestone5.qmd) on
+October 29, 2026 (D105). Unrealized-intensity/sparse-cell limitations, incomplete
+birth histories and reproductive selection remain explicit; completion does
+not imply universal rate recovery or stationary cohort weight distributions.
 
-## Planned milestone 6: group transitions
+## Next milestone 6: group transitions
 
 Allow group membership to change during life. Use **group transitions** for
 this feature, reserving conversion terminology for cohabitation becoming
@@ -351,7 +352,7 @@ reference for investigation, not an adopted response rule or period length.
 - Previous-father continuity at subsequent births or union formation (D042).
 - Declining poor nonempty candidate pools and waiting (D044).
 - Multiple concurrent unions remain unassigned. Parity-specific fertility is
-  part of current milestone 5; non-death dissolution is complete in milestone 4.
+  complete under milestone 5; non-death dissolution is complete in milestone 4.
 
 R formula-fallback performance comparisons are now included in the user-authored
 milestone 2 validation report, accepted by the user on October 19, 2026 (D050).

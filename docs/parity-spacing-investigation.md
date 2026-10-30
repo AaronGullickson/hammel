@@ -1,8 +1,13 @@
 # Parity-specific fertility: spacing calibration investigation
 
-October 29, 2026. Milestone 5 remains in progress. This is an investigation and
-collaboration handoff, not acceptance of a replacement demographic model.
-Current behavior remains D099; do not silently change the simulation correction.
+October 29, 2026. This records the diagnosis and alternatives that led to the
+implemented D101 cell-accounting mechanism, followed by D102 fertility weights.
+Milestone 5 is accepted complete under D105. The original D099 correction below
+is superseded; [cell accounting](fertility-cell-accounting.md) and
+[heterogeneity](fertility-heterogeneity-notes.md) describe current behavior.
+The [accepted report](../validation/milestone5.qmd) remains the user's scientific
+assessment. Historical diagnostic evidence does not imply every proposed
+alternative was adopted or every target is feasible.
 
 ## Evidence from the user's validation report
 
@@ -217,7 +222,7 @@ memorylessness), replacing per-woman fertility waiting times. The matching
 tracker's eligible fertility contributions would then follow from the cell
 intensity.
 
-**Decisions this requires.**
+**Design questions raised by the toy (resolved by D101/D102).**
 
 1. *Population dependence.* A woman's hazard would rise when others in her cell
    recently gave birth. This is a calibration device rather than a behavioral
@@ -226,9 +231,8 @@ intensity.
    them, or error. Temporary after initialization; persistent cases mean the
    schedule cannot be met under the minimum interval (shared with the
    composition-based correction).
-3. *Fertility heterogeneity.* Still unselected for milestone 5. Individual
-   multipliers would presumably weight the assignment among eligible women;
-   deciding both together avoids redoing either.
+3. *Fertility heterogeneity.* D102 selects persistent lognormal weights for
+   within-cell assignment, not direct multipliers of cell rates.
 4. *Scope.* Replace D028/D099 everywhere (changing milestone 1–4 behavior and
    requiring re-validation) or offer it as an option. Fixed-seed histories
    change either way.
@@ -249,29 +253,22 @@ After validation the user selected 1-year, actual-parity cells and then made
 cell accounting the only method, removing midpoint compensation and D099's
 correction.
 
-## Next questions for collaboration
+## Implemented outcome and remaining scope
 
-The user asked whether to seek a general solution or a parity-only patch. The
-agent recommended investigating a common eligibility-calibration framework,
-using parity as the first concrete validation case. This is a proposal, not an
-accepted algorithm or authorization to implement one.
+D101 selects runtime population accounting with per-cell birth clocks, fixed
+rate-times-member intensity, and dropped/reported intensity when nobody is
+eligible. Cells distinguish actual parity even within open input categories.
+D102 supplies weighted eligible-mother selection and D104 defines disabled
+weight lifecycle. The user accepted the combined milestone under D105.
 
-Questions to resolve before changing the scientific contract:
+The new mechanism removes the earlier precomputed-correction assumption. It
+does not make every input schedule feasible, create actual births from lost
+intensity, reconstruct missing histories or enforce a stationary inherited
+weight distribution. The accepted report shows realized and unrealized-adjusted
+rates separately; its latter measure is an accounting diagnostic.
 
-- How should eligible exposure be estimated: deterministic preparation, pilot
-  simulations, or runtime population accounting?
-- What target is promised: conditional period ASFR recovery, an eligible-woman
-  hazard, or another interpretation? Keep input units and exposure explicit.
-- How does a proposed method handle cells with positive target fertility but
-  no eligible women, sparse exposure, initialization and changing composition?
-- Can the same accounting support group/union-type transitions and future
-  heterogeneity without implicitly changing their effects?
-- How should the highest open parity category include both entry births and
-  repeat births within that category?
-
-A general conceptual identity is target rate = eligible fraction times eligible
-hazard, but this does not select an estimator, solve feedback/circularity, or
-guarantee that every target schedule is feasible under a minimum interval.
-Validate any candidate with analytical cases, zero-spacing controls, initialized
-and later windows, and age/parity conditional rates before acceptance. Do not
-claim that a preceding-parity-only formula or a longer burn-in is sufficient.
+Next is milestone 6, group transitions, followed by time-varying inputs in
+milestone 7. Historical group histories, eligibility, tracker changes and event
+invalidation still require specification for those features. The rejected
+composition-only correction and former midpoint implementation remain in Git
+history and supporting diagnostics, not current execution rules.

@@ -43,7 +43,8 @@ be made autonomously; record choices with substantial architectural consequences
   monthly increment or execution-step parameter. Births use cell-accounted
   fertility (D101): each one-year age x actual parity x union type x group cell
   produces births at its input rate times all members, assigned to a random
-  eligible member; births in cells with no eligible woman are reported as
+  eligible member, weighted by persistent hetfert when enabled (D102). Births
+  in cells with no eligible woman are reported as
   unrealized. See docs/fertility-cell-accounting.md. Midpoint compensation
   (D028/D095/D099) was removed. Do not reintroduce superseded monthly timing,
   midpoint compensation or the specialized exact fertility sampler without an
@@ -80,6 +81,9 @@ the user's agreement.
   union formation was accepted as complete on October 19, 2026 (D050). Milestone 3
   groups was accepted as complete on October 27, 2026 (D077). Milestone 4
   dissolution/remarriage/cohabitation was accepted October 29, 2026 (D093).
+  Milestone 5 parity-specific fertility, cell accounting and heterogeneity was
+  accepted October 29, 2026 (D105). Group transitions (milestone 6) are next;
+  detailed semantics and API need specification before implementation.
   Distinguish current
   specifications from deferred mechanisms and future proposals.
 - `validation/milestone1.qmd` is the accepted historical assessment; reproduce it
@@ -88,8 +92,9 @@ the user's agreement.
   matching-parameter recovery and performance comparisons.
   `validation/milestone3.qmd` contains the accepted group-rate, matching, ancestry,
   inheritance, and performance assessment. `validation/milestone4.qmd` is the
-  accepted dissolution/remarriage/cohabitation assessment. Preserve all four
-  reports and rendered
+  accepted dissolution/remarriage/cohabitation assessment.
+  `validation/milestone5.qmd` is the accepted parity/spacing/heterogeneity
+  assessment. Preserve all five reports and rendered
   artifacts; do not fabricate results or set scientific acceptance thresholds. Milestone
   completion retains documented limitations and does not authorize future features.
 - Milestone 4 includes duration-dependent dissolution, age/duration searches by
@@ -99,8 +104,11 @@ the user's agreement.
   See `docs/union-dissolution.md`, `docs/remarriage.md`, and `docs/cohabitation.md`.
   Supporting benchmarks/recovery evidence lives in `validation/milestone4/`;
   top-level reports and `validation/data/` remain in place. Preserve active render
-  intermediates until rendering finishes. Parity and calendar-time schedules
-  remain future scope and require separate scientific specification.
+  intermediates until rendering finishes, including milestone 5's active final
+  render at closeout. Parity and fertility heterogeneity are implemented; group
+  transitions (milestone 6) and calendar-time schedules (milestone 7) require
+  their own scientific specifications. Most categorical characteristics should
+  use groups, with multiple types of groups an optional complexity direction.
 - Use `devtools::test()` for the testthat suite. Live database tests require
   explicit opt-in; ordinary verification must not download rates or expose
   credentials. See `docs/testing.md` for commands and evidence.

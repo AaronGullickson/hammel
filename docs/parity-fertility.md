@@ -1,10 +1,13 @@
 # Parity-specific fertility and PATFR
 
-Milestone 5 design, October 29, 2026 (D094). The user selected half-open parity
+Milestone 5 accepted complete October 29, 2026 (D105). The user selected half-open parity
 bands and HFD preparation, then authorized history-derived parity and parity
 execution (D098–D099). Births use cell-accounted fertility with one cell per
 actual parity (D101), which replaced D099's SOCSIM-style spacing correction.
-Fertility heterogeneity remains unselected.
+Persistent lognormal fertility weights and maternal inheritance are implemented
+under D102/D104; see [heterogeneity](fertility-heterogeneity-notes.md). The
+[accepted report](../validation/milestone5.qmd) retains sparse/unrealized-cell
+and reproductive-selection limitations; group transitions are next.
 
 ## Selected representation
 
@@ -65,12 +68,13 @@ change it. Retained complete person histories reconstruct parity at restart.
 Incomplete earlier histories consequently understate parity; no hidden births
 or externally supplied parity values are inferred. This is the implemented initialization contract under D099.
 
-## Remaining scope
+## Observation and remaining scope
 
 Parity-stratified observations use `calculate_fertility_rates(parity_breaks = ...)`
 (D100), described below.
-Heterogeneity distribution, persistence, association with other attributes and
-calibration remain unselected. The HFD-only zero-fill rule does not set
+D102 defines persistent lognormal weights and maternal inheritance. Other
+distributions, cohort normalization, group transitions and calendar-time inputs
+remain future scope. The HFD-only zero-fill rule does not set
 missing-data defaults for arbitrary rate tables. Remaining young high-parity
 shortfalls are births in cells without an eligible woman; see below.
 
@@ -160,9 +164,9 @@ With the user's HFD USA 2000 conditional rates (50,000-person baselines, 100
 replications, years 2050–2150), conditional rates are recovered at most ages
 and parities. Young high-parity cells fall short (for example parity 4+ at age
 21 at .55 of input) because those cells hold very few women, nearly all of whom
-have just given birth, so they often have no eligible member. Adding back the
-reported unrealized births with `calculate_fertility_rates(unrealized = TRUE)`
-restores them (.98 of input for that cell). Unrealized births were about 0.1% of
+have just given birth, so they often have no eligible member. As an accounting diagnostic, adding the
+reported unrealized expected births with `calculate_fertility_rates(unrealized = TRUE)`
+gives .98 of input for that cell; these are not additional realized births. Unrealized births were about 0.1% of
 all births and fell to about 0.04% in a 200,000-person check, so the shortfall
 shrinks with population size. The earlier preceding-parity correction (D099)
 gave .53 for that cell with nothing to add back; see

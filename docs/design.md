@@ -1,7 +1,8 @@
 # Design and implemented interface
 
-Updated October 29, 2026. Milestones 1–4 are complete by user acceptance
-(D029, D050, D077, D093). This document describes implemented architecture.
+Updated October 29, 2026. Milestones 1–5 are complete by user acceptance
+(D029, D050, D077, D093, D105). Group transitions (milestone 6) are next; their
+scientific specification and API remain to be selected. This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
 The [scientific contract](scientific-contract.md) defines demographic semantics.
 
@@ -22,7 +23,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Continuous scheduling and events | `src/simulate.cpp` |
 | Demographic extraction and measures | `src/demography.cpp`, `R/calc_demographic_measures.R` |
 | Software and analytical validation | `tests/testthat/` |
-| Replication assessment | `validation/milestone1.qmd`, `validation/milestone2.qmd`, `validation/milestone3.qmd` |
+| Replication assessment | `validation/milestone1.qmd`, `validation/milestone2.qmd`, `validation/milestone3.qmd`, `validation/milestone4.qmd`, `validation/milestone5.qmd` |
 
 The engine is C++17 with Rcpp. R exposes ordinary list objects and tibbles.
 `Band` and `waiting_time()` are shared by mortality and adjusted fertility.
@@ -174,7 +175,7 @@ that transition issue is [documented and deferred](scientific-contract.md#known-
 return rate tibbles, without configuring a model. Users can save/load them with
 RDS and reuse them without downloads. HMDHFDplus is optional for these helpers.
 The HFD helper's `by_parity = TRUE` option imports conditional mi rates as
-age/parity interval rows for milestone 5 preparation. Unavailable
+age/parity interval rows for parity-specific fertility (milestone 5, accepted under D105). Unavailable
 conditional cells are zero-filled under D096, with policy/count metadata. The
 engine accepts complete parity partitions under D099, initializes counts
 from recorded maternal births and uses one fertility cell per actual parity (D101).

@@ -47,8 +47,8 @@ accepted age, generation-distance kin and exclusivity restrictions below.
 SOCSIM is an investigation reference, not an adopted matching algorithm.
 
 Scheduled-search mode must support partnered and unpartnered fertility inputs.
-Parity-specific fertility is deferred to a later milestone; milestone 2 does
-not add parity conditioning. For the accepted milestone 2 scope, dissolution was excluded except when a
+Parity-specific fertility was outside milestone 2 and is now implemented
+and accepted in milestone 5 (D105). For the accepted milestone 2 scope, dissolution was excluded except when a
 partner dies (widowhood). Exclusive ongoing unions, return of widowed men to
 availability and renewed female rate searches after widowhood are implemented. The construction interface below adds no major dependency.
 

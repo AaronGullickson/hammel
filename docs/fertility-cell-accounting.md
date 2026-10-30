@@ -1,8 +1,8 @@
 # Cell-accounted fertility under birth spacing
 
 **Status: accepted and implemented (D101, October 29, 2026); the only
-birth-spacing method.** Written at the user's request after the
-[spacing investigation](parity-spacing-investigation.md). It was first an
+birth-spacing method; milestone 5 accepted under D105.** Written at the user's
+request after the [spacing investigation](parity-spacing-investigation.md). It was first an
 opt-in (`spacing_method = "cell"`) alongside midpoint compensation
 (D028/D099); after reviewing the validation below, the user removed midpoint
 and the argument. The midpoint comparisons in this document are reproducible at
@@ -14,10 +14,10 @@ actual parities. See [implementation and validation](#implementation-and-validat
 
 Fertility inputs are births per woman-year over *all* women in a stratum,
 including women inside their minimum birth interval. The simulation can only
-assign births to eligible women. Every current correction raises eligible
+assign births to eligible women. The former precomputed corrections raised eligible
 women's hazards by an amount computed from the input schedule alone, which
 assumes a particular mix of eligible and ineligible women. When the simulated
-mix differs, the input rates are not recovered. Known cases:
+mix differed, the input rates were not recovered. Known cases:
 
 - parity-specific rates, especially at young ages (milestone 5);
 - union-type rates when women change type during the interval (milestone 2, D045);

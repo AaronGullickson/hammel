@@ -2,8 +2,9 @@
 
 Updated October 29, 2026. This is the current mortality, fertility, union-formation,
 dissolution, remarriage, cohabitation/conversion, group identity/ancestry, and
-observation contract. Milestones 1–4 are accepted as complete
-(D029, D050, D077, D093), retaining documented limitations.
+observation contract. Milestones 1–5 are accepted as complete
+(D029, D050, D077, D093, D105), retaining documented limitations. Milestone 6
+group transitions are next and require a separate scientific specification.
 Earlier monthly, exact
 age-varying and midpoint compensation specifications are available in Git
 history; the [decision log](decisions.md) records their replacement by
@@ -682,8 +683,9 @@ universal accuracy or additional numerical thresholds. For further validation,
 make rate/age alignment, observation windows, replications, acceptance criteria,
 and sparse-cell treatment explicit. Compare ASFR/ASMR as well as aggregate
 TFR/life-table measures, reporting uncertainty and systematic departures
-separately. No controlled executable SOCSIM comparison has been performed;
-compare with a pinned reference when appropriate. Changed algorithms do not
+separately. Narrow controlled SOCSIM parity/spacing and heterogeneity checks are recorded
+in the audits; they do not establish broad engine equivalence. Compare with a
+pinned reference when appropriate. Changed algorithms do not
 warrant exact seed matching.
 
 Every new consequential mechanism needs its own plain-language specification:
@@ -735,3 +737,22 @@ The [spacing-calibration investigation](parity-spacing-investigation.md) records
 the parity-rate failures of the earlier preceding-parity correction (D099), a
 controlled executable SOCSIM comparison showing the same limitation, and the
 evidence that led to cell accounting (D101).
+
+
+## Milestone 5 acceptance and next scope
+
+The user accepted parity-specific fertility, cell-accounted birth spacing and
+persistent lognormal fertility weights on October 29, 2026 (D105), based on
+[the milestone 5 report](../validation/milestone5.qmd). Its final render was
+active at documentation closeout. Acceptance retains unrealized intensity in
+empty-eligibility cells, sparse-cell and structural feasibility limits,
+history-dependent parity/spacing, reproductive selection of weights and
+non-checkpoint restarts. Adjusted rates that include unrealized expected births
+are accounting diagnostics, not realized fertility. No universal scientific
+accuracy claim or new acceptance threshold is inferred.
+
+Group transitions (milestone 6) are the next design task. Transition eligibility,
+clocks, identity/ancestry histories, and event and tracker updates need an
+explicit contract before execution changes. Multiple types of groups remain an
+option for more complex applications. Time-varying inputs remain milestone 7;
+neither mechanism is implemented or authorized by milestone 5 completion.

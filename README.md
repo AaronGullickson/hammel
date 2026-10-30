@@ -11,8 +11,10 @@ C++17 engine. It models continuous-time mortality, fertility, and union
 formation, dissolution, remarriage, and optional cohabitation/conversion, with
 group-specific rates, partner matching, ancestry, and newborn identity inheritance. Results expose population and union histories as tibbles.
 
-Milestones 1–4 are complete by user acceptance: mortality/fertility, union
-formation, groups, and dissolution/remarriage/cohabitation. See the [documentation index](docs/README.md),
+Milestones 1–5 are complete by user acceptance: mortality/fertility, union
+formation, groups, dissolution/remarriage/cohabitation, and parity-specific
+fertility with persistent fertility heterogeneity. Milestone 6, group
+transitions, is next (D105). See the [documentation index](docs/README.md),
 [scientific contract](docs/scientific-contract.md), and
 [validation record](docs/testing.md) for implemented behavior and limitations.
 Future mechanisms are listed in the [roadmap](docs/roadmap.md).
@@ -43,3 +45,12 @@ The user accepted milestone 4 on October 29, 2026 (D093). Rendering retrieves HM
 mortality, runs 100 independently initialized replications per scenario, and
 executes the offline test suite. See [validation contents](validation/README.md)
 for retained reports, inputs, and supporting diagnostic evidence.
+
+
+The accepted [milestone 5 report](validation/milestone5.qmd) and
+[rendered assessment](validation/milestone5.html) cover parity-specific fertility,
+cell-accounted birth spacing, restart and union-type rate checks, and lognormal
+fertility weights with maternal inheritance (D105). Completion retains the
+documented sparse-cell/unrealized-intensity and reproductive-selection
+limitations. Rendering installs the package, retrieves HFD/HMD inputs, runs
+replications and the offline tests; it is not an ordinary package check.

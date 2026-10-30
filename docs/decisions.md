@@ -46,6 +46,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Persistent lognormal fertility weights and maternal inheritance | D102 |
 | Milestone order and groups-based characteristics scope | D103 |
 | Disabled fertility heterogeneity removes output weights | D104 |
+| Milestone 5 acceptance; group transitions next | D105 |
 
 ## Recorded decisions
 
@@ -2137,3 +2138,36 @@ output; it does not silently assign unit weights to daughters born while the
 feature was disabled. Weight persistence is guaranteed across enabled restarts,
 not across an explicit disabled interval. This replaces D102's original
 ordinary-custom-column treatment for disabled runs.
+
+
+## D105 — Milestone 5 accepted complete (October 29, 2026)
+
+- **Status:** accepted complete by the user after reviewing and revising the
+  milestone 5 report. Its final HTML render was running when the user requested
+  documentation closeout; preserve the source, rendered artifact and active
+  intermediates. Closeout does not independently rerun or certify that render.
+- **Scope:** parity-specific conditional fertility inputs and history-derived
+  parity (D094–D099), HFD preparation and PATFR/TFR dispatch, separate mortality
+  and fertility observations with parity bands (D100), cell-accounted fertility
+  replacing precomputed spacing compensation (D101), persistent lognormal
+  fertility weights with maternal inheritance (D102), and the disabled-weight
+  lifecycle (D104). The report revisits baseline, restart and union-type
+  fertility, and assesses parity rates, heterogeneity and performance.
+- **Evidence:** the user-authored [report](../validation/milestone5.qmd), its
+  [rendered assessment](../validation/milestone5.html), and supporting
+  [diagnostics/provenance](../validation/milestone5/README.md). Acceptance is the
+  user's scientific assessment, not a new agent-defined numerical threshold.
+- **Retained limitations:** cells with members but no eligible women lose
+  intensity, reported as unrealized expected births. Adding it back is an
+  accounting diagnostic, not realized births. Sparse or structurally infeasible
+  young/high-parity cells need not recover their target. Missing birth
+  histories cannot be reconstructed. Inherited weight distributions may change
+  under reproductive selection; alpha and raw mother–daughter correlations
+  are not generally identical. Restarts are not exact checkpoints, and failed
+  partner searches retain their existing cancellation behavior.
+- **Next:** milestone 6 is group transitions, using that term for life-course
+  group changes. Multiple types of groups remain an optional complexity
+  direction; transition semantics, histories, tracker/event invalidation,
+  ancestry effects and public API require specification before implementation.
+  Milestone 7 remains time-varying inputs under D103. Completion does not
+  authorize unspecified future demographic behavior.

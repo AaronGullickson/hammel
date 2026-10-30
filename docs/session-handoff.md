@@ -1,223 +1,122 @@
 # Current project handoff
 
 Updated October 29, 2026. This is a dated status record, not authorization for
-additional features. The current user request controls work. Start with the
-[documentation index](README.md) and [scientific contract](scientific-contract.md).
+unspecified features or a standing pause instruction. The current user request
+controls work. Start with [the documentation index](README.md),
+[scientific contract](scientific-contract.md) and [decisions](decisions.md).
 
-## Accepted milestones
+## Accepted milestones and active render
 
-The user accepted milestones 1–4 on October 15, October 19, October 27 and
-October 29, 2026 (D029, D050, D077, D093). Preserve all four report sources,
-rendered assessments, rate provenance and the author's explanatory comments.
-Milestone 1 requires its recorded historical commit because current execution
-requires a union process. The final milestone 4 report was rendering when the
-user requested documentation closeout; do not interrupt that render or delete
-its temporary files. No new scientific analysis is implied by closeout.
+Milestones 1–5 are complete by user acceptance: mortality/fertility (D029),
+union formation (D050), groups (D077), dissolution/remarriage/cohabitation
+(D093), and parity-specific fertility/cell accounting/heterogeneity (D105).
+Acceptance dates are October 15, 19, 27, 29 and 29, 2026 respectively.
 
-## Implemented state
+Preserve all five user-authored report sources and rendered artifacts, their
+input provenance, and explanatory comments. Milestone 1 must be reproduced at
+its recorded historical commit because current execution requires a union
+process. The final milestone 5 render was active when the user requested this
+closeout. Do not delete or move its intermediates while rendering; do not
+rerender, download rates or rerun simulations merely to update documentation.
+No final-render result or new test count is claimed by this closeout.
 
-- Independent C++17/Rcpp continuous-event simulations, isolated R RNG policy,
-  tibble population/union histories, shared known-kin screening and extraction.
-- Mortality and fertility with annual hazards and midpoint birth-spacing
-  compensation. Actual birth spacing persists through union transitions.
-- On-demand or female rate-based partnership searches, exact full-pool matching,
-  group schedules/multipliers, calibrated group weights and optional delta.
-  Current female hazards are summed by group/cohort; a common boundary queue
-  handles age, duration, spacing and cohabitation probability changes.
-- Duration-specific dissolution with one female-carried clock, symmetric group
-  pairs/multipliers, optional cohab/marriage schedules and retained end reasons.
-- Searches by previous_union none/dissolved/widowed, requiring all categories
-  when stratified. None uses age; each other category may use age or duration
-  since the latest actual ending. State is reconstructed from complete histories.
-- Rate-mode cohabitation: cohab_prob by woman's age and optional group/previous
-  category; optional separate cohab_matching; age/duration union_convert_rate
-  optionally by woman's group. Conversion creates same-partner linked episodes
-  with previous_cohab_id and resets dissolution duration. Exact ties prioritize
-  death, birth, dissolution, conversion, then search.
-- Fertility input union_type accepts unpartnered/partnered or
-  unpartnered/cohab/marriage; hazard-list names match supplied types. Father
-  matching at unpartnered births can use a separate model. Failed matches cancel
-  births by default. Cohabitors remain unavailable for new matching.
-- Cohabitation endings recover earlier legal status by default; the configured
-  toggle can count them as dissolved/widowed. Latest simulation metadata carries
-  the policy for observation. Changing policy reclassifies supplied histories.
-- Newborn identities and ancestry are separate; random_parent inheritance is
-  default with maternal fallback. Custom inheritance is supported.
+## Next milestone: 6, group transitions
 
-## Observation APIs
+The user selected group transitions next, ahead of calendar-time inputs in
+milestone 7 (D103/D105). Use "group transitions" for life-course group changes;
+cohabitation-to-marriage conversion retains its existing name. Groups should
+cover most categorical characteristics, with multiple types of groups an
+optional direction for more complex applications. The former separate
+individual-characteristics milestone is removed; milestones 8–10 retain their
+numbers. See [the roadmap](roadmap.md).
 
-- calculate_fertility_rates() and calculate_mortality_rates(): separate process
-  summaries; by_union_type = TRUE returns unpartnered plus discovered types,
-  without overall rows. Fertility accepts parity_breaks for current-parity ASFRs.
-- calculate_union_rates(): partnership entries over unpartnered years, excluding
-  conversion. Optional by_union_type repeats shared unpartnered exposure;
-  by_previous_union and optional dur_breaks retain mixed age/duration observations.
-- calculate_marriage_rates(): direct marriages plus conversions over nonmarried
-  (unpartnered plus cohabiting) years; optional previous categories, age only.
-- calculate_dissolution_rates(): dissolutions per union-year, optionally by
-  symmetric group_pair and union_type.
-- calculate_cohab_convert_rate(): conversions per cohabitation union-year,
-  either woman's age or cohabitation duration, optionally woman's group.
-- get_unpartnered_births(): known-parent births outside partnerships, enriched
-  with parent ages/groups. Preserve repeated pairs; use to assess father choice.
+Before implementation, specify transition inputs, age/duration clocks,
+eligibility, timing/ties, historical group observation, ancestry implications,
+newborn assignment, and invalidation/update of pending events, fertility cells
+and matching contributions. A multiple-group schema/API is not selected.
+Fixed newborn group assignment remains part of this discussion, not an
+implemented method; custom mixed-parent assignment already exists. Completion
+of milestone 5 does not authorize unresolved transition behavior.
 
-## Validation and cleanup
+## Current engine and fertility
 
-The accepted [milestone 4 report](../validation/milestone4.qmd) assesses rate
-recovery, separate matching contexts and performance over independently seeded
-baselines. Its final render includes the test suite. The earlier reviewed HTML
-had 321 passing tests and one opt-in live-database skip; final-render results
-remain the author's record. No new tests/downloads were run for docs cleanup.
+- Independent C++17/Rcpp continuous-time engine with R seed isolation, tibble
+  histories, exact full-pool partner draws and known-kin screening.
+- Births use D101 cell accounting exclusively: intensity is input rate times
+  all living cell members; assign attempts to an eligible mother. Age cells
+  are at most one year, split at input edges, with actual-parity cells for
+  parity schedules. Zero-rate bands form no cells; sufficiently low-rate
+  upper-open bands remain pooled under the documented .001 tolerance.
+- No-eligible-member intensity is dropped and reported in unrealized_births.
+  This is expected lost intensity, not actual births. Adding it to measured
+  rates is an accounting diagnostic. Sparse/structurally infeasible young
+  high-parity cells may not recover their schedules.
+- HFD conditional mi rates map birth order 5+ (m5px) to current parity 4+.
+  Endpoint and missing-cell conventions are explicit (D094–D096). PATFR uses
+  HFD midpoint-table rules and calculate_tfr delegates on parity bounds (D097).
+- Parity and last-birth dates come from recorded maternal histories, including
+  deceased children and unknown fathers, with no overriding parity column or
+  imputed prehistory (D098–D099). Successful births alone advance parity.
+- D102 het_fert(cv, alpha) specifies positive mean-one lognormal fresh weights
+  and maternal log-scale inheritance with sqrt(1-alpha^2) normal innovation.
+  Cell intensity is fixed; eligible mother selection uses relative weights.
+  Matching calibration uses the same weighted individual hazards.
+- Existing female persons$hetfert values are retained in enabled runs; absent
+  columns are drawn under the simulation seed. Output always includes numeric
+  weights when enabled, including zero-year runs. Newly generated males get NA.
+  Alpha one copies maternal weights exactly; alpha zero draws independently.
+  Reproductive selection can change cohort weight distributions.
+- Under D104, disabled runs omit the weight column even if it was supplied.
+  Input populations are unchanged. Subsequent re-enabling draws fresh weights
+  for all recorded women, rather than keeping a partially populated column.
+- D028/D095's interior-limit adjustment and D099's spacing correction were
+  superseded by D101. The former spacing_method argument was removed.
+  Midpoint comparison diagnostics require recorded commit 89d451b.
 
-Reports remain at validation/ top level; the 14 supplementary benchmark/recovery
-files moved to [validation/milestone4/](../validation/milestone4/README.md), with
-links and script paths updated. Rate/source inputs remain in validation/data/.
-The author deleted milestone4_tests.R; the final report supersedes it. Quarto
-intermediates are ignored and disposable only after rendering finishes.
+## Other implemented processes
 
-## Retained limitations and future scope
+Female rate-mode searches optionally stratify by previous_union none/dissolved/
+widowed, with age or duration per previous category (D080/D083). On-demand
+formation remains birth-triggered. Dissolution uses one female-carried duration
+clock with symmetric group-pair schedules/multipliers. Optional rate-mode
+cohabitation supports cohab_prob, separate matching, type-specific fertility
+and dissolution, and age/duration union_convert_rate. Conversion links episodes
+through previous_cohab_id and resets marriage dissolution duration. Exact ties
+prioritize death, birth, dissolution, conversion, search.
 
-Transition-aware fertility compensation (D045), poor-pool waiting (D044), former-
-partner/father continuity (D042), sparse exposure, initialization transients and
-approximate calibration ages remain limitations. Pooled cross-tab log odds are
-not universal exact constraints; conditional-choice recovery is separate evidence.
-Static SOCSIM audits are not executable reference comparisons.
+Newborn identity and ancestry are separate; random_parent with maternal
+fallback is the default. Custom inheritance is supported. Cohabitation endings
+recover earlier legal status by default, with a toggle to count previous unions
+instead. Unpartnered father matching can use a separate model. Failed matches
+cancel births by default; pending spacing and weighted-cell state remain
+consistent after cancellations.
 
-The roadmap tracks current parity/heterogeneity work (milestone 5), group
-transitions (milestone 6), calendar-time schedules (milestone 7), and later
-summaries, immigration and internal migration. Multiple types of groups are
-an option for more complex categorical characteristics. The user
-has discussed adding calendar bounds alongside age/duration, but this does not
-authorize implementation or resolve gap/coverage and fertility-compensation rules.
-Fixed newborn assignment remains deferred to group transitions. Marriage-order
-effects, richer couple covariates, general two-sex models, API restructuring,
-arbitrary callbacks and exact checkpoints remain future scope. Acceptance does
-not authorize those mechanisms. An African historical benchmark remains postponed.
+## Observation APIs and evidence
 
+- calculate_fertility_rates: female exposure/births, optional parity_breaks,
+  by_group/by_union_type, and unrealized-intensity accounting.
+- calculate_mortality_rates: deaths/exposure for both sexes, optional group/type.
+- calculate_union_rates: entries from unpartnered exposure, excluding conversion;
+  optional previous_union and duration clocks, group and entry type.
+- calculate_marriage_rates: direct marriage plus conversion over nonmarried
+  exposure, optional previous_union and group; age only.
+- calculate_dissolution_rates: union-years/dissolutions by optional group_pair/type.
+- calculate_cohab_convert_rate: conversion over cohab union-years, age or duration.
+- get_unpartnered_births: known-parent births outside partnerships, preserving
+  repeated father-selection events.
 
-## Milestone 5 current work
+The accepted [milestone 5 report](../validation/milestone5.qmd) revisits baseline,
+restart and union-type fertility, then assesses parity and heterogeneity,
+childbearing dispersion, mother–daughter association and runtime. Software
+checks are recorded separately in [testing](testing.md). Supporting scripts
+and their version restrictions live in [validation/milestone5/](../validation/milestone5/README.md).
+The pinned SOCSIM source audits and narrow executable parity/spacing and
+heterogeneity checks are reference evidence, not broad engine equivalence.
 
-The user confirmed the milestone 4 PR was merged and authorized parity work.
-D094 selects half-open parity_start/parity_end, including Inf. HFD conditional
-mi rates map birth-order 5+ (m5px) to current parity 4+. D095 retains 12- as
-[12,13) and 55+ as [55,Inf), supports upper-open fertility ages with interior-
-limit spacing adjustment, and warns when TFR drops nonzero open-age rates.
-D096 zero-fills unavailable HFD conditional cells with policy/count provenance.
-D097 adds calculate_patfr(), with automatic calculate_tfr() delegation and all
-existing strata, missing included cells yielding NA and upper-age truncation.
-
-D098/D099 implement actual parity counts from recorded maternal births only.
-No optional persons parity column overrides history; deceased children and
-unknown fathers count. Initialize random baselines at zero if there are no
-recorded births. Increment only on successful births; reconstruct at restart.
-Complete parity partitions are required for every group/union-type schedule.
-Parity zero is unadjusted; higher parity uses the preceding actual parity's raw
-age schedule for the selected SOCSIM-style compensation. Entry to the open
-highest category differs from later births within it. Refresh father-matching
-fertility contributions and scheduling after births, with no parity matching bins.
-
-**Important limitation:** the offline initialized-cohort check at
-[validation/milestone5/](../validation/milestone5/README.md) finds mean parity-1
-and 2+ rates .2665 and .3335 with .75-year spacing against inputs .3 and .4.
-Zero-spacing controls recover approximately .2992 and .4035. This is the selected
-approximation's limitation, not a scientific acceptance claim. Do not silently
-change to population-ratio compensation. D100 adds `calculate_fertility_rates(parity_breaks = ...)` and separates
-`calculate_mortality_rates()`. Fertility heterogeneity is not implemented. Preserve the user's
-validation/milestone5.qmd, which is outside these implementation changes.
-
-
-## Current investigation for collaboration (October 29)
-
-The user confirmed persistent high-parity/young-age shortfalls after 50 years
-of burn-in, then close schedule recovery with `birth_interval = 0`. The user
-requested an executable SOCSIM toy comparison and documentation for collaboration
-with Claude. See [the investigation](parity-spacing-investigation.md) and
-[reference experiment](../validation/milestone5/socsim/README.md). No new
-compensation method is accepted. Investigate a shared eligibility framework
-before choosing between pre-calibration and runtime accounting. Preserve the
-user-authored milestone 5 report and do not implement a replacement on the basis
-of the agent's proposals alone.
-
-Later on October 29 the user agreed to pursue a general runtime mechanism
-instead of a parity-only correction and requested its specification:
-[cell-accounted fertility](fertility-cell-accounting.md). Births are generated
-per fertility cell at m_c * N_c and assigned to an eligible woman, with
-reserved individual weights for future heterogeneity. Its six open decisions
-need the user's answers before any engine change; D028/D099 remain current.
-The user then agreed to all six decisions (D101): drop births in cells with no
-eligible women and report them; individual weights set selection probability
-within a cell rather than multiplying rates. Next step is the opt-in engine
-implementation sharing the matching-calibration tracker; D028/D099 remain the
-current behavior until it is validated.
-
-Implementation status (October 29): cell accounting is implemented as the
-opt-in `spacing_method = "cell"` with tests, internal scan checks, offline
-validation and a benchmark. After validation the user selected 1-year age cells
-split by actual parity (revised decision 5); young-age parity rates now recover
-except structurally infeasible cells (for example parity 5+ at age 18), whose
-intensity is reported as unrealized. Midpoint remains the default and its
-histories are unchanged. Making cell mode the default needs the user's
-decision and re-validation of earlier milestones.
-
-Midpoint removed (October 29): at the user's direction, cell-accounted fertility
-(D101) is now the only birth-spacing method. The user committed the opt-in
-state as `89d451b` first; midpoint comparison scripts in `validation/milestone5/`
-run at that commit. `spacing_method` was removed (an old specification with
-`"midpoint"` warns and uses cells). The user's `validation/milestone5.qmd`
-still passes `spacing_method = "cell"` and needs that argument removed. D028,
-D045, D095's interior limit and D099's correction are marked superseded.
-
-
-## Fertility heterogeneity discussion recorded (October 29, 2026)
-
-The user requested written notes and a SOCSIM audit. Added
-[SOCSIM heterogeneity findings](socsim-fertility-heterogeneity-audit.md) and
-[distribution/inheritance design notes](fertility-heterogeneity-notes.md).
-The latter proposes mean-one lognormal weights parameterized by CV and latent
-normal inheritance with innovation coefficient sqrt(1-alpha^2). Distribution
-preservation assumes standard-normal latent values among reproducing mothers;
-reproductive selection is explicitly unresolved. No heterogeneity distribution,
-parameter default, initialization contract or engine implementation was accepted
-by this documentation request. The SOCSIM audit also verifies its alpha=0,
-betaT=1 defaults, non-normalizing power transformation, and first-supervisory-
-line loader quirk. Existing engine edits and the user's report were left alone.
-
-## Persistent fertility weights implemented (D102, October 29, 2026)
-
-The user selected `set_fertility(..., hetfert = het_fert(cv, alpha))`. Fresh
-weights are positive mean-one lognormal draws at the requested CV; daughters
-inherit on the latent normal/log scale with independent innovation scaled by
-sqrt(1-alpha^2). Supplied female persons$hetfert values are authoritative and
-must be finite/positive; an absent column is drawn under the simulation seed,
-including in zero-year runs. Output retains weights on restarts and includes
-NA for newly generated males. Alpha one copies exactly; alpha zero is fresh.
-No normalization against reproductive selection is added.
-
-Cell mother selection uses eligible weight-sum trees; rate times member count
-remains unchanged. Grouped partner/father calibration uses the same weighted
-hazards and passes explicit scan checks. Full tests and final targeted tests
-passed; hetfert NULL retained identical complete histories against a pre-change
-HEAD control. See [the specification](fertility-heterogeneity-notes.md) and
-[verification](testing.md). No report edits or milestone acceptance are implied.
-
-
-## Roadmap order updated (D103, October 29, 2026)
-
-Milestone 4 is complete; milestone 5 is current and awaiting user acceptance.
-Group transitions are milestone 6, ahead of time-varying inputs in milestone 7.
-The separate individual-characteristics milestone is removed: groups should
-cover most categorical applications, with multiple types of groups available
-as a future option for more complexity. Detailed semantics and APIs remain
-open. Milestones 8–10 keep their numbers. See [the roadmap](roadmap.md).
-
-## Disabled weight lifecycle revised (D104, October 29, 2026)
-
-The user selected that disabling fertility heterogeneity removes persons$hetfert
-from output even when it exists in the starting population. This applies to
-zero-year/empty runs, leaves input histories unchanged and makes subsequent
-re-enabling draw fresh weights for all recorded women. It replaces the original
-disabled-as-custom-column behavior. Missing-sex and logical-NA-placeholder
-validation, weighted-selection help, and the schema omission statement were
-also corrected. Focused heterogeneity, simulation and cell suites passed without
-warnings. D102 records the requested API/inheritance construction, not a claim
-of scientific acceptance or stationary cohort variance under selection.
+Retain sparse-cell, infeasible-input, history completeness, reproductive
+selection, failed-search and approximate matching-bin limitations. Restarts
+are not exact checkpoints. Poor-pool waiting (D044), former-parent continuity
+(D042), general two-sex squeeze models, custom process execution and calendar-
+time schedules remain future work. The postponed African historical benchmark
+has not been selected. Scientific acceptance remains distinct from passing
+software checks or universal accuracy.

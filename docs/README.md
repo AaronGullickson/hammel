@@ -1,11 +1,13 @@
 # Hammel documentation
 
-Updated October 29, 2026. Milestones 1 (mortality/fertility), 2 (union
-formation), 3 (groups/matching/inheritance), and 4 (dissolution/remarriage/
-cohabitation) are complete by user acceptance (D029, D050, D077, D093). Current behavior uses
-continuous event times and cell-accounted fertility under birth spacing (D101),
-with no monthly time grid. Acceptance is based on the user-authored validation
-reports. Deferred mechanisms remain future work.
+Updated October 29, 2026. Milestones 1–5 are complete by user acceptance
+(D029, D050, D077, D093, D105), including parity-specific fertility,
+cell-accounted birth spacing and persistent lognormal fertility weights.
+Current behavior uses continuous event times with no monthly grid. Acceptance
+is based on the user-authored validation reports and retains their limitations.
+**Next: milestone 6, group transitions.** Detailed transition semantics and the
+public API require specification before implementation; milestone 7 is
+time-varying inputs (D103).
 
 ## Reading order
 
@@ -40,7 +42,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [Cohabitation](cohabitation.md) | Rate-mode type probabilities, type-specific matching/rates, conversion and histories (D085/D086) |
 | [Remarriage schedules](remarriage.md) | Age/duration previous-union search strata, calibration, and marriage observations (D080/D083) |
 | [Fertility heterogeneity](fertility-heterogeneity-notes.md) | D102: persistent lognormal weights, maternal inheritance, validation and selection caveat |
-| [Parity fertility and PATFR](parity-fertility.md) | History-derived parity, schedules, HFD recovery and PATFR; milestone 5 in progress (D094–D101) |
+| [Parity fertility and PATFR](parity-fertility.md) | History-derived parity, schedules, HFD recovery and PATFR; milestone 5 accepted (D105) |
 | [Union dissolution](union-dissolution.md) | Milestone 4 duration hazards, female carrier, state changes, and worked examples (D078) |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
 | [Two-sex union models](two-sex-union-models.md) | Proposal notes: directional asymmetry, marriage squeeze, Schoen/Choo–Siow/Dagsvik models, API considerations (D073) |
@@ -85,6 +87,13 @@ To inspect prior versions, use `git log -- docs` and
   cohabitation, age/duration conversion, fertility by type, separate matching
   roles, and performance. Rendering downloads HMD mortality and runs 100
   independent-baseline replications per scenario plus the offline test suite.
+- [Milestone 5 validation report](../validation/milestone5.qmd) and
+  [rendered assessment](../validation/milestone5.html): accepted October 29,
+  2026 (D105), covering parity-specific rates, cell-accounted spacing, baseline,
+  restart and union-type fertility checks, heterogeneous weights, maternal
+  inheritance and performance. The final render was active at closeout;
+  preserve all intermediates. Rendering installs the package, downloads HFD/HMD
+  inputs and runs substantial replications and offline tests.
 - [Validation directory guide](../validation/README.md): retained reports,
   rate provenance, and supporting benchmark/conditional-choice evidence.
 The former `milestone1.R` and `milestone1_bootstrap.R` examples have been
