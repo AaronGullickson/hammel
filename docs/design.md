@@ -28,6 +28,10 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Replication assessment | `validation/milestone1.qmd`, `validation/milestone2.qmd`, `validation/milestone3.qmd`, `validation/milestone4.qmd`, `validation/milestone5.qmd` |
 
 The engine is C++17 with Rcpp. R exposes ordinary list objects and tibbles.
+Grouped dissolution and conversion observations build union-level group
+histories through `union_group_history_cpp()` using the shared `GroupHistory`
+index. Each union visits only its partners' transition histories; pair labels
+are mapped once before native traversal.
 `Band` and `waiting_time()` are shared by mortality and adjusted fertility.
 Every simulation owns its population, queue, and working state; there is no
 hidden process-wide engine population.

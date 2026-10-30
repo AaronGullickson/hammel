@@ -149,31 +149,17 @@ prepare_union_group_observations <- function(unions, population, groups,
                                               pair = FALSE, typed = FALSE) {
   tx <- population$transitions
   if (is.null(tx) || !nrow(tx) || !nrow(unions)) return(unions)
-  p <- population$persons
-  chunks <- vector("list", nrow(unions))
-  histories <- split(seq_len(nrow(tx)), tx$person_id)
-  for (u in seq_len(nrow(unions))) {
-    wife <- match(unions$wife_id[u], p$person_id)
-    husband <- match(unions$husband_id[u], p$person_id)
-    ids <- p$person_id[if (pair) c(wife, husband) else wife]
-    rows <- unlist(histories[as.character(ids)], use.names = FALSE)
-    times <- sort(unique(tx$time[rows]))
-    if (!length(times)) next
-    from <- groups_at(population, rep(wife, length(times)), times, left = TRUE, histories = histories)
-    to <- groups_at(population, rep(wife, length(times)), times, histories = histories)
-    if (pair) {
-      from <- canonical_union_pairs(from, groups_at(population, rep(husband, length(times)), times, left = TRUE, histories = histories))
-      to <- canonical_union_pairs(to, groups_at(population, rep(husband, length(times)), times, histories = histories))
-    }
-    offset <- if (typed) length(groups) * (match(unions$union_type[u], c("cohab", "marriage")) - 1L) else 0L
-    chunks[[u]] <- list(row = rep(u - 1L, length(times)), time = times,
-      from = match(from, groups) - 1L + offset, to = match(to, groups) - 1L + offset)
-  }
-  chunks <- Filter(Negate(is.null), chunks)
-  if (!length(chunks)) return(unions)
-  columns <- c("row", "time", "from", "to")
-  history <- lapply(columns, function(column) unlist(lapply(chunks, `[[`, column), use.names = FALSE))
-  names(history) <- columns
-  attr(unions, ".hammel_group_history") <- history
+  persons <- prepare_group_observations(population$persons, population, TRUE)
+  identities <- observation_groups(persons, TRUE)
+  indices <- match(persons$group, identities) - 1L
+  # Map unordered pair labels once; native history traversal uses integer keys.
+  pair_indices <- if (pair) {
+    grid <- expand.grid(w = seq_along(identities), h = seq_along(identities))
+    matrix(match(canonical_union_pairs(identities[grid$w], identities[grid$h]), groups) - 1L,
+      nrow = length(identities))
+  } else matrix(integer(), 0L, 0L)
+  history <- union_group_history_cpp(persons, unions, indices, pair_indices,
+    pair, typed, length(groups))
+  if (length(history$row)) attr(unions, ".hammel_group_history") <- history
   unions
 }

@@ -129,3 +129,11 @@ second band. Union-type components and sex components sum to pooled exposure
 and counts within each directed pair. Validation uses hand-calculated repeated
 moves, union changes and deaths, boundary cases, empty histories and
 analytical hazard recovery; no simulation state or randomness is changed.
+
+Attaching a transition process with all-zero rates is distributionally inert
+but does not promise fixed-seed equality with omitting the process. Applicable
+zero-rate schedules still consume hazard draws, and union-state changes can
+reschedule partners' candidates while the process is enabled. Use independent
+replications and statistical comparisons; a shared seed does not preserve
+identical demographic paths across these configurations. This does not change
+the no-extra-transition-draws guarantee when the process is absent.

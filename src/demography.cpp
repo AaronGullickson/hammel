@@ -220,7 +220,8 @@ struct MarriageEpisode {
   bool cohab, conversion;
 };
 std::vector<std::vector<MarriageEpisode>> marriage_histories(DataFrame persons,
-                                                            DataFrame unions) {
+                                                            DataFrame unions,
+    const std::string& context = "Previous-union stratification") {
   NumericVector ids = persons["person_id"], died = persons["death_time"];
   NumericVector wives = unions["wife_id"], husbands = unions["husband_id"];
   NumericVector starts = unions["start_time"], ends = unions["end_time"], uids = unions["union_id"];
@@ -250,7 +251,7 @@ std::vector<std::vector<MarriageEpisode>> marriage_histories(DataFrame persons,
     });
     for (size_t u = 1; u < history.size(); ++u)
       if (history[u].start < history[u - 1].end)
-        stop("Previous-union stratification requires nonoverlapping union histories for each person.");
+        stop(context + " requires nonoverlapping union histories for each person.");
   }
   return histories;
 }
@@ -552,7 +553,7 @@ List transition_counts_cpp(DataFrame persons, DataFrame unions, DataFrame transi
   NumericVector times = transitions["time"];
   for (int j = 0; j < times.size(); ++j) changes[row[j]].push_back({times[j], from[j], to[j]});
   std::vector<std::vector<MarriageEpisode>> unions_by_person;
-  if (by_union_type) unions_by_person = marriage_histories(persons, unions);
+  if (by_union_type) unions_by_person = marriage_histories(persons, unions, "Transition-rate observation by union type");
   for (int i = 0; i < persons.nrows(); ++i) {
     if (i % 1024 == 0) checkUserInterrupt();
     auto& moves = changes[i];
@@ -635,4 +636,39 @@ IntegerMatrix union_start_groups_cpp(DataFrame persons, DataFrame unions,
     groups(u, 1) = history.at(index.at(husbands[u]), starts[u], true);
   }
   return groups;
+}
+
+// Construct union-level indexed group histories in one native pass. Each union
+// visits only its partners' changes, never a named R list of all movers.
+// [[Rcpp::export]]
+List union_group_history_cpp(DataFrame persons, DataFrame unions, IntegerVector group_indices,
+    IntegerMatrix pair_indices, bool pair, bool typed, int group_count) {
+  GroupHistory history(persons, group_indices);
+  NumericVector ids = persons["person_id"], wives = unions["wife_id"], husbands = unions["husband_id"];
+  CharacterVector types = typed ? as<CharacterVector>(unions["union_type"]) : CharacterVector();
+  std::map<double, int> index;
+  for (int i = 0; i < ids.size(); ++i) index[ids[i]] = i;
+  std::vector<int> rows, from, to;
+  std::vector<double> times;
+  for (int u = 0; u < unions.nrows(); ++u) {
+    if (u % 1024 == 0) checkUserInterrupt();
+    const int wife = index.at(wives[u]), husband = index.at(husbands[u]);
+    std::vector<double> changes;
+    history.append_times(wife, changes);
+    if (pair) history.append_times(husband, changes);
+    std::sort(changes.begin(), changes.end());
+    changes.erase(std::unique(changes.begin(), changes.end()), changes.end());
+    const int offset = typed && types[u] == "marriage" ? group_count : 0;
+    for (double time : changes) {
+      int before = history.at(wife, time, true), after = history.at(wife, time);
+      if (pair) {
+        before = pair_indices(before, history.at(husband, time, true));
+        after = pair_indices(after, history.at(husband, time));
+      }
+      rows.push_back(u); times.push_back(time);
+      from.push_back(before + offset); to.push_back(after + offset);
+    }
+  }
+  return List::create(_["row"] = wrap(rows), _["time"] = wrap(times),
+    _["from"] = wrap(from), _["to"] = wrap(to));
 }

@@ -29,6 +29,9 @@ public:
     if (!left && next != h.end() && next->time == time) ++next;
     return next == h.begin() ? h.front().from : std::prev(next)->to;
   }
+  void append_times(int row, std::vector<double>& times) const {
+    for (const auto& change : changes[row]) times.push_back(change.time);
+  }
   template<class F> void split(int row, double lo, double hi, F add) const {
     if (hi <= lo) return;
     const auto& h = changes[row];

@@ -306,3 +306,27 @@ test_that("dissolution observations retain unions whose partners never move", {
   expect_equal(out$dissolutions[out$group_pair == "B:B"], 1)
   expect_equal(sum(out$union_years), 3)
 })
+
+test_that("union observations combine simultaneous partner moves and typed numeric pairs", {
+  persons <- data.frame(person_id = c(4, 3, 2, 1), sex = c("m", "f", "m", "f"),
+    birth_time = -20, death_time = NA_real_, mother_id = NA_real_, father_id = NA_real_,
+    group = c(10L, 10L, 10L, 20L))
+  unions <- data.frame(union_id = c(2, 1), wife_id = c(3, 1), husband_id = c(4, 2),
+    start_time = 0, end_time = 4, end_reason = "dissolution", union_type = "marriage")
+  tx <- data.frame(person_id = c(1, 2), time = 2, group_origin = c(10L, 20L), group_dest = c(20L, 10L))
+  pop <- hammel_population(persons, unions, end_time = 5, transitions = tx)
+  out <- calculate_dissolution_rates(pop, c(0, 5), c(0, Inf), by_group = TRUE, by_union_type = TRUE)
+  expect_equal(subset(out, group_pair == "10:20" & union_type == "marriage")$union_years, 4)
+  expect_equal(subset(out, group_pair == "10:10" & union_type == "marriage")$union_years, 4)
+  expect_equal(sum(out$dissolutions), 2)
+  expect_equal(sum(out$union_years), 8)
+  expect_equal(sum(out$union_years[out$union_type == "cohab"]), 0)
+
+  # For conversion exposure only the woman's moves matter; his simultaneous
+  # move must not introduce a second boundary or change her duration origin.
+  pop$unions <- transform(pop$unions, union_type = "cohab")
+  conversion <- calculate_cohab_convert_rate(pop, c(0, 5), dur_breaks = c(0, Inf), by_group = TRUE)
+  expect_identical(conversion$group, c(10L, 20L))
+  expect_equal(conversion$union_years, c(6, 2))
+  expect_equal(sum(conversion$conversions), 0)
+})

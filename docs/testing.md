@@ -54,6 +54,19 @@ retains sparse-cell, initialization, fertility-transition and calibration limits
 
 ## Run the suite
 
+October 30 external-review follow-up: `prepare_union_group_observations()` now
+uses native indexed partner histories for both grouped dissolution and
+conversion. On synthetic data with 40,000 people, 20,000 unions and 8,000
+moves, the old adapter took 8.016 seconds and the new one 0.032 seconds,
+producing identical adapted union histories. Full grouped dissolution and
+conversion calls took 0.299 and 0.211 seconds, respectively, including
+validation. These are local development timings, not performance guarantees.
+The full offline `devtools::test()` suite passed without failures or warnings;
+the opt-in live database test was skipped. New regressions cover simultaneous
+partner moves, typed numeric group pairs, conversion exposure, and contextual
+errors for missing groups and overlapping union histories. No event-generation
+or RNG behavior changed.
+
 October 30 PR #7 coverage follow-up: added tests for invalid transition units,
 history references/life dates, unsupported processes, unknown/nonmoving identity
 lookups, legacy populations without transition components, and union exposure
@@ -919,3 +932,9 @@ Partner groups now refer to union formation; regression cases cover later
 and return moves, exact-time priority, numeric and character labels, repeated
 unions, empty histories, unknown endpoints and unchanged inputs. Existing
 simulation outputs can be reanalyzed using their retained transition tables.
+
+For baseline comparisons, an attached all-zero transition process is not
+fixed-seed equivalent to omitting the process: outgoing schedule draws and
+partner rescheduling can change RNG consumption without changing the model's
+zero-transition distribution. Sharing a seed across scenarios therefore does
+not guarantee identical paths; compare replicated demographic quantities.

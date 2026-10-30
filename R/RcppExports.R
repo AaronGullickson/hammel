@@ -45,6 +45,10 @@ union_start_groups_cpp <- function(persons, unions, group_indices) {
     .Call(`_hammel_union_start_groups_cpp`, persons, unions, group_indices)
 }
 
+union_group_history_cpp <- function(persons, unions, group_indices, pair_indices, pair, typed, group_count) {
+    .Call(`_hammel_union_group_history_cpp`, persons, unions, group_indices, pair_indices, pair, typed, group_count)
+}
+
 extract_kin_cpp <- function(persons, ego_ids, relative_ids, generations) {
     .Call(`_hammel_extract_kin_cpp`, persons, ego_ids, relative_ids, generations)
 }

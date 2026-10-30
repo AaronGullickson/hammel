@@ -40,6 +40,8 @@ calculate_transition_rates <- function(population, time_breaks, age_breaks = NUL
   if (!inherits(population, "hammel_population"))
     stop("`population` must be a grouped hammel_population.", call. = FALSE)
   validate_population(population)
+  if (!"group" %in% names(population$persons))
+    stop("`calculate_transition_rates()` requires a persons `group` column.", call. = FALSE)
   for (name in c("by_sex", "by_union_type")) {
     value <- get(name)
     if (!is.logical(value) || length(value) != 1L || !is.null(dim(value)) || is.na(value))

@@ -155,3 +155,15 @@ test_that("transition counters accept legacy grouped populations without history
   expect_error(calculate_transition_rates(pop$persons, c(0, 6), age_breaks = c(0, Inf)),
     "grouped hammel_population")
 })
+
+test_that("transition-rate errors identify the requested observation", {
+  pop <- transition_rate_population()
+  pop$persons$group <- NULL
+  pop$transitions <- NULL
+  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf)),
+    "calculate_transition_rates.*requires a persons.*group")
+  pop <- transition_rate_population()
+  pop$unions <- rbind(pop$unions, transform(pop$unions, union_id = 2, start_time = 2))
+  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by_union_type = TRUE),
+    "Transition-rate observation by union type requires nonoverlapping")
+})
