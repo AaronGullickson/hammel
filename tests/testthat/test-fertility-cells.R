@@ -336,3 +336,50 @@ test_that("unrealized births pool into observed parity bands and restore cohort 
                   4 * sqrt(c(.2, .3, .4) / adj$person_years)))
   expect_lt(adj$rate_fertility[2], adj$rate_fertility_adjusted[2])
 })
+
+test_that("unrealized births follow group and union-type strata and refuse parity splits", {
+  # A group-A woman, unpartnered, in spacing until 1.9; her son is group B.
+  people <- data.frame(person_id = 1:2, sex = c("f", "m"), birth_time = c(-30, -0.1),
+    death_time = NA_real_, mother_id = c(NA, 1), father_id = NA_real_, group = c("A", "B"))
+  rates <- data.frame(age_start = 15, age_end = 50, rate = c(.2, .5),
+                      union_type = c("partnered", "unpartnered"))
+  model <- hammel_model() |>
+    set_population(hammel_population(people, end_time = 0)) |>
+    set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
+    set_fertility(rates, birth_interval = 2) |>
+    set_union_formation("rate", rates = data.frame(age_start = 15, age_end = Inf, rate = 0),
+                        cancel_birth_if_no_match = FALSE)
+  pop <- simulate(model, 1, seed = 6)
+  r <- calculate_fertility_rates(pop, c(0, 1), c(15, 50), by_group = TRUE,
+                                 by_union_type = TRUE, unrealized = TRUE)
+  r <- r[r$age_start == 15, ]
+  cell <- r$group == "A" & r$union_type == "unpartnered"
+  expect_equal(r$unrealized_births[cell], .5)
+  expect_true(all(r$unrealized_births[!cell] == 0))
+  expect_equal(r$rate_fertility_adjusted[cell], .5)
+  # This schedule has no parity columns, so parity rows cannot be attributed.
+  p <- calculate_fertility_rates(pop, c(0, 1), c(15, 50), parity_breaks = c(0, 1),
+                                 unrealized = TRUE)
+  expect_true(all(is.na(p$unrealized_births[p$age_start == 15])))
+  expect_equal(p$unrealized_births[p$age_start == 50], c(0, 0))
+})
+
+test_that("a cut period makes only the overlapping parity rows unknown", {
+  # Actual parity 4 in a pooled [2,Inf) band; a break at .5 cuts the record.
+  people <- data.frame(person_id = 1:5, sex = c("f", rep("m", 4)),
+    birth_time = c(-20.5, -4, -3, -2, -0.1), death_time = NA_real_,
+    mother_id = c(NA, 1, 1, 1, 1), father_id = NA_real_)
+  rates <- data.frame(age_start = 15, age_end = Inf, parity_start = c(0, 2),
+                      parity_end = c(2, Inf), rate = c(.1, .4))
+  model <- hammel_model() |>
+    set_population(hammel_population(people, end_time = 0)) |>
+    set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
+    (\(m) quiet_unreachable(set_fertility(m, rates, birth_interval = 2)))() |>
+    set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
+  pop <- simulate(model, 1, seed = 7)
+  r <- calculate_fertility_rates(pop, c(0, .5, 1), c(15, Inf), parity_breaks = c(0, 2),
+                                 unrealized = TRUE)
+  r <- r[r$age_start == 15, ]
+  expect_true(all(is.na(r$unrealized_births[r$parity_start == 2])))
+  expect_equal(r$unrealized_births[r$parity_start == 0], c(0, 0))
+})

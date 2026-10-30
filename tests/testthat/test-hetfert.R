@@ -229,3 +229,16 @@ test_that("weight validation handles missing sex and logical NA placeholders cle
   p <- p[FALSE, ]
   expect_no_error(validate_fertility_weights(p))
 })
+
+test_that("daughters' weights follow the lognormal spread for cv above one", {
+  # alpha = 0: every daughter draws afresh in the engine, whose variance uses
+  # the large-cv form log1p(cv^2) = 2 log(cv) + log1p(1 / cv^2).
+  m <- het_model(2000, het_fert(2, 0), rate = .5, interval = 0, ffab = 1)
+  p <- simulate(m, 2, seed = 91)$persons
+  w <- p$hetfert[!is.na(p$mother_id)]
+  expect_gt(length(w), 1000)
+  expect_true(all(is.finite(w) & w > 0))
+  target <- sqrt(log1p(2^2))
+  expect_lt(abs(sd(log(w)) - target), 4 * target / sqrt(2 * length(w)))
+  expect_lt(abs(mean(log(w)) + target^2 / 2), 4 * target / sqrt(length(w)))
+})
