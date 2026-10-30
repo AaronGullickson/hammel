@@ -210,7 +210,7 @@ This can then be converted to a weight $W_d$ following the equation above. If re
 
 The correlation coefficient between mother's and daughter's weights is given by: 
 
-$$\r(W_m, W_d)=\frac{(1+c^2)^\alpha-1}{c^2}$$
+$$r(W_m, W_d)=\frac{(1+c^2)^\alpha-1}{c^2}$$
 
 Because we need access to this score across restarts, we record each women's score in a `hetfert` column.
 
