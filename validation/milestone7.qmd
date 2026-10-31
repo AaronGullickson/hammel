@@ -81,6 +81,102 @@ Assess whether the current simulation successfully handles time varying rate sch
 
 ## Inputs and Simulation Design
 
+We will reproduce the demographic transition in Sweden! It has HMD and HFD data that go far enough back.
+
+```{r}
+fertility_rates_sweden <- get_fertility_hfd("SWE", 1891:2020)
+mortality_rates_sweden <- get_mortality_hmd("SWE", 1800:2020, open_age = 95)
+```
+
+We only have fertility back to 1891, but we were along in terms of mortality decline then. So lets just take the 1891 fertility rates back to a year where we get a roughly stationary population. Then we will take use those rates for a 100 years to produce a stable population for the actual starting population of the simulation. Then run it forward.
+
+Codex thinks 1810 would be a good starting year for mortality. Don't know if I need to go back that far. I can create a get_growth_rate() function that uses the log(NRR)/(mu) approximation to estimate growth rates for candidates quickly
+
+```{r}
+
+get_growth_rate <- function(fert_rates, mort_rates) {
+
+  NRR <- mort_rates |> calculate_life_table() |>
+    filter(sex == "f") |>
+    select(age_start, Lx) |>
+    right_join(fert_rates, by = c("age_start")) |>
+    mutate(prod = Lx * rate) |>
+    pull(prod) |>
+    sum() * 0.4886
+  mu <- sum((fert_rates$age_start + 0.5) * fert_rates$rate) / sum(fert_rates$rate)
+
+  log(NRR)/mu
+
+}
+
+
+fert_rates <- fertility_rates_sweden |> filter(time_start == 1891)
+get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1811))
+get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1810))
+get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1812))
+get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1813))
+get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1838))
+```
+
+It looks like 1811 is the winner.
+
+```{r}
+
+fert_rates <- fertility_rates_sweden |> filter(time_start == 1891) |>
+  select(-starts_with("time_"))
+mort_rates <- mortality_rates_sweden |> filter(time_start == 1811) |>
+  select(-starts_with("time_"))
+
+pop <- create_baseline_population(50000, 70, 1811 - 100)
+model <- hammel_model() |>
+  set_population(pop) |>
+  set_fertility(fert_rates) |>
+  set_mortality(mort_rates) |>
+  set_union_formation("on_demand")
+pop_start <- simulate(model, 100, 1)
+```
+
+```{r}
+mort_rates_time <- mortality_rates_sweden |> filter(time_start >= 1770)
+fert_rates_time <- fertility_rates_sweden |> 
+  mutate(time_start = if_else(time_start == 1891, 1770, time_start))
+
+model <- hammel_model() |>
+  set_population(pop_start) |>
+  set_fertility(fert_rates_time) |>
+  set_mortality(mort_rates_time) |>
+  set_union_formation("on_demand")
+pop_final <- simulate(model, 2020 - 1811, 1)
+
+```
+
+```{r}
+pop_final |> calculate_population_size(1770:2020) |>
+  ggplot(aes(x = time, y = population))+
+  geom_line()
+
+```
+
+```{r}
+# get crude rates
+cbr_f <- calculate_fertility_rates(pop_final, 1770:2020, c(0, Inf)) |> 
+  mutate(rate_fertility = rate_fertility * 0.4886) |>
+  select(time_start, rate_fertility)
+cmr_f <- calculate_mortality_rates(pop_final, 1770:2020, c(0, Inf)) |> 
+  filter(sex == "f") |>
+  select(time_start, rate_mortality)
+full_join(cbr_f, cmr_f) |>
+  pivot_longer(cols = starts_with("rate_"), names_prefix = "rate_",
+               names_to = "type", values_to = "crude_rate") |>
+  ggplot(aes(x = time_start, y = crude_rate, color = type))+
+  geom_line()
+
+```
+
+
+
+
+
 ## Time Tests
 
 @tbl-processing-time shows the average processing time per simulation for different scenarios.
