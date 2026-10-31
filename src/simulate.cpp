@@ -1703,13 +1703,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   // stay in this single engine invocation across every rate change.
   const DataFrame all_mortality = mortality_rates, all_fertility = fertility_rates,
     all_search = union_rates, all_dissolution = dissolution_rates,
-    all_conversion = conversion_rates;
+    all_conversion = conversion_rates, all_probability = cohab_prob;
   const DataFrame all_transitions = transition_input.isNotNull() ?
     DataFrame(transition_input.get()) : DataFrame::create();
   DataFrame active_transitions = calendar_slice(all_transitions, start);
   std::set<double> calendar_boundaries;
   for (const DataFrame& table : {all_mortality, all_fertility, all_search,
-      all_dissolution, all_conversion, all_transitions}) {
+      all_dissolution, all_conversion, all_transitions, all_probability}) {
     if (!table.containsElementNamed("time_start")) continue;
     for (const char* column : {"time_start", "time_end"}) {
       NumericVector times = table[column];
@@ -1722,6 +1722,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   union_rates = calendar_slice(all_search, start);
   dissolution_rates = calendar_slice(all_dissolution, start);
   conversion_rates = calendar_slice(all_conversion, start);
+  cohab_prob = calendar_slice(all_probability, start);
   const List heterogeneity = hetfert.isNotNull() ? List(hetfert.get()) : List::create();
   const bool heterogeneous = heterogeneity.size() > 0;
   const double fertility_cv = heterogeneous ? as<double>(heterogeneity["cv"]) : 0;
@@ -1826,12 +1827,15 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::vector<const std::vector<Band>*> search_hazards;
   std::vector<bool> search_duration;
   std::vector<std::vector<Band>> probability_schedules(group_count * 3);
-  if (cohab_enabled) {
-    const bool previous_prob = cohab_prob.containsElementNamed("previous_union");
-    const std::array<std::string, 3> labels = {"none", "dissolved", "widowed"};
-    for (int g = 0; g < group_count; ++g) for (int p = 0; p < 3; ++p)
-      probability_schedules[g * 3 + p] = read_bands(cohab_prob, "", "", g, previous_prob ? labels[p] : "");
-  }
+  auto load_probabilities = [&]() {
+    if (cohab_enabled) {
+      const bool previous_prob = cohab_prob.containsElementNamed("previous_union");
+      const std::array<std::string, 3> labels = {"none", "dissolved", "widowed"};
+      for (int g = 0; g < group_count; ++g) for (int p = 0; p < 3; ++p)
+        probability_schedules[g * 3 + p] = read_bands(cohab_prob, "", "", g, previous_prob ? labels[p] : "");
+    }
+  };
+  load_probabilities();
   // Pool updates are constant-time (swap removal within a cell).
   auto remove_male = [&](int man) {
     if (!pool.contains(man)) return; // Partnered men are already absent when they die.
@@ -2269,6 +2273,21 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         checkUserInterrupt();
         for (int w = 0; w < static_cast<int>(counted_woman.size()); ++w)
           remove_counted_woman(w);
+        cohab_prob = calendar_slice(all_probability, now);
+        load_probabilities();
+        const bool rate_change = calendar_changes_at(all_mortality, now) ||
+          calendar_changes_at(all_fertility, now) || calendar_changes_at(all_search, now) ||
+          calendar_changes_at(all_dissolution, now) || calendar_changes_at(all_conversion, now) ||
+          calendar_changes_at(all_transitions, now);
+        if (!rate_change) {
+          // A type-probability change redistributes search calibration only.
+          // Keep every pending event date and consume no new random thresholds.
+          for (int w = 0; w < static_cast<int>(people.size()); ++w) {
+            if (w % 1024 == 0) checkUserInterrupt();
+            add_counted_woman(w, now);
+          }
+          continue;
+        }
         const bool fertility_change = calendar_changes_at(all_fertility, now);
         if (fertility_change) {
           cells->finish(now);

@@ -29,8 +29,10 @@ The user approved calendar input semantics and authorized the six annual-rate
 inputs first (D118). Rates now accept flat `time_start`/`time_end` bands;
 [the contract](time-varying-rates.md) records coverage, fractional years,
 boundary precedence, resampling, histories and observations. Matching and
-inheritance schedules are deferred to a second step; other arguments remain
-static. D119 adds multi-year HMD/HFD getters and native HMD shape selection;
+inheritance schedules are deferred to a second step. D122 adds calendar bands
+to the flat `cohab_prob` table, with current probabilities selected at searches
+and matching-calibration updates that preserve event clocks at probability-only
+boundaries. Other arguments remain static. D119 adds multi-year HMD/HFD getters and native HMD shape selection;
 D120 adds optional `open_age` pooling from native deaths/exposure products;
 see [database preparation](database-rates.md). The user deferred stationary-year
 and historical-run setup to fix the getter first. This is implementation status,

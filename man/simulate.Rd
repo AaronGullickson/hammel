@@ -106,7 +106,9 @@ initialize from recorded identities. No additional random draws are made.
 Calendar-banded rates change within the same run at \code{time_start}/\code{time_end}
 boundaries, before same-time demographic events. Histories, birth spacing and
 duration origins persist. Pending candidates are resampled at boundaries;
-adding redundant boundaries need not preserve a fixed-seed trajectory.
+adding redundant rate boundaries need not preserve a fixed-seed trajectory.
+Calendar-banded \code{cohab_prob} is evaluated at the search instant; probability-
+only boundaries refresh role calibration while retaining pending event dates.
 }
 \examples{
 population <- create_baseline_population(100, max_age = 50)

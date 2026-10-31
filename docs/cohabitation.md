@@ -13,6 +13,58 @@ optionally `group` and `previous_union`; probabilities are finite in [0,1].
 Bands cannot overlap within strata. Gaps and uncovered ages have probability
 zero. Group coverage and all-three previous categories follow search schedules.
 
+### Calendar-varying type probabilities (D122)
+
+The user authorized `cohab_prob` to use the same flat calendar-band format as
+rate inputs. Optional numeric `time_start` and `time_end` are supplied together,
+in absolute years, including fractional years. Intervals are half-open, with
+finite starts and greater ends (possibly Inf), and no interpolation. Values
+remain probabilities in [0,1], not annual hazards. Without calendar columns,
+the existing static behavior applies.
+
+Every active calendar slice must satisfy the existing age/group/previous-union
+rules. Overlapping probabilities for the same stratum and age are errors.
+Calendar coverage is required across the requested run, including a valid
+starting slice for zero-year runs. Gaps within the age schedule still select
+marriage. Missing calendar periods are not interpreted as probability zero;
+use an explicit zero-probability interval when intended.
+
+At a search attempt, the woman's current age, group, previous category and
+calendar time select the probability. A change is effective before an attempt
+at exactly the same instant. It does not relabel existing episodes or trigger
+conversion, matching or a type draw on its own. Typed cohabitation mode stays
+enabled throughout a configured table's coverage, even during probability-zero
+periods. Other cohabitation and history rules are unchanged.
+
+At a probability-only calendar boundary, refresh marriage/cohabitation
+calibration contributions to lambda*(1-p) and lambda*p. Preserve pending person,
+union and fertility clocks: changing intended type probabilities does not change
+the total search hazard. This bookkeeping consumes no random draws. At a shared
+rate/probability boundary, apply both active slices before the existing rate
+rescheduling. Future actual events may consume different random draws when type
+outcomes differ; no general fixed-seed agreement is implied.
+
+Worked examples (illustrative probabilities, not demographic defaults):
+
+- Probability zero in `[2000,2005.5)` and one in `[2005.5,Inf)` produces direct
+  marriages for successful searches before 2005.5 and cohabitations afterward,
+  including at 2005.5. Existing marriages stay marriages.
+- A woman has a pending search at 2006 when probability changes in 2005.5.
+  That search stays at 2006 and uses the new probability. There is no additional
+  search at the change date.
+- Search hazard 0.2 and probability 0.25 give intended marriage/cohabitation
+  intensities 0.15 and 0.05 per unpartnered woman-year. Changing probability to
+  0.75 reverses those components without changing their sum of 0.2. Realized
+  formations still depend on matching success.
+
+Validate construction and edited specifications, malformed and overlapping
+intervals, calendar/group/category coverage, fractional boundaries, exact
+search ties, zero-year and empty runs, age gaps, current group/previous category,
+preserved existing episodes and clocks, type probabilities and search recovery,
+calibration refresh with distinct group probabilities, asynchronous rate changes,
+seed isolation, and unchanged static controls. Ordinary checks use synthetic
+inputs and `devtools::test()` without live downloads.
+
 The overall search hazard still schedules attempts. At the attempt time, draw
 intended type before matching using current age/group/previous category.
 Matching uses the general model for marriage and `cohab_matching` for cohabitation

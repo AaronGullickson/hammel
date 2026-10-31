@@ -440,11 +440,18 @@ ages and matching cohort bins. Cohabitation is implemented under D086; richer co
 ### Optional cohabitation (D085/D086)
 
 Rate formation accepts cohab_prob age/group/previous-category probabilities,
-with gaps zero. At each attempt, intended type is drawn before matching;
+with age gaps zero. Optional `time_start`/`time_end` select half-open calendar
+bands under D122, with coverage/overlap validation as for rates. At each attempt,
+the current calendar/age/group/previous-category probability selects intended
+type before matching;
 cohab_matching optionally overrides general preferences. Unpartnered father
 matching remains separate. Calibration uses lambda*p for cohabitation,
 lambda*(1-p) for direct marriage, and fertility intensity for fathers.
-Probability boundaries update the common contribution queue. NULL probability
+Probability age boundaries update the common contribution queue. Calendar
+probability changes refresh role contributions before same-time searches;
+probability-only changes retain all pending event dates and existing union types.
+See [the probability contract](cohabitation.md#calendar-varying-type-probabilities-d122).
+NULL probability
 keeps the untyped/no-extra-RNG path; on-demand rejects cohabitation inputs.
 
 Fertility input uses union_type: either unpartnered/partnered or

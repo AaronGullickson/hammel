@@ -1,7 +1,8 @@
-# Calendar-varying rates
+# Calendar-varying rates and cohabitation probabilities
 
 Milestone 7 rate specification, October 30, 2026. The user approved these
-semantics and authorized rate implementation. Matching, inheritance and other
+semantics and authorized rate implementation. D122 (October 31) adds flat
+calendar-banded cohabitation probabilities. Matching, inheritance and other
 arguments remain static in this step. Milestone 7 scientific acceptance remains
 separate from implementation and software verification.
 
@@ -36,9 +37,18 @@ Input tables and source attributes are retained; group multipliers remain static
 The static-only parity reachability warning is not applied to calendar-varying
 fertility, because earlier rate periods can produce different parity histories.
 
-The probability table `cohab_prob` is not an annual rate and remains static.
+`cohab_prob` accepts the same optional calendar columns under D122, while
+remaining a probability table with `prob` in [0,1]. All active age/group/previous-
+union strata must be valid; calendar coverage is required and age gaps mean
+probability zero. At a search, select type using the current probability.
+Probability changes refresh marriage/cohabitation calibration without changing
+the total search hazard or existing union types. Probability-only boundaries
+retain pending event dates and consume no random draws. A shared rate boundary
+keeps the existing rate rescheduling, with both changes effective first.
+See [the cohabitation contract](cohabitation.md#calendar-varying-type-probabilities-d122).
+
 Matching, inheritance, `group_prop_hazard`, birth spacing, `ffab`, `hetfert`,
-and previous-union classification settings also remain static.
+and previous-union classification settings remain static.
 
 The database getters can prepare these calendars directly from year vectors;
 see [HMD/HFD preparation](database-rates.md) (D119). Single-year requests remain

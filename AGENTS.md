@@ -86,7 +86,9 @@ the user's agreement.
   were accepted October 30, 2026 (D116). Milestone 7 calendar-varying rates are
   implemented under the user-approved D118 contract in
   `docs/time-varying-rates.md`; scientific assessment remains pending. Matching
-  and inheritance schedules are deferred to a second step; other arguments
+  and inheritance schedules are deferred to a second step. D122 adds calendar
+  bands to `cohab_prob`; probability-only changes update type selection and
+  matching calibration while preserving pending event dates. Other arguments
   remain static. Finish milestone 7 with the current engine. D121 assigns
   binned-group hazards and custom formula weights across rate processes to
   milestone 8; see `docs/binned-group-hazards.md`. This direction is not

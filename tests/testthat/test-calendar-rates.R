@@ -218,12 +218,12 @@ test_that("grouped schedules require future group and pair coverage", {
   expect_error(simulate(set_union_dissolution(m, d), 1), "missing schedules.*A:B")
 })
 
-test_that("non-rate arguments stay static and empty populations cross changes", {
+test_that("probability calendar columns are accepted and empty populations cross changes", {
   m <- make_rate_model()
   prob <- data.frame(age_start = 0, age_end = Inf, prob = .5,
     time_start = 0, time_end = Inf)
-  expect_error(set_union_formation(m, "rate", rates = m$processes$union_formation$rates,
-    cohab_prob = prob), "remains static")
+  expect_s3_class(set_union_formation(m, "rate", rates = m$processes$union_formation$rates,
+    cohab_prob = prob), "hammel_model")
   m <- make_model(0)
   m <- set_mortality(m, calendar_epochs(m$processes$mortality$rates, c(.2, .3)))
   expect_equal(nrow(simulate(m, 1.3, seed = 1)$persons), 0)

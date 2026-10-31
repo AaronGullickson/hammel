@@ -3,8 +3,8 @@
 Updated October 30, 2026. This document describes implemented inputs through
 accepted milestone 6, extended by milestone 7 calendar bands under D118.
 All six annual-rate tables now optionally take `time_start`/`time_end`; see
-[calendar-varying rates](time-varying-rates.md). Matching, inheritance and
-non-rate arguments remain static in this step.
+[calendar-varying rates](time-varying-rates.md). Matching and inheritance models
+remain static. `cohab_prob` also accepts calendar bands under D122.
 
 ## Rates, bands and strata
 
@@ -131,7 +131,10 @@ See [group transitions](group-transitions.md).
 | `cohab_prob` on union formation | Woman's age only | Woman's `group`; `previous_union` | Probability that a search attempt seeks cohabitation rather than marriage |
 
 This table uses `prob` in `[0, 1]`, not an annual rate. It requires rate-based
-union formation. Bands cannot overlap; gaps have probability zero. If previous
+union formation. Bands cannot overlap within active strata; age gaps have
+probability zero. Optional calendar bands follow the rate-table coverage rules
+(D122), and select probability at search execution without relabeling existing
+unions or changing the overall search hazard. If previous
 categories are supplied, all three are required within each group. Type is
 drawn before matching. The overall search intensity is split into intended
 cohabitation and marriage searches by this probability.

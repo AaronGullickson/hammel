@@ -197,7 +197,10 @@ spacing and duration origins. See [the rate contract](time-varying-rates.md).
 
 The user selected annual rates first. Matching and inheritance model schedules
 are deferred to the second step, along with their interface implementation.
-Non-rate arguments, including `cohab_prob` and multipliers, remain static.
+D122 also implements flat calendar-banded `cohab_prob`, using the same interval
+and coverage rules as rates. Probability-only boundaries update type-selection
+and calibration without changing pending event dates. Other non-rate arguments,
+including multipliers, remain static.
 The representation and execution-time model selection below were approved in
 D118, but model-schedule constructors and public arguments remain to be designed.
 Flat rate representation and timing are specified by the implemented D118 contract.

@@ -1,14 +1,14 @@
 # Testing and milestone validation
 
-Updated October 30, 2026. Milestones 1–6 are accepted as complete (D029,
+Updated October 31, 2026. Milestones 1–6 are accepted as complete (D029,
 D050, D077, D093, D105, D116). Software test history and the user's demographic assessment
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
-## Milestone 7 rate implementation checks
+## Milestone 7 rate and probability implementation checks
 
-October 30, 2026 (D118–D120): the full offline `devtools::test(stop_on_failure = TRUE)`
-suite passed with 3,964 assertions, no failures or warnings, and one opt-in live
+October 31, 2026 (D118–D120, D122): the full offline `devtools::test(stop_on_failure = TRUE)`
+suite passed with 4,024 assertions, no failures or warnings, and one opt-in live
 DB test skipped. The run used `TZ=America/Los_Angeles` so optional database-reader
 dependencies did not need to query the unavailable sandbox system bus for a time
 zone. No rates were downloaded and no credentials were used.
@@ -42,11 +42,24 @@ provenance and analytical survival using a pooled schedule. The default getter
 still rejects missing rates, now with year/sex/age context. The pooled web path
 was checked with mocked readers; no new live pooling downloads were made.
 
+D122 adds 60 assertions in ten calendar-probability cases: valid/edited/future
+probability slices; age/calendar overlap and coverage; group/category coverage;
+fractional type switches; non-extreme type shares; unchanged aggregate search
+hazards; exact tied searches; retained ongoing episodes and conversion/dissolution
+clocks; current age/previous-category selection; zero/empty runs, restarts and
+RNG isolation; and shared/asynchronous rate/probability boundaries. A grouped
+matching regression changes probabilities before the first realized search and
+compares subsequent unions and logged role weights with the equivalent static
+new-probability reference, checking immediate calibration refresh. Existing
+static cohabitation tests also pass. No rate inputs were downloaded.
+
 This is software verification, not scientific acceptance of milestone 7 or a
 new demographic validation report. Calendar boundaries redraw person/union
 candidates and require work proportional to the population; redundant boundaries
-do not promise fixed-seed agreement with static inputs. Matching, inheritance
-and other non-rate arguments remain static. See
+do not promise fixed-seed agreement with static inputs. Probability-only
+boundaries retain all pending clocks and consume no randomness. Matching,
+inheritance and other non-rate arguments remain static; `cohab_prob` is the
+explicit D122 probability-calendar extension. See
 [the rate contract](time-varying-rates.md).
 
 ## Milestone 6 accepted assessment and active final render

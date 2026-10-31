@@ -108,8 +108,11 @@ Matching utilities and input rate tables are unchanged.}
 
 \item{cohab_prob}{Optional age-specific probability table with \code{age_start},
 \code{age_end}, \code{prob}, optionally \code{group} and \code{previous_union}. Enables typed
-unions only in rate mode. Probability gaps mean zero. Type is drawn before
-matching; NULL retains untyped partnerships and their RNG path.}
+unions only in rate mode. Age gaps mean zero. Optional \code{time_start} and
+\code{time_end} supply half-open calendar intervals; each active slice must satisfy
+the same age/group/previous-category rules and cover the run. Type uses the
+active probability at the search instant, before matching. Existing unions
+keep their types. NULL retains untyped partnerships and their RNG path.}
 
 \item{cohab_matching}{Optional cohabitation matching model; NULL shares
 \code{matching}. Marriage, cohabitation and unpartnered father searches calibrate
@@ -190,6 +193,9 @@ Search \code{rates} and \code{union_convert_rate} optionally accept \code{time_s
 years. Both columns are required together, with finite starts and greater
 ends (possibly Inf). Every active slice must satisfy its existing rate rules
 and cover the requested run. Clock choices stay consistent across periods;
-changes precede same-time events and retain duration origins. \code{cohab_prob},
-matching models and all other arguments remain static.
+changes precede same-time events and retain duration origins. \code{cohab_prob}
+accepts the same calendar columns, with probabilities selected at the search
+instant. Probability-only changes refresh matching calibration without
+resampling pending event clocks. Matching models and other arguments remain
+static.
 }

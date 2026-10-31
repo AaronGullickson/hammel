@@ -13,7 +13,6 @@ validate_cohabitation <- function(process) {
     if (!identical(process$initiation, "rate"))
       stop("Cohabitation is available only with rate-based initiation.", call. = FALSE)
     x <- process$cohab_prob
-    if (has_calendar_rates(x)) stop("cohab_prob remains static; calendar schedules currently apply to rates only.", call. = FALSE)
     check_columns(x, c("age_start", "age_end", "prob"), "cohab_prob")
     check_numeric_column(x$prob, "cohab_prob$prob")
     if (any(x$prob < 0 | x$prob > 1) ||

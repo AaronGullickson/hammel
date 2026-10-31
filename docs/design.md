@@ -405,7 +405,11 @@ without consuming random draws. Diagnostics default off; see the
 ## Typed partnerships (D086)
 
 Optional cohab_prob on union formation enables cohab/marriage histories in rate
-mode. Cohab matching and conversion are part of that process; dissolution
+mode. `cohab_prob` optionally includes flat half-open calendar bands (D122);
+active probability schedules update before same-time searches. Probability-only
+changes rebuild marriage/cohabitation intensity contributions without resampling
+pending events, while rate changes retain D118 rescheduling. Cohab matching and
+conversion are part of that process; dissolution
 optionally stratifies by type. See [cohabitation](cohabitation.md) for complete
 inputs, chronology, linked episodes, legal-history recovery and observations.
 Fertility input strata are now union_type (the old input union_status errors).

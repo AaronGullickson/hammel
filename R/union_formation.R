@@ -379,8 +379,11 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' years. Both columns are required together, with finite starts and greater
 #' ends (possibly Inf). Every active slice must satisfy its existing rate rules
 #' and cover the requested run. Clock choices stay consistent across periods;
-#' changes precede same-time events and retain duration origins. `cohab_prob`,
-#' matching models and all other arguments remain static.
+#' changes precede same-time events and retain duration origins. `cohab_prob`
+#' accepts the same calendar columns, with probabilities selected at the search
+#' instant. Probability-only changes refresh matching calibration without
+#' resampling pending event clocks. Matching models and other arguments remain
+#' static.
 #'
 #' @param rates For `"rate"` initiation, an age-specific female search-hazard
 #'   table with `age_start`, `age_end`, and `rate`, in years and per person-year.
@@ -414,8 +417,11 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   Matching utilities and input rate tables are unchanged.
 #' @param cohab_prob Optional age-specific probability table with `age_start`,
 #'   `age_end`, `prob`, optionally `group` and `previous_union`. Enables typed
-#'   unions only in rate mode. Probability gaps mean zero. Type is drawn before
-#'   matching; NULL retains untyped partnerships and their RNG path.
+#'   unions only in rate mode. Age gaps mean zero. Optional `time_start` and
+#'   `time_end` supply half-open calendar intervals; each active slice must satisfy
+#'   the same age/group/previous-category rules and cover the run. Type uses the
+#'   active probability at the search instant, before matching. Existing unions
+#'   keep their types. NULL retains untyped partnerships and their RNG path.
 #' @param cohab_matching Optional cohabitation matching model; NULL shares
 #'   `matching`. Marriage, cohabitation and unpartnered father searches calibrate
 #'   weights using their own intensities and share the available male pool.

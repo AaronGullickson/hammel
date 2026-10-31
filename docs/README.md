@@ -6,8 +6,8 @@ cell-accounted birth spacing and persistent lognormal fertility weights.
 Current behavior uses continuous event times with no monthly grid. Acceptance
 is based on the user-authored validation reports and retains their limitations.
 **Milestone 6 is accepted complete** (D116); its final report render is active.
-**Milestone 7: calendar-varying rates are implemented under D118; scientific
-assessment remains pending.** Matching and inheritance schedules are deferred.
+**Milestone 7: calendar-varying rates (D118) and cohabitation probabilities
+(D122) are implemented; scientific assessment remains pending.** Matching and inheritance schedules are deferred.
 See the [rate contract](time-varying-rates.md) and
 [group-transition contract](group-transitions.md). Household moves are deferred to
 tentative milestone 10's multiple-group/regions applications (D114/D121).

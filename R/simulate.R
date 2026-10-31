@@ -82,7 +82,9 @@
 #' Calendar-banded rates change within the same run at `time_start`/`time_end`
 #' boundaries, before same-time demographic events. Histories, birth spacing and
 #' duration origins persist. Pending candidates are resampled at boundaries;
-#' adding redundant boundaries need not preserve a fixed-seed trajectory.
+#' adding redundant rate boundaries need not preserve a fixed-seed trajectory.
+#' Calendar-banded `cohab_prob` is evaluated at the search instant; probability-
+#' only boundaries refresh role calibration while retaining pending event dates.
 #'
 #' @param model A `hammel_model` containing a population, mortality, fertility,
 #'   and union-formation processes, optionally union dissolution and group transitions. The population
@@ -166,7 +168,8 @@ simulate <- function(model, years, seed = NULL) {
   attach_process(model, union_process)
   calendar_inputs <- list(mortality = death_rates, fertility = birth_rates,
     search = union_process$rates, dissolution = dissolution_process$rates,
-    conversion = union_process$union_convert_rate, transition = transition_process$rates)
+    conversion = union_process$union_convert_rate, transition = transition_process$rates,
+    cohabitation_probability = union_process$cohab_prob)
   for (name in names(calendar_inputs))
     check_calendar_coverage(calendar_inputs[[name]], start, start + years, name)
   cohab_enabled <- !is.null(union_process$cohab_prob)

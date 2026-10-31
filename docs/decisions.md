@@ -63,6 +63,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Multi-year HMD/HFD preparation and native HMD shapes | D119 |
 | Optional HMD open-age pooling from deaths and exposure | D120 |
 | Milestone 8 binned-group hazards/formula weights and milestones 9–12 revision | D121 |
+| Calendar-varying flat cohabitation probabilities | D122 |
 
 ## Recorded decisions
 
@@ -2526,3 +2527,30 @@ membership, regional matching restrictions and linked-move semantics remain
 unselected. D117's two-sex priority moves from milestone 11 to 12; its scientific
 model remains unselected. No existing validation report, result or acceptance
 status is changed by this reordering.
+
+
+## D122 — Calendar-varying cohabitation probabilities (October 31, 2026)
+
+**Status:** user-approved semantics and explicit implementation authorization.
+
+The user selected `cohab_prob` to work like flat rate tables, rather than whole-
+model schedules. Optional `time_start`/`time_end` supply half-open absolute-year
+intervals, including fractional years. Retain age/group/previous-union strata,
+probabilities in [0,1], static-table compatibility and age-gap probability zero.
+Validate every active slice, reject overlapping risks and require calendar
+coverage during execution. The active probability at search execution selects
+intended type before matching, with changes preceding exact same-time searches.
+
+Refresh marriage/cohabitation calibration contributions as lambda*(1-p) and
+lambda*p. Probability-only boundaries preserve pending person/union/fertility
+clocks and consume no randomness; a probability change does not change the
+overall search hazard. Shared rate boundaries apply both changes before D118's
+existing rescheduling. Existing unions keep their type; histories, ancestry,
+spacing, parity, duration origins and prior-union classification remain unchanged.
+The configured table retains typed mode even during probability-zero intervals.
+
+This extends D118's original rate-only scope. Matching and inheritance model
+schedules remain future milestone 7 work, with APIs still unselected; no
+milestone 8 engine change is introduced. See [cohabitation](cohabitation.md#calendar-varying-type-probabilities-d122)
+for worked examples and validation. Implementation checks are distinct from
+milestone 7 scientific acceptance.

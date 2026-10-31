@@ -6,8 +6,9 @@ on October 15, 2026 (D029), milestone 2 (union formation) on October 19,
 (dissolution/remarriage/cohabitation) on October 29, 2026 (D093). Milestone 5
 (parity-specific fertility, cell-accounted spacing and fertility heterogeneity)
 was accepted October 29, 2026 (D105). The user accepted individual group transitions, milestone 6, on October 30,
-2026 (D116). Milestone 7 calendar-varying rates are implemented under D118;
-scientific assessment and model schedules remain pending.
+2026 (D116). Milestone 7 calendar-varying rates (D118) and cohabitation
+probabilities (D122) are implemented; scientific assessment and model schedules
+remain pending.
 See [testing](testing.md) for evidence and limits.
 
 ## Purpose
