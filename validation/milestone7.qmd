@@ -127,7 +127,7 @@ fert_rates <- fertility_rates_sweden |> filter(time_start == 1891) |>
 mort_rates <- mortality_rates_sweden |> filter(time_start == 1811) |>
   select(-starts_with("time_"))
 
-pop <- create_baseline_population(50000, 70, 1770 - 100)
+pop <- create_baseline_population(50000, 70, 1780 - 100)
 model <- hammel_model() |>
   set_population(pop) |>
   set_fertility(fert_rates) |>
@@ -137,21 +137,25 @@ pop_start <- simulate(model, 100, 1)
 ```
 
 ```{r}
-mort_rates_time <- mortality_rates_sweden |> filter(time_start >= 1770)
-fert_rates_time <- fertility_rates_sweden |> 
-  mutate(time_start = if_else(time_start == 1891, 1770, time_start))
+mort_rates_time <- mortality_rates_sweden |> filter(time_start >= 1780)
+fert_rates_time <- bind_rows(
+  fertility_rates_sweden |>
+    filter(time_start == 1891) |>
+    mutate(time_start = 1780, time_end = 1891),
+  fertility_rates_sweden
+)
 
 model <- hammel_model() |>
   set_population(pop_start) |>
   set_fertility(fert_rates_time) |>
   set_mortality(mort_rates_time) |>
   set_union_formation("on_demand")
-pop_final <- simulate(model, 2020 - 1770, 1)
+system.time(pop_final <- simulate(model, 2020 - 1780, 1))
 
 ```
 
 ```{r}
-pop_final |> calculate_population_size(1770:2020) |>
+pop_final |> calculate_population_size(1780:2020) |>
   ggplot(aes(x = time, y = population))+
   geom_line()
 
@@ -159,14 +163,13 @@ pop_final |> calculate_population_size(1770:2020) |>
 
 ```{r}
 # get crude rates
-cbr_f <- calculate_fertility_rates(pop_final, 1770:2020, c(0, Inf)) |> 
+cbr_f <- calculate_fertility_rates(pop_final, 1780:2020, c(0, Inf)) |> 
   mutate(rate_fertility = rate_fertility * 0.4886) |>
   select(time_start, rate_fertility)
-cmr_f <- calculate_mortality_rates(pop_final, 1770:2020, c(0, Inf)) |> 
+cmr_f <- calculate_mortality_rates(pop_final, 1780:2020, c(0, Inf)) |> 
   filter(sex == "f") |>
   select(time_start, rate_mortality)
 full_join(cbr_f, cmr_f) |>
-  filter(time_start > 1779) |>
   pivot_longer(cols = starts_with("rate_"), names_prefix = "rate_",
                names_to = "type", values_to = "crude_rate") |>
   ggplot(aes(x = time_start, y = crude_rate, color = type))+
@@ -174,9 +177,51 @@ full_join(cbr_f, cmr_f) |>
 
 ```
 
+```{r}
+births <- pop_final$persons |>
+  mutate(year = floor(birth_time)) |>
+  count(year, name = "births")
+deaths <- pop_final$persons |>
+  mutate(year = floor(death_time)) |>
+  count(year, name = "deaths")
+crude_rates <- calculate_population_size(pop_final, 1780:2019 + 0.5) |>
+  mutate(year = floor(time)) |>
+  left_join(births, by = "year") |>
+  left_join(deaths, by = "year") |>
+  mutate(rate_birth = births / population, rate_death = deaths / population) |>
+  pivot_longer(cols = starts_with("rate_"), names_prefix = "rate_",
+               names_to = "type", values_to = "crude_rate") 
+
+crude_rates |>
+  ggplot(aes(x = time, y = crude_rate, color = type))+
+  geom_line()
+```
 
 
 
+```{r}
+
+input_tfr <- fert_rates_time |> calculate_tfr()
+
+calculate_fertility_rates(pop_final, 1780:2020, 12:55) |> 
+  calculate_tfr() |>
+  ggplot(aes(x = time_start, y = tfr))+
+  geom_line()+
+  geom_line(data = input_tfr, linetype = 2, color = 'red')
+```
+
+```{r}
+input_lifeexp <- mort_rates_time |> calculate_life_table() |>
+  filter(age_start == 0)
+
+calculate_mortality_rates(pop_final, 1780:2020, 0:85) |>
+  calculate_life_table() |>
+  filter(age_start == 0) |>
+  ggplot(aes(x = time_start, y = ex))+
+  geom_line()+
+  geom_line(data = input_lifeexp, linetype = 2, color = 'red')+
+  facet_wrap(~sex)
+```
 
 ## Time Tests
 
