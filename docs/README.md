@@ -20,6 +20,7 @@ the regions milestone (D114); milestone 7 is time-varying inputs (D103).
 | [Design](design.md) | Implemented architecture, API, and source locations |
 | [Scientific contract](scientific-contract.md) | Current demographic assumptions and event rules |
 | [Calendar-varying rates](time-varying-rates.md) | Calendar bands, coverage, boundary timing and retained histories (D118) |
+| [Database rate preparation](database-rates.md) | Single/multiple years, native HMD shapes, pooled open ages and provenance (D119/D120) |
 | [Rate input census](rate-inputs.md) | Existing rate schedules, age/duration bands, supported strata and multipliers |
 | [Population schema](population-schema.md) | Person/union tables and structural validation |
 | [Group transitions](group-transitions.md) | Individual transitions, histories, state updates and age/duration Lexis rates |

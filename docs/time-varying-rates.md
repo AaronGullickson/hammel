@@ -40,6 +40,10 @@ The probability table `cohab_prob` is not an annual rate and remains static.
 Matching, inheritance, `group_prop_hazard`, birth spacing, `ffab`, `hetfert`,
 and previous-union classification settings also remain static.
 
+The database getters can prepare these calendars directly from year vectors;
+see [HMD/HFD preparation](database-rates.md) (D119). Single-year requests remain
+static. HMD also supports its native grouped age/time products.
+
 ## Event timing and state
 
 Calendar changes take precedence over demographic events at the same instant.

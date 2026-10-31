@@ -605,15 +605,26 @@ age/period cells.
 
 `get_mortality_hmd()` and `get_fertility_hfd()` return prepared rate tibbles,
 without configuring a model or writing files. Select one population and one
-explicit year; no latest-year selection, interpolation, averaging, or automatic
+explicit year or a vector of distinct years (D119). A singleton retains a static
+schema; multiple years add calendar bands. Missing years error and nonconsecutive
+requests retain gaps. No interpolation, averaging, latest-year selection or
 cache refresh occurs. Save/load with RDS to preserve tables and their `source`
 attributes. Constructors copy provenance into the process. Credentials are
 never retained. HMDHFDplus is optional and needed only for downloads.
 
-HMD uses `Mx_1x1` for both sexes and the accepted hazard interpretation. Closed
-single-year ages become `[age,age+1)` and the open age becomes `[age,Inf)`.
-Respect both raw `+` labels and parsed `OpenInterval` indicators, including
-HMDHFDplus 2.0.8 behavior. Missing retained rates are rejected, not filled.
+HMD defaults to `Mx_1x1`; `shape` also selects native `1x5`, `1x10`, `5x1`,
+`5x5`, or `5x10` rates under the accepted hazard interpretation. Native age and
+source-period widths are preserved; grouped years select period starts.
+Five-year ages use [0,1), [1,5), [5,10), etc.; upper-open ages end at Inf.
+Inclusive source periods become half-open intervals, retaining shortened first
+or last periods. Respect both raw `+` labels and parsed `OpenInterval` indicators.
+For grouped-time products whose reader discards upper bounds, an auxiliary
+annual download recovers coverage (HMDHFDplus 2.0.8). Optional `open_age` pools
+source deaths and exposure above an aligned cutoff into one open-band rate,
+separately by sex/period (D120). Younger rates are unchanged; replaced-tail Mx
+may be missing, but pooled counts/exposure must be finite and nonnegative with
+positive aggregate exposure. The cutoff is not a maximum lifespan. Missing
+retained rates are rejected, not filled. See [database preparation](database-rates.md).
 
 By default HFD uses total `asfrRR` in births per woman-year without scaling.
 D095 retains all endpoint rows: map 12- to [12,13) with its supplied rate,
@@ -622,8 +633,9 @@ representation of the source aggregates, not a re-estimation of their rates.
 TFR includes the lower represented band but drops the upper-open band, warning
 if its known rate is nonzero; it need not equal the full published HFD TFR.
 
-Record database, population, year, product, retrieval timestamp, and reader
-version. HFD records requested revision date and endpoint mapping. A null
+Record database, population, requested years, product, represented source
+periods, retrieval timestamp and reader version, plus HMD shape and any auxiliary
+coverage product. HFD records requested revision date and endpoint mapping. A null
 revision requests the current release; it does not pin a historical revision.
 Synthetic/local-reader tests establish conversions; live requests are opt-in.
 `get_fertility_hfd(..., by_parity = TRUE)` imports

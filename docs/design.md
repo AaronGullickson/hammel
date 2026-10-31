@@ -21,7 +21,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Persistent fertility weights and specification | `R/het_fert.R`; cell weight trees in `src/simulate.cpp` |
 | Union formation/matching and dissolution specifications | `R/union_formation.R`, `R/union_dissolution.R` |
 | Shared kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/kinship.R` |
-| HMD/HFD downloads and preparation | `R/construct_demographic_rates.R` |
+| HMD/HFD downloads and preparation | `R/construct_demographic_rates.R`, `R/database_intervals.R`, `R/hmd_open_age.R` |
 | Simulation validation, RNG isolation, result assembly | `R/simulate.R` |
 | Continuous scheduling and events | `src/simulate.cpp` |
 | Demographic extraction and measures | `src/demography.cpp`, `R/calc_demographic_measures.R` |
@@ -189,7 +189,16 @@ calendar boundary does not promise fixed-seed equality with a static table.
 ## Data and observation interfaces
 
 `get_mortality_hmd(country, year, ...)` and `get_fertility_hfd(country, year, ...)`
-return rate tibbles, without configuring a model. Users can save/load them with
+return rate tibbles, without configuring a model. One requested year returns
+static rates; a vector returns calendar-banded rates. HMD's `shape` selects one
+of six native products, defaulting to `1x1`; grouped periods select source
+starting years. Each required product is downloaded once, including auxiliary
+annual coverage when a parsed HMD grouped-time product needs its endpoint
+recovered. Optional `open_age` retains younger rates and pools deaths/exposure
+into the final open band, using two additional native products (D120).
+Cutoffs align with source age bands; pooled counts and exposure are retained
+in provenance. HFD retains native annual/single-age products. See
+[database preparation](database-rates.md). Users can save/load tables with
 RDS and reuse them without downloads. HMDHFDplus is optional for these helpers.
 The HFD helper's `by_parity = TRUE` option imports conditional mi rates as
 age/parity interval rows for parity-specific fertility (milestone 5, accepted under D105). Unavailable

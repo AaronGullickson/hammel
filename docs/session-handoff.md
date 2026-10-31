@@ -30,7 +30,11 @@ inputs first (D118). Rates now accept flat `time_start`/`time_end` bands;
 [the contract](time-varying-rates.md) records coverage, fractional years,
 boundary precedence, resampling, histories and observations. Matching and
 inheritance schedules are deferred to a second step; other arguments remain
-static. This is implementation status, not scientific acceptance of milestone 7.
+static. D119 adds multi-year HMD/HFD getters and native HMD shape selection;
+D120 adds optional `open_age` pooling from native deaths/exposure products;
+see [database preparation](database-rates.md). The user deferred stationary-year
+and historical-run setup to fix the getter first. This is implementation status,
+not scientific acceptance of milestone 7.
 
 Groups cover most categorical characteristics. Multiple independent group
 dimensions remain an optional direction with no selected schema. Fixed newborn

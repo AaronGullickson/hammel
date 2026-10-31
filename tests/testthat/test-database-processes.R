@@ -15,7 +15,7 @@ test_that("HMD conversion selects the year and preserves rates and open ages", {
   expect_error(hammel:::mortality_from_hmd(bad, 2000))
   expect_error(hammel:::mortality_from_hmd(rbind(hmd, hmd[2, ]), 2000))
   expect_error(get_mortality_hmd("USA", 2000, username = "", password = ""))
-  expect_error(get_mortality_hmd("USA", c(2000, 2001), "test", "test"))
+  expect_error(get_mortality_hmd("USA", c(2000, 2000), "test", "test"))
 })
 
 test_that("HFD conversion represents both endpoints and rejects invalid rates", {

@@ -16,7 +16,8 @@ get_fertility_hfd(
 \arguments{
 \item{country}{A single HFD population code.}
 
-\item{year}{A single whole-number calendar year.}
+\item{year}{One whole-number calendar year or a nonempty vector of distinct
+years. All requested years must exist; duplicates are rejected.}
 
 \item{username}{HFD username, defaulting to \code{HFD_USERNAME}.}
 
@@ -31,19 +32,25 @@ Requires the HFD conditional-rate product; unavailable products/years error
 rather than falling back to unconditional rates.}
 }
 \value{
-A fertility rate tibble with a \code{source} attribute. Total-rate tables
+A fertility rate tibble with a \code{source} attribute recording selected
+years and source periods. Multiple years include \code{time_start}/\code{time_end};
+length-one requests omit them. Total-rate tables
 are validated for execution. Parity tables use half-open age/parity bounds;
 unavailable conditional rates are zero-filled.
 }
 \description{
 Download total period age-specific fertility rates (\code{asfrRR}) through
-HMDHFDplus and select one explicit year. Rates remain births per woman-year
-and the schedule is constant over simulation time. Birth-order-specific
-columns are not used by default. Missing total rates are rejected.
+HMDHFDplus and select one year or a vector of years from one download.
+Rates remain births per woman-year. One year gives a static schedule without
+calendar columns; multiple years give chronological \code{time_start}/\code{time_end}
+bands [year, year + 1). Nonconsecutive years retain gaps. Birth-order-specific
+columns are not used by default. Missing total rates are rejected. These HFD
+products use their native annual, single-age layout; HMD-style \code{shape}
+options are not available.
 With \code{by_parity = TRUE}, request conditional age/parity rates (\code{mi}) instead:
 first births map to parity [0,1), through fifth-or-higher births at [4,Inf).
 Missing conditional cells are replaced with zero; source metadata records
-that policy and the number of replacements in the selected year.
+that policy and the number of replacements across the selected years.
 Parity tables can be supplied to fertility constructors for parity-dependent
 execution. Parity initializes from recorded maternal birth histories.
 }
@@ -58,7 +65,8 @@ Credentials are never retained in the table.
 rates <- get_fertility_hfd("USA", 2000)
 saveRDS(rates, "rates.rds")
 model <- hammel_model() |> set_fertility(readRDS("rates.rds"))
-# Data preparation for future parity-dependent execution:
+history <- get_fertility_hfd("SWE", 1891:2000)
+# Conditional age/parity rates for simulation:
 parity_rates <- get_fertility_hfd("USA", 2000, by_parity = TRUE)
 }
 }

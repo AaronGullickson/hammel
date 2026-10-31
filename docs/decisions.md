@@ -60,6 +60,8 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Milestone 6 acceptance; time-varying inputs next | D116 |
 | Two-sex marriage model as tentative milestone 11 | D117 |
 | Milestone 7 calendar-varying rates; model schedules deferred | D118 |
+| Multi-year HMD/HFD preparation and native HMD shapes | D119 |
+| Optional HMD open-age pooling from deaths and exposure | D120 |
 
 ## Recorded decisions
 
@@ -2428,3 +2430,49 @@ clock origins, observation semantics and scope. Conditional exponential
 resampling at calendar boundaries is the engine implementation choice; histories
 and duration origins do not restart. Static inputs remain supported. Neither
 implementation authorization nor software checks establish demographic acceptance.
+
+
+## D119 — Multi-year database preparation and native HMD shapes (October 30, 2026)
+
+**Status:** user-requested implementation, extending D118's rate preparation.
+
+The user requested both getters accept one year (static output without calendar
+columns) or a vector of years (output with `time_start`/`time_end`), and requested
+additional source shapes while retaining `1x1` as default. All requested years
+are selected locally from one download of each required product.
+
+HMD supports its six native age-by-time shapes through `shape`; grouped `year`
+requests select source period starts and preserve complete source intervals.
+The getter retains source pooled rates and shortened endpoint periods, without
+estimating or interpolating rates. HMDHFDplus 2.0.8's loss of end labels requires
+an auxiliary annual coverage download for parsed grouped-time products; this is
+an implementation workaround recorded in provenance. HFD's existing products
+remain native annual/single-age, with no equivalent shape option or invented
+local aggregation. The existing HFD endpoint and conditional zero-fill policies
+are retained.
+
+See [database preparation](database-rates.md) for interval mapping, examples,
+validation and scope. This does not establish milestone 7 scientific acceptance.
+
+
+## D120 — Optional pooled HMD open age (October 30, 2026)
+
+**Status:** user-selected pooling rule and implementation authorization.
+
+After Swedish historical Mx downloads exposed missing oldest-age rates, the
+user requested optional age truncation and explicitly selected pooling deaths
+and exposure instead of extending the cutoff-age rate. The getter accepts
+`open_age = NULL` by default. A supplied cutoff retains source rates below it
+and replaces its tail with `[open_age, Inf)` at total deaths / total person-years,
+separately by sex and selected source period. Download matching native deaths
+and exposure products once each. Missing Mx in the replaced tail are allowed;
+missing/invalid retained rates or tail counts/exposure remain errors. Pooled
+exposure must be positive; no imputation or forced maximum lifespan is added.
+
+The cutoff must align with native source bands; no splitting counts or silently
+moving the cutoff. Validate matching complete age tails and source periods.
+Provenance retains cutoff, method, auxiliary products and a tibble of pooled
+counts, exposure and rates. Singleton versus vector-year output schemas are
+unchanged. See [database preparation](database-rates.md) for worked examples
+and validation. Stationary-year investigation and historical simulation setup
+were explicitly deferred while fixing the getter.

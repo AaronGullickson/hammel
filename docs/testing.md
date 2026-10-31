@@ -7,8 +7,8 @@ Earlier implementation-specific runs and counts remain available in Git history.
 
 ## Milestone 7 rate implementation checks
 
-October 30, 2026 (D118): the full offline `devtools::test(stop_on_failure = TRUE)`
-suite passed with 3,771 assertions, no failures or warnings, and one opt-in live
+October 30, 2026 (D118–D120): the full offline `devtools::test(stop_on_failure = TRUE)`
+suite passed with 3,964 assertions, no failures or warnings, and one opt-in live
 DB test skipped. The run used `TZ=America/Los_Angeles` so optional database-reader
 dependencies did not need to query the unavailable sandbox system bus for a time
 zone. No rates were downloaded and no credentials were used.
@@ -23,6 +23,24 @@ ties, reproducibility, RNG isolation, future group/pair coverage and empty runs.
 The fractional-year example in `inst/examples/milestone7-rates.R` executed
 successfully. Generated public help, local documentation links and
 `git diff --check` were also checked.
+
+D119 adds offline multi-year HMD/HFD and native HMD shape checks: single-year
+schema preservation, chronological vector selection, missing/duplicate years,
+download counts, unchanged rate units, all six shapes, infant/child/open age
+bands, raw and parsed source periods, shortened endpoints, auxiliary annual
+coverage, HFD parity partitions and selected missing-cell counts, provenance,
+and direct simulation with prepared calendars. Synthetic local HMD parsing
+exercises the installed reader; automated web requests use mocks and the
+opt-in live test was not run.
+
+D120 adds 77 assertions for optional HMD open-age pooling: ratios of summed
+counts/exposure, sex/period separation, unchanged younger rates, missing replaced
+tail Mx, positive pooled exposure, zero-exposure individual cells, zero deaths,
+invalid counts and cutoffs, native grouped ages, raw/parsed source periods,
+source alignment independent of row order, download counts, safe retained
+provenance and analytical survival using a pooled schedule. The default getter
+still rejects missing rates, now with year/sex/age context. The pooled web path
+was checked with mocked readers; no new live pooling downloads were made.
 
 This is software verification, not scientific acceptance of milestone 7 or a
 new demographic validation report. Calendar boundaries redraw person/union
