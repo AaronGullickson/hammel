@@ -1,6 +1,6 @@
 # Hammel project brief
 
-Updated October 30, 2026. The user accepted milestone 1 (mortality/fertility)
+Updated October 31, 2026. The user accepted milestone 1 (mortality/fertility)
 on October 15, 2026 (D029), milestone 2 (union formation) on October 19,
 2026 (D050), milestone 3 (groups) on October 27, 2026 (D077), and milestone 4
 (dissolution/remarriage/cohabitation) on October 29, 2026 (D093). Milestone 5
@@ -108,9 +108,10 @@ sparse-cell, calibration, or fertility-transition limitations. Weighted matching
 does not model marriage squeezes; fuller two-sex models remain future work.
 
 The [roadmap](roadmap.md) records group transitions complete (milestone 6), then
-time-varying inputs next (milestone 7), summaries and migration work. A two-sex
-marriage model is tentative milestone 11 (D117); its model and API remain
-unselected. No future
+milestone 7 completion with the current engine, then binned-group hazards and
+formula weights (milestone 8), summaries/helpers (9), tentative multiple group
+columns (10), external immigration (11) and a two-sex marriage model (12), under
+D121. The two-sex model and API remain unselected (D117). No future
 feature is authorized by milestone completion. Fixed newborn assignment was
 explicitly deferred to the group-transitions discussion; custom inheritance
 already supports assignment of mixed-parent births to a specified category.
@@ -157,8 +158,9 @@ following implementation and report review; see [the transition contract](group-
 process uses annual hazards, common age or duration bands, directed pair
 columns and optional sex/union-type strata. Group histories are retained and
 affected risks, cells and matching state update at moves. Ancestry stays
-unchanged. Household moves are deferred to the regions milestone (D114), multiple group dimensions
-remain optional future work. The final milestone 6 render was active at
+unchanged. Household moves remain deferred (D114). Multiple group columns are
+now tentative milestone 10 (D121), potentially covering the former standalone
+regions/internal-migration work; schema and household rules remain unselected. The final milestone 6 render was active at
 acceptance; preserve the report and intermediates. Acceptance retains history,
 finite-cell and non-checkpoint-restart limitations. The user subsequently
 approved calendar-varying rate semantics and authorized their implementation

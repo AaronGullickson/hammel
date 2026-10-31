@@ -64,7 +64,8 @@ Software checks and prior developmental measurements below are separate
 records. Acceptance retains finite-sample and sparse-cell limits, complete
 history requirements, duration fallback to age without prehistory,
 non-checkpoint restarts and the documented life-table aggregation caveat.
-Household moves are deferred to milestone 10 (D114). Calendar-varying rates
+Household moves remain deferred (D114), with unresolved regional applications
+retained under tentative milestone 10's multiple group columns (D121). Calendar-varying rates
 are now implemented under D118; matching and inheritance schedules are deferred
 to a second step, and milestone 7 scientific assessment remains pending.
 

@@ -4,8 +4,9 @@ Accepted milestone 6 contract, October 30, 2026 (D116). Implementation follows
 D106–D115 and the user's October 30 request. The accepted
 [report](../validation/milestone6.qmd) was undergoing its final render at
 acceptance; preserve all active intermediates. Household moves are deferred to
-[milestone 10, internal migration and regions](roadmap.md#tentative-milestone-10-internal-migration-and-regions)
-under D114 and are excluded here.
+[tentative milestone 10, multiple group columns](roadmap.md#tentative-milestone-10-multiple-group-columns),
+which may include regions/internal-migration applications (D114/D121), and are
+excluded here.
 
 `group_transition(rates)` constructs an optional process;
 `set_group_transition(model, rates)` attaches it. Required columns are

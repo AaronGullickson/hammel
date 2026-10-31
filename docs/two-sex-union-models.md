@@ -6,8 +6,9 @@ implementation, or an accepted modeling decision, except the user decisions
 recorded in D073 and D074. D074 authorizes the male-target adjustment
 described below; D075 subsequently removes unweighted matching and directed
 pair effects. The user assigned a two-sex marriage model to
-[tentative milestone 11](roadmap.md#tentative-milestone-11-two-sex-marriage-model)
-on October 30, 2026 (D117). This sets a planning priority, not a model or API;
+tentative milestone 11 on October 30, 2026 (D117), subsequently moved to
+[tentative milestone 12](roadmap.md#tentative-milestone-12-two-sex-marriage-model)
+on October 31 (D121). This sets a planning priority, not a model or API;
 the fuller two-sex proposals remain deferred. The current union process remains as described in
 [union-formation models](union-formation-models.md) and
 [weighted-choice matching](weighted-choice-matching.md).

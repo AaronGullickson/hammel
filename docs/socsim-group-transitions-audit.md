@@ -151,7 +151,7 @@ Three important static caveats need controlled reference tests:
 
 These quirks are findings about the pinned version, not requirements for Hammel.
 Hammel implements individual transitions. D114 defers household moves to
-milestone 10, internal migration and regions, superseding D109's earlier
+the former milestone 10, internal migration and regions, superseding D109's earlier
 stretch-goal placement; membership and follower rules remain open.
 ENHANCED builds have before/after hooks and can alter behavior; those extensions
 were not audited.
@@ -203,7 +203,9 @@ universally. The October 30 implementation request and follow-up decisions
 select latest-entry duration (age without history), zero risk for missing pairs
 and gaps, and unchanged ancestry. The implemented individual process updates
 events, pools, calibration, fertility cells, pair hazards and historical group
-observations. Household moves are deferred to the regions milestone (D114); fixed newborn assignment
+observations. Household moves remain deferred (D114); D121 removes the standalone
+regions milestone and retains its unresolved applications under tentative
+milestone 10, multiple group columns. Fixed newborn assignment
 and multiple independent group dimensions remain separate future work.
 The user accepted Hammel milestone 6 on October 30, 2026 (D116), based on
 the Hammel report and implementation review. This does not turn the static

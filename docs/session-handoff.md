@@ -1,6 +1,6 @@
 # Current project handoff
 
-Updated October 30, 2026. This is a dated status record, not authorization for
+Updated October 31, 2026. This is a dated status record, not authorization for
 unspecified features or a standing pause instruction. The current user request
 controls work. Start with [the documentation index](README.md),
 [scientific contract](scientific-contract.md) and [decisions](decisions.md).
@@ -36,12 +36,16 @@ see [database preparation](database-rates.md). The user deferred stationary-year
 and historical-run setup to fix the getter first. This is implementation status,
 not scientific acceptance of milestone 7.
 
-Groups cover most categorical characteristics. Multiple independent group
-dimensions remain an optional direction with no selected schema. Fixed newborn
+D121 keeps milestone 7 on the current engine and assigns the future
+[binned-group hazard/formula-weight change](binned-group-hazards.md) to milestone
+8. It remains unimplemented, with detailed formula and mechanism contracts
+still to specify. Summaries/helpers move to milestone 9. Multiple independent
+group columns are tentative milestone 10, with no selected schema. Fixed newborn
 assignment remains unselected; custom mixed-parent assignment already exists.
-Household moves are deferred to milestone 10, internal migration and regions
-(D114); rate interpretation, household membership and conditional rescheduling
-issues are recorded in the roadmap. No household mechanism is implemented.
+The standalone regions/internal-migration milestone is removed; regional and
+household applications may be considered under tentative milestone 10 (D121).
+D114's rate-interpretation, household-membership and conditional-rescheduling
+questions are preserved in the roadmap. No household mechanism is implemented.
 
 ## Individual transitions and observations
 
@@ -112,7 +116,8 @@ acceptance and do not establish universal accuracy or SOCSIM equivalence.
 Restarts are not exact checkpoints. Sparse-cell feasibility, incomplete
 histories, failed searches and matching-calibration approximations remain
 limitations. Poor-pool waiting (D044), previous-father continuity (D042),
-a two-sex marriage model (tentative milestone 11, D117), custom process
-execution and the postponed African historical benchmark remain deferred.
-Milestone 11 assigns a planning priority only; model and API selection remain
+external immigration (tentative milestone 11), a two-sex marriage model
+(tentative milestone 12, D117/D121), custom process execution and the postponed
+African historical benchmark remain deferred.
+Milestone 12 assigns a planning priority only; model and API selection remain
 open in the [two-sex research notes](two-sex-union-models.md).

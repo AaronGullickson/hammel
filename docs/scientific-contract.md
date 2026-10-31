@@ -1,6 +1,6 @@
 # Scientific contract
 
-Updated October 30, 2026. This is the current mortality, fertility, union-formation,
+Updated October 31, 2026. This is the current mortality, fertility, union-formation,
 dissolution, remarriage, cohabitation/conversion, group identity/ancestry, and
 observation contract. Milestones 1–6 are accepted as complete
 (D029, D050, D077, D093, D105, D116), retaining documented limitations.
@@ -786,9 +786,21 @@ strata. Group duration runs from latest entry, or birth without history;
 missing pairs and gaps mean zero risk. Moves preserve ancestry and refresh
 affected events, fertility cells, matching pools and calibration. Grouped
 outputs retain all moves in a `transitions` tibble, even when empty. Household
-moves are deferred to milestone 10, internal migration and regions (D114). Multiple group dimensions remain unimplemented. Calendar-time rates are
+moves remain deferred beyond milestone 6 (D114). Tentative milestone 10 now
+covers multiple group columns, potentially including regions/internal migration
+(D121); those mechanisms remain unimplemented. Calendar-time rates are
 implemented under D118; matching and inheritance schedules are deferred. The user accepted milestone 6 on
 October 30, 2026 (D116) after reviewing the report and implementation. Its final
 render was active at acceptance; no final-render outcome is inferred.
 Acceptance retains documented limitations and does not authorize the next
 mechanism or household moves.
+
+
+## Future engine direction: milestone 8
+
+D121 assigns binned-group hazards and custom formula weights for all rate
+processes to milestone 8. The selected direction and remaining modeling/API
+questions are recorded in [the design discussion](binned-group-hazards.md).
+It is not implemented and does not change the current contracts above.
+The user will finish milestone 7 with the current engine before that rewrite;
+this planning decision does not mark milestone 7 accepted complete.

@@ -1,10 +1,13 @@
 # Design and implemented interface
 
-Updated October 30, 2026. Milestones 1–6 are complete by user acceptance
+Updated October 31, 2026. Milestones 1–6 are complete by user acceptance
 (D029, D050, D077, D093, D105, D116). Individual group transitions are accepted
 under D116; milestone 7 calendar-varying rates are implemented under D118,
 with scientific assessment pending and model schedules deferred. This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
+[Milestone 8 binned-group hazards](binned-group-hazards.md) are a selected future
+direction (D121), not implemented architecture. Finish milestone 7 with the
+current engine.
 The [scientific contract](scientific-contract.md) defines demographic semantics.
 
 ## Responsibilities and source locations

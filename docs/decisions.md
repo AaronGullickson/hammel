@@ -1,6 +1,6 @@
 # Decision log
 
-Updated October 29, 2026. Entries retain the choices made at their original
+Updated October 31, 2026. Entries retain the choices made at their original
 dates; each numbered entry now states whether and how it remains current.
 Read [the scientific contract](scientific-contract.md) for implemented behavior,
 not a superseded API or timing statement buried in a historical entry.
@@ -55,13 +55,14 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Grouped output always includes transition history tibble | D111 |
 | Individual transition implementation, duration and ancestry | D112 |
 | Directed transition Lexis counter | D113 |
-| Household moves deferred to the regions milestone | D114 |
+| Household moves deferred; regional applications under tentative multiple-group milestone 10 | D114, D121 |
 | Detailed union partner groups refer to formation | D115 |
 | Milestone 6 acceptance; time-varying inputs next | D116 |
-| Two-sex marriage model as tentative milestone 11 | D117 |
+| Two-sex marriage model as tentative milestone 12 | D117, D121 |
 | Milestone 7 calendar-varying rates; model schedules deferred | D118 |
 | Multi-year HMD/HFD preparation and native HMD shapes | D119 |
 | Optional HMD open-age pooling from deaths and exposure | D120 |
+| Milestone 8 binned-group hazards/formula weights and milestones 9–12 revision | D121 |
 
 ## Recorded decisions
 
@@ -2329,7 +2330,10 @@ observation helper and changes neither event execution nor model assumptions.
 
 **Status:** accepted by the user; supersedes D109's milestone 6 stretch goal.
 
-Household moves are deferred to milestone 10, internal migration and regions.
+Household moves were deferred to the then-planned milestone 10, internal
+migration and regions. D121 subsequently removes that standalone milestone and
+retains these unresolved applications under tentative milestone 10, multiple
+group columns; no household behavior is selected by that reordering.
 The user identified ambiguity between individual initiation hazards and total
 move hazards induced by household members, and questioned conditional
 rescheduling after externally triggered moves. Discussion also identified
@@ -2395,7 +2399,8 @@ completion documentation while compiling the final report.
 
 ## D117 — Tentative milestone 11: two-sex marriage model (October 30, 2026)
 
-**Status:** user-selected tentative planning milestone.
+**Status:** user-selected tentative planning milestone; renumbered to milestone
+12 by D121 on October 31, 2026. The model and API remain unselected.
 
 Add a two-sex marriage model as tentative milestone 11, following the regions
 milestone. Existing [two-sex research notes](two-sex-union-models.md) and D073
@@ -2476,3 +2481,48 @@ counts, exposure and rates. Singleton versus vector-year output schemas are
 unchanged. See [database preparation](database-rates.md) for worked examples
 and validation. Stationary-year investigation and historical simulation setup
 were explicitly deferred while fixing the getter.
+
+## D121 — Binned-group hazard direction and roadmap revision (October 31, 2026)
+
+**Status:** user-selected future engine direction and milestone priorities;
+documentation authorized now, implementation and detailed APIs still pending.
+Milestone 7 is not declared complete by this decision.
+
+The user will finish milestone 7 with the current engine, then make milestone 8
+use binned-group hazards for all six existing rate processes and allow custom
+formula weights on all rates. Input rates determine aggregate cell intensity;
+weights redistribute event risk within cells. Use single-year age or duration
+subdivisions even for wider input bands, retaining fractional boundaries and
+all other input strata. Fertility retains its actual-parity cells. Calendar
+changes update active rates rather than add historical-period membership bins.
+
+The user distinguished separate rate targets from relative formula stratification
+and recognized that weighting an already stratified group has no effect when
+the resulting factor is constant within a cell. Redundancy warnings should be
+considered; their exact diagnostic policy is still a proposal. Formula weights
+provide a route to future user-defined characteristics, but do not specify their
+initialization, inheritance, longitudinal updates or missing-data rules.
+See [the discussion record](binned-group-hazards.md) for equations, examples,
+composition effects, process-specific exposure/eligibility distinctions,
+unresolved contracts and proposed validation. No new scheduler is implemented.
+
+The user revised the roadmap as follows:
+
+| Milestone | Revised scope | Status |
+| --- | --- | --- |
+| 7 | Finish existing time-varying-input work with the current engine | In progress; scientific acceptance remains pending |
+| 8 | Binned-group hazards for all rate processes and custom formula weights | User-selected direction; specification/API and implementation pending |
+| 9 | Former milestone 8: summaries, diagnostics and helpers | Proposed details retained |
+| 10 | Possibility of more than one group column | Tentative; schema and mechanisms unselected |
+| 11 | Former milestone 9: external immigration and generation tracking | Tentative; no emigration mechanism implied |
+| 12 | Former milestone 11: two-sex marriage model | Tentative; model and API unselected |
+
+The former standalone milestone 10 for internal migration and regions is removed
+because those applications may be handled through multiple group columns in new
+milestone 10. This supersedes D114's dedicated milestone placement, not its
+unresolved household-move questions, which remain in the roadmap. A separate
+mandatory `region` schema is no longer the roadmap direction. Household
+membership, regional matching restrictions and linked-move semantics remain
+unselected. D117's two-sex priority moves from milestone 11 to 12; its scientific
+model remains unselected. No existing validation report, result or acceptance
+status is changed by this reordering.

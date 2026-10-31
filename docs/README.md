@@ -1,6 +1,6 @@
 # Hammel documentation
 
-Updated October 30, 2026. Milestones 1–6 are complete by user acceptance
+Updated October 31, 2026. Milestones 1–6 are complete by user acceptance
 (D029, D050, D077, D093, D105, D116), including individual group transitions, parity-specific fertility,
 cell-accounted birth spacing and persistent lognormal fertility weights.
 Current behavior uses continuous event times with no monthly grid. Acceptance
@@ -10,7 +10,9 @@ is based on the user-authored validation reports and retains their limitations.
 assessment remains pending.** Matching and inheritance schedules are deferred.
 See the [rate contract](time-varying-rates.md) and
 [group-transition contract](group-transitions.md). Household moves are deferred to
-the regions milestone (D114); milestone 7 is time-varying inputs (D103).
+tentative milestone 10's multiple-group/regions applications (D114/D121).
+Finish milestone 7 with the current engine; binned-group hazards and formula
+weights are planned for milestone 8 (D121).
 
 ## Reading order
 
@@ -52,6 +54,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [Parity fertility and PATFR](parity-fertility.md) | History-derived parity, schedules, HFD recovery and PATFR; milestone 5 accepted (D105) |
 | [Union dissolution](union-dissolution.md) | Milestone 4 duration hazards, female carrier, state changes, and worked examples (D078) |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
+| [Binned-group hazards](binned-group-hazards.md) | User-selected milestone 8 direction; formula weights, cell definitions and unresolved contracts (D121), not implemented |
 | [Two-sex union models](two-sex-union-models.md) | Proposal notes: directional asymmetry, marriage squeeze, Schoen/Choo–Siow/Dagsvik models, API considerations (D073) |
 | [Future roadmap](roadmap.md) | Accepted milestones and future priorities with unresolved specifications |
 | [Decision log](decisions.md) | Accepted choices and supersession history |

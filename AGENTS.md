@@ -87,7 +87,12 @@ the user's agreement.
   implemented under the user-approved D118 contract in
   `docs/time-varying-rates.md`; scientific assessment remains pending. Matching
   and inheritance schedules are deferred to a second step; other arguments
-  remain static.
+  remain static. Finish milestone 7 with the current engine. D121 assigns
+  binned-group hazards and custom formula weights across rate processes to
+  milestone 8; see `docs/binned-group-hazards.md`. This direction is not
+  implemented. Summaries/helpers move to 9; multiple group columns are tentative
+  10; external immigration is 11; the two-sex model is 12. The separate regions
+  milestone is removed, with its unresolved applications retained under 10.
   Distinguish current
   specifications from deferred mechanisms and future proposals.
 - `validation/milestone1.qmd` is the accepted historical assessment; reproduce it
@@ -114,10 +119,12 @@ the user's agreement.
   intermediates until rendering finishes, including milestone 5's active final
   render at closeout and milestone 6's active final render. Parity, fertility
   heterogeneity and individual group transitions are implemented and accepted.
-  See `docs/group-transitions.md`; household moves are deferred to the regions
-  milestone (D114). Calendar-time rates follow `docs/time-varying-rates.md`
+  See `docs/group-transitions.md`; household moves remain deferred (D114),
+  with regional applications retained under tentative milestone 10's multiple
+  group columns (D121). Calendar-time rates follow `docs/time-varying-rates.md`
   (D118); model schedules remain deferred. Most categorical characteristics should
-  use groups, with multiple types of groups an optional complexity direction.
+  use groups; multiple group columns are tentative milestone 10 with their
+  schema still unselected.
 - Use `devtools::test()` for the testthat suite. Live database tests require
   explicit opt-in; ordinary verification must not download rates or expose
   credentials. See `docs/testing.md` for commands and evidence.
