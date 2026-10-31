@@ -148,3 +148,16 @@ The user selected random-parent inheritance as the default with maternal
 fallback (D076). This is a default choice, not a guarantee of directional
 balance or absence of sensitivity to starting populations. See the
 [user-authored report](../validation/milestone3.qmd) for the assessment.
+
+
+## Calendar-varying inheritance (D123)
+
+Fertility's `inheritance` argument also accepts a tibble with `time_start`,
+`time_end` and list-column `model`, containing complete inheritance objects.
+Select the active rule at birth, without reassigning existing identities or
+changing ancestry. All declared possible identities from all intervals enter
+one shared simulation registry, including future custom outputs. Other grouped
+processes and matching models must cover that registry upfront. Direct models
+and existing static method-name aliases remain supported. See
+[calendar-varying models](time-varying-models.md) for interval validation,
+coverage, callback behavior, worked examples and dynamic matching fallbacks.

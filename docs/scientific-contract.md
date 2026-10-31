@@ -8,7 +8,8 @@ Individual group transitions are accepted under the
 [transition contract](group-transitions.md). Milestone 7, time-varying inputs,
 has implemented calendar-varying rates under the user-approved
 [rate contract](time-varying-rates.md) (D118). Scientific assessment remains
-pending; matching and inheritance schedules are deferred.
+pending. Matching and inheritance model schedules are implemented under
+[their contract](time-varying-models.md) (D123).
 Earlier monthly, exact
 age-varying and midpoint compensation specifications are available in Git
 history; the [decision log](decisions.md) records their replacement by
@@ -796,7 +797,8 @@ outputs retain all moves in a `transitions` tibble, even when empty. Household
 moves remain deferred beyond milestone 6 (D114). Tentative milestone 10 now
 covers multiple group columns, potentially including regions/internal migration
 (D121); those mechanisms remain unimplemented. Calendar-time rates are
-implemented under D118; matching and inheritance schedules are deferred. The user accepted milestone 6 on
+implemented under D118; matching and inheritance model schedules are implemented
+under D123. The user accepted milestone 6 on
 October 30, 2026 (D116) after reviewing the report and implementation. Its final
 render was active at acceptance; no final-render outcome is inferred.
 Acceptance retains documented limitations and does not authorize the next
@@ -811,3 +813,17 @@ questions are recorded in [the design discussion](binned-group-hazards.md).
 It is not implemented and does not change the current contracts above.
 The user will finish milestone 7 with the current engine before that rewrite;
 this planning decision does not mark milestone 7 accepted complete.
+
+
+## Calendar-varying matching and inheritance (D123)
+
+`matching`, `father_matching`, `cohab_matching` and fertility's `inheritance`
+accept direct models or tibbles with `time_start`, `time_end` and list-column
+`model`. Half-open absolute-year intervals select complete models at event
+execution; all rows validate and execution requires coverage. Model-only
+boundaries preserve pending dates and do not rewrite existing partners,
+identities, ancestry or histories. NULL father/cohabitation roles dynamically
+share current general matching. All possible inheritance identities across the
+schedule join one registry checked against grouped rates and matching levels.
+See [the model-schedule contract](time-varying-models.md) for defaults, worked
+examples, calibration updates, callback constraints and validation.

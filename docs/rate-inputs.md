@@ -3,8 +3,9 @@
 Updated October 30, 2026. This document describes implemented inputs through
 accepted milestone 6, extended by milestone 7 calendar bands under D118.
 All six annual-rate tables now optionally take `time_start`/`time_end`; see
-[calendar-varying rates](time-varying-rates.md). Matching and inheritance models
-remain static. `cohab_prob` also accepts calendar bands under D122.
+[calendar-varying rates](time-varying-rates.md). `cohab_prob` also accepts
+calendar bands under D122. Matching/inheritance arguments accept separate
+[whole-model schedules](time-varying-models.md) under D123.
 
 ## Rates, bands and strata
 

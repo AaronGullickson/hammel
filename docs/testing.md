@@ -5,10 +5,10 @@ D050, D077, D093, D105, D116). Software test history and the user's demographic 
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
-## Milestone 7 rate and probability implementation checks
+## Milestone 7 calendar-input implementation checks
 
-October 31, 2026 (D118–D120, D122): the full offline `devtools::test(stop_on_failure = TRUE)`
-suite passed with 4,024 assertions, no failures or warnings, and one opt-in live
+October 31, 2026 (D118–D120, D122–D123): the full offline `devtools::test(stop_on_failure = TRUE)`
+suite passed with 4,136 assertions, no failures or warnings, and one opt-in live
 DB test skipped. The run used `TZ=America/Los_Angeles` so optional database-reader
 dependencies did not need to query the unavailable sandbox system bus for a time
 zone. No rates were downloaded and no credentials were used.
@@ -53,14 +53,26 @@ compares subsequent unions and logged role weights with the equivalent static
 new-probability reference, checking immediate calibration refresh. Existing
 static cohabitation tests also pass. No rate inputs were downloaded.
 
+D123 adds 112 assertions for whole-model matching/inheritance calendars:
+all four argument roles; direct models and normalized list-column tables;
+invalid, edited and future entries; overlap and run coverage; exact search and
+birth boundaries; dynamic NULL fallback versus fixed explicit models; native
+and custom matching formulas; within-group restrictions and weighted calibration
+in both directions; hierarchy changes, custom callbacks and numeric/character
+future identity registries; unchanged earlier identities and ancestry; restarts;
+zero/empty runs; shared rate/probability/model boundaries; reproducibility and
+RNG isolation. Controlled candidate pools test event-time selection, and static
+reference runs check retained event dates and refreshed role weights. The user's
+milestone 7 report was neither edited nor rendered.
+
 This is software verification, not scientific acceptance of milestone 7 or a
 new demographic validation report. Calendar boundaries redraw person/union
 candidates and require work proportional to the population; redundant boundaries
-do not promise fixed-seed agreement with static inputs. Probability-only
-boundaries retain all pending clocks and consume no randomness. Matching,
-inheritance and other non-rate arguments remain static; `cohab_prob` is the
-explicit D122 probability-calendar extension. See
-[the rate contract](time-varying-rates.md).
+do not promise fixed-seed agreement with static inputs. Probability-only and model-only
+boundaries retain all pending clocks and consume no demographic randomness.
+Other scalar process arguments remain static. See
+[the rate contract](time-varying-rates.md) and
+[the model contract](time-varying-models.md).
 
 ## Milestone 6 accepted assessment and active final render
 
@@ -79,8 +91,8 @@ history requirements, duration fallback to age without prehistory,
 non-checkpoint restarts and the documented life-table aggregation caveat.
 Household moves remain deferred (D114), with unresolved regional applications
 retained under tentative milestone 10's multiple group columns (D121). Calendar-varying rates
-are now implemented under D118; matching and inheritance schedules are deferred
-to a second step, and milestone 7 scientific assessment remains pending.
+are implemented under D118, with matching and inheritance schedules under D123.
+Milestone 7 scientific assessment remains pending.
 
 ## Milestone 5 accepted assessment and closeout
 

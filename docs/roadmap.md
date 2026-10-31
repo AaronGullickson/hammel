@@ -2,8 +2,9 @@
 
 Updated October 31, 2026. Milestones 1–6 are complete by user acceptance
 (D029, D050, D077, D093, D105, D116). **Milestone 7 calendar-varying rates
-are implemented under D118; scientific assessment and model schedules remain
-pending.** Finish milestone 7 with the current engine. The user selected
+are implemented under D118; D122 adds cohabitation probability calendars and
+D123 implements matching/inheritance model schedules. Scientific assessment
+remains pending.** Finish milestone 7 with the current engine. The user selected
 binned-group hazards and formula weights for milestone 8 (D121).
 Future entries record planning priorities, not authorization to implement unspecified demographic behavior
 or an unselected public API.
@@ -13,7 +14,7 @@ or an unselected public API.
 | 4 | Union dissolution, age/duration remarriage, and cohabitation | Complete (D093) |
 | 5 | Parity-specific fertility and fertility heterogeneity | Complete (D105); limitations retained |
 | 6 | Group transitions, including categorical characteristics represented by groups | Complete October 30, 2026 (D116); final render active at acceptance |
-| 7 | Time-varying rates, matching, and inheritance within a simulation run | Rates implemented (D118); scientific assessment pending; matching/inheritance schedules deferred |
+| 7 | Time-varying rates, matching, and inheritance within a simulation run | Rates/probabilities/models implemented (D118/D122/D123); scientific assessment pending |
 | 8 | Binned-group hazards for all rate processes; custom formula weights on all rates | User-selected direction (D121); specification/API and implementation pending |
 | 9 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed; moved from former milestone 8 (D121) |
 | 10 | More than one group column, potentially including regions and internal migration | Tentative (D121); schema and mechanism contracts unselected |
@@ -195,57 +196,21 @@ scientific assessment remains pending. Flat rate tables use optional half-open
 pending risks, fertility cells and calibration while preserving histories,
 spacing and duration origins. See [the rate contract](time-varying-rates.md).
 
-The user selected annual rates first. Matching and inheritance model schedules
-are deferred to the second step, along with their interface implementation.
-D122 also implements flat calendar-banded `cohab_prob`, using the same interval
-and coverage rules as rates. Probability-only boundaries update type-selection
-and calibration without changing pending event dates. Other non-rate arguments,
-including multipliers, remain static.
-The representation and execution-time model selection below were approved in
-D118, but model-schedule constructors and public arguments remain to be designed.
-Flat rate representation and timing are specified by the implemented D118 contract.
+The user selected annual rates first. D122 also implements flat calendar-
+banded `cohab_prob`, using the same interval and coverage rules as rates.
+D123 implements complete model schedules for `matching`, `father_matching`,
+`cohab_matching` and fertility's `inheritance`: direct objects remain supported,
+or supply a tibble with `time_start`, `time_end` and list-column `model`.
 
-### Input representation (October 21 proposal; October 30 D118 selection)
-
-The user requested retaining the following approach for time-varying inputs,
-now scheduled for milestone 7, allowing inputs to change without restarting
-the simulation:
-
-- Keep rate schedules as flat tibbles, adding `time_start` and `time_end`
-  alongside age, sex, group, union status, and other supported rate strata.
-  This preserves ordinary filtering, joins, plotting, and inspection.
-- For structured inputs that are not already rate tibbles, use a schedule
-  tibble with `time_start`, `time_end`, and a list column containing a complete
-  model object for each interval. Matching models and group inheritance models
-  are the current examples. Changing the whole matching model permits changes
-  to formulas, coefficients, and group exogamy effects without making each
-  internal parameter separately time-varying.
-- Keep the time schedule outside each individual model object. A shared
-  scheduling helper could validate intervals and select objects, while rates
-  retain their flat representation. Constructor names and public arguments
-  remain to be designed; no generic framework beyond these needs is selected.
-
-For example, a matching schedule could have the following shape (illustrative
-data structure, not an implemented process interface):
-
-```r
-tibble::tibble(
-  time_start = c(2000, 2050),
-  time_end = c(2050, Inf),
-  matching = list(matching_model_before, matching_model_after)
-)
-```
-
-An inheritance schedule would similarly hold complete inheritance models in
-a list column. Shared half-open calendar intervals `[time_start, time_end)`
-are accepted under D118. Selecting matching at search/father-selection
-execution and inheritance at birth, without rewriting existing unions or
-identities, is also approved; model-schedule implementation is deferred.
-Before that step, specify the public API and validation of all scheduled models
-and apply the approved coverage and boundary rules.
-Rate sampling now accounts for future rate boundaries under D118. The
-whole-model scheduling interface remains to be designed; the user explicitly
-deferred its implementation to the second step.
+Select matching at partner/father choice and inheritance at birth, without
+rewriting existing unions or identities. Model/probability-only boundaries retain
+pending event dates. All supplied models and their possible identities validate
+upfront; future inheritance outputs share one simulation-wide group registry.
+See [calendar-varying models](time-varying-models.md) for the implemented API,
+coverage rules, callbacks, fallback roles and validation. The schedule remains
+outside each individual model, as selected in D118. Other non-rate arguments,
+including multipliers, spacing, `ffab` and persistent fertility heterogeneity,
+remain static. This work does not introduce the milestone 8 engine change.
 
 ## Milestone 8: binned-group hazards and formula weights
 

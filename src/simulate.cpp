@@ -355,6 +355,9 @@ class WeightCalibrator {
     sums_.emplace_back(static_cast<size_t>(groups_) * groups_ * bins_, 0.0);
     return static_cast<int>(tables_.size()) - 1;
   }
+  // Replace a role's preference table; refresh() rebuilds sums from the
+  // current pool after all roles have switched. Table storage must stay alive.
+  void set_table(int id, const LagTable* table) { tables_.at(id) = table; }
   // Rebuild every pool sum from the counts, discarding accumulated roundoff.
   void refresh() {
     for (size_t t = 0; t < tables_.size(); ++t) {
@@ -1698,7 +1701,23 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   NumericMatrix initial_ancestry, List inheritance, double ffab,
                   DataFrame dissolution_rates, DataFrame cohab_prob, DataFrame conversion_rates,
                   List cohab_matching, bool counts_cohab, bool check_cells = false,
-                  Nullable<List> hetfert = R_NilValue, Nullable<DataFrame> transition_input = R_NilValue) {
+                  Nullable<List> hetfert = R_NilValue, Nullable<DataFrame> transition_input = R_NilValue,
+                  Nullable<List> model_schedule_input = R_NilValue) {
+  const bool scheduled_models = model_schedule_input.isNotNull();
+  List matching_bank, inheritance_bank;
+  NumericVector model_times;
+  IntegerVector general_route, father_route, cohab_route, inheritance_route;
+  int model_epoch = 0, general_id = 0, father_id = 0, cohab_id = 0;
+  if (scheduled_models) {
+    List config(model_schedule_input.get());
+    matching_bank = config["matching_models"];
+    inheritance_bank = config["inheritance_models"];
+    DataFrame epochs = as<DataFrame>(config["epochs"]);
+    model_times = epochs["time_start"];
+    general_route = epochs["matching"]; father_route = epochs["father_matching"];
+    cohab_route = epochs["cohab_matching"]; inheritance_route = epochs["inheritance"];
+    general_id = general_route[0]; father_id = father_route[0]; cohab_id = cohab_route[0];
+  }
   // Keep all epochs in call-local tables; the population and its histories
   // stay in this single engine invocation across every rate change.
   const DataFrame all_mortality = mortality_rates, all_fertility = fertility_rates,
@@ -1717,6 +1736,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         if (start < time && time < start + years) calendar_boundaries.insert(time);
     }
   }
+  if (scheduled_models) for (double time : model_times)
+    if (start < time && time < start + years) calendar_boundaries.insert(time);
   mortality_rates = calendar_slice(all_mortality, start);
   fertility_rates = calendar_slice(all_fertility, start);
   union_rates = calendar_slice(all_search, start);
@@ -1779,19 +1800,33 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       pool.add(i, people[i].group, people[i].born);
   // Draw models for the union and (if separate) father matching models.
   // An empty population never draws; skip building custom-formula grids then.
-  const DrawModel union_draw = people.empty() ? DrawModel() :
+  const DrawModel union_draw = people.empty() || scheduled_models ? DrawModel() :
     make_draw_model(matching, group_count, start + years - min_birth);
+  const DrawModel* union_draw_current = &union_draw;
+  std::map<int, DrawModel> scheduled_draws;
+  auto get_scheduled_draw = [&](int id) -> const DrawModel* {
+    auto found = scheduled_draws.find(id);
+    if (found == scheduled_draws.end())
+      found = scheduled_draws.emplace(id, people.empty() ? DrawModel() :
+        make_draw_model(as<List>(matching_bank[id]), group_count, start + years - min_birth)).first;
+    return &found->second;
+  };
   DrawModel father_draw_storage;
   const DrawModel* father_draw = &union_draw;
-  if (!people.empty() && SEXP(father_matching) != SEXP(matching)) {
+  if (!scheduled_models && !people.empty() && SEXP(father_matching) != SEXP(matching)) {
     father_draw_storage = make_draw_model(father_matching, group_count, start + years - min_birth);
     father_draw = &father_draw_storage;
   }
   DrawModel cohab_draw_storage;
   const DrawModel* cohab_draw = &union_draw;
-  if (cohab_enabled && !people.empty() && SEXP(cohab_matching) != SEXP(matching)) {
+  if (!scheduled_models && cohab_enabled && !people.empty() && SEXP(cohab_matching) != SEXP(matching)) {
     cohab_draw_storage = make_draw_model(cohab_matching, group_count, start + years - min_birth);
     cohab_draw = &cohab_draw_storage;
+  }
+  if (scheduled_models) {
+    union_draw_current = get_scheduled_draw(general_id);
+    father_draw = get_scheduled_draw(father_id);
+    cohab_draw = get_scheduled_draw(cohab_id);
   }
   DrawWorkspace draw_workspace;
   double draw_approximate = 0;
@@ -1928,9 +1963,20 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   auto applies_weights = [](const List& model) {
     return !as<bool>(model["prevent_exogamy_all"]);
   };
-  const bool union_weighted = applies_weights(matching);
-  const bool father_weighted = applies_weights(father_matching);
-  const bool cohab_weighted = cohab_enabled && applies_weights(cohab_matching);
+  bool union_weighted = applies_weights(matching);
+  bool father_weighted = applies_weights(father_matching);
+  bool cohab_weighted = cohab_enabled && applies_weights(cohab_matching);
+  bool any_weighted = union_weighted || father_weighted || cohab_weighted;
+  if (scheduled_models) for (auto model : matching_bank)
+    any_weighted = any_weighted || applies_weights(as<List>(model));
+  std::map<int, LagTable> scheduled_lags;
+  auto get_scheduled_lag = [&](int id) -> const LagTable* {
+    auto found = scheduled_lags.find(id);
+    if (found == scheduled_lags.end())
+      found = scheduled_lags.emplace(id, build_lag_table(as<List>(matching_bank[id]),
+        group_count, calibrator->bins(), kWeightBinWidth)).first;
+    return &found->second;
+  };
   std::vector<double> union_warm, father_warm, cohab_warm;
   double weighted_infeasible = 0;
   // Partner and father searches share eligibility and the exact draw; only
@@ -1977,7 +2023,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       &probability_schedules[people[woman].group * 3 + previous_union[woman]], people[woman].born, now).first : 0;
     const bool is_cohab = cohab_enabled && R::runif(0, 1) < p;
     partner = find_candidate(woman, now, is_cohab ? cohab_matching : matching,
-      is_cohab ? *cohab_draw : union_draw, false, diagnostics ? &applied : nullptr, is_cohab);
+      is_cohab ? *cohab_draw : *union_draw_current, false, diagnostics ? &applied : nullptr, is_cohab);
     if (partner >= 0) {
       if (next_union_id >= 9007199254740991.0 ||
           union_history.size() >= static_cast<size_t>(std::numeric_limits<int>::max()))
@@ -2003,8 +2049,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     std::array<std::vector<Band>, 3> previous_search;
     std::array<bool, 3> duration_search = {false, false, false};
   };
-  const int inheritance_method = inheritance["method"];
-  const double passing = inheritance["passing"];
+  int inheritance_method = inheritance["method"];
+  double passing = inheritance["passing"];
   IntegerVector inheritance_ranks = inheritance["ranks"];
   IntegerVector ancestry_groups = inheritance["ancestry_groups"];
   Function inherit_custom = inheritance["custom"];
@@ -2036,7 +2082,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   load_schedules();
   // weighted_choice needs schedules and group indices, so it starts here.
   // One group means unit weights, so calibration is unnecessary.
-  if ((union_weighted || father_weighted || cohab_weighted) && group_count > 1) {
+  if (any_weighted && group_count > 1) {
     double min_birth = start;
     for (const Person& person : people) min_birth = std::min(min_birth, person.born);
     calibrator.reset(new WeightCalibrator(min_birth, start + years, group_count,
@@ -2052,20 +2098,26 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         search_duration.push_back(false);
       }
     }
-    if (union_weighted) {
-      union_table = build_lag_table(matching, group_count, calibrator->bins(), kWeightBinWidth);
-      union_table_id = father_table_id = calibrator->add_table(&union_table);
-    }
-    if (father_weighted && SEXP(father_matching) != SEXP(matching)) {
-      father_table_storage = build_lag_table(father_matching, group_count, calibrator->bins(),
-                                             kWeightBinWidth);
-      father_table_id = calibrator->add_table(&father_table_storage);
-    }
-    if (cohab_weighted) {
-      if (SEXP(cohab_matching) == SEXP(matching)) cohab_table_id = union_table_id;
-      else {
-        cohab_table = build_lag_table(cohab_matching, group_count, calibrator->bins(), kWeightBinWidth);
-        cohab_table_id = calibrator->add_table(&cohab_table);
+    if (scheduled_models) {
+      union_table_id = calibrator->add_table(get_scheduled_lag(general_id));
+      father_table_id = calibrator->add_table(get_scheduled_lag(father_id));
+      cohab_table_id = calibrator->add_table(get_scheduled_lag(cohab_id));
+    } else {
+      if (union_weighted) {
+        union_table = build_lag_table(matching, group_count, calibrator->bins(), kWeightBinWidth);
+        union_table_id = father_table_id = calibrator->add_table(&union_table);
+      }
+      if (father_weighted && SEXP(father_matching) != SEXP(matching)) {
+        father_table_storage = build_lag_table(father_matching, group_count, calibrator->bins(),
+                                               kWeightBinWidth);
+        father_table_id = calibrator->add_table(&father_table_storage);
+      }
+      if (cohab_weighted) {
+        if (SEXP(cohab_matching) == SEXP(matching)) cohab_table_id = union_table_id;
+        else {
+          cohab_table = build_lag_table(cohab_matching, group_count, calibrator->bins(), kWeightBinWidth);
+          cohab_table_id = calibrator->add_table(&cohab_table);
+        }
       }
     }
     counted_woman.assign(people.size(), 0);
@@ -2075,6 +2127,37 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     for (int woman = 0; woman < static_cast<int>(people.size()); ++woman)
       add_counted_woman(woman, start);
   }
+  auto update_models = [&](double now) {
+    if (!scheduled_models) return;
+    while (model_epoch + 1 < model_times.size() && model_times[model_epoch + 1] <= now)
+      ++model_epoch;
+    const bool matching_changed = general_id != general_route[model_epoch] ||
+      father_id != father_route[model_epoch] || cohab_id != cohab_route[model_epoch];
+    if (matching_changed) {
+      general_id = general_route[model_epoch]; father_id = father_route[model_epoch];
+      cohab_id = cohab_route[model_epoch];
+      matching = as<List>(matching_bank[general_id]);
+      father_matching = as<List>(matching_bank[father_id]);
+      cohab_matching = as<List>(matching_bank[cohab_id]);
+      union_draw_current = get_scheduled_draw(general_id);
+      father_draw = get_scheduled_draw(father_id); cohab_draw = get_scheduled_draw(cohab_id);
+      union_weighted = applies_weights(matching); father_weighted = applies_weights(father_matching);
+      cohab_weighted = cohab_enabled && applies_weights(cohab_matching);
+      union_warm.clear(); father_warm.clear(); cohab_warm.clear();
+      if (calibrator) {
+        calibrator->set_table(union_table_id, get_scheduled_lag(general_id));
+        calibrator->set_table(father_table_id, get_scheduled_lag(father_id));
+        calibrator->set_table(cohab_table_id, get_scheduled_lag(cohab_id));
+        calibrator->refresh();
+      }
+    }
+    inheritance = as<List>(inheritance_bank[inheritance_route[model_epoch]]);
+    inheritance_method = as<int>(inheritance["method"]);
+    passing = as<double>(inheritance["passing"]);
+    inheritance_ranks = as<IntegerVector>(inheritance["ranks"]);
+    ancestry_groups = as<IntegerVector>(inheritance["ancestry_groups"]);
+    inherit_custom = as<Function>(inheritance["custom"]);
+  };
   std::vector<unsigned long long> event_versions(people.size(), 0);
   // Continuous dates order events. Equivalent keys retain insertion order.
   std::multimap<double, Event> queue;
@@ -2271,6 +2354,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
           (queue.empty() || now <= queue.begin()->first)) {
         calendar_boundaries.erase(calendar_boundaries.begin());
         checkUserInterrupt();
+        update_models(now);
         for (int w = 0; w < static_cast<int>(counted_woman.size()); ++w)
           remove_counted_woman(w);
         cohab_prob = calendar_slice(all_probability, now);
@@ -2280,8 +2364,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
           calendar_changes_at(all_dissolution, now) || calendar_changes_at(all_conversion, now) ||
           calendar_changes_at(all_transitions, now);
         if (!rate_change) {
-          // A type-probability change redistributes search calibration only.
-          // Keep every pending event date and consume no new random thresholds.
+          // Model/probability changes retain all demographic event clocks.
+          // Role preferences and intensities use the newly active inputs.
           for (int w = 0; w < static_cast<int>(people.size()); ++w) {
             if (w % 1024 == 0) checkUserInterrupt();
             add_counted_woman(w, now);

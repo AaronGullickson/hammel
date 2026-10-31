@@ -42,7 +42,12 @@ set_union_formation(
 \item{initiation}{Either \code{"on_demand"} for birth-triggered searches or
 \code{"rate"} for scheduled searches. No default is selected.}
 
-\item{matching}{A specification created by \code{\link[=create_matching_model]{create_matching_model()}}. Defaults
+\item{matching}{A specification created by \code{\link[=create_matching_model]{create_matching_model()}}, or a
+tibble with numeric \code{time_start}, \code{time_end}, and list-column \code{model} holding
+complete matching objects. Model intervals are half-open absolute years,
+cannot overlap, and must cover the requested run. The active model is used
+at partner selection, without changing pending search dates or existing
+unions. Base data frames with list columns are also accepted. Defaults
 to \code{create_age_gap_matching_model(0, 5)}: preferred age gap zero years,
 with selection weight halving five years on either side.}
 
@@ -79,8 +84,9 @@ unrelatedness; only demonstrated relationships are screened. Existing unions
 are retained. See \code{\link[=extract_kin]{extract_kin()}} for the shared distance definitions.}
 
 \item{father_matching}{Optional matching specification for fathers of
-unpartnered births in rate mode, created by \code{\link[=create_matching_model]{create_matching_model()}}.
-Defaults to \code{NULL}, using the current general \code{matching} model. Union
+unpartnered births in rate mode, created by \code{\link[=create_matching_model]{create_matching_model()}}, or a
+\code{time_start}/\code{time_end}/\code{model} schedule as for \code{matching}.
+Defaults to \code{NULL}, using the general \code{matching} model active at that birth. Union
 searches always use \code{matching}. Not used by on-demand initiation. Process-level
 age and kinship screening settings are shared; NULL inherits the general
 model's settings.}
@@ -114,8 +120,8 @@ the same age/group/previous-category rules and cover the run. Type uses the
 active probability at the search instant, before matching. Existing unions
 keep their types. NULL retains untyped partnerships and their RNG path.}
 
-\item{cohab_matching}{Optional cohabitation matching model; NULL shares
-\code{matching}. Marriage, cohabitation and unpartnered father searches calibrate
+\item{cohab_matching}{Optional cohabitation matching model or whole-model
+schedule; NULL shares the general \code{matching} model active at that search. Marriage, cohabitation and unpartnered father searches calibrate
 weights using their own intensities and share the available male pool.}
 
 \item{union_convert_rate}{Optional age- or duration-specific conversion table,
@@ -196,6 +202,11 @@ and cover the requested run. Clock choices stay consistent across periods;
 changes precede same-time events and retain duration origins. \code{cohab_prob}
 accepts the same calendar columns, with probabilities selected at the search
 instant. Probability-only changes refresh matching calibration without
-resampling pending event clocks. Matching models and other arguments remain
-static.
+resampling pending event clocks. All three matching arguments also accept
+whole-model schedule tibbles with \code{time_start}, \code{time_end}, and list-column
+\code{model}. Model changes update role-specific preferences and calibration before
+same-time choices without resampling event clocks. All supplied models,
+including future intervals, are validated; gaps in a run are errors. NULL
+father/cohabitation matching dynamically follows general matching. Other
+non-rate arguments remain static.
 }

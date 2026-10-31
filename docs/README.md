@@ -7,7 +7,8 @@ Current behavior uses continuous event times with no monthly grid. Acceptance
 is based on the user-authored validation reports and retains their limitations.
 **Milestone 6 is accepted complete** (D116); its final report render is active.
 **Milestone 7: calendar-varying rates (D118) and cohabitation probabilities
-(D122) are implemented; scientific assessment remains pending.** Matching and inheritance schedules are deferred.
+(D122), plus matching/inheritance model schedules (D123), are implemented;
+scientific assessment remains pending.**
 See the [rate contract](time-varying-rates.md) and
 [group-transition contract](group-transitions.md). Household moves are deferred to
 tentative milestone 10's multiple-group/regions applications (D114/D121).
@@ -21,6 +22,7 @@ weights are planned for milestone 8 (D121).
 | [Project brief](project-brief.md) | Purpose, current scope, and milestone status |
 | [Design](design.md) | Implemented architecture, API, and source locations |
 | [Scientific contract](scientific-contract.md) | Current demographic assumptions and event rules |
+| [Calendar-varying models](time-varying-models.md) | Matching/father/cohabitation/inheritance model schedules and event-time selection (D123) |
 | [Calendar-varying rates](time-varying-rates.md) | Calendar bands, coverage, boundary timing and retained histories (D118) |
 | [Database rate preparation](database-rates.md) | Single/multiple years, native HMD shapes, pooled open ages and provenance (D119/D120) |
 | [Rate input census](rate-inputs.md) | Existing rate schedules, age/duration bands, supported strata and multipliers |

@@ -86,7 +86,10 @@ the user's agreement.
   were accepted October 30, 2026 (D116). Milestone 7 calendar-varying rates are
   implemented under the user-approved D118 contract in
   `docs/time-varying-rates.md`; scientific assessment remains pending. Matching
-  and inheritance schedules are deferred to a second step. D122 adds calendar
+  and inheritance model schedules are implemented under D123; see
+  `docs/time-varying-models.md` for the shared model-list tibble interface,
+  event-time selection, dynamic NULL fallbacks and future identity registry.
+  D122 adds calendar
   bands to `cohab_prob`; probability-only changes update type selection and
   matching calibration while preserving pending event dates. Other arguments
   remain static. Finish milestone 7 with the current engine. D121 assigns

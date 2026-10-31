@@ -5,7 +5,8 @@ validate_cohabitation <- function(process) {
   if (!is.null(flag) && (!is.logical(flag) || length(flag) != 1L ||
       !is.null(dim(flag)) || is.na(flag)))
     stop("`cohabitation_counts_as_previous_union` must be TRUE or FALSE.", call. = FALSE)
-  if (!is.null(process$cohab_matching)) validate_matching_model(process$cohab_matching)
+  if (!is.null(process$cohab_matching))
+    validate_model_argument(process$cohab_matching, validate_matching_model, "cohab_matching")
   enabled <- !is.null(process$cohab_prob)
   if (!enabled && (!is.null(process$cohab_matching) || !is.null(process$union_convert_rate)))
     stop("`cohab_matching` and `union_convert_rate` require `cohab_prob`.", call. = FALSE)

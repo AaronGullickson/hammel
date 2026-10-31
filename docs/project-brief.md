@@ -7,8 +7,8 @@ on October 15, 2026 (D029), milestone 2 (union formation) on October 19,
 (parity-specific fertility, cell-accounted spacing and fertility heterogeneity)
 was accepted October 29, 2026 (D105). The user accepted individual group transitions, milestone 6, on October 30,
 2026 (D116). Milestone 7 calendar-varying rates (D118) and cohabitation
-probabilities (D122) are implemented; scientific assessment and model schedules
-remain pending.
+probabilities (D122), plus matching/inheritance model schedules (D123), are
+implemented; scientific assessment remains pending.
 See [testing](testing.md) for evidence and limits.
 
 ## Purpose
@@ -165,8 +165,9 @@ regions/internal-migration work; schema and household rules remain unselected. T
 acceptance; preserve the report and intermediates. Acceptance retains history,
 finite-cell and non-checkpoint-restart limitations. The user subsequently
 approved calendar-varying rate semantics and authorized their implementation
-under D118; see [the rate contract](time-varying-rates.md). Matching and
-inheritance schedules are deferred to a second step. Milestone 7 scientific
+under D118; see [the rate contract](time-varying-rates.md). Whole-model matching and
+inheritance schedules are implemented under D123; see
+[the model contract](time-varying-models.md). Milestone 7 scientific
 acceptance remains pending.
 
 ## Boundaries and future work

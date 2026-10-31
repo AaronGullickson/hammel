@@ -24,7 +24,13 @@
 #' @param ffab Probability that a newborn is female, default `0.4886`.
 #'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
 #' @param inheritance A group identity model from [create_group_inheritance()],
-#'   or a method name requiring no additional parameters: `"mother"`, `"father"`,
+#'   or a tibble with numeric `time_start`, `time_end` and list-column `model`
+#'   containing complete inheritance models. Intervals are half-open absolute
+#'   years, must not overlap and must cover the requested run. Select the active
+#'   model at each birth; older identities and ancestry remain unchanged.
+#'   Base data frames with list columns are accepted. All declared possible
+#'   identities across scheduled models join the simulation-wide registry.
+#'   Static inputs may also be a method name requiring no additional parameters: `"mother"`, `"father"`,
 #'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
 #'   Applies to fertility and defaults to selecting either parent with equal
 #'   probability, with maternal fallback. Assignment is independent of recorded
@@ -85,6 +91,8 @@ attach_process <- function(model, process) {
   if (name == "union_formation") {
     validate_union_formation(process)
     if (!is.null(process$rates)) process$rates <- tibble::as_tibble(process$rates)
+    for (field in c("matching", "father_matching", "cohab_matching"))
+      process[field] <- list(normalize_model_argument(process[[field]]))
   }
   if (name == "group_transition") {
     validate_group_transition(process)
@@ -139,8 +147,9 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #' and ends exceed starts (possibly Inf). Active slices must satisfy the existing
 #' strata/coverage rules and cover the requested run. Rates are constant within
 #' intervals, with no interpolation. Calendar changes precede same-time events,
-#' preserving histories, birth spacing, parity and duration origins. Other
-#' process arguments remain static.
+#' preserving histories, birth spacing, parity and duration origins. Inheritance
+#' also accepts whole-model calendar schedules; other fertility arguments remain
+#' static.
 #'
 #' Fertility optionally accepts `union_type` containing both `"partnered"`
 #' and `"unpartnered"`, or all three `"unpartnered"`, `"cohab"`, `"marriage"`.
@@ -211,7 +220,13 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #' @param ffab Probability that a newborn is female, default `0.4886`.
 #'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
 #' @param inheritance A group identity model from [create_group_inheritance()],
-#'   or a method name requiring no additional parameters: `"mother"`, `"father"`,
+#'   or a tibble with numeric `time_start`, `time_end` and list-column `model`
+#'   containing complete inheritance models. Intervals are half-open absolute
+#'   years, must not overlap and must cover the requested run. Select the active
+#'   model at each birth; older identities and ancestry remain unchanged.
+#'   Base data frames with list columns are accepted. All declared possible
+#'   identities across scheduled models join the simulation-wide registry.
+#'   Static inputs may also be a method name requiring no additional parameters: `"mother"`, `"father"`,
 #'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
 #'   Fertility defaults to selecting either parent with equal probability,
 #'   with maternal fallback. Other parental, ancestry,

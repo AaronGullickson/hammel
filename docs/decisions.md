@@ -64,6 +64,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Optional HMD open-age pooling from deaths and exposure | D120 |
 | Milestone 8 binned-group hazards/formula weights and milestones 9–12 revision | D121 |
 | Calendar-varying flat cohabitation probabilities | D122 |
+| Complete matching/inheritance model-list calendar schedules | D123 |
 
 ## Recorded decisions
 
@@ -2554,3 +2555,38 @@ schedules remain future milestone 7 work, with APIs still unselected; no
 milestone 8 engine change is introduced. See [cohabitation](cohabitation.md#calendar-varying-type-probabilities-d122)
 for worked examples and validation. Implementation checks are distinct from
 milestone 7 scientific acceptance.
+
+
+## D123 — Complete model schedules for all matching and inheritance arguments (October 31, 2026)
+
+**Status:** user-selected API and explicit implementation authorization; implemented,
+with milestone 7 scientific assessment still pending.
+
+The user selected either a direct static model or a tibble with `time_start`,
+`time_end` and list-column `model` containing complete objects for `matching`,
+`father_matching`, `cohab_matching` and fertility's `inheritance`. Base data
+frames with list columns are accepted and normalized to tibbles. Preserve full
+objects, formula environments, callbacks, extra columns and provenance.
+
+D118's event-time selection applies: active matching at partner/father choice,
+active inheritance at each successful birth, with half-open absolute-year bands,
+no interpolation, overlap rejection and coverage across a run. Validate every
+row, including unused/future intervals. NULL entries and nested schedules are
+not complete models; existing top-level optional matching NULLs dynamically
+follow general matching. Static inheritance method aliases remain supported.
+
+Use one registry covering identities from all inheritance models, including
+future custom outputs; validate grouped schedules and matching levels against
+that registry before execution. Keep past identities, unions, ancestry,
+spacing, durations, weights and pending event dates at model-only boundaries.
+Refresh active role-specific preference/draw structures and weighted-calibration
+sums from the current pool, without demographic RNG draws. Custom inheritance
+executes only at births; deterministic matching formulas may be evaluated for
+cache preparation under the existing purity contract.
+
+See [the model-schedule contract](time-varying-models.md) for worked examples,
+validation, retained defaults and limitations. Direct static execution remains
+supported; caches belong to the simulation call. Model schedules complete this
+implementation component of milestone 7, not its scientific acceptance. Other
+non-rate arguments remain static, and the milestone 8 hazard rewrite remains
+unimplemented.

@@ -85,6 +85,10 @@
 #' adding redundant rate boundaries need not preserve a fixed-seed trajectory.
 #' Calendar-banded `cohab_prob` is evaluated at the search instant; probability-
 #' only boundaries refresh role calibration while retaining pending event dates.
+#' Matching and inheritance arguments may be direct models or calendar schedules
+#' with `time_start`, `time_end` and list-column `model`. The current matching
+#' model is selected at partner/father choice and inheritance at birth. Model-
+#' only boundaries preserve pending events and earlier histories.
 #'
 #' @param model A `hammel_model` containing a population, mortality, fertility,
 #'   and union-formation processes, optionally union dissolution and group transitions. The population
@@ -194,7 +198,16 @@ simulate <- function(model, years, seed = NULL) {
   registry_population$.transition_groups <- unique(c(
     as.character(population$transitions$group_origin), as.character(population$transitions$group_dest),
     as.character(transition_process$rates$group_origin), as.character(transition_process$rates$group_dest)))
-  inheritance <- prepare_group_inheritance(model$processes$fertility$inheritance, registry_population)
+  model_arguments <- list(matching = union_process$matching,
+    father_matching = union_process$father_matching, cohab_matching = union_process$cohab_matching,
+    inheritance = model$processes$fertility$inheritance)
+  for (name in names(model_arguments))
+    check_model_coverage(model_arguments[[name]], start, start + years, name)
+  scheduled_models <- any(vapply(model_arguments, is_model_schedule, logical(1)))
+  model_context <- if (scheduled_models)
+    prepare_model_schedules(model_arguments, registry_population, start, start + years) else NULL
+  inheritance <- if (scheduled_models) model_context$inheritance else
+    prepare_group_inheritance(model$processes$fertility$inheritance, registry_population)
   group_values <- inheritance$values
   death_rates <- prepare_group_rates(death_rates, population$persons, "mortality", group_values)
   birth_rates <- prepare_group_rates(birth_rates, population$persons, "fertility", group_values)
@@ -261,9 +274,14 @@ simulate <- function(model, years, seed = NULL) {
   result <- population
   births <- deaths <- 0
   if (years > 0) {
-    matching <- prepare_matching_model(union_process$matching, group_values)
-    father_matching <- if (is.null(union_process$father_matching)) matching else
-      prepare_matching_model(union_process$father_matching, group_values)
+    matching <- if (scheduled_models) model_context$matching else
+      prepare_matching_model(union_process$matching, group_values)
+    father_matching <- if (scheduled_models) model_context$father_matching else
+      if (is.null(union_process$father_matching)) matching else
+        prepare_matching_model(union_process$father_matching, group_values)
+    cohab_matching <- if (scheduled_models) model_context$cohab_matching else
+      if (is.null(union_process$cohab_matching)) matching else
+        prepare_matching_model(union_process$cohab_matching, group_values)
     native <- simulate_cpp(engine_persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
                            matching,
@@ -276,10 +294,10 @@ simulate <- function(model, years, seed = NULL) {
                              matrix(numeric(), nrow = nrow(engine_persons), ncol = 0L) else
                              as.matrix(population[["ancestry"]][setdiff(names(population[["ancestry"]]), "person_id")]),
                            inheritance, ffab, dissolution_rates, cohab$prob, cohab$conversion,
-                           if (is.null(union_process$cohab_matching)) matching else
-                             prepare_matching_model(union_process$cohab_matching, group_values), counts_cohab,
+                           cohab_matching, counts_cohab,
                            isTRUE(getOption("hammel.check_cells", FALSE)),
-                           if (is.null(hetfert)) NULL else unclass(hetfert), transition_rates)
+                           if (is.null(hetfert)) NULL else unclass(hetfert), transition_rates,
+                           if (scheduled_models) model_context$config else NULL)
     if (!isTRUE(native$cells_consistent))
       stop("Internal error: fertility cell counts are inconsistent.", call. = FALSE)
     persons <- population$persons

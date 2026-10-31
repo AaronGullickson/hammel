@@ -3,7 +3,8 @@
 Updated October 31, 2026. Milestones 1–6 are complete by user acceptance
 (D029, D050, D077, D093, D105, D116). Individual group transitions are accepted
 under D116; milestone 7 calendar-varying rates are implemented under D118,
-with scientific assessment pending and model schedules deferred. This document describes implemented architecture.
+with scientific assessment pending. D123 implements matching/inheritance model
+schedules. This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
 [Milestone 8 binned-group hazards](binned-group-hazards.md) are a selected future
 direction (D121), not implemented architecture. Finish milestone 7 with the
@@ -19,6 +20,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Ancestry schema and initialization | `R/ancestry.R` |
 | Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
 | Mortality/fertility specification and rate validation | `R/set_process.R` |
+| Shared model schedules and registry preparation | `R/model_schedules.R`; model caches and switches in `src/simulate.cpp` |
 | Shared calendar-rate validation | `R/calendar_rates.R`; boundaries and active slices in `src/simulate.cpp` |
 | Individual transition specification and history | `R/group_transition.R`; events in `src/simulate.cpp`; observation splitting in `src/group_history.h` |
 | Persistent fertility weights and specification | `R/het_fert.R`; cell weight trees in `src/simulate.cpp` |
@@ -182,8 +184,14 @@ boundary; fertility cells rebuild when fertility changes, preserving spacing,
 weights, parity and histories. Matching calibration contributions refresh under
 the current rates. Unrealized intensity is retained across fertility epochs.
 This stays within one native invocation with independent call-local state;
-matching and inheritance models remain static. See
-[calendar-varying rates](time-varying-rates.md).
+matching and inheritance models can also vary through model-list tibbles (D123).
+Model-only changes preserve pending dates and histories. Role preference/draw
+structures and calibration tables are cached per model within the call, with
+active calibration sums rebuilt from the current male pool when preferences
+change. All inheritance models share one registry including future declared
+identities. Direct static models retain the existing execution path. See
+[calendar-varying rates](time-varying-rates.md) and
+[calendar-varying models](time-varying-models.md).
 
 Restarting redraws pending events and is not guaranteed to match an uninterrupted
 fixed-seed run. Boundary processing also consumes random draws, so a redundant

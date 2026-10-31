@@ -28,8 +28,10 @@ independently certified by this documentation update.
 The user approved calendar input semantics and authorized the six annual-rate
 inputs first (D118). Rates now accept flat `time_start`/`time_end` bands;
 [the contract](time-varying-rates.md) records coverage, fractional years,
-boundary precedence, resampling, histories and observations. Matching and
-inheritance schedules are deferred to a second step. D122 adds calendar bands
+boundary precedence, resampling, histories and observations. D123 implements
+[matching/inheritance model schedules](time-varying-models.md) for all four
+arguments, with a shared `time_start`/`time_end`/`model` interface, dynamic NULL
+matching fallbacks and a registry covering all future inheritance identities. D122 adds calendar bands
 to the flat `cohab_prob` table, with current probabilities selected at searches
 and matching-calibration updates that preserve event clocks at probability-only
 boundaries. Other arguments remain static. D119 adds multi-year HMD/HFD getters and native HMD shape selection;

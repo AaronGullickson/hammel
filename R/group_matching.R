@@ -93,6 +93,10 @@ matching_pair_offsets <- function(matching, female_group, male_group) {
 }
 
 validate_matching_groups <- function(matching, population_groups) {
+  if (is_model_schedule(matching)) {
+    for (m in model_entries(matching)) validate_matching_groups(m, population_groups)
+    return(invisible(matching))
+  }
   if (length(matching$delta) && (is.null(population_groups) ||
       any(!names(matching$delta) %in% as.character(population_groups))))
     stop("`delta` names must belong to the population group identity registry.", call. = FALSE)

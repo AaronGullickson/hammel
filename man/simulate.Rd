@@ -109,6 +109,10 @@ duration origins persist. Pending candidates are resampled at boundaries;
 adding redundant rate boundaries need not preserve a fixed-seed trajectory.
 Calendar-banded \code{cohab_prob} is evaluated at the search instant; probability-
 only boundaries refresh role calibration while retaining pending event dates.
+Matching and inheritance arguments may be direct models or calendar schedules
+with \code{time_start}, \code{time_end} and list-column \code{model}. The current matching
+model is selected at partner/father choice and inheritance at birth. Model-
+only boundaries preserve pending events and earlier histories.
 }
 \examples{
 population <- create_baseline_population(100, max_age = 50)

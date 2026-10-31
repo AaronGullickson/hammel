@@ -68,7 +68,9 @@ inputs and `devtools::test()` without live downloads.
 The overall search hazard still schedules attempts. At the attempt time, draw
 intended type before matching using current age/group/previous category.
 Matching uses the general model for marriage and `cohab_matching` for cohabitation
-(NULL shares the general preferences). Both draw from the same exclusive pool
+(NULL shares the general preferences active at that instant). Both matching
+arguments also accept complete-model calendar schedules under
+[D123](time-varying-models.md). Both draw from the same exclusive pool
 of unpartnered men. Failure leaves the woman unpartnered, resamples her ordinary
 search risk, and draws type anew at the next attempt. Father selection remains
 separate through `father_matching`; partnered births use the current partner.

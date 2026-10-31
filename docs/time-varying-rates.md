@@ -2,8 +2,9 @@
 
 Milestone 7 rate specification, October 30, 2026. The user approved these
 semantics and authorized rate implementation. D122 (October 31) adds flat
-calendar-banded cohabitation probabilities. Matching, inheritance and other
-arguments remain static in this step. Milestone 7 scientific acceptance remains
+calendar-banded cohabitation probabilities. D123 adds
+[matching/inheritance model schedules](time-varying-models.md); other non-rate
+arguments remain static. Milestone 7 scientific acceptance remains
 separate from implementation and software verification.
 
 ## Inputs and coverage
@@ -47,8 +48,9 @@ retain pending event dates and consume no random draws. A shared rate boundary
 keeps the existing rate rescheduling, with both changes effective first.
 See [the cohabitation contract](cohabitation.md#calendar-varying-type-probabilities-d122).
 
-Matching, inheritance, `group_prop_hazard`, birth spacing, `ffab`, `hetfert`,
-and previous-union classification settings remain static.
+Matching and inheritance accept complete-model schedule tibbles under D123;
+see [their contract](time-varying-models.md). `group_prop_hazard`, birth spacing,
+`ffab`, `hetfert` and previous-union classification settings remain static.
 
 The database getters can prepare these calendars directly from year vectors;
 see [HMD/HFD preparation](database-rates.md) (D119). Single-year requests remain

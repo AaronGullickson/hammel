@@ -347,7 +347,12 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'
 #' @param initiation Either `"on_demand"` for birth-triggered searches or
 #'   `"rate"` for scheduled searches. No default is selected.
-#' @param matching A specification created by [create_matching_model()]. Defaults
+#' @param matching A specification created by [create_matching_model()], or a
+#'   tibble with numeric `time_start`, `time_end`, and list-column `model` holding
+#'   complete matching objects. Model intervals are half-open absolute years,
+#'   cannot overlap, and must cover the requested run. The active model is used
+#'   at partner selection, without changing pending search dates or existing
+#'   unions. Base data frames with list columns are also accepted. Defaults
 #'   to `create_age_gap_matching_model(0, 5)`: preferred age gap zero years,
 #'   with selection weight halving five years on either side.
 #' @param cancel_birth_if_no_match Logical, default `TRUE`. Cancel a birth when
@@ -357,8 +362,9 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   fresh waiting times from the failed attempt. Partner scarcity can reduce
 #'   realized fertility below inputs.
 #' @param father_matching Optional matching specification for fathers of
-#'   unpartnered births in rate mode, created by [create_matching_model()].
-#'   Defaults to `NULL`, using the current general `matching` model. Union
+#'   unpartnered births in rate mode, created by [create_matching_model()], or a
+#'   `time_start`/`time_end`/`model` schedule as for `matching`.
+#'   Defaults to `NULL`, using the general `matching` model active at that birth. Union
 #'   searches always use `matching`. Not used by on-demand initiation. Process-level
 #'   age and kinship screening settings are shared; NULL inherits the general
 #'   model's settings.
@@ -382,8 +388,13 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' changes precede same-time events and retain duration origins. `cohab_prob`
 #' accepts the same calendar columns, with probabilities selected at the search
 #' instant. Probability-only changes refresh matching calibration without
-#' resampling pending event clocks. Matching models and other arguments remain
-#' static.
+#' resampling pending event clocks. All three matching arguments also accept
+#' whole-model schedule tibbles with `time_start`, `time_end`, and list-column
+#' `model`. Model changes update role-specific preferences and calibration before
+#' same-time choices without resampling event clocks. All supplied models,
+#' including future intervals, are validated; gaps in a run are errors. NULL
+#' father/cohabitation matching dynamically follows general matching. Other
+#' non-rate arguments remain static.
 #'
 #' @param rates For `"rate"` initiation, an age-specific female search-hazard
 #'   table with `age_start`, `age_end`, and `rate`, in years and per person-year.
@@ -422,8 +433,8 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   the same age/group/previous-category rules and cover the run. Type uses the
 #'   active probability at the search instant, before matching. Existing unions
 #'   keep their types. NULL retains untyped partnerships and their RNG path.
-#' @param cohab_matching Optional cohabitation matching model; NULL shares
-#'   `matching`. Marriage, cohabitation and unpartnered father searches calibrate
+#' @param cohab_matching Optional cohabitation matching model or whole-model
+#'   schedule; NULL shares the general `matching` model active at that search. Marriage, cohabitation and unpartnered father searches calibrate
 #'   weights using their own intensities and share the available male pool.
 #' @param union_convert_rate Optional age- or duration-specific conversion table,
 #'   optionally by woman's group. Duration uses the current cohabitation start.
@@ -456,6 +467,8 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
     cohabitation_counts_as_previous_union = cohabitation_counts_as_previous_union
   ), class = c("hammel_union_formation", "hammel_process"))
   validate_union_formation(process)
+  for (field in c("matching", "father_matching", "cohab_matching"))
+    process[field] <- list(normalize_model_argument(process[[field]]))
   for (field in c("cohab_prob", "union_convert_rate"))
     if (!is.null(process[[field]])) process[[field]] <- tibble::as_tibble(process[[field]])
   if (!is.null(rates)) {
@@ -507,8 +520,9 @@ validate_union_formation <- function(process) {
     stop("`cancel_birth_if_no_match` must be TRUE or FALSE.", call. = FALSE)
   }
   validate_kinship_generations(process$kinship_generations)
-  validate_matching_model(process$matching)
-  if (!is.null(process$father_matching)) validate_matching_model(process$father_matching)
+  validate_model_argument(process$matching, validate_matching_model, "matching")
+  if (!is.null(process$father_matching))
+    validate_model_argument(process$father_matching, validate_matching_model, "father_matching")
   if (process$initiation == "on_demand") {
     if (!is.null(process$group_prop_hazard)) {
       stop("`group_prop_hazard` requires rate-based union initiation; on-demand formation has no search hazard.",
