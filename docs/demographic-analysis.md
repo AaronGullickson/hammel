@@ -1,6 +1,6 @@
 # Demographic analysis
 
-Updated October 19, 2026. All outputs are tibbles; base data frames are valid
+Updated November 1, 2026. All outputs are tibbles; base data frames are valid
 inputs. Dates and age boundaries use years, and exposure uses person-years.
 See the [scientific contract](scientific-contract.md) for model assumptions.
 
@@ -553,3 +553,39 @@ and exposure before computing rates, and do not sum denominator copies across
 destinations. Zero exposure gives NA; a positive-exposure cell without moves
 has rate zero. See the [full contract](group-transitions.md#observed-transition-rates)
 for endpoint, empty-output and history-completeness rules.
+
+## Optional Poisson rate intervals
+
+All seven event-rate calculators (mortality, fertility, union formation,
+marriage, dissolution, cohabitation conversion and group transitions) accept
+`conf.level = NULL` by default, retaining their existing output. A finite numeric
+scalar strictly between zero and one requests two-sided exact Poisson intervals
+at that confidence level, appended as numeric `conf_low` and `conf_high` columns.
+For example:
+
+```r
+calculate_fertility_rates(
+  result, time_breaks = c(2000, 2010), age_breaks = c(15, 20, 25, 30, 35, 40, 45, 50),
+  conf.level = 0.95
+)
+```
+
+This requests 95% intervals. Each positive-exposure
+row uses `stats::poisson.test(x = events, T = exposure, conf.level = conf.level)`.
+Exposure is person-years or union-years according to the existing measure.
+Zero exposure produces two NA bounds, even when an endpoint event is recorded;
+empty results retain numeric zero-length confidence columns. Zero events with
+positive exposure have a zero lower bound and a positive upper bound: zero
+events in 100 years of exposure gives approximately [0, 0.036889] at 95%.
+
+Intervals use the final stratum's counts and exposure, after pooling where
+requested. They preserve all existing rate definitions, attributes and ordering.
+Fertility intervals describe observed `births / person_years`, including when
+`unrealized = TRUE`; fractional expected unrealized births are not Poisson
+event counts and do not enter the interval. These are marginal Poisson-model
+intervals, not simultaneous intervals, Monte Carlo SEs, or a guarantee of
+coverage under demographic feedback, shared partners or endogenous exposure.
+
+Validation compares every calculator with `stats::poisson.test()` and checks
+zero events, zero exposure, empty results, pooling/strata, fertility parity and
+unrealized outputs, invalid confidence levels and unchanged default outputs.

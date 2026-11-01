@@ -827,3 +827,15 @@ share current general matching. All possible inheritance identities across the
 schedule join one registry checked against grouped rates and matching levels.
 See [the model-schedule contract](time-varying-models.md) for defaults, worked
 examples, calibration updates, callback constraints and validation.
+
+## Optional uncertainty for observed rates (D124)
+
+All event-rate calculators accept `conf.level = NULL` (unchanged default output)
+or a confidence level strictly between zero and one. Non-NULL values append
+`conf_low` and `conf_high`, using the row's observed count and its existing
+exposure in `stats::poisson.test()`. Zero exposure yields NA bounds. Fertility
+intervals describe observed births, not the rate adjusted by expected unrealized
+births. These are marginal Poisson-model intervals, not replication-based
+uncertainty or a guarantee under demographic dependence. See
+[the analysis contract](demographic-analysis.md#optional-poisson-rate-intervals)
+for units, examples and edge cases.

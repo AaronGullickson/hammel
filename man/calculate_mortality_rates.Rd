@@ -9,7 +9,8 @@ calculate_mortality_rates(
   time_breaks,
   age_breaks,
   by_union_type = FALSE,
-  by_group = FALSE
+  by_group = FALSE,
+  conf.level = NULL
 )
 }
 \arguments{
@@ -37,6 +38,12 @@ mother's group, even when the child has a different group.
 Combines with \code{by_union_type}. No pooled
 group row is added. Unknown-mother births remain in the single period-level
 \code{unassigned_births} attribute, without a group assignment.}
+
+\item{conf.level}{NULL (default) to omit confidence intervals, or a finite
+numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
+from two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} intervals for observed event
+counts over exposure. Bounds are NA at zero exposure. For fertility, these
+describe the observed rate, not the unrealized-adjusted rate.}
 }
 \value{
 A tibble containing period, age, sex, person_years, deaths and

@@ -1,9 +1,23 @@
 # Testing and milestone validation
 
-Updated October 31, 2026. Milestones 1–6 are accepted as complete (D029,
+Updated November 1, 2026. Milestones 1–6 are accepted as complete (D029,
 D050, D077, D093, D105, D116). Software test history and the user's demographic assessment
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
+
+## Optional Poisson rate intervals (D124, November 1, 2026)
+
+`TZ=America/Los_Angeles Rscript -e 'devtools::test(stop_on_failure=TRUE)'`
+passed the full offline suite: 4,318 assertions, no failures or warnings, one
+opt-in live database test skipped. The 182 assertions in `test-rate-confidence.R`
+cover all seven public rate calculators, comparison with `stats::poisson.test()`
+at 95% and 80%, unchanged NULL/default output and attributes, group/type/parity
+strata, positive and zero event counts, zero exposure including endpoint events,
+empty grouped tables, invalid levels, and observed-birth intervals alongside
+fractional unrealized fertility. Public help was regenerated and documentation
+links and `git diff --check` checked. No rates were downloaded or reports edited.
+Exactness refers to the Poisson counting model; these tests do not establish
+coverage under all demographic dependence or milestone 7 scientific acceptance.
 
 ## Milestone 7 calendar-input implementation checks
 

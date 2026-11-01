@@ -1,6 +1,6 @@
 # Decision log
 
-Updated October 31, 2026. Entries retain the choices made at their original
+Updated November 1, 2026. Entries retain the choices made at their original
 dates; each numbered entry now states whether and how it remains current.
 Read [the scientific contract](scientific-contract.md) for implemented behavior,
 not a superseded API or timing statement buried in a historical entry.
@@ -24,6 +24,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Process constructors/setters | D017, D026 |
 | Database rate products and reusable downloads | D018, D025 |
 | Demographic extraction and function names | D020–D022, D081 and missing-ASFR clarification |
+| Optional Poisson intervals for observed rates | D124 |
 | Continuous execution | D024 |
 | Fertility spacing (cell accounting) | D026, D101 (superseding D027/D028/D099 compensation) |
 | Two-sex union models and union API restructuring (deferred) | D073 |
@@ -2590,3 +2591,26 @@ supported; caches belong to the simulation call. Model schedules complete this
 implementation component of milestone 7, not its scientific acceptance. Other
 non-rate arguments remain static, and the milestone 8 hazard rewrite remains
 unimplemented.
+
+## D124 — Optional exact Poisson intervals for observed event rates (November 1, 2026)
+
+**Status:** User-requested interface and Poisson method; implemented. This does
+not establish milestone 7 scientific acceptance.
+
+**Decision:** Add `conf.level = NULL` to mortality, fertility, union, marriage,
+dissolution, cohabitation conversion and transition rate calculators. A supplied
+confidence level requests `conf_low` and `conf_high` using two-sided
+`stats::poisson.test()` intervals for each row's observed event count and its
+existing person-year or union-year denominator. NULL preserves existing output.
+
+**Implementation choices:** Require a finite numeric scalar strictly between
+zero and one. Zero exposure yields NA bounds; zero events with positive exposure
+retain the Poisson upper limit. Empty tables retain numeric confidence columns.
+Fertility bounds refer to observed births, including with `unrealized = TRUE`;
+fractional expected unrealized intensity is not treated as an observed count.
+
+**Rationale and limits:** Supply within-run counting uncertainty without requiring
+replications. Normal SE approximations are unsuitable for very small counts.
+Exactness refers to the Poisson model, not guaranteed coverage for all simulator
+feedback or shared exposure. These are marginal intervals, not Monte Carlo SEs
+or simultaneous confidence bands. See [the analysis contract](demographic-analysis.md#optional-poisson-rate-intervals).

@@ -35,9 +35,11 @@
 #'   episodes using each type's own exposure. Requires a valid `union_type` column.
 #'   Conversion stops cohabitation exposure without counting as dissolution;
 #'   duration resets at the start of the linked marriage episode.
+#' @inheritParams calculate_mortality_rates
 #' @return A tibble with `time_start`, `time_end`, `dur_start`, `dur_end`,
 #'   `union_years`, `dissolutions`, and `rate_dissolution`, plus `group_pair` and
 #'   `union_type` when requested. Period varies fastest within duration bands and group blocks.
+#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
 #' @export
 #' @examples
 #' unions <- data.frame(union_id = 1:3, start_time = c(0, 1, 2),
@@ -45,7 +47,9 @@
 #'   end_reason = c("dissolution", "death_husband", NA))
 #' calculate_dissolution_rates(unions, c(0, 2, 5), c(0, 2, Inf))
 calculate_dissolution_rates <- function(population, time_breaks, dur_breaks,
-                                   by_group = FALSE, by_union_type = FALSE) {
+                                   by_group = FALSE, by_union_type = FALSE,
+                                   conf.level = NULL) {
+  validate_rate_conf_level(conf.level)
   if (!is.logical(by_group) || length(by_group) != 1L ||
       !is.null(dim(by_group)) || is.na(by_group))
     stop("`by_group` must be TRUE or FALSE.", call. = FALSE)
@@ -122,5 +126,5 @@ calculate_dissolution_rates <- function(population, time_breaks, dur_breaks,
   result$dissolutions <- counts$dissolutions
   result$rate_dissolution <- as.numeric(ifelse(result$union_years > 0,
     result$dissolutions / result$union_years, NA_real_))
-  result
+  add_rate_confidence(result, "dissolutions", "union_years", conf.level)
 }

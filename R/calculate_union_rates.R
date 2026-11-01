@@ -40,21 +40,26 @@
 #' @param by_union_type Logical, default FALSE. Separate cohabitation and direct
 #'   marriage entries. Requires typed histories. Both types use the same full
 #'   unpartnered exposure; exposure must not be summed across type rows.
+#' @inheritParams calculate_mortality_rates
 #' @return A tibble with `time_start`, `time_end`, `sex`, `age_start`, `age_end`,
 #'   `person_years`, `unions`, and `rate_union`, plus `group` and
 #'   `previous_union` when requested, and duration columns when `dur_breaks` is
 #'   supplied, and `union_type` when requested. Empty cells are retained.
+#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
 #' @export
 calculate_union_rates <- function(population, time_breaks, age_breaks,
                                      by_group = FALSE, by_previous_union = FALSE,
-                                     dur_breaks = NULL, by_union_type = FALSE) {
+                                     dur_breaks = NULL, by_union_type = FALSE,
+                                     conf.level = NULL) {
+  validate_rate_conf_level(conf.level)
   calculate_entry_rates(population, time_breaks, age_breaks, by_group,
-    by_previous_union, dur_breaks, by_union_type, marriage_measure = FALSE)
+    by_previous_union, dur_breaks, by_union_type, marriage_measure = FALSE,
+    conf.level = conf.level)
 }
 
 calculate_entry_rates <- function(population, time_breaks, age_breaks,
                                   by_group, by_previous_union, dur_breaks,
-                                  by_union_type, marriage_measure) {
+                                  by_union_type, marriage_measure, conf.level = NULL) {
   if (!is.logical(by_union_type) || length(by_union_type) != 1L ||
       !is.null(dim(by_union_type)) || is.na(by_union_type))
     stop("`by_union_type` must be TRUE or FALSE.", call. = FALSE)
@@ -144,5 +149,6 @@ calculate_entry_rates <- function(population, time_breaks, age_breaks,
     names(result)[names(result) == "unions"] <- "marriages"
     names(result)[names(result) == "rate_union"] <- "rate_marriage"
   }
-  result
+  add_rate_confidence(result, if (marriage_measure) "marriages" else "unions",
+    "person_years", conf.level)
 }

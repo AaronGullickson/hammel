@@ -11,7 +11,8 @@ calculate_union_rates(
   by_group = FALSE,
   by_previous_union = FALSE,
   dur_breaks = NULL,
-  by_union_type = FALSE
+  by_union_type = FALSE,
+  conf.level = NULL
 )
 }
 \arguments{
@@ -41,12 +42,19 @@ Duration rows include all ages; this is not an age-by-duration surface.}
 \item{by_union_type}{Logical, default FALSE. Separate cohabitation and direct
 marriage entries. Requires typed histories. Both types use the same full
 unpartnered exposure; exposure must not be summed across type rows.}
+
+\item{conf.level}{NULL (default) to omit confidence intervals, or a finite
+numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
+from two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} intervals for observed event
+counts over exposure. Bounds are NA at zero exposure. For fertility, these
+describe the observed rate, not the unrealized-adjusted rate.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, \code{sex}, \code{age_start}, \code{age_end},
 \code{person_years}, \code{unions}, and \code{rate_union}, plus \code{group} and
 \code{previous_union} when requested, and duration columns when \code{dur_breaks} is
 supplied, and \code{union_type} when requested. Empty cells are retained.
+With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
 }
 \description{
 Count union starts and unpartnered person-years by age, period, sex, and

@@ -10,7 +10,8 @@ calculate_transition_rates(
   age_breaks = NULL,
   dur_breaks = NULL,
   by_sex = FALSE,
-  by_union_type = FALSE
+  by_union_type = FALSE,
+  conf.level = NULL
 )
 }
 \arguments{
@@ -30,6 +31,12 @@ axis boundary gains Inf.}
 \item{by_union_type}{Logical, default FALSE. Disaggregate exposure and events
 by current union type. Typed histories use unpartnered/cohab/marriage;
 untyped histories use unpartnered/partnered. Requires exclusive histories.}
+
+\item{conf.level}{NULL (default) to omit confidence intervals, or a finite
+numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
+from two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} intervals for observed event
+counts over exposure. Bounds are NA at zero exposure. For fertility, these
+describe the observed rate, not the unrealized-adjusted rate.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, age or duration bounds,
@@ -38,6 +45,7 @@ A tibble with \code{time_start}, \code{time_end}, age or duration bounds,
 directed pairs among current and historical identities are retained,
 including zero-event cells. Fewer than two known groups returns a typed
 empty tibble. Period varies fastest within axis bands and pair blocks.
+With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
 }
 \description{
 Count individual moves and person-years in their origin group in half-open

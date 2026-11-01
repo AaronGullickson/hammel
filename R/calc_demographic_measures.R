@@ -193,16 +193,23 @@ collect_demographic_counts <- function(population, time_breaks, age_breaks,
 #'   Combines with `by_union_type`. No pooled
 #'   group row is added. Unknown-mother births remain in the single period-level
 #'   `unassigned_births` attribute, without a group assignment.
+#' @param conf.level NULL (default) to omit confidence intervals, or a finite
+#'   numeric scalar strictly between 0 and 1. Adds `conf_low` and `conf_high`
+#'   from two-sided exact [stats::poisson.test()] intervals for observed event
+#'   counts over exposure. Bounds are NA at zero exposure. For fertility, these
+#'   describe the observed rate, not the unrealized-adjusted rate.
 #' @return A tibble containing period, age, sex, person_years, deaths and
 #'   rate_mortality, with optional group and union_type strata.
 #' @export
 calculate_mortality_rates <- function(population, time_breaks, age_breaks,
-                                     by_union_type = FALSE, by_group = FALSE) {
+                                     by_union_type = FALSE, by_group = FALSE,
+                                     conf.level = NULL) {
+  validate_rate_conf_level(conf.level)
   x <- collect_demographic_counts(population, time_breaks, age_breaks,
                             by_union_type, by_group)
   x$births <- x$rate_fertility <- NULL
   attr(x, "unassigned_births") <- NULL
-  x
+  add_rate_confidence(x, "deaths", "person_years", conf.level)
 }
 
 #' Calculate age-specific fertility rates, optionally by current parity
@@ -233,7 +240,9 @@ calculate_mortality_rates <- function(population, time_breaks, age_breaks,
 #' @export
 calculate_fertility_rates <- function(population, time_breaks, age_breaks,
                                      by_union_type = FALSE, by_group = FALSE,
-                                     parity_breaks = NULL, unrealized = FALSE) {
+                                     parity_breaks = NULL, unrealized = FALSE,
+                                     conf.level = NULL) {
+  validate_rate_conf_level(conf.level)
   if (!is.logical(unrealized) || length(unrealized) != 1L || is.na(unrealized))
     stop("`unrealized` must be TRUE or FALSE.", call. = FALSE)
   if (unrealized) {
@@ -250,7 +259,7 @@ calculate_fertility_rates <- function(population, time_breaks, age_breaks,
   female$deaths <- female$rate_mortality <- NULL
   if (is.null(parity_breaks)) {
     if (unrealized) female <- add_unrealized_births(female, population$simulation)
-    return(female)
+    return(add_rate_confidence(female, "births", "person_years", conf.level))
   }
   check_demographic_breaks(parity_breaks, "parity_breaks", ages = TRUE)
   finite <- parity_breaks[is.finite(parity_breaks)]
@@ -284,7 +293,7 @@ calculate_fertility_rates <- function(population, time_breaks, age_breaks,
     out$births / out$person_years, NA_real_))
   if (unrealized) out <- add_unrealized_births(out, population$simulation)
   attr(out, "unassigned_births") <- unknown
-  out
+  add_rate_confidence(out, "births", "person_years", conf.level)
 }
 
 # Attribute recorded unrealized births (D101) to observation rows. A record is

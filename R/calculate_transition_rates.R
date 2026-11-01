@@ -20,12 +20,14 @@
 #' @param by_union_type Logical, default FALSE. Disaggregate exposure and events
 #'   by current union type. Typed histories use unpartnered/cohab/marriage;
 #'   untyped histories use unpartnered/partnered. Requires exclusive histories.
+#' @inheritParams calculate_mortality_rates
 #' @return A tibble with `time_start`, `time_end`, age or duration bounds,
 #'   `group_origin`, `group_dest`, optional `sex` and `union_type`, `person_years`,
 #'   `transitions`, and `rate_transition` (NA at zero exposure). All distinct
 #'   directed pairs among current and historical identities are retained,
 #'   including zero-event cells. Fewer than two known groups returns a typed
 #'   empty tibble. Period varies fastest within axis bands and pair blocks.
+#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
 #' @export
 #' @examples
 #' persons <- data.frame(person_id = 1, sex = "f", birth_time = 0,
@@ -36,7 +38,8 @@
 #' calculate_transition_rates(population, c(0, 5), age_breaks = c(0, Inf))
 calculate_transition_rates <- function(population, time_breaks, age_breaks = NULL,
                                       dur_breaks = NULL, by_sex = FALSE,
-                                      by_union_type = FALSE) {
+                                      by_union_type = FALSE, conf.level = NULL) {
+  validate_rate_conf_level(conf.level)
   if (!inherits(population, "hammel_population"))
     stop("`population` must be a grouped hammel_population.", call. = FALSE)
   validate_population(population)
@@ -95,5 +98,5 @@ calculate_transition_rates <- function(population, time_breaks, age_breaks = NUL
   out$person_years <- counts$person_years[cell + 1]
   out$transitions <- counts$transitions[event_cell + 1]
   out$rate_transition <- as.numeric(ifelse(out$person_years > 0, out$transitions / out$person_years, NA_real_))
-  out
+  add_rate_confidence(out, "transitions", "person_years", conf.level)
 }
