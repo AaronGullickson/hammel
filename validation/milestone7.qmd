@@ -115,20 +115,36 @@ The arguments for both matching and inheritance will take either a single model 
 
 ## Inputs and Simulation Design
 
-## Simulating the Demographic Transition
+For this milestone, I am going to try several different demonstration projects with time-varying rates in some capacity to show off the full range of the program at this point. I will define inputs within each demonstration project.
 
-We will reproduce the demographic transition in Sweden! It has HMD and HFD data that go far enough back.
+Rather than Monte Carlo replication, I will focus on a single simulation with a large initial population and I will use visual examination to confirm that rates are changing at the appropriate point and the confidence intervals around rates themselves at selected time points to confirm that the input rates are being preserved correctly. Confidence intervals are defined by the correct Poisson confidence interval around each rate, which can account better for sparse cells than the normal approximation.
+
+## Demonstration Projects
+
+### The Demographic Transition
+
+I will reproduce the demographic transition by using fertility and mortality rates for Sweden, available from th Human Fertility Database (HFD) and Human Mortality Database (HMD). 
+
+Age-specific fertility rates in Sweden only go back to 1891, while age-specific mortality rates go back to 1751. both series continue until 2024. I will download the full range of years for each series. In some cases, using the full open age of 110+ from the HMD can lead to missing values at extreme ages in older dat, so I truncate the open-age group to 95 (this is done correctly by recomputing the open-age mortality rate by pooling deaths and person years for that inteval from HMD data).
 
 ```{r}
-fertility_rates_sweden <- get_fertility_hfd("SWE", 1891:2020)
-mortality_rates_sweden <- get_mortality_hmd("SWE", 1770:2020, open_age = 95)
+#| label: get-rates-demog-trans-sweden
+
+fertility_rates_sweden <- get_fertility_hfd("SWE", 1891:2024)
+mortality_rates_sweden <- get_mortality_hmd("SWE", 1751:2024, open_age = 95)
 ```
 
-We only have fertility back to 1891, but we were along in terms of mortality decline then. So lets just take the 1891 fertility rates back to a year where we get a roughly stationary population. Then we will take use those rates for a 100 years to produce a stable population for the actual starting population of the simulation. Then run it forward.
+The mortality transition was already well underway by 1891, when we first get the fertility data, so I will make the assumption that fertility rates before 1891 were at the 1891 levels.
 
-Codex thinks 1810 would be a good starting year for mortality. Don't know if I need to go back that far. I can create a get_growth_rate() function that uses the log(NRR)/(mu) approximation to estimate growth rates for candidates quickly
+I want to start the simulation with a population age structure fom a stable but stationary population. To do so, I need to find mortality rates to match with the 1891 fertility rates that will produce roughly zero population growth in the stable population. I use the approximation that:
+
+$$r = \log(NRR)/\mu$$
+
+Where $\mu$ is the mean age of childbearing. I test different candidate years until I get one that works in the code below.
 
 ```{r}
+#| label: determine-growth-rate-zero
+#| eval: false
 
 get_growth_rate <- function(fert_rates, mort_rates) {
 
@@ -145,25 +161,27 @@ get_growth_rate <- function(fert_rates, mort_rates) {
 
 }
 
-
 fert_rates <- fertility_rates_sweden |> filter(time_start == 1891)
-get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1811))
 get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1810))
 get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1812))
 get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1813))
 get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1838))
+get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1811))
 ```
 
-It looks like 1811 is the winner. But lets take it back to 1770
+Mortality rates in 1811 are the winner. Pairing them with the 1891 fertility rates gives me a growth rate of 0.0019 per annum.
+
+The next task is to run a 100 year simulation from a uniform population distribution to produce my starting stationary population. To do this correctly, I want to start this simulation 100 years before when I want to start my "real" simulation. I decide on 1780 as a starting point for my simulation. 
 
 ```{r}
+#| label: get-starting-stationary-pop
 
 fert_rates <- fertility_rates_sweden |> filter(time_start == 1891) |>
   select(-starts_with("time_"))
 mort_rates <- mortality_rates_sweden |> filter(time_start == 1811) |>
   select(-starts_with("time_"))
 
-pop <- create_baseline_population(50000, 70, 1780 - 100)
+pop <- create_baseline_population(100000, 70, 1780 - 100)
 model <- hammel_model() |>
   set_population(pop) |>
   set_fertility(fert_rates) |>
@@ -172,9 +190,15 @@ model <- hammel_model() |>
 pop_start <- simulate(model, 100, 1)
 ```
 
+I now have a starting population that should be roughly consistent with the stable population under Sweden's pre-transition rates. I can now use my time-varying rates to project this population forward. I will project it to 2020. Since I only care about the effect of fertility and mortality rates on creating the demographic transition, I will use the "on demand" model for union formation and will not complicate the simulation otherwise.
+
 ```{r}
-mort_rates_time <- mortality_rates_sweden |> filter(time_start >= 1780)
-fert_rates_time <- bind_rows(
+#| label: run-simulation-demog-transition
+
+# for fertiliity rates I need to extend the last year back to my starting point of 1870
+# I do this by adding one row at the front for the 1780-1891 time period that duplicates 
+# my 1891 rates
+fertility_rates_sweden <- bind_rows(
   fertility_rates_sweden |>
     filter(time_start == 1891) |>
     mutate(time_start = 1780, time_end = 1891),
@@ -183,37 +207,30 @@ fert_rates_time <- bind_rows(
 
 model <- hammel_model() |>
   set_population(pop_start) |>
-  set_fertility(fert_rates_time) |>
-  set_mortality(mort_rates_time) |>
+  set_fertility(fertility_rates_sweden) |>
+  set_mortality(mortality_rates_sweden) |>
   set_union_formation("on_demand")
-system.time(pop_final <- simulate(model, 2020 - 1780, 1))
-
+sim_time_demog_trans <- system.time(pop_final <- simulate(model, 2020 - 1780, 1))
 ```
 
+The simulation took `r sim_time_demog_trans` seconds to run.
+
 ```{r}
+#| label: fig-pop-size-demog-trans
+#| fig-cap: Relative population size from start from simulation starting in 1780 to 2020, using Sweden's historic age-specific fertility and mortality rates
+
 pop_final |> calculate_population_size(1780:2020) |>
-  ggplot(aes(x = time, y = population))+
-  geom_line()
-
+  ggplot(aes(x = time, y = population / first(population)))+
+  geom_line()+
+  labs(x = "year", y = "population size relative to initial")
 ```
 
-```{r}
-# get crude rates
-cbr_f <- calculate_fertility_rates(pop_final, 1780:2020, c(0, Inf)) |> 
-  mutate(rate_fertility = rate_fertility * 0.4886) |>
-  select(time_start, rate_fertility)
-cmr_f <- calculate_mortality_rates(pop_final, 1780:2020, c(0, Inf)) |> 
-  filter(sex == "f") |>
-  select(time_start, rate_mortality)
-full_join(cbr_f, cmr_f) |>
-  pivot_longer(cols = starts_with("rate_"), names_prefix = "rate_",
-               names_to = "type", values_to = "crude_rate") |>
-  ggplot(aes(x = time_start, y = crude_rate, color = type))+
-  geom_line()
-
-```
+@fig-pop-size-demog-trans show the population size over time in the simulation. It displays the classic S-shaped curve expected of the demographic transition, although we start late enough in 1780 that it is already rising a bit at the beginning. The population grows by four-fold over the simulation period. 
 
 ```{r}
+#| label: fig-crude-rates-demog-trans
+#| fig-cap: Crude birth and death rates annually over the simulation
+
 births <- pop_final$persons |>
   mutate(year = floor(birth_time)) |>
   count(year, name = "births")
@@ -226,16 +243,19 @@ crude_rates <- calculate_population_size(pop_final, 1780:2019 + 0.5) |>
   left_join(deaths, by = "year") |>
   mutate(rate_birth = births / population, rate_death = deaths / population) |>
   pivot_longer(cols = starts_with("rate_"), names_prefix = "rate_",
-               names_to = "type", values_to = "crude_rate") 
+               names_to = "event", values_to = "crude_rate") 
 
 crude_rates |>
-  ggplot(aes(x = time, y = crude_rate, color = type))+
-  geom_line()
+  ggplot(aes(x = time, y = crude_rate, color = event))+
+  geom_line()+
+  labs(x = "year", y = "crude rate")
 ```
 
-
+@fig-crude-rates-demog-trans shows another classic demographic transition figure - A comparison of crude birth and death rates over time. These are estimated by taking counts of births or deaths over mid-yer population sizes. Mortality rates fall faster than fertility rates over the time period, leading to population growth. We can also see the post-war baby boom.
 
 ```{r}
+#| label: fig-tfr-demog-trans
+#| fig-cap: Total fertility rates by year of the simulation. Dotted red line shows the total fertility rate from the input rates.
 
 input_tfr <- fert_rates_time |> calculate_tfr()
 
@@ -243,12 +263,19 @@ calculate_fertility_rates(pop_final, 1780:2020, 12:55) |>
   calculate_tfr() |>
   ggplot(aes(x = time_start, y = tfr))+
   geom_line()+
-  geom_line(data = input_tfr, linetype = 2, color = 'red')
+  geom_line(data = input_tfr, linetype = 2, color = 'red')+
+  labs(x = "year", y = "total fertility rate")
 ```
 
+@fig-tfr-demog-trans shows the estimated TFR for each year of the simulation. The dotted red line shows the TFR from the input rates. The estimated TFRs match closely to that expected by the input rates. There is less random noise at the end of the simulation when the population is much larger.
+
 ```{r}
+#| label: fig-life-exp-demog-trans
+#| fig-cap: Life expectancy at age zero by year of the simulation, separately by gender. Dotted red lines show the life expectancy at birth from input rates.
+
 input_lifeexp <- mort_rates_time |> calculate_life_table() |>
-  filter(age_start == 0)
+  # 1853 has a problem with the open-ended age caegory leading to Inf results so remove it
+  filter(age_start == 0, time_start != 1853)
 
 calculate_mortality_rates(pop_final, 1780:2020, 0:85) |>
   calculate_life_table() |>
@@ -256,21 +283,71 @@ calculate_mortality_rates(pop_final, 1780:2020, 0:85) |>
   ggplot(aes(x = time_start, y = ex))+
   geom_line()+
   geom_line(data = input_lifeexp, linetype = 2, color = 'red')+
-  facet_wrap(~sex)
+  facet_wrap(~sex)+
+  labs(x = "year", y = "life expectancy at birth")
 ```
 
-## Simulating the Second Demographic Transition
+@fig-life-exp-demog-trans shows the estimated life expectancy at birth for each year of the simulation. The dotted red line shows the life expectancy at birth from the input rates. The estimated life expectancy matches closely to that expected by the input rates.
+
+As a final test, I look at age-specific mortality rates and age-specific fertility rates at specific time points and compare them to the input rates at those time points. For this exercise I also show the 95% CI around each of my estimates.
+
+```{r}
+#| label: fig-asfr-demog-trans
+#| fig-cap: Age-specific fertility rates estimated from simulation for selected years. 95% confidence band shown around each estimate. Dotted red line shows input rate.
+
+selected_years <- c(1900, 1920, 1940, 1960, 1980, 2000)
+temp <- fertility_rates_sweden |>
+  filter(time_start %in% selected_years)
+
+calculate_fertility_rates(pop_final, 1780:2020, 12:55, conf.level = 0.95) |>
+  filter(time_start %in% selected_years) |> 
+  ggplot(aes(x = age_start + 0.5, y = rate_fertility))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(data = temp, aes(y = rate), linetype = 2, color = "red")+
+  facet_wrap(~time_start)+
+  labs(x = "age", y = "age-specific fertility rate")
+```
+
+@fig-asfr-demogr-trans shows the estimated fertility rates at 20 year intervals from 1900 to 2000. Dotted red lines show the values from the input rates. The red dotted line fits well to the estimated data and is generally within the 95% confidence interval. 
+
+```{r}
+#| label: fig-asmr-demog-trans
+#| fig-cap: Age-specific mortality rates by sex estimated from simulation for selected years. 95% confidence band shown around each estimate. Dotted red line shows input rate.
+
+selected_years <- c(1800, 1850, 1900, 1950, 2000)
+temp <- mortality_rates_sweden |>
+  filter(time_start %in% selected_years)
+
+calculate_mortality_rates(pop_final, 1780:2020, 0:95, conf.level = 0.95) |>
+  filter(time_start %in% selected_years) |> 
+  ggplot(aes(x = age_start + 0.5, y = rate_mortality))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(data = temp, aes(y = rate), linetype = 2, color = "red")+
+  facet_grid(sex~time_start)+
+  scale_y_log10()+
+  labs(x = "age", y = "age-specific mortality rate")
+```
+
+@fig-asmr-demogr-trans shows the estimated mortality  rates at 50 year intervals from 1800 to 2000. Dotted red lines show the values from the input rates. In the more recent years, very low mortality rates at some younger ages lead to no observed deaths in some single year age groups, resulting in wide confidence bands. In general, the red dotted line fits well to the estimated data and is generally within the 95% confidence interval. 
+
+### The Second Demographic Transition
 
 - hold fertility and mortality constant at low levels
 - increase cohabitation, dissolution rates, and increase age at first marriage
 
+
+### Replicate Gullickson and Saperstein
+
+- changing intermarriage and inheritance rates
+
+### Another Project for Transition Rates
+
+
 ## Specific Test on Fertility
 
 - Switch from low fertility rate to high fertility rate and confirm that this no longer produces a blip.
-
-## Replicate Gullickson and Saperstein
-
-- changing intermarriage and inheritance rates
 
 ## Time Tests
 
