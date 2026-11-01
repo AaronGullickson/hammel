@@ -74,12 +74,48 @@ Assess whether the current simulation successfully handles time varying rate sch
 
 | Measure | Comparison | Acceptance criterion |
 |---|---|---|
+| TFR | Over time | Should change in the expected way over time within simulation and remain close to expected values |
+| Life Expectancy at birth | Over time | Should change in the expected way over time within simulation and remain close to expected values |
 | Accounting and implementation | Existing tests | Successful unit tests |
 
 ## Overview of Design
 
+### Time-varying rate processes
+
+For all rate processes, we add time varying rates by allowing stratification of these rate objects by `time_start` and `time_end` columns. The simulation will use the rates in the currect time interval as it progresses through time in the simulation. If the `time_start` and `time_end` columns are not provided, then the rates will remain constant throughout the simulation. Users can use `Inf` in `time_end` to indicate a time interval that should be followed for the remainder of the simulation.
+
+The times provided must cover the entire interval of the simulation and there can be no gaps. If the program detects a lack of coverage or gaps, it will fail to process the simulation with an error. This requires some extra work by the user to ensure that they providing adequate coverage. Notably, you can provide time intervals that exceed the coverage without problem.For example, you could provide historical fertility rates from 1900 to 2000 and then run the simulation only from 1950 to 1980. This makes it possible for users to download large historical rate schedules and use them without further modification to fit a specific time period, so long as the simulation time period falls within the range.
+
+It is also possible for users to create time varying rates by stopping the simulation and then restarting it with the final results from the previous simulation and new rates. However, because there is some initialization cost to each simulation, this approach will usually be *substantially* slower than specifying time-varying rates within a single simulation.
+
+The argument to `cohab_prob`, while not technically a rate, takes the same form as a rate process and so we allow it to vary in the same way.
+
+To assist with generating long runs of rates, the `get_mortality_hmd` and `get_fertility_hfd` functions have been improved to pull in a vector of years rather than just a single year. Additionally, users can specify age by time shapes other than 1x1 with the `shape` argument to `get_mortality_hmd` (the only shape currently available in HFD is 1x1).
+
+### Time-varying matching and inheritance models
+
+The matching models used in the union formation process (assigned by arguments `matching`, `cohab_matching`, and `father_matching`) and the inheritance models used in the fertility process are additional places where users may wish to add time variance within a single simulation. For example, users may wish to adjust the rate of exogamy between groups over time, shift preferences in spousal age differences, or shift to a difference method for inheritance of group identity.
+
+To specify time variance, these arguments can be entered as tibbles that include the `time_start` and `time_end` columns as well as a list column for the `model`. So for example:
+
+```r
+tibble(
+  time_start = c(1950, 1980),
+  time_end   = c(1980, Inf),
+  model      = list(
+    create_age_gap_matching_model(2, 5),
+    create_age_gap_matching_model(4, 5)
+  )
+)
+```
+
+will create two separate matching models that differ by the preferred spousal age gap. From 1950 until 1980, the first model will be used and from 1980 onward, the second model will be used.
+
+The arguments for both matching and inheritance will take either a single model for time constant models or a time-varying tibble of this format.
 
 ## Inputs and Simulation Design
+
+## Simulating the Demographic Transition
 
 We will reproduce the demographic transition in Sweden! It has HMD and HFD data that go far enough back.
 
@@ -222,6 +258,19 @@ calculate_mortality_rates(pop_final, 1780:2020, 0:85) |>
   geom_line(data = input_lifeexp, linetype = 2, color = 'red')+
   facet_wrap(~sex)
 ```
+
+## Simulating the Second Demographic Transition
+
+- hold fertility and mortality constant at low levels
+- increase cohabitation, dissolution rates, and increase age at first marriage
+
+## Specific Test on Fertility
+
+- Switch from low fertility rate to high fertility rate and confirm that this no longer produces a blip.
+
+## Replicate Gullickson and Saperstein
+
+- changing intermarriage and inheritance rates
 
 ## Time Tests
 
