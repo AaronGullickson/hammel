@@ -17,3 +17,5 @@ validation/.quarto/
 # Quarto execution intermediates; keep final QMD/HTML reports.
 validation/*.rmarkdown
 validation/*.knit.md
+inst/doc
+**/.quarto/
