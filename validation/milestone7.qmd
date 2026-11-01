@@ -74,6 +74,7 @@ Assess whether the current simulation successfully handles time varying rate sch
 
 | Measure | Comparison | Acceptance criterion |
 |---|---|---|
+| Age-specific rates | Output rates vs. input rates | Input rates should generally fall within the 95% Poisson-based confidence intervals for the rate, although we don't expect complete coverage |
 | TFR | Over time | Should change in the expected way over time within simulation and remain close to expected values |
 | Life Expectancy at birth | Over time | Should change in the expected way over time within simulation and remain close to expected values |
 | Accounting and implementation | Existing tests | Successful unit tests |
@@ -213,7 +214,7 @@ model <- hammel_model() |>
 sim_time_demog_trans <- system.time(pop_final <- simulate(model, 2020 - 1780, 1))
 ```
 
-The simulation took `r sim_time_demog_trans` seconds to run.
+The simulation took `r sim_time_demog_trans[["elapsed"]]` seconds to run.
 
 ```{r}
 #| label: fig-pop-size-demog-trans
@@ -257,7 +258,9 @@ crude_rates |>
 #| label: fig-tfr-demog-trans
 #| fig-cap: Total fertility rates by year of the simulation. Dotted red line shows the total fertility rate from the input rates.
 
-input_tfr <- fert_rates_time |> calculate_tfr()
+input_tfr <- fertility_rates_sweden |>
+  calculate_tfr() |>
+  filter(time_start >= 1780, time_start <= 2020)
 
 calculate_fertility_rates(pop_final, 1780:2020, 12:55) |> 
   calculate_tfr() |>
@@ -273,9 +276,11 @@ calculate_fertility_rates(pop_final, 1780:2020, 12:55) |>
 #| label: fig-life-exp-demog-trans
 #| fig-cap: Life expectancy at age zero by year of the simulation, separately by gender. Dotted red lines show the life expectancy at birth from input rates.
 
-input_lifeexp <- mort_rates_time |> calculate_life_table() |>
+input_lifeexp <- mortality_rates_sweden |> 
+  calculate_life_table() |>
   # 1853 has a problem with the open-ended age caegory leading to Inf results so remove it
-  filter(age_start == 0, time_start != 1853)
+  filter(age_start == 0, time_start != 1853) |>
+  filter(time_start >= 1780, time_start <= 2020)
 
 calculate_mortality_rates(pop_final, 1780:2020, 0:85) |>
   calculate_life_table() |>
@@ -309,7 +314,7 @@ calculate_fertility_rates(pop_final, 1780:2020, 12:55, conf.level = 0.95) |>
   labs(x = "age", y = "age-specific fertility rate")
 ```
 
-@fig-asfr-demogr-trans shows the estimated fertility rates at 20 year intervals from 1900 to 2000. Dotted red lines show the values from the input rates. The red dotted line fits well to the estimated data and is generally within the 95% confidence interval. 
+@fig-asfr-demog-trans shows the estimated fertility rates at 20 year intervals from 1900 to 2000. Dotted red lines show the values from the input rates. The red dotted line fits well to the estimated data and is generally within the 95% confidence interval. 
 
 ```{r}
 #| label: fig-asmr-demog-trans
@@ -330,7 +335,7 @@ calculate_mortality_rates(pop_final, 1780:2020, 0:95, conf.level = 0.95) |>
   labs(x = "age", y = "age-specific mortality rate")
 ```
 
-@fig-asmr-demogr-trans shows the estimated mortality  rates at 50 year intervals from 1800 to 2000. Dotted red lines show the values from the input rates. In the more recent years, very low mortality rates at some younger ages lead to no observed deaths in some single year age groups, resulting in wide confidence bands. In general, the red dotted line fits well to the estimated data and is generally within the 95% confidence interval. 
+@fig-asmr-demog-trans shows the estimated mortality  rates at 50 year intervals from 1800 to 2000. Dotted red lines show the values from the input rates. In the more recent years, very low mortality rates at some younger ages lead to no observed deaths in some single year age groups, resulting in wide confidence bands. In general, the red dotted line fits well to the estimated data and is generally within the 95% confidence interval. 
 
 ### The Second Demographic Transition
 
@@ -349,30 +354,13 @@ calculate_mortality_rates(pop_final, 1780:2020, 0:95, conf.level = 0.95) |>
 
 - Switch from low fertility rate to high fertility rate and confirm that this no longer produces a blip.
 
-## Time Tests
-
-@tbl-processing-time shows the average processing time per simulation for different scenarios.
-
-
-```{r}
-#| label: tbl-processing-time
-#| tbl-cap: Mean processing time by simulation scenario
-
-time_scenario |>
-  gt() |>
-  cols_label(
-    scenario ~ "Scenario",
-    elapsed_time ~ "Mean processing time"
-  )
-```
-
 ## Tests
 
 The following tests have been constructed and are currently all passing.
 
 ```{r}
 #| label: test-results
-#| eval: true
+#| eval: false
 
 test_results <- devtools::test(pkg = here::here(), reporter = "silent")
 test_table <- as.data.frame(test_results)
