@@ -202,3 +202,10 @@ D086 adds optional union_type cohab/marriage strata within each shared or
 symmetric group_pair schedule. Supply both when stratifying; without the column,
 each episode uses the same dissolution schedule. Conversion is not dissolution:
 it ends the cohab episode and starts marriage with a fresh duration clock.
+
+For calendar-varying tables, both types are required in each nonempty active
+calendar interval. Missing-type errors name the absent type, the half-open
+calendar interval, and the group pair only when pair-specific rates are used.
+For example, cohabitation rates starting in 1990 and marriage rates starting
+in 1992 report a missing marriage schedule during `[1990,1992)`. Validation
+still examines supplied intervals outside the eventual simulation window.

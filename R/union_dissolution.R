@@ -63,15 +63,22 @@ set_union_dissolution <- function(model, rates, group_prop_hazard = NULL) {
   set_process(model, union_dissolution(rates, group_prop_hazard))
 }
 
-validate_union_dissolution <- function(process) {
+validate_union_dissolution <- function(process, calendar_interval = NULL) {
   if (!identical(process$name, "union_dissolution") ||
       !identical(process$rate_unit, "person_year"))
     stop("Invalid union-dissolution specification or units.", call. = FALSE)
   validate_dissolution_multipliers(process$group_prop_hazard)
   rates <- process$rates
-  if (validate_calendar_rates(rates, function(x) {
-    copy <- process; copy$rates <- x; validate_union_dissolution(copy)
-  })) return(invisible(process))
+  if (has_calendar_rates(rates)) {
+    slices <- calendar_rate_slices(rates)
+    boundaries <- sort(unique(c(rates$time_start, rates$time_end)))
+    for (i in seq_along(slices)) if (nrow(slices[[i]])) {
+      copy <- process
+      copy$rates <- slices[[i]]
+      validate_union_dissolution(copy, boundaries[c(i, i + 1L)])
+    }
+    return(invisible(process))
+  }
   check_columns(rates, c("dur_start", "dur_end", "rate"), "rates")
   check_numeric_column(rates$dur_start, "rates$dur_start")
   check_numeric_column(rates$rate, "rates$rate")
@@ -87,9 +94,21 @@ validate_union_dissolution <- function(process) {
     canonical_union_pairs(rates$group_pair) else rep("shared", nrow(rates))
   types <- if ("union_type" %in% names(rates)) rates$union_type else rep("shared", nrow(rates))
   if ("union_type" %in% names(rates)) {
-    if (!is.character(types) || anyNA(types) || any(!types %in% c("cohab", "marriage")) ||
-        any(vapply(split(types, pair_labels), function(x) !setequal(x, c("cohab", "marriage")), logical(1))))
-      stop("Typed dissolution requires both cohab and marriage schedules in each pair stratum.", call. = FALSE)
+    if (!is.character(types) || anyNA(types) || any(!types %in% c("cohab", "marriage")))
+      stop("Dissolution `union_type` must use cohab and marriage labels without missing values.", call. = FALSE)
+    for (pair in unique(pair_labels)) {
+      missing <- setdiff(c("cohab", "marriage"), types[pair_labels == pair])
+      if (!length(missing)) next
+      context <- if (is.null(calendar_interval)) "" else sprintf(
+        " during calendar interval [%s, %s)",
+        format(calendar_interval[1], trim = TRUE, scientific = FALSE),
+        format(calendar_interval[2], trim = TRUE, scientific = FALSE))
+      if ("group_pair" %in% names(rates))
+        context <- paste0(context, sprintf(" for group pair '%s'", pair))
+      stop(sprintf(paste0("Dissolution rates are missing a '%s' schedule%s. ",
+        "Supply both cohab and marriage schedules wherever typed dissolution rates are supplied."),
+        missing, context), call. = FALSE)
+    }
   }
   for (rows in split(seq_len(nrow(rates)), paste(pair_labels, types, sep = "\r"))) {
     ordered <- rates[rows, , drop = FALSE]
