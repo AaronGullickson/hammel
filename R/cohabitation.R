@@ -20,7 +20,7 @@ validate_cohabitation <- function(process) {
         any(c("rate", "dur_start", "dur_end") %in% names(x)))
       stop("`cohab_prob` needs age-specific probabilities in [0, 1], with `prob`, not `rate`.", call. = FALSE)
     x$rate <- x$prob
-    validate_union_search_rates(x)
+    validate_union_search_rates(x, widow_fallback = FALSE)
   }
   if (!is.null(process$union_convert_rate)) validate_conversion_rates(process$union_convert_rate)
   invisible(process)

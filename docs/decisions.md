@@ -2614,3 +2614,18 @@ replications. Normal SE approximations are unsuitable for very small counts.
 Exactness refers to the Poisson model, not guaranteed coverage for all simulator
 feedback or shared exposure. These are marginal intervals, not Monte Carlo SEs
 or simultaneous confidence bands. See [the analysis contract](demographic-analysis.md#optional-poisson-rate-intervals).
+
+## D125 — Widowed search-rate fallback to dissolved (November 2, 2026)
+
+**Status:** User-requested convenience; implemented and software-tested.
+
+**Decision:** Union-search rate tables stratified by `previous_union` may supply
+`none` and `dissolved` without `widowed`. For each group and active calendar
+slice, omitted widowed rates use the complete dissolved schedule, including
+its age/duration clock. Explicit widowed schedules take precedence as a whole;
+their gaps remain zero. Effective clocks retain the existing consistency rules.
+Actual widowhood histories and observation categories do not change.
+This supersedes D080's mandatory third category for search-rate inputs only;
+cohabitation-probability tables retain their existing three-category contract.
+Preserve the public input and expand only a private execution copy. See
+[remarriage schedules](remarriage.md) for examples and validation.

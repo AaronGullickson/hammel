@@ -405,7 +405,10 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   See [mortality()] for group-label and rate-coverage rules.
 #'   Nonoverlapping bands may have gaps or an open end; gaps and ages outside
 #'   support have zero hazard. Optional `previous_union` stratifies by `"none"`,
-#'   `"dissolved"`, and `"widowed"`; all three are required within each group.
+#'   `"dissolved"`, and `"widowed"`. Each group requires `"none"` and
+#'   `"dissolved"`; omitted `"widowed"` uses the complete dissolved schedule
+#'   in that group and active calendar period. Explicit widowed bands override
+#'   the fallback as a whole, including zero hazard in their gaps.
 #'   Without it, the schedule applies to all previous union types. Categories
 #'   describe the most recent recorded episode; complete histories are required.
 #'   Optionally include both `dur_start` and `dur_end` for elapsed years since
@@ -538,13 +541,40 @@ validate_union_formation <- function(process) {
 }
 
 
-validate_union_search_rates <- function(rates) {
+expand_widowed_search_rates <- function(rates) {
+  if (!"previous_union" %in% names(rates)) return(rates)
+  changed <- FALSE
+  expand_slice <- function(x) {
+    copies <- lapply(split_rate_groups(x), function(rows) {
+      if ("widowed" %in% x$previous_union[rows]) return(NULL)
+      copy <- x[rows[x$previous_union[rows] == "dissolved"], , drop = FALSE]
+      if (nrow(copy)) changed <<- TRUE
+      copy$previous_union <- rep("widowed", nrow(copy))
+      copy
+    })
+    do.call(rbind, c(list(x), copies))
+  }
+  if (!has_calendar_rates(rates)) return(expand_slice(rates))
+  times <- sort(unique(c(rates$time_start, rates$time_end)))
+  pieces <- lapply(seq_len(length(times) - 1L), function(i) {
+    rows <- rates$time_start <= times[i] & times[i] < rates$time_end
+    x <- rates[rows, , drop = FALSE]
+    if (!nrow(x)) return(NULL)
+    x$time_start <- times[i]
+    x$time_end <- times[i + 1L]
+    expand_slice(x)
+  })
+  if (changed) do.call(rbind, pieces) else rates
+}
+
+validate_union_search_rates <- function(rates, widow_fallback = TRUE) {
     if (has_calendar_rates(rates)) {
-      if (all(c("previous_union", "dur_start") %in% names(rates)) &&
-          any(vapply(split(!is.na(rates$dur_start), rates$previous_union),
+      validate_calendar_rates(rates, function(x) validate_union_search_rates(x, widow_fallback))
+      effective <- if (widow_fallback) expand_widowed_search_rates(rates) else rates
+      if (all(c("previous_union", "dur_start") %in% names(effective)) &&
+          any(vapply(split(!is.na(effective$dur_start), effective$previous_union),
             function(x) length(unique(x)) != 1L, logical(1))))
         stop("Each previous_union category must use the same age or duration clock across calendar periods.", call. = FALSE)
-      validate_calendar_rates(rates, validate_union_search_rates)
       return(invisible(rates))
     }
     check_columns(rates, c("age_start", "age_end", "rate"), "rates")
@@ -593,12 +623,16 @@ validate_union_search_rates <- function(rates) {
           any(!previous %in% categories))
         stop("`previous_union` must contain 'none', 'dissolved', or 'widowed'.", call. = FALSE)
       if (any(vapply(strata, function(rows)
-          !setequal(previous[rows], categories), logical(1))))
-        stop("Union-search schedules require all three `previous_union` categories within each group.",
+          !(if (widow_fallback) all(c("none", "dissolved") %in% previous[rows]) else
+            setequal(previous[rows], categories)), logical(1))))
+        stop("Union-search schedules require 'none' and 'dissolved' (or all three `previous_union` categories) within each group; cohab_prob requires all three.",
              call. = FALSE)
       if (any(duration & previous == "none"))
         stop("`previous_union = 'none'` requires age-specific bands.", call. = FALSE)
-      if (any(vapply(split(duration, previous), function(x) length(unique(x)) != 1L, logical(1))))
+      effective <- if (widow_fallback) expand_widowed_search_rates(rates) else rates
+      effective_duration <- if (all(duration_columns)) !is.na(effective$dur_start) else
+        rep(FALSE, nrow(effective))
+      if (any(vapply(split(effective_duration, effective$previous_union), function(x) length(unique(x)) != 1L, logical(1))))
         stop("Each `previous_union` category must use the same age or duration clock for all bands and groups.",
              call. = FALSE)
       strata <- unlist(lapply(strata, function(rows) split(rows, previous[rows])), recursive = FALSE)

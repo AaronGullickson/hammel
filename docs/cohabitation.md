@@ -11,7 +11,9 @@ October 29, 2026 (D093); see the [validation report](../validation/milestone4.qm
 clocks. When enabled, probability tables use `age_start`, `age_end`, `prob`,
 optionally `group` and `previous_union`; probabilities are finite in [0,1].
 Bands cannot overlap within strata. Gaps and uncovered ages have probability
-zero. Group coverage and all-three previous categories follow search schedules.
+zero. Group coverage follows search schedules. When `previous_union` is used,
+all three categories remain required for probabilities; the D125 widowed
+fallback applies only to search rates.
 
 ### Calendar-varying type probabilities (D122)
 

@@ -14,9 +14,28 @@ Milestone 4 was accepted October 29, 2026 (D093); see the
 
 The single rate data frame requires `age_start`, `age_end`, and `rate`.
 Optional `previous_union` takes exactly `none`, `dissolved`, or `widowed`.
-When supplied, all three categories are required within each scheduled group,
-with explicit zero rates allowed. Without it, the same age-specific schedule
+When supplied, `none` and `dissolved` are required within each scheduled group.
+An omitted `widowed` category inherits the complete `dissolved` schedule
+(D125); an explicit `widowed` category overrides that fallback. Explicit zero
+rates are allowed. Without the column, the same age-specific schedule
 applies to all unpartnered women.
+
+The fallback is selected independently for each group and active calendar
+slice. It copies the dissolved clock, bands and rates, including duration since
+the most recent union ended. An explicit widowed schedule is used as a whole:
+its age/duration gaps retain zero hazard rather than borrowing dissolved rates.
+Effective categories must still use a consistent clock across groups and time.
+Public input tables retain the user's two or three categories; execution expands
+a private copy. People and observations retain their actual `widowed` status.
+This convenience applies to union-search rates, not `cohab_prob` strata.
+
+For example, `none: [15,Inf) at .1` and `dissolved: [20,Inf) at .2`
+give widowed women the .2 search hazard from age 20. Adding an explicit
+`widowed: [30,Inf) at .05` instead gives zero widowed search hazard below 30
+and .05 afterward. A two-category duration schedule for dissolved women also
+uses elapsed time since widowhood for widowed women. Validation compares the
+fallback with explicitly duplicated schedules under fixed seeds, including
+calendar changes, groups, duration clocks and restart histories.
 
 Optionally include both `dur_start` and `dur_end`. Each row supplies exactly
 one complete pair of boundaries, with both unused boundaries NA. `none` must

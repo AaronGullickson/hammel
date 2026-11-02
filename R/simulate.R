@@ -213,7 +213,8 @@ simulate <- function(model, years, seed = NULL) {
   birth_rates <- prepare_group_rates(birth_rates, population$persons, "fertility", group_values)
   union_rates <- if (is.null(union_process$rates))
     data.frame(age_start = numeric(), age_end = numeric(), rate = numeric()) else
-    prepare_group_rates(union_process$rates, population$persons, "union formation", group_values)
+    prepare_group_rates(expand_widowed_search_rates(union_process$rates),
+      population$persons, "union formation", group_values)
   death_rates <- apply_group_prop_hazard(death_rates, population$persons,
     model$processes$mortality$group_prop_hazard, "mortality", group_values)
   birth_rates <- apply_group_prop_hazard(birth_rates, population$persons,

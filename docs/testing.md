@@ -1041,3 +1041,16 @@ fixed-seed equivalent to omitting the process: outgoing schedule draws and
 partner rescheduling can change RNG consumption without changing the model's
 zero-transition distribution. Sharing a seed across scenarios therefore does
 not guarantee identical paths; compare replicated demographic quantities.
+
+## Widowed search-rate fallback (D125, November 2, 2026)
+
+`devtools::test()` passed 4,337 assertions with zero failures, one skipped
+opt-in live database test, and one environment warning: `timedatectl` exited
+with status 1 while loading the HMDHFDplus dependency in a local-reader test.
+No live rates were downloaded. The 19 fallback checks cover fixed-seed
+equivalence to explicit widowed copies for age and duration schedules, existing
+widowhood histories, calendar-slice and group selection, explicit zero rates
+and gaps, unchanged stored inputs, edited inputs, and effective clock
+consistency. Cohabitation probabilities still require all three categories.
+These are software checks, not a new demographic validation or milestone
+acceptance. The user-authored milestone 7 report was not changed.

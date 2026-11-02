@@ -70,7 +70,9 @@ See [parity fertility](parity-fertility.md) and
 These are annual female search hazards, not guaranteed union-formation rates.
 Failed matching leaves the woman unpartnered. Men have no search clock.
 Without `previous_union`, a shared age schedule applies to all unpartnered
-women. Supplying that column requires all three categories within each group.
+women. Supplying that column requires `none` and `dissolved` within each group.
+Omitted `widowed` uses the complete dissolved schedule in that group and
+active calendar slice; an explicit widowed schedule overrides it as a whole.
 
 `none` must use age. `dissolved` and `widowed` may each independently use age
 or duration, but each category must use one clock consistently across all its

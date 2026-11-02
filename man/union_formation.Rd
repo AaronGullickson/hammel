@@ -60,7 +60,10 @@ population groups, simulation warns and selects the first alphabetical group.
 See \code{\link[=mortality]{mortality()}} for group-label and rate-coverage rules.
 Nonoverlapping bands may have gaps or an open end; gaps and ages outside
 support have zero hazard. Optional \code{previous_union} stratifies by \code{"none"},
-\code{"dissolved"}, and \code{"widowed"}; all three are required within each group.
+\code{"dissolved"}, and \code{"widowed"}. Each group requires \code{"none"} and
+\code{"dissolved"}; omitted \code{"widowed"} uses the complete dissolved schedule
+in that group and active calendar period. Explicit widowed bands override
+the fallback as a whole, including zero hazard in their gaps.
 Without it, the schedule applies to all previous union types. Categories
 describe the most recent recorded episode; complete histories are required.
 Optionally include both \code{dur_start} and \code{dur_end} for elapsed years since
