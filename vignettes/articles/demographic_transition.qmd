@@ -1,5 +1,9 @@
 ---
 title: "Simulating the Demographic Transition"
+vignette: >
+  %\VignetteIndexEntry{demographic_transition}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
 knitr:
   opts_chunk:
     collapse: true
@@ -169,8 +173,8 @@ calculate_population_size(pop_start, 1680:1780) |>
   mutate(growth_rate = log(lead(population) / population)) |>
   ggplot(aes(x = time, y = growth_rate))+
   geom_line()+
-  geom_smooth(se = FALSE)
-  labs(x = "year")
+  geom_smooth(se = FALSE)+
+  labs(x = "year", y = "population growth rate")
 ```
 
 @fig-pop-growth-burn-in shows that the population growth rate is settling into a low positive growth rate, with some year to year noise, by the mid-point of the burn-in period, as we would expect of a stable population.
@@ -190,10 +194,12 @@ model <- hammel_model() |>
   set_mortality(mortality_rates_sweden) |>
   # on demand works fine here because our focus is on the fertility and mortility
   set_union_formation("on_demand")
-sim_time_demog_trans <- system.time(pop_final <- simulate(model, 2020 - 1780, seed = 1))
+sim_time <- system.time(
+  pop_final <- simulate(model, 2020 - 1780, seed = 1)
+)
 ```
 
-The simulation took `r sim_time_demog_trans[["elapsed"]]` seconds to run.
+The simulation took `r sim_time[["elapsed"]]` seconds to run.
 
 ## Analyzing the Simulation Results
 
@@ -299,7 +305,8 @@ temp <- fertility_rates_sweden |>
 calculate_fertility_rates(pop_final, 1780:2020, 12:55, conf.level = 0.95) |>
   filter(time_start %in% selected_years) |> 
   ggplot(aes(x = age_start + 0.5, y = rate_fertility))+
-  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high),
+              color = NA, fill = "grey70")+
   geom_point(size = 0.5)+
   geom_line(data = temp, aes(y = rate), linetype = 2, color = "red")+
   facet_wrap(~time_start)+
@@ -319,7 +326,8 @@ temp <- mortality_rates_sweden |>
 calculate_mortality_rates(pop_final, 1780:2020, 0:85, conf.level = 0.95) |>
   filter(time_start %in% selected_years) |> 
   ggplot(aes(x = age_start + 0.5, y = rate_mortality))+
-  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high),
+              color = NA, fill = "grey70")+
   geom_point(size = 0.5)+
   geom_line(data = temp, aes(y = rate), linetype = 2, color = "red")+
   facet_grid(sex~time_start)+
@@ -341,26 +349,26 @@ Where $NRR$ is the net reproduction ratio and $\mu$ is the mean age of childbear
 ```{r}
 #| label: determine-growth-rate-zero
 
-get_growth_rate <- function(fert_rates, mort_rates) {
+get_growth_rate <- function(fert, mort) {
 
-  NRR <- mort_rates |> calculate_life_table() |>
+  NRR <- mort |> calculate_life_table() |>
     filter(sex == "f") |>
     select(age_start, Lx) |>
-    right_join(fert_rates, by = c("age_start")) |>
+    right_join(fert, by = c("age_start")) |>
     mutate(prod = Lx * rate) |>
     pull(prod) |>
     sum() * 0.4886
-  mu <- sum((fert_rates$age_start + 0.5) * fert_rates$rate) / sum(fert_rates$rate)
+  mu <- sum((fert$age_start + 0.5) * fert$rate) / sum(fert$rate)
 
   log(NRR)/mu
 }
 
-fert_rates <- fertility_rates_sweden |> filter(time_start == 1891)
-get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1810))
-get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1812))
-get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1813))
-get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1838))
-get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1811))
+fert <- fertility_rates_sweden |> filter(time_start == 1891)
+get_growth_rate(fert, mortality_rates_sweden |> filter(time_start == 1810))
+get_growth_rate(fert, mortality_rates_sweden |> filter(time_start == 1812))
+get_growth_rate(fert, mortality_rates_sweden |> filter(time_start == 1813))
+get_growth_rate(fert, mortality_rates_sweden |> filter(time_start == 1838))
+get_growth_rate(fert, mortality_rates_sweden |> filter(time_start == 1811))
 ```
 
 The 1811 mortality rates produces a very low but slightly positive growth rate when paired with the 1891 fertility rates, so we will use this set of rates to create the starting stable population.
