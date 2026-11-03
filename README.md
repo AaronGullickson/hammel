@@ -16,10 +16,10 @@ histories as tibbles.
 Milestones 1–6 are complete by user acceptance: mortality/fertility, union
 formation, groups, dissolution/remarriage/cohabitation, parity-specific
 fertility with persistent fertility heterogeneity, and individual group
-transitions (D116). Milestone 7, time-varying inputs, is next. See the [documentation index](docs/README.md),
-[scientific contract](docs/scientific-contract.md), and
-[validation record](docs/testing.md) for implemented behavior and limitations.
-Future mechanisms are listed in the [roadmap](docs/roadmap.md).
+transitions (D116). Milestone 7, time-varying inputs, is next. See the [documentation index](design/README.md),
+[scientific contract](design/scientific-contract.md), and
+[validation record](design/testing.md) for implemented behavior and limitations.
+Future mechanisms are listed in the [roadmap](design/roadmap.md).
 
 ## Installation
 

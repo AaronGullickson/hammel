@@ -19,3 +19,4 @@ validation/*.rmarkdown
 validation/*.knit.md
 inst/doc
 **/.quarto/
+docs

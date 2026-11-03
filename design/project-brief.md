@@ -188,6 +188,6 @@ No replacement case or new rate-source integration is currently selected.
 
 The project direction originated in the October 11, 2026 conversation,
 summarized in `/home/aarong/Work/Hammel-project-notes.md`. Current decisions are
-recorded in the [decision log](decisions.md). See [design](design.md) for the
+recorded in the [decision log](decisions.md). See [specification](specification.md) for the
 implemented workflow and [scientific contract](scientific-contract.md) for
 units, timing, rate interpretation, and limitations.

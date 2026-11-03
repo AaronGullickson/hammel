@@ -92,7 +92,7 @@ shortfalls here; do not claim that no-spacing rates match exactly.
 
 See `age18-summary.csv` for the later-window young-age comparison and
 `age18-replications.csv` for its exposure/event denominators. The separate
-[collaboration note](../../../docs/parity-spacing-investigation.md) distinguishes
+[collaboration note](../../../design/parity-spacing-investigation.md) distinguishes
 these reference results from the user's empirical-schedule results.
 
 ## Files and reproduction

@@ -1,7 +1,7 @@
 ^hammel\.Rproj$
 ^\.Rproj\.user$
 ^AGENTS\.md$
-^docs$
+^design$
 ^validation$
 ^\.github$
 ^nvim\.log$
@@ -9,4 +9,11 @@
 ^src/.*\.gcda$
 ^src/.*\.gcno$
 ^vignettes/\.quarto$
-^vignettes/*_files$
+^vignettes/.*_files$
+^vignettes/.*\.html$
+^vignettes/articles$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^vignettes/articles/\.quarto$
+^vignettes/articles/*_files$

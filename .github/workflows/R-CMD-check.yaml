@@ -41,9 +41,12 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          # Make the current checkout visible to Quarto's vignette subprocess
-          # on Windows: https://github.com/quarto-dev/quarto-r/issues/217
-          extra-packages: any::rcmdcheck, local::.
+          extra-packages: any::rcmdcheck
+          # Not currently needed (no Quarto vignettes). If Quarto vignettes
+          # return, use the line below instead to make the current checkout
+          # visible to Quarto's vignette subprocess on Windows:
+          # https://github.com/quarto-dev/quarto-r/issues/217
+          # extra-packages: any::rcmdcheck, local::.
           needs: check
 
       - uses: r-lib/actions/check-r-package@v2
