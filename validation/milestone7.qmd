@@ -1125,7 +1125,7 @@ calculate_population_size(pop_final, seq(0, 300, 5), by_group = TRUE) |>
   geom_area()
 ```
 
-@fig-pop-share-group-trans shows the group share over time in the simulation with these transition rates. As expected, the growth of the AB group is slower than the previous simulation due to some transitions back into single group categories.
+@fig-pop-share-groups-trans shows the group share over time in the simulation with these transition rates. As expected, the growth of the AB group is slower than the previous simulation due to some transitions back into single group categories.
 
 ```{r}
 #| label: tbl-transition-rates
