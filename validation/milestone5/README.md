@@ -20,8 +20,8 @@ exposure are reconstructed from event histories independently of engine parity.
 `parity-spacing-summary.csv` gives means and MCSEs. The zero-spacing comparison
 supports schedule switching. With spacing, the former SOCSIM-style correction
 does not recover the higher-parity target rates in this case. See
-[the parity specification](../../docs/parity-fertility.md) and
-[testing](../../docs/testing.md) for the interpretation and limits. No empirical
+[the parity specification](../../design/parity-fertility.md) and
+[testing](../../design/testing.md) for the interpretation and limits. No empirical
 rates, credentials or live downloads are needed; no SOCSIM run is implied.
 
 
@@ -37,7 +37,7 @@ cohort. Run `Rscript validation/milestone5/check-composition-spacing.R` from the
 repository root to regenerate `composition-spacing-summary.csv` (dt = .0025,
 seed 9601); pass a step size, e.g. `0.001`, to print a sensitivity rerun
 without writing. The candidate is not an accepted model; see
-[the investigation](../../docs/parity-spacing-investigation.md).
+[the investigation](../../design/parity-spacing-investigation.md).
 
 `check-runtime-spacing.R` extends that toy to a schedule change at t = 5,
 comparing no spacing, the composition-based correction (table from the original
@@ -63,7 +63,7 @@ used `spacing_method = "cell"`; current execution uses cells exclusively):
   an optimized build installed in LIB (`R CMD INSTALL --library=LIB .`) and
   writes `cell-spacing-benchmark.csv`.
 
-See [cell-accounted fertility](../../docs/fertility-cell-accounting.md#implementation-and-validation).
+See [cell-accounted fertility](../../design/fertility-cell-accounting.md#implementation-and-validation).
 
 Midpoint compensation was removed after these checks (D101 is the only
 method). `check-parity-spacing.R`, `check-cell-spacing.R` and

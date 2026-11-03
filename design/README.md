@@ -21,7 +21,7 @@ weights remain planned for milestone 8 (D121).
 | Document | Purpose |
 | --- | --- |
 | [Project brief](project-brief.md) | Purpose, current scope, and milestone status |
-| [Design](design.md) | Implemented architecture, API, and source locations |
+| [Specification](specification.md) | Implemented architecture, API, and source locations |
 | [Scientific contract](scientific-contract.md) | Current demographic assumptions and event rules |
 | [Calendar-varying models](time-varying-models.md) | Matching/father/cohabitation/inheritance model schedules and event-time selection (D123) |
 | [Calendar-varying rates](time-varying-rates.md) | Calendar bands, coverage, boundary timing and retained histories (D118) |
@@ -75,7 +75,9 @@ snapshot copies in the docs tree. The decision log records rationale and
 supersession. Current contracts take precedence over earlier monthly timing,
 class names, and fertility compensation descriptions.
 
-To inspect prior versions, use `git log -- docs` and
+To inspect prior versions, use `git log --follow -- design/scientific-contract.md`
+and `git show <commit>:design/scientific-contract.md`. This folder was named
+`docs/` before November 3, 2026, so older commits use `docs/` paths, as in
 `git show <commit>:docs/scientific-contract.md`.
 
 ## Validation artifacts and examples
@@ -130,7 +132,7 @@ removed from the current tree; use Git history for those historical workflows.
 - [Milestone 7 rate example](../inst/examples/milestone7-rates.R): synthetic
   calendar-varying mortality/fertility with fractional dates and run duration.
 
-`inst/examples/` ships with the installed R package. `validation/` and `docs/`
+`inst/examples/` ships with the installed R package. `validation/` and `design/`
 are development material excluded from package builds. Preserve the completed
 report sources and rendered artifacts. Some local inputs and generated files
 are Git-ignored; reproducible evidence needs its input provenance and software

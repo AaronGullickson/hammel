@@ -17,7 +17,7 @@
 #                 Equivalent to cell intensity m_c * N_c assigned to a random
 #                 eligible woman. Intensity in cells with no eligible women is
 #                 recorded as expected lost births.
-# See docs/parity-spacing-investigation.md for interpretation and limitations.
+# See design/parity-spacing-investigation.md for interpretation and limitations.
 set.seed(7)
 B <- .75; dt <- .0025; Tend <- 8; K <- 15; N <- 40000
 base <- function(k) ifelse(k == 0, .2, ifelse(k == 1, .3, .4))

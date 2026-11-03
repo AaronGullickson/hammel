@@ -1,7 +1,7 @@
 ^hammel\.Rproj$
 ^\.Rproj\.user$
 ^AGENTS\.md$
-^docs$
+^design$
 ^validation$
 ^\.github$
 ^nvim\.log$

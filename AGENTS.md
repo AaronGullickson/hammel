@@ -1,10 +1,10 @@
 # Working on Hammel
 
-Start with the [documentation index](docs/README.md). Read [the project
-brief](docs/project-brief.md), [the design specification](docs/design.md), and [the
-scientific contract](docs/scientific-contract.md) before consequential implementation.
-Consult [the decision log](docs/decisions.md) for the status and rationale of choices
-and [the audit plan](docs/socsim-audit.md) when investigating SOCSIM.
+Start with the [documentation index](design/README.md). Read [the project
+brief](design/project-brief.md), [the design specification](design/specification.md), and [the
+scientific contract](design/scientific-contract.md) before consequential implementation.
+Consult [the decision log](design/decisions.md) for the status and rationale of choices
+and [the audit plan](design/socsim-audit.md) when investigating SOCSIM.
 
 ## Purpose and scope
 
@@ -45,7 +45,7 @@ be made autonomously; record choices with substantial architectural consequences
   produces births at its input rate times all members, assigned to a random
   eligible member, weighted by persistent hetfert when enabled (D102). Births
   in cells with no eligible woman are reported as
-  unrealized. See docs/fertility-cell-accounting.md. Midpoint compensation
+  unrealized. See design/fertility-cell-accounting.md. Midpoint compensation
   (D028/D095/D099) was removed. Do not reintroduce superseded monthly timing,
   midpoint compensation or the specialized exact fertility sampler without an
   explicit modeling decision.
@@ -74,7 +74,7 @@ the user's agreement.
 
 - Current specifications describe implemented behavior. Use Git history for
   superseded specifications and verification records; do not maintain snapshot
-  archives in `docs/`. Keep rationale and supersession in `docs/decisions.md`.
+  archives in `design/`. Keep rationale and supersession in `design/decisions.md`.
   Do not make readers reconcile contradictory current rules with appended
   corrections.
 - Milestone 1 was accepted as complete on October 15, 2026 (D029). Milestone 2
@@ -85,18 +85,18 @@ the user's agreement.
   accepted October 29, 2026 (D105). Individual group transitions (milestone 6)
   were accepted October 30, 2026 (D116). Milestone 7 calendar-varying rates are
   implemented under the user-approved D118 contract in
-  `docs/time-varying-rates.md`; the user accepted milestone 7 as complete on
+  `design/time-varying-rates.md`; the user accepted milestone 7 as complete on
   November 2, 2026 (D127), based on `validation/milestone7.qmd` and its retained
   rendered assessment. Matching
   and inheritance model schedules are implemented under D123; see
-  `docs/time-varying-models.md` for the shared model-list tibble interface,
+  `design/time-varying-models.md` for the shared model-list tibble interface,
   event-time selection, dynamic NULL fallbacks and future identity registry.
   D122 adds calendar
   bands to `cohab_prob`; probability-only changes update type selection and
   matching calibration while preserving pending event dates. Other arguments
   remain static. Milestone 7 is complete with the current engine. D121 assigns
   binned-group hazards and custom formula weights across rate processes to
-  milestone 8; see `docs/binned-group-hazards.md`. This direction is not
+  milestone 8; see `design/binned-group-hazards.md`. This direction is not
   implemented. Summaries/helpers move to 9; multiple group columns are tentative
   10; external immigration is 11; the two-sex model is 12. The separate regions
   milestone is removed, with its unresolved applications retained under 10.
@@ -120,21 +120,21 @@ the user's agreement.
   episodes and type-specific matching/rates (D078–D092). One woman carries each
   union clock; exact ties prioritize death, birth, dissolution, conversion,
   search, then group transition.
-  See `docs/union-dissolution.md`, `docs/remarriage.md`, and `docs/cohabitation.md`.
+  See `design/union-dissolution.md`, `design/remarriage.md`, and `design/cohabitation.md`.
   Supporting benchmarks/recovery evidence lives in `validation/milestone4/`;
   top-level reports and `validation/data/` remain in place. Preserve active render
   intermediates until rendering finishes, including milestone 5's active final
   render at closeout and milestone 6's active final render. Parity, fertility
   heterogeneity and individual group transitions are implemented and accepted.
-  See `docs/group-transitions.md`; household moves remain deferred (D114),
+  See `design/group-transitions.md`; household moves remain deferred (D114),
   with regional applications retained under tentative milestone 10's multiple
-  group columns (D121). Calendar-time rates follow `docs/time-varying-rates.md`
+  group columns (D121). Calendar-time rates follow `design/time-varying-rates.md`
   (D118); matching and inheritance model schedules are implemented under D123. Most categorical characteristics should
   use groups; multiple group columns are tentative milestone 10 with their
   schema still unselected.
 - Use `devtools::test()` for the testthat suite. Live database tests require
   explicit opt-in; ordinary verification must not download rates or expose
-  credentials. See `docs/testing.md` for commands and evidence.
+  credentials. See `design/testing.md` for commands and evidence.
 - Treat session handoffs as dated status records, not standing pause instructions.
   The current user request controls work. Preserve the user's edits, including
   explanatory source comments and the accepted reports. Fixed newborn assignment

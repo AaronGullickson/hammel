@@ -13,7 +13,7 @@
 #   composition : h_k = m_k / e_k(t), where e_k is the eligible fraction implied by
 #                 the deterministic target cohort l_k(t):
 #                 e_k = 1 - (inflow to parity k during the last B years) / l_k.
-# See docs/parity-spacing-investigation.md for the derivation and limitations.
+# See design/parity-spacing-investigation.md for the derivation and limitations.
 args <- commandArgs(trailingOnly = TRUE)
 dt <- if (length(args)) as.numeric(args[[1]]) else 0.0025
 set.seed(9601)
