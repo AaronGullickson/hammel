@@ -38,7 +38,6 @@ library(stringr)
 library(ggplot2)
 library(gt)
 library(furrr)
-library(googlesheets4)
 set_theme(theme_bw())
 ```
 
@@ -326,7 +325,7 @@ For the second demographic transition, I want to hold fertility (separated by un
 
 This simulation has a high demand on input terms. The goal here is a "stylized" simulation rather than one completely accurate for a particular country. However, England and Wales provide some of the best disaggregated data for my purposes. We will run the simulation from 1992 to 2019.
 
-First, we need to get age-specific fertility rates disaggregated by union status. We use SOURCE to get age-specific fertility rates in 1992 by union status (marriage, cohabitation, or unpartnered). 
+First, we need to get age-specific fertility rates disaggregated by union status. We use O'Leary et. al (2010) to get age-specific fertility rates in 1992 by union status (Table B1, marriage, cohabitation, or unpartnered). 
 
 ```{r}
 #| label: get-fertility-second-demog-trans
@@ -351,7 +350,7 @@ We will hold mortality rates to the 1992 level as well.
 mortality_rates1992 <- get_mortality_hmd("GBRTENW", 1992, shape = "5x1", open_age = 90)
 ```
 
-Next lets look at the probability that a formed union is cohabitation. We will use data on all of Great Britian that shows the share of married couples that cohabited prior to marriage. This number is not exactly the same as what we want because it excludes cohabitations that did not survive into marriage or continued on as cohabitations. They also don't line up with new unions but rather existing union. Overall, it should give us a ballpark figure for what we are looking for.
+Next lets look at the probability that a formed union is cohabitation. We will use data on all of Great Britain that shows the share of married couples that cohabited prior to marriage (Beaujouan and Bhrolcháin 2011). This number is not exactly the same as what we want because it excludes cohabitations that did not survive into marriage or continued on as cohabitations. They also don't line up with new unions but rather existing unions. Overall, it should give us a ballpark figure for what we are looking for.
 
 ```{r}
 #| label: get-cohab-prob-second-demog-trans
@@ -374,7 +373,7 @@ prob_cohab <- read_csv(here(
   mutate(time_start = if_else(time_start == 1994, 1992, time_start))
 ```
 
-Next we look at the conversion of cohabitations to marriage. SOURCE provides 0-5 and 5-10 year duration probabilities of cohabitations either ending in marriage or separation. We can convert these to hazard rates using the following method. If $p_m$ and $p_d$ are the probabilities of marriage or dissolution for cohabitations over a period of length $n$, we can get the total exit hazard for cohabitation ($h_e$) as:
+Next we look at the conversion of cohabitations to marriage. Beaujouan and Bhrolcháin (2011) provides 0-5 and 5-10 year duration probabilities of cohabitations either ending in marriage or separation. We can convert these to hazard rates using the following method. If $p_m$ and $p_d$ are the probabilities of marriage or dissolution for cohabitations over a period of length $n$, we can get the total exit hazard for cohabitation ($h_e$) as:
 
 $$h_{e} = -log(1 - p_m - p_d)$$
 
@@ -870,18 +869,7 @@ calculate_union_rates(
 
 ### Replicate Gullickson and Saperstein
 
-Our goal in this project is replication Gullickson and Saperstein (2025). Specifically, we will replicate their simulation of a two group system with a high and resilient inheritance pattern for multiracial identification with an intermarriage rate that plateaus halfway through the simulation. The inheritance model was already used as an example in the Milestone 3 report. 
-
-We can read their parameters directly from the provided google sheet.
-
-```{r}
-gs4_deauth()
-parameters_highres <- read_sheet(
-  "1ad-fJUCjRy_zslI2MMce8UaolepG536-IZr1yNNIuZ8", 
-  sheet = "uneven_progress_high_resilient", 
-  skip = 7
-)
-```
+Our goal in this project is replication Gullickson and Saperstein (2026). Specifically, we will replicate their simulation of a two group system with a high and resilient inheritance pattern for multiracial identification with an intermarriage rate that plateaus halfway through the simulation. The inheritance model was already used as an example in the Milestone 3 report. 
 
 Like Gullickson and Saperstein, we will use US 2000 fertility and mortality rates.
 
@@ -1250,6 +1238,14 @@ knitr::kable(
 ## Conclusions and Unresolved Limitations
 
 All expectations for this milestone have been met and each of the seven rate processes and the two models has been used in time-varying simulations and have performed as expected.
+
+## References
+
+Beaujouan, Éva and Máire Ní Bhrolcháin. 2011. "Cohabitation and Marriage in Britain since the 1970s". Population Trends nr 145, Office for National Statistics.
+
+Gullickson, Aaron, and Aliya Saperstein. 2026. “The Dynamics of Population Mixing: A Simulation Approach.” Population Association of America, St. Louis, MO, May 8.
+
+O'Leary, Louise, Eva Natamba, Julie Jefferies, and Ben Wilson. 2010. "Fertility and Partnership Status in the Last Two Decades." Population Trends 140, Office for National Statistics. 
 
 ## Reproducibility record
 
