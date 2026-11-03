@@ -9,4 +9,6 @@
 ^src/.*\.gcda$
 ^src/.*\.gcno$
 ^vignettes/\.quarto$
-^vignettes/*_files$
+^vignettes/.*_files$
+^vignettes/.*\.html$
+^vignettes/articles$
