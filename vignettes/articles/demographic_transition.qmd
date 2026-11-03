@@ -1,9 +1,5 @@
 ---
 title: "Simulating the Demographic Transition"
-vignette: >
-  %\VignetteIndexEntry{demographic_transition}
-  %\VignetteEngine{quarto::html}
-  %\VignetteEncoding{UTF-8}
 knitr:
   opts_chunk:
     collapse: true
