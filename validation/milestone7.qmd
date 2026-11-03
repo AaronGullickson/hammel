@@ -11,11 +11,6 @@ format:
     code-fold: true
     code-tools: true
     self-contained: true
-params:
-  n_replications: 20
-  initial_population: 20000
-  years: 100
-  burn_in: 25
 execute:
   eval: true
   echo: true
@@ -53,20 +48,6 @@ set_theme(theme_bw())
 future::plan(future::multicore, workers = 4)
 ```
 
-```{r}
-#| label: create-functions
-
-run_replication <- function(replication, model) {
-  set.seed(410000L + replication)
-  population <- create_baseline_population(params$initial_population, 60, 2000, 
-    group_weights = c("A" = 1, "B" = 1, "C" = 1))
-  model <- model |> set_population(population)
-  time <- system.time(result <- simulate(model, params$years, 420000L + replication))[["elapsed"]]
-  result$runtime <- time
-  return(result)
-}
-```
-
 ## Purpose and completion criteria
 
 
@@ -78,13 +59,14 @@ Assess whether the current simulation successfully handles time varying rate sch
 | Age-specific rates | Output rates vs. input rates | Input rates should generally fall within the 95% Poisson-based confidence intervals for the rate, although we don't expect complete coverage |
 | TFR | Over time | Should change in the expected way over time within simulation and remain close to expected values |
 | Life Expectancy at birth | Over time | Should change in the expected way over time within simulation and remain close to expected values |
+| Log odds ratios | Over time | Should generally be consistent with double the input exogamy values and move in the expected direction over time |
 | Accounting and implementation | Existing tests | Successful unit tests |
 
 ## Overview of Design
 
 ### Time-varying rate processes
 
-For all rate processes, we add time varying rates by allowing stratification of these rate objects by `time_start` and `time_end` columns. The simulation will use the rates in the currect time interval as it progresses through time in the simulation. If the `time_start` and `time_end` columns are not provided, then the rates will remain constant throughout the simulation. Users can use `Inf` in `time_end` to indicate a time interval that should be followed for the remainder of the simulation.
+For all rate processes, we add time varying rates by allowing stratification of these rate objects by `time_start` and `time_end` columns. The simulation will use the rates in the correct time interval as it progresses through time in the simulation. If the `time_start` and `time_end` columns are not provided, then the rates will remain constant throughout the simulation. Users can use `Inf` in `time_end` to indicate a time interval that should be followed for the remainder of the simulation.
 
 The times provided must cover the entire interval of the simulation and there can be no gaps. If the program detects a lack of coverage or gaps, it will fail to process the simulation with an error. This requires some extra work by the user to ensure that they providing adequate coverage. Notably, you can provide time intervals that exceed the coverage without problem.For example, you could provide historical fertility rates from 1900 to 2000 and then run the simulation only from 1950 to 1980. This makes it possible for users to download large historical rate schedules and use them without further modification to fit a specific time period, so long as the simulation time period falls within the range.
 
@@ -127,7 +109,7 @@ Rather than Monte Carlo replication, I will focus on a single simulation with a 
 
 I will reproduce the demographic transition by using fertility and mortality rates for Sweden, available from th Human Fertility Database (HFD) and Human Mortality Database (HMD). 
 
-Age-specific fertility rates in Sweden only go back to 1891, while age-specific mortality rates go back to 1751. both series continue until 2024. I will download the full range of years for each series. In some cases, using the full open age of 110+ from the HMD can lead to missing values at extreme ages in older dat, so I truncate the open-age group to 95 (this is done correctly by recomputing the open-age mortality rate by pooling deaths and person years for that inteval from HMD data).
+Age-specific fertility rates in Sweden only go back to 1891, while age-specific mortality rates go back to 1751. Both series continue until 2024. I will download the full range of years for each series. In some cases, using the full open age of 110+ from the HMD can lead to missing values at extreme ages in older data, so I truncate the open-age group to 95 (this is done correctly by recomputing the open-age mortality rate by pooling deaths and person years for that inteval from HMD data).
 
 ```{r}
 #| label: get-rates-demog-trans-sweden
@@ -138,7 +120,7 @@ mortality_rates_sweden <- get_mortality_hmd("SWE", 1751:2024, open_age = 95)
 
 The mortality transition was already well underway by 1891, when we first get the fertility data, so I will make the assumption that fertility rates before 1891 were at the 1891 levels.
 
-I want to start the simulation with a population age structure fom a stable but stationary population. To do so, I need to find mortality rates to match with the 1891 fertility rates that will produce roughly zero population growth in the stable population. I use the approximation that:
+I want to start the simulation with a population age structure from a stable but stationary population. To do so, I need to find mortality rates to match with the 1891 fertility rates that will produce roughly zero population growth in the stable population. I use the approximation that:
 
 $$r = \log(NRR)/\mu$$
 
@@ -197,7 +179,7 @@ I now have a starting population that should be roughly consistent with the stab
 ```{r}
 #| label: run-simulation-demog-transition
 
-# for fertiliity rates I need to extend the last year back to my starting point of 1870
+# for fertility rates I need to extend the last year back to my starting point of 1870
 # I do this by adding one row at the front for the 1780-1891 time period that duplicates 
 # my 1891 rates
 fertility_rates_sweden <- bind_rows(
@@ -344,7 +326,7 @@ For the second demographic transition, I want to hold fertility (separated by un
 
 This simulation has a high demand on input terms. The goal here is a "stylized" simulation rather than one completely accurate for a particular country. However, England and Wales provide some of the best disaggregated data for my purposes. We will run the simulation from 1992 to 2019.
 
-First, we need to get age-specific fertility rates disaggregated by union status. We use SOURCE to get age-specific fertility rates in 1992 by union status (marriage, cohabiation, or unpartnered). 
+First, we need to get age-specific fertility rates disaggregated by union status. We use SOURCE to get age-specific fertility rates in 1992 by union status (marriage, cohabitation, or unpartnered). 
 
 ```{r}
 #| label: get-fertility-second-demog-trans
@@ -380,7 +362,7 @@ prob_cohab <- read_csv(here(
   "england_wales_1992_onward", 
   "female_premarital_cohabitation_1994_2019.csv"
 )) |>
-  # There are some differenes by age but not huge so lets just assume
+  # There are some differences by age but not huge so lets just assume
   # this is constant with regard to age
   filter(source_age_label == "All ages") |>
   arrange(year) |>
@@ -396,7 +378,7 @@ Next we look at the conversion of cohabitations to marriage. SOURCE provides 0-5
 
 $$h_{e} = -log(1 - p_m - p_d)$$
 
-We can then apportion that to marriage risk and dissolution risk by mutiplying the exit hazard by the relative proportion of marriage and dissolution:
+We can then apportion that to marriage risk and dissolution risk by multiplying the exit hazard by the relative proportion of marriage and dissolution:
 
 $$h_{m} = h_e \frac{p_m}{p_m + p_d}$$
 $$h_{d} = h_e \frac{p_d}{p_m + p_d}$$
@@ -474,7 +456,7 @@ cohab_dissolution_rates <- cohab_hazards |>
   mutate(union_type = "cohab")
 ```
 
-We have somewaht similar duration-based cumulative divorce and death risk for marriages by year for 2005 and 2010. We can use this to get 5-year duration bands of divorce hazard for these two time points. I will then interpolate rates back to 1992 and hold them constant from 2010 onward. 
+We have somewhat similar duration-based cumulative divorce and death risk for marriages by year for 2005 and 2010. We can use this to get 5-year duration bands of divorce hazard for these two time points. I will then interpolate rates back to 1992 and hold them constant from 2010 onward. 
 
 ```{r}
 #| label: get-dissolution-rates-second-demog-trans
@@ -757,7 +739,7 @@ bind_rows(
   labs(x = "year", y = "mean age of childbearing")
 ```
 
-@fig-mean-age-childbearing-second-demog-trans shows the mean age of childbearing over time based on the observed age-specific fertility rates. As exepcted, it increases in the model that allows for changing rate schedule, despite no change in the fertility rates *within* union types. 
+@fig-mean-age-childbearing-second-demog-trans shows the mean age of childbearing over time based on the observed age-specific fertility rates. As expected, it increases in the model that allows for changing rate schedule, despite no change in the fertility rates *within* union types. 
 
 I now investigate specific time-varying rate schedules from the simulation to confirm that the empirical estimates conform to the expected input rates. I pick a few specific time points to illustrate.
 
@@ -824,7 +806,7 @@ calculate_dissolution_rates(
   labs(x = "duration", y = "rate of dissolution")
 ```
 
-@fig-dissolution-rates-cohab shows the dissolution rates of cohabitations esimated from the simulation. The bands used here are much coarser than for marriage. The estimates fit well to the input rates.
+@fig-dissolution-rates-cohab shows the dissolution rates of cohabitations estimated from the simulation. The bands used here are much coarser than for marriage. The estimates fit well to the input rates.
 
 ```{r}
 #| label: fig-union-rates
@@ -1189,9 +1171,69 @@ temp |>
 
 ## Specific Test on Fertility
 
-- Switch from low fertility rate to high fertility rate and confirm that this no longer produces a blip.
+Finally, I want to test a simulation where I raise fertility rates dramatically to confirm that we don't observe a blip due to the birth interval issue that should now be solved.
 
-## Tests
+```{r}
+fertility_rates <- bind_rows(
+  get_fertility_hfd("USA", 2000) |> mutate(time_start = 0, time_end = 100), 
+  fertility_niger <- read_csv("validation/data/niger_2012/niger_2012_asfr_wpp2024.csv") |>
+    mutate(time_start = 100, time_end = 120)
+)
+mortality_rates <- get_mortality_hmd("USA", 2000)
+```
+
+```{r}
+pop <- create_baseline_population(100000)
+
+model <- hammel_model() |>
+  set_population(pop) |>
+  set_fertility(fertility_rates) |>
+  set_mortality(mortality_rates) |>
+  set_union_formation("on_demand")
+
+results <- future_map(1077:1097, 
+  function(seed) {
+    simulate(model, 120, seed)
+  }, 
+  .options = furrr_options(seed = NULL)
+)
+```
+
+```{r}
+#| label: fig-tfr-jump
+#| fig-cap: Estimated total fertility rate and 95% confidence interval in simulation with jump in fertility rates at year 100.
+
+tfr_summary <- results |>
+  map(
+    calculate_fertility_rates,
+    time_breaks = 90:110,
+    age_breaks = 12:55
+  ) |>
+  map(calculate_tfr) |>
+  bind_rows(.id = "replication") |>
+  group_by(time_start, time_end) |>
+  summarize(
+    n_valid = sum(!is.na(tfr)),
+    tfr_mean = if (n_valid > 0) {
+      mean(tfr, na.rm = TRUE)
+    } else NA_real_,
+    tfr_mcse = if (n_valid > 1) {
+      sd(tfr, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+
+tfr_summary |>
+  ggplot(aes(x = time_start, y = tfr_mean))+
+  geom_ribbon(aes(ymin = tfr_mean - 1.96 * tfr_mcse, ymax = tfr_mean + 1.96 * tfr_mcse),
+              color = NA, fill = "grey70")+
+  geom_line()+
+  labs(x = "year", y = "total fertility rate")
+```
+
+@fig-tfr-jump shows the estimated total fertility rate immediately before and after the change in fertility rates at time 100. There is no evidence of a blip immediately after the transition.
+
+## Unit Tests
 
 The following tests have been constructed and are currently all passing.
 
@@ -1207,6 +1249,7 @@ knitr::kable(
 ```
 ## Conclusions and Unresolved Limitations
 
+All expectations for this milestone have been met and each of the seven rate processes and the two models has been used in time-varying simulations and have performed as expected.
 
 ## Reproducibility record
 
