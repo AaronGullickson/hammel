@@ -113,7 +113,7 @@ increase in dissolution. Cohabitation estimates remain separate future work.
 
 ## Rebuild and checks
 
-Run `Rscript validation/data/prepare_usa_1980_2019_marital_rates.R` from the
+Run `Rscript validation/data/usa_1980_2019/prepare_usa_1980_2019_marital_rates.R` from the
 repository root. It rebuilds the CSVs offline from the attributed printed-value
 transcription in the script, checks nonoverlap/contiguity over each supplied age
 range, and verifies units and endpoint cells. Source PDFs are retained for

@@ -2,7 +2,7 @@
 # Numerical transcriptions and limitations: usa_1980_2019_marital_rates.README.md.
 # NCHS: women/1980 column, Table 4 p.8; wife/1980 column, Table 3 p.19.
 # NCFMR: printed age-specific labels in the indicated female series.
-root <- "validation/data"
+root <- "validation/data/usa_1980_2019"
 rows <- function(measure, year, starts, ends, values, source, denominator) {
   stopifnot(length(starts) == length(ends), length(starts) == length(values),
     all(is.finite(starts)), all(ends > starts), all(is.finite(values)),

@@ -15,6 +15,8 @@ contract; software checks and empirical assessment are different evidence.
   observation.
 - `data/`: local rate inputs, source documents, metadata and preparation scripts
   used by the reports and shipped examples. Retain these for reproducibility.
+  See the [data directory guide](data/README.md) for country/period folders and
+  the path mapping for existing reports, which were not edited during relocation.
 - [England and Wales, 1992 onward](data/england_wales_1992_onward/README.md):
   fertility by three union types, annual marriage evidence and population
   denominators, cohabitation composition, and duration-specific divorce

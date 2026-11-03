@@ -382,7 +382,7 @@ live database checks disabled.
 The user-authored [report](../validation/milestone2.qmd) uses USA circa
 2000–2001 HMD mortality, NCHS overall/status-specific fertility, and SIPP-based
 female marriage inputs with male rates as a reference. Input preparation and
-limitations are recorded in [data provenance](../validation/data/usa_2000_rates.README.md).
+limitations are recorded in [data provenance](../validation/data/usa_2000_2001/usa_2000_rates.README.md).
 England and Wales 2015 prepared data are an additional example, not the case
 used in the current report.
 

@@ -27,10 +27,10 @@ Without divorce, the simulation need not reproduce observed status proportions.
 
 ```r
 fertility_rates <- read.csv(
-  "validation/data/england_wales_2015_fertility_by_union_status.csv"
+  "validation/data/england_wales_2015_2019/england_wales_2015_fertility_by_union_status.csv"
 )
 union_rates <- read.csv(
-  "validation/data/england_wales_2015_female_union_rates.csv"
+  "validation/data/england_wales_2015_2019/england_wales_2015_female_union_rates.csv"
 )
 model <- model |>
   set_fertility(fertility_rates) |>
@@ -38,6 +38,6 @@ model <- model |>
 ```
 
 Rebuild offline from the package root with
-`Rscript validation/data/prepare_england_wales_2015_rates.R` (requires `readxl`).
+`Rscript validation/data/england_wales_2015_2019/prepare_england_wales_2015_rates.R` (requires `readxl`).
 The archived XLS and marriage chart CSV are inputs. Source links, hashes,
 transformation details and checks are in `england_wales_2015_rates.source.json`.

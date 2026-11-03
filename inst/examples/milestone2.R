@@ -14,14 +14,14 @@ fertility_rates <- get_fertility_hfd("USA", year = 2000)
 # Use data on England and Wales that provides marital and non-marital rates
 
 marriage_rates <- read_csv(
-  here("validation", "data", "england_wales_2015_female_union_rates.csv")
+  here("validation", "data", "england_wales_2015_2019", "england_wales_2015_female_union_rates.csv")
 )
 fertility_rates_status <- read_csv(
-  here("validation", "data", "england_wales_2015_fertility_by_union_status.csv")
+  here("validation", "data", "england_wales_2015_2019", "england_wales_2015_fertility_by_union_status.csv")
 ) |>
   rename(union_type = union_status)
 fertility_rates <- read_csv(
-  here("validation", "data", "england_wales_2015_overall_fertility.csv")
+  here("validation", "data", "england_wales_2015_2019", "england_wales_2015_overall_fertility.csv")
 )
 
 fertility_rates |> calculate_tfr()

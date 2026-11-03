@@ -1,5 +1,5 @@
 # Run from the package root. Requires readxl; no network access.
-root <- "validation/data"
+root <- "validation/data/england_wales_2015_2019"
 path <- file.path(root, "england_wales_births_by_parents_2015_ons.xls")
 x <- readxl::read_excel(path, sheet = "Table 6", col_names = FALSE,
                         col_types = "text", .name_repair = "minimal")
