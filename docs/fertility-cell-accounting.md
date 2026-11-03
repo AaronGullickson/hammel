@@ -500,3 +500,15 @@ rates under D118; see [group transitions](group-transitions.md) and
 Alternative heterogeneity distributions, cohort normalization and
 fertility-dependent mortality remain future features. D102 implements
 lognormal weights and maternal inheritance.
+
+## Calendar changes and unrealized-birth accounting
+
+Unrealized-birth reporting uses one-year windows anchored at the simulation's
+original start, even when fertility cells are rebuilt after a rate change.
+Only the window containing a change is split into rate-epoch fragments. For a
+run starting at 2000 with a change at 2000.5, the fragments are [2000,2000.5)
+and [2000.5,2001), followed by [2001,2002), not shifted annual windows. The
+same rule applies to fractional run starts, multiple changes within a window,
+partial final windows and changes in cell strata. Fragments are combined
+without redistributing an expected count across unknown exposure patterns.
+This reporting correction does not alter event hazards or random draws.

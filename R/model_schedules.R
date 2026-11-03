@@ -41,11 +41,8 @@ model_at <- function(x, time) {
 
 check_model_coverage <- function(x, start, end, name) {
   if (!is_model_schedule(x)) return(invisible(NULL))
-  times <- sort(unique(c(start, x$time_start, x$time_end)))
-  times <- times[times >= start & (times < end | times == start)]
-  for (time in times) if (!any(x$time_start <= time & time < x$time_end))
-    stop(sprintf("%s model schedule has a coverage gap at time %g.", name, time), call. = FALSE)
-  invisible(NULL)
+  check_time_coverage(x$time_start, x$time_end, start, end,
+    sprintf("%s model schedule has a coverage gap", name))
 }
 
 collect_model_bank <- function(arguments) {

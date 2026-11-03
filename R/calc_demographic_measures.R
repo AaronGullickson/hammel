@@ -297,7 +297,8 @@ calculate_fertility_rates <- function(population, time_breaks, age_breaks,
 }
 
 # Attribute recorded unrealized births (D101) to observation rows. A record is
-# one one-year period from the run start and one fertility cell; it is added to
+# one run-anchored annual period (or a fragment split at a fertility-rate
+# change) and one fertility cell; it is added to
 # the row whose period, age, parity, group and union type contain it. Rows that
 # a record only partly overlaps, or that a stratum the schedule did not use
 # would have to split, become NA, as do periods before the run start.

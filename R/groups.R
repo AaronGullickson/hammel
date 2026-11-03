@@ -58,13 +58,14 @@ split_rate_groups <- function(rates) {
 }
 
 prepare_group_rates <- function(rates, persons, process,
-                                group_values = if ("group" %in% names(persons)) unique(persons$group) else NULL) {
+                                group_values = if ("group" %in% names(persons)) unique(persons$group) else NULL,
+                                start = -Inf, end = Inf) {
   rates$.hammel_group <- NULL
   if (!"group" %in% names(rates)) return(rates)
   labels <- as.character(rates$group)
   if (!"group" %in% names(persons)) {
     first <- sort(unique(labels), method = "radix")[1L]
-    if (any(vapply(calendar_rate_slices(rates), function(x)
+    if (any(vapply(calendar_rate_slices(rates, start, end), function(x)
         nrow(x) > 0L && !first %in% as.character(x$group), logical(1))))
       stop(sprintf("%s rates are missing schedules for fallback group '%s' in a calendar interval.",
                    process, first), call. = FALSE)
@@ -73,7 +74,7 @@ prepare_group_rates <- function(rates, persons, process,
     return(rates[labels == first, , drop = FALSE])
   }
   groups <- as.character(group_values)
-  missing <- unique(unlist(lapply(calendar_rate_slices(rates), function(x)
+  missing <- unique(unlist(lapply(calendar_rate_slices(rates, start, end), function(x)
     if (nrow(x)) setdiff(groups, as.character(x$group)) else character())))
   if (length(missing)) {
     stop(sprintf("%s rates are missing schedules for population group(s): %s.",

@@ -59,18 +59,18 @@ validate_conversion_rates <- function(rates) {
   invisible(rates)
 }
 
-prepare_cohabitation <- function(process, population, groups) {
+prepare_cohabitation <- function(process, population, groups, start = -Inf, end = Inf) {
   empty <- data.frame(age_start = numeric(), age_end = numeric(), rate = numeric())
   if (is.null(process$cohab_prob)) return(list(enabled = FALSE, prob = empty, conversion = empty))
   prob <- prepare_group_rates(expand_previous_union_rates(process$cohab_prob),
-    population$persons, "cohabitation probability", groups)
+    population$persons, "cohabitation probability", groups, start, end)
   prob$rate <- prob$prob # private Band convention
   conversion <- process$union_convert_rate
   if (is.null(conversion)) {
     warning("Cohabitation is enabled without `union_convert_rate`; no conversions will occur.", call. = FALSE)
     conversion <- empty
   } else {
-    conversion <- prepare_group_rates(conversion, population$persons, "cohabitation conversion", groups)
+    conversion <- prepare_group_rates(conversion, population$persons, "cohabitation conversion", groups, start, end)
     if (!"age_start" %in% names(conversion)) conversion$age_start <- NA_real_
     if (!"age_end" %in% names(conversion)) conversion$age_end <- NA_real_
   }

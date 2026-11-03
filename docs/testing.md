@@ -1067,3 +1067,34 @@ After regenerating help, `devtools::test(filter =
 "previous-union-pooling|marriage-entry|marriage-duration|marriage-counts")`
 passed 2,339 assertions without failures, warnings or skips. Tests include the
 explicit-flag requirement and duration breaks' existing implicit stratification.
+
+## Calendar review follow-up (November 2, 2026)
+
+`TZ=UTC Rscript -e 'devtools::test()'` passed 6,430 assertions with no failures
+or warnings and one skipped opt-in live database test. No validation report
+was edited or rendered and no external rates were downloaded.
+
+Analytical regression cases use a mother excluded by birth spacing throughout
+the run and fertility changes at offsets .5, 1.25 and 2.2. Both integer and
+fractional run starts recover the exact expected unrealized totals .15, .35,
+.32 and .12 in run-anchored annual/partial-final windows. Only the supplied
+initial birth counts as observed; no simulated births occur. Additional cases
+accept complete in-run mortality, fertility, search, probability, conversion and
+dissolution group/pair schedules despite incomplete unreachable periods. They
+retain errors for active gaps, active incomplete age support, zero-run coverage
+and malformed supplied rows. Inheritance-only boundaries retain matching
+outcomes and demographic clocks in a fixed-seed comparison without births.
+
+Engine output now binds all unrealized epoch pieces in one call rather than
+repeatedly copying a growing table. Calendar boundaries avoid probability
+reloads unless probabilities change, and skip intensity-tracker rebuilding
+when only inheritance changes. These allocation/work reductions are established
+by code inspection; no runtime speedup or empirical benchmark is claimed.
+
+R calendar segmentation and time-coverage checking are shared by rate/model
+coverage, pooled previous-category expansion and contextual dissolution
+validation. Most rate validators already used `validate_calendar_rates()` before
+this review; their domain-specific cross-period clock checks remain necessary.
+The stale model-schedule status in AGENTS and the detailed dissolution category
+in the dissolution specification were corrected. No demographic defaults or
+calendar-gap rules were changed.

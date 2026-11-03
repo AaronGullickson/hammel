@@ -127,7 +127,7 @@ the user's agreement.
   See `docs/group-transitions.md`; household moves remain deferred (D114),
   with regional applications retained under tentative milestone 10's multiple
   group columns (D121). Calendar-time rates follow `docs/time-varying-rates.md`
-  (D118); model schedules remain deferred. Most categorical characteristics should
+  (D118); matching and inheritance model schedules are implemented under D123. Most categorical characteristics should
   use groups; multiple group columns are tentative milestone 10 with their
   schema still unselected.
 - Use `devtools::test()` for the testthat suite. Live database tests require

@@ -99,7 +99,8 @@ When dissolution executes:
 
 Unpartnered rate-mode women use the currently supplied search rates; on-demand
 women may form another union at a later birth attempt. Age-specific searches
-may now select the `dissolved` schedule under D080. No waiting period or
+select the detailed `separated` schedule, or the pooled `dissolved` schedule
+when separation and widowhood share rates (D126). No waiting period or
 former-partner exclusion is introduced.
 Current kinship/matching restrictions still apply. New union episodes have new
 IDs and their own duration clocks, even when the partners previously formed a

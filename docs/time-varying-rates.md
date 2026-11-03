@@ -34,6 +34,15 @@ Execution additionally checks calendar coverage over the requested run. A
 zero-year run requires a valid active table at its starting instant. Different
 processes may have different calendar boundaries. Existing clock-selection
 restrictions apply across the entire table, including across calendar periods.
+
+Execution-only population coverage checks (required groups, possible group
+pairs and complete mortality age support) examine active slices overlapping
+the requested run. For a zero-year run they examine the slice active at its
+start. Supplied rows outside the run still undergo construction validation
+for malformed bounds, overlapping bands and intrinsically incomplete typed
+schedules, but population-specific group coverage outside the run is not
+required. For example, an A-only historical slice before 1950 does not prevent
+an A/B population from running in 2000–2010 when both groups are covered then.
 Input tables and source attributes are retained; group multipliers remain static.
 The static-only parity reachability warning is not applied to calendar-varying
 fertility, because earlier rate periods can produce different parity histories.

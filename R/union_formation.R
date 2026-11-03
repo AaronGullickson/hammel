@@ -556,13 +556,12 @@ expand_previous_union_rates <- function(rates) {
     do.call(rbind, c(list(x[x$previous_union != "dissolved", , drop = FALSE]), copies))
   }
   if (!has_calendar_rates(rates)) return(expand_slice(rates))
-  times <- sort(unique(c(rates$time_start, rates$time_end)))
-  pieces <- lapply(seq_len(length(times) - 1L), function(i) {
-    rows <- rates$time_start <= times[i] & times[i] < rates$time_end
-    x <- rates[rows, , drop = FALSE]
+  pieces <- lapply(calendar_rate_segments(rates), function(segment) {
+    x <- segment$rates
     if (!nrow(x)) return(NULL)
-    x$time_start <- times[i]
-    x$time_end <- times[i + 1L]
+    x$time_start <- segment$start
+    x$time_end <- segment$end
+    x <- x[, names(rates), drop = FALSE]
     expand_slice(x)
   })
   if (changed) do.call(rbind, pieces) else rates

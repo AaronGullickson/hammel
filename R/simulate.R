@@ -140,7 +140,7 @@ simulate <- function(model, years, seed = NULL) {
   ffab <- model$processes$fertility$ffab
   hetfert <- model$processes$fertility$hetfert
   if (!is.null(hetfert)) validate_fertility_weights(population$persons)
-  for (death_slice in calendar_rate_slices(death_rates)) {
+  for (death_slice in calendar_rate_slices(death_rates, start, start + years)) {
     if (!nrow(death_slice)) next
     for (rows in split_rate_groups(death_slice)) {
       for (sex in c("m", "f")) {
@@ -209,12 +209,12 @@ simulate <- function(model, years, seed = NULL) {
   inheritance <- if (scheduled_models) model_context$inheritance else
     prepare_group_inheritance(model$processes$fertility$inheritance, registry_population)
   group_values <- inheritance$values
-  death_rates <- prepare_group_rates(death_rates, population$persons, "mortality", group_values)
-  birth_rates <- prepare_group_rates(birth_rates, population$persons, "fertility", group_values)
+  death_rates <- prepare_group_rates(death_rates, population$persons, "mortality", group_values, start, start + years)
+  birth_rates <- prepare_group_rates(birth_rates, population$persons, "fertility", group_values, start, start + years)
   union_rates <- if (is.null(union_process$rates))
     data.frame(age_start = numeric(), age_end = numeric(), rate = numeric()) else
     prepare_group_rates(expand_previous_union_rates(union_process$rates),
-      population$persons, "union formation", group_values)
+      population$persons, "union formation", group_values, start, start + years)
   death_rates <- apply_group_prop_hazard(death_rates, population$persons,
     model$processes$mortality$group_prop_hazard, "mortality", group_values)
   birth_rates <- apply_group_prop_hazard(birth_rates, population$persons,
@@ -227,8 +227,8 @@ simulate <- function(model, years, seed = NULL) {
   if (!is.null(union_process$father_matching))
     validate_matching_groups(union_process$father_matching, group_values)
   dissolution_rates <- prepare_dissolution_rates(dissolution_process,
-    population$persons, group_values)
-  cohab <- prepare_cohabitation(union_process, population, group_values)
+    population$persons, group_values, start, start + years)
+  cohab <- prepare_cohabitation(union_process, population, group_values, start, start + years)
   if (!is.null(union_process$cohab_matching))
     validate_matching_groups(union_process$cohab_matching, group_values)
   if (cohab_enabled && !"union_type" %in% names(population$unions))

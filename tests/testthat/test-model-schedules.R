@@ -308,3 +308,19 @@ test_that("model choices update before shared rate and probability changes", {
   expect_equal(out$unions$husband_id, 3)
   expect_gte(out$unions$start_time, .3)
 })
+
+test_that("inheritance-only boundaries preserve matching execution without births", {
+  m <- make_rate_model(100,search_rate=.4)
+  m$population$persons$sex <- rep(c("f","m"),each=50)
+  m$population$persons$group <- rep(c("A","B"),50)
+  m <- set_fertility(m,m$processes$fertility$rates,
+    inheritance=create_group_inheritance("mother"))
+  scheduled <- set_fertility(m,m$processes$fertility$rates,
+    inheritance=model_calendar(create_group_inheritance("mother"),
+      create_group_inheritance("father"),boundary=.25))
+  actual <- simulate(scheduled,2,seed=812)
+  expected <- simulate(m,2,seed=812)
+  expect_equal(actual$persons,expected$persons)
+  expect_equal(actual$unions,expected$unions)
+  expect_equal(actual$simulation$births,0)
+})

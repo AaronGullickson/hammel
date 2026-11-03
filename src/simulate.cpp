@@ -954,7 +954,7 @@ class FertilityCells {
   std::function<State(int)> state_;
   std::function<double()> draw_threshold_;
   const WeightCalibrator* calibrator_;
-  double start_, end_;
+  double start_, end_, period_origin_;
   // Unrealized expected births and member-years without eligible women, by
   // one-year period from the simulation start and cell.
   std::map<std::pair<long long, int>, std::array<double, 2>> unrealized_;
@@ -962,9 +962,9 @@ class FertilityCells {
 
   void record_unrealized(int c, double from, double to, double lambda) {
     while (from < to) {
-      long long k = static_cast<long long>(std::floor(from - start_));
-      if (start_ + static_cast<double>(k + 1) <= from) ++k; // roundoff at a boundary
-      const double stop = std::min(to, start_ + static_cast<double>(k + 1));
+      long long k = static_cast<long long>(std::floor(from - period_origin_));
+      if (period_origin_ + static_cast<double>(k + 1) <= from) ++k; // roundoff at a boundary
+      const double stop = std::min(to, period_origin_ + static_cast<double>(k + 1));
       auto& value = unrealized_[{k, c}];
       value[0] += lambda * (stop - from);
       value[1] += stop - from;
@@ -1069,11 +1069,11 @@ class FertilityCells {
   FertilityCells(std::vector<Source> sources, int groups, int types, bool split_parity,
                  double max_age, double interval, bool weighted,
                  std::function<State(int)> state, std::function<double()> draw_threshold,
-                 const WeightCalibrator* calibrator, double start, double end)
+                 const WeightCalibrator* calibrator, double start, double end, double period_origin)
       : sources_(std::move(sources)), types_(types), split_parity_(split_parity), weighted_(weighted),
         max_age_(max_age), interval_(interval), lookup_(static_cast<size_t>(groups) * types),
         state_(std::move(state)), draw_threshold_(std::move(draw_threshold)),
-        calibrator_(calibrator), start_(start), end_(end) {
+        calibrator_(calibrator), start_(start), end_(end), period_origin_(period_origin) {
     if (!split_parity_)
       for (const Source& source : sources_)
         lookup_[static_cast<size_t>(source.group) * types_ + source.type] =
@@ -1235,8 +1235,9 @@ class FertilityCells {
     for (const auto& entry : unrealized_) {
       const Cell& x = cells_[entry.first.second];
       const Stratum& st = strata_[x.stratum];
-      period_start[r] = start_ + static_cast<double>(entry.first.first);
-      period_end[r] = std::min(std::min(end_, cutoff), period_start[r] + 1);
+      const double grid_start = period_origin_ + static_cast<double>(entry.first.first);
+      period_start[r] = std::max(start_, grid_start);
+      period_end[r] = std::min(std::min(end_, cutoff), grid_start + 1);
       group[r] = st.group;
       type[r] = type_labels[st.type];
       parity_start[r] = st.parity_start; parity_end[r] = st.parity_end;
@@ -2128,7 +2129,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       add_counted_woman(woman, start);
   }
   auto update_models = [&](double now) {
-    if (!scheduled_models) return;
+    if (!scheduled_models) return false;
     while (model_epoch + 1 < model_times.size() && model_times[model_epoch + 1] <= now)
       ++model_epoch;
     const bool matching_changed = general_id != general_route[model_epoch] ||
@@ -2157,6 +2158,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     inheritance_ranks = as<IntegerVector>(inheritance["ranks"]);
     ancestry_groups = as<IntegerVector>(inheritance["ancestry_groups"]);
     inherit_custom = as<Function>(inheritance["custom"]);
+    return matching_changed;
   };
   std::vector<unsigned long long> event_versions(people.size(), 0);
   // Continuous dates order events. Equivalent keys retain insertion order.
@@ -2330,7 +2332,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     for (const Person& person : people) oldest_birth = std::min(oldest_birth, person.born);
     cells.reset(new FertilityCells(fertility_strata(fertility_rates, group_count, fertility_types),
       group_count, static_cast<int>(fertility_types.size()), parity_specific, end - oldest_birth,
-      birth_interval, heterogeneous, state, threshold, calibrator.get(), now, end));
+      birth_interval, heterogeneous, state, threshold, calibrator.get(), now, end, start));
   };
   load_cells(start);
   // Initialize one next event for each living person. Known age changes are
@@ -2354,15 +2356,19 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
           (queue.empty() || now <= queue.begin()->first)) {
         calendar_boundaries.erase(calendar_boundaries.begin());
         checkUserInterrupt();
-        update_models(now);
-        for (int w = 0; w < static_cast<int>(counted_woman.size()); ++w)
-          remove_counted_woman(w);
-        cohab_prob = calendar_slice(all_probability, now);
-        load_probabilities();
+        const bool matching_changed = update_models(now);
+        const bool probability_changed = calendar_changes_at(all_probability, now);
         const bool rate_change = calendar_changes_at(all_mortality, now) ||
           calendar_changes_at(all_fertility, now) || calendar_changes_at(all_search, now) ||
           calendar_changes_at(all_dissolution, now) || calendar_changes_at(all_conversion, now) ||
           calendar_changes_at(all_transitions, now);
+        if (!rate_change && !matching_changed && !probability_changed) continue;
+        for (int w = 0; w < static_cast<int>(counted_woman.size()); ++w)
+          remove_counted_woman(w);
+        if (probability_changed) {
+          cohab_prob = calendar_slice(all_probability, now);
+          load_probabilities();
+        }
         if (!rate_change) {
           // Model/probability changes retain all demographic event clocks.
           // Role preferences and intensities use the newly active inputs.
@@ -2666,9 +2672,14 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     cells->finish(end);
     cells_consistent = cells_consistent && cells->consistent();
     unrealized = cells->unrealized(fertility_types);
-    Function bind = Environment::base_env()["rbind"];
-    for (auto it = unrealized_epochs.rbegin(); it != unrealized_epochs.rend(); ++it)
-      unrealized = as<DataFrame>(bind(*it, unrealized));
+    if (!unrealized_epochs.empty()) {
+      List pieces(unrealized_epochs.size() + 1);
+      for (size_t i = 0; i < unrealized_epochs.size(); ++i) pieces[i] = unrealized_epochs[i];
+      pieces[unrealized_epochs.size()] = unrealized;
+      Function bind = Environment::base_env()["rbind"];
+      Function invoke = Environment::base_env()["do.call"];
+      unrealized = as<DataFrame>(invoke(bind, pieces));
+    }
   }
   // Materialize ordinary R columns from the C++ records. The R wrapper restores
   // custom columns, closes existing unions affected by deaths, and assembles the
