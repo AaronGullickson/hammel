@@ -78,7 +78,8 @@ We will hold mortality rates to the 1992 level. These values are pulled from the
 ```{r}
 #| label: get-mortality-rates
 
-mortality_rates1992 <- get_mortality_hmd("GBRTENW", 1992, shape = "5x1", open_age = 90)
+mortality_rates1992 <- get_mortality_hmd("GBRTENW", 1992, shape = "5x1", 
+                                         open_age = 90)
 
 mortality_rates1992
 ```
@@ -296,12 +297,13 @@ marriage_rates_pretuned <- read_csv(
     time_start = year, 
     time_end = year + 1,
     #rate = rate * 3,
-    previous_union = if_else(marriage_order == "first_marriage", "none", "dissolved")
+    previous_union = if_else(marriage_order == "first_marriage",
+                             "none", "dissolved")
   ) |>
   select(time_start, time_end, age_start, age_end, previous_union, rate)
 
-# some marriage rates for young age groups and dissolved are missing. For those cases,
-# carry forward the previous years
+# some marriage rates for young age groups and dissolved are missing. For those 
+# cases, carry forward the previous years
 marriage_rates_pretuned <- marriage_rates_pretuned |>
   arrange(previous_union, age_start, time_start) |>
   group_by(previous_union, age_start, age_end) |>
@@ -373,8 +375,10 @@ calculate_marriage_rates(
 ) |>
   filter(sex == "f", previous_union == "none") |>
   left_join(
-    marriage_rates_pretuned |> filter(previous_union == "none", time_start == 1992),
-    by = join_by(time_end == time_start, age_start == age_start, age_end == age_end)
+    marriage_rates_pretuned |> 
+      filter(previous_union == "none", time_start == 1992),
+    by = join_by(time_end == time_start, 
+                 age_start == age_start, age_end == age_end)
   ) |>
   select(age_start, age_end, rate_marriage, rate) |>
   rename(rate_observed = rate_marriage, rate_input = rate) |>
@@ -543,7 +547,8 @@ calculate_dissolution_rates(
 ) |>
   filter(union_type == "marriage", time_start %in% c(1992, 2000, 2010, 2018)) |>
   ggplot(aes(x = dur_start + 2.5, y = rate_dissolution))+
-  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), 
+              color = NA, fill = "grey70")+
   geom_point(size = 0.5)+
   geom_line(
     data = dissolution_rates |> 
@@ -569,7 +574,8 @@ calculate_dissolution_rates(
   filter(union_type == "cohab") |>
   mutate(time_mid = (time_start + time_end) / 2) |>
   ggplot(aes(x = dur_start, y = rate_dissolution))+
-  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), 
+              color = NA, fill = "grey70")+
   geom_point(size = 0.5)+
   geom_line(
     data = dissolution_rates |> filter(union_type == "cohab"), 
@@ -598,7 +604,8 @@ mar_rates_observed |>
   filter(sex == "f", time_start %in% c(1992, 2000, 2010, 2018), 
     (age_start > 20 & previous_union == "dissolved") | previous_union == "none")  |>
   ggplot(aes(x = age_start, y = rate_union))+
-  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), 
+                  color = NA, fill = "grey70")+
   geom_point(size = 0.5)+
   geom_line(
     data = marriage_rates |> filter(time_start %in% c(1992, 2000, 2010, 2018)),
@@ -624,7 +631,8 @@ calculate_union_rates(
   filter(sex == "f") |>
   select(time_start, time_end, union_type, unions) |>
   rename(n = unions) |>
-  pivot_wider(id_cols = starts_with("time_"), names_from = union_type, values_from = n) |>
+  pivot_wider(id_cols = starts_with("time_"), 
+              names_from = union_type, values_from = n) |>
   mutate(
     prob_cohab = cohab / (cohab + marriage),
     se = sqrt(prob_cohab * (1 - prob_cohab) / (cohab + marriage)),
@@ -632,7 +640,8 @@ calculate_union_rates(
     conf_high = prob_cohab + 1.96 * se
   ) |>
   ggplot(aes(x = time_start, y = prob_cohab))+
-  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), 
+              color = NA, fill = "grey70")+
   geom_point(size = 0.5)+
   geom_line(data =prob_cohab, aes(y = prob), linetype = 2, color = "red")+
   labs(x = "year", y = "probability of cohabitation when union forms")
