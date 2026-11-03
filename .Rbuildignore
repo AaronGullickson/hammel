@@ -12,3 +12,6 @@
 ^vignettes/.*_files$
 ^vignettes/.*\.html$
 ^vignettes/articles$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
