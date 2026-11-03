@@ -18,6 +18,7 @@ LinkingTo:
 SystemRequirements: C++17
 Suggests:
     HMDHFDplus (>= 2.0.8),
+    quarto,
     testthat (>= 3.2.0),
     withr
 Roxygen: list(markdown = TRUE)
@@ -25,3 +26,4 @@ URL: https://github.com/AaronGullickson/hammel, https://aarongullickson.github.i
 BugReports: https://github.com/AaronGullickson/hammel/issues
 Config/roxygen2/version: 8.1.1
 Config/testthat/edition: 3
+Config/Needs/website: quarto
