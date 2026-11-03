@@ -43,6 +43,7 @@ library(stringr)
 library(ggplot2)
 library(gt)
 library(furrr)
+library(googlesheets4)
 set_theme(theme_bw())
 ```
 
@@ -885,13 +886,306 @@ calculate_union_rates(
 
 @fig-prob-cohab-compare shows the estimated probability that a newly formed union is a cohabitation rather than a marriage. This percentage conforms to the input rate.
 
-
 ### Replicate Gullickson and Saperstein
 
-- changing intermarriage and inheritance rates
+Our goal in this project is replication Gullickson and Saperstein (2025). Specifically, we will replicate their simulation of a two group system with a high and resilient inheritance pattern for multiracial identification with an intermarriage rate that plateaus halfway through the simulation. The inheritance model was already used as an example in the Milestone 3 report. 
 
-### Another Project for Transition Rates
+We can read their parameters directly from the provided google sheet.
 
+```{r}
+gs4_deauth()
+parameters_highres <- read_sheet(
+  "1ad-fJUCjRy_zslI2MMce8UaolepG536-IZr1yNNIuZ8", 
+  sheet = "uneven_progress_high_resilient", 
+  skip = 7
+)
+```
+
+Like Gullickson and Saperstein, we will use US 2000 fertility and mortality rates.
+
+```{r}
+mortality_rates <- get_mortality_hmd("USA", 2000)
+fertility_rates <- get_fertility_hfd("USA", 2000)
+```
+
+We will use on-demand partnering because we don't need to track it directly. 
+
+We will use uneven starting groups of A (85%) and B (15%).
+
+```{r}
+#| label: set-base-pop
+pop <- create_baseline_population(200000, group_weights = c("A" = 0.85, "B" = 0.15))
+```
+
+The simulation will proceed as follows:
+
+- 100 year burn in with no allowed intermarriage and random_parent inheritance.
+- 200 year simulation that will switch to the custom inheritance model used by Gullickson and Saperstein.
+- incremental increases in the likelihood of intermarriage in 5 year increments until year 100 at which point it plateaus.
+
+```{r}
+#| label: setup-inheritance-models
+
+inheritance_models <- tibble(
+  time_start = c(0, 100),
+  time_end   = c(100, Inf),
+  model      = list(
+    create_group_inheritance("random_parent"),
+    create_group_inheritance(
+      "custom",
+      groups = c("A", "B", "AB"),
+      fun = function(child_ancestry, mother_group, father_group, ...) {
+        # Same identity or missing father: follow mother
+        if (is.na(father_group) || mother_group == father_group) {
+          return(mother_group)
+        }
+
+        # Entirely unknown ancestry: follow mother
+        known <- 1 - child_ancestry[["unknown"]]
+        if (known <= 0) return(mother_group)
+
+        # if we are here then assign as a function of group A ancestry
+        prop_A <- child_ancestry[["group_A"]] / known
+
+        logits <- c(
+          A  = -5.138 + 11.88 * prop_A - 15.3 * prop_A^2 + 9.553 * prop_A^3,
+          B  = 0.949 - 9.39 * prop_A + 11.935 * prop_A^2 - 8.483 * prop_A^3,
+          AB = 0
+        )
+        weights <- exp(logits - max(logits))
+
+        sample(names(weights), size = 1, prob = weights)
+      }
+    )
+  )
+)
+```
+
+```{r}
+#| label: setup-matching-models
+
+m <- list(create_age_gap_matching_model(2, 5, prevent_exogamy = TRUE))
+lodds <- -5
+for (i in 1:11) {
+  m[[length(m) + 1L]] <- create_age_gap_matching_model(
+    2, 5,
+    group_exogamy = c("A:B" = lodds, "A:AB" = lodds / 2, "B:AB" = lodds / 2)
+  )
+  lodds <- lodds + 0.25
+}
+
+matching_models <- tibble(
+  time_start = c(0, seq(100, 150, 5)),
+  time_end   = c(100, seq(105, 150, 5), 300),
+  model      = m
+)
+```
+
+```{r}
+#| label: run-multigroup-sims
+
+model <- hammel_model() |>
+  set_population(pop) |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates, inheritance = inheritance_models) |>
+  set_union_formation("on_demand", matching = matching_models)
+
+runtime <- system.time(pop_final <- simulate(model, 300, 42))
+```
+
+The simulation takes `r runtime[["elapsed"]]` seconds to run.
+
+```{r}
+#| label: fig-pop-share-groups
+#| fig-cap: Group share across time in simulation
+
+calculate_population_size(pop_final, seq(0, 300, 5), by_group = TRUE) |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ungroup() |>
+  mutate(group = factor(group, levels = c("A", "B", "AB"))) |>
+  ggplot(aes(x = time, y = prop, fill = group))+
+  geom_area()
+```
+
+@fig-pop-share-groups shows the group shares over time. The AB group emerges after 100 years as expected and grows to a larger share of the population over time.
+
+
+```{r}
+#| label: calculate-crosstabs
+
+crosstabs <- pop_final |>
+  get_detailed_unions() |>
+  #mutate(time_period = cut(start_time, breaks = seq(0, 300, 5))) |>
+  mutate(time_mid = floor(start_time / 5) * 5 + 2.5) |>
+  count(time_mid, group_w, group_h) |>
+  pivot_wider(names_from = c(group_w, group_h), values_from = n) |>
+  mutate(
+    log_odds_A_B = log(A_B) + log(B_A) - log(A_A) - log(B_B),
+    se_A_B = sqrt(1 / A_B + 1 / B_A + 1 / A_A + 1 / B_B),
+    log_odds_A_AB = log(A_AB) + log(AB_A) - log(A_A) - log(AB_AB),
+    se_A_AB = sqrt(1 / A_AB + 1 / B_AB + 1 / A_A + 1 / AB_AB),
+    log_odds_B_AB = log(B_AB) + log(AB_B) - log(B_B) - log(AB_AB),
+    se_B_AB = sqrt(1 / B_AB + 1 / AB_B + 1 / B_B + 1 / AB_AB)
+  )
+```
+
+```{r}
+#| label: fig-log-odds
+#| fig-cap: Log-odds ratio over time (5 year intervals) between three groups. 95% confidence bands shown. Dotted lines show expected plateaus for the A:B group and A:AB and B:AB groups. 
+
+crosstabs |>
+  select(time_mid, starts_with("log_odds"), starts_with("se_")) |>
+  pivot_longer(
+    cols = -time_mid,
+    names_to = c(".value", "combo"),
+    names_pattern = "(log_odds|se)_(.*)"
+  ) |>
+  mutate(
+    combo = str_replace(combo, "_", ":"),
+    combo = factor(combo, levels = c("A:B", "A:AB", "B:AB")) 
+  ) |>
+  ggplot(aes(x = time_mid, y = log_odds, color = combo, group = combo))+
+  geom_ribbon(aes(ymin = log_odds - 1.96 * se, ymax = log_odds + 1.96 * se, fill = combo), color = NA, alpha = 0.3)+
+  geom_line()+
+  geom_hline(yintercept = c(-5, -2.5), linetype = 2)+
+  scale_y_continuous(limits = c(0, -11))+
+  labs(x = "year", y = "log odds")
+```
+
+@fig-log-odds shows the log odds ratios over time for the three combinations. No log odds ratios show for the first 100 years as expected because intermarriage was not allowed. When the log odds are very low or the groups are still very small (as for the AB group between 100 and 150 years), the log odds ratio can sometimes not be estimated due to zero values in one of the cells. Thus, log odds ratios don't appear for combos involving the AB group for some time after year 100. The A:B log odds ratio behaves exactly as expected by the input exogamy ratios, starting at roughly -10 and plateauing at -5. The A:AB and B:AB log odds ratios are about half that throughout and stabilize at -2.5, as expected.
+
+```{r}
+#| label: fig-custom-inheritance-prob
+#| fig-cap: Probability of group assignment as a function of proportion A ancestry among births to parents belonging to different groups for all births in a single simulation. Proportion A ancestry is plotted in 10 percent bins by the midpoint of the bin. 95% confidence intervals shown. The dotted line shows the expected probability from the inheritance model.
+
+temp <- tibble(
+  prop_A = seq(0.005, 0.995, 0.005),
+  logit_A = -5.138 + 11.88 * prop_A - 15.3 * prop_A^2 + 9.553 * prop_A^3,
+  logit_B = 0.949 - 9.39 * prop_A + 11.935 * prop_A^2 - 8.483 * prop_A^3,
+  denom = exp(logit_A) + exp(logit_B) + exp(0),
+  prob_A = exp(logit_A)/denom,
+  prob_B = exp(logit_B)/denom,
+  prob_AB = exp(0)/denom
+) |>
+  select(prop_A, starts_with("prob_")) |>
+  pivot_longer(cols = starts_with("prob_"), names_prefix = "prob_", names_to = "group", values_to = "prop") |>
+  rename(prop_a_group = prop_A)
+
+pop_final$persons |>
+  filter(birth_time >= 100) |>
+  left_join(pop_final$ancestry, by = "person_id") |>
+  left_join(
+    pop_final$persons |> 
+      select(person_id, group) |> 
+      rename(father_id = person_id, group_father = group),
+    by = "father_id"
+  ) |>
+  left_join(
+    pop_final$persons |> 
+      select(person_id, group) |> 
+      rename(mother_id = person_id, group_mother = group),
+    by = "mother_id"
+  ) |>
+  filter(!is.na(group_father) & !is.na(group_mother) &
+    group_father != group_mother) |>
+  mutate(
+    prop_a_group = cut(
+      group_A,
+      breaks = seq(0, 1, 0.1),
+      labels = FALSE,
+      include.lowest = TRUE
+    ) * 0.1 - 0.05
+  ) |>
+  group_by(prop_a_group, group) |>
+  summarize(n = n()) |>
+  mutate(prop = n / sum(n), se = sqrt(prop * (1 - prop) / sum(n))) |>
+  ungroup() |>
+  ggplot(aes(x = prop_a_group, y = prop, group = group, color = group))+
+  geom_line(data = temp, linetype = 2)+
+  geom_point(alpha = 0.8)+
+  geom_linerange(aes(ymin = prop - 1.96 * se, ymax = prop + 1.96 * se), alpha = 0.8)+
+  labs(x = "proportion A ancestry", y = "probability of group identity")+
+  theme_bw()
+```
+
+@fig-custom-inheritance-prob shows the observed probability of being assigned to a given group as a function of share of A ancestry for births to parents from different groups. The dotted line shows the expected probabilities from the model. The results line up closely to expectation and most 95% confidence intervals contain the expected value.
+
+#### Add transition rates
+
+To test time-varying transition rates, I add transition rates to the simulation where AB individuals have an equal rate of transitioning back to A or B with equal probability upon becoming adults. We will double that transition rate halfway through the latter 200 years of the simulation. 
+
+```{r}
+#| label: create-transition-rates
+
+trans_rates <- tribble(
+  ~time_start, ~time_end, ~group_origin, ~group_dest, ~age_start, ~age_end, ~rate,
+  0,           100,       "AB",           "B",         15,         20,       0.00,
+  0,           100,       "AB",           "A",         15,         20,       0.00,
+  100,         200,       "AB",           "B",         15,         20,       0.02,
+  100,         200,       "AB",           "A",         15,         20,       0.02,
+  200,         300,       "AB",           "B",         15,         20,       0.04,
+  200,         300,       "AB",           "A",         15,         20,       0.04
+)
+```
+
+```{r}
+#| label: run-multigroup-trans-sims
+
+model <- hammel_model() |>
+  set_population(pop) |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates, inheritance = inheritance_models) |>
+  set_union_formation("on_demand", matching = matching_models) |>
+  set_group_transition(trans_rates)
+
+runtime <- system.time(pop_final <- simulate(model, 300, 42))
+```
+
+```{r}
+#| label: fig-pop-share-groups-trans
+#| fig-cap: Group share across time in simulation with transition rates
+
+calculate_population_size(pop_final, seq(0, 300, 5), by_group = TRUE) |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ungroup() |>
+  mutate(group = factor(group, levels = c("A", "B", "AB"))) |>
+  ggplot(aes(x = time, y = prop, fill = group))+
+  geom_area()
+```
+
+@fig-pop-share-group-trans shows the group share over time in the simulation with these transition rates. As expected, the growth of the AB group is slower than the previous simulation due to some transitions back into single group categories.
+
+```{r}
+#| label: tbl-transition-rates
+#| tbl-cap: Estimated transition rates from simulation with 95% confidence intervals. Input rates are shown for reference.
+
+temp <- calculate_transition_rates(pop_final, c(0, 100, 200, 300), c(15, 20), conf.level = 0.95) |>
+  filter(group_origin == "AB", age_start == 15) |>
+  select(time_start, time_end, age_start, age_end, group_origin, group_dest, rate_transition,
+    conf_low, conf_high) |>
+  left_join(trans_rates)
+
+temp |>
+  gt() |>
+  cols_label(
+    time_start ~ "Starting time",
+    time_end  ~ "Ending time",
+    age_start ~ "Age start",
+    age_end ~ "Age end",
+    group_origin ~ "Origin",
+    group_dest ~ "Destination",
+    rate_transition ~ "Observed rate",
+    conf_low ~ "Low",
+    conf_high ~ "High",
+    rate ~ "Input rate"
+  ) |>
+  tab_spanner(starts_with("conf_"), label = "95% Confidence interval") |>
+  fmt_number(c(rate_transition, conf_low, conf_high), decimals = 4)
+```
+
+@tbl-transition-rates shows that the estimated transition rates are very close to the expected input transition rates.
 
 ## Specific Test on Fertility
 
