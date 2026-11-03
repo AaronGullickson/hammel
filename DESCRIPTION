@@ -19,7 +19,8 @@ Suggests:
     HMDHFDplus (>= 2.0.8),
     knitr,
     quarto,
-    testthat (>= 3.2.0)
+    testthat (>= 3.2.0),
+    withr
 Roxygen: list(markdown = TRUE)
 URL: https://github.com/AaronGullickson/hammel
 BugReports: https://github.com/AaronGullickson/hammel/issues
