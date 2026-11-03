@@ -339,8 +339,551 @@ calculate_mortality_rates(pop_final, 1780:2020, 0:95, conf.level = 0.95) |>
 
 ### The Second Demographic Transition
 
-- hold fertility and mortality constant at low levels
-- increase cohabitation, dissolution rates, and increase age at first marriage
+For the second demographic transition, I want to hold fertility (separated by union type) constant at a certain level and then increase the share of cohabitation, increase age at first marriage, and increase dissolution rates. I can then observe how these changes trigger changes in observed TFR over time despite constant fertility rates within union types.
+
+This simulation has a high demand on input terms. The goal here is a "stylized" simulation rather than one completely accurate for a particular country. However, England and Wales provide some of the best disaggregated data for my purposes. We will run the simulation from 1992 to 2019.
+
+First, we need to get age-specific fertility rates disaggregated by union status. We use SOURCE to get age-specific fertility rates in 1992 by union status (marriage, cohabiation, or unpartnered). 
+
+```{r}
+#| label: get-fertility-second-demog-trans
+
+fertility_rates1992 <- read_csv(here("validation", "data", 
+  "england_wales_1992_onward", "fertility_by_union_type_1992.csv")) |>
+  rename(
+    age_start = denominator_age_start,
+    age_end = denominator_age_end
+  ) |>
+  select(union_type, age_start, age_end, rate)
+
+fertility_rates1992 |>
+  calculate_tfr()
+```
+
+We will hold mortality rates to the 1992 level as well.
+
+```{r}
+#| label: get-mortality-second-demog-trans
+
+mortality_rates1992 <- get_mortality_hmd("GBRTENW", 1992, shape = "5x1", open_age = 90)
+```
+
+Next lets look at the probability that a formed union is cohabitation. We will use data on all of Great Britian that shows the share of married couples that cohabited prior to marriage. This number is not exactly the same as what we want because it excludes cohabitations that did not survive into marriage or continued on as cohabitations. They also don't line up with new unions but rather existing union. Overall, it should give us a ballpark figure for what we are looking for.
+
+```{r}
+#| label: get-cohab-prob-second-demog-trans
+
+prob_cohab <- read_csv(here(
+  "validation",
+  "data",
+  "england_wales_1992_onward", 
+  "female_premarital_cohabitation_1994_2019.csv"
+)) |>
+  # There are some differenes by age but not huge so lets just assume
+  # this is constant with regard to age
+  filter(source_age_label == "All ages") |>
+  arrange(year) |>
+  rename(prob = proportion_cohabiting_before_marriage) |>
+  mutate(time_start = year, time_end = year + 1, 
+         age_start = 0, age_end = Inf) |>
+  select(starts_with("time_"), starts_with("age_"), prob) |>
+  # extend 1994 back to 1992
+  mutate(time_start = if_else(time_start == 1994, 1992, time_start))
+```
+
+Next we look at the conversion of cohabitations to marriage. SOURCE provides 0-5 and 5-10 year duration probabilities of cohabitations either ending in marriage or separation. We can convert these to hazard rates using the following method. If $p_m$ and $p_d$ are the probabilities of marriage or dissolution for cohabitations over a period of length $n$, we can get the total exit hazard for cohabitation ($h_e$) as:
+
+$$h_{e} = -log(1 - p_m - p_d)$$
+
+We can then apportion that to marriage risk and dissolution risk by mutiplying the exit hazard by the relative proportion of marriage and dissolution:
+
+$$h_{m} = h_e \frac{p_m}{p_m + p_d}$$
+$$h_{d} = h_e \frac{p_d}{p_m + p_d}$$
+
+```{r}
+#| label: get-cohab-hazards-second-demog-trans
+
+cohab_hazards <- read_csv(here(
+  "validation",
+  "data", 
+  "england_wales_1992_onward", 
+  "great_britain_cohabitation_cohort_outcomes.csv"
+)) |>
+  # extrapolate missing values for 10 year estimates in last
+  # cohort
+  mutate(
+    across(
+      c(marriage_10, separation_10, continuing_10),
+      ~ replace(.x, is.na(.x), 2 * .x[2] - .x[1])
+    )
+  ) |>
+  # fix rounding error so they all sum to one
+  mutate(
+    across(
+      c(marriage_10, separation_10, continuing_10),
+      ~ .x / (marriage_10 + separation_10 + continuing_10)
+    )
+  ) |>
+  mutate(
+    # probs are cumulative so to get this relative to each span we need
+    # to make some changes
+    marriage_5_10 = (marriage_10 - marriage_5) / continuing_5,
+    separation_5_10 = (separation_10 - separation_5) / continuing_5
+  ) |>
+  select(cohort_start, cohort_end, marriage_5, separation_5,
+         marriage_5_10, separation_5_10) |>
+  pivot_longer(
+    cols = -c(cohort_start, cohort_end),
+    names_to = c(".value", "interval"),
+    names_pattern = "(marriage|separation)_(.*)"
+  ) |>
+  mutate(
+    hazard_exit = - log(1 - marriage - separation) / 5,
+    hazard_marriage = hazard_exit * (marriage / (marriage + separation)),
+    hazard_dissolved = hazard_exit * (separation / (marriage + separation)),
+    dur_start = if_else(interval == "5", 0, 5),
+    # treat the 5-10 duration as the open interval
+    dur_end = if_else(interval == "5", 5, Inf),
+    # 1990-1995 cohort will be stand in for 1992 to 1997
+    # 1995-2000 cohort wil stand in for 1998-2005
+    # 2000-2005 cohort will stand in for 2005-2019
+    time_start = case_when(
+      cohort_start == 1990 ~ 1992,
+      cohort_start == 1995 ~ 1998,
+      cohort_start == 2000 ~ 2005
+    ),
+    time_end = case_when(
+      cohort_start == 1990 ~ 1998,
+      cohort_start == 1995 ~ 2005,
+      cohort_start == 2000 ~ 2020
+    )
+  ) |>
+  select(starts_with("time_"), starts_with("dur_"), 
+         hazard_marriage, hazard_dissolved) |>
+  pivot_longer(cols = starts_with("hazard_"), names_prefix = "hazard_",
+               names_to = "type", values_to = "rate")
+
+conversion_rates <- cohab_hazards |>
+  filter(type == "marriage") |>
+  select(-type)
+
+cohab_dissolution_rates <- cohab_hazards |>
+  filter(type == "dissolved") |>
+  select(-type) |>
+  mutate(union_type = "cohab")
+```
+
+We have somewaht similar duration-based cumulative divorce and death risk for marriages by year for 2005 and 2010. We can use this to get 5-year duration bands of divorce hazard for these two time points. I will then interpolate rates back to 1992 and hold them constant from 2010 onward. 
+
+```{r}
+#| label: get-dissolution-rates-second-demog-trans
+
+dissolution_rates <- bind_rows(
+  read_csv(here(
+    "validation",
+    "data",
+    "england_wales_1992_onward",
+    "marital_divorce_death_cumulative_2005.csv"
+  )),
+  read_csv(here(
+    "validation",
+    "data",
+    "england_wales_1992_onward",
+    "marital_divorce_death_cumulative_2010.csv"
+  ))) |>
+  # lets do it five year intervals
+  filter((anniversary %% 5) == 0) |>
+  arrange(year, anniversary) |>
+  group_by(year) |>
+  mutate(
+    divorce_increment = cumulative_divorce - lag(cumulative_divorce, default = 0),
+    death_increment = cumulative_death - lag(cumulative_death, default = 0),
+    surviving_start = 1 - lag(cumulative_divorce, default = 0) - lag(cumulative_death, default = 0),
+    p_divorce = divorce_increment / surviving_start,
+    p_death = death_increment / surviving_start,
+    p_exit = p_divorce + p_death,
+    rate = (-log1p(-p_exit) / 5) * (p_divorce / p_exit),
+    dur_start = anniversary - 5,
+    dur_end = anniversary,
+    union_type = "marriage"
+  ) |>
+  ungroup() |>
+  select(year, union_type, dur_start, dur_end, rate) |>
+  # truncate to duration 50
+  filter(dur_end <= 50) |>
+  mutate(dur_end = if_else(dur_end == 50, Inf, dur_end))
+
+# lets interpolate between 2005 and 2010 and extrapolate back to 1992
+dissolution_rates <- dissolution_rates |>
+  select(year, union_type, dur_start, dur_end, rate) |>
+  pivot_wider(
+    names_from = year,
+    values_from = rate,
+    names_prefix = "rate_"
+  ) |>
+  expand_grid(year = 1992:2019) |>
+  mutate(
+    rate = rate_2005 +
+      (pmin(year, 2010) - 2005) *
+      (rate_2010 - rate_2005) / 5,
+    time_start = year,
+    time_end = year + 1
+  ) |>
+  select(time_start, time_end, union_type, dur_start, dur_end, rate) |>
+  arrange(time_start, dur_start)
+
+dissolution_rates <- dissolution_rates |>
+  bind_rows(cohab_dissolution_rates)
+```
+
+The final ingredient here are marriage rates. We have age-specific marriage rate data, however this is total marriages including those that come through cohabitation. Our marriage rates should include those cohabitations that will fail to advance into marriage, meaning that these marriage rates will be underestimated. To keep this simple, we will just apply a multiplicative factor to all of the rates. Our target for the tuning is reproducing similar first-time marriage rates in the output as the original input. That exercise led us to double the rates.
+
+```{r}
+#| label: get-marriage-rates-second-demog-trans
+
+marriage_rates_pretuned <- read_csv(here(
+  "validation",
+  "data",
+  "england_wales_1992_onward",
+  "female_marriage_rates_1992_2019.csv"
+)) |>
+  filter(marriage_order != "all_marriages") |>
+  mutate(
+    time_start = year, 
+    time_end = year + 1,
+    #rate = rate * 3,
+    previous_union = if_else(marriage_order == "first_marriage", "none", "dissolved")
+  ) |>
+  select(time_start, time_end, age_start, age_end, previous_union, rate)
+
+# some marriage rates for young age groups and dissolved are missing. For those cases, carry
+# forward the previous years
+marriage_rates_pretuned <- marriage_rates_pretuned |>
+  arrange(previous_union, age_start, time_start) |>
+  group_by(previous_union, age_start, age_end) |>
+    fill(rate, .direction = "down") |>
+  ungroup() |>
+  arrange(time_start, age_start, previous_union)
+
+# tune marriage rates to account for loss of cohabitation - our primary target is reproducing
+# the pre-tuned overall marriage rates in the output
+marriage_rates <- marriage_rates_pretuned |>
+  mutate(rate = rate * 2)
+
+```
+
+Now that we have all the pieces, we can set up the initial population. We will do this by burning in a uniform population over 50 years using the 1992 rates to generate a roughly stable population. Notably, this stable population may not match England and Wales precisely because historical rates were changing over time prior to 1992. However, it should give us something reasonable to work with.
+
+```{r}
+#| label: get-baseline-pop-start-second-demog-trans
+
+# apply baseline rates to population for 50 years to get a reasonable starting pop
+marriage_rates1992 <- marriage_rates |> 
+  filter(time_start == 1992) |>
+  select(-starts_with("time_"))
+prob_cohab1992 <- prob_cohab |> 
+  filter(time_start == 1992) |>
+  select(-starts_with("time_"))
+conversion_rates1992 <- conversion_rates |> 
+  filter(time_start == 1992) |>
+  select(-starts_with("time_"))
+dissolution_rates1992 <- dissolution_rates |> 
+  filter(time_start == 1992) |>
+  select(-starts_with("time_"))
+
+# because this is a negative growth rate population start big
+pop <- create_baseline_population(150000, 70, 1942)
+
+model <- hammel_model() |>  
+  set_population(pop) |>
+  set_mortality(mortality_rates1992) |>
+  set_fertility(fertility_rates1992) |>
+  set_union_formation(
+    "rate", 
+    matching = create_age_gap_matching_model(2, 5),
+    rates = marriage_rates1992, 
+    cohab_prob = prob_cohab1992,
+    union_convert_rate = conversion_rates1992
+  ) |>
+  set_union_dissolution(dissolution_rates1992)
+
+pop_start <- simulate(model, 1992-1942, 42)
+#calculate_population_size(pop_start, 1992)
+```
+
+```{r}
+#| label: fig-tuning-mar-rates
+#| fig-cap: Age-specific first time marriage rates in the observed baseline simulation compared to the pre-tuned original input rates
+
+calculate_marriage_rates(
+  pop_start,
+  time_breaks = c(1942, 1992),
+  age_breaks = c(16, seq(20, 60, 5), 70, 80, Inf),
+  by_previous_union = TRUE
+) |>
+  filter(sex == "f", previous_union == "none") |>
+  left_join(marriage_rates_pretuned |> filter(previous_union == "none", time_start == 1992), 
+    by = join_by(time_end == time_start, age_start == age_start, age_end == age_end)) |>
+  select(age_start, age_end, rate_marriage, rate) |>
+  rename(rate_observed = rate_marriage, rate_input = rate) |>
+  pivot_longer(cols = starts_with("rate"), names_prefix = "rate_") |>
+  ggplot(aes(x = age_start, y = value, group = name, color = name))+
+  geom_point()+
+  geom_line()+
+  labs(x = "age", y = "age-specific first time marriage rate")
+```
+
+@fig-tuning-mar-rates show our primary tuning target. By doubling the marriage rates in the simulation, we are able to fairly closely match the observed marriage rates from 1992. Notably, this produces a TFR of 1.55 which is a little lower than the empirical 1.79 TFR for England and Wales in 1992 because the stable population does not produce the same distribution of women by union status. However, for our purposes this is fine. 
+
+
+```{r}
+#| label: calc-fert-rate-tuning
+#| eval: false
+
+calculate_fertility_rates(
+  pop_start,
+  age_breaks = c(16, 20, 25, 30, 35, 40, 45),
+  time_breaks = c(1942, 1992)
+) |> calculate_tfr()
+```
+
+We now run two simulations. In the first simulation, I hold all rates constant to the  1992 values from 1992 to 2019. In the second simulation, I allow them all to vary. We can then compare the two simulations.
+
+```{r}
+#| label: run-second-demog-sims
+
+# two simulations - holding everything constant and allowing it to vary
+pop_constant <- simulate(model |> set_population(pop_start), 2019-1992, 42)
+
+model <- hammel_model() |>  
+  set_population(pop_start) |>
+  set_mortality(mortality_rates1992) |>
+  set_fertility(fertility_rates1992) |>
+  set_union_formation(
+    "rate", 
+    matching = create_age_gap_matching_model(2, 5),
+    rates = marriage_rates,
+    cohab_prob = prob_cohab,
+    union_convert_rate = conversion_rates
+  ) |>
+  set_union_dissolution(dissolution_rates)
+
+pop_change <- simulate(model, 2019-1992, 42)
+```
+
+```{r}
+#| label: fig-tfr-second-demog-trans
+#| fig-cap: Total Fertility rate over time in simulations that include changing rates of marriage, dissolution, and cohabitation vs. a simulation which holds values constant. 
+
+
+bind_rows(
+  calculate_fertility_rates(
+    pop_constant, 
+    age_breaks = c(16, 20, 25, 30, 35, 40, 45),
+    time_breaks = 1992:2019
+  ) |>
+    calculate_tfr() |>
+    mutate(model = "constant"),
+  calculate_fertility_rates(
+    pop_change, 
+    age_breaks = c(16, 20, 25, 30, 35, 40, 45),
+    time_breaks = 1992:2019
+  ) |>
+    calculate_tfr() |>
+    mutate(model = "changing")
+) |>
+  ggplot(aes(x = time_start + 0.5, y = tfr, color = model))+
+  geom_line()+
+  labs(x = "year", y = "total fertility rate")
+```
+@fig-tfr-second-demog-trans illustrates a key feature of the second demographic transition. Rising rates of cohabitation and union dissolution along with later ages at marriage reduce total fertility rates even when fertility rates *within* union type are held constant over time. If we wanted a more detailed look at this, we could hold all rate schedules except one constant to see how much each process contributes to fertility decline, but I will not do that here.
+
+```{r}
+#| label: fig-prop-cohab-second-demog-trans
+#| fig-cap: Share of new unions that are cohabitations over time, across types of simulations.
+
+get_cohab_prop <- function(result) {
+  result$unions |>
+    mutate(year = floor(start_time)) |>
+    group_by(year) |>
+    count(union_type) |>
+    mutate(prop = n / sum(n)) |>
+    ungroup() |>
+    filter(union_type == "cohab") |>
+    select(year, prop)
+}
+
+bind_rows(
+  get_cohab_prop(pop_constant) |> mutate(model = "constant"),
+  get_cohab_prop(pop_change) |> mutate(model = "changing")
+) |>
+  filter(year >= 1992) |>
+  ggplot(aes(x = year, y = prop, color = model))+
+  geom_line()+
+  labs(y = "Share of new unions that are cohabiations")
+```
+
+@fig-prop-cohab-second-demog-trans shows the rise in cohabitation that occurs in the changing model. by the end of the time period, nearly 60% of newly formed unions are cohabitations rather than marriage.
+
+```{r}
+#| label: fig-mean-age-childbearing-second-demog-trans
+#| fig-cap: Mean age of childbearing over time, across types of simulations.
+
+get_mean_age_childbearing <- function(result) {
+  calculate_fertility_rates(
+    result, 
+    age_breaks = c(16, 20, 25, 30, 35, 40, 45),
+    time_breaks = 1992:2019
+  ) |>
+    mutate(prod = rate_fertility * (age_end + age_start) / 2) |>
+    group_by(time_start, time_end)  |>
+    summarize(
+      numerator = sum(prod, na.rm = TRUE),
+      denominator = sum(rate_fertility),
+      .groups = "drop"
+    ) |>
+    mutate(mu = numerator / denominator)
+}
+
+
+bind_rows(
+  get_mean_age_childbearing(pop_constant) |> mutate(model = "constant"),
+  get_mean_age_childbearing(pop_change) |> mutate(model = "changing")
+) |>
+  filter(time_start >= 1992) |>
+  ggplot(aes(x = time_start + 0.5, y = mu, color = model))+
+  geom_line()+
+  labs(x = "year", y = "mean age of childbearing")
+```
+
+@fig-mean-age-childbearing-second-demog-trans shows the mean age of childbearing over time based on the observed age-specific fertility rates. As exepcted, it increases in the model that allows for changing rate schedule, despite no change in the fertility rates *within* union types. 
+
+I now investigate specific time-varying rate schedules from the simulation to confirm that the empirical estimates conform to the expected input rates. I pick a few specific time points to illustrate.
+
+First, I show that the estimated TFR by union type from the data matches the TFR from the input rates.
+
+```{r}
+#| label: fig-tfr-union-type-second-demogr-trans
+
+fertility_rates1992 |> calculate_tfr()
+
+calculate_fertility_rates(
+  pop_change, 
+  age_breaks = c(16, 20, 25, 30, 35, 40, 45),
+  time_breaks = c(1992, 2019), 
+  by_union_type = TRUE
+) |>
+  calculate_tfr()
+```
+
+```{r}
+#| label: fig-dissolution-rates-marriage
+#| fig-cap: Duration-specific union dissolution rate of marriages, estimated from simulation for selected years. 95% confidence bands are shown around estimates. The dotted red line shows the input rate.
+
+calculate_dissolution_rates(
+  pop_change,
+  1992:2019,
+  dur_breaks = seq(0, 45, 5),
+  by_union_type = TRUE,
+  conf.level = 0.95
+) |>
+  filter(union_type == "marriage", time_start %in% c(1992, 2000, 2010, 2018)) |>
+  ggplot(aes(x = dur_start + 2.5, y = rate_dissolution))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(
+    data = dissolution_rates |> filter(union_type == "marriage", time_start %in% c(1992, 2000, 2010, 2018)), 
+    aes(y = rate), linetype = 2, color = "red")+
+  facet_wrap(~time_start)+
+  labs(x = "union duration", y = "rate of dissolution")
+```
+
+@fig-dissolution-rates-marriage shows the duration-specific dissolution rates of marriages from the simulation. The empirical estimates fit well to the input rate schedules.
+
+```{r}
+#| label: fig-dissolution-rates-cohab
+#| fig-cap: Duration-specific union dissolution rate of cohabitation, estimated from simulation for selected years. 95% confidence bands are shown around estimates. The dotted red line shows the input rate.
+
+calculate_dissolution_rates(
+  pop_change,
+  c(1992, 1998, 2005, 2019),
+  dur_breaks = c(0, 5),
+  by_union_type = TRUE,
+  conf.level = 0.95
+) |>
+  filter(union_type == "cohab") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  ggplot(aes(x = dur_start, y = rate_dissolution))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(
+    data = dissolution_rates |> filter(union_type == "cohab"), 
+    aes(y = rate), linetype = 2, color = "red")+
+  facet_wrap(~time_start)+
+  labs(x = "duration", y = "rate of dissolution")
+```
+
+@fig-dissolution-rates-cohab shows the dissolution rates of cohabitations esimated from the simulation. The bands used here are much coarser than for marriage. The estimates fit well to the input rates.
+
+```{r}
+#| label: fig-union-rates
+#| fig-cap: Age-specific union rate (direct marriage and cohabitation), estimated from simulation for selected years. 95% confidence bands are shown around estimates. The dotted red line shows the input rate. Results are shown separately for first marriages and remarriages. The youngest age groups are excluded from the remarriage case due to sparseness issues.
+
+mar_rates_observed <- calculate_union_rates(
+  pop_change,
+  1992:2019,
+  c(16, seq(20, 60, 5), 70, 80),
+  by_previous_union = TRUE,
+  conf.level = 0.95,
+  pool_dissolved = TRUE
+) |>
+  filter(sex == "f")
+
+mar_rates_observed |>
+  filter(sex == "f", time_start %in% c(1992, 2000, 2010, 2018), 
+    (age_start > 20 & previous_union == "dissolved") | previous_union == "none")  |>
+  ggplot(aes(x = age_start, y = rate_union))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(
+    data = marriage_rates |> filter(time_start %in% c(1992, 2000, 2010, 2018)),
+    aes(y = rate), linetype = 2, color = "red"
+  )+
+  facet_grid(previous_union~time_start, scales = "free_y")+
+  labs(x = "age", y = "union rate")
+```
+
+@fig-union-rates shows the age-specific estimated rates of union formation (cohabitation or direct marriage) from the simulation. The estimates fit will to the input rates.
+
+```{r}
+#| label: fig-prob-cohab-compare
+#| fig-cap: Probability over time that when a union forms, it will be a cohabitation rather than a marriage over time. 95% confidence bands are shown around estimates. The dotted red line shows the input probability.
+
+calculate_union_rates(
+  pop_change,
+  c(1992, 1995:2019),
+  c(0, Inf),
+  by_union_type = TRUE,
+  conf.level = 0.95
+) |>
+  filter(sex == "f") |>
+  select(time_start, time_end, union_type, unions) |>
+  rename(n = unions) |>
+  pivot_wider(id_cols = starts_with("time_"), names_from = union_type, values_from = n) |>
+  mutate(
+    prob_cohab = cohab / (cohab + marriage),
+    se = sqrt(prob_cohab * (1 - prob_cohab) / (cohab + marriage)),
+    conf_low = prob_cohab - 1.96 * se,
+    conf_high = prob_cohab + 1.96 * se
+  ) |>
+  ggplot(aes(x = time_start, y = prob_cohab))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(data =prob_cohab, aes(y = prob), linetype = 2, color = "red")+
+  labs(x = "year", y = "probability of cohabitation when union forms")
+```
+
+@fig-prob-cohab-compare shows the estimated probability that a newly formed union is a cohabitation rather than a marriage. This percentage conforms to the input rate.
 
 
 ### Replicate Gullickson and Saperstein

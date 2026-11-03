@@ -15,6 +15,12 @@ contract; software checks and empirical assessment are different evidence.
   observation.
 - `data/`: local rate inputs, source documents, metadata and preparation scripts
   used by the reports and shipped examples. Retain these for reproducibility.
+- [England and Wales, 1992 onward](data/england_wales_1992_onward/README.md):
+  fertility by three union types, annual marriage evidence and population
+  denominators, cohabitation composition, and duration-specific divorce
+  probabilities for a proposed second-transition demonstration. Observations
+  and British supplementary evidence are retained separately from unselected
+  scenario assumptions; includes an offline rebuild and source manifest.
 - `milestone5.qmd` / `.html`: accepted October 29, 2026 (D105); parity-specific
   fertility, cell-accounted birth spacing, lognormal fertility weights with
   maternal inheritance, and baseline/restart/union-type recovery checks. The
