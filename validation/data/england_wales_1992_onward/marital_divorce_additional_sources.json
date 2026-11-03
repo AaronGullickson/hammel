@@ -1,0 +1,33 @@
+{
+  "retrieved": "2026-11-02",
+  "title": "The proportion of marriages ending in divorce",
+  "authors": [
+    "Ben Wilson",
+    "Steve Smallwood"
+  ],
+  "publisher": "Office for National Statistics",
+  "publication": "Population Trends 131, Spring 2008, pp. 28-36",
+  "url": "https://sociologytwynham.com/wp-content/uploads/2008/07/proportion-of-marriages-ending-in-divorce.pdf",
+  "pdf_sha256": "8dab345e2614fa14535b57de6077167a44fa5226a6e7320e2a706a116967a928",
+  "pdf_redistributed": false,
+  "extraction": "Numerical observations from Table 3 (printed p.33; PDF page 6), extracted with pdftotext -layout and checked against rendered page. Table 4 and 5 early-period benchmarks transcribed separately.",
+  "raw_table_file": "marital_life_table_2005.csv",
+  "early_benchmark_file": "marital_divorce_benchmarks_1993_1994.csv",
+  "early_original": {
+    "author": "John Haskey",
+    "year": 1996,
+    "title": "The proportion of married couples who divorce: past patterns and current prospects",
+    "publication": "Population Trends 83, pp.25-36",
+    "pubmed": "https://pubmed.ncbi.nlm.nih.gov/8729793/",
+    "full_table_retrieved": false
+  },
+  "scenario_conventions": {
+    "early_source_period": "1993-1994",
+    "early_scenario_anchor": 1992,
+    "intermediate_anchor": 2005,
+    "last_anchor": 2010,
+    "after_last_anchor": "hold constant",
+    "duration_tail": "retain estimated 45-50 hazard at durations 45 and above"
+  },
+  "complete_1992_onward_schedule_created": false
+}

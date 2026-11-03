@@ -1,6 +1,6 @@
 # Decision log
 
-Updated October 29, 2026. Entries retain the choices made at their original
+Updated November 2, 2026. Entries retain the choices made at their original
 dates; each numbered entry now states whether and how it remains current.
 Read [the scientific contract](scientific-contract.md) for implemented behavior,
 not a superseded API or timing statement buried in a historical entry.
@@ -24,6 +24,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Process constructors/setters | D017, D026 |
 | Database rate products and reusable downloads | D018, D025 |
 | Demographic extraction and function names | D020–D022, D081 and missing-ASFR clarification |
+| Optional Poisson intervals for observed rates | D124 |
 | Continuous execution | D024 |
 | Fertility spacing (cell accounting) | D026, D101 (superseding D027/D028/D099 compensation) |
 | Two-sex union models and union API restructuring (deferred) | D073 |
@@ -55,10 +56,18 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Grouped output always includes transition history tibble | D111 |
 | Individual transition implementation, duration and ancestry | D112 |
 | Directed transition Lexis counter | D113 |
-| Household moves deferred to the regions milestone | D114 |
+| Household moves deferred; regional applications under tentative multiple-group milestone 10 | D114, D121 |
 | Detailed union partner groups refer to formation | D115 |
 | Milestone 6 acceptance; time-varying inputs next | D116 |
-| Two-sex marriage model as tentative milestone 11 | D117 |
+| Two-sex marriage model as tentative milestone 12 | D117, D121 |
+| Calendar-varying rate inputs | D118 |
+| Multi-year HMD/HFD preparation and native HMD shapes | D119 |
+| Optional HMD open-age pooling from deaths and exposure | D120 |
+| Milestone 8 binned-group hazards/formula weights and milestones 9–12 revision | D121 |
+| Calendar-varying flat cohabitation probabilities | D122 |
+| Complete matching/inheritance model-list calendar schedules | D123 |
+| Detailed and pooled previous-union inputs and summaries | D126 |
+| Milestone 7 acceptance and retained validation evidence | D127 |
 
 ## Recorded decisions
 
@@ -2326,7 +2335,10 @@ observation helper and changes neither event execution nor model assumptions.
 
 **Status:** accepted by the user; supersedes D109's milestone 6 stretch goal.
 
-Household moves are deferred to milestone 10, internal migration and regions.
+Household moves were deferred to the then-planned milestone 10, internal
+migration and regions. D121 subsequently removes that standalone milestone and
+retains these unresolved applications under tentative milestone 10, multiple
+group columns; no household behavior is selected by that reordering.
 The user identified ambiguity between individual initiation hazards and total
 move hazards induced by household members, and questioned conditional
 rescheduling after externally triggered moves. Discussion also identified
@@ -2392,10 +2404,299 @@ completion documentation while compiling the final report.
 
 ## D117 — Tentative milestone 11: two-sex marriage model (October 30, 2026)
 
-**Status:** user-selected tentative planning milestone.
+**Status:** user-selected tentative planning milestone; renumbered to milestone
+12 by D121 on October 31, 2026. The model and API remain unselected.
 
 Add a two-sex marriage model as tentative milestone 11, following the regions
 milestone. Existing [two-sex research notes](two-sex-union-models.md) and D073
 provide the starting discussion. No particular model, parameterization, input
 semantics, cohabitation integration or public API is selected by assigning this
 milestone. Current union formation remains unchanged; milestone 7 remains next.
+
+
+## D118 — Calendar-varying rates within one run (October 30, 2026)
+
+**Status:** user-approved semantics and implementation authorization; implemented.
+Milestone 7 was subsequently accepted complete under D127.
+
+The user approved flat rate tables with `time_start`/`time_end`, half-open
+calendar intervals, piecewise constant rates without interpolation, coverage
+checks, boundary changes before same-time events, and updates to pending risks,
+fertility cells and matching calibration while preserving demographic histories.
+The user narrowed this implementation step to the six existing annual-rate
+inputs: mortality, fertility, union search, dissolution, conversion and individual
+group transitions. Matching and inheritance model schedules are deferred to a
+second step. Other arguments, including `cohab_prob` and rate multipliers,
+remain static. Fractional calendar years and simulation durations are supported.
+
+For the deferred model-schedule step, the user also approved selecting matching
+at partner selection and inheritance at birth, without rewriting existing unions
+or identities. Complete-model schedule tibbles are the selected representation;
+constructor names and public arguments still need design. This step does not
+implement those schedules.
+
+See [the rate contract](time-varying-rates.md) for validation, worked examples,
+clock origins, observation semantics and scope. Conditional exponential
+resampling at calendar boundaries is the engine implementation choice; histories
+and duration origins do not restart. Static inputs remain supported. Neither
+implementation authorization nor software checks establish demographic acceptance.
+
+
+## D119 — Multi-year database preparation and native HMD shapes (October 30, 2026)
+
+**Status:** user-requested implementation, extending D118's rate preparation.
+
+The user requested both getters accept one year (static output without calendar
+columns) or a vector of years (output with `time_start`/`time_end`), and requested
+additional source shapes while retaining `1x1` as default. All requested years
+are selected locally from one download of each required product.
+
+HMD supports its six native age-by-time shapes through `shape`; grouped `year`
+requests select source period starts and preserve complete source intervals.
+The getter retains source pooled rates and shortened endpoint periods, without
+estimating or interpolating rates. HMDHFDplus 2.0.8's loss of end labels requires
+an auxiliary annual coverage download for parsed grouped-time products; this is
+an implementation workaround recorded in provenance. HFD's existing products
+remain native annual/single-age, with no equivalent shape option or invented
+local aggregation. The existing HFD endpoint and conditional zero-fill policies
+are retained.
+
+See [database preparation](database-rates.md) for interval mapping, examples,
+validation and scope. This does not establish milestone 7 scientific acceptance.
+
+
+## D120 — Optional pooled HMD open age (October 30, 2026)
+
+**Status:** user-selected pooling rule and implementation authorization.
+
+After Swedish historical Mx downloads exposed missing oldest-age rates, the
+user requested optional age truncation and explicitly selected pooling deaths
+and exposure instead of extending the cutoff-age rate. The getter accepts
+`open_age = NULL` by default. A supplied cutoff retains source rates below it
+and replaces its tail with `[open_age, Inf)` at total deaths / total person-years,
+separately by sex and selected source period. Download matching native deaths
+and exposure products once each. Missing Mx in the replaced tail are allowed;
+missing/invalid retained rates or tail counts/exposure remain errors. Pooled
+exposure must be positive; no imputation or forced maximum lifespan is added.
+
+The cutoff must align with native source bands; no splitting counts or silently
+moving the cutoff. Validate matching complete age tails and source periods.
+Provenance retains cutoff, method, auxiliary products and a tibble of pooled
+counts, exposure and rates. Singleton versus vector-year output schemas are
+unchanged. See [database preparation](database-rates.md) for worked examples
+and validation. Stationary-year investigation and historical simulation setup
+were explicitly deferred while fixing the getter.
+
+## D121 — Binned-group hazard direction and roadmap revision (October 31, 2026)
+
+**Status:** user-selected future engine direction and milestone priorities;
+documentation authorized now, implementation and detailed APIs still pending.
+Milestone 7 is not declared complete by this decision.
+
+The user will finish milestone 7 with the current engine, then make milestone 8
+use binned-group hazards for all six existing rate processes and allow custom
+formula weights on all rates. Input rates determine aggregate cell intensity;
+weights redistribute event risk within cells. Use single-year age or duration
+subdivisions even for wider input bands, retaining fractional boundaries and
+all other input strata. Fertility retains its actual-parity cells. Calendar
+changes update active rates rather than add historical-period membership bins.
+
+The user distinguished separate rate targets from relative formula stratification
+and recognized that weighting an already stratified group has no effect when
+the resulting factor is constant within a cell. Redundancy warnings should be
+considered; their exact diagnostic policy is still a proposal. Formula weights
+provide a route to future user-defined characteristics, but do not specify their
+initialization, inheritance, longitudinal updates or missing-data rules.
+See [the discussion record](binned-group-hazards.md) for equations, examples,
+composition effects, process-specific exposure/eligibility distinctions,
+unresolved contracts and proposed validation. No new scheduler is implemented.
+
+The user revised the roadmap as follows:
+
+| Milestone | Revised scope | Status |
+| --- | --- | --- |
+| 7 | Finish existing time-varying-input work with the current engine | In progress; scientific acceptance remains pending |
+| 8 | Binned-group hazards for all rate processes and custom formula weights | User-selected direction; specification/API and implementation pending |
+| 9 | Former milestone 8: summaries, diagnostics and helpers | Proposed details retained |
+| 10 | Possibility of more than one group column | Tentative; schema and mechanisms unselected |
+| 11 | Former milestone 9: external immigration and generation tracking | Tentative; no emigration mechanism implied |
+| 12 | Former milestone 11: two-sex marriage model | Tentative; model and API unselected |
+
+The former standalone milestone 10 for internal migration and regions is removed
+because those applications may be handled through multiple group columns in new
+milestone 10. This supersedes D114's dedicated milestone placement, not its
+unresolved household-move questions, which remain in the roadmap. A separate
+mandatory `region` schema is no longer the roadmap direction. Household
+membership, regional matching restrictions and linked-move semantics remain
+unselected. D117's two-sex priority moves from milestone 11 to 12; its scientific
+model remains unselected. No existing validation report, result or acceptance
+status is changed by this reordering.
+
+
+## D122 — Calendar-varying cohabitation probabilities (October 31, 2026)
+
+**Status:** user-approved semantics and explicit implementation authorization.
+
+The user selected `cohab_prob` to work like flat rate tables, rather than whole-
+model schedules. Optional `time_start`/`time_end` supply half-open absolute-year
+intervals, including fractional years. Retain age/group/previous-union strata,
+probabilities in [0,1], static-table compatibility and age-gap probability zero.
+Validate every active slice, reject overlapping risks and require calendar
+coverage during execution. The active probability at search execution selects
+intended type before matching, with changes preceding exact same-time searches.
+
+Refresh marriage/cohabitation calibration contributions as lambda*(1-p) and
+lambda*p. Probability-only boundaries preserve pending person/union/fertility
+clocks and consume no randomness; a probability change does not change the
+overall search hazard. Shared rate boundaries apply both changes before D118's
+existing rescheduling. Existing unions keep their type; histories, ancestry,
+spacing, parity, duration origins and prior-union classification remain unchanged.
+The configured table retains typed mode even during probability-zero intervals.
+
+This extends D118's original rate-only scope. Matching and inheritance model
+schedules remain future milestone 7 work, with APIs still unselected; no
+milestone 8 engine change is introduced. See [cohabitation](cohabitation.md#calendar-varying-type-probabilities-d122)
+for worked examples and validation. Implementation checks are distinct from
+milestone 7 scientific acceptance.
+
+
+## D123 — Complete model schedules for all matching and inheritance arguments (October 31, 2026)
+
+**Status:** user-selected API and explicit implementation authorization; implemented.
+Milestone 7 was subsequently accepted complete under D127.
+
+The user selected either a direct static model or a tibble with `time_start`,
+`time_end` and list-column `model` containing complete objects for `matching`,
+`father_matching`, `cohab_matching` and fertility's `inheritance`. Base data
+frames with list columns are accepted and normalized to tibbles. Preserve full
+objects, formula environments, callbacks, extra columns and provenance.
+
+D118's event-time selection applies: active matching at partner/father choice,
+active inheritance at each successful birth, with half-open absolute-year bands,
+no interpolation, overlap rejection and coverage across a run. Validate every
+row, including unused/future intervals. NULL entries and nested schedules are
+not complete models; existing top-level optional matching NULLs dynamically
+follow general matching. Static inheritance method aliases remain supported.
+
+Use one registry covering identities from all inheritance models, including
+future custom outputs; validate grouped schedules and matching levels against
+that registry before execution. Keep past identities, unions, ancestry,
+spacing, durations, weights and pending event dates at model-only boundaries.
+Refresh active role-specific preference/draw structures and weighted-calibration
+sums from the current pool, without demographic RNG draws. Custom inheritance
+executes only at births; deterministic matching formulas may be evaluated for
+cache preparation under the existing purity contract.
+
+See [the model-schedule contract](time-varying-models.md) for worked examples,
+validation, retained defaults and limitations. Direct static execution remains
+supported; caches belong to the simulation call. Model schedules complete this
+implementation component of milestone 7, not its scientific acceptance. Other
+non-rate arguments remain static, and the milestone 8 hazard rewrite remains
+unimplemented.
+
+## D124 — Optional exact Poisson intervals for observed event rates (November 1, 2026)
+
+**Status:** User-requested interface and Poisson method; implemented. This does
+not establish milestone 7 scientific acceptance.
+
+**Decision:** Add `conf.level = NULL` to mortality, fertility, union, marriage,
+dissolution, cohabitation conversion and transition rate calculators. A supplied
+confidence level requests `conf_low` and `conf_high` using two-sided
+`stats::poisson.test()` intervals for each row's observed event count and its
+existing person-year or union-year denominator. NULL preserves existing output.
+
+**Implementation choices:** Require a finite numeric scalar strictly between
+zero and one. Zero exposure yields NA bounds; zero events with positive exposure
+retain the Poisson upper limit. Empty tables retain numeric confidence columns.
+Fertility bounds refer to observed births, including with `unrealized = TRUE`;
+fractional expected unrealized intensity is not treated as an observed count.
+
+**Rationale and limits:** Supply within-run counting uncertainty without requiring
+replications. Normal SE approximations are unsuitable for very small counts.
+Exactness refers to the Poisson model, not guaranteed coverage for all simulator
+feedback or shared exposure. These are marginal intervals, not Monte Carlo SEs
+or simultaneous confidence bands. See [the analysis contract](demographic-analysis.md#optional-poisson-rate-intervals).
+
+## D125 — Widowed search-rate fallback to dissolved (November 2, 2026)
+
+**Status:** Superseded by D126, which replaces the ambiguous detailed
+`dissolved` label with `separated` and reserves `dissolved` for pooled inputs.
+
+**Decision:** Union-search rate tables stratified by `previous_union` may supply
+`none` and `dissolved` without `widowed`. For each group and active calendar
+slice, omitted widowed rates use the complete dissolved schedule, including
+its age/duration clock. Explicit widowed schedules take precedence as a whole;
+their gaps remain zero. Effective clocks retain the existing consistency rules.
+Actual widowhood histories and observation categories do not change.
+This supersedes D080's mandatory third category for search-rate inputs only;
+cohabitation-probability tables retain their existing three-category contract.
+Preserve the public input and expand only a private execution copy. See
+[remarriage schedules](remarriage.md) for examples and validation.
+
+## D126 — Distinct detailed and pooled previous-union categories (November 2, 2026)
+
+**Status:** User-requested, implemented and software-tested; replaces D125.
+
+**Decision:** Detailed previous-union categories are `none`, `separated`, and
+`widowed`; pooled categories are `none` and `dissolved`, where dissolved
+includes separation and widowhood. Use the same two complete alternatives for
+union-search rate and cohabitation-probability inputs, independently per group
+and active calendar slice. Never mix the two alternatives within one slice and
+group. Expand pooled inputs privately to the two detailed engine states; retain
+actual histories, duration origins, eligibility and event timing. Effective
+categories must retain consistent clocks across groups and calendar periods.
+No compatibility aliases, migration messages or automatic reinterpretation of
+old three-category tables are required for this unreleased package.
+
+Union and marriage calculators retain `by_previous_union = TRUE` for detailed
+output and add `pool_dissolved = TRUE` for the bipartite output. The user
+selected this additional flag rather than overloading `by_previous_union`;
+pooling requires previous-union stratification (explicitly enabled or implied
+by duration breaks). Sum separated/widowed events and exposure in
+each otherwise identical cell before calculating rates and exact Poisson
+confidence intervals. With duration breaks, the pooled dissolved duration is
+still elapsed time since the most recent ending, irrespective of cause. Empty
+cells, grouping, union types, sex and calendar/age boundaries retain their rules.
+For example, 2 separated events/10 years plus 3 widowed events/20 years gives
+5 dissolved events/30 years and a confidence interval from that count/exposure,
+not an average of rates or confidence limits. Validate equivalence of pooled
+inputs to explicitly equal detailed inputs and accounting/Poisson identities
+for pooled outputs, including calendars, groups, durations and conversions.
+
+## D127 — Milestone 7 accepted complete (November 2, 2026)
+
+**Status:** Accepted complete by the user's explicit request to record milestone
+7 completion. Date uses America/Los_Angeles; recorded November 3 UTC.
+
+**Decision:** Calendar-varying inputs are complete with the current engine:
+six annual-rate processes under D118, calendar-banded cohabitation probabilities
+under D122, and complete matching/inheritance model-list schedules under D123.
+Retain supporting database preparation (D119/D120), optional Poisson rate
+intervals (D124), and consistent detailed/pooled previous-union categories and
+confidence intervals (D126). This does not select or implement milestone 8's
+binned-group hazard and custom formula-weight mechanisms (D121).
+
+**Evidence:** The user's [milestone 7 report](../validation/milestone7.qmd),
+[rendered assessment](../validation/milestone7.html), its conclusion that the
+expectations were met, and the user's explicit completion instruction establish
+acceptance. The code/report revision at acceptance is
+`3b65d2202b006ef6f3e232c98595814b1544f9fe`. Software checks and the calendar-review
+regressions are separately recorded in [testing](testing.md). This documentation
+update does not rerun simulations, render the report, or independently certify
+all numerical findings or a remote CI rerun. Preserve all seven accepted report
+sources, rendered artifacts, source comments, provenance and active render
+intermediates.
+
+**Retained limits:** Acceptance applies to the assessed scenarios and documented
+contracts. Finite samples and sparse cells, complete-history requirements,
+failed searches and matching calibration, non-checkpoint restarts, and finite
+resolution of unrealized-birth reporting remain relevant. The historical-data
+demonstrations use documented approximations; completion does not establish
+universal rate recovery, historical reconstruction, SOCSIM equivalence, or
+release readiness. Non-rate settings outside D122/D123 remain static. Current
+calendar coverage and strata rules are unchanged. No additional acceptance
+thresholds or demographic defaults are inferred.
+
+**Next priority:** Milestone 8 remains the selected future direction under D121;
+its scientific specification, formula API and unresolved mechanisms require
+separate work and user decisions.

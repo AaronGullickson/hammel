@@ -9,7 +9,8 @@ calculate_dissolution_rates(
   time_breaks,
   dur_breaks,
   by_group = FALSE,
-  by_union_type = FALSE
+  by_union_type = FALSE,
+  conf.level = NULL
 )
 }
 \arguments{
@@ -38,11 +39,18 @@ tibble; no pooled row is added.}
 episodes using each type's own exposure. Requires a valid \code{union_type} column.
 Conversion stops cohabitation exposure without counting as dissolution;
 duration resets at the start of the linked marriage episode.}
+
+\item{conf.level}{NULL (default) to omit confidence intervals, or a finite
+numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
+from two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} intervals for observed event
+counts over exposure. Bounds are NA at zero exposure. For fertility, these
+describe the observed rate, not the unrealized-adjusted rate.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, \code{dur_start}, \code{dur_end},
 \code{union_years}, \code{dissolutions}, and \code{rate_dissolution}, plus \code{group_pair} and
 \code{union_type} when requested. Period varies fastest within duration bands and group blocks.
+With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
 }
 \description{
 Split each union episode across calendar periods and elapsed-duration bands,

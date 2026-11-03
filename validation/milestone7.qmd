@@ -1,0 +1,1259 @@
+---
+title: "Hammel: Milestone 7 Validation"
+author: "Aaron Gullickson"
+date: today
+format:
+  html:
+    toc: true
+    toc-expand: 1
+    toc-depth: 4
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    self-contained: true
+execute:
+  eval: true
+  echo: true
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: setup
+#| eval: true
+#| include: false
+
+
+library(here)
+# installing will lead to faster computation
+devtools::install(here::here())
+library(hammel)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(purrr)
+library(tibble)
+library(stringr)
+library(ggplot2)
+library(gt)
+library(furrr)
+set_theme(theme_bw())
+```
+
+```{r}
+#| label: set-up-parallel-processing
+
+future::plan(future::multicore, workers = 4)
+```
+
+## Purpose and completion criteria
+
+
+Assess whether the current simulation successfully handles time varying rate schedules and time varying model parameters. 
+
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| Age-specific rates | Output rates vs. input rates | Input rates should generally fall within the 95% Poisson-based confidence intervals for the rate, although we don't expect complete coverage |
+| TFR | Over time | Should change in the expected way over time within simulation and remain close to expected values |
+| Life Expectancy at birth | Over time | Should change in the expected way over time within simulation and remain close to expected values |
+| Log odds ratios | Over time | Should generally be consistent with double the input exogamy values and move in the expected direction over time |
+| Accounting and implementation | Existing tests | Successful unit tests |
+
+## Overview of Design
+
+### Time-varying rate processes
+
+For all rate processes, we add time varying rates by allowing stratification of these rate objects by `time_start` and `time_end` columns. The simulation will use the rates in the correct time interval as it progresses through time in the simulation. If the `time_start` and `time_end` columns are not provided, then the rates will remain constant throughout the simulation. Users can use `Inf` in `time_end` to indicate a time interval that should be followed for the remainder of the simulation.
+
+The times provided must cover the entire interval of the simulation and there can be no gaps. If the program detects a lack of coverage or gaps, it will fail to process the simulation with an error. This requires some extra work by the user to ensure that they providing adequate coverage. Notably, you can provide time intervals that exceed the coverage without problem.For example, you could provide historical fertility rates from 1900 to 2000 and then run the simulation only from 1950 to 1980. This makes it possible for users to download large historical rate schedules and use them without further modification to fit a specific time period, so long as the simulation time period falls within the range.
+
+It is also possible for users to create time varying rates by stopping the simulation and then restarting it with the final results from the previous simulation and new rates. However, because there is some initialization cost to each simulation, this approach will usually be *substantially* slower than specifying time-varying rates within a single simulation.
+
+The argument to `cohab_prob`, while not technically a rate, takes the same form as a rate process and so we allow it to vary in the same way.
+
+To assist with generating long runs of rates, the `get_mortality_hmd` and `get_fertility_hfd` functions have been improved to pull in a vector of years rather than just a single year. Additionally, users can specify age by time shapes other than 1x1 with the `shape` argument to `get_mortality_hmd` (the only shape currently available in HFD is 1x1).
+
+### Time-varying matching and inheritance models
+
+The matching models used in the union formation process (assigned by arguments `matching`, `cohab_matching`, and `father_matching`) and the inheritance models used in the fertility process are additional places where users may wish to add time variance within a single simulation. For example, users may wish to adjust the rate of exogamy between groups over time, shift preferences in spousal age differences, or shift to a difference method for inheritance of group identity.
+
+To specify time variance, these arguments can be entered as tibbles that include the `time_start` and `time_end` columns as well as a list column for the `model`. So for example:
+
+```r
+tibble(
+  time_start = c(1950, 1980),
+  time_end   = c(1980, Inf),
+  model      = list(
+    create_age_gap_matching_model(2, 5),
+    create_age_gap_matching_model(4, 5)
+  )
+)
+```
+
+will create two separate matching models that differ by the preferred spousal age gap. From 1950 until 1980, the first model will be used and from 1980 onward, the second model will be used.
+
+The arguments for both matching and inheritance will take either a single model for time constant models or a time-varying tibble of this format.
+
+## Inputs and Simulation Design
+
+For this milestone, I am going to try several different demonstration projects with time-varying rates in some capacity to show off the full range of the program at this point. I will define inputs within each demonstration project.
+
+Rather than Monte Carlo replication, I will focus on a single simulation with a large initial population and I will use visual examination to confirm that rates are changing at the appropriate point and the confidence intervals around rates themselves at selected time points to confirm that the input rates are being preserved correctly. Confidence intervals are defined by the correct Poisson confidence interval around each rate, which can account better for sparse cells than the normal approximation.
+
+## Demonstration Projects
+
+### The Demographic Transition
+
+I will reproduce the demographic transition by using fertility and mortality rates for Sweden, available from th Human Fertility Database (HFD) and Human Mortality Database (HMD). 
+
+Age-specific fertility rates in Sweden only go back to 1891, while age-specific mortality rates go back to 1751. Both series continue until 2024. I will download the full range of years for each series. In some cases, using the full open age of 110+ from the HMD can lead to missing values at extreme ages in older data, so I truncate the open-age group to 95 (this is done correctly by recomputing the open-age mortality rate by pooling deaths and person years for that inteval from HMD data).
+
+```{r}
+#| label: get-rates-demog-trans-sweden
+
+fertility_rates_sweden <- get_fertility_hfd("SWE", 1891:2024)
+mortality_rates_sweden <- get_mortality_hmd("SWE", 1751:2024, open_age = 95)
+```
+
+The mortality transition was already well underway by 1891, when we first get the fertility data, so I will make the assumption that fertility rates before 1891 were at the 1891 levels.
+
+I want to start the simulation with a population age structure from a stable but stationary population. To do so, I need to find mortality rates to match with the 1891 fertility rates that will produce roughly zero population growth in the stable population. I use the approximation that:
+
+$$r = \log(NRR)/\mu$$
+
+Where $\mu$ is the mean age of childbearing. I test different candidate years until I get one that works in the code below.
+
+```{r}
+#| label: determine-growth-rate-zero
+#| eval: false
+
+get_growth_rate <- function(fert_rates, mort_rates) {
+
+  NRR <- mort_rates |> calculate_life_table() |>
+    filter(sex == "f") |>
+    select(age_start, Lx) |>
+    right_join(fert_rates, by = c("age_start")) |>
+    mutate(prod = Lx * rate) |>
+    pull(prod) |>
+    sum() * 0.4886
+  mu <- sum((fert_rates$age_start + 0.5) * fert_rates$rate) / sum(fert_rates$rate)
+
+  log(NRR)/mu
+
+}
+
+fert_rates <- fertility_rates_sweden |> filter(time_start == 1891)
+get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1810))
+get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1812))
+get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1813))
+get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1838))
+get_growth_rate(fert_rates, mortality_rates_sweden |> filter(time_start == 1811))
+```
+
+Mortality rates in 1811 are the winner. Pairing them with the 1891 fertility rates gives me a growth rate of 0.0019 per annum.
+
+The next task is to run a 100 year simulation from a uniform population distribution to produce my starting stationary population. To do this correctly, I want to start this simulation 100 years before when I want to start my "real" simulation. I decide on 1780 as a starting point for my simulation. 
+
+```{r}
+#| label: get-starting-stationary-pop
+
+fert_rates <- fertility_rates_sweden |> filter(time_start == 1891) |>
+  select(-starts_with("time_"))
+mort_rates <- mortality_rates_sweden |> filter(time_start == 1811) |>
+  select(-starts_with("time_"))
+
+pop <- create_baseline_population(100000, 70, 1780 - 100)
+model <- hammel_model() |>
+  set_population(pop) |>
+  set_fertility(fert_rates) |>
+  set_mortality(mort_rates) |>
+  set_union_formation("on_demand")
+pop_start <- simulate(model, 100, 1)
+```
+
+I now have a starting population that should be roughly consistent with the stable population under Sweden's pre-transition rates. I can now use my time-varying rates to project this population forward. I will project it to 2020. Since I only care about the effect of fertility and mortality rates on creating the demographic transition, I will use the "on demand" model for union formation and will not complicate the simulation otherwise.
+
+```{r}
+#| label: run-simulation-demog-transition
+
+# for fertility rates I need to extend the last year back to my starting point of 1870
+# I do this by adding one row at the front for the 1780-1891 time period that duplicates 
+# my 1891 rates
+fertility_rates_sweden <- bind_rows(
+  fertility_rates_sweden |>
+    filter(time_start == 1891) |>
+    mutate(time_start = 1780, time_end = 1891),
+  fertility_rates_sweden
+)
+
+model <- hammel_model() |>
+  set_population(pop_start) |>
+  set_fertility(fertility_rates_sweden) |>
+  set_mortality(mortality_rates_sweden) |>
+  set_union_formation("on_demand")
+sim_time_demog_trans <- system.time(pop_final <- simulate(model, 2020 - 1780, 1))
+```
+
+The simulation took `r sim_time_demog_trans[["elapsed"]]` seconds to run.
+
+```{r}
+#| label: fig-pop-size-demog-trans
+#| fig-cap: Relative population size from start from simulation starting in 1780 to 2020, using Sweden's historic age-specific fertility and mortality rates
+
+pop_final |> calculate_population_size(1780:2020) |>
+  ggplot(aes(x = time, y = population / first(population)))+
+  geom_line()+
+  labs(x = "year", y = "population size relative to initial")
+```
+
+@fig-pop-size-demog-trans show the population size over time in the simulation. It displays the classic S-shaped curve expected of the demographic transition, although we start late enough in 1780 that it is already rising a bit at the beginning. The population grows by four-fold over the simulation period. 
+
+```{r}
+#| label: fig-crude-rates-demog-trans
+#| fig-cap: Crude birth and death rates annually over the simulation
+
+births <- pop_final$persons |>
+  mutate(year = floor(birth_time)) |>
+  count(year, name = "births")
+deaths <- pop_final$persons |>
+  mutate(year = floor(death_time)) |>
+  count(year, name = "deaths")
+crude_rates <- calculate_population_size(pop_final, 1780:2019 + 0.5) |>
+  mutate(year = floor(time)) |>
+  left_join(births, by = "year") |>
+  left_join(deaths, by = "year") |>
+  mutate(rate_birth = births / population, rate_death = deaths / population) |>
+  pivot_longer(cols = starts_with("rate_"), names_prefix = "rate_",
+               names_to = "event", values_to = "crude_rate") 
+
+crude_rates |>
+  ggplot(aes(x = time, y = crude_rate, color = event))+
+  geom_line()+
+  labs(x = "year", y = "crude rate")
+```
+
+@fig-crude-rates-demog-trans shows another classic demographic transition figure - A comparison of crude birth and death rates over time. These are estimated by taking counts of births or deaths over mid-yer population sizes. Mortality rates fall faster than fertility rates over the time period, leading to population growth. We can also see the post-war baby boom.
+
+```{r}
+#| label: fig-tfr-demog-trans
+#| fig-cap: Total fertility rates by year of the simulation. Dotted red line shows the total fertility rate from the input rates.
+
+input_tfr <- fertility_rates_sweden |>
+  calculate_tfr() |>
+  filter(time_start >= 1780, time_start <= 2020)
+
+calculate_fertility_rates(pop_final, 1780:2020, 12:55) |> 
+  calculate_tfr() |>
+  ggplot(aes(x = time_start, y = tfr))+
+  geom_line()+
+  geom_line(data = input_tfr, linetype = 2, color = 'red')+
+  labs(x = "year", y = "total fertility rate")
+```
+
+@fig-tfr-demog-trans shows the estimated TFR for each year of the simulation. The dotted red line shows the TFR from the input rates. The estimated TFRs match closely to that expected by the input rates. There is less random noise at the end of the simulation when the population is much larger.
+
+```{r}
+#| label: fig-life-exp-demog-trans
+#| fig-cap: Life expectancy at age zero by year of the simulation, separately by gender. Dotted red lines show the life expectancy at birth from input rates.
+
+input_lifeexp <- mortality_rates_sweden |> 
+  calculate_life_table() |>
+  # 1853 has a problem with the open-ended age caegory leading to Inf results so remove it
+  filter(age_start == 0, time_start != 1853) |>
+  filter(time_start >= 1780, time_start <= 2020)
+
+calculate_mortality_rates(pop_final, 1780:2020, 0:85) |>
+  calculate_life_table() |>
+  filter(age_start == 0) |>
+  ggplot(aes(x = time_start, y = ex))+
+  geom_line()+
+  geom_line(data = input_lifeexp, linetype = 2, color = 'red')+
+  facet_wrap(~sex)+
+  labs(x = "year", y = "life expectancy at birth")
+```
+
+@fig-life-exp-demog-trans shows the estimated life expectancy at birth for each year of the simulation. The dotted red line shows the life expectancy at birth from the input rates. The estimated life expectancy matches closely to that expected by the input rates.
+
+As a final test, I look at age-specific mortality rates and age-specific fertility rates at specific time points and compare them to the input rates at those time points. For this exercise I also show the 95% CI around each of my estimates.
+
+```{r}
+#| label: fig-asfr-demog-trans
+#| fig-cap: Age-specific fertility rates estimated from simulation for selected years. 95% confidence band shown around each estimate. Dotted red line shows input rate.
+
+selected_years <- c(1900, 1920, 1940, 1960, 1980, 2000)
+temp <- fertility_rates_sweden |>
+  filter(time_start %in% selected_years)
+
+calculate_fertility_rates(pop_final, 1780:2020, 12:55, conf.level = 0.95) |>
+  filter(time_start %in% selected_years) |> 
+  ggplot(aes(x = age_start + 0.5, y = rate_fertility))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(data = temp, aes(y = rate), linetype = 2, color = "red")+
+  facet_wrap(~time_start)+
+  labs(x = "age", y = "age-specific fertility rate")
+```
+
+@fig-asfr-demog-trans shows the estimated fertility rates at 20 year intervals from 1900 to 2000. Dotted red lines show the values from the input rates. The red dotted line fits well to the estimated data and is generally within the 95% confidence interval. 
+
+```{r}
+#| label: fig-asmr-demog-trans
+#| fig-cap: Age-specific mortality rates by sex estimated from simulation for selected years. 95% confidence band shown around each estimate. Dotted red line shows input rate.
+
+selected_years <- c(1800, 1850, 1900, 1950, 2000)
+temp <- mortality_rates_sweden |>
+  filter(time_start %in% selected_years)
+
+calculate_mortality_rates(pop_final, 1780:2020, 0:95, conf.level = 0.95) |>
+  filter(time_start %in% selected_years) |> 
+  ggplot(aes(x = age_start + 0.5, y = rate_mortality))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(data = temp, aes(y = rate), linetype = 2, color = "red")+
+  facet_grid(sex~time_start)+
+  scale_y_log10()+
+  labs(x = "age", y = "age-specific mortality rate")
+```
+
+@fig-asmr-demog-trans shows the estimated mortality  rates at 50 year intervals from 1800 to 2000. Dotted red lines show the values from the input rates. In the more recent years, very low mortality rates at some younger ages lead to no observed deaths in some single year age groups, resulting in wide confidence bands. In general, the red dotted line fits well to the estimated data and is generally within the 95% confidence interval. 
+
+### The Second Demographic Transition
+
+For the second demographic transition, I want to hold fertility (separated by union type) constant at a certain level and then increase the share of cohabitation, increase age at first marriage, and increase dissolution rates. I can then observe how these changes trigger changes in observed TFR over time despite constant fertility rates within union types.
+
+This simulation has a high demand on input terms. The goal here is a "stylized" simulation rather than one completely accurate for a particular country. However, England and Wales provide some of the best disaggregated data for my purposes. We will run the simulation from 1992 to 2019.
+
+First, we need to get age-specific fertility rates disaggregated by union status. We use O'Leary et. al (2010) to get age-specific fertility rates in 1992 by union status (Table B1, marriage, cohabitation, or unpartnered). 
+
+```{r}
+#| label: get-fertility-second-demog-trans
+
+fertility_rates1992 <- read_csv(here("validation", "data", 
+  "england_wales_1992_onward", "fertility_by_union_type_1992.csv")) |>
+  rename(
+    age_start = denominator_age_start,
+    age_end = denominator_age_end
+  ) |>
+  select(union_type, age_start, age_end, rate)
+
+fertility_rates1992 |>
+  calculate_tfr()
+```
+
+We will hold mortality rates to the 1992 level as well.
+
+```{r}
+#| label: get-mortality-second-demog-trans
+
+mortality_rates1992 <- get_mortality_hmd("GBRTENW", 1992, shape = "5x1", open_age = 90)
+```
+
+Next lets look at the probability that a formed union is cohabitation. We will use data on all of Great Britain that shows the share of married couples that cohabited prior to marriage (Beaujouan and Bhrolcháin 2011). This number is not exactly the same as what we want because it excludes cohabitations that did not survive into marriage or continued on as cohabitations. They also don't line up with new unions but rather existing unions. Overall, it should give us a ballpark figure for what we are looking for.
+
+```{r}
+#| label: get-cohab-prob-second-demog-trans
+
+prob_cohab <- read_csv(here(
+  "validation",
+  "data",
+  "england_wales_1992_onward", 
+  "female_premarital_cohabitation_1994_2019.csv"
+)) |>
+  # There are some differences by age but not huge so lets just assume
+  # this is constant with regard to age
+  filter(source_age_label == "All ages") |>
+  arrange(year) |>
+  rename(prob = proportion_cohabiting_before_marriage) |>
+  mutate(time_start = year, time_end = year + 1, 
+         age_start = 0, age_end = Inf) |>
+  select(starts_with("time_"), starts_with("age_"), prob) |>
+  # extend 1994 back to 1992
+  mutate(time_start = if_else(time_start == 1994, 1992, time_start))
+```
+
+Next we look at the conversion of cohabitations to marriage. Beaujouan and Bhrolcháin (2011) provides 0-5 and 5-10 year duration probabilities of cohabitations either ending in marriage or separation. We can convert these to hazard rates using the following method. If $p_m$ and $p_d$ are the probabilities of marriage or dissolution for cohabitations over a period of length $n$, we can get the total exit hazard for cohabitation ($h_e$) as:
+
+$$h_{e} = -log(1 - p_m - p_d)$$
+
+We can then apportion that to marriage risk and dissolution risk by multiplying the exit hazard by the relative proportion of marriage and dissolution:
+
+$$h_{m} = h_e \frac{p_m}{p_m + p_d}$$
+$$h_{d} = h_e \frac{p_d}{p_m + p_d}$$
+
+```{r}
+#| label: get-cohab-hazards-second-demog-trans
+
+cohab_hazards <- read_csv(here(
+  "validation",
+  "data", 
+  "england_wales_1992_onward", 
+  "great_britain_cohabitation_cohort_outcomes.csv"
+)) |>
+  # extrapolate missing values for 10 year estimates in last
+  # cohort
+  mutate(
+    across(
+      c(marriage_10, separation_10, continuing_10),
+      ~ replace(.x, is.na(.x), 2 * .x[2] - .x[1])
+    )
+  ) |>
+  # fix rounding error so they all sum to one
+  mutate(
+    across(
+      c(marriage_10, separation_10, continuing_10),
+      ~ .x / (marriage_10 + separation_10 + continuing_10)
+    )
+  ) |>
+  mutate(
+    # probs are cumulative so to get this relative to each span we need
+    # to make some changes
+    marriage_5_10 = (marriage_10 - marriage_5) / continuing_5,
+    separation_5_10 = (separation_10 - separation_5) / continuing_5
+  ) |>
+  select(cohort_start, cohort_end, marriage_5, separation_5,
+         marriage_5_10, separation_5_10) |>
+  pivot_longer(
+    cols = -c(cohort_start, cohort_end),
+    names_to = c(".value", "interval"),
+    names_pattern = "(marriage|separation)_(.*)"
+  ) |>
+  mutate(
+    hazard_exit = - log(1 - marriage - separation) / 5,
+    hazard_marriage = hazard_exit * (marriage / (marriage + separation)),
+    hazard_dissolved = hazard_exit * (separation / (marriage + separation)),
+    dur_start = if_else(interval == "5", 0, 5),
+    # treat the 5-10 duration as the open interval
+    dur_end = if_else(interval == "5", 5, Inf),
+    # 1990-1995 cohort will be stand in for 1992 to 1997
+    # 1995-2000 cohort wil stand in for 1998-2005
+    # 2000-2005 cohort will stand in for 2005-2019
+    time_start = case_when(
+      cohort_start == 1990 ~ 1992,
+      cohort_start == 1995 ~ 1998,
+      cohort_start == 2000 ~ 2005
+    ),
+    time_end = case_when(
+      cohort_start == 1990 ~ 1998,
+      cohort_start == 1995 ~ 2005,
+      cohort_start == 2000 ~ 2020
+    )
+  ) |>
+  select(starts_with("time_"), starts_with("dur_"), 
+         hazard_marriage, hazard_dissolved) |>
+  pivot_longer(cols = starts_with("hazard_"), names_prefix = "hazard_",
+               names_to = "type", values_to = "rate")
+
+conversion_rates <- cohab_hazards |>
+  filter(type == "marriage") |>
+  select(-type)
+
+cohab_dissolution_rates <- cohab_hazards |>
+  filter(type == "dissolved") |>
+  select(-type) |>
+  mutate(union_type = "cohab")
+```
+
+We have somewhat similar duration-based cumulative divorce and death risk for marriages by year for 2005 and 2010. We can use this to get 5-year duration bands of divorce hazard for these two time points. I will then interpolate rates back to 1992 and hold them constant from 2010 onward. 
+
+```{r}
+#| label: get-dissolution-rates-second-demog-trans
+
+dissolution_rates <- bind_rows(
+  read_csv(here(
+    "validation",
+    "data",
+    "england_wales_1992_onward",
+    "marital_divorce_death_cumulative_2005.csv"
+  )),
+  read_csv(here(
+    "validation",
+    "data",
+    "england_wales_1992_onward",
+    "marital_divorce_death_cumulative_2010.csv"
+  ))) |>
+  # lets do it five year intervals
+  filter((anniversary %% 5) == 0) |>
+  arrange(year, anniversary) |>
+  group_by(year) |>
+  mutate(
+    divorce_increment = cumulative_divorce - lag(cumulative_divorce, default = 0),
+    death_increment = cumulative_death - lag(cumulative_death, default = 0),
+    surviving_start = 1 - lag(cumulative_divorce, default = 0) - lag(cumulative_death, default = 0),
+    p_divorce = divorce_increment / surviving_start,
+    p_death = death_increment / surviving_start,
+    p_exit = p_divorce + p_death,
+    rate = (-log1p(-p_exit) / 5) * (p_divorce / p_exit),
+    dur_start = anniversary - 5,
+    dur_end = anniversary,
+    union_type = "marriage"
+  ) |>
+  ungroup() |>
+  select(year, union_type, dur_start, dur_end, rate) |>
+  # truncate to duration 50
+  filter(dur_end <= 50) |>
+  mutate(dur_end = if_else(dur_end == 50, Inf, dur_end))
+
+# lets interpolate between 2005 and 2010 and extrapolate back to 1992
+dissolution_rates <- dissolution_rates |>
+  select(year, union_type, dur_start, dur_end, rate) |>
+  pivot_wider(
+    names_from = year,
+    values_from = rate,
+    names_prefix = "rate_"
+  ) |>
+  expand_grid(year = 1992:2019) |>
+  mutate(
+    rate = rate_2005 +
+      (pmin(year, 2010) - 2005) *
+      (rate_2010 - rate_2005) / 5,
+    time_start = year,
+    time_end = year + 1
+  ) |>
+  select(time_start, time_end, union_type, dur_start, dur_end, rate) |>
+  arrange(time_start, dur_start)
+
+dissolution_rates <- dissolution_rates |>
+  bind_rows(cohab_dissolution_rates)
+```
+
+The final ingredient here are marriage rates. We have age-specific marriage rate data, however this is total marriages including those that come through cohabitation. Our marriage rates should include those cohabitations that will fail to advance into marriage, meaning that these marriage rates will be underestimated. To keep this simple, we will just apply a multiplicative factor to all of the rates. Our target for the tuning is reproducing similar first-time marriage rates in the output as the original input. That exercise led us to double the rates.
+
+```{r}
+#| label: get-marriage-rates-second-demog-trans
+
+marriage_rates_pretuned <- read_csv(here(
+  "validation",
+  "data",
+  "england_wales_1992_onward",
+  "female_marriage_rates_1992_2019.csv"
+)) |>
+  filter(marriage_order != "all_marriages") |>
+  mutate(
+    time_start = year, 
+    time_end = year + 1,
+    #rate = rate * 3,
+    previous_union = if_else(marriage_order == "first_marriage", "none", "dissolved")
+  ) |>
+  select(time_start, time_end, age_start, age_end, previous_union, rate)
+
+# some marriage rates for young age groups and dissolved are missing. For those cases, carry
+# forward the previous years
+marriage_rates_pretuned <- marriage_rates_pretuned |>
+  arrange(previous_union, age_start, time_start) |>
+  group_by(previous_union, age_start, age_end) |>
+    fill(rate, .direction = "down") |>
+  ungroup() |>
+  arrange(time_start, age_start, previous_union)
+
+# tune marriage rates to account for loss of cohabitation - our primary target is reproducing
+# the pre-tuned overall marriage rates in the output
+marriage_rates <- marriage_rates_pretuned |>
+  mutate(rate = rate * 2)
+
+```
+
+Now that we have all the pieces, we can set up the initial population. We will do this by burning in a uniform population over 50 years using the 1992 rates to generate a roughly stable population. Notably, this stable population may not match England and Wales precisely because historical rates were changing over time prior to 1992. However, it should give us something reasonable to work with.
+
+```{r}
+#| label: get-baseline-pop-start-second-demog-trans
+
+# apply baseline rates to population for 50 years to get a reasonable starting pop
+marriage_rates1992 <- marriage_rates |> 
+  filter(time_start == 1992) |>
+  select(-starts_with("time_"))
+prob_cohab1992 <- prob_cohab |> 
+  filter(time_start == 1992) |>
+  select(-starts_with("time_"))
+conversion_rates1992 <- conversion_rates |> 
+  filter(time_start == 1992) |>
+  select(-starts_with("time_"))
+dissolution_rates1992 <- dissolution_rates |> 
+  filter(time_start == 1992) |>
+  select(-starts_with("time_"))
+
+# because this is a negative growth rate population start big
+pop <- create_baseline_population(150000, 70, 1942)
+
+model <- hammel_model() |>  
+  set_population(pop) |>
+  set_mortality(mortality_rates1992) |>
+  set_fertility(fertility_rates1992) |>
+  set_union_formation(
+    "rate", 
+    matching = create_age_gap_matching_model(2, 5),
+    rates = marriage_rates1992, 
+    cohab_prob = prob_cohab1992,
+    union_convert_rate = conversion_rates1992
+  ) |>
+  set_union_dissolution(dissolution_rates1992)
+
+pop_start <- simulate(model, 1992-1942, 42)
+#calculate_population_size(pop_start, 1992)
+```
+
+```{r}
+#| label: fig-tuning-mar-rates
+#| fig-cap: Age-specific first time marriage rates in the observed baseline simulation compared to the pre-tuned original input rates
+
+calculate_marriage_rates(
+  pop_start,
+  time_breaks = c(1942, 1992),
+  age_breaks = c(16, seq(20, 60, 5), 70, 80, Inf),
+  by_previous_union = TRUE
+) |>
+  filter(sex == "f", previous_union == "none") |>
+  left_join(marriage_rates_pretuned |> filter(previous_union == "none", time_start == 1992), 
+    by = join_by(time_end == time_start, age_start == age_start, age_end == age_end)) |>
+  select(age_start, age_end, rate_marriage, rate) |>
+  rename(rate_observed = rate_marriage, rate_input = rate) |>
+  pivot_longer(cols = starts_with("rate"), names_prefix = "rate_") |>
+  ggplot(aes(x = age_start, y = value, group = name, color = name))+
+  geom_point()+
+  geom_line()+
+  labs(x = "age", y = "age-specific first time marriage rate")
+```
+
+@fig-tuning-mar-rates show our primary tuning target. By doubling the marriage rates in the simulation, we are able to fairly closely match the observed marriage rates from 1992. Notably, this produces a TFR of 1.55 which is a little lower than the empirical 1.79 TFR for England and Wales in 1992 because the stable population does not produce the same distribution of women by union status. However, for our purposes this is fine. 
+
+
+```{r}
+#| label: calc-fert-rate-tuning
+#| eval: false
+
+calculate_fertility_rates(
+  pop_start,
+  age_breaks = c(16, 20, 25, 30, 35, 40, 45),
+  time_breaks = c(1942, 1992)
+) |> calculate_tfr()
+```
+
+We now run two simulations. In the first simulation, I hold all rates constant to the  1992 values from 1992 to 2019. In the second simulation, I allow them all to vary. We can then compare the two simulations.
+
+```{r}
+#| label: run-second-demog-sims
+
+# two simulations - holding everything constant and allowing it to vary
+pop_constant <- simulate(model |> set_population(pop_start), 2019-1992, 42)
+
+model <- hammel_model() |>  
+  set_population(pop_start) |>
+  set_mortality(mortality_rates1992) |>
+  set_fertility(fertility_rates1992) |>
+  set_union_formation(
+    "rate", 
+    matching = create_age_gap_matching_model(2, 5),
+    rates = marriage_rates,
+    cohab_prob = prob_cohab,
+    union_convert_rate = conversion_rates
+  ) |>
+  set_union_dissolution(dissolution_rates)
+
+pop_change <- simulate(model, 2019-1992, 42)
+```
+
+```{r}
+#| label: fig-tfr-second-demog-trans
+#| fig-cap: Total Fertility rate over time in simulations that include changing rates of marriage, dissolution, and cohabitation vs. a simulation which holds values constant. 
+
+
+bind_rows(
+  calculate_fertility_rates(
+    pop_constant, 
+    age_breaks = c(16, 20, 25, 30, 35, 40, 45),
+    time_breaks = 1992:2019
+  ) |>
+    calculate_tfr() |>
+    mutate(model = "constant"),
+  calculate_fertility_rates(
+    pop_change, 
+    age_breaks = c(16, 20, 25, 30, 35, 40, 45),
+    time_breaks = 1992:2019
+  ) |>
+    calculate_tfr() |>
+    mutate(model = "changing")
+) |>
+  ggplot(aes(x = time_start + 0.5, y = tfr, color = model))+
+  geom_line()+
+  labs(x = "year", y = "total fertility rate")
+```
+@fig-tfr-second-demog-trans illustrates a key feature of the second demographic transition. Rising rates of cohabitation and union dissolution along with later ages at marriage reduce total fertility rates even when fertility rates *within* union type are held constant over time. If we wanted a more detailed look at this, we could hold all rate schedules except one constant to see how much each process contributes to fertility decline, but I will not do that here.
+
+```{r}
+#| label: fig-prop-cohab-second-demog-trans
+#| fig-cap: Share of new unions that are cohabitations over time, across types of simulations.
+
+get_cohab_prop <- function(result) {
+  result$unions |>
+    mutate(year = floor(start_time)) |>
+    group_by(year) |>
+    count(union_type) |>
+    mutate(prop = n / sum(n)) |>
+    ungroup() |>
+    filter(union_type == "cohab") |>
+    select(year, prop)
+}
+
+bind_rows(
+  get_cohab_prop(pop_constant) |> mutate(model = "constant"),
+  get_cohab_prop(pop_change) |> mutate(model = "changing")
+) |>
+  filter(year >= 1992) |>
+  ggplot(aes(x = year, y = prop, color = model))+
+  geom_line()+
+  labs(y = "Share of new unions that are cohabiations")
+```
+
+@fig-prop-cohab-second-demog-trans shows the rise in cohabitation that occurs in the changing model. by the end of the time period, nearly 60% of newly formed unions are cohabitations rather than marriage.
+
+```{r}
+#| label: fig-mean-age-childbearing-second-demog-trans
+#| fig-cap: Mean age of childbearing over time, across types of simulations.
+
+get_mean_age_childbearing <- function(result) {
+  calculate_fertility_rates(
+    result, 
+    age_breaks = c(16, 20, 25, 30, 35, 40, 45),
+    time_breaks = 1992:2019
+  ) |>
+    mutate(prod = rate_fertility * (age_end + age_start) / 2) |>
+    group_by(time_start, time_end)  |>
+    summarize(
+      numerator = sum(prod, na.rm = TRUE),
+      denominator = sum(rate_fertility),
+      .groups = "drop"
+    ) |>
+    mutate(mu = numerator / denominator)
+}
+
+
+bind_rows(
+  get_mean_age_childbearing(pop_constant) |> mutate(model = "constant"),
+  get_mean_age_childbearing(pop_change) |> mutate(model = "changing")
+) |>
+  filter(time_start >= 1992) |>
+  ggplot(aes(x = time_start + 0.5, y = mu, color = model))+
+  geom_line()+
+  labs(x = "year", y = "mean age of childbearing")
+```
+
+@fig-mean-age-childbearing-second-demog-trans shows the mean age of childbearing over time based on the observed age-specific fertility rates. As expected, it increases in the model that allows for changing rate schedule, despite no change in the fertility rates *within* union types. 
+
+I now investigate specific time-varying rate schedules from the simulation to confirm that the empirical estimates conform to the expected input rates. I pick a few specific time points to illustrate.
+
+First, I show that the estimated TFR by union type from the data matches the TFR from the input rates.
+
+```{r}
+#| label: fig-tfr-union-type-second-demogr-trans
+
+fertility_rates1992 |> calculate_tfr()
+
+calculate_fertility_rates(
+  pop_change, 
+  age_breaks = c(16, 20, 25, 30, 35, 40, 45),
+  time_breaks = c(1992, 2019), 
+  by_union_type = TRUE
+) |>
+  calculate_tfr()
+```
+
+```{r}
+#| label: fig-dissolution-rates-marriage
+#| fig-cap: Duration-specific union dissolution rate of marriages, estimated from simulation for selected years. 95% confidence bands are shown around estimates. The dotted red line shows the input rate.
+
+calculate_dissolution_rates(
+  pop_change,
+  1992:2019,
+  dur_breaks = seq(0, 45, 5),
+  by_union_type = TRUE,
+  conf.level = 0.95
+) |>
+  filter(union_type == "marriage", time_start %in% c(1992, 2000, 2010, 2018)) |>
+  ggplot(aes(x = dur_start + 2.5, y = rate_dissolution))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(
+    data = dissolution_rates |> filter(union_type == "marriage", time_start %in% c(1992, 2000, 2010, 2018)), 
+    aes(y = rate), linetype = 2, color = "red")+
+  facet_wrap(~time_start)+
+  labs(x = "union duration", y = "rate of dissolution")
+```
+
+@fig-dissolution-rates-marriage shows the duration-specific dissolution rates of marriages from the simulation. The empirical estimates fit well to the input rate schedules.
+
+```{r}
+#| label: fig-dissolution-rates-cohab
+#| fig-cap: Duration-specific union dissolution rate of cohabitation, estimated from simulation for selected years. 95% confidence bands are shown around estimates. The dotted red line shows the input rate.
+
+calculate_dissolution_rates(
+  pop_change,
+  c(1992, 1998, 2005, 2019),
+  dur_breaks = c(0, 5),
+  by_union_type = TRUE,
+  conf.level = 0.95
+) |>
+  filter(union_type == "cohab") |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  ggplot(aes(x = dur_start, y = rate_dissolution))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(
+    data = dissolution_rates |> filter(union_type == "cohab"), 
+    aes(y = rate), linetype = 2, color = "red")+
+  facet_wrap(~time_start)+
+  labs(x = "duration", y = "rate of dissolution")
+```
+
+@fig-dissolution-rates-cohab shows the dissolution rates of cohabitations estimated from the simulation. The bands used here are much coarser than for marriage. The estimates fit well to the input rates.
+
+```{r}
+#| label: fig-union-rates
+#| fig-cap: Age-specific union rate (direct marriage and cohabitation), estimated from simulation for selected years. 95% confidence bands are shown around estimates. The dotted red line shows the input rate. Results are shown separately for first marriages and remarriages. The youngest age groups are excluded from the remarriage case due to sparseness issues.
+
+mar_rates_observed <- calculate_union_rates(
+  pop_change,
+  1992:2019,
+  c(16, seq(20, 60, 5), 70, 80),
+  by_previous_union = TRUE,
+  conf.level = 0.95,
+  pool_dissolved = TRUE
+) |>
+  filter(sex == "f")
+
+mar_rates_observed |>
+  filter(sex == "f", time_start %in% c(1992, 2000, 2010, 2018), 
+    (age_start > 20 & previous_union == "dissolved") | previous_union == "none")  |>
+  ggplot(aes(x = age_start, y = rate_union))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(
+    data = marriage_rates |> filter(time_start %in% c(1992, 2000, 2010, 2018)),
+    aes(y = rate), linetype = 2, color = "red"
+  )+
+  facet_grid(previous_union~time_start, scales = "free_y")+
+  labs(x = "age", y = "union rate")
+```
+
+@fig-union-rates shows the age-specific estimated rates of union formation (cohabitation or direct marriage) from the simulation. The estimates fit will to the input rates.
+
+```{r}
+#| label: fig-prob-cohab-compare
+#| fig-cap: Probability over time that when a union forms, it will be a cohabitation rather than a marriage over time. 95% confidence bands are shown around estimates. The dotted red line shows the input probability.
+
+calculate_union_rates(
+  pop_change,
+  c(1992, 1995:2019),
+  c(0, Inf),
+  by_union_type = TRUE,
+  conf.level = 0.95
+) |>
+  filter(sex == "f") |>
+  select(time_start, time_end, union_type, unions) |>
+  rename(n = unions) |>
+  pivot_wider(id_cols = starts_with("time_"), names_from = union_type, values_from = n) |>
+  mutate(
+    prob_cohab = cohab / (cohab + marriage),
+    se = sqrt(prob_cohab * (1 - prob_cohab) / (cohab + marriage)),
+    conf_low = prob_cohab - 1.96 * se,
+    conf_high = prob_cohab + 1.96 * se
+  ) |>
+  ggplot(aes(x = time_start, y = prob_cohab))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(data =prob_cohab, aes(y = prob), linetype = 2, color = "red")+
+  labs(x = "year", y = "probability of cohabitation when union forms")
+```
+
+@fig-prob-cohab-compare shows the estimated probability that a newly formed union is a cohabitation rather than a marriage. This percentage conforms to the input rate.
+
+### Replicate Gullickson and Saperstein
+
+Our goal in this project is replication Gullickson and Saperstein (2026). Specifically, we will replicate their simulation of a two group system with a high and resilient inheritance pattern for multiracial identification with an intermarriage rate that plateaus halfway through the simulation. The inheritance model was already used as an example in the Milestone 3 report. 
+
+Like Gullickson and Saperstein, we will use US 2000 fertility and mortality rates.
+
+```{r}
+mortality_rates <- get_mortality_hmd("USA", 2000)
+fertility_rates <- get_fertility_hfd("USA", 2000)
+```
+
+We will use on-demand partnering because we don't need to track it directly. 
+
+We will use uneven starting groups of A (85%) and B (15%).
+
+```{r}
+#| label: set-base-pop
+pop <- create_baseline_population(200000, group_weights = c("A" = 0.85, "B" = 0.15))
+```
+
+The simulation will proceed as follows:
+
+- 100 year burn in with no allowed intermarriage and random_parent inheritance.
+- 200 year simulation that will switch to the custom inheritance model used by Gullickson and Saperstein.
+- incremental increases in the likelihood of intermarriage in 5 year increments until year 100 at which point it plateaus.
+
+```{r}
+#| label: setup-inheritance-models
+
+inheritance_models <- tibble(
+  time_start = c(0, 100),
+  time_end   = c(100, Inf),
+  model      = list(
+    create_group_inheritance("random_parent"),
+    create_group_inheritance(
+      "custom",
+      groups = c("A", "B", "AB"),
+      fun = function(child_ancestry, mother_group, father_group, ...) {
+        # Same identity or missing father: follow mother
+        if (is.na(father_group) || mother_group == father_group) {
+          return(mother_group)
+        }
+
+        # Entirely unknown ancestry: follow mother
+        known <- 1 - child_ancestry[["unknown"]]
+        if (known <= 0) return(mother_group)
+
+        # if we are here then assign as a function of group A ancestry
+        prop_A <- child_ancestry[["group_A"]] / known
+
+        logits <- c(
+          A  = -5.138 + 11.88 * prop_A - 15.3 * prop_A^2 + 9.553 * prop_A^3,
+          B  = 0.949 - 9.39 * prop_A + 11.935 * prop_A^2 - 8.483 * prop_A^3,
+          AB = 0
+        )
+        weights <- exp(logits - max(logits))
+
+        sample(names(weights), size = 1, prob = weights)
+      }
+    )
+  )
+)
+```
+
+```{r}
+#| label: setup-matching-models
+
+m <- list(create_age_gap_matching_model(2, 5, prevent_exogamy = TRUE))
+lodds <- -5
+for (i in 1:11) {
+  m[[length(m) + 1L]] <- create_age_gap_matching_model(
+    2, 5,
+    group_exogamy = c("A:B" = lodds, "A:AB" = lodds / 2, "B:AB" = lodds / 2)
+  )
+  lodds <- lodds + 0.25
+}
+
+matching_models <- tibble(
+  time_start = c(0, seq(100, 150, 5)),
+  time_end   = c(100, seq(105, 150, 5), 300),
+  model      = m
+)
+```
+
+```{r}
+#| label: run-multigroup-sims
+
+model <- hammel_model() |>
+  set_population(pop) |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates, inheritance = inheritance_models) |>
+  set_union_formation("on_demand", matching = matching_models)
+
+runtime <- system.time(pop_final <- simulate(model, 300, 42))
+```
+
+The simulation takes `r runtime[["elapsed"]]` seconds to run.
+
+```{r}
+#| label: fig-pop-share-groups
+#| fig-cap: Group share across time in simulation
+
+calculate_population_size(pop_final, seq(0, 300, 5), by_group = TRUE) |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ungroup() |>
+  mutate(group = factor(group, levels = c("A", "B", "AB"))) |>
+  ggplot(aes(x = time, y = prop, fill = group))+
+  geom_area()
+```
+
+@fig-pop-share-groups shows the group shares over time. The AB group emerges after 100 years as expected and grows to a larger share of the population over time.
+
+
+```{r}
+#| label: calculate-crosstabs
+
+crosstabs <- pop_final |>
+  get_detailed_unions() |>
+  #mutate(time_period = cut(start_time, breaks = seq(0, 300, 5))) |>
+  mutate(time_mid = floor(start_time / 5) * 5 + 2.5) |>
+  count(time_mid, group_w, group_h) |>
+  pivot_wider(names_from = c(group_w, group_h), values_from = n) |>
+  mutate(
+    log_odds_A_B = log(A_B) + log(B_A) - log(A_A) - log(B_B),
+    se_A_B = sqrt(1 / A_B + 1 / B_A + 1 / A_A + 1 / B_B),
+    log_odds_A_AB = log(A_AB) + log(AB_A) - log(A_A) - log(AB_AB),
+    se_A_AB = sqrt(1 / A_AB + 1 / B_AB + 1 / A_A + 1 / AB_AB),
+    log_odds_B_AB = log(B_AB) + log(AB_B) - log(B_B) - log(AB_AB),
+    se_B_AB = sqrt(1 / B_AB + 1 / AB_B + 1 / B_B + 1 / AB_AB)
+  )
+```
+
+```{r}
+#| label: fig-log-odds
+#| fig-cap: Log-odds ratio over time (5 year intervals) between three groups. 95% confidence bands shown. Dotted lines show expected plateaus for the A:B group and A:AB and B:AB groups. 
+
+crosstabs |>
+  select(time_mid, starts_with("log_odds"), starts_with("se_")) |>
+  pivot_longer(
+    cols = -time_mid,
+    names_to = c(".value", "combo"),
+    names_pattern = "(log_odds|se)_(.*)"
+  ) |>
+  mutate(
+    combo = str_replace(combo, "_", ":"),
+    combo = factor(combo, levels = c("A:B", "A:AB", "B:AB")) 
+  ) |>
+  ggplot(aes(x = time_mid, y = log_odds, color = combo, group = combo))+
+  geom_ribbon(aes(ymin = log_odds - 1.96 * se, ymax = log_odds + 1.96 * se, fill = combo), color = NA, alpha = 0.3)+
+  geom_line()+
+  geom_hline(yintercept = c(-5, -2.5), linetype = 2)+
+  scale_y_continuous(limits = c(0, -11))+
+  labs(x = "year", y = "log odds")
+```
+
+@fig-log-odds shows the log odds ratios over time for the three combinations. No log odds ratios show for the first 100 years as expected because intermarriage was not allowed. When the log odds are very low or the groups are still very small (as for the AB group between 100 and 150 years), the log odds ratio can sometimes not be estimated due to zero values in one of the cells. Thus, log odds ratios don't appear for combos involving the AB group for some time after year 100. The A:B log odds ratio behaves exactly as expected by the input exogamy ratios, starting at roughly -10 and plateauing at -5. The A:AB and B:AB log odds ratios are about half that throughout and stabilize at -2.5, as expected.
+
+```{r}
+#| label: fig-custom-inheritance-prob
+#| fig-cap: Probability of group assignment as a function of proportion A ancestry among births to parents belonging to different groups for all births in a single simulation. Proportion A ancestry is plotted in 10 percent bins by the midpoint of the bin. 95% confidence intervals shown. The dotted line shows the expected probability from the inheritance model.
+
+temp <- tibble(
+  prop_A = seq(0.005, 0.995, 0.005),
+  logit_A = -5.138 + 11.88 * prop_A - 15.3 * prop_A^2 + 9.553 * prop_A^3,
+  logit_B = 0.949 - 9.39 * prop_A + 11.935 * prop_A^2 - 8.483 * prop_A^3,
+  denom = exp(logit_A) + exp(logit_B) + exp(0),
+  prob_A = exp(logit_A)/denom,
+  prob_B = exp(logit_B)/denom,
+  prob_AB = exp(0)/denom
+) |>
+  select(prop_A, starts_with("prob_")) |>
+  pivot_longer(cols = starts_with("prob_"), names_prefix = "prob_", names_to = "group", values_to = "prop") |>
+  rename(prop_a_group = prop_A)
+
+pop_final$persons |>
+  filter(birth_time >= 100) |>
+  left_join(pop_final$ancestry, by = "person_id") |>
+  left_join(
+    pop_final$persons |> 
+      select(person_id, group) |> 
+      rename(father_id = person_id, group_father = group),
+    by = "father_id"
+  ) |>
+  left_join(
+    pop_final$persons |> 
+      select(person_id, group) |> 
+      rename(mother_id = person_id, group_mother = group),
+    by = "mother_id"
+  ) |>
+  filter(!is.na(group_father) & !is.na(group_mother) &
+    group_father != group_mother) |>
+  mutate(
+    prop_a_group = cut(
+      group_A,
+      breaks = seq(0, 1, 0.1),
+      labels = FALSE,
+      include.lowest = TRUE
+    ) * 0.1 - 0.05
+  ) |>
+  group_by(prop_a_group, group) |>
+  summarize(n = n()) |>
+  mutate(prop = n / sum(n), se = sqrt(prop * (1 - prop) / sum(n))) |>
+  ungroup() |>
+  ggplot(aes(x = prop_a_group, y = prop, group = group, color = group))+
+  geom_line(data = temp, linetype = 2)+
+  geom_point(alpha = 0.8)+
+  geom_linerange(aes(ymin = prop - 1.96 * se, ymax = prop + 1.96 * se), alpha = 0.8)+
+  labs(x = "proportion A ancestry", y = "probability of group identity")+
+  theme_bw()
+```
+
+@fig-custom-inheritance-prob shows the observed probability of being assigned to a given group as a function of share of A ancestry for births to parents from different groups. The dotted line shows the expected probabilities from the model. The results line up closely to expectation and most 95% confidence intervals contain the expected value.
+
+#### Add transition rates
+
+To test time-varying transition rates, I add transition rates to the simulation where AB individuals have an equal rate of transitioning back to A or B with equal probability upon becoming adults. We will double that transition rate halfway through the latter 200 years of the simulation. 
+
+```{r}
+#| label: create-transition-rates
+
+trans_rates <- tribble(
+  ~time_start, ~time_end, ~group_origin, ~group_dest, ~age_start, ~age_end, ~rate,
+  0,           100,       "AB",           "B",         15,         20,       0.00,
+  0,           100,       "AB",           "A",         15,         20,       0.00,
+  100,         200,       "AB",           "B",         15,         20,       0.02,
+  100,         200,       "AB",           "A",         15,         20,       0.02,
+  200,         300,       "AB",           "B",         15,         20,       0.04,
+  200,         300,       "AB",           "A",         15,         20,       0.04
+)
+```
+
+```{r}
+#| label: run-multigroup-trans-sims
+
+model <- hammel_model() |>
+  set_population(pop) |>
+  set_mortality(mortality_rates) |>
+  set_fertility(fertility_rates, inheritance = inheritance_models) |>
+  set_union_formation("on_demand", matching = matching_models) |>
+  set_group_transition(trans_rates)
+
+runtime <- system.time(pop_final <- simulate(model, 300, 42))
+```
+
+```{r}
+#| label: fig-pop-share-groups-trans
+#| fig-cap: Group share across time in simulation with transition rates
+
+calculate_population_size(pop_final, seq(0, 300, 5), by_group = TRUE) |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ungroup() |>
+  mutate(group = factor(group, levels = c("A", "B", "AB"))) |>
+  ggplot(aes(x = time, y = prop, fill = group))+
+  geom_area()
+```
+
+@fig-pop-share-groups-trans shows the group share over time in the simulation with these transition rates. As expected, the growth of the AB group is slower than the previous simulation due to some transitions back into single group categories.
+
+```{r}
+#| label: tbl-transition-rates
+#| tbl-cap: Estimated transition rates from simulation with 95% confidence intervals. Input rates are shown for reference.
+
+temp <- calculate_transition_rates(pop_final, c(0, 100, 200, 300), c(15, 20), conf.level = 0.95) |>
+  filter(group_origin == "AB", age_start == 15) |>
+  select(time_start, time_end, age_start, age_end, group_origin, group_dest, rate_transition,
+    conf_low, conf_high) |>
+  left_join(trans_rates)
+
+temp |>
+  gt() |>
+  cols_label(
+    time_start ~ "Starting time",
+    time_end  ~ "Ending time",
+    age_start ~ "Age start",
+    age_end ~ "Age end",
+    group_origin ~ "Origin",
+    group_dest ~ "Destination",
+    rate_transition ~ "Observed rate",
+    conf_low ~ "Low",
+    conf_high ~ "High",
+    rate ~ "Input rate"
+  ) |>
+  tab_spanner(starts_with("conf_"), label = "95% Confidence interval") |>
+  fmt_number(c(rate_transition, conf_low, conf_high), decimals = 4)
+```
+
+@tbl-transition-rates shows that the estimated transition rates are very close to the expected input transition rates.
+
+## Specific Test on Fertility
+
+Finally, I want to test a simulation where I raise fertility rates dramatically to confirm that we don't observe a blip due to the birth interval issue that should now be solved.
+
+```{r}
+#| label: set-changing-fertility-rates
+fertility_rates <- bind_rows(
+  get_fertility_hfd("USA", 2000) |> mutate(time_start = 0, time_end = 100), 
+  read_csv(here("validation", "data", "niger_2012", "niger_2012_asfr_wpp2024.csv")) |>
+    mutate(time_start = 100, time_end = 120)
+)
+mortality_rates <- get_mortality_hmd("USA", 2000)
+```
+
+```{r}
+pop <- create_baseline_population(100000)
+
+model <- hammel_model() |>
+  set_population(pop) |>
+  set_fertility(fertility_rates) |>
+  set_mortality(mortality_rates) |>
+  set_union_formation("on_demand")
+
+results <- future_map(1077:1097, 
+  function(seed) {
+    simulate(model, 120, seed)
+  }, 
+  .options = furrr_options(seed = NULL)
+)
+```
+
+```{r}
+#| label: fig-tfr-jump
+#| fig-cap: Estimated total fertility rate and 95% confidence interval in simulation with jump in fertility rates at year 100.
+
+tfr_summary <- results |>
+  map(
+    calculate_fertility_rates,
+    time_breaks = 90:110,
+    age_breaks = 12:55
+  ) |>
+  map(calculate_tfr) |>
+  bind_rows(.id = "replication") |>
+  group_by(time_start, time_end) |>
+  summarize(
+    n_valid = sum(!is.na(tfr)),
+    tfr_mean = if (n_valid > 0) {
+      mean(tfr, na.rm = TRUE)
+    } else NA_real_,
+    tfr_mcse = if (n_valid > 1) {
+      sd(tfr, na.rm = TRUE) / sqrt(n_valid)
+    } else NA_real_,
+    .groups = "drop"
+  )
+
+tfr_summary |>
+  ggplot(aes(x = time_start, y = tfr_mean))+
+  geom_ribbon(aes(ymin = tfr_mean - 1.96 * tfr_mcse, ymax = tfr_mean + 1.96 * tfr_mcse),
+              color = NA, fill = "grey70")+
+  geom_line()+
+  labs(x = "year", y = "total fertility rate")
+```
+
+@fig-tfr-jump shows the estimated total fertility rate immediately before and after the change in fertility rates at time 100. There is no evidence of a blip immediately after the transition.
+
+## Unit Tests
+
+The following tests have been constructed and are currently all passing.
+
+```{r}
+#| label: test-results
+#| eval: false
+
+test_results <- devtools::test(pkg = here::here(), reporter = "silent")
+test_table <- as.data.frame(test_results)
+knitr::kable(
+  test_table[, c("test", "passed", "failed", "error", "skipped", "warning")]
+)
+```
+## Conclusions and Unresolved Limitations
+
+All expectations for this milestone have been met and each of the seven rate processes and the two models has been used in time-varying simulations and have performed as expected.
+
+## References
+
+Beaujouan, Éva and Máire Ní Bhrolcháin. 2011. "Cohabitation and Marriage in Britain since the 1970s". Population Trends nr 145, Office for National Statistics.
+
+Gullickson, Aaron, and Aliya Saperstein. 2026. “The Dynamics of Population Mixing: A Simulation Approach.” Population Association of America, St. Louis, MO, May 8.
+
+O'Leary, Louise, Eva Natamba, Julie Jefferies, and Ben Wilson. 2010. "Fertility and Partnership Status in the Last Two Decades." Population Trends 140, Office for National Statistics. 
+
+## Reproducibility record
+
+```{r}
+#| label: reproducibility
+system2("git", c("-C", shQuote(here::here()), "rev-parse", "HEAD"), stdout = TRUE)
+system2("git", c("-C", shQuote(here::here()), "status", "--short"), stdout = TRUE)
+sessionInfo()
+```
+

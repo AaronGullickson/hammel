@@ -44,7 +44,13 @@ defaulting to \code{0.75}. Must be finite and nonnegative. Applies to fertility
 only; see cell-accounted fertility below.}
 
 \item{inheritance}{A group identity model from \code{\link[=create_group_inheritance]{create_group_inheritance()}},
-or a method name requiring no additional parameters: \code{"mother"}, \code{"father"},
+or a tibble with numeric \code{time_start}, \code{time_end} and list-column \code{model}
+containing complete inheritance models. Intervals are half-open absolute
+years, must not overlap and must cover the requested run. Select the active
+model at each birth; older identities and ancestry remain unchanged.
+Base data frames with list columns are accepted. All declared possible
+identities across scheduled models join the simulation-wide registry.
+Static inputs may also be a method name requiring no additional parameters: \code{"mother"}, \code{"father"},
 \code{"random_parent"}, \code{"same_sex"}, \code{"opposite_sex"}, or \code{"ancestry"}.
 Fertility defaults to selecting either parent with equal probability,
 with maternal fallback. Other parental, ancestry,
@@ -82,8 +88,15 @@ of character representations, including numeric codes).
 
 Mortality requires separate schedules for both sexes. Gaps and uncovered
 ages are not filled or interpreted as zero rates. Coverage must be specified
-before simulation. Calendar-time-varying
-schedules are not yet supported; time interval columns are rejected.
+before simulation. Optional \code{time_start}/\code{time_end} columns select half-open
+calendar intervals in absolute years, including fractional years, on mortality
+and fertility tables. Both columns are required together; starts are finite
+and ends exceed starts (possibly Inf). Active slices must satisfy the existing
+strata/coverage rules and cover the requested run. Rates are constant within
+intervals, with no interpolation. Calendar changes precede same-time events,
+preserving histories, birth spacing, parity and duration origins. Inheritance
+also accepts whole-model calendar schedules; other fertility arguments remain
+static.
 
 Fertility optionally accepts \code{union_type} containing both \code{"partnered"}
 and \code{"unpartnered"}, or all three \code{"unpartnered"}, \code{"cohab"}, \code{"marriage"}.

@@ -17,7 +17,10 @@ person-year. Ends may be \code{Inf}. Bands cannot overlap within a stratum.
 Self-transitions are invalid. Optional \code{sex} is m/f. Optional \code{union_type}
 is unpartnered/partnered or unpartnered/cohab/marriage. Omitted columns
 apply universally. Destinations may initially be empty; other configured
-group-specific processes must cover all possible groups.}
+group-specific processes must cover all possible groups. Optional
+\code{time_start}/\code{time_end} specify half-open absolute calendar-year bands,
+including fractional years. Every active slice must be valid and the table
+must cover the requested run. Rate changes do not reset group duration.}
 
 \item{model}{A \code{hammel_model}.}
 }

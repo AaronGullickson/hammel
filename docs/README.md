@@ -1,14 +1,20 @@
 # Hammel documentation
 
-Updated October 30, 2026. Milestones 1–6 are complete by user acceptance
-(D029, D050, D077, D093, D105, D116), including individual group transitions, parity-specific fertility,
+Updated November 2, 2026. Milestones 1–7 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116, D127), including individual group transitions, parity-specific fertility,
 cell-accounted birth spacing and persistent lognormal fertility weights.
 Current behavior uses continuous event times with no monthly grid. Acceptance
 is based on the user-authored validation reports and retains their limitations.
 **Milestone 6 is accepted complete** (D116); its final report render is active.
-**Next: milestone 7, time-varying inputs.** See the
+**Milestone 7 is accepted complete, November 2, 2026 (D127): calendar-varying
+rates (D118), cohabitation probabilities (D122), and matching/inheritance model
+schedules (D123).** See the [validation report](../validation/milestone7.qmd)
+and [rendered assessment](../validation/milestone7.html).
+See the [rate contract](time-varying-rates.md) and
 [group-transition contract](group-transitions.md). Household moves are deferred to
-the regions milestone (D114); milestone 7 is time-varying inputs (D103).
+tentative milestone 10's multiple-group/regions applications (D114/D121).
+Milestone 7 finishes with the current engine; binned-group hazards and formula
+weights remain planned for milestone 8 (D121).
 
 ## Reading order
 
@@ -17,6 +23,10 @@ the regions milestone (D114); milestone 7 is time-varying inputs (D103).
 | [Project brief](project-brief.md) | Purpose, current scope, and milestone status |
 | [Design](design.md) | Implemented architecture, API, and source locations |
 | [Scientific contract](scientific-contract.md) | Current demographic assumptions and event rules |
+| [Calendar-varying models](time-varying-models.md) | Matching/father/cohabitation/inheritance model schedules and event-time selection (D123) |
+| [Calendar-varying rates](time-varying-rates.md) | Calendar bands, coverage, boundary timing and retained histories (D118) |
+| [Database rate preparation](database-rates.md) | Single/multiple years, native HMD shapes, pooled open ages and provenance (D119/D120) |
+| [Rate input census](rate-inputs.md) | Existing rate schedules, age/duration bands, supported strata and multipliers |
 | [Population schema](population-schema.md) | Person/union tables and structural validation |
 | [Group transitions](group-transitions.md) | Individual transitions, histories, state updates and age/duration Lexis rates |
 | [Groups](groups.md) | Group-specific schedules, multipliers, newborn identity, and baseline sampling |
@@ -47,6 +57,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [Parity fertility and PATFR](parity-fertility.md) | History-derived parity, schedules, HFD recovery and PATFR; milestone 5 accepted (D105) |
 | [Union dissolution](union-dissolution.md) | Milestone 4 duration hazards, female carrier, state changes, and worked examples (D078) |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
+| [Binned-group hazards](binned-group-hazards.md) | User-selected milestone 8 direction; formula weights, cell definitions and unresolved contracts (D121), not implemented |
 | [Two-sex union models](two-sex-union-models.md) | Proposal notes: directional asymmetry, marriage squeeze, Schoen/Choo–Siow/Dagsvik models, API considerations (D073) |
 | [Future roadmap](roadmap.md) | Accepted milestones and future priorities with unresolved specifications |
 | [Decision log](decisions.md) | Accepted choices and supersession history |
@@ -109,6 +120,15 @@ To inspect prior versions, use `git log -- docs` and
   rate provenance, and supporting benchmark/conditional-choice evidence.
 The former `milestone1.R` and `milestone1_bootstrap.R` examples have been
 removed from the current tree; use Git history for those historical workflows.
+
+- [Milestone 7 validation report](../validation/milestone7.qmd) and
+  [rendered assessment](../validation/milestone7.html): user-authored assessment
+  accepted November 2, 2026 (D127), covering calendar-varying demographic inputs
+  and model scenarios. Preserve its source, rendered artifact and provenance;
+  the report's conclusions retain the current contracts and limitations.
+
+- [Milestone 7 rate example](../inst/examples/milestone7-rates.R): synthetic
+  calendar-varying mortality/fertility with fractional dates and run duration.
 
 `inst/examples/` ships with the installed R package. `validation/` and `docs/`
 are development material excluded from package builds. Preserve the completed

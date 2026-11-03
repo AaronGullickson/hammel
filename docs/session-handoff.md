@@ -1,43 +1,75 @@
 # Current project handoff
 
-Updated October 30, 2026. This is a dated status record, not authorization for
+Updated November 2, 2026. This is a dated status record, not authorization for
 unspecified features or a standing pause instruction. The current user request
 controls work. Start with [the documentation index](README.md),
 [scientific contract](scientific-contract.md) and [decisions](decisions.md).
 
 ## Accepted milestones and active render
 
-Milestones 1–6 are complete by user acceptance: mortality/fertility (D029,
+Milestones 1–7 are complete by user acceptance: mortality/fertility (D029,
 October 15), union formation (D050, October 19), groups (D077, October 27),
 dissolution/remarriage/cohabitation (D093, October 29), parity-specific
 fertility/cell accounting/heterogeneity (D105, October 29), and individual
-group transitions (D116, October 30), all in 2026.
+group transitions (D116, October 30), followed by calendar-varying inputs
+(D127, November 2), all in 2026.
 
-Preserve all six user-authored report sources and rendered artifacts, input
+Preserve all seven user-authored report sources and rendered artifacts, input
 provenance and explanatory comments. Milestone 1 must be reproduced at its
 recorded historical commit because current execution requires a union process.
-The user is compiling the final milestone 6 report at this closeout. Preserve
+Milestone 6 had an active final render at its acceptance. Preserve
 `validation/milestone6.qmd`, `.html`, and all active render intermediates;
 do not move, remove, rerender or interrupt them for documentation work. Actual
 replication counts and population settings belong to the report. Acceptance
 is explicit, but final-render completion and numerical results are not
 independently certified by this documentation update.
 
-## Next milestone: 7, time-varying inputs
+## Milestone 7 accepted complete
 
-Calendar-varying rates, matching and inheritance within a run are next under
-D103/D116. Specify input representation, period boundaries, update/invalidation
-rules, history and observation semantics, and the public API before consequential
-implementation. Existing flat time-banded table and whole-model schedule notes
-in [the roadmap](roadmap.md) remain proposals. Completion of milestone 6 does
-not accept those proposals or authorize unspecified execution behavior.
+The user approved calendar input semantics and authorized the six annual-rate
+inputs first (D118). Rates now accept flat `time_start`/`time_end` bands;
+[the contract](time-varying-rates.md) records coverage, fractional years,
+boundary precedence, resampling, histories and observations. D123 implements
+[matching/inheritance model schedules](time-varying-models.md) for all four
+arguments, with a shared `time_start`/`time_end`/`model` interface, dynamic NULL
+matching fallbacks and a registry covering all future inheritance identities. D122 adds calendar bands
+to the flat `cohab_prob` table, with current probabilities selected at searches
+and matching-calibration updates that preserve event clocks at probability-only
+boundaries. Other arguments remain static. D119 adds multi-year HMD/HFD getters and native HMD shape selection;
+D120 adds optional `open_age` pooling from native deaths/exposure products;
+see [database preparation](database-rates.md). The user deferred stationary-year
+and historical-run setup to fix the getter first. The user has now accepted
+milestone 7 complete (D127), based on `validation/milestone7.qmd` and its retained
+HTML assessment. The code/report revision at acceptance is
+`3b65d2202b006ef6f3e232c98595814b1544f9fe`. This closeout does not rerender or
+independently reproduce the report.
 
-Groups cover most categorical characteristics. Multiple independent group
-dimensions remain an optional direction with no selected schema. Fixed newborn
+Milestone 7 is complete with the current engine (D127). D121 assigns the future
+[binned-group hazard/formula-weight change](binned-group-hazards.md) to milestone
+8. It remains unimplemented, with detailed formula and mechanism contracts
+still to specify. Summaries/helpers move to milestone 9. Multiple independent
+group columns are tentative milestone 10, with no selected schema. Fixed newborn
 assignment remains unselected; custom mixed-parent assignment already exists.
-Household moves are deferred to milestone 10, internal migration and regions
-(D114); rate interpretation, household membership and conditional rescheduling
-issues are recorded in the roadmap. No household mechanism is implemented.
+The standalone regions/internal-migration milestone is removed; regional and
+household applications may be considered under tentative milestone 10 (D121).
+D114's rate-interpretation, household-membership and conditional-rescheduling
+questions are preserved in the roadmap. No household mechanism is implemented.
+
+D126 uses detailed previous-union categories `none`/`separated`/`widowed`, or
+pooled `none`/`dissolved`, consistently for search and probability inputs.
+Union/marriage calculators use `by_previous_union = TRUE` with optional
+`pool_dissolved = TRUE`; confidence limits use combined counts/exposure.
+Recent review fixes retain run-anchored unrealized-birth accounting and restrict
+execution group-coverage checks to active run slices. The last recorded full
+offline suite passed 6,430 assertions with no failures or warnings and one
+opt-in live test skipped; the subsequent `withr` test dependency declaration
+passed R's dependency scan and 133 focused assertions. These are local checks,
+not a claim that GitHub CI was rerun. See [testing](testing.md).
+
+Validation data now live in country/period subfolders; see the
+[data guide](../validation/data/README.md). Earlier report sources were not
+rewritten for that relocation; preserve historical reproducibility at their
+recorded revisions.
 
 ## Individual transitions and observations
 
@@ -108,7 +140,8 @@ acceptance and do not establish universal accuracy or SOCSIM equivalence.
 Restarts are not exact checkpoints. Sparse-cell feasibility, incomplete
 histories, failed searches and matching-calibration approximations remain
 limitations. Poor-pool waiting (D044), previous-father continuity (D042),
-a two-sex marriage model (tentative milestone 11, D117), custom process
-execution and the postponed African historical benchmark remain deferred.
-Milestone 11 assigns a planning priority only; model and API selection remain
+external immigration (tentative milestone 11), a two-sex marriage model
+(tentative milestone 12, D117/D121), custom process execution and the postponed
+African historical benchmark remain deferred.
+Milestone 12 assigns a planning priority only; model and API selection remain
 open in the [two-sex research notes](two-sex-union-models.md).

@@ -21,10 +21,14 @@
 #'   `person_years`, `marriages`, and `rate_marriage`, plus `group` and
 #'   `previous_union` when requested.
 #'   Empty cells are retained. Person-years include cohabiting time.
+#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
 #' @export
 calculate_marriage_rates <- function(population, time_breaks, age_breaks,
-                                     by_group = FALSE, by_previous_union = FALSE) {
+                                     by_group = FALSE, by_previous_union = FALSE,
+                                     conf.level = NULL, pool_dissolved = FALSE) {
+  validate_rate_conf_level(conf.level)
   calculate_entry_rates(population, time_breaks, age_breaks, by_group,
     by_previous_union = by_previous_union, dur_breaks = NULL, by_union_type = FALSE,
-    marriage_measure = TRUE)
+    marriage_measure = TRUE, conf.level = conf.level,
+    pool_dissolved = pool_dissolved)
 }

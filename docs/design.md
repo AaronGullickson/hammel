@@ -1,9 +1,14 @@
 # Design and implemented interface
 
-Updated October 30, 2026. Milestones 1–6 are complete by user acceptance
-(D029, D050, D077, D093, D105, D116). Individual group transitions are accepted
-under D116; time-varying inputs (milestone 7) are next. This document describes implemented architecture.
+Updated November 2, 2026. Milestones 1–7 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116, D127). Individual group transitions are accepted
+under D116; milestone 7 calendar-varying rates are implemented under D118,
+accepted complete November 2, 2026 (D127). D123 implements matching/inheritance model
+schedules. This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
+[Milestone 8 binned-group hazards](binned-group-hazards.md) are a selected future
+direction (D121), not implemented architecture. Milestone 7 was completed with
+the current engine.
 The [scientific contract](scientific-contract.md) defines demographic semantics.
 
 ## Responsibilities and source locations
@@ -15,11 +20,13 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Ancestry schema and initialization | `R/ancestry.R` |
 | Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
 | Mortality/fertility specification and rate validation | `R/set_process.R` |
+| Shared model schedules and registry preparation | `R/model_schedules.R`; model caches and switches in `src/simulate.cpp` |
+| Shared calendar-rate validation | `R/calendar_rates.R`; boundaries and active slices in `src/simulate.cpp` |
 | Individual transition specification and history | `R/group_transition.R`; events in `src/simulate.cpp`; observation splitting in `src/group_history.h` |
 | Persistent fertility weights and specification | `R/het_fert.R`; cell weight trees in `src/simulate.cpp` |
 | Union formation/matching and dissolution specifications | `R/union_formation.R`, `R/union_dissolution.R` |
 | Shared kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/kinship.R` |
-| HMD/HFD downloads and preparation | `R/construct_demographic_rates.R` |
+| HMD/HFD downloads and preparation | `R/construct_demographic_rates.R`, `R/database_intervals.R`, `R/hmd_open_age.R` |
 | Simulation validation, RNG isolation, result assembly | `R/simulate.R` |
 | Continuous scheduling and events | `src/simulate.cpp` |
 | Demographic extraction and measures | `src/demography.cpp`, `R/calc_demographic_measures.R` |
@@ -85,7 +92,8 @@ See [groups](groups.md) for effective-rate examples and validation rules.
 Setters validate built-in specifications again, including edited objects.
 Mortality constructors permit partial nonoverlapping schedules, but simulation
 requires complete coverage. Fertility bands must be finite; gaps have zero risk
-at execution. Time-varying rate columns are rejected. Arbitrary named process
+at execution. Optional `time_start`/`time_end` columns select half-open calendar
+bands on all six annual-rate inputs; static tables remain supported (D118). Arbitrary named process
 specifications can be stored; execution supports mortality/fertility and the
 conditional-logit on-demand and rate-based union formation plus optional
 duration-dependent union dissolution. Optional `group_transition()` is also supported. Other processes are rejected.
@@ -169,16 +177,39 @@ Reusing the original model retains its processes. Building a new model from
 `result` requires explicitly attaching processes; the output stores population
 history and run metadata, not a saved model or pending queue.
 
-Users can replace rates between runs. This supports incremental workflows,
-but does not implement calendar-varying schedules inside one run. Restarting
-redraws pending events and is not guaranteed to match an uninterrupted fixed-seed
-run. Fertility adjustment after changing rates ignores the previous schedule;
-that transition issue is [documented and deferred](scientific-contract.md#known-limitations-and-deferred-issues).
+Users can replace rates between runs or supply calendar bands inside one run.
+The engine selects active rate rows and processes calendar boundaries before
+same-time events. It redraws pending person/union candidates at each calendar
+boundary; fertility cells rebuild when fertility changes, preserving spacing,
+weights, parity and histories. Matching calibration contributions refresh under
+the current rates. Unrealized intensity is retained across fertility epochs.
+This stays within one native invocation with independent call-local state;
+matching and inheritance models can also vary through model-list tibbles (D123).
+Model-only changes preserve pending dates and histories. Role preference/draw
+structures and calibration tables are cached per model within the call, with
+active calibration sums rebuilt from the current male pool when preferences
+change. All inheritance models share one registry including future declared
+identities. Direct static models retain the existing execution path. See
+[calendar-varying rates](time-varying-rates.md) and
+[calendar-varying models](time-varying-models.md).
+
+Restarting redraws pending events and is not guaranteed to match an uninterrupted
+fixed-seed run. Boundary processing also consumes random draws, so a redundant
+calendar boundary does not promise fixed-seed equality with a static table.
 
 ## Data and observation interfaces
 
 `get_mortality_hmd(country, year, ...)` and `get_fertility_hfd(country, year, ...)`
-return rate tibbles, without configuring a model. Users can save/load them with
+return rate tibbles, without configuring a model. One requested year returns
+static rates; a vector returns calendar-banded rates. HMD's `shape` selects one
+of six native products, defaulting to `1x1`; grouped periods select source
+starting years. Each required product is downloaded once, including auxiliary
+annual coverage when a parsed HMD grouped-time product needs its endpoint
+recovered. Optional `open_age` retains younger rates and pools deaths/exposure
+into the final open band, using two additional native products (D120).
+Cutoffs align with source age bands; pooled counts and exposure are retained
+in provenance. HFD retains native annual/single-age products. See
+[database preparation](database-rates.md). Users can save/load tables with
 RDS and reuse them without downloads. HMDHFDplus is optional for these helpers.
 The HFD helper's `by_parity = TRUE` option imports conditional mi rates as
 age/parity interval rows for parity-specific fertility (milestone 5, accepted under D105). Unavailable
@@ -205,7 +236,7 @@ unpartnered exposure, union starts, and partnership-entry rates by sex,
 excluding conversions.
 `by_previous_union = TRUE` adds previous categories; `by_group = TRUE` independently
 adds individual groups. Both default to FALSE (D080). Optional `dur_breaks`
-automatically separates previous categories and measures dissolved/widowed rows
+automatically separates previous categories and measures separated/widowed rows
 by duration, leaving none rows by age (D084). It requires exclusive union histories.
 Rate-mode input schedules optionally use the same `previous_union` categories;
 see [remarriage](remarriage.md) for initialization and calibration details.
@@ -382,7 +413,11 @@ without consuming random draws. Diagnostics default off; see the
 ## Typed partnerships (D086)
 
 Optional cohab_prob on union formation enables cohab/marriage histories in rate
-mode. Cohab matching and conversion are part of that process; dissolution
+mode. `cohab_prob` optionally includes flat half-open calendar bands (D122);
+active probability schedules update before same-time searches. Probability-only
+changes rebuild marriage/cohabitation intensity contributions without resampling
+pending events, while rate changes retain D118 rescheduling. Cohab matching and
+conversion are part of that process; dissolution
 optionally stratifies by type. See [cohabitation](cohabitation.md) for complete
 inputs, chronology, linked episodes, legal-history recovery and observations.
 Fertility input strata are now union_type (the old input union_status errors).

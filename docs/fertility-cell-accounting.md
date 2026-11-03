@@ -295,8 +295,9 @@ inputs could not be met.
   in each calibration bin, and must equal an explicit scan of rule 4.
 - **Zero spacing** (`B = 0`): every member is always eligible, so
   `h_i = m_c * N_c * w_i / W_c`, which is `m_c` when all weights are 1.
-- **Future calendar-time schedules**: a change in `m_c` is one more clock
-  update; no new mechanism is needed.
+- **Calendar-time rates (D118)**: changes in `m_c` rebuild active cells while
+  preserving weights, parity and spacing. Accrued unrealized intensity is
+  retained; see [calendar-varying rates](time-varying-rates.md).
 
 ## Individual weights (D102)
 
@@ -493,7 +494,21 @@ exact.
 
 ## Not covered
 
-Group transitions, calendar-time schedules, alternative heterogeneity
-distributions and cohort normalization, and fertility-dependent mortality are
-separate future features. D102 implements lognormal weights and maternal inheritance.
-This specification only ensures the accounting can accommodate them.
+Individual group transitions are implemented under D116 and calendar-time
+rates under D118; see [group transitions](group-transitions.md) and
+[calendar-varying rates](time-varying-rates.md) for their state updates.
+Alternative heterogeneity distributions, cohort normalization and
+fertility-dependent mortality remain future features. D102 implements
+lognormal weights and maternal inheritance.
+
+## Calendar changes and unrealized-birth accounting
+
+Unrealized-birth reporting uses one-year windows anchored at the simulation's
+original start, even when fertility cells are rebuilt after a rate change.
+Only the window containing a change is split into rate-epoch fragments. For a
+run starting at 2000 with a change at 2000.5, the fragments are [2000,2000.5)
+and [2000.5,2001), followed by [2001,2002), not shifted annual windows. The
+same rule applies to fractional run starts, multiple changes within a window,
+partial final windows and changes in cell strata. Fragments are combined
+without redistributing an expected count across unknown exposure patterns.
+This reporting correction does not alter event hazards or random draws.

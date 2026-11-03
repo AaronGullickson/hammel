@@ -4,6 +4,10 @@
 #' object with [fertility()] or [set_fertility()]. The default selects either
 #' parent with equal probability, with maternal fallback.
 #' Existing people are not reassigned, and ancestry is unchanged by assignment.
+#' Fertility also accepts a schedule tibble with `time_start`, `time_end`, and a
+#' `model` list column containing complete inheritance objects. Half-open
+#' absolute-year intervals select the model at birth; all scheduled possible
+#' identities enter one shared registry before execution. See [fertility()].
 #'
 #' @param method One of `"mother"`, `"father"`, `"random_parent"`, `"same_sex"`,
 #'   `"opposite_sex"`, `"ancestry"`, `"hierarchy"`, or `"custom"`.
@@ -53,6 +57,10 @@ inheritance_methods <- function() {
 }
 
 normalize_group_inheritance <- function(model) {
+  if (is_model_schedule(model)) {
+    validate_model_argument(model, validate_group_inheritance, "inheritance")
+    return(normalize_model_argument(model))
+  }
   if (is.null(model)) model <- create_group_inheritance()
   if (is.character(model)) model <- create_group_inheritance(method = model)
   validate_group_inheritance(model)
@@ -100,7 +108,7 @@ extend_identity_groups <- function(values, additions) {
   c(as.character(values), extra)
 }
 
-prepare_group_inheritance <- function(model, population) {
+prepare_group_inheritance <- function(model, population, registry = NULL) {
   model <- normalize_group_inheritance(model)
   if (!"group" %in% names(population$persons)) {
     if (!model$method %in% c("mother", "random_parent") || length(model$groups))
@@ -114,6 +122,7 @@ prepare_group_inheritance <- function(model, population) {
     positive <- known[vapply(ancestry[known], function(x) any(x > 0), logical(1))]
     values <- extend_identity_groups(values, c(substring(positive, 7L), as.character(model$groups)))
   }
+  if (!is.null(registry)) values <- registry
   labels <- as.character(values)
   components <- setdiff(names(population[["ancestry"]]), "person_id")
   ranks <- match(labels, as.character(model$order)) - 1L

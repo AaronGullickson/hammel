@@ -1,12 +1,15 @@
 # Scientific contract
 
-Updated October 30, 2026. This is the current mortality, fertility, union-formation,
+Updated November 2, 2026. This is the current mortality, fertility, union-formation,
 dissolution, remarriage, cohabitation/conversion, group identity/ancestry, and
-observation contract. Milestones 1–6 are accepted as complete
-(D029, D050, D077, D093, D105, D116), retaining documented limitations.
+observation contract. Milestones 1–7 are accepted as complete
+(D029, D050, D077, D093, D105, D116, D127), retaining documented limitations.
 Individual group transitions are accepted under the
 [transition contract](group-transitions.md). Milestone 7, time-varying inputs,
-is next and still requires its scientific specification and API.
+has implemented calendar-varying rates under the user-approved
+[rate contract](time-varying-rates.md) (D118), accepted complete November 2,
+2026 (D127). Matching and inheritance model schedules are implemented under
+[their contract](time-varying-models.md) (D123).
 Earlier monthly, exact
 age-varying and midpoint compensation specifications are available in Git
 history; the [decision log](decisions.md) records their replacement by
@@ -28,8 +31,11 @@ Mortality also contains
 `sex`, with separate `"m"` and `"f"` schedules. Intervals are half-open
 `[age_start, age_end)`. Starts must be finite and nonnegative; ends must exceed
 starts. Rates must be finite and nonnegative, and may exceed one because they
-are rates rather than probabilities. Overlapping bands, duplicate bands, and
-calendar columns `time_start`/`time_end` are rejected. Constructors preserve
+are rates rather than probabilities. Overlapping or duplicate risk bands are rejected within each active calendar
+slice. Optional `time_start`/`time_end` select half-open absolute-year calendar
+bands on all six annual-rate inputs (D118). Starts are finite, ends may be Inf,
+and fractional years are supported. Calendar changes precede same-time events;
+coverage is required during a run. See [calendar-varying rates](time-varying-rates.md). Constructors preserve
 input order and extra columns; native scheduling sorts its own copy.
 
 | Rule | Mortality | Fertility |
@@ -371,7 +377,7 @@ screening, matching and formation code as on-demand mode. A failed search
 reschedules from the attempt time using the same attained-age schedule.
 Without `previous_union` stratification, all unpartnered women use that schedule
 regardless of prior union history. Stratified schedules distinguish none,
-dissolved and widowed, with age or permitted duration clocks (D080–D083).
+separated and widowed, with age or permitted duration clocks (D080–D083).
 
 Women face birth risk while unpartnered or partnered: the current `union_type` selects
 fertility, or an overall schedule applies equally to both. With overall rates,
@@ -419,10 +425,13 @@ hazards are status-independent, so their pending death events remain valid.
 Either partner's death cancels the episode's risk. Without this process,
 existing death-only behavior and random-number consumption are retained.
 Search schedules may distinguish `previous_union` as `none`,
-`dissolved`, or `widowed` (D080). The most recent recorded episode determines
+`separated`, or `widowed` (D080). The most recent recorded episode determines
 state; complete histories are required. Without that column, all categories
-share the same rates. All three categories must be supplied per scheduled
-group when stratifying. `none` must use age; `dissolved` and `widowed` each
+share the same rates. Under D126, search-rate and cohabitation-probability
+inputs supply either the complete detailed set `none`/`separated`/`widowed`,
+or pooled `none`/`dissolved`, where dissolved includes separation and widowhood.
+Each group/calendar slice requires one complete alternative.
+`none` must use age; `separated` and `widowed` each
 select age or duration since the latest union ending (D083). Each category uses
 one clock in all bands/groups. Duration columns are optional for all-age tables;
 when included, each row supplies one complete boundary pair with the unused
@@ -435,11 +444,18 @@ ages and matching cohort bins. Cohabitation is implemented under D086; richer co
 ### Optional cohabitation (D085/D086)
 
 Rate formation accepts cohab_prob age/group/previous-category probabilities,
-with gaps zero. At each attempt, intended type is drawn before matching;
+with age gaps zero. Optional `time_start`/`time_end` select half-open calendar
+bands under D122, with coverage/overlap validation as for rates. At each attempt,
+the current calendar/age/group/previous-category probability selects intended
+type before matching;
 cohab_matching optionally overrides general preferences. Unpartnered father
 matching remains separate. Calibration uses lambda*p for cohabitation,
 lambda*(1-p) for direct marriage, and fertility intensity for fathers.
-Probability boundaries update the common contribution queue. NULL probability
+Probability age boundaries update the common contribution queue. Calendar
+probability changes refresh role contributions before same-time searches;
+probability-only changes retain all pending event dates and existing union types.
+See [the probability contract](cohabitation.md#calendar-varying-type-probabilities-d122).
+NULL probability
 keeps the untyped/no-extra-RNG path; on-demand rejects cohabitation inputs.
 
 Fertility input uses union_type: either unpartnered/partnered or
@@ -572,10 +588,13 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   overlapping episodes are rejected. Touching and zero-duration episodes count
   separately without adding time. With common age bands, summing categories
   recovers pooled unpartnered exposure and starts. Men describe matching outcomes, not male search inputs.
-  Optional `dur_breaks` switches dissolved/widowed rows to duration since the
+  Optional `dur_breaks` switches separated/widowed rows to duration since the
   latest ending and automatically separates previous categories (D084). None
   rows retain age bands; unused boundary pairs are NA. Duration rows include
-  all ages, and clocks are not crossed or pooled. NULL preserves age-only output.
+  all ages, and age/duration axes are not crossed. `pool_dissolved = TRUE`
+  combines separated/widowed counts and exposure before rates and confidence
+  intervals when previous-union stratification is enabled (D126). NULL duration
+  breaks preserve age-only output.
   See [remarriage](remarriage.md) for input, restart and boundary conventions.
 - `calculate_dissolution_rates()` splits each recorded union episode at calendar
   and duration boundaries, counting union-years once per episode and dissolution
@@ -600,15 +619,26 @@ age/period cells.
 
 `get_mortality_hmd()` and `get_fertility_hfd()` return prepared rate tibbles,
 without configuring a model or writing files. Select one population and one
-explicit year; no latest-year selection, interpolation, averaging, or automatic
+explicit year or a vector of distinct years (D119). A singleton retains a static
+schema; multiple years add calendar bands. Missing years error and nonconsecutive
+requests retain gaps. No interpolation, averaging, latest-year selection or
 cache refresh occurs. Save/load with RDS to preserve tables and their `source`
 attributes. Constructors copy provenance into the process. Credentials are
 never retained. HMDHFDplus is optional and needed only for downloads.
 
-HMD uses `Mx_1x1` for both sexes and the accepted hazard interpretation. Closed
-single-year ages become `[age,age+1)` and the open age becomes `[age,Inf)`.
-Respect both raw `+` labels and parsed `OpenInterval` indicators, including
-HMDHFDplus 2.0.8 behavior. Missing retained rates are rejected, not filled.
+HMD defaults to `Mx_1x1`; `shape` also selects native `1x5`, `1x10`, `5x1`,
+`5x5`, or `5x10` rates under the accepted hazard interpretation. Native age and
+source-period widths are preserved; grouped years select period starts.
+Five-year ages use [0,1), [1,5), [5,10), etc.; upper-open ages end at Inf.
+Inclusive source periods become half-open intervals, retaining shortened first
+or last periods. Respect both raw `+` labels and parsed `OpenInterval` indicators.
+For grouped-time products whose reader discards upper bounds, an auxiliary
+annual download recovers coverage (HMDHFDplus 2.0.8). Optional `open_age` pools
+source deaths and exposure above an aligned cutoff into one open-band rate,
+separately by sex/period (D120). Younger rates are unchanged; replaced-tail Mx
+may be missing, but pooled counts/exposure must be finite and nonnegative with
+positive aggregate exposure. The cutoff is not a maximum lifespan. Missing
+retained rates are rejected, not filled. See [database preparation](database-rates.md).
 
 By default HFD uses total `asfrRR` in births per woman-year without scaling.
 D095 retains all endpoint rows: map 12- to [12,13) with its supplied rate,
@@ -617,8 +647,9 @@ representation of the source aggregates, not a re-estimation of their rates.
 TFR includes the lower represented band but drops the upper-open band, warning
 if its known rate is nonzero; it need not equal the full published HFD TFR.
 
-Record database, population, year, product, retrieval timestamp, and reader
-version. HFD records requested revision date and endpoint mapping. A null
+Record database, population, requested years, product, represented source
+periods, retrieval timestamp and reader version, plus HMD shape and any auxiliary
+coverage product. HFD records requested revision date and endpoint mapping. A null
 revision requests the current release; it does not pin a historical revision.
 Synthetic/local-reader tests establish conversions; live requests are opt-in.
 `get_fertility_hfd(..., by_parity = TRUE)` imports
@@ -715,7 +746,7 @@ retained earlier limitations, including transition-aware fertility compensation
 age bins. Reported recovery in these scenarios is not a universal exact pooled
 cross-tab constraint. Static SOCSIM audits remain distinct from executable
 reference comparisons. Parity-specific execution is implemented (D099 schedules,
-D101 cells); calendar-time schedules remain unimplemented; D102 implements lognormal fertility weights.
+D101 cells); D118 implements calendar-time rate schedules; D102 implements lognormal fertility weights.
 
 
 ## Parity-specific fertility execution
@@ -769,9 +800,49 @@ strata. Group duration runs from latest entry, or birth without history;
 missing pairs and gaps mean zero risk. Moves preserve ancestry and refresh
 affected events, fertility cells, matching pools and calibration. Grouped
 outputs retain all moves in a `transitions` tibble, even when empty. Household
-moves are deferred to milestone 10, internal migration and regions (D114). Multiple group dimensions and calendar-time
-inputs (milestone 7) remain unimplemented. The user accepted milestone 6 on
+moves remain deferred beyond milestone 6 (D114). Tentative milestone 10 now
+covers multiple group columns, potentially including regions/internal migration
+(D121); those mechanisms remain unimplemented. Calendar-time rates are
+implemented under D118; matching and inheritance model schedules are implemented
+under D123. The user accepted milestone 6 on
 October 30, 2026 (D116) after reviewing the report and implementation. Its final
 render was active at acceptance; no final-render outcome is inferred.
 Acceptance retains documented limitations and does not authorize the next
 mechanism or household moves.
+
+
+## Future engine direction: milestone 8
+
+D121 assigns binned-group hazards and custom formula weights for all rate
+processes to milestone 8. The selected direction and remaining modeling/API
+questions are recorded in [the design discussion](binned-group-hazards.md).
+It is not implemented and does not change the current contracts above.
+Milestone 7 was accepted complete with the current engine (D127). The
+milestone 8 direction remains separate future work; completion does not
+authorize an unselected formula API or demographic mechanism.
+
+
+## Calendar-varying matching and inheritance (D123)
+
+`matching`, `father_matching`, `cohab_matching` and fertility's `inheritance`
+accept direct models or tibbles with `time_start`, `time_end` and list-column
+`model`. Half-open absolute-year intervals select complete models at event
+execution; all rows validate and execution requires coverage. Model-only
+boundaries preserve pending dates and do not rewrite existing partners,
+identities, ancestry or histories. NULL father/cohabitation roles dynamically
+share current general matching. All possible inheritance identities across the
+schedule join one registry checked against grouped rates and matching levels.
+See [the model-schedule contract](time-varying-models.md) for defaults, worked
+examples, calibration updates, callback constraints and validation.
+
+## Optional uncertainty for observed rates (D124)
+
+All event-rate calculators accept `conf.level = NULL` (unchanged default output)
+or a confidence level strictly between zero and one. Non-NULL values append
+`conf_low` and `conf_high`, using the row's observed count and its existing
+exposure in `stats::poisson.test()`. Zero exposure yields NA bounds. Fertility
+intervals describe observed births, not the rate adjusted by expected unrealized
+births. These are marginal Poisson-model intervals, not replication-based
+uncertainty or a guarantee under demographic dependence. See
+[the analysis contract](demographic-analysis.md#optional-poisson-rate-intervals)
+for units, examples and edge cases.

@@ -1,9 +1,12 @@
 # Development roadmap
 
-Updated October 30, 2026. Milestones 1–6 are complete by user acceptance
-(D029, D050, D077, D093, D105, D116). **Next is milestone 7:
-time-varying inputs** (D103). Future entries record planning
-priorities, not authorization to implement unspecified demographic behavior
+Updated November 2, 2026. Milestones 1–7 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116, D127). **Milestone 7 was accepted complete
+on November 2, 2026:** calendar-varying rates (D118), cohabitation probability
+calendars (D122), and matching/inheritance model schedules (D123), retaining
+the current engine and documented limitations. The user selected
+binned-group hazards and formula weights for milestone 8 (D121).
+Future entries record planning priorities, not authorization to implement unspecified demographic behavior
 or an unselected public API.
 
 | Milestone | Scope | Status |
@@ -11,15 +14,18 @@ or an unselected public API.
 | 4 | Union dissolution, age/duration remarriage, and cohabitation | Complete (D093) |
 | 5 | Parity-specific fertility and fertility heterogeneity | Complete (D105); limitations retained |
 | 6 | Group transitions, including categorical characteristics represented by groups | Complete October 30, 2026 (D116); final render active at acceptance |
-| 7 | Time-varying rates, matching, and inheritance within a simulation run | Next (D103); scientific specification and API first |
-| 8 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed |
-| 9 | Immigration from outside the system, tracking generation | Tentative |
-| 10 | Internal migration between regions, with unions restricted to the same region | Tentative |
-| 11 | Two-sex marriage model | Tentative (D117); model and API unselected |
+| 7 | Time-varying rates, matching, and inheritance within a simulation run | Complete November 2, 2026 (D127); current engine and documented limitations retained |
+| 8 | Binned-group hazards for all rate processes; custom formula weights on all rates | User-selected direction (D121); specification/API and implementation pending |
+| 9 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed; moved from former milestone 8 (D121) |
+| 10 | More than one group column, potentially including regions and internal migration | Tentative (D121); schema and mechanism contracts unselected |
+| 11 | Immigration from outside the system, tracking generation | Tentative; moved from former milestone 9 (D121) |
+| 12 | Two-sex marriage model | Tentative (D117/D121); model and API unselected |
 
 Milestone 6's scope is individual group transitions. Household moves are
-now deferred to milestone 10, internal migration and regions (D114), superseding
-D109's milestone 6 stretch-goal placement. D106–D108 select annual hazards, directed competing
+deferred beyond milestone 6 (D114, superseding D109). D121 removes the separate
+regions milestone and places multiple group columns at tentative milestone 10;
+regions/internal migration and household moves remain possible applications
+requiring their own specifications. D106–D108 select annual hazards, directed competing
 age- or duration-specific schedules with optional strata,
 and no transition-count target adjustment. The implemented contract is in [group transitions](group-transitions.md).
 D110 requires `group_origin`, `group_dest`, `rate`, and one common age or
@@ -113,7 +119,7 @@ effect or coefficient: the functional form, supported characteristics, and how
 effects relate to baseline duration-specific rates remain to be specified.
 
 Female search rates now optionally distinguish `previous_union`
-as `none`, `dissolved`, or `widowed` (D080), with all three strata required
+as `none`, `separated`, or `widowed` (D080), with all three strata required
 within each scheduled group. Separate marriage observations use the same
 categories. Age or duration since the latest ending can be selected per
 previous category in the same table (D083); `none` remains age-specific. See
@@ -160,79 +166,74 @@ rates, matching and inheritance rather than a separate general individual-
 characteristics milestone. Education is one example: people could start in a
 minimum category and transition to higher categories over life.
 
-For applications needing more complexity, consider multiple types of groups
-that can represent different dimensions simultaneously. This is an optional
-design direction, not a selected schema or public API. How multiple group types
-interact in rate stratification, matching, newborn assignment, transitions and
+Multiple group columns that represent different dimensions simultaneously are
+now tentative milestone 10 (D121). No schema or public API is selected.
+How multiple group types interact in rate stratification, matching, newborn assignment, transitions and
 ancestry remains to be specified. The roadmap does not introduce an arbitrary
 attribute-mutation callback or a continuous-characteristic model.
 
 Individual transition schedules, age/duration dependence, eligibility, timing,
 event/tracker updates and retained ancestry are implemented under the
-[group-transition contract](group-transitions.md). Household moves are deferred
-to milestone 10 (D114). The user accepted milestone 6 on October 30, 2026
-(D116), based on the [report](../validation/milestone6.qmd); its final render
+[group-transition contract](group-transitions.md). Household moves remain deferred
+beyond this milestone (D114), with their unresolved questions retained under
+[tentative milestone 10](#tentative-milestone-10-multiple-group-columns) (D121).
+The user accepted milestone 6 on October 30, 2026 (D116), based on the [report](../validation/milestone6.qmd); its final render
 was active at acceptance and must be preserved.
-Region-specific migration remains in milestone 10; how it
-relates to any multiple-group representation is also open.
+The former standalone regions/internal-migration milestone is removed; those
+applications may be handled through multiple group columns in tentative
+milestone 10. Household and geographic rules remain unselected.
 
 Fixed newborn group assignment (for example all children starting in the minimum
 education category) was deferred to this discussion on October 27, 2026. No
 `fixed` inheritance method or API has yet been adopted. A custom inheritance
 function already handles assigning mixed-parent births to a specified category.
 
-## Next milestone 7: time-varying inputs within a run
+## Milestone 7: time-varying inputs within a run
 
-Allow demographic schedules to change during a single simulation, rather than
-requiring population restarts. Specify calendar-time inputs, change boundaries,
-which processes may change, event ordering at boundaries, and invalidation of
-pending events. Preserve birth spacing from actual births and address the
-interaction with cell-accounted fertility and matching intensity updates (D101/D082). No rate-change
-API, interpolation rule, or demographic default is selected.
+Accepted complete November 2, 2026 (D127), based on the user-authored
+[validation report](../validation/milestone7.qmd) and explicit acceptance.
+Calendar-varying rates are implemented under the user's D118 authorization. Flat rate tables use optional half-open
+`time_start`/`time_end` bands, including fractional years. The engine updates
+pending risks, fertility cells and calibration while preserving histories,
+spacing and duration origins. See [the rate contract](time-varying-rates.md).
 
-### Input representation proposal (October 21, 2026)
+The user selected annual rates first. D122 also implements flat calendar-
+banded `cohab_prob`, using the same interval and coverage rules as rates.
+D123 implements complete model schedules for `matching`, `father_matching`,
+`cohab_matching` and fertility's `inheritance`: direct objects remain supported,
+or supply a tibble with `time_start`, `time_end` and list-column `model`.
 
-The user requested retaining the following approach for time-varying inputs,
-now scheduled for milestone 7, allowing inputs to change without restarting
-the simulation:
+Select matching at partner/father choice and inheritance at birth, without
+rewriting existing unions or identities. Model/probability-only boundaries retain
+pending event dates. All supplied models and their possible identities validate
+upfront; future inheritance outputs share one simulation-wide group registry.
+See [calendar-varying models](time-varying-models.md) for the implemented API,
+coverage rules, callbacks, fallback roles and validation. The schedule remains
+outside each individual model, as selected in D118. Other non-rate arguments,
+including multipliers, spacing, `ffab` and persistent fertility heterogeneity,
+remain static. This work does not introduce the milestone 8 engine change.
 
-- Keep rate schedules as flat tibbles, adding `time_start` and `time_end`
-  alongside age, sex, group, union status, and other supported rate strata.
-  This preserves ordinary filtering, joins, plotting, and inspection.
-- For structured inputs that are not already rate tibbles, use a schedule
-  tibble with `time_start`, `time_end`, and a list column containing a complete
-  model object for each interval. Matching models and group inheritance models
-  are the current examples. Changing the whole matching model permits changes
-  to formulas, coefficients, and group exogamy effects without making each
-  internal parameter separately time-varying.
-- Keep the time schedule outside each individual model object. A shared
-  scheduling helper could validate intervals and select objects, while rates
-  retain their flat representation. Constructor names and public arguments
-  remain to be designed; no generic framework beyond these needs is selected.
+## Milestone 8: binned-group hazards and formula weights
 
-For example, a matching schedule could have the following shape (illustrative
-data structure, not an implemented process interface):
+The user selected this engine change on October 31, 2026 (D121), after milestone
+7, completed with its current engine (D127). Extend cell-based event scheduling to all
+six existing rate processes and allow custom formula weights to distribute
+individual or union risk within cells while preserving input cell intensities.
+Use single-year age or duration subdivisions, retain fractional input boundaries
+and all other existing rate strata, and preserve fertility's actual-parity rule.
 
-```r
-tibble::tibble(
-  time_start = c(2000, 2050),
-  time_end = c(2050, Inf),
-  matching = list(matching_model_before, matching_model_after)
-)
-```
+See [the discussion and design direction](binned-group-hazards.md) for equations,
+worked examples, the distinction between rate strata and relative weights,
+composition-dependent normalization, possible redundancy warnings, future
+user-defined characteristics, process-specific caveats and proposed validation.
+Formula APIs, safe evaluation, eligibility/failure rules and scheduling details
+still require specification before implementation. This milestone does not
+change the accepted milestone 7 behavior or authorize an unspecified mechanism.
 
-An inheritance schedule would similarly hold complete inheritance models in
-a list column. Shared half-open calendar intervals `[time_start, time_end)`
-are a proposed convention. Selecting matching at search/father-selection
-execution and inheritance at birth, without rewriting existing unions or
-identities, is a proposal requiring confirmation in the scientific specification.
-Before implementation, resolve coverage, gaps, overlaps, boundary ties,
-validation of all scheduled models, and interactions with pending events.
-Rate sampling must account for future rate boundaries rather than assume the
-rate at scheduling time persists indefinitely. This note records a future
-design direction, not implementation authorization or accepted timing rules.
+## Proposed milestone 9: summaries, diagnostics, and helpers
 
-## Proposed milestone 8: summaries, diagnostics, and helpers
+Moved from former milestone 8 by D121; its scope and unresolved API choices
+remain as described below.
 
 The user also requested future model diagnostic tools (October 20, 2026),
 including checks that help identify unintentionally omitted group-pair settings.
@@ -266,7 +267,7 @@ population to living individuals, so a burn-in run can provide a new starting
 population without retaining the full initialization history. The desired result
 preserves correct reproductive histories and parent–child relationships, while
 allowing the deeper ancestral kinship history to be discarded. This is a
-milestone 8 proposal; no function name or implementation is selected.
+milestone 9 proposal; no function name or implementation is selected.
 
 Before implementation, specify how to preserve births to deceased children,
 parity and last-birth dates after removing deceased person records. Simply
@@ -278,30 +279,30 @@ which kinship information has been discarded; it cannot imply complete pedigree
 or historical exposure after truncation. The representation of minimal history
 needed for correct restarting remains to be designed.
 
-## Tentative milestone 9: immigration from outside the system
+## Tentative milestone 10: multiple group columns
 
-Add immigrants within a running simulation, rather than requiring a restart.
-The user envisages specifying numbers and an age/sex distribution and tracking
-individual immigrant generational status. Timing (batch dates versus arrivals),
-meaning of supplied numbers, attribute/kin/union initialization, ancestry and
-generation definitions, and interactions with group assignment remain open.
-No emigration process is implied by the immigration request.
+The user assigned the possibility of more than one group column to tentative
+milestone 10 on October 31, 2026 (D121). Different columns could represent
+identity, education or location simultaneously. Representation, supported rate
+strata, matching predictors/restrictions, dimension-specific histories,
+transitions, newborn assignment and ancestry interactions remain to be specified.
+No naming convention, default dimension or independent-dimension assumption is
+selected.
 
-## Tentative milestone 10: internal migration and regions
-
-Represent location with a dedicated `region` column, separately from group
-identity. Allow internal migration using rates between regions, and restrict
-union formation to partners within the same region. The region schema, migration
-clock and rate strata, individual versus household movement, and treatment of
-existing unions when partners move remain to be specified. No migration default
-or rule about relocating existing partners is selected.
+The former separate milestone for internal migration and regions is removed.
+Location may be represented as one group dimension, with internal migration as
+transitions in that dimension and geographic matching restrictions where
+explicitly specified. This replaces the former roadmap's dedicated-region-column
+direction; it does not implement or settle any geographic or household behavior.
+The following D114 questions remain relevant to a future regional application.
 
 ### Household moves: deferred design questions (D114)
 
-On October 30 the user deferred household moves to this milestone, rather
-than treating them as a milestone 6 stretch goal. This authorizes recording
-requirements and concerns, not implementing a household mechanism. The
-following questions must be resolved for a concrete regions application.
+D114 deferred household moves from milestone 6 to the former regions milestone.
+D121 removes that standalone milestone while retaining multiple group columns
+as tentative milestone 10. These concerns are retained for a possible regional
+application; no household mechanism is authorized by this placement. The
+following questions still require a concrete scientific specification.
 
 - **Meaning of input rates.** An individual's total move hazard includes
   initiation by that person and moves induced by others. For two partners who
@@ -352,10 +353,21 @@ following questions must be resolved for a concrete regions application.
   household accounting, linked-event invalidation and the chosen input-rate
   interpretation before assessing demographic performance.
 
-## Tentative milestone 11: two-sex marriage model
+## Tentative milestone 11: immigration from outside the system
 
-Assigned tentative milestone 11 by the user on October 30, 2026 (D117),
-following the October 24 discussion; see
+Moved from former milestone 9 by D121. Add immigrants within a running
+simulation, rather than requiring a restart.
+The user envisages specifying numbers and an age/sex distribution and tracking
+individual immigrant generational status. Timing (batch dates versus arrivals),
+meaning of supplied numbers, attribute/kin/union initialization, ancestry and
+generation definitions, and interactions with group assignment remain open.
+No emigration process is implied by the immigration request.
+
+## Tentative milestone 12: two-sex marriage model
+
+Originally assigned tentative milestone 11 on October 30, 2026 (D117), then
+moved to tentative milestone 12 on October 31 (D121), following the October 24
+discussion; see
 [two-sex union models](two-sex-union-models.md) and D073. Possible
 extensions: a participation function making a woman's chance of forming a
 union depend on market conditions (overlapping D044); a Schoen harmonic-mean
@@ -429,4 +441,4 @@ reference for investigation, not an adopted response rule or period length.
 R formula-fallback performance comparisons are now included in the user-authored
 milestone 2 validation report, accepted by the user on October 19, 2026 (D050).
 Initialization and exact checkpoints remain separate future topics. Calendar-varying
-schedules now fall under planned milestone 7 above.
+schedules are implemented under milestone 7, accepted complete (D127).

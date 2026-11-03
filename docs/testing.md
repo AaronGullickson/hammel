@@ -1,9 +1,110 @@
 # Testing and milestone validation
 
-Updated October 30, 2026. Milestones 1–6 are accepted as complete (D029,
-D050, D077, D093, D105, D116). Software test history and the user's demographic assessment
+Updated November 2, 2026. Milestones 1–7 are accepted as complete (D029,
+D050, D077, D093, D105, D116, D127). Software test history and the user's demographic assessment
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
+
+## Milestone 7 accepted assessment and closeout
+
+The user accepted milestone 7 as complete on November 2, 2026 (D127), following
+the user-authored [assessment](../validation/milestone7.qmd), its
+[rendered report](../validation/milestone7.html), and explicit acceptance.
+The report concludes that its expectations were met for calendar-varying
+rate/probability and model scenarios. The report's settings and numerical
+findings remain authoritative; no new thresholds or validation results are
+inferred. The code/report revision at acceptance is
+`3b65d2202b006ef6f3e232c98595814b1544f9fe`.
+
+Acceptance retains the current engine, documented model and observation
+limitations, and approximate demonstration inputs. Milestone 8's binned-group
+hazards and custom formula weights remain separate future work (D121).
+Reports, rendered artifacts and active intermediates are preserved unchanged;
+this documentation-only closeout neither reruns nor renders them. The earlier
+software-check records below are distinct from scientific acceptance.
+
+## Optional Poisson rate intervals (D124, November 1, 2026)
+
+`TZ=America/Los_Angeles Rscript -e 'devtools::test(stop_on_failure=TRUE)'`
+passed the full offline suite: 4,318 assertions, no failures or warnings, one
+opt-in live database test skipped. The 182 assertions in `test-rate-confidence.R`
+cover all seven public rate calculators, comparison with `stats::poisson.test()`
+at 95% and 80%, unchanged NULL/default output and attributes, group/type/parity
+strata, positive and zero event counts, zero exposure including endpoint events,
+empty grouped tables, invalid levels, and observed-birth intervals alongside
+fractional unrealized fertility. Public help was regenerated and documentation
+links and `git diff --check` checked. No rates were downloaded or reports edited.
+Exactness refers to the Poisson counting model; these tests do not establish
+coverage under all demographic dependence or milestone 7 scientific acceptance.
+
+## Milestone 7 calendar-input implementation checks
+
+October 31, 2026 (D118–D120, D122–D123): the full offline `devtools::test(stop_on_failure = TRUE)`
+suite passed with 4,136 assertions, no failures or warnings, and one opt-in live
+DB test skipped. The run used `TZ=America/Los_Angeles` so optional database-reader
+dependencies did not need to query the unavailable sandbox system bus for a time
+zone. No rates were downloaded and no credentials were used.
+
+New calendar-rate checks cover malformed bounds, overlapping risks, calendar
+coverage and endpoints, fractional years, analytical integrated mortality,
+search/formation, dissolution, conversion and directed transition hazards,
+retained duration origins, birth spacing and persistent weights, exact
+unrealized-intensity accounting, changing parity/union-type fertility schedules,
+asynchronous process changes, calibration/cell consistency, exact calendar/event
+ties, reproducibility, RNG isolation, future group/pair coverage and empty runs.
+The fractional-year example in `inst/examples/milestone7-rates.R` executed
+successfully. Generated public help, local documentation links and
+`git diff --check` were also checked.
+
+D119 adds offline multi-year HMD/HFD and native HMD shape checks: single-year
+schema preservation, chronological vector selection, missing/duplicate years,
+download counts, unchanged rate units, all six shapes, infant/child/open age
+bands, raw and parsed source periods, shortened endpoints, auxiliary annual
+coverage, HFD parity partitions and selected missing-cell counts, provenance,
+and direct simulation with prepared calendars. Synthetic local HMD parsing
+exercises the installed reader; automated web requests use mocks and the
+opt-in live test was not run.
+
+D120 adds 77 assertions for optional HMD open-age pooling: ratios of summed
+counts/exposure, sex/period separation, unchanged younger rates, missing replaced
+tail Mx, positive pooled exposure, zero-exposure individual cells, zero deaths,
+invalid counts and cutoffs, native grouped ages, raw/parsed source periods,
+source alignment independent of row order, download counts, safe retained
+provenance and analytical survival using a pooled schedule. The default getter
+still rejects missing rates, now with year/sex/age context. The pooled web path
+was checked with mocked readers; no new live pooling downloads were made.
+
+D122 adds 60 assertions in ten calendar-probability cases: valid/edited/future
+probability slices; age/calendar overlap and coverage; group/category coverage;
+fractional type switches; non-extreme type shares; unchanged aggregate search
+hazards; exact tied searches; retained ongoing episodes and conversion/dissolution
+clocks; current age/previous-category selection; zero/empty runs, restarts and
+RNG isolation; and shared/asynchronous rate/probability boundaries. A grouped
+matching regression changes probabilities before the first realized search and
+compares subsequent unions and logged role weights with the equivalent static
+new-probability reference, checking immediate calibration refresh. Existing
+static cohabitation tests also pass. No rate inputs were downloaded.
+
+D123 adds 112 assertions for whole-model matching/inheritance calendars:
+all four argument roles; direct models and normalized list-column tables;
+invalid, edited and future entries; overlap and run coverage; exact search and
+birth boundaries; dynamic NULL fallback versus fixed explicit models; native
+and custom matching formulas; within-group restrictions and weighted calibration
+in both directions; hierarchy changes, custom callbacks and numeric/character
+future identity registries; unchanged earlier identities and ancestry; restarts;
+zero/empty runs; shared rate/probability/model boundaries; reproducibility and
+RNG isolation. Controlled candidate pools test event-time selection, and static
+reference runs check retained event dates and refreshed role weights. The user's
+milestone 7 report was neither edited nor rendered.
+
+This is software verification, not scientific acceptance of milestone 7 or a
+new demographic validation report. Calendar boundaries redraw person/union
+candidates and require work proportional to the population; redundant boundaries
+do not promise fixed-seed agreement with static inputs. Probability-only and model-only
+boundaries retain all pending clocks and consume no demographic randomness.
+Other scalar process arguments remain static. See
+[the rate contract](time-varying-rates.md) and
+[the model contract](time-varying-models.md).
 
 ## Milestone 6 accepted assessment and active final render
 
@@ -20,8 +121,10 @@ Software checks and prior developmental measurements below are separate
 records. Acceptance retains finite-sample and sparse-cell limits, complete
 history requirements, duration fallback to age without prehistory,
 non-checkpoint restarts and the documented life-table aggregation caveat.
-Household moves are deferred to milestone 10 (D114). Time-varying inputs are
-next in milestone 7 and still need their own contract and API.
+Household moves remain deferred (D114), with unresolved regional applications
+retained under tentative milestone 10's multiple group columns (D121). Calendar-varying rates
+are implemented under D118, with matching and inheritance schedules under D123.
+Milestone 7 was subsequently accepted complete on November 2, 2026 (D127).
 
 ## Milestone 5 accepted assessment and closeout
 
@@ -297,7 +400,7 @@ live database checks disabled.
 The user-authored [report](../validation/milestone2.qmd) uses USA circa
 2000–2001 HMD mortality, NCHS overall/status-specific fertility, and SIPP-based
 female marriage inputs with male rates as a reference. Input preparation and
-limitations are recorded in [data provenance](../validation/data/usa_2000_rates.README.md).
+limitations are recorded in [data provenance](../validation/data/usa_2000_2001/usa_2000_rates.README.md).
 England and Wales 2015 prepared data are an additional example, not the case
 used in the current report.
 
@@ -956,3 +1059,60 @@ fixed-seed equivalent to omitting the process: outgoing schedule draws and
 partner rescheduling can change RNG consumption without changing the model's
 zero-transition distribution. Sharing a seed across scenarios therefore does
 not guarantee identical paths; compare replicated demographic quantities.
+
+## Detailed and pooled previous unions (D126, November 2, 2026)
+
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test()'` passed 6,404
+assertions with zero failures or warnings and one skipped opt-in live database
+test. No live rates were downloaded. Detailed inputs and outputs now use
+none/separated/widowed; pooled inputs and outputs use none/dissolved. Regression
+checks compare pooled inputs with explicit detailed copies for both ending
+causes, age and duration clocks, grouped calendar schedules, cohabitation
+probabilities and fixed-seed execution. Incomplete/mixed alternatives and
+inconsistent effective clocks are rejected.
+
+Calculator checks sum detailed events/exposure independently for every pooled
+cell and compare rate and exact Poisson limits with those totals, including
+marriage conversions, union-type strata, periods, sex, numeric groups, age and
+duration bands, empty cells and the requirement for previous-union strata.
+Documentation and help were regenerated. These are software checks, not a new
+demographic validation or milestone acceptance. User-authored validation reports
+and their data files were not edited.
+
+The user-selected follow-up renames the pooling flag to `pool_dissolved` and
+requires previous-union stratification rather than implicitly enabling it.
+After regenerating help, `devtools::test(filter =
+"previous-union-pooling|marriage-entry|marriage-duration|marriage-counts")`
+passed 2,339 assertions without failures, warnings or skips. Tests include the
+explicit-flag requirement and duration breaks' existing implicit stratification.
+
+## Calendar review follow-up (November 2, 2026)
+
+`TZ=UTC Rscript -e 'devtools::test()'` passed 6,430 assertions with no failures
+or warnings and one skipped opt-in live database test. No validation report
+was edited or rendered and no external rates were downloaded.
+
+Analytical regression cases use a mother excluded by birth spacing throughout
+the run and fertility changes at offsets .5, 1.25 and 2.2. Both integer and
+fractional run starts recover the exact expected unrealized totals .15, .35,
+.32 and .12 in run-anchored annual/partial-final windows. Only the supplied
+initial birth counts as observed; no simulated births occur. Additional cases
+accept complete in-run mortality, fertility, search, probability, conversion and
+dissolution group/pair schedules despite incomplete unreachable periods. They
+retain errors for active gaps, active incomplete age support, zero-run coverage
+and malformed supplied rows. Inheritance-only boundaries retain matching
+outcomes and demographic clocks in a fixed-seed comparison without births.
+
+Engine output now binds all unrealized epoch pieces in one call rather than
+repeatedly copying a growing table. Calendar boundaries avoid probability
+reloads unless probabilities change, and skip intensity-tracker rebuilding
+when only inheritance changes. These allocation/work reductions are established
+by code inspection; no runtime speedup or empirical benchmark is claimed.
+
+R calendar segmentation and time-coverage checking are shared by rate/model
+coverage, pooled previous-category expansion and contextual dissolution
+validation. Most rate validators already used `validate_calendar_rates()` before
+this review; their domain-specific cross-period clock checks remain necessary.
+The stale model-schedule status in AGENTS and the detailed dissolution category
+in the dissolution specification were corrected. No demographic defaults or
+calendar-gap rules were changed.

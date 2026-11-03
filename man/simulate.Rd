@@ -11,7 +11,8 @@ simulate(model, years, seed = NULL)
 and union-formation processes, optionally union dissolution and group transitions. The population
 must have a finite \code{end_time}.}
 
-\item{years}{Nonnegative simulation duration in years.}
+\item{years}{Nonnegative simulation duration in years; fractional years are
+supported, as are fractional population endpoints and calendar-rate bands.}
 
 \item{seed}{Optional integer seed. With a seed, the caller's RNG state is
 restored afterward. With \code{NULL}, the simulation advances the current RNG.}
@@ -38,7 +39,7 @@ of a common ancestor (default two). Hard group exclusions also apply.
 If no eligible man exists, cancel the birth by default. Explicitly set
 \code{cancel_birth_if_no_match = FALSE} to preserve it with unknown father.
 Rate initiation adds age- or duration-specific search events for unpartnered
-women only. Duration schedules for dissolved/widowed categories measure time
+women only. Duration schedules for separated/widowed categories measure time
 since the most recent union ended; \code{none} remains age-specific.
 Failed attempts draw another waiting time. Widowhood cancels pending births
 and switches to unpartnered fertility; a new union switches to partnered
@@ -56,7 +57,7 @@ availability and fertility/search eligibility. Exact same-person ties select
 death, birth, dissolution, then search. Dissolution \code{group_pair} schedules and
 multipliers use symmetric pairings of both partners' groups. Rate-based
 formation optionally selects age/duration schedules using \code{previous_union}:
-none, dissolved, or widowed. Duration origins and categories are recovered
+none, separated, or widowed (or pooled none/dissolved). Duration origins and categories are recovered
 from recorded histories.
 Matching uses male-group weights recalibrated at each search; simulation
 warns once if any search needed approximate weights. A separate father model
@@ -101,6 +102,17 @@ When ancestry is tracked, each newborn receives half of each parent's shares,
 with a missing parent contributing its half to unknown ancestry. Initial
 shares are retained, including on restart; grouped populations without shares
 initialize from recorded identities. No additional random draws are made.
+
+Calendar-banded rates change within the same run at \code{time_start}/\code{time_end}
+boundaries, before same-time demographic events. Histories, birth spacing and
+duration origins persist. Pending candidates are resampled at boundaries;
+adding redundant rate boundaries need not preserve a fixed-seed trajectory.
+Calendar-banded \code{cohab_prob} is evaluated at the search instant; probability-
+only boundaries refresh role calibration while retaining pending event dates.
+Matching and inheritance arguments may be direct models or calendar schedules
+with \code{time_start}, \code{time_end} and list-column \code{model}. The current matching
+model is selected at partner/father choice and inheritance at birth. Model-
+only boundaries preserve pending events and earlier histories.
 }
 \examples{
 population <- create_baseline_population(100, max_age = 50)

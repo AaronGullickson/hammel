@@ -6,7 +6,7 @@ test_that("queued cell intensities equal explicit individual scans after every c
   search <- do.call(rbind, lapply(0:1, function(g)
     do.call(rbind, lapply(0:2, function(p)
       transform(base, .hammel_group = g,
-        previous_union = c("none", "dissolved", "widowed")[p + 1],
+        previous_union = c("none", "separated", "widowed")[p + 1],
         rate = rate * (1 + g) * (1 + p))))))
   fertility <- do.call(rbind, lapply(0:1, function(g)
     data.frame(age_start = c(15, 21, 25, 31), age_end = c(20.02, 25, 30.05, 45),
@@ -28,7 +28,7 @@ test_that("queued cell intensities equal explicit individual scans after every c
     rows <- rates$.hammel_group == groups[i] &
       born[i] + rates$age_start <= now & now < born[i] + rates$age_end
     if ("previous_union" %in% names(rates))
-      rows <- rows & rates$previous_union == c("none", "dissolved", "widowed")[previous[i] + 1]
+      rows <- rows & rates$previous_union == c("none", "separated", "widowed")[previous[i] + 1]
     sum(rates$rate[rows])
   }
   for (k in seq_len(nrow(ops))) {

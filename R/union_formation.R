@@ -347,7 +347,12 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'
 #' @param initiation Either `"on_demand"` for birth-triggered searches or
 #'   `"rate"` for scheduled searches. No default is selected.
-#' @param matching A specification created by [create_matching_model()]. Defaults
+#' @param matching A specification created by [create_matching_model()], or a
+#'   tibble with numeric `time_start`, `time_end`, and list-column `model` holding
+#'   complete matching objects. Model intervals are half-open absolute years,
+#'   cannot overlap, and must cover the requested run. The active model is used
+#'   at partner selection, without changing pending search dates or existing
+#'   unions. Base data frames with list columns are also accepted. Defaults
 #'   to `create_age_gap_matching_model(0, 5)`: preferred age gap zero years,
 #'   with selection weight halving five years on either side.
 #' @param cancel_birth_if_no_match Logical, default `TRUE`. Cancel a birth when
@@ -357,8 +362,9 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   fresh waiting times from the failed attempt. Partner scarcity can reduce
 #'   realized fertility below inputs.
 #' @param father_matching Optional matching specification for fathers of
-#'   unpartnered births in rate mode, created by [create_matching_model()].
-#'   Defaults to `NULL`, using the current general `matching` model. Union
+#'   unpartnered births in rate mode, created by [create_matching_model()], or a
+#'   `time_start`/`time_end`/`model` schedule as for `matching`.
+#'   Defaults to `NULL`, using the general `matching` model active at that birth. Union
 #'   searches always use `matching`. Not used by on-demand initiation. Process-level
 #'   age and kinship screening settings are shared; NULL inherits the general
 #'   model's settings.
@@ -373,6 +379,23 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   Zero imposes no cross-person kin exclusion. Missing ancestry is not proof of
 #'   unrelatedness; only demonstrated relationships are screened. Existing unions
 #'   are retained. See [extract_kin()] for the shared distance definitions.
+#' @section Calendar rates:
+#' Search `rates` and `union_convert_rate` optionally accept `time_start` and
+#' `time_end` for half-open absolute calendar-year bands, including fractional
+#' years. Both columns are required together, with finite starts and greater
+#' ends (possibly Inf). Every active slice must satisfy its existing rate rules
+#' and cover the requested run. Clock choices stay consistent across periods;
+#' changes precede same-time events and retain duration origins. `cohab_prob`
+#' accepts the same calendar columns, with probabilities selected at the search
+#' instant. Probability-only changes refresh matching calibration without
+#' resampling pending event clocks. All three matching arguments also accept
+#' whole-model schedule tibbles with `time_start`, `time_end`, and list-column
+#' `model`. Model changes update role-specific preferences and calibration before
+#' same-time choices without resampling event clocks. All supplied models,
+#' including future intervals, are validated; gaps in a run are errors. NULL
+#' father/cohabitation matching dynamically follows general matching. Other
+#' non-rate arguments remain static.
+#'
 #' @param rates For `"rate"` initiation, an age-specific female search-hazard
 #'   table with `age_start`, `age_end`, and `rate`, in years and per person-year.
 #'   These specify search attempts, not guaranteed realized union formation.
@@ -381,8 +404,10 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   population groups, simulation warns and selects the first alphabetical group.
 #'   See [mortality()] for group-label and rate-coverage rules.
 #'   Nonoverlapping bands may have gaps or an open end; gaps and ages outside
-#'   support have zero hazard. Optional `previous_union` stratifies by `"none"`,
-#'   `"dissolved"`, and `"widowed"`; all three are required within each group.
+#'   support have zero hazard. Optional `previous_union` supplies either
+#'   `"none"`, `"separated"`, `"widowed"`, or pooled `"none"`, `"dissolved"`.
+#'   Dissolved pools separation and widowhood. Each group and active calendar
+#'   slice must supply one complete set; mixing the sets is not allowed.
 #'   Without it, the schedule applies to all previous union types. Categories
 #'   describe the most recent recorded episode; complete histories are required.
 #'   Optionally include both `dur_start` and `dur_end` for elapsed years since
@@ -405,10 +430,13 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   Matching utilities and input rate tables are unchanged.
 #' @param cohab_prob Optional age-specific probability table with `age_start`,
 #'   `age_end`, `prob`, optionally `group` and `previous_union`. Enables typed
-#'   unions only in rate mode. Probability gaps mean zero. Type is drawn before
-#'   matching; NULL retains untyped partnerships and their RNG path.
-#' @param cohab_matching Optional cohabitation matching model; NULL shares
-#'   `matching`. Marriage, cohabitation and unpartnered father searches calibrate
+#'   unions only in rate mode. Age gaps mean zero. Optional `time_start` and
+#'   `time_end` supply half-open calendar intervals; each active slice must satisfy
+#'   the same age/group/previous-category rules and cover the run. Type uses the
+#'   active probability at the search instant, before matching. Existing unions
+#'   keep their types. NULL retains untyped partnerships and their RNG path.
+#' @param cohab_matching Optional cohabitation matching model or whole-model
+#'   schedule; NULL shares the general `matching` model active at that search. Marriage, cohabitation and unpartnered father searches calibrate
 #'   weights using their own intensities and share the available male pool.
 #' @param union_convert_rate Optional age- or duration-specific conversion table,
 #'   optionally by woman's group. Duration uses the current cohabitation start.
@@ -418,7 +446,7 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   a linked marriage with a new dissolution-duration origin.
 #' @param cohabitation_counts_as_previous_union Logical, default FALSE. FALSE
 #'   restores previous legal-marriage category after a cohabitation ends; TRUE
-#'   classifies cohab breakup/death as dissolved/widowed. Search duration still
+#'   classifies cohab breakup/death as separated/widowed. Search duration still
 #'   starts at the latest partnership ending. Only applies to typed unions.
 #' @param model A `hammel_model` object.
 #' @return `union_formation()` returns a `hammel_union_formation` process;
@@ -441,6 +469,8 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
     cohabitation_counts_as_previous_union = cohabitation_counts_as_previous_union
   ), class = c("hammel_union_formation", "hammel_process"))
   validate_union_formation(process)
+  for (field in c("matching", "father_matching", "cohab_matching"))
+    process[field] <- list(normalize_model_argument(process[[field]]))
   for (field in c("cohab_prob", "union_convert_rate"))
     if (!is.null(process[[field]])) process[[field]] <- tibble::as_tibble(process[[field]])
   if (!is.null(rates)) {
@@ -492,8 +522,9 @@ validate_union_formation <- function(process) {
     stop("`cancel_birth_if_no_match` must be TRUE or FALSE.", call. = FALSE)
   }
   validate_kinship_generations(process$kinship_generations)
-  validate_matching_model(process$matching)
-  if (!is.null(process$father_matching)) validate_matching_model(process$father_matching)
+  validate_model_argument(process$matching, validate_matching_model, "matching")
+  if (!is.null(process$father_matching))
+    validate_model_argument(process$father_matching, validate_matching_model, "father_matching")
   if (process$initiation == "on_demand") {
     if (!is.null(process$group_prop_hazard)) {
       stop("`group_prop_hazard` requires rate-based union initiation; on-demand formation has no search hazard.",
@@ -509,7 +540,43 @@ validate_union_formation <- function(process) {
 }
 
 
+expand_previous_union_rates <- function(rates) {
+  if (!"previous_union" %in% names(rates)) return(rates)
+  changed <- FALSE
+  expand_slice <- function(x) {
+    copies <- lapply(split_rate_groups(x), function(rows) {
+      copy <- x[rows[x$previous_union[rows] == "dissolved"], , drop = FALSE]
+      if (nrow(copy)) changed <<- TRUE
+      do.call(rbind, lapply(c("separated", "widowed"), function(label) {
+        out <- copy
+        out$previous_union <- rep(label, nrow(copy))
+        out
+      }))
+    })
+    do.call(rbind, c(list(x[x$previous_union != "dissolved", , drop = FALSE]), copies))
+  }
+  if (!has_calendar_rates(rates)) return(expand_slice(rates))
+  pieces <- lapply(calendar_rate_segments(rates), function(segment) {
+    x <- segment$rates
+    if (!nrow(x)) return(NULL)
+    x$time_start <- segment$start
+    x$time_end <- segment$end
+    x <- x[, names(rates), drop = FALSE]
+    expand_slice(x)
+  })
+  if (changed) do.call(rbind, pieces) else rates
+}
+
 validate_union_search_rates <- function(rates) {
+    if (has_calendar_rates(rates)) {
+      validate_calendar_rates(rates, validate_union_search_rates)
+      effective <- expand_previous_union_rates(rates)
+      if (all(c("previous_union", "dur_start") %in% names(effective)) &&
+          any(vapply(split(!is.na(effective$dur_start), effective$previous_union),
+            function(x) length(unique(x)) != 1L, logical(1))))
+        stop("Each previous_union category must use the same age or duration clock across calendar periods.", call. = FALSE)
+      return(invisible(rates))
+    }
     check_columns(rates, c("age_start", "age_end", "rate"), "rates")
     check_numeric_column(rates$rate, "rates$rate")
     if (!nrow(rates) || any(rates$rate < 0) ||
@@ -541,7 +608,7 @@ validate_union_search_rates <- function(rates) {
     ends <- rates$age_end
     if (any(duration)) {
       if (!"previous_union" %in% names(rates))
-        stop("Duration search bands require `previous_union` ('dissolved' or 'widowed').", call. = FALSE)
+        stop("Duration search bands require `previous_union` ('dissolved', 'separated', or 'widowed').", call. = FALSE)
       starts[duration] <- rates$dur_start[duration]
       ends[duration] <- rates$dur_end[duration]
     }
@@ -551,17 +618,21 @@ validate_union_search_rates <- function(rates) {
     strata <- split_rate_groups(rates)
     if ("previous_union" %in% names(rates)) {
       previous <- rates$previous_union
-      categories <- c("none", "dissolved", "widowed")
+      categories <- c("none", "separated", "widowed", "dissolved")
       if (!is.character(previous) || !is.null(dim(previous)) || anyNA(previous) ||
           any(!previous %in% categories))
-        stop("`previous_union` must contain 'none', 'dissolved', or 'widowed'.", call. = FALSE)
+        stop("`previous_union` must contain 'none', 'separated', 'widowed', or pooled 'dissolved'.", call. = FALSE)
       if (any(vapply(strata, function(rows)
-          !setequal(previous[rows], categories), logical(1))))
-        stop("Union-search schedules require all three `previous_union` categories within each group.",
+          !(setequal(previous[rows], c("none", "dissolved")) ||
+            setequal(previous[rows], c("none", "separated", "widowed"))), logical(1))))
+        stop("Supply either 'none' and 'dissolved', or all three detailed `previous_union` categories: 'none', 'separated', 'widowed', within each group and calendar period. Do not mix pooled and detailed categories.",
              call. = FALSE)
       if (any(duration & previous == "none"))
         stop("`previous_union = 'none'` requires age-specific bands.", call. = FALSE)
-      if (any(vapply(split(duration, previous), function(x) length(unique(x)) != 1L, logical(1))))
+      effective <- expand_previous_union_rates(rates)
+      effective_duration <- if (all(duration_columns)) !is.na(effective$dur_start) else
+        rep(FALSE, nrow(effective))
+      if (any(vapply(split(effective_duration, effective$previous_union), function(x) length(unique(x)) != 1L, logical(1))))
         stop("Each `previous_union` category must use the same age or duration clock for all bands and groups.",
              call. = FALSE)
       strata <- unlist(lapply(strata, function(rows) split(rows, previous[rows])), recursive = FALSE)

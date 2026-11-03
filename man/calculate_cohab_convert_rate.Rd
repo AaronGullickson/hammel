@@ -9,7 +9,8 @@ calculate_cohab_convert_rate(
   time_breaks,
   dur_breaks = NULL,
   age_breaks = NULL,
-  by_group = FALSE
+  by_group = FALSE,
+  conf.level = NULL
 )
 }
 \arguments{
@@ -27,12 +28,19 @@ woman's attained age, matching the conversion schedule's age convention.}
 
 \item{by_group}{Logical, default FALSE. Separate by the woman's group, matching
 conversion input schedules. Require person groups; retain their input type.}
+
+\item{conf.level}{NULL (default) to omit confidence intervals, or a finite
+numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
+from two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} intervals for observed event
+counts over exposure. Bounds are NA at zero exposure. For fertility, these
+describe the observed rate, not the unrealized-adjusted rate.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, \code{dur_start}, \code{dur_end} (or
 \code{age_start}, \code{age_end}), \code{union_years}, \code{conversions}, \code{rate_cohab_convert},
 and optional \code{group}. Empty cells are retained. Rates are conversions per
 cohabitation union-year, not conversion probabilities with competing risks.
+With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
 }
 \description{
 Count conversions over cohabitation union-years, once per episode. Marriage

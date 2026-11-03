@@ -18,14 +18,17 @@
 #'   woman's attained age, matching the conversion schedule's age convention.
 #' @param by_group Logical, default FALSE. Separate by the woman's group, matching
 #'   conversion input schedules. Require person groups; retain their input type.
+#' @inheritParams calculate_mortality_rates
 #' @return A tibble with `time_start`, `time_end`, `dur_start`, `dur_end` (or
 #'   `age_start`, `age_end`), `union_years`, `conversions`, `rate_cohab_convert`,
 #'   and optional `group`. Empty cells are retained. Rates are conversions per
 #'   cohabitation union-year, not conversion probabilities with competing risks.
+#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
 #' @export
 calculate_cohab_convert_rate <- function(population, time_breaks,
                                          dur_breaks = NULL, age_breaks = NULL,
-                                         by_group = FALSE) {
+                                         by_group = FALSE, conf.level = NULL) {
+  validate_rate_conf_level(conf.level)
   if (!inherits(population, "hammel_population"))
     stop("`population` must be a hammel_population with typed union histories.", call. = FALSE)
   if (is.null(dur_breaks) == is.null(age_breaks))
@@ -62,5 +65,5 @@ calculate_cohab_convert_rate <- function(population, time_breaks,
   result$conversions <- counts$dissolutions
   result$rate_cohab_convert <- as.numeric(ifelse(result$union_years > 0,
     result$conversions / result$union_years, NA_real_))
-  result
+  add_rate_confidence(result, "conversions", "union_years", conf.level)
 }

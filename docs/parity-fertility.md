@@ -8,7 +8,8 @@ Persistent lognormal fertility weights and maternal inheritance are implemented
 under D102/D104; see [heterogeneity](fertility-heterogeneity-notes.md). The
 [accepted report](../validation/milestone5.qmd) retains sparse/unrealized-cell
 and reproductive-selection limitations. Group transitions were accepted
-October 30, 2026 (D116); time-varying inputs are next.
+October 30, 2026 (D116); calendar-varying rates are implemented under D118,
+with milestone 7 accepted complete November 2, 2026 (D127).
 
 ## Selected representation
 
@@ -74,8 +75,9 @@ or externally supplied parity values are inferred. This is the implemented initi
 Parity-stratified observations use `calculate_fertility_rates(parity_breaks = ...)`
 (D100), described below.
 D102 defines persistent lognormal weights and maternal inheritance. Other
-distributions, cohort normalization, group transitions and calendar-time inputs
-remain future scope. The HFD-only zero-fill rule does not set
+distributions and cohort normalization remain future scope. Individual group
+transitions are implemented under D116; calendar-time rates under
+[the D118 contract](time-varying-rates.md). The HFD-only zero-fill rule does not set
 missing-data defaults for arbitrary rate tables. Remaining young high-parity
 shortfalls are births in cells without an eligible woman; see below.
 

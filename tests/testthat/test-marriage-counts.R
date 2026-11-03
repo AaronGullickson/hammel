@@ -13,7 +13,7 @@ test_that("marriage counts assign exact exposure and starts by latest episode", 
   counts <- calculate_union_rates(pop, c(0, 6), c(0, Inf), by_previous_union = TRUE)
   expect_s3_class(counts, "tbl_df")
   women <- subset(counts, sex == "f")
-  expect_identical(women$previous_union, c("none", "dissolved", "widowed"))
+  expect_identical(women$previous_union, c("none", "separated", "widowed"))
   expect_equal(women$person_years, c(1, 1, 1))
   expect_equal(women$unions, c(1, 1, 1))
   expect_equal(women$rate_union, c(1, 1, 1))
@@ -37,7 +37,7 @@ test_that("marriage cells are half-open and use preformation categories", {
   starts <- subset(counts, sex == "f" & unions > 0)
   expect_equal(starts$time_start, c(1, 3, 5))
   expect_equal(starts$age_start, c(21, 23, 25))
-  expect_equal(starts$previous_union, c("none", "dissolved", "widowed"))
+  expect_equal(starts$previous_union, c("none", "separated", "widowed"))
   # Ending at the observation endpoint excludes the formation there.
   before <- calculate_union_rates(pop, c(2, 5), c(0, Inf), by_previous_union = TRUE)
   women <- subset(before, sex == "f")

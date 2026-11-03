@@ -11,7 +11,8 @@ calculate_fertility_rates(
   by_union_type = FALSE,
   by_group = FALSE,
   parity_breaks = NULL,
-  unrealized = FALSE
+  unrealized = FALSE,
+  conf.level = NULL
 )
 }
 \arguments{
@@ -53,6 +54,12 @@ Values are \code{NA} where they cannot be attributed exactly: periods before the
 most recent simulation's start (restarts keep only the latest run's
 record), breaks that cut through a recorded one-year period or fertility
 cell, and \code{union_type} or parity strata the fertility schedule did not use.}
+
+\item{conf.level}{NULL (default) to omit confidence intervals, or a finite
+numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
+from two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} intervals for observed event
+counts over exposure. Bounds are NA at zero exposure. For fertility, these
+describe the observed rate, not the unrealized-adjusted rate.}
 }
 \value{
 A tibble with period, age, sex (female), person_years, births and

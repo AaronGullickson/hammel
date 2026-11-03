@@ -1,15 +1,15 @@
 #' Calculate union exposure and formation rates
 #'
 #' Count union starts and unpartnered person-years by age, period, sex, and
-#' optionally `previous_union`: `"none"`, `"dissolved"`, or `"widowed"`. The most recent
+#' optionally `previous_union`: `"none"`, `"separated"`, or `"widowed"`. The most recent
 #' episode's ending determines the category; each start counts in the category
 #' immediately before formation. Partnered time contributes no exposure.
 #' Men describe realized matching outcomes, not a male search-rate input.
 #' Typed entries pool cohabitation and direct marriage; conversion is excluded
 #' because partners remain partnered. Previous-category classification follows
 #' the population's recorded cohabitation policy, default FALSE without metadata.
-#' With `dur_breaks`, only none rows use age; dissolved/widowed rows use
-#' duration since the most recent ending and always remain separate.
+#' With `dur_breaks`, only none rows use age; separated/widowed rows use
+#' duration since the most recent ending; `pool_dissolved` can combine them.
 #'
 #' Histories must be complete for the intended interpretation. `"none"` means
 #' no recorded earlier union; omitted history cannot establish never-partnered
@@ -31,8 +31,13 @@
 #'   and starts by previous union category and include `previous_union`. Otherwise
 #'   pool counts and exposure before calculating rates, and omit that column.
 #'   Supplying `dur_breaks` automatically enables this option.
+#' @param pool_dissolved Logical, default FALSE. With TRUE, return `"none"`
+#'   and `"dissolved"`, pooling separated and widowed events and exposure before
+#'   calculating rates and confidence intervals. Requires `by_previous_union`
+#'   (also enabled by `dur_breaks`). With FALSE, stratified output uses the detailed
+#'   `"none"`, `"separated"`, and `"widowed"` categories.
 #' @param dur_breaks Optional nonnegative duration boundaries in years. When
-#'   supplied, dissolved/widowed rows use years since the latest union ending;
+#'   supplied, separated/widowed rows use years since the latest union ending;
 #'   none rows still use `age_breaks`. Automatically enables `by_previous_union`
 #'   regardless of its supplied value. A finite final boundary gains Inf.
 #'   Adds `dur_start`/`dur_end`, with NA in the unused age/duration pair.
@@ -40,21 +45,30 @@
 #' @param by_union_type Logical, default FALSE. Separate cohabitation and direct
 #'   marriage entries. Requires typed histories. Both types use the same full
 #'   unpartnered exposure; exposure must not be summed across type rows.
+#' @inheritParams calculate_mortality_rates
 #' @return A tibble with `time_start`, `time_end`, `sex`, `age_start`, `age_end`,
 #'   `person_years`, `unions`, and `rate_union`, plus `group` and
 #'   `previous_union` when requested, and duration columns when `dur_breaks` is
 #'   supplied, and `union_type` when requested. Empty cells are retained.
+#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
 #' @export
 calculate_union_rates <- function(population, time_breaks, age_breaks,
                                      by_group = FALSE, by_previous_union = FALSE,
-                                     dur_breaks = NULL, by_union_type = FALSE) {
+                                     dur_breaks = NULL, by_union_type = FALSE,
+                                     conf.level = NULL, pool_dissolved = FALSE) {
+  validate_rate_conf_level(conf.level)
   calculate_entry_rates(population, time_breaks, age_breaks, by_group,
-    by_previous_union, dur_breaks, by_union_type, marriage_measure = FALSE)
+    by_previous_union, dur_breaks, by_union_type, marriage_measure = FALSE,
+    conf.level = conf.level, pool_dissolved = pool_dissolved)
 }
 
 calculate_entry_rates <- function(population, time_breaks, age_breaks,
                                   by_group, by_previous_union, dur_breaks,
-                                  by_union_type, marriage_measure) {
+                                  by_union_type, marriage_measure, conf.level = NULL,
+                                  pool_dissolved = FALSE) {
+  if (!is.logical(pool_dissolved) || length(pool_dissolved) != 1L ||
+      !is.null(dim(pool_dissolved)) || is.na(pool_dissolved))
+    stop("`pool_dissolved` must be TRUE or FALSE.", call. = FALSE)
   if (!is.logical(by_union_type) || length(by_union_type) != 1L ||
       !is.null(dim(by_union_type)) || is.na(by_union_type))
     stop("`by_union_type` must be TRUE or FALSE.", call. = FALSE)
@@ -70,6 +84,8 @@ calculate_entry_rates <- function(population, time_breaks, age_breaks,
     if (is.finite(tail(dur_breaks, 1))) dur_breaks <- c(dur_breaks, Inf)
     by_previous_union <- TRUE
   }
+  if (pool_dissolved && !by_previous_union)
+    stop("`pool_dissolved = TRUE` requires `by_previous_union = TRUE` or `dur_breaks`.", call. = FALSE)
   validate_population(population)
   check_demographic_breaks(time_breaks, "time_breaks")
   check_demographic_breaks(age_breaks, "age_breaks", ages = TRUE)
@@ -84,7 +100,7 @@ calculate_entry_rates <- function(population, time_breaks, age_breaks,
   if (is.null(dur_breaks)) {
     grid <- expand.grid(t = seq_len(length(time_breaks) - 1L),
       a = seq_len(length(age_breaks) - 1L), sex = c("m", "f"),
-      previous = if (by_previous_union) c("none", "dissolved", "widowed") else "pooled",
+      previous = if (by_previous_union) c("none", "separated", "widowed") else "pooled",
       g = seq_len(group_count), KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
     result <- tibble::tibble(time_start = time_breaks[grid$t],
       time_end = time_breaks[grid$t + 1L], sex = grid$sex,
@@ -102,7 +118,7 @@ calculate_entry_rates <- function(population, time_breaks, age_breaks,
         previous_union = grid$previous)
     }
     one_group <- rbind(axis_grid(age_breaks, "none", FALSE),
-      axis_grid(dur_breaks, c("dissolved", "widowed"), TRUE))
+      axis_grid(dur_breaks, c("separated", "widowed"), TRUE))
     result <- one_group[rep(seq_len(nrow(one_group)), times = group_count), ]
     grid <- list(previous = result$previous_union,
       g = rep(seq_len(group_count), each = nrow(one_group)))
@@ -138,11 +154,22 @@ calculate_entry_rates <- function(population, time_breaks, age_breaks,
   }
   result$person_years <- counts$person_years
   result$unions <- counts$unions
+  if (pool_dissolved) {
+    # Each detailed category uses the same ordered grid of all other strata,
+    # including when duration axes or separate entry types are requested.
+    separated <- which(result$previous_union == "separated")
+    widowed <- which(result$previous_union == "widowed")
+    result$person_years[separated] <- result$person_years[separated] + result$person_years[widowed]
+    result$unions[separated] <- result$unions[separated] + result$unions[widowed]
+    result$previous_union[separated] <- "dissolved"
+    if (length(widowed)) result <- result[-widowed, , drop = FALSE]
+  }
   result$rate_union <- as.numeric(ifelse(result$person_years > 0,
     result$unions / result$person_years, NA_real_))
   if (marriage_measure) {
     names(result)[names(result) == "unions"] <- "marriages"
     names(result)[names(result) == "rate_union"] <- "rate_marriage"
   }
-  result
+  add_rate_confidence(result, if (marriage_measure) "marriages" else "unions",
+    "person_years", conf.level)
 }

@@ -13,14 +13,25 @@ Milestone 4 was accepted October 29, 2026 (D093); see the
 ## Schedules and state
 
 The single rate data frame requires `age_start`, `age_end`, and `rate`.
-Optional `previous_union` takes exactly `none`, `dissolved`, or `widowed`.
-When supplied, all three categories are required within each scheduled group,
-with explicit zero rates allowed. Without it, the same age-specific schedule
-applies to all unpartnered women.
+Optional `previous_union` accepts either the detailed set `none`, `separated`,
+`widowed`, or the pooled set `none`, `dissolved` (D126). `separated` means a
+breakup, while pooled `dissolved` includes breakup and partner death. Each group
+and active calendar slice must supply one complete set; do not mix the sets
+within a group/slice. Both search rates and `cohab_prob` support this convention.
+Without the column the same schedule applies to every previous-union state.
+
+Pooled input rows expand privately into equal separated and widowed schedules,
+including their clock, rate/probability, bands, and gaps. Public inputs and actual
+histories remain unchanged. Effective categories still require consistent age
+or duration clocks across groups and time. A dissolved duration band refers to
+time since the most recent ending, whether separation or partner death.
+For example, `none: [15,Inf) at .1` and `dissolved: [20,Inf) at .2` give
+both separated and widowed women the .2 hazard from age 20. To distinguish their
+hazards, supply all three detailed categories instead.
 
 Optionally include both `dur_start` and `dur_end`. Each row supplies exactly
 one complete pair of boundaries, with both unused boundaries NA. `none` must
-use age. `dissolved` and `widowed` each independently use age or duration, but a
+use age. `separated` and `widowed` each independently use age or duration, but a
 category must use the same clock in all its rows, including across groups.
 Age and duration cannot act simultaneously, and bands within a category cannot
 switch clocks. Supplying just one duration column, partial bands, both clocks,
@@ -49,8 +60,8 @@ integrate across the selected bands using the same annual-hazard sampler.
 search_rates <- tibble::tribble(
   ~previous_union, ~age_start, ~age_end, ~dur_start, ~dur_end, ~rate,
   "none",          18,         80,       NA,          NA,       .10,
-  "dissolved",     NA,         NA,       0,           1,        0,
-  "dissolved",     NA,         NA,       1,           Inf,      .15,
+  "separated",     NA,         NA,       0,           1,        0,
+  "separated",     NA,         NA,       1,           Inf,      .15,
   "widowed",       NA,         NA,       0,           2,        0,
   "widowed",       NA,         NA,       2,           Inf,      .08
 )
@@ -60,7 +71,7 @@ model <- set_union_formation(model, "rate", rates = search_rates)
 These example rates are illustrative, not empirical estimates or defaults.
 
 `none` means no recorded prior union. After an episode ends, dissolution gives
-`dissolved` to each living partner; partner death gives `widowed` to the survivor.
+`separated` to each living partner; partner death gives `widowed` to the survivor.
 The most recent episode determines the category, not whether a person has ever
 experienced either event. A new union removes both partners from the available
 pool. Its subsequent ending replaces their previous category. Births and failed
@@ -77,10 +88,10 @@ order when their starts coincide. Events after a person's death are invalid for
 these summaries. Existing pooled observation methods retain their contract.
 
 For example, a woman forms at 20, dissolves at 25, forms again at 28, and is
-widowed at 35. Her unpartnered exposure is `none` before 20, `dissolved` from
+widowed at 35. Her unpartnered exposure is `none` before 20, `separated` from
 25 to 28, and `widowed` after 35. The starts at 20 and 28 count respectively
-in `none` and `dissolved`. Partnered time is outside all three denominators.
-A later dissolution would replace `widowed` with `dissolved`.
+in `none` and `separated`. Partnered time is outside all three denominators.
+A later dissolution would replace `widowed` with `separated`.
 
 ## Timing and weighted choice
 
@@ -121,7 +132,11 @@ returns `person_years`, `unions`, and `rate_union`, split by period, age and sex
 `by_previous_union = TRUE` to add the three previous-union categories; otherwise
 counts and exposure are pooled before calculating rates and that column is omitted. All exposure is unpartnered; no additional `union_status`
 column is needed. Optional `group` follows each individual's identity, including
-men. When stratifying, all three categories and empty cells are retained. Rates with zero exposure
+men. Detailed output retains all three categories and empty cells.
+Set `pool_dissolved = TRUE` to retain `none` and pool separated/widowed
+as `dissolved`; this requires previous-union stratification and sums events/exposure before
+rates and exact Poisson intervals. The same option is available on
+`calculate_marriage_rates()`. Rates with zero exposure
 are NA; positive exposure and no starts gives zero. Starts are classified by
 category immediately before formation. Both spouses contribute one event and
 their own exposure; men's realized rates are outcomes, not search inputs.
@@ -141,7 +156,7 @@ for formation counts and rates.
 
 ```r
 search_rates <- tibble::tibble(
-  previous_union = c("none", "dissolved", "widowed"),
+  previous_union = c("none", "separated", "widowed"),
   age_start = 18, age_end = 80, rate = c(.1, .15, .08))
 model <- set_union_formation(model, "rate", rates = search_rates)
 marriages <- calculate_union_rates(result, seq(2025, 2100, 5), 0:100,
@@ -151,7 +166,7 @@ marriages <- calculate_union_rates(result, seq(2025, 2100, 5), 0:100,
 The rates above are illustrative inputs, not empirical estimates or defaults.
 
 
-Optional `dur_breaks` on `calculate_union_rates()` now measures dissolved
+Optional `dur_breaks` on `calculate_union_rates()` now measures separated
 and widowed exposure/events by duration since the latest ending (D084).
 Supplying it automatically enables previous-category stratification, including
 when `by_previous_union = FALSE`. `none` still uses required `age_breaks`.

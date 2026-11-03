@@ -1,0 +1,39 @@
+{
+  "title": "US female age-specific marriage rates, 2018",
+  "author": "Valerie Schweizer",
+  "publication": "NCFMR Family Profiles FP-19-27 (2019), Figure 3",
+  "source_url": "https://www.bgsu.edu/ncfmr/resources/data/family-profiles/schweizer-marriage-divorce-ratio-demo-variation-fp-19-27",
+  "doi": "https://doi.org/10.25035/ncfmr/fp-19-27",
+  "figure_url": "https://www.bgsu.edu/content/dam/BGSU/college-of-arts-and-sciences/NCFMR/images/family-profiles/fp-19-27-fig3.png",
+  "underlying_data": "NCFMR analyses of the 2018 American Community Survey 1-year estimates",
+  "retrieved_utc": "2026-11-01T22:56:58.086372+00:00",
+  "extraction": "Manual transcription of the six printed dark-green marriage-rate labels in Figure 3; not digitized from point positions.",
+  "source_unit": "Women married in last 12 months per 1,000 unmarried women of the same age group",
+  "source_age_groups": [
+    "15-24",
+    "25-34",
+    "35-44",
+    "45-54",
+    "55-64",
+    "65+"
+  ],
+  "published_rates_per_1000": [
+    23.0,
+    75.3,
+    45.9,
+    27.9,
+    12.1,
+    3.3
+  ],
+  "transformation": "Divide by 1,000; represent age intervals with exclusive upper bounds and Inf for 65+. No interpolation or hazard conversion.",
+  "figure_sha256": "41ca7336744529566b80e861ba135ec60f3fb14dfc1296483e82c4ac04a85dd6",
+  "output_sha256": "7517f0a9821b577697f31842216e23aa6cc3521fee6c01d6c99144f97c2dc43b",
+  "reuse": "Only factual printed numerical values transcribed with attribution. No chart, prose, source code, or claimed open licence copied.",
+  "limitations": [
+    "Pooled first marriages and remarriages; no separate never-married, divorced or widowed schedules.",
+    "Current unmarried denominator differs from starting-unmarried denominator in existing 2001 SIPP data; neither measures exact unmarried person-time.",
+    "Marriage includes entry after cohabitation; this is not total union formation or a directly estimated search hazard.",
+    "Printed source rates rounded to one decimal per 1,000; no precision beyond that is inferred.",
+    "No interpolation, simulation changes, or new approval of demographic assumptions."
+  ]
+}

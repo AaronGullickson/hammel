@@ -52,6 +52,10 @@ Assign one group independently of genealogical ancestry shares. Attach this
 object with \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}. The default selects either
 parent with equal probability, with maternal fallback.
 Existing people are not reassigned, and ancestry is unchanged by assignment.
+Fertility also accepts a schedule tibble with \code{time_start}, \code{time_end}, and a
+\code{model} list column containing complete inheritance objects. Half-open
+absolute-year intervals select the model at birth; all scheduled possible
+identities enter one shared registry before execution. See \code{\link[=fertility]{fertility()}}.
 }
 \examples{
 create_group_inheritance("mother")

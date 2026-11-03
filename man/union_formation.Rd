@@ -42,7 +42,12 @@ set_union_formation(
 \item{initiation}{Either \code{"on_demand"} for birth-triggered searches or
 \code{"rate"} for scheduled searches. No default is selected.}
 
-\item{matching}{A specification created by \code{\link[=create_matching_model]{create_matching_model()}}. Defaults
+\item{matching}{A specification created by \code{\link[=create_matching_model]{create_matching_model()}}, or a
+tibble with numeric \code{time_start}, \code{time_end}, and list-column \code{model} holding
+complete matching objects. Model intervals are half-open absolute years,
+cannot overlap, and must cover the requested run. The active model is used
+at partner selection, without changing pending search dates or existing
+unions. Base data frames with list columns are also accepted. Defaults
 to \code{create_age_gap_matching_model(0, 5)}: preferred age gap zero years,
 with selection weight halving five years on either side.}
 
@@ -54,8 +59,10 @@ share the schedule. Group does not restrict partner matching. With no
 population groups, simulation warns and selects the first alphabetical group.
 See \code{\link[=mortality]{mortality()}} for group-label and rate-coverage rules.
 Nonoverlapping bands may have gaps or an open end; gaps and ages outside
-support have zero hazard. Optional \code{previous_union} stratifies by \code{"none"},
-\code{"dissolved"}, and \code{"widowed"}; all three are required within each group.
+support have zero hazard. Optional \code{previous_union} supplies either
+\code{"none"}, \code{"separated"}, \code{"widowed"}, or pooled \code{"none"}, \code{"dissolved"}.
+Dissolved pools separation and widowhood. Each group and active calendar
+slice must supply one complete set; mixing the sets is not allowed.
 Without it, the schedule applies to all previous union types. Categories
 describe the most recent recorded episode; complete histories are required.
 Optionally include both \code{dur_start} and \code{dur_end} for elapsed years since
@@ -79,8 +86,9 @@ unrelatedness; only demonstrated relationships are screened. Existing unions
 are retained. See \code{\link[=extract_kin]{extract_kin()}} for the shared distance definitions.}
 
 \item{father_matching}{Optional matching specification for fathers of
-unpartnered births in rate mode, created by \code{\link[=create_matching_model]{create_matching_model()}}.
-Defaults to \code{NULL}, using the current general \code{matching} model. Union
+unpartnered births in rate mode, created by \code{\link[=create_matching_model]{create_matching_model()}}, or a
+\code{time_start}/\code{time_end}/\code{model} schedule as for \code{matching}.
+Defaults to \code{NULL}, using the general \code{matching} model active at that birth. Union
 searches always use \code{matching}. Not used by on-demand initiation. Process-level
 age and kinship screening settings are shared; NULL inherits the general
 model's settings.}
@@ -108,11 +116,14 @@ Matching utilities and input rate tables are unchanged.}
 
 \item{cohab_prob}{Optional age-specific probability table with \code{age_start},
 \code{age_end}, \code{prob}, optionally \code{group} and \code{previous_union}. Enables typed
-unions only in rate mode. Probability gaps mean zero. Type is drawn before
-matching; NULL retains untyped partnerships and their RNG path.}
+unions only in rate mode. Age gaps mean zero. Optional \code{time_start} and
+\code{time_end} supply half-open calendar intervals; each active slice must satisfy
+the same age/group/previous-category rules and cover the run. Type uses the
+active probability at the search instant, before matching. Existing unions
+keep their types. NULL retains untyped partnerships and their RNG path.}
 
-\item{cohab_matching}{Optional cohabitation matching model; NULL shares
-\code{matching}. Marriage, cohabitation and unpartnered father searches calibrate
+\item{cohab_matching}{Optional cohabitation matching model or whole-model
+schedule; NULL shares the general \code{matching} model active at that search. Marriage, cohabitation and unpartnered father searches calibrate
 weights using their own intensities and share the available male pool.}
 
 \item{union_convert_rate}{Optional age- or duration-specific conversion table,
@@ -124,7 +135,7 @@ a linked marriage with a new dissolution-duration origin.}
 
 \item{cohabitation_counts_as_previous_union}{Logical, default FALSE. FALSE
 restores previous legal-marriage category after a cohabitation ends; TRUE
-classifies cohab breakup/death as dissolved/widowed. Search duration still
+classifies cohab breakup/death as separated/widowed. Search duration still
 starts at the latest partnership ending. Only applies to typed unions.}
 
 \item{model}{A \code{hammel_model} object.}
@@ -182,4 +193,22 @@ on the man's group, so they do not change the association between partners'
 characteristics in the static group-only illustration. With one group,
 all group weights are one. When no
 exact weights exist, approximate weights are used with a warning.
+}
+\section{Calendar rates}{
+
+Search \code{rates} and \code{union_convert_rate} optionally accept \code{time_start} and
+\code{time_end} for half-open absolute calendar-year bands, including fractional
+years. Both columns are required together, with finite starts and greater
+ends (possibly Inf). Every active slice must satisfy its existing rate rules
+and cover the requested run. Clock choices stay consistent across periods;
+changes precede same-time events and retain duration origins. \code{cohab_prob}
+accepts the same calendar columns, with probabilities selected at the search
+instant. Probability-only changes refresh matching calibration without
+resampling pending event clocks. All three matching arguments also accept
+whole-model schedule tibbles with \code{time_start}, \code{time_end}, and list-column
+\code{model}. Model changes update role-specific preferences and calibration before
+same-time choices without resampling event clocks. All supplied models,
+including future intervals, are validated; gaps in a run are errors. NULL
+father/cohabitation matching dynamically follows general matching. Other
+non-rate arguments remain static.
 }

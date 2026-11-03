@@ -35,8 +35,9 @@ returned/stored as a tibble. Duration bands are half-open `[dur_start, dur_end)`
 Starts and rates are finite and nonnegative; ends exceed starts and may be
 `Inf`. Bands cannot overlap within an unordered group pair. Gaps and durations outside supplied
 support have zero risk. Input order, custom columns and source provenance are
-preserved. Sex, age, union-status and calendar-time schedule columns are rejected
-rather than interpreted as additional risk strata.
+preserved. Sex, age and union-status columns are rejected. Optional
+`time_start`/`time_end` bands follow [the rate contract](time-varying-rates.md)
+(D118); calendar changes retain the union-duration origin.
 
 An optional `group_pair` column gives symmetric pair labels, e.g. `A:A`,
 `A:B`, `B:B`. Pair order is normalized using character labels in radix order,
@@ -98,7 +99,8 @@ When dissolution executes:
 
 Unpartnered rate-mode women use the currently supplied search rates; on-demand
 women may form another union at a later birth attempt. Age-specific searches
-may now select the `dissolved` schedule under D080. No waiting period or
+select the detailed `separated` schedule, or the pooled `dissolved` schedule
+when separation and widowhood share rates (D126). No waiting period or
 former-partner exclusion is introduced.
 Current kinship/matching restrictions still apply. New union episodes have new
 IDs and their own duration clocks, even when the partners previously formed a
@@ -189,8 +191,8 @@ D101 cell accounting, accepted in milestone 5 (D105), replaces the former
 D045 fertility-transition approximation: dissolution moves the woman between
 current fertility cells while retaining her spacing eligibility. Sparse cells
 without eligible women still report unrealized intensity. Cohabitation is
-implemented under D086; richer couple covariates and calendar-varying
-dissolution require further specifications.
+implemented under D086; richer couple covariates remain deferred. Calendar-varying
+dissolution is implemented under [D118](time-varying-rates.md).
 Duration-based remarriage observations are available via `dur_breaks` under D084. These rules intentionally differ from SOCSIM's
 monthly probability inputs and potentially two-spouse candidate clocks, while
 sharing its duration-based baseline idea. No scientific validation threshold
@@ -201,3 +203,10 @@ D086 adds optional union_type cohab/marriage strata within each shared or
 symmetric group_pair schedule. Supply both when stratifying; without the column,
 each episode uses the same dissolution schedule. Conversion is not dissolution:
 it ends the cohab episode and starts marriage with a fresh duration clock.
+
+For calendar-varying tables, both types are required in each nonempty active
+calendar interval. Missing-type errors name the absent type, the half-open
+calendar interval, and the group pair only when pair-specific rates are used.
+For example, cohabitation rates starting in 1990 and marriage rates starting
+in 1992 report a missing marriage schedule during `[1990,1992)`. Validation
+still examines supplied intervals outside the eventual simulation window.

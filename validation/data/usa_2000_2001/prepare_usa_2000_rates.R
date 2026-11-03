@@ -1,6 +1,6 @@
 # Run from the package root. Requires readxl and the pdftotext command.
 # Rebuild offline from the archived official sources; no interpolation.
-root <- "validation/data"
+root <- "validation/data/usa_2000_2001"
 pdf <- file.path(root, "usa_fertility_revised_nchs_2003.pdf")
 txt <- tempfile(fileext = ".txt")
 status <- system2("pdftotext", c("-layout", shQuote(pdf), shQuote(txt)))

@@ -174,7 +174,7 @@ test_that("cohab probabilities select group and previous category and require co
   model <- cohab_fixture(200)
   model$population$persons$sex[1:100] <- "f"
   model$population$persons$group <- rep(c("A","B"),100)
-  p <- expand.grid(group=c("A","B"),previous_union=c("none","dissolved","widowed"),stringsAsFactors=FALSE)
+  p <- expand.grid(group=c("A","B"),previous_union=c("none","separated","widowed"),stringsAsFactors=FALSE)
   p$age_start <- 15; p$age_end <- Inf
   p$prob <- as.numeric(p$group=="B" & p$previous_union=="none")
   model$processes$union_formation$cohab_prob <- p
@@ -243,7 +243,7 @@ test_that("earlier legal history governs subsequent searches after cohabitant de
     expect_equal(info$legal_previous[1],1L)
     model <- set_population(model,result)
     model$processes$union_formation$rates <- data.frame(age_start=15,age_end=Inf,
-      previous_union=c("none","dissolved","widowed"),rate=c(0,1e5,0))
+      previous_union=c("none","separated","widowed"),rate=c(0,1e5,0))
     continued <- simulate(model,.1,43)
     expect_equal(nrow(continued$unions),if(counts)2L else 3L)
   }

@@ -84,14 +84,14 @@ values and the combined transitions CSV are retained unchanged. No interpolation
 smoothing or fertility compensation is applied.
 
 ```r
-marriage_rates <- read.csv("validation/data/usa_2001_marriage_rates_female.csv")
+marriage_rates <- read.csv("validation/data/usa_2000_2001/usa_2001_marriage_rates_female.csv")
 model <- set_union_formation(model, "rate", matching, rates = marriage_rates)
 ```
 
 Rebuild offline from the package root:
 
 ```sh
-Rscript validation/data/prepare_usa_2000_rates.R
+Rscript validation/data/usa_2000_2001/prepare_usa_2000_rates.R
 ```
 
 Requires `readxl` and Poppler's `pdftotext`. The script checks source labels,

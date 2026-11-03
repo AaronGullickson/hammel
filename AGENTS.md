@@ -83,8 +83,23 @@ the user's agreement.
   dissolution/remarriage/cohabitation was accepted October 29, 2026 (D093).
   Milestone 5 parity-specific fertility, cell accounting and heterogeneity was
   accepted October 29, 2026 (D105). Individual group transitions (milestone 6)
-  were accepted October 30, 2026 (D116). Time-varying inputs (milestone 7) are
-  next; their detailed semantics and API need specification before implementation.
+  were accepted October 30, 2026 (D116). Milestone 7 calendar-varying rates are
+  implemented under the user-approved D118 contract in
+  `docs/time-varying-rates.md`; the user accepted milestone 7 as complete on
+  November 2, 2026 (D127), based on `validation/milestone7.qmd` and its retained
+  rendered assessment. Matching
+  and inheritance model schedules are implemented under D123; see
+  `docs/time-varying-models.md` for the shared model-list tibble interface,
+  event-time selection, dynamic NULL fallbacks and future identity registry.
+  D122 adds calendar
+  bands to `cohab_prob`; probability-only changes update type selection and
+  matching calibration while preserving pending event dates. Other arguments
+  remain static. Milestone 7 is complete with the current engine. D121 assigns
+  binned-group hazards and custom formula weights across rate processes to
+  milestone 8; see `docs/binned-group-hazards.md`. This direction is not
+  implemented. Summaries/helpers move to 9; multiple group columns are tentative
+  10; external immigration is 11; the two-sex model is 12. The separate regions
+  milestone is removed, with its unresolved applications retained under 10.
   Distinguish current
   specifications from deferred mechanisms and future proposals.
 - `validation/milestone1.qmd` is the accepted historical assessment; reproduce it
@@ -97,7 +112,7 @@ the user's agreement.
   `validation/milestone5.qmd` is the accepted parity/spacing/heterogeneity
   assessment. `validation/milestone6.qmd` is the accepted individual-transition
   assessment (D116), with its final render active at acceptance. Preserve all
-  six reports, rendered artifacts and active render intermediates; do not
+  seven reports, rendered artifacts and any active render intermediates; do not
   fabricate results or set scientific acceptance thresholds. Milestone
   completion retains documented limitations and does not authorize future features.
 - Milestone 4 includes duration-dependent dissolution, age/duration searches by
@@ -111,10 +126,12 @@ the user's agreement.
   intermediates until rendering finishes, including milestone 5's active final
   render at closeout and milestone 6's active final render. Parity, fertility
   heterogeneity and individual group transitions are implemented and accepted.
-  See `docs/group-transitions.md`; household moves are deferred to the regions
-  milestone (D114). Calendar-time schedules (milestone 7) still require their
-  own scientific specification. Most categorical characteristics should
-  use groups, with multiple types of groups an optional complexity direction.
+  See `docs/group-transitions.md`; household moves remain deferred (D114),
+  with regional applications retained under tentative milestone 10's multiple
+  group columns (D121). Calendar-time rates follow `docs/time-varying-rates.md`
+  (D118); matching and inheritance model schedules are implemented under D123. Most categorical characteristics should
+  use groups; multiple group columns are tentative milestone 10 with their
+  schema still unselected.
 - Use `devtools::test()` for the testthat suite. Live database tests require
   explicit opt-in; ordinary verification must not download rates or expose
   credentials. See `docs/testing.md` for commands and evidence.

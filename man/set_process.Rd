@@ -39,7 +39,13 @@ strata. List names must occur in the schedules; omitted entries use 1.0.}
 defaulting to \code{0.75}. Must be finite and nonnegative.}
 
 \item{inheritance}{A group identity model from \code{\link[=create_group_inheritance]{create_group_inheritance()}},
-or a method name requiring no additional parameters: \code{"mother"}, \code{"father"},
+or a tibble with numeric \code{time_start}, \code{time_end} and list-column \code{model}
+containing complete inheritance models. Intervals are half-open absolute
+years, must not overlap and must cover the requested run. Select the active
+model at each birth; older identities and ancestry remain unchanged.
+Base data frames with list columns are accepted. All declared possible
+identities across scheduled models join the simulation-wide registry.
+Static inputs may also be a method name requiring no additional parameters: \code{"mother"}, \code{"father"},
 \code{"random_parent"}, \code{"same_sex"}, \code{"opposite_sex"}, or \code{"ancestry"}.
 Applies to fertility and defaults to selecting either parent with equal
 probability, with maternal fallback. Assignment is independent of recorded
