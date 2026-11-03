@@ -1,29 +1,30 @@
 # Current project handoff
 
-Updated October 31, 2026. This is a dated status record, not authorization for
+Updated November 2, 2026. This is a dated status record, not authorization for
 unspecified features or a standing pause instruction. The current user request
 controls work. Start with [the documentation index](README.md),
 [scientific contract](scientific-contract.md) and [decisions](decisions.md).
 
 ## Accepted milestones and active render
 
-Milestones 1–6 are complete by user acceptance: mortality/fertility (D029,
+Milestones 1–7 are complete by user acceptance: mortality/fertility (D029,
 October 15), union formation (D050, October 19), groups (D077, October 27),
 dissolution/remarriage/cohabitation (D093, October 29), parity-specific
 fertility/cell accounting/heterogeneity (D105, October 29), and individual
-group transitions (D116, October 30), all in 2026.
+group transitions (D116, October 30), followed by calendar-varying inputs
+(D127, November 2), all in 2026.
 
-Preserve all six user-authored report sources and rendered artifacts, input
+Preserve all seven user-authored report sources and rendered artifacts, input
 provenance and explanatory comments. Milestone 1 must be reproduced at its
 recorded historical commit because current execution requires a union process.
-The user is compiling the final milestone 6 report at this closeout. Preserve
+Milestone 6 had an active final render at its acceptance. Preserve
 `validation/milestone6.qmd`, `.html`, and all active render intermediates;
 do not move, remove, rerender or interrupt them for documentation work. Actual
 replication counts and population settings belong to the report. Acceptance
 is explicit, but final-render completion and numerical results are not
 independently certified by this documentation update.
 
-## Milestone 7: calendar-varying rates
+## Milestone 7 accepted complete
 
 The user approved calendar input semantics and authorized the six annual-rate
 inputs first (D118). Rates now accept flat `time_start`/`time_end` bands;
@@ -37,10 +38,13 @@ and matching-calibration updates that preserve event clocks at probability-only
 boundaries. Other arguments remain static. D119 adds multi-year HMD/HFD getters and native HMD shape selection;
 D120 adds optional `open_age` pooling from native deaths/exposure products;
 see [database preparation](database-rates.md). The user deferred stationary-year
-and historical-run setup to fix the getter first. This is implementation status,
-not scientific acceptance of milestone 7.
+and historical-run setup to fix the getter first. The user has now accepted
+milestone 7 complete (D127), based on `validation/milestone7.qmd` and its retained
+HTML assessment. The code/report revision at acceptance is
+`3b65d2202b006ef6f3e232c98595814b1544f9fe`. This closeout does not rerender or
+independently reproduce the report.
 
-D121 keeps milestone 7 on the current engine and assigns the future
+Milestone 7 is complete with the current engine (D127). D121 assigns the future
 [binned-group hazard/formula-weight change](binned-group-hazards.md) to milestone
 8. It remains unimplemented, with detailed formula and mechanism contracts
 still to specify. Summaries/helpers move to milestone 9. Multiple independent
@@ -50,6 +54,22 @@ The standalone regions/internal-migration milestone is removed; regional and
 household applications may be considered under tentative milestone 10 (D121).
 D114's rate-interpretation, household-membership and conditional-rescheduling
 questions are preserved in the roadmap. No household mechanism is implemented.
+
+D126 uses detailed previous-union categories `none`/`separated`/`widowed`, or
+pooled `none`/`dissolved`, consistently for search and probability inputs.
+Union/marriage calculators use `by_previous_union = TRUE` with optional
+`pool_dissolved = TRUE`; confidence limits use combined counts/exposure.
+Recent review fixes retain run-anchored unrealized-birth accounting and restrict
+execution group-coverage checks to active run slices. The last recorded full
+offline suite passed 6,430 assertions with no failures or warnings and one
+opt-in live test skipped; the subsequent `withr` test dependency declaration
+passed R's dependency scan and 133 focused assertions. These are local checks,
+not a claim that GitHub CI was rerun. See [testing](testing.md).
+
+Validation data now live in country/period subfolders; see the
+[data guide](../validation/data/README.md). Earlier report sources were not
+rewritten for that relocation; preserve historical reproducibility at their
+recorded revisions.
 
 ## Individual transitions and observations
 

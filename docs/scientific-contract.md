@@ -1,14 +1,14 @@
 # Scientific contract
 
-Updated October 31, 2026. This is the current mortality, fertility, union-formation,
+Updated November 2, 2026. This is the current mortality, fertility, union-formation,
 dissolution, remarriage, cohabitation/conversion, group identity/ancestry, and
-observation contract. Milestones 1–6 are accepted as complete
-(D029, D050, D077, D093, D105, D116), retaining documented limitations.
+observation contract. Milestones 1–7 are accepted as complete
+(D029, D050, D077, D093, D105, D116, D127), retaining documented limitations.
 Individual group transitions are accepted under the
 [transition contract](group-transitions.md). Milestone 7, time-varying inputs,
 has implemented calendar-varying rates under the user-approved
-[rate contract](time-varying-rates.md) (D118). Scientific assessment remains
-pending. Matching and inheritance model schedules are implemented under
+[rate contract](time-varying-rates.md) (D118), accepted complete November 2,
+2026 (D127). Matching and inheritance model schedules are implemented under
 [their contract](time-varying-models.md) (D123).
 Earlier monthly, exact
 age-varying and midpoint compensation specifications are available in Git
@@ -817,8 +817,9 @@ D121 assigns binned-group hazards and custom formula weights for all rate
 processes to milestone 8. The selected direction and remaining modeling/API
 questions are recorded in [the design discussion](binned-group-hazards.md).
 It is not implemented and does not change the current contracts above.
-The user will finish milestone 7 with the current engine before that rewrite;
-this planning decision does not mark milestone 7 accepted complete.
+Milestone 7 was accepted complete with the current engine (D127). The
+milestone 8 direction remains separate future work; completion does not
+authorize an unselected formula API or demographic mechanism.
 
 
 ## Calendar-varying matching and inheritance (D123)

@@ -1,6 +1,6 @@
 # Decision log
 
-Updated November 1, 2026. Entries retain the choices made at their original
+Updated November 2, 2026. Entries retain the choices made at their original
 dates; each numbered entry now states whether and how it remains current.
 Read [the scientific contract](scientific-contract.md) for implemented behavior,
 not a superseded API or timing statement buried in a historical entry.
@@ -60,12 +60,14 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Detailed union partner groups refer to formation | D115 |
 | Milestone 6 acceptance; time-varying inputs next | D116 |
 | Two-sex marriage model as tentative milestone 12 | D117, D121 |
-| Milestone 7 calendar-varying rates; model schedules deferred | D118 |
+| Calendar-varying rate inputs | D118 |
 | Multi-year HMD/HFD preparation and native HMD shapes | D119 |
 | Optional HMD open-age pooling from deaths and exposure | D120 |
 | Milestone 8 binned-group hazards/formula weights and milestones 9–12 revision | D121 |
 | Calendar-varying flat cohabitation probabilities | D122 |
 | Complete matching/inheritance model-list calendar schedules | D123 |
+| Detailed and pooled previous-union inputs and summaries | D126 |
+| Milestone 7 acceptance and retained validation evidence | D127 |
 
 ## Recorded decisions
 
@@ -2414,8 +2416,8 @@ milestone. Current union formation remains unchanged; milestone 7 remains next.
 
 ## D118 — Calendar-varying rates within one run (October 30, 2026)
 
-**Status:** user-approved semantics and implementation authorization. Scientific
-acceptance of milestone 7 remains pending.
+**Status:** user-approved semantics and implementation authorization; implemented.
+Milestone 7 was subsequently accepted complete under D127.
 
 The user approved flat rate tables with `time_start`/`time_end`, half-open
 calendar intervals, piecewise constant rates without interpolation, coverage
@@ -2560,8 +2562,8 @@ milestone 7 scientific acceptance.
 
 ## D123 — Complete model schedules for all matching and inheritance arguments (October 31, 2026)
 
-**Status:** user-selected API and explicit implementation authorization; implemented,
-with milestone 7 scientific assessment still pending.
+**Status:** user-selected API and explicit implementation authorization; implemented.
+Milestone 7 was subsequently accepted complete under D127.
 
 The user selected either a direct static model or a tibble with `time_start`,
 `time_end` and list-column `model` containing complete objects for `matching`,
@@ -2660,3 +2662,41 @@ For example, 2 separated events/10 years plus 3 widowed events/20 years gives
 not an average of rates or confidence limits. Validate equivalence of pooled
 inputs to explicitly equal detailed inputs and accounting/Poisson identities
 for pooled outputs, including calendars, groups, durations and conversions.
+
+## D127 — Milestone 7 accepted complete (November 2, 2026)
+
+**Status:** Accepted complete by the user's explicit request to record milestone
+7 completion. Date uses America/Los_Angeles; recorded November 3 UTC.
+
+**Decision:** Calendar-varying inputs are complete with the current engine:
+six annual-rate processes under D118, calendar-banded cohabitation probabilities
+under D122, and complete matching/inheritance model-list schedules under D123.
+Retain supporting database preparation (D119/D120), optional Poisson rate
+intervals (D124), and consistent detailed/pooled previous-union categories and
+confidence intervals (D126). This does not select or implement milestone 8's
+binned-group hazard and custom formula-weight mechanisms (D121).
+
+**Evidence:** The user's [milestone 7 report](../validation/milestone7.qmd),
+[rendered assessment](../validation/milestone7.html), its conclusion that the
+expectations were met, and the user's explicit completion instruction establish
+acceptance. The code/report revision at acceptance is
+`3b65d2202b006ef6f3e232c98595814b1544f9fe`. Software checks and the calendar-review
+regressions are separately recorded in [testing](testing.md). This documentation
+update does not rerun simulations, render the report, or independently certify
+all numerical findings or a remote CI rerun. Preserve all seven accepted report
+sources, rendered artifacts, source comments, provenance and active render
+intermediates.
+
+**Retained limits:** Acceptance applies to the assessed scenarios and documented
+contracts. Finite samples and sparse cells, complete-history requirements,
+failed searches and matching calibration, non-checkpoint restarts, and finite
+resolution of unrealized-birth reporting remain relevant. The historical-data
+demonstrations use documented approximations; completion does not establish
+universal rate recovery, historical reconstruction, SOCSIM equivalence, or
+release readiness. Non-rate settings outside D122/D123 remain static. Current
+calendar coverage and strata rules are unchanged. No additional acceptance
+thresholds or demographic defaults are inferred.
+
+**Next priority:** Milestone 8 remains the selected future direction under D121;
+its scientific specification, formula API and unresolved mechanisms require
+separate work and user decisions.

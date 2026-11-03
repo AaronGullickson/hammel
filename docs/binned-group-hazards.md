@@ -1,7 +1,8 @@
 # Milestone 8: binned-group hazards and formula weights
 
 Recorded October 31, 2026 (D121). **Status: user-selected future engine direction;
-not implemented.** Finish milestone 7 with its current engine. Milestone 8 will
+not implemented.** Milestone 7 was accepted complete with its current engine
+(D127, November 2, 2026). Milestone 8 will
 extend the fertility cell approach to all existing rate processes and allow
 custom formula weights on those processes. This document records the discussion,
 selected principles, proposed diagnostics and questions still needing a contract.

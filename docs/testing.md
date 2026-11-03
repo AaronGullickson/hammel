@@ -1,9 +1,27 @@
 # Testing and milestone validation
 
-Updated November 1, 2026. Milestones 1–6 are accepted as complete (D029,
-D050, D077, D093, D105, D116). Software test history and the user's demographic assessment
+Updated November 2, 2026. Milestones 1–7 are accepted as complete (D029,
+D050, D077, D093, D105, D116, D127). Software test history and the user's demographic assessment
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
+
+## Milestone 7 accepted assessment and closeout
+
+The user accepted milestone 7 as complete on November 2, 2026 (D127), following
+the user-authored [assessment](../validation/milestone7.qmd), its
+[rendered report](../validation/milestone7.html), and explicit acceptance.
+The report concludes that its expectations were met for calendar-varying
+rate/probability and model scenarios. The report's settings and numerical
+findings remain authoritative; no new thresholds or validation results are
+inferred. The code/report revision at acceptance is
+`3b65d2202b006ef6f3e232c98595814b1544f9fe`.
+
+Acceptance retains the current engine, documented model and observation
+limitations, and approximate demonstration inputs. Milestone 8's binned-group
+hazards and custom formula weights remain separate future work (D121).
+Reports, rendered artifacts and active intermediates are preserved unchanged;
+this documentation-only closeout neither reruns nor renders them. The earlier
+software-check records below are distinct from scientific acceptance.
 
 ## Optional Poisson rate intervals (D124, November 1, 2026)
 
@@ -106,7 +124,7 @@ non-checkpoint restarts and the documented life-table aggregation caveat.
 Household moves remain deferred (D114), with unresolved regional applications
 retained under tentative milestone 10's multiple group columns (D121). Calendar-varying rates
 are implemented under D118, with matching and inheritance schedules under D123.
-Milestone 7 scientific assessment remains pending.
+Milestone 7 was subsequently accepted complete on November 2, 2026 (D127).
 
 ## Milestone 5 accepted assessment and closeout
 

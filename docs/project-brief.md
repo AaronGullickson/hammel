@@ -1,6 +1,6 @@
 # Hammel project brief
 
-Updated October 31, 2026. The user accepted milestone 1 (mortality/fertility)
+Updated November 2, 2026. The user accepted milestone 1 (mortality/fertility)
 on October 15, 2026 (D029), milestone 2 (union formation) on October 19,
 2026 (D050), milestone 3 (groups) on October 27, 2026 (D077), and milestone 4
 (dissolution/remarriage/cohabitation) on October 29, 2026 (D093). Milestone 5
@@ -8,7 +8,8 @@ on October 15, 2026 (D029), milestone 2 (union formation) on October 19,
 was accepted October 29, 2026 (D105). The user accepted individual group transitions, milestone 6, on October 30,
 2026 (D116). Milestone 7 calendar-varying rates (D118) and cohabitation
 probabilities (D122), plus matching/inheritance model schedules (D123), are
-implemented; scientific assessment remains pending.
+accepted complete on November 2, 2026 (D127), based on the user-authored
+[validation report](../validation/milestone7.qmd) and explicit user acceptance.
 See [testing](testing.md) for evidence and limits.
 
 ## Purpose
@@ -167,8 +168,9 @@ finite-cell and non-checkpoint-restart limitations. The user subsequently
 approved calendar-varying rate semantics and authorized their implementation
 under D118; see [the rate contract](time-varying-rates.md). Whole-model matching and
 inheritance schedules are implemented under D123; see
-[the model contract](time-varying-models.md). Milestone 7 scientific
-acceptance remains pending.
+[the model contract](time-varying-models.md). The user accepted milestone 7
+as complete on November 2, 2026 (D127). Acceptance retains the report and
+current-contract limitations and does not authorize milestone 8 implementation.
 
 ## Boundaries and future work
 

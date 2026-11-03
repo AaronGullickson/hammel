@@ -4,8 +4,9 @@ Milestone 7 rate specification, October 30, 2026. The user approved these
 semantics and authorized rate implementation. D122 (October 31) adds flat
 calendar-banded cohabitation probabilities. D123 adds
 [matching/inheritance model schedules](time-varying-models.md); other non-rate
-arguments remain static. Milestone 7 scientific acceptance remains
-separate from implementation and software verification.
+arguments remain static. The user accepted milestone 7 as complete on
+November 2, 2026 (D127), based on the [validation report](../validation/milestone7.qmd).
+Scientific acceptance remains distinct from implementation and software verification.
 
 ## Inputs and coverage
 

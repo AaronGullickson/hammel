@@ -5,7 +5,8 @@ model arguments—`matching`, `cohab_matching`, `father_matching`, and fertility
 `inheritance`—to accept either a direct model or a schedule tibble with
 `time_start`, `time_end`, and a list column named `model`. This extends D118's
 approved event-time model selection. It does not introduce the milestone 8
-binned-group hazard rewrite or establish milestone 7 scientific acceptance.
+binned-group hazard rewrite. Milestone 7 was subsequently accepted complete
+on November 2, 2026 (D127); see the [validation report](../validation/milestone7.qmd).
 
 ## Input contract
 

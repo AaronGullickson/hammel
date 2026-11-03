@@ -1,6 +1,6 @@
 # Validation reports and supporting evidence
 
-Milestones 1–6 are accepted by the user (D029, D050, D077, D093, D105, D116). Keep the
+Milestones 1–7 are accepted by the user (D029, D050, D077, D093, D105, D116, D127). Keep the
 source reports, final rendered HTML, explanatory comments, and input provenance.
 Acceptance retains the limitations documented in each report and the scientific
 contract; software checks and empirical assessment are different evidence.
@@ -32,6 +32,11 @@ contract; software checks and empirical assessment are different evidence.
   formation-group recovery, population shares and performance. The final render
   is active at acceptance; preserve all intermediates. Actual replication and
   population settings are in the report, not inferred from earlier drafts.
+- [Milestone 7 report](milestone7.qmd) / [rendered assessment](milestone7.html):
+  accepted November 2, 2026 (D127); calendar-varying rates, cohabitation
+  probabilities and matching/inheritance model schedules. Retain the report's
+  settings, conclusions and documented approximations. The current engine is
+  unchanged by closeout; milestone 8's engine redesign remains future work.
 - `milestone5/`: supporting method investigations and diagnostics, including
   superseded-correction evidence, runtime cell-accounting checks, reference
   SOCSIM experiments and version-specific reproduction instructions.

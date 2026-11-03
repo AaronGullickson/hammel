@@ -9,7 +9,7 @@ under D102/D104; see [heterogeneity](fertility-heterogeneity-notes.md). The
 [accepted report](../validation/milestone5.qmd) retains sparse/unrealized-cell
 and reproductive-selection limitations. Group transitions were accepted
 October 30, 2026 (D116); calendar-varying rates are implemented under D118,
-with milestone 7 scientific assessment pending.
+with milestone 7 accepted complete November 2, 2026 (D127).
 
 ## Selected representation
 

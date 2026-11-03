@@ -85,14 +85,16 @@ the user's agreement.
   accepted October 29, 2026 (D105). Individual group transitions (milestone 6)
   were accepted October 30, 2026 (D116). Milestone 7 calendar-varying rates are
   implemented under the user-approved D118 contract in
-  `docs/time-varying-rates.md`; scientific assessment remains pending. Matching
+  `docs/time-varying-rates.md`; the user accepted milestone 7 as complete on
+  November 2, 2026 (D127), based on `validation/milestone7.qmd` and its retained
+  rendered assessment. Matching
   and inheritance model schedules are implemented under D123; see
   `docs/time-varying-models.md` for the shared model-list tibble interface,
   event-time selection, dynamic NULL fallbacks and future identity registry.
   D122 adds calendar
   bands to `cohab_prob`; probability-only changes update type selection and
   matching calibration while preserving pending event dates. Other arguments
-  remain static. Finish milestone 7 with the current engine. D121 assigns
+  remain static. Milestone 7 is complete with the current engine. D121 assigns
   binned-group hazards and custom formula weights across rate processes to
   milestone 8; see `docs/binned-group-hazards.md`. This direction is not
   implemented. Summaries/helpers move to 9; multiple group columns are tentative
@@ -110,7 +112,7 @@ the user's agreement.
   `validation/milestone5.qmd` is the accepted parity/spacing/heterogeneity
   assessment. `validation/milestone6.qmd` is the accepted individual-transition
   assessment (D116), with its final render active at acceptance. Preserve all
-  six reports, rendered artifacts and active render intermediates; do not
+  seven reports, rendered artifacts and any active render intermediates; do not
   fabricate results or set scientific acceptance thresholds. Milestone
   completion retains documented limitations and does not authorize future features.
 - Milestone 4 includes duration-dependent dissolution, age/duration searches by

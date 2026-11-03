@@ -1,10 +1,10 @@
 # Development roadmap
 
-Updated October 31, 2026. Milestones 1–6 are complete by user acceptance
-(D029, D050, D077, D093, D105, D116). **Milestone 7 calendar-varying rates
-are implemented under D118; D122 adds cohabitation probability calendars and
-D123 implements matching/inheritance model schedules. Scientific assessment
-remains pending.** Finish milestone 7 with the current engine. The user selected
+Updated November 2, 2026. Milestones 1–7 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116, D127). **Milestone 7 was accepted complete
+on November 2, 2026:** calendar-varying rates (D118), cohabitation probability
+calendars (D122), and matching/inheritance model schedules (D123), retaining
+the current engine and documented limitations. The user selected
 binned-group hazards and formula weights for milestone 8 (D121).
 Future entries record planning priorities, not authorization to implement unspecified demographic behavior
 or an unselected public API.
@@ -14,7 +14,7 @@ or an unselected public API.
 | 4 | Union dissolution, age/duration remarriage, and cohabitation | Complete (D093) |
 | 5 | Parity-specific fertility and fertility heterogeneity | Complete (D105); limitations retained |
 | 6 | Group transitions, including categorical characteristics represented by groups | Complete October 30, 2026 (D116); final render active at acceptance |
-| 7 | Time-varying rates, matching, and inheritance within a simulation run | Rates/probabilities/models implemented (D118/D122/D123); scientific assessment pending |
+| 7 | Time-varying rates, matching, and inheritance within a simulation run | Complete November 2, 2026 (D127); current engine and documented limitations retained |
 | 8 | Binned-group hazards for all rate processes; custom formula weights on all rates | User-selected direction (D121); specification/API and implementation pending |
 | 9 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed; moved from former milestone 8 (D121) |
 | 10 | More than one group column, potentially including regions and internal migration | Tentative (D121); schema and mechanism contracts unselected |
@@ -190,8 +190,9 @@ function already handles assigning mixed-parent births to a specified category.
 
 ## Milestone 7: time-varying inputs within a run
 
-Calendar-varying rates are implemented under the user's D118 authorization;
-scientific assessment remains pending. Flat rate tables use optional half-open
+Accepted complete November 2, 2026 (D127), based on the user-authored
+[validation report](../validation/milestone7.qmd) and explicit acceptance.
+Calendar-varying rates are implemented under the user's D118 authorization. Flat rate tables use optional half-open
 `time_start`/`time_end` bands, including fractional years. The engine updates
 pending risks, fertility cells and calibration while preserving histories,
 spacing and duration origins. See [the rate contract](time-varying-rates.md).
@@ -215,7 +216,7 @@ remain static. This work does not introduce the milestone 8 engine change.
 ## Milestone 8: binned-group hazards and formula weights
 
 The user selected this engine change on October 31, 2026 (D121), after milestone
-7 is finished with its current engine. Extend cell-based event scheduling to all
+7, completed with its current engine (D127). Extend cell-based event scheduling to all
 six existing rate processes and allow custom formula weights to distribute
 individual or union risk within cells while preserving input cell intensities.
 Use single-year age or duration subdivisions, retain fractional input boundaries
@@ -227,7 +228,7 @@ composition-dependent normalization, possible redundancy warnings, future
 user-defined characteristics, process-specific caveats and proposed validation.
 Formula APIs, safe evaluation, eligibility/failure rules and scheduling details
 still require specification before implementation. This milestone does not
-redefine the remaining milestone 7 work or imply its scientific acceptance.
+change the accepted milestone 7 behavior or authorize an unspecified mechanism.
 
 ## Proposed milestone 9: summaries, diagnostics, and helpers
 
@@ -440,4 +441,4 @@ reference for investigation, not an adopted response rule or period length.
 R formula-fallback performance comparisons are now included in the user-authored
 milestone 2 validation report, accepted by the user on October 19, 2026 (D050).
 Initialization and exact checkpoints remain separate future topics. Calendar-varying
-schedules now fall under planned milestone 7 above.
+schedules are implemented under milestone 7, accepted complete (D127).
