@@ -129,7 +129,7 @@ test_that("duration search clocks retain their origin across rate boundaries", {
   m <- calendar_pairs(1)
   m$population$unions$end_time <- -.2
   m$population$unions$end_reason <- "dissolution"
-  r <- data.frame(previous_union = c("none", "dissolved", "widowed"),
+  r <- data.frame(previous_union = c("none", "separated", "widowed"),
     age_start = c(0, NA, 0), age_end = c(Inf, NA, Inf),
     dur_start = c(NA, 1, NA), dur_end = c(NA, Inf, NA), rate = 0)
   r <- calendar_epochs(r, c(0, 1e5))

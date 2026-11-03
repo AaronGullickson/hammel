@@ -10,7 +10,8 @@ calculate_marriage_rates(
   age_breaks,
   by_group = FALSE,
   by_previous_union = FALSE,
-  conf.level = NULL
+  conf.level = NULL,
+  pool_dissolved = FALSE
 )
 }
 \arguments{
@@ -35,6 +36,12 @@ numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_hig
 from two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} intervals for observed event
 counts over exposure. Bounds are NA at zero exposure. For fertility, these
 describe the observed rate, not the unrealized-adjusted rate.}
+
+\item{pool_dissolved}{Logical, default FALSE. With TRUE, return \code{"none"}
+and \code{"dissolved"}, pooling separated and widowed events and exposure before
+calculating rates and confidence intervals. Requires \code{by_previous_union}
+(also enabled by \code{dur_breaks}). With FALSE, stratified output uses the detailed
+\code{"none"}, \code{"separated"}, and \code{"widowed"} categories.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, \code{sex}, \code{age_start}, \code{age_end},

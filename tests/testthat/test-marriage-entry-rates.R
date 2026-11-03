@@ -99,9 +99,9 @@ test_that("marriage previous categories include cohabiting exposure and conversi
       by_previous_union=TRUE)
     expect_equal(sum(split$person_years),sum(pooled$person_years))
     expect_equal(sum(split$marriages),sum(pooled$marriages))
-    expect_equal(sum(split$person_years[split$previous_union == "dissolved"]),6)
-    expect_equal(sum(split$marriages[split$previous_union == "dissolved"]),2)
-    expect_equal(sum(split$person_years[split$previous_union != "dissolved"]),0)
+    expect_equal(sum(split$person_years[split$previous_union == "separated"]),6)
+    expect_equal(sum(split$marriages[split$previous_union == "separated"]),2)
+    expect_equal(sum(split$person_years[split$previous_union != "separated"]),0)
   }
   expect_error(calculate_marriage_rates(pop,c(0,5),c(0,Inf),
     by_previous_union=NA),"TRUE or FALSE")

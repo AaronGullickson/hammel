@@ -59,11 +59,10 @@ share the schedule. Group does not restrict partner matching. With no
 population groups, simulation warns and selects the first alphabetical group.
 See \code{\link[=mortality]{mortality()}} for group-label and rate-coverage rules.
 Nonoverlapping bands may have gaps or an open end; gaps and ages outside
-support have zero hazard. Optional \code{previous_union} stratifies by \code{"none"},
-\code{"dissolved"}, and \code{"widowed"}. Each group requires \code{"none"} and
-\code{"dissolved"}; omitted \code{"widowed"} uses the complete dissolved schedule
-in that group and active calendar period. Explicit widowed bands override
-the fallback as a whole, including zero hazard in their gaps.
+support have zero hazard. Optional \code{previous_union} supplies either
+\code{"none"}, \code{"separated"}, \code{"widowed"}, or pooled \code{"none"}, \code{"dissolved"}.
+Dissolved pools separation and widowhood. Each group and active calendar
+slice must supply one complete set; mixing the sets is not allowed.
 Without it, the schedule applies to all previous union types. Categories
 describe the most recent recorded episode; complete histories are required.
 Optionally include both \code{dur_start} and \code{dur_end} for elapsed years since
@@ -136,7 +135,7 @@ a linked marriage with a new dissolution-duration origin.}
 
 \item{cohabitation_counts_as_previous_union}{Logical, default FALSE. FALSE
 restores previous legal-marriage category after a cohabitation ends; TRUE
-classifies cohab breakup/death as dissolved/widowed. Search duration still
+classifies cohab breakup/death as separated/widowed. Search duration still
 starts at the latest partnership ending. Only applies to typed unions.}
 
 \item{model}{A \code{hammel_model} object.}

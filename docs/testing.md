@@ -1042,15 +1042,28 @@ partner rescheduling can change RNG consumption without changing the model's
 zero-transition distribution. Sharing a seed across scenarios therefore does
 not guarantee identical paths; compare replicated demographic quantities.
 
-## Widowed search-rate fallback (D125, November 2, 2026)
+## Detailed and pooled previous unions (D126, November 2, 2026)
 
-`devtools::test()` passed 4,337 assertions with zero failures, one skipped
-opt-in live database test, and one environment warning: `timedatectl` exited
-with status 1 while loading the HMDHFDplus dependency in a local-reader test.
-No live rates were downloaded. The 19 fallback checks cover fixed-seed
-equivalence to explicit widowed copies for age and duration schedules, existing
-widowhood histories, calendar-slice and group selection, explicit zero rates
-and gaps, unchanged stored inputs, edited inputs, and effective clock
-consistency. Cohabitation probabilities still require all three categories.
-These are software checks, not a new demographic validation or milestone
-acceptance. The user-authored milestone 7 report was not changed.
+`TZ=UTC Rscript -e 'devtools::document(); devtools::test()'` passed 6,404
+assertions with zero failures or warnings and one skipped opt-in live database
+test. No live rates were downloaded. Detailed inputs and outputs now use
+none/separated/widowed; pooled inputs and outputs use none/dissolved. Regression
+checks compare pooled inputs with explicit detailed copies for both ending
+causes, age and duration clocks, grouped calendar schedules, cohabitation
+probabilities and fixed-seed execution. Incomplete/mixed alternatives and
+inconsistent effective clocks are rejected.
+
+Calculator checks sum detailed events/exposure independently for every pooled
+cell and compare rate and exact Poisson limits with those totals, including
+marriage conversions, union-type strata, periods, sex, numeric groups, age and
+duration bands, empty cells and the requirement for previous-union strata.
+Documentation and help were regenerated. These are software checks, not a new
+demographic validation or milestone acceptance. User-authored validation reports
+and their data files were not edited.
+
+The user-selected follow-up renames the pooling flag to `pool_dissolved` and
+requires previous-union stratification rather than implicitly enabling it.
+After regenerating help, `devtools::test(filter =
+"previous-union-pooling|marriage-entry|marriage-duration|marriage-counts")`
+passed 2,339 assertions without failures, warnings or skips. Tests include the
+explicit-flag requirement and duration breaks' existing implicit stratification.

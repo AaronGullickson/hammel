@@ -236,7 +236,7 @@ unpartnered exposure, union starts, and partnership-entry rates by sex,
 excluding conversions.
 `by_previous_union = TRUE` adds previous categories; `by_group = TRUE` independently
 adds individual groups. Both default to FALSE (D080). Optional `dur_breaks`
-automatically separates previous categories and measures dissolved/widowed rows
+automatically separates previous categories and measures separated/widowed rows
 by duration, leaving none rows by age (D084). It requires exclusive union histories.
 Rate-mode input schedules optionally use the same `previous_union` categories;
 see [remarriage](remarriage.md) for initialization and calibration details.

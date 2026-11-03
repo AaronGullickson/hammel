@@ -404,11 +404,10 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   population groups, simulation warns and selects the first alphabetical group.
 #'   See [mortality()] for group-label and rate-coverage rules.
 #'   Nonoverlapping bands may have gaps or an open end; gaps and ages outside
-#'   support have zero hazard. Optional `previous_union` stratifies by `"none"`,
-#'   `"dissolved"`, and `"widowed"`. Each group requires `"none"` and
-#'   `"dissolved"`; omitted `"widowed"` uses the complete dissolved schedule
-#'   in that group and active calendar period. Explicit widowed bands override
-#'   the fallback as a whole, including zero hazard in their gaps.
+#'   support have zero hazard. Optional `previous_union` supplies either
+#'   `"none"`, `"separated"`, `"widowed"`, or pooled `"none"`, `"dissolved"`.
+#'   Dissolved pools separation and widowhood. Each group and active calendar
+#'   slice must supply one complete set; mixing the sets is not allowed.
 #'   Without it, the schedule applies to all previous union types. Categories
 #'   describe the most recent recorded episode; complete histories are required.
 #'   Optionally include both `dur_start` and `dur_end` for elapsed years since
@@ -447,7 +446,7 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   a linked marriage with a new dissolution-duration origin.
 #' @param cohabitation_counts_as_previous_union Logical, default FALSE. FALSE
 #'   restores previous legal-marriage category after a cohabitation ends; TRUE
-#'   classifies cohab breakup/death as dissolved/widowed. Search duration still
+#'   classifies cohab breakup/death as separated/widowed. Search duration still
 #'   starts at the latest partnership ending. Only applies to typed unions.
 #' @param model A `hammel_model` object.
 #' @return `union_formation()` returns a `hammel_union_formation` process;
@@ -541,18 +540,20 @@ validate_union_formation <- function(process) {
 }
 
 
-expand_widowed_search_rates <- function(rates) {
+expand_previous_union_rates <- function(rates) {
   if (!"previous_union" %in% names(rates)) return(rates)
   changed <- FALSE
   expand_slice <- function(x) {
     copies <- lapply(split_rate_groups(x), function(rows) {
-      if ("widowed" %in% x$previous_union[rows]) return(NULL)
       copy <- x[rows[x$previous_union[rows] == "dissolved"], , drop = FALSE]
       if (nrow(copy)) changed <<- TRUE
-      copy$previous_union <- rep("widowed", nrow(copy))
-      copy
+      do.call(rbind, lapply(c("separated", "widowed"), function(label) {
+        out <- copy
+        out$previous_union <- rep(label, nrow(copy))
+        out
+      }))
     })
-    do.call(rbind, c(list(x), copies))
+    do.call(rbind, c(list(x[x$previous_union != "dissolved", , drop = FALSE]), copies))
   }
   if (!has_calendar_rates(rates)) return(expand_slice(rates))
   times <- sort(unique(c(rates$time_start, rates$time_end)))
@@ -567,10 +568,10 @@ expand_widowed_search_rates <- function(rates) {
   if (changed) do.call(rbind, pieces) else rates
 }
 
-validate_union_search_rates <- function(rates, widow_fallback = TRUE) {
+validate_union_search_rates <- function(rates) {
     if (has_calendar_rates(rates)) {
-      validate_calendar_rates(rates, function(x) validate_union_search_rates(x, widow_fallback))
-      effective <- if (widow_fallback) expand_widowed_search_rates(rates) else rates
+      validate_calendar_rates(rates, validate_union_search_rates)
+      effective <- expand_previous_union_rates(rates)
       if (all(c("previous_union", "dur_start") %in% names(effective)) &&
           any(vapply(split(!is.na(effective$dur_start), effective$previous_union),
             function(x) length(unique(x)) != 1L, logical(1))))
@@ -608,7 +609,7 @@ validate_union_search_rates <- function(rates, widow_fallback = TRUE) {
     ends <- rates$age_end
     if (any(duration)) {
       if (!"previous_union" %in% names(rates))
-        stop("Duration search bands require `previous_union` ('dissolved' or 'widowed').", call. = FALSE)
+        stop("Duration search bands require `previous_union` ('dissolved', 'separated', or 'widowed').", call. = FALSE)
       starts[duration] <- rates$dur_start[duration]
       ends[duration] <- rates$dur_end[duration]
     }
@@ -618,18 +619,18 @@ validate_union_search_rates <- function(rates, widow_fallback = TRUE) {
     strata <- split_rate_groups(rates)
     if ("previous_union" %in% names(rates)) {
       previous <- rates$previous_union
-      categories <- c("none", "dissolved", "widowed")
+      categories <- c("none", "separated", "widowed", "dissolved")
       if (!is.character(previous) || !is.null(dim(previous)) || anyNA(previous) ||
           any(!previous %in% categories))
-        stop("`previous_union` must contain 'none', 'dissolved', or 'widowed'.", call. = FALSE)
+        stop("`previous_union` must contain 'none', 'separated', 'widowed', or pooled 'dissolved'.", call. = FALSE)
       if (any(vapply(strata, function(rows)
-          !(if (widow_fallback) all(c("none", "dissolved") %in% previous[rows]) else
-            setequal(previous[rows], categories)), logical(1))))
-        stop("Union-search schedules require 'none' and 'dissolved' (or all three `previous_union` categories) within each group; cohab_prob requires all three.",
+          !(setequal(previous[rows], c("none", "dissolved")) ||
+            setequal(previous[rows], c("none", "separated", "widowed"))), logical(1))))
+        stop("Supply either 'none' and 'dissolved', or all three detailed `previous_union` categories: 'none', 'separated', 'widowed', within each group and calendar period. Do not mix pooled and detailed categories.",
              call. = FALSE)
       if (any(duration & previous == "none"))
         stop("`previous_union = 'none'` requires age-specific bands.", call. = FALSE)
-      effective <- if (widow_fallback) expand_widowed_search_rates(rates) else rates
+      effective <- expand_previous_union_rates(rates)
       effective_duration <- if (all(duration_columns)) !is.na(effective$dur_start) else
         rep(FALSE, nrow(effective))
       if (any(vapply(split(effective_duration, effective$previous_union), function(x) length(unique(x)) != 1L, logical(1))))

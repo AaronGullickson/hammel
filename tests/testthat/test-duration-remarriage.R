@@ -1,5 +1,5 @@
 duration_search_rates <- function(rate = .2) {
-  data.frame(previous_union = c("none", "dissolved", "widowed"),
+  data.frame(previous_union = c("none", "separated", "widowed"),
     age_start = c(15, NA, NA), age_end = c(Inf, NA, NA),
     dur_start = c(NA, 0, 0), dur_end = c(NA, Inf, Inf), rate = c(0, rate, rate))
 }

@@ -12,8 +12,8 @@ clocks. When enabled, probability tables use `age_start`, `age_end`, `prob`,
 optionally `group` and `previous_union`; probabilities are finite in [0,1].
 Bands cannot overlap within strata. Gaps and uncovered ages have probability
 zero. Group coverage follows search schedules. When `previous_union` is used,
-all three categories remain required for probabilities; the D125 widowed
-fallback applies only to search rates.
+supply either `none`/`dissolved` (pooling breakup and widowhood), or
+`none`/`separated`/`widowed`, independently per group and active period (D126).
 
 ### Calendar-varying type probabilities (D122)
 
@@ -129,8 +129,8 @@ summaries reset at conversion. Marriage-entry summaries exclude conversion.
 ## Previous history, restarts and observations
 
 Track legal-marriage category independently from current partnership type.
-Under the default toggle, a cohab ending restores none/dissolved/widowed from
-legal marriages; with TRUE it assigns dissolved/widowed from that cohab ending.
+Under the default toggle, a cohab ending restores none/separated/widowed from
+legal marriages; with TRUE it assigns separated/widowed from that cohab ending.
 Every actual partnership ending resets the subsequent search-duration origin,
 including a cohab ending when an older legal category is recovered. Conversion
 is not an unpartnered ending and does not reset the previous-category cache.

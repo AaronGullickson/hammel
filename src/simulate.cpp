@@ -1320,7 +1320,7 @@ List inspect_weighted_calibration_cpp(NumericVector female_born, IntegerVector f
   std::vector<bool> duration_bands(group_count * categories, false);
   std::vector<std::vector<Band>> bands(group_count * categories);
   std::vector<const std::vector<Band>*> hazards(group_count * categories);
-  const std::array<std::string, 3> labels = {"none", "dissolved", "widowed"};
+  const std::array<std::string, 3> labels = {"none", "separated", "widowed"};
   for (int g = 0; g < group_count; ++g) {
     for (int p = 0; p < categories; ++p) {
       const int i = g * categories + p;
@@ -1865,7 +1865,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   auto load_probabilities = [&]() {
     if (cohab_enabled) {
       const bool previous_prob = cohab_prob.containsElementNamed("previous_union");
-      const std::array<std::string, 3> labels = {"none", "dissolved", "widowed"};
+      const std::array<std::string, 3> labels = {"none", "separated", "widowed"};
       for (int g = 0; g < group_count; ++g) for (int p = 0; p < 3; ++p)
         probability_schedules[g * 3 + p] = read_bands(cohab_prob, "", "", g, previous_prob ? labels[p] : "");
     }
@@ -2069,7 +2069,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       }
       if (rate_initiation) {
         if (previous_specific) {
-          const std::array<std::string, 3> labels = {"none", "dissolved", "widowed"};
+          const std::array<std::string, 3> labels = {"none", "separated", "widowed"};
           for (int p = 0; p < 3; ++p) {
             rates.duration_search[p] = search_uses_duration(union_rates, labels[p]);
             rates.previous_search[p] = read_bands(union_rates, "", "", group, labels[p],
@@ -2762,7 +2762,7 @@ List inspect_intensity_tracker_cpp(NumericVector female_born, IntegerVector fema
   FemaleIntensityTracker tracker(calibration);
   const bool stratified = search_rates.containsElementNamed("previous_union");
   const int categories = stratified ? 3 : 1;
-  const std::array<std::string, 3> labels = {"none", "dissolved", "widowed"};
+  const std::array<std::string, 3> labels = {"none", "separated", "widowed"};
   std::vector<std::vector<Band>> searches(group_count * categories), fertility(group_count);
   for (int g = 0; g < group_count; ++g) {
     fertility[g] = read_bands(fertility_rates, "", "", g);

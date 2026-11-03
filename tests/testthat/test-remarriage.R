@@ -1,13 +1,13 @@
 previous_rates <- function(none = 0, dissolved = 0, widowed = 0) {
   data.frame(age_start = 15, age_end = Inf, rate = c(none, dissolved, widowed),
-    previous_union = c("none", "dissolved", "widowed"))
+    previous_union = c("none", "separated", "widowed"))
 }
 
 test_that("previous-union schedules require complete valid strata within groups", {
   rates <- previous_rates(.1, .2, .3)
   expect_s3_class(union_formation("rate", rates = rates)$rates, "tbl_df")
   expect_error(union_formation("rate", rates = rates[-1, ]), "all three")
-  for (value in list(c("none", "dissolved", NA), c("none", "divorced", "widowed"),
+  for (value in list(c("none", "separated", NA), c("none", "divorced", "widowed"),
                      factor(rates$previous_union), matrix(rates$previous_union))) {
     bad <- rates; bad$previous_union <- value
     expect_error(union_formation("rate", rates = bad), "previous_union")
@@ -29,13 +29,13 @@ test_that("latest recorded union selects the search schedule on restart", {
     husband_id = c(3, 2), start_time = c(-4, -8), end_time = c(-2, -6),
     end_reason = c("dissolution", "death_husband"))
   model$population$persons$death_time[2] <- -6
-  for (category in c("none", "dissolved", "widowed")) {
+  for (category in c("none", "separated", "widowed")) {
     rates <- previous_rates()
     rates$rate[rates$previous_union == category] <- 1e4
     m <- set_union_formation(model, "rate", rates = rates, kinship_generations = 0)
     result <- simulate(m, .1, 42)
-    expect_equal(nrow(result$unions), if (category == "dissolved") 3 else 2)
-    if (category == "dissolved") expect_lt(tail(result$unions$start_time, 1), .1)
+    expect_equal(nrow(result$unions), if (category == "separated") 3 else 2)
+    if (category == "separated") expect_lt(tail(result$unions$start_time, 1), .1)
     # Reversing the input rows leaves execution unchanged.
     m$population$unions <- m$population$unions[2:1, ]
     other <- simulate(m, .1, 42)
@@ -143,7 +143,7 @@ test_that("grouped schedules and multipliers preserve the explicit hazards", {
   expect_identical(a, simulate(reference, 5, 73))
   expect_true(any(a$unions$end_reason == "dissolution", na.rm = TRUE))
   counts <- calculate_union_rates(a, c(0, 5), c(0, Inf), TRUE, by_previous_union = TRUE)
-  expect_gt(sum(counts$unions[counts$previous_union == "dissolved"]), 0)
+  expect_gt(sum(counts$unions[counts$previous_union == "separated"]), 0)
   # Shared hazards versus three equal category hazards give the same execution.
   plain <- set_union_formation(model, "rate", matching,
     rates = data.frame(age_start = 15, age_end = Inf, rate = 2),

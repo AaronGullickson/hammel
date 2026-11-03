@@ -20,7 +20,7 @@ test_that("duration breaks select the previous ending clock and enable stratific
   none <- subset(women, previous_union == "none")
   expect_equal(none$person_years, c(1, 0))
   expect_equal(none$unions, c(0, 1))
-  for (status in c("dissolved", "widowed")) {
+  for (status in c("separated", "widowed")) {
     rows <- subset(women, previous_union == status)
     expect_equal(rows$person_years, c(.5, .5, 0, 0))
     expect_equal(rows$unions, c(0, 0, 1, 0))
@@ -37,7 +37,7 @@ test_that("duration exposure uses history before the window and resets after eac
   pop <- make_duration_rate_history()
   result <- calculate_union_rates(pop, c(2.5, 3, 4, 4.5, 5, 6), c(0, Inf),
     dur_breaks = c(0, .5, 1, Inf))
-  dissolved <- subset(result, sex == "f" & previous_union == "dissolved")
+  dissolved <- subset(result, sex == "f" & previous_union == "separated")
   expect_equal(sum(dissolved$person_years), .5)
   expect_equal(dissolved$dur_start[dissolved$person_years > 0], .5)
   event <- subset(dissolved, unions > 0)
@@ -69,7 +69,7 @@ test_that("group/sex/period duration cells preserve pooled counts and exposure",
   limited <- calculate_union_rates(pop, c(0, 6), c(50, Inf),
     dur_breaks = c(0, Inf))
   expect_equal(sum(subset(limited, previous_union == "none")$person_years), 0)
-  expect_equal(sum(subset(limited, previous_union == "dissolved")$person_years), 5)
+  expect_equal(sum(subset(limited, previous_union == "separated")$person_years), 5)
   expect_equal(sum(subset(limited, previous_union == "widowed")$person_years), 1)
 })
 
@@ -79,7 +79,7 @@ test_that("duration observation handles zero-duration episodes and empty outputs
   pop$unions$end_time <- c(2, 2, NA)
   pop$unions$end_reason[2] <- "dissolution"
   counts <- calculate_union_rates(pop, c(0, 6), c(0, Inf), dur_breaks = c(0, .5, Inf))
-  women <- subset(counts, sex == "f" & previous_union == "dissolved")
+  women <- subset(counts, sex == "f" & previous_union == "separated")
   expect_equal(women$unions, c(2, 0))
   expect_equal(women$person_years, c(0, 0))
   expect_true(all(is.na(women$rate_union)))
@@ -110,14 +110,14 @@ test_that("observed duration rates recover known female search hazards", {
   model$population$unions <- tibble::tibble(union_id = seq_len(n),
     wife_id = seq_len(n), husband_id = n + seq_len(n), start_time = -5,
     end_time = 0, end_reason = "dissolution")
-  rates <- data.frame(previous_union = c("none", rep("dissolved", 3), "widowed"),
+  rates <- data.frame(previous_union = c("none", rep("separated", 3), "widowed"),
     age_start = c(15, NA, NA, NA, NA), age_end = c(Inf, NA, NA, NA, NA),
     dur_start = c(NA, 0, 1, 2, 0), dur_end = c(NA, 1, 2, Inf, Inf),
     rate = c(0, .1, .3, .2, 0))
   model <- set_union_formation(model, "rate", rates = rates, kinship_generations = 0L)
   result <- simulate(model, 4, 771)
   observed <- calculate_union_rates(result, c(0, 4), c(0, Inf), dur_breaks = c(0, 1, 2, Inf))
-  women <- subset(observed, sex == "f" & previous_union == "dissolved")
+  women <- subset(observed, sex == "f" & previous_union == "separated")
   target <- c(.1, .3, .2)
   expect_true(all(abs(women$rate_union - target) < 6 * sqrt(target / women$person_years)))
   expect_equal(sum(women$unions), nrow(result$unions) - n)

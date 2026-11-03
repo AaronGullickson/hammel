@@ -20,7 +20,7 @@ validate_cohabitation <- function(process) {
         any(c("rate", "dur_start", "dur_end") %in% names(x)))
       stop("`cohab_prob` needs age-specific probabilities in [0, 1], with `prob`, not `rate`.", call. = FALSE)
     x$rate <- x$prob
-    validate_union_search_rates(x, widow_fallback = FALSE)
+    validate_union_search_rates(x)
   }
   if (!is.null(process$union_convert_rate)) validate_conversion_rates(process$union_convert_rate)
   invisible(process)
@@ -45,9 +45,9 @@ validate_conversion_rates <- function(rates) {
   duration <- !is.na(x$dur_start)
   if (length(unique(duration)) != 1L)
     stop("Conversion rates must use one age or duration clock across all groups.", call. = FALSE)
-  x$previous_union <- "dissolved"
+  x$previous_union <- "separated"
   # Fill unused synthetic categories with copies to exercise existing coverage.
-  x <- do.call(rbind, lapply(c("none", "dissolved", "widowed"), function(label) {
+  x <- do.call(rbind, lapply(c("none", "separated", "widowed"), function(label) {
     copy <- x; copy$previous_union <- label
     if (label == "none" && all(duration)) {
       copy$age_start <- copy$dur_start; copy$age_end <- copy$dur_end
@@ -62,7 +62,8 @@ validate_conversion_rates <- function(rates) {
 prepare_cohabitation <- function(process, population, groups) {
   empty <- data.frame(age_start = numeric(), age_end = numeric(), rate = numeric())
   if (is.null(process$cohab_prob)) return(list(enabled = FALSE, prob = empty, conversion = empty))
-  prob <- prepare_group_rates(process$cohab_prob, population$persons, "cohabitation probability", groups)
+  prob <- prepare_group_rates(expand_previous_union_rates(process$cohab_prob),
+    population$persons, "cohabitation probability", groups)
   prob$rate <- prob$prob # private Band convention
   conversion <- process$union_convert_rate
   if (is.null(conversion)) {

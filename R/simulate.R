@@ -16,7 +16,7 @@
 #' If no eligible man exists, cancel the birth by default. Explicitly set
 #' `cancel_birth_if_no_match = FALSE` to preserve it with unknown father.
 #' Rate initiation adds age- or duration-specific search events for unpartnered
-#' women only. Duration schedules for dissolved/widowed categories measure time
+#' women only. Duration schedules for separated/widowed categories measure time
 #' since the most recent union ended; `none` remains age-specific.
 #' Failed attempts draw another waiting time. Widowhood cancels pending births
 #' and switches to unpartnered fertility; a new union switches to partnered
@@ -34,7 +34,7 @@
 #' death, birth, dissolution, then search. Dissolution `group_pair` schedules and
 #' multipliers use symmetric pairings of both partners' groups. Rate-based
 #' formation optionally selects age/duration schedules using `previous_union`:
-#' none, dissolved, or widowed. Duration origins and categories are recovered
+#' none, separated, or widowed (or pooled none/dissolved). Duration origins and categories are recovered
 #' from recorded histories.
 #' Matching uses male-group weights recalibrated at each search; simulation
 #' warns once if any search needed approximate weights. A separate father model
@@ -213,7 +213,7 @@ simulate <- function(model, years, seed = NULL) {
   birth_rates <- prepare_group_rates(birth_rates, population$persons, "fertility", group_values)
   union_rates <- if (is.null(union_process$rates))
     data.frame(age_start = numeric(), age_end = numeric(), rate = numeric()) else
-    prepare_group_rates(expand_widowed_search_rates(union_process$rates),
+    prepare_group_rates(expand_previous_union_rates(union_process$rates),
       population$persons, "union formation", group_values)
   death_rates <- apply_group_prop_hazard(death_rates, population$persons,
     model$processes$mortality$group_prop_hazard, "mortality", group_values)

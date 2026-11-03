@@ -22,7 +22,7 @@ columns do not automatically create supported rate strata.
 | --- | --- | --- | --- |
 | Mortality: `set_mortality(model, rates)` | Age only | `sex`: both `m` and `f` | Individual `group` |
 | Fertility: `set_fertility(model, rates)` | Age only | Women; no `sex` column | Mother's `group`; `union_type`; current-parity bands `parity_start`/`parity_end` |
-| Union-search attempts: `set_union_formation(model, "rate", rates = rates)` | Age, or duration since the most recent partnership ended | Currently unpartnered women | Woman's `group`; `previous_union`: `none`, `dissolved`, `widowed` |
+| Union-search attempts: `set_union_formation(model, "rate", rates = rates)` | Age, or duration since the most recent partnership ended | Currently unpartnered women | Woman's `group`; `previous_union`: `none`, `separated`, `widowed` |
 | Union dissolution: `set_union_dissolution(model, rates)` | Duration since the current union episode began | One risk per union, carried by the woman | Symmetric `group_pair`; `union_type`: `cohab`/`marriage` |
 | Cohabitation-to-marriage conversion: `union_convert_rate` on union formation | Woman's age or duration since the current cohabitation began | Currently cohabiting women | Woman's `group` |
 | Individual group transitions: `set_group_transition(model, rates)` | Age or duration since latest group entry; age without earlier transition history | Directed `group_origin` and `group_dest` | `sex`; current `union_type` |
@@ -70,11 +70,11 @@ See [parity fertility](parity-fertility.md) and
 These are annual female search hazards, not guaranteed union-formation rates.
 Failed matching leaves the woman unpartnered. Men have no search clock.
 Without `previous_union`, a shared age schedule applies to all unpartnered
-women. Supplying that column requires `none` and `dissolved` within each group.
-Omitted `widowed` uses the complete dissolved schedule in that group and
-active calendar slice; an explicit widowed schedule overrides it as a whole.
+women. Supply either `none`/`separated`/`widowed`, or pooled
+`none`/`dissolved` within each group and active calendar slice (D126). Pooled
+dissolved applies the same schedule to separation and widowhood.
 
-`none` must use age. `dissolved` and `widowed` may each independently use age
+`none` must use age. `separated` and `widowed` may each independently use age
 or duration, but each category must use one clock consistently across all its
 bands and groups. Each row supplies exactly one boundary pair, with unused
 age/duration boundaries `NA`. The age columns remain part of the table schema
@@ -138,7 +138,8 @@ union formation. Bands cannot overlap within active strata; age gaps have
 probability zero. Optional calendar bands follow the rate-table coverage rules
 (D122), and select probability at search execution without relabeling existing
 unions or changing the overall search hazard. If previous
-categories are supplied, all three are required within each group. Type is
+categories are supplied, use the same complete detailed or pooled alternatives
+as search rates (D126). Type is
 drawn before matching. The overall search intensity is split into intended
 cohabitation and marriage searches by this probability.
 

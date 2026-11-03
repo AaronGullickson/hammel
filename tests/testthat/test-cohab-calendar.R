@@ -50,7 +50,7 @@ test_that("probability coverage follows rate calendar and group/category rules",
   m$processes$union_formation$cohab_prob <- p[!(p$group == "B" & p$time_start == .5), ]
   expect_error(simulate(m, 1), "cohabitation probability.*missing schedules.*B")
   p <- rbind(transform(cohab_calendar(), previous_union = "none"),
-    transform(cohab_calendar(), previous_union = "dissolved"),
+    transform(cohab_calendar(), previous_union = "separated"),
     transform(cohab_calendar(), previous_union = "widowed"))
   expect_s3_class(cohab_calendar_model(p), "hammel_model")
   expect_error(cohab_calendar_model(p[-nrow(p), ]), "all three")
@@ -134,7 +134,7 @@ test_that("probability changes refresh weighted matching contributions immediate
 
 test_that("active age and previous-union strata apply after a calendar change", {
   p <- rbind(transform(cohab_calendar(c(0, 1)), previous_union = "none"),
-    transform(cohab_calendar(c(1, 0)), previous_union = "dissolved"),
+    transform(cohab_calendar(c(1, 0)), previous_union = "separated"),
     transform(cohab_calendar(c(0, 0)), previous_union = "widowed"))
   m <- cohab_calendar_model(p, n = 4, search = 1e5)
   m$population$unions <- tibble::tibble(union_id = 1L, wife_id = 1L, husband_id = 2L,

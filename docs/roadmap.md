@@ -119,7 +119,7 @@ effect or coefficient: the functional form, supported characteristics, and how
 effects relate to baseline duration-specific rates remain to be specified.
 
 Female search rates now optionally distinguish `previous_union`
-as `none`, `dissolved`, or `widowed` (D080), with all three strata required
+as `none`, `separated`, or `widowed` (D080), with all three strata required
 within each scheduled group. Separate marriage observations use the same
 categories. Age or duration since the latest ending can be selected per
 previous category in the same table (D083); `none` remains age-specific. See

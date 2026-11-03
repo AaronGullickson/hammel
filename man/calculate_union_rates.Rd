@@ -12,7 +12,8 @@ calculate_union_rates(
   by_previous_union = FALSE,
   dur_breaks = NULL,
   by_union_type = FALSE,
-  conf.level = NULL
+  conf.level = NULL,
+  pool_dissolved = FALSE
 )
 }
 \arguments{
@@ -33,7 +34,7 @@ pool counts and exposure before calculating rates, and omit that column.
 Supplying \code{dur_breaks} automatically enables this option.}
 
 \item{dur_breaks}{Optional nonnegative duration boundaries in years. When
-supplied, dissolved/widowed rows use years since the latest union ending;
+supplied, separated/widowed rows use years since the latest union ending;
 none rows still use \code{age_breaks}. Automatically enables \code{by_previous_union}
 regardless of its supplied value. A finite final boundary gains Inf.
 Adds \code{dur_start}/\code{dur_end}, with NA in the unused age/duration pair.
@@ -48,6 +49,12 @@ numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_hig
 from two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} intervals for observed event
 counts over exposure. Bounds are NA at zero exposure. For fertility, these
 describe the observed rate, not the unrealized-adjusted rate.}
+
+\item{pool_dissolved}{Logical, default FALSE. With TRUE, return \code{"none"}
+and \code{"dissolved"}, pooling separated and widowed events and exposure before
+calculating rates and confidence intervals. Requires \code{by_previous_union}
+(also enabled by \code{dur_breaks}). With FALSE, stratified output uses the detailed
+\code{"none"}, \code{"separated"}, and \code{"widowed"} categories.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, \code{sex}, \code{age_start}, \code{age_end},
@@ -58,15 +65,15 @@ With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_hi
 }
 \description{
 Count union starts and unpartnered person-years by age, period, sex, and
-optionally \code{previous_union}: \code{"none"}, \code{"dissolved"}, or \code{"widowed"}. The most recent
+optionally \code{previous_union}: \code{"none"}, \code{"separated"}, or \code{"widowed"}. The most recent
 episode's ending determines the category; each start counts in the category
 immediately before formation. Partnered time contributes no exposure.
 Men describe realized matching outcomes, not a male search-rate input.
 Typed entries pool cohabitation and direct marriage; conversion is excluded
 because partners remain partnered. Previous-category classification follows
 the population's recorded cohabitation policy, default FALSE without metadata.
-With \code{dur_breaks}, only none rows use age; dissolved/widowed rows use
-duration since the most recent ending and always remain separate.
+With \code{dur_breaks}, only none rows use age; separated/widowed rows use
+duration since the most recent ending; \code{pool_dissolved} can combine them.
 }
 \details{
 Histories must be complete for the intended interpretation. \code{"none"} means

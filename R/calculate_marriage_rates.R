@@ -25,9 +25,10 @@
 #' @export
 calculate_marriage_rates <- function(population, time_breaks, age_breaks,
                                      by_group = FALSE, by_previous_union = FALSE,
-                                     conf.level = NULL) {
+                                     conf.level = NULL, pool_dissolved = FALSE) {
   validate_rate_conf_level(conf.level)
   calculate_entry_rates(population, time_breaks, age_breaks, by_group,
     by_previous_union = by_previous_union, dur_breaks = NULL, by_union_type = FALSE,
-    marriage_measure = TRUE, conf.level = conf.level)
+    marriage_measure = TRUE, conf.level = conf.level,
+    pool_dissolved = pool_dissolved)
 }

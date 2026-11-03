@@ -332,13 +332,13 @@ By default, union counts pool previous categories and omit `previous_union`.
 Set `by_previous_union = TRUE` as above to stratify independently of `by_group`.
 The stratified output returns period, age, sex, `previous_union`, optional individual `group`,
 `person_years`, `unions`, and `rate_union`. Categories are `none`,
-`dissolved`, and `widowed`, determined by the most recent recorded episode.
+`separated`, and `widowed`, determined by the most recent recorded episode.
 Each spouse contributes a start in their category immediately before formation.
 Partnered time contributes no exposure. Men's rates describe matching outcomes;
 female search inputs can exceed realized rates when searches fail.
 
 For the widowhood example above, the woman has 0.5 unpartnered years in `none`
-and 1 in `widowed`, with one formation in each category. The `dissolved` row has
+and 1 in `widowed`, with one formation in each category. The `separated` row has
 zero exposure and starts, with an NA rate. Pool counts and exposure before
 calculating a combined rate: `(1 + 1) / (0.5 + 1)`, rather than averaging the
 category rates. Summing counts/exposure also gives pooled results across groups
@@ -358,7 +358,7 @@ This replaces the former `unions` and `rate_union` columns from
 current-status exposure and their respective event counts and rates.
 
 
-Optional `dur_breaks` on `calculate_union_rates()` measures dissolved and
+Optional `dur_breaks` on `calculate_union_rates()` measures separated and
 widowed rates since the latest union ending (D084). `none` still uses
 `age_breaks`. Supplying duration breaks automatically enables previous-category
 stratification, even if its flag is FALSE; unlike clocks are not pooled.
@@ -589,3 +589,16 @@ coverage under demographic feedback, shared partners or endogenous exposure.
 Validation compares every calculator with `stats::poisson.test()` and checks
 zero events, zero exposure, empty results, pooling/strata, fertility parity and
 unrealized outputs, invalid confidence levels and unchanged default outputs.
+
+## Detailed and pooled previous unions (D126)
+
+Union and marriage rate calculators use `none`, `separated`, and `widowed`
+when `by_previous_union = TRUE`. Set `pool_dissolved = TRUE` to return
+`none` and `dissolved` instead, together with `by_previous_union = TRUE`.
+Duration breaks also enable previous-union stratification.
+Dissolved pools separation and widowhood. Events and exposure are summed
+within each period, sex, group, age/duration and union-type cell before computing
+rates and optional exact Poisson intervals. Confidence bounds are never averaged.
+Duration remains elapsed time since the most recent ending. Actual histories
+and the recorded cohabitation policy are unchanged. Rate and probability inputs
+accept the same detailed or pooled category sets.

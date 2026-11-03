@@ -2617,7 +2617,8 @@ or simultaneous confidence bands. See [the analysis contract](demographic-analys
 
 ## D125 — Widowed search-rate fallback to dissolved (November 2, 2026)
 
-**Status:** User-requested convenience; implemented and software-tested.
+**Status:** Superseded by D126, which replaces the ambiguous detailed
+`dissolved` label with `separated` and reserves `dissolved` for pooled inputs.
 
 **Decision:** Union-search rate tables stratified by `previous_union` may supply
 `none` and `dissolved` without `widowed`. For each group and active calendar
@@ -2629,3 +2630,33 @@ This supersedes D080's mandatory third category for search-rate inputs only;
 cohabitation-probability tables retain their existing three-category contract.
 Preserve the public input and expand only a private execution copy. See
 [remarriage schedules](remarriage.md) for examples and validation.
+
+## D126 — Distinct detailed and pooled previous-union categories (November 2, 2026)
+
+**Status:** User-requested, implemented and software-tested; replaces D125.
+
+**Decision:** Detailed previous-union categories are `none`, `separated`, and
+`widowed`; pooled categories are `none` and `dissolved`, where dissolved
+includes separation and widowhood. Use the same two complete alternatives for
+union-search rate and cohabitation-probability inputs, independently per group
+and active calendar slice. Never mix the two alternatives within one slice and
+group. Expand pooled inputs privately to the two detailed engine states; retain
+actual histories, duration origins, eligibility and event timing. Effective
+categories must retain consistent clocks across groups and calendar periods.
+No compatibility aliases, migration messages or automatic reinterpretation of
+old three-category tables are required for this unreleased package.
+
+Union and marriage calculators retain `by_previous_union = TRUE` for detailed
+output and add `pool_dissolved = TRUE` for the bipartite output. The user
+selected this additional flag rather than overloading `by_previous_union`;
+pooling requires previous-union stratification (explicitly enabled or implied
+by duration breaks). Sum separated/widowed events and exposure in
+each otherwise identical cell before calculating rates and exact Poisson
+confidence intervals. With duration breaks, the pooled dissolved duration is
+still elapsed time since the most recent ending, irrespective of cause. Empty
+cells, grouping, union types, sex and calendar/age boundaries retain their rules.
+For example, 2 separated events/10 years plus 3 widowed events/20 years gives
+5 dissolved events/30 years and a confidence interval from that count/exposure,
+not an average of rates or confidence limits. Validate equivalence of pooled
+inputs to explicitly equal detailed inputs and accounting/Poisson identities
+for pooled outputs, including calendars, groups, durations and conversions.
