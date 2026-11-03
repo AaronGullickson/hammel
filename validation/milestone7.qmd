@@ -1162,9 +1162,10 @@ temp |>
 Finally, I want to test a simulation where I raise fertility rates dramatically to confirm that we don't observe a blip due to the birth interval issue that should now be solved.
 
 ```{r}
+#| label: set-changing-fertility-rates
 fertility_rates <- bind_rows(
   get_fertility_hfd("USA", 2000) |> mutate(time_start = 0, time_end = 100), 
-  fertility_niger <- read_csv("validation/data/niger_2012/niger_2012_asfr_wpp2024.csv") |>
+  read_csv(here("validation", "data", "niger_2012", "niger_2012_asfr_wpp2024.csv")) |>
     mutate(time_start = 100, time_end = 120)
 )
 mortality_rates <- get_mortality_hmd("USA", 2000)
