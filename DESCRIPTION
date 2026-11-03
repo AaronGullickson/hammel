@@ -2,7 +2,8 @@ Package: hammel
 Title: What the Package Does (One Line, Title Case)
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
+    person("Aaron", "Gullickson", , "aarongullickson@gmail.com", role = c("aut", "cre", "cph"),
+           comment = c(ORCID = "0000-0001-7237-8131"))
 Description: What the package does (one paragraph).
 License: MIT + file LICENSE
 Depends:
