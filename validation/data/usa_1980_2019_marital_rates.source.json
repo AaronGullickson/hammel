@@ -1,0 +1,64 @@
+{
+  "retrieved_utc": "2026-11-01T23:02:15.790442+00:00",
+  "sources": [
+    {
+      "source_id": "NCHS_MVSR_32_11_Table4",
+      "url": "https://www.cdc.gov/nchs/data/mvsr/supp/mv32_11s.pdf",
+      "sha256": "671731dcce793d9f2f3aadf8346a668f525f3736821ee7219ece74d9dc3c0066",
+      "selection": "1980 female columns, Table 4, printed/PDF page 8",
+      "coverage": "US MRA, all rates exclude Iowa"
+    },
+    {
+      "source_id": "NCHS_Series21_43_Table3",
+      "url": "https://stacks.cdc.gov/view/cdc/12848/cdc_12848_DS1.pdf",
+      "sha256": "b28d734121f174bb6e8b305f51494c35bd61f88c2e4cb52197ae4cafc5c09b5d",
+      "selection": "Wife, 1980 column, Table 3, printed page 19, PDF page 24",
+      "coverage": "US national estimates from DRA age distributions"
+    },
+    {
+      "source_id": "NCFMR_FP19_05_Figure1",
+      "url": "https://www.bgsu.edu/content/dam/BGSU/college-of-arts-and-sciences/NCFMR/documents/FP/eickmeyer-age-var-first-mar-rt-fp-19-05.pdf",
+      "sha256": "5f33958b3bd34cdadb94a38012b3dc125c268b2727e0f9b8c29ea73848b48283",
+      "selection": "2017 series, Figure 1, PDF page 1, excluding Total",
+      "coverage": "US ACS 2017 1-year"
+    },
+    {
+      "source_id": "NCFMR_FP20_13_Figure3",
+      "url": "https://www.bgsu.edu/content/dam/BGSU/college-of-arts-and-sciences/NCFMR/images/family-profiles/fp-20-13-fig3.png",
+      "sha256": "d8d4c9e1191012da142112ebeed608b823c2f4676b7ff4912cade02e0f7537a1",
+      "selection": "Women, 2018 orange series, Figure 3",
+      "coverage": "US ACS 2018 1-year"
+    },
+    {
+      "source_id": "NCFMR_FP21_16_Figure2_Women",
+      "url": "https://www.bgsu.edu/content/dam/BGSU/college-of-arts-and-sciences/NCFMR/documents/FP/carlson-age-variation-in-the-divorce-rate-fp-21-16.pdf",
+      "sha256": "3b17b616ddc7ba1770e056dc604819427d991843644b088d94034d494abb22b3",
+      "selection": "Women, 2019 orange series, Figure 2, PDF page 2",
+      "coverage": "US ACS 2019 1-year"
+    }
+  ],
+  "archived_federal_sources": {
+    "usa_marriage_1980_1981_nchs.pdf": "671731dcce793d9f2f3aadf8346a668f525f3736821ee7219ece74d9dc3c0066",
+    "usa_divorce_1970_1981_nchs.pdf": "b28d734121f174bb6e8b305f51494c35bd61f88c2e4cb52197ae4cafc5c09b5d"
+  },
+  "transcription": "Manually transcribed printed numerical labels, visually checked against source page/figure. Original per-1000 values retained in combined CSV and offline preparation script.",
+  "transformations": [
+    "Divide by 1000.",
+    "Convert inclusive published age groups to half-open age bands; open final groups end at Inf.",
+    "Exclude totals and overlapping source subtotals.",
+    "Retain actual source years, sex and denominator for each measure.",
+    "No interpolation, rebinning, extrapolation, age-to-duration mapping, or simulation changes."
+  ],
+  "licensing": "NCHS public-domain US government reports retained with attribution. Only numerical facts transcribed from NCFMR; third-party figures/prose not redistributed; no open licence asserted.",
+  "limitations_document": "usa_1980_2019_marital_rates.README.md",
+  "sha256": {
+    "usa_1980_2019_marital_rates.csv": "b0990cb5428b63068de4344ce79a1bc60fef49aba0bce384df38b7c569e2a7aa",
+    "prepare_usa_1980_2019_marital_rates.R": "706dc45b5b297e30d1d8b2c3da6648d5851aedf13ef7f540d0d81630c606ba61",
+    "usa_1980_first_marriage_rates_female.csv": "a4cabaca9cca3fff993c3918b6f7cb036859e443ce10b529b5987cff744e9ba3",
+    "usa_1980_remarriage_rates_female.csv": "aa1f67ed0444fdf1af5df97a8261207ef527692de132dcccab3b8b7531c01c16",
+    "usa_1980_divorce_rates_female.csv": "c20952929dd226ef50a6f66698b49a8864aeb7d5af13f1cc1116bf580d61ece6",
+    "usa_2017_first_marriage_rates_female.csv": "e73b4d090d7755ef479289ef4df34e188212e63d6c6021a0cfd53c878b9d5a00",
+    "usa_2018_remarriage_rates_female.csv": "15c464e85dc2fd2208cdff6fc3edc1475b69dbf30bd1f69f47bf2be9770fe06d",
+    "usa_2019_divorce_rates_female.csv": "261369e421bb7820a41b2885dca7592108152bbc5f6e22fb00b5d504bcef1c25"
+  }
+}
