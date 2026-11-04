@@ -646,24 +646,68 @@ std::pair<double, double> current_hazard(const std::vector<Band>* bands,
 }
 
 // Ordered bookkeeping boundaries with at most one pending time per person.
-// Shared by the calibration tracker and fertility cells: entries are rate
-// changes (age bands, gaps, spacing release), not demographic events, and
+// Shared by the calibration tracker and fertility/mortality cells: entries are
+// rate changes (age bands, gaps, spacing release), not demographic events, and
 // consume no randomness. Ties are ordered by person index.
+//
+// A bucket queue: a ring of buckets of width 1/kBuckets years spanning
+// kSpan years, plus an overflow heap for later entries. A bucket is sorted by
+// (time, person) when reached, so pops follow exactly (time, person) order.
+// Entries are lazily deleted: one is current only while it matches next_[person].
 class BoundaryQueue {
-  // Binary min-heap of (time, person) with lazy deletion: an entry is current
-  // only while it matches next_[person]. Pops follow (time, person) order.
-  std::vector<std::pair<double, int>> heap_;
-  std::vector<double> next_;
-  size_t live_ = 0;
+  static constexpr int kBuckets = 365, kSpan = 2, kRing = kBuckets * kSpan;
+  using Entry = std::pair<double, int>;
   struct Later {
-    bool operator()(const std::pair<double, int>& a, const std::pair<double, int>& b) const {
-      return a > b;
-    }
+    bool operator()(const Entry& a, const Entry& b) const { return a > b; }
   };
-  void discard_stale() {
-    while (!heap_.empty() && heap_.front().first != next_[heap_.front().second]) {
-      std::pop_heap(heap_.begin(), heap_.end(), Later());
-      heap_.pop_back();
+  std::vector<std::vector<Entry>> ring_ = std::vector<std::vector<Entry>>(kRing);
+  std::vector<Entry> overflow_;          // min-heap of entries beyond the ring
+  std::vector<double> next_;
+  size_t live_ = 0, in_ring_ = 0, pos_ = 0;
+  long long cur_ = 0;                    // absolute index of the bucket being drained
+  bool started_ = false, sorted_ = false;
+  static long long bucket(double t) { return static_cast<long long>(std::floor(t * kBuckets)); }
+  std::vector<Entry>& slot(long long b) {
+    return ring_[static_cast<size_t>(((b % kRing) + kRing) % kRing)];
+  }
+  void push(const Entry& e) {
+    long long b = bucket(e.first);
+    if (!started_) { cur_ = b; started_ = true; }
+    if (b < cur_) b = cur_;              // at or after the current time; roundoff guard
+    if (b - cur_ >= kRing) {
+      overflow_.push_back(e);
+      std::push_heap(overflow_.begin(), overflow_.end(), Later());
+      return;
+    }
+    auto& v = slot(b);
+    if (b == cur_ && sorted_)
+      v.insert(std::upper_bound(v.begin() + static_cast<long>(pos_), v.end(), e), e);
+    else v.push_back(e);
+    ++in_ring_;
+  }
+  // Position the cursor on the earliest current entry; false if none remain.
+  bool settle() {
+    if (live_ == 0) return false;
+    for (;;) {
+      if (!sorted_ && in_ring_ == 0 && !overflow_.empty()) // jump over empty buckets
+        cur_ = std::max(cur_, bucket(overflow_.front().first));
+      auto& v = slot(cur_);
+      if (!sorted_) {
+        while (!overflow_.empty() && bucket(overflow_.front().first) <= cur_) {
+          v.push_back(overflow_.front());
+          ++in_ring_;
+          std::pop_heap(overflow_.begin(), overflow_.end(), Later());
+          overflow_.pop_back();
+        }
+        std::sort(v.begin(), v.end());
+        sorted_ = true; pos_ = 0;
+      }
+      while (pos_ < v.size()) {
+        const Entry& e = v[pos_];
+        if (e.first == next_[e.second]) return true;
+        ++pos_; --in_ring_;
+      }
+      v.clear(); sorted_ = false; ++cur_;
     }
   }
  public:
@@ -672,35 +716,23 @@ class BoundaryQueue {
     if (next_[person] == time) return;
     if (R_finite(next_[person])) --live_;
     next_[person] = time;
-    if (R_finite(time)) {
-      ++live_;
-      heap_.push_back({time, person});
-      std::push_heap(heap_.begin(), heap_.end(), Later());
-    }
-    // Bound stale entries: rebuild from current times when they dominate.
-    if (heap_.size() > 64 && heap_.size() > 4 * live_) {
-      heap_.clear();
-      for (size_t p = 0; p < next_.size(); ++p)
-        if (R_finite(next_[p])) heap_.push_back({next_[p], static_cast<int>(p)});
-      std::make_heap(heap_.begin(), heap_.end(), Later());
-    }
+    if (R_finite(time)) { ++live_; push({time, person}); }
   }
   void clear(int person) {
     if (person < static_cast<int>(next_.size())) set(person, R_PosInf);
   }
   double top() {
-    discard_stale();
-    return heap_.empty() ? R_PosInf : heap_.front().first;
+    if (!settle()) return R_PosInf;
+    return slot(cur_)[pos_].first;
   }
   // Remove and return the earliest entry; the caller refreshes that person.
-  std::pair<double, int> pop() {
-    discard_stale();
-    const auto entry = heap_.front();
-    std::pop_heap(heap_.begin(), heap_.end(), Later());
-    heap_.pop_back();
-    next_[entry.second] = R_PosInf;
+  Entry pop() {
+    settle();
+    const Entry e = slot(cur_)[pos_++];
+    --in_ring_;
+    next_[e.second] = R_PosInf;
     --live_;
-    return entry;
+    return e;
   }
   size_t size() const { return live_; }
 };
@@ -784,6 +816,72 @@ class FemaleIntensityTracker {
 // Upper-open fertility bands stay one cell when birth_interval * rate is below
 // this share (a numerical tolerance, not a demographic parameter).
 constexpr double kOpenBandSplitTolerance = 0.001;
+
+// Sum tree over a process's cells: leaf c holds that cell's current event
+// intensity. Sums are recomputed from children along each updated path, so
+// they do not drift. Capacity grows geometrically as cells are added.
+class IntensityTree {
+  size_t capacity_ = 0;
+  std::vector<double> tree_;
+ public:
+  void set(size_t cell, double value) {
+    if (cell >= capacity_) {
+      size_t next = capacity_ ? capacity_ : 1;
+      while (next <= cell) next *= 2;
+      std::vector<double> grown(2 * next, 0);
+      for (size_t i = 0; i < capacity_; ++i) grown[next + i] = tree_[capacity_ + i];
+      for (size_t i = next - 1; i > 0; --i) grown[i] = grown[2 * i] + grown[2 * i + 1];
+      capacity_ = next;
+      tree_.swap(grown);
+    }
+    size_t node = capacity_ + cell;
+    tree_[node] = value;
+    while (node > 1) {
+      node /= 2;
+      tree_[node] = tree_[2 * node] + tree_[2 * node + 1];
+    }
+  }
+  double total() const { return tree_.empty() ? 0 : tree_[1]; }
+  double value(size_t cell) const { return cell < capacity_ ? tree_[capacity_ + cell] : 0; }
+  // The cell holding position uniform * total; only cells with positive intensity.
+  size_t choose(double uniform) const {
+    double value = std::min(uniform * total(), std::nextafter(total(), 0.0));
+    size_t node = 1;
+    while (node < capacity_) {
+      const double left = tree_[2 * node], right = tree_[2 * node + 1];
+      // Roundoff guard: never descend into a branch with no intensity.
+      if ((value < left && left > 0) || !(right > 0)) node *= 2;
+      else { value = std::max(0.0, value - left); node = 2 * node + 1; }
+    }
+    return node - capacity_;
+  }
+};
+
+// One event clock for a whole process. Independent cell streams sum to one
+// Poisson stream at the total intensity; the cell of each event is then chosen
+// in proportion to its intensity. The Exp(1) threshold is spent at the current
+// total, so intensity changes recompute the due time without random draws.
+// Call spend(now) before every intensity change.
+class ProcessClock {
+  double threshold_ = 0, last_ = 0;
+  bool has_threshold_ = false;
+ public:
+  void start(double now) { last_ = now; }
+  void spend(const IntensityTree& tree, double now) {
+    if (has_threshold_ && now > last_)
+      threshold_ = std::max(0.0, threshold_ - tree.total() * (now - last_));
+    last_ = now;
+  }
+  // After intensity changes: ensure a threshold exists while events can occur.
+  void arm(const IntensityTree& tree, const std::function<double()>& draw) {
+    if (!has_threshold_ && tree.total() > 0) { threshold_ = draw(); has_threshold_ = true; }
+  }
+  double due(const IntensityTree& tree) const {
+    return has_threshold_ && tree.total() > 0 ? last_ + threshold_ / tree.total() : R_PosInf;
+  }
+  // The clock fired at now: its threshold is used up.
+  void fired(double now) { has_threshold_ = false; last_ = now; }
+};
 
 // Positive eligible weights in swap-remove slots. Recompute sums from children
 // rather than subtracting from a running total, so removing a dominant weight
@@ -884,8 +982,7 @@ class FertilityCells {
     int members = 0;
     std::vector<int> eligible;                 // swap-remove list of women
     FertilityWeightTree weights;
-    double lambda = 0, threshold = 0, last = 0, due = R_PosInf;
-    bool has_threshold = false, queued = false;
+    double lambda = 0, last = 0;               // last: unrealized accounting time
     std::map<size_t, std::pair<int, FertilityWeightSum>> counted; // count and weight per unpartnered calibration bin
   };
   struct Member {
@@ -905,52 +1002,10 @@ class FertilityCells {
   double max_age_, interval_;
   std::vector<std::vector<int>> lookup_;
   BoundaryQueue boundaries_;
-  // Cell birth clocks: an indexed binary min-heap of armed cells keyed by
-  // (due, cell), updated in place without allocation. The main loop compares
-  // its head with the person event queue.
-  std::vector<int> heap_, position_;
-  bool earlier(int a, int b) const {
-    const double da = cells_[a].due, db = cells_[b].due;
-    return da < db || (da == db && a < b);
-  }
-  void swap_nodes(size_t i, size_t j) {
-    std::swap(heap_[i], heap_[j]);
-    position_[heap_[i]] = static_cast<int>(i);
-    position_[heap_[j]] = static_cast<int>(j);
-  }
-  void sift_up(size_t i) {
-    while (i > 0) {
-      const size_t parent = (i - 1) / 2;
-      if (!earlier(heap_[i], heap_[parent])) break;
-      swap_nodes(i, parent);
-      i = parent;
-    }
-  }
-  void sift_down(size_t i) {
-    for (;;) {
-      size_t best = i;
-      const size_t left = 2 * i + 1, right = left + 1;
-      if (left < heap_.size() && earlier(heap_[left], heap_[best])) best = left;
-      if (right < heap_.size() && earlier(heap_[right], heap_[best])) best = right;
-      if (best == i) break;
-      swap_nodes(i, best);
-      i = best;
-    }
-  }
-  void unschedule(int c) {
-    const size_t i = static_cast<size_t>(position_[c]);
-    const size_t last = heap_.size() - 1;
-    if (i != last) swap_nodes(i, last);
-    heap_.pop_back();
-    position_[c] = -1;
-    if (i < heap_.size()) { sift_up(i); sift_down(i); }
-  }
-  void schedule_clock(int c) {
-    if (static_cast<size_t>(c) >= position_.size()) position_.resize(c + 1, -1);
-    position_[c] = static_cast<int>(heap_.size());
-    heap_.push_back(c);
-    sift_up(heap_.size() - 1);
-  }
+  // One birth clock for all cells. A cell contributes its intensity only while
+  // it has an eligible woman; otherwise its intensity is recorded as unrealized.
+  IntensityTree intensity_;
+  ProcessClock clock_;
   std::function<State(int)> state_;
   std::function<double()> draw_threshold_;
   const WeightCalibrator* calibrator_;
@@ -975,29 +1030,18 @@ class FertilityCells {
   // during it. Must run before membership or eligibility changes.
   void settle(int c, double now) {
     Cell& x = cells_[c];
-    if (x.lambda > 0 && now > x.last) {
-      if (x.eligible.empty()) record_unrealized(c, x.last, now, x.lambda);
-      else if (x.has_threshold) x.threshold = std::max(0.0, x.threshold - x.lambda * (now - x.last));
-    }
+    if (x.lambda > 0 && now > x.last && x.eligible.empty())
+      record_unrealized(c, x.last, now, x.lambda);
     x.last = now;
+    clock_.spend(intensity_, now);
   }
-  // Recompute the intensity and firing time from current counts (after settle).
+  // Recompute the cell's intensity from current counts (after settle).
   void touch(int c, double now) {
     Cell& x = cells_[c];
     x.lambda = x.rate * x.members;
-    rearm(c, now);
-  }
-  void rearm(int c, double now) {
-    Cell& x = cells_[c];
-    if (x.queued) { unschedule(c); x.queued = false; }
-    if (!(x.lambda > 0) || x.eligible.empty()) return;
-    if (!x.has_threshold) { x.threshold = draw_threshold_(); x.has_threshold = true; }
-    const double due = now + x.threshold / x.lambda;
-    if (due < end_) {
-      x.due = due;
-      schedule_clock(c);
-      x.queued = true;
-    }
+    clock_.spend(intensity_, now);
+    intensity_.set(static_cast<size_t>(c), x.eligible.empty() ? 0.0 : x.lambda);
+    clock_.arm(intensity_, draw_threshold_);
   }
   void leave(int woman, int& changed) {
     Member& m = members_[woman];
@@ -1074,6 +1118,7 @@ class FertilityCells {
         max_age_(max_age), interval_(interval), lookup_(static_cast<size_t>(groups) * types),
         state_(std::move(state)), draw_threshold_(std::move(draw_threshold)),
         calibrator_(calibrator), start_(start), end_(end), period_origin_(period_origin) {
+    clock_.start(start);
     if (!split_parity_)
       for (const Source& source : sources_)
         lookup_[static_cast<size_t>(source.group) * types_ + source.type] =
@@ -1150,14 +1195,15 @@ class FertilityCells {
     refresh(entry.second, entry.first);
     if (++updates_ % 1024 == 0) checkUserInterrupt();
   }
-  double next_clock() const { return heap_.empty() ? R_PosInf : cells_[heap_.front()].due; }
-  // The earliest cell clock fires: spend its threshold, pick a mother, re-arm.
+  double next_clock() const {
+    const double due = clock_.due(intensity_);
+    return due < end_ ? due : R_PosInf;
+  }
+  // The birth clock fires: choose a cell by intensity, then a mother in it.
   int fire_next(double now) {
-    const int c = heap_.front();
-    unschedule(c);
+    clock_.spend(intensity_, now);
+    const int c = static_cast<int>(intensity_.choose(R::runif(0, 1)));
     Cell& x = cells_[c];
-    x.queued = false;
-    x.has_threshold = false;
     x.last = now;
     if (x.eligible.empty()) stop("A fertility cell fired without eligible women.");
     const double n = static_cast<double>(x.eligible.size());
@@ -1165,7 +1211,8 @@ class FertilityCells {
     const size_t pick = weighted_ ? x.weights.choose(uniform) :
       std::min(x.eligible.size() - 1, static_cast<size_t>(std::floor(uniform * n)));
     const int woman = x.eligible[pick];
-    rearm(c, now);
+    clock_.fired(now);
+    clock_.arm(intensity_, draw_threshold_);
     return woman;
   }
   // Calibration fertility totals: each unpartnered eligible member contributes
@@ -1218,9 +1265,12 @@ class FertilityCells {
         if (cells_[m.cell].eligible[m.slot] != static_cast<int>(w)) return false;
       }
     }
-    for (size_t c = 0; c < cells_.size(); ++c)
+    for (size_t c = 0; c < cells_.size(); ++c) {
       if (members[c] != cells_[c].members || eligible[c] != static_cast<int>(cells_[c].eligible.size()))
         return false;
+      const double expected = cells_[c].eligible.empty() ? 0.0 : cells_[c].lambda;
+      if (intensity_.value(c) != expected) return false;
+    }
     if (weighted_) for (size_t c = 0; c < cells_.size(); ++c)
       if (std::abs(weights[c] - cells_[c].weights.sum()) > 1e-9 * std::max(weights[c], 1.0)) return false;
     return true;
@@ -1249,6 +1299,137 @@ class FertilityCells {
       _["group"] = group, _["union_type"] = type, _["parity_start"] = parity_start,
       _["parity_end"] = parity_end, _["age_start"] = age_start, _["age_end"] = age_end,
       _["unrealized_births"] = births, _["years_without_eligible"] = years);
+  }
+};
+
+// ---- Milestone 8 step 1 prototype: cell-scheduled mortality ---------------
+// Each living person belongs to one cell: a sub-band of at most one year of
+// their group/sex schedule (upper-open bands stay one cell). A cell generates
+// deaths at rate * members and assigns each death to a uniformly chosen member.
+// No eligibility rules or weights. Clocks keep an Exp(1) threshold consumed at
+// the current intensity, as fertility cells do.
+class MortalityCells {
+  struct Cell {
+    double rate = 0;
+    std::vector<int> members;   // swap-remove list of people
+  };
+  struct Member { int cell = -1, slot = -1, stratum = -1; double born = 0; };
+  // strata_[k] = split bands of schedule k; first_[k] = its first cell index.
+  std::vector<std::vector<Band>> strata_;
+  std::vector<int> first_;
+  std::vector<Cell> cells_;
+  std::vector<Member> members_;
+  BoundaryQueue boundaries_;
+  // One death clock for all cells (see ProcessClock).
+  IntensityTree intensity_;
+  ProcessClock clock_;
+  std::function<double()> draw_threshold_;
+  double end_;
+  unsigned long long updates_ = 0;
+  void update(int c, double now) {
+    clock_.spend(intensity_, now);
+    intensity_.set(static_cast<size_t>(c),
+                   cells_[c].rate * static_cast<double>(cells_[c].members.size()));
+    clock_.arm(intensity_, draw_threshold_);
+  }
+
+ public:
+  MortalityCells(const std::vector<std::vector<Band>>& schedules,
+                 std::function<double()> draw_threshold, double start, double end)
+      : draw_threshold_(std::move(draw_threshold)), end_(end) {
+    for (const auto& bands : schedules) {
+      // Interval 0: upper-open bands are never split (no eligibility rules).
+      strata_.push_back(FertilityCells::split_ages(bands, 0, 0));
+      first_.push_back(static_cast<int>(cells_.size()));
+      for (const Band& band : strata_.back()) {
+        Cell x;
+        x.rate = band.rate;
+        cells_.push_back(std::move(x));
+      }
+    }
+    if (!cells_.empty()) intensity_.set(cells_.size() - 1, 0);
+    clock_.start(start);
+  }
+  // Place a person in the cell of schedule `stratum` (-1: not alive) that
+  // holds age now - born, and queue their next band boundary.
+  void refresh(int person, int stratum, double born, double now) {
+    if (person >= static_cast<int>(members_.size())) members_.resize(person + 1);
+    int cell = -1;
+    double next = R_PosInf;
+    if (stratum >= 0) {
+      const auto& bands = strata_[stratum];
+      size_t lo = 0, hi = bands.size();
+      while (lo < hi) {
+        const size_t mid = (lo + hi) / 2;
+        if (born + bands[mid].start <= now) lo = mid + 1; else hi = mid;
+      }
+      if (lo > 0 && now < born + bands[lo - 1].end) {
+        cell = first_[stratum] + static_cast<int>(lo - 1);
+        next = born + bands[lo - 1].end;
+      } else if (lo < bands.size()) {
+        next = born + bands[lo].start;
+      }
+    }
+    Member& m = members_[person];
+    m.stratum = stratum; m.born = born;
+    if (m.cell != cell) {
+      const int old = m.cell;
+      if (old >= 0) {
+        auto& list = cells_[old].members;
+        const int last = list.back();
+        list[m.slot] = last;
+        members_[last].slot = m.slot;
+        list.pop_back();
+      }
+      m.cell = cell;
+      if (cell >= 0) {
+        m.slot = static_cast<int>(cells_[cell].members.size());
+        cells_[cell].members.push_back(person);
+      } else m.slot = -1;
+      if (old >= 0) update(old, now);
+      if (cell >= 0) update(cell, now);
+    }
+    boundaries_.set(person, next);
+  }
+  double next_boundary() { return boundaries_.top(); }
+  // Move the person with the earliest boundary to their next cell, using the
+  // schedule and birth time recorded at their last refresh.
+  void advance_boundary() {
+    if (++updates_ % 1024 == 0) checkUserInterrupt();
+    const auto entry = boundaries_.pop();
+    const Member& m = members_[entry.second];
+    refresh(entry.second, m.stratum, m.born, entry.first);
+  }
+  double next_clock() const {
+    const double due = clock_.due(intensity_);
+    return due < end_ ? due : R_PosInf;
+  }
+  // The death clock fires: choose a cell by intensity, then a member uniformly.
+  // The caller removes them with refresh(), which updates the cell's intensity.
+  int fire_next(double now) {
+    clock_.spend(intensity_, now);
+    const int c = static_cast<int>(intensity_.choose(R::runif(0, 1)));
+    const Cell& x = cells_[c];
+    if (x.members.empty()) stop("A mortality cell fired without members.");
+    const double n = static_cast<double>(x.members.size());
+    const size_t pick = std::min(x.members.size() - 1,
+      static_cast<size_t>(std::floor(R::runif(0, 1) * n)));
+    clock_.fired(now);
+    return x.members[pick];
+  }
+  bool consistent() const {
+    std::vector<int> counts(cells_.size(), 0);
+    for (size_t p = 0; p < members_.size(); ++p) {
+      const Member& m = members_[p];
+      if (m.cell < 0) continue;
+      ++counts[m.cell];
+      if (cells_[m.cell].members[m.slot] != static_cast<int>(p)) return false;
+    }
+    for (size_t c = 0; c < cells_.size(); ++c) {
+      if (counts[c] != static_cast<int>(cells_[c].members.size())) return false;
+      if (intensity_.value(c) != cells_[c].rate * static_cast<double>(counts[c])) return false;
+    }
+    return true;
   }
 };
 
@@ -1860,6 +2041,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::unique_ptr<FemaleIntensityTracker> intensity_tracker;
   // Cell-accounted fertility under birth spacing (D101).
   std::unique_ptr<FertilityCells> cells;
+  std::unique_ptr<MortalityCells> mortality;
   std::vector<const std::vector<Band>*> search_hazards;
   std::vector<bool> search_duration;
   std::vector<std::vector<Band>> probability_schedules(group_count * 3);
@@ -2234,10 +2416,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     const auto version = ++event_versions[i];
     const Person& p = people[i];
     if (p.female) cells->refresh(i, now);
-    if (!NumericVector::is_na(p.died)) return;
+    const bool alive = NumericVector::is_na(p.died);
+    mortality->refresh(i, alive ? 2 * p.group + (p.female ? 1 : 0) : -1, p.born, now);
+    if (!alive) return;
     const auto& rates = schedules[p.group];
-    const auto& death_rates = p.female ? rates.female : rates.male;
-    double death_time = candidate(waiting_time(death_rates, now - p.born, threshold()), now);
+    // Deaths come from mortality cells (milestone 8 prototype).
+    const double death_time = std::numeric_limits<double>::infinity();
     // Births come from fertility cells (D101), not per-person candidates.
     const double birth_time = std::numeric_limits<double>::infinity();
     double search_time = std::numeric_limits<double>::infinity();
@@ -2335,6 +2519,15 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       birth_interval, heterogeneous, state, threshold, calibrator.get(), now, end, start));
   };
   load_cells(start);
+  auto load_mortality = [&](double now) {
+    std::vector<std::vector<Band>> strata;
+    for (int g = 0; g < group_count; ++g) {
+      strata.push_back(schedules[g].male);
+      strata.push_back(schedules[g].female);
+    }
+    mortality.reset(new MortalityCells(strata, threshold, now, end));
+  };
+  load_mortality(start);
   // Initialize one next event for each living person. Known age changes are
   // already incorporated, so birthdays alone do not trigger resampling.
   for (int i = 0; i < static_cast<int>(people.size()); ++i) {
@@ -2353,6 +2546,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (!calendar_boundaries.empty()) {
       const double now = *calendar_boundaries.begin();
       if (now <= cells->next_boundary() && now <= cells->next_clock() &&
+          now <= mortality->next_boundary() && now <= mortality->next_clock() &&
           (queue.empty() || now <= queue.begin()->first)) {
         calendar_boundaries.erase(calendar_boundaries.begin());
         checkUserInterrupt();
@@ -2392,6 +2586,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         active_transitions = calendar_slice(all_transitions, now);
         load_schedules(); load_dissolution(); load_transitions();
         if (fertility_change) load_cells(now);
+        // Rebuilt cells redraw thresholds (memoryless); schedule() below
+        // re-enters every living person.
+        if (calendar_changes_at(all_mortality, now)) {
+          cells_consistent = cells_consistent && mortality->consistent();
+          load_mortality(now);
+        }
         for (auto& relationship : union_history) {
           if (!NumericVector::is_na(relationship.end)) continue;
           relationship.dissolution_sampled = false;
@@ -2411,32 +2611,37 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     }
     // Cell clocks depend on current membership, so bookkeeping boundaries are
     // processed in time order before any event at or after them.
+    const double clock = cells ? cells->next_clock() : R_PosInf;
+    const double death_clock = mortality->next_clock();
+    const double queue_top = queue.empty() ? R_PosInf : queue.begin()->first;
+    const double next_event = std::min(std::min(clock, death_clock), queue_top);
     if (cells) {
       const double boundary = cells->next_boundary();
-      if (boundary < end && boundary <= cells->next_clock() &&
-          (queue.empty() || boundary <= queue.begin()->first)) {
+      if (boundary < end && boundary <= next_event && boundary <= mortality->next_boundary()) {
         cells->advance_boundary();
         continue;
       }
     }
+    {
+      const double boundary = mortality->next_boundary();
+      if (boundary < end && boundary <= next_event) {
+        mortality->advance_boundary();
+        continue;
+      }
+    }
     // Exact ties follow the event priority death, birth, dissolution,
-    // conversion, search: person events at the same time as a cell clock go
-    // first only while a current death is pending at that time.
-    const double clock = cells ? cells->next_clock() : R_PosInf;
-    if (queue.empty() && !(clock < end)) break;
+    // conversion, search: a mortality clock wins ties with fertility clocks
+    // and person events; a fertility clock wins ties with person events.
+    if (!(next_event < end)) break;
     if (++processed % 1024 == 0) checkUserInterrupt();
     double now;
     EventType type;
     int i;
-    auto death_at = [&](double time) {
-      const auto range = queue.equal_range(time);
-      for (auto it = range.first; it != range.second; ++it)
-        if (it->second.type == EventType::death && it->second.version == event_versions[it->second.person])
-          return true;
-      return false;
-    };
-    if (clock < end && (queue.empty() || clock < queue.begin()->first ||
-        (clock == queue.begin()->first && !death_at(clock)))) {
+    if (death_clock <= clock && death_clock <= queue_top) {
+      now = death_clock;
+      i = mortality->fire_next(now);
+      type = EventType::death;
+    } else if (clock <= queue_top) {
       now = clock;
       i = cells->fire_next(now);
       type = EventType::birth;
@@ -2452,6 +2657,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (intensity_tracker) intensity_tracker->advance(now);
     if (check_cells && cells && !cells->consistent())
       stop("Internal error: fertility cell counts differ from an explicit scan.");
+    if (check_cells && !mortality->consistent())
+      stop("Internal error: mortality cell counts differ from an explicit scan.");
     if (type == EventType::transition) {
       const int destination = transition_destination[i];
       if (destination < 0 || destination == people[i].group) stop("Invalid transition destination.");
@@ -2473,6 +2680,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     } else if (type == EventType::death) {
       // Retain the person's history, record death, and stop their scheduling.
       people[i].died = now;
+      // Pending person events (search, dissolution, transition) are now stale.
+      ++event_versions[i];
+      mortality->refresh(i, -1, people[i].born, now);
       for (int u : person_unions[i]) {
         UnionRecord& relationship = union_history[u];
         if (!NumericVector::is_na(relationship.end)) continue;
