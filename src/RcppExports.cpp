@@ -215,19 +215,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// hazard_wait_cpp
-NumericVector hazard_wait_cpp(DataFrame rates, NumericVector ages, NumericVector thresholds);
-RcppExport SEXP _hammel_hazard_wait_cpp(SEXP ratesSEXP, SEXP agesSEXP, SEXP thresholdsSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< DataFrame >::type rates(ratesSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type ages(agesSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type thresholds(thresholdsSEXP);
-    rcpp_result_gen = Rcpp::wrap(hazard_wait_cpp(rates, ages, thresholds));
-    return rcpp_result_gen;
-END_RCPP
-}
 // inspect_matching_cpp
 NumericVector inspect_matching_cpp(NumericVector age_difference, List matching);
 RcppExport SEXP _hammel_inspect_matching_cpp(SEXP age_differenceSEXP, SEXP matchingSEXP) {
@@ -394,7 +381,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_union_start_groups_cpp", (DL_FUNC) &_hammel_union_start_groups_cpp, 3},
     {"_hammel_union_group_history_cpp", (DL_FUNC) &_hammel_union_group_history_cpp, 7},
     {"_hammel_extract_kin_cpp", (DL_FUNC) &_hammel_extract_kin_cpp, 4},
-    {"_hammel_hazard_wait_cpp", (DL_FUNC) &_hammel_hazard_wait_cpp, 3},
     {"_hammel_inspect_matching_cpp", (DL_FUNC) &_hammel_inspect_matching_cpp, 2},
     {"_hammel_inspect_group_matching_cpp", (DL_FUNC) &_hammel_inspect_group_matching_cpp, 4},
     {"_hammel_inspect_weighted_calibration_cpp", (DL_FUNC) &_hammel_inspect_weighted_calibration_cpp, 14},

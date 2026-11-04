@@ -37,11 +37,17 @@ test_that("mortality survival is analytical and seeded runs preserve RNG and his
     expect_equal(later$end_time, 3, tolerance = 0)
   })
 
-test_that("mortality times equal continuous exponential draws", {
+test_that("mortality times follow the process clock's exponential draws", {
+  # All 100 men share one cell. The mortality clock spends an Exp(1) threshold
+  # at the total intensity rate * members; each death draws two uniforms (cell,
+  # then member) before the next threshold, and the dead man leaves the cell.
   set.seed(42)
-  waits <- rexp(100, rate = 1e+08)
+  thresholds <- numeric(100)
+  thresholds[1] <- rexp(1)
+  for (k in 2:100) { runif(2); thresholds[k] <- rexp(1) }
+  expected <- cumsum(thresholds / (1e+08 * (100:1)))
   exact <- simulate(make_model(100, death_rate = 1e+08), 1/12, seed = 42)
-  expect_equal(exact$persons$death_time, waits, tolerance = 1e-14)
+  expect_equal(sort(exact$persons$death_time), expected, tolerance = 1e-14)
   expect_true(all(exact$persons$death_time > 0))
 })
 

@@ -53,10 +53,6 @@ extract_kin_cpp <- function(persons, ego_ids, relative_ids, generations) {
     .Call(`_hammel_extract_kin_cpp`, persons, ego_ids, relative_ids, generations)
 }
 
-hazard_wait_cpp <- function(rates, ages, thresholds) {
-    .Call(`_hammel_hazard_wait_cpp`, rates, ages, thresholds)
-}
-
 inspect_matching_cpp <- function(age_difference, matching) {
     .Call(`_hammel_inspect_matching_cpp`, age_difference, matching)
 }

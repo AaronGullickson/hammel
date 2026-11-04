@@ -82,50 +82,6 @@ bool search_uses_duration(DataFrame rates, const std::string& previous) {
   return false;
 }
 
-// Calculate waiting time until the next event. The threshold is drawn
-// from Exp(1), equivalent in distribution to -log(U), with U uniform
-// on (0, 1). Subtract rate * duration across successive age bands.
-// In the band where the remaining threshold is reached, divide it
-// by the rate to obtain the remaining waiting time.
-double waiting_time(const std::vector<Band>& bands, double age, double threshold) {
-  const double origin = age;
-  for (const Band& band : bands) {
-    // if we are older than the end of this band, skip it
-    if (band.end <= age) continue;
-    // if we are entering a band higher than current age, then age up
-    age = std::max(age, band.start);
-    // determine how long we will spend in this band
-    const double duration = band.end - age;
-    // A zero-rate band consumes time but no threshold.
-    if (band.rate > 0) {
-      if (threshold <= band.rate * duration)
-        // The event will occur within this band. Return the total waiting time.
-        // Include time crossed in previous bands, then the remaining time here.
-        return age - origin + threshold / band.rate;
-      //if the event doesn't happen consume hazard from this band
-      threshold -= band.rate * duration;
-    }
-    age = band.end;
-  }
-  // if we got here, we are out of bands so the event never happens, return infinity
-  return std::numeric_limits<double>::infinity();
-}
-
-// Internal deterministic entry point for analytical validation of the sampler.
-// [[Rcpp::export]]
-NumericVector hazard_wait_cpp(DataFrame rates, NumericVector ages,
-                             NumericVector thresholds) {
-  if (ages.size() != thresholds.size()) stop("Sampler inputs must have equal length.");
-  std::vector<Band> bands = read_bands(rates);
-  NumericVector waits(ages.size());
-  for (int i = 0; i < ages.size(); ++i) {
-    if (!R_finite(ages[i]) || ages[i] < 0 || !R_finite(thresholds[i]) ||
-        thresholds[i] <= 0) stop("Sampler ages and thresholds are invalid.");
-    waits[i] = waiting_time(bands, ages[i], thresholds[i]);
-  }
-  return waits;
-}
-
 struct Person {
   // Public history fields plus working state. NA died means currently alive;
   // last_birth enforces spacing.
@@ -136,7 +92,6 @@ struct Person {
 // person is a zero-based position in people, not the public person_id.
 // A version invalidates queued events after a change in union status.
 enum class EventType { death, birth, search, dissolution, conversion, transition };
-struct Event { int person; EventType type; unsigned long long version; };
 
 // Evaluate candidate utilities without rounding age differences. Common linear
 // and raw quadratic formulas use an exact native path; other formulas call the
@@ -1302,25 +1257,30 @@ class FertilityCells {
   }
 };
 
-// ---- Milestone 8 step 1 prototype: cell-scheduled mortality ---------------
-// Each living person belongs to one cell: a sub-band of at most one year of
-// their group/sex schedule (upper-open bands stay one cell). A cell generates
-// deaths at rate * members and assigns each death to a uniformly chosen member.
-// No eligibility rules or weights. Clocks keep an Exp(1) threshold consumed at
-// the current intensity, as fertility cells do.
-class MortalityCells {
+// ---- Cell-scheduled rate processes (milestone 8 step 1) --------------------
+// One demographic rate process (mortality, union search, dissolution,
+// conversion, or one group-transition slot). Each at-risk unit (a person, or a
+// union identified by its history index) belongs to one cell: one input band
+// of its schedule, measured from the unit's own clock origin (birth, union
+// start, last union end, or group entry). Cells are the input bands: with no
+// eligibility rules every member's hazard is the cell rate, so splitting a band
+// cannot change results, only add boundary updates. Zero-rate bands are gaps.
+// A cell generates events at rate * members; one process clock fires at the
+// total intensity, the cell is chosen in proportion to its intensity, and the
+// unit uniformly within it. No eligibility rules or weights.
+class RateCells {
   struct Cell {
     double rate = 0;
     std::vector<int> members;   // swap-remove list of people
   };
-  struct Member { int cell = -1, slot = -1, stratum = -1; double born = 0; };
+  struct Member { int cell = -1, slot = -1, stratum = -1; double origin = 0; };
   // strata_[k] = split bands of schedule k; first_[k] = its first cell index.
   std::vector<std::vector<Band>> strata_;
   std::vector<int> first_;
   std::vector<Cell> cells_;
   std::vector<Member> members_;
   BoundaryQueue boundaries_;
-  // One death clock for all cells (see ProcessClock).
+  // One event clock for all cells (see ProcessClock).
   IntensityTree intensity_;
   ProcessClock clock_;
   std::function<double()> draw_threshold_;
@@ -1334,12 +1294,13 @@ class MortalityCells {
   }
 
  public:
-  MortalityCells(const std::vector<std::vector<Band>>& schedules,
+  RateCells(const std::vector<std::vector<Band>>& schedules,
                  std::function<double()> draw_threshold, double start, double end)
       : draw_threshold_(std::move(draw_threshold)), end_(end) {
     for (const auto& bands : schedules) {
-      // Interval 0: upper-open bands are never split (no eligibility rules).
-      strata_.push_back(FertilityCells::split_ages(bands, 0, 0));
+      std::vector<Band> cells;
+      for (const Band& band : bands) if (band.rate > 0) cells.push_back(band);
+      strata_.push_back(std::move(cells));
       first_.push_back(static_cast<int>(cells_.size()));
       for (const Band& band : strata_.back()) {
         Cell x;
@@ -1350,10 +1311,11 @@ class MortalityCells {
     if (!cells_.empty()) intensity_.set(cells_.size() - 1, 0);
     clock_.start(start);
   }
-  // Place a person in the cell of schedule `stratum` (-1: not alive) that
-  // holds age now - born, and queue their next band boundary.
-  void refresh(int person, int stratum, double born, double now) {
+  // Place a unit in the cell of schedule `stratum` (-1: not at risk) that
+  // holds its clock value now - origin, and queue its next band boundary.
+  void refresh(int person, int stratum, double origin, double now) {
     if (person >= static_cast<int>(members_.size())) members_.resize(person + 1);
+    if (stratum >= 0 && !R_finite(origin)) stop("A rate process requires a finite clock origin.");
     int cell = -1;
     double next = R_PosInf;
     if (stratum >= 0) {
@@ -1361,17 +1323,17 @@ class MortalityCells {
       size_t lo = 0, hi = bands.size();
       while (lo < hi) {
         const size_t mid = (lo + hi) / 2;
-        if (born + bands[mid].start <= now) lo = mid + 1; else hi = mid;
+        if (origin + bands[mid].start <= now) lo = mid + 1; else hi = mid;
       }
-      if (lo > 0 && now < born + bands[lo - 1].end) {
+      if (lo > 0 && now < origin + bands[lo - 1].end) {
         cell = first_[stratum] + static_cast<int>(lo - 1);
-        next = born + bands[lo - 1].end;
+        next = origin + bands[lo - 1].end;
       } else if (lo < bands.size()) {
-        next = born + bands[lo].start;
+        next = origin + bands[lo].start;
       }
     }
     Member& m = members_[person];
-    m.stratum = stratum; m.born = born;
+    m.stratum = stratum; m.origin = origin;
     if (m.cell != cell) {
       const int old = m.cell;
       if (old >= 0) {
@@ -1392,29 +1354,30 @@ class MortalityCells {
     boundaries_.set(person, next);
   }
   double next_boundary() { return boundaries_.top(); }
-  // Move the person with the earliest boundary to their next cell, using the
-  // schedule and birth time recorded at their last refresh.
+  // Move the unit with the earliest boundary to its next cell, using the
+  // schedule and clock origin recorded at its last refresh.
   void advance_boundary() {
     if (++updates_ % 1024 == 0) checkUserInterrupt();
     const auto entry = boundaries_.pop();
     const Member& m = members_[entry.second];
-    refresh(entry.second, m.stratum, m.born, entry.first);
+    refresh(entry.second, m.stratum, m.origin, entry.first);
   }
   double next_clock() const {
     const double due = clock_.due(intensity_);
     return due < end_ ? due : R_PosInf;
   }
-  // The death clock fires: choose a cell by intensity, then a member uniformly.
-  // The caller removes them with refresh(), which updates the cell's intensity.
+  // The clock fires: choose a cell by intensity, then a member uniformly, and
+  // re-arm. The caller updates the unit's state and refreshes its membership.
   int fire_next(double now) {
     clock_.spend(intensity_, now);
     const int c = static_cast<int>(intensity_.choose(R::runif(0, 1)));
     const Cell& x = cells_[c];
-    if (x.members.empty()) stop("A mortality cell fired without members.");
+    if (x.members.empty()) stop("A rate cell fired without members.");
     const double n = static_cast<double>(x.members.size());
     const size_t pick = std::min(x.members.size() - 1,
       static_cast<size_t>(std::floor(R::runif(0, 1) * n)));
     clock_.fired(now);
+    clock_.arm(intensity_, draw_threshold_);
     return x.members[pick];
   }
   bool consistent() const {
@@ -1866,10 +1829,8 @@ struct UnionRecord {
   int wife, husband;
   bool wife_died = false;
   bool dissolved = false;
-  bool dissolution_sampled = false;
-  bool cohab = false, converted = false, conversion_sampled = false;
-  double converted_from = NA_REAL, conversion_time = R_PosInf;
-  double dissolution_time = std::numeric_limits<double>::infinity();
+  bool cohab = false, converted = false;
+  double converted_from = NA_REAL;
 };
 
 // [[Rcpp::export]]
@@ -2041,7 +2002,10 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::unique_ptr<FemaleIntensityTracker> intensity_tracker;
   // Cell-accounted fertility under birth spacing (D101).
   std::unique_ptr<FertilityCells> cells;
-  std::unique_ptr<MortalityCells> mortality;
+  // Other rate processes; search, dissolution and conversion are null when
+  // not configured. One transition process per outgoing-schedule slot.
+  std::unique_ptr<RateCells> mortality, search, dissolution, conversion;
+  std::vector<std::unique_ptr<RateCells>> transitions;
   std::vector<const std::vector<Band>*> search_hazards;
   std::vector<bool> search_duration;
   std::vector<std::vector<Band>> probability_schedules(group_count * 3);
@@ -2342,16 +2306,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     inherit_custom = as<Function>(inheritance["custom"]);
     return matching_changed;
   };
-  std::vector<unsigned long long> event_versions(people.size(), 0);
-  // Continuous dates order events. Equivalent keys retain insertion order.
-  std::multimap<double, Event> queue;
   const double end = start + years;
-  auto candidate = [&](double waiting, double now) {
-    double due = now + waiting;
-    if (std::isfinite(waiting) && due <= now)
-      stop("Event time cannot advance at this numerical scale.");
-    return due;
-  };
   auto threshold = [&]() {
     // Use R's RNG, shared with the seed policy in simulate(). Exp(1) is the
     // cumulative-hazard threshold; avoid zero to keep waiting times positive.
@@ -2409,83 +2364,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   load_transitions();
   std::vector<double> group_entry(people.size());
   if (has_transition) group_entry = as<std::vector<double>>(persons[".group_entry"]);
-  std::vector<int> transition_destination(people.size(), -1);
   std::vector<double> tx_person, tx_time;
   std::vector<int> tx_origin, tx_dest;
-  auto schedule = [&](int i, double now) {
-    const auto version = ++event_versions[i];
-    const Person& p = people[i];
-    if (p.female) cells->refresh(i, now);
-    const bool alive = NumericVector::is_na(p.died);
-    mortality->refresh(i, alive ? 2 * p.group + (p.female ? 1 : 0) : -1, p.born, now);
-    if (!alive) return;
-    const auto& rates = schedules[p.group];
-    // Deaths come from mortality cells (milestone 8 prototype).
-    const double death_time = std::numeric_limits<double>::infinity();
-    // Births come from fertility cells (D101), not per-person candidates.
-    const double birth_time = std::numeric_limits<double>::infinity();
-    double search_time = std::numeric_limits<double>::infinity();
-    if (rate_initiation && p.female && current_partner[i] < 0) {
-      const bool duration = previous_specific && rates.duration_search[previous_union[i]];
-      const double origin = duration ? previous_union_end[i] : p.born;
-      if (!R_finite(origin)) stop("Duration search risk requires a recorded previous union ending.");
-      search_time = candidate(waiting_time(previous_specific ? rates.previous_search[previous_union[i]] : rates.search,
-        now - origin, threshold()), now);
-    }
-    double dissolution_time = std::numeric_limits<double>::infinity();
-    if (has_dissolution && p.female && current_partner[i] >= 0) {
-      UnionRecord& relationship = union_history[person_unions[i].back()];
-      if (!relationship.dissolution_sampled) {
-        const int pair = dissolution_schedules.size() == 1 ? 0 :
-          p.group + group_count * people[current_partner[i]].group;
-        relationship.dissolution_time = candidate(waiting_time(relationship.cohab ? cohab_dissolution_schedules[pair] : dissolution_schedules[pair],
-          now - relationship.start, threshold()), now);
-        relationship.dissolution_sampled = true;
-      }
-      // Retain the union clock through births, including a dissolution due now
-      // after a tied partnered birth. It is not a new zero-wait random draw.
-      dissolution_time = relationship.dissolution_time;
-    }
-    double conversion_time = R_PosInf;
-    if (cohab_enabled && !rates.conversion.empty() && p.female && current_partner[i] >= 0) {
-      auto& relationship = union_history[person_unions[i].back()];
-      if (relationship.cohab) {
-        if (!relationship.conversion_sampled) {
-          relationship.conversion_time = candidate(waiting_time(rates.conversion,
-            now - (rates.duration_conversion ? relationship.start : p.born), threshold()), now);
-          relationship.conversion_sampled = true;
-        }
-        conversion_time = relationship.conversion_time;
-      }
-    }
-    double transition_time = R_PosInf;
-    transition_destination[i] = -1;
-    if (has_transition) {
-      const int partner = current_partner[i];
-      const std::string type = partner < 0 ? "unpartnered" :
-        (union_history[person_unions[i].back()].cohab ? "cohab" : "marriage");
-      for (const auto& outgoing : transition_schedules[p.group]) {
-        if (outgoing.sex >= 0 && outgoing.sex != (p.female ? 1 : 0)) continue;
-        if (!outgoing.type.empty() && outgoing.type != type &&
-            !(outgoing.type == "partnered" && partner >= 0)) continue;
-        const double due = candidate(waiting_time(outgoing.bands,
-          now - (transition_duration ? group_entry[i] : p.born), threshold()), now);
-        if (due < transition_time) {
-          transition_time = due;
-          transition_destination[i] = outgoing.dest;
-        }
-      }
-    }
-    const double other_due = std::min(std::min(death_time, birth_time),
-      std::min(std::min(dissolution_time, conversion_time), search_time));
-    const double due = std::min(other_due, transition_time);
-    const auto type = death_time <= due ? EventType::death :
-      (birth_time <= due ? EventType::birth :
-       (dissolution_time <= due ? EventType::dissolution :
-        (conversion_time <= due ? EventType::conversion :
-         (search_time <= due ? EventType::search : EventType::transition))));
-    if (due < end) queue.emplace(due, Event{i, type, version});
-  };
   // Fertility type labels: overall, unpartnered/partnered, or three types.
   std::vector<std::string> fertility_types;
   auto load_cells = [&](double now) {
@@ -2519,21 +2399,135 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       birth_interval, heterogeneous, state, threshold, calibrator.get(), now, end, start));
   };
   load_cells(start);
-  auto load_mortality = [&](double now) {
+  // Build the non-fertility rate processes from the active schedules. Strata:
+  // mortality group x sex; search group (x previous-union category);
+  // dissolution group pair x union type; conversion group; transition slot k
+  // has one stratum per origin group (its k-th outgoing schedule).
+  auto load_processes = [&](double now) {
+    auto make = [&](const std::vector<std::vector<Band>>& strata) {
+      return std::unique_ptr<RateCells>(new RateCells(strata, threshold, now, end));
+    };
     std::vector<std::vector<Band>> strata;
     for (int g = 0; g < group_count; ++g) {
       strata.push_back(schedules[g].male);
       strata.push_back(schedules[g].female);
     }
-    mortality.reset(new MortalityCells(strata, threshold, now, end));
+    mortality = make(strata);
+    search.reset();
+    if (rate_initiation) {
+      strata.clear();
+      for (int g = 0; g < group_count; ++g) {
+        if (previous_specific) for (int k = 0; k < 3; ++k) strata.push_back(schedules[g].previous_search[k]);
+        else strata.push_back(schedules[g].search);
+      }
+      search = make(strata);
+    }
+    dissolution.reset();
+    if (has_dissolution) {
+      strata.clear();
+      for (size_t pair = 0; pair < dissolution_schedules.size(); ++pair) {
+        strata.push_back(dissolution_schedules[pair]);
+        strata.push_back(cohab_dissolution_schedules[pair]);
+      }
+      dissolution = make(strata);
+    }
+    conversion.reset();
+    if (cohab_enabled) {
+      strata.clear();
+      for (int g = 0; g < group_count; ++g) strata.push_back(schedules[g].conversion);
+      conversion = make(strata);
+    }
+    transitions.clear();
+    size_t slots = 0;
+    for (const auto& origin : transition_schedules) slots = std::max(slots, origin.size());
+    for (size_t k = 0; k < slots; ++k) {
+      strata.clear();
+      for (int g = 0; g < group_count; ++g)
+        strata.push_back(k < transition_schedules[g].size() ? transition_schedules[g][k].bands :
+                         std::vector<Band>());
+      transitions.push_back(make(strata));
+    }
   };
-  load_mortality(start);
-  // Initialize one next event for each living person. Known age changes are
-  // already incorporated, so birthdays alone do not trigger resampling.
+  // Recompute union u's membership in the union processes (dissolution and
+  // conversion), whose units are unions identified by their history index.
+  // Called when a union starts or ends and when a partner changes group.
+  auto refresh_union = [&](int u, double now) {
+    const UnionRecord& x = union_history[u];
+    const bool ongoing = NumericVector::is_na(x.end);
+    const Person& wife = people[x.wife];
+    if (dissolution) {
+      // Pair schedules are symmetric: both orders of a group pair share cells.
+      const int low = std::min(wife.group, people[x.husband].group);
+      const int high = std::max(wife.group, people[x.husband].group);
+      const int pair = dissolution_schedules.size() == 1 ? 0 : low + group_count * high;
+      dissolution->refresh(u, ongoing ? 2 * pair + (x.cohab ? 1 : 0) : -1, x.start, now);
+    }
+    if (conversion) {
+      // Conversion schedules use the wife's group, by union duration or her age.
+      const double origin = schedules[wife.group].duration_conversion ? x.start : wife.born;
+      conversion->refresh(u, ongoing && x.cohab ? wife.group : -1, origin, now);
+    }
+  };
+  // Recompute a person's membership in every rate process from their current
+  // state. Called for each person whose state an event changes.
+  auto refresh_person = [&](int i, double now) {
+    const Person& p = people[i];
+    const bool alive = NumericVector::is_na(p.died);
+    const int partner = current_partner[i];
+    if (p.female) cells->refresh(i, now);
+    mortality->refresh(i, alive ? 2 * p.group + (p.female ? 1 : 0) : -1, p.born, now);
+    if (search) {
+      int stratum = -1;
+      double origin = p.born;
+      if (alive && p.female && partner < 0) {
+        const int previous = previous_specific ? previous_union[i] : 0;
+        stratum = previous_specific ? 3 * p.group + previous : p.group;
+        if (previous_specific && schedules[p.group].duration_search[previous]) {
+          origin = previous_union_end[i];
+          if (!R_finite(origin)) stop("Duration search risk requires a recorded previous union ending.");
+        }
+      }
+      search->refresh(i, stratum, origin, now);
+    }
+    if ((dissolution || conversion) && partner >= 0) refresh_union(person_unions[i].back(), now);
+    if (!transitions.empty()) {
+      const std::string type = partner < 0 ? "unpartnered" :
+        (union_history[person_unions[i].back()].cohab ? "cohab" : "marriage");
+      const auto& outgoing = transition_schedules[p.group];
+      for (size_t k = 0; k < transitions.size(); ++k) {
+        bool at_risk = alive && k < outgoing.size();
+        if (at_risk) {
+          const auto& x = outgoing[k];
+          if (x.sex >= 0 && x.sex != (p.female ? 1 : 0)) at_risk = false;
+          if (!x.type.empty() && x.type != type && !(x.type == "partnered" && partner >= 0)) at_risk = false;
+        }
+        transitions[k]->refresh(i, at_risk ? p.group : -1,
+          transition_duration ? group_entry[i] : p.born, now);
+      }
+    }
+  };
+  load_processes(start);
   for (int i = 0; i < static_cast<int>(people.size()); ++i) {
     if (i % 1024 == 0) checkUserInterrupt();
-    schedule(i, start);
+    refresh_person(i, start);
   }
+  // Event sources in same-time priority order: death, birth, dissolution,
+  // conversion, search, then transition slots. Birth is the fertility cells.
+  struct Source { EventType type; RateCells* cells; int slot; };
+  std::vector<Source> sources;
+  auto collect_sources = [&]() {
+    sources.clear();
+    sources.push_back({EventType::death, mortality.get(), -1});
+    sources.push_back({EventType::birth, nullptr, -1});
+    if (dissolution) sources.push_back({EventType::dissolution, dissolution.get(), -1});
+    if (conversion) sources.push_back({EventType::conversion, conversion.get(), -1});
+    if (search) sources.push_back({EventType::search, search.get(), -1});
+    for (size_t k = 0; k < transitions.size(); ++k)
+      sources.push_back({EventType::transition, transitions[k].get(), static_cast<int>(k)});
+  };
+  collect_sources();
+  auto source_clock = [&](const Source& x) { return x.cells ? x.cells->next_clock() : cells->next_clock(); };
+  auto source_boundary = [&](const Source& x) { return x.cells ? x.cells->next_boundary() : cells->next_boundary(); };
   double birth_count = 0, death_count = 0, dissolution_count = 0, conversion_count = 0;
   unsigned long long processed = 0;
   std::vector<DataFrame> unrealized_epochs;
@@ -2545,9 +2539,10 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     // Candidates under the superseded rates never execute beyond it.
     if (!calendar_boundaries.empty()) {
       const double now = *calendar_boundaries.begin();
-      if (now <= cells->next_boundary() && now <= cells->next_clock() &&
-          now <= mortality->next_boundary() && now <= mortality->next_clock() &&
-          (queue.empty() || now <= queue.begin()->first)) {
+      bool first = true;
+      for (const Source& x : sources)
+        if (!(now <= source_boundary(x) && now <= source_clock(x))) { first = false; break; }
+      if (first) {
         calendar_boundaries.erase(calendar_boundaries.begin());
         checkUserInterrupt();
         const bool matching_changed = update_models(now);
@@ -2586,82 +2581,56 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         active_transitions = calendar_slice(all_transitions, now);
         load_schedules(); load_dissolution(); load_transitions();
         if (fertility_change) load_cells(now);
-        // Rebuilt cells redraw thresholds (memoryless); schedule() below
-        // re-enters every living person.
-        if (calendar_changes_at(all_mortality, now)) {
-          cells_consistent = cells_consistent && mortality->consistent();
-          load_mortality(now);
-        }
-        for (auto& relationship : union_history) {
-          if (!NumericVector::is_na(relationship.end)) continue;
-          relationship.dissolution_sampled = false;
-          relationship.conversion_sampled = false;
-        }
+        // Rebuilt processes draw new thresholds, valid after survival to the
+        // boundary (memoryless); every person re-enters below.
+        for (const Source& x : sources)
+          if (x.cells) cells_consistent = cells_consistent && x.cells->consistent();
+        load_processes(now);
+        collect_sources();
         // All table objects referenced by the tracker keep their addresses.
         // Clock selection is fixed across calendar periods by R validation.
         for (int w = 0; w < static_cast<int>(people.size()); ++w)
           add_counted_woman(w, now);
-        queue.clear();
         for (int i = 0; i < static_cast<int>(people.size()); ++i) {
           if (i % 1024 == 0) checkUserInterrupt();
-          schedule(i, now);
+          refresh_person(i, now);
         }
         continue;
       }
     }
-    // Cell clocks depend on current membership, so bookkeeping boundaries are
-    // processed in time order before any event at or after them.
-    const double clock = cells ? cells->next_clock() : R_PosInf;
-    const double death_clock = mortality->next_clock();
-    const double queue_top = queue.empty() ? R_PosInf : queue.begin()->first;
-    const double next_event = std::min(std::min(clock, death_clock), queue_top);
-    if (cells) {
-      const double boundary = cells->next_boundary();
-      if (boundary < end && boundary <= next_event && boundary <= mortality->next_boundary()) {
-        cells->advance_boundary();
-        continue;
-      }
+    // Cell intensities depend on current membership, so bookkeeping boundaries
+    // are processed in time order before any event at or after them. Exact
+    // event ties follow the source priority order (earlier source wins).
+    double boundary = R_PosInf, next_event = R_PosInf;
+    size_t boundary_source = 0, event_source = 0;
+    for (size_t k = 0; k < sources.size(); ++k) {
+      const double b = source_boundary(sources[k]), c = source_clock(sources[k]);
+      if (b < boundary) { boundary = b; boundary_source = k; }
+      if (c < next_event) { next_event = c; event_source = k; }
     }
-    {
-      const double boundary = mortality->next_boundary();
-      if (boundary < end && boundary <= next_event) {
-        mortality->advance_boundary();
-        continue;
-      }
+    if (boundary < end && boundary <= next_event) {
+      const Source& x = sources[boundary_source];
+      if (x.cells) x.cells->advance_boundary(); else cells->advance_boundary();
+      continue;
     }
-    // Exact ties follow the event priority death, birth, dissolution,
-    // conversion, search: a mortality clock wins ties with fertility clocks
-    // and person events; a fertility clock wins ties with person events.
     if (!(next_event < end)) break;
     if (++processed % 1024 == 0) checkUserInterrupt();
-    double now;
-    EventType type;
-    int i;
-    if (death_clock <= clock && death_clock <= queue_top) {
-      now = death_clock;
-      i = mortality->fire_next(now);
-      type = EventType::death;
-    } else if (clock <= queue_top) {
-      now = clock;
-      i = cells->fire_next(now);
-      type = EventType::birth;
-    } else {
-      auto next = queue.begin();
-      now = next->first;
-      const Event event = next->second;
-      queue.erase(next);
-      type = event.type;
-      i = event.person;
-      if (event.version != event_versions[i]) continue;
-    }
+    const double now = next_event;
+    const Source& fired = sources[event_source];
+    const EventType type = fired.type;
+    // Union processes return a union index; their events act on its wife.
+    const int unit = fired.cells ? fired.cells->fire_next(now) : cells->fire_next(now);
+    const bool union_event = type == EventType::dissolution || type == EventType::conversion;
+    const int i = union_event ? union_history[unit].wife : unit;
     if (intensity_tracker) intensity_tracker->advance(now);
     if (check_cells && cells && !cells->consistent())
       stop("Internal error: fertility cell counts differ from an explicit scan.");
-    if (check_cells && !mortality->consistent())
-      stop("Internal error: mortality cell counts differ from an explicit scan.");
+    if (check_cells) for (const Source& x : sources)
+      if (x.cells && !x.cells->consistent())
+        stop("Internal error: rate cell counts differ from an explicit scan.");
     if (type == EventType::transition) {
-      const int destination = transition_destination[i];
-      if (destination < 0 || destination == people[i].group) stop("Invalid transition destination.");
+      const int destination = transition_schedules[people[i].group][fired.slot].dest;
+      if (destination == people[i].group) stop("Invalid transition destination.");
       const int partner = current_partner[i];
       if (people[i].female) remove_counted_woman(i); else remove_male(i);
       tx_person.push_back(people[i].id); tx_time.push_back(now);
@@ -2669,20 +2638,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       people[i].group = destination;
       group_entry[i] = now;
       if (people[i].female) add_counted_woman(i, now); else add_male(i);
-      if (partner >= 0) {
-        auto& relationship = union_history[person_unions[i].back()];
-        relationship.dissolution_sampled = false;
-        if (people[i].female) relationship.conversion_sampled = false;
-        // The woman carries the pair-dependent union clock even when he moves.
-        if (!people[i].female) schedule(partner, now);
-      }
-      schedule(i, now);
+      // A move changes the group pair of a union carried by the wife.
+      refresh_person(i, now);
     } else if (type == EventType::death) {
-      // Retain the person's history, record death, and stop their scheduling.
+      // Retain the person's history, record death, and leave every process.
       people[i].died = now;
-      // Pending person events (search, dissolution, transition) are now stale.
-      ++event_versions[i];
-      mortality->refresh(i, -1, people[i].born, now);
+      std::vector<int> widowed, ended;
       for (int u : person_unions[i]) {
         UnionRecord& relationship = union_history[u];
         if (!NumericVector::is_na(relationship.end)) continue;
@@ -2696,20 +2657,19 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         previous_union_end[relationship.wife] = previous_union_end[relationship.husband] = now;
         add_male(relationship.husband);
         add_counted_woman(relationship.wife, now);
-        if (has_transition && i == relationship.wife) schedule(relationship.husband, now);
-        if (cells) cells->refresh(relationship.wife, now);
-        // Her old birth candidate is invalid once her husband has died.
-        if ((rate_initiation || has_dissolution || has_transition) && i == relationship.husband)
-          schedule(relationship.wife, now);
+        widowed.push_back(i == relationship.wife ? relationship.husband : relationship.wife);
+        ended.push_back(u);
       }
       if (!people[i].female) remove_male(i);
       else remove_counted_woman(i);
-      if (cells && people[i].female) cells->refresh(i, now);
+      refresh_person(i, now);
+      for (int survivor : widowed) refresh_person(survivor, now);
+      for (int u : ended) refresh_union(u, now);
       ++death_count;
     } else if (type == EventType::dissolution) {
       const int partner = current_partner[i];
       if (partner < 0) stop("Dissolution requires an ongoing union.");
-      UnionRecord& relationship = union_history[person_unions[i].back()];
+      UnionRecord& relationship = union_history[unit];
       relationship.end = now;
       relationship.dissolved = true;
       current_partner[i] = current_partner[partner] = -1;
@@ -2720,13 +2680,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       add_male(partner);
       add_counted_woman(i, now);
       ++dissolution_count;
-      // The woman's cell/search state changes. With transition risks enabled,
-      // both partners also need fresh union-type-dependent candidates.
-      schedule(i, now);
-      if (has_transition) schedule(partner, now);
+      refresh_union(unit, now);
+      refresh_person(i, now);
+      refresh_person(partner, now);
     } else if (type == EventType::conversion) {
       const int partner = current_partner[i];
-      const int old = person_unions[i].back();
+      const int old = unit;
       if (partner < 0 || !union_history[old].cohab) stop("Conversion requires an ongoing cohabitation.");
       union_history[old].end = now;
       union_history[old].converted = true;
@@ -2740,25 +2699,26 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       person_unions[partner].push_back(next);
       if (diagnostics) diagnostic_log_weights.emplace_back(group_count, NA_REAL);
       ++conversion_count;
-      schedule(i, now);
-      if (has_transition) schedule(partner, now);
+      refresh_union(old, now);   // the cohabitation closes; the marriage enters below
+      refresh_person(i, now);
+      refresh_person(partner, now);
     } else if (type == EventType::search) {
       const int partner = form_union(i, now);
-      schedule(i, now);
-      if (has_transition && partner >= 0) schedule(partner, now);
+      refresh_person(i, now);
+      if (partner >= 0) refresh_person(partner, now);
     } else {
       double father = NA_REAL;
       int partner = current_partner[i];
       if (!rate_initiation && partner < 0) {
         partner = form_union(i, now);
-        if (has_transition && partner >= 0) schedule(partner, now);
+        if (partner >= 0) refresh_person(partner, now);
       }
       // A nonmarital father stays available: parentage alone is not a union.
       const int father_position = partner >= 0 ? partner :
         (rate_initiation ? find_candidate(i, now, father_matching, *father_draw, true, nullptr) : -1);
       if (father_position < 0 && cancel_birth_if_no_match) {
-        // No child was born: retain last_birth and redraw risks from this instant.
-        schedule(i, now);
+        // No child was born: retain last_birth; her union state may have changed.
+        refresh_person(i, now);
         continue;
       }
       if (father_position >= 0) father = people[father_position].id;
@@ -2867,14 +2827,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         counted_woman.push_back(0);
         add_counted_woman(child, now);
       }
-      event_versions.push_back(0);
       group_entry.push_back(now);
-      transition_destination.push_back(-1);
       ++birth_count;
-      // Both newborn and mother need fresh candidates. The mother now has a
-      // new last_birth; spacing delays her next birth, but not a possible death.
-      schedule(child, now);
-      schedule(i, now);
+      // The newborn enters its cells; the mother's spacing (and possibly her
+      // union state, in on-demand mode) has changed.
+      refresh_person(child, now);
+      refresh_person(i, now);
     }
   }
   DataFrame unrealized;

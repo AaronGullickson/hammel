@@ -37,3 +37,19 @@ quiet_unreachable <- function(expr) {
       invokeRestart("muffleWarning")
   })
 }
+
+# Models that differ only in how equal rates are stratified create different
+# cells, so their histories differ draw by draw while agreeing in distribution.
+# Compare union and dissolution counts over replications.
+expect_equivalent_unions <- function(a, b, years, seeds = 1:20) {
+  counts <- function(model) vapply(seeds, function(seed) {
+    unions <- simulate(model, years, seed)$unions
+    c(nrow(unions), sum(unions$end_reason %in% "dissolution"))
+  }, numeric(2))
+  x <- counts(a)
+  y <- counts(b)
+  for (k in 1:2) {
+    se <- sqrt(var(x[k, ]) / length(seeds) + var(y[k, ]) / length(seeds))
+    expect_lt(abs(mean(x[k, ]) - mean(y[k, ])), 4 * se + 1e-9)
+  }
+}

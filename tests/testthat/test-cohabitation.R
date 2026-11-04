@@ -191,12 +191,13 @@ test_that("conversion age clocks and pending birth ties retain the conversion", 
   model$processes$union_formation$union_convert_rate <- data.frame(age_start=21,age_end=Inf,rate=1e5)
   result <- simulate(model,2,413)
   expect_gte(result$unions$start_time[2],1)
-  # The woman's fertility-cell clock draws first, then her death, dissolution
-  # and conversion candidates. With one member the cell rate is her rate. Ties
-  # are placed at .5, away from her integer-age cell boundaries.
+  # Process clocks draw thresholds in refresh order: fertility, then (when its
+  # rate is positive) dissolution, then conversion; zero-rate processes draw
+  # none. With one unit per process each due time is its threshold over the
+  # rate. Ties are placed at .5, away from her integer-age fertility cells.
   seed <- 71L
-  set.seed(seed); draws <- rexp(4)
-  model <- initial_cohabs(conversion=draws[4]/.5,breakup=0)
+  set.seed(seed); draws <- rexp(3)
+  model <- initial_cohabs(conversion=draws[2]/.5,breakup=0)
   model <- set_fertility(model,data.frame(age_start=15,age_end=50,
     union_type=c("unpartnered","cohab","marriage"),rate=c(0,draws[1]/.5,0)),birth_interval=0)
   tied <- simulate(model,1.5,seed)
@@ -206,7 +207,8 @@ test_that("conversion age clocks and pending birth ties retain the conversion", 
   expect_equal(tied$unions$end_time[1],.5,tolerance=0)
   expect_equal(tied$unions$end_reason[1],"conversion")
   # Dissolution at the same time wins, preventing conversion.
-  model$processes$union_dissolution$rates$rate[1] <- draws[3]/.5
+  model$processes$union_dissolution$rates$rate[1] <- draws[2]/.5
+  model$processes$union_formation$union_convert_rate$rate <- draws[3]/.5
   ended <- simulate(model,1.5,seed)
   expect_equal(ended$unions$end_reason[1],"dissolution")
   expect_equal(ended$simulation$conversions,0)

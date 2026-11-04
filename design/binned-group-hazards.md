@@ -1,28 +1,34 @@
 # Milestone 8: binned-group hazards and formula weights
 
-Recorded October 31, 2026 (D121). **Status: user-selected future engine direction;
-not implemented.** Milestone 7 was accepted complete with its current engine
-(D127, November 2, 2026). Milestone 8 will
-extend the fertility cell approach to all existing rate processes and allow
-custom formula weights on those processes. This document records the discussion,
-selected principles, proposed diagnostics and questions still needing a contract.
-It does not select a public API or authorize an unspecified implementation.
+Recorded October 31, 2026 (D121). **Status: step 1 (cell scheduling for every
+rate process) is implemented on the `milestone8-binned-intensity` branch and
+not yet accepted; step 2 (weights and eligibility) is not implemented.**
+Milestone 7 was accepted complete with its previous engine (D127, November 2,
+2026). Milestone 8 extends the fertility cell approach to all existing rate
+processes and will allow custom formula weights on those processes. This
+document records the implemented step 1 design, the discussion, selected
+principles, proposed diagnostics and questions still needing a contract. It
+does not select a public API or authorize an unspecified implementation.
 
-The current engine still uses [cell-accounted fertility](fertility-cell-accounting.md)
-with [persistent fertility weights](fertility-heterogeneity-notes.md), alongside
-individual/union hazard scheduling for other processes. Calendar-varying rates
-remain governed by [the milestone 7 contract](time-varying-rates.md).
+The engine uses [cell-accounted fertility](fertility-cell-accounting.md) with
+[persistent fertility weights](fertility-heterogeneity-notes.md), and the same
+cell scheduling for the other five processes (see
+[step 1 implementation](#step-1-implementation)). Calendar-varying rates remain
+governed by [the milestone 7 contract](time-varying-rates.md). Other design
+documents that describe individual waiting-time clocks, such as
+[waiting-time sampling](waiting-time-sampling.md), predate step 1 and still
+need revision.
 
 ## Phasing
 
 User direction (November 4, 2026):
 
-1. **Step 1:** move every rate process to cell scheduling, then measure
-   performance against the current engine. Fertility keeps its current spacing
+1. **Step 1 (implemented):** move every rate process to cell scheduling, then
+   measure performance against the previous engine. Fertility keeps its spacing
    eligibility and persistent `hetfert` weights unchanged. The other five
-   processes use weights of one and have no eligibility rules. Fertility's existing cell machinery, including
-   its handling of members crossing age boundaries, should be reused and
-   generalized.
+   processes use weights of one and have no eligibility rules. Fertility's cell
+   machinery, including its handling of members crossing age boundaries, is
+   reused and generalized.
 2. **Step 2:** add weighting and eligibility mechanisms. The weight and
    eligibility material below is notes for this step.
 
@@ -30,6 +36,144 @@ One scheduling approach serves all rate processes. The engine will not keep
 individual clocks for some processes alongside cells for others. The aim is a
 simpler code base. If step 1 performance is unacceptable, the approach may be
 abandoned rather than combined with individual clocks.
+
+## Step 1 implementation
+
+This section describes the engine on the milestone 8 branch (November 4,
+2026). Choices marked *user direction* were selected by the user during step 1;
+the rest are implementation choices within that direction.
+
+### Processes, units and cells
+
+Each rate process keeps cells of at-risk units. A unit belongs to at most one
+cell of a process at a time. A cell is one band of a stratum's schedule,
+measured on the unit's own clock from its origin.
+
+| Process | Unit | Strata | Clock origin |
+| --- | --- | --- | --- |
+| Mortality | Living person | Group x sex | Birth |
+| Fertility | Living woman (members); eligible women receive births | Group x union type x actual parity (when parity-specific) | Birth |
+| Union search (rate mode) | Living unpartnered woman | Group, or group x previous-union category | Birth, or most recent union end for duration schedules |
+| Dissolution | Ongoing union, by its history index | Unordered group pair x union type | Union start |
+| Conversion | Ongoing cohabitation, by its history index | Wife's group | Union start (duration schedules) or wife's birth (age schedules) |
+| Group transition | Living person in the origin group | One process per outgoing-schedule slot k: the origin group's k-th schedule (destination, sex, union type) | Birth, or group entry for duration schedules |
+
+- **Cell width (user direction):** fertility splits bands into cells of at
+  most one year and by actual parity, as in D101, because spacing is an
+  eligibility rule. The other five processes use their input bands as cells.
+  Zero-rate bands are gaps with no cells.
+- **Symmetric pairs:** dissolution schedules are defined by unordered group
+  pairs, so both orders of a pair (A:B and B:A) share cells.
+- **Transitions:** one process per outgoing-schedule slot keeps each origin
+  group's competing destinations as separate processes, as the previous
+  engine did.
+
+### One clock per process (user direction)
+
+A process does not keep one clock per cell. Its cells are independent Poisson
+streams with intensity m_c * N_c, and their sum is one stream at the total
+intensity Lambda = sum over cells of m_c * N_c, in which each event belongs to
+cell c with probability m_c * N_c / Lambda. Each process therefore keeps:
+
+- an `IntensityTree`, a sum tree whose leaf c holds the cell's current
+  intensity. Sums are recomputed from children along each updated path, so they
+  do not drift;
+- a `ProcessClock`, one Exp(1) threshold spent at the current total intensity.
+  Before any intensity change the elapsed interval consumes threshold; the due
+  time is then `last + threshold / Lambda`. Membership and rate changes
+  therefore recompute the due time without random draws.
+
+When the clock fires, the engine draws one uniform to choose the cell in
+proportion to its intensity, and one uniform to choose the unit within it
+(uniformly, or by `hetfert` weight in fertility). It then draws a new threshold.
+
+Fertility cells with members but no eligible woman contribute zero to the tree.
+Their intensity keeps accumulating as expected unrealized births, exactly as in
+D101 (*user direction*: smoothed unrealized births are retained rather than
+counting discarded events).
+
+### Boundaries and membership updates
+
+- Each process has a `BoundaryQueue` with at most one pending boundary per
+  unit: its next band edge. Boundaries are bookkeeping, consume no randomness,
+  and are processed in time order before any event at or after them.
+- The queue is a bucket queue (buckets of 1/365 year over a two-year ring, plus
+  an overflow heap). Buckets are sorted when reached, so pops follow exactly
+  (time, unit) order.
+- `refresh_person()` recomputes a person's membership in every process from
+  current state. Every event refreshes each person whose state it changes.
+  `refresh_union()` does the same for a union's dissolution and conversion
+  cells when a union starts or ends and when a partner changes group.
+
+### Event selection and priority
+
+Each loop iteration processes the earliest boundary if it is not later than
+the earliest process clock. Otherwise the earliest clock fires. Exact ties
+follow the source order death, birth, dissolution, conversion, search, then
+transition slots. Calendar changes still precede same-time boundaries and
+events. A rate change rebuilds every process from the active schedules and
+re-enters every person and union. New thresholds are valid after survival to
+the boundary, since the clocks are memoryless.
+
+### Random-number use
+
+At the start, persons are refreshed in index order. Each process's clock draws
+its first threshold when its total intensity first becomes positive, so
+processes with no positive cells draw nothing. Each event draws the cell and
+unit uniforms and the next threshold, followed by the event's own draws (for
+example, union type, partner choice and newborn sex). Fixed-seed histories
+differ from the previous engine, and models that stratify equal rates
+differently (for example, one shared search schedule against three equal
+previous-union schedules) create different cells and so differ draw by draw,
+while agreeing in distribution.
+
+### Removed with step 1
+
+The per-person event queue and its event versions, `schedule()`, the stored
+per-union dissolution and conversion clocks, the special handling of ties
+between cell clocks and person events, the individual waiting-time sampler
+`waiting_time()` and its internal test entry point `hazard_wait_cpp()`.
+
+The matching-calibration intensity tracker (`FemaleIntensityTracker`) is
+retained. It keeps its own per-woman boundaries for weighted matching. Feeding
+it from the search cells is a possible later simplification.
+
+### Validation and performance (November 4, 2026)
+
+These are software checks, not user-selected acceptance thresholds.
+
+- **Equivalence with the previous engine:** a model with every process (two
+  groups, mortality, fertility, rate-mode search, cohabitation and conversion,
+  typed duration dissolution, two-way transitions) was run for ten seeds on
+  each engine. All 23 summary measures agree within replication noise (largest
+  |z| = 2.05), and observed dissolution, conversion and transition rates match
+  their inputs.
+- **Fertility:** the milestone 5 cell-spacing recovery check agrees with the
+  accepted results across its 29 comparisons (largest |z| = 2.4), including
+  unrealized births.
+- **Mortality:** observed single-year death rates match Gompertz inputs
+  (chi-square over about 155 age-by-sex cells, p = 0.30).
+- **Tests:** the suite passes, also with internal consistency checks that
+  rescan every process's cells, and its tree, at each event. Tests that
+  constructed exact ties from the previous draw order were rewritten for the new
+  order; tests asserting draw-for-draw identity between differently stratified
+  models now compare distributions.
+
+Timings on the development machine (seconds, optimized builds):
+
+| Model | Previous engine | Step 1 | SOCSIM 1.9.18 |
+| --- | --- | --- | --- |
+| Full model above, 50K people, 100 years | 7.7 | 9.2 | not run |
+| Mortality and fertility, 50K people, 100 years | 0.51 | 1.29 | 2.00 |
+| Mortality and fertility, 100K people, 200 years, replacement fertility | 3.86 | 7.2 | 13.9 |
+| Demographic transition article, main run (yearly rates, on-demand; timed by the user) | 42 | 32 | not run |
+| Second demographic transition article, three main runs (rate mode) | 4.6 | 6.3 | not run |
+
+The SOCSIM runs used comparable inputs with random fathers instead of matching.
+The second demographic transition timings are the means of two runs of the
+article's code, extracted with `knitr::purl`.
+Per-boundary updates are the main added cost; calendar rate changes and
+fertility became cheaper.
 
 ## Purpose and selected direction
 
@@ -56,6 +200,20 @@ one named population `group`, nor require a grouped population.
 
 ## Cell boundaries selected by the user
 
+User direction (November 4, 2026), revising the original single-year rule:
+cells are split to single years only for a process with eligibility rules,
+which is currently fertility alone (spacing; D101 decision 5). The other five
+processes use their input bands as cells. Without eligibility rules every
+member's hazard equals the cell rate whatever the cell's width, so splitting
+cannot change results and only adds boundary updates. In the second
+demographic transition article, single-year splitting roughly doubled the cost
+of a rate-mode model with five-year bands. Weights will not depend on age
+within a band. Step 2 must still consider weights on traits correlated with
+age inside a wide band, which shift events toward the ages where the trait is
+common while keeping the band total.
+
+The rules below describe single-year splitting where it applies:
+
 - Use single-year attained-age or elapsed-duration bands, even when input bands
   are wider. The process keeps its existing choice of clock; this does not add
   a joint age-by-duration surface.
@@ -77,10 +235,11 @@ An input age band of five years crossed with two sexes and two input groups
 therefore yields 20 potential cell definitions, before any additional
 input strata. Formula predictors do not automatically create further cells.
 
-For upper-open input ages/durations, implementation must represent the attainable
-one-year cells without allocating infinitely many cells. The treatment of the
-existing fertility small-rate open-band optimization needs explicit review;
-it is not automatically a general exception to the selected cell definition.
+For upper-open input ages in fertility, single-year cells are created up to the
+oldest attainable age in the run and the rest stays one open cell. Fertility's
+small-rate open-band tolerance (an open band stays one cell when spacing could
+affect only a negligible share) is retained. The other processes keep each
+upper-open band as one cell.
 
 ## Aggregate intensity and relative individual risk
 
@@ -103,15 +262,11 @@ conditional aggregate intensity, with observed counts fluctuating stochastically
 around their exposure-based expectations. It does not promise exact event quotas
 or exact observed rates in every finite cell or time interval.
 
-A cell clock generates an event and selection assigns its recipient. The
-precise clock implementation, threshold retention and data structures remain to
-be designed. It must handle competing events, changes in membership, eligibility
-and rates, and preserve the engine's documented state-consistency and invalidation
-rules. Calendar changes precede same-time events; the current demographic
-priority is death, birth, dissolution, conversion, search, then group transition.
-How cell-level selection preserves these priorities needs explicit
-specification. This remains continuous-time execution, not annual simulation
-steps.
+A process clock generates an event, a cell is chosen in proportion to its
+intensity, and selection assigns the recipient; see
+[step 1 implementation](#step-1-implementation) for the clocks, data
+structures, competing processes and same-time priority. This remains
+continuous-time execution, not annual simulation steps.
 
 With all eligible weights one and N_c equal to eligible membership, each member
 has hazard m_c. Aggregate scheduling can then reproduce the current independent
@@ -274,9 +429,9 @@ for age-based schedules.
 | Conversion | Current cohabitation exposure, with the documented woman's age or episode-duration clock |
 | Group transition | Origin-group exposure for each directed destination risk; destination denominators can share the same members |
 
-Dissolution's current female clock carrier is an implementation detail, not a
-reason to restrict future weight predictors to the woman's characteristics.
-Couple covariate names and evaluation context remain to be designed.
+Dissolution and conversion units are unions, so future weight predictors need
+not be restricted to the woman's characteristics. Couple covariate names and
+evaluation context remain to be designed.
 
 No feasible recipient or no positive eligible weight sum can make a target
 unattainable. The zero-weight proposal above awaits acceptance; invalid-weight
@@ -306,14 +461,14 @@ recipient selection instead of redrawing individual clocks. It is a computationa
 opportunity, not a selected evaluation policy or demonstrated speed improvement.
 Time-dependent formulas and efficient weighted selection need investigation.
 
-Before implementation, specify:
+Before step 2 implementation, specify:
 
 - Formula API, weight scale and validation, supported person/partner/history
   covariates, persistent heterogeneity interactions and handling of missing values.
 - For each process, exact membership, exposure, eligibility, zero-weight behavior,
   affected cells after events and duration-origin preservation/reset rules.
-- Aggregate clocks, boundary ordering, destination competition, updates after
-  births/deaths/unions/moves, and matching-calibration integration.
+- How weighted selection and eligibility fit the step 1 clocks, trees and
+  updates, including matching-calibration integration.
 - Characteristic/formula update timing and safe evaluation context, including
   continuously changing age/duration predictors and new people.
 - Diagnostic provenance, observation semantics and any reporting of infeasible

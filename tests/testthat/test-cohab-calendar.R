@@ -86,8 +86,9 @@ test_that("non-extreme calendar probabilities recover type shares in each period
 test_that("probability changes precede an exact tied search without rescheduling it", {
   seed <- 783
   set.seed(seed)
-  # Female: first threshold is death, second is search. No positive fertility.
-  boundary <- rexp(2)[2]
+  # Zero death and fertility rates draw no thresholds: the first draw is the
+  # search clock's, and with one searching woman at rate 1 it is her search time.
+  boundary <- rexp(1)
   m <- cohab_calendar_model(cohab_calendar(times = c(0, boundary, Inf)))
   early <- simulate(m, boundary, seed = seed)
   expect_equal(nrow(early$unions), 0)
