@@ -13,6 +13,24 @@ with [persistent fertility weights](fertility-heterogeneity-notes.md), alongside
 individual/union hazard scheduling for other processes. Calendar-varying rates
 remain governed by [the milestone 7 contract](time-varying-rates.md).
 
+## Phasing
+
+User direction (November 4, 2026):
+
+1. **Step 1:** move every rate process to cell scheduling, then measure
+   performance against the current engine. Fertility keeps its current spacing
+   eligibility and persistent `hetfert` weights unchanged. The other five
+   processes use weights of one and have no eligibility rules. Fertility's existing cell machinery, including
+   its handling of members crossing age boundaries, should be reused and
+   generalized.
+2. **Step 2:** add weighting and eligibility mechanisms. The weight and
+   eligibility material below is notes for this step.
+
+One scheduling approach serves all rate processes. The engine will not keep
+individual clocks for some processes alongside cells for others. The aim is a
+simpler code base. If step 1 performance is unacceptable, the approach may be
+abandoned rather than combined with individual clocks.
+
 ## Purpose and selected direction
 
 Separate two aspects of each demographic rate process:
@@ -91,7 +109,9 @@ be designed. It must handle competing events, changes in membership, eligibility
 and rates, and preserve the engine's documented state-consistency and invalidation
 rules. Calendar changes precede same-time events; the current demographic
 priority is death, birth, dissolution, conversion, search, then group transition.
-How cell-level selection preserves these priorities needs explicit specification. This remains continuous-time execution, not annual simulation steps.
+How cell-level selection preserves these priorities needs explicit
+specification. This remains continuous-time execution, not annual simulation
+steps.
 
 With all eligible weights one and N_c equal to eligible membership, each member
 has hazard m_c. Aggregate scheduling can then reproduce the current independent
@@ -132,6 +152,33 @@ h_i = m_c * w_i and total intensity m_c * sum(w_i). That alternative permits
 composition to alter aggregate rates. It was discussed to distinguish computation
 from demographic interpretation; it is not the selected target-preserving
 weight mechanism for milestone 8.
+
+User direction (November 4, 2026): the first milestone 8 version offers
+normalized weights only. An unnormalized option may be considered as a later
+feature, but it needs its own contract first. A consequence to record as a
+limitation: normalized weights cannot produce frailty selection. Under
+normalization, a cell keeps its input rate however its members' weights shift.
+As high-weight members die, the survivors' hazards rise to compensate. Old-age
+mortality deceleration or cross-overs arising from selection therefore cannot
+come from weights. The current engine has no frailty mechanism either, so this
+is not a regression.
+
+### Cell composition and population-level effects
+
+Within a cell, the ratio of two eligible members' hazards equals their weight
+ratio exactly. In a cell where a share p has a binary trait with weight 1.1 and
+the rest weight 1, members with the trait have hazard 1.1 m_c / (1 + 0.1 p) and
+the others m_c / (1 + 0.1 p). The mix changes the levels, not the ratio.
+
+A cell whose members all share one value has no contrast: every member gets
+m_c whatever the weight. A singleton cell is the extreme case. Such cells pull
+population-level estimates of the effect toward no effect. A model fitted to
+simulated output therefore recovers the weight's effect only to the extent that
+cells are large and mixed in the weighted trait. The same model can show
+smaller effects in a small population than in a large one. Persistent fertility
+weights are already subject to this. Coarser cells for weighted processes are a
+possible later remedy if the effect proves to matter in practice; they are not
+selected.
 
 Existing proportional input-rate multipliers act on m_c and therefore can change
 cell targets. They are conceptually distinct from normalized formula weights.
@@ -178,8 +225,45 @@ normalized separately within each cell."
 ## Process-specific exposure and eligibility
 
 A shared scheduler must retain each process's demographic denominator and unit.
-The fertility spacing compensation rule must not silently become a universal
+The fertility spacing eligibility rule must not silently become a universal
 eligibility rule for other mechanisms.
+
+### Proposed general eligibility mechanism
+
+Status: proposal awaiting the user's acceptance. The user wants eligibility as a
+general mechanism, so that rules can be added later without redesigning the
+scheduler. Milestone 8 adds no new eligibility rules; fertility spacing remains
+the only one. A possible future rule is a grace period after divorce or
+widowhood before a new union search.
+
+Proposed rules:
+
+- **Rates are per member, not per eligible member.** Lambda_c = m_c * N_c counts
+  all reference members, including ineligible ones, as fertility does now
+  (D101). Eligible members' hazards rise to carry the cell's full intensity.
+  This keeps output rates equal to input rates when inputs are observed rates
+  for the whole population at risk. A future rule may choose per-eligible-member
+  rates only through its own decision.
+- **A weight of zero means ineligible.** Weights and eligibility are one
+  mechanism.
+- **A cell with no eligible member produces no events,** and its intensity is
+  reported as unrealized, as with fertility.
+- **Mortality has no eligibility rules,** and any mortality weights must be
+  strictly positive, so that no cell can make its members immortal.
+- **Model checks should warn when a rule and a schedule conflict,** for example
+  when a grace period covers a whole duration band whose input rate is nonzero.
+
+Worked example (illustrative rule, not implemented): the age-60 widowed
+search rate is 0.10 per year. The cell has 100 widows, 20 widowed less than a
+year ago and in a one-year grace period. The cell produces 100 x 0.10 = 10
+searches per year, shared by the 80 eligible widows at 0.125 each. Observed
+output is 10 searches per 100 widow-years, matching the input. Per-eligible-
+member rates would instead give 8 per year and an observed rate of 0.08.
+
+Duration-specific search schedules can already express a delay after a union
+ends: a schedule with `[0,1): 0` gives no searches in the first year
+([remarriage](remarriage.md)). A grace-period rule would add something new only
+for age-based schedules.
 
 | Process | Reference exposure or distinction to preserve |
 | --- | --- |
@@ -195,8 +279,8 @@ reason to restrict future weight predictors to the woman's characteristics.
 Couple covariate names and evaluation context remain to be designed.
 
 No feasible recipient or no positive eligible weight sum can make a target
-unattainable. Zero/invalid weight policy, reporting and process-specific failure
-rules need specification. Existing fertility unrealized-intensity and cancelled-
+unattainable. The zero-weight proposal above awaits acceptance; invalid-weight
+policy, reporting and other process-specific failure rules need specification. Existing fertility unrealized-intensity and cancelled-
 birth rules remain current behavior; they are not automatically generalized or
 removed. Failed matching can still reduce union formation or realized births,
 even when their attempt intensities are preserved.
@@ -236,7 +320,8 @@ Before implementation, specify:
   target intensity beyond the existing fertility contract.
 
 Validation should include analytical uniform-weight equivalence in distribution,
-within-cell hazard-ratio recovery, cell intensity/exposure accounting, selective
+within-cell hazard-ratio recovery, how much population-level effects shrink
+across population sizes, cell intensity/exposure accounting, selective
 removal and changing normalization, formula redundancy/interactions, changing
 rates and covariates, duration boundaries, competing destinations, joint union
 state changes, infeasible risks, reproducibility and independence between runs.
