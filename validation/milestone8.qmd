@@ -105,6 +105,19 @@ Using a single clock provided a notable speed improvement that also sped up the 
 
 We still make one additional change for the fertility clock that we don't make for other clocks. Because of the birth interval issue, we use single year age bins and single birth parity bins even when the bands provided are wider because eligibility may vary within a band by age. Because other processes have no similar eligibility limitation, we can use the original age or duration bands for the bins. If we add eligilibity rules for other processes later, we made need to use a similar approach.
 
+## Computational Time
+
+To test how much the new approach changes computational time, I re-ran the three current vignettes and recorded the processing time under the old and new approaches.
+
+| Vignette                      | Simulation | Previous Approach | New Approach       |
+|-------------------------------|------------|-------------------|--------------------|
+| Demographic Transition        | Main       | 32.6 seconds      |                    |
+| Second Demographic Transition | Constant   | 2.4 seconds       |                    |
+| Second Demographic Transition | Changing   | 3.2 seconds       |                    |
+| Multigroup Inheritance        | Main       | 50.5 seconds      |                    |
+
+
+
 ## Unit Tests
 
 The following tests have been constructed and are currently all passing.
