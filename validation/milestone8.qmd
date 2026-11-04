@@ -113,10 +113,10 @@ To test how much the new approach changes computational time, I re-ran the three
 
 | Vignette                      | Simulation | Previous Approach | New Approach   | % Change |
 |-------------------------------|------------|-------------------|----------------|----------|
-| Demographic Transition        | Main       | 45.89 seconds     | 32.369 seconds | -29.5%   |
-| Second Demographic Transition | Constant   | 1.263 seconds     | 1.581 seconds  | 25.1 %   |
-| Second Demographic Transition | Changing   | 1.811 seconds     | 2.458 seconds  | 35.7%    |
-| Multigroup Inheritance        | Main       | 36.691 seconds    | 49.748 seconds | 35.6%    |
+| Demographic Transition        | Main       | 45.89 seconds     | 29.546 seconds | -35.6%   |
+| Second Demographic Transition | Constant   | 1.263 seconds     | 1.652 seconds  | 30.7%   |
+| Second Demographic Transition | Changing   | 1.811 seconds     | 2.714 seconds  | 49.8%    |
+| Multigroup Inheritance        | Main       | 36.691 seconds    | 48.689 seconds | 32.7%    |
 
 In the demographic transition vignette, the new approach actually reduces overall processing time by 29.5%. This is likely due to the frequency of time changes to the fertility and mortality schedules in that simulation, which can be faster when using the new approach. In contrast, the remaining simulations which have more complex rate inputs were 25% to 36% longer. 
 

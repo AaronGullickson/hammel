@@ -606,11 +606,13 @@ std::pair<double, double> current_hazard(const std::vector<Band>* bands,
 // consume no randomness. Ties are ordered by person index.
 //
 // A bucket queue: a ring of buckets of width 1/kBuckets years spanning
-// kSpan years, plus an overflow heap for later entries. A bucket is sorted by
+// kSpan years, plus an overflow heap for later entries. The span covers the
+// usual band widths (input bands of five or more years for rate processes), so
+// few boundaries need the heap. A bucket is sorted by
 // (time, person) when reached, so pops follow exactly (time, person) order.
 // Entries are lazily deleted: one is current only while it matches next_[person].
 class BoundaryQueue {
-  static constexpr int kBuckets = 365, kSpan = 2, kRing = kBuckets * kSpan;
+  static constexpr int kBuckets = 365, kSpan = 16, kRing = kBuckets * kSpan;
   using Entry = std::pair<double, int>;
   struct Later {
     bool operator()(const Entry& a, const Entry& b) const { return a > b; }
@@ -950,6 +952,7 @@ class FertilityCells {
   std::vector<Stratum> strata_;
   std::vector<Cell> cells_;
   std::vector<Member> members_;
+  std::vector<State> states_;   // engine state at each woman's last refresh
   // lookup_[group * types + type][actual parity] -> stratum (-1 until created);
   // without parity-specific schedules, index 0 serves every parity.
   int types_;
@@ -1097,8 +1100,17 @@ class FertilityCells {
   }
   // Recompute a woman's cell, eligibility and calibration bin from engine state.
   void refresh(int woman, double now) {
-    if (woman >= static_cast<int>(members_.size())) members_.resize(woman + 1);
-    const State s = state_(woman);
+    if (woman >= static_cast<int>(members_.size())) {
+      members_.resize(woman + 1);
+      states_.resize(woman + 1);
+    }
+    states_[woman] = state_(woman);
+    place(woman, now);
+  }
+  // Place a woman from her cached state (set by the last refresh). Only time
+  // changes between refreshes, so boundaries reuse the cached state.
+  void place(int woman, double now) {
+    const State& s = states_[woman];
     int cell = -1;
     double next = R_PosInf;
     if (s.stratum >= 0) {
@@ -1147,7 +1159,7 @@ class FertilityCells {
   double next_boundary() { return boundaries_.top(); }
   void advance_boundary() {
     const auto entry = boundaries_.pop();
-    refresh(entry.second, entry.first);
+    place(entry.second, entry.first);
     if (++updates_ % 1024 == 0) checkUserInterrupt();
   }
   double next_clock() const {
@@ -1270,8 +1282,8 @@ class FertilityCells {
 // unit uniformly within it. No eligibility rules or weights.
 class RateCells {
   struct Cell {
-    double rate = 0;
-    std::vector<int> members;   // swap-remove list of people
+    double rate = 0, start = 0, end = 0;   // band edges on the unit's clock
+    std::vector<int> members;   // swap-remove list of units
   };
   struct Member { int cell = -1, slot = -1, stratum = -1; double origin = 0; };
   // strata_[k] = split bands of schedule k; first_[k] = its first cell index.
@@ -1304,7 +1316,7 @@ class RateCells {
       first_.push_back(static_cast<int>(cells_.size()));
       for (const Band& band : strata_.back()) {
         Cell x;
-        x.rate = band.rate;
+        x.rate = band.rate; x.start = band.start; x.end = band.end;
         cells_.push_back(std::move(x));
       }
     }
@@ -1316,6 +1328,12 @@ class RateCells {
   void refresh(int person, int stratum, double origin, double now) {
     if (person >= static_cast<int>(members_.size())) members_.resize(person + 1);
     if (stratum >= 0 && !R_finite(origin)) stop("A rate process requires a finite clock origin.");
+    // Fast path: most refreshes follow events that leave this process's state
+    // unchanged. Same stratum and origin, still inside the current cell's band:
+    // the cell and the queued boundary are already correct.
+    Member& m = members_[person];
+    if (stratum == m.stratum && (stratum < 0 ? m.cell < 0 : origin == m.origin && m.cell >= 0 &&
+        origin + cells_[m.cell].start <= now && now < origin + cells_[m.cell].end)) return;
     int cell = -1;
     double next = R_PosInf;
     if (stratum >= 0) {
@@ -1332,7 +1350,6 @@ class RateCells {
         next = origin + bands[lo].start;
       }
     }
-    Member& m = members_[person];
     m.stratum = stratum; m.origin = origin;
     if (m.cell != cell) {
       const int old = m.cell;
@@ -2591,8 +2608,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         // Clock selection is fixed across calendar periods by R validation.
         for (int w = 0; w < static_cast<int>(people.size()); ++w)
           add_counted_woman(w, now);
+        // Rebuilt processes start empty; only the living (and their ongoing
+        // unions) re-enter, so the dead need no refresh.
         for (int i = 0; i < static_cast<int>(people.size()); ++i) {
           if (i % 1024 == 0) checkUserInterrupt();
+          if (!NumericVector::is_na(people[i].died)) continue;
           refresh_person(i, now);
         }
         continue;
