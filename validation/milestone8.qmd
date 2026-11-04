@@ -54,10 +54,8 @@ Assess whether a switch to one clock and binned draws for events for each proces
 
 | Measure | Comparison | Acceptance criterion |
 |---|---|---|
-| Age-specific rates | Output rates vs. input rates | Input rates should generally fall within the 95% Poisson-based confidence intervals for the rate, although we don't expect complete coverage |
-| TFR | Over time | Should change in the expected way over time within simulation and remain close to expected values |
-| Life Expectancy at birth | Over time | Should change in the expected way over time within simulation and remain close to expected values |
-| Log odds ratios | Over time | Should generally be consistent with double the input exogamy values and move in the expected direction over time |
+| Age-specific rates | Output rates vs. input rates under new and old approaches in vignettes | Input rates should generally fall within the 95% Poisson-based confidence intervals for the rate, although we don't expect complete coverage |
+| Processing Time | Vignette simulations under new and old approach | Changes should not drastically increase processing time, although some increase is expected in most simulations | 
 | Accounting and implementation | Existing tests | Successful unit tests |
 
 ## Overview of Design
@@ -104,6 +102,10 @@ Basically, we sum up all the $\gamma_i$ rates for each bin to get a single $gamm
 Using a single clock provided a notable speed improvement that also sped up the original fertility process as well. This approach is still likely to be somewhat slower than the individual process when lots of rates are in use, but can also be faster when lots of time-varying rates are provided because it is easier to apply changes across time.
 
 We still make one additional change for the fertility clock that we don't make for other clocks. Because of the birth interval issue, we use single year age bins and single birth parity bins even when the bands provided are wider because eligibility may vary within a band by age. Because other processes have no similar eligibility limitation, we can use the original age or duration bands for the bins. If we add eligilibity rules for other processes later, we made need to use a similar approach.
+
+## Vignette Comparison
+
+All three vignettes were re-run using the new approach and the results, while not identical due to new random seed paths, were subtantively the same and showed all output rates falling consistently close to the input rates.
 
 ## Computational Time
 
