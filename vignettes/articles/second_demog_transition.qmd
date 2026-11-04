@@ -399,7 +399,9 @@ We now run two simulations. In the first simulation, we hold all rates constant 
 #| label: run-second-demog-sims
 
 # two simulations - holding everything constant and allowing it to vary
-pop_constant <- simulate(model |> set_population(pop_start), 2019-1992, 42)
+time_constant <- system.time(
+  pop_constant <- simulate(model |> set_population(pop_start), 2019-1992, 42)
+)
 
 model <- hammel_model() |>  
   set_population(pop_start) |>
@@ -414,8 +416,12 @@ model <- hammel_model() |>
   ) |>
   set_union_dissolution(dissolution_rates)
 
-pop_change <- simulate(model, 2019-1992, 42)
+time_changing <- system.time(
+  pop_change <- simulate(model, 2019-1992, 42)
+)
 ```
+
+The simulation with constant rates takes `r time_constant[["elapsed"]]` seconds to process. The simulation with varying rates takes `r time_changing[["elapsed"]]` second to process.
 
 ## Analyzing the Simulation Results
 
