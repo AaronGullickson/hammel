@@ -1,0 +1,133 @@
+---
+title: "Hammel: Milestone 7 Validation"
+author: "Aaron Gullickson"
+date: today
+format:
+  html:
+    toc: true
+    toc-expand: 1
+    toc-depth: 4
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    self-contained: true
+execute:
+  eval: true
+  echo: true
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: setup
+#| eval: true
+#| include: false
+
+
+library(here)
+# installing will lead to faster computation
+devtools::install(here::here())
+library(hammel)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(purrr)
+library(tibble)
+library(stringr)
+library(ggplot2)
+library(gt)
+library(furrr)
+set_theme(theme_bw())
+```
+
+```{r}
+#| label: set-up-parallel-processing
+
+future::plan(future::multicore, workers = 4)
+```
+
+## Purpose and completion criteria
+
+Assess whether a switch to one clock and binned draws for events for each process reproduces prior results and remains computationally efficient, while allowing for relative weighting of individuals within bins.
+
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| Age-specific rates | Output rates vs. input rates | Input rates should generally fall within the 95% Poisson-based confidence intervals for the rate, although we don't expect complete coverage |
+| TFR | Over time | Should change in the expected way over time within simulation and remain close to expected values |
+| Life Expectancy at birth | Over time | Should change in the expected way over time within simulation and remain close to expected values |
+| Log odds ratios | Over time | Should generally be consistent with double the input exogamy values and move in the expected direction over time |
+| Accounting and implementation | Existing tests | Successful unit tests |
+
+## Overview of Design
+
+### Original approach at the invividual level
+
+Previously, all waiting times except for fertility were decided at the individual level. For each, process, we draw a value from `rexp(1)` which provides the accumulated risk. Notably, this distribution is identical to $-log(U)$ where $U$ is a draw from a random uniform distribution between 0 and 1. This is the same basic approach that SOCSIM uses.
+
+We then followed a person's piecewise constant hazards across age and time within whatever stratified categories they belonged to and those piecewise hazards consume the risk until we reach zero at an exact time. We then chose the event with the shortest waiting time for a person and added it to the queue of events to process and if they are still alive they redraw another next event in the same way (dissolution and cohabitation conversion are union-based processes that are not redrawn at  the individual level). If something changes that would affect a person's relevant hazard (e.g. getting married) then we cancel their next event and redraw another event, relying on the memoryless featureo of the hazard process. 
+
+### Changes to a binned approach for the fertility process
+
+In Milestone 5, we made a change to this process specifically for fertility in order to handle the birth interval issue. Birth intervals present a complication because they reduce the amount of person-years that a woman is actually available compared to what typical age-specific fertility rates would imply. Originally, we had handled this with an approximation that adjusted fertility rates upward to account for this issue, but this approximation falls apart in cases where fertility shift over time or restarts. It also failed dramatically for parity-specific fertility.
+
+The solution to this problem was to change the way birth events occurred. We moved them from individual women into bins stratified by relevant characteristics (e.g. age, parity, group, union type) and tracked how many women were within each bin in continuous time. Each bin, then was given its own waiting time based on the aggregate "intensity" rate $\gamma_i$ given by:
+
+$$\gamma_i = N_i\lambda_i$$
+
+where $\lambda_i$ is the fertility rate in bin $i$ from the input rates and $N_i$ is the number of women in bin $i$. This produces a waiting time and we add the next birth to this bin to our queue. When it fires, we select a random woman within the bin to have the birth. If $N_i$ changes before that birth event fires, then we recompute the waiting time from the remaining accumulated risk, without a new draw. If $\lambda_i$ changes, we redraw a waiting time.
+
+This approach to fertility completely resolved the birth interval issue because the intensity rate is determined by all women to preserve the input rate, but only women not within the birth interval of a previous birth are eligible to be chosen. 
+
+This approach also allowed us to easy include the heterogeneous fertility feature from SOCSIM where each women had a score and that score was treated as a weight when being sampled from a bin. This allowed for greater variance in fertility across women, while preserving the input rates.
+
+If a bin has women but none of them is eligible, it is removed from the clock's total intensity rate, so no birth can be drawn from it. The births it would have produced in that time ($N_i\lambda_i$ times the time spent without an eligible woman) are recorded separately as expected unrealized births.
+
+Although it resolved the birth interval issue, this approach was slower because we have to track potential changes in bin membership for all women at birthdays. Nonetheless, it was considered a major improvement.
+
+### Generalizing the fertility process approach
+
+The idea of this milestone is to convert all of the other rate processes to use the same approach as the fertility approach. The reasons were two-fold:
+
+- It allows for more symmetry in how these processes are handled in the code, which makes maintaining the code easier and allowing for future features to be handled the same way across rate processes.
+- It allows for the potential for customizable weights by process that allow for relative differences in rates across individuals in arbitrarily complex ways while preserving the underlying input rates.
+
+The potential issue is that this might make computational time much more expensive. However, a few modifications allowed us to do this much more efficiently. The most notable change was the use of a single clock per process.
+
+This modification is to track a single waiting time clock for each process rather than by bin. In this approach, we further generalize the rate to get an overall rate for the next event of a type (e.g. birth, death, union) as:
+
+$$\gamma = \sum_i N_i\lambda_i$$
+
+Basically, we sum up all the $\gamma_i$ rates for each bin to get a single $gamma$ intensity rate for the process. We can then figure out waiting time until the next event by taking $E/\gamma$ where $E$ is a draw from `rexp(1)`. If $\gamma$ changes later due to a change in underlying $N_i$ values, then we recompute the reamining waiting time $t$ by taking $t (\gamma_{\text{old}}/\gamma_{\text{new}})$. If, $\gamma$ changes due to a change in $\lambda_i$ due to time-varying rates, then we redraw waiting times from scratch. When an event occurs, we then choose which bin it occurs from by drawing bins weighted by their intensity rate $N_i\lambda_i$. Within each bin, we then draw a random person/union. Then the process fires off a new waiting time. 
+
+Using a single clock provided a notable speed improvement that also sped up the original fertility process as well. This approach is still likely to be somewhat slower than the individual process when lots of rates are in use, but can also be faster when lots of time-varying rates are provided because it is easier to apply changes across time.
+
+We still make one additional change for the fertility clock that we don't make for other clocks. Because of the birth interval issue, we use single year age bins and single birth parity bins even when the bands provided are wider because eligibility may vary within a band by age. Because other processes have no similar eligibility limitation, we can use the original age or duration bands for the bins. If we add eligilibity rules for other processes later, we made need to use a similar approach.
+
+## Unit Tests
+
+The following tests have been constructed and are currently all passing.
+
+```{r}
+#| label: test-results
+#| eval: true
+
+test_results <- devtools::test(pkg = here::here(), reporter = "silent")
+test_table <- as.data.frame(test_results)
+knitr::kable(
+  test_table[, c("test", "passed", "failed", "error", "skipped", "warning")]
+)
+```
+## Conclusions and Unresolved Limitations
+
+
+## Reproducibility record
+
+```{r}
+#| label: reproducibility
+system2("git", c("-C", shQuote(here::here()), "rev-parse", "HEAD"), stdout = TRUE)
+system2("git", c("-C", shQuote(here::here()), "status", "--short"), stdout = TRUE)
+sessionInfo()
+```
+
