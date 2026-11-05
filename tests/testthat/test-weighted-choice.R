@@ -185,7 +185,8 @@ test_that("three-group calibration meets targets and handles zero and unattainab
 
 weighted_population <- function(n = 600, weights = NULL, seed = 903) {
   set.seed(seed)
-  create_baseline_population(n, max_age = 60, end_time = 0, group_weights = weights)
+  create_baseline_population(n, max_age = 60, end_time = 0,
+    groups = if (!is.null(weights)) list(group = weights))
 }
 
 weighted_model <- function(population, initiation = "on_demand",
@@ -274,7 +275,7 @@ test_that("weighted choice warns once when weights must be approximated", {
   population <- weighted_population(300, c(A = 1))
   persons <- population$persons
   persons$group[persons$sex == "m"][1:40] <- "B"
-  population <- hammel_population(persons, population$unions, end_time = 0)
+  population <- hammel_population(persons, population$unions, end_time = 0, groups = if ("group" %in% names(persons)) "group")
   # A partial restriction keeps calibration active (full prevention skips it).
   matching <- create_matching_model(~ age_difference, c(age_difference = 0),
                                     prevent_exogamy = "A::B")
@@ -339,14 +340,14 @@ test_that("weighted choice handles identities created during the run", {
   expect_equal(result$target[3], 50 / 450, tolerance = 1e-12)
   expect_equal(result$flow, result$target, tolerance = 1e-9)
   # Mixed couples have AB children, who later enter the pools and form unions.
-  rule <- create_group_inheritance("custom", groups = "AB", fun = function(mother_group, father_group, ...) {
+  rule <- create_group_inheritance("custom", fun = function(mother_group, father_group, ...) {
     if (is.na(father_group) || mother_group == father_group) mother_group else "AB"
   })
   population <- weighted_population(800, c(A = 3, B = 1))
   model <- hammel_model() |>
     set_population(population) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)) |>
-    set_fertility(data.frame(age_start = 15, age_end = 45, rate = 0.15), inheritance = rule) |>
+    set_fertility(data.frame(age_start = 15, age_end = 45, rate = 0.15)) |> set_inheritance(rule, extra = "AB") |>
     set_union_formation("on_demand",
       create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1, "A:AB" = -0.5, "B:AB" = -0.5)),
       diagnostics = TRUE)

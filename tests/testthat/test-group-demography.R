@@ -10,7 +10,7 @@ make_group_history <- function() {
     group = c("A", "B", "B", "A", "B", "B"))
   unions <- data.frame(union_id = 1, wife_id = 10, husband_id = 20,
     start_time = 0.25, end_time = 0.75, end_reason = "death_husband")
-  hammel_population(persons, unions, end_time = 1)
+  hammel_population(persons, unions, end_time = 1, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("group Lexis counts preserve exact maternal and spouse classification", {
@@ -76,14 +76,16 @@ test_that("population sizes preserve time order and count each person's group", 
   expect_equal(subset(sizes, group == "B")$population, c(1, 3, 3, 2, 3))
   pooled <- calculate_population_size(p, times)
   expect_equal(rowSums(matrix(sizes$population, ncol = 2)), pooled$population)
-  expect_identical(calculate_population_size(p$persons, times, by = "group"), sizes)
+  # A bare persons table has no declaration, so it cannot be split by group.
+  expect_error(calculate_population_size(p$persons, times, by = "group"), "declared group")
   expect_identical(calculate_population_size(p, times), pooled)
 })
 
 test_that("numeric group types persist and bare histories keep maternal links", {
   p <- make_group_history()
   p$persons$group <- ifelse(p$persons$group == "A", 20L, 10L)
-  counts <- demographic_counts(p$persons, c(0, 1), c(0, Inf), by = "group")
+  p$groups <- list(group = group())
+  counts <- demographic_counts(p, c(0, 1), c(0, Inf), by = "group")
   expect_type(counts$group, "integer")
   expect_identical(unique(counts$group), c(20L, 10L))
   expect_equal(subset(counts, group == 20L & sex == "f")$births, 2)
@@ -165,8 +167,9 @@ test_that("group observations validate flags and required group data", {
     expect_error(calculate_population_size(p, 0, by = bad), "by")
   }
   p$persons$group <- NULL
-  expect_error(demographic_counts(p, c(0, 1), c(0, Inf), by = "group"), "group.*column")
-  expect_error(calculate_population_size(p, 0, by = "group"), "group.*column")
+  p$groups <- NULL
+  expect_error(demographic_counts(p, c(0, 1), c(0, Inf), by = "group"), "declared group")
+  expect_error(calculate_population_size(p, 0, by = "group"), "declared group")
   expect_error(calculate_population_size(make_group_history(), 2, by = "group"), "endpoint")
   expect_error(demographic_counts(make_group_history(), c(0, 2), c(0, Inf), by = "group"), "endpoint")
   rates <- data.frame(group = NA_character_, age_start = 0, age_end = Inf, rate = 0.1)

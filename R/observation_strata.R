@@ -48,8 +48,9 @@ person_observation <- function(population, by, end, needs_unions = FALSE,
     hammel_population(persons)
     unions <- NULL
   }
-  if (grouped && !"group" %in% names(persons))
-    stop("Splitting by \"group\" requires a persons `group` column.", call. = FALSE)
+  if (grouped && !declared_group(population))
+    stop("Splitting by \"group\" requires a declared group dimension; see set_groups() or hammel_population(groups = ).",
+         call. = FALSE)
   persons <- prepare_group_observations(persons, population, grouped)
   groups <- if (grouped) observation_groups(persons, TRUE) else NULL
   typed <- !is.null(unions) && "union_type" %in% names(unions)
@@ -179,8 +180,8 @@ union_strata <- function(population, unions, by, stride, typed_split = "union_ty
   w <- h <- rep(0L, nrow(unions))
   if (wives || husbands) {
     if (inherits(population, "hammel_population")) {
-      if (!"group" %in% names(population$persons))
-        stop("Splitting by \"group_w\" or \"group_h\" requires population group identities.", call. = FALSE)
+      if (!declared_group(population))
+        stop("Splitting by \"group_w\" or \"group_h\" requires a declared group dimension.", call. = FALSE)
       persons <- prepare_group_observations(population$persons, population, TRUE)
       identities <- observation_groups(persons, TRUE)
       w <- match(persons$group[match(unions$wife_id, persons$person_id)], identities) - 1L

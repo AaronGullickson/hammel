@@ -7,7 +7,7 @@ make_lexis_union_history <- function() {
   unions <- data.frame(union_id = 1:2, wife_id = 1L, husband_id = 2:3,
     start_time = c(0.5, 2.5), end_time = c(1.5, NA),
     end_reason = c("death_husband", NA))
-  hammel_population(persons, unions, end_time = 3)
+  hammel_population(persons, unions, end_time = 3, groups = if ("group" %in% names(persons)) "group")
 }
 
 
@@ -58,7 +58,7 @@ test_that("union type summaries validate flags and empty histories", {
   x <- demographic_counts(pop,c(0,3),c(0,Inf), by = "union_type")
   expect_equal(subset(x,union_type == "partnered")$person_years,c(0,0))
   expect_true(all(is.na(subset(x,union_type == "partnered")$rate_fertility)))
-  pop <- hammel_population(pop$persons[0, ],end_time=3)
+  pop <- hammel_population(pop$persons[0, ],end_time=3, groups = if ("group" %in% names(pop$persons[0, ])) "group")
   x <- demographic_counts(pop,c(0,3),c(0,Inf), by = "union_type")
   expect_s3_class(x,"tbl_df")
   expect_equal(nrow(x),4)

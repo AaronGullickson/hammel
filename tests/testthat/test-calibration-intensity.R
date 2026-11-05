@@ -6,7 +6,7 @@
 
 test_that("cell search intensities match explicit scans through every state change", {
   set.seed(31)
-  pop <- create_baseline_population(3000, max_age = 60, group_weights = c(A = .5, B = .5))
+  pop <- create_baseline_population(3000, max_age = 60, groups = list(group = c(A = .5, B = .5)))
   mortality <- data.frame(sex = rep(c("m", "f"), 2), age_start = 0, age_end = Inf,
     rate = c(.01, .01, .03, .03), time_start = rep(c(0, 2), each = 2), time_end = rep(c(2, Inf), each = 2))
   # Never-partnered women search by age; separated women by time since their

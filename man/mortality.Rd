@@ -10,7 +10,6 @@ mortality(rates, weights = NULL)
 fertility(
   rates,
   birth_interval = 0.75,
-  inheritance = create_group_inheritance(),
   ffab = 0.4886,
   hetfert = NULL,
   weights = NULL
@@ -32,21 +31,6 @@ fertility they combine with \code{hetfert} on the log scale.}
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
 defaulting to \code{0.75}. Must be finite and nonnegative. Applies to fertility
 only; see cell-accounted fertility below.}
-
-\item{inheritance}{A group identity model from \code{\link[=create_group_inheritance]{create_group_inheritance()}},
-or a tibble with numeric \code{time_start}, \code{time_end} and list-column \code{model}
-containing complete inheritance models. Intervals are half-open absolute
-years, must not overlap and must cover the requested run. Select the active
-model at each birth; older identities and ancestry remain unchanged.
-Base data frames with list columns are accepted. All declared possible
-identities across scheduled models join the simulation-wide registry.
-Static inputs may also be a method name requiring no additional parameters: \code{"mother"}, \code{"father"},
-\code{"random_parent"}, \code{"same_sex"}, \code{"opposite_sex"}, or \code{"ancestry"}.
-Fertility defaults to selecting either parent with equal probability,
-with maternal fallback. Other parental, ancestry,
-hierarchy, and custom rules assign identity after child sex and ancestry
-are calculated. Possible identities are checked against grouped schedules
-and categorical matching levels before execution. Applies to fertility only.}
 
 \item{ffab}{Probability that a newborn is female, default \code{0.4886}.
 Must be a finite numeric scalar in \verb{[0, 1]}. Applies to fertility only.}
@@ -72,9 +56,9 @@ An optional \code{group} column supplies separate schedules by nonmissing charac
 label or finite numeric code. Without it, rates apply to all groups. Each
 mortality group needs both sexes, and each conditional fertility group needs
 both statuses. Overlap is checked within groups.
-Simulation requires schedules for every population group. Without population
-groups, simulation warns and uses the first group alphabetically (radix order
-of character representations, including numeric codes).
+Simulation requires schedules for every category of the declared group
+dimension (see \code{\link[=set_groups]{set_groups()}}); a rate table with a \code{group} column is an
+error when no group is declared.
 
 Mortality requires separate schedules for both sexes. Gaps and uncovered
 ages are not filled or interpreted as zero rates. Coverage must be specified

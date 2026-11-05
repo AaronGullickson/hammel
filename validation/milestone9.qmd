@@ -52,8 +52,49 @@ Assess a switch to allow multiple group columns to a simulation to allow more th
 
 The `group` column is intended to be abstract so that users can use it for different kinds of things. For example, it could designate ethnoracial groups, educational categories, or regions. While this is useful, users are still limited to a single group column. So, if they want a simulation that includes both regional migration and ethnoracial breakdowns, they will have a difficult time. While it is possible to hack together a set of categories for a group that are a combination of multiple groups that the user wants, this is not easy or elegant.
 
-However, we have all the internal plumbing to allow for more than one group. Its really just another stratification dimension and we know how to handle those already. So, 
+However, we have all the internal plumbing to allow for more than one group. Its really just another stratification dimension and we know how to handle those already. So, while it will takes some work to update the code to accept multiple group columns, it doesn't require any big underlying changes to the engine. The biggest change is to the calibration method for group weighting used for intergroup partnership, which I discuss below.
 
+To allow for multiple groups, we have created a separate `set_groups` argument for building the model. This is a change from the program inferring groups from the `group` column. Now, users can use any name they want to identify a group column (e.g. race, region, education) and then explicitly define it as a group column with the `group()` function. The inheritance model also now belongs to this `group()` output. Users can also specify explicit categories for the group in `group` rather than in the inheritance model, but if they don't, categories will be inferred from the data. So, here is an example setup:
+
+```r
+model |>
+  set_groups(
+   race = group(
+      categories = c("white", "black", "other"),
+      ancestry = TRUE,
+      inheritance = create_group_inheritance("random_parent")
+    ),
+   region = group(
+      categories = c("NE", "MW", "S", "W"),
+      ancestry = FALSE,
+      inheritance = create_group_inheritance("mother")
+    )
+  )
+```
+
+Group exogamy parameters still live in the matching model but are now specified with a named list structure where names identify which group's exogamy is being considered. So:
+
+```r
+model |>
+  set_union_formation(
+    "on_demand", 
+    matching = create_age_gap_matching_model(
+      2, 5,
+      group_exogamy = list(
+race = c()
+      )
+    )
+  )
+
+```
+
+I envision that users will enter groups with a prefix that starts with `group_` to identify group columns (e.g. `group_race`, `group_region`). Stratification could occur within all rate schedules by these specified group columns. As before, groups are not specifically specified in the model but inferred from the initial population and rate schedules.
+
+The trickiest points I can think of that will require some rethinking are:
+
+- group_exogamy in matching models. We need a slightly different format that is specific to each group - that could probably work with a named list of named vectors where the names of the list identify the group. However, that would not allow for cross-group exogamy effects for users who want to get really fancy. I think for a first attempt we don't allow that but maybe possibly allow user specified R functions to allow greater complexity here.
+- inheritance models will need a specific model for each type of group. This could be specified with a list structure.
+- transition rate structure. Should it be separate transition schedules for each group or strack them altogether? I also think it should be possible to stratify one group's transition rates by another group. So educational transition rates might vary by region.
 
 ### Changes to helpers
 
@@ -138,36 +179,18 @@ pop_end <- simulate(model, 150, 42)
 calculate_fertility_rates(pop_end, c(50, 150), seq(15, 45, 5)) |>
   calculate_tfr()
 
-
-calculate_fertility_rates(pop_end, c(50, 150), seq(15, 45, 5), #by = "group"
-  by_union_type = TRUE,
-  by_group = TRUE,
-  #by = "group"
-) |>
+calculate_fertility_rates(pop_end, c(50, 150), seq(15, 45, 5), 
+                          by = "group") |>
   calculate_tfr()
 
-calculate_mortality_rates(
-  pop_end, 
-  c(50, 150),
-  0:95,
-  by_group = TRUE,
-  #by = "group"
-) |>
+calculate_fertility_rates(pop_end, c(50, 150), seq(15, 45, 5), 
+                          by = c("group", "union_type")) |>
+  calculate_tfr()
+
+calculate_mortality_rates(pop_end, c(50, 150),  0:95, by = "group") |>
   calculate_life_table() |>
   filter(age_start == 0) |>
   select(group, sex, ex)
-
-calculate_mortality_rates(
-  pop_end, 
-  c(50, 150),
-  0:95,
-  by_group = TRUE,
-  by_union_type = TRUE,
-  by = c("group", "union_type")
-) |>
-  calculate_life_table() |>
-  filter(age_start == 0) |>
-  select(group, union_type, sex, ex)
 ```
 
 

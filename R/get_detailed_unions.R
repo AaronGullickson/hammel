@@ -6,7 +6,7 @@
 #' population and its union table are not modified. No known endpoint is needed.
 #'
 #' Dates remain in years. Missing death times denote people alive at the recorded
-#' endpoint. Group columns are omitted when persons has no `group` column;
+#' endpoint. Group columns are omitted unless a group dimension is declared;
 #' otherwise their types are preserved. Groups are reconstructed at each union's
 #' start from retained transitions; later moves do not relabel earlier unions.
 #' A transition at the exact formation time follows formation, so its origin
@@ -28,7 +28,7 @@ get_detailed_unions <- function(population) {
   validate_population(population)
   persons <- population$persons
   result <- tibble::as_tibble(population$unions)
-  columns <- c("birth_time", "death_time", if ("group" %in% names(persons)) "group")
+  columns <- c("birth_time", "death_time", if (declared_group(population)) "group")
   added <- c(paste0(columns, "_w"), paste0(columns, "_h"))
   conflicts <- intersect(names(result), added)
   if (length(conflicts)) {
@@ -36,7 +36,7 @@ get_detailed_unions <- function(population) {
                  paste(conflicts, collapse = ", ")), call. = FALSE)
   }
   formation_groups <- NULL
-  if ("group" %in% names(persons) && !is.null(population$transitions) && nrow(population$transitions)) {
+  if (declared_group(population) && !is.null(population$transitions) && nrow(population$transitions)) {
     indexed <- prepare_group_observations(persons, population, TRUE)
     groups <- observation_groups(indexed, TRUE)
     formation_groups <- union_start_groups_cpp(indexed, population$unions,

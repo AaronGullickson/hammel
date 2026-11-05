@@ -22,8 +22,7 @@ Optional \code{union_type} supplies both \code{cohab} and \code{marriage} schedu
 each pair stratum; without it the same duration risk applies to either type.
 Pair names require nonempty colon-free group labels. Pair-stratified tables
 must cover every unordered pair of possible identities, including future
-ones. Without population groups, warn and use the first canonical pair
-alphabetically. Omit \code{group_pair} for shared rates. \code{group}, \code{group_w} and
+ones; they require a declared group dimension. Omit \code{group_pair} for shared rates. \code{group}, \code{group_w} and
 \code{group_h} schedule columns are not supported. Use \code{\link[=stratify_rates]{stratify_rates()}} to add
 proportional pair differences.}
 

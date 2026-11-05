@@ -128,6 +128,7 @@ test_that("grouped and stratified schedules preserve the explicit hazards", {
   model <- make_rate_model(80, search_rate = 2)
   model$population$persons$sex[1:40] <- "f"
   model$population$persons$group <- rep(c("A", "B"), 40)
+  model$population$groups <- list(group = group())
   model <- set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = .8))
   rates <- rbind(transform(previous_rates(.8, .4, .2), group = "A"),
     transform(previous_rates(.5, .3, .1), group = "B"))

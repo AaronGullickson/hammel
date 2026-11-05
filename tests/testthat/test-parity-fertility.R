@@ -42,7 +42,7 @@ test_that("birth history initializes parity without custom column overrides", {
   child$death_time <- -.5; child$mother_id <- 1L
   people <- rbind(people,child)
   people$parity <- 99L
-  model <- set_population(model,hammel_population(people,end_time=0))
+  model <- set_population(model,hammel_population(people,end_time=0, groups = if ("group" %in% names(people)) "group"))
   result <- simulate(model,1,42)
   born <- subset(result$persons,birth_time>=0)
   expect_equal(nrow(born),1)
@@ -94,7 +94,7 @@ test_that("absent parity and zero-spacing equal-parity rates give the same ferti
 
 test_that("parity composes with grouped typed fertility, conversion and stratified rates", {
   set.seed(33)
-  pop <- create_baseline_population(500,50,0,group_weights=c(A=1,B=1))
+  pop <- create_baseline_population(500,50,0,groups = list(group = c(A=1,B=1)))
   base <- parity_rates(c(.3,.2,.1))
   rates <- rbind(transform(base,union_type="unpartnered"),
     transform(base,union_type="cohab",rate=rate*.8),
@@ -123,7 +123,7 @@ test_that("parity composes with grouped typed fertility, conversion and stratifi
 
 test_that("grouped zero-spacing parity schedules match shared rates in distribution", {
   set.seed(123)
-  pop <- create_baseline_population(400,50,0,group_weights=c(A=1,B=1))
+  pop <- create_baseline_population(400,50,0,groups = list(group = c(A=1,B=1)))
   base <- data.frame(age_start=15,age_end=50,union_type=c("unpartnered","partnered"),rate=.2)
   model <- hammel_model() |> set_population(pop) |>
     set_mortality(data.frame(sex=c("m","f"),age_start=0,age_end=Inf,rate=.01)) |>

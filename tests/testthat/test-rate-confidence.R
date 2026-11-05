@@ -9,7 +9,7 @@ confidence_population <- function() {
     previous_cohab_id = c(NA, 1, NA))
   hammel_population(persons, unions, end_time = 8,
     transitions = tibble::tibble(person_id = 1, time = 4,
-      group_origin = "B", group_dest = "A"))
+      group_origin = "B", group_dest = "A"), groups = if ("group" %in% names(persons)) "group")
 }
 
 confidence_calls <- function(population) {
@@ -72,7 +72,7 @@ test_that("empty grouped rate results retain numeric confidence columns", {
   pop <- confidence_population()
   pop$persons <- pop$persons[0, ]
   pop$unions <- pop$unions[0, ]
-  pop <- hammel_population(pop$persons, pop$unions, end_time = 8)
+  pop <- hammel_population(pop$persons, pop$unions, end_time = 8, groups = if ("group" %in% names(pop$persons)) "group")
   for (case in confidence_calls(pop)) {
     group_by <- if (identical(case[[1]], calculate_transition_rates)) NULL else
       if (identical(case[[1]], calculate_dissolution_rates)) c("group_w", "group_h") else

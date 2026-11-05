@@ -7,5 +7,5 @@ make_kinship_population <- function() {
     death_time = NA_real_,
     mother_id = c(NA, NA, NA, NA, 10, 10, 30, NA, 50, 50, 50, 100, NA, 80, NA, 130, NA),
     father_id = c(NA, NA, NA, NA, 20, 20, 40, NA, 70, 70, NA, 60, 60, NA, NA, 90, NA))
-  hammel_population(persons, end_time = 0)
+  hammel_population(persons, end_time = 0, groups = if ("group" %in% names(persons)) "group")
 }

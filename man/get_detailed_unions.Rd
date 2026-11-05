@@ -24,7 +24,7 @@ population and its union table are not modified. No known endpoint is needed.
 }
 \details{
 Dates remain in years. Missing death times denote people alive at the recorded
-endpoint. Group columns are omitted when persons has no \code{group} column;
+endpoint. Group columns are omitted unless a group dimension is declared;
 otherwise their types are preserved. Groups are reconstructed at each union's
 start from retained transitions; later moves do not relabel earlier unions.
 A transition at the exact formation time follows formation, so its origin

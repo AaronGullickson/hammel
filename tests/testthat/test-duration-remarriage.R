@@ -129,6 +129,7 @@ test_that("each new ending resets duration and widowhood starts at partner death
 test_that("grouped duration calibration matches the equivalent age hazards", {
   model <- ended_union_model(30, ended = -2)
   model$population$persons$group <- rep(c("A", "B"), 30)
+  model$population$groups <- list(group = group())
   duration <- duration_search_rates(.4)
   duration$dur_start[2:3] <- 3
   age <- duration

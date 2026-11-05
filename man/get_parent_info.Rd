@@ -25,7 +25,7 @@ population is not modified and no known endpoint is required.
 \details{
 Ages are in continuous years: the child's birth time minus the parent's birth
 time. Unknown parents yield missing ages and groups. Group fields are omitted
-when persons has no \code{group} column; otherwise its type is preserved. These
+unless a group dimension is declared; otherwise its type is preserved. These
 are recorded identities, not reconstructions of historical group transitions.
 Existing columns that conflict with the added fields cause an error.
 }

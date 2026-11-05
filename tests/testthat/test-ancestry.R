@@ -3,7 +3,8 @@ ancestry_population <- function() {
   p$persons$person_id <- c(10, 30)
   p$persons$sex <- c("f", "m")
   p$persons$group <- c("A", "B")
-  hammel_population(p$persons, end_time = 0)
+  p$groups <- list(group = group(ancestry = TRUE))
+  hammel_population(p$persons, end_time = 0, groups = list(group = group(ancestry = TRUE)))
 }
 
 ancestry_birth_model <- function(population = ancestry_population()) {
@@ -21,7 +22,7 @@ test_that("grouped constructors initialize all starting people from identity", {
   expect_equal(p$ancestry$unknown, c(0, 0))
   # Initial identities are the reference, even where earlier parents are known.
   p$persons$mother_id[2] <- 10
-  rebuilt <- hammel_population(p$persons, end_time = 0)
+  rebuilt <- hammel_population(p$persons, end_time = 0, groups = list(group = group(ancestry = TRUE)))
   expect_identical(rebuilt$ancestry, p$ancestry)
   ungrouped <- make_model(2)$population
   expect_null(ungrouped$ancestry)
@@ -32,7 +33,7 @@ test_that("supplied shares and ancestral groups survive normalization and restar
   p <- ancestry_population()
   a <- data.frame(person_id = c(30, 10), unknown = c(0, 0.25),
                   group_B = c(1, 0.5), group_C = c(0, 0.25))
-  p <- hammel_population(p$persons, end_time = 0, ancestry = a)
+  p <- hammel_population(p$persons, end_time = 0, ancestry = a, groups = list(group = group(ancestry = TRUE)))
   expect_s3_class(p$ancestry, "tbl_df")
   expect_named(p$ancestry, c("person_id", "group_B", "group_C", "unknown"))
   expect_equal(p$ancestry$person_id, c(10, 30))
@@ -49,7 +50,7 @@ test_that("supplied shares and ancestral groups survive normalization and restar
 
 test_that("cross-group newborns average parental ancestry under explicit maternal inheritance", {
   model <- ancestry_birth_model()
-  model$processes$fertility$inheritance <- create_group_inheritance("mother")
+  model <- set_inheritance(model, create_group_inheritance("mother"))
   result <- simulate(model, 0.3, seed = 654)
   children <- result$persons$birth_time >= 0
   expect_true(any(children))
@@ -105,25 +106,25 @@ test_that("supplied ancestry needs complete IDs and bounded unit-sum shares", {
   p <- ancestry_population()
   a <- p$ancestry
   bad <- a[-1, ]
-  expect_error(hammel_population(p$persons, end_time = 0, ancestry = bad), "one row")
+  expect_error(hammel_population(p$persons, end_time = 0, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "one row")
   bad <- a; bad$person_id[2] <- bad$person_id[1]
-  expect_error(hammel_population(p$persons, ancestry = bad), "one row")
+  expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "one row")
   bad <- a; bad$person_id[2] <- 99
-  expect_error(hammel_population(p$persons, ancestry = bad), "one row")
+  expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "one row")
   for (value in c(NA_real_, Inf, -0.1, 1.1)) {
     bad <- a; bad$group_A[1] <- value
-    expect_error(hammel_population(p$persons, ancestry = bad), "proportions")
+    expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "proportions")
   }
   bad <- a; bad$group_A[1] <- 0.9
-  expect_error(hammel_population(p$persons, ancestry = bad), "sum to 1")
+  expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "sum to 1")
   bad <- a; bad$unknown <- NULL
-  expect_error(hammel_population(p$persons, ancestry = bad), "unknown")
+  expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "unknown")
   bad <- a; names(bad)[2] <- "A"
-  expect_error(hammel_population(p$persons, ancestry = bad), "group_<label>")
+  expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "group_<label>")
   bad <- a; names(bad)[2] <- "group_"
-  expect_error(hammel_population(p$persons, ancestry = bad), "nonempty labels")
+  expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "nonempty labels")
   bad <- a; bad$group_A <- as.character(bad$group_A)
-  expect_error(hammel_population(p$persons, ancestry = bad), "proportions")
+  expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "proportions")
   p$ancestry$unknown[1] <- NA_real_
   expect_error(set_population(hammel_model(), p), "proportions")
   model <- ancestry_birth_model()
@@ -134,12 +135,14 @@ test_that("supplied ancestry needs complete IDs and bounded unit-sum shares", {
 test_that("automatic ancestry supports numeric labels, collisions, and empty groups", {
   p <- ancestry_population()
   p$persons$group <- c(20L, 10L)
-  p <- hammel_population(p$persons, end_time = 0)
+  p$groups <- list(group = group(ancestry = TRUE))
+  p <- hammel_population(p$persons, end_time = 0, groups = list(group = group(ancestry = TRUE)))
   expect_named(p$ancestry, c("person_id", "group_20", "group_10", "unknown"))
   p$persons$group <- c("unknown", "person_id")
-  p <- hammel_population(p$persons, end_time = 0)
+  p$groups <- list(group = group(ancestry = TRUE))
+  p <- hammel_population(p$persons, end_time = 0, groups = list(group = group(ancestry = TRUE)))
   expect_named(p$ancestry, c("person_id", "group_unknown", "group_person_id", "unknown"))
-  empty <- hammel_population(p$persons[FALSE, ], end_time = 0)
+  empty <- hammel_population(p$persons[FALSE, ], end_time = 0, groups = list(group = group(ancestry = TRUE)))
   expect_s3_class(empty$ancestry, "tbl_df")
   expect_named(empty$ancestry, c("person_id", "unknown"))
   expect_equal(nrow(empty$ancestry), 0)
@@ -147,15 +150,16 @@ test_that("automatic ancestry supports numeric labels, collisions, and empty gro
   expect_identical(simulate(ancestry_birth_model(p), 0)$ancestry, p$ancestry)
 })
 
-test_that("supplied ancestry can be retained without current identity groups", {
+test_that("ancestry belongs to a declared group dimension", {
   p <- ancestry_population()
-  p$persons$group <- NULL
-  result <- simulate(ancestry_birth_model(p), 0.3, seed = 654)
-  expect_false("group" %in% names(result$persons))
-  expect_gt(nrow(result$ancestry), 2)
-  expect_true(all(result$ancestry$group_A[-(1:2)] == 0.5))
+  # Ancestry requires its dimension's column and an ancestry = TRUE declaration.
+  expect_error(hammel_population(p$persons[setdiff(names(p$persons), "group")], end_time = 0,
+    ancestry = p$ancestry, groups = list(group = group(ancestry = TRUE))), "not a persons column")
+  expect_error(hammel_population(p$persons, end_time = 0, ancestry = p$ancestry, groups = "group"),
+               "ancestry = TRUE")
+  expect_error(hammel_population(p$persons, end_time = 0, ancestry = p$ancestry), "declared group")
   unknown <- data.frame(person_id = p$persons$person_id, unknown = 1)
-  p <- hammel_population(p$persons, end_time = 0, ancestry = unknown)
+  p <- hammel_population(p$persons, end_time = 0, ancestry = unknown, groups = list(group = group(ancestry = TRUE)))
   expect_true(all(simulate(ancestry_birth_model(p), 0.3, seed = 654)$ancestry$unknown == 1))
 })
 
@@ -196,6 +200,7 @@ test_that("integer shares and cancelled births retain valid ancestry rows", {
 test_that("directly edited grouped populations initialize ancestry at attachment and execution", {
   model <- make_model(2)
   model$population$persons$group <- c("A", "B")
+  model$population$groups <- list(group = group(ancestry = TRUE))
   expect_null(model$population$ancestry)
   attached <- set_population(model, model$population)
   expect_named(attached$population$ancestry, c("person_id", "group_A", "group_B", "unknown"))

@@ -18,7 +18,7 @@ calendar_pairs <- function(n = 2000, cohab = FALSE) {
       cohab_prob = data.frame(age_start = 0, age_end = Inf, prob = 1),
       union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = 0))
   }
-  m$population <- hammel_population(m$population$persons, u, end_time = 0)
+  m$population <- hammel_population(m$population$persons, u, end_time = 0, groups = if ("group" %in% names(m$population$persons)) "group")
   m
 }
 
@@ -193,6 +193,7 @@ test_that("directed transitions compete after a fractional rate boundary", {
   n <- 12000
   m <- make_model(n)
   m$population$persons$group <- "A"
+  m$population$groups <- list(group = group(ancestry = TRUE))
   r <- data.frame(group_origin = "A", group_dest = c("B", "C"),
     age_start = 0, age_end = Inf, rate = 0)
   r <- calendar_epochs(r, c(0, 1), c(0, .3, Inf))
@@ -208,6 +209,7 @@ test_that("directed transitions compete after a fractional rate boundary", {
 test_that("grouped schedules require future group and pair coverage", {
   m <- make_model(2)
   m$population$persons$group <- c("A", "B")
+  m$population$groups <- list(group = group())
   r <- calendar_epochs(data.frame(group = rep(c("A", "B"), each = 2),
     sex = rep(c("m", "f"), 2), age_start = 0, age_end = Inf, rate = 0), c(0, 0))
   r <- r[!(r$time_start == .5 & r$group == "B"), ]
@@ -247,6 +249,7 @@ test_that("calendar changes precede exact person and cell clock ties", {
 test_that("group-duration transitions preserve latest-entry origin at boundaries", {
   m <- make_model(1)
   m$population$persons$group <- "A"
+  m$population$groups <- list(group = group())
   r <- data.frame(group_origin = "A", group_dest = "B", dur_start = 20.8,
     dur_end = Inf, rate = 0)
   m <- set_group_transition(m, calendar_epochs(r, c(0, 1e5)))
@@ -260,6 +263,7 @@ test_that("asynchronous changes retain parity/type/group accounting and calibrat
   m <- make_rate_model(n)
   m$population$persons$sex <- rep(c("f", "m"), each = n / 2)
   m$population$persons$group <- rep(c("A", "B"), n / 2)
+  m$population$groups <- list(group = group())
   f <- expand.grid(group = c("A", "B"), union_type = c("unpartnered", "partnered"),
     parity_start = c(0, 1), stringsAsFactors = FALSE)
   f$parity_end <- ifelse(f$parity_start == 0, 1, Inf)

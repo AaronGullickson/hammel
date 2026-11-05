@@ -5,7 +5,7 @@ parity_observation_history <- function() {
     death_time = c(NA, NA, -.5, NA, NA),
     mother_id = c(NA, NA, 10, 10, 10), father_id = NA_real_,
     group = c("A", "B", "B", "B", "A"), parity = 99L)
-  hammel_population(persons, end_time = 3)
+  hammel_population(persons, end_time = 3, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("separate rates contain only their process summaries", {
@@ -64,7 +64,7 @@ test_that("parity boundaries and empty histories are validated", {
   pop <- parity_observation_history()
   for (bad in list(c(1,2),c(0,.5,Inf),c(0,0,Inf),c(0,NA,Inf),c(-1,0,Inf)))
     expect_error(calculate_fertility_rates(pop,c(0,3),c(0,Inf),parity_breaks=bad),"parity_breaks")
-  empty <- hammel_population(pop$persons[FALSE,],end_time=3)
+  empty <- hammel_population(pop$persons[FALSE,],end_time=3, groups = if ("group" %in% names(pop$persons[FALSE,])) "group")
   x <- calculate_fertility_rates(empty,c(0,3),c(0,Inf),by = "group",parity_breaks=c(0,Inf))
   expect_s3_class(x,"tbl_df")
   expect_equal(nrow(x),0L)

@@ -11,7 +11,7 @@ union_count_population <- function() {
   unions <- union_count_history()
   unions$wife_id <- c(1L, 3L, 5L)
   unions$husband_id <- c(2L, 4L, 6L)
-  hammel_population(persons, unions, end_time = 5)
+  hammel_population(persons, unions, end_time = 5, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("union counts split exact exposure by calendar time and duration", {

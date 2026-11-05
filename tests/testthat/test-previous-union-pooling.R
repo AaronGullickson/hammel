@@ -7,7 +7,7 @@ previous_pool_history <- function() {
     end_reason=c("dissolution","death_husband","conversion",NA,NA),
     union_type=c("marriage","marriage","cohab","marriage","marriage"),
     previous_cohab_id=c(NA_integer_,NA_integer_,NA_integer_,3L,NA_integer_))
-  hammel_population(persons,unions,end_time=3)
+  hammel_population(persons,unions,end_time=3, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("pooled previous-union summaries sum exposure and events before exact intervals", {
@@ -57,7 +57,7 @@ test_that("pooling requires previous strata and validates its option", {
     x <- fun(pop,c(0,3),c(0,Inf),by = "previous_union",pool_dissolved=TRUE)
     expect_setequal(x$previous_union,c("none","dissolved"))
     expect_false("conf_low" %in% names(x))
-    empty <- hammel_population(pop$persons[FALSE,],end_time=3)
+    empty <- hammel_population(pop$persons[FALSE,],end_time=3, groups = if ("group" %in% names(pop$persons)) "group")
     x <- fun(empty,c(0,3),c(0,Inf),by = "previous_union",pool_dissolved=TRUE,conf.level=.95)
     expect_true(all(x$person_years==0 & is.na(x$conf_low) & is.na(x$conf_high)))
   }

@@ -88,7 +88,7 @@ test_that("repeated ancestry is deduplicated with shortest-route lineage", {
   persons <- data.frame(person_id = c(10, 20, 30, 40), sex = c("f", "f", "m", "f"),
     birth_time = c(-80, -50, -50, -20), death_time = NA_real_,
     mother_id = c(NA, 10, 10, 20), father_id = c(NA, NA, NA, 30))
-  population <- hammel_population(persons, end_time = 0)
+  population <- hammel_population(persons, end_time = 0, groups = if ("group" %in% names(persons)) "group")
   result <- extract_kin(population, 40, generations = 100, relative_ids = 10)
   expect_equal(nrow(result), 1)
   expect_equal(result$ego_distance, 2L)
@@ -109,7 +109,7 @@ test_that("ancestry cycles fail and deep traversal is iterative", {
   ids <- seq_len(n) * 10
   persons <- data.frame(person_id = ids, sex = "f", birth_time = -10,
     death_time = NA_real_, mother_id = c(ids[-1], NA_real_), father_id = NA_real_)
-  result <- extract_kin(hammel_population(persons, end_time = 0), ids[1],
+  result <- extract_kin(hammel_population(persons, end_time = 0, groups = if ("group" %in% names(persons)) "group"), ids[1],
                          generations = n, relative_ids = ids[n])
   expect_equal(result$ego_distance, n - 1L)
   expect_equal(result$relative_distance, 0L)

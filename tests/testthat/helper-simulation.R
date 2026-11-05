@@ -6,7 +6,7 @@ make_model <- function(n = 1000, sex = "m", age = 20, death_rate = 0,
   birth_time = rep(-age, n), death_time = rep(NA_real_, n),
   mother_id = rep(NA_integer_, n), father_id = rep(NA_integer_, n))
  hammel_model() |>
-  set_population(hammel_population(persons, end_time = 0)) |>
+  set_population(hammel_population(persons, end_time = 0, groups = if ("group" %in% names(persons)) "group")) |>
   set_mortality(data.frame(sex = c("m", "f"), age_start = 0,
               age_end = Inf, rate = death_rate)) |>
   set_fertility(data.frame(age_start = 15, age_end = 50, rate = birth_rate),
@@ -66,7 +66,7 @@ spacing_population <- function(n, age = 30, sons = -0.1, groups = NULL, end_time
     mother_id = c(rep(NA_real_, n), rep(seq_len(n), each = k)),
     father_id = NA_real_)
   if (!is.null(groups)) persons$group <- c(rep(groups[1], n), rep(groups[2], n * k))
-  hammel_population(persons, end_time = end_time)
+  hammel_population(persons, end_time = end_time, groups = if ("group" %in% names(persons)) "group")
 }
 # Poisson check of a count against its expected value.
 expect_count <- function(count, expected) {
@@ -95,4 +95,25 @@ pair_rates <- function(x) {
   keys <- intersect(c("time_start", "time_end", "dur_start", "dur_end", "group_pair", "union_type"),
                     names(x))
   aggregate(x[c("union_years", "dissolutions")], x[keys], sum)
+}
+
+# The recorded histories of a result, without its group declaration (which
+# records the inheritance rule and so differs between equivalent models).
+histories <- function(x) x[intersect(c("persons", "unions", "ancestry", "transitions"), names(x))]
+
+# Change the inheritance rule of a model's (single) declared group dimension.
+# `extra` appends categories (such as a custom rule's outputs) to the current
+# ones, or to the population's values when none are listed.
+set_inheritance <- function(model, rule, extra = NULL) {
+  declaration <- hammel:::model_groups(model)
+  if (is.null(declaration)) declaration <- list(group = group())
+  current <- declaration$group
+  categories <- current$categories
+  if (!is.null(extra)) {
+    if (is.null(categories)) categories <- unique(model$population$persons$group)
+    categories <- c(categories, extra)
+  }
+  declaration$group <- group(categories = categories, ancestry = current$ancestry,
+                             inheritance = rule)
+  do.call(set_groups, c(list(model), declaration))
 }

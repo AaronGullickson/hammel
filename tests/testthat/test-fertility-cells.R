@@ -5,7 +5,7 @@ cell_model <- function(n = 2000, rate = .2, spacing = .75, age = 20,
   people <- data.frame(person_id = seq_len(n), sex = "f", birth_time = -age,
     death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
   hammel_model() |>
-    set_population(hammel_population(people, end_time = 0)) |>
+    set_population(hammel_population(people, end_time = 0, groups = if ("group" %in% names(people)) "group")) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(rates, birth_interval = spacing) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
@@ -128,6 +128,7 @@ test_that("cell mode runs with groups, union types, cohabitation, matching and r
   set.seed(5)
   base <- create_baseline_population(1500, max_age = 60)
   base$persons$group <- sample(c("A", "B"), 1500, TRUE)
+  base$groups <- list(group = group())
   fert <- data.frame(age_start = c(15, 25, 35), age_end = c(25, 35, 50), rate = c(.1, .12, .04))
   sf <- rbind(transform(fert, union_type = "unpartnered", rate = rate * .3),
               transform(fert, union_type = "cohab", rate = rate * .8),
@@ -242,7 +243,7 @@ test_that("released eligibility does not consume blocked time or force a birth",
   one <- data.frame(person_id = 1, sex = "f", birth_time = -15, death_time = NA_real_,
                     mother_id = NA_real_, father_id = NA_real_)
   long <- hammel_model() |>
-    set_population(hammel_population(one, end_time = 0)) |>
+    set_population(hammel_population(one, end_time = 0, groups = if ("group" %in% names(one)) "group")) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 1000, rate = 2),
                   birth_interval = .75, ffab = 0) |>

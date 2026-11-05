@@ -41,7 +41,7 @@ test_that("typed population dissolution exposure resets on conversion", {
       death_time=NA_real_,mother_id=NA_integer_,father_id=NA_integer_,group=c("A","B")),
     tibble::tibble(union_id=1:2,wife_id=1L,husband_id=2L,start_time=c(1,3),
       end_time=c(3,NA),end_reason=c("conversion",NA),union_type=c("cohab","marriage"),
-      previous_cohab_id=c(NA_integer_,1L)),end_time=5)
+      previous_cohab_id=c(NA_integer_,1L)),end_time=5, groups = "group")
   x <- calculate_dissolution_rates(pop,c(0,5),c(0,1,Inf),by = c("group_w", "group_h", "union_type"))
   expect_equal(sum(x$union_years[x$union_type == "cohab"]),2)
   expect_equal(sum(x$union_years[x$union_type == "marriage"]),2)

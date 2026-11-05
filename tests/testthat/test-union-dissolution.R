@@ -5,7 +5,7 @@ dissolution_model <- function(n = 1L, duration = 0, rate = 0.1) {
   model <- set_population(model, hammel_population(p, unions = data.frame(
     union_id = seq_len(n), wife_id = seq.int(1L, 2L*n, 2L),
     husband_id = seq.int(2L, 2L*n, 2L), start_time = -duration,
-    end_time = NA_real_, end_reason = NA_character_), end_time = 0))
+    end_time = NA_real_, end_reason = NA_character_), end_time = 0, groups = if ("group" %in% names(p)) "group"))
   set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = rate))
 }
 
@@ -166,6 +166,7 @@ test_that("dissolution restores matching availability and repeat episodes start 
 test_that("dissolution uses symmetric pair schedules and stratified rates with future coverage", {
   model <- dissolution_model(4)
   model$population$persons$group <- c("A", "A", "A", "B", "B", "A", "B", "B")
+  model$population$groups <- list(group = group())
   model <- set_population(model, model$population)
   shared <- data.frame(dur_start = 0, dur_end = Inf, rate = 1e4)
   model <- set_union_dissolution(model,
@@ -179,6 +180,7 @@ test_that("dissolution uses symmetric pair schedules and stratified rates with f
   # Swapping wives' and husbands' group identities must not change their risk.
   reversed <- stratified
   reversed$population$persons$group <- c("A", "A", "B", "A", "A", "B", "B", "B")
+  reversed$population$groups <- list(group = group())
   expect_identical(simulate(reversed, 1, seed = 52)$unions, result$unions)
   reverse_factors <- set_union_dissolution(model,
     stratify_rates(shared, list(group_pair = c("A:A" = 0, "B:A" = 1, "B:B" = 0))))
@@ -196,7 +198,8 @@ test_that("dissolution uses symmetric pair schedules and stratified rates with f
   expect_error(simulate(model, 0), "missing schedules.*A:B")
   model <- dissolution_model()
   model$population$persons$group <- "A"
-  model$processes$fertility$inheritance <- create_group_inheritance("custom", groups = "AB", fun = function(...) "AB")
+  model$population$groups <- list(group = group())
+  model <- set_inheritance(model, create_group_inheritance("custom", fun = function(...) "AB"), extra = "AB")
   model <- set_union_dissolution(model, data.frame(group_pair = "A:A", dur_start = 0, dur_end = Inf, rate = 0))
   expect_error(simulate(model, 0), "missing schedules.*AB")
 })
@@ -215,8 +218,7 @@ test_that("optional process, zero-duration runs, empty populations and fallbacks
   expect_s3_class(out$unions, "tbl_df")
   fallback <- set_union_dissolution(model, data.frame(group_pair = c("B:B", "A:A"), dur_start = 0,
     dur_end = Inf, rate = c(1e4, 0)))
-  expect_warning(out <- simulate(fallback, 1, seed = 52), "first alphabetically")
-  expect_equal(out$simulation$dissolutions, 0)
+  expect_error(simulate(fallback, 1, seed = 52), "not a declared group dimension")
 })
 
 test_that("dissolution histories conserve partnered exposure and survive later deaths", {

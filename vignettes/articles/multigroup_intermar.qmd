@@ -77,7 +77,6 @@ inheritance_models <- tibble(
     create_group_inheritance("random_parent"),
     create_group_inheritance(
       "custom",
-      groups = c("A", "B", "AB"),
       fun = function(child_ancestry, mother_group, father_group, ...) {
         # Same identity or missing father: follow mother
         if (is.na(father_group) || mother_group == father_group) {
@@ -112,7 +111,7 @@ We will use uneven starting groups of A (85%) and B (15%).
 ```{r}
 #| label: set-base-pop
 pop <- create_baseline_population(200000, end_time = 0,
-                                  group_weights = c("A" = 0.85, "B" = 0.15))
+                                  groups = list(group = c("A" = 0.85, "B" = 0.15)))
 ```
 
 In this case, the 100 year run-in to produce a stable population is included already in the input objects. So, we just need to run the simulation for 300 years to produce the desired result. Note that because I set `end_time = 0` in the baseline population, all of our time increments count up from zero.
@@ -123,7 +122,9 @@ In this case, the 100 year run-in to produce a stable population is included alr
 model <- hammel_model() |>
   set_population(pop) |>
   set_mortality(mortality_rates) |>
-  set_fertility(fertility_rates, inheritance = inheritance_models) |>
+  set_fertility(fertility_rates) |>
+  set_groups(group = group(categories = c("A", "B", "AB"), ancestry = TRUE,
+                           inheritance = inheritance_models)) |>
   set_union_formation("on_demand", matching = matching_models)
 
 runtime <- system.time(pop_final <- simulate(model, 300, 42))
@@ -309,7 +310,9 @@ trans_rates <- tribble(
 model <- hammel_model() |>
   set_population(pop) |>
   set_mortality(mortality_rates) |>
-  set_fertility(fertility_rates, inheritance = inheritance_models) |>
+  set_fertility(fertility_rates) |>
+  set_groups(group = group(categories = c("A", "B", "AB"), ancestry = TRUE,
+                           inheritance = inheritance_models)) |>
   set_union_formation("on_demand", matching = matching_models) |>
   set_group_transition(trans_rates)
 

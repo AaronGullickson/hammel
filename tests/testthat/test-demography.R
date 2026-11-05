@@ -2,7 +2,7 @@ test_that("Lexis counts use exact exposure and maternal ages", {
   persons <- data.frame(person_id = 1:3, sex = c("f", "m", "f"), birth_time = c(-0.5, 0.25,
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
-  population <- hammel_population(persons, end_time = 1)
+  population <- hammel_population(persons, end_time = 1, groups = if ("group" %in% names(persons)) "group")
   exposure <- demographic_counts(population, c(0, 1), c(0, 1, Inf))
   expect_equal(exposure$person_years[exposure$sex == "f"], c(1, 0.25))
   expect_equal(exposure$person_years[exposure$sex == "m"], c(0.75, 0))
@@ -23,7 +23,7 @@ test_that("fractional periods and ages conserve exposure", {
   persons <- data.frame(person_id = 1:3, sex = c("f", "m", "f"), birth_time = c(-0.5, 0.25,
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
-  population <- hammel_population(persons, end_time = 1)
+  population <- hammel_population(persons, end_time = 1, groups = if ("group" %in% names(persons)) "group")
   exposure <- demographic_counts(population, c(0, 1), c(0, 1, Inf))
   split <- demographic_counts(population, c(0, 0.5, 1), c(0, 0.5, 1, Inf))
   expect_equal(sum(split$person_years), sum(exposure$person_years))
@@ -33,7 +33,7 @@ test_that("Lexis event boundaries are half open", {
   persons <- data.frame(person_id = 1:3, sex = c("f", "m", "f"), birth_time = c(-0.5, 0.25,
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
-  population <- hammel_population(persons, end_time = 1)
+  population <- hammel_population(persons, end_time = 1, groups = if ("group" %in% names(persons)) "group")
   exposure <- demographic_counts(population, c(0, 1), c(0, 1, Inf))
   p <- persons[1, ]
   p$birth_time <- 0
@@ -52,7 +52,7 @@ test_that("duplicate identities in stacked histories are rejected", {
   persons <- data.frame(person_id = 1:3, sex = c("f", "m", "f"), birth_time = c(-0.5, 0.25,
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
-  population <- hammel_population(persons, end_time = 1)
+  population <- hammel_population(persons, end_time = 1, groups = if ("group" %in% names(persons)) "group")
   exposure <- demographic_counts(population, c(0, 1), c(0, 1, Inf))
   stacked <- rbind(persons, persons)
   expect_error(demographic_counts(stacked, c(0, 1), c(0, Inf)))
@@ -130,9 +130,9 @@ test_that("empty populations have zero exposure and missing mortality rates", {
   persons <- data.frame(person_id = 1:3, sex = c("f", "m", "f"), birth_time = c(-0.5, 0.25,
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
-  population <- hammel_population(persons, end_time = 1)
+  population <- hammel_population(persons, end_time = 1, groups = if ("group" %in% names(persons)) "group")
   exposure <- demographic_counts(population, c(0, 1), c(0, 1, Inf))
-  empty <- hammel_population(persons[FALSE, ], end_time = 1)
+  empty <- hammel_population(persons[FALSE, ], end_time = 1, groups = if ("group" %in% names(persons[FALSE, ])) "group")
   empty_rates <- demographic_counts(empty, c(0, 1), c(0, 1, Inf))
   expect_true(all(empty_rates$person_years == 0))
   expect_true(all(empty_rates$deaths == 0))
@@ -143,7 +143,7 @@ test_that("Lexis summaries feed TFR and life tables directly", {
   persons <- data.frame(person_id = 1:3, sex = c("f", "m", "f"), birth_time = c(-0.5, 0.25,
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
-  population <- hammel_population(persons, end_time = 1)
+  population <- hammel_population(persons, end_time = 1, groups = if ("group" %in% names(persons)) "group")
   exposure <- demographic_counts(population, c(0, 1), c(0, 1, Inf))
   summary <- demographic_counts(population, c(0, 1), c(0, 1, 2, Inf))
   expect_equal(calculate_tfr(summary)$tfr, 4, tolerance = 0)
@@ -159,7 +159,7 @@ test_that("finite age breaks append an open interval", {
   persons <- data.frame(person_id = 1:3, sex = c("f", "m", "f"), birth_time = c(-0.5, 0.25,
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
-  population <- hammel_population(persons, end_time = 1)
+  population <- hammel_population(persons, end_time = 1, groups = if ("group" %in% names(persons)) "group")
   exposure <- demographic_counts(population, c(0, 1), c(0, 1, Inf))
   expect_identical(demographic_counts(population, c(0, 1), c(0, 1)), demographic_counts(population,
     c(0, 1), c(0, 1, Inf)))
@@ -184,9 +184,9 @@ test_that("population counts include births and exclude deaths at each instant",
   persons <- data.frame(person_id = 1:3, sex = c("f", "m", "f"), birth_time = c(-0.5, 0.25,
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
-  population <- hammel_population(persons, end_time = 1)
+  population <- hammel_population(persons, end_time = 1, groups = if ("group" %in% names(persons)) "group")
   exposure <- demographic_counts(population, c(0, 1), c(0, 1, Inf))
-  empty <- hammel_population(persons[FALSE, ], end_time = 1)
+  empty <- hammel_population(persons[FALSE, ], end_time = 1, groups = if ("group" %in% names(persons[FALSE, ])) "group")
   counts <- calculate_population_size(population, c(0, 0.25, 0.5, 0.75, 1))
   expect_identical(counts$population, c(1L, 2L, 3L, 2L, 2L))
   expect_identical(calculate_population_size(population, c(1, 0, 1))$population, c(2L,
@@ -205,9 +205,9 @@ test_that("all public demographic tables are tibbles including empty outputs", {
   persons <- data.frame(person_id = 1:3, sex = c("f", "m", "f"), birth_time = c(-0.5, 0.25,
     0.5), death_time = c(0.75, NA, NA), mother_id = c(NA_integer_, NA_integer_, 1L),
     father_id = NA_integer_)
-  population <- hammel_population(persons, end_time = 1)
+  population <- hammel_population(persons, end_time = 1, groups = if ("group" %in% names(persons)) "group")
   exposure <- demographic_counts(population, c(0, 1), c(0, 1, Inf))
-  empty <- hammel_population(persons[FALSE, ], end_time = 1)
+  empty <- hammel_population(persons[FALSE, ], end_time = 1, groups = if ("group" %in% names(persons[FALSE, ])) "group")
   summary <- demographic_counts(population, c(0, 1), c(0, 1, 2, Inf))
   counts <- calculate_population_size(population, c(0, 0.25, 0.5, 0.75, 1))
   expect_true(tibble::is_tibble(counts))

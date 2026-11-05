@@ -399,9 +399,9 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' @param rates For `"rate"` initiation, an age-specific female search-hazard
 #'   table with `age_start`, `age_end`, and `rate`, in years and per person-year.
 #'   These specify search attempts, not guaranteed realized union formation.
-#'   An optional `group` column selects the woman's group. Without it, all groups
-#'   share the schedule. Group does not restrict partner matching. With no
-#'   population groups, simulation warns and selects the first alphabetical group.
+#'   An optional `group` column selects the woman's group (requires a declared
+#'   group dimension). Without it, all groups share the schedule. Group does
+#'   not restrict partner matching.
 #'   See [mortality()] for group-label and rate-coverage rules.
 #'   Nonoverlapping bands may have gaps or an open end; gaps and ages outside
 #'   support have zero hazard. Optional `previous_union` supplies either

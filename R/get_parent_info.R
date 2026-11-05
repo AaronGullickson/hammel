@@ -7,7 +7,7 @@
 #'
 #' Ages are in continuous years: the child's birth time minus the parent's birth
 #' time. Unknown parents yield missing ages and groups. Group fields are omitted
-#' when persons has no `group` column; otherwise its type is preserved. These
+#' unless a group dimension is declared; otherwise its type is preserved. These
 #' are recorded identities, not reconstructions of historical group transitions.
 #' Existing columns that conflict with the added fields cause an error.
 #'
@@ -25,7 +25,7 @@ get_parent_info <- function(population) {
   validate_population(population)
   persons <- population$persons
   result <- tibble::as_tibble(persons)
-  grouped <- "group" %in% names(persons)
+  grouped <- declared_group(population)
   added <- c("age_mother", "age_father",
              if (grouped) c("group_mother", "group_father"))
   conflicts <- intersect(names(result), added)

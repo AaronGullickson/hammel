@@ -58,8 +58,6 @@ collect_model_bank <- function(arguments) {
 prepare_model_schedules <- function(arguments, population, start, end) {
   first <- prepare_group_inheritance(model_at(arguments$inheritance, start), population)
   values <- first$values
-  for (m in model_entries(arguments$inheritance))
-    if (!is.null(values)) values <- extend_identity_groups(values, as.character(m$groups))
   matching_bank <- collect_model_bank(arguments[c("matching", "father_matching", "cohab_matching")])
   inheritance_bank <- collect_model_bank(arguments["inheritance"])
   prepared_matching <- lapply(matching_bank, prepare_matching_model, population_groups = values)

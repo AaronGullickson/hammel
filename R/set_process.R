@@ -20,18 +20,6 @@
 #'   fertility they combine with `hetfert` on the log scale.
 #' @param ffab Probability that a newborn is female, default `0.4886`.
 #'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
-#' @param inheritance A group identity model from [create_group_inheritance()],
-#'   or a tibble with numeric `time_start`, `time_end` and list-column `model`
-#'   containing complete inheritance models. Intervals are half-open absolute
-#'   years, must not overlap and must cover the requested run. Select the active
-#'   model at each birth; older identities and ancestry remain unchanged.
-#'   Base data frames with list columns are accepted. All declared possible
-#'   identities across scheduled models join the simulation-wide registry.
-#'   Static inputs may also be a method name requiring no additional parameters: `"mother"`, `"father"`,
-#'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
-#'   Applies to fertility and defaults to selecting either parent with equal
-#'   probability, with maternal fallback. Assignment is independent of recorded
-#'   ancestry proportions.
 #'
 #' @return An updated `hammel_model`. The input model is not modified.
 #' @export
@@ -67,7 +55,6 @@ attach_process <- function(model, process) {
     validate_rates(process$rates, mortality = name == "mortality")
     validate_process_weights(process$weights, "person")
     if (name == "fertility") {
-      process$inheritance <- normalize_group_inheritance(process$inheritance)
       validate_birth_interval(process$birth_interval)
       if (!"ffab" %in% names(process)) process$ffab <- 0.4886
       validate_ffab(process$ffab)
@@ -111,12 +98,10 @@ set_mortality <- function(model, rates, weights = NULL) {
 
 #' @rdname set_process
 #' @export
-set_fertility <- function(model, rates, birth_interval = 0.75,
-                          inheritance = create_group_inheritance(), ffab = 0.4886,
+set_fertility <- function(model, rates, birth_interval = 0.75, ffab = 0.4886,
                           hetfert = NULL, weights = NULL) {
   set_process(model, fertility(rates, birth_interval = birth_interval,
-                              inheritance = inheritance, ffab = ffab, hetfert = hetfert,
-                              weights = weights))
+                              ffab = ffab, hetfert = hetfert, weights = weights))
 }
 
 #' Specify age-specific demographic rates
@@ -132,9 +117,9 @@ set_fertility <- function(model, rates, birth_interval = 0.75,
 #' label or finite numeric code. Without it, rates apply to all groups. Each
 #' mortality group needs both sexes, and each conditional fertility group needs
 #' both statuses. Overlap is checked within groups.
-#' Simulation requires schedules for every population group. Without population
-#' groups, simulation warns and uses the first group alphabetically (radix order
-#' of character representations, including numeric codes).
+#' Simulation requires schedules for every category of the declared group
+#' dimension (see [set_groups()]); a rate table with a `group` column is an
+#' error when no group is declared.
 #'
 #' Mortality requires separate schedules for both sexes. Gaps and uncovered
 #' ages are not filled or interpreted as zero rates. Coverage must be specified
@@ -207,20 +192,6 @@ set_fertility <- function(model, rates, birth_interval = 0.75,
 #'   fertility they combine with `hetfert` on the log scale.
 #' @param ffab Probability that a newborn is female, default `0.4886`.
 #'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
-#' @param inheritance A group identity model from [create_group_inheritance()],
-#'   or a tibble with numeric `time_start`, `time_end` and list-column `model`
-#'   containing complete inheritance models. Intervals are half-open absolute
-#'   years, must not overlap and must cover the requested run. Select the active
-#'   model at each birth; older identities and ancestry remain unchanged.
-#'   Base data frames with list columns are accepted. All declared possible
-#'   identities across scheduled models join the simulation-wide registry.
-#'   Static inputs may also be a method name requiring no additional parameters: `"mother"`, `"father"`,
-#'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
-#'   Fertility defaults to selecting either parent with equal probability,
-#'   with maternal fallback. Other parental, ancestry,
-#'   hierarchy, and custom rules assign identity after child sex and ancestry
-#'   are calculated. Possible identities are checked against grouped schedules
-#'   and categorical matching levels before execution. Applies to fertility only.
 #' @return A named list containing `name`, `rates`, and `rate_unit`, plus
 #'   `birth_interval` and `ffab` for fertility, inheriting
 #'   from `hammel_mortality` or `hammel_fertility` and `hammel_process`.
@@ -243,18 +214,15 @@ mortality <- function(rates, weights = NULL) {
 
 #' @rdname mortality
 #' @export
-fertility <- function(rates, birth_interval = 0.75,
-                      inheritance = create_group_inheritance(), ffab = 0.4886,
-                          hetfert = NULL, weights = NULL) {
+fertility <- function(rates, birth_interval = 0.75, ffab = 0.4886,
+                      hetfert = NULL, weights = NULL) {
   validate_rates(rates, mortality = FALSE)
   validate_process_weights(weights, "person")
   warn_cancelled_weight_terms(weights, weight_strata("fertility", rates), "fertility")
-  inheritance <- normalize_group_inheritance(inheritance)
   validate_birth_interval(birth_interval)
   validate_ffab(ffab)
   validate_het_fert(hetfert)
   process <- new_rate_process("fertility", rates)
-  process$inheritance <- if (is.null(inheritance)) create_group_inheritance() else inheritance
   process$birth_interval <- birth_interval
   process$ffab <- ffab
   process$hetfert <- hetfert

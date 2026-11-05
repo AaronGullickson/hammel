@@ -6,7 +6,7 @@ marriage_entry_history <- function() {
     start_time = c(1, 3), end_time = c(3, NA),
     end_reason = c("conversion", NA), union_type = c("cohab", "marriage"),
     previous_cohab_id = c(NA_integer_, 1L))
-  hammel_population(persons, unions, end_time = 5)
+  hammel_population(persons, unions, end_time = 5, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("marriage entry includes conversion and nonmarried exposure", {

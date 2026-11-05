@@ -92,7 +92,7 @@ empty_transitions <- function(groups = character()) {
 }
 
 normalize_population_transitions <- function(population) {
-  if ("group" %in% names(population$persons)) {
+  if (declared_group(population)) {
     if (is.null(population$transitions))
       population$transitions <- empty_transitions(population$persons$group)
     else population$transitions <- tibble::as_tibble(population$transitions)
@@ -105,8 +105,8 @@ validate_transition_history <- function(population) {
   if (is.null(tx)) return(invisible(population))
   p <- population$persons
   check_columns(tx, c("person_id", "time", "group_origin", "group_dest"), "transitions")
-  if (nrow(tx) && !"group" %in% names(p))
-    stop("Transition histories require person groups.", call. = FALSE)
+  if (nrow(tx) && !declared_group(population))
+    stop("Transition histories require a declared group dimension.", call. = FALSE)
   check_numeric_column(tx$person_id, "transitions$person_id", id = TRUE)
   check_numeric_column(tx$time, "transitions$time")
   for (col in c("group_origin", "group_dest")) check_groups(data.frame(group = tx[[col]]), col)

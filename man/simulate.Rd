@@ -95,8 +95,8 @@ fertility's inheritance model (random parent by default, with maternal fallback)
 other newborn custom columns are missing. Grouped rate
 tables use each person's group (the woman's group for union searches).
 Ungrouped tables apply to everyone. Missing population groups in a grouped
-rate table are errors. Without population groups, each grouped table uses its
-first alphabetical group with a warning; this does not create group identities.
+rate table are errors. Groups must be declared (\code{\link[=set_groups]{set_groups()}}); a grouped
+table without a declared group dimension is an error.
 Matching can use group predictors and pair effects. Existing custom columns and histories are preserved. Restarting samples new
 pending events and does not reproduce an uninterrupted run exactly.
 When ancestry is tracked, each newborn receives half of each parent's shares,

@@ -71,8 +71,8 @@
 #' other newborn custom columns are missing. Grouped rate
 #' tables use each person's group (the woman's group for union searches).
 #' Ungrouped tables apply to everyone. Missing population groups in a grouped
-#' rate table are errors. Without population groups, each grouped table uses its
-#' first alphabetical group with a warning; this does not create group identities.
+#' rate table are errors. Groups must be declared ([set_groups()]); a grouped
+#' table without a declared group dimension is an error.
 #' Matching can use group predictors and pair effects. Existing custom columns and histories are preserved. Restarting samples new
 #' pending events and does not reproduce an uninterrupted run exactly.
 #' When ancestry is tracked, each newborn receives half of each parent's shares,
@@ -122,9 +122,21 @@ simulate <- function(model, years, seed = NULL) {
          call. = FALSE)
   }
   population <- model$population
+  population <- apply_group_declaration(population, model_groups(model))
   validate_population(population)
   population <- normalize_population_transitions(population)
   population <- normalize_population_ancestry(population)
+  grouped <- declared_group(population)
+  declaration <- population$groups
+  # An undeclared `group` column is an ordinary custom column: hide it from
+  # the engine and restore it afterwards, with NA for newborns.
+  undeclared <- setdiff(names(population$persons), c("person_id", "sex", "birth_time",
+    "death_time", "mother_id", "father_id", "hetfert", names(declaration)))
+  hidden_group <- NULL
+  if (!grouped && "group" %in% names(population$persons)) {
+    hidden_group <- population$persons$group
+    population$persons$group <- NULL
+  }
   start <- population$end_time
   if (is.null(start)) stop("The population needs a finite `end_time`.", call. = FALSE)
   if (!is.numeric(years) || length(years) != 1L || !is.finite(years) || years < 0) {
@@ -165,8 +177,8 @@ simulate <- function(model, years, seed = NULL) {
   transition_process <- model$processes$group_transition
   if (!is.null(transition_process)) {
     attach_process(model, transition_process)
-    if (!"group" %in% names(population$persons))
-      stop("Group transitions require population group identities.", call. = FALSE)
+    if (!grouped)
+      stop("Group transitions require a declared group dimension; use set_groups().", call. = FALSE)
   }
   dissolution_process <- model$processes$union_dissolution
   if (!is.null(dissolution_process)) attach_process(model, dissolution_process)
@@ -176,6 +188,15 @@ simulate <- function(model, years, seed = NULL) {
     search = union_process$rates, dissolution = dissolution_process$rates,
     conversion = union_process$union_convert_rate, transition = transition_process$rates,
     cohabitation_probability = union_process$cohab_prob)
+  # A rate table stratified by a persons column that is not a declared group.
+  for (name in names(calendar_inputs)) {
+    columns <- names(calendar_inputs[[name]])
+    bad <- c(intersect(undeclared, columns), if (!grouped && any(c("group", "group_pair") %in% columns))
+      intersect(c("group", "group_pair"), columns))
+    if (length(bad))
+      stop(sprintf("The %s rates use %s, which is not a declared group dimension; declare it with set_groups().",
+                   name, paste0("`", unique(bad), "`", collapse = ", ")), call. = FALSE)
+  }
   for (name in names(calendar_inputs))
     check_calendar_coverage(calendar_inputs[[name]], start, start + years, name)
   cohab_enabled <- !is.null(union_process$cohab_prob)
@@ -200,16 +221,21 @@ simulate <- function(model, years, seed = NULL) {
   registry_population$.transition_groups <- unique(c(
     as.character(population$transitions$group_origin), as.character(population$transitions$group_dest),
     as.character(transition_process$rates$group_origin), as.character(transition_process$rates$group_dest)))
+  registry_population$.group_categories <- if (grouped) declaration$group$categories
+  inheritance_model <- if (grouped) declaration$group$inheritance else create_group_inheritance()
+  if (!isTRUE(declaration$group$ancestry) &&
+      any(vapply(model_entries(inheritance_model), function(m) identical(m$method, "ancestry"), logical(1))))
+    stop("The \"ancestry\" inheritance method requires `ancestry = TRUE` in group().", call. = FALSE)
   model_arguments <- list(matching = union_process$matching,
     father_matching = union_process$father_matching, cohab_matching = union_process$cohab_matching,
-    inheritance = model$processes$fertility$inheritance)
+    inheritance = inheritance_model)
   for (name in names(model_arguments))
     check_model_coverage(model_arguments[[name]], start, start + years, name)
   scheduled_models <- any(vapply(model_arguments, is_model_schedule, logical(1)))
   model_context <- if (scheduled_models)
     prepare_model_schedules(model_arguments, registry_population, start, start + years) else NULL
   inheritance <- if (scheduled_models) model_context$inheritance else
-    prepare_group_inheritance(model$processes$fertility$inheritance, registry_population)
+    prepare_group_inheritance(inheritance_model, registry_population)
   group_values <- inheritance$values
   death_rates <- prepare_group_rates(death_rates, population$persons, "mortality", group_values, start, start + years)
   birth_rates <- prepare_group_rates(birth_rates, population$persons, "fertility", group_values, start, start + years)
@@ -388,6 +414,8 @@ simulate <- function(model, years, seed = NULL) {
     result$simulation$transitions <- if (years > 0) nrow(native$transitions) else 0L
   if (!is.null(dissolution_process))
     result$simulation$dissolutions <- if (years > 0) native$dissolutions else 0
+  if (!is.null(hidden_group))
+    result$persons$group <- c(hidden_group, hidden_group[rep(NA_integer_, nrow(result$persons) - length(hidden_group))])
   result$persons <- tibble::as_tibble(result$persons)
   result$unions <- tibble::as_tibble(result$unions)
   validate_population(result)

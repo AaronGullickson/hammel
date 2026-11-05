@@ -5,7 +5,7 @@ detailed_union_population <- function() {
   unions <- data.frame(union_id = c(9, 4), wife_id = 10, husband_id = c(70, 30),
     start_time = c(1.5, 0), end_time = c(NA, 1), end_reason = c(NA, "death_husband"),
     note = c("current", "earlier"))
-  hammel_population(persons, unions, end_time = 2)
+  hammel_population(persons, unions, end_time = 2, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("detailed unions attach spouses by ID and preserve episodes and input", {
@@ -28,8 +28,10 @@ test_that("detailed unions attach spouses by ID and preserve episodes and input"
 test_that("groups are optional and their labels retain their input types", {
   population <- detailed_union_population()
   population$persons$group <- c("B", "A", "C")
+  population$groups <- list(group = group())
   expect_identical(get_detailed_unions(population)$group_h, c("C", "B"))
   population$persons$group <- NULL
+  population$groups <- NULL
   expect_false(any(c("group_w", "group_h") %in% names(get_detailed_unions(population))))
 })
 
@@ -86,6 +88,7 @@ test_that("partner groups describe formation rather than identity after later mo
 test_that("formation reconstruction preserves character labels and works without an endpoint", {
   population <- detailed_union_population()
   population$persons$group <- c("B", "A", "C")
+  population$groups <- list(group = group())
   population$transitions <- tibble::tibble(person_id = c(10, 70), time = c(1, 1.75),
     group_origin = c("X", "Y"), group_dest = c("A", "C"))
   population["end_time"] <- list(NULL)

@@ -1,13 +1,14 @@
 #' Specify newborn group identity inheritance
 #'
 #' Assign one group independently of genealogical ancestry shares. Attach this
-#' object with [fertility()] or [set_fertility()]. The default selects either
+#' object to a dimension with [group()]. The default selects either
 #' parent with equal probability, with maternal fallback.
 #' Existing people are not reassigned, and ancestry is unchanged by assignment.
-#' Fertility also accepts a schedule tibble with `time_start`, `time_end`, and a
+#' [group()] also accepts a schedule tibble with `time_start`, `time_end`, and a
 #' `model` list column containing complete inheritance objects. Half-open
-#' absolute-year intervals select the model at birth; all scheduled possible
-#' identities enter one shared registry before execution. See [fertility()].
+#' absolute-year intervals select the model at birth. A custom rule must return
+#' one of the dimension's categories; declare categories that may only appear
+#' later in [group()].
 #'
 #' @param method One of `"mother"`, `"father"`, `"random_parent"`, `"same_sex"`,
 #'   `"opposite_sex"`, `"ancestry"`, `"hierarchy"`, or `"custom"`.
@@ -26,10 +27,6 @@
 #'   NA group and NULL ancestry. Return exactly one nonmissing identity in the
 #'   possible group set. Ordinary R random draws are supported; functions must
 #'   not mutate simulation/global state. Invalid returns and errors fail.
-#' @param groups Optional unique group labels extending the inferred possible
-#'   identities (starting groups plus ancestry groups with positive shares).
-#'   Declare any additional custom outputs here. Grouped rates and categorical
-#'   matching levels must cover the complete set before simulation.
 #' @param order For `"hierarchy"`, unique group labels, highest-ranked first.
 #'   Choose between parental identities, not ancestry. Complex orders use `fun`.
 #' @param passing For `"hierarchy"`, probability in `[0,1]` of reversing the
@@ -40,13 +37,13 @@
 #' @examples
 #' create_group_inheritance("mother")
 #' create_group_inheritance("hierarchy", order = c("A", "B"), passing = 0.05)
-#' create_group_inheritance("custom", groups = "mixed",
+#' create_group_inheritance("custom",
 #'   fun = function(mother_group, father_group, ...) {
 #'     if (is.na(father_group) || mother_group == father_group) mother_group else "mixed"
 #'   })
-create_group_inheritance <- function(method = "random_parent", fun = NULL, groups = NULL,
+create_group_inheritance <- function(method = "random_parent", fun = NULL,
                                      order = NULL, passing = 0) {
-  model <- structure(list(method = method, fun = fun, groups = groups,
+  model <- structure(list(method = method, fun = fun,
                           order = order, passing = passing), class = "hammel_group_inheritance")
   validate_group_inheritance(model)
   model
@@ -73,7 +70,7 @@ validate_group_inheritance <- function(model) {
     stop("`inheritance` must be created with create_group_inheritance().", call. = FALSE)
   if (!is.character(model$method) || length(model$method) != 1L || is.na(model$method) ||
       !model$method %in% inheritance_methods()) stop("Invalid group inheritance method.", call. = FALSE)
-  for (field in c("groups", "order")) {
+  for (field in "order") {
     value <- model[[field]]
     if (!is.null(value)) {
       check_groups(tibble::tibble(group = value), field)
@@ -111,8 +108,6 @@ extend_identity_groups <- function(values, additions) {
 prepare_group_inheritance <- function(model, population, registry = NULL) {
   model <- normalize_group_inheritance(model)
   if (!"group" %in% names(population$persons)) {
-    if (!model$method %in% c("mother", "random_parent") || length(model$groups))
-      stop("Group inheritance requires population group identities.", call. = FALSE)
     values <- NULL
   } else {
     values <- unique(population$persons$group)
@@ -120,7 +115,9 @@ prepare_group_inheritance <- function(model, population, registry = NULL) {
     ancestry <- population[["ancestry"]]
     known <- setdiff(names(ancestry), c("person_id", "unknown"))
     positive <- known[vapply(ancestry[known], function(x) any(x > 0), logical(1))]
-    values <- extend_identity_groups(values, c(substring(positive, 7L), as.character(model$groups)))
+    values <- extend_identity_groups(values, substring(positive, 7L))
+    # Declared categories are the complete, ordered list.
+    if (!is.null(population$.group_categories)) values <- population$.group_categories
   }
   if (!is.null(registry)) values <- registry
   labels <- as.character(values)

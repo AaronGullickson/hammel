@@ -6,6 +6,7 @@ strata_model <- function() {
   model <- make_rate_model(6, search_rate = 0.4, birth_interval = 0.75)
   model$population$persons$sex <- rep(c("f", "m"), 3)
   model$population$persons$group <- c("A", "B", "C", "A", "B", "C")
+  model$population$groups <- list(group = group())
   model$processes$fertility$rates$rate <- c(0.2, 0.1)
   model
 }
@@ -108,6 +109,7 @@ test_that("stratified tables equal explicit schedules for each process and toget
 test_that("zero factors suppress only the selected risk", {
   model <- make_model(2, death_rate = 1e8)
   model$population$persons$group <- c("A", "B")
+  model$population$groups <- list(group = group())
   model$processes$mortality$rates <- stratify_rates(model$processes$mortality$rates,
                                                     list(group = c(A = 0, B = 1)))
   result <- simulate(model, 1, seed = 654)
@@ -115,6 +117,7 @@ test_that("zero factors suppress only the selected risk", {
   expect_false(is.na(result$persons$death_time[2]))
   model <- make_rate_model(2, search_rate = 1e8)
   model$population$persons$group <- c("A", "B")
+  model$population$groups <- list(group = group())
   search <- model$processes$union_formation$rates
   model$processes$union_formation$rates <- stratify_rates(search, list(group = c(A = 0, B = 1)))
   expect_equal(nrow(simulate(model, 1, seed = 654)$unions), 0)
@@ -122,18 +125,20 @@ test_that("zero factors suppress only the selected risk", {
   expect_equal(nrow(simulate(model, 1, seed = 654)$unions), 1)
 })
 
-test_that("every group must be listed and populations without groups fall back", {
+test_that("every group must be listed and groups must be declared", {
   model <- strata_model()
   model$processes$mortality$rates <- stratify_rates(model$processes$mortality$rates,
                                                     list(group = c(A = 1.2, B = 1)))
   expect_error(simulate(model, 0), "missing schedules.*C")
   model$population$persons$group <- NULL
-  expect_warning(simulate(model, 0), "using group 'A'")
+  model$population$groups <- NULL
+  expect_error(simulate(model, 0), "not a declared group dimension")
 })
 
 test_that("stratified tables support numeric group codes and restarts", {
   model <- strata_model()
   model$population$persons$group <- match(model$population$persons$group, c("A", "B", "C"))
+  model$population$groups <- list(group = group())
   factors <- c("1" = 1.1, "2" = 0.9, "3" = 1)
   explicit <- model
   for (name in c("mortality", "fertility", "union_formation")) {

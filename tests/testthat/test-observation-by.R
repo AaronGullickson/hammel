@@ -11,7 +11,7 @@ by_history <- function() {
     end_reason = c("conversion", "dissolution", "death_husband"),
     union_type = c("cohab", "marriage", "cohab"), previous_cohab_id = c(NA, 1L, NA))
   transitions <- tibble::tibble(person_id = 1L, time = 35, group_origin = "A", group_dest = "B")
-  hammel_population(persons, unions, end_time = 40, transitions = transitions)
+  hammel_population(persons, unions, end_time = 40, transitions = transitions, groups = if ("group" %in% names(persons)) "group")
 }
 
 woman <- function(x) x[x$sex == "f", ]
@@ -102,7 +102,8 @@ test_that("observation inputs are validated before splitting", {
   expect_error(calculate_mortality_rates(list(1), c(0, 1), c(0, Inf)), "persons data frame")
   pop <- by_history()
   pop$persons$group <- NULL
+  pop$groups <- NULL
   pop$transitions <- NULL
   expect_error(calculate_dissolution_rates(pop, c(0, 40), c(0, Inf), by = "group_w"),
-               "population group identities")
+               "declared group dimension")
 })

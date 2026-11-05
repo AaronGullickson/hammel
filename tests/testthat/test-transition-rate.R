@@ -5,7 +5,7 @@ transition_rate_population <- function() {
     group_origin = c("B", "A"), group_dest = c("A", "B"))
   unions <- data.frame(union_id = 1, wife_id = 11, husband_id = 29,
     start_time = 1, end_time = 3, end_reason = "dissolution")
-  hammel_population(persons, unions, end_time = 6, transitions = tx)
+  hammel_population(persons, unions, end_time = 6, transitions = tx, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("directed age rates use origin exposure and retain zero-event directions", {
@@ -99,6 +99,7 @@ test_that("empty histories, empty populations and group label types are retained
   pop <- transition_rate_population()
   pop$transitions <- pop$transitions[0, ]
   pop$persons$group <- c(10L, 20L)
+  pop$groups <- list(group = group())
   out <- calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf))
   expect_identical(out$group_origin, c(10L, 20L))
   expect_equal(out$person_years, c(6, 4))
@@ -112,7 +113,7 @@ test_that("empty histories, empty populations and group label types are retained
   expect_type(empty$group_origin, "integer")
   expect_type(empty$rate_transition, "double")
   one <- hammel_population(data.frame(person_id = 1, sex = "m", birth_time = 0,
-    death_time = NA_real_, mother_id = NA_real_, father_id = NA_real_, group = "A"), end_time = 6)
+    death_time = NA_real_, mother_id = NA_real_, father_id = NA_real_, group = "A"), end_time = 6, groups = "group")
   expect_equal(nrow(calculate_transition_rates(one, c(0, 6), age_breaks = c(0, Inf))), 0)
 })
 
@@ -127,12 +128,14 @@ test_that("transition counter rejects invalid axes, endpoints and flags", {
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = 1), "`by` must")
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "group"), "cannot split")
   pop$persons$group <- NULL; pop$transitions <- NULL
+  pop$groups <- list(group = group())
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf)), "group")
 })
 
 test_that("simulated competing hazards recover directed rates with shared origin exposure", {
   model <- make_model(10000)
   model$population$persons$group <- rep("A", 10000)
+  model$population$groups <- list(group = group())
   model <- set_group_transition(model, data.frame(group_origin = "A", group_dest = c("B", "C"),
     age_start = 0, age_end = Inf, rate = c(.2, .3)))
   pop <- simulate(model, 2, seed = 317)
@@ -160,9 +163,10 @@ test_that("transition counters accept legacy grouped populations without history
 test_that("transition-rate errors identify the requested observation", {
   pop <- transition_rate_population()
   pop$persons$group <- NULL
+  pop$groups <- NULL
   pop$transitions <- NULL
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf)),
-    "calculate_transition_rates.*requires a persons.*group")
+    "calculate_transition_rates.*requires a declared group")
   pop <- transition_rate_population()
   pop$unions <- rbind(pop$unions, transform(pop$unions, union_id = 2, start_time = 2))
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "union_type"),

@@ -135,6 +135,7 @@ test_that("type-specific group strata built by binding stratified subsets", {
   model <- cohab_fixture(40)
   model$population$persons$sex[1:20] <- "f"
   model$population$persons$group <- rep(c("A","B"),20)
+  model$population$groups <- list(group = group())
   typed <- data.frame(age_start=15,age_end=50,union_type=c("unpartnered","cohab","marriage"),rate=c(.03,.15,.1))
   factors <- list(unpartnered=c(A=1,B=.8),cohab=c(A=1.2,B=.9),marriage=c(A=1,B=1.1))
   stratified <- do.call(rbind, lapply(names(factors), function(type)
@@ -152,6 +153,7 @@ test_that("cohabitation and marriage use distinct matching and diagnostic weight
   model <- cohab_fixture(600,.5)
   model$population$persons$sex[1:300] <- "f"
   model$population$persons$group <- rep(c("A","B"),300)
+  model$population$groups <- list(group = group())
   model$processes$union_formation$matching <- create_matching_model(~1,numeric(),prevent_exogamy=TRUE)
   model$processes$union_formation$cohab_matching <- create_matching_model(~1,numeric(),group_exogamy=c("A:B"=10))
   model$processes$union_formation$diagnostics <- TRUE
@@ -171,6 +173,7 @@ test_that("cohab probabilities select group and previous category and require co
   model <- cohab_fixture(200)
   model$population$persons$sex[1:100] <- "f"
   model$population$persons$group <- rep(c("A","B"),100)
+  model$population$groups <- list(group = group())
   p <- expand.grid(group=c("A","B"),previous_union=c("none","separated","widowed"),stringsAsFactors=FALSE)
   p$age_start <- 15; p$age_end <- Inf
   p$prob <- as.numeric(p$group=="B" & p$previous_union=="none")
@@ -236,6 +239,7 @@ test_that("earlier legal history governs subsequent searches after cohabitant de
 test_that("typed dissolution retains symmetric pair hazards", {
   model <- initial_cohabs(3,conversion=0,breakup=0)
   model$population$persons$group <- c("A","B","A","A","B","B")
+  model$population$groups <- list(group = group())
   rates <- expand.grid(group_pair=c("A:A","A:B","B:B"),union_type=c("cohab","marriage"),stringsAsFactors=FALSE)
   rates$dur_start <- 0; rates$dur_end <- Inf
   rates$rate <- ifelse(rates$union_type=="cohab" & rates$group_pair=="A:B",1e5,0)
@@ -254,7 +258,7 @@ test_that("union entry types share exposure and exclude conversion", {
       mother_id = NA_integer_, father_id = NA_integer_, group = c("A", "B", "A", "B")),
     data.frame(union_id = 1:3, wife_id = 1, husband_id = 2:4,
       start_time = c(1, 3, 5), end_time = c(2, 4, NA),
-      end_reason = c("dissolution", "death_husband", NA)), end_time = 6)
+      end_reason = c("dissolution", "death_husband", NA)), end_time = 6, groups = "group")
   pop <- history()
   pop$unions$union_type <- c("cohab", "marriage", "cohab")
   for (previous in c(FALSE, TRUE)) {

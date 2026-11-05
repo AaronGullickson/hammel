@@ -46,6 +46,7 @@ test_that("probability coverage follows rate calendar and group/category rules",
   m <- cohab_calendar_model(rbind(transform(cohab_calendar(), group = "A"),
     transform(cohab_calendar(), group = "B")))
   m$population$persons$group <- c("A", "B")
+  m$population$groups <- list(group = group())
   p <- m$processes$union_formation$cohab_prob
   m$processes$union_formation$cohab_prob <- p[!(p$group == "B" & p$time_start == .5), ]
   expect_error(simulate(m, 1), "cohabitation probability.*missing schedules.*B")
@@ -119,6 +120,7 @@ test_that("probability changes refresh weighted matching contributions immediate
   m <- cohab_calendar_model(p, n = n, search = .4)
   m$population$persons$sex <- rep(c("f", "m"), each = n / 2)
   m$population$persons$group <- rep(c("A", "B"), n / 2)
+  m$population$groups <- list(group = group())
   m$processes$union_formation$diagnostics <- TRUE
   reference <- m
   reference$processes$union_formation$cohab_prob <- data.frame(

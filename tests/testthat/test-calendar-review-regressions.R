@@ -31,6 +31,7 @@ test_that("fractional fertility epochs retain the run-start accounting grid", {
 test_that("execution population coverage checks ignore unreachable historical and future slices", {
   m <- make_rate_model(4,search_rate=0)
   m$population$persons$group <- c("A","A","B","B")
+  m$population$groups <- list(group = group())
   m$population$end_time <- 2000
   m$population$persons$birth_time <- m$population$persons$birth_time+2000
   extend <- function(x) rbind(transform(x,group="A",time_start=1900,time_end=1950),

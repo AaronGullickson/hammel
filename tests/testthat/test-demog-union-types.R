@@ -6,7 +6,7 @@ typed_demog_history <- function() {
   unions <- tibble::tibble(union_id=1:2,wife_id=1L,husband_id=2L,
     start_time=c(1,3),end_time=c(3,4),end_reason=c("conversion","dissolution"),
     union_type=c("cohab","marriage"),previous_cohab_id=c(NA_integer_,1L))
-  hammel_population(persons,unions,end_time=5)
+  hammel_population(persons,unions,end_time=5, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("typed demographic exposure and births partition totals", {

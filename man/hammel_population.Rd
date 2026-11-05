@@ -9,7 +9,8 @@ hammel_population(
   unions = NULL,
   end_time = NULL,
   ancestry = NULL,
-  transitions = NULL
+  transitions = NULL,
+  groups = NULL
 )
 }
 \arguments{
@@ -39,6 +40,12 @@ parent contributes its half to \code{unknown}. Identity remains separate.}
 \code{person_id}, \code{time}, \code{group_origin}, and \code{group_dest}. Histories must chain
 to current person groups and lie within life dates and the known endpoint.
 Grouped populations always include this tibble, even when empty.}
+
+\item{groups}{Optional group declaration: a character vector of dimension
+names (each with \code{\link[=group]{group()}} defaults) or a named list of \code{\link[=group]{group()}} objects.
+Persons columns that are not declared are ordinary custom columns. Models
+usually declare groups with \code{\link[=set_groups]{set_groups()}}; declare them here to analyze a
+population directly, without a model.}
 }
 \value{
 A named list of class \code{hammel_population} with components \code{persons},
@@ -49,10 +56,11 @@ persons has groups, and a \code{transitions} tibble when groups are present. Anc
 Collect person and union histories in an inspectable population object.
 This constructor does not run a simulation. It validates
 consistent tables against the population schema. Custom columns are retained.
-An optional \code{group} column contains nonmissing character labels or finite
-numeric codes (character labels must be nonempty). Newborns inherit their
-group from either parent with equal probability by default, with maternal fallback,
-or use fertility's configured inheritance model.
+A declared group dimension (see \code{groups} and \code{\link[=set_groups]{set_groups()}}) is a persons
+column of nonmissing character labels or finite numeric codes (character
+labels must be nonempty). Newborns are assigned by its \code{\link[=group]{group()}}
+inheritance rule. Undeclared columns, including one named \code{group}, are
+ordinary custom columns.
 }
 \examples{
 sim <- hammel_population(

@@ -5,7 +5,7 @@ marriage_history <- function() {
   unions <- data.frame(union_id = 1:3, wife_id = 1, husband_id = 2:4,
     start_time = c(1, 3, 5), end_time = c(2, 4, NA),
     end_reason = c("dissolution", "death_husband", NA))
-  hammel_population(persons, unions, end_time = 6)
+  hammel_population(persons, unions, end_time = 6, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("marriage counts assign exact exposure and starts by latest episode", {
@@ -77,6 +77,7 @@ test_that("male widowhood and repeated changes follow the latest ending", {
 test_that("grouped marriage counts pool correctly and include empty categories", {
   pop <- marriage_history()
   pop$persons$group <- c(10, 20, 20, 10)
+  pop$groups <- list(group = group())
   counts <- calculate_union_rates(pop, c(0, 6), c(0, Inf), by = c("group", "previous_union"))
   expect_type(counts$group, "double")
   expect_equal(nrow(counts), 12)
@@ -86,7 +87,7 @@ test_that("grouped marriage counts pool correctly and include empty categories",
   rows <- match(paste(plain$sex, plain$previous_union), paste(pooled$sex, pooled$previous_union))
   expect_equal(pooled$person_years[rows], plain$person_years)
   expect_equal(pooled$unions[rows], plain$unions)
-  empty <- hammel_population(pop$persons[FALSE, ], end_time = 6)
+  empty <- hammel_population(pop$persons[FALSE, ], end_time = 6, groups = if ("group" %in% names(pop$persons)) "group")
   grouped <- calculate_union_rates(empty, c(0, 6), c(0, Inf), by = c("group", "previous_union"))
   expect_s3_class(grouped, "tbl_df")
   expect_equal(nrow(grouped), 0)
@@ -112,6 +113,7 @@ test_that("previous union is optional and pooled rates use summed exposure", {
   pop <- marriage_history()
   for (by_group in c(FALSE, TRUE)) {
     pop$persons$group <- c("A", "B", "A", "B")
+    pop$groups <- list(group = group())
     pooled <- calculate_union_rates(pop, c(0, 3, 6), c(0, 23, Inf), by = if (isTRUE(by_group)) "group")
     strata <- calculate_union_rates(pop, c(0, 3, 6), c(0, 23, Inf), by = c(if (isTRUE(by_group)) "group", "previous_union"))
     expect_false("previous_union" %in% names(pooled))
@@ -125,7 +127,7 @@ test_that("previous union is optional and pooled rates use summed exposure", {
       expect_equal(pooled$rate_union[i], expected)
     }
   }
-  empty <- hammel_population(pop$persons[FALSE, ], end_time = 6)
+  empty <- hammel_population(pop$persons[FALSE, ], end_time = 6, groups = if ("group" %in% names(pop$persons)) "group")
   expect_equal(nrow(calculate_union_rates(empty, c(0, 6), c(0, Inf), by = "group")), 0)
   expect_equal(nrow(calculate_union_rates(empty, c(0, 6), c(0, Inf))), 2)
   for (bad in list(NA, 1, "yes", TRUE, c("group", "group"), matrix("group")))

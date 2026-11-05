@@ -48,8 +48,8 @@ A tibble with \code{time_start}, \code{time_end}, age or duration bounds,
 \code{transitions}, and \code{rate_transition} (NA at zero exposure). All distinct
 directed pairs among current and historical identities are retained,
 including zero-event cells. Fewer than two known groups returns a typed
-empty tibble. Rows vary by time fastest, then the axis band, then origin,
-then destination, then the \code{by} variables in the order given.
+empty tibble. Rows vary by time fastest, then the axis band, then
+destination, then origin, then the \code{by} variables in the order given.
 With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
 }
 \description{

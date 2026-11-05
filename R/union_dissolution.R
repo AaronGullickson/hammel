@@ -35,8 +35,7 @@
 #'   each pair stratum; without it the same duration risk applies to either type.
 #'   Pair names require nonempty colon-free group labels. Pair-stratified tables
 #'   must cover every unordered pair of possible identities, including future
-#'   ones. Without population groups, warn and use the first canonical pair
-#'   alphabetically. Omit `group_pair` for shared rates. `group`, `group_w` and
+#'   ones; they require a declared group dimension. Omit `group_pair` for shared rates. `group`, `group_w` and
 #'   `group_h` schedule columns are not supported. Use [stratify_rates()] to add
 #'   proportional pair differences.
 #' @param model A `hammel_model` object.
@@ -125,17 +124,8 @@ prepare_dissolution_rates <- function(process, persons, group_values, start = -I
   rates$.hammel_group <- NULL
   grouped <- "group_pair" %in% names(rates)
   labels <- if (grouped) canonical_union_pairs(rates$group_pair) else NULL
-  if (!"group" %in% names(persons)) {
-    if (grouped) {
-      first <- sort(unique(labels), method = "radix")[1L]
-    if (any(vapply(calendar_rate_slices(rates, start, end), function(x)
-          nrow(x) > 0L && !first %in% canonical_union_pairs(x$group_pair), logical(1))))
-        stop("Dissolution rates are missing schedules for the fallback pair in a calendar interval.", call. = FALSE)
-      warning(sprintf("Pair rates were specified for union dissolution but no groups found in the population; using pair '%s' (first alphabetically).",
-                      first), call. = FALSE)
-      rates <- rates[labels == first, , drop = FALSE]
-    }
-  } else if (grouped) {
+  # Simulation has already rejected pair rates without a declared group.
+  if (grouped) {
     pairs <- possible_union_pairs(group_values)
     if (grouped) {
       missing <- unique(unlist(lapply(calendar_rate_slices(rates, start, end), function(x)

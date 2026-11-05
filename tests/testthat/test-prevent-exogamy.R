@@ -2,6 +2,7 @@ exogamy_test_model <- function(prevent = FALSE, group_exogamy = NULL) {
   model <- make_model(3, birth_rate = 20, birth_interval = 0)
   model$population$persons$sex <- c("f", "m", "m")
   model$population$persons$group <- c("A", "A", "B")
+  model$population$groups <- list(group = group())
   identity(set_union_formation(model, "on_demand", diagnostics = TRUE,
     matching = create_age_gap_matching_model(0, 5, group_exogamy = group_exogamy,
                                              prevent_exogamy = prevent)))
@@ -40,6 +41,7 @@ test_that("directional and symmetric prohibitions use female-first identities", 
 test_that("empty filtered samples use existing birth cancellation and unknown-father rules", {
   model <- exogamy_test_model(TRUE)
   model$population$persons$group <- c("A", "B", "B")
+  model$population$groups <- list(group = group())
   model$processes$union_formation$cancel_birth_if_no_match <- TRUE
   result <- simulate(model, 0.3, seed = 52)
   expect_equal(result$simulation$births, 0)
@@ -89,6 +91,7 @@ test_that("rate searches retry and father overrides carry independent restrictio
   expect_equal(result$unions$husband_id, 2)
   # No compatible men: repeated searches neither form unions nor reserve men.
   model$population$persons$group <- c("A", "B", "B")
+  model$population$groups <- list(group = group())
   model$processes$union_formation$father_matching <- NULL
   model$processes$union_formation$cancel_birth_if_no_match <- TRUE
   expect_equal(nrow(simulate(model, 0.3, seed = 52)$unions), 0)
@@ -120,5 +123,6 @@ test_that("restriction tables and missing or empty group populations validate", 
   model$processes$union_formation$matching <- create_age_gap_matching_model(0, 5, prevent_exogamy = TRUE)
   expect_error(simulate(model, 0), "group identities")
   model$population$persons$group <- character()
+  model$population$groups <- list(group = group())
   expect_no_error(simulate(model, 1))
 })

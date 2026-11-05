@@ -76,6 +76,7 @@ group_choice_model <- function(initiation = "on_demand", matching, father_matchi
   model <- make_model(3, birth_rate = 20, birth_interval = 0)
   model$population$persons$sex <- c("f", "m", "m")
   model$population$persons$group <- c("A", "A", "B")
+  model$population$groups <- list(group = group())
   if (initiation == "rate") {
     model <- identity(set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
       age_start = 15, age_end = 50, rate = c(0, 20)), 0))
@@ -109,6 +110,7 @@ test_that("group matching validates edited models and missing identities even at
   model$processes$union_formation$matching <- matching
   expect_error(simulate(model, 0), "group identities")
   model$population$persons$group <- character()
+  model$population$groups <- list(group = group())
   expect_no_error(simulate(model, 1))
   matching <- create_matching_model(~ age_difference, c(age_difference = 0), group_exogamy = c("A:B" = 0))
   matching$group_exogamy <- c("A:B" = 0, "B:A" = 0)

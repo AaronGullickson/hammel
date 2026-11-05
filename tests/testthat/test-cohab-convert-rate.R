@@ -5,7 +5,7 @@ conversion_rate_history <- function() {
     start_time=c(0,2,3),end_time=c(2,3,6),
     end_reason=c("conversion","dissolution","dissolution"),
     union_type=c("cohab","marriage","cohab"),previous_cohab_id=c(NA_integer_,1L,NA_integer_))
-  hammel_population(persons,unions,end_time=8)
+  hammel_population(persons,unions,end_time=8, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("conversion rates use cohabitation exposure and duration", {

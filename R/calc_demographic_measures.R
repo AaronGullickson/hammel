@@ -68,7 +68,7 @@ person_breaks <- function(time_breaks, age_breaks) {
 #' `by` lists categorical variables to split exposure and events over. Each is
 #' the person's state at the time, changing only at recorded events:
 #' * `"group"`: current group, following the transition history. Requires a
-#'   persons `group` column.
+#'   declared group dimension (see [set_groups()]).
 #' * `"union_type"`: current union state, `"unpartnered"`, `"cohab"` or
 #'   `"marriage"` for typed histories, or `"unpartnered"` and `"partnered"`
 #'   for untyped ones.

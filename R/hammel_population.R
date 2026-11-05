@@ -3,10 +3,11 @@
 #' Collect person and union histories in an inspectable population object.
 #' This constructor does not run a simulation. It validates
 #' consistent tables against the population schema. Custom columns are retained.
-#' An optional `group` column contains nonmissing character labels or finite
-#' numeric codes (character labels must be nonempty). Newborns inherit their
-#' group from either parent with equal probability by default, with maternal fallback,
-#' or use fertility's configured inheritance model.
+#' A declared group dimension (see `groups` and [set_groups()]) is a persons
+#' column of nonmissing character labels or finite numeric codes (character
+#' labels must be nonempty). Newborns are assigned by its [group()]
+#' inheritance rule. Undeclared columns, including one named `group`, are
+#' ordinary custom columns.
 #'
 #' @param persons A data frame with one row per person, including deceased
 #'   persons. Columns are preserved and the table is returned as a tibble.
@@ -18,6 +19,11 @@
 #'   links the same-time marriage through `previous_cohab_id`.
 #' @param end_time Optional finite simulation endpoint in years. Its calendar origin is supplied by the user. `NULL` means
 #'   that the endpoint is unknown.
+#' @param groups Optional group declaration: a character vector of dimension
+#'   names (each with [group()] defaults) or a named list of [group()] objects.
+#'   Persons columns that are not declared are ordinary custom columns. Models
+#'   usually declare groups with [set_groups()]; declare them here to analyze a
+#'   population directly, without a model.
 #' @param transitions Optional data frame of individual group changes with
 #'   `person_id`, `time`, `group_origin`, and `group_dest`. Histories must chain
 #'   to current person groups and lie within life dates and the known endpoint.
@@ -45,11 +51,15 @@
 #' )
 #' sim$persons
 #' sim$unions
-hammel_population <- function(persons, unions = NULL, end_time = NULL, ancestry = NULL, transitions = NULL) {
+hammel_population <- function(persons, unions = NULL, end_time = NULL, ancestry = NULL,
+                              transitions = NULL, groups = NULL) {
   results <- structure(
     list(persons = persons, unions = normalize_unions(unions), end_time = end_time),
     class = "hammel_population"
   )
+  results$groups <- normalize_group_declaration(groups)
+  if (!is.null(transitions)) results$transitions <- transitions
+  validate_group_declaration(results$groups, results)
   if (!is.null(transitions)) results$transitions <- transitions
   results <- normalize_population_transitions(results)
   if (!is.null(ancestry)) results$ancestry <- ancestry
@@ -87,7 +97,7 @@ validate_population <- function(results) {
   check_time(time, "end_time")
   check_columns(persons, c("person_id", "sex", "birth_time", "death_time",
                           "mother_id", "father_id"), "persons")
-  check_groups(persons, "persons")
+  validate_group_declaration(results$groups, results)
   validate_transition_history(results)
   check_columns(unions, names(empty_unions()), "unions")
   check_numeric_column(persons$person_id, "persons$person_id", id = TRUE)
@@ -192,11 +202,15 @@ empty_unions <- function() {
 #'   minus the sampled ages. Defaults to a relative time origin of zero.
 #' @param female_probability Probability of assigning sex "f" (female).
 #'   The other sex value is "m" (male). This does not enforce exact proportions.
-#' @param group_weights Optional named numeric vector of nonnegative, finite
-#'   weights with at least one positive value. Unique, nonempty names give group
-#'   labels. Weights are normalized and each person's group is sampled
-#'   independently of age and sex. Realized group counts are random. `NULL`
-#'   (the default) adds no group column and consumes no extra random draws.
+#' @param groups Optional group dimensions to sample, independently of age and
+#'   sex. Either a named list with one named numeric vector of weights per
+#'   dimension (categories as names; dimensions are drawn independently), or a
+#'   data frame with one column per dimension and a numeric `weight` column,
+#'   giving the joint distribution of category combinations. Weights are finite
+#'   and nonnegative with at least one positive value, and are normalized.
+#'   Realized counts are random. The population declares each dimension with
+#'   [group()] defaults; [set_groups()] can replace that declaration. `NULL`
+#'   (the default) adds no groups and consumes no extra random draws.
 #'
 #' @return A validated `hammel_population` object.
 #' @export
@@ -206,7 +220,7 @@ empty_unions <- function() {
 #' model <- hammel_model() |>
 #'   set_population(population)
 create_baseline_population <- function(size, max_age = 70, end_time = 0,
-                                female_probability = 0.5, group_weights = NULL) {
+                                female_probability = 0.5, groups = NULL) {
   if (!is.numeric(size) || length(size) != 1L || !is.finite(size) ||
       size < 0 || size != trunc(size) || size > .Machine$integer.max) {
     stop("`size` must be a nonnegative whole number no larger than R's integer limit.",
@@ -226,20 +240,7 @@ create_baseline_population <- function(size, max_age = 70, end_time = 0,
     stop("`female_probability` must be a number between 0 and 1.", call. = FALSE)
   }
 
-  if (!is.null(group_weights)) {
-    labels <- names(group_weights)
-    if (!is.numeric(group_weights) || !is.null(dim(group_weights)) ||
-        !length(group_weights) || anyNA(group_weights) ||
-        any(!is.finite(group_weights)) || any(group_weights < 0) ||
-        !any(group_weights > 0) || is.null(labels) || anyNA(labels) ||
-        any(!nzchar(trimws(labels))) || anyDuplicated(labels)) {
-      stop("`group_weights` must be a named numeric vector with unique nonempty group names and finite nonnegative weights, including a positive weight.",
-           call. = FALSE)
-    }
-    # Scale before summation to avoid overflow for large finite weights.
-    probabilities <- group_weights / max(group_weights)
-    probabilities <- probabilities / sum(probabilities)
-  }
+  draw <- baseline_group_sampler(groups)
   persons <- data.frame(
     person_id = seq_len(size),
     sex = as.character(ifelse(stats::rbinom(size, size = 1, prob = female_probability) == 1,
@@ -249,9 +250,48 @@ create_baseline_population <- function(size, max_age = 70, end_time = 0,
     mother_id = rep(NA_integer_, size),
     father_id = rep(NA_integer_, size)
   )
-  if (!is.null(group_weights)) {
-    persons$group <- names(group_weights)[sample.int(length(group_weights), size,
-                                                   replace = TRUE, prob = probabilities)]
+  if (!is.null(draw)) for (column in names(drawn <- draw(size))) persons[[column]] <- drawn[[column]]
+  hammel_population(persons, end_time = end_time,
+                    groups = if (is.null(draw)) NULL else attr(draw, "dimensions"))
+}
+
+# Validate baseline group weights and return a function drawing `size` people.
+baseline_group_sampler <- function(groups) {
+  if (is.null(groups)) return(NULL)
+  check_weights <- function(w, what) {
+    if (!is.numeric(w) || !is.null(dim(w)) || !length(w) || anyNA(w) ||
+        any(!is.finite(w)) || any(w < 0) || !any(w > 0))
+      stop(sprintf("%s must be finite and nonnegative, with a positive value.", what), call. = FALSE)
+    # Scale before summation to avoid overflow for large finite weights.
+    p <- w / max(w)
+    p / sum(p)
   }
-  hammel_population(persons, end_time = end_time)
+  if (is.data.frame(groups)) {
+    dimensions <- setdiff(names(groups), "weight")
+    if (!"weight" %in% names(groups) || !length(dimensions) || !nrow(groups))
+      stop("A `groups` data frame needs one column per dimension and a `weight` column.", call. = FALSE)
+    check_group_names(dimensions)
+    for (d in dimensions) check_groups(data.frame(group = groups[[d]]), "groups")
+    p <- check_weights(groups$weight, "`groups$weight`")
+    draw <- function(size) {
+      rows <- sample.int(nrow(groups), size, replace = TRUE, prob = p)
+      lapply(stats::setNames(dimensions, dimensions), function(d) groups[[d]][rows])
+    }
+  } else {
+    if (!is.list(groups) || !length(groups))
+      stop("`groups` must be a named list of weight vectors or a data frame.", call. = FALSE)
+    dimensions <- names(groups)
+    check_group_names(dimensions)
+    probabilities <- lapply(dimensions, function(d) {
+      labels <- names(groups[[d]])
+      if (is.null(labels) || anyNA(labels) || any(!nzchar(trimws(labels))) || anyDuplicated(labels))
+        stop(sprintf("`groups$%s` must be named by unique, nonempty categories.", d), call. = FALSE)
+      check_weights(groups[[d]], sprintf("`groups$%s`", d))
+    })
+    draw <- function(size) stats::setNames(lapply(seq_along(dimensions), function(k)
+      names(groups[[k]])[sample.int(length(groups[[k]]), size, replace = TRUE,
+                                    prob = probabilities[[k]])]), dimensions)
+  }
+  attr(draw, "dimensions") <- dimensions
+  draw
 }

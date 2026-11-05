@@ -1,6 +1,8 @@
 # Milestone 9: multiple group dimensions
 
-Started November 5, 2026. **Status: design decided (D134); not yet implemented.**
+Started November 5, 2026. **Status: design decided (D134); stage 1 (the
+declaration) implemented, with one dimension named `group` allowed until stage
+2; later stages not implemented.**
 This records the user's decisions as they are made. Milestone 9 was assigned
 multiple group columns by D131. See the [roadmap](roadmap.md#milestone-9-multiple-group-columns)
 for the motivation and the household-move questions retained from D114.
@@ -143,3 +145,19 @@ Step 1, each stage leaving the test suite passing:
 6. Tests, articles and documents.
 
 Step 2: joint matching calibration across dimensions.
+
+### Stage 1 as implemented (November 5, 2026)
+
+`group()`, `set_groups()`, `hammel_population(groups =)` and baseline `groups`
+(named list of weights or a joint data frame) work as specified, with the
+declaration stored on the population (`population$groups`) and on the model
+(`model$groups`, which wins). Inheritance and categories moved into `group()`
+(`set_fertility(inheritance =)` and `create_group_inheritance(groups =)` are
+gone); ancestry is tracked only with `ancestry = TRUE`. An undeclared `group`
+column is hidden from the engine during simulation and restored with `NA` for
+newborns; rate tables using an undeclared persons column are errors, which
+replaces the former alphabetical fallback for ungrouped populations. Until
+stage 2, a declaration may contain only one dimension, named `group`, so the
+engine and rate tables are unchanged. The broader documentation pass is
+stage 6; until then the other design documents still describe an implicit
+`group` column.

@@ -10,7 +10,8 @@ weighted_mortality_model <- function(n, groups = NULL) {
   unions <- data.frame(union_id = 1:n, wife_id = 1:n, husband_id = 2 * n + 1:n,
     start_time = -10, end_time = NA_real_, end_reason = NA_character_)
   hammel_model() |>
-    set_population(hammel_population(persons, unions = unions, end_time = 0)) |>
+    set_population(hammel_population(persons, unions = unions, end_time = 0,
+      groups = if ("group" %in% names(persons)) list(group = group(ancestry = TRUE)))) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .05)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0)) |>
     set_union_formation("on_demand", kinship_generations = 0)
@@ -151,7 +152,7 @@ weighted_fertility_model <- function(n, groups = NULL) {
     birth_time = -25.2, death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
   if (!is.null(groups)) persons$group <- rep(groups, length.out = 2 * n)
   hammel_model() |>
-    set_population(hammel_population(persons, end_time = 0)) |>
+    set_population(hammel_population(persons, end_time = 0, groups = if ("group" %in% names(persons)) "group")) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_union_formation("on_demand", kinship_generations = 0, cancel_birth_if_no_match = FALSE)
 }
@@ -195,7 +196,8 @@ weighted_union_model <- function(n, type = "marriage") {
   unions <- data.frame(union_id = 1:n, wife_id = 1:n, husband_id = n + 1:n, start_time = -1,
     end_time = NA_real_, end_reason = NA_character_, union_type = type)
   hammel_model() |>
-    set_population(hammel_population(persons, unions = unions, end_time = 0)) |>
+    set_population(hammel_population(persons, unions = unions, end_time = 0,
+      groups = if ("group" %in% names(persons)) list(group = group(ancestry = TRUE)))) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(union_type = c("partnered", "unpartnered"), age_start = 15,
       age_end = 50, rate = 0), birth_interval = 0)
@@ -234,7 +236,7 @@ test_that("transition weights can use person variables and the destination", {
   persons <- data.frame(person_id = 1:n, sex = rep(c("f", "m"), length.out = n), birth_time = -30,
     death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_, group = "A")
   model <- hammel_model() |>
-    set_population(hammel_population(persons, end_time = 0)) |>
+    set_population(hammel_population(persons, end_time = 0, groups = if ("group" %in% names(persons)) "group")) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0)) |>
     set_union_formation("on_demand", kinship_generations = 0)
@@ -261,7 +263,7 @@ weighted_search_model <- function(n) {
     death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_,
     group = rep(c("A", "B"), length.out = 2 * n))
   hammel_model() |>
-    set_population(hammel_population(persons, end_time = 0)) |>
+    set_population(hammel_population(persons, end_time = 0, groups = if ("group" %in% names(persons)) "group")) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(union_type = c("partnered", "unpartnered"), age_start = 15,
       age_end = 50, rate = 0), birth_interval = 0)
@@ -400,7 +402,7 @@ test_that("rejection sampling recovers after an extreme-weight member leaves", {
   persons <- data.frame(person_id = 1:4, sex = "m", birth_time = -30, death_time = NA_real_,
     mother_id = NA_integer_, father_id = NA_integer_, group = c("B", "A", "A", "A"))
   model <- hammel_model() |>
-    set_population(hammel_population(persons, end_time = 0)) |>
+    set_population(hammel_population(persons, end_time = 0, groups = if ("group" %in% names(persons)) "group")) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 1),
       weights = create_weight_model(~ group, c(groupB = 40), group_levels = c("A", "B"))) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0)) |>
@@ -440,7 +442,8 @@ grouped_union_model <- function(n, type = "marriage") {
   unions <- data.frame(union_id = 1:n, wife_id = 1:n, husband_id = n + 1:n, start_time = -1,
     end_time = NA_real_, end_reason = NA_character_, union_type = type)
   hammel_model() |>
-    set_population(hammel_population(persons, unions = unions, end_time = 0)) |>
+    set_population(hammel_population(persons, unions = unions, end_time = 0,
+      groups = if ("group" %in% names(persons)) list(group = group(ancestry = TRUE)))) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(union_type = c("partnered", "unpartnered"), age_start = 15,
       age_end = 50, rate = 0), birth_interval = 0) |>
@@ -541,7 +544,7 @@ test_that("custom functions receive members and cells for every process", {
   persons <- data.frame(person_id = 1:200, sex = rep(c("f", "m"), 100), birth_time = -30,
     death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_, group = "A")
   moves <- hammel_model() |>
-    set_population(hammel_population(persons, end_time = 0)) |>
+    set_population(hammel_population(persons, end_time = 0, groups = if ("group" %in% names(persons)) "group")) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0)) |>
     set_union_formation("on_demand") |>

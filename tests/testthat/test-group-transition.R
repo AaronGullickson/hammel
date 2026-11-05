@@ -1,6 +1,7 @@
 transition_model <- function(n = 1, sex = "m", age = 20) {
   model <- make_model(n, sex = sex, age = age)
   model$population$persons$group <- rep("A", n)
+  model$population$groups <- list(group = group(ancestry = TRUE))
   model
 }
 transition_rates <- function(rate = 1, origin = "A", dest = "B") {
@@ -23,7 +24,7 @@ test_that("transition specifications validate common bands and optional strata",
                    transform(r, dur_start = 0, dur_end = Inf), rbind(r, r)))
     expect_error(group_transition(bad))
   expect_s3_class(group_transition(transform(r, sex = "f", union_type = "cohab")), "hammel_process")
-  expect_error(simulate(set_group_transition(make_model(1), r), 1), "group identities")
+  expect_error(simulate(set_group_transition(make_model(1), r), 1), "declared group")
 })
 
 test_that("competing outgoing hazards recover analytical destinations and survival", {
@@ -54,6 +55,7 @@ test_that("grouped outputs always have typed histories, including zero and empty
   }
   model <- transition_model(2)
   model$population$persons$group <- c(10L, 10L)
+  model$population$groups <- list(group = group())
   out <- simulate(set_group_transition(model, transition_rates(1e5, 10L, 20L)), .1, seed = 1)
   expect_identical(out$persons$group, c(20L, 20L))
   expect_type(out$transitions$group_origin, "integer")
@@ -85,7 +87,7 @@ test_that("duration resets at moves, survives restarts and falls back to age", {
   expect_identical(second$transitions[1, ], out$transitions)
   expect_identical(second$persons$group, "A")
   expect_error(hammel_population(second$persons, end_time = 3,
-    transitions = transform(second$transitions, group_dest = "C")), "chain")
+    transitions = transform(second$transitions, group_dest = "C"), groups = if ("group" %in% names(second$persons)) "group"), "chain")
 })
 
 test_that("group changes select new mortality and update only the individual", {
@@ -134,7 +136,7 @@ transition_observation_population <- function() {
   unions <- data.frame(union_id = 1, wife_id = 1, husband_id = 2,
     start_time = 0, end_time = 3, end_reason = "dissolution")
   tx <- data.frame(person_id = 1:2, time = c(2, 1), group_origin = "A", group_dest = "B")
-  hammel_population(persons, unions, end_time = 5, transitions = tx)
+  hammel_population(persons, unions, end_time = 5, transitions = tx, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("observations split exposure and attribute events using group history", {
@@ -169,6 +171,7 @@ test_that("moves refresh available male pools and active fertility/calibration c
   on.exit(options(old))
   model <- make_rate_model(2, search_rate = 0)
   model$population$persons$group <- c("B", "A")
+  model$population$groups <- list(group = group())
   model <- set_union_formation(model, "rate",
     matching = create_age_gap_matching_model(0, 5, prevent_exogamy = TRUE),
     rates = data.frame(age_start = 21, age_end = Inf, rate = 1e5))
@@ -180,7 +183,7 @@ test_that("moves refresh available male pools and active fertility/calibration c
   model <- transition_model(2, sex = "f")
   rates <- rbind(data.frame(group = "A", age_start = 15, age_end = 50, rate = 0),
                  data.frame(group = "B", age_start = 15, age_end = 50, rate = 30))
-  model <- set_fertility(model, rates, birth_interval = 0, inheritance = "mother")
+  model <- set_inheritance(set_fertility(model, rates, birth_interval = 0), "mother")
   out <- simulate(set_group_transition(model, transform(transition_rates(1e5), age_end = 21)), .3, seed = 51)
   expect_gt(out$simulation$births, 0)
   expect_equal(nrow(out$transitions), 2)
@@ -196,6 +199,7 @@ test_that("cohabitation conversion refreshes both partners' transition strata", 
     rate = c(0, 1e5, 0))
   model <- make_rate_model(2, search_rate = 0)
   model$population$persons$group <- c("A", "A")
+  model$population$groups <- list(group = group())
   model$population$unions <- data.frame(union_id = 1, wife_id = 1, husband_id = 2,
     start_time = -1, end_time = NA_real_, end_reason = NA_character_, union_type = "cohab")
   model <- set_union_formation(model, "rate", rates = data.frame(age_start = 0, age_end = Inf, rate = 0),
@@ -235,7 +239,7 @@ test_that("snapshot event accounting handles repeated moves, deaths and arbitrar
     mother_id = NA_real_, father_id = NA_real_, group = c("A", "B", "C"))
   tx <- data.frame(person_id = c(30, 10, 30, 10), time = c(4, 2, 1, 4),
     group_origin = c("B", "C", "A", "A"), group_dest = c("A", "A", "B", "B"))
-  pop <- hammel_population(persons, end_time = 6, transitions = tx)
+  pop <- hammel_population(persons, end_time = 6, transitions = tx, groups = if ("group" %in% names(persons)) "group")
   times <- c(5, -2, 0, 4, 1, 3, 4, 2, 6)
   out <- calculate_population_size(pop, times, by = "group")
   # Independently reconstruct identity from each person's ordered history.
@@ -281,7 +285,8 @@ test_that("transition histories reject invalid references, life dates and missin
     expect_error(validate_population(pop), "invalid people, dates or self-transitions")
   }
   original$persons$group <- NULL
-  expect_error(validate_population(original), "require person groups")
+  original$groups <- NULL
+  expect_error(validate_population(original), "declared group")
 })
 
 test_that("historical identity lookup retains unknown references and nonmoving people", {
@@ -315,7 +320,7 @@ test_that("union observations combine simultaneous partner moves and typed numer
   unions <- data.frame(union_id = c(2, 1), wife_id = c(3, 1), husband_id = c(4, 2),
     start_time = 0, end_time = 4, end_reason = "dissolution", union_type = "marriage")
   tx <- data.frame(person_id = c(1, 2), time = 2, group_origin = c(10L, 20L), group_dest = c(20L, 10L))
-  pop <- hammel_population(persons, unions, end_time = 5, transitions = tx)
+  pop <- hammel_population(persons, unions, end_time = 5, transitions = tx, groups = if ("group" %in% names(persons)) "group")
   out <- pair_rates(calculate_dissolution_rates(pop, c(0, 5), c(0, Inf),
     by = c("group_w", "group_h", "union_type")))
   expect_equal(subset(out, group_pair == "10:20" & union_type == "marriage")$union_years, 4)

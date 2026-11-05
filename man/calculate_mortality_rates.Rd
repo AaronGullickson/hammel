@@ -49,7 +49,7 @@ Report deaths per person-year, with exact half-open period and age splitting.
 the person's state at the time, changing only at recorded events:
 \itemize{
 \item \code{"group"}: current group, following the transition history. Requires a
-persons \code{group} column.
+declared group dimension (see \code{\link[=set_groups]{set_groups()}}).
 \item \code{"union_type"}: current union state, \code{"unpartnered"}, \code{"cohab"} or
 \code{"marriage"} for typed histories, or \code{"unpartnered"} and \code{"partnered"}
 for untyped ones.

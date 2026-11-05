@@ -31,8 +31,12 @@ validate_ancestry <- function(ancestry, persons) {
 normalize_population_ancestry <- function(population) {
   persons <- population$persons
   ancestry <- population[["ancestry"]]
+  # Ancestry is tracked only for dimensions declared with `ancestry = TRUE`.
+  if (!isTRUE(population$groups$group$ancestry)) {
+    population$ancestry <- NULL
+    return(population)
+  }
   if (is.null(ancestry)) {
-    if (!"group" %in% names(persons)) return(population)
     labels <- as.character(persons$group)
     ancestry <- tibble::tibble(person_id = persons$person_id)
     for (group in unique(labels)) ancestry[[paste0("group_", group)]] <- as.numeric(labels == group)
