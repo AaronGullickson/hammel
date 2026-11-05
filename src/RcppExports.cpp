@@ -345,28 +345,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// inspect_intensity_tracker_cpp
-List inspect_intensity_tracker_cpp(NumericVector female_born, IntegerVector female_groups, DataFrame search_rates, DataFrame fertility_rates, NumericVector times, IntegerVector persons, CharacterVector actions, IntegerVector previous, NumericVector ready, int group_count, Nullable<NumericVector> search_origins, Nullable<DataFrame> probability_rates);
-RcppExport SEXP _hammel_inspect_intensity_tracker_cpp(SEXP female_bornSEXP, SEXP female_groupsSEXP, SEXP search_ratesSEXP, SEXP fertility_ratesSEXP, SEXP timesSEXP, SEXP personsSEXP, SEXP actionsSEXP, SEXP previousSEXP, SEXP readySEXP, SEXP group_countSEXP, SEXP search_originsSEXP, SEXP probability_ratesSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericVector >::type female_born(female_bornSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type female_groups(female_groupsSEXP);
-    Rcpp::traits::input_parameter< DataFrame >::type search_rates(search_ratesSEXP);
-    Rcpp::traits::input_parameter< DataFrame >::type fertility_rates(fertility_ratesSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type times(timesSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type persons(personsSEXP);
-    Rcpp::traits::input_parameter< CharacterVector >::type actions(actionsSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type previous(previousSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type ready(readySEXP);
-    Rcpp::traits::input_parameter< int >::type group_count(group_countSEXP);
-    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type search_origins(search_originsSEXP);
-    Rcpp::traits::input_parameter< Nullable<DataFrame> >::type probability_rates(probability_ratesSEXP);
-    rcpp_result_gen = Rcpp::wrap(inspect_intensity_tracker_cpp(female_born, female_groups, search_rates, fertility_rates, times, persons, actions, previous, ready, group_count, search_origins, probability_rates));
-    return rcpp_result_gen;
-END_RCPP
-}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_hammel_demographic_counts_cpp", (DL_FUNC) &_hammel_demographic_counts_cpp, 5},
@@ -388,7 +366,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_inspect_exact_draw_cpp", (DL_FUNC) &_hammel_inspect_exact_draw_cpp, 11},
     {"_hammel_inspect_weighted_incremental_cpp", (DL_FUNC) &_hammel_inspect_weighted_incremental_cpp, 11},
     {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 28},
-    {"_hammel_inspect_intensity_tracker_cpp", (DL_FUNC) &_hammel_inspect_intensity_tracker_cpp, 12},
     {NULL, NULL, 0}
 };
 

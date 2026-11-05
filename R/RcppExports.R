@@ -77,7 +77,3 @@ simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years
     .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab, dissolution_rates, cohab_prob, conversion_rates, cohab_matching, counts_cohab, check_cells, hetfert, transition_input, model_schedule_input, weight_input)
 }
 
-inspect_intensity_tracker_cpp <- function(female_born, female_groups, search_rates, fertility_rates, times, persons, actions, previous, ready, group_count, search_origins = NULL, probability_rates = NULL) {
-    .Call(`_hammel_inspect_intensity_tracker_cpp`, female_born, female_groups, search_rates, fertility_rates, times, persons, actions, previous, ready, group_count, search_origins, probability_rates)
-}
-

@@ -156,9 +156,19 @@ per-union dissolution and conversion clocks, the special handling of ties
 between cell clocks and person events, the individual waiting-time sampler
 `waiting_time()` and its internal test entry point `hazard_wait_cpp()`.
 
-The matching-calibration intensity tracker (`FemaleIntensityTracker`) is
-retained. It keeps its own per-woman boundaries for weighted matching. Feeding
-it from the search cells is a possible later simplification.
+*Calibration tracker replaced (user direction, November 4, 2026, for
+simplicity).* The former `FemaleIntensityTracker` kept a second, per-woman
+record of search intensity with its own boundary queue, duplicating the search
+cells, and an unused fertility channel. Matching calibration now takes all
+search intensities from the search cells (SearchCalibration, with weights of
+one when search is unweighted) and fertility intensities from the fertility
+cells. A small `ProbabilityTracker` remains only for each unpartnered woman's
+cohabitation probability, whose age bands can differ from the search clock;
+it exists only with rate-mode search and cohabitation. Calibrated runs gave
+identical histories before and after the change, and run time was unchanged.
+`inspect_intensity_tracker_cpp()` and its tests were removed; a
+simulation-level test exercises every calibration path under
+`hammel.check_cells`.
 
 ### Validation and performance (November 4, 2026)
 
@@ -373,16 +383,16 @@ the seed.
   whole cell. Search weights are then computed when each woman is refreshed and
   stored. Each search cell keeps, per calibration bin, its member count and
   the sums of w (1 - p) and w p, where p is her current cohabitation
-  probability (reported by the intensity tracker, which also handles
+  probability (reported by the probability tracker, which also handles
   probability-band boundaries). A bin's marriage and cohabitation intensities
   are the sum over cells of rate_c * N_c / W_c times those sums. Cells whose
   contents changed are recomputed before the next search solve, and the two
   channels are assigned to the calibrator, as fertility's channel already is.
-  Searchers are chosen by the same rejection sampling. Without search weights the
-  previous tracker path is unchanged. A custom search function is called at
+  Searchers are chosen by the same rejection sampling. Without search weights
+  the same sums are kept with weights of one. A custom search function is called at
   every refresh of every searching woman, with a warning. An internal check
   (`hammel.check_cells`) compares the maintained totals with an explicit scan
-  before each solve.
+  before each solve, recomputing each woman's probability from her schedule.
 - **Fertility with matching calibration:** when weighted matching calibration
   is active (more than one group and group terms in matching), calibration
   needs the weighted intensity of unpartnered women by calibration bin at all

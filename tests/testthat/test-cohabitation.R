@@ -214,21 +214,6 @@ test_that("conversion age clocks and pending birth ties retain the conversion", 
   expect_equal(ended$simulation$conversions,0)
 })
 
-test_that("probability boundaries split search intensity and preserve father intensity", {
-  rates <- data.frame(age_start=15,age_end=50,rate=.4)
-  probabilities <- data.frame(age_start=c(15,21),age_end=c(21,50),rate=c(.25,.75))
-  # Two women aged 20; at .5 one gives birth, at 1 p changes, at 1.5 spacing ends.
-  got <- inspect_intensity_tracker_cpp(c(-20,-20),c(0L,0L),rates,rates,
-    c(0,0,.5,1,1.5),c(0L,1L,0L,0L,0L),
-    c("activate","activate","ready","inspect","inspect"),rep(0L,5),
-    c(-Inf,-Inf,1.5,-Inf,-Inf),1L,NULL,probabilities)
-  sums <- vapply(got$intensities,colSums,numeric(3))
-  expect_equal(sums[1,],c(.3,.6,.6,.2,.2),tolerance=1e-12)
-  expect_equal(sums[2,],c(.4,.8,.4,.4,.8),tolerance=1e-12)
-  expect_equal(sums[3,],c(.1,.2,.2,.6,.6),tolerance=1e-12)
-  expect_true(all(got$pending<=2))
-})
-
 test_that("earlier legal history governs subsequent searches after cohabitant death", {
   for (counts in c(FALSE,TRUE)) {
     model <- cohab_fixture(3)

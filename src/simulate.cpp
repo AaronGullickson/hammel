@@ -695,73 +695,39 @@ class BoundaryQueue {
   size_t size() const { return live_; }
 };
 
-// One pending boundary per active woman, replaced eagerly on state changes.
-// Separate channels share one queue and one state-update interface; no Cartesian
-// table of previous status, parity, region, etc. is needed by calibration.
-class FemaleIntensityTracker {
-  struct Woman {
-    int group = 0;
-    double born = 0, search_origin = 0, ready = 0;
-    bool active = false;
-    const std::vector<Band>* search = nullptr;
-    const std::vector<Band>* fertility = nullptr;
-    const std::vector<Band>* probability = nullptr;
-    std::array<double, 3> value = {0, 0, 0};
-  };
-  WeightCalibrator& calibration_;
+// Each counted (living, unpartnered) woman's current cohabitation probability,
+// with one pending boundary per woman at her next probability band edge.
+// Matching calibration splits search intensity into marriage and cohabitation
+// by this probability (see SearchCalibration). Consumes no randomness.
+class ProbabilityTracker {
+  struct Woman { bool active = false; double born = 0; const std::vector<Band>* schedule = nullptr; };
   std::vector<Woman> women_;
   BoundaryQueue queue_;
-  unsigned long long updates_ = 0;
+  std::function<void(int, double)> on_change_;
   void refresh(int person, double now) {
-    Woman& w = women_[person];
-    const auto search = current_hazard(w.search, w.search_origin, now);
-    const auto fertility = now < w.ready ? std::make_pair(0.0, w.ready) :
-      current_hazard(w.fertility, w.born, now);
-    const auto probability = current_hazard(w.probability, w.born, now);
-    const double p = probability.first;
-    const std::array<double, 3> value = {search.first * (1 - p), fertility.first, search.first * p};
-    calibration_.replace_role_intensity(w.group, w.born, w.value, value);
-    w.value = value;
-    queue_.set(person, std::min(std::min(search.second, fertility.second), probability.second));
-    if (on_probability_) on_probability_(person, p);
+    const Woman& w = women_[person];
+    const auto p = current_hazard(w.schedule, w.born, now);
+    on_change_(person, p.first);
+    queue_.set(person, p.second);
   }
-  // Weighted search (step 2) keeps search intensities elsewhere and needs each
-  // counted woman's current cohabitation probability.
-  std::function<void(int, double)> on_probability_;
  public:
-  explicit FemaleIntensityTracker(WeightCalibrator& calibration) : calibration_(calibration) {}
-  void set_probability_hook(std::function<void(int, double)> f) { on_probability_ = std::move(f); }
-  void activate(int person, int group, double born, const std::vector<Band>* search,
-                const std::vector<Band>* fertility, double ready, double now,
-                double search_origin = NA_REAL, const std::vector<Band>* probability = nullptr) {
+  explicit ProbabilityTracker(std::function<void(int, double)> on_change) : on_change_(std::move(on_change)) {}
+  void activate(int person, double born, const std::vector<Band>* schedule, double now) {
     if (person >= static_cast<int>(women_.size())) women_.resize(person + 1);
-    remove(person);
-    Woman& w = women_[person];
-    w.active = true; w.group = group; w.born = born;
-    w.search_origin = NumericVector::is_na(search_origin) ? born : search_origin;
-    w.search = search; w.fertility = fertility; w.ready = ready; w.probability = probability;
+    women_[person] = {true, born, schedule};
     refresh(person, now);
   }
   void remove(int person) {
     if (person >= static_cast<int>(women_.size()) || !women_[person].active) return;
-    Woman& w = women_[person];
+    women_[person].active = false;
     queue_.clear(person);
-    calibration_.replace_role_intensity(w.group, w.born, w.value, {0, 0, 0});
-    w.active = false; w.value = {0, 0, 0};
-  }
-  void set_ready(int person, double ready, double now) {
-    if (person >= static_cast<int>(women_.size()) || !women_[person].active) return;
-    women_[person].ready = ready;
-    refresh(person, now);
   }
   void advance(double now) {
     while (queue_.top() <= now) {
       const auto entry = queue_.pop();
       refresh(entry.second, entry.first);
-      if (++updates_ % 1024 == 0) checkUserInterrupt();
     }
   }
-  size_t pending() const { return queue_.size(); }
 };
 
 // ---- Cell-accounted fertility under birth spacing (D101) -------------------
@@ -2298,18 +2264,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   // populations; until it is created below, pool hooks record nothing.
   std::unique_ptr<WeightCalibrator> calibrator;
   std::vector<char> counted_woman;
-  std::unique_ptr<FemaleIntensityTracker> intensity_tracker;
-  // Weighted search under matching calibration (step 2); set with the models.
+  // Rate-mode search under matching calibration: search intensities come from
+  // the search cells (SearchCalibration); cohabitation probabilities from the
+  // probability tracker. Both are set up with the calibrator and models.
+  std::unique_ptr<ProbabilityTracker> probability_tracker;
   SearchCalibration search_calibration;
-  bool search_refresh_weights = false;
+  bool search_calibrated = false;
   // Cell-accounted fertility under birth spacing (D101).
   std::unique_ptr<FertilityCells> cells;
   // Other rate processes; search, dissolution and conversion are null when
   // not configured. One transition process per outgoing-schedule slot.
   std::unique_ptr<RateCells> mortality, search, dissolution, conversion;
   std::vector<std::unique_ptr<RateCells>> transitions;
-  std::vector<const std::vector<Band>*> search_hazards;
-  std::vector<bool> search_duration;
   std::vector<std::vector<Band>> probability_schedules(group_count * 3);
   auto load_probabilities = [&]() {
     if (cohab_enabled) {
@@ -2374,35 +2340,23 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       }
     }
   }
-  // weighted_choice counts living, unpartnered women; fertility-driven intensity
-  // also requires the birth-spacing interval to have ended (queued re-entry).
+  // weighted_choice counts living, unpartnered women. Their search and
+  // fertility intensities come from the cells; with cohabitation, their current
+  // cohabitation probabilities come from the probability tracker.
   auto add_counted_woman = [&](int woman, double now) {
     if (!calibrator || !people[woman].female || !NumericVector::is_na(people[woman].died) ||
         current_partner[woman] >= 0 || counted_woman[woman]) return;
     counted_woman[woman] = 1;
     calibrator->add_woman(people[woman].group, people[woman].born, 1);
-    const int g = people[woman].group;
-    const int index = previous_specific ? g * 3 + previous_union[woman] : g;
-    const auto* search = !rate_initiation ? nullptr : search_hazards[index];
-    const double origin = rate_initiation && search_duration[index] ?
-      previous_union_end[woman] : people[woman].born;
-    if (!R_finite(origin)) stop("Duration search risk requires a recorded previous union ending.");
-    // The fertility channel comes from cells (fill_calibration), not women.
-    intensity_tracker->activate(woman, g, people[woman].born, search, nullptr,
-      people[woman].last_birth + birth_interval, now, origin,
-      cohab_enabled ? &probability_schedules[g * 3 + previous_union[woman]] : nullptr);
+    if (probability_tracker)
+      probability_tracker->activate(woman, people[woman].born,
+        &probability_schedules[people[woman].group * 3 + previous_union[woman]], now);
   };
   auto remove_counted_woman = [&](int woman) {
     if (!calibrator || !counted_woman[woman]) return;
     counted_woman[woman] = 0;
-    intensity_tracker->remove(woman);
+    if (probability_tracker) probability_tracker->remove(woman);
     calibrator->add_woman(people[woman].group, people[woman].born, -1);
-  };
-  auto counted_birth = [&](int woman, double now) {
-    if (calibrator && counted_woman[woman]) {
-      if (parity_specific) { remove_counted_woman(woman); add_counted_woman(woman, now); }
-      else intensity_tracker->set_ready(woman, now + birth_interval, now);
-    }
   };
   LagTable union_table, father_table_storage, cohab_table;
   int union_table_id = 0, father_table_id = 0, cohab_table_id = 0;
@@ -2438,7 +2392,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (calibrator && (cohab_role ? cohab_weighted : (father ? father_weighted : union_weighted))) {
       // Searches and on-demand unions use the union-formation calibration;
       // rate-mode nonmarital fathers have their own, driven by fertility.
-      intensity_tracker->advance(now);
+      if (probability_tracker) probability_tracker->advance(now);
       const bool fertility_driven = !rate_initiation || father;
       if (cells && !cohab_role && fertility_driven) {
         const std::vector<double> filled = cells->fill_calibration(*calibrator);
@@ -2452,15 +2406,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
               stop("Internal error: cell calibration totals differ from an explicit scan.");
         }
       }
-      if (search_refresh_weights && !fertility_driven) {
-        // Weighted searches: marriage and cohabitation channels from the cells.
+      if (search_calibrated && !fertility_driven) {
+        // Searches: marriage and cohabitation channels from the search cells.
         std::vector<double> marriage, cohab;
         search_calibration.apply(marriage, cohab);
         if (check_cells) {
           std::vector<double> scan_m(marriage.size(), 0.0), scan_c(cohab.size(), 0.0);
           for (int w = 0; w < static_cast<int>(people.size()); ++w) {
             if (!search_calibration.active(w)) continue;
-            const double h = search_calibration.hazard(w), p = search_calibration.probability(w);
+            // Independent of stored values: p from the woman's schedule now.
+            const double h = search_calibration.hazard(w);
+            const double p = cohab_enabled ? current_hazard(
+              &probability_schedules[people[w].group * 3 + previous_union[w]], people[w].born, now).first : 0.0;
             const size_t b = search_calibration.bin(w);
             scan_m[b] += h * (1 - p); scan_c[b] += h * p;
           }
@@ -2562,17 +2519,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     for (const Person& person : people) min_birth = std::min(min_birth, person.born);
     calibrator.reset(new WeightCalibrator(min_birth, start + years, group_count,
                                           kWeightBinWidth, min_male_age));
-    for (int group = 0; group < group_count; ++group) {
-      if (previous_specific) {
-        for (int p = 0; p < 3; ++p) {
-          search_hazards.push_back(&schedules[group].previous_search[p]);
-          search_duration.push_back(schedules[group].duration_search[p]);
-        }
-      } else {
-        search_hazards.push_back(&schedules[group].search);
-        search_duration.push_back(false);
-      }
-    }
     if (scheduled_models) {
       union_table_id = calibrator->add_table(get_scheduled_lag(general_id));
       father_table_id = calibrator->add_table(get_scheduled_lag(father_id));
@@ -2596,7 +2542,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       }
     }
     counted_woman.assign(people.size(), 0);
-    intensity_tracker.reset(new FemaleIntensityTracker(*calibrator));
+    search_calibrated = rate_initiation;
+    if (rate_initiation && cohab_enabled)
+      probability_tracker.reset(new ProbabilityTracker([&](int woman, double p) {
+        search_calibration.set_probability(woman, p);
+      }));
     for (int man = 0; man < static_cast<int>(people.size()); ++man)
       if (pool.contains(man)) calibrator->add_man(people[man].group, people[man].born, 1);
     for (int woman = 0; woman < static_cast<int>(people.size()); ++woman)
@@ -3044,8 +2994,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   WeightSpec* search_weights_spec = weight_spec("search");
   WeightSpec* mortality_weights_spec = weight_spec("mortality");
   WeightSpec* transition_weights_spec = weight_spec("transition");
-  search_refresh_weights = search_weights_spec && calibrator && rate_initiation;
-  if (search_refresh_weights && search_weights_spec->custom)
+  if (search_calibrated && search_weights_spec && search_weights_spec->custom)
     Rcpp::warning("With weighted matching calibration, the custom search weight function is "
                   "evaluated at every refresh of every searching woman, which can be slow.");
   // A searching woman's stored weight in search cell c (calibration mode).
@@ -3070,10 +3019,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (!(w > 0) || !R_finite(w)) stop("A search weight is not finite and positive.");
     return w;
   };
-  if (search_refresh_weights)
-    intensity_tracker->set_probability_hook([&](int woman, double p) {
-      search_calibration.set_probability(woman, p);
-    });
   if (fertility_refresh_weights && fertility_weights_spec->custom && calibrator)
     Rcpp::warning("With weighted matching calibration, the custom fertility weight function is "
                   "evaluated at every refresh of every woman, which can be slow.");
@@ -3192,15 +3137,19 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     search.reset();
     if (rate_initiation) {
       search = make(layout.search);
-      if (search_refresh_weights) {
+      if (search_calibrated) {
         search_calibration.reset(search.get(), calibrator->cells());
-        // Stored weights pick the searcher; bin moves update calibration sums.
-        search->enable_stored_weights();
+        // Stored weights (if any) pick the searcher; bin moves update the
+        // calibration sums. Without a weight model every weight is one.
+        if (search_weights_spec) search->enable_stored_weights();
         search->set_move_hook([&](int woman, int, int cell) {
           if (cell < 0) { search_calibration.update(woman, -1, 0, 1); return; }
-          const double w = search_weights_spec->custom || !search_calibration.active(woman) ?
-            search_weight(woman, cell) : search_calibration.weight(woman);
-          search->set_weight(woman, w);
+          double w = 1;
+          if (search_weights_spec) {
+            w = search_weights_spec->custom || !search_calibration.active(woman) ?
+              search_weight(woman, cell) : search_calibration.weight(woman);
+            search->set_weight(woman, w);
+          }
           search_calibration.update(woman, cell, calibrator->bin_index(people[woman].group, people[woman].born), w);
         });
       } else if (WeightSpec* spec = weight_spec("search")) {
@@ -3238,7 +3187,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     mortality->set_rates(layout.mortality, now);
     if (search) {
       search->set_rates(layout.search, now);
-      if (search_refresh_weights) search_calibration.mark_all_dirty();
+      if (search_calibrated) search_calibration.mark_all_dirty();
     }
     if (dissolution) dissolution->set_rates(layout.dissolution, now);
     if (conversion) conversion->set_rates(layout.conversion, now);
@@ -3290,15 +3239,15 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         }
       }
       search->refresh(i, stratum, origin, now);
-      if (!search_refresh_weights && stratum >= 0) stored_weight(search_weights_spec, search.get(), i, false, -1);
-      if (search_refresh_weights) {
+      if (!search_calibrated && stratum >= 0) stored_weight(search_weights_spec, search.get(), i, false, -1);
+      if (search_calibrated) {
         const int cell = search->cell_of(i);
         if (cell < 0) search_calibration.update(i, -1, 0, 1);
         else {
           search_calibration.set_probability(i, cohab_enabled ? current_hazard(
             &probability_schedules[p.group * 3 + previous_union[i]], p.born, now).first : 0.0);
-          const double w = search_weight(i, cell);
-          search->set_weight(i, w);
+          double w = 1;
+          if (search_weights_spec) { w = search_weight(i, cell); search->set_weight(i, w); }
           search_calibration.update(i, cell, calibrator->bin_index(p.group, p.born), w);
         }
       }
@@ -3464,7 +3413,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     const bool union_event = type == EventType::dissolution || type == EventType::conversion;
     if (unit < 0) continue;   // an unrealized birth: no event follows
     const int i = union_event ? union_history[unit].wife : unit;
-    if (intensity_tracker) intensity_tracker->advance(now);
+    if (probability_tracker) probability_tracker->advance(now);
     if (check_cells && cells && !cells->consistent())
       stop("Internal error: fertility cell counts differ from an explicit scan.");
     if (check_cells) for (const Source& x : sources)
@@ -3574,7 +3523,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       double mother = people[i].id;
       people[i].last_birth = now;
       ++parity[i];
-      counted_birth(i, now);
       // Default ffab is 0.4886 - its the signature of Berkeley training!
       bool female = R::runif(0, 1) < ffab;
       int child = static_cast<int>(people.size());
@@ -3780,69 +3728,3 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
 
 // Deterministic validation hook for contribution updates. Operations use zero-
 // based person indices; no demographic event or RNG is involved.
-// [[Rcpp::export]]
-List inspect_intensity_tracker_cpp(NumericVector female_born, IntegerVector female_groups,
-                                   DataFrame search_rates, DataFrame fertility_rates,
-                                   NumericVector times, IntegerVector persons,
-                                   CharacterVector actions, IntegerVector previous,
-                                   NumericVector ready, int group_count,
-                                   Nullable<NumericVector> search_origins = R_NilValue,
-                                   Nullable<DataFrame> probability_rates = R_NilValue) {
-  const int n = female_born.size(), ops = times.size();
-  if (!ops || female_groups.size() != n || persons.size() != ops || actions.size() != ops ||
-      previous.size() != ops || ready.size() != ops) stop("Invalid intensity-tracker inputs.");
-  double lo = times[0], hi = times[ops - 1];
-  for (double born : female_born) lo = std::min(lo, born);
-  WeightCalibrator calibration(lo, hi, group_count, kWeightBinWidth, 0);
-  FemaleIntensityTracker tracker(calibration);
-  const bool stratified = search_rates.containsElementNamed("previous_union");
-  const int categories = stratified ? 3 : 1;
-  const std::array<std::string, 3> labels = {"none", "separated", "widowed"};
-  std::vector<std::vector<Band>> searches(group_count * categories), fertility(group_count);
-  for (int g = 0; g < group_count; ++g) {
-    fertility[g] = read_bands(fertility_rates, "", "", g);
-    for (int p = 0; p < categories; ++p)
-      searches[g * categories + p] = read_bands(search_rates, "", "", g,
-        stratified ? labels[p] : "", stratified && search_uses_duration(search_rates, labels[p]));
-  }
-  const bool split_types = probability_rates.isNotNull();
-  std::vector<std::vector<Band>> probabilities(group_count * 3);
-  if (split_types) {
-    DataFrame table(probability_rates);
-    const bool by_previous = table.containsElementNamed("previous_union");
-    for (int g = 0; g < group_count; ++g) for (int p = 0; p < 3; ++p)
-      probabilities[g * 3 + p] = read_bands(table, "", "", g, by_previous ? labels[p] : "");
-  }
-  NumericVector origins(ops, NA_REAL);
-  if (search_origins.isNotNull()) origins = NumericVector(search_origins);
-  if (origins.size() != ops) stop("Invalid search origins.");
-  List snapshots(ops);
-  IntegerVector pending(ops);
-  std::vector<bool> active(n, false);
-  for (int k = 0; k < ops; ++k) {
-    if (!R_finite(times[k]) || (k && times[k] < times[k - 1])) stop("Unordered tracker times.");
-    tracker.advance(times[k]);
-    const std::string action = as<std::string>(actions[k]);
-    const int person = persons[k];
-    if (person < 0 || person >= n || previous[k] < 0 || previous[k] > 2)
-      stop("Invalid intensity-tracker person or category.");
-    if (action == "activate") {
-      const int g = female_groups[person];
-      if (!active[person]) calibration.add_woman(g, female_born[person], 1);
-      active[person] = true;
-      tracker.activate(person, g, female_born[person],
-        &searches[g * categories + (stratified ? previous[k] : 0)], &fertility[g], ready[k], times[k], origins[k],
-        split_types ? &probabilities[g * 3 + previous[k]] : nullptr);
-    } else if (action == "remove") {
-      tracker.remove(person);
-      if (active[person]) calibration.add_woman(female_groups[person], female_born[person], -1);
-      active[person] = false;
-    }
-    else if (action == "ready") tracker.set_ready(person, ready[k], times[k]);
-    else if (action != "inspect") stop("Unknown intensity-tracker operation.");
-    snapshots[k] = calibration.intensity_snapshot(split_types);
-    pending[k] = tracker.pending();
-  }
-  return List::create(_["intensities"] = snapshots, _["pending"] = pending,
-    _["bins"] = calibration.bins(), _["first"] = std::floor(lo / kWeightBinWidth));
-}
