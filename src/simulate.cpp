@@ -1430,7 +1430,7 @@ class RateCells {
   int fire_next(double now) {
     clock_.spend(intensity_, now);
     const int c = static_cast<int>(intensity_.choose(R::runif(0, 1)));
-    const Cell& x = cells_[c];
+    Cell& x = cells_[c];
     if (x.members.empty()) stop("A rate cell fired without members.");
     const double n = static_cast<double>(x.members.size());
     const double uniform = R::runif(0, 1);
@@ -1440,9 +1440,20 @@ class RateCells {
       // exact for any bound at or above the largest weight. A member at the
       // bound is accepted without a further draw, so equal weights keep the
       // unweighted pick and its random-number use.
-      for (;;) {
+      // The bound only falls when the cell empties, so it can go stale after
+      // a high-weight member leaves. After repeated rejections it is reset to
+      // the cell's exact maximum; any bound at or above it keeps the sampling
+      // exact, and with the exact maximum a pick takes at most about n tries
+      // in expectation.
+      for (unsigned long rejected = 0;; ++rejected) {
         const double w = members_[x.members[pick]].weight;
         if (w >= x.weight_bound || R::runif(0, 1) * x.weight_bound < w) break;
+        if (rejected % 32 == 31) {
+          double top = 0;
+          for (int unit : x.members) top = std::max(top, members_[unit].weight);
+          x.weight_bound = top;
+          checkUserInterrupt();
+        }
         pick = std::min(x.members.size() - 1, static_cast<size_t>(std::floor(R::runif(0, 1) * n)));
       }
     } else if (chooser_) pick = chooser_(c, x.members, uniform);
@@ -3376,8 +3387,10 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         for (int w = 0; w < static_cast<int>(people.size()); ++w)
           add_counted_woman(w, now);
         // Rebuilt processes start empty; only the living (and their ongoing
-        // unions) re-enter, so the dead need no refresh.
-        if (rebuilt)
+        // unions) re-enter, so the dead need no refresh. A new weight model
+        // also needs every stored weight recomputed, even when rates changed
+        // in place.
+        if (rebuilt || weights_changed)
           for (int i = 0; i < static_cast<int>(people.size()); ++i) {
             if (i % 1024 == 0) checkUserInterrupt();
             if (!NumericVector::is_na(people[i].died)) continue;

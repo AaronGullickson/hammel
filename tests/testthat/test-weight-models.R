@@ -379,3 +379,35 @@ test_that("weight schedules are validated like model schedules", {
   expect_s3_class(set_mortality(model, mortality_rates, weights = data.frame(time_start = 0, time_end = Inf,
     model = I(list(half))))$processes$mortality$weights, "tbl_df")
 })
+
+test_that("weight switches refresh stored weights when rates also change in place", {
+  # Regression: a weight-model switch at the same instant as an in-place rate
+  # update must still recompute every stored weight. An identical-rate calendar
+  # split then reproduces the static-rate run exactly.
+  model <- weighted_mortality_model(2000)
+  w <- tibble::tibble(time_start = c(0, 1), time_end = c(1, Inf), model = list(
+    create_weight_model(~ partnered, c(partnered = log(.1))),
+    create_weight_model(~ partnered, c(partnered = 0))))
+  split <- data.frame(sex = rep(c("m", "f"), 2), age_start = 0, age_end = Inf, rate = .05,
+    time_start = rep(c(0, 1), each = 2), time_end = rep(c(1, Inf), each = 2))
+  expect_identical(simulate(set_mortality(model, split, weights = w), 2, seed = 9)$persons,
+                   simulate(set_mortality(model, mortality_rates, weights = w), 2, seed = 9)$persons)
+})
+
+test_that("rejection sampling recovers after an extreme-weight member leaves", {
+  # Regression: after the only high-weight member dies, the cell's weight bound
+  # is stale; repeated rejections reset it to the exact maximum.
+  persons <- data.frame(person_id = 1:4, sex = "m", birth_time = -30, death_time = NA_real_,
+    mother_id = NA_integer_, father_id = NA_integer_, group = c("B", "A", "A", "A"))
+  model <- hammel_model() |>
+    set_population(hammel_population(persons, end_time = 0)) |>
+    set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 1),
+      weights = create_weight_model(~ group, c(groupB = 40), group_levels = c("A", "B"))) |>
+    set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0)) |>
+    set_union_formation("on_demand")
+  withr::local_options(hammel.check_cells = TRUE)
+  out <- simulate(model, 20, seed = 1)
+  expect_equal(out$simulation$deaths, 4)
+  # The extreme-weight member is chosen first.
+  expect_equal(which.min(out$persons$death_time), 1L)
+})

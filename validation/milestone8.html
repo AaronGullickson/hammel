@@ -7728,6 +7728,22 @@ height: 0px !important;
 <td style="text-align: right;">0</td>
 </tr>
 <tr class="even">
+<td style="text-align: left;">weight switches refresh stored weights when rates also change in place</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">rejection sampling recovers after an extreme-weight member leaves</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
 <td style="text-align: left;">calibration reproduces the analytical group-only examples</td>
 <td style="text-align: right;">16</td>
 <td style="text-align: right;">0</td>
@@ -7881,14 +7897,17 @@ height: 0px !important;
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">system2</span>(<span class="st">&quot;git&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;-C&quot;</span>, <span class="fu">shQuote</span>(here<span class="sc">::</span><span class="fu">here</span>()), <span class="st">&quot;rev-parse&quot;</span>, <span class="st">&quot;HEAD&quot;</span>), <span class="at">stdout =</span> <span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>[1] &quot;4d9fe3aa6cedf62cc86e23dc95c729d077874cd2&quot;</code></pre>
+<pre><code>[1] &quot;a4e5763e8ab6ca7c8c79d5720f8e44dcc1a416fd&quot;</code></pre>
 </div>
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">system2</span>(<span class="st">&quot;git&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;-C&quot;</span>, <span class="fu">shQuote</span>(here<span class="sc">::</span><span class="fu">here</span>()), <span class="st">&quot;status&quot;</span>, <span class="st">&quot;--short&quot;</span>), <span class="at">stdout =</span> <span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>[1] &quot;?? validation/milestone8.html&quot;</code></pre>
+<pre><code>[1] &quot; M src/simulate.cpp&quot;                                   
+[2] &quot; M tests/testthat/test-weight-models.R&quot;                
+[3] &quot;?? vignettes/_quarto.yaml&quot;                             
+[4] &quot;?? vignettes/articles/demographic_transition.rmarkdown&quot;</code></pre>
 </div>
 <details class="code-fold">
 <summary>Code</summary>
