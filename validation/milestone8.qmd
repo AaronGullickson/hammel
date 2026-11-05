@@ -48,6 +48,7 @@ Assess whether a switch to one clock and binned draws for events for each proces
 | Measure | Comparison | Acceptance criterion |
 |---|---|---|
 | Age-specific rates | Output rates vs. input rates under new and old approaches in vignettes | Input rates should generally fall within the 95% Poisson-based confidence intervals for the rate, although we don't expect complete coverage |
+| Hazard ratios | Hazard ratios across categories used in weight models | Observed hazard ratios should be close to expected values from the input data |
 | Processing Time | Vignette simulations under new and old approach | Changes should not drastically increase processing time, although some increase is expected in most simulations | 
 | Accounting and implementation | Existing tests | Successful unit tests |
 
@@ -97,6 +98,70 @@ Using a single clock provided a notable speed improvement that also sped up the 
 We still make one additional change for the fertility clock that we don't make for other clocks. Because of the birth interval issue, we use single year age bins and single birth parity bins even when the bands provided are wider because eligibility may vary within a band by age. Because other processes have no similar eligibility limitation, we can use the original age or duration bands for the bins. If we add eligilibity rules for other processes later, we made need to use a similar approach.
 
 ### Allowing sampling weights
+
+To allow users the ability to create fairly complex relationships between rates and individual or union characteristics, we have added a `weight_model` that can be applied to the `weights` argument of every rate process and is used to determine weights that are then used to draw individuals/unions from within a bin.
+
+Because weights only affect the likelihood of sampling within the bin and not the selection of the bin itself, this approach will preserve the input rate schedule provided while allowing users to create proportional hazards between individuals/unions. This differs from using stratified rate schedules in two ways:
+
+- Stratified rate schedules will preserve the input rates provided across strata but will not preserve the overall rate schedule when the distribution of the strata shift. Weighting will preserve the overall rate schedule but not the stratum-specific rate schedule.
+- The weighting approach can be used to create complex scenarios where strata are not available or sufficient.
+
+The `weight_model` is specified in a manner analagous to the formulas used for matching models but exposes a wider set of variables for use. Formulas are for the log-weight, so that coefficients correspond to log-hazard ratios. For example, the following code can be used to create a 20% higher rate for group B compared to group A on some rate schedule.
+
+```r
+create_weight_model(
+  ~group, 
+  coefficients = c("groupB" = log(1.2)), 
+  group_levels = c("A", "B")
+)
+```
+
+Additionally, users can instead specify their own custom R function that returns a log-weight value. For, example, the following code could be used to increase the likelihood of dissolution for a union as the absolute age difference between partners grows.
+
+```r
+set_union_dissolution(
+  rates = dissolution_rates,
+  weights = create_weight_model(
+    fun = function(members, bin) {
+      log(1.05) * abs(members$age_difference)
+    }
+  )
+)
+```
+
+Custom functions slow down processing because they use R rather than C++, but they provide users a great deal of flexibility in how to set up differences in risk in their simulation. @tbl-person-vars and @tbl-union-vars show the variables exposed for use in regular formula of custom functions.
+
+
+| Variable | Type | Values / levels | Processes | Notes |
+|---|---|---|---|---|
+| `sex` | categorical | `"f"`, `"m"` | mortality, transitions | Constant within fertility and search cells (women only) |
+| `group` | categorical | `group_levels` | all | Cancels where the rates are group-specific |
+| `union_type` | categorical | `"unpartnered"`, `"cohab"`, `"marriage"` | mortality, fertility, transitions | Constant in search (all searchers unpartnered) |
+| `partnered` | 0/1 | 1 if in a union | mortality, fertility, transitions | Constant in search |
+| `parity` | numeric | number of births (0 for men) | all | Cancels in parity-specific fertility |
+| `previous_union` | categorical | `"none"`, `"separated"`, `"widowed"` | all | Cancels in search with previous-union rates |
+| `partner_group` | categorical | `group_levels`; NA when unpartnered | mortality, fertility, transitions | An NA term contributes 0; always NA in search |
+| `ancestry_<g>` | numeric | ancestry share from group `<g>`, 0–1 | all | One per recorded group, e.g. `ancestry_A` |
+| `ancestry_unknown` | numeric | unknown ancestry share, 0–1 | all | Shares sum to 1 |
+| `group_dest` | categorical | `group_levels` | transitions only | Destination of the risk; cancels alone, useful in interactions |
+
+: Variables available for use in weight models for person-level processes (mortality, fertility, union search, group transitions) {#tbl-person-vars}
+
+#### Union processes (dissolution, conversion)
+
+| Variable | Type | Values / levels | Notes |
+|---|---|---|---|
+| `group_w`, `group_h` | categorical | `group_levels` | Wife's and husband's groups |
+| `parity_w` | numeric | wife's births | No `parity_h`: births are counted for mothers only |
+| `previous_union_w`, `previous_union_h` | categorical | `"none"`, `"separated"`, `"widowed"` | Each partner's category before this union |
+| `ancestry_<g>_w`, `ancestry_<g>_h` | numeric | ancestry shares, 0–1 | Includes `ancestry_unknown_w`, `ancestry_unknown_h` |
+| `same_group` | 0/1 | 1 if partners share a group | Cancels when dissolution rates are group-pair-specific |
+| `age_difference` | numeric | husband's age minus wife's age, years | Fixed for the union |
+| `union_type` | categorical | `"cohab"`, `"marriage"` | Constant in conversion; cancels in type-specific dissolution |
+
+: Variables available for use in weight models for union-level processes (dissolution, conversion) {#tbl-union-vars}
+
+One potential limitation of the weighting approach is sparse cells. When a large number of cells are sparse, the weights may not be correctly apportioned out to the respective categories because certain strata may not exist within the cell. This will lead to an underestimation of the proportional hazard ratios in the output.
 
 ## Vignette Comparison
 

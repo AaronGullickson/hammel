@@ -194,6 +194,37 @@ crosstabs |>
 @fig-log-odds shows the log odds ratios over time for the three combinations. No log odds ratios show for the first 100 years as expected because intermarriage was not allowed. When the log odds are very low or the groups are still very small (as for the AB group between 100 and 150 years), the log odds ratio can sometimes not be estimated due to zero values in one of the cells. Thus, log odds ratios don't appear for combos involving the AB group for some time after year 100 because the group is so small and the first members of it must grow old enough to be able to partner up. The A:B log odds ratio behaves exactly as expected by the input exogamy ratios, starting at roughly -10 and plateauing at -5. The A:AB and B:AB log odds ratios are about half that throughout and stabilize at -2.5, as expected.
 
 ```{r}
+#| label: fig-gender-ratio
+#| fig-cap: Gender ratio over time (5 year intervals) within A:B marriages. 95% confidence bands shown. Dotted lines show the expected ratio of 1. 
+
+ratio <- pop_final |>
+  get_detailed_unions() |>
+  #mutate(time_period = cut(start_time, breaks = seq(0, 300, 5))) |>
+  mutate(time_mid = floor(start_time / 5) * 5 + 2.5) |>
+  count(time_mid, group_w, group_h) |>
+  pivot_wider(names_from = c(group_w, group_h), values_from = n) |>
+  mutate(
+    ratio_A_B = A_B / B_A,
+    se_log = sqrt(1 / A_B + 1 / B_A),
+    conf_lower = ratio_A_B * exp(-1.96 * se_log),
+    conf_upper = ratio_A_B * exp(1.96 * se_log)
+  )
+
+ratio |>
+  ggplot(aes(x = time_mid, y = ratio_A_B))+
+  geom_ribbon(
+    aes(ymin = conf_lower, ymax = conf_upper), 
+    color = NA,
+    fill = "grey70"
+  )+
+  geom_line()+
+  geom_hline(yintercept = 1, linetype = 2)+
+  labs(x = "year", y = "gender ratio")
+```
+
+@fig-gender-ratio shows the gender ratio over time which should be held at roughly one throughout the simulation. This is generally true, except for the early period where the low rates lead to high volatility across samples.
+
+```{r}
 #| label: fig-custom-inheritance-prob
 #| fig-cap: Probability of group assignment as a function of proportion A ancestry among births to parents belonging to different groups for all births in a single simulation. Proportion A ancestry is plotted in 10 percent bins by the midpoint of the bin. 95% confidence intervals shown. The dotted line shows the expected probability from the inheritance model.
 
