@@ -1,10 +1,11 @@
 test_that("fractional fertility epochs retain the run-start accounting grid", {
+  # Women aged 20 with a child born at the run start and a 10-year interval
+  # stay ineligible; rates change at fractional times. Unrealized births are
+  # counted on the one-year grid from the run start.
+  n <- 2000
   for(origin in c(2000,2000.25)) {
-    m <- make_rate_model(3,search_rate=0)
-    m$population$persons$birth_time <- origin+c(-20,-21,0)
-    m$population$persons$mother_id[3] <- 1L
-    m$population$persons$father_id[3] <- 2L
-    m$population$end_time <- origin
+    m <- make_rate_model(3,search_rate=0) |>
+      set_population(spacing_population(n, age = 20, sons = 0, end_time = origin))
     rates <- data.frame(age_start=15,age_end=50,rate=.1)
     epochs <- do.call(rbind,lapply(1:4,function(i) {
       x <- rates
@@ -17,14 +18,13 @@ test_that("fractional fertility epochs retain the run-start accounting grid", {
     out <- simulate(m,3.4,seed=42)
     u <- out$simulation$unrealized_births
     expect_true(all(u$period_end<=origin+ceiling(u$period_end-origin)))
-    # Boundary fragments do not bridge any run-anchored annual boundary.
+    # Records do not bridge any run-anchored annual boundary.
     expect_true(all(floor(u$period_start-origin+1e-9)==ceiling(u$period_end-origin-1e-9)-1))
     observed <- calculate_fertility_rates(out,origin+c(0,1,2,3,3.4),c(0,Inf),unrealized=TRUE)
     expect_equal(out$simulation$births,0)
-    expect_equal(observed$births,c(1,0,0,0)) # the supplied child was born at the run start
-    expect_equal(observed$unrealized_births,c(.15,.35,.32,.12),tolerance=1e-9)
+    expect_equal(observed$births,c(n,0,0,0)) # the supplied children were born at the run start
+    for (k in 1:4) expect_count(observed$unrealized_births[k], c(.15,.35,.32,.12)[k] * n)
     expect_false(anyNA(observed$rate_fertility_adjusted))
-    expect_equal(sum(u$unrealized_births),.94,tolerance=1e-9)
   }
 })
 

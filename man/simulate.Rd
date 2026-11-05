@@ -24,8 +24,10 @@ A \code{hammel_population} with updated histories and endpoint, plus a
 }
 \description{
 Advance a configured model and return a population that can initialize a
-later run. The C++ engine samples candidate waiting times across age bands
-(fertility cell clocks for births), executes at continuous times, and
+later run. The C++ engine schedules every rate process by cells of at-risk
+units with one exponential clock per process: a cell produces events at its
+input rate times its members, and the member is chosen uniformly or by weight
+models (\code{\link[=create_weight_model]{create_weight_model()}}). It executes at continuous times and
 prioritizes death over birth on exact ties.
 Events execute chronologically. In on-demand mode all living females face the
 fertility schedule. Rate mode uses either overall rates for all women (with
@@ -41,8 +43,8 @@ If no eligible man exists, cancel the birth by default. Explicitly set
 Rate initiation adds age- or duration-specific search events for unpartnered
 women only. Duration schedules for separated/widowed categories measure time
 since the most recent union ended; \code{none} remains age-specific.
-Failed attempts draw another waiting time. Widowhood cancels pending births
-and switches to unpartnered fertility; a new union switches to partnered
+Failed attempts leave the woman searching. Widowhood switches her to
+unpartnered fertility; a new union switches to partnered
 fertility, preserving birth spacing. Unpartnered births do not trigger searches
 in rate mode. Instead, select a father using the same available male pool,
 screening and \code{father_matching} model (falling back to \code{matching}), without
@@ -50,11 +52,10 @@ forming a union or reserving the man.
 A failed match cancels the birth unless explicitly allowed by the union process.
 Cancellation starts no new birth-spacing interval. On-demand mode rejects
 status schedules.
-Optional \code{\link[=union_dissolution]{union_dissolution()}} adds one duration-dependent annual union hazard
-carried by the woman. It preserves the pending dissolution through births,
-ends the episode with \code{end_reason = "dissolution"}, and restores unpartnered
-availability and fertility/search eligibility. Exact same-person ties select
-death, birth, dissolution, then search. Dissolution \code{group_pair} schedules and
+Optional \code{\link[=union_dissolution]{union_dissolution()}} adds one duration-dependent annual hazard per
+union, unaffected by births. It ends the episode with \code{end_reason = "dissolution"}, and restores unpartnered
+availability and fertility/search eligibility. Exact ties select death,
+birth, dissolution, conversion, search, then group transition. Dissolution \code{group_pair} schedules and
 multipliers use symmetric pairings of both partners' groups. Rate-based
 formation optionally selects age/duration schedules using \code{previous_union}:
 none, separated, or widowed (or pooled none/dissolved). Duration origins and categories are recovered
@@ -85,7 +86,7 @@ by cell-accounted fertility (D101; see \code{\link[=fertility]{fertility()}}): e
 age/parity/union-type/group cell produces births at its input rate times all
 its members, assigned to an eligible member uniformly or proportionally to
 \code{hetfert} weights when enabled. Births that
-cannot occur because a cell has no eligible member are reported in
+cannot occur because a cell has no eligible member are counted in
 \code{simulation$unrealized_births}. Fertility outside supplied bands is zero. Mortality must cover all ages for both sexes, ending at \code{Inf}.
 
 Events are recorded at their sampled times in \verb{[start, start + years)}. Rates and all
@@ -105,8 +106,9 @@ initialize from recorded identities. No additional random draws are made.
 
 Calendar-banded rates change within the same run at \code{time_start}/\code{time_end}
 boundaries, before same-time demographic events. Histories, birth spacing and
-duration origins persist. Pending candidates are resampled at boundaries;
-adding redundant rate boundaries need not preserve a fixed-seed trajectory.
+duration origins persist. Rates change in place when a process keeps its
+cells; otherwise its cells are rebuilt with new draws, so adding rate
+boundaries need not preserve a fixed-seed trajectory.
 Calendar-banded \code{cohab_prob} is evaluated at the search instant; probability-
 only boundaries refresh role calibration while retaining pending event dates.
 Matching and inheritance arguments may be direct models or calendar schedules

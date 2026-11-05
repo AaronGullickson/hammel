@@ -65,7 +65,9 @@ test_that("formation and widowhood switch fertility schedules without bypassing 
   p$mother_id[3] <- 1
   p$sex[3] <- "m"
   model <- set_population(model, hammel_population(p, end_time = 0))
-  model <- set_fertility(model, status_rates(1, 0), 0.5)
+  # A high partnered rate makes births near-certain once spacing ends, so the
+  # check does not depend on the seed and several births must respect spacing.
+  model <- set_fertility(model, status_rates(5, 0), 0.5)
   result <- simulate(model, 2, seed = 52)
   expect_lt(result$unions$start_time[1], 0.5)
   children <- result$persons[result$persons$person_id > 3, ]

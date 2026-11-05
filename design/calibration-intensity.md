@@ -1,63 +1,76 @@
 # Current-hazard contributions for matching calibration
 
-User-approved implementation and performance trial, October 28, 2026. Replace
-age-band-averaged female intensities with actual current hazards and an internal
-boundary-update queue. D083 now extends the same mechanism to duration-specific
-remarriage without introducing another calibration dimension.
+Updated November 5, 2026. D082 (October 28, 2026) replaced age-band-averaged
+female intensities with actual current hazards; D083 extended it to
+duration-specific remarriage. Since milestone 8 (D128) the contributions come
+from the search and fertility cells themselves, rather than from a separate
+per-woman tracker with its own boundary queue (the former
+`FemaleIntensityTracker`, removed November 4, 2026).
 
 ## Scientific behavior
 
-Each living unpartnered woman contributes her current female search hazard to
-her group/birth-cohort calibration cell. Rate-mode marriage searches select the
-woman's group/previous-union schedule on its selected age/duration clock after
-proportional multipliers. The search origin is independent of fertility age.
-Fertility-driven searches use each unpartnered eligible woman's cell-derived
-hazard (D101: cell intensity divided by eligible members), formed from the
-fertility cells at search time, and contribute zero during birth spacing. Keep separate totals
-for marriage searches and fertility-driven partner/father searches.
+Each living unpartnered woman contributes her current female hazards to her
+group/birth-cohort calibration cell, in two channels kept separately:
 
-Sum individual contributions into the existing group/cohort cells. Derive male
-mirrored targets and expected flows from these same totals. Male-group target
+- **Marriage searches (rate mode).** Her search hazard is
+  `rate_c * N_c * w_i / W_c` in her search cell c (`rate_c` with weights of
+  one), split by her current cohabitation probability p into a cohabitation
+  share `p` and a direct-marriage share `1 - p`. The search origin, age or
+  duration since the latest union ended, is independent of fertility age.
+- **Fertility-driven partner and father searches.** Each unpartnered eligible
+  woman's cell-derived fertility hazard (D101: cell intensity times her weight
+  over the eligible weight sum), zero during birth spacing.
+
+Sum contributions into the existing group/cohort cells. Derive male mirrored
+targets and expected flows from these totals. Male-group target
 normalization, delta, matching utilities, kinship conventions, and the solver
 are unchanged. Quarter-year cohort bins still approximate matching utilities
 and cutoff eligibility for calibration; their center-based inclusion rule is
-retained. Actual female hazards, rather than bin-averaged hazards, are the
-intentional approximation change. Individual event scheduling integrates actual schedules on the selected
-age/duration search clock; D082 bookkeeping does not redraw demographic events. Different calibrated weights
-can change partner identities and downstream histories; identical seeds need
-not reproduce previous grouped outcomes. One/no-group paths and paths with
-all exogamy prohibited do not create the tracker or consume additional draws.
+retained. Calibrated weights can change partner identities and downstream
+histories. One/no-group paths and paths with all exogamy prohibited do not
+calibrate or consume additional draws.
 
 ## Updates and event timing
 
-Maintain the current two hazard contributions per counted woman and at most
-one pending bookkeeping entry for her next relevant rate change. Boundaries
-include search age/duration and fertility age band starts and ends, gaps and terminal support, and
-birth-spacing release. Rate schedules are piecewise constant, so no update is
-needed between changes. This is not a simulation step or a demographic event.
-The queue advances through every boundary up to a demographic event/search time
-before calibration is used. At an exact boundary the new half-open band applies.
-No threshold is drawn and no demographic event is rescheduled by a bookkeeping
-update. Use absolute calendar boundaries to avoid subtraction roundoff at ties.
+- **Search cells** keep, per calibration bin, their member count and the sums
+  of `w (1 - p)` and `w p` (`SearchCalibration`). A cell whose contents
+  changed is marked and recomputed before the next search solve, so the
+  totals change only through cell membership, weights and rates.
+- **Fertility cells** keep the weight of unpartnered eligible members per
+  calibration bin and contribute `Lambda_c / W_c^e` per unit weight.
+- **Cohabitation probabilities** are the one quantity that can change between
+  cell moves, because their age bands can differ from the search clock. A small
+  `ProbabilityTracker` keeps each unpartnered woman's current p and a
+  bookkeeping boundary at her next probability band edge; it exists only with
+  rate-mode search and cohabitation. Calendar probability changes refresh p
+  for everyone before same-time searches.
 
-Entering the unpartnered pool inserts contributions and a boundary entry;
-forming a union or dying removes both. Dissolution/widowhood inserts the newly
-selected previous-union schedule. Birth updates fertility eligibility while
-retaining marriage-search intensity. Replace old pending entries when state
-changes, keeping queue size bounded by counted women rather than all past
-changes. Restarts rebuild contributions and spacing from supplied histories.
-The same update interface now accepts a separate search clock origin for D083
-duration schedules. It provides a common update point for future state-dependent
-rates, without adding parity, region or custom state transitions.
+Cell moves at band edges, spacing releases and probability boundaries are
+bookkeeping: no threshold is drawn and no demographic event is rescheduled.
+At an exact boundary the new half-open band applies. Restarts rebuild cells and
+spacing from supplied histories.
 
-For example, a woman aged 19.9 with search hazards .1 below age 20 and .3
-thereafter contributes .1 now and .3 after 0.1 years, even if her cohort bin
-straddles age 20. A birth with spacing .75 temporarily sets her fertility-driven
-contribution to zero; her marriage hazard continues to follow its schedule.
-At spacing release use the fertility rate at the attained age, including any
-age boundaries crossed during exclusion.
+For example, a woman aged 19.9 in a search cell [15,20) with rate .1 moves to
+the [20,25) cell with rate .3 after 0.1 years; her calibration contribution
+follows the cell, even if her cohort bin straddles age 20. A birth with spacing
+.75 makes her ineligible for fertility, removing her fertility-driven
+contribution until release; her marriage contribution continues.
 
-## Validation and comparison
+## Validation
+
+With option `hammel.check_cells = TRUE`, every search solve compares the
+maintained marriage, cohabitation and fertility totals with an explicit scan
+of searching women, recomputing each woman's probability from her schedule
+(`tests/testthat/test-calibration-intensity.R`). Calibrated runs gave
+identical histories before and after the tracker's replacement.
+
+## D082 evidence (previous engine, October 28, 2026)
+
+The checks and timings below were recorded for the original tracker. They
+remain the evidence for D082's change from bin-averaged to actual hazards; the
+engine they timed has since been replaced.
+
+### Validation and comparison
 
 Compare maintained cell totals against explicit individual scans at boundaries,
 in gaps and after pool/state changes, births, spacing releases and restarts.
@@ -71,7 +84,7 @@ identical stored baselines, schedules, years and seed sets. Report elapsed times
 workload counts, input provenance and limitations. No empirical rates are fetched
 or scientific acceptance thresholds adopted.
 
-## Performance trial results
+### Performance trial results
 
 Compared baseline commit `93efcc1a6c41c2eb2f23ff597edf17089bd36c47` with the
 D082 working tree on October 28, 2026. Both were installed into separate
@@ -133,7 +146,7 @@ The recorded input RDS MD5 was `1ec7e19db1b6baf7b40b7fb410ee57bb`; the new
 `src/simulate.cpp` MD5 was `3140b5c733e304c8184b3ae7b2b497c3`.
 
 
-## Matching association recovery
+### Matching association recovery
 
 A subsequent 20-replication recovery check with A:B utility -3 recovered
 conditional cross-group log odds ratios -5.97493 (MCSE .05378) for group-only

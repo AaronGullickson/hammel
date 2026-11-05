@@ -73,8 +73,8 @@ Matching uses the general model for marriage and `cohab_matching` for cohabitati
 (NULL shares the general preferences active at that instant). Both matching
 arguments also accept complete-model calendar schedules under
 [D123](time-varying-models.md). Both draw from the same exclusive pool
-of unpartnered men. Failure leaves the woman unpartnered, resamples her ordinary
-search risk, and draws type anew at the next attempt. Father selection remains
+of unpartnered men. Failure leaves the woman unpartnered in her search cell,
+and type is drawn anew at the next attempt. Father selection remains
 separate through `father_matching`; partnered births use the current partner.
 
 Calibration maintains marriage lambda*(1-p), cohabitation lambda*p, and
@@ -95,8 +95,8 @@ Type-specific fertility requires cohabitation mode. On-demand stays overall-only
 
 Dissolution can omit `union_type` for a common duration hazard or supply both
 cohab and marriage schedules within each shared/group-pair stratum. Pair
-multipliers apply to either type. There is one female-carried clock per episode,
-retained through births. No process means no non-death dissolution.
+multipliers apply to either type. Each episode is one unit in the dissolution
+cells (D128), unaffected by births. No process means no non-death dissolution.
 
 ## Conversion and history
 
@@ -107,8 +107,8 @@ Gaps have zero hazard. NULL disables conversion and emits a simulation warning
 when cohabitation is enabled. Explicit zero bands disable risk without that
 missing-schedule warning. Inputs use rate per cohabiting woman-year.
 
-One female conversion clock is sampled per cohab episode and retained through
-births. Same-person tie priority is death, birth, dissolution, conversion, search.
+Each cohab episode is one unit in the conversion cells, by the woman's age or
+episode duration (D128), unaffected by births. Same-person tie priority is death, birth, dissolution, conversion, search.
 Conversion closes the cohab episode with `end_reason = "conversion"`, then
 starts a marriage at exactly the same time with the same partners and a new ID.
 `previous_cohab_id` links the new marriage to its cohab episode. Both
@@ -155,8 +155,8 @@ or typed dissolution observations count only dissolution reasons.
 - A never-married cohabitor who loses a partner returns to none by default, and
   widowed when the toggle is TRUE; both use the most recent ending origin if
   the selected previous category has a duration schedule.
-- Restart in an active cohabitation resamples conversion/dissolution at attained
-  age/duration and reconstructs legal history, rather than fabricating origins.
+- Restart in an active cohabitation rebuilds conversion/dissolution cells at
+  attained age/duration and reconstructs legal history, rather than fabricating origins.
 
 Check input coverage, exact clocks and ties, analytical conversion/dissolution
 competition, spacing and fathers, type-specific fertility and matching recovery,

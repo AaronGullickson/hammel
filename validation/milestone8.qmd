@@ -1,0 +1,457 @@
+---
+title: "Hammel: Milestone 8 Validation"
+author: "Aaron Gullickson"
+date: today
+format:
+  html:
+    toc: true
+    toc-expand: 1
+    toc-depth: 4
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    self-contained: true
+execute:
+  eval: true
+  echo: true
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: setup
+#| eval: true
+#| include: false
+
+library(here)
+# installing will lead to faster computation
+devtools::install(here::here())
+library(hammel)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(purrr)
+library(tibble)
+library(stringr)
+library(ggplot2)
+library(gt)
+library(modelsummary)
+set_theme(theme_bw())
+```
+
+## Purpose and completion criteria
+
+Assess whether a switch to one clock and binned draws for events for each process reproduces prior results and remains computationally efficient, while allowing for relative weighting of individuals within bins.
+
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| Age-specific rates | Output rates vs. input rates under new and old approaches in vignettes | Input rates should generally fall within the 95% Poisson-based confidence intervals for the rate, although we don't expect complete coverage |
+| Hazard ratios | Hazard ratios across categories used in weight models | Observed hazard ratios should be close to expected values from the input data |
+| Processing Time | Vignette simulations under new and old approach | Changes should not drastically increase processing time, although some increase is expected in most simulations | 
+| Accounting and implementation | Existing tests | Successful unit tests |
+
+## Overview of Design
+
+### Original approach at the individual level
+
+Previously, all waiting times except for fertility were decided at the individual level. For each, process, we draw a value from `rexp(1)` which provides the accumulated risk. Notably, this distribution is identical to $-log(U)$ where $U$ is a draw from a random uniform distribution between 0 and 1. This is the same basic approach that SOCSIM uses.
+
+We then followed a person's piecewise constant hazards across age and time within whatever stratified categories they belonged to and those piecewise hazards consume the risk until we reach zero at an exact time. We then chose the event with the shortest waiting time for a person and added it to the queue of events to process and if they are still alive they redraw another next event in the same way (dissolution and cohabitation conversion are union-based processes that are not redrawn at  the individual level). If something changes that would affect a person's relevant hazard (e.g. getting married) then we cancel their next event and redraw another event, relying on the memoryless feature of the hazard process. 
+
+### Changes to a binned approach for the fertility process
+
+In Milestone 5, we made a change to this process specifically for fertility in order to handle the birth interval issue. Birth intervals present a complication because they reduce the amount of person-years that a woman is actually available compared to what typical age-specific fertility rates would imply. Originally, we had handled this with an approximation that adjusted fertility rates upward to account for this issue, but this approximation falls apart in cases where fertility shift over time or restarts. It also failed dramatically for parity-specific fertility.
+
+The solution to this problem was to change the way birth events occurred. We moved them from individual women into bins stratified by relevant characteristics (e.g. age, parity, group, union type) and tracked how many women were within each bin in continuous time. Each bin, then was given its own waiting time based on the aggregate "intensity" rate $\gamma_i$ given by:
+
+$$\gamma_i = N_i\lambda_i$$
+
+where $\lambda_i$ is the fertility rate in bin $i$ from the input rates and $N_i$ is the number of women in bin $i$. This produces a waiting time and we add the next birth to this bin to our queue. When it fires, we select a random woman within the bin to have the birth. If $N_i$ changes before that birth event fires, then we recompute the waiting time from the remaining accumulated risk, without a new draw. If $\lambda_i$ changes, we redraw a waiting time.
+
+This approach to fertility completely resolved the birth interval issue because the intensity rate is determined by all women to preserve the input rate, but only women not within the birth interval of a previous birth are eligible to be chosen. 
+
+This approach also allowed us to easy include the heterogeneous fertility feature from SOCSIM where each women had a score and that score was treated as a weight when being sampled from a bin. This allowed for greater variance in fertility across women, while preserving the input rates.
+
+If a bin has women but none of them is eligible, it was removed from the clock's total intensity rate, so no birth can be drawn from it. The births it would have produced in that time ($N_i\lambda_i$ times the time spent without an eligible woman) are recorded separately as expected unrealized births.
+
+Although it resolved the birth interval issue, this approach was slower because we have to track potential changes in bin membership for all women at birthdays. Nonetheless, it was considered a major improvement.
+
+### Generalizing the fertility process approach
+
+The idea of this milestone is to convert all of the other rate processes to use the same approach as the fertility approach. The reasons were two-fold:
+
+- It allows for more symmetry in how these processes are handled in the code, which makes maintaining the code easier and allowing for future features to be handled the same way across rate processes.
+- It allows for the potential for customizable weights by process that allow for relative differences in rates across individuals in arbitrarily complex ways while preserving the underlying input rates.
+
+The potential issue is that this might make computational time much more expensive. However, a few modifications allowed us to do this much more efficiently. The most notable change was the use of a single clock per process.
+
+This modification is to track a single waiting time clock for each process rather than by bin. In this approach, we further generalize the rate to get an overall rate for the next event of a type (e.g. birth, death, union) as:
+
+$$\gamma = \sum_i N_i\lambda_i$$
+
+Basically, we sum up all the $\gamma_i$ rates for each bin to get a single $\gamma$ intensity rate for the process. We can then figure out waiting time until the next event by taking $E/\gamma$ where $E$ is a draw from `rexp(1)`. If $\gamma$ changes later due to a change in underlying $N_i$ values, then we recompute the remaining waiting time $t$ by taking $t \cdot (\gamma_{\text{old}}/\gamma_{\text{new}})$. If $\gamma$ changes due to a change in $\lambda_i$, then we redraw waiting times from scratch. When an event occurs, we then choose which bin it occurs from by drawing bins weighted by their intensity rate $N_i\lambda_i$. Within each bin, we then draw a random person/union, possibly with weights that are discussed below. Then the process fires off a new waiting time. 
+
+Using a single clock provided a notable speed improvement that also sped up the original fertility process as well. This approach is still likely to be somewhat slower than the individual process when lots of rates are in use, but can also be faster when lots of time-varying rates are provided because it is easier to apply changes across time.
+
+We still make one additional change for the fertility clock that we don't make for other clocks. Because of the birth interval issue, we use single year age bins and single birth parity bins even when the bands provided are wider because eligibility may vary within a band by age. Because other processes have no similar eligibility limitation, we can use the original age or duration bands for the bins. If we add eligibility rules for other processes later, we made need to use a similar approach.
+
+We also changed the way unrealized births are drawn in this milestone. Rather than reporting an expected unrealized birth, we allow bins with no eligible women to contribute to the overall intensity rate and to be selected. If they are selected then a single unrealized birth is recorded. Thus, the `unrealized_births` object produced in the output is now a record of single births not realized due to ineligibility. It will be noisier than expected births, but is simpler to code and is more intuitive for users.
+
+### Using bin sampling weights
+
+To allow users the ability to create fairly complex relationships between rates and individual or union characteristics, we have added a `weight_model` that can be applied to the `weights` argument of every rate process and is used to determine weights that are then used to draw individuals/unions from within a bin. These weights build on the work done for heterogeneous fertility in Milestone 5.
+
+Because weights only affect the likelihood of sampling within the bin and not the selection of the bin itself, this approach will preserve the input rate schedule provided while allowing users to create proportional hazards between individuals/unions. This differs from using stratified rate schedules in two ways:
+
+- Stratified rate schedules will preserve the input rates provided across strata but will not preserve the overall rate schedule when the distribution of the strata shift. Weighting will preserve the overall rate schedule but not the stratum-specific rate schedule.
+- The weighting approach can be used to create complex scenarios where strata are not available or sufficient.
+
+The `weight_model` is specified in a manner analogous to the formulas used for matching models but exposes a wider set of variables for use. Formulas are for the log-weight, so that coefficients correspond to log-hazard ratios. For example, the following code can be used to create a 20% higher rate for group B compared to group A on some rate schedule.
+
+```r
+create_weight_model(
+  ~group, 
+  coefficients = c("groupB" = log(1.2)), 
+  group_levels = c("A", "B")
+)
+```
+
+Additionally, users can instead specify their own custom R function that returns a log-weight value. For, example, the following code could be used to increase the likelihood of dissolution for a union as the absolute age difference between partners grows.
+
+```r
+set_union_dissolution(
+  rates = dissolution_rates,
+  weights = create_weight_model(
+    fun = function(members, bin) {
+      log(1.05) * abs(members$age_difference)
+    }
+  )
+)
+```
+
+Custom functions slow down processing because they use R rather than C++, but they provide users a great deal of flexibility in how to set up differences in risk in their simulation. @tbl-person-vars and @tbl-union-vars show the variables exposed for use in regular formula of custom functions.
+
+
+| Variable | Type | Values / levels | Processes | Notes |
+|---|---|---|---|---|
+| `sex` | categorical | `"f"`, `"m"` | mortality, transitions | Constant within fertility and search cells (women only) |
+| `group` | categorical | `group_levels` | all | Cancels where the rates are group-specific |
+| `union_type` | categorical | `"unpartnered"`, `"cohab"`, `"marriage"` | mortality, fertility, transitions | Constant in search (all searchers unpartnered) |
+| `partnered` | 0/1 | 1 if in a union | mortality, fertility, transitions | Constant in search |
+| `parity` | numeric | number of births (0 for men) | all | Cancels in parity-specific fertility |
+| `previous_union` | categorical | `"none"`, `"separated"`, `"widowed"` | all | Cancels in search with previous-union rates |
+| `partner_group` | categorical | `group_levels`; NA when unpartnered | mortality, fertility, transitions | An NA term contributes 0; always NA in search |
+| `ancestry_<g>` | numeric | ancestry share from group `<g>`, 0–1 | all | One per recorded group, e.g. `ancestry_A` |
+| `ancestry_unknown` | numeric | unknown ancestry share, 0–1 | all | Shares sum to 1 |
+| `group_dest` | categorical | `group_levels` | transitions only | Destination of the risk; cancels alone, useful in interactions |
+
+: Variables available for use in weight models for person-level processes (mortality, fertility, union search, group transitions) {#tbl-person-vars}
+
+
+| Variable | Type | Values / levels | Notes |
+|---|---|---|---|
+| `group_w`, `group_h` | categorical | `group_levels` | Wife's and husband's groups |
+| `parity_w` | numeric | wife's births | No `parity_h`: births are counted for mothers only |
+| `previous_union_w`, `previous_union_h` | categorical | `"none"`, `"separated"`, `"widowed"` | Each partner's category before this union |
+| `ancestry_<g>_w`, `ancestry_<g>_h` | numeric | ancestry shares, 0–1 | Includes `ancestry_unknown_w`, `ancestry_unknown_h` |
+| `same_group` | 0/1 | 1 if partners share a group | Cancels when dissolution rates are group-pair-specific |
+| `age_difference` | numeric | husband's age minus wife's age, years | Fixed for the union |
+| `union_type` | categorical | `"cohab"`, `"marriage"` | Constant in conversion; cancels in type-specific dissolution |
+
+: Variables available for use in weight models for union-level processes (dissolution, conversion) {#tbl-union-vars}
+
+One potential limitation of the weighting approach is sparse cells. When a large number of cells are sparse, the weights may not be correctly apportioned out to the respective categories because certain strata may not exist within the cell. This will lead to an underestimation of the proportional hazard ratios in the output.
+
+## Vignette Comparison
+
+All three vignettes were re-run using the new approach and the results, while not identical due to new random seed paths, were substantively the same and showed all output rates falling consistently close to the input rates.
+
+## Computational Time
+
+To test how much the new approach changes computational time, I re-ran the three current vignettes and recorded the processing time under the old and new approaches. These times are shown in @tbl-runtimes.
+
+| Vignette                      | Simulation | Previous Approach | New Approach   | % Change |
+|-------------------------------|------------|-------------------|----------------|----------|
+| Demographic Transition        | Main       | 45.89 seconds     | 30.768 seconds | -32.9%   |
+| Second Demographic Transition | Constant   | 1.263 seconds     | 1.451 seconds  | 14.9%   |
+| Second Demographic Transition | Changing   | 1.811 seconds     | 1.333 seconds  | -26.5%    |
+| Multigroup Inheritance        | Main       | 36.691 seconds    | 48.907 seconds | 33.3%    |
+
+: Runtimes for different simulations under the previous and new approach to tracking events {#tbl-runtimes}
+
+The new approach is faster in some situations and slower in others, but does not produce a drastic increase in runtime generally. Simulations with frequent calendar time changes in rates are generally faster under the new approach, while runs with larger populations and single year bins for age may be slower.
+
+## Weighting Models
+
+### Group differences in fertility
+
+I use a two-group simulation with only fertility and mortality to generate a difference in fertility rates by use of a weighting model. We will allow group B's fertility rates to be 20% higher than group A.
+
+```{r}
+#| label: run-group-fert-diff-sim
+
+fertility_rates <- get_fertility_hfd("USA", 2000)
+mortality_rates <- get_mortality_hmd("USA", 2000)
+
+set.seed(42)
+pop <- create_baseline_population(200000, group_weights = c("A" = 1, "B" = 1))
+
+model <- hammel_model() |>
+  set_population(pop) |>
+  set_fertility(
+    fertility_rates,
+    weights = create_weight_model(
+      ~group, 
+      coefficients = c("groupB" = log(1.2)), 
+      group_levels = c("A", "B")
+    )
+  ) |>
+  set_mortality(mortality_rates) |>
+  set_union_formation("on_demand")
+
+pop_final <- simulate(model, 100, 42)
+```
+
+```{r}
+#| label: fig-fert-ratio
+#| fig-cap: Ratio of age-specific fertility rates between Group B and Group A. Dotted red line shows the expected ratio from the model. 95% confidence intervals are shown. 
+calculate_fertility_rates(pop_final, c(0, 100), 15:45, by_group = TRUE) |>
+  select(age_start, age_end, group, births, rate_fertility) |>
+  pivot_wider(names_from = group, values_from = c(births, rate_fertility)) |>
+  mutate(ratio = rate_fertility_B / rate_fertility_A,
+         se_log = sqrt(1 / births_A + 1 / births_B),
+         lower = ratio * exp(-1.96 * se_log),
+         upper = ratio * exp(1.96 * se_log)) |>
+  ggplot(aes(x = age_start, y = ratio))+
+  geom_ribbon(aes(ymin = lower, ymax = upper), color = NA, fill = "grey70")+
+  geom_point()+
+  geom_hline(yintercept = 1.2, linetype = 2, color = "red")+
+  labs(x = "age", y = "ratio of B/A fertility")
+```
+
+@fig-fert-ratio shows the ratio of A/B fertility rates in the simulation. The ratios in each age group fit closely to the expected ratio of 1.2 and the true value is generally within the 95% confidence interval.
+
+```{r}
+#| label: fig-fert-rates-overall
+#| fig-cap: Estimated overall age-specific fertility rates from simulation pooled across groups. 95% confidence bands shown. The red dotted line shows the input rates.
+calculate_fertility_rates(pop_final, c(0, 100), 12:55, conf.level = 0.95) |>
+  ggplot(aes(x = age_start, y =rate_fertility))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(data = fertility_rates, aes(y = rate), linetype = 2, color = "red")
+```
+
+@fig-fert-rates-overall shows that the overall fertility rate is preserved in the simulation as we expected.
+
+### Dissolution differences by spousal age gap
+
+In this simulation, we will use a custom function to allow the risk of dissolution to increase by 5% for every year increase in the absolute age gap between partners. 
+
+```{r}
+#| label: run-age-diff-dissolution-sim
+
+marriage_rates <- read_csv(here("validation", "data", "usa_2000_2001", 
+                                "usa_2001_marriage_rates_female.csv"))
+
+dissolution_rates <- tibble(
+  dur_start = c(0, 5, 10, 15),
+  dur_end = c(5, 10, 15, Inf),
+  rate = -log(c(.80, .68, .60, .52) / c(1, .80, .68, .60)) / 5
+)
+
+set.seed(42)
+pop <- create_baseline_population(50000)
+
+model <- hammel_model() |>
+  set_population(pop) |>
+  set_fertility(fertility_rates) |>
+  set_mortality(mortality_rates) |>
+  set_union_formation("rate", rates = marriage_rates) |>
+  set_union_dissolution(
+    rates = dissolution_rates,
+    weights = create_weight_model(
+      fun = function(members, bin) {
+        log(1.05) * abs(members$age_difference)
+      }
+    )
+  )
+
+pop_final <- simulate(model, 100, 42)
+```
+
+We don't have a built-in function to determine dissolution rates by age differences, so instead we build a split-episode dataset of union dissolution and fit the absolute age gap as a predictor.
+
+```{r}
+#| label: tbl-hazard-model-age-diff
+#| tbl-cap: Piecewise constant hazard model predicting dissolution by absolute value of age gap, using simulated data  
+
+# no predefined method so lets set up the data so that we can model it
+# we need to set up each union as a split episode file by our duration bands. 
+u <- pop_final |> get_detailed_unions() |>
+  filter(start_time > 0) |>
+  mutate(
+    gap = abs(birth_time_w - birth_time_h),
+    stop = coalesce(end_time, pop_final$end_time),
+    dissolved = end_reason %in% "dissolution"
+  ) |>
+  select(start_time, end_time, stop, dissolved, gap)
+
+
+bands <- tibble(dur_start = c(0, 5, 10, 15), dur_end = c(5, 10, 15, Inf))
+
+split <- u |> cross_join(bands) |>
+  mutate(
+    enter = start_time + dur_start,
+    exit = pmin(stop, start_time + dur_end),
+    exposure = exit - enter,
+    event = dissolved & stop > enter & stop <= start_time + dur_end
+  ) |>
+  filter(exposure > 0)
+
+model_hazard <- glm(event ~ gap + factor(dur_start), family = poisson,
+                    offset = log(exposure), data = split)
+
+modelsummary(
+  model_hazard,
+  fmt = 4,
+  output = "gt",
+  estimate  = "{estimate} [{conf.low}, {conf.high}]",
+  ci_method = "wald",
+  statistic = NULL,
+  coef_omit = "Intercept",
+  gof_map = c("nobs")
+)
+```
+
+The results show that our estimated coefficient is very close to the expected 1.05 ratio and that the confidence interval contains the true value.
+
+### Changing weight models over time
+
+For this simulation, I will allow for changing weight models over time. For the first 100 years of the simulation, I will allow mortality to be 20% lower for partnered individuals than unpartnered individuals. Then for the last 50 years of he simulation, I will remove that difference so that both partnered and unpartnered individuals have the same mortality rates.
+
+In addition to allowing us to test changing the weight models over time, this simulation provides an opportunity to demonstrate how sparse cells can affect the expected proportional hazards. Initially, no one in this simulation will be partnered. So, when samples are drawn from bins, you will have many cases in the first part of the simulation where the bin will contain zero partnered individuals and thus the weights won't apply and sampling will be equal across individuals in that cell. This will lead to an underestimate of the total effect because only some of the bins will produce weighted results.
+
+```{r}
+#| label: run-changing-weights-sim
+
+set.seed(51)
+pop <- create_baseline_population(150000)
+
+model <- hammel_model() |>
+  set_population(pop) |>
+  set_fertility(fertility_rates) |>
+  set_mortality(mortality_rates) |>
+  set_mortality(
+    mortality_rates, 
+    weights = tibble(
+      time_start = c(0, 100),
+      time_end = c(100, Inf),
+      model = list(
+        # allow partnered to be different for first part of the period
+        create_weight_model(~ partnered, c(partnered = log(0.8))),
+        create_weight_model(~ partnered, c(partnered = 0))
+      )
+    )
+  ) |>
+  set_union_formation("on_demand")
+
+pop_final <- simulate(model, 150, 42)
+```
+
+I can use the results from `calculate_mortality_rates` to create binned piecewise constant hazard models. To avoid sparseness problems I only include ages between 20 and 85 and I exclude the open ended age category because it mixed different rates. I run models for the 0-50, 50-100, and 100-150 intervals.
+
+```{r}
+#| label: tbl-hazard-model-partnership
+#| tbl-cap: Hazard ratios from piecewise constant hazard models predicting mortality rate by partnership status. All models include controls for sex, age group, and the interaction between sex and age group. 95% confidence intervals are shown below each estimate.
+
+temp <- calculate_mortality_rates(
+    pop_final,
+    c(0, 50),
+    20:85,
+    by_union_type = TRUE
+  ) |>
+  mutate(partnered = union_type == "partnered") |>
+  # remove open ended group
+  filter(age_end != Inf)
+
+model_early <- glm(deaths ~ partnered + factor(age_start) * sex, offset = log(person_years), 
+                   family = poisson, data = temp)
+
+temp <- calculate_mortality_rates(
+    pop_final,
+    c(50, 100),
+    20:85,
+    by_union_type = TRUE
+  ) |>
+  mutate(partnered = union_type == "partnered") |>
+  # remove open ended group
+  filter(age_end != Inf)
+
+model_mid <- glm(deaths ~ partnered + factor(age_start) * sex, offset = log(person_years), 
+                 family = poisson, data = temp)
+
+temp <- calculate_mortality_rates(
+    pop_final,
+    c(100, 150),
+    20:85,
+    by_union_type = TRUE
+  ) |>
+  mutate(partnered = union_type == "partnered") |>
+  # remove open ended group
+  filter(age_end != Inf)
+
+model_late <- glm(deaths ~ partnered + factor(age_start) * sex, offset = log(person_years), 
+                  family = poisson, data = temp)
+
+modelsummary(
+  list(
+    "0-50 time period" = model_early, 
+    "50-100 time period" = model_mid, 
+    "100-150 time period" = model_late
+  ), 
+  coef_map = c("partneredTRUE"),
+  fmt = 4,
+  output = "gt",
+  exponentiate = TRUE,
+  statistic  = "conf.int",
+  ci_method = "wald",
+  coef_omit = "Intercept",
+  gof_map = c("nobs")
+)
+```
+
+The models shows the expected results for the 50-100 and 100-150 periods. In the 50-100 periods, partnered individuals have a 20% lower risk of mortality. In the 100-150 period, there is no difference in mortality risk. Both hazard ratio confidence intervals include the expected values of 0.8 and 1 within their range.
+
+For the 0-50 period, we observe that the lower risk is only about 13%. This is a result of the bias from sparse cells of partnered individuals in the initial burn in period that is ultimately resolved.
+
+## Unit Tests
+
+The following tests have been constructed and are currently all passing.
+
+```{r}
+#| label: test-results
+#| eval: true
+
+test_results <- devtools::test(pkg = here::here(), reporter = "silent")
+test_table <- as.data.frame(test_results)
+knitr::kable(
+  test_table[, c("test", "passed", "failed", "error", "skipped", "warning")]
+)
+```
+## Conclusions and Unresolved Limitations
+
+This milestone meets all expectation. The new approach to producing events is working as expected and continues to preserve input rates in the output. The new approach increases runtime slightly in some situations but reduces it in other situations. The weight models are producing the expected proportional hazards in the output.
+
+Remaining limitations include the fact that weights may fail to produce expected difference when bins are sparsely populated and the continued issue of unrealized births in sparse bins.
+
+## Reproducibility record
+
+```{r}
+#| label: reproducibility
+system2("git", c("-C", shQuote(here::here()), "rev-parse", "HEAD"), stdout = TRUE)
+system2("git", c("-C", shQuote(here::here()), "status", "--short"), stdout = TRUE)
+sessionInfo()
+```
+

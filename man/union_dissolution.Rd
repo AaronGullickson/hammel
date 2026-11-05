@@ -5,9 +5,9 @@
 \alias{set_union_dissolution}
 \title{Specify duration-dependent union dissolution}
 \usage{
-union_dissolution(rates, group_prop_hazard = NULL)
+union_dissolution(rates, group_prop_hazard = NULL, weights = NULL)
 
-set_union_dissolution(model, rates, group_prop_hazard = NULL)
+set_union_dissolution(model, rates, group_prop_hazard = NULL, weights = NULL)
 }
 \arguments{
 \item{rates}{A nonempty data frame with numeric \code{dur_start}, \code{dur_end}, and
@@ -32,6 +32,10 @@ in both directions. Omitted pairs use 1; zero suppresses risk. Reversed
 duplicate keys are errors. With no population groups, simulation warns
 and ignores multipliers.}
 
+\item{weights}{NULL (default) for unweighted selection, or a
+\code{\link[=create_weight_model]{create_weight_model()}} using union variables, which chooses which union
+in a cell dissolves without changing the cell's input rate.}
+
 \item{model}{A \code{hammel_model} object.}
 }
 \value{
@@ -41,19 +45,19 @@ and ignores multipliers.}
 }
 \description{
 Construct or attach an optional dissolution process. One continuous hazard
-per union is carried by the female partner, using years since the union
+applies per union, using years since the union
 began, independently of either partner's age. Rates are per partnered
 woman-year (equivalently union-year), not annual probabilities. Omitting
 this process retains death-only union endings.
 }
 \details{
-Births preserve the pending dissolution date. Exact same-person ties select
-death, then birth, then dissolution; a tied birth occurs while partnered.
-Dissolution ends the episode, restores both partners' availability, and
-reschedules the woman under her unpartnered fertility and existing search
-rules, retaining birth spacing. Optional age-specific search schedules by
+Births do not affect a union's dissolution risk. Exact ties select death,
+then birth, then dissolution; a tied birth occurs while partnered.
+Dissolution ends the episode, restores both partners' availability, and moves
+the woman to her unpartnered fertility and search risks, retaining birth
+spacing. Optional age-specific search schedules by
 previous union are specified through \code{\link[=union_formation]{union_formation()}}.
-Restarts resample at attained union duration rather than reset duration.
+Restarts resume at attained union duration rather than reset duration.
 }
 \section{Calendar rates}{
 

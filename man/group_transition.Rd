@@ -5,9 +5,9 @@
 \alias{set_group_transition}
 \title{Specify individual group transitions}
 \usage{
-group_transition(rates)
+group_transition(rates, weights = NULL)
 
-set_group_transition(model, rates)
+set_group_transition(model, rates, weights = NULL)
 }
 \arguments{
 \item{rates}{A nonempty data frame requiring \code{group_origin}, \code{group_dest},
@@ -22,6 +22,10 @@ group-specific processes must cover all possible groups. Optional
 including fractional years. Every active slice must be valid and the table
 must cover the requested run. Rate changes do not reset group duration.}
 
+\item{weights}{NULL (default) for unweighted selection, or a
+\code{\link[=create_weight_model]{create_weight_model()}} using person variables and \code{group_dest}, which
+chooses who in a cell moves without changing the cell's input rate.}
+
 \item{model}{A \code{hammel_model}.}
 }
 \value{
@@ -35,5 +39,5 @@ Construct or attach competing origin-to-destination hazards. Only the
 individual changes group; ancestry, parentage and union histories are retained.
 Duration is years since the latest recorded transition, or age without one.
 Missing directed pairs, strata and gaps have zero risk. Restarts retain
-transition histories and redraw pending events.
+transition histories and resume durations from them.
 }

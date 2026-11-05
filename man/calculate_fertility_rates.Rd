@@ -47,8 +47,9 @@ boundary receives Inf, as for age breaks.}
 
 \item{unrealized}{Logical, default \code{FALSE}. With \code{TRUE}, the population must
 come from \code{simulate()}; add
-\code{unrealized_births} (expected births dropped from fertility cells that had
-members but no eligible woman, from \code{simulation$unrealized_births}) and
+\code{unrealized_births} (counted births that could not occur because their
+fertility cell had members but no eligible woman, from
+\code{simulation$unrealized_births}) and
 \code{rate_fertility_adjusted = (births + unrealized_births) / person_years}.
 Values are \code{NA} where they cannot be attributed exactly: periods before the
 most recent simulation's start (restarts keep only the latest run's

@@ -1,7 +1,7 @@
 # Hammel documentation
 
-Updated November 2, 2026. Milestones 1–7 are complete by user acceptance
-(D029, D050, D077, D093, D105, D116, D127), including individual group transitions, parity-specific fertility,
+Updated November 5, 2026. Milestones 1–8 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116, D127, D130), including individual group transitions, parity-specific fertility,
 cell-accounted birth spacing and persistent lognormal fertility weights.
 Current behavior uses continuous event times with no monthly grid. Acceptance
 is based on the user-authored validation reports and retains their limitations.
@@ -12,9 +12,11 @@ schedules (D123).** See the [validation report](../validation/milestone7.qmd)
 and [rendered assessment](../validation/milestone7.html).
 See the [rate contract](time-varying-rates.md) and
 [group-transition contract](group-transitions.md). Household moves are deferred to
-tentative milestone 10's multiple-group/regions applications (D114/D121).
-Milestone 7 finishes with the current engine; binned-group hazards and formula
-weights remain planned for milestone 8 (D121).
+milestone 9's multiple-group/regions applications (D114/D121/D131).
+**Milestone 8 is accepted complete, November 5, 2026 (D130): cell scheduling
+for every rate process with one clock per process (D128) and weight models
+(D129).** See the [specification](binned-group-hazards.md) and the
+[validation report](../validation/milestone8.qmd).
 
 ## Reading order
 
@@ -23,6 +25,7 @@ weights remain planned for milestone 8 (D121).
 | [Project brief](project-brief.md) | Purpose, current scope, and milestone status |
 | [Specification](specification.md) | Implemented architecture, API, and source locations |
 | [Scientific contract](scientific-contract.md) | Current demographic assumptions and event rules |
+| [Cell scheduling and weight models](binned-group-hazards.md) | Cells and one clock per rate process (D128); formula/custom weight models and schedules (D129) |
 | [Calendar-varying models](time-varying-models.md) | Matching/father/cohabitation/inheritance model schedules and event-time selection (D123) |
 | [Calendar-varying rates](time-varying-rates.md) | Calendar bands, coverage, boundary timing and retained histories (D118) |
 | [Database rate preparation](database-rates.md) | Single/multiple years, native HMD shapes, pooled open ages and provenance (D119/D120) |
@@ -32,7 +35,7 @@ weights remain planned for milestone 8 (D121).
 | [Groups](groups.md) | Group-specific schedules, multipliers, newborn identity, and baseline sampling |
 | [Ancestry](ancestry.md) | Starting proportions, parental averaging, unknown shares, and restarts |
 | [Group inheritance](group-inheritance.md) | Built-in/custom identity rules, passing, and possible groups |
-| [Calibration intensity updates](calibration-intensity.md) | Actual female hazards, aggregate cells, and bookkeeping boundary queue (D082) |
+| [Calibration intensity updates](calibration-intensity.md) | Actual female hazards from search and fertility cells (D082/D128) |
 | [Weighted-choice matching](weighted-choice-matching.md) | Calibrated male-group weights and delta target adjustments (D074/D075) |
 | [Group matching](group-matching.md) | Symmetric pair effects and fixed group formula predictors |
 | [Demographic analysis](demographic-analysis.md) | Separate mortality/fertility rates, parity ASFRs, union rates, TFR, and life tables |
@@ -49,7 +52,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 
 | Document | Status |
 | --- | --- |
-| [Waiting-time sampling](waiting-time-sampling.md) | Explanation of the current shared hazard sampler |
+| [Event timing](waiting-time-sampling.md) | Explanation of the per-process exponential clock and cell choice |
 | [Union-formation models](union-formation-models.md) | Implemented milestone 2 rules, matching defaults, diagnostics, and deferred work |
 | [Cohabitation](cohabitation.md) | Rate-mode type probabilities, type-specific matching/rates, conversion and histories (D085/D086) |
 | [Remarriage schedules](remarriage.md) | Age/duration previous-union search strata, calibration, and marriage observations (D080/D083) |
@@ -57,7 +60,6 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [Parity fertility and PATFR](parity-fertility.md) | History-derived parity, schedules, HFD recovery and PATFR; milestone 5 accepted (D105) |
 | [Union dissolution](union-dissolution.md) | Milestone 4 duration hazards, female carrier, state changes, and worked examples (D078) |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
-| [Binned-group hazards](binned-group-hazards.md) | User-selected milestone 8 direction; formula weights, cell definitions and unresolved contracts (D121), not implemented |
 | [Two-sex union models](two-sex-union-models.md) | Proposal notes: directional asymmetry, marriage squeeze, Schoen/Choo–Siow/Dagsvik models, API considerations (D073) |
 | [Future roadmap](roadmap.md) | Accepted milestones and future priorities with unresolved specifications |
 | [Decision log](decisions.md) | Accepted choices and supersession history |

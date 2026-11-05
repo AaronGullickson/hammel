@@ -49,10 +49,10 @@ test_that("group schedules validate overlap and required strata independently", 
   expect_error(fertility(births), "group")
 })
 
-test_that("shared and identical grouped schedules preserve fixed-seed histories", {
-  # Groups always have their own fertility cells (D101), so a grouped run and
-  # an ungrouped run with the same rates agree in distribution, not seed by
-  # seed. Shared and explicitly identical grouped schedules use the same cells.
+test_that("shared and identical grouped schedules agree in distribution", {
+  # Cells stratify by group only when the rates do, so shared schedules pool
+  # groups while explicitly identical grouped schedules split them. The two
+  # agree in distribution, not seed by seed.
   model <- group_model()
   model <- set_fertility(model, group_status_rates(0.3, 0.2), 0.75, inheritance = "mother")
   model <- set_union_formation(model, "rate", rates = data.frame(
@@ -64,14 +64,15 @@ test_that("shared and identical grouped schedules preserve fixed-seed histories"
   original$population$persons$group <- NULL
   ungrouped <- simulate(original, 5, seed = 123)
   shared <- simulate(model, 5, seed = 123)
+  original_grouped <- model
   for (name in c("mortality", "fertility", "union_formation")) {
     rates <- model$processes[[name]]$rates
     model$processes[[name]]$rates <- rbind(transform(rates, group = "B"),
                                         transform(rates, group = "A"))
   }
-  grouped <- simulate(model, 5, seed = 123)
-  expect_identical(grouped, shared)
+  expect_equivalent_unions(original_grouped, model, 5)
   expect_s3_class(ungrouped, "hammel_population")
+  expect_s3_class(shared, "hammel_population")
 })
 
 test_that("group-specific mortality and newborn mortality use own group", {

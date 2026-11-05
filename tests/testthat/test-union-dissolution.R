@@ -75,17 +75,15 @@ test_that("duration bands use union duration, gaps and attained restart duration
   expect_true(all(old$unions$end_time < 1))
   model$population$persons$birth_time <- -40
   expect_identical(simulate(model, 1, seed = 52)$unions, old$unions)
-  gaps <- data.frame(dur_start = c(0, 2), dur_end = c(1, Inf), rate = c(.1, .2))
-  internal <- prepare_dissolution_rates(union_dissolution(gaps), model$population$persons, NULL)
-  expect_equal(as.numeric(hazard_wait_cpp(internal, c(0, 2.5), c(.3, .1))), c(3, .5))
 })
 
 test_that("birth ties retain the pending dissolution and death wins same-person ties", {
-  # Draw order: the woman's fertility-cell clock, her death, her dissolution,
-  # then the man's death. Ties sit at .5, away from integer-age cell boundaries.
+  # Process clocks draw thresholds in refresh order: fertility, mortality (only
+  # when positive), then dissolution. With one unit per process each due time is
+  # its threshold over the rate. Ties sit at .5, away from integer-age cells.
   seed <- 71
-  set.seed(seed); draws <- rexp(4)
-  model <- dissolution_model(rate = draws[3] / .5)
+  set.seed(seed); draws <- rexp(3)
+  model <- dissolution_model(rate = draws[2] / .5)
   model <- set_fertility(model, data.frame(age_start = 15, age_end = 50,
     union_type = c("partnered", "unpartnered"), rate = c(draws[1] / .5, 0)), birth_interval = 0)
   tied <- simulate(model, 1.5, seed = seed)
@@ -104,8 +102,10 @@ test_that("birth ties retain the pending dissolution and death wins same-person 
   endpoint <- simulate(model, .5, seed = seed)
   expect_equal(endpoint$simulation$births, 0)
   expect_equal(endpoint$simulation$dissolutions, 0)
+  # Her positive death rate now draws second, so dissolution draws third.
   model <- set_mortality(model, data.frame(sex = c("f", "m"),
     age_start = 0, age_end = Inf, rate = c(draws[2] / .5, 0)))
+  model$processes$union_dissolution$rates$rate <- draws[3] / .5
   dead <- simulate(model, 1.5, seed = seed)
   expect_equal(dead$simulation$births, 0)
   expect_equal(dead$simulation$dissolutions, 0)
@@ -113,17 +113,17 @@ test_that("birth ties retain the pending dissolution and death wins same-person 
 })
 
 test_that("widowhood invalidates pending dissolution in both initiation modes", {
-  # Zero fertility forms no cell clock: draws are her death, her dissolution,
-  # then his death.
-  set.seed(71); draws <- rexp(4)
+  # Zero rates draw no thresholds: the dissolution clock draws first (due at
+  # 1), then the mortality clock when his positive-rate cell fills (due at .5).
+  set.seed(71); draws <- rexp(2)
   for (mode in c("rate", "on_demand")) {
-    model <- dissolution_model(rate = draws[2])
+    model <- dissolution_model(rate = draws[1])
     if (mode == "on_demand") {
       model <- set_union_formation(model, mode)
       model <- set_fertility(model, data.frame(age_start = 15, age_end = 50, rate = 0))
     }
     model <- set_mortality(model, data.frame(sex = c("f", "m"),
-      age_start = 0, age_end = Inf, rate = c(0, draws[3] * 2)))
+      age_start = 0, age_end = Inf, rate = c(0, draws[2] * 2)))
     result <- simulate(model, 1.5, seed = 71)
     expect_equal(result$persons$death_time[2], .5, tolerance = 0)
     expect_identical(result$unions$end_reason, "death_husband")

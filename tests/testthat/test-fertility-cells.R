@@ -35,42 +35,41 @@ test_that("simulations report unrealized births as a typed tibble", {
   expect_s3_class(out, "tbl_df")
   expect_identical(nrow(out), 0L)
   expect_identical(names(out), c("period_start", "period_end", "age_start", "age_end",
-                                 "unrealized_births", "years_without_eligible"))
+                                 "unrealized_births"))
 })
 
-test_that("a cell whose only member is in spacing accrues exact unrealized intensity", {
-  # One woman whose previous birth (a son) was at -0.1 with a 2-year interval:
-  # she is ineligible until 1.9, so the cell has a member but no eligible woman.
-  people <- data.frame(person_id = 1:2, sex = c("f", "m"), birth_time = c(-30, -0.1),
-    death_time = NA_real_, mother_id = c(NA, 1), father_id = NA_real_)
+test_that("cells without an eligible woman count unrealized births", {
+  # Women whose previous birth (a son) was at -0.1 with a 2-year interval are
+  # ineligible until 1.9: their cells have members but no eligible woman, and
+  # each would-be birth is counted as unrealized.
+  n <- 2000
   model <- hammel_model() |>
-    set_population(hammel_population(people, end_time = 0)) |>
+    set_population(spacing_population(n)) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .5),
                   birth_interval = 2) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
   result <- simulate(model, 1.5, seed = 4)
   out <- result$simulation$unrealized_births
-  expect_equal(nrow(result$persons), 2L)
+  expect_equal(nrow(result$persons), 2 * n)
   expect_equal(out$period_start, c(0, 1))
   expect_equal(out$period_end, c(1, 1.5))
-  expect_equal(out$unrealized_births, c(.5, .25))
-  expect_equal(out$years_without_eligible, c(1, .5))
-  # Cells are 1-year age sub-bands: she is 30 at the start and 31 after a year.
+  expect_true(all(out$unrealized_births == round(out$unrealized_births)))
+  expect_count(out$unrealized_births[1], .5 * n)
+  expect_count(out$unrealized_births[2], .25 * n)
+  # Cells are 1-year age sub-bands: they are 30 at the start and 31 after a year.
   expect_equal(out$age_start, c(30, 31))
   expect_equal(out$age_end, c(31, 32))
 })
 
 test_that("cells split ages at whole years and pooled parity bands by actual parity", {
-  # A woman aged 20.5 at actual parity 4 in a pooled [2,Inf) band, last birth
-  # at -0.1 with a 2-year interval: one member and none eligible.
-  people <- data.frame(person_id = 1:5, sex = c("f", rep("m", 4)),
-    birth_time = c(-20.5, -4, -3, -2, -0.1), death_time = NA_real_,
-    mother_id = c(NA, 1, 1, 1, 1), father_id = NA_real_)
+  # Women aged 20.5 at actual parity 4 in a pooled [2,Inf) band, last birth
+  # at -0.1 with a 2-year interval: members and none eligible.
+  n <- 1000
   rates <- data.frame(age_start = 15, age_end = Inf, parity_start = c(0, 2),
                       parity_end = c(2, Inf), rate = c(.1, .4))
   model <- hammel_model() |>
-    set_population(hammel_population(people, end_time = 0)) |>
+    set_population(spacing_population(n, 20.5, c(-4, -3, -2, -0.1))) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     (\(m) quiet_unreachable(set_fertility(m, rates, birth_interval = 2)))() |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
@@ -81,8 +80,8 @@ test_that("cells split ages at whole years and pooled parity bands by actual par
   expect_equal(out$parity_end, c(5, 5))
   expect_equal(out$age_start, c(20, 21))
   expect_equal(out$age_end, c(21, 22))
-  expect_equal(out$unrealized_births, c(.2, .2))
-  expect_equal(out$years_without_eligible, c(.5, .5))
+  expect_count(out$unrealized_births[1], .2 * n)
+  expect_count(out$unrealized_births[2], .2 * n)
 })
 
 test_that("zero spacing generates births at the input rate", {
@@ -200,42 +199,44 @@ test_that("unreachable parity/age cells are reported from the schedule and inter
 })
 
 test_that("upper-open bands stay one cell only when interval x rate is very small", {
-  # One woman aged 30 whose last birth was at -0.1 with a 2-year interval.
-  open_case <- function(rate) {
-    people <- data.frame(person_id = 1:2, sex = c("f", "m"), birth_time = c(-30, -0.1),
-      death_time = NA_real_, mother_id = c(NA, 1), father_id = NA_real_)
+  # Women aged 30 whose last birth was at -0.1 with a 2-year interval.
+  open_case <- function(rate, n) {
     model <- hammel_model() |>
-      set_population(hammel_population(people, end_time = 0)) |>
+      set_population(spacing_population(n)) |>
       set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
       set_fertility(data.frame(age_start = 15, age_end = Inf, rate = rate),
                     birth_interval = 2) |>
       set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
     simulate(model, 1.5, seed = 8)$simulation$unrealized_births
   }
-  small <- open_case(.0004) # 2 * .0004 = .0008 < .001: one open cell
+  small <- open_case(.0004, 50000) # 2 * .0004 = .0008 < .001: one open cell
   expect_equal(small$age_start, c(15, 15))
   expect_equal(small$age_end, c(Inf, Inf))
-  expect_equal(small$unrealized_births, c(.0004, .0002))
-  large <- open_case(.5)    # split into yearly cells
+  expect_count(small$unrealized_births[1], .0004 * 50000)
+  expect_count(small$unrealized_births[2], .0002 * 50000)
+  large <- open_case(.5, 2000)    # split into yearly cells
   expect_equal(large$age_start, c(30, 31))
   expect_equal(large$age_end, c(31, 32))
-  expect_equal(large$unrealized_births, c(.5, .25))
+  expect_count(large$unrealized_births[1], .5 * 2000)
+  expect_count(large$unrealized_births[2], .25 * 2000)
 })
 
 test_that("released eligibility does not consume blocked time or force a birth", {
-  # Review reproduction: blocked 0.65 years at rate .5 must report .325
-  # unrealized births after release, and release must not trigger an
-  # immediate birth from threshold spent while no one was eligible.
-  people <- data.frame(person_id = 1:2, sex = c("f", "m"), birth_time = c(-30, -0.1),
-    death_time = NA_real_, mother_id = c(NA, 1), father_id = NA_real_)
+  # Review reproduction: blocked 0.65 years at rate .5 gives .325 expected
+  # unrealized births per woman before release, and release must not trigger
+  # an immediate birth.
+  n <- 2000
   model <- hammel_model() |>
-    set_population(hammel_population(people, end_time = 0)) |>
+    set_population(spacing_population(n)) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .5),
                   birth_interval = .75) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
-  out <- simulate(model, .9, seed = 2)$simulation$unrealized_births
-  expect_equal(sum(out$unrealized_births), .5 * .65)
+  result <- simulate(model, .9, seed = 2)
+  expect_count(result$simulation$unrealized_births$unrealized_births, .5 * .65 * n)
+  # After release at .65 the women give births at the input rate.
+  released <- sum(result$persons$birth_time >= .65 & result$persons$mother_id %in% seq_len(n))
+  expect_count(released, .5 * .25 * n)
   # One woman, many intervals (sons only, so no descendants reproduce): none
   # may sit exactly at the minimum spacing.
   one <- data.frame(person_id = 1, sex = "f", birth_time = -15, death_time = NA_real_,
@@ -265,11 +266,11 @@ test_that("the unreachable-cell check terminates for infinite unreachable ranges
 })
 
 test_that("calculate_fertility_rates attributes unrealized births exactly or returns NA", {
-  # One woman aged 30 in spacing until 1.9: unrealized .5 in [0,1), .25 in [1,1.5).
-  people <- data.frame(person_id = 1:2, sex = c("f", "m"), birth_time = c(-30, -0.1),
-    death_time = NA_real_, mother_id = c(NA, 1), father_id = NA_real_)
+  # Women aged 30 in spacing until 1.9: unrealized .5 per woman in [0,1),
+  # .25 in [1,1.5).
+  n <- 2000
   model <- hammel_model() |>
-    set_population(hammel_population(people, end_time = 0)) |>
+    set_population(spacing_population(n)) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .5),
                   birth_interval = 2) |>
@@ -277,8 +278,9 @@ test_that("calculate_fertility_rates attributes unrealized births exactly or ret
   pop <- simulate(model, 1.5, seed = 4)
   r <- calculate_fertility_rates(pop, c(0, 1, 1.5), c(15, 50), unrealized = TRUE)
   r <- r[r$age_start == 15, ]
-  expect_equal(r$unrealized_births, c(.5, .25))
-  expect_equal(r$rate_fertility_adjusted, c(.5, .5))
+  expect_count(r$unrealized_births[1], .5 * n)
+  expect_count(r$unrealized_births[2], .25 * n)
+  expect_true(all(abs(r$rate_fertility_adjusted - .5) < 4 * sqrt(.5 / r$person_years)))
   expect_equal(r$rate_fertility, c(0, 0))
   # Without the argument the schema is unchanged.
   expect_false("unrealized_births" %in% names(calculate_fertility_rates(pop, c(0, 1.5), c(15, 50))))
@@ -305,25 +307,24 @@ test_that("calculate_fertility_rates attributes unrealized births exactly or ret
 })
 
 test_that("unrealized births pool into observed parity bands and restore cohort rates", {
-  # Actual parity 4 inside a pooled [2,Inf) band: .2 in each one-year age cell.
-  people <- data.frame(person_id = 1:5, sex = c("f", rep("m", 4)),
-    birth_time = c(-20.5, -4, -3, -2, -0.1), death_time = NA_real_,
-    mother_id = c(NA, 1, 1, 1, 1), father_id = NA_real_)
+  # Actual parity 4 inside a pooled [2,Inf) band: .2 per woman in each
+  # one-year age cell.
+  n <- 1000
   rates <- data.frame(age_start = 15, age_end = Inf, parity_start = c(0, 2),
                       parity_end = c(2, Inf), rate = c(.1, .4))
   model <- hammel_model() |>
-    set_population(hammel_population(people, end_time = 0)) |>
+    set_population(spacing_population(n, 20.5, c(-4, -3, -2, -0.1))) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     (\(m) quiet_unreachable(set_fertility(m, rates, birth_interval = 2)))() |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
   pop <- simulate(model, 1, seed = 7)
   r <- calculate_fertility_rates(pop, c(0, 1), c(15, Inf), parity_breaks = c(0, 2),
                                  unrealized = TRUE)
-  expect_equal(r$unrealized_births[r$parity_start == 2], .4)
+  expect_count(r$unrealized_births[r$parity_start == 2], .4 * n)
   expect_equal(r$unrealized_births[r$parity_start == 0], 0)
   pooled <- calculate_fertility_rates(pop, c(0, 1), c(15, Inf), unrealized = TRUE)
-  expect_equal(pooled$unrealized_births[pooled$age_start == 15], .4)
-  expect_equal(pooled$rate_fertility_adjusted[pooled$age_start == 15], .4)
+  expect_count(pooled$unrealized_births[pooled$age_start == 15], .4 * n)
+  expect_lt(abs(pooled$rate_fertility_adjusted[pooled$age_start == 15] - .4), 4 * sqrt(.4 / n))
   # Initialized cohort: adding back start-up unrealized births restores parity 1.
   n <- 3000
   cohort <- data.frame(age_start = 15, age_end = Inf, parity_start = 0:2,
@@ -338,13 +339,12 @@ test_that("unrealized births pool into observed parity bands and restore cohort 
 })
 
 test_that("unrealized births follow group and union-type strata and refuse parity splits", {
-  # A group-A woman, unpartnered, in spacing until 1.9; her son is group B.
-  people <- data.frame(person_id = 1:2, sex = c("f", "m"), birth_time = c(-30, -0.1),
-    death_time = NA_real_, mother_id = c(NA, 1), father_id = NA_real_, group = c("A", "B"))
+  # Group-A women, unpartnered, in spacing until 1.9; their sons are group B.
+  n <- 2000
   rates <- data.frame(age_start = 15, age_end = 50, rate = c(.2, .5),
                       union_type = c("partnered", "unpartnered"))
   model <- hammel_model() |>
-    set_population(hammel_population(people, end_time = 0)) |>
+    set_population(spacing_population(n, groups = c("A", "B"))) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(rates, birth_interval = 2) |>
     set_union_formation("rate", rates = data.frame(age_start = 15, age_end = Inf, rate = 0),
@@ -354,9 +354,9 @@ test_that("unrealized births follow group and union-type strata and refuse parit
                                  by_union_type = TRUE, unrealized = TRUE)
   r <- r[r$age_start == 15, ]
   cell <- r$group == "A" & r$union_type == "unpartnered"
-  expect_equal(r$unrealized_births[cell], .5)
+  expect_count(r$unrealized_births[cell], .5 * n)
   expect_true(all(r$unrealized_births[!cell] == 0))
-  expect_equal(r$rate_fertility_adjusted[cell], .5)
+  expect_lt(abs(r$rate_fertility_adjusted[cell] - .5), 4 * sqrt(.5 / n))
   # This schedule has no parity columns, so parity rows cannot be attributed.
   p <- calculate_fertility_rates(pop, c(0, 1), c(15, 50), parity_breaks = c(0, 1),
                                  unrealized = TRUE)
@@ -366,13 +366,10 @@ test_that("unrealized births follow group and union-type strata and refuse parit
 
 test_that("a cut period makes only the overlapping parity rows unknown", {
   # Actual parity 4 in a pooled [2,Inf) band; a break at .5 cuts the record.
-  people <- data.frame(person_id = 1:5, sex = c("f", rep("m", 4)),
-    birth_time = c(-20.5, -4, -3, -2, -0.1), death_time = NA_real_,
-    mother_id = c(NA, 1, 1, 1, 1), father_id = NA_real_)
   rates <- data.frame(age_start = 15, age_end = Inf, parity_start = c(0, 2),
                       parity_end = c(2, Inf), rate = c(.1, .4))
   model <- hammel_model() |>
-    set_population(hammel_population(people, end_time = 0)) |>
+    set_population(spacing_population(200, 20.5, c(-4, -3, -2, -0.1))) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     (\(m) quiet_unreachable(set_fertility(m, rates, birth_interval = 2)))() |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)

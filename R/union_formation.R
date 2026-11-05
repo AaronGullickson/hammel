@@ -309,7 +309,7 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' available; surviving husbands return to the pool at widowhood. Death ends affected
 #' unions. In rate mode unpartnered women face competing search events and
 #' use their unpartnered fertility schedule and may give birth without initiating
-#' a search. Failed searches draw another waiting time; formation and widowhood
+#' a search. Failed searches leave the woman searching; formation and widowhood
 #' switch fertility schedules while preserving spacing. An overall fertility
 #' schedule applies to both statuses, with a simulation warning. On-demand mode
 #' requires an overall fertility schedule. Unpartnered rate-mode births use the
@@ -358,8 +358,8 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' @param cancel_birth_if_no_match Logical, default `TRUE`. Cancel a birth when
 #'   its on-demand partner search or rate-mode nonmarital father selection fails.
 #'   Set `FALSE` to allow births with unknown fathers. Historical missing father
-#'   IDs are retained. A cancellation starts no new spacing interval and draws
-#'   fresh waiting times from the failed attempt. Partner scarcity can reduce
+#'   IDs are retained. A cancellation starts no new spacing interval, and the
+#'   attempt is not replaced. Partner scarcity can reduce
 #'   realized fertility below inputs.
 #' @param father_matching Optional matching specification for fathers of
 #'   unpartnered births in rate mode, created by [create_matching_model()], or a
@@ -388,10 +388,10 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' changes precede same-time events and retain duration origins. `cohab_prob`
 #' accepts the same calendar columns, with probabilities selected at the search
 #' instant. Probability-only changes refresh matching calibration without
-#' resampling pending event clocks. All three matching arguments also accept
+#' changing event clocks. All three matching arguments also accept
 #' whole-model schedule tibbles with `time_start`, `time_end`, and list-column
 #' `model`. Model changes update role-specific preferences and calibration before
-#' same-time choices without resampling event clocks. All supplied models,
+#' same-time choices without changing event clocks. All supplied models,
 #' including future intervals, are validated; gaps in a run are errors. NULL
 #' father/cohabitation matching dynamically follows general matching. Other
 #' non-rate arguments remain static.
@@ -444,6 +444,15 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   previous-union axis. NULL gives no conversions and warns at simulation.
 #'   Conversion keeps partners, closes cohab with reason `conversion`, and starts
 #'   a linked marriage with a new dissolution-duration origin.
+#' @param weights NULL (default) for unweighted selection of searching women,
+#'   or a [create_weight_model()] using person variables, which chooses which
+#'   unpartnered woman in a cell searches without changing the cell's input
+#'   search rate. Rate mode only. With weighted matching calibration the
+#'   weights are kept current for every searching woman, so calibration uses
+#'   the weighted search intensities.
+#' @param weights_conversion NULL (default) for unweighted selection, or a
+#'   [create_weight_model()] using union variables, which chooses which
+#'   cohabitation in a cell converts without changing the cell's input rate.
 #' @param cohabitation_counts_as_previous_union Logical, default FALSE. FALSE
 #'   restores previous legal-marriage category after a cohabitation ends; TRUE
 #'   classifies cohab breakup/death as separated/widowed. Search duration still
@@ -458,7 +467,8 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
                             diagnostics = FALSE, group_prop_hazard = NULL,
                             cohab_prob = NULL, cohab_matching = NULL, union_convert_rate = NULL,
-                            cohabitation_counts_as_previous_union = FALSE) {
+                            cohabitation_counts_as_previous_union = FALSE,
+                            weights_conversion = NULL, weights = NULL) {
   process <- structure(list(
     name = "union_formation", initiation = initiation, matching = matching,
     min_male_age = min_male_age,
@@ -466,9 +476,20 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
     cancel_birth_if_no_match = cancel_birth_if_no_match, diagnostics = diagnostics,
     rates = rates, rate_unit = "person_year", group_prop_hazard = group_prop_hazard,
     cohab_prob = cohab_prob, cohab_matching = cohab_matching, union_convert_rate = union_convert_rate,
-    cohabitation_counts_as_previous_union = cohabitation_counts_as_previous_union
+    cohabitation_counts_as_previous_union = cohabitation_counts_as_previous_union,
+    weights_conversion = normalize_model_argument(weights_conversion),
+    weights = normalize_model_argument(weights)
   ), class = c("hammel_union_formation", "hammel_process"))
   validate_union_formation(process)
+  validate_process_weights(weights_conversion, "union")
+  validate_process_weights(weights, "person")
+  if (!is.null(weights) && !identical(initiation, "rate"))
+    stop("Search `weights` require rate-based union formation.", call. = FALSE)
+  if (!is.null(weights) && !is.null(rates))
+    warn_cancelled_weight_terms(weights, weight_strata("search", rates, group_prop_hazard), "search")
+  if (!is.null(weights_conversion) && !is.null(union_convert_rate))
+    warn_cancelled_weight_terms(weights_conversion, weight_strata("conversion", union_convert_rate),
+                                "conversion")
   for (field in c("matching", "father_matching", "cohab_matching"))
     process[field] <- list(normalize_model_argument(process[[field]]))
   for (field in c("cohab_prob", "union_convert_rate"))
@@ -488,12 +509,14 @@ set_union_formation <- function(model, initiation, matching = create_age_gap_mat
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
                             diagnostics = FALSE, group_prop_hazard = NULL,
                             cohab_prob = NULL, cohab_matching = NULL, union_convert_rate = NULL,
-                            cohabitation_counts_as_previous_union = FALSE) {
+                            cohabitation_counts_as_previous_union = FALSE,
+                            weights_conversion = NULL, weights = NULL) {
   set_process(model, union_formation(initiation, matching, rates,
                                      min_male_age, kinship_generations, father_matching,
                                      cancel_birth_if_no_match, diagnostics, group_prop_hazard,
                                      cohab_prob, cohab_matching, union_convert_rate,
-                                     cohabitation_counts_as_previous_union))
+                                     cohabitation_counts_as_previous_union, weights_conversion,
+                                     weights))
 }
 
 validate_union_formation <- function(process) {

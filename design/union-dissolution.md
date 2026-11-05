@@ -10,11 +10,11 @@ Milestone 4 was accepted October 29, 2026 (D093); see the
 
 ## Risk, units and eligibility
 
-Each ongoing union has one dissolution clock, carried by its living female
-partner. Duration is current time minus the union's recorded `start_time`, in
+Each ongoing union is one unit at risk in the dissolution process's cells
+(D128; until milestone 8 the woman carried a per-union clock). Duration is current time minus the union's recorded `start_time`, in
 years. Input `rate` is a continuous hazard per partnered woman-year, equivalently
 per union-year under Hammel's exclusive unions. It is not an annual probability.
-There is no second male clock and no multiplication by two. Neither partner's
+There is no second male risk and no multiplication by two. Neither partner's
 age selects this baseline schedule. Shared schedules apply to all unions;
 optional schedules and multipliers select an unordered group pair (D079).
 Thus A-wife/B-husband and B-wife/A-husband share the same dissolution risk;
@@ -70,17 +70,17 @@ model <- set_union_dissolution(model, rates)
 
 ## Timing and state changes
 
-The clock uses the shared cumulative-hazard inversion (`Band`/`waiting_time()`),
-with duration as its time coordinate. Sample one pending dissolution date per
-union episode. Births and cancelled birth attempts retain that date; a birth
-must not reset union duration. Restarts resample at attained duration, like
-other processes, and are not exact checkpoints.
+A union sits in the cell of its group pair, union type and duration band, and
+moves at duration band edges. The dissolution process's clock fires at the
+total intensity of its cells and picks a union within the chosen cell (D128).
+Births and cancelled birth attempts do not affect it; a birth must not reset
+union duration. Restarts rebuild cells at attained duration, like other
+processes, and are not exact checkpoints.
 
-The pending date competes with the woman's death and birth. For exact
-same-person ties, death precedes birth, then dissolution, then search. In a
-birth/dissolution tie, birth uses the still-partnered status; the pending
-dissolution executes afterward if the union is still ongoing. Across different
-people, existing insertion-order tie semantics remain. The run covers
+Exact ties between processes put death before birth, then dissolution, then
+conversion and search. In a birth/dissolution tie, birth uses the
+still-partnered status; the dissolution executes afterward if the union is
+still ongoing. The run covers
 `[start, start + years)` and excludes endpoint events.
 
 When dissolution executes:
@@ -121,9 +121,9 @@ dissolutions against union-year exposure.
   another two years is `exp(-0.1 * 2)`, not `1 - 0.1 * 2`.
 - Rate zero for `[0,5)`, then 0.2: a new union cannot dissolve before duration
   five; an input union already at duration seven faces rate 0.2 immediately.
-- Bands `[0,1)` at 0.1 and `[2,Inf)` at 0.2: threshold 0.3 from duration zero
-  crosses the first year, a zero-risk gap, and one additional year, reaching
-  duration three. From duration 2.5, threshold 0.1 gives a wait of 0.5 years.
+- Bands `[0,1)` at 0.1 and `[2,Inf)` at 0.2: a union faces 0.1 in its first
+  year, no risk in its second, and 0.2 from duration two; the integrated hazard
+  from duration zero reaches 0.3 at duration three.
 - With factor `"A:B" = 2`, both wife-A/husband-B and wife-B/husband-A
   couples use twice the baseline; A:A and B:B use the baseline unless specified.
 - A birth and pending dissolution at time 1: record the partnered birth with
@@ -190,7 +190,7 @@ absent-process history/RNG preservation. Use synthetic local inputs only.
 D101 cell accounting, accepted in milestone 5 (D105), replaces the former
 D045 fertility-transition approximation: dissolution moves the woman between
 current fertility cells while retaining her spacing eligibility. Sparse cells
-without eligible women still report unrealized intensity. Cohabitation is
+without eligible women still count unrealized births. Cohabitation is
 implemented under D086; richer couple covariates remain deferred. Calendar-varying
 dissolution is implemented under [D118](time-varying-rates.md).
 Duration-based remarriage observations are available via `dur_breaks` under D084. These rules intentionally differ from SOCSIM's

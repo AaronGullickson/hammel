@@ -1,14 +1,14 @@
 # Design and implemented interface
 
-Updated November 2, 2026. Milestones 1–7 are complete by user acceptance
-(D029, D050, D077, D093, D105, D116, D127). Individual group transitions are accepted
+Updated November 5, 2026. Milestones 1–8 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116, D127, D130). Individual group transitions are accepted
 under D116; milestone 7 calendar-varying rates are implemented under D118,
 accepted complete November 2, 2026 (D127). D123 implements matching/inheritance model
 schedules. This document describes implemented architecture.
 Future extension ideas are listed separately and do not authorize new behavior.
-[Milestone 8 binned-group hazards](binned-group-hazards.md) are a selected future
-direction (D121), not implemented architecture. Milestone 7 was completed with
-the current engine.
+Milestone 8 schedules every rate process by cells with one clock per process
+(D128) and adds weight models (D129); see
+[cell scheduling and weight models](binned-group-hazards.md).
 The [scientific contract](scientific-contract.md) defines demographic semantics.
 
 ## Responsibilities and source locations
@@ -24,6 +24,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Shared calendar-rate validation | `R/calendar_rates.R`; boundaries and active slices in `src/simulate.cpp` |
 | Individual transition specification and history | `R/group_transition.R`; events in `src/simulate.cpp`; observation splitting in `src/group_history.h` |
 | Persistent fertility weights and specification | `R/het_fert.R`; cell weight trees in `src/simulate.cpp` |
+| Weight models (formulas, custom functions, schedules) | `R/weight_model.R`; stored weights and selection in `src/simulate.cpp` (`RateCells`, `FertilityCells`) |
 | Union formation/matching and dissolution specifications | `R/union_formation.R`, `R/union_dissolution.R` |
 | Shared kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/kinship.R` |
 | HMD/HFD downloads and preparation | `R/construct_demographic_rates.R`, `R/database_intervals.R`, `R/hmd_open_age.R` |
@@ -32,15 +33,17 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Demographic extraction and measures | `src/demography.cpp`, `R/calc_demographic_measures.R` |
 | Directed transition Lexis counts | `R/calculate_transition_rates.R`; `transition_counts_cpp()` in `src/demography.cpp` |
 | Software and analytical validation | `tests/testthat/` |
-| Replication assessment | `validation/milestone1.qmd`, `validation/milestone2.qmd`, `validation/milestone3.qmd`, `validation/milestone4.qmd`, `validation/milestone5.qmd`, `validation/milestone6.qmd` |
+| Replication assessment | `validation/milestone1.qmd` through `validation/milestone8.qmd` |
 
 The engine is C++17 with Rcpp. R exposes ordinary list objects and tibbles.
 Grouped dissolution and conversion observations build union-level group
 histories through `union_group_history_cpp()` using the shared `GroupHistory`
 index. Each union visits only its partners' transition histories; pair labels
 are mapped once before native traversal.
-`Band` and `waiting_time()` are shared by mortality and adjusted fertility.
-Every simulation owns its population, queue, and working state; there is no
+Every rate process uses the same cell machinery (`RateCells`, or
+`FertilityCells` for fertility): an `IntensityTree` over cells, one
+`ProcessClock` and a `BoundaryQueue` for band-edge moves (D128). Every
+simulation owns its population, cells, clocks and working state; there is no
 hidden process-wide engine population.
 
 ## Construction is separate from execution
@@ -104,16 +107,18 @@ duration-dependent union dissolution. Optional `group_transition()` is also supp
 fertility, and an explicit union-formation process. It uses continuous years, with no `dt`, execution step, monthly
 compensation grid, or birth-spacing argument on the execution function.
 
-C++ builds fertility cells from the input schedules (D101), samples
-cumulative-hazard thresholds, and processes the earliest of the next person
-event, the next fertility-cell clock and the next cell boundary.
+C++ builds cells for every rate process from the input schedules (D101,
+D128) and processes the earliest of the next calendar change, the next cell
+boundary and the next process clock; `refresh_person()` and `refresh_union()`
+update a unit's memberships in every process after each state change.
 R validates inputs and assembles the returned `hammel_population`, retaining
 histories and existing extra person columns. Newborn group identity follows
 the fertility inheritance model (random parent by default, with maternal fallback); other custom attributes are
 missing. Group-specific schedules and baseline group sampling are documented in
 [groups](groups.md). The `simulation` component records `start_time`, `end_time`,
 `birth_interval`, `ffab`, `births`, and `deaths` for the latest run, plus
-`dissolutions` when that optional process is configured.
+`dissolutions` when that optional process is configured, and
+`unrealized_births`, a tibble of counted unrealized births.
 
 Grouped populations also have an `ancestry` tibble, or may supply it explicitly
 to `hammel_population(ancestry = ...)`. Initialization uses recorded identities
@@ -127,7 +132,7 @@ components; it does not traverse the genealogy or draw random numbers. See
 
 With an explicit seed, R's RNG state is restored after the call. With no seed,
 the current state advances normally. See the scientific contract for ties,
-run boundaries, parent assignment, and resampling.
+run boundaries, parent assignment, and restarts.
 
 ## Union-history observations
 
@@ -175,14 +180,16 @@ continued <- model |>
 
 Reusing the original model retains its processes. Building a new model from
 `result` requires explicitly attaching processes; the output stores population
-history and run metadata, not a saved model or pending queue.
+history and run metadata, not a saved model or pending clocks.
 
 Users can replace rates between runs or supply calendar bands inside one run.
 The engine selects active rate rows and processes calendar boundaries before
-same-time events. It redraws pending person/union candidates at each calendar
-boundary; fertility cells rebuild when fertility changes, preserving spacing,
-weights, parity and histories. Matching calibration contributions refresh under
-the current rates. Unrealized intensity is retained across fertility epochs.
+same-time events. A process whose cell layout is unchanged takes the new
+rates in place and keeps its clock (`same_layout`/`set_rates`,
+`FertilityCells::update_rates`); otherwise its cells are rebuilt, preserving
+spacing, weights, parity and histories. Matching calibration contributions
+follow the cells. Weight schedules switch the active model and recompute stored
+weights without touching clocks.
 This stays within one native invocation with independent call-local state;
 matching and inheritance models can also vary through model-list tibbles (D123).
 Model-only changes preserve pending dates and histories. Role preference/draw
@@ -193,9 +200,9 @@ identities. Direct static models retain the existing execution path. See
 [calendar-varying rates](time-varying-rates.md) and
 [calendar-varying models](time-varying-models.md).
 
-Restarting redraws pending events and is not guaranteed to match an uninterrupted
-fixed-seed run. Boundary processing also consumes random draws, so a redundant
-calendar boundary does not promise fixed-seed equality with a static table.
+Restarting rebuilds cells with new thresholds and is not guaranteed to match an
+uninterrupted fixed-seed run. A calendar boundary that rebuilds cells consumes
+random draws, so it does not promise fixed-seed equality with a static table.
 
 ## Data and observation interfaces
 
@@ -315,19 +322,16 @@ his selection score in the exact draw.
 `WeightCalibrator` in `src/simulate.cpp` keeps unpartnered counts by group and
 birth-time bin and incrementally maintained pool sums for each matching model's
 table of utilities over bin-centre lags, updated at events, and solves the
-weights at each search from those sums. `FemaleIntensityTracker` maintains
-individual current search/fertility contributions and their group/cohort totals,
-with one queued next age/duration/spacing boundary per counted woman
-(D082/D083). Search clock origins are separate from fertility birth times. State
-changes replace contributions; searches do not scan all women or enumerate a
+weights at each search from those sums. Female contributions come from the
+cells (D082/D083/D128): `SearchCalibration` keeps per search cell and
+calibration bin the sums of w(1-p) and w p, recomputing changed cells before
+each solve; `FertilityCells` keeps unpartnered eligible weight per bin; and
+`ProbabilityTracker` keeps each unpartnered woman's cohabitation probability
+and its age boundaries. Searches do not scan all women or enumerate a
 cross-classification of rate predictors. See
-[current-hazard contributions](calibration-intensity.md). Its boundary
-queue is the shared `BoundaryQueue` class, also used by `FertilityCells`
-(D101), which keeps cell counts and eligible lists,
-keeps one birth clock per cell in its own indexed heap (compared with the main
-event queue at each step), processes its boundaries in time order, and
-supplies calibration fertility totals at search time. `BoundaryQueue` is a
-lazy-deletion binary heap ordered by (time, person). See [cell-accounted fertility](fertility-cell-accounting.md). Matching models carry
+[current-hazard contributions](calibration-intensity.md). `BoundaryQueue` is a
+bucket queue (1/365-year buckets over a 16-year ring, plus an overflow heap)
+ordered by (time, unit). See [cell-accounted fertility](fertility-cell-accounting.md). Matching models carry
 `delta` (omitted groups default to zero). One group gives unit weights and female
 choice exactly. See [weighted-choice matching](weighted-choice-matching.md).
 
@@ -363,11 +367,10 @@ the pool; widowhood returns a surviving husband. Pool updates use constant-time
 swap removal within each group and birth-bin cell.
 
 There is no union-enable flag or no-union execution path. Both initiation modes share the same partner and union state and search helper.
-Rate mode adds a search event type and per-person event versions to invalidate
-queued births after widowhood. Rate mode selects the current status fertility schedule; an overall schedule
+Rate mode adds a search process. Rate mode selects the current status fertility schedule; an overall schedule
 applies to both statuses with one warning per simulation. On-demand requires
 overall fertility. Birth spacing persists across status transitions.
-Failed searches reschedule at attained age; age-band gaps have zero hazard.
+Failed searches leave the woman in her search cell; age-band gaps have zero hazard.
 
 Matching uses the entered formula and named coefficients. R prepares an exact
 native linear/raw-quadratic evaluator where applicable; other formulas retain
@@ -415,13 +418,13 @@ without consuming random draws. Diagnostics default off; see the
 Optional cohab_prob on union formation enables cohab/marriage histories in rate
 mode. `cohab_prob` optionally includes flat half-open calendar bands (D122);
 active probability schedules update before same-time searches. Probability-only
-changes rebuild marriage/cohabitation intensity contributions without resampling
-pending events, while rate changes retain D118 rescheduling. Cohab matching and
+changes refresh marriage/cohabitation contributions without touching clocks,
+while rate changes follow the D118/D128 rules. Cohab matching and
 conversion are part of that process; dissolution
 optionally stratifies by type. See [cohabitation](cohabitation.md) for complete
 inputs, chronology, linked episodes, legal-history recovery and observations.
 Fertility input strata are now union_type (the old input union_status errors).
-The contribution cache has marriage-search, father and cohab-search channels;
+Calibration has marriage-search, father and cohab-search channels;
 preference tables may be shared, but role weights use each role's intensity.
 
 
@@ -443,6 +446,21 @@ No tree is allocated on the uniform path. Daughter weights use independent
 normal innovations, except exact-copy or zero-innovation endpoints. No
 per-generation marginal normalization is imposed. See [the specification](fertility-heterogeneity-notes.md).
 
+## Weight models (D129)
+
+`create_weight_model(formula, coefficients, group_levels)` or
+`create_weight_model(fun = f)` builds a weight model, validated by
+`validate_weight_model()`; `weights` arguments on `set_mortality()`,
+`set_fertility()`, `set_union_dissolution()`, `set_group_transition()` and
+`set_union_formation()` (with `weights_conversion`) accept one model or a
+`time_start`/`time_end`/`model` schedule. `prepare_weight_model()` decodes a
+formula into variable codes and coefficients for the engine, and simulation
+warns about terms that cancel within every cell. The engine stores formula
+weights at each refresh and selects by rejection sampling against a per-cell
+weight bound; custom functions are called for the chosen cell at selection,
+except for fertility and search under matching calibration, where stored
+weights are needed. See [weight models](binned-group-hazards.md#weight-models-d129).
+
 ## Individual group transitions
 
 `group_transition(rates)` and `set_group_transition(model, rates)` configure
@@ -451,7 +469,7 @@ optional competing person-level moves. Required direction columns are
 the table, optionally stratified by `sex` and `union_type`. The transition
 registry includes initially empty groups and all other grouped specifications
 must cover it. Native events update pools, calibration, fertility cells and
-union clocks affected by either partner's identity. Duration uses latest entry,
+union cells affected by either partner's identity. Duration uses latest entry,
 or age without history; ancestry is retained. No household moves or target
 adjustments are implemented.
 

@@ -1,6 +1,6 @@
 # Hammel project brief
 
-Updated November 2, 2026. The user accepted milestone 1 (mortality/fertility)
+Updated November 5, 2026. The user accepted milestone 1 (mortality/fertility)
 on October 15, 2026 (D029), milestone 2 (union formation) on October 19,
 2026 (D050), milestone 3 (groups) on October 27, 2026 (D077), and milestone 4
 (dissolution/remarriage/cohabitation) on October 29, 2026 (D093). Milestone 5
@@ -10,6 +10,8 @@ was accepted October 29, 2026 (D105). The user accepted individual group transit
 probabilities (D122), plus matching/inheritance model schedules (D123), are
 accepted complete on November 2, 2026 (D127), based on the user-authored
 [validation report](../validation/milestone7.qmd) and explicit user acceptance.
+Milestone 8, cell scheduling for every rate process (D128) and weight models
+(D129), was accepted complete on November 5, 2026 (D130).
 See [testing](testing.md) for evidence and limits.
 
 ## Purpose
@@ -109,11 +111,11 @@ belongs to the user; completion does not establish universal accuracy or remove
 sparse-cell, calibration, or fertility-transition limitations. Weighted matching
 does not model marriage squeezes; fuller two-sex models remain future work.
 
-The [roadmap](roadmap.md) records group transitions complete (milestone 6), then
-milestone 7 completion with the current engine, then binned-group hazards and
-formula weights (milestone 8), summaries/helpers (9), tentative multiple group
-columns (10), external immigration (11) and a two-sex marriage model (12), under
-D121. The two-sex model and API remain unselected (D117). No future
+The [roadmap](roadmap.md) records group transitions complete (milestone 6),
+calendar-varying inputs (milestone 7), cell scheduling and weight models
+(milestone 8), then multiple group columns (9), external immigration (10),
+summaries/helpers (11) and a two-sex marriage model (12), under D121 as
+reordered by D131. The two-sex model and API remain unselected (D117). No future
 feature is authorized by milestone completion. Fixed newborn assignment was
 explicitly deferred to the group-transitions discussion; custom inheritance
 already supports assignment of mixed-parent births to a specified category.
@@ -123,7 +125,7 @@ already supports assignment of mixed-parent births to a specified category.
 The user accepted milestone 4 on October 29, 2026 (D093), based on the
 [final validation report](../validation/milestone4.qmd). Its scope includes
 optional duration-dependent dissolution (D078), with
-annual hazards and one female-carried clock per union, symmetric group-pair
+annual hazards per union (originally one female-carried clock per union; cells since D128), symmetric group-pair
 schedules/multipliers (D079), and birth before dissolution on exact same-person
 ties. See [union dissolution](union-dissolution.md). Search schedules optionally stratify by `previous_union`
 (D080) and select age or duration since the latest ending per category in one
@@ -147,7 +149,7 @@ The report revisits baseline, restart and partnered/unpartnered fertility,
 then assesses parity rates, heterogeneity and performance.
 
 Cell accounting is the only birth-spacing mechanism. Cells with no eligible
-women report unrealized intensity; adding it to an analysis is an accounting
+women count unrealized births (D128); adding them to an analysis is an accounting
 diagnostic, not actual births. Sparse and structurally infeasible young/high-
 parity cells can still fall below input rates. Retained histories determine
 parity and spacing; missing prehistory is not imputed. Reproductive selection
@@ -161,7 +163,7 @@ process uses annual hazards, common age or duration bands, directed pair
 columns and optional sex/union-type strata. Group histories are retained and
 affected risks, cells and matching state update at moves. Ancestry stays
 unchanged. Household moves remain deferred (D114). Multiple group columns are
-now tentative milestone 10 (D121), potentially covering the former standalone
+now milestone 9 (D121, D131), potentially covering the former standalone
 regions/internal-migration work; schema and household rules remain unselected. The final milestone 6 render was active at
 acceptance; preserve the report and intermediates. Acceptance retains history,
 finite-cell and non-checkpoint-restart limitations. The user subsequently
@@ -170,7 +172,25 @@ under D118; see [the rate contract](time-varying-rates.md). Whole-model matching
 inheritance schedules are implemented under D123; see
 [the model contract](time-varying-models.md). The user accepted milestone 7
 as complete on November 2, 2026 (D127). Acceptance retains the report and
-current-contract limitations and does not authorize milestone 8 implementation.
+current-contract limitations.
+
+## Milestone 8 complete
+
+The user accepted milestone 8 on November 5, 2026 (D130), based on the
+[validation report](../validation/milestone8.qmd) and its rendered assessment.
+Every rate process (mortality, fertility, rate-mode search, dissolution,
+conversion and group transitions) is scheduled by cells of at-risk units with
+one clock per process, cells stratifying only as finely as the input rates
+(D128). Weight models, as log-linear formulas or custom functions, optionally
+on a calendar schedule, choose who in a cell experiences an event without
+changing cell intensities (D129). Unrealized births are counted, calendar rate
+changes update cells in place where the layout allows, and matching
+calibration takes intensities from the cells. See
+[cell scheduling and weight models](binned-group-hazards.md). Acceptance
+retains the documented limitations: weights are normalized within cells, so
+population-level effects depend on cell size and composition, and no
+eligibility rules beyond fertility spacing or user-defined characteristics are
+implemented.
 
 ## Boundaries and future work
 

@@ -53,8 +53,8 @@ For example, a dissolution at 2005 and duration schedule `[0,1): 0`,
 `[1,5): .2`, `[5,Inf): .1` gives zero risk until 2006, .2 until 2010 and .1
 thereafter, irrespective of the woman's age. Restarting in 2008 begins at
 attained duration 3; it does not restart the one-year delay. A subsequent union
-ending in 2012 resets duration to zero. Individual search waiting times
-integrate across the selected bands using the same annual-hazard sampler.
+ending in 2012 resets duration to zero. The woman moves between the
+category's search cells at its band edges (D128).
 
 ```r
 search_rates <- tibble::tribble(
@@ -101,15 +101,11 @@ birth, dissolution, and search retain their existing same-person priority.
 Any delay must be expressed as a zero-risk input band; no default waiting
 period or former-spouse exclusion is added.
 
-Calibration now maintains each unpartnered woman's actual current hazard
-contributions, summed by group/birth-cohort bin (D082). A common boundary-update
-queue refreshes marriage-search totals on the selected age/duration clock and
-fertility-driven totals at age bands and spacing releases, with state/pool
-changes replacing contributions. Previous
-categories select individual schedules but are not an extra calibration count
-dimension. Matching utilities and mirrored targets retain their definition.
-Individual event scheduling and random-number rules are unchanged; actual
-hazards replace bin-averaged calibration hazards. See
+Calibration uses each unpartnered woman's actual current hazard
+contributions, summed by group/birth-cohort bin (D082), taken from the search
+cells on the selected age/duration clock and from the fertility cells (D128).
+Previous categories select schedules but are not an extra calibration count
+dimension. Matching utilities and mirrored targets retain their definition. See
 [current-hazard contributions](calibration-intensity.md). The search clock
 origin is separate from the birth-cohort cell used for matching.
 

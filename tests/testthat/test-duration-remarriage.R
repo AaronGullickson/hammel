@@ -149,23 +149,7 @@ test_that("grouped duration calibration matches the equivalent age hazards", {
   expect_identical(simulate(configure(duration), 4, 71), a)
 })
 
-test_that("duration boundary updates use ending origins independently of fertility ages", {
-  search <- data.frame(age_start = c(0, 1, 2), age_end = c(1, 2, Inf), rate = c(0, .4, .1))
-  fertility <- data.frame(age_start = 15, age_end = 50, rate = .2)
-  times <- c(0, 0, .5, 1, 1.5, 2, 2.5, 3, 3.5)
-  persons <- c(0L, 1L, rep(0L, 7))
-  actions <- c("activate", "activate", "inspect", "ready", "inspect", "activate",
-    "inspect", "inspect", "inspect")
-  # Women were born together but their previous episodes ended at -.5 and 0.
-  # Person 0 is reactivated at time 2 with a fresh ending origin.
-  origins <- c(-.5, 0, rep(NA_real_, 3), 2, rep(NA_real_, 3))
-  ready <- c(-Inf, -Inf, -Inf, 1.75, -Inf, 2, rep(-Inf, 3))
-  got <- inspect_intensity_tracker_cpp(c(-20, -20), c(0L, 0L), search, fertility,
-    times, persons, actions, rep(0L, length(times)), ready, 1L, origins)
-  totals <- vapply(got$intensities, colSums, numeric(2))
-  expect_equal(totals[1, ], c(0, 0, .4, .8, .5, .1, .1, .5, .5), tolerance = 1e-12)
-  expect_equal(totals[2, ], c(.2, .4, .4, .2, .2, .4, .4, .4, .4), tolerance = 1e-12)
-  expect_true(all(got$pending <= 2L))
+test_that("duration searches calibrate on their ending origins", {
   rates <- duration_search_rates()
   women <- c(-20, -50)
   prepared <- prepare_matching_model(create_matching_model(~ 1, numeric(),

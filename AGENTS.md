@@ -40,12 +40,15 @@ be made autonomously; record choices with substantial architectural consequences
 - Make time, rate units, random-number behavior, and observation semantics explicit.
   Public times/durations are years, exposure is person-years, and input rates are
   per person-year. The current engine executes continuously (D024), with no
-  monthly increment or execution-step parameter. Births use cell-accounted
-  fertility (D101): each one-year age x actual parity x union type x group cell
-  produces births at its input rate times all members, assigned to a random
-  eligible member, weighted by persistent hetfert when enabled (D102). Births
-  in cells with no eligible woman are reported as
-  unrealized. See design/fertility-cell-accounting.md. Midpoint compensation
+  monthly increment or execution-step parameter. Every rate process is
+  scheduled by cells with one exponential clock per process (D128); there are
+  no individual waiting-time clocks. Births use cell-accounted
+  fertility (D101): each one-year age x actual parity x union type (x group,
+  when schedules are group-specific) cell produces births at its input rate
+  times all members, assigned to a random eligible member, weighted by
+  persistent hetfert and any weight model when enabled (D102, D129). Draws of
+  cells with no eligible woman are counted as unrealized births. See
+  design/binned-group-hazards.md and design/fertility-cell-accounting.md. Midpoint compensation
   (D028/D095/D099) was removed. Do not reintroduce superseded monthly timing,
   midpoint compensation or the specialized exact fertility sampler without an
   explicit modeling decision.
@@ -94,12 +97,14 @@ the user's agreement.
   D122 adds calendar
   bands to `cohab_prob`; probability-only changes update type selection and
   matching calibration while preserving pending event dates. Other arguments
-  remain static. Milestone 7 is complete with the current engine. D121 assigns
-  binned-group hazards and custom formula weights across rate processes to
-  milestone 8; see `design/binned-group-hazards.md`. This direction is not
-  implemented. Summaries/helpers move to 9; multiple group columns are tentative
-  10; external immigration is 11; the two-sex model is 12. The separate regions
-  milestone is removed, with its unresolved applications retained under 10.
+  remain static. Milestone 7 was completed with the previous engine. Milestone
+  8, cell scheduling for every rate process (D128) and weight models (D129),
+  was accepted complete on November 5, 2026 (D130), based on
+  `validation/milestone8.qmd`; see `design/binned-group-hazards.md`.
+  Under D131, multiple group columns are next as milestone 9; external
+  immigration is 10; summaries/helpers are 11; the two-sex model is 12. The
+  separate regions milestone is removed, with its unresolved applications
+  retained under 9.
   Distinguish current
   specifications from deferred mechanisms and future proposals.
 - `validation/milestone1.qmd` is the accepted historical assessment; reproduce it
@@ -111,15 +116,17 @@ the user's agreement.
   accepted dissolution/remarriage/cohabitation assessment.
   `validation/milestone5.qmd` is the accepted parity/spacing/heterogeneity
   assessment. `validation/milestone6.qmd` is the accepted individual-transition
-  assessment (D116), with its final render active at acceptance. Preserve all
-  seven reports, rendered artifacts and any active render intermediates; do not
+  assessment (D116), with its final render active at acceptance.
+  `validation/milestone7.qmd` and `validation/milestone8.qmd` are the accepted
+  calendar-input and cell-scheduling/weight-model assessments. Preserve all
+  eight reports, rendered artifacts and any active render intermediates; do not
   fabricate results or set scientific acceptance thresholds. Milestone
   completion retains documented limitations and does not authorize future features.
 - Milestone 4 includes duration-dependent dissolution, age/duration searches by
   previous union, and optional rate-mode cohabitation with linked conversion
-  episodes and type-specific matching/rates (D078–D092). One woman carries each
-  union clock; exact ties prioritize death, birth, dissolution, conversion,
-  search, then group transition.
+  episodes and type-specific matching/rates (D078–D092). Unions are the units
+  in dissolution and conversion cells (D128); exact ties prioritize death,
+  birth, dissolution, conversion, search, then group transition.
   See `design/union-dissolution.md`, `design/remarriage.md`, and `design/cohabitation.md`.
   Supporting benchmarks/recovery evidence lives in `validation/milestone4/`;
   top-level reports and `validation/data/` remain in place. Preserve active render
@@ -127,10 +134,10 @@ the user's agreement.
   render at closeout and milestone 6's active final render. Parity, fertility
   heterogeneity and individual group transitions are implemented and accepted.
   See `design/group-transitions.md`; household moves remain deferred (D114),
-  with regional applications retained under tentative milestone 10's multiple
-  group columns (D121). Calendar-time rates follow `design/time-varying-rates.md`
+  with regional applications retained under milestone 9's multiple
+  group columns (D121, D131). Calendar-time rates follow `design/time-varying-rates.md`
   (D118); matching and inheritance model schedules are implemented under D123. Most categorical characteristics should
-  use groups; multiple group columns are tentative milestone 10 with their
+  use groups; multiple group columns are milestone 9 with their
   schema still unselected.
 - Use `devtools::test()` for the testthat suite. Live database tests require
   explicit opt-in; ordinary verification must not download rates or expose

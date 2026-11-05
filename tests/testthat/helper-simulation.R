@@ -37,3 +37,38 @@ quiet_unreachable <- function(expr) {
       invokeRestart("muffleWarning")
   })
 }
+
+# Models that differ only in how equal rates are stratified create different
+# cells, so their histories differ draw by draw while agreeing in distribution.
+# Compare union and dissolution counts over replications.
+expect_equivalent_unions <- function(a, b, years, seeds = 1:20) {
+  counts <- function(model) vapply(seeds, function(seed) {
+    unions <- simulate(model, years, seed)$unions
+    c(nrow(unions), sum(unions$end_reason %in% "dissolution"))
+  }, numeric(2))
+  x <- counts(a)
+  y <- counts(b)
+  for (k in 1:2) {
+    se <- sqrt(var(x[k, ]) / length(seeds) + var(y[k, ]) / length(seeds))
+    expect_lt(abs(mean(x[k, ]) - mean(y[k, ])), 4 * se + 1e-9)
+  }
+}
+
+# n copies of a woman aged `age` whose sons were born at `sons`, so a birth
+# interval can keep every woman ineligible; unrealized births are then counted
+# events with expected value n times the single-woman intensity.
+spacing_population <- function(n, age = 30, sons = -0.1, groups = NULL, end_time = 0) {
+  k <- length(sons)
+  persons <- data.frame(person_id = seq_len(n * (k + 1)),
+    sex = c(rep("f", n), rep("m", n * k)),
+    birth_time = c(rep(end_time - age, n), end_time + rep(sons, times = n)),
+    death_time = NA_real_,
+    mother_id = c(rep(NA_real_, n), rep(seq_len(n), each = k)),
+    father_id = NA_real_)
+  if (!is.null(groups)) persons$group <- c(rep(groups[1], n), rep(groups[2], n * k))
+  hammel_population(persons, end_time = end_time)
+}
+# Poisson check of a count against its expected value.
+expect_count <- function(count, expected) {
+  expect_lt(abs(sum(count) - expected), 4 * sqrt(expected) + 1e-9)
+}

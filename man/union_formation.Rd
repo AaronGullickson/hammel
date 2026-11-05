@@ -18,7 +18,9 @@ union_formation(
   cohab_prob = NULL,
   cohab_matching = NULL,
   union_convert_rate = NULL,
-  cohabitation_counts_as_previous_union = FALSE
+  cohabitation_counts_as_previous_union = FALSE,
+  weights_conversion = NULL,
+  weights = NULL
 )
 
 set_union_formation(
@@ -35,7 +37,9 @@ set_union_formation(
   cohab_prob = NULL,
   cohab_matching = NULL,
   union_convert_rate = NULL,
-  cohabitation_counts_as_previous_union = FALSE
+  cohabitation_counts_as_previous_union = FALSE,
+  weights_conversion = NULL,
+  weights = NULL
 )
 }
 \arguments{
@@ -96,8 +100,8 @@ model's settings.}
 \item{cancel_birth_if_no_match}{Logical, default \code{TRUE}. Cancel a birth when
 its on-demand partner search or rate-mode nonmarital father selection fails.
 Set \code{FALSE} to allow births with unknown fathers. Historical missing father
-IDs are retained. A cancellation starts no new spacing interval and draws
-fresh waiting times from the failed attempt. Partner scarcity can reduce
+IDs are retained. A cancellation starts no new spacing interval, and the
+attempt is not replaced. Partner scarcity can reduce
 realized fertility below inputs.}
 
 \item{diagnostics}{Logical, default \code{FALSE}. When the general matching model
@@ -138,6 +142,17 @@ restores previous legal-marriage category after a cohabitation ends; TRUE
 classifies cohab breakup/death as separated/widowed. Search duration still
 starts at the latest partnership ending. Only applies to typed unions.}
 
+\item{weights_conversion}{NULL (default) for unweighted selection, or a
+\code{\link[=create_weight_model]{create_weight_model()}} using union variables, which chooses which
+cohabitation in a cell converts without changing the cell's input rate.}
+
+\item{weights}{NULL (default) for unweighted selection of searching women,
+or a \code{\link[=create_weight_model]{create_weight_model()}} using person variables, which chooses which
+unpartnered woman in a cell searches without changing the cell's input
+search rate. Rate mode only. With weighted matching calibration the
+weights are kept current for every searching woman, so calibration uses
+the weighted search intensities.}
+
 \item{model}{A \code{hammel_model} object.}
 }
 \value{
@@ -157,7 +172,7 @@ Each person may have only one ongoing union. Partnered men are not
 available; surviving husbands return to the pool at widowhood. Death ends affected
 unions. In rate mode unpartnered women face competing search events and
 use their unpartnered fertility schedule and may give birth without initiating
-a search. Failed searches draw another waiting time; formation and widowhood
+a search. Failed searches leave the woman searching; formation and widowhood
 switch fertility schedules while preserving spacing. An overall fertility
 schedule applies to both statuses, with a simulation warning. On-demand mode
 requires an overall fertility schedule. Unpartnered rate-mode births use the
@@ -204,11 +219,12 @@ and cover the requested run. Clock choices stay consistent across periods;
 changes precede same-time events and retain duration origins. \code{cohab_prob}
 accepts the same calendar columns, with probabilities selected at the search
 instant. Probability-only changes refresh matching calibration without
-resampling pending event clocks. All three matching arguments also accept
+changing event clocks. All three matching arguments also accept
 whole-model schedule tibbles with \code{time_start}, \code{time_end}, and list-column
 \code{model}. Model changes update role-specific preferences and calibration before
-same-time choices without resampling event clocks. All supplied models,
+same-time choices without changing event clocks. All supplied models,
 including future intervals, are validated; gaps in a run are errors. NULL
 father/cohabitation matching dynamically follows general matching. Other
 non-rate arguments remain static.
 }
+

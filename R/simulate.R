@@ -1,8 +1,10 @@
 #' Run a demographic simulation
 #'
 #' Advance a configured model and return a population that can initialize a
-#' later run. The C++ engine samples candidate waiting times across age bands
-#' (fertility cell clocks for births), executes at continuous times, and
+#' later run. The C++ engine schedules every rate process by cells of at-risk
+#' units with one exponential clock per process: a cell produces events at its
+#' input rate times its members, and the member is chosen uniformly or by weight
+#' models ([create_weight_model()]). It executes at continuous times and
 #' prioritizes death over birth on exact ties.
 #' Events execute chronologically. In on-demand mode all living females face the
 #' fertility schedule. Rate mode uses either overall rates for all women (with
@@ -18,8 +20,8 @@
 #' Rate initiation adds age- or duration-specific search events for unpartnered
 #' women only. Duration schedules for separated/widowed categories measure time
 #' since the most recent union ended; `none` remains age-specific.
-#' Failed attempts draw another waiting time. Widowhood cancels pending births
-#' and switches to unpartnered fertility; a new union switches to partnered
+#' Failed attempts leave the woman searching. Widowhood switches her to
+#' unpartnered fertility; a new union switches to partnered
 #' fertility, preserving birth spacing. Unpartnered births do not trigger searches
 #' in rate mode. Instead, select a father using the same available male pool,
 #' screening and `father_matching` model (falling back to `matching`), without
@@ -27,11 +29,10 @@
 #' A failed match cancels the birth unless explicitly allowed by the union process.
 #' Cancellation starts no new birth-spacing interval. On-demand mode rejects
 #' status schedules.
-#' Optional [union_dissolution()] adds one duration-dependent annual union hazard
-#' carried by the woman. It preserves the pending dissolution through births,
-#' ends the episode with `end_reason = "dissolution"`, and restores unpartnered
-#' availability and fertility/search eligibility. Exact same-person ties select
-#' death, birth, dissolution, then search. Dissolution `group_pair` schedules and
+#' Optional [union_dissolution()] adds one duration-dependent annual hazard per
+#' union, unaffected by births. It ends the episode with `end_reason = "dissolution"`, and restores unpartnered
+#' availability and fertility/search eligibility. Exact ties select death,
+#' birth, dissolution, conversion, search, then group transition. Dissolution `group_pair` schedules and
 #' multipliers use symmetric pairings of both partners' groups. Rate-based
 #' formation optionally selects age/duration schedules using `previous_union`:
 #' none, separated, or widowed (or pooled none/dissolved). Duration origins and categories are recovered
@@ -61,7 +62,7 @@
 #' age/parity/union-type/group cell produces births at its input rate times all
 #' its members, assigned to an eligible member uniformly or proportionally to
 #' `hetfert` weights when enabled. Births that
-#' cannot occur because a cell has no eligible member are reported in
+#' cannot occur because a cell has no eligible member are counted in
 #' `simulation$unrealized_births`. Fertility outside supplied bands is zero. Mortality must cover all ages for both sexes, ending at `Inf`.
 #'
 #' Events are recorded at their sampled times in `[start, start + years)`. Rates and all
@@ -81,8 +82,9 @@
 #'
 #' Calendar-banded rates change within the same run at `time_start`/`time_end`
 #' boundaries, before same-time demographic events. Histories, birth spacing and
-#' duration origins persist. Pending candidates are resampled at boundaries;
-#' adding redundant rate boundaries need not preserve a fixed-seed trajectory.
+#' duration origins persist. Rates change in place when a process keeps its
+#' cells; otherwise its cells are rebuilt with new draws, so adding rate
+#' boundaries need not preserve a fixed-seed trajectory.
 #' Calendar-banded `cohab_prob` is evaluated at the search instant; probability-
 #' only boundaries refresh role calibration while retaining pending event dates.
 #' Matching and inheritance arguments may be direct models or calendar schedules
@@ -250,7 +252,16 @@ simulate <- function(model, years, seed = NULL) {
       engine_persons$.group_entry[i] <- as.numeric(latest)
     }
   }
-  if ("previous_union" %in% names(union_rates) || cohab_enabled) {
+  weight_models <- list(mortality = model$processes$mortality$weights,
+    fertility = model$processes$fertility$weights,
+    dissolution = dissolution_process$weights,
+    conversion = union_process$weights_conversion,
+    transition = transition_process$weights,
+    search = union_process$weights)
+  weight_models <- Filter(Negate(is.null), weight_models)
+  for (name in names(weight_models))
+    check_model_coverage(weight_models[[name]], start, start + years, paste(name, "weights"))
+  if ("previous_union" %in% names(union_rates) || cohab_enabled || length(weight_models)) {
     previous <- previous_union_info_cpp(population$persons, population$unions, counts_cohab)
     engine_persons$.hammel_previous_union <- previous$previous_union
     engine_persons$.hammel_previous_union_end <- previous$end_time
@@ -283,6 +294,17 @@ simulate <- function(model, years, seed = NULL) {
     cohab_matching <- if (scheduled_models) model_context$cohab_matching else
       if (is.null(union_process$cohab_matching)) matching else
         prepare_matching_model(union_process$cohab_matching, group_values)
+    ancestry_labels <- if (is.null(population[["ancestry"]])) character() else
+      setdiff(names(population[["ancestry"]]), "person_id")
+    weight_input <- if (!length(weight_models)) NULL else {
+      types <- c(mortality = "person", fertility = "person", dissolution = "union",
+                 conversion = "union", transition = "transition", search = "person")
+      prepared <- lapply(names(weight_models), function(name)
+        prepare_weight_model(weight_models[[name]], types[[name]], name, group_values, ancestry_labels))
+      names(prepared) <- names(weight_models)
+      c(prepared, list(group_labels = if (is.null(group_values)) character() else
+        as.character(group_values), ancestry_labels = ancestry_labels))
+    }
     native <- simulate_cpp(engine_persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
                            matching,
@@ -298,7 +320,8 @@ simulate <- function(model, years, seed = NULL) {
                            cohab_matching, counts_cohab,
                            isTRUE(getOption("hammel.check_cells", FALSE)),
                            if (is.null(hetfert)) NULL else unclass(hetfert), transition_rates,
-                           if (scheduled_models) model_context$config else NULL)
+                           if (scheduled_models) model_context$config else NULL,
+                           weight_input)
     if (!isTRUE(native$cells_consistent))
       stop("Internal error: fertility cell counts are inconsistent.", call. = FALSE)
     persons <- population$persons
@@ -388,7 +411,7 @@ validate_birth_interval <- function(duration) {
   invisible(duration)
 }
 
-# Unrealized expected births from cells with members but no eligible woman
+# Counts of unrealized births from cells with members but no eligible woman
 # (D101), by one-year period from the run start and cell. Columns mirror the
 # fertility table's strata: group, union_type and parity bounds appear only
 # when the schedules use them. Always a tibble, possibly with zero rows.
@@ -397,7 +420,7 @@ format_unrealized_births <- function(native, rates, group_values) {
     native <- data.frame(period_start = numeric(), period_end = numeric(),
       group = integer(), union_type = character(), parity_start = numeric(),
       parity_end = numeric(), age_start = numeric(), age_end = numeric(),
-      unrealized_births = numeric(), years_without_eligible = numeric())
+      unrealized_births = numeric())
   }
   out <- tibble::tibble(period_start = native$period_start, period_end = native$period_end)
   if (!is.null(group_values)) out$group <- group_values[native$group + 1L]
@@ -409,6 +432,5 @@ format_unrealized_births <- function(native, rates, group_values) {
   out$age_start <- native$age_start
   out$age_end <- native$age_end
   out$unrealized_births <- native$unrealized_births
-  out$years_without_eligible <- native$years_without_eligible
   out
 }

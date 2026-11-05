@@ -226,8 +226,9 @@ calculate_mortality_rates <- function(population, time_breaks, age_breaks,
 #'   boundary receives Inf, as for age breaks.
 #' @param unrealized Logical, default `FALSE`. With `TRUE`, the population must
 #'   come from `simulate()`; add
-#'   `unrealized_births` (expected births dropped from fertility cells that had
-#'   members but no eligible woman, from `simulation$unrealized_births`) and
+#'   `unrealized_births` (counted births that could not occur because their
+#'   fertility cell had members but no eligible woman, from
+#'   `simulation$unrealized_births`) and
 #'   `rate_fertility_adjusted = (births + unrealized_births) / person_years`.
 #'   Values are `NA` where they cannot be attributed exactly: periods before the
 #'   most recent simulation's start (restarts keep only the latest run's

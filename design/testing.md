@@ -1,9 +1,40 @@
 # Testing and milestone validation
 
-Updated November 2, 2026. Milestones 1–7 are accepted as complete (D029,
-D050, D077, D093, D105, D116, D127). Software test history and the user's demographic assessment
+Updated November 5, 2026. Milestones 1–8 are accepted as complete (D029,
+D050, D077, D093, D105, D116, D127, D130). Software test history and the user's demographic assessment
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
+
+## Milestone 8 accepted assessment and closeout
+
+The user accepted milestone 8 as complete on November 5, 2026 (D130),
+following the user-authored [assessment](../validation/milestone8.qmd), its
+[rendered report](../validation/milestone8.html), and explicit acceptance. The
+report's settings and numerical findings remain authoritative; this
+documentation closeout neither reruns nor renders it.
+
+Software checks at closeout (November 5, 2026, local, not a GitHub CI rerun):
+
+- The full offline suite (`devtools::test()`) passed all 500 tests with no
+  failures, also with `options(hammel.check_cells = TRUE)`, which rescans every
+  process's cells, intensity tree and matching-calibration totals at each
+  event or search solve.
+- Coverage (`covr::package_coverage(type = "tests")`) was 98.11%, with
+  `R/weight_model.R` fully covered.
+- Weight-model tests (`test-weight-models.R`) check within-cell ratio recovery
+  for each process within four standard errors, exact reproduction of
+  unweighted runs with zero coefficients or constant custom functions,
+  cancellation warnings, NA handling, the custom-function contract for every
+  process, weight schedules (including a switch combined with an in-place rate
+  update) and recovery of rejection sampling after an extreme-weight member
+  leaves.
+- Step 1 equivalence, recovery and timing checks are recorded in
+  [cell scheduling](binned-group-hazards.md#step-1-validation-and-performance-november-4-2026),
+  and weight-model costs in [its cost table](binned-group-hazards.md#cost-november-4-2026).
+
+The D082 calibration-tracker checks below describe the engine before milestone
+8; `test-calibration-intensity.R` now runs a simulation-level comparison of
+cell-derived calibration totals with explicit scans.
 
 ## Milestone 7 accepted assessment and closeout
 
@@ -17,8 +48,8 @@ inferred. The code/report revision at acceptance is
 `3b65d2202b006ef6f3e232c98595814b1544f9fe`.
 
 Acceptance retains the current engine, documented model and observation
-limitations, and approximate demonstration inputs. Milestone 8's binned-group
-hazards and custom formula weights remain separate future work (D121).
+limitations, and approximate demonstration inputs. Milestone 8 later replaced
+the engine's scheduling (D128) and added weight models (D129).
 Reports, rendered artifacts and active intermediates are preserved unchanged;
 this documentation-only closeout neither reruns nor renders them. The earlier
 software-check records below are distinct from scientific acceptance.
@@ -122,7 +153,7 @@ records. Acceptance retains finite-sample and sparse-cell limits, complete
 history requirements, duration fallback to age without prehistory,
 non-checkpoint restarts and the documented life-table aggregation caveat.
 Household moves remain deferred (D114), with unresolved regional applications
-retained under tentative milestone 10's multiple group columns (D121). Calendar-varying rates
+retained under milestone 9's multiple group columns (D121, D131). Calendar-varying rates
 are implemented under D118, with matching and inheritance schedules under D123.
 Milestone 7 was subsequently accepted complete on November 2, 2026 (D127).
 

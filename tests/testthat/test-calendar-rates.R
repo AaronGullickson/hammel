@@ -89,25 +89,25 @@ test_that("mortality integrates fractional calendar and age boundaries", {
   expect_equal(simulate(make_model(2), .75, seed = 2)$simulation$deaths, 0)
 })
 
-test_that("fertility changes retain spacing, weights and exact unrealized intensity", {
-  m <- make_model(2, sex = "f", age = 30, birth_interval = 2)
-  m$population$persons$sex[2] <- "m"
-  m$population$persons$birth_time[2] <- -.1
-  m$population$persons$mother_id[2] <- 1
+test_that("fertility changes retain spacing, weights and count unrealized births", {
+  # Women in spacing until 1.9 under rates .2 then .4 from .5 (calendar epochs).
+  n <- 2000
+  m <- make_model(2, sex = "f", age = 30, birth_interval = 2) |>
+    set_population(spacing_population(n))
   r <- calendar_epochs(data.frame(age_start = 15, age_end = 50, rate = 0), c(.2, .4))
   m <- set_fertility(m, r, birth_interval = 2, hetfert = het_fert(cv = 0, alpha = 1))
-  m$population$persons$hetfert <- c(2, NA)
+  m$population$persons$hetfert <- c(rep(2, n), rep(NA, n))
   out <- simulate(m, 1, seed = 81)
   u <- out$simulation$unrealized_births
-  expect_equal(sum(u$unrealized_births), .3)
-  expect_equal(sum(u$years_without_eligible), 1)
-  expect_equal(u$period_start, c(0, .5))
-  expect_equal(u$period_end, c(.5, 1))
+  expect_count(u$unrealized_births, (.2 * .5 + .4 * .5) * n)
+  # Counts sit on the one-year grid from the run start, across the rate change.
+  expect_equal(u$period_start, 0)
+  expect_equal(u$period_end, 1)
   expect_equal(out$persons$hetfert[1], 2)
   expect_equal(out$simulation$births, 0)
   expect_equal(out$persons$mother_id, m$population$persons$mother_id)
   restarted <- simulate(set_population(m, out), .5, seed = 82)
-  expect_equal(sum(restarted$simulation$unrealized_births$unrealized_births), .2)
+  expect_count(restarted$simulation$unrealized_births$unrealized_births, .4 * .5 * n)
 })
 
 test_that("cell birth counts recover rates on either side of a calendar change", {
@@ -304,4 +304,26 @@ test_that("fertility can change parity partitions and pooled/typed union rates",
   expect_equal(out$simulation$births, 1)
   expect_gte(tail(out$persons$birth_time, 1), .5)
   expect_equal(tail(out$persons$mother_id, 1), 1)
+})
+
+test_that("rate changes recover rates in place and when band layouts change", {
+  n <- 20000
+  check <- function(rates) {
+    out <- simulate(set_mortality(make_model(n, age = 30), rates), 2, seed = 71)
+    d <- out$persons$death_time
+    years <- function(a, b) sum(pmax(0, pmin(ifelse(is.na(d), 2, d), b) - a))
+    deaths <- function(a, b) sum(!is.na(d) & d >= a & d < b)
+    expect_count(deaths(0, 1), .05 * years(0, 1))
+    expect_count(deaths(1, 2), .2 * years(1, 2))
+  }
+  withr::local_options(hammel.check_cells = TRUE)
+  # Same bands in both periods: rates change in place.
+  same <- data.frame(sex = rep(c("m", "f"), 2), age_start = 0, age_end = Inf,
+    rate = c(.05, .05, .2, .2), time_start = rep(c(0, 1), each = 2), time_end = rep(c(1, Inf), each = 2))
+  check(same)
+  # Different band edges after the change: processes are rebuilt.
+  split <- rbind(same[1:2, ],
+    data.frame(sex = rep(c("m", "f"), 2), age_start = rep(c(0, 31.5), each = 2),
+      age_end = rep(c(31.5, Inf), each = 2), rate = .2, time_start = 1, time_end = Inf))
+  check(split)
 })

@@ -5,7 +5,7 @@
 \alias{fertility}
 \title{Specify age-specific demographic rates}
 \usage{
-mortality(rates, group_prop_hazard = NULL)
+mortality(rates, group_prop_hazard = NULL, weights = NULL)
 
 fertility(
   rates,
@@ -13,7 +13,8 @@ fertility(
   group_prop_hazard = NULL,
   inheritance = create_group_inheritance(),
   ffab = 0.4886,
-  hetfert = NULL
+  hetfert = NULL,
+  weights = NULL
 )
 }
 \arguments{
@@ -38,6 +39,11 @@ types (or overall fertility). Type lists require \code{union_type} rates and
 their names must match the supplied schedule types. Three-type schedules
 accept lists named unpartnered/cohab/marriage; shared partnered schedules
 accept unpartnered/partnered. Omitted types and groups have multiplier 1.}
+
+\item{weights}{NULL (default) for unweighted selection within rate cells, or
+a \code{\link[=create_weight_model]{create_weight_model()}} specification. Weights choose which member of a
+cell experiences an event without changing the cell's input rate. In
+fertility they combine with \code{hetfert} on the log scale.}
 
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
 defaulting to \code{0.75}. Must be finite and nonnegative. Applies to fertility
@@ -124,8 +130,9 @@ interval, and each birth goes to an eligible member, uniformly by default
 or proportional to persistent weights when \code{hetfert} is enabled. Observed
 rates then equal inputs in expectation for any population composition,
 including after restarts and union-type changes, while a cell has an eligible
-member. Intensity in cells with members but none eligible is dropped and
-reported in \code{simulation$unrealized_births}. An individual woman's hazard
+member. A cell with members but none eligible keeps its intensity; when it
+would produce a birth, no child is born and the event is counted in
+\code{simulation$unrealized_births}. An individual woman's hazard
 depends on recent births by others in her cell; this is a calibration
 device. Upper-open age bands stay one cell when \code{birth_interval * rate} is
 below 0.001 and are otherwise split yearly. Zero-rate bands form no cells.

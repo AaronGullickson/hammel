@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 #include <set>
+#include <tuple>
 #include <vector>
 
 using namespace Rcpp;
@@ -82,50 +83,6 @@ bool search_uses_duration(DataFrame rates, const std::string& previous) {
   return false;
 }
 
-// Calculate waiting time until the next event. The threshold is drawn
-// from Exp(1), equivalent in distribution to -log(U), with U uniform
-// on (0, 1). Subtract rate * duration across successive age bands.
-// In the band where the remaining threshold is reached, divide it
-// by the rate to obtain the remaining waiting time.
-double waiting_time(const std::vector<Band>& bands, double age, double threshold) {
-  const double origin = age;
-  for (const Band& band : bands) {
-    // if we are older than the end of this band, skip it
-    if (band.end <= age) continue;
-    // if we are entering a band higher than current age, then age up
-    age = std::max(age, band.start);
-    // determine how long we will spend in this band
-    const double duration = band.end - age;
-    // A zero-rate band consumes time but no threshold.
-    if (band.rate > 0) {
-      if (threshold <= band.rate * duration)
-        // The event will occur within this band. Return the total waiting time.
-        // Include time crossed in previous bands, then the remaining time here.
-        return age - origin + threshold / band.rate;
-      //if the event doesn't happen consume hazard from this band
-      threshold -= band.rate * duration;
-    }
-    age = band.end;
-  }
-  // if we got here, we are out of bands so the event never happens, return infinity
-  return std::numeric_limits<double>::infinity();
-}
-
-// Internal deterministic entry point for analytical validation of the sampler.
-// [[Rcpp::export]]
-NumericVector hazard_wait_cpp(DataFrame rates, NumericVector ages,
-                             NumericVector thresholds) {
-  if (ages.size() != thresholds.size()) stop("Sampler inputs must have equal length.");
-  std::vector<Band> bands = read_bands(rates);
-  NumericVector waits(ages.size());
-  for (int i = 0; i < ages.size(); ++i) {
-    if (!R_finite(ages[i]) || ages[i] < 0 || !R_finite(thresholds[i]) ||
-        thresholds[i] <= 0) stop("Sampler ages and thresholds are invalid.");
-    waits[i] = waiting_time(bands, ages[i], thresholds[i]);
-  }
-  return waits;
-}
-
 struct Person {
   // Public history fields plus working state. NA died means currently alive;
   // last_birth enforces spacing.
@@ -136,7 +93,6 @@ struct Person {
 // person is a zero-based position in people, not the public person_id.
 // A version invalidates queued events after a change in union status.
 enum class EventType { death, birth, search, dissolution, conversion, transition };
-struct Event { int person; EventType type; unsigned long long version; };
 
 // Evaluate candidate utilities without rounding age differences. Common linear
 // and raw quadratic formulas use an exact native path; other formulas call the
@@ -646,24 +602,70 @@ std::pair<double, double> current_hazard(const std::vector<Band>* bands,
 }
 
 // Ordered bookkeeping boundaries with at most one pending time per person.
-// Shared by the calibration tracker and fertility cells: entries are rate
-// changes (age bands, gaps, spacing release), not demographic events, and
+// Shared by the calibration tracker and fertility/mortality cells: entries are
+// rate changes (age bands, gaps, spacing release), not demographic events, and
 // consume no randomness. Ties are ordered by person index.
+//
+// A bucket queue: a ring of buckets of width 1/kBuckets years spanning
+// kSpan years, plus an overflow heap for later entries. The span covers the
+// usual band widths (input bands of five or more years for rate processes), so
+// few boundaries need the heap. A bucket is sorted by
+// (time, person) when reached, so pops follow exactly (time, person) order.
+// Entries are lazily deleted: one is current only while it matches next_[person].
 class BoundaryQueue {
-  // Binary min-heap of (time, person) with lazy deletion: an entry is current
-  // only while it matches next_[person]. Pops follow (time, person) order.
-  std::vector<std::pair<double, int>> heap_;
-  std::vector<double> next_;
-  size_t live_ = 0;
+  static constexpr int kBuckets = 365, kSpan = 16, kRing = kBuckets * kSpan;
+  using Entry = std::pair<double, int>;
   struct Later {
-    bool operator()(const std::pair<double, int>& a, const std::pair<double, int>& b) const {
-      return a > b;
-    }
+    bool operator()(const Entry& a, const Entry& b) const { return a > b; }
   };
-  void discard_stale() {
-    while (!heap_.empty() && heap_.front().first != next_[heap_.front().second]) {
-      std::pop_heap(heap_.begin(), heap_.end(), Later());
-      heap_.pop_back();
+  std::vector<std::vector<Entry>> ring_ = std::vector<std::vector<Entry>>(kRing);
+  std::vector<Entry> overflow_;          // min-heap of entries beyond the ring
+  std::vector<double> next_;
+  size_t live_ = 0, in_ring_ = 0, pos_ = 0;
+  long long cur_ = 0;                    // absolute index of the bucket being drained
+  bool started_ = false, sorted_ = false;
+  static long long bucket(double t) { return static_cast<long long>(std::floor(t * kBuckets)); }
+  std::vector<Entry>& slot(long long b) {
+    return ring_[static_cast<size_t>(((b % kRing) + kRing) % kRing)];
+  }
+  void push(const Entry& e) {
+    long long b = bucket(e.first);
+    if (!started_) { cur_ = b; started_ = true; }
+    if (b < cur_) b = cur_;              // at or after the current time; roundoff guard
+    if (b - cur_ >= kRing) {
+      overflow_.push_back(e);
+      std::push_heap(overflow_.begin(), overflow_.end(), Later());
+      return;
+    }
+    auto& v = slot(b);
+    if (b == cur_ && sorted_)
+      v.insert(std::upper_bound(v.begin() + static_cast<long>(pos_), v.end(), e), e);
+    else v.push_back(e);
+    ++in_ring_;
+  }
+  // Position the cursor on the earliest current entry; false if none remain.
+  bool settle() {
+    if (live_ == 0) return false;
+    for (;;) {
+      if (!sorted_ && in_ring_ == 0 && !overflow_.empty()) // jump over empty buckets
+        cur_ = std::max(cur_, bucket(overflow_.front().first));
+      auto& v = slot(cur_);
+      if (!sorted_) {
+        while (!overflow_.empty() && bucket(overflow_.front().first) <= cur_) {
+          v.push_back(overflow_.front());
+          ++in_ring_;
+          std::pop_heap(overflow_.begin(), overflow_.end(), Later());
+          overflow_.pop_back();
+        }
+        std::sort(v.begin(), v.end());
+        sorted_ = true; pos_ = 0;
+      }
+      while (pos_ < v.size()) {
+        const Entry& e = v[pos_];
+        if (e.first == next_[e.second]) return true;
+        ++pos_; --in_ring_;
+      }
+      v.clear(); sorted_ = false; ++cur_;
     }
   }
  public:
@@ -672,101 +674,60 @@ class BoundaryQueue {
     if (next_[person] == time) return;
     if (R_finite(next_[person])) --live_;
     next_[person] = time;
-    if (R_finite(time)) {
-      ++live_;
-      heap_.push_back({time, person});
-      std::push_heap(heap_.begin(), heap_.end(), Later());
-    }
-    // Bound stale entries: rebuild from current times when they dominate.
-    if (heap_.size() > 64 && heap_.size() > 4 * live_) {
-      heap_.clear();
-      for (size_t p = 0; p < next_.size(); ++p)
-        if (R_finite(next_[p])) heap_.push_back({next_[p], static_cast<int>(p)});
-      std::make_heap(heap_.begin(), heap_.end(), Later());
-    }
+    if (R_finite(time)) { ++live_; push({time, person}); }
   }
   void clear(int person) {
     if (person < static_cast<int>(next_.size())) set(person, R_PosInf);
   }
   double top() {
-    discard_stale();
-    return heap_.empty() ? R_PosInf : heap_.front().first;
+    if (!settle()) return R_PosInf;
+    return slot(cur_)[pos_].first;
   }
   // Remove and return the earliest entry; the caller refreshes that person.
-  std::pair<double, int> pop() {
-    discard_stale();
-    const auto entry = heap_.front();
-    std::pop_heap(heap_.begin(), heap_.end(), Later());
-    heap_.pop_back();
-    next_[entry.second] = R_PosInf;
+  Entry pop() {
+    settle();
+    const Entry e = slot(cur_)[pos_++];
+    --in_ring_;
+    next_[e.second] = R_PosInf;
     --live_;
-    return entry;
+    return e;
   }
   size_t size() const { return live_; }
 };
 
-// One pending boundary per active woman, replaced eagerly on state changes.
-// Separate channels share one queue and one state-update interface; no Cartesian
-// table of previous status, parity, region, etc. is needed by calibration.
-class FemaleIntensityTracker {
-  struct Woman {
-    int group = 0;
-    double born = 0, search_origin = 0, ready = 0;
-    bool active = false;
-    const std::vector<Band>* search = nullptr;
-    const std::vector<Band>* fertility = nullptr;
-    const std::vector<Band>* probability = nullptr;
-    std::array<double, 3> value = {0, 0, 0};
-  };
-  WeightCalibrator& calibration_;
+// Each counted (living, unpartnered) woman's current cohabitation probability,
+// with one pending boundary per woman at her next probability band edge.
+// Matching calibration splits search intensity into marriage and cohabitation
+// by this probability (see SearchCalibration). Consumes no randomness.
+class ProbabilityTracker {
+  struct Woman { bool active = false; double born = 0; const std::vector<Band>* schedule = nullptr; };
   std::vector<Woman> women_;
   BoundaryQueue queue_;
-  unsigned long long updates_ = 0;
+  std::function<void(int, double)> on_change_;
   void refresh(int person, double now) {
-    Woman& w = women_[person];
-    const auto search = current_hazard(w.search, w.search_origin, now);
-    const auto fertility = now < w.ready ? std::make_pair(0.0, w.ready) :
-      current_hazard(w.fertility, w.born, now);
-    const auto probability = current_hazard(w.probability, w.born, now);
-    const double p = probability.first;
-    const std::array<double, 3> value = {search.first * (1 - p), fertility.first, search.first * p};
-    calibration_.replace_role_intensity(w.group, w.born, w.value, value);
-    w.value = value;
-    queue_.set(person, std::min(std::min(search.second, fertility.second), probability.second));
+    const Woman& w = women_[person];
+    const auto p = current_hazard(w.schedule, w.born, now);
+    on_change_(person, p.first);
+    queue_.set(person, p.second);
   }
  public:
-  explicit FemaleIntensityTracker(WeightCalibrator& calibration) : calibration_(calibration) {}
-  void activate(int person, int group, double born, const std::vector<Band>* search,
-                const std::vector<Band>* fertility, double ready, double now,
-                double search_origin = NA_REAL, const std::vector<Band>* probability = nullptr) {
+  explicit ProbabilityTracker(std::function<void(int, double)> on_change) : on_change_(std::move(on_change)) {}
+  void activate(int person, double born, const std::vector<Band>* schedule, double now) {
     if (person >= static_cast<int>(women_.size())) women_.resize(person + 1);
-    remove(person);
-    Woman& w = women_[person];
-    w.active = true; w.group = group; w.born = born;
-    w.search_origin = NumericVector::is_na(search_origin) ? born : search_origin;
-    w.search = search; w.fertility = fertility; w.ready = ready; w.probability = probability;
+    women_[person] = {true, born, schedule};
     refresh(person, now);
   }
   void remove(int person) {
     if (person >= static_cast<int>(women_.size()) || !women_[person].active) return;
-    Woman& w = women_[person];
+    women_[person].active = false;
     queue_.clear(person);
-    calibration_.replace_role_intensity(w.group, w.born, w.value, {0, 0, 0});
-    w.active = false; w.value = {0, 0, 0};
-  }
-  void set_ready(int person, double ready, double now) {
-    if (person >= static_cast<int>(women_.size()) || !women_[person].active) return;
-    women_[person].ready = ready;
-    refresh(person, now);
   }
   void advance(double now) {
     while (queue_.top() <= now) {
       const auto entry = queue_.pop();
       refresh(entry.second, entry.first);
-      if (++updates_ % 1024 == 0) checkUserInterrupt();
     }
   }
-  size_t pending() const { return queue_.size(); }
 };
 
 // ---- Cell-accounted fertility under birth spacing (D101) -------------------
@@ -778,12 +739,95 @@ class FemaleIntensityTracker {
 // each birth to an eligible member, weighted by persistent hetfert when
 // enabled (selection probability, not a rate multiplier). Without hetfert,
 // selection is uniform and no weight tree is allocated. A cell with members but no eligible member
-// cannot produce births: its intensity is dropped and recorded as unrealized.
+// keeps its intensity: when it is drawn, no child is born and one unrealized birth is recorded.
 // Clocks keep an Exp(1) threshold consumed at the current intensity, so count
 // changes recompute firing times without drawing random numbers.
 // Upper-open fertility bands stay one cell when birth_interval * rate is below
 // this share (a numerical tolerance, not a demographic parameter).
 constexpr double kOpenBandSplitTolerance = 0.001;
+
+// Sum tree over a process's cells: leaf c holds that cell's current event
+// intensity. Sums are recomputed from children along each updated path, so
+// they do not drift. Capacity grows geometrically as cells are added.
+class IntensityTree {
+  size_t capacity_ = 0;
+  std::vector<double> tree_;
+ public:
+  void set(size_t cell, double value) {
+    if (cell >= capacity_) {
+      size_t next = capacity_ ? capacity_ : 1;
+      while (next <= cell) next *= 2;
+      std::vector<double> grown(2 * next, 0);
+      for (size_t i = 0; i < capacity_; ++i) grown[next + i] = tree_[capacity_ + i];
+      for (size_t i = next - 1; i > 0; --i) grown[i] = grown[2 * i] + grown[2 * i + 1];
+      capacity_ = next;
+      tree_.swap(grown);
+    }
+    size_t node = capacity_ + cell;
+    tree_[node] = value;
+    while (node > 1) {
+      node /= 2;
+      tree_[node] = tree_[2 * node] + tree_[2 * node + 1];
+    }
+  }
+  double total() const { return tree_.empty() ? 0 : tree_[1]; }
+  double value(size_t cell) const { return cell < capacity_ ? tree_[capacity_ + cell] : 0; }
+  // The cell holding position uniform * total; only cells with positive intensity.
+  size_t choose(double uniform) const {
+    double value = std::min(uniform * total(), std::nextafter(total(), 0.0));
+    size_t node = 1;
+    while (node < capacity_) {
+      const double left = tree_[2 * node], right = tree_[2 * node + 1];
+      // Roundoff guard: never descend into a branch with no intensity.
+      if ((value < left && left > 0) || !(right > 0)) node *= 2;
+      else { value = std::max(0.0, value - left); node = 2 * node + 1; }
+    }
+    return node - capacity_;
+  }
+};
+
+// One event clock for a whole process. Independent cell streams sum to one
+// Poisson stream at the total intensity; the cell of each event is then chosen
+// in proportion to its intensity. The Exp(1) threshold is spent at the current
+// total, so intensity changes recompute the due time without random draws.
+// Call spend(now) before every intensity change.
+class ProcessClock {
+  double threshold_ = 0, last_ = 0;
+  bool has_threshold_ = false;
+ public:
+  void start(double now) { last_ = now; }
+  void spend(const IntensityTree& tree, double now) {
+    if (has_threshold_ && now > last_)
+      threshold_ = std::max(0.0, threshold_ - tree.total() * (now - last_));
+    last_ = now;
+  }
+  // After intensity changes: ensure a threshold exists while events can occur.
+  void arm(const IntensityTree& tree, const std::function<double()>& draw) {
+    if (!has_threshold_ && tree.total() > 0) { threshold_ = draw(); has_threshold_ = true; }
+  }
+  double due(const IntensityTree& tree) const {
+    return has_threshold_ && tree.total() > 0 ? last_ + threshold_ / tree.total() : R_PosInf;
+  }
+  // The clock fired at now: its threshold is used up.
+  void fired(double now) { has_threshold_ = false; last_ = now; }
+};
+
+// Choose a member from log weights with one uniform draw. Equal log weights
+// use the unweighted rule floor(uniform * n), so constant weights reproduce
+// unweighted runs exactly (milestone 8 step 2).
+size_t pick_log_weights(const std::vector<double>& eta, double uniform) {
+  const size_t n = eta.size();
+  bool equal = true;
+  double top = eta[0];
+  for (double e : eta) { if (e != eta[0]) equal = false; top = std::max(top, e); }
+  if (equal) return std::min(n - 1, static_cast<size_t>(std::floor(uniform * static_cast<double>(n))));
+  std::vector<double> cumulative(n);
+  double total = 0;
+  for (size_t k = 0; k < n; ++k) { total += std::exp(eta[k] - top); cumulative[k] = total; }
+  const double target = uniform * total;
+  for (size_t k = 0; k < n; ++k) if (target < cumulative[k]) return k;
+  return n - 1;
+}
 
 // Positive eligible weights in swap-remove slots. Recompute sums from children
 // rather than subtracting from a running total, so removing a dominant weight
@@ -802,6 +846,7 @@ class FertilityWeightTree {
   }
  public:
   double sum() const { return tree_.empty() ? 0 : tree_[1]; }
+  void update(size_t slot, double value) { set(slot, value); }
   void add(double value) {
     if (size_ == capacity_) {
       const size_t next = capacity_ ? 2 * capacity_ : 1;
@@ -859,6 +904,7 @@ class FertilityCells {
  public:
   struct State {
     int stratum = -1;          // -1: not a living woman
+    int group = 0;             // her group (cells pool groups when rates do)
     double born = 0, ready = 0, weight = 1;
     bool unpartnered = false;
   };
@@ -884,12 +930,13 @@ class FertilityCells {
     int members = 0;
     std::vector<int> eligible;                 // swap-remove list of women
     FertilityWeightTree weights;
-    double lambda = 0, threshold = 0, last = 0, due = R_PosInf;
-    bool has_threshold = false, queued = false;
+    double lambda = 0;
     std::map<size_t, std::pair<int, FertilityWeightSum>> counted; // count and weight per unpartnered calibration bin
+    std::map<int, int> by_group;               // members by group, when groups share cells
+                                               // (attributes unrealized births to a group)
   };
   struct Member {
-    int cell = -1, slot = -1;
+    int cell = -1, slot = -1, group = 0;
     bool eligible = false, counted = false;
     size_t bin = 0;
     double weight = 1;
@@ -898,112 +945,49 @@ class FertilityCells {
   std::vector<Stratum> strata_;
   std::vector<Cell> cells_;
   std::vector<Member> members_;
+  std::vector<State> states_;   // engine state at each woman's last refresh
+  // Weight models (step 2). Without matching calibration, log weights are
+  // computed for the chosen cell's eligible women at selection. With
+  // calibration, refresh_eta_ folds them into each woman's stored weight.
+  std::function<void(int, const std::vector<int>&, std::vector<double>&)> select_eta_;
+  std::function<double(int, int)> refresh_eta_;
   // lookup_[group * types + type][actual parity] -> stratum (-1 until created);
   // without parity-specific schedules, index 0 serves every parity.
   int types_;
   bool split_parity_, weighted_;
+  bool pooled_groups_ = false;   // rates shared by groups: one set of cells
   double max_age_, interval_;
   std::vector<std::vector<int>> lookup_;
   BoundaryQueue boundaries_;
-  // Cell birth clocks: an indexed binary min-heap of armed cells keyed by
-  // (due, cell), updated in place without allocation. The main loop compares
-  // its head with the person event queue.
-  std::vector<int> heap_, position_;
-  bool earlier(int a, int b) const {
-    const double da = cells_[a].due, db = cells_[b].due;
-    return da < db || (da == db && a < b);
-  }
-  void swap_nodes(size_t i, size_t j) {
-    std::swap(heap_[i], heap_[j]);
-    position_[heap_[i]] = static_cast<int>(i);
-    position_[heap_[j]] = static_cast<int>(j);
-  }
-  void sift_up(size_t i) {
-    while (i > 0) {
-      const size_t parent = (i - 1) / 2;
-      if (!earlier(heap_[i], heap_[parent])) break;
-      swap_nodes(i, parent);
-      i = parent;
-    }
-  }
-  void sift_down(size_t i) {
-    for (;;) {
-      size_t best = i;
-      const size_t left = 2 * i + 1, right = left + 1;
-      if (left < heap_.size() && earlier(heap_[left], heap_[best])) best = left;
-      if (right < heap_.size() && earlier(heap_[right], heap_[best])) best = right;
-      if (best == i) break;
-      swap_nodes(i, best);
-      i = best;
-    }
-  }
-  void unschedule(int c) {
-    const size_t i = static_cast<size_t>(position_[c]);
-    const size_t last = heap_.size() - 1;
-    if (i != last) swap_nodes(i, last);
-    heap_.pop_back();
-    position_[c] = -1;
-    if (i < heap_.size()) { sift_up(i); sift_down(i); }
-  }
-  void schedule_clock(int c) {
-    if (static_cast<size_t>(c) >= position_.size()) position_.resize(c + 1, -1);
-    position_[c] = static_cast<int>(heap_.size());
-    heap_.push_back(c);
-    sift_up(heap_.size() - 1);
-  }
+  // One birth clock for all cells; every cell contributes rate * members.
+  IntensityTree intensity_;
+  ProcessClock clock_;
   std::function<State(int)> state_;
   std::function<double()> draw_threshold_;
+  std::vector<double> eta_;     // scratch log weights for selection
   const WeightCalibrator* calibrator_;
   double start_, end_, period_origin_;
-  // Unrealized expected births and member-years without eligible women, by
-  // one-year period from the simulation start and cell.
-  std::map<std::pair<long long, int>, std::array<double, 2>> unrealized_;
+  // Called with (cell, group) when a cell without eligible women is drawn.
+  std::function<void(int, int)> on_unrealized_;
   unsigned long long updates_ = 0;
 
-  void record_unrealized(int c, double from, double to, double lambda) {
-    while (from < to) {
-      long long k = static_cast<long long>(std::floor(from - period_origin_));
-      if (period_origin_ + static_cast<double>(k + 1) <= from) ++k; // roundoff at a boundary
-      const double stop = std::min(to, period_origin_ + static_cast<double>(k + 1));
-      auto& value = unrealized_[{k, c}];
-      value[0] += lambda * (stop - from);
-      value[1] += stop - from;
-      from = stop;
-    }
-  }
-  // Account for the interval since the last update under the state that held
-  // during it. Must run before membership or eligibility changes.
-  void settle(int c, double now) {
-    Cell& x = cells_[c];
-    if (x.lambda > 0 && now > x.last) {
-      if (x.eligible.empty()) record_unrealized(c, x.last, now, x.lambda);
-      else if (x.has_threshold) x.threshold = std::max(0.0, x.threshold - x.lambda * (now - x.last));
-    }
-    x.last = now;
-  }
-  // Recompute the intensity and firing time from current counts (after settle).
+  // Spend the clock for the interval since the last change. Must run before
+  // membership or eligibility changes.
+  void settle(int, double now) { clock_.spend(intensity_, now); }
+  // Recompute the cell's intensity from current counts (after settle).
   void touch(int c, double now) {
     Cell& x = cells_[c];
     x.lambda = x.rate * x.members;
-    rearm(c, now);
-  }
-  void rearm(int c, double now) {
-    Cell& x = cells_[c];
-    if (x.queued) { unschedule(c); x.queued = false; }
-    if (!(x.lambda > 0) || x.eligible.empty()) return;
-    if (!x.has_threshold) { x.threshold = draw_threshold_(); x.has_threshold = true; }
-    const double due = now + x.threshold / x.lambda;
-    if (due < end_) {
-      x.due = due;
-      schedule_clock(c);
-      x.queued = true;
-    }
+    clock_.spend(intensity_, now);
+    intensity_.set(static_cast<size_t>(c), x.lambda);
+    clock_.arm(intensity_, draw_threshold_);
   }
   void leave(int woman, int& changed) {
     Member& m = members_[woman];
     if (m.cell < 0) return;
     Cell& x = cells_[m.cell];
     --x.members;
+    if (pooled_groups_ && --x.by_group[m.group] == 0) x.by_group.erase(m.group);
     if (m.eligible) {
       const int last = x.eligible.back();
       x.eligible[m.slot] = last;
@@ -1058,7 +1042,6 @@ class FertilityCells {
       Cell x;
       x.stratum = k;
       x.rate = band.rate; x.age_start = band.start; x.age_end = band.end;
-      x.last = start_;
       cells_.push_back(x);
     }
     strata_.push_back(st);
@@ -1074,6 +1057,7 @@ class FertilityCells {
         max_age_(max_age), interval_(interval), lookup_(static_cast<size_t>(groups) * types),
         state_(std::move(state)), draw_threshold_(std::move(draw_threshold)),
         calibrator_(calibrator), start_(start), end_(end), period_origin_(period_origin) {
+    clock_.start(start);
     if (!split_parity_)
       for (const Source& source : sources_)
         lookup_[static_cast<size_t>(source.group) * types_ + source.type] =
@@ -1097,8 +1081,17 @@ class FertilityCells {
   }
   // Recompute a woman's cell, eligibility and calibration bin from engine state.
   void refresh(int woman, double now) {
-    if (woman >= static_cast<int>(members_.size())) members_.resize(woman + 1);
-    const State s = state_(woman);
+    if (woman >= static_cast<int>(members_.size())) {
+      members_.resize(woman + 1);
+      states_.resize(woman + 1);
+    }
+    states_[woman] = state_(woman);
+    place(woman, now);
+  }
+  // Place a woman from her cached state (set by the last refresh). Only time
+  // changes between refreshes, so boundaries reuse the cached state.
+  void place(int woman, double now) {
+    const State& s = states_[woman];
     int cell = -1;
     double next = R_PosInf;
     if (s.stratum >= 0) {
@@ -1121,9 +1114,15 @@ class FertilityCells {
     const bool eligible = cell >= 0 && now >= s.ready;
     if (cell >= 0 && !eligible) next = std::min(next, s.ready);
     const bool counted = calibrator_ && eligible && s.unpartnered;
-    const size_t bin = counted ? calibrator_->bin_index(strata_[s.stratum].group, s.born) : 0;
+    const size_t bin = counted ? calibrator_->bin_index(s.group, s.born) : 0;
+    double weight = s.weight;
+    if (refresh_eta_ && cell >= 0) {
+      weight *= std::exp(refresh_eta_(woman, cell));
+      if (!(weight > 0) || !R_finite(weight)) stop("A fertility weight is not finite and positive.");
+    }
     Member& m = members_[woman];
-    if (m.cell != cell || m.eligible != eligible || m.counted != counted || (counted && m.bin != bin)) {
+    if (m.cell != cell || m.eligible != eligible || m.counted != counted || (counted && m.bin != bin) ||
+        (cell >= 0 && weight != m.weight)) {
       // Settle elapsed intensity under the old state before changing it.
       if (m.cell >= 0) settle(m.cell, now);
       if (cell >= 0 && cell != m.cell) settle(cell, now);
@@ -1132,7 +1131,9 @@ class FertilityCells {
       if (cell >= 0) {
         Cell& x = cells_[cell];
         ++x.members;
-        m.cell = cell; m.eligible = eligible; m.counted = counted; m.bin = bin; m.weight = s.weight;
+        if (pooled_groups_) ++x.by_group[s.group];
+        m.cell = cell; m.eligible = eligible; m.counted = counted; m.bin = bin; m.weight = weight;
+        m.group = s.group;
         if (eligible) {
           m.slot = static_cast<int>(x.eligible.size()); x.eligible.push_back(woman);
           if (weighted_) x.weights.add(m.weight);
@@ -1147,26 +1148,65 @@ class FertilityCells {
   double next_boundary() { return boundaries_.top(); }
   void advance_boundary() {
     const auto entry = boundaries_.pop();
-    refresh(entry.second, entry.first);
+    place(entry.second, entry.first);
     if (++updates_ % 1024 == 0) checkUserInterrupt();
   }
-  double next_clock() const { return heap_.empty() ? R_PosInf : cells_[heap_.front()].due; }
-  // The earliest cell clock fires: spend its threshold, pick a mother, re-arm.
+  double next_clock() const {
+    const double due = clock_.due(intensity_);
+    return due < end_ ? due : R_PosInf;
+  }
+  // The birth clock fires: choose a cell by intensity, then a mother in it.
   int fire_next(double now) {
-    const int c = heap_.front();
-    unschedule(c);
+    clock_.spend(intensity_, now);
+    const int c = static_cast<int>(intensity_.choose(R::runif(0, 1)));
     Cell& x = cells_[c];
-    x.queued = false;
-    x.has_threshold = false;
-    x.last = now;
-    if (x.eligible.empty()) stop("A fertility cell fired without eligible women.");
-    const double n = static_cast<double>(x.eligible.size());
     const double uniform = R::runif(0, 1);
-    const size_t pick = weighted_ ? x.weights.choose(uniform) :
+    if (x.eligible.empty()) {
+      // No eligible woman: an unrealized birth. In a cell shared by groups the
+      // uniform draw picks the group in proportion to its members.
+      int group = strata_[x.stratum].group;
+      if (pooled_groups_) {
+        double target = uniform * static_cast<double>(x.members);
+        for (const auto& g : x.by_group) {
+          group = g.first;
+          if ((target -= g.second) < 0) break;
+        }
+      }
+      clock_.fired(now);
+      clock_.arm(intensity_, draw_threshold_);
+      if (on_unrealized_) on_unrealized_(c, group);
+      return -1;
+    }
+    const double n = static_cast<double>(x.eligible.size());
+    size_t pick = weighted_ ? x.weights.choose(uniform) :
       std::min(x.eligible.size() - 1, static_cast<size_t>(std::floor(uniform * n)));
+    if (select_eta_) {
+      // Equal formula weights keep the pick above (hetfert or uniform).
+      select_eta_(c, x.eligible, eta_);
+      bool equal = true;
+      for (double e : eta_) if (e != eta_[0]) { equal = false; break; }
+      if (!equal) {
+        if (weighted_) for (size_t k = 0; k < eta_.size(); ++k)
+          eta_[k] += std::log(members_[x.eligible[k]].weight);
+        pick = pick_log_weights(eta_, uniform);
+      }
+    }
     const int woman = x.eligible[pick];
-    rearm(c, now);
+    clock_.fired(now);
+    clock_.arm(intensity_, draw_threshold_);
     return woman;
+  }
+  void set_select_eta(std::function<void(int, const std::vector<int>&, std::vector<double>&)> f) {
+    select_eta_ = std::move(f);
+  }
+  void set_refresh_eta(std::function<double(int, int)> f) { refresh_eta_ = std::move(f); }
+  void set_pooled_groups(bool pooled) { pooled_groups_ = pooled; }
+  // A cell's group, union-type index, parity range and age band.
+  struct CellInfo { int group, type; double parity_start, parity_end, age_start, age_end; };
+  CellInfo cell_info(int c) const {
+    const Cell& x = cells_[c];
+    const Stratum& st = strata_[x.stratum];
+    return {st.group, st.type, st.parity_start, st.parity_end, x.age_start, x.age_end};
   }
   // Calibration fertility totals: each unpartnered eligible member contributes
   // her equivalent weighted hazard in her calibration bin.
@@ -1195,14 +1235,44 @@ class FertilityCells {
     return weighted_ ? x.lambda * (m.weight / x.weights.sum()) :
       x.lambda / static_cast<double>(x.eligible.size());
   }
-  // Close unrealized-intensity intervals at the end of the run.
-  void finish(double end) {
-    for (size_t c = 0; c < cells_.size(); ++c) {
-      Cell& x = cells_[c];
-      if (x.lambda > 0 && x.eligible.empty() && end > x.last)
-        record_unrealized(static_cast<int>(c), x.last, end, x.lambda);
-      x.last = end;
+  void set_unrealized_hook(std::function<void(int, int)> f) { on_unrealized_ = std::move(f); }
+  // Calendar rate changes: update rates in place when the new sources keep
+  // every stratum's cells (same sources and, after age splitting, the same
+  // band edges). Returns false, changing nothing, otherwise.
+  bool update_rates(const std::vector<Source>& sources, double now) {
+    if (sources.size() != sources_.size()) return false;
+    for (size_t i = 0; i < sources.size(); ++i)
+      if (sources[i].group != sources_[i].group || sources[i].type != sources_[i].type ||
+          sources[i].parity_start != sources_[i].parity_start || sources[i].parity_end != sources_[i].parity_end)
+        return false;
+    std::vector<std::vector<Band>> staged(strata_.size());
+    for (size_t k = 0; k < strata_.size(); ++k) {
+      const Stratum& st = strata_[k];
+      const Source* source = nullptr;
+      for (const Source& x : sources)
+        if (x.group == st.group && x.type == st.type && x.parity_start <= st.parity_start &&
+            st.parity_start < x.parity_end) { source = &x; break; }
+      if (!source) return false;
+      staged[k] = split_ages(source->bands, max_age_, interval_);
+      if (staged[k].size() != st.bands.size()) return false;
+      for (size_t i = 0; i < staged[k].size(); ++i)
+        if (staged[k][i].start != st.bands[i].start || staged[k][i].end != st.bands[i].end) return false;
     }
+    clock_.spend(intensity_, now);
+    for (size_t k = 0; k < strata_.size(); ++k) {
+      Stratum& st = strata_[k];
+      for (size_t i = 0; i < staged[k].size(); ++i) {
+        const int c = st.first_cell + static_cast<int>(i);
+        st.bands[i].rate = staged[k][i].rate;
+        Cell& x = cells_[c];
+        x.rate = staged[k][i].rate;
+        x.lambda = x.rate * x.members;
+        intensity_.set(static_cast<size_t>(c), x.lambda);
+      }
+    }
+    clock_.arm(intensity_, draw_threshold_);
+    sources_ = sources;
+    return true;
   }
   // Internal consistency check against an explicit scan of member records.
   bool consistent() const {
@@ -1218,38 +1288,385 @@ class FertilityCells {
         if (cells_[m.cell].eligible[m.slot] != static_cast<int>(w)) return false;
       }
     }
-    for (size_t c = 0; c < cells_.size(); ++c)
+    for (size_t c = 0; c < cells_.size(); ++c) {
       if (members[c] != cells_[c].members || eligible[c] != static_cast<int>(cells_[c].eligible.size()))
         return false;
+      if (intensity_.value(c) != cells_[c].lambda) return false;
+    }
     if (weighted_) for (size_t c = 0; c < cells_.size(); ++c)
       if (std::abs(weights[c] - cells_[c].weights.sum()) > 1e-9 * std::max(weights[c], 1.0)) return false;
     return true;
   }
-  DataFrame unrealized(const std::vector<std::string>& type_labels, double cutoff = R_PosInf) const {
-    const size_t n = unrealized_.size();
-    NumericVector period_start(n), period_end(n), parity_start(n), parity_end(n),
-      age_start(n), age_end(n), births(n), years(n);
-    IntegerVector group(n);
-    CharacterVector type(n);
-    size_t r = 0;
-    for (const auto& entry : unrealized_) {
-      const Cell& x = cells_[entry.first.second];
-      const Stratum& st = strata_[x.stratum];
-      const double grid_start = period_origin_ + static_cast<double>(entry.first.first);
-      period_start[r] = std::max(start_, grid_start);
-      period_end[r] = std::min(std::min(end_, cutoff), grid_start + 1);
-      group[r] = st.group;
-      type[r] = type_labels[st.type];
-      parity_start[r] = st.parity_start; parity_end[r] = st.parity_end;
-      age_start[r] = x.age_start; age_end[r] = x.age_end;
-      births[r] = entry.second[0]; years[r] = entry.second[1];
-      ++r;
-    }
-    return DataFrame::create(_["period_start"] = period_start, _["period_end"] = period_end,
-      _["group"] = group, _["union_type"] = type, _["parity_start"] = parity_start,
-      _["parity_end"] = parity_end, _["age_start"] = age_start, _["age_end"] = age_end,
-      _["unrealized_births"] = births, _["years_without_eligible"] = years);
+};
+
+// ---- Cell-scheduled rate processes (milestone 8 step 1) --------------------
+// One demographic rate process (mortality, union search, dissolution,
+// conversion, or one group-transition slot). Each at-risk unit (a person, or a
+// union identified by its history index) belongs to one cell: one input band
+// of its schedule, measured from the unit's own clock origin (birth, union
+// start, last union end, or group entry). Cells are the input bands: with no
+// eligibility rules every member's hazard is the cell rate, so splitting a band
+// cannot change results, only add boundary updates. Zero-rate bands are gaps.
+// A cell generates events at rate * members; one process clock fires at the
+// total intensity, the cell is chosen in proportion to its intensity, and the
+// unit uniformly within it. No eligibility rules or weights.
+class RateCells {
+  struct Cell {
+    int stratum = 0;
+    double rate = 0, start = 0, end = 0;   // band edges on the unit's clock
+    std::vector<int> members;   // swap-remove list of units
+    double weight_bound = 0;     // upper bound on members' stored weights
+  };
+  struct Member { int cell = -1, slot = -1, stratum = -1; double origin = 0, weight = 1; };
+  bool stored_weights_ = false;
+  // strata_[k] = split bands of schedule k; first_[k] = its first cell index.
+  std::vector<std::vector<Band>> strata_;
+  std::vector<int> first_;
+  std::vector<Cell> cells_;
+  std::vector<Member> members_;
+  BoundaryQueue boundaries_;
+  // One event clock for all cells (see ProcessClock).
+  IntensityTree intensity_;
+  ProcessClock clock_;
+  std::function<double()> draw_threshold_;
+  // Weighted selection (step 2): returns the index of the chosen member of a
+  // cell's member list, given the cell and one uniform draw.
+  std::function<size_t(int, const std::vector<int>&, double)> chooser_;
+  // Called after a unit changes cell (old, new; -1 for none).
+  std::function<void(int, int, int)> on_move_;
+  double end_;
+  unsigned long long updates_ = 0;
+  void update(int c, double now) {
+    clock_.spend(intensity_, now);
+    intensity_.set(static_cast<size_t>(c),
+                   cells_[c].rate * static_cast<double>(cells_[c].members.size()));
+    clock_.arm(intensity_, draw_threshold_);
   }
+
+ public:
+  RateCells(const std::vector<std::vector<Band>>& schedules,
+                 std::function<double()> draw_threshold, double start, double end)
+      : draw_threshold_(std::move(draw_threshold)), end_(end) {
+    for (const auto& bands : schedules) {
+      std::vector<Band> cells;
+      for (const Band& band : bands) if (band.rate > 0) cells.push_back(band);
+      strata_.push_back(std::move(cells));
+      first_.push_back(static_cast<int>(cells_.size()));
+      for (const Band& band : strata_.back()) {
+        Cell x;
+        x.stratum = static_cast<int>(strata_.size()) - 1;
+        x.rate = band.rate; x.start = band.start; x.end = band.end;
+        cells_.push_back(std::move(x));
+      }
+    }
+    if (!cells_.empty()) intensity_.set(cells_.size() - 1, 0);
+    clock_.start(start);
+  }
+  // Place a unit in the cell of schedule `stratum` (-1: not at risk) that
+  // holds its clock value now - origin, and queue its next band boundary.
+  void refresh(int person, int stratum, double origin, double now) {
+    if (person >= static_cast<int>(members_.size())) members_.resize(person + 1);
+    if (stratum >= 0 && !R_finite(origin)) stop("A rate process requires a finite clock origin.");
+    // Fast path: most refreshes follow events that leave this process's state
+    // unchanged. Same stratum and origin, still inside the current cell's band:
+    // the cell and the queued boundary are already correct.
+    Member& m = members_[person];
+    if (stratum == m.stratum && (stratum < 0 ? m.cell < 0 : origin == m.origin && m.cell >= 0 &&
+        origin + cells_[m.cell].start <= now && now < origin + cells_[m.cell].end)) return;
+    int cell = -1;
+    double next = R_PosInf;
+    if (stratum >= 0) {
+      const auto& bands = strata_[stratum];
+      size_t lo = 0, hi = bands.size();
+      while (lo < hi) {
+        const size_t mid = (lo + hi) / 2;
+        if (origin + bands[mid].start <= now) lo = mid + 1; else hi = mid;
+      }
+      if (lo > 0 && now < origin + bands[lo - 1].end) {
+        cell = first_[stratum] + static_cast<int>(lo - 1);
+        next = origin + bands[lo - 1].end;
+      } else if (lo < bands.size()) {
+        next = origin + bands[lo].start;
+      }
+    }
+    m.stratum = stratum; m.origin = origin;
+    if (m.cell != cell) {
+      const int old = m.cell;
+      if (old >= 0) {
+        auto& list = cells_[old].members;
+        const int last = list.back();
+        list[m.slot] = last;
+        members_[last].slot = m.slot;
+        list.pop_back();
+        if (list.empty()) cells_[old].weight_bound = 0;
+      }
+      m.cell = cell;
+      if (cell >= 0) {
+        m.slot = static_cast<int>(cells_[cell].members.size());
+        cells_[cell].members.push_back(person);
+        if (stored_weights_) cells_[cell].weight_bound = std::max(cells_[cell].weight_bound, m.weight);
+      } else m.slot = -1;
+      if (old >= 0) update(old, now);
+      if (cell >= 0) update(cell, now);
+      if (on_move_) on_move_(person, old, cell);
+    }
+    boundaries_.set(person, next);
+  }
+  double next_boundary() { return boundaries_.top(); }
+  // Move the unit with the earliest boundary to its next cell, using the
+  // schedule and clock origin recorded at its last refresh.
+  void advance_boundary() {
+    if (++updates_ % 1024 == 0) checkUserInterrupt();
+    const auto entry = boundaries_.pop();
+    const Member& m = members_[entry.second];
+    refresh(entry.second, m.stratum, m.origin, entry.first);
+  }
+  double next_clock() const {
+    const double due = clock_.due(intensity_);
+    return due < end_ ? due : R_PosInf;
+  }
+  // The clock fires: choose a cell by intensity, then a member uniformly, and
+  // re-arm. The caller updates the unit's state and refreshes its membership.
+  int fire_next(double now) {
+    clock_.spend(intensity_, now);
+    const int c = static_cast<int>(intensity_.choose(R::runif(0, 1)));
+    Cell& x = cells_[c];
+    if (x.members.empty()) stop("A rate cell fired without members.");
+    const double n = static_cast<double>(x.members.size());
+    const double uniform = R::runif(0, 1);
+    size_t pick = std::min(x.members.size() - 1, static_cast<size_t>(std::floor(uniform * n)));
+    if (stored_weights_) {
+      // Stored weights: rejection sampling against the cell's weight bound,
+      // exact for any bound at or above the largest weight. A member at the
+      // bound is accepted without a further draw, so equal weights keep the
+      // unweighted pick and its random-number use.
+      // The bound only falls when the cell empties, so it can go stale after
+      // a high-weight member leaves. After repeated rejections it is reset to
+      // the cell's exact maximum; any bound at or above it keeps the sampling
+      // exact, and with the exact maximum a pick takes at most about n tries
+      // in expectation.
+      for (unsigned long rejected = 0;; ++rejected) {
+        const double w = members_[x.members[pick]].weight;
+        if (w >= x.weight_bound || R::runif(0, 1) * x.weight_bound < w) break;
+        if (rejected % 32 == 31) {
+          double top = 0;
+          for (int unit : x.members) top = std::max(top, members_[unit].weight);
+          x.weight_bound = top;
+          checkUserInterrupt();
+        }
+        pick = std::min(x.members.size() - 1, static_cast<size_t>(std::floor(R::runif(0, 1) * n)));
+      }
+    } else if (chooser_) pick = chooser_(c, x.members, uniform);
+    clock_.fired(now);
+    clock_.arm(intensity_, draw_threshold_);
+    return x.members[pick];
+  }
+  void set_chooser(std::function<size_t(int, const std::vector<int>&, double)> f) {
+    chooser_ = std::move(f);
+  }
+  void set_move_hook(std::function<void(int, int, int)> f) { on_move_ = std::move(f); }
+  // Calendar rate changes: true if new schedules keep this process's cells
+  // (same strata and nonzero band edges), so rates can change in place.
+  bool same_layout(const std::vector<std::vector<Band>>& schedules) const {
+    if (schedules.size() != strata_.size()) return false;
+    for (size_t k = 0; k < schedules.size(); ++k) {
+      size_t i = 0;
+      for (const Band& band : schedules[k]) {
+        if (!(band.rate > 0)) continue;
+        if (i >= strata_[k].size() || band.start != strata_[k][i].start || band.end != strata_[k][i].end)
+          return false;
+        ++i;
+      }
+      if (i != strata_[k].size()) return false;
+    }
+    return true;
+  }
+  // Change every cell's rate at now (after same_layout). The clock spends its
+  // threshold under the old rates and continues; nobody changes cells.
+  void set_rates(const std::vector<std::vector<Band>>& schedules, double now) {
+    clock_.spend(intensity_, now);
+    for (size_t k = 0; k < schedules.size(); ++k) {
+      size_t i = 0;
+      for (const Band& band : schedules[k]) {
+        if (!(band.rate > 0)) continue;
+        const int c = first_[k] + static_cast<int>(i);
+        strata_[k][i].rate = band.rate;
+        cells_[c].rate = band.rate;
+        intensity_.set(static_cast<size_t>(c), band.rate * static_cast<double>(cells_[c].members.size()));
+        ++i;
+      }
+    }
+    clock_.arm(intensity_, draw_threshold_);
+  }
+  // Keep a weight per member; events choose members in proportion to it.
+  void enable_stored_weights() { stored_weights_ = true; }
+  void set_weight(int unit, double weight) {
+    if (unit >= static_cast<int>(members_.size())) members_.resize(unit + 1);
+    Member& m = members_[unit];
+    if (m.weight == weight) return;
+    m.weight = weight;
+    if (m.cell >= 0) cells_[m.cell].weight_bound = std::max(cells_[m.cell].weight_bound, weight);
+  }
+  int cell_of(int unit) const {
+    return unit < static_cast<int>(members_.size()) ? members_[unit].cell : -1;
+  }
+  double cell_rate(int c) const { return cells_[c].rate; }
+  // A cell's stratum and band edges on its clock.
+  int cell_stratum(int c) const { return cells_[c].stratum; }
+  double cell_start(int c) const { return cells_[c].start; }
+  double cell_end(int c) const { return cells_[c].end; }
+  bool consistent() const {
+    std::vector<int> counts(cells_.size(), 0);
+    for (size_t p = 0; p < members_.size(); ++p) {
+      const Member& m = members_[p];
+      if (m.cell < 0) continue;
+      ++counts[m.cell];
+      if (cells_[m.cell].members[m.slot] != static_cast<int>(p)) return false;
+    }
+    if (stored_weights_) {
+      // Stored weights: each cell's bound covers its members' weights.
+      for (size_t c = 0; c < cells_.size(); ++c)
+        for (int unit : cells_[c].members)
+          if (members_[unit].weight > cells_[c].weight_bound) return false;
+    }
+    for (size_t c = 0; c < cells_.size(); ++c) {
+      if (counts[c] != static_cast<int>(cells_[c].members.size())) return false;
+      if (intensity_.value(c) != cells_[c].rate * static_cast<double>(counts[c])) return false;
+    }
+    return true;
+  }
+};
+
+// ---- Weighted search intensities for matching calibration (step 2) --------
+// With search weights, a woman's search hazard is rate_c * N_c * w_i / W_c, so
+// her calibration contribution depends on her whole cell. Each search cell
+// keeps, per calibration bin, the member count and the sums of w (1 - p) and
+// w p (p: her cohabitation probability). A bin's marriage and cohabitation
+// intensities are sum over cells of rate_c * N_c / W_c times those sums.
+// Cells whose contents changed are recomputed before the next search solve.
+class SearchCalibration {
+  struct Woman { int cell = -1; size_t bin = 0; double weight = 1; bool active = false; };
+  // Per calibration bin within a cell: members, sums, and the last applied
+  // contribution (kept until applied as zero, so stale entries are removed).
+  struct BinSums { int count = 0; double marriage = 0, cohab = 0; std::array<double, 2> applied = {0, 0}; };
+  struct CellSums { int count = 0; double weight = 0; std::map<size_t, BinSums> bins; bool dirty = false; };
+  std::vector<Woman> women_;
+  std::vector<double> probability_;
+  std::vector<CellSums> cells_;
+  std::vector<int> dirty_;
+  std::vector<std::array<double, 2>> totals_;
+  std::vector<std::array<int, 2>> positive_;
+  const RateCells* search_ = nullptr;
+  void grow(int woman) {
+    if (woman >= static_cast<int>(women_.size())) {
+      women_.resize(woman + 1);
+      probability_.resize(woman + 1, 0.0);
+    }
+  }
+  CellSums& cell(int c) {
+    if (c >= static_cast<int>(cells_.size())) cells_.resize(c + 1);
+    return cells_[c];
+  }
+  void touch(int c) {
+    CellSums& x = cell(c);
+    if (!x.dirty) { x.dirty = true; dirty_.push_back(c); }
+  }
+  void remove(int woman) {
+    Woman& x = women_[woman];
+    if (!x.active) return;
+    CellSums& c = cell(x.cell);
+    const double p = probability_[woman];
+    BinSums& b = c.bins[x.bin];
+    b.marriage -= x.weight * (1 - p);
+    b.cohab -= x.weight * p;
+    if (--b.count == 0) b.marriage = b.cohab = 0;
+    c.weight -= x.weight;
+    if (--c.count == 0) c.weight = 0;
+    touch(x.cell);
+    x.active = false;
+  }
+  void add(int woman) {
+    Woman& x = women_[woman];
+    CellSums& c = cell(x.cell);
+    const double p = probability_[woman];
+    BinSums& b = c.bins[x.bin];
+    b.marriage += x.weight * (1 - p);
+    b.cohab += x.weight * p;
+    ++b.count;
+    c.weight += x.weight;
+    ++c.count;
+    touch(x.cell);
+    x.active = true;
+  }
+
+ public:
+  void reset(const RateCells* search, size_t bins) {
+    search_ = search;
+    for (Woman& x : women_) x.active = false;
+    cells_.clear();
+    dirty_.clear();
+    totals_.assign(bins, {0, 0});
+    positive_.assign(bins, {0, 0});
+  }
+  // Place a woman in a search cell (-1: not searching) with her bin and weight.
+  void update(int woman, int c, size_t bin, double weight) {
+    grow(woman);
+    const Woman& x0 = women_[woman];
+    if (x0.active ? (c == x0.cell && bin == x0.bin && weight == x0.weight) : c < 0) return;
+    remove(woman);
+    if (c < 0) return;
+    Woman& x = women_[woman];
+    x.cell = c; x.bin = bin; x.weight = weight;
+    add(woman);
+  }
+  void set_probability(int woman, double p) {
+    grow(woman);
+    if (probability_[woman] == p) return;
+    const bool active = women_[woman].active;
+    remove(woman);
+    probability_[woman] = p;
+    if (active) add(woman);
+  }
+  double weight(int woman) const { return women_[woman].weight; }
+  // Search rates changed in place: every cell's contribution is recomputed.
+  void mark_all_dirty() { for (size_t c = 0; c < cells_.size(); ++c) touch(static_cast<int>(c)); }
+  size_t bin(int woman) const { return women_[woman].bin; }
+  bool active(int woman) const { return woman < static_cast<int>(women_.size()) && women_[woman].active; }
+  // Recompute changed cells and return marriage and cohabitation totals by bin.
+  void apply(std::vector<double>& marriage, std::vector<double>& cohab) {
+    for (int c : dirty_) {
+      CellSums& x = cells_[c];
+      x.dirty = false;
+      const double scale = x.count > 0 && x.weight > 0 ?
+        search_->cell_rate(c) * static_cast<double>(x.count) / x.weight : 0.0;
+      for (auto it = x.bins.begin(); it != x.bins.end();) {
+        BinSums& e = it->second;
+        const size_t b = it->first;
+        const std::array<double, 2> value = {e.count ? scale * std::max(0.0, e.marriage) : 0.0,
+                                             e.count ? scale * std::max(0.0, e.cohab) : 0.0};
+        for (int k = 0; k < 2; ++k) {
+          positive_[b][k] += (value[k] > 0) - (e.applied[k] > 0);
+          totals_[b][k] += value[k] - e.applied[k];
+          // Exact zero when no cell contributes: no phantom roundoff intensity.
+          if (positive_[b][k] == 0) totals_[b][k] = 0;
+        }
+        e.applied = value;
+        if (!e.count) it = x.bins.erase(it); else ++it;
+      }
+    }
+    dirty_.clear();
+    marriage.resize(totals_.size());
+    cohab.resize(totals_.size());
+    for (size_t b = 0; b < totals_.size(); ++b) { marriage[b] = totals_[b][0]; cohab[b] = totals_[b][1]; }
+  }
+  // A woman's equivalent search hazard (for consistency checks).
+  double hazard(int woman) const {
+    if (!active(woman)) return 0;
+    const Woman& x = women_[woman];
+    const CellSums& c = cells_[x.cell];
+    return search_->cell_rate(x.cell) * static_cast<double>(c.count) * x.weight / c.weight;
+  }
+  double probability(int woman) const { return probability_[woman]; }
 };
 
 // Input schedules for cells from the effective (group-multiplied) fertility table.
@@ -1685,10 +2102,8 @@ struct UnionRecord {
   int wife, husband;
   bool wife_died = false;
   bool dissolved = false;
-  bool dissolution_sampled = false;
-  bool cohab = false, converted = false, conversion_sampled = false;
-  double converted_from = NA_REAL, conversion_time = R_PosInf;
-  double dissolution_time = std::numeric_limits<double>::infinity();
+  bool cohab = false, converted = false;
+  double converted_from = NA_REAL;
 };
 
 // [[Rcpp::export]]
@@ -1703,7 +2118,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   DataFrame dissolution_rates, DataFrame cohab_prob, DataFrame conversion_rates,
                   List cohab_matching, bool counts_cohab, bool check_cells = false,
                   Nullable<List> hetfert = R_NilValue, Nullable<DataFrame> transition_input = R_NilValue,
-                  Nullable<List> model_schedule_input = R_NilValue) {
+                  Nullable<List> model_schedule_input = R_NilValue,
+                  Nullable<List> weight_input = R_NilValue) {
   const bool scheduled_models = model_schedule_input.isNotNull();
   List matching_bank, inheritance_bank;
   NumericVector model_times;
@@ -1794,7 +2210,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     next_id = std::max(next_id, ids[i]);
     min_birth = std::min(min_birth, births[i]);
   }
-  std::vector<int> parity(parity_specific ? people.size() : 0, 0);
+  // Parity selects fertility cells when schedules are parity-specific; it is
+  // tracked always because weight models may use it.
+  std::vector<int> parity(people.size(), 0);
   MalePool pool(min_birth, start + years, group_count, kWeightBinWidth);
   for (int i = 0; i < static_cast<int>(people.size()); ++i)
     if (!people[i].female && NumericVector::is_na(people[i].died))
@@ -1857,11 +2275,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   // populations; until it is created below, pool hooks record nothing.
   std::unique_ptr<WeightCalibrator> calibrator;
   std::vector<char> counted_woman;
-  std::unique_ptr<FemaleIntensityTracker> intensity_tracker;
+  // Rate-mode search under matching calibration: search intensities come from
+  // the search cells (SearchCalibration); cohabitation probabilities from the
+  // probability tracker. Both are set up with the calibrator and models.
+  std::unique_ptr<ProbabilityTracker> probability_tracker;
+  SearchCalibration search_calibration;
+  bool search_calibrated = false;
   // Cell-accounted fertility under birth spacing (D101).
   std::unique_ptr<FertilityCells> cells;
-  std::vector<const std::vector<Band>*> search_hazards;
-  std::vector<bool> search_duration;
+  // Other rate processes; search, dissolution and conversion are null when
+  // not configured. One transition process per outgoing-schedule slot.
+  std::unique_ptr<RateCells> mortality, search, dissolution, conversion;
+  std::vector<std::unique_ptr<RateCells>> transitions;
   std::vector<std::vector<Band>> probability_schedules(group_count * 3);
   auto load_probabilities = [&]() {
     if (cohab_enabled) {
@@ -1922,39 +2347,27 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       auto found = index.find(child.mother);
       if (found != index.end()) {
         people[found->second].last_birth = std::max(people[found->second].last_birth, child.born);
-        if (parity_specific && people[found->second].female) ++parity[found->second];
+        if (people[found->second].female) ++parity[found->second];
       }
     }
   }
-  // weighted_choice counts living, unpartnered women; fertility-driven intensity
-  // also requires the birth-spacing interval to have ended (queued re-entry).
+  // weighted_choice counts living, unpartnered women. Their search and
+  // fertility intensities come from the cells; with cohabitation, their current
+  // cohabitation probabilities come from the probability tracker.
   auto add_counted_woman = [&](int woman, double now) {
     if (!calibrator || !people[woman].female || !NumericVector::is_na(people[woman].died) ||
         current_partner[woman] >= 0 || counted_woman[woman]) return;
     counted_woman[woman] = 1;
     calibrator->add_woman(people[woman].group, people[woman].born, 1);
-    const int g = people[woman].group;
-    const int index = previous_specific ? g * 3 + previous_union[woman] : g;
-    const auto* search = !rate_initiation ? nullptr : search_hazards[index];
-    const double origin = rate_initiation && search_duration[index] ?
-      previous_union_end[woman] : people[woman].born;
-    if (!R_finite(origin)) stop("Duration search risk requires a recorded previous union ending.");
-    // The fertility channel comes from cells (fill_calibration), not women.
-    intensity_tracker->activate(woman, g, people[woman].born, search, nullptr,
-      people[woman].last_birth + birth_interval, now, origin,
-      cohab_enabled ? &probability_schedules[g * 3 + previous_union[woman]] : nullptr);
+    if (probability_tracker)
+      probability_tracker->activate(woman, people[woman].born,
+        &probability_schedules[people[woman].group * 3 + previous_union[woman]], now);
   };
   auto remove_counted_woman = [&](int woman) {
     if (!calibrator || !counted_woman[woman]) return;
     counted_woman[woman] = 0;
-    intensity_tracker->remove(woman);
+    if (probability_tracker) probability_tracker->remove(woman);
     calibrator->add_woman(people[woman].group, people[woman].born, -1);
-  };
-  auto counted_birth = [&](int woman, double now) {
-    if (calibrator && counted_woman[woman]) {
-      if (parity_specific) { remove_counted_woman(woman); add_counted_woman(woman, now); }
-      else intensity_tracker->set_ready(woman, now + birth_interval, now);
-    }
   };
   LagTable union_table, father_table_storage, cohab_table;
   int union_table_id = 0, father_table_id = 0, cohab_table_id = 0;
@@ -1990,7 +2403,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (calibrator && (cohab_role ? cohab_weighted : (father ? father_weighted : union_weighted))) {
       // Searches and on-demand unions use the union-formation calibration;
       // rate-mode nonmarital fathers have their own, driven by fertility.
-      intensity_tracker->advance(now);
+      if (probability_tracker) probability_tracker->advance(now);
       const bool fertility_driven = !rate_initiation || father;
       if (cells && !cohab_role && fertility_driven) {
         const std::vector<double> filled = cells->fill_calibration(*calibrator);
@@ -2003,6 +2416,29 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
             if (std::abs(scan[k] - filled[k]) > 1e-9 * std::max(1.0, std::abs(scan[k])))
               stop("Internal error: cell calibration totals differ from an explicit scan.");
         }
+      }
+      if (search_calibrated && !fertility_driven) {
+        // Searches: marriage and cohabitation channels from the search cells.
+        std::vector<double> marriage, cohab;
+        search_calibration.apply(marriage, cohab);
+        if (check_cells) {
+          std::vector<double> scan_m(marriage.size(), 0.0), scan_c(cohab.size(), 0.0);
+          for (int w = 0; w < static_cast<int>(people.size()); ++w) {
+            if (!search_calibration.active(w)) continue;
+            // Independent of stored values: p from the woman's schedule now.
+            const double h = search_calibration.hazard(w);
+            const double p = cohab_enabled ? current_hazard(
+              &probability_schedules[people[w].group * 3 + previous_union[w]], people[w].born, now).first : 0.0;
+            const size_t b = search_calibration.bin(w);
+            scan_m[b] += h * (1 - p); scan_c[b] += h * p;
+          }
+          for (size_t k = 0; k < scan_m.size(); ++k)
+            if (std::abs(scan_m[k] - marriage[k]) > 1e-9 * std::max(1.0, std::abs(scan_m[k])) ||
+                std::abs(scan_c[k] - cohab[k]) > 1e-9 * std::max(1.0, std::abs(scan_c[k])))
+              stop("Internal error: weighted search calibration differs from an explicit scan.");
+        }
+        calibrator->assign_channel(0, marriage);
+        calibrator->assign_channel(2, cohab);
       }
       const WeightSolution weights = calibrator->solve(now, cohab_role ? 2 : (fertility_driven ? 1 : 0),
         cohab_role ? cohab_table_id : (father ? father_table_id : union_table_id),
@@ -2058,7 +2494,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::vector<GroupSchedules> schedules(group_count);
   const bool status_fertility = fertility_rates.containsElementNamed("union_type");
   bool typed_fertility = false;
+  // Cells stratify by group only when a process's active rates do (directly
+  // or through group multipliers); otherwise groups share one set of cells.
+  bool mortality_grouped = false, search_grouped = false, conversion_grouped = false;
   auto load_schedules = [&]() {
+    mortality_grouped = mortality_rates.containsElementNamed(".hammel_group");
+    search_grouped = union_rates.containsElementNamed(".hammel_group");
+    conversion_grouped = conversion_rates.containsElementNamed(".hammel_group");
     for (int group = 0; group < group_count; ++group) {
       auto& rates = schedules[group];
       rates.male = read_bands(mortality_rates, "m", "", group);
@@ -2088,17 +2530,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     for (const Person& person : people) min_birth = std::min(min_birth, person.born);
     calibrator.reset(new WeightCalibrator(min_birth, start + years, group_count,
                                           kWeightBinWidth, min_male_age));
-    for (int group = 0; group < group_count; ++group) {
-      if (previous_specific) {
-        for (int p = 0; p < 3; ++p) {
-          search_hazards.push_back(&schedules[group].previous_search[p]);
-          search_duration.push_back(schedules[group].duration_search[p]);
-        }
-      } else {
-        search_hazards.push_back(&schedules[group].search);
-        search_duration.push_back(false);
-      }
-    }
     if (scheduled_models) {
       union_table_id = calibrator->add_table(get_scheduled_lag(general_id));
       father_table_id = calibrator->add_table(get_scheduled_lag(father_id));
@@ -2122,7 +2553,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       }
     }
     counted_woman.assign(people.size(), 0);
-    intensity_tracker.reset(new FemaleIntensityTracker(*calibrator));
+    search_calibrated = rate_initiation;
+    if (rate_initiation && cohab_enabled)
+      probability_tracker.reset(new ProbabilityTracker([&](int woman, double p) {
+        search_calibration.set_probability(woman, p);
+      }));
     for (int man = 0; man < static_cast<int>(people.size()); ++man)
       if (pool.contains(man)) calibrator->add_man(people[man].group, people[man].born, 1);
     for (int woman = 0; woman < static_cast<int>(people.size()); ++woman)
@@ -2160,16 +2595,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     inherit_custom = as<Function>(inheritance["custom"]);
     return matching_changed;
   };
-  std::vector<unsigned long long> event_versions(people.size(), 0);
-  // Continuous dates order events. Equivalent keys retain insertion order.
-  std::multimap<double, Event> queue;
   const double end = start + years;
-  auto candidate = [&](double waiting, double now) {
-    double due = now + waiting;
-    if (std::isfinite(waiting) && due <= now)
-      stop("Event time cannot advance at this numerical scale.");
-    return due;
-  };
   auto threshold = [&]() {
     // Use R's RNG, shared with the seed policy in simulate(). Exp(1) is the
     // cumulative-hazard threshold; avoid zero to keep waiting times positive.
@@ -2227,83 +2653,385 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   load_transitions();
   std::vector<double> group_entry(people.size());
   if (has_transition) group_entry = as<std::vector<double>>(persons[".group_entry"]);
-  std::vector<int> transition_destination(people.size(), -1);
   std::vector<double> tx_person, tx_time;
   std::vector<int> tx_origin, tx_dest;
-  auto schedule = [&](int i, double now) {
-    const auto version = ++event_versions[i];
-    const Person& p = people[i];
-    if (p.female) cells->refresh(i, now);
-    if (!NumericVector::is_na(p.died)) return;
-    const auto& rates = schedules[p.group];
-    const auto& death_rates = p.female ? rates.female : rates.male;
-    double death_time = candidate(waiting_time(death_rates, now - p.born, threshold()), now);
-    // Births come from fertility cells (D101), not per-person candidates.
-    const double birth_time = std::numeric_limits<double>::infinity();
-    double search_time = std::numeric_limits<double>::infinity();
-    if (rate_initiation && p.female && current_partner[i] < 0) {
-      const bool duration = previous_specific && rates.duration_search[previous_union[i]];
-      const double origin = duration ? previous_union_end[i] : p.born;
-      if (!R_finite(origin)) stop("Duration search risk requires a recorded previous union ending.");
-      search_time = candidate(waiting_time(previous_specific ? rates.previous_search[previous_union[i]] : rates.search,
-        now - origin, threshold()), now);
-    }
-    double dissolution_time = std::numeric_limits<double>::infinity();
-    if (has_dissolution && p.female && current_partner[i] >= 0) {
-      UnionRecord& relationship = union_history[person_unions[i].back()];
-      if (!relationship.dissolution_sampled) {
-        const int pair = dissolution_schedules.size() == 1 ? 0 :
-          p.group + group_count * people[current_partner[i]].group;
-        relationship.dissolution_time = candidate(waiting_time(relationship.cohab ? cohab_dissolution_schedules[pair] : dissolution_schedules[pair],
-          now - relationship.start, threshold()), now);
-        relationship.dissolution_sampled = true;
-      }
-      // Retain the union clock through births, including a dissolution due now
-      // after a tied partnered birth. It is not a new zero-wait random draw.
-      dissolution_time = relationship.dissolution_time;
-    }
-    double conversion_time = R_PosInf;
-    if (cohab_enabled && !rates.conversion.empty() && p.female && current_partner[i] >= 0) {
-      auto& relationship = union_history[person_unions[i].back()];
-      if (relationship.cohab) {
-        if (!relationship.conversion_sampled) {
-          relationship.conversion_time = candidate(waiting_time(rates.conversion,
-            now - (rates.duration_conversion ? relationship.start : p.born), threshold()), now);
-          relationship.conversion_sampled = true;
-        }
-        conversion_time = relationship.conversion_time;
-      }
-    }
-    double transition_time = R_PosInf;
-    transition_destination[i] = -1;
-    if (has_transition) {
-      const int partner = current_partner[i];
-      const std::string type = partner < 0 ? "unpartnered" :
-        (union_history[person_unions[i].back()].cohab ? "cohab" : "marriage");
-      for (const auto& outgoing : transition_schedules[p.group]) {
-        if (outgoing.sex >= 0 && outgoing.sex != (p.female ? 1 : 0)) continue;
-        if (!outgoing.type.empty() && outgoing.type != type &&
-            !(outgoing.type == "partnered" && partner >= 0)) continue;
-        const double due = candidate(waiting_time(outgoing.bands,
-          now - (transition_duration ? group_entry[i] : p.born), threshold()), now);
-        if (due < transition_time) {
-          transition_time = due;
-          transition_destination[i] = outgoing.dest;
-        }
-      }
-    }
-    const double other_due = std::min(std::min(death_time, birth_time),
-      std::min(std::min(dissolution_time, conversion_time), search_time));
-    const double due = std::min(other_due, transition_time);
-    const auto type = death_time <= due ? EventType::death :
-      (birth_time <= due ? EventType::birth :
-       (dissolution_time <= due ? EventType::dissolution :
-        (conversion_time <= due ? EventType::conversion :
-         (search_time <= due ? EventType::search : EventType::transition))));
-    if (due < end) queue.emplace(due, Event{i, type, version});
-  };
   // Fertility type labels: overall, unpartnered/partnered, or three types.
   std::vector<std::string> fertility_types;
+  bool fertility_grouped = false;   // fertility cells stratify by group
+  // Unrealized births: (period, group, union type, parity start/end, age start/end).
+  std::map<std::tuple<long long, int, std::string, double, double, double, double>, double> unrealized_counts;
+  // ---- Weight models (milestone 8 step 2) ----------------------------------
+  // A model gives each unit a log weight eta; selection within a chosen cell is
+  // in proportion to exp(eta). Formula models are columns of factors (variable
+  // code, level code or -1 for a numeric value, ancestry component); custom
+  // models call an R function on the chosen cell's members.
+  struct WeightSpec {
+    bool custom = false, warned_na = false;
+    std::string process;
+    std::vector<double> coefficients;
+    std::vector<std::vector<std::array<int, 3>>> factors;
+    SEXP fun = R_NilValue;
+  };
+  std::map<std::string, WeightSpec> weight_specs;
+  // Calendar schedules of weight models: intervals and their models. The
+  // active model is copied into weight_specs, so references to it stay valid.
+  struct WeightSchedule {
+    std::vector<double> start, end;
+    std::vector<WeightSpec> models;
+    int active = -1;
+  };
+  std::map<std::string, WeightSchedule> weight_schedules;
+  std::vector<std::string> weight_group_labels, weight_ancestry_labels;
+  auto parse_weight_spec = [&](List x, const std::string& name) {
+    WeightSpec spec;
+    spec.process = name;
+    spec.custom = as<bool>(x["custom"]);
+    if (spec.custom) spec.fun = x["fun"];
+    else {
+      spec.coefficients = as<std::vector<double>>(x["coefficients"]);
+      List factors = x["factors"];
+      for (int k = 0; k < factors.size(); ++k) {
+        IntegerMatrix m = factors[k];
+        std::vector<std::array<int, 3>> column;
+        for (int r = 0; r < m.nrow(); ++r) column.push_back({m(r, 0), m(r, 1), m(r, 2)});
+        spec.factors.push_back(column);
+      }
+    }
+    return spec;
+  };
+  auto weight_interval = [&](const WeightSchedule& w, double now) {
+    for (size_t k = 0; k < w.start.size(); ++k)
+      if (w.start[k] <= now && now < w.end[k]) return static_cast<int>(k);
+    return -1;
+  };
+  if (weight_input.isNotNull()) {
+    List input(weight_input.get());
+    weight_group_labels = as<std::vector<std::string>>(input["group_labels"]);
+    weight_ancestry_labels = as<std::vector<std::string>>(input["ancestry_labels"]);
+    for (const char* name : {"mortality", "fertility", "dissolution", "conversion", "transition", "search"}) {
+      if (!input.containsElementNamed(name)) continue;
+      List x = input[name];
+      if (x.containsElementNamed("schedule")) {
+        WeightSchedule w;
+        w.start = as<std::vector<double>>(x["time_start"]);
+        w.end = as<std::vector<double>>(x["time_end"]);
+        List models = x["models"];
+        for (int k = 0; k < models.size(); ++k) w.models.push_back(parse_weight_spec(models[k], name));
+        w.active = weight_interval(w, start);
+        if (w.active < 0) stop(std::string("No ") + name + " weight model covers the run start.");
+        // Scheduled models stay installed even when an interval is unweighted.
+        weight_specs[name] = w.models[w.active];
+        for (size_t k = 0; k < w.start.size(); ++k)
+          for (double t : {w.start[k], w.end[k]})
+            if (start < t && t < start + years) calendar_boundaries.insert(t);
+        weight_schedules[name] = w;
+        continue;
+      }
+      WeightSpec spec = parse_weight_spec(x, name);
+      if (!spec.custom && spec.coefficients.empty()) continue;   // all coefficients zero: unweighted
+      weight_specs[name] = spec;
+    }
+  }
+  // Switch scheduled weight models at a calendar boundary; true if any changed.
+  auto switch_weights = [&](double now) {
+    bool changed = false;
+    for (auto& entry : weight_schedules) {
+      WeightSchedule& w = entry.second;
+      const int k = weight_interval(w, now);
+      if (k < 0 || k == w.active) continue;
+      w.active = k;
+      weight_specs[entry.first] = w.models[k];
+      changed = true;
+    }
+    return changed;
+  };
+  auto weight_spec = [&](const std::string& name) -> WeightSpec* {
+    auto found = weight_specs.find(name);
+    return found == weight_specs.end() ? nullptr : &found->second;
+  };
+  auto group_label = [&](int g) -> SEXP {
+    if (g < 0 || g >= static_cast<int>(weight_group_labels.size())) return NA_STRING;
+    return Rf_mkChar(weight_group_labels[g].c_str());
+  };
+  // Variable values (codes as in R's weight_variable_codes). NA is NaN.
+  // Person variables take a transition destination for group_dest.
+  auto person_value = [&](int var, int component, int i, int dest) -> double {
+    const Person& p = people[i];
+    const int partner = current_partner[i];
+    switch (var) {
+      case 0: return p.female ? 1 : 0;
+      case 1: return p.group;
+      case 2: return partner < 0 ? 0 : (union_history[person_unions[i].back()].cohab ? 1 : 2);
+      case 3: return partner >= 0 ? 1 : 0;
+      case 4: return parity[i];
+      case 5: return previous_union[i];
+      case 6: return partner < 0 ? R_NaN : people[partner].group;
+      case 7: return ancestry[static_cast<size_t>(i) * ancestry_components + component];
+      case 8: return dest;
+    }
+    stop("Internal error: unknown person weight variable.");
+  };
+  auto union_value = [&](int var, int component, int u) -> double {
+    const UnionRecord& x = union_history[u];
+    const Person& w = people[x.wife];
+    const Person& h = people[x.husband];
+    switch (var) {
+      case 2: return x.cohab ? 1 : 2;
+      case 9: return w.group;
+      case 10: return h.group;
+      case 11: return parity[x.wife];
+      case 12: return previous_union[x.wife];
+      case 13: return previous_union[x.husband];
+      case 14: return ancestry[static_cast<size_t>(x.wife) * ancestry_components + component];
+      case 15: return ancestry[static_cast<size_t>(x.husband) * ancestry_components + component];
+      case 16: return w.group == h.group ? 1 : 0;
+      case 17: return w.born - h.born;   // husband's age minus wife's age
+    }
+    stop("Internal error: unknown union weight variable.");
+  };
+  auto warn_weight_na = [&](WeightSpec& spec, const std::string& what) {
+    if (spec.warned_na) return;
+    spec.warned_na = true;
+    Rcpp::warning("Missing values in the " + spec.process + " weight " + what +
+                  " were treated as a zero log-weight contribution.");
+  };
+  // A formula's log weight; a term with a missing variable contributes zero.
+  auto formula_eta = [&](WeightSpec& spec, int unit, bool is_union, int dest) {
+    double eta = 0;
+    for (size_t k = 0; k < spec.coefficients.size(); ++k) {
+      double product = 1;
+      bool missing = false;
+      for (const auto& f : spec.factors[k]) {
+        const double v = is_union ? union_value(f[0], f[2], unit) : person_value(f[0], f[2], unit, dest);
+        if (std::isnan(v)) { missing = true; break; }
+        product *= f[1] == -1 ? v : (f[1] >= 0 && v == f[1] ? 1.0 : 0.0);
+      }
+      if (missing) { warn_weight_na(spec, "formula"); continue; }
+      eta += spec.coefficients[k] * product;
+    }
+    return eta;
+  };
+  const std::array<const char*, 3> union_type_labels = {"unpartnered", "cohab", "marriage"};
+  const std::array<const char*, 3> previous_labels = {"none", "separated", "widowed"};
+  auto ancestry_name = [&](size_t k, const std::string& suffix) {
+    const std::string& label = weight_ancestry_labels[k];
+    const std::string base = label.rfind("group_", 0) == 0 ? label.substr(6) : label;
+    return "ancestry_" + base + suffix;
+  };
+  // The members tibble a custom function receives.
+  auto weight_members = [&](const std::vector<int>& units, bool is_union, int dest) {
+    const int n = static_cast<int>(units.size());
+    List columns;
+    CharacterVector names;
+    auto add = [&](const std::string& name, SEXP value) { columns.push_back(value); names.push_back(name); };
+    if (!is_union) {
+      NumericVector id(n); CharacterVector sex(n), group(n), type(n), previous(n), partner_group(n);
+      IntegerVector partnered(n), births(n);
+      for (int r = 0; r < n; ++r) {
+        const int i = units[r];
+        const int partner = current_partner[i];
+        id[r] = people[i].id;
+        sex[r] = people[i].female ? "f" : "m";
+        group[r] = group_label(people[i].group);
+        type[r] = union_type_labels[static_cast<int>(person_value(2, 0, i, -1))];
+        partnered[r] = partner >= 0;
+        births[r] = parity[i];
+        previous[r] = previous_labels[previous_union[i]];
+        partner_group[r] = partner < 0 ? NA_STRING : group_label(people[partner].group);
+      }
+      add("person_id", id); add("sex", sex); add("group", group); add("union_type", type);
+      add("partnered", partnered); add("parity", births); add("previous_union", previous);
+      add("partner_group", partner_group);
+      for (size_t k = 0; k < ancestry_components; ++k) {
+        NumericVector share(n);
+        for (int r = 0; r < n; ++r) share[r] = person_value(7, static_cast<int>(k), units[r], -1);
+        add(ancestry_name(k, ""), share);
+      }
+      if (dest >= 0) {
+        CharacterVector destination(n, group_label(dest));
+        add("group_dest", destination);
+      }
+    } else {
+      NumericVector id(n), wife(n), husband(n), gap(n);
+      CharacterVector group_w(n), group_h(n), previous_w(n), previous_h(n), type(n);
+      IntegerVector parity_w(n), same(n);
+      for (int r = 0; r < n; ++r) {
+        const UnionRecord& x = union_history[units[r]];
+        id[r] = x.id; wife[r] = people[x.wife].id; husband[r] = people[x.husband].id;
+        group_w[r] = group_label(people[x.wife].group); group_h[r] = group_label(people[x.husband].group);
+        parity_w[r] = parity[x.wife];
+        previous_w[r] = previous_labels[previous_union[x.wife]];
+        previous_h[r] = previous_labels[previous_union[x.husband]];
+        same[r] = people[x.wife].group == people[x.husband].group;
+        gap[r] = people[x.wife].born - people[x.husband].born;
+        type[r] = x.cohab ? "cohab" : "marriage";
+      }
+      add("union_id", id); add("wife_id", wife); add("husband_id", husband);
+      add("group_w", group_w); add("group_h", group_h); add("parity_w", parity_w);
+      add("previous_union_w", previous_w); add("previous_union_h", previous_h);
+      for (const std::string suffix : {"_w", "_h"})
+        for (size_t k = 0; k < ancestry_components; ++k) {
+          NumericVector share(n);
+          for (int r = 0; r < n; ++r)
+            share[r] = union_value(suffix == "_w" ? 14 : 15, static_cast<int>(k), units[r]);
+          add(ancestry_name(k, suffix), share);
+        }
+      add("same_group", same); add("age_difference", gap); add("union_type", type);
+    }
+    columns.attr("names") = names;
+    columns.attr("class") = CharacterVector::create("tbl_df", "tbl", "data.frame");
+    columns.attr("row.names") = IntegerVector::create(NA_INTEGER, -n);
+    return columns;
+  };
+  // The active rate period of a process table around now (NA when static).
+  auto rate_period = [&](DataFrame rates, double now) {
+    if (!rates.containsElementNamed("time_start")) return std::make_pair(NA_REAL, NA_REAL);
+    NumericVector lo = rates["time_start"], hi = rates["time_end"];
+    double a = R_NegInf, b = R_PosInf;
+    for (int r = 0; r < lo.size(); ++r) {
+      for (double t : {lo[r], hi[r]}) {
+        if (t <= now) a = std::max(a, t); else b = std::min(b, t);
+      }
+    }
+    return std::make_pair(a, b);
+  };
+  // Call a custom weight function and check its log weights.
+  auto custom_eta = [&](WeightSpec& spec, List members, List bin, std::vector<double>& eta) {
+    Function f(spec.fun);
+    PutRNGstate();
+    NumericVector result;
+    try {
+      result = as<NumericVector>(f(members, bin));
+    } catch (...) {
+      GetRNGstate();
+      throw;
+    }
+    GetRNGstate();
+    const int n = Rf_xlength(members[0]);
+    if (result.size() != n) stop("A custom " + spec.process + " weight function returned " +
+      std::to_string(result.size()) + " values for " + std::to_string(n) + " members.");
+    eta.assign(n, 0.0);
+    for (int r = 0; r < n; ++r) {
+      if (NumericVector::is_na(result[r])) { warn_weight_na(spec, "function result"); continue; }
+      if (!R_finite(result[r])) stop("A custom " + spec.process + " weight function returned an infinite value.");
+      eta[r] = result[r];
+    }
+  };
+  auto band_list = [&](List bin, bool duration, double lo, double hi, DataFrame all, double now) {
+    bin[duration ? "dur_start" : "age_start"] = lo;
+    bin[duration ? "dur_end" : "age_end"] = hi;
+    const auto period = rate_period(all, now);
+    bin["time_start"] = period.first;
+    bin["time_end"] = period.second;
+    return bin;
+  };
+  double weight_now = start;   // event time, for custom-function rate periods
+  // Selection within a chosen RateCells cell by a custom weight function.
+  auto make_chooser = [&](WeightSpec* spec, RateCells* process, int slot) {
+    return [&, spec, process, slot](int c, const std::vector<int>& members, double uniform) -> size_t {
+      const std::string& name = spec->process;
+      const bool is_union = name == "dissolution" || name == "conversion";
+      const int stratum = process->cell_stratum(c);
+      int dest = -1;
+      if (name == "transition") dest = transition_schedules[stratum][slot].dest;
+      // Only custom functions choose this way; formula weights are stored.
+      std::vector<double> eta(members.size());
+      {
+        List bin = List::create(_["process"] = name);
+        bool duration = false;
+        DataFrame all = all_mortality;
+        if (name == "mortality") {
+          bin["sex"] = stratum % 2 ? "f" : "m";
+          bin["group"] = Rf_ScalarString(mortality_grouped ? group_label(stratum / 2) : NA_STRING);
+        } else if (name == "dissolution") {
+          const int pair = stratum / 2;
+          bin["group_pair"] = Rf_ScalarString(dissolution_schedules.size() == 1 ? NA_STRING : Rf_mkChar(
+            (weight_group_labels[pair % group_count] + ":" + weight_group_labels[pair / group_count]).c_str()));
+          bin["union_type"] = stratum % 2 ? "cohab" : "marriage";
+          duration = true; all = all_dissolution;
+        } else if (name == "conversion") {
+          bin["group"] = Rf_ScalarString(conversion_grouped ? group_label(stratum) : NA_STRING);
+          duration = schedules[stratum].duration_conversion; all = all_conversion;
+        } else if (name == "search") {
+          const int g = previous_specific ? stratum / 3 : stratum;
+          const int previous = previous_specific ? stratum % 3 : 0;
+          bin["group"] = Rf_ScalarString(search_grouped ? group_label(g) : NA_STRING);
+          bin["previous_union"] = Rf_ScalarString(previous_specific ? Rf_mkChar(previous_labels[previous]) : NA_STRING);
+          duration = previous_specific && schedules[g].duration_search[previous]; all = all_search;
+        } else {
+          const auto& x = transition_schedules[stratum][slot];
+          bin["group_origin"] = Rf_ScalarString(group_label(stratum));
+          bin["group_dest"] = Rf_ScalarString(group_label(x.dest));
+          bin["sex"] = Rf_ScalarString(x.sex < 0 ? NA_STRING : Rf_mkChar(x.sex ? "f" : "m"));
+          bin["union_type"] = Rf_ScalarString(x.type.empty() ? NA_STRING : Rf_mkChar(x.type.c_str()));
+          duration = transition_duration; all = all_transitions;
+        }
+        custom_eta(*spec, weight_members(members, is_union, dest),
+          band_list(bin, duration, process->cell_start(c), process->cell_end(c), all, weight_now), eta);
+      }
+      return pick_log_weights(eta, uniform);
+    };
+  };
+  // Formula models store weights (set by stored_weight at each refresh);
+  // custom functions choose within the fired cell.
+  auto install_weights = [&](WeightSpec* spec, RateCells* process, int slot) {
+    if (spec->custom) process->set_chooser(make_chooser(spec, process, slot));
+    else process->enable_stored_weights();
+  };
+  auto stored_weight = [&](WeightSpec* spec, RateCells* process, int unit, bool is_union, int dest) {
+    if (!spec || spec->custom || !process) return;
+    const double w = std::exp(formula_eta(*spec, unit, is_union, dest));
+    if (!(w > 0) || !R_finite(w)) stop("A " + spec->process + " weight is not finite and positive.");
+    process->set_weight(unit, w);
+  };
+  auto fertility_bin = [&](int c) {
+    const auto info = cells->cell_info(c);
+    List bin = List::create(_["process"] = "fertility");
+    bin["group"] = Rf_ScalarString(fertility_grouped ? group_label(info.group) : NA_STRING);
+    const std::string& type = fertility_types[info.type];
+    bin["union_type"] = Rf_ScalarString(type.empty() ? NA_STRING : Rf_mkChar(type.c_str()));
+    bin["parity_start"] = info.parity_start;
+    bin["parity_end"] = info.parity_end;
+    return band_list(bin, false, info.age_start, info.age_end, all_fertility, weight_now);
+  };
+  WeightSpec* fertility_weights_spec = weight_spec("fertility");
+  // With matching calibration, fertility weights are stored at refresh.
+  // Formula weights change only at events, so they are stored at refresh and
+  // members are chosen by rejection sampling. Custom functions are evaluated when a
+  // cell is chosen, except fertility under matching calibration.
+  const bool fertility_refresh_weights = fertility_weights_spec &&
+    (calibrator || !fertility_weights_spec->custom);
+  WeightSpec* search_weights_spec = weight_spec("search");
+  WeightSpec* mortality_weights_spec = weight_spec("mortality");
+  WeightSpec* transition_weights_spec = weight_spec("transition");
+  if (search_calibrated && search_weights_spec && search_weights_spec->custom)
+    Rcpp::warning("With weighted matching calibration, the custom search weight function is "
+                  "evaluated at every refresh of every searching woman, which can be slow.");
+  // A searching woman's stored weight in search cell c (calibration mode).
+  std::function<double(int, int)> search_weight = [&](int woman, int c) {
+    double eta;
+    if (!search_weights_spec->custom) eta = formula_eta(*search_weights_spec, woman, false, -1);
+    else {
+      std::vector<double> values;
+      std::vector<int> one = {woman};
+      List bin = List::create(_["process"] = "search");
+      const int stratum = search->cell_stratum(c);
+      const int g = previous_specific ? stratum / 3 : stratum;
+      const int previous = previous_specific ? stratum % 3 : 0;
+      bin["group"] = Rf_ScalarString(search_grouped ? group_label(g) : NA_STRING);
+      bin["previous_union"] = Rf_ScalarString(previous_specific ? Rf_mkChar(previous_labels[previous]) : NA_STRING);
+      custom_eta(*search_weights_spec, weight_members(one, false, -1),
+        band_list(bin, previous_specific && schedules[g].duration_search[previous],
+                  search->cell_start(c), search->cell_end(c), all_search, weight_now), values);
+      eta = values[0];
+    }
+    const double w = std::exp(eta);
+    if (!(w > 0) || !R_finite(w)) stop("A search weight is not finite and positive.");
+    return w;
+  };
+  if (fertility_refresh_weights && fertility_weights_spec->custom && calibrator)
+    Rcpp::warning("With weighted matching calibration, the custom fertility weight function is "
+                  "evaluated at every refresh of every woman, which can be slow.");
   auto load_cells = [&](double now) {
     typed_fertility = false;
     if (status_fertility) {
@@ -2320,7 +3048,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       int type = 0;
       if (status_fertility && current_partner[w] >= 0)
         type = typed_fertility && union_history[person_unions[w].back()].cohab ? 2 : 1;
-      st.stratum = cells->stratum(p.group, type, parity_specific ? parity[w] : 0);
+      st.stratum = cells->stratum(fertility_grouped ? p.group : 0, type, parity_specific ? parity[w] : 0);
+      st.group = p.group;
       if (st.stratum < 0) stop("No fertility schedule covers a woman's current parity.");
       st.weight = heterogeneous ? fertility_weights[w] : 1;
       st.born = p.born;
@@ -2330,20 +3059,251 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     };
     double oldest_birth = end;
     for (const Person& person : people) oldest_birth = std::min(oldest_birth, person.born);
-    cells.reset(new FertilityCells(fertility_strata(fertility_rates, group_count, fertility_types),
-      group_count, static_cast<int>(fertility_types.size()), parity_specific, end - oldest_birth,
-      birth_interval, heterogeneous, state, threshold, calibrator.get(), now, end, start));
+    fertility_grouped = fertility_rates.containsElementNamed(".hammel_group");
+    const int fertility_groups = fertility_grouped ? group_count : 1;
+    cells.reset(new FertilityCells(fertility_strata(fertility_rates, fertility_groups, fertility_types),
+      fertility_groups, static_cast<int>(fertility_types.size()), parity_specific, end - oldest_birth,
+      birth_interval, heterogeneous || fertility_refresh_weights, state, threshold, calibrator.get(),
+      now, end, start));
+    cells->set_pooled_groups(!fertility_grouped && group_count > 1);
+    cells->set_unrealized_hook([&](int c, int group) {
+      // Record one unrealized birth in its one-year period from the run start.
+      long long k = static_cast<long long>(std::floor(weight_now - start));
+      if (start + static_cast<double>(k + 1) <= weight_now) ++k;   // roundoff at a boundary
+      const auto info = cells->cell_info(c);
+      ++unrealized_counts[std::make_tuple(k, group, fertility_types[info.type], info.parity_start,
+        info.parity_end, info.age_start, info.age_end)];
+    });
+    if (WeightSpec* spec = fertility_weights_spec) {
+      if (fertility_refresh_weights) {
+        cells->set_refresh_eta([&, spec](int woman, int c) {
+          if (!spec->custom) return formula_eta(*spec, woman, false, -1);
+          std::vector<double> eta;
+          custom_eta(*spec, weight_members({woman}, false, -1), fertility_bin(c), eta);
+          return eta[0];
+        });
+      } else {
+        cells->set_select_eta([&, spec](int c, const std::vector<int>& women, std::vector<double>& eta) {
+          if (spec->custom) { custom_eta(*spec, weight_members(women, false, -1), fertility_bin(c), eta); return; }
+          eta.resize(women.size());
+          for (size_t k = 0; k < women.size(); ++k) eta[k] = formula_eta(*spec, women[k], false, -1);
+        });
+      }
+    }
   };
   load_cells(start);
-  // Initialize one next event for each living person. Known age changes are
-  // already incorporated, so birthdays alone do not trigger resampling.
+  // Build the non-fertility rate processes from the active schedules. Strata:
+  // mortality group x sex; search group (x previous-union category);
+  // dissolution group pair x union type; conversion group; transition slot k
+  // has one stratum per origin group (its k-th outgoing schedule).
+  // The strata of each non-fertility process from the active schedules.
+  struct ProcessStrata {
+    std::vector<std::vector<Band>> mortality, search, dissolution, conversion;
+    std::vector<std::vector<std::vector<Band>>> transitions;   // per outgoing-schedule slot
+    std::vector<std::vector<std::tuple<int, int, std::string>>> transition_layout;
+  };
+  auto process_strata = [&]() {
+    ProcessStrata x;
+    for (int g = 0; g < (mortality_grouped ? group_count : 1); ++g) {
+      x.mortality.push_back(schedules[g].male);
+      x.mortality.push_back(schedules[g].female);
+    }
+    if (rate_initiation)
+      for (int g = 0; g < (search_grouped ? group_count : 1); ++g) {
+        if (previous_specific) for (int k = 0; k < 3; ++k) x.search.push_back(schedules[g].previous_search[k]);
+        else x.search.push_back(schedules[g].search);
+      }
+    if (has_dissolution)
+      for (size_t pair = 0; pair < dissolution_schedules.size(); ++pair) {
+        x.dissolution.push_back(dissolution_schedules[pair]);
+        x.dissolution.push_back(cohab_dissolution_schedules[pair]);
+      }
+    if (cohab_enabled)
+      for (int g = 0; g < (conversion_grouped ? group_count : 1); ++g) x.conversion.push_back(schedules[g].conversion);
+    size_t slots = 0;
+    for (const auto& origin : transition_schedules) slots = std::max(slots, origin.size());
+    for (size_t k = 0; k < slots; ++k) {
+      std::vector<std::vector<Band>> strata;
+      for (int g = 0; g < group_count; ++g)
+        strata.push_back(k < transition_schedules[g].size() ? transition_schedules[g][k].bands :
+                         std::vector<Band>());
+      x.transitions.push_back(strata);
+    }
+    for (const auto& origin : transition_schedules) {
+      std::vector<std::tuple<int, int, std::string>> layout;
+      for (const auto& schedule : origin) layout.emplace_back(schedule.dest, schedule.sex, schedule.type);
+      x.transition_layout.push_back(layout);
+    }
+    return x;
+  };
+  std::vector<std::vector<std::tuple<int, int, std::string>>> transition_layout;
+  auto load_processes = [&](double now) {
+    auto make = [&](const std::vector<std::vector<Band>>& strata) {
+      return std::unique_ptr<RateCells>(new RateCells(strata, threshold, now, end));
+    };
+    const ProcessStrata layout = process_strata();
+    transition_layout = layout.transition_layout;
+    mortality = make(layout.mortality);
+    search.reset();
+    if (rate_initiation) {
+      search = make(layout.search);
+      if (search_calibrated) {
+        search_calibration.reset(search.get(), calibrator->cells());
+        // Stored weights (if any) pick the searcher; bin moves update the
+        // calibration sums. Without a weight model every weight is one.
+        if (search_weights_spec) search->enable_stored_weights();
+        search->set_move_hook([&](int woman, int, int cell) {
+          if (cell < 0) { search_calibration.update(woman, -1, 0, 1); return; }
+          double w = 1;
+          if (search_weights_spec) {
+            w = search_weights_spec->custom || !search_calibration.active(woman) ?
+              search_weight(woman, cell) : search_calibration.weight(woman);
+            search->set_weight(woman, w);
+          }
+          search_calibration.update(woman, cell, calibrator->bin_index(people[woman].group, people[woman].born), w);
+        });
+      } else if (WeightSpec* spec = weight_spec("search")) {
+        install_weights(spec, search.get(), -1);
+      }
+    }
+    dissolution.reset();
+    if (has_dissolution) dissolution = make(layout.dissolution);
+    conversion.reset();
+    if (cohab_enabled) conversion = make(layout.conversion);
+    transitions.clear();
+    for (size_t k = 0; k < layout.transitions.size(); ++k) {
+      transitions.push_back(make(layout.transitions[k]));
+      if (WeightSpec* spec = weight_spec("transition"))
+        install_weights(spec, transitions.back().get(), static_cast<int>(k));
+    }
+    if (WeightSpec* spec = weight_spec("mortality")) install_weights(spec, mortality.get(), -1);
+    if (WeightSpec* spec = weight_spec("dissolution"))
+      if (dissolution) install_weights(spec, dissolution.get(), -1);
+    if (WeightSpec* spec = weight_spec("conversion"))
+      if (conversion) install_weights(spec, conversion.get(), -1);
+  };
+  // Calendar rate change: update every process's rates in place when all keep
+  // their cells; otherwise return false so the caller rebuilds them.
+  auto update_process_rates = [&](double now) {
+    const ProcessStrata layout = process_strata();
+    if (layout.transition_layout != transition_layout) return false;
+    if (!mortality->same_layout(layout.mortality)) return false;
+    if (search && !search->same_layout(layout.search)) return false;
+    if (dissolution && !dissolution->same_layout(layout.dissolution)) return false;
+    if (conversion && !conversion->same_layout(layout.conversion)) return false;
+    if (layout.transitions.size() != transitions.size()) return false;
+    for (size_t k = 0; k < transitions.size(); ++k)
+      if (!transitions[k]->same_layout(layout.transitions[k])) return false;
+    mortality->set_rates(layout.mortality, now);
+    if (search) {
+      search->set_rates(layout.search, now);
+      if (search_calibrated) search_calibration.mark_all_dirty();
+    }
+    if (dissolution) dissolution->set_rates(layout.dissolution, now);
+    if (conversion) conversion->set_rates(layout.conversion, now);
+    for (size_t k = 0; k < transitions.size(); ++k) transitions[k]->set_rates(layout.transitions[k], now);
+    return true;
+  };
+  // Recompute union u's membership in the union processes (dissolution and
+  // conversion), whose units are unions identified by their history index.
+  // Called when a union starts or ends and when a partner changes group.
+  auto refresh_union = [&](int u, double now) {
+    const UnionRecord& x = union_history[u];
+    const bool ongoing = NumericVector::is_na(x.end);
+    const Person& wife = people[x.wife];
+    if (dissolution) {
+      // Pair schedules are symmetric: both orders of a group pair share cells.
+      const int low = std::min(wife.group, people[x.husband].group);
+      const int high = std::max(wife.group, people[x.husband].group);
+      const int pair = dissolution_schedules.size() == 1 ? 0 : low + group_count * high;
+      dissolution->refresh(u, ongoing ? 2 * pair + (x.cohab ? 1 : 0) : -1, x.start, now);
+      if (ongoing) stored_weight(weight_spec("dissolution"), dissolution.get(), u, true, -1);
+    }
+    if (conversion) {
+      // Conversion schedules use the wife's group, by union duration or her age.
+      const double origin = schedules[wife.group].duration_conversion ? x.start : wife.born;
+      conversion->refresh(u, ongoing && x.cohab ? (conversion_grouped ? wife.group : 0) : -1, origin, now);
+      if (ongoing && x.cohab) stored_weight(weight_spec("conversion"), conversion.get(), u, true, -1);
+    }
+  };
+  // Recompute a person's membership in every rate process from their current
+  // state. Called for each person whose state an event changes.
+  auto refresh_person = [&](int i, double now) {
+    const Person& p = people[i];
+    const bool alive = NumericVector::is_na(p.died);
+    const int partner = current_partner[i];
+    if (p.female) cells->refresh(i, now);
+    mortality->refresh(i, alive ? 2 * (mortality_grouped ? p.group : 0) + (p.female ? 1 : 0) : -1,
+                       p.born, now);
+    if (alive) stored_weight(mortality_weights_spec, mortality.get(), i, false, -1);
+    if (search) {
+      int stratum = -1;
+      double origin = p.born;
+      if (alive && p.female && partner < 0) {
+        const int previous = previous_specific ? previous_union[i] : 0;
+        const int g = search_grouped ? p.group : 0;
+        stratum = previous_specific ? 3 * g + previous : g;
+        if (previous_specific && schedules[p.group].duration_search[previous]) {
+          origin = previous_union_end[i];
+          if (!R_finite(origin)) stop("Duration search risk requires a recorded previous union ending.");
+        }
+      }
+      search->refresh(i, stratum, origin, now);
+      if (!search_calibrated && stratum >= 0) stored_weight(search_weights_spec, search.get(), i, false, -1);
+      if (search_calibrated) {
+        const int cell = search->cell_of(i);
+        if (cell < 0) search_calibration.update(i, -1, 0, 1);
+        else {
+          search_calibration.set_probability(i, cohab_enabled ? current_hazard(
+            &probability_schedules[p.group * 3 + previous_union[i]], p.born, now).first : 0.0);
+          double w = 1;
+          if (search_weights_spec) { w = search_weight(i, cell); search->set_weight(i, w); }
+          search_calibration.update(i, cell, calibrator->bin_index(p.group, p.born), w);
+        }
+      }
+    }
+    if ((dissolution || conversion) && partner >= 0) refresh_union(person_unions[i].back(), now);
+    if (!transitions.empty()) {
+      const std::string type = partner < 0 ? "unpartnered" :
+        (union_history[person_unions[i].back()].cohab ? "cohab" : "marriage");
+      const auto& outgoing = transition_schedules[p.group];
+      for (size_t k = 0; k < transitions.size(); ++k) {
+        bool at_risk = alive && k < outgoing.size();
+        if (at_risk) {
+          const auto& x = outgoing[k];
+          if (x.sex >= 0 && x.sex != (p.female ? 1 : 0)) at_risk = false;
+          if (!x.type.empty() && x.type != type && !(x.type == "partnered" && partner >= 0)) at_risk = false;
+        }
+        transitions[k]->refresh(i, at_risk ? p.group : -1,
+          transition_duration ? group_entry[i] : p.born, now);
+        if (at_risk) stored_weight(transition_weights_spec, transitions[k].get(), i, false, outgoing[k].dest);
+      }
+    }
+  };
+  load_processes(start);
   for (int i = 0; i < static_cast<int>(people.size()); ++i) {
     if (i % 1024 == 0) checkUserInterrupt();
-    schedule(i, start);
+    refresh_person(i, start);
   }
+  // Event sources in same-time priority order: death, birth, dissolution,
+  // conversion, search, then transition slots. Birth is the fertility cells.
+  struct Source { EventType type; RateCells* cells; int slot; };
+  std::vector<Source> sources;
+  auto collect_sources = [&]() {
+    sources.clear();
+    sources.push_back({EventType::death, mortality.get(), -1});
+    sources.push_back({EventType::birth, nullptr, -1});
+    if (dissolution) sources.push_back({EventType::dissolution, dissolution.get(), -1});
+    if (conversion) sources.push_back({EventType::conversion, conversion.get(), -1});
+    if (search) sources.push_back({EventType::search, search.get(), -1});
+    for (size_t k = 0; k < transitions.size(); ++k)
+      sources.push_back({EventType::transition, transitions[k].get(), static_cast<int>(k)});
+  };
+  collect_sources();
+  auto source_clock = [&](const Source& x) { return x.cells ? x.cells->next_clock() : cells->next_clock(); };
+  auto source_boundary = [&](const Source& x) { return x.cells ? x.cells->next_boundary() : cells->next_boundary(); };
   double birth_count = 0, death_count = 0, dissolution_count = 0, conversion_count = 0;
   unsigned long long processed = 0;
-  std::vector<DataFrame> unrealized_epochs;
   bool cells_consistent = true;
   // Process events in chronological order until no scheduled events remain.
   while (true) {
@@ -2352,17 +3312,21 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     // Candidates under the superseded rates never execute beyond it.
     if (!calendar_boundaries.empty()) {
       const double now = *calendar_boundaries.begin();
-      if (now <= cells->next_boundary() && now <= cells->next_clock() &&
-          (queue.empty() || now <= queue.begin()->first)) {
+      bool first = true;
+      for (const Source& x : sources)
+        if (!(now <= source_boundary(x) && now <= source_clock(x))) { first = false; break; }
+      if (first) {
         calendar_boundaries.erase(calendar_boundaries.begin());
+        weight_now = now;
         checkUserInterrupt();
         const bool matching_changed = update_models(now);
+        const bool weights_changed = switch_weights(now);
         const bool probability_changed = calendar_changes_at(all_probability, now);
         const bool rate_change = calendar_changes_at(all_mortality, now) ||
           calendar_changes_at(all_fertility, now) || calendar_changes_at(all_search, now) ||
           calendar_changes_at(all_dissolution, now) || calendar_changes_at(all_conversion, now) ||
           calendar_changes_at(all_transitions, now);
-        if (!rate_change && !matching_changed && !probability_changed) continue;
+        if (!rate_change && !matching_changed && !probability_changed && !weights_changed) continue;
         for (int w = 0; w < static_cast<int>(counted_woman.size()); ++w)
           remove_counted_woman(w);
         if (probability_changed) {
@@ -2376,14 +3340,19 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
             if (w % 1024 == 0) checkUserInterrupt();
             add_counted_woman(w, now);
           }
+          // New weight models: recompute every stored weight. Intensities and
+          // event clocks are unchanged, so no draws are needed.
+          if (weights_changed)
+            for (int i = 0; i < static_cast<int>(people.size()); ++i) {
+              if (i % 1024 == 0) checkUserInterrupt();
+              if (NumericVector::is_na(people[i].died)) refresh_person(i, now);
+            }
           continue;
         }
         const bool fertility_change = calendar_changes_at(all_fertility, now);
-        if (fertility_change) {
-          cells->finish(now);
-          cells_consistent = cells_consistent && cells->consistent();
-          unrealized_epochs.push_back(cells->unrealized(fertility_types, now));
-        }
+        if (fertility_change) cells_consistent = cells_consistent && cells->consistent();
+        for (const Source& x : sources)
+          if (x.cells) cells_consistent = cells_consistent && x.cells->consistent();
         mortality_rates = calendar_slice(all_mortality, now);
         fertility_rates = calendar_slice(all_fertility, now);
         union_rates = calendar_slice(all_search, now);
@@ -2391,70 +3360,80 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         conversion_rates = calendar_slice(all_conversion, now);
         active_transitions = calendar_slice(all_transitions, now);
         load_schedules(); load_dissolution(); load_transitions();
-        if (fertility_change) load_cells(now);
-        for (auto& relationship : union_history) {
-          if (!NumericVector::is_na(relationship.end)) continue;
-          relationship.dissolution_sampled = false;
-          relationship.conversion_sampled = false;
+        // Rates that keep every cell change in place: clocks continue and
+        // nobody moves. A changed layout rebuilds that part, and its new
+        // thresholds are valid after survival to the boundary (memoryless).
+        bool rebuilt = false;
+        if (fertility_change) {
+          bool typed = false;
+          if (status_fertility) {
+            CharacterVector types = fertility_rates["union_type"];
+            for (auto type : types) if (as<std::string>(type) == "cohab") typed = true;
+          }
+          const bool same = typed == typed_fertility &&
+            fertility_rates.containsElementNamed(".hammel_group") == fertility_grouped &&
+            cells->update_rates(fertility_strata(fertility_rates, fertility_grouped ? group_count : 1,
+                                                 fertility_types), now);
+          if (!same) { load_cells(now); rebuilt = true; }
+        }
+        if (!update_process_rates(now)) {
+          load_processes(now);
+          collect_sources();
+          rebuilt = true;
         }
         // All table objects referenced by the tracker keep their addresses.
         // Clock selection is fixed across calendar periods by R validation.
         for (int w = 0; w < static_cast<int>(people.size()); ++w)
           add_counted_woman(w, now);
-        queue.clear();
-        for (int i = 0; i < static_cast<int>(people.size()); ++i) {
-          if (i % 1024 == 0) checkUserInterrupt();
-          schedule(i, now);
-        }
+        // Rebuilt processes start empty; only the living (and their ongoing
+        // unions) re-enter, so the dead need no refresh. A new weight model
+        // also needs every stored weight recomputed, even when rates changed
+        // in place.
+        if (rebuilt || weights_changed)
+          for (int i = 0; i < static_cast<int>(people.size()); ++i) {
+            if (i % 1024 == 0) checkUserInterrupt();
+            if (!NumericVector::is_na(people[i].died)) continue;
+            refresh_person(i, now);
+          }
         continue;
       }
     }
-    // Cell clocks depend on current membership, so bookkeeping boundaries are
-    // processed in time order before any event at or after them.
-    if (cells) {
-      const double boundary = cells->next_boundary();
-      if (boundary < end && boundary <= cells->next_clock() &&
-          (queue.empty() || boundary <= queue.begin()->first)) {
-        cells->advance_boundary();
-        continue;
-      }
+    // Cell intensities depend on current membership, so bookkeeping boundaries
+    // are processed in time order before any event at or after them. Exact
+    // event ties follow the source priority order (earlier source wins).
+    double boundary = R_PosInf, next_event = R_PosInf;
+    size_t boundary_source = 0, event_source = 0;
+    for (size_t k = 0; k < sources.size(); ++k) {
+      const double b = source_boundary(sources[k]), c = source_clock(sources[k]);
+      if (b < boundary) { boundary = b; boundary_source = k; }
+      if (c < next_event) { next_event = c; event_source = k; }
     }
-    // Exact ties follow the event priority death, birth, dissolution,
-    // conversion, search: person events at the same time as a cell clock go
-    // first only while a current death is pending at that time.
-    const double clock = cells ? cells->next_clock() : R_PosInf;
-    if (queue.empty() && !(clock < end)) break;
+    if (boundary < end && boundary <= next_event) {
+      weight_now = boundary;
+      const Source& x = sources[boundary_source];
+      if (x.cells) x.cells->advance_boundary(); else cells->advance_boundary();
+      continue;
+    }
+    if (!(next_event < end)) break;
     if (++processed % 1024 == 0) checkUserInterrupt();
-    double now;
-    EventType type;
-    int i;
-    auto death_at = [&](double time) {
-      const auto range = queue.equal_range(time);
-      for (auto it = range.first; it != range.second; ++it)
-        if (it->second.type == EventType::death && it->second.version == event_versions[it->second.person])
-          return true;
-      return false;
-    };
-    if (clock < end && (queue.empty() || clock < queue.begin()->first ||
-        (clock == queue.begin()->first && !death_at(clock)))) {
-      now = clock;
-      i = cells->fire_next(now);
-      type = EventType::birth;
-    } else {
-      auto next = queue.begin();
-      now = next->first;
-      const Event event = next->second;
-      queue.erase(next);
-      type = event.type;
-      i = event.person;
-      if (event.version != event_versions[i]) continue;
-    }
-    if (intensity_tracker) intensity_tracker->advance(now);
+    const double now = next_event;
+    weight_now = now;
+    const Source& fired = sources[event_source];
+    const EventType type = fired.type;
+    // Union processes return a union index; their events act on its wife.
+    const int unit = fired.cells ? fired.cells->fire_next(now) : cells->fire_next(now);
+    const bool union_event = type == EventType::dissolution || type == EventType::conversion;
+    if (unit < 0) continue;   // an unrealized birth: no event follows
+    const int i = union_event ? union_history[unit].wife : unit;
+    if (probability_tracker) probability_tracker->advance(now);
     if (check_cells && cells && !cells->consistent())
       stop("Internal error: fertility cell counts differ from an explicit scan.");
+    if (check_cells) for (const Source& x : sources)
+      if (x.cells && !x.cells->consistent())
+        stop("Internal error: rate cell counts differ from an explicit scan.");
     if (type == EventType::transition) {
-      const int destination = transition_destination[i];
-      if (destination < 0 || destination == people[i].group) stop("Invalid transition destination.");
+      const int destination = transition_schedules[people[i].group][fired.slot].dest;
+      if (destination == people[i].group) stop("Invalid transition destination.");
       const int partner = current_partner[i];
       if (people[i].female) remove_counted_woman(i); else remove_male(i);
       tx_person.push_back(people[i].id); tx_time.push_back(now);
@@ -2462,17 +3441,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       people[i].group = destination;
       group_entry[i] = now;
       if (people[i].female) add_counted_woman(i, now); else add_male(i);
-      if (partner >= 0) {
-        auto& relationship = union_history[person_unions[i].back()];
-        relationship.dissolution_sampled = false;
-        if (people[i].female) relationship.conversion_sampled = false;
-        // The woman carries the pair-dependent union clock even when he moves.
-        if (!people[i].female) schedule(partner, now);
-      }
-      schedule(i, now);
+      // A move changes the union's group pair and the partner's partner group.
+      refresh_person(i, now);
+      if (partner >= 0) refresh_person(partner, now);
     } else if (type == EventType::death) {
-      // Retain the person's history, record death, and stop their scheduling.
+      // Retain the person's history, record death, and leave every process.
       people[i].died = now;
+      std::vector<int> widowed, ended;
       for (int u : person_unions[i]) {
         UnionRecord& relationship = union_history[u];
         if (!NumericVector::is_na(relationship.end)) continue;
@@ -2486,20 +3461,19 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         previous_union_end[relationship.wife] = previous_union_end[relationship.husband] = now;
         add_male(relationship.husband);
         add_counted_woman(relationship.wife, now);
-        if (has_transition && i == relationship.wife) schedule(relationship.husband, now);
-        if (cells) cells->refresh(relationship.wife, now);
-        // Her old birth candidate is invalid once her husband has died.
-        if ((rate_initiation || has_dissolution || has_transition) && i == relationship.husband)
-          schedule(relationship.wife, now);
+        widowed.push_back(i == relationship.wife ? relationship.husband : relationship.wife);
+        ended.push_back(u);
       }
       if (!people[i].female) remove_male(i);
       else remove_counted_woman(i);
-      if (cells && people[i].female) cells->refresh(i, now);
+      refresh_person(i, now);
+      for (int survivor : widowed) refresh_person(survivor, now);
+      for (int u : ended) refresh_union(u, now);
       ++death_count;
     } else if (type == EventType::dissolution) {
       const int partner = current_partner[i];
       if (partner < 0) stop("Dissolution requires an ongoing union.");
-      UnionRecord& relationship = union_history[person_unions[i].back()];
+      UnionRecord& relationship = union_history[unit];
       relationship.end = now;
       relationship.dissolved = true;
       current_partner[i] = current_partner[partner] = -1;
@@ -2510,13 +3484,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       add_male(partner);
       add_counted_woman(i, now);
       ++dissolution_count;
-      // The woman's cell/search state changes. With transition risks enabled,
-      // both partners also need fresh union-type-dependent candidates.
-      schedule(i, now);
-      if (has_transition) schedule(partner, now);
+      refresh_union(unit, now);
+      refresh_person(i, now);
+      refresh_person(partner, now);
     } else if (type == EventType::conversion) {
       const int partner = current_partner[i];
-      const int old = person_unions[i].back();
+      const int old = unit;
       if (partner < 0 || !union_history[old].cohab) stop("Conversion requires an ongoing cohabitation.");
       union_history[old].end = now;
       union_history[old].converted = true;
@@ -2530,25 +3503,26 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       person_unions[partner].push_back(next);
       if (diagnostics) diagnostic_log_weights.emplace_back(group_count, NA_REAL);
       ++conversion_count;
-      schedule(i, now);
-      if (has_transition) schedule(partner, now);
+      refresh_union(old, now);   // the cohabitation closes; the marriage enters below
+      refresh_person(i, now);
+      refresh_person(partner, now);
     } else if (type == EventType::search) {
       const int partner = form_union(i, now);
-      schedule(i, now);
-      if (has_transition && partner >= 0) schedule(partner, now);
+      refresh_person(i, now);
+      if (partner >= 0) refresh_person(partner, now);
     } else {
       double father = NA_REAL;
       int partner = current_partner[i];
       if (!rate_initiation && partner < 0) {
         partner = form_union(i, now);
-        if (has_transition && partner >= 0) schedule(partner, now);
+        if (partner >= 0) refresh_person(partner, now);
       }
       // A nonmarital father stays available: parentage alone is not a union.
       const int father_position = partner >= 0 ? partner :
         (rate_initiation ? find_candidate(i, now, father_matching, *father_draw, true, nullptr) : -1);
       if (father_position < 0 && cancel_birth_if_no_match) {
-        // No child was born: retain last_birth and redraw risks from this instant.
-        schedule(i, now);
+        // No child was born: retain last_birth; her union state may have changed.
+        refresh_person(i, now);
         continue;
       }
       if (father_position >= 0) father = people[father_position].id;
@@ -2560,14 +3534,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       // sex; union formation above happens before the newborn exists.
       double mother = people[i].id;
       people[i].last_birth = now;
-      if (parity_specific) ++parity[i];
-      counted_birth(i, now);
+      ++parity[i];
       // Default ffab is 0.4886 - its the signature of Berkeley training!
       bool female = R::runif(0, 1) < ffab;
       int child = static_cast<int>(people.size());
       people.push_back({++next_id, now, NA_REAL, mother, father,
                         -std::numeric_limits<double>::infinity(), female, people[i].group});
-      if (parity_specific) parity.push_back(0);
+      parity.push_back(0);
       if (heterogeneous) fertility_weights.push_back(female ?
         inherit_fertility_weight(fertility_weights[i], fertility_variance, fertility_alpha) : NA_REAL);
       // Append ancestry before scheduling the child. Missing fathers contribute
@@ -2657,29 +3630,40 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         counted_woman.push_back(0);
         add_counted_woman(child, now);
       }
-      event_versions.push_back(0);
       group_entry.push_back(now);
-      transition_destination.push_back(-1);
       ++birth_count;
-      // Both newborn and mother need fresh candidates. The mother now has a
-      // new last_birth; spacing delays her next birth, but not a possible death.
-      schedule(child, now);
-      schedule(i, now);
+      // The newborn enters its cells; the mother's spacing (and possibly her
+      // union state, in on-demand mode) has changed.
+      refresh_person(child, now);
+      refresh_person(i, now);
     }
   }
+  // Unrealized births by one-year period from the run start and cell.
   DataFrame unrealized;
-  if (cells) {
-    cells->finish(end);
-    cells_consistent = cells_consistent && cells->consistent();
-    unrealized = cells->unrealized(fertility_types);
-    if (!unrealized_epochs.empty()) {
-      List pieces(unrealized_epochs.size() + 1);
-      for (size_t i = 0; i < unrealized_epochs.size(); ++i) pieces[i] = unrealized_epochs[i];
-      pieces[unrealized_epochs.size()] = unrealized;
-      Function bind = Environment::base_env()["rbind"];
-      Function invoke = Environment::base_env()["do.call"];
-      unrealized = as<DataFrame>(invoke(bind, pieces));
+  {
+    const size_t n = unrealized_counts.size();
+    NumericVector period_start(n), period_end(n), parity_start(n), parity_end(n),
+      age_start(n), age_end(n), births(n);
+    IntegerVector group(n);
+    CharacterVector type(n);
+    size_t r = 0;
+    for (const auto& entry : unrealized_counts) {
+      const auto& key = entry.first;
+      const double grid_start = start + static_cast<double>(std::get<0>(key));
+      period_start[r] = std::max(start, grid_start);
+      period_end[r] = std::min(end, grid_start + 1);
+      group[r] = std::get<1>(key);
+      type[r] = std::get<2>(key);
+      parity_start[r] = std::get<3>(key); parity_end[r] = std::get<4>(key);
+      age_start[r] = std::get<5>(key); age_end[r] = std::get<6>(key);
+      births[r] = entry.second;
+      ++r;
     }
+    unrealized = DataFrame::create(_["period_start"] = period_start, _["period_end"] = period_end,
+      _["group"] = group, _["union_type"] = type, _["parity_start"] = parity_start,
+      _["parity_end"] = parity_end, _["age_start"] = age_start, _["age_end"] = age_end,
+      _["unrealized_births"] = births);
+    if (cells) cells_consistent = cells_consistent && cells->consistent();
   }
   // Materialize ordinary R columns from the C++ records. The R wrapper restores
   // custom columns, closes existing unions affected by deaths, and assembles the
@@ -2756,69 +3740,3 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
 
 // Deterministic validation hook for contribution updates. Operations use zero-
 // based person indices; no demographic event or RNG is involved.
-// [[Rcpp::export]]
-List inspect_intensity_tracker_cpp(NumericVector female_born, IntegerVector female_groups,
-                                   DataFrame search_rates, DataFrame fertility_rates,
-                                   NumericVector times, IntegerVector persons,
-                                   CharacterVector actions, IntegerVector previous,
-                                   NumericVector ready, int group_count,
-                                   Nullable<NumericVector> search_origins = R_NilValue,
-                                   Nullable<DataFrame> probability_rates = R_NilValue) {
-  const int n = female_born.size(), ops = times.size();
-  if (!ops || female_groups.size() != n || persons.size() != ops || actions.size() != ops ||
-      previous.size() != ops || ready.size() != ops) stop("Invalid intensity-tracker inputs.");
-  double lo = times[0], hi = times[ops - 1];
-  for (double born : female_born) lo = std::min(lo, born);
-  WeightCalibrator calibration(lo, hi, group_count, kWeightBinWidth, 0);
-  FemaleIntensityTracker tracker(calibration);
-  const bool stratified = search_rates.containsElementNamed("previous_union");
-  const int categories = stratified ? 3 : 1;
-  const std::array<std::string, 3> labels = {"none", "separated", "widowed"};
-  std::vector<std::vector<Band>> searches(group_count * categories), fertility(group_count);
-  for (int g = 0; g < group_count; ++g) {
-    fertility[g] = read_bands(fertility_rates, "", "", g);
-    for (int p = 0; p < categories; ++p)
-      searches[g * categories + p] = read_bands(search_rates, "", "", g,
-        stratified ? labels[p] : "", stratified && search_uses_duration(search_rates, labels[p]));
-  }
-  const bool split_types = probability_rates.isNotNull();
-  std::vector<std::vector<Band>> probabilities(group_count * 3);
-  if (split_types) {
-    DataFrame table(probability_rates);
-    const bool by_previous = table.containsElementNamed("previous_union");
-    for (int g = 0; g < group_count; ++g) for (int p = 0; p < 3; ++p)
-      probabilities[g * 3 + p] = read_bands(table, "", "", g, by_previous ? labels[p] : "");
-  }
-  NumericVector origins(ops, NA_REAL);
-  if (search_origins.isNotNull()) origins = NumericVector(search_origins);
-  if (origins.size() != ops) stop("Invalid search origins.");
-  List snapshots(ops);
-  IntegerVector pending(ops);
-  std::vector<bool> active(n, false);
-  for (int k = 0; k < ops; ++k) {
-    if (!R_finite(times[k]) || (k && times[k] < times[k - 1])) stop("Unordered tracker times.");
-    tracker.advance(times[k]);
-    const std::string action = as<std::string>(actions[k]);
-    const int person = persons[k];
-    if (person < 0 || person >= n || previous[k] < 0 || previous[k] > 2)
-      stop("Invalid intensity-tracker person or category.");
-    if (action == "activate") {
-      const int g = female_groups[person];
-      if (!active[person]) calibration.add_woman(g, female_born[person], 1);
-      active[person] = true;
-      tracker.activate(person, g, female_born[person],
-        &searches[g * categories + (stratified ? previous[k] : 0)], &fertility[g], ready[k], times[k], origins[k],
-        split_types ? &probabilities[g * 3 + previous[k]] : nullptr);
-    } else if (action == "remove") {
-      tracker.remove(person);
-      if (active[person]) calibration.add_woman(female_groups[person], female_born[person], -1);
-      active[person] = false;
-    }
-    else if (action == "ready") tracker.set_ready(person, ready[k], times[k]);
-    else if (action != "inspect") stop("Unknown intensity-tracker operation.");
-    snapshots[k] = calibration.intensity_snapshot(split_types);
-    pending[k] = tracker.pending();
-  }
-  return List::create(_["intensities"] = snapshots, _["pending"] = pending,
-    _["bins"] = calibration.bins(), _["first"] = std::floor(lo / kWeightBinWidth));
-}

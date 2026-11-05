@@ -96,6 +96,7 @@ apply_group_prop_hazard <- function(rates, persons, multipliers, process,
   }
   groups <- as.character(group_values)
   if (!length(groups)) return(rates)
+  shared <- rates
   if (!".hammel_group" %in% names(rates)) {
     rows <- nrow(rates)
     rates <- rates[rep(seq_len(rows), times = length(groups)), , drop = FALSE]
@@ -113,6 +114,8 @@ apply_group_prop_hazard <- function(rates, persons, multipliers, process,
     factors <- multipliers[match(labels, names(multipliers))]
   }
   factors[is.na(factors)] <- 1
+  # Unit multipliers do not stratify shared rates: groups keep sharing cells.
+  if (!".hammel_group" %in% names(shared) && all(factors == 1)) return(shared)
   rates$rate <- rates$rate * factors
   if (any(!is.finite(rates$rate))) {
     stop(sprintf("%s rates multiplied by `group_prop_hazard` must remain finite.", process),

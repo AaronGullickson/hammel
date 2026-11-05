@@ -96,7 +96,9 @@ test_that("coverage applies to all four arguments and zero-year starts", {
 test_that("general and cohabitation matching use the new model at a tied pending search", {
   first <- create_age_gap_matching_model(0, .1)
   second <- create_age_gap_matching_model(20, .1)
-  seed <- 783; set.seed(seed); boundary <- rexp(2)[2]
+  # The first draw is the search clock's (zero death and fertility rates draw
+  # none); one searching woman at rate 1 makes it her search time.
+  seed <- 783; set.seed(seed); boundary <- rexp(1)
   for (role in c("matching", "cohab_matching")) {
     m <- model_choice_fixture(role, model_calendar(first, second, boundary))
     out <- simulate(m, boundary + .01, seed = seed)
@@ -128,7 +130,8 @@ test_that("NULL father and cohabitation matching follow general calendars dynami
   second <- create_age_gap_matching_model(20, .1)
   for (role in c("father_matching", "cohab_matching")) {
     birth <- role == "father_matching"
-    seed <- 183; set.seed(seed); boundary <- if (birth) rexp(1) / 20 else rexp(2)[2]
+    # The first draw is the fertility clock's (rate 20) or the search clock's (rate 1).
+    seed <- 183; set.seed(seed); boundary <- if (birth) rexp(1) / 20 else rexp(1)
     general <- model_calendar(first, second, boundary)
     fallback <- model_choice_fixture(role, NULL, general, birth = birth)
     fixed <- model_choice_fixture(role, first, general, birth = birth)
@@ -216,7 +219,9 @@ test_that("weighted calibration switches from hard within-group matching and bac
 test_that("matching formulas can switch between native and R formula paths", {
   first <- create_age_gap_matching_model(0, .1)
   second <- create_matching_model(~ abs(age_difference), c("abs(age_difference)" = 100))
-  seed <- 783; set.seed(seed); boundary <- rexp(2)[2]
+  # The first draw is the search clock's (zero death and fertility rates draw
+  # none); one searching woman at rate 1 makes it her search time.
+  seed <- 783; set.seed(seed); boundary <- rexp(1)
   out <- simulate(model_choice_fixture("matching", model_calendar(first, second, boundary)),
     boundary + .01, seed = seed)
   expect_equal(out$unions$husband_id, 3)

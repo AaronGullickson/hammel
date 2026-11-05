@@ -1,9 +1,13 @@
 # Scientific contract
 
-Updated November 2, 2026. This is the current mortality, fertility, union-formation,
+Updated November 5, 2026. This is the current mortality, fertility, union-formation,
 dissolution, remarriage, cohabitation/conversion, group identity/ancestry, and
-observation contract. Milestones 1–7 are accepted as complete
-(D029, D050, D077, D093, D105, D116, D127), retaining documented limitations.
+observation contract. Milestones 1–8 are accepted as complete
+(D029, D050, D077, D093, D105, D116, D127, D130), retaining documented limitations.
+Milestone 8 schedules every rate process by cells with one clock per process
+(D128) and adds weight models that choose who in a cell experiences an event
+(D129); see [cell scheduling](#cell-scheduling-of-rate-processes-d128) and
+[weight models](#weight-models-d129).
 Individual group transitions are accepted under the
 [transition contract](group-transitions.md). Milestone 7, time-varying inputs,
 has implemented calendar-varying rates under the user-approved
@@ -68,8 +72,8 @@ matching eligibility. Optional group formula predictors and symmetric
 pair effects can change utility. Newborns select either parent's group with equal probability by default
 (with maternal fallback for unknown fathers)
 or the configured inheritance rule, entering the assigned group's mortality
-schedule immediately. Fertility cells are separate for each group/status
-schedule. Group values are
+schedule immediately. Rate cells split by group only when a process's effective
+schedules are group-specific (D128). Group values are
 nonmissing character labels or finite numeric codes, with nonempty labels.
 See [groups](groups.md) for full rules, ordering, examples, and validation scope.
 
@@ -85,7 +89,8 @@ overflowing effective rates fail explicitly.
 Conditional fertility also accepts a named list of vectors for partnered and/or
 unpartnered rates. Omitted statuses and omitted groups within a status use 1.0.
 A single vector applies to both statuses; overall fertility requires the vector
-form. Each effective group/status schedule has its own fertility cells.
+form. Fertility cells split by group only when the effective schedules are
+group-specific; multipliers that are all one do not stratify (D128).
 
 ## Initialization and population history
 
@@ -126,25 +131,43 @@ independent of assigned group identity. All shares are retained after death;
 the engine appends them before scheduling the newborn without extra RNG draws.
 See [ancestry](ancestry.md) for the public schema, examples, and validation.
 
-## Shared waiting-time sampling
+## Cell scheduling of rate processes (D128)
 
-The engine draws a positive threshold `E` from R's `Exp(1)` generator,
-equivalent in distribution to `-log(U)` for a uniform `U` in `(0,1)`.
-It consumes `rate * duration` across age bands. If a band reaches the remaining
-threshold, the additional within-band wait is `remaining_threshold / rate`.
-Zero-rate bands and uncovered fertility gaps consume time without consuming
-threshold. If the schedule never reaches the threshold, no future event is
-scheduled; no maximum age forces death.
+Every rate process (mortality, fertility, rate-mode union search, dissolution,
+cohabitation-to-marriage conversion, and each group-transition slot) keeps
+cells of at-risk units. A unit is a person, or for dissolution and conversion a
+union. A cell is one band of a stratum's schedule on the unit's clock (age, or
+duration since union start, last union end or group entry). Cells stratify
+only as finely as the input schedules: by group only when a process's
+effective schedules are group-specific, and by unordered group pair for
+dissolution only when its rates are. Fertility splits its bands into cells of
+at most one year and by actual parity, because spacing is an eligibility rule
+(D101); the other processes use their input bands as cells, since without
+eligibility rules every member's hazard is the cell rate. Zero-rate bands are
+gaps with no cells.
 
-Mortality and adjusted fertility both use the same piecewise constant `Band`
-and `waiting_time()` implementation. Crossing a known age boundary does not
-require a new random draw. See [the sampling explanation](waiting-time-sampling.md)
-for the derivation.
+A cell produces events at its input rate times its members. Each process keeps
+one clock: an Exp(1) threshold from R's generator, spent at the process's total
+intensity (the sum over cells of rate times members). Any change in membership
+or rates first spends the threshold for the elapsed interval and then re-times
+the clock, with no new random draw. When the clock fires, a uniform draw picks
+a cell in proportion to its intensity, a second picks the unit within it
+(uniformly, or in proportion to weights), and a new threshold is drawn. Units
+move between cells at band edges through bookkeeping boundaries, which consume
+no randomness and are processed before events at the same time. If nobody can
+reach a positive band, no event occurs; no maximum age forces death.
 
-Worked example: two months remain at hazard 0.12/year, followed by 0.24/year.
-For threshold 0.05, the first band consumes 0.02; the remaining 0.03 needs
-0.125 years. Total wait is 3.5 months, preserved as a fractional number of years.
-Months here are explanatory durations, not an execution grid.
+Worked example: a mortality process has two cells, rate .01 with 300 members
+and rate .05 with 100. Its total intensity is 3 + 5 = 8 deaths per year, so with
+threshold .4 the next death is due in .05 years. If one member of the second
+cell dies first by another route, the elapsed .02 years spend .16 of the
+threshold and the remaining .24 is re-timed at the new total 7.95.
+
+At a calendar rate change, a process whose new schedules keep its cells (same
+strata and nonzero band edges; for fertility also the same union types, group
+stratification and age splitting; for transitions the same slots) changes its
+cell rates in place and its clock continues. Otherwise that part is rebuilt and
+everyone re-enters with new thresholds, valid after survival to the boundary.
 
 ## Fertility and birth spacing
 
@@ -185,8 +208,8 @@ See [group inheritance](group-inheritance.md) for rules and worked examples.
 ### Cell-accounted fertility (D101)
 
 Births are generated by accounting of the simulated population. Cells come
-from the effective schedules: group (after multipliers) and union type or
-overall. Input age bands are split at whole ages and band edges into sub-cells
+from the effective schedules: union type or overall, and group (after
+multipliers) when those schedules are group-specific. Input age bands are split at whole ages and band edges into sub-cells
 of at most one year; upper-open bands are split up to the oldest attainable age
 and then left open, except that an upper-open band stays one cell when
 `birth_interval * rate < 0.001` (a numerical tolerance). Zero-rate bands form no
@@ -202,16 +225,18 @@ chosen eligible member, uniformly by default or proportional to persistent
 for any composition (initialization without histories, restarts with new
 schedules or intervals, union-type transitions), at cell resolution, while a
 cell has an eligible member. Within a one-year cell, selection does not vary
-with exact age. Intensity in a cell with members but none eligible is dropped
-and reported in `simulation$unrealized_births` (a tibble by one-year period
-from the run start and cell); `calculate_fertility_rates(unrealized = TRUE)`
-attributes it to observation rows. Cancelled attempts keep their spent
-intensity. Union changes move a woman between cells; restarts rebuild cells
+with exact age. A cell with members but none eligible keeps its intensity; when
+the birth clock draws it, no child is born and one unrealized birth is counted
+in `simulation$unrealized_births` (a tibble of counts by one-year period from
+the run start, group, union type, parity band and age band; D128 revises D101's
+expected-value reporting). In a cell shared by groups, the draw that would pick
+a mother picks the group in proportion to its members.
+`calculate_fertility_rates(unrealized = TRUE)` attributes the counts to
+observation rows. Cancelled attempts keep their spent intensity. Union changes move a woman between cells; restarts rebuild cells
 from histories. A woman's hazard depends on recent births by others in her cell;
-this is a calibration device rather than a behavioral model. Each cell keeps an
-Exp(1) threshold consumed at its current intensity, so count changes recompute
-firing times without new random draws. At exact ties a pending death precedes a
-cell birth, which precedes other person events. Individual weights set selection
+this is a calibration device rather than a behavioral model. Births come from
+the fertility process's clock (D128). At exact ties a death precedes a birth,
+which precedes the other processes. Individual weights set selection
 probability within a cell, not the cell's rate. See [cell-accounted fertility](fertility-cell-accounting.md).
 
 For example, a cell with input rate .2 has 100 members, 15 of them within the
@@ -351,15 +376,15 @@ partners and at most one ongoing union per person; unsupported or inconsistent
 active histories are rejected. Supplied ended histories remain unchanged.
 Death closes all affected ongoing unions and clears both partners' current
 partner immediately. Her next birth may trigger another search in on-demand mode. In that mode fertility and
-mortality remain independent of union status, so surviving partners' pending
-events need no resampling merely because a union forms or ends. Optional
+mortality remain independent of union status; union changes refresh the
+partners' cell memberships without random draws. Optional
 `diagnostics = TRUE` records only weighted choice's applied log group weights
 (`.log_weight_<group>`) on newly formed unions in grouped populations; it
 defaults off and consumes no additional random draws. See [union formation](union-formation-models.md)
 for worked examples and implemented milestone 2 rules.
 
-Update the mother's latest birth and resample both newborn and mother. Newborns
-enter mortality risk immediately; their fertility depends on the supplied ages.
+Update the mother's latest birth and refresh the newborn's and mother's cell
+memberships. Newborns enter mortality risk immediately; their fertility depends on the supplied ages.
 Existing custom person/union columns are retained; new rows have missing custom
 values, except that `group` is assigned by the fertility inheritance model. C++ maintains union histories and shared partner caches for all runs,
 closing unions at death with `end_reason = "death_husband"` or
@@ -370,11 +395,10 @@ controls search timing; it does not control whether partner state is tracked.
 
 With `initiation = "rate"`, only living unpartnered women face the supplied
 age-specific search hazard. Men never initiate searches. Gaps and ages outside
-search bands have zero hazard. Search waiting times use the same cumulative
-hazard sampler as deaths and births. Searches compete with death; death wins
-exact same-person ties. Search execution uses the same exact draw,
+search bands have zero hazard. Searches come from the search process's cells
+and clock (D128). Searches compete with death; death wins exact ties. Search execution uses the same exact draw,
 screening, matching and formation code as on-demand mode. A failed search
-reschedules from the attempt time using the same attained-age schedule.
+leaves the woman in her search cell.
 Without `previous_union` stratification, all unpartnered women use that schedule
 regardless of prior union history. Stratified schedules distinguish none,
 separated and widowed, with age or permitted duration clocks (D080–D083).
@@ -396,11 +420,9 @@ rate-mode births; NULL uses the current general `matching` model. Union searches
 always use the general model. Both follow the same formula contract. Birth and search candidates
 compete while unpartnered; death wins exact ties, followed by birth then search.
 
-A new union or husband's death invalidates the woman's pending event and
-reschedules at attained age with the new fertility schedule, preserving her
-recorded birth spacing. Widowhood also restores search risk. Versioned queue
-entries prevent invalidated candidates executing. Surviving men's death hazards
-do not depend on union status. A woman who changes type moves to the new
+A new union or husband's death moves the woman to the cells of her new state,
+preserving her recorded birth spacing. Widowhood also restores search risk.
+Surviving men's death hazards do not depend on union status. A woman who changes type moves to the new
 type's fertility cell with her eligibility status, so that cell's births cover
 her spacing-excluded exposure (D101). The milestone 2 report's conditional
 ASFR discrepancies came from the earlier midpoint compensation.
@@ -408,20 +430,20 @@ See [union fertility specification](union-formation-models.md#fertility-schedule
 
 ### Duration-dependent union dissolution (D078)
 
-An optional `union_dissolution` process adds one annual hazard per union,
-carried by its female partner and indexed by elapsed years since `start_time`.
+An optional `union_dissolution` process adds one annual hazard per union (the
+union is the unit at risk, D128), indexed by elapsed years since `start_time`.
 Shared rates or schedules/multipliers by unordered group pair (D079) use
 half-open duration bands;
 gaps and uncovered durations have zero hazard. New episodes start at duration
-zero; active input unions and restarts use attained duration. The union's
-sampled dissolution date is retained through births. Exact same-person ties
+zero; active input unions and restarts use attained duration. Births do not
+change a union's dissolution cell. Exact same-person ties
 select death, birth, dissolution, conversion, search, then group transition. A tied birth occurs before
 closure and retains that husband as father.
 
 Execution ends the episode with reason `dissolution`, clears partner links,
 restores male availability and female calibration counts with spacing preserved,
-and reschedules her unpartnered fertility and existing searches. Men's death
-hazards are status-independent, so their pending death events remain valid.
+and moves her to her unpartnered fertility and search cells. Men's mortality
+cells do not depend on union status.
 Either partner's death cancels the episode's risk. Without this process,
 existing death-only behavior and random-number consumption are retained.
 Search schedules may distinguish `previous_union` as `none`,
@@ -436,9 +458,9 @@ select age or duration since the latest union ending (D083). Each category uses
 one clock in all bands/groups. Duration columns are optional for all-age tables;
 when included, each row supplies one complete boundary pair with the unused
 pair NA. No simultaneous age/duration hazards are permitted. Recover the latest
-ending origin on restart and reset it at each subsequent ending. The
-contribution queue handles the selected search clock independently of fertility
-ages and matching cohort bins. Cohabitation is implemented under D086; richer couple covariates remain deferred. See [remarriage](remarriage.md) and the
+ending origin on restart and reset it at each subsequent ending. Search
+cells use the selected clock; matching calibration takes their intensities by
+cohort bin (D128). Cohabitation is implemented under D086; richer couple covariates remain deferred. See [remarriage](remarriage.md) and the
 [dissolution specification](union-dissolution.md) for worked examples and limits.
 
 ### Optional cohabitation (D085/D086)
@@ -451,7 +473,7 @@ type before matching;
 cohab_matching optionally overrides general preferences. Unpartnered father
 matching remains separate. Calibration uses lambda*p for cohabitation,
 lambda*(1-p) for direct marriage, and fertility intensity for fathers.
-Probability age boundaries update the common contribution queue. Calendar
+A probability tracker updates each woman's probability at its age boundaries. Calendar
 probability changes refresh role contributions before same-time searches;
 probability-only changes retain all pending event dates and existing union types.
 See [the probability contract](cohabitation.md#calendar-varying-type-probabilities-d122).
@@ -463,7 +485,7 @@ unpartnered/cohab/marriage per group; old input union_status errors. Fertility
 multiplier-list keys must exist in those schedules, with omitted factors 1.
 Dissolution rates may supply both union types within each pair or share rates.
 Conversion uses a female age/cohab-duration clock, optional group, no previous
-axis; NULL warns and disables conversion. Pending clocks survive births. Ties
+axis; NULL warns and disables conversion. Births do not change conversion cells. Ties
 select death, birth, dissolution, conversion, search. Conversion closes cohab,
 opens a linked marriage with the same partners and resets dissolution duration;
 neither partner enters availability. Typed histories preserve legal classification
@@ -505,11 +527,11 @@ Duration is finite and nonnegative; zero duration returns the population with
 updated run metadata. Times that cannot be represented at the chosen numeric
 scale are rejected. Candidates exactly at the run endpoint are excluded.
 
-Each person retains one selected next event. Exact same-person ties select
-death, birth, dissolution, conversion, search, then group transition. A union retains its sampled dissolution
-date through births, so a tied dissolution can follow a birth at the same time. Across people, exact ties follow queue insertion order:
-initial row order; after birth, newborn before mother. Otherwise execute the
-earliest continuous candidate. Father availability changes immediately when
+Each process has one clock (D128); the earliest due clock fires. Exact ties
+between processes select death, birth, dissolution, conversion, search, then
+group transition, so a tied dissolution can follow a birth at the same time.
+Calendar changes precede, and cell boundaries are processed before, events at
+the same time. Father availability changes immediately when
 births/deaths execute. For example, a birth at 0.02 precedes death at 0.06 even
 though both occur within the same nominal month.
 
@@ -521,7 +543,7 @@ agreement with SOCSIM or older Hammel algorithms.
 
 The output is a `hammel_population` containing all person/union histories,
 `end_time`, retained extra components, and latest-run `simulation` metadata.
-Restarts recover birth spacing from those histories and resample pending events.
+Restarts recover birth spacing from those histories and rebuild every cell with new thresholds.
 They are not exact checkpoints, and split runs need not reproduce uninterrupted
 runs. Reattach processes explicitly in a new model, or reuse the original model
 with `set_population(result)` to retain its process specifications.
@@ -678,12 +700,12 @@ or birth-spacing dynamics. See [parity fertility](parity-fertility.md).
 | Issue | Current treatment |
 | --- | --- |
 | Initialization transient | No correction or automatic burn-in; users choose observation windows |
-| Cells without an eligible woman | Births dropped and reported as unrealized; concentrated in sparse young high-parity cells and initialization |
+| Cells without an eligible woman | Would-be births counted as unrealized (D128); concentrated in sparse young high-parity cells and initialization |
 | Rate changes between runs | Histories retain spacing; cell accounting uses the current population, so no transient correction is needed |
 | Sparse oldest ages | Observed missing cells remain missing; HFD conditional import alone uses the user-selected zero-fill rule (D096) |
 | Union formation/dissolution | Exclusive conditional-logit on-demand or female rate-based formation, minimum male age and known-kin screening; widowhood plus optional duration-dependent dissolution; age- or duration-specific searches by previous union |
-| Custom mechanisms/attributes | No arbitrary callback execution or newborn-attribute initializer |
-| Exact continuation | No saved queue/RNG checkpoint |
+| Custom mechanisms/attributes | Read-only custom weight functions (D129) and custom inheritance; no other callbacks or newborn-attribute initializer |
+| Exact continuation | No saved clock/RNG checkpoint |
 
 Milestone 3 was accepted October 27, 2026 (D077), based on the user's
 [group validation report](../validation/milestone3.qmd). Its assessment covers
@@ -713,7 +735,8 @@ transient in expectation; remaining losses are cells without an eligible woman.
 ## Validation requirements and future mechanism specifications
 
 Current checks cover analytical survival and waiting times, cell accounting
-(counts, unrealized intensity, recovery), constant-rate fertility after burn-in, spacing through restarts,
+(counts, unrealized births, recovery), cell and clock consistency against
+explicit scans, weight-model ratio recovery, constant-rate fertility after burn-in, spacing through restarts,
 accounting, identities, father availability, seed behavior, and empty/zero-risk
 runs. [Testing](testing.md) separates these from broader demographic assessment.
 
@@ -800,9 +823,9 @@ strata. Group duration runs from latest entry, or birth without history;
 missing pairs and gaps mean zero risk. Moves preserve ancestry and refresh
 affected events, fertility cells, matching pools and calibration. Grouped
 outputs retain all moves in a `transitions` tibble, even when empty. Household
-moves remain deferred beyond milestone 6 (D114). Tentative milestone 10 now
+moves remain deferred beyond milestone 6 (D114). Milestone 9 now
 covers multiple group columns, potentially including regions/internal migration
-(D121); those mechanisms remain unimplemented. Calendar-time rates are
+(D121, D131); those mechanisms remain unimplemented. Calendar-time rates are
 implemented under D118; matching and inheritance model schedules are implemented
 under D123. The user accepted milestone 6 on
 October 30, 2026 (D116) after reviewing the report and implementation. Its final
@@ -811,16 +834,33 @@ Acceptance retains documented limitations and does not authorize the next
 mechanism or household moves.
 
 
-## Future engine direction: milestone 8
+## Weight models (D129)
 
-D121 assigns binned-group hazards and custom formula weights for all rate
-processes to milestone 8. The selected direction and remaining modeling/API
-questions are recorded in [the design discussion](binned-group-hazards.md).
-It is not implemented and does not change the current contracts above.
-Milestone 7 was accepted complete with the current engine (D127). The
-milestone 8 direction remains separate future work; completion does not
-authorize an unselected formula API or demographic mechanism.
+Weight models choose which member of a cell experiences an event, without
+changing any cell's intensity. Member i is chosen with probability
+w_i / sum(w), where log w_i is a formula's linear predictor x_i * beta or the
+value of a custom function; exp(beta) is the hazard ratio between members of
+the same cell. A model attaches through `weights` on mortality, fertility,
+rate-mode search, dissolution and group transitions, and `weights_conversion`
+for conversion, either as one `create_weight_model()` or a calendar schedule
+of them (the D123 tibble structure). Weights are normalized within cells, so
+each cell keeps its input rate; population-level effects can be smaller where
+cells are small, homogeneous or changing in composition, and terms that are
+constant within every cell cancel with a warning. In fertility, formula weights
+combine with `hetfert` on the log scale. Variables, the custom-function
+contract, missing values, evaluation and matching calibration are specified in
+[binned-group hazards](binned-group-hazards.md#weight-models-d129).
+No eligibility rules beyond fertility spacing exist; unnormalized weights are
+not offered.
 
+## Milestone 8 acceptance
+
+Milestone 8 was accepted complete on November 5, 2026 (D130), based on the
+user's [validation report](../validation/milestone8.qmd) and its
+[rendered assessment](../validation/milestone8.html). Acceptance covers the
+assessed scenarios and retains the documented limitations, including
+composition-dependent population-level effects and performance that depends on
+model structure.
 
 ## Calendar-varying matching and inheritance (D123)
 
@@ -841,7 +881,7 @@ All event-rate calculators accept `conf.level = NULL` (unchanged default output)
 or a confidence level strictly between zero and one. Non-NULL values append
 `conf_low` and `conf_high`, using the row's observed count and its existing
 exposure in `stats::poisson.test()`. Zero exposure yields NA bounds. Fertility
-intervals describe observed births, not the rate adjusted by expected unrealized
+intervals describe observed births, not the rate adjusted by unrealized
 births. These are marginal Poisson-model intervals, not replication-based
 uncertainty or a guarantee under demographic dependence. See
 [the analysis contract](demographic-analysis.md#optional-poisson-rate-intervals)

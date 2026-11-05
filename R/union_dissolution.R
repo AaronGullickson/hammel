@@ -1,18 +1,18 @@
 #' Specify duration-dependent union dissolution
 #'
 #' Construct or attach an optional dissolution process. One continuous hazard
-#' per union is carried by the female partner, using years since the union
+#' applies per union, using years since the union
 #' began, independently of either partner's age. Rates are per partnered
 #' woman-year (equivalently union-year), not annual probabilities. Omitting
 #' this process retains death-only union endings.
 #'
-#' Births preserve the pending dissolution date. Exact same-person ties select
-#' death, then birth, then dissolution; a tied birth occurs while partnered.
-#' Dissolution ends the episode, restores both partners' availability, and
-#' reschedules the woman under her unpartnered fertility and existing search
-#' rules, retaining birth spacing. Optional age-specific search schedules by
+#' Births do not affect a union's dissolution risk. Exact ties select death,
+#' then birth, then dissolution; a tied birth occurs while partnered.
+#' Dissolution ends the episode, restores both partners' availability, and moves
+#' the woman to her unpartnered fertility and search risks, retaining birth
+#' spacing. Optional age-specific search schedules by
 #' previous union are specified through [union_formation()].
-#' Restarts resample at attained union duration rather than reset duration.
+#' Restarts resume at attained union duration rather than reset duration.
 #'
 #' @section Calendar rates:
 #' Optional `time_start`/`time_end` select half-open absolute calendar-year bands,
@@ -20,6 +20,9 @@
 #' and must cover the requested run. Changes precede same-time events without
 #' resetting the union-duration origin. Other arguments remain static.
 #'
+#' @param weights NULL (default) for unweighted selection, or a
+#'   [create_weight_model()] using union variables, which chooses which union
+#'   in a cell dissolves without changing the cell's input rate.
 #' @param rates A nonempty data frame with numeric `dur_start`, `dur_end`, and
 #'   `rate`. Bands are half-open `[dur_start, dur_end)` in years. Starts and
 #'   rates must be finite and nonnegative; ends must exceed starts and may be
@@ -50,17 +53,20 @@
 #' rates <- data.frame(dur_start = c(0, 5), dur_end = c(5, Inf),
 #'                     rate = c(0.04, 0.02))
 #' model <- hammel_model() |> set_union_dissolution(rates)
-union_dissolution <- function(rates, group_prop_hazard = NULL) {
+union_dissolution <- function(rates, group_prop_hazard = NULL, weights = NULL) {
   process <- new_rate_process("union_dissolution", rates)
   process$group_prop_hazard <- group_prop_hazard
   validate_union_dissolution(process)
+  validate_process_weights(weights, "union")
+  warn_cancelled_weight_terms(weights, weight_strata("dissolution", rates), "dissolution")
+  process$weights <- normalize_model_argument(weights)
   process
 }
 
 #' @rdname union_dissolution
 #' @export
-set_union_dissolution <- function(model, rates, group_prop_hazard = NULL) {
-  set_process(model, union_dissolution(rates, group_prop_hazard))
+set_union_dissolution <- function(model, rates, group_prop_hazard = NULL, weights = NULL) {
+  set_process(model, union_dissolution(rates, group_prop_hazard, weights))
 }
 
 validate_union_dissolution <- function(process, calendar_interval = NULL) {

@@ -92,14 +92,13 @@ test_that("each previous-category hazard agrees with analytical incidence", {
   }
 })
 
-test_that("equal previous-union schedules preserve ungrouped execution exactly", {
+test_that("equal previous-union schedules match ungrouped execution in distribution", {
   model <- make_rate_model(20, search_rate = 2)
   model$population$persons$sex[1:10] <- "f"
   model <- set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = .5))
-  shared <- simulate(model, 3, 71)
-  model <- set_union_formation(model, "rate", matching = model$processes$union_formation$matching,
+  stratified <- set_union_formation(model, "rate", matching = model$processes$union_formation$matching,
     rates = previous_rates(2, 2, 2), cancel_birth_if_no_match = FALSE)
-  expect_identical(simulate(model, 3, 71), shared)
+  expect_equivalent_unions(model, stratified, 3)
 })
 
 test_that("previous categories contribute the explicit calibrated intensity", {
@@ -144,13 +143,13 @@ test_that("grouped schedules and multipliers preserve the explicit hazards", {
   expect_true(any(a$unions$end_reason == "dissolution", na.rm = TRUE))
   counts <- calculate_union_rates(a, c(0, 5), c(0, Inf), TRUE, by_previous_union = TRUE)
   expect_gt(sum(counts$unions[counts$previous_union == "separated"]), 0)
-  # Shared hazards versus three equal category hazards give the same execution.
+  # Shared hazards versus three equal category hazards agree in distribution.
   plain <- set_union_formation(model, "rate", matching,
     rates = data.frame(age_start = 15, age_end = Inf, rate = 2),
     diagnostics = TRUE, kinship_generations = 0)
   stratified <- set_union_formation(model, "rate", matching,
     rates = previous_rates(2, 2, 2), diagnostics = TRUE, kinship_generations = 0)
-  expect_equal(simulate(plain, 5, 74), simulate(stratified, 5, 74), tolerance = 1e-10)
+  expect_equivalent_unions(plain, stratified, 5)
   # History overlap is ambiguous only for the new stratification contract.
   bad <- stratified
   bad$population$unions <- data.frame(union_id = 1:2, wife_id = 1,

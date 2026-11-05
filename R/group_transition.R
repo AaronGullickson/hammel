@@ -4,8 +4,11 @@
 #' individual changes group; ancestry, parentage and union histories are retained.
 #' Duration is years since the latest recorded transition, or age without one.
 #' Missing directed pairs, strata and gaps have zero risk. Restarts retain
-#' transition histories and redraw pending events.
+#' transition histories and resume durations from them.
 #'
+#' @param weights NULL (default) for unweighted selection, or a
+#'   [create_weight_model()] using person variables and `group_dest`, which
+#'   chooses who in a cell moves without changing the cell's input rate.
 #' @param rates A nonempty data frame requiring `group_origin`, `group_dest`,
 #'   `rate`, and either `age_start`/`age_end` or `dur_start`/`dur_end` throughout.
 #'   Half-open bands use years; rates are finite nonnegative hazards per
@@ -23,16 +26,19 @@
 #'   output always includes a `transitions` tibble with `person_id`, `time`,
 #'   `group_origin`, and `group_dest`, including when empty.
 #' @export
-group_transition <- function(rates) {
+group_transition <- function(rates, weights = NULL) {
   process <- new_rate_process("group_transition", rates)
   validate_group_transition(process)
+  validate_process_weights(weights, "transition")
+  warn_cancelled_weight_terms(weights, weight_strata("transition", rates), "group transition")
+  process$weights <- normalize_model_argument(weights)
   process
 }
 
 #' @rdname group_transition
 #' @export
-set_group_transition <- function(model, rates) {
-  set_process(model, group_transition(rates))
+set_group_transition <- function(model, rates, weights = NULL) {
+  set_process(model, group_transition(rates, weights))
 }
 
 validate_group_transition <- function(process) {
