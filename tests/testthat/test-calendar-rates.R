@@ -89,25 +89,25 @@ test_that("mortality integrates fractional calendar and age boundaries", {
   expect_equal(simulate(make_model(2), .75, seed = 2)$simulation$deaths, 0)
 })
 
-test_that("fertility changes retain spacing, weights and exact unrealized intensity", {
-  m <- make_model(2, sex = "f", age = 30, birth_interval = 2)
-  m$population$persons$sex[2] <- "m"
-  m$population$persons$birth_time[2] <- -.1
-  m$population$persons$mother_id[2] <- 1
+test_that("fertility changes retain spacing, weights and count unrealized births", {
+  # Women in spacing until 1.9 under rates .2 then .4 from .5 (calendar epochs).
+  n <- 2000
+  m <- make_model(2, sex = "f", age = 30, birth_interval = 2) |>
+    set_population(spacing_population(n))
   r <- calendar_epochs(data.frame(age_start = 15, age_end = 50, rate = 0), c(.2, .4))
   m <- set_fertility(m, r, birth_interval = 2, hetfert = het_fert(cv = 0, alpha = 1))
-  m$population$persons$hetfert <- c(2, NA)
+  m$population$persons$hetfert <- c(rep(2, n), rep(NA, n))
   out <- simulate(m, 1, seed = 81)
   u <- out$simulation$unrealized_births
-  expect_equal(sum(u$unrealized_births), .3)
-  expect_equal(sum(u$years_without_eligible), 1)
-  expect_equal(u$period_start, c(0, .5))
-  expect_equal(u$period_end, c(.5, 1))
+  expect_count(u$unrealized_births, (.2 * .5 + .4 * .5) * n)
+  # Counts sit on the one-year grid from the run start, across the rate change.
+  expect_equal(u$period_start, 0)
+  expect_equal(u$period_end, 1)
   expect_equal(out$persons$hetfert[1], 2)
   expect_equal(out$simulation$births, 0)
   expect_equal(out$persons$mother_id, m$population$persons$mother_id)
   restarted <- simulate(set_population(m, out), .5, seed = 82)
-  expect_equal(sum(restarted$simulation$unrealized_births$unrealized_births), .2)
+  expect_count(restarted$simulation$unrealized_births$unrealized_births, .4 * .5 * n)
 })
 
 test_that("cell birth counts recover rates on either side of a calendar change", {

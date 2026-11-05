@@ -85,7 +85,7 @@ by cell-accounted fertility (D101; see \code{\link[=fertility]{fertility()}}): e
 age/parity/union-type/group cell produces births at its input rate times all
 its members, assigned to an eligible member uniformly or proportionally to
 \code{hetfert} weights when enabled. Births that
-cannot occur because a cell has no eligible member are reported in
+cannot occur because a cell has no eligible member are counted in
 \code{simulation$unrealized_births}. Fertility outside supplied bands is zero. Mortality must cover all ages for both sexes, ending at \code{Inf}.
 
 Events are recorded at their sampled times in \verb{[start, start + years)}. Rates and all

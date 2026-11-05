@@ -249,6 +249,18 @@ component. The summary proposal does not itself select a new result class or
 authorize changing that return contract. Keep underlying tables and settings
 available as ordinary inspectable R objects.
 
+### Unweighted or default intervals in model schedules
+
+Recorded November 4, 2026, during milestone 8. Calendar model schedules (the
+`time_start`/`time_end`/`model` tibbles) currently require a complete model in
+every interval. For weight schedules, a period without weighting is written as
+a formula with zero coefficients. The user is open to allowing `NULL` entries
+to mean "no model" for an interval (unweighted, or the default model), but only
+if the change applies in parallel to all three schedule types: matching,
+inheritance and weight models. Not selected; the meaning of `NULL` for
+matching and inheritance (for example, falling back to the general or default
+model) needs specification first.
+
 ### Post-simulation helpers
 
 Expand the existing extraction/summary functions into a coherent user toolkit

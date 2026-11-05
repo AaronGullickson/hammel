@@ -87,10 +87,20 @@ When the clock fires, the engine draws one uniform to choose the cell in
 proportion to its intensity, and one uniform to choose the unit within it
 (uniformly, or by `hetfert` weight in fertility). It then draws a new threshold.
 
-Fertility cells with members but no eligible woman contribute zero to the tree.
-Their intensity keeps accumulating as expected unrealized births, exactly as in
-D101 (*user direction*: smoothed unrealized births are retained rather than
-counting discarded events).
+*Unrealized births are counted (user direction, November 4, 2026, revising
+D101's reporting and an earlier step 1 choice to keep expected values).* Every
+fertility cell contributes rate * members, including cells whose members are
+all within the birth interval. When the clock draws a cell with no eligible
+woman, no child is born and one unrealized birth is recorded for its one-year
+period from the run start, group, union type, parity band and age band. In a
+cell shared by groups, the draw that would pick a mother picks the group in
+proportion to its members. Realized births are unchanged in distribution;
+`simulation$unrealized_births` now holds counts rather than expected values,
+`years_without_eligible` is removed, and records no longer split at fertility
+rate changes (the per-epoch tables are gone). The accepted milestone 5 report
+used the earlier expected values. Simpler code and output motivated the
+change; it also removes the unrealized accounting that complicated in-place
+rate updates.
 
 ### Boundaries and membership updates
 

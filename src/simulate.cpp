@@ -773,7 +773,7 @@ class FemaleIntensityTracker {
 // each birth to an eligible member, weighted by persistent hetfert when
 // enabled (selection probability, not a rate multiplier). Without hetfert,
 // selection is uniform and no weight tree is allocated. A cell with members but no eligible member
-// cannot produce births: its intensity is dropped and recorded as unrealized.
+// keeps its intensity: when it is drawn, no child is born and one unrealized birth is recorded.
 // Clocks keep an Exp(1) threshold consumed at the current intensity, so count
 // changes recompute firing times without drawing random numbers.
 // Upper-open fertility bands stay one cell when birth_interval * rate is below
@@ -964,9 +964,10 @@ class FertilityCells {
     int members = 0;
     std::vector<int> eligible;                 // swap-remove list of women
     FertilityWeightTree weights;
-    double lambda = 0, last = 0;               // last: unrealized accounting time
+    double lambda = 0;
     std::map<size_t, std::pair<int, FertilityWeightSum>> counted; // count and weight per unpartnered calibration bin
     std::map<int, int> by_group;               // members by group, when groups share cells
+                                               // (attributes unrealized births to a group)
   };
   struct Member {
     int cell = -1, slot = -1, group = 0;
@@ -992,8 +993,7 @@ class FertilityCells {
   double max_age_, interval_;
   std::vector<std::vector<int>> lookup_;
   BoundaryQueue boundaries_;
-  // One birth clock for all cells. A cell contributes its intensity only while
-  // it has an eligible woman; otherwise its intensity is recorded as unrealized.
+  // One birth clock for all cells; every cell contributes rate * members.
   IntensityTree intensity_;
   ProcessClock clock_;
   std::function<State(int)> state_;
@@ -1001,47 +1001,19 @@ class FertilityCells {
   std::vector<double> eta_;     // scratch log weights for selection
   const WeightCalibrator* calibrator_;
   double start_, end_, period_origin_;
-  // Unrealized expected births and years without eligible women, by one-year
-  // period from the simulation start, cell and group. When groups share cells,
-  // each group's share is the cell rate times its members.
-  std::map<std::tuple<long long, int, int>, std::array<double, 2>> unrealized_;
+  // Called with (cell, group) when a cell without eligible women is drawn.
+  std::function<void(int, int)> on_unrealized_;
   unsigned long long updates_ = 0;
 
-  void record_unrealized(int c, double from, double to, double lambda) {
-    while (from < to) {
-      long long k = static_cast<long long>(std::floor(from - period_origin_));
-      if (period_origin_ + static_cast<double>(k + 1) <= from) ++k; // roundoff at a boundary
-      const double stop = std::min(to, period_origin_ + static_cast<double>(k + 1));
-      const Cell& x = cells_[c];
-      if (!pooled_groups_) {
-        auto& value = unrealized_[std::make_tuple(k, c, strata_[x.stratum].group)];
-        value[0] += lambda * (stop - from);
-        value[1] += stop - from;
-      } else {
-        for (const auto& g : x.by_group) {
-          auto& value = unrealized_[std::make_tuple(k, c, g.first)];
-          value[0] += x.rate * g.second * (stop - from);
-          value[1] += stop - from;
-        }
-      }
-      from = stop;
-    }
-  }
-  // Account for the interval since the last update under the state that held
-  // during it. Must run before membership or eligibility changes.
-  void settle(int c, double now) {
-    Cell& x = cells_[c];
-    if (x.lambda > 0 && now > x.last && x.eligible.empty())
-      record_unrealized(c, x.last, now, x.lambda);
-    x.last = now;
-    clock_.spend(intensity_, now);
-  }
+  // Spend the clock for the interval since the last change. Must run before
+  // membership or eligibility changes.
+  void settle(int, double now) { clock_.spend(intensity_, now); }
   // Recompute the cell's intensity from current counts (after settle).
   void touch(int c, double now) {
     Cell& x = cells_[c];
     x.lambda = x.rate * x.members;
     clock_.spend(intensity_, now);
-    intensity_.set(static_cast<size_t>(c), x.eligible.empty() ? 0.0 : x.lambda);
+    intensity_.set(static_cast<size_t>(c), x.lambda);
     clock_.arm(intensity_, draw_threshold_);
   }
   void leave(int woman, int& changed) {
@@ -1104,7 +1076,6 @@ class FertilityCells {
       Cell x;
       x.stratum = k;
       x.rate = band.rate; x.age_start = band.start; x.age_end = band.end;
-      x.last = start_;
       cells_.push_back(x);
     }
     strata_.push_back(st);
@@ -1223,10 +1194,24 @@ class FertilityCells {
     clock_.spend(intensity_, now);
     const int c = static_cast<int>(intensity_.choose(R::runif(0, 1)));
     Cell& x = cells_[c];
-    x.last = now;
-    if (x.eligible.empty()) stop("A fertility cell fired without eligible women.");
-    const double n = static_cast<double>(x.eligible.size());
     const double uniform = R::runif(0, 1);
+    if (x.eligible.empty()) {
+      // No eligible woman: an unrealized birth. In a cell shared by groups the
+      // uniform draw picks the group in proportion to its members.
+      int group = strata_[x.stratum].group;
+      if (pooled_groups_) {
+        double target = uniform * static_cast<double>(x.members);
+        for (const auto& g : x.by_group) {
+          group = g.first;
+          if ((target -= g.second) < 0) break;
+        }
+      }
+      clock_.fired(now);
+      clock_.arm(intensity_, draw_threshold_);
+      if (on_unrealized_) on_unrealized_(c, group);
+      return -1;
+    }
+    const double n = static_cast<double>(x.eligible.size());
     size_t pick = weighted_ ? x.weights.choose(uniform) :
       std::min(x.eligible.size() - 1, static_cast<size_t>(std::floor(uniform * n)));
     if (select_eta_) {
@@ -1284,15 +1269,7 @@ class FertilityCells {
     return weighted_ ? x.lambda * (m.weight / x.weights.sum()) :
       x.lambda / static_cast<double>(x.eligible.size());
   }
-  // Close unrealized-intensity intervals at the end of the run.
-  void finish(double end) {
-    for (size_t c = 0; c < cells_.size(); ++c) {
-      Cell& x = cells_[c];
-      if (x.lambda > 0 && x.eligible.empty() && end > x.last)
-        record_unrealized(static_cast<int>(c), x.last, end, x.lambda);
-      x.last = end;
-    }
-  }
+  void set_unrealized_hook(std::function<void(int, int)> f) { on_unrealized_ = std::move(f); }
   // Internal consistency check against an explicit scan of member records.
   bool consistent() const {
     std::vector<int> members(cells_.size(), 0), eligible(cells_.size(), 0);
@@ -1310,37 +1287,11 @@ class FertilityCells {
     for (size_t c = 0; c < cells_.size(); ++c) {
       if (members[c] != cells_[c].members || eligible[c] != static_cast<int>(cells_[c].eligible.size()))
         return false;
-      const double expected = cells_[c].eligible.empty() ? 0.0 : cells_[c].lambda;
-      if (intensity_.value(c) != expected) return false;
+      if (intensity_.value(c) != cells_[c].lambda) return false;
     }
     if (weighted_) for (size_t c = 0; c < cells_.size(); ++c)
       if (std::abs(weights[c] - cells_[c].weights.sum()) > 1e-9 * std::max(weights[c], 1.0)) return false;
     return true;
-  }
-  DataFrame unrealized(const std::vector<std::string>& type_labels, double cutoff = R_PosInf) const {
-    const size_t n = unrealized_.size();
-    NumericVector period_start(n), period_end(n), parity_start(n), parity_end(n),
-      age_start(n), age_end(n), births(n), years(n);
-    IntegerVector group(n);
-    CharacterVector type(n);
-    size_t r = 0;
-    for (const auto& entry : unrealized_) {
-      const Cell& x = cells_[std::get<1>(entry.first)];
-      const Stratum& st = strata_[x.stratum];
-      const double grid_start = period_origin_ + static_cast<double>(std::get<0>(entry.first));
-      period_start[r] = std::max(start_, grid_start);
-      period_end[r] = std::min(std::min(end_, cutoff), grid_start + 1);
-      group[r] = std::get<2>(entry.first);
-      type[r] = type_labels[st.type];
-      parity_start[r] = st.parity_start; parity_end[r] = st.parity_end;
-      age_start[r] = x.age_start; age_end[r] = x.age_end;
-      births[r] = entry.second[0]; years[r] = entry.second[1];
-      ++r;
-    }
-    return DataFrame::create(_["period_start"] = period_start, _["period_end"] = period_end,
-      _["group"] = group, _["union_type"] = type, _["parity_start"] = parity_start,
-      _["parity_end"] = parity_end, _["age_start"] = age_start, _["age_end"] = age_end,
-      _["unrealized_births"] = births, _["years_without_eligible"] = years);
   }
 };
 
@@ -2673,6 +2624,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   // Fertility type labels: overall, unpartnered/partnered, or three types.
   std::vector<std::string> fertility_types;
   bool fertility_grouped = false;   // fertility cells stratify by group
+  // Unrealized births: (period, group, union type, parity start/end, age start/end).
+  std::map<std::tuple<long long, int, std::string, double, double, double, double>, double> unrealized_counts;
   // ---- Weight models (milestone 8 step 2) ----------------------------------
   // A model gives each unit a log weight eta; selection within a chosen cell is
   // in proportion to exp(eta). Formula models are columns of factors (variable
@@ -3085,6 +3038,14 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       birth_interval, heterogeneous || fertility_refresh_weights, state, threshold, calibrator.get(),
       now, end, start));
     cells->set_pooled_groups(!fertility_grouped && group_count > 1);
+    cells->set_unrealized_hook([&](int c, int group) {
+      // Record one unrealized birth in its one-year period from the run start.
+      long long k = static_cast<long long>(std::floor(weight_now - start));
+      if (start + static_cast<double>(k + 1) <= weight_now) ++k;   // roundoff at a boundary
+      const auto info = cells->cell_info(c);
+      ++unrealized_counts[std::make_tuple(k, group, fertility_types[info.type], info.parity_start,
+        info.parity_end, info.age_start, info.age_end)];
+    });
     if (WeightSpec* spec = fertility_weights_spec) {
       if (fertility_refresh_weights) {
         cells->set_refresh_eta([&, spec](int woman, int c) {
@@ -3273,7 +3234,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   auto source_boundary = [&](const Source& x) { return x.cells ? x.cells->next_boundary() : cells->next_boundary(); };
   double birth_count = 0, death_count = 0, dissolution_count = 0, conversion_count = 0;
   unsigned long long processed = 0;
-  std::vector<DataFrame> unrealized_epochs;
   bool cells_consistent = true;
   // Process events in chronological order until no scheduled events remain.
   while (true) {
@@ -3320,11 +3280,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
           continue;
         }
         const bool fertility_change = calendar_changes_at(all_fertility, now);
-        if (fertility_change) {
-          cells->finish(now);
-          cells_consistent = cells_consistent && cells->consistent();
-          unrealized_epochs.push_back(cells->unrealized(fertility_types, now));
-        }
+        if (fertility_change) cells_consistent = cells_consistent && cells->consistent();
         mortality_rates = calendar_slice(all_mortality, now);
         fertility_rates = calendar_slice(all_fertility, now);
         union_rates = calendar_slice(all_search, now);
@@ -3378,6 +3334,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     // Union processes return a union index; their events act on its wife.
     const int unit = fired.cells ? fired.cells->fire_next(now) : cells->fire_next(now);
     const bool union_event = type == EventType::dissolution || type == EventType::conversion;
+    if (unit < 0) continue;   // an unrealized birth: no event follows
     const int i = union_event ? union_history[unit].wife : unit;
     if (intensity_tracker) intensity_tracker->advance(now);
     if (check_cells && cells && !cells->consistent())
@@ -3593,19 +3550,32 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       refresh_person(i, now);
     }
   }
+  // Unrealized births by one-year period from the run start and cell.
   DataFrame unrealized;
-  if (cells) {
-    cells->finish(end);
-    cells_consistent = cells_consistent && cells->consistent();
-    unrealized = cells->unrealized(fertility_types);
-    if (!unrealized_epochs.empty()) {
-      List pieces(unrealized_epochs.size() + 1);
-      for (size_t i = 0; i < unrealized_epochs.size(); ++i) pieces[i] = unrealized_epochs[i];
-      pieces[unrealized_epochs.size()] = unrealized;
-      Function bind = Environment::base_env()["rbind"];
-      Function invoke = Environment::base_env()["do.call"];
-      unrealized = as<DataFrame>(invoke(bind, pieces));
+  {
+    const size_t n = unrealized_counts.size();
+    NumericVector period_start(n), period_end(n), parity_start(n), parity_end(n),
+      age_start(n), age_end(n), births(n);
+    IntegerVector group(n);
+    CharacterVector type(n);
+    size_t r = 0;
+    for (const auto& entry : unrealized_counts) {
+      const auto& key = entry.first;
+      const double grid_start = start + static_cast<double>(std::get<0>(key));
+      period_start[r] = std::max(start, grid_start);
+      period_end[r] = std::min(end, grid_start + 1);
+      group[r] = std::get<1>(key);
+      type[r] = std::get<2>(key);
+      parity_start[r] = std::get<3>(key); parity_end[r] = std::get<4>(key);
+      age_start[r] = std::get<5>(key); age_end[r] = std::get<6>(key);
+      births[r] = entry.second;
+      ++r;
     }
+    unrealized = DataFrame::create(_["period_start"] = period_start, _["period_end"] = period_end,
+      _["group"] = group, _["union_type"] = type, _["parity_start"] = parity_start,
+      _["parity_end"] = parity_end, _["age_start"] = age_start, _["age_end"] = age_end,
+      _["unrealized_births"] = births);
+    if (cells) cells_consistent = cells_consistent && cells->consistent();
   }
   // Materialize ordinary R columns from the C++ records. The R wrapper restores
   // custom columns, closes existing unions affected by deaths, and assembles the

@@ -130,8 +130,9 @@ interval, and each birth goes to an eligible member, uniformly by default
 or proportional to persistent weights when \code{hetfert} is enabled. Observed
 rates then equal inputs in expectation for any population composition,
 including after restarts and union-type changes, while a cell has an eligible
-member. Intensity in cells with members but none eligible is dropped and
-reported in \code{simulation$unrealized_births}. An individual woman's hazard
+member. A cell with members but none eligible keeps its intensity; when it
+would produce a birth, no child is born and the event is counted in
+\code{simulation$unrealized_births}. An individual woman's hazard
 depends on recent births by others in her cell; this is a calibration
 device. Upper-open age bands stay one cell when \code{birth_interval * rate} is
 below 0.001 and are otherwise split yearly. Zero-rate bands form no cells.

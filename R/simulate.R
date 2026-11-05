@@ -61,7 +61,7 @@
 #' age/parity/union-type/group cell produces births at its input rate times all
 #' its members, assigned to an eligible member uniformly or proportionally to
 #' `hetfert` weights when enabled. Births that
-#' cannot occur because a cell has no eligible member are reported in
+#' cannot occur because a cell has no eligible member are counted in
 #' `simulation$unrealized_births`. Fertility outside supplied bands is zero. Mortality must cover all ages for both sexes, ending at `Inf`.
 #'
 #' Events are recorded at their sampled times in `[start, start + years)`. Rates and all
@@ -409,7 +409,7 @@ validate_birth_interval <- function(duration) {
   invisible(duration)
 }
 
-# Unrealized expected births from cells with members but no eligible woman
+# Counts of unrealized births from cells with members but no eligible woman
 # (D101), by one-year period from the run start and cell. Columns mirror the
 # fertility table's strata: group, union_type and parity bounds appear only
 # when the schedules use them. Always a tibble, possibly with zero rows.
@@ -418,7 +418,7 @@ format_unrealized_births <- function(native, rates, group_values) {
     native <- data.frame(period_start = numeric(), period_end = numeric(),
       group = integer(), union_type = character(), parity_start = numeric(),
       parity_end = numeric(), age_start = numeric(), age_end = numeric(),
-      unrealized_births = numeric(), years_without_eligible = numeric())
+      unrealized_births = numeric())
   }
   out <- tibble::tibble(period_start = native$period_start, period_end = native$period_end)
   if (!is.null(group_values)) out$group <- group_values[native$group + 1L]
@@ -430,6 +430,5 @@ format_unrealized_births <- function(native, rates, group_values) {
   out$age_start <- native$age_start
   out$age_end <- native$age_end
   out$unrealized_births <- native$unrealized_births
-  out$years_without_eligible <- native$years_without_eligible
   out
 }
