@@ -19,7 +19,8 @@ union_formation(
   cohab_matching = NULL,
   union_convert_rate = NULL,
   cohabitation_counts_as_previous_union = FALSE,
-  weights_conversion = NULL
+  weights_conversion = NULL,
+  weights = NULL
 )
 
 set_union_formation(
@@ -37,7 +38,8 @@ set_union_formation(
   cohab_matching = NULL,
   union_convert_rate = NULL,
   cohabitation_counts_as_previous_union = FALSE,
-  weights_conversion = NULL
+  weights_conversion = NULL,
+  weights = NULL
 )
 }
 \arguments{
@@ -143,6 +145,13 @@ starts at the latest partnership ending. Only applies to typed unions.}
 \item{weights_conversion}{NULL (default) for unweighted selection, or a
 \code{\link[=create_weight_model]{create_weight_model()}} using union variables, which chooses which
 cohabitation in a cell converts without changing the cell's input rate.}
+
+\item{weights}{NULL (default) for unweighted selection of searching women,
+or a \code{\link[=create_weight_model]{create_weight_model()}} using person variables, which chooses which
+unpartnered woman in a cell searches without changing the cell's input
+search rate. Rate mode only. With weighted matching calibration the
+weights are kept current for every searching woman, so calibration uses
+the weighted search intensities.}
 
 \item{model}{A \code{hammel_model} object.}
 }

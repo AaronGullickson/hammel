@@ -723,9 +723,14 @@ class FemaleIntensityTracker {
     calibration_.replace_role_intensity(w.group, w.born, w.value, value);
     w.value = value;
     queue_.set(person, std::min(std::min(search.second, fertility.second), probability.second));
+    if (on_probability_) on_probability_(person, p);
   }
+  // Weighted search (step 2) keeps search intensities elsewhere and needs each
+  // counted woman's current cohabitation probability.
+  std::function<void(int, double)> on_probability_;
  public:
   explicit FemaleIntensityTracker(WeightCalibrator& calibration) : calibration_(calibration) {}
+  void set_probability_hook(std::function<void(int, double)> f) { on_probability_ = std::move(f); }
   void activate(int person, int group, double born, const std::vector<Band>* search,
                 const std::vector<Band>* fertility, double ready, double now,
                 double search_origin = NA_REAL, const std::vector<Band>* probability = nullptr) {
@@ -875,6 +880,7 @@ class FertilityWeightTree {
   }
  public:
   double sum() const { return tree_.empty() ? 0 : tree_[1]; }
+  void update(size_t slot, double value) { set(slot, value); }
   void add(double value) {
     if (size_ == capacity_) {
       const size_t next = capacity_ ? 2 * capacity_ : 1;
@@ -1354,8 +1360,10 @@ class RateCells {
     int stratum = 0;
     double rate = 0, start = 0, end = 0;   // band edges on the unit's clock
     std::vector<int> members;   // swap-remove list of units
+    double weight_bound = 0;     // upper bound on members' stored weights
   };
-  struct Member { int cell = -1, slot = -1, stratum = -1; double origin = 0; };
+  struct Member { int cell = -1, slot = -1, stratum = -1; double origin = 0, weight = 1; };
+  bool stored_weights_ = false;
   // strata_[k] = split bands of schedule k; first_[k] = its first cell index.
   std::vector<std::vector<Band>> strata_;
   std::vector<int> first_;
@@ -1369,6 +1377,8 @@ class RateCells {
   // Weighted selection (step 2): returns the index of the chosen member of a
   // cell's member list, given the cell and one uniform draw.
   std::function<size_t(int, const std::vector<int>&, double)> chooser_;
+  // Called after a unit changes cell (old, new; -1 for none).
+  std::function<void(int, int, int)> on_move_;
   double end_;
   unsigned long long updates_ = 0;
   void update(int c, double now) {
@@ -1433,14 +1443,17 @@ class RateCells {
         list[m.slot] = last;
         members_[last].slot = m.slot;
         list.pop_back();
+        if (list.empty()) cells_[old].weight_bound = 0;
       }
       m.cell = cell;
       if (cell >= 0) {
         m.slot = static_cast<int>(cells_[cell].members.size());
         cells_[cell].members.push_back(person);
+        if (stored_weights_) cells_[cell].weight_bound = std::max(cells_[cell].weight_bound, m.weight);
       } else m.slot = -1;
       if (old >= 0) update(old, now);
       if (cell >= 0) update(cell, now);
+      if (on_move_) on_move_(person, old, cell);
     }
     boundaries_.set(person, next);
   }
@@ -1466,8 +1479,18 @@ class RateCells {
     if (x.members.empty()) stop("A rate cell fired without members.");
     const double n = static_cast<double>(x.members.size());
     const double uniform = R::runif(0, 1);
-    const size_t pick = chooser_ ? chooser_(c, x.members, uniform) :
-      std::min(x.members.size() - 1, static_cast<size_t>(std::floor(uniform * n)));
+    size_t pick = std::min(x.members.size() - 1, static_cast<size_t>(std::floor(uniform * n)));
+    if (stored_weights_) {
+      // Stored weights: rejection sampling against the cell's weight bound,
+      // exact for any bound at or above the largest weight. A member at the
+      // bound is accepted without a further draw, so equal weights keep the
+      // unweighted pick and its random-number use.
+      for (;;) {
+        const double w = members_[x.members[pick]].weight;
+        if (w >= x.weight_bound || R::runif(0, 1) * x.weight_bound < w) break;
+        pick = std::min(x.members.size() - 1, static_cast<size_t>(std::floor(R::runif(0, 1) * n)));
+      }
+    } else if (chooser_) pick = chooser_(c, x.members, uniform);
     clock_.fired(now);
     clock_.arm(intensity_, draw_threshold_);
     return x.members[pick];
@@ -1475,6 +1498,20 @@ class RateCells {
   void set_chooser(std::function<size_t(int, const std::vector<int>&, double)> f) {
     chooser_ = std::move(f);
   }
+  void set_move_hook(std::function<void(int, int, int)> f) { on_move_ = std::move(f); }
+  // Keep a weight per member; events choose members in proportion to it.
+  void enable_stored_weights() { stored_weights_ = true; }
+  void set_weight(int unit, double weight) {
+    if (unit >= static_cast<int>(members_.size())) members_.resize(unit + 1);
+    Member& m = members_[unit];
+    if (m.weight == weight) return;
+    m.weight = weight;
+    if (m.cell >= 0) cells_[m.cell].weight_bound = std::max(cells_[m.cell].weight_bound, weight);
+  }
+  int cell_of(int unit) const {
+    return unit < static_cast<int>(members_.size()) ? members_[unit].cell : -1;
+  }
+  double cell_rate(int c) const { return cells_[c].rate; }
   // A cell's stratum and band edges on its clock.
   int cell_stratum(int c) const { return cells_[c].stratum; }
   double cell_start(int c) const { return cells_[c].start; }
@@ -1487,12 +1524,148 @@ class RateCells {
       ++counts[m.cell];
       if (cells_[m.cell].members[m.slot] != static_cast<int>(p)) return false;
     }
+    if (stored_weights_) {
+      // Stored weights: each cell's bound covers its members' weights.
+      for (size_t c = 0; c < cells_.size(); ++c)
+        for (int unit : cells_[c].members)
+          if (members_[unit].weight > cells_[c].weight_bound) return false;
+    }
     for (size_t c = 0; c < cells_.size(); ++c) {
       if (counts[c] != static_cast<int>(cells_[c].members.size())) return false;
       if (intensity_.value(c) != cells_[c].rate * static_cast<double>(counts[c])) return false;
     }
     return true;
   }
+};
+
+// ---- Weighted search intensities for matching calibration (step 2) --------
+// With search weights, a woman's search hazard is rate_c * N_c * w_i / W_c, so
+// her calibration contribution depends on her whole cell. Each search cell
+// keeps, per calibration bin, the member count and the sums of w (1 - p) and
+// w p (p: her cohabitation probability). A bin's marriage and cohabitation
+// intensities are sum over cells of rate_c * N_c / W_c times those sums.
+// Cells whose contents changed are recomputed before the next search solve.
+class SearchCalibration {
+  struct Woman { int cell = -1; size_t bin = 0; double weight = 1; bool active = false; };
+  // Per calibration bin within a cell: members, sums, and the last applied
+  // contribution (kept until applied as zero, so stale entries are removed).
+  struct BinSums { int count = 0; double marriage = 0, cohab = 0; std::array<double, 2> applied = {0, 0}; };
+  struct CellSums { int count = 0; double weight = 0; std::map<size_t, BinSums> bins; bool dirty = false; };
+  std::vector<Woman> women_;
+  std::vector<double> probability_;
+  std::vector<CellSums> cells_;
+  std::vector<int> dirty_;
+  std::vector<std::array<double, 2>> totals_;
+  std::vector<std::array<int, 2>> positive_;
+  const RateCells* search_ = nullptr;
+  void grow(int woman) {
+    if (woman >= static_cast<int>(women_.size())) {
+      women_.resize(woman + 1);
+      probability_.resize(woman + 1, 0.0);
+    }
+  }
+  CellSums& cell(int c) {
+    if (c >= static_cast<int>(cells_.size())) cells_.resize(c + 1);
+    return cells_[c];
+  }
+  void touch(int c) {
+    CellSums& x = cell(c);
+    if (!x.dirty) { x.dirty = true; dirty_.push_back(c); }
+  }
+  void remove(int woman) {
+    Woman& x = women_[woman];
+    if (!x.active) return;
+    CellSums& c = cell(x.cell);
+    const double p = probability_[woman];
+    BinSums& b = c.bins[x.bin];
+    b.marriage -= x.weight * (1 - p);
+    b.cohab -= x.weight * p;
+    if (--b.count == 0) b.marriage = b.cohab = 0;
+    c.weight -= x.weight;
+    if (--c.count == 0) c.weight = 0;
+    touch(x.cell);
+    x.active = false;
+  }
+  void add(int woman) {
+    Woman& x = women_[woman];
+    CellSums& c = cell(x.cell);
+    const double p = probability_[woman];
+    BinSums& b = c.bins[x.bin];
+    b.marriage += x.weight * (1 - p);
+    b.cohab += x.weight * p;
+    ++b.count;
+    c.weight += x.weight;
+    ++c.count;
+    touch(x.cell);
+    x.active = true;
+  }
+
+ public:
+  void reset(const RateCells* search, size_t bins) {
+    search_ = search;
+    for (Woman& x : women_) x.active = false;
+    cells_.clear();
+    dirty_.clear();
+    totals_.assign(bins, {0, 0});
+    positive_.assign(bins, {0, 0});
+  }
+  // Place a woman in a search cell (-1: not searching) with her bin and weight.
+  void update(int woman, int c, size_t bin, double weight) {
+    grow(woman);
+    const Woman& x0 = women_[woman];
+    if (x0.active ? (c == x0.cell && bin == x0.bin && weight == x0.weight) : c < 0) return;
+    remove(woman);
+    if (c < 0) return;
+    Woman& x = women_[woman];
+    x.cell = c; x.bin = bin; x.weight = weight;
+    add(woman);
+  }
+  void set_probability(int woman, double p) {
+    grow(woman);
+    if (probability_[woman] == p) return;
+    const bool active = women_[woman].active;
+    remove(woman);
+    probability_[woman] = p;
+    if (active) add(woman);
+  }
+  double weight(int woman) const { return women_[woman].weight; }
+  size_t bin(int woman) const { return women_[woman].bin; }
+  bool active(int woman) const { return woman < static_cast<int>(women_.size()) && women_[woman].active; }
+  // Recompute changed cells and return marriage and cohabitation totals by bin.
+  void apply(std::vector<double>& marriage, std::vector<double>& cohab) {
+    for (int c : dirty_) {
+      CellSums& x = cells_[c];
+      x.dirty = false;
+      const double scale = x.count > 0 && x.weight > 0 ?
+        search_->cell_rate(c) * static_cast<double>(x.count) / x.weight : 0.0;
+      for (auto it = x.bins.begin(); it != x.bins.end();) {
+        BinSums& e = it->second;
+        const size_t b = it->first;
+        const std::array<double, 2> value = {e.count ? scale * std::max(0.0, e.marriage) : 0.0,
+                                             e.count ? scale * std::max(0.0, e.cohab) : 0.0};
+        for (int k = 0; k < 2; ++k) {
+          positive_[b][k] += (value[k] > 0) - (e.applied[k] > 0);
+          totals_[b][k] += value[k] - e.applied[k];
+          // Exact zero when no cell contributes: no phantom roundoff intensity.
+          if (positive_[b][k] == 0) totals_[b][k] = 0;
+        }
+        e.applied = value;
+        if (!e.count) it = x.bins.erase(it); else ++it;
+      }
+    }
+    dirty_.clear();
+    marriage.resize(totals_.size());
+    cohab.resize(totals_.size());
+    for (size_t b = 0; b < totals_.size(); ++b) { marriage[b] = totals_[b][0]; cohab[b] = totals_[b][1]; }
+  }
+  // A woman's equivalent search hazard (for consistency checks).
+  double hazard(int woman) const {
+    if (!active(woman)) return 0;
+    const Woman& x = women_[woman];
+    const CellSums& c = cells_[x.cell];
+    return search_->cell_rate(x.cell) * static_cast<double>(c.count) * x.weight / c.weight;
+  }
+  double probability(int woman) const { return probability_[woman]; }
 };
 
 // Input schedules for cells from the effective (group-multiplied) fertility table.
@@ -2102,6 +2275,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::unique_ptr<WeightCalibrator> calibrator;
   std::vector<char> counted_woman;
   std::unique_ptr<FemaleIntensityTracker> intensity_tracker;
+  // Weighted search under matching calibration (step 2); set with the models.
+  SearchCalibration search_calibration;
+  bool search_refresh_weights = false;
   // Cell-accounted fertility under birth spacing (D101).
   std::unique_ptr<FertilityCells> cells;
   // Other rate processes; search, dissolution and conversion are null when
@@ -2251,6 +2427,26 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
             if (std::abs(scan[k] - filled[k]) > 1e-9 * std::max(1.0, std::abs(scan[k])))
               stop("Internal error: cell calibration totals differ from an explicit scan.");
         }
+      }
+      if (search_refresh_weights && !fertility_driven) {
+        // Weighted searches: marriage and cohabitation channels from the cells.
+        std::vector<double> marriage, cohab;
+        search_calibration.apply(marriage, cohab);
+        if (check_cells) {
+          std::vector<double> scan_m(marriage.size(), 0.0), scan_c(cohab.size(), 0.0);
+          for (int w = 0; w < static_cast<int>(people.size()); ++w) {
+            if (!search_calibration.active(w)) continue;
+            const double h = search_calibration.hazard(w), p = search_calibration.probability(w);
+            const size_t b = search_calibration.bin(w);
+            scan_m[b] += h * (1 - p); scan_c[b] += h * p;
+          }
+          for (size_t k = 0; k < scan_m.size(); ++k)
+            if (std::abs(scan_m[k] - marriage[k]) > 1e-9 * std::max(1.0, std::abs(scan_m[k])) ||
+                std::abs(scan_c[k] - cohab[k]) > 1e-9 * std::max(1.0, std::abs(scan_c[k])))
+              stop("Internal error: weighted search calibration differs from an explicit scan.");
+        }
+        calibrator->assign_channel(0, marriage);
+        calibrator->assign_channel(2, cohab);
       }
       const WeightSolution weights = calibrator->solve(now, cohab_role ? 2 : (fertility_driven ? 1 : 0),
         cohab_role ? cohab_table_id : (father ? father_table_id : union_table_id),
@@ -2495,7 +2691,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     List input(weight_input.get());
     weight_group_labels = as<std::vector<std::string>>(input["group_labels"]);
     weight_ancestry_labels = as<std::vector<std::string>>(input["ancestry_labels"]);
-    for (const char* name : {"mortality", "fertility", "dissolution", "conversion", "transition"}) {
+    for (const char* name : {"mortality", "fertility", "dissolution", "conversion", "transition", "search"}) {
       if (!input.containsElementNamed(name)) continue;
       List x = input[name];
       WeightSpec spec;
@@ -2724,6 +2920,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         } else if (name == "conversion") {
           bin["group"] = Rf_ScalarString(conversion_grouped ? group_label(stratum) : NA_STRING);
           duration = schedules[stratum].duration_conversion; all = all_conversion;
+        } else if (name == "search") {
+          const int g = previous_specific ? stratum / 3 : stratum;
+          const int previous = previous_specific ? stratum % 3 : 0;
+          bin["group"] = Rf_ScalarString(search_grouped ? group_label(g) : NA_STRING);
+          bin["previous_union"] = Rf_ScalarString(previous_specific ? Rf_mkChar(previous_labels[previous]) : NA_STRING);
+          duration = previous_specific && schedules[g].duration_search[previous]; all = all_search;
         } else {
           const auto& x = transition_schedules[stratum][slot];
           bin["group_origin"] = Rf_ScalarString(group_label(stratum));
@@ -2738,6 +2940,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       return pick_log_weights(eta, uniform);
     };
   };
+  // Formula models store weights (set by stored_weight at each refresh);
+  // custom functions choose within the fired cell.
+  auto install_weights = [&](WeightSpec* spec, RateCells* process, int slot) {
+    if (spec->custom) process->set_chooser(make_chooser(spec, process, slot));
+    else process->enable_stored_weights();
+  };
+  auto stored_weight = [&](WeightSpec* spec, RateCells* process, int unit, bool is_union, int dest) {
+    if (!spec || spec->custom || !process) return;
+    const double w = std::exp(formula_eta(*spec, unit, is_union, dest));
+    if (!(w > 0) || !R_finite(w)) stop("A " + spec->process + " weight is not finite and positive.");
+    process->set_weight(unit, w);
+  };
   auto fertility_bin = [&](int c) {
     const auto info = cells->cell_info(c);
     List bin = List::create(_["process"] = "fertility");
@@ -2750,8 +2964,45 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   };
   WeightSpec* fertility_weights_spec = weight_spec("fertility");
   // With matching calibration, fertility weights are stored at refresh.
-  const bool fertility_refresh_weights = fertility_weights_spec && calibrator;
-  if (fertility_refresh_weights && fertility_weights_spec->custom)
+  // Formula weights change only at events, so they are stored at refresh and
+  // members are chosen by rejection sampling. Custom functions are evaluated when a
+  // cell is chosen, except fertility under matching calibration.
+  const bool fertility_refresh_weights = fertility_weights_spec &&
+    (calibrator || !fertility_weights_spec->custom);
+  WeightSpec* search_weights_spec = weight_spec("search");
+  WeightSpec* mortality_weights_spec = weight_spec("mortality");
+  WeightSpec* transition_weights_spec = weight_spec("transition");
+  search_refresh_weights = search_weights_spec && calibrator && rate_initiation;
+  if (search_refresh_weights && search_weights_spec->custom)
+    Rcpp::warning("With weighted matching calibration, the custom search weight function is "
+                  "evaluated at every refresh of every searching woman, which can be slow.");
+  // A searching woman's stored weight in search cell c (calibration mode).
+  std::function<double(int, int)> search_weight = [&](int woman, int c) {
+    double eta;
+    if (!search_weights_spec->custom) eta = formula_eta(*search_weights_spec, woman, false, -1);
+    else {
+      std::vector<double> values;
+      std::vector<int> one = {woman};
+      List bin = List::create(_["process"] = "search");
+      const int stratum = search->cell_stratum(c);
+      const int g = previous_specific ? stratum / 3 : stratum;
+      const int previous = previous_specific ? stratum % 3 : 0;
+      bin["group"] = Rf_ScalarString(search_grouped ? group_label(g) : NA_STRING);
+      bin["previous_union"] = Rf_ScalarString(previous_specific ? Rf_mkChar(previous_labels[previous]) : NA_STRING);
+      custom_eta(*search_weights_spec, weight_members(one, false, -1),
+        band_list(bin, previous_specific && schedules[g].duration_search[previous],
+                  search->cell_start(c), search->cell_end(c), all_search, weight_now), values);
+      eta = values[0];
+    }
+    const double w = std::exp(eta);
+    if (!(w > 0) || !R_finite(w)) stop("A search weight is not finite and positive.");
+    return w;
+  };
+  if (search_refresh_weights)
+    intensity_tracker->set_probability_hook([&](int woman, double p) {
+      search_calibration.set_probability(woman, p);
+    });
+  if (fertility_refresh_weights && fertility_weights_spec->custom && calibrator)
     Rcpp::warning("With weighted matching calibration, the custom fertility weight function is "
                   "evaluated at every refresh of every woman, which can be slow.");
   auto load_cells = [&](double now) {
@@ -2828,6 +3079,20 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         else strata.push_back(schedules[g].search);
       }
       search = make(strata);
+      if (search_refresh_weights) {
+        search_calibration.reset(search.get(), calibrator->cells());
+        // Stored weights pick the searcher; bin moves update calibration sums.
+        search->enable_stored_weights();
+        search->set_move_hook([&](int woman, int, int cell) {
+          if (cell < 0) { search_calibration.update(woman, -1, 0, 1); return; }
+          const double w = search_weights_spec->custom || !search_calibration.active(woman) ?
+            search_weight(woman, cell) : search_calibration.weight(woman);
+          search->set_weight(woman, w);
+          search_calibration.update(woman, cell, calibrator->bin_index(people[woman].group, people[woman].born), w);
+        });
+      } else if (WeightSpec* spec = weight_spec("search")) {
+        install_weights(spec, search.get(), -1);
+      }
     }
     dissolution.reset();
     if (has_dissolution) {
@@ -2854,13 +3119,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                          std::vector<Band>());
       transitions.push_back(make(strata));
       if (WeightSpec* spec = weight_spec("transition"))
-        transitions.back()->set_chooser(make_chooser(spec, transitions.back().get(), static_cast<int>(k)));
+        install_weights(spec, transitions.back().get(), static_cast<int>(k));
     }
-    if (WeightSpec* spec = weight_spec("mortality")) mortality->set_chooser(make_chooser(spec, mortality.get(), -1));
+    if (WeightSpec* spec = weight_spec("mortality")) install_weights(spec, mortality.get(), -1);
     if (WeightSpec* spec = weight_spec("dissolution"))
-      if (dissolution) dissolution->set_chooser(make_chooser(spec, dissolution.get(), -1));
+      if (dissolution) install_weights(spec, dissolution.get(), -1);
     if (WeightSpec* spec = weight_spec("conversion"))
-      if (conversion) conversion->set_chooser(make_chooser(spec, conversion.get(), -1));
+      if (conversion) install_weights(spec, conversion.get(), -1);
   };
   // Recompute union u's membership in the union processes (dissolution and
   // conversion), whose units are unions identified by their history index.
@@ -2875,11 +3140,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       const int high = std::max(wife.group, people[x.husband].group);
       const int pair = dissolution_schedules.size() == 1 ? 0 : low + group_count * high;
       dissolution->refresh(u, ongoing ? 2 * pair + (x.cohab ? 1 : 0) : -1, x.start, now);
+      if (ongoing) stored_weight(weight_spec("dissolution"), dissolution.get(), u, true, -1);
     }
     if (conversion) {
       // Conversion schedules use the wife's group, by union duration or her age.
       const double origin = schedules[wife.group].duration_conversion ? x.start : wife.born;
       conversion->refresh(u, ongoing && x.cohab ? (conversion_grouped ? wife.group : 0) : -1, origin, now);
+      if (ongoing && x.cohab) stored_weight(weight_spec("conversion"), conversion.get(), u, true, -1);
     }
   };
   // Recompute a person's membership in every rate process from their current
@@ -2891,6 +3158,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (p.female) cells->refresh(i, now);
     mortality->refresh(i, alive ? 2 * (mortality_grouped ? p.group : 0) + (p.female ? 1 : 0) : -1,
                        p.born, now);
+    if (alive) stored_weight(mortality_weights_spec, mortality.get(), i, false, -1);
     if (search) {
       int stratum = -1;
       double origin = p.born;
@@ -2904,6 +3172,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         }
       }
       search->refresh(i, stratum, origin, now);
+      if (!search_refresh_weights && stratum >= 0) stored_weight(search_weights_spec, search.get(), i, false, -1);
+      if (search_refresh_weights) {
+        const int cell = search->cell_of(i);
+        if (cell < 0) search_calibration.update(i, -1, 0, 1);
+        else {
+          search_calibration.set_probability(i, cohab_enabled ? current_hazard(
+            &probability_schedules[p.group * 3 + previous_union[i]], p.born, now).first : 0.0);
+          const double w = search_weight(i, cell);
+          search->set_weight(i, w);
+          search_calibration.update(i, cell, calibrator->bin_index(p.group, p.born), w);
+        }
+      }
     }
     if ((dissolution || conversion) && partner >= 0) refresh_union(person_unions[i].back(), now);
     if (!transitions.empty()) {
@@ -2919,6 +3199,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         }
         transitions[k]->refresh(i, at_risk ? p.group : -1,
           transition_duration ? group_entry[i] : p.born, now);
+        if (at_risk) stored_weight(transition_weights_spec, transitions[k].get(), i, false, outgoing[k].dest);
       }
     }
   };

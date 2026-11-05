@@ -96,6 +96,7 @@ attach_process <- function(model, process) {
   if (name == "union_formation") {
     validate_union_formation(process)
     validate_process_weights(process$weights_conversion, "union")
+    validate_process_weights(process$weights, "person")
     if (!is.null(process$rates)) process$rates <- tibble::as_tibble(process$rates)
     for (field in c("matching", "father_matching", "cohab_matching"))
       process[field] <- list(normalize_model_argument(process[[field]]))

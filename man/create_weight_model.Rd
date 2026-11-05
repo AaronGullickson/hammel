@@ -35,8 +35,9 @@ level effects can be smaller where cells are small or homogeneous.
 }
 \details{
 Attach a weight model with the \code{weights} argument of \code{\link[=set_mortality]{set_mortality()}},
-\code{\link[=set_fertility]{set_fertility()}}, \code{\link[=set_union_dissolution]{set_union_dissolution()}} and \code{\link[=set_group_transition]{set_group_transition()}},
-or \code{weights_conversion} of \code{\link[=set_union_formation]{set_union_formation()}}.
+\code{\link[=set_fertility]{set_fertility()}}, \code{\link[=set_union_dissolution]{set_union_dissolution()}}, \code{\link[=set_group_transition]{set_group_transition()}} and
+\code{\link[=set_union_formation]{set_union_formation()}} (searches), or \code{weights_conversion} of
+\code{\link[=set_union_formation]{set_union_formation()}}.
 
 \strong{Variables.} Mortality, fertility and group transitions are person
 processes and may use \code{sex} (\code{"f"}, \code{"m"}), \code{group}, \code{union_type}

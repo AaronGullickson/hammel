@@ -102,10 +102,20 @@ test_that("custom functions receive members and the cell, without exact times", 
   expect_false(any(c("birth_time", "age", "time") %in% names(seen$members)))
   expect_identical(seen$bin$process, "mortality")
   expect_true(all(c("sex", "age_start", "age_end", "time_start", "time_end") %in% names(seen$bin)))
-  # The same model written as a formula gives the same run.
+  # The same model as a formula agrees in distribution. Formulas store weights
+  # and pick by rejection sampling; custom functions scan the chosen cell.
   formula <- set_mortality(model, mortality_rates,
     weights = create_weight_model(~ partnered, c(partnered = log(.5))))
-  expect_identical(simulate(formula, 1, seed = 3), out)
+  share <- function(x) {
+    dead <- x$persons[!is.na(x$persons$death_time), ]
+    mean(dead$person_id %in% c(seq_len(200), 400 + seq_len(200)))   # partnered share
+  }
+  runs <- 1:15
+  custom_share <- vapply(runs, function(s) share(simulate(set_mortality(model, mortality_rates,
+    weights = create_weight_model(fun = f)), 1, seed = s)), 0)
+  formula_share <- vapply(runs, function(s) share(simulate(formula, 1, seed = s)), 0)
+  expect_lt(abs(mean(custom_share) - mean(formula_share)),
+            4 * sqrt(var(custom_share) / 15 + var(formula_share) / 15) + 1e-9)
   bad_length <- create_weight_model(fun = function(members, bin) 0)
   expect_error(simulate(set_mortality(model, mortality_rates, weights = bad_length), 1, seed = 3),
     "returned 1 values")
@@ -243,4 +253,64 @@ test_that("transition weights can use person variables and the destination", {
   expect_lt(abs(log(c_moves[["f"]] / c_moves[["m"]])), 4 * sqrt(1 / c_moves[["f"]] + 1 / c_moves[["m"]]))
   expect_warning(group_transition(rates, weights = create_weight_model(~ group_dest,
     c(group_destB = 1, group_destC = 1), group_levels = c("A", "B", "C"))), "no effect")
+})
+
+# Unpartnered women aged 22 in two groups, with no mortality or fertility.
+weighted_search_model <- function(n) {
+  persons <- data.frame(person_id = 1:(2 * n), sex = rep(c("f", "m"), each = n), birth_time = -22,
+    death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_,
+    group = rep(c("A", "B"), length.out = 2 * n))
+  hammel_model() |>
+    set_population(hammel_population(persons, end_time = 0)) |>
+    set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
+    set_fertility(data.frame(union_type = c("partnered", "unpartnered"), age_start = 15,
+      age_end = 50, rate = 0), birth_interval = 0)
+}
+first_union_ratio <- function(out) {
+  u <- out$unions
+  first <- tapply(u$start_time, u$wife_id, min)
+  wives <- out$persons$person_id[out$persons$sex == "f"]
+  start <- first[as.character(wives)]
+  formed <- !is.na(start)
+  start[!formed] <- out$simulation$end_time - out$simulation$start_time
+  group <- out$persons$group[match(wives, out$persons$person_id)]
+  events <- tapply(formed, group, sum)
+  years <- tapply(start, group, sum)
+  c(log_ratio = log((events[["B"]] / years[["B"]]) / (events[["A"]] / years[["A"]])),
+    se = sqrt(1 / events[["A"]] + 1 / events[["B"]]))
+}
+
+test_that("search weights select searchers with and without matching calibration", {
+  n <- 6000
+  rates <- data.frame(age_start = 15, age_end = Inf, rate = .3)
+  w <- create_weight_model(~ group, c(groupB = log(2)), group_levels = c("A", "B"))
+  # Two groups activate calibration: weights stored, calibration totals weighted.
+  withr::local_options(hammel.check_cells = TRUE)
+  calibrated <- set_union_formation(weighted_search_model(n), "rate", rates = rates,
+    kinship_generations = 0, weights = w)
+  r <- first_union_ratio(suppressWarnings(simulate(calibrated, 1, seed = 3)))
+  expect_lt(abs(r[["log_ratio"]] - log(2)), 4 * r[["se"]])
+  # Matching within groups only: no calibration, weights at selection.
+  within <- create_matching_model(~ age_difference, c(age_difference = 0), prevent_exogamy = TRUE)
+  restricted <- set_union_formation(weighted_search_model(n), "rate", rates = rates,
+    matching = within, kinship_generations = 0, weights = w)
+  r <- first_union_ratio(suppressWarnings(simulate(restricted, 1, seed = 4)))
+  expect_lt(abs(r[["log_ratio"]] - log(2)), 4 * r[["se"]])
+  withr::local_options(hammel.check_cells = FALSE)
+  plain <- set_union_formation(weighted_search_model(500), "rate", rates = rates, kinship_generations = 0)
+  zero <- set_union_formation(weighted_search_model(500), "rate", rates = rates, kinship_generations = 0,
+    weights = create_weight_model(~ group, c(groupB = 0), group_levels = c("A", "B")))
+  expect_identical(suppressWarnings(simulate(zero, 1, seed = 5)), suppressWarnings(simulate(plain, 1, seed = 5)))
+})
+
+test_that("search weights require rate mode and warn about cancelled terms and slow paths", {
+  model <- weighted_search_model(50)
+  w <- create_weight_model(~ parity, c(parity = 1))
+  expect_error(set_union_formation(model, "on_demand", weights = w), "rate-based")
+  rates <- data.frame(age_start = 15, age_end = Inf, rate = .3)
+  expect_warning(set_union_formation(model, "rate", rates = rates,
+    weights = create_weight_model(~ partnered, c(partnered = 1))), "`partnered` has no effect")
+  slow <- set_union_formation(model, "rate", rates = rates, kinship_generations = 0,
+    weights = create_weight_model(fun = function(members, bin) rep(0, nrow(members))))
+  expect_warning(simulate(slow, .2, seed = 1), "every refresh of every searching woman")
 })

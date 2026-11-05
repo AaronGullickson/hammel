@@ -184,11 +184,9 @@ where they differ, this section is current.
 
 ### Scope of this round
 
-Weights apply to mortality, fertility, dissolution, cohabitation-to-marriage
-conversion and group transitions. **Search weights are deferred**, because
-weighted searches change the intensities that matching calibration solves on;
-they will come with the calibration rework. Eligibility rules are also out of
-scope: every weight is strictly positive. Weight models are fixed over calendar
+Weights apply to mortality, fertility, rate-mode union search,
+dissolution, cohabitation-to-marriage conversion and group transitions.
+Eligibility rules are out of scope: every weight is strictly positive. Weight models are fixed over calendar
 time; time-varying weight schedules are deferred.
 
 ### Weights and selection
@@ -237,7 +235,7 @@ Weight models attach to processes through new arguments:
 | Dissolution | `set_union_dissolution(..., weights = NULL)` |
 | Conversion | `set_union_formation(..., weights_conversion = NULL)` |
 | Group transitions | `set_group_transition(model, rates, weights = NULL)` |
-| Union search (deferred) | `set_union_formation(..., weights = NULL)` |
+| Union search (rate mode) | `set_union_formation(..., weights = NULL)` |
 
 `NULL` keeps unweighted selection.
 
@@ -325,9 +323,33 @@ the seed.
 
 ### Evaluation
 
-- **At selection:** weights are computed only when a cell has been chosen,
-  for that cell's eligible members. Formulas are evaluated natively; custom
-  functions are called once per event.
+- **Formulas: stored at refresh** (*user direction, November 4, 2026*,
+  replacing selection-time evaluation after timing). Formula variables change
+  only at events, so each unit's weight is computed when it is refreshed and
+  stored. A chosen cell picks its member by rejection sampling: a uniform
+  candidate is accepted with probability w / bound, where the cell keeps an
+  upper bound on its members' weights (raised as weights arrive, reset when
+  the cell empties). This is exact for any bound at or above the largest
+  weight; a candidate at the bound is accepted without a further draw, so
+  equal weights keep the unweighted pick and its random-number use. No
+  structure is updated when units change cells.
+- **Custom functions: at selection.** They are called once per event for the
+  chosen cell's eligible members, because they can depend on the band.
+- **Search with matching calibration:** a searching woman's hazard is
+  rate_c * N_c * w_i / W_c, so her calibration contribution depends on her
+  whole cell. Search weights are then computed when each woman is refreshed and
+  stored. Each search cell keeps, per calibration bin, its member count and
+  the sums of w (1 - p) and w p, where p is her current cohabitation
+  probability (reported by the intensity tracker, which also handles
+  probability-band boundaries). A bin's marriage and cohabitation intensities
+  are the sum over cells of rate_c * N_c / W_c times those sums. Cells whose
+  contents changed are recomputed before the next search solve, and the two
+  channels are assigned to the calibrator, as fertility's channel already is.
+  Searchers are chosen by the same rejection sampling. Without search weights the
+  previous tracker path is unchanged. A custom search function is called at
+  every refresh of every searching woman, with a warning. An internal check
+  (`hammel.check_cells`) compares the maintained totals with an explicit scan
+  before each solve.
 - **Fertility with matching calibration:** when weighted matching calibration
   is active (more than one group and group terms in matching), calibration
   needs the weighted intensity of unpartnered women by calibration bin at all
@@ -344,6 +366,21 @@ the seed.
   the same weight, the member is chosen with the unweighted rule and the same
   uniform draw, so a custom function returning a constant also reproduces the
   unweighted run.
+
+### Cost (November 4, 2026)
+
+Optimized builds, development machine:
+
+| Model | Without weights | With formula weights |
+| --- | --- | --- |
+| Rate-mode second-transition model, two groups, 150K people, 50 years; search weights under calibration | 7.91 s | 8.53 s (+8%) |
+| Same, 20K people; custom search function | 1.01 s | 2.73 s |
+| Mortality and fertility, 100K people, 100 years; mortality weights | 9.25 s | 9.07 s (no measurable cost) |
+
+Models without weights are unaffected. Earlier designs cost more: scanning the
+whole chosen cell at every event (+29% for the mortality model, +78% for
+search) and per-cell sum trees, which must be updated at every birthday move
+(+19% for mortality). Search's remaining cost is mostly the calibration sums.
 
 ### Diagnostics
 

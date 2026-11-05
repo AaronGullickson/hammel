@@ -264,6 +264,10 @@ exp(confint.default(fit)["gap", ])
 
 The results show that our estimated coefficient is very close to the expected 1.05 ratio and that the confidence interval contains the true value. 
 
+### Gender ratio in group simulations with intermarriage
+
+This milestone included a significant rewrite of our weighted choice method for balancing intermarriage, so its worth checking that the gender ratios are still coming out in the expected directions.
+
 ## Unit Tests
 
 The following tests have been constructed and are currently all passing.

@@ -254,7 +254,8 @@ simulate <- function(model, years, seed = NULL) {
     fertility = model$processes$fertility$weights,
     dissolution = dissolution_process$weights,
     conversion = union_process$weights_conversion,
-    transition = transition_process$weights)
+    transition = transition_process$weights,
+    search = union_process$weights)
   weight_models <- Filter(Negate(is.null), weight_models)
   if ("previous_union" %in% names(union_rates) || cohab_enabled || length(weight_models)) {
     previous <- previous_union_info_cpp(population$persons, population$unions, counts_cohab)
@@ -293,7 +294,7 @@ simulate <- function(model, years, seed = NULL) {
       setdiff(names(population[["ancestry"]]), "person_id")
     weight_input <- if (!length(weight_models)) NULL else {
       types <- c(mortality = "person", fertility = "person", dissolution = "union",
-                 conversion = "union", transition = "transition")
+                 conversion = "union", transition = "transition", search = "person")
       prepared <- lapply(names(weight_models), function(name)
         prepare_weight_model(weight_models[[name]], types[[name]], name, group_values, ancestry_labels))
       names(prepared) <- names(weight_models)

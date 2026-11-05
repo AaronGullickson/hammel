@@ -9,8 +9,9 @@
 #' level effects can be smaller where cells are small or homogeneous.
 #'
 #' Attach a weight model with the `weights` argument of [set_mortality()],
-#' [set_fertility()], [set_union_dissolution()] and [set_group_transition()],
-#' or `weights_conversion` of [set_union_formation()].
+#' [set_fertility()], [set_union_dissolution()], [set_group_transition()] and
+#' [set_union_formation()] (searches), or `weights_conversion` of
+#' [set_union_formation()].
 #'
 #' **Variables.** Mortality, fertility and group transitions are person
 #' processes and may use `sex` (`"f"`, `"m"`), `group`, `union_type`
@@ -238,6 +239,8 @@ weight_strata <- function(process, rates, multipliers = NULL) {
                   if ("parity_start" %in% n) "parity"),
     dissolution = c(if ("union_type" %in% n) "union_type", if ("group_pair" %in% n) "same_group"),
     conversion = c("union_type", if ("group" %in% n) "group_w"),
+    search = c("sex", "partnered", "union_type", if (grouped) "group",
+               if ("previous_union" %in% n) "previous_union", "partner_group"),
     transition = c("group", "group_dest", if ("sex" %in% n) "sex",
                    if ("union_type" %in% n) c("union_type", "partnered")))
 }
