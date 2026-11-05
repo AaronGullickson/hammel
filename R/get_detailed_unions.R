@@ -6,7 +6,8 @@
 #' population and its union table are not modified. No known endpoint is needed.
 #'
 #' Dates remain in years. Missing death times denote people alive at the recorded
-#' endpoint. Group columns are omitted unless a group dimension is declared;
+#' endpoint. Each declared group dimension adds its wife's and husband's
+#' categories (`<group>_w`, `<group>_h`); undeclared columns are not added;
 #' otherwise their types are preserved. Groups are reconstructed at each union's
 #' start from retained transitions; later moves do not relabel earlier unions.
 #' A transition at the exact formation time follows formation, so its origin
@@ -17,8 +18,8 @@
 #' @param population A validated `hammel_population` containing person and union
 #'   histories, such as the result of [simulate()].
 #' @return A separate tibble with all union columns plus `birth_time_w`,
-#'   `death_time_w`, `birth_time_h`, and `death_time_h`. When group is present,
-#'   also `group_w` and `group_h`. Suffixes `_w` and `_h` identify wives and
+#'   `death_time_w`, `birth_time_h`, and `death_time_h`, plus `<group>_w` and
+#'   `<group>_h` for each declared group dimension. Suffixes `_w` and `_h` identify wives and
 #'   husbands. Empty union histories retain the enriched column types.
 #' @export
 #' @examples
@@ -28,7 +29,8 @@ get_detailed_unions <- function(population) {
   validate_population(population)
   persons <- population$persons
   result <- tibble::as_tibble(population$unions)
-  columns <- c("birth_time", "death_time", if (declared_group(population)) "group")
+  dims <- names(population$groups)
+  columns <- c("birth_time", "death_time", dims)
   added <- c(paste0(columns, "_w"), paste0(columns, "_h"))
   conflicts <- intersect(names(result), added)
   if (length(conflicts)) {
@@ -36,17 +38,19 @@ get_detailed_unions <- function(population) {
                  paste(conflicts, collapse = ", ")), call. = FALSE)
   }
   formation_groups <- NULL
-  if (declared_group(population) && !is.null(population$transitions) && nrow(population$transitions)) {
-    indexed <- prepare_group_observations(persons, population, TRUE)
+  # Transitions (one dimension for now) are replayed to each union's start.
+  if (length(dims) == 1L && !is.null(population$transitions) && nrow(population$transitions)) {
+    aliased <- observation_alias(population, character())$population
+    indexed <- prepare_group_observations(aliased$persons, aliased, TRUE)
     groups <- observation_groups(indexed, TRUE)
     formation_groups <- union_start_groups_cpp(indexed, population$unions,
-      match(persons$group, groups) - 1L)
+      match(aliased$persons$group, groups) - 1L)
   }
   for (suffix in c("w", "h")) {
     id_column <- if (suffix == "w") "wife_id" else "husband_id"
     rows <- match(result[[id_column]], persons$person_id)
     for (column in columns) {
-      result[[paste0(column, "_", suffix)]] <- if (column == "group" && !is.null(formation_groups))
+      result[[paste0(column, "_", suffix)]] <- if (column %in% dims && !is.null(formation_groups))
         groups[formation_groups[, if (suffix == "w") 1L else 2L] + 1L] else persons[[column]][rows]
     }
   }

@@ -84,8 +84,9 @@ birth. It is FALSE for nonmarital births, including those with a known father,
 and births with an unknown father. It describes birth-time status, not status
 at conception. Older callbacks without this argument or `...` remain supported.
 Ancestry
-inputs are numeric vectors named like the public ancestry columns (`group_A`,
-`group_B`, `unknown`). Missing fathers have an NA group and NULL ancestry.
+inputs are the rule's own dimension's shares, numeric vectors named like its
+public ancestry columns (`A`, `B`, `unknown`). Missing fathers have an NA group
+and NULL ancestry.
 Functions may use `...` for unused arguments and ordinary R RNG draws. They
 receive copied inputs, not mutable population/queue state, and must not mutate
 simulation/global state. Custom functions must handle missing inputs as needed,

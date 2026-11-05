@@ -12,12 +12,12 @@ test_that("missing dissolution types identify calendar coverage rather than pair
 
 test_that("missing dissolution types identify relevant group pairs and open periods", {
   rates <- data.frame(time_start=1992.5,time_end=Inf,
-    union_type="marriage",group_pair="B:A",dur_start=0,dur_end=Inf,rate=.1)
+    union_type="marriage",group_w="B",group_h="A",dur_start=0,dur_end=Inf,rate=.1)
   expect_error(union_dissolution(rates),
-    "missing a 'cohab' schedule during calendar interval \\[1992.5, Inf\\) for group pair 'A:B'")
+    "missing a 'cohab' schedule during calendar interval \\[1992.5, Inf\\) for group stratum 'B:A'")
   rates$time_start <- rates$time_end <- NULL
-  expect_error(union_dissolution(rates),"missing a 'cohab' schedule for group pair 'A:B'")
-  rates$group_pair <- NULL
+  expect_error(union_dissolution(rates),"missing a 'cohab' schedule for group stratum 'B:A'")
+  rates$group_w <- rates$group_h <- NULL
   expect_error(union_dissolution(rates),"missing a 'cohab' schedule\\. Supply both")
   rates$union_type <- "unknown"
   expect_error(union_dissolution(rates),"union_type.*cohab and marriage labels")

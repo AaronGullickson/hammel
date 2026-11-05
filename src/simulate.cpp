@@ -904,7 +904,8 @@ class FertilityCells {
  public:
   struct State {
     int stratum = -1;          // -1: not a living woman
-    int group = 0;             // her group (cells pool groups when rates do)
+    int group = 0;             // her matching group (calibration bins)
+    int report = 0;            // her categories in all group dimensions, combined
     double born = 0, ready = 0, weight = 1;
     bool unpartnered = false;
   };
@@ -932,11 +933,11 @@ class FertilityCells {
     FertilityWeightTree weights;
     double lambda = 0;
     std::map<size_t, std::pair<int, FertilityWeightSum>> counted; // count and weight per unpartnered calibration bin
-    std::map<int, int> by_group;               // members by group, when groups share cells
-                                               // (attributes unrealized births to a group)
+    std::map<int, int> by_group;               // members by reporting categories
+                                               // (attributes unrealized births)
   };
   struct Member {
-    int cell = -1, slot = -1, group = 0;
+    int cell = -1, slot = -1, group = 0, report = 0;
     bool eligible = false, counted = false;
     size_t bin = 0;
     double weight = 1;
@@ -987,7 +988,7 @@ class FertilityCells {
     if (m.cell < 0) return;
     Cell& x = cells_[m.cell];
     --x.members;
-    if (pooled_groups_ && --x.by_group[m.group] == 0) x.by_group.erase(m.group);
+    if (pooled_groups_ && --x.by_group[m.report] == 0) x.by_group.erase(m.report);
     if (m.eligible) {
       const int last = x.eligible.back();
       x.eligible[m.slot] = last;
@@ -1121,6 +1122,14 @@ class FertilityCells {
       if (!(weight > 0) || !R_finite(weight)) stop("A fertility weight is not finite and positive.");
     }
     Member& m = members_[woman];
+    if (cell >= 0 && m.cell == cell && m.report != s.report && pooled_groups_) {
+      // Only her reporting categories changed (a group transition): update the
+      // cell's member counts in place, keeping her place among eligible women.
+      Cell& x = cells_[cell];
+      if (--x.by_group[m.report] == 0) x.by_group.erase(m.report);
+      ++x.by_group[s.report];
+      m.report = s.report;
+    }
     if (m.cell != cell || m.eligible != eligible || m.counted != counted || (counted && m.bin != bin) ||
         (cell >= 0 && weight != m.weight)) {
       // Settle elapsed intensity under the old state before changing it.
@@ -1131,9 +1140,9 @@ class FertilityCells {
       if (cell >= 0) {
         Cell& x = cells_[cell];
         ++x.members;
-        if (pooled_groups_) ++x.by_group[s.group];
+        if (pooled_groups_) ++x.by_group[s.report];
         m.cell = cell; m.eligible = eligible; m.counted = counted; m.bin = bin; m.weight = weight;
-        m.group = s.group;
+        m.group = s.group; m.report = s.report;
         if (eligible) {
           m.slot = static_cast<int>(x.eligible.size()); x.eligible.push_back(woman);
           if (weighted_) x.weights.add(m.weight);
@@ -2119,7 +2128,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   List cohab_matching, bool counts_cohab, bool check_cells = false,
                   Nullable<List> hetfert = R_NilValue, Nullable<DataFrame> transition_input = R_NilValue,
                   Nullable<List> model_schedule_input = R_NilValue,
-                  Nullable<List> weight_input = R_NilValue) {
+                  Nullable<List> weight_input = R_NilValue,
+                  Nullable<List> group_input = R_NilValue) {
   const bool scheduled_models = model_schedule_input.isNotNull();
   List matching_bank, inheritance_bank;
   NumericVector model_times;
@@ -2191,11 +2201,55 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     for (size_t g = 0; g < ancestry_components; ++g)
       ancestry[static_cast<size_t>(i) * ancestry_components + g] = initial_ancestry(i, g);
   }
+  // Group dimensions (D134): one category per person per dimension, stored
+  // row-major. The matching dimension (if any) carries matching, transitions
+  // and weight-model group variables; each rate process uses its own strata,
+  // combining the dimensions its rate table uses.
+  const List groups_in = group_input.isNotNull() ? List(group_input.get()) : List::create();
+  const int dimensions = groups_in.size() ? as<int>(groups_in["dimensions"]) : 0;
+  std::vector<int> cats(static_cast<size_t>(ids.size()) * dimensions);
+  if (dimensions) {
+    IntegerMatrix input = groups_in["categories"];
+    for (int i = 0; i < ids.size(); ++i) for (int d = 0; d < dimensions; ++d)
+      cats[static_cast<size_t>(i) * dimensions + d] = input(i, d);
+  }
+  const int match_dim = groups_in.size() ? as<int>(groups_in["match_dim"]) : -1;
+  const int group_count = match_dim >= 0 ?
+    std::max(1, as<IntegerVector>(groups_in["counts"])[match_dim]) : 1;
   IntegerVector person_groups(ids.size(), 0);
-  if (persons.containsElementNamed(".hammel_group")) person_groups = persons[".hammel_group"];
-  // Group indices cover starting identities and every declared possible one.
-  int group_count = std::max(1, as<int>(inheritance["group_count"]));
-  for (int value : person_groups) group_count = std::max(group_count, value + 1);
+  if (match_dim >= 0) for (int i = 0; i < ids.size(); ++i)
+    person_groups[i] = cats[static_cast<size_t>(i) * dimensions + match_dim];
+  struct StrataSpec { std::vector<int> dims, roles, strides; int count = 1; };
+  auto read_spec = [&](const char* name) {
+    StrataSpec spec;
+    if (!groups_in.size() || !groups_in.containsElementNamed(name)) return spec;
+    List x = groups_in[name];
+    IntegerVector d = x["dims"], r = x["roles"], st = x["strides"];
+    spec.dims.assign(d.begin(), d.end());
+    spec.roles.assign(r.begin(), r.end());
+    spec.strides.assign(st.begin(), st.end());
+    spec.count = std::max(1, as<int>(x["count"]));
+    return spec;
+  };
+  const StrataSpec mortality_spec = read_spec("mortality"), fertility_spec = read_spec("fertility"),
+    search_spec = read_spec("search"), probability_spec = read_spec("probability"),
+    conversion_spec = read_spec("conversion"), dissolution_spec = read_spec("dissolution"),
+    report_spec = read_spec("report");
+  // A person's stratum in a process: her categories in the dimensions it uses.
+  auto person_stratum = [&](const StrataSpec& spec, int i) {
+    int k = 0;
+    for (size_t j = 0; j < spec.dims.size(); ++j)
+      k += cats[static_cast<size_t>(i) * dimensions + spec.dims[j]] * spec.strides[j];
+    return k;
+  };
+  // A union's stratum: the wife's (role 0) and husband's (role 1) categories.
+  auto union_stratum = [&](const StrataSpec& spec, int wife, int husband) {
+    int k = 0;
+    for (size_t j = 0; j < spec.dims.size(); ++j)
+      k += cats[static_cast<size_t>(spec.roles[j] ? husband : wife) * dimensions + spec.dims[j]] *
+        spec.strides[j];
+    return k;
+  };
   // people retains every history, including deaths. pool holds living,
   // unpartnered men by group and birth bin for exact partner draws. index maps
   // public IDs to positions while reconstructing initial maternal histories.
@@ -2287,12 +2341,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   // not configured. One transition process per outgoing-schedule slot.
   std::unique_ptr<RateCells> mortality, search, dissolution, conversion;
   std::vector<std::unique_ptr<RateCells>> transitions;
-  std::vector<std::vector<Band>> probability_schedules(group_count * 3);
+  std::vector<std::vector<Band>> probability_schedules(probability_spec.count * 3);
   auto load_probabilities = [&]() {
     if (cohab_enabled) {
       const bool previous_prob = cohab_prob.containsElementNamed("previous_union");
       const std::array<std::string, 3> labels = {"none", "separated", "widowed"};
-      for (int g = 0; g < group_count; ++g) for (int p = 0; p < 3; ++p)
+      for (int g = 0; g < probability_spec.count; ++g) for (int p = 0; p < 3; ++p)
         probability_schedules[g * 3 + p] = read_bands(cohab_prob, "", "", g, previous_prob ? labels[p] : "");
     }
   };
@@ -2361,7 +2415,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     calibrator->add_woman(people[woman].group, people[woman].born, 1);
     if (probability_tracker)
       probability_tracker->activate(woman, people[woman].born,
-        &probability_schedules[people[woman].group * 3 + previous_union[woman]], now);
+        &probability_schedules[person_stratum(probability_spec, woman) * 3 + previous_union[woman]], now);
   };
   auto remove_counted_woman = [&](int woman) {
     if (!calibrator || !counted_woman[woman]) return;
@@ -2428,7 +2482,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
             // Independent of stored values: p from the woman's schedule now.
             const double h = search_calibration.hazard(w);
             const double p = cohab_enabled ? current_hazard(
-              &probability_schedules[people[w].group * 3 + previous_union[w]], people[w].born, now).first : 0.0;
+              &probability_schedules[person_stratum(probability_spec, w) * 3 + previous_union[w]], people[w].born, now).first : 0.0;
             const size_t b = search_calibration.bin(w);
             scan_m[b] += h * (1 - p); scan_c[b] += h * p;
           }
@@ -2457,7 +2511,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (partner >= 0) return partner;
     std::vector<double> applied;
     const double p = cohab_enabled ? current_hazard(
-      &probability_schedules[people[woman].group * 3 + previous_union[woman]], people[woman].born, now).first : 0;
+      &probability_schedules[person_stratum(probability_spec, woman) * 3 + previous_union[woman]], people[woman].born, now).first : 0;
     const bool is_cohab = cohab_enabled && R::runif(0, 1) < p;
     partner = find_candidate(woman, now, is_cohab ? cohab_matching : matching,
       is_cohab ? *cohab_draw : *union_draw_current, false, diagnostics ? &applied : nullptr, is_cohab);
@@ -2486,12 +2540,36 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     std::array<std::vector<Band>, 3> previous_search;
     std::array<bool, 3> duration_search = {false, false, false};
   };
-  int inheritance_method = inheritance["method"];
-  double passing = inheritance["passing"];
-  IntegerVector inheritance_ranks = inheritance["ranks"];
-  IntegerVector ancestry_groups = inheritance["ancestry_groups"];
-  Function inherit_custom = inheritance["custom"];
-  std::vector<GroupSchedules> schedules(group_count);
+  // One inheritance rule per dimension, each with its own ancestry block (size
+  // zero when untracked). Calendar schedules switch dimension 0's rule.
+  struct InheritanceRule {
+    int method = 0, count = 1;
+    double passing = 0;
+    IntegerVector ranks, ancestry_groups;
+    SEXP custom = R_NilValue;
+    size_t offset = 0, size = 0;
+  };
+  std::vector<InheritanceRule> inheritance_rules(dimensions);
+  auto read_rule = [&](List x, InheritanceRule& rule) {
+    rule.method = as<int>(x["method"]);
+    rule.passing = as<double>(x["passing"]);
+    rule.ranks = as<IntegerVector>(x["ranks"]);
+    rule.ancestry_groups = as<IntegerVector>(x["ancestry_groups"]);
+    rule.custom = x["custom"];
+  };
+  for (int d = 0; d < dimensions; ++d) {
+    List x = inheritance[d];
+    read_rule(x, inheritance_rules[d]);
+    inheritance_rules[d].count = as<int>(x["group_count"]);
+    inheritance_rules[d].offset = static_cast<size_t>(as<int>(x["ancestry_offset"]));
+    inheritance_rules[d].size = static_cast<size_t>(as<int>(x["ancestry_size"]));
+  }
+  // The unknown share closes each tracked dimension's ancestry block.
+  std::vector<char> unknown_component(ancestry_components, 0);
+  for (const auto& rule : inheritance_rules)
+    if (rule.size) unknown_component[rule.offset + rule.size - 1] = 1;
+  const int schedule_count = std::max({mortality_spec.count, search_spec.count, conversion_spec.count});
+  std::vector<GroupSchedules> schedules(schedule_count);
   const bool status_fertility = fertility_rates.containsElementNamed("union_type");
   bool typed_fertility = false;
   // Cells stratify by group only when a process's active rates do (directly
@@ -2501,7 +2579,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     mortality_grouped = mortality_rates.containsElementNamed(".hammel_group");
     search_grouped = union_rates.containsElementNamed(".hammel_group");
     conversion_grouped = conversion_rates.containsElementNamed(".hammel_group");
-    for (int group = 0; group < group_count; ++group) {
+    for (int group = 0; group < schedule_count; ++group) {
       auto& rates = schedules[group];
       rates.male = read_bands(mortality_rates, "m", "", group);
       rates.female = read_bands(mortality_rates, "f", "", group);
@@ -2587,12 +2665,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         calibrator->refresh();
       }
     }
-    inheritance = as<List>(inheritance_bank[inheritance_route[model_epoch]]);
-    inheritance_method = as<int>(inheritance["method"]);
-    passing = as<double>(inheritance["passing"]);
-    inheritance_ranks = as<IntegerVector>(inheritance["ranks"]);
-    ancestry_groups = as<IntegerVector>(inheritance["ancestry_groups"]);
-    inherit_custom = as<Function>(inheritance["custom"]);
+    if (dimensions) read_rule(as<List>(inheritance_bank[inheritance_route[model_epoch]]), inheritance_rules[0]);
     return matching_changed;
   };
   const double end = start + years;
@@ -2608,8 +2681,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   auto load_dissolution = [&]() {
     dissolution_schedules.clear(); cohab_dissolution_schedules.clear();
     if (has_dissolution) {
-      const int count = dissolution_rates.containsElementNamed(".hammel_group") ?
-        group_count * group_count : 1;
+      const int count = dissolution_spec.count;
       const bool typed = dissolution_rates.containsElementNamed("union_type");
       for (int pair = 0; pair < count; ++pair) {
         dissolution_schedules.push_back(read_bands(dissolution_rates, "", typed ? "marriage" : "", pair));
@@ -3048,8 +3120,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       int type = 0;
       if (status_fertility && current_partner[w] >= 0)
         type = typed_fertility && union_history[person_unions[w].back()].cohab ? 2 : 1;
-      st.stratum = cells->stratum(fertility_grouped ? p.group : 0, type, parity_specific ? parity[w] : 0);
+      st.stratum = cells->stratum(person_stratum(fertility_spec, w), type, parity_specific ? parity[w] : 0);
       st.group = p.group;
+      st.report = person_stratum(report_spec, w);
       if (st.stratum < 0) stop("No fertility schedule covers a woman's current parity.");
       st.weight = heterogeneous ? fertility_weights[w] : 1;
       st.born = p.born;
@@ -3060,12 +3133,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     double oldest_birth = end;
     for (const Person& person : people) oldest_birth = std::min(oldest_birth, person.born);
     fertility_grouped = fertility_rates.containsElementNamed(".hammel_group");
-    const int fertility_groups = fertility_grouped ? group_count : 1;
+    const int fertility_groups = fertility_spec.count;
     cells.reset(new FertilityCells(fertility_strata(fertility_rates, fertility_groups, fertility_types),
       fertility_groups, static_cast<int>(fertility_types.size()), parity_specific, end - oldest_birth,
       birth_interval, heterogeneous || fertility_refresh_weights, state, threshold, calibrator.get(),
       now, end, start));
-    cells->set_pooled_groups(!fertility_grouped && group_count > 1);
+    // Unrealized births are attributed by members' categories in every dimension.
+    cells->set_pooled_groups(report_spec.count > 1);
     cells->set_unrealized_hook([&](int c, int group) {
       // Record one unrealized birth in its one-year period from the run start.
       long long k = static_cast<long long>(std::floor(weight_now - start));
@@ -3104,12 +3178,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   };
   auto process_strata = [&]() {
     ProcessStrata x;
-    for (int g = 0; g < (mortality_grouped ? group_count : 1); ++g) {
+    for (int g = 0; g < mortality_spec.count; ++g) {
       x.mortality.push_back(schedules[g].male);
       x.mortality.push_back(schedules[g].female);
     }
     if (rate_initiation)
-      for (int g = 0; g < (search_grouped ? group_count : 1); ++g) {
+      for (int g = 0; g < search_spec.count; ++g) {
         if (previous_specific) for (int k = 0; k < 3; ++k) x.search.push_back(schedules[g].previous_search[k]);
         else x.search.push_back(schedules[g].search);
       }
@@ -3119,7 +3193,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         x.dissolution.push_back(cohab_dissolution_schedules[pair]);
       }
     if (cohab_enabled)
-      for (int g = 0; g < (conversion_grouped ? group_count : 1); ++g) x.conversion.push_back(schedules[g].conversion);
+      for (int g = 0; g < conversion_spec.count; ++g) x.conversion.push_back(schedules[g].conversion);
     size_t slots = 0;
     for (const auto& origin : transition_schedules) slots = std::max(slots, origin.size());
     for (size_t k = 0; k < slots; ++k) {
@@ -3212,17 +3286,16 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     const bool ongoing = NumericVector::is_na(x.end);
     const Person& wife = people[x.wife];
     if (dissolution) {
-      // Pair schedules are symmetric: both orders of a group pair share cells.
-      const int low = std::min(wife.group, people[x.husband].group);
-      const int high = std::max(wife.group, people[x.husband].group);
-      const int pair = dissolution_schedules.size() == 1 ? 0 : low + group_count * high;
+      // Directional strata from the wife's and husband's categories.
+      const int pair = union_stratum(dissolution_spec, x.wife, x.husband);
       dissolution->refresh(u, ongoing ? 2 * pair + (x.cohab ? 1 : 0) : -1, x.start, now);
       if (ongoing) stored_weight(weight_spec("dissolution"), dissolution.get(), u, true, -1);
     }
     if (conversion) {
-      // Conversion schedules use the wife's group, by union duration or her age.
-      const double origin = schedules[wife.group].duration_conversion ? x.start : wife.born;
-      conversion->refresh(u, ongoing && x.cohab ? (conversion_grouped ? wife.group : 0) : -1, origin, now);
+      // Conversion schedules use the partners' categories, by union duration or her age.
+      const int g = union_stratum(conversion_spec, x.wife, x.husband);
+      const double origin = schedules[g].duration_conversion ? x.start : wife.born;
+      conversion->refresh(u, ongoing && x.cohab ? g : -1, origin, now);
       if (ongoing && x.cohab) stored_weight(weight_spec("conversion"), conversion.get(), u, true, -1);
     }
   };
@@ -3233,7 +3306,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     const bool alive = NumericVector::is_na(p.died);
     const int partner = current_partner[i];
     if (p.female) cells->refresh(i, now);
-    mortality->refresh(i, alive ? 2 * (mortality_grouped ? p.group : 0) + (p.female ? 1 : 0) : -1,
+    mortality->refresh(i, alive ? 2 * person_stratum(mortality_spec, i) + (p.female ? 1 : 0) : -1,
                        p.born, now);
     if (alive) stored_weight(mortality_weights_spec, mortality.get(), i, false, -1);
     if (search) {
@@ -3241,9 +3314,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       double origin = p.born;
       if (alive && p.female && partner < 0) {
         const int previous = previous_specific ? previous_union[i] : 0;
-        const int g = search_grouped ? p.group : 0;
+        const int g = person_stratum(search_spec, i);
         stratum = previous_specific ? 3 * g + previous : g;
-        if (previous_specific && schedules[p.group].duration_search[previous]) {
+        if (previous_specific && schedules[g].duration_search[previous]) {
           origin = previous_union_end[i];
           if (!R_finite(origin)) stop("Duration search risk requires a recorded previous union ending.");
         }
@@ -3255,7 +3328,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         if (cell < 0) search_calibration.update(i, -1, 0, 1);
         else {
           search_calibration.set_probability(i, cohab_enabled ? current_hazard(
-            &probability_schedules[p.group * 3 + previous_union[i]], p.born, now).first : 0.0);
+            &probability_schedules[person_stratum(probability_spec, i) * 3 + previous_union[i]], p.born, now).first : 0.0);
           double w = 1;
           if (search_weights_spec) { w = search_weight(i, cell); search->set_weight(i, w); }
           search_calibration.update(i, cell, calibrator->bin_index(p.group, p.born), w);
@@ -3439,6 +3512,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       tx_person.push_back(people[i].id); tx_time.push_back(now);
       tx_origin.push_back(people[i].group); tx_dest.push_back(destination);
       people[i].group = destination;
+      if (match_dim >= 0) cats[static_cast<size_t>(i) * dimensions + match_dim] = destination;
       group_entry[i] = now;
       if (people[i].female) add_counted_woman(i, now); else add_male(i);
       // A move changes the union's group pair and the partner's partner group.
@@ -3539,82 +3613,91 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       bool female = R::runif(0, 1) < ffab;
       int child = static_cast<int>(people.size());
       people.push_back({++next_id, now, NA_REAL, mother, father,
-                        -std::numeric_limits<double>::infinity(), female, people[i].group});
+                        -std::numeric_limits<double>::infinity(), female, 0});
       parity.push_back(0);
       if (heterogeneous) fertility_weights.push_back(female ?
         inherit_fertility_weight(fertility_weights[i], fertility_variance, fertility_alpha) : NA_REAL);
       // Append ancestry before scheduling the child. Missing fathers contribute
-      // their entire half to unknown; supplied parental unknown shares transmit
-      // through the same deterministic averaging rule.
+      // their entire half to each dimension's unknown share; supplied parental
+      // unknown shares transmit through the same deterministic averaging rule.
       const size_t child_offset = static_cast<size_t>(child) * ancestry_components;
       ancestry.resize(child_offset + ancestry_components);
       for (size_t g = 0; g < ancestry_components; ++g) {
         const double paternal = father_position >= 0 ?
           ancestry[static_cast<size_t>(father_position) * ancestry_components + g] :
-          (g + 1 == ancestry_components ? 1.0 : 0.0);
+          (unknown_component[g] ? 1.0 : 0.0);
         ancestry[child_offset + g] = 0.5 *
           ancestry[static_cast<size_t>(i) * ancestry_components + g] + 0.5 * paternal;
       }
-      // Sex and ancestry are now available; assign identity before any newborn
-      // hazard or matching lookup. Transitions separately update existing identities.
-      const int maternal_group = people[i].group;
-      const int paternal_group = father_position < 0 ? -1 : people[father_position].group;
-      int child_group = maternal_group;
-      if (inheritance_method == 1 && paternal_group >= 0) child_group = paternal_group;
-      else if (inheritance_method == 2 && paternal_group >= 0 && paternal_group != maternal_group)
-        child_group = R::runif(0, 1) < 0.5 ? maternal_group : paternal_group;
-      else if (inheritance_method == 3 && !female && paternal_group >= 0) child_group = paternal_group;
-      else if (inheritance_method == 4 && female && paternal_group >= 0) child_group = paternal_group;
-      else if (inheritance_method == 5 && ancestry_components > 0 &&
-               ancestry[child_offset + ancestry_components - 1] < 1.0) {
-        double total = 0;
-        int positive = 0, sole_group = maternal_group;
-        for (size_t g = 0; g + 1 < ancestry_components; ++g) {
-          const double share = ancestry[child_offset + g];
-          if (share > 0) {
-            if (ancestry_groups[g] < 0) stop("Positive ancestry has no declared identity group.");
-            total += share; ++positive; sole_group = ancestry_groups[g];
+      // Sex and ancestry are now available; assign each dimension's category,
+      // in declaration order, before any newborn hazard or matching lookup.
+      // Transitions separately update existing identities.
+      cats.resize(static_cast<size_t>(child + 1) * dimensions);
+      for (int d = 0; d < dimensions; ++d) {
+        const InheritanceRule& rule = inheritance_rules[d];
+        const size_t base = rule.offset, size = rule.size;
+        const int maternal_group = cats[static_cast<size_t>(i) * dimensions + d];
+        const int paternal_group = father_position < 0 ? -1 :
+          cats[static_cast<size_t>(father_position) * dimensions + d];
+        int child_group = maternal_group;
+        if (rule.method == 1 && paternal_group >= 0) child_group = paternal_group;
+        else if (rule.method == 2 && paternal_group >= 0 && paternal_group != maternal_group)
+          child_group = R::runif(0, 1) < 0.5 ? maternal_group : paternal_group;
+        else if (rule.method == 3 && !female && paternal_group >= 0) child_group = paternal_group;
+        else if (rule.method == 4 && female && paternal_group >= 0) child_group = paternal_group;
+        else if (rule.method == 5 && size > 0 && ancestry[child_offset + base + size - 1] < 1.0) {
+          double total = 0;
+          int positive = 0, sole_group = maternal_group;
+          for (size_t g = 0; g + 1 < size; ++g) {
+            const double share = ancestry[child_offset + base + g];
+            if (share > 0) {
+              if (rule.ancestry_groups[g] < 0) stop("Positive ancestry has no declared identity group.");
+              total += share; ++positive; sole_group = rule.ancestry_groups[g];
+            }
           }
-        }
-        if (positive == 1) child_group = sole_group;
-        else if (positive > 1) {
-          const double draw = R::runif(0, total);
-          double cumulative = 0;
-          child_group = sole_group; // Protect the final cell against rounding.
-          for (size_t g = 0; g + 1 < ancestry_components; ++g) {
-            cumulative += ancestry[child_offset + g];
-            if (draw < cumulative) { child_group = ancestry_groups[g]; break; }
+          if (positive == 1) child_group = sole_group;
+          else if (positive > 1) {
+            const double draw = R::runif(0, total);
+            double cumulative = 0;
+            child_group = sole_group; // Protect the final cell against rounding.
+            for (size_t g = 0; g + 1 < size; ++g) {
+              cumulative += ancestry[child_offset + base + g];
+              if (draw < cumulative) { child_group = rule.ancestry_groups[g]; break; }
+            }
           }
-        }
-      } else if (inheritance_method == 6 && paternal_group >= 0 && paternal_group != maternal_group) {
-        const int maternal_rank = inheritance_ranks[maternal_group];
-        const int paternal_rank = inheritance_ranks[paternal_group];
-        if (maternal_rank >= 0 && paternal_rank >= 0) {
-          const bool reverse = passing == 1 || (passing > 0 && R::runif(0, 1) < passing);
-          const bool maternal_first = maternal_rank < paternal_rank;
-          child_group = (maternal_first != reverse) ? maternal_group : paternal_group;
-        }
-      } else if (inheritance_method == 7) {
-        NumericVector maternal(ancestry_components), paternal(ancestry_components), child_shares(ancestry_components);
-        for (size_t g = 0; g < ancestry_components; ++g) {
-          maternal[g] = ancestry[static_cast<size_t>(i) * ancestry_components + g];
-          if (father_position >= 0)
-            paternal[g] = ancestry[static_cast<size_t>(father_position) * ancestry_components + g];
-          child_shares[g] = ancestry[child_offset + g];
-        }
-        // R's random functions must see all preceding native draws, and native
-        // scheduling must resume from the state left by the R callback.
-        PutRNGstate();
-        try {
-          child_group = as<int>(inherit_custom(maternal_group, paternal_group,
-            female ? "f" : "m", maternal, paternal, child_shares, partner >= 0));
-        } catch (...) {
+        } else if (rule.method == 6 && paternal_group >= 0 && paternal_group != maternal_group) {
+          const int maternal_rank = rule.ranks[maternal_group];
+          const int paternal_rank = rule.ranks[paternal_group];
+          if (maternal_rank >= 0 && paternal_rank >= 0) {
+            const bool reverse = rule.passing == 1 || (rule.passing > 0 && R::runif(0, 1) < rule.passing);
+            const bool maternal_first = maternal_rank < paternal_rank;
+            child_group = (maternal_first != reverse) ? maternal_group : paternal_group;
+          }
+        } else if (rule.method == 7) {
+          NumericVector maternal(size), paternal(size), child_shares(size);
+          for (size_t g = 0; g < size; ++g) {
+            maternal[g] = ancestry[static_cast<size_t>(i) * ancestry_components + base + g];
+            if (father_position >= 0)
+              paternal[g] = ancestry[static_cast<size_t>(father_position) * ancestry_components + base + g];
+            child_shares[g] = ancestry[child_offset + base + g];
+          }
+          // R's random functions must see all preceding native draws, and native
+          // scheduling must resume from the state left by the R callback.
+          PutRNGstate();
+          try {
+            Function inherit_custom(rule.custom);
+            child_group = as<int>(inherit_custom(maternal_group, paternal_group,
+              female ? "f" : "m", maternal, paternal, child_shares, partner >= 0));
+          } catch (...) {
+            GetRNGstate();
+            throw;
+          }
           GetRNGstate();
-          throw;
         }
-        GetRNGstate();
+        if (child_group < 0 || child_group >= rule.count) stop("Invalid newborn group index.");
+        cats[static_cast<size_t>(child) * dimensions + d] = child_group;
       }
-      if (child_group < 0 || child_group >= group_count) stop("Invalid newborn group index.");
+      const int child_group = match_dim >= 0 ? cats[static_cast<size_t>(child) * dimensions + match_dim] : 0;
       people[child].group = child_group;
       kinship.append(i, father_position);
       if (!female) {
@@ -3679,6 +3762,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     out_sex[i] = p.female ? "f" : "m";
     out_group[i] = p.group;
   }
+  IntegerMatrix out_categories(people.size(), dimensions);
+  for (size_t i = 0; i < people.size(); ++i)
+    for (int d = 0; d < dimensions; ++d) out_categories(i, d) = cats[i * dimensions + d];
   NumericMatrix out_ancestry(people.size(), ancestry_components);
   for (size_t i = 0; i < people.size(); ++i) {
     for (size_t g = 0; g < ancestry_components; ++g)
@@ -3721,7 +3807,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),
     _["transitions"] = DataFrame::create(_["person_id"] = wrap(tx_person), _["time"] = wrap(tx_time),
       _["group_origin"] = wrap(tx_origin), _["group_dest"] = wrap(tx_dest)),
-    _["groups"] = out_group, _["unions"] = out_unions, _["ancestry"] = out_ancestry,
+    _["groups"] = out_group, _["categories"] = out_categories, _["unions"] = out_unions,
+    _["ancestry"] = out_ancestry,
     _["births"] = birth_count, _["deaths"] = death_count,
     _["dissolutions"] = dissolution_count, _["conversions"] = conversion_count,
     _["weighted_infeasible"] = weighted_infeasible, _["draw_approximate"] = draw_approximate,

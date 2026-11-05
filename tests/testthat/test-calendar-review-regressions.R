@@ -46,8 +46,8 @@ test_that("execution population coverage checks ignore unreachable historical an
   m <- set_union_formation(m,"rate",rates=extend(m$processes$union_formation$rates),
     cohab_prob=transform(extend(data.frame(age_start=0,age_end=Inf,rate=0)),prob=0)[,
       c("age_start","age_end","group","time_start","time_end","prob")],
-    union_convert_rate=extend(data.frame(dur_start=0,dur_end=Inf,rate=0)))
-  pairs <- data.frame(group_pair=c("A:A","A:B","B:B"),dur_start=0,dur_end=Inf,rate=0)
+    union_convert_rate=transform(extend(data.frame(dur_start=0,dur_end=Inf,rate=0)),group_w=group,group=NULL))
+  pairs <- directional_pairs(data.frame(group_pair=c("A:A","A:B","B:B"),dur_start=0,dur_end=Inf,rate=0))
   dissolution <- rbind(transform(pairs[1,],time_start=1900,time_end=1950),
     transform(pairs,time_start=1950,time_end=2010),
     transform(pairs[3,],time_start=2010,time_end=2100))

@@ -26,18 +26,17 @@
 #' @param rates A nonempty data frame with numeric `dur_start`, `dur_end`, and
 #'   `rate`. Bands are half-open `[dur_start, dur_end)` in years. Starts and
 #'   rates must be finite and nonnegative; ends must exceed starts and may be
-#'   `Inf`. Bands cannot overlap within an unordered group pair. Gaps and
+#'   `Inf`. Bands cannot overlap within a stratum. Gaps and
 #'   durations outside support have zero hazard. Sex, age and union-status columns
 #'   are not supported. Input order, custom columns and provenance are retained.
-#'   An optional `group_pair` column selects an unordered pair such as `"A:A"`,
-#'   `"A:B"`, or `"B:B"`; `"A:B"` and `"B:A"` select the same schedule.
-#'   Optional `union_type` supplies both `cohab` and `marriage` schedules within
-#'   each pair stratum; without it the same duration risk applies to either type.
-#'   Pair names require nonempty colon-free group labels. Pair-stratified tables
-#'   must cover every unordered pair of possible identities, including future
-#'   ones; they require a declared group dimension. Omit `group_pair` for shared rates. `group`, `group_w` and
-#'   `group_h` schedule columns are not supported. Use [stratify_rates()] to add
-#'   proportional pair differences.
+#'   Optional `<group>_w` and `<group>_h` columns (for a declared group dimension
+#'   such as `race`: `race_w`, `race_h`) select the wife's and husband's
+#'   categories; strata are directional, so A-wife/B-husband and B-wife/A-husband
+#'   are separate. Stratified tables must cover every combination of the
+#'   dimension's categories. Optional `union_type` supplies both `cohab` and
+#'   `marriage` schedules within each stratum; without it the same duration risk
+#'   applies to either type. Use [stratify_rates()] to add proportional
+#'   differences, for example by listing both directions of a pair.
 #' @param model A `hammel_model` object.
 #' @return `union_dissolution()` returns an inspectable
 #'   `hammel_union_dissolution` process with a tibble of rates;
@@ -68,7 +67,7 @@ validate_union_dissolution <- function(process, calendar_interval = NULL) {
       !identical(process$rate_unit, "person_year"))
     stop("Invalid union-dissolution specification or units.", call. = FALSE)
   rates <- process$rates
-  check_stratified_columns(rates, c("group_pair", "union_type"), "Union-dissolution")
+  check_stratified_columns(rates, "union_type", "Union-dissolution")
   if (validate_calendar_rates(rates, function(slice, interval) {
       copy <- process
       copy$rates <- slice
@@ -81,12 +80,13 @@ validate_union_dissolution <- function(process, calendar_interval = NULL) {
   if (!nrow(rates) || !is.numeric(ends) || !is.null(dim(ends)) ||
       anyNA(ends) || any(ends <= rates$dur_start) ||
       any(rates$dur_start < 0) || any(rates$rate < 0) ||
-      any(c("sex", "age_start", "age_end", "union_status", "time_start", "time_end",
-            "group", "group_w", "group_h") %in% names(rates)))
-    stop("Use nonnegative dissolution rates in valid duration bands; use group_pair for symmetric strata, without sex, age, status or calendar columns.",
+      any(c("sex", "age_start", "age_end", "union_status", "time_start", "time_end") %in% names(rates)))
+    stop("Use nonnegative dissolution rates in valid duration bands; use `<group>_w`/`<group>_h` for group strata, without sex, age, status or calendar columns.",
          call. = FALSE)
-  pair_labels <- if ("group_pair" %in% names(rates))
-    canonical_union_pairs(rates$group_pair) else rep("shared", nrow(rates))
+  # Possible group columns (`<group>_w`, `<group>_h`) define strata.
+  strata <- candidate_strata(rates)
+  pair_labels <- if (length(strata)) do.call(paste, c(lapply(rates[strata], as.character), sep = ":")) else
+    rep("shared", nrow(rates))
   types <- if ("union_type" %in% names(rates)) rates$union_type else rep("shared", nrow(rates))
   if ("union_type" %in% names(rates)) {
     if (!is.character(types) || anyNA(types) || any(!types %in% c("cohab", "marriage")))
@@ -98,8 +98,7 @@ validate_union_dissolution <- function(process, calendar_interval = NULL) {
         " during calendar interval [%s, %s)",
         format(calendar_interval[1], trim = TRUE, scientific = FALSE),
         format(calendar_interval[2], trim = TRUE, scientific = FALSE))
-      if ("group_pair" %in% names(rates))
-        context <- paste0(context, sprintf(" for group pair '%s'", pair))
+      if (length(strata)) context <- paste0(context, sprintf(" for group stratum '%s'", pair))
       stop(sprintf(paste0("Dissolution rates are missing a '%s' schedule%s. ",
         "Supply both cohab and marriage schedules wherever typed dissolution rates are supplied."),
         missing, context), call. = FALSE)
@@ -115,39 +114,3 @@ validate_union_dissolution <- function(process, calendar_interval = NULL) {
   invisible(process)
 }
 
-# Use the shared Band reader with private ordered-pair indices. The public
-# strata remain unordered labels, and stored rates/provenance are never changed.
-prepare_dissolution_rates <- function(process, persons, group_values, start = -Inf, end = Inf) {
-  if (is.null(process))
-    return(data.frame(age_start = numeric(), age_end = numeric(), rate = numeric()))
-  rates <- process$rates
-  rates$.hammel_group <- NULL
-  grouped <- "group_pair" %in% names(rates)
-  labels <- if (grouped) canonical_union_pairs(rates$group_pair) else NULL
-  # Simulation has already rejected pair rates without a declared group.
-  if (grouped) {
-    pairs <- possible_union_pairs(group_values)
-    if (grouped) {
-      missing <- unique(unlist(lapply(calendar_rate_slices(rates, start, end), function(x)
-        if (nrow(x)) setdiff(pairs, canonical_union_pairs(x$group_pair)) else character())))
-      if (length(missing))
-        stop(sprintf("Union dissolution rates are missing schedules for group pair(s): %s.",
-                     paste(missing, collapse = ", ")), call. = FALSE)
-    }
-    groups <- as.character(group_values)
-    copies <- list()
-    for (male in seq_along(groups)) for (female in seq_along(groups)) {
-      key <- canonical_union_pairs(groups[female], groups[male])
-      selected <- rates[labels == key, , drop = FALSE]
-      selected$.hammel_group <- (female - 1L) + length(groups) * (male - 1L)
-      copies[[length(copies) + 1L]] <- selected
-    }
-    rates <- if (length(copies)) tibble::as_tibble(do.call(rbind, copies)) else {
-      rates$.hammel_group <- rep(-1L, nrow(rates))
-      rates
-    }
-  }
-  rates$age_start <- rates$dur_start
-  rates$age_end <- rates$dur_end
-  rates
-}

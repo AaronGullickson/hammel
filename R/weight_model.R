@@ -257,14 +257,20 @@ warn_cancelled_weight_terms <- function(weights, strata, process) {
 # Cells stratify by group only when rates or group multipliers do.
 weight_strata <- function(process, rates) {
   n <- names(rates)
-  grouped <- "group" %in% n
+  # Group columns are known only from the declaration; at construction any
+  # possible group column is taken to stratify the single dimension.
+  grouped <- length(candidate_strata(rates)) > 0L
+  wives <- any(grepl("_w$", candidate_strata(rates)))
+  husbands <- any(grepl("_h$", candidate_strata(rates)))
   switch(process,
     mortality = c("sex", if (grouped) "group"),
     fertility = c(if (grouped) "group",
                   if ("union_type" %in% n) c("union_type", "partnered"),
                   if ("parity_start" %in% n) "parity"),
-    dissolution = c(if ("union_type" %in% n) "union_type", if ("group_pair" %in% n) "same_group"),
-    conversion = c("union_type", if ("group" %in% n) "group_w"),
+    dissolution = c(if ("union_type" %in% n) "union_type", if (wives) "group_w",
+                    if (husbands) "group_h", if (wives && husbands) "same_group"),
+    conversion = c("union_type", if (wives) "group_w", if (husbands) "group_h",
+                   if (wives && husbands) "same_group"),
     search = c("sex", "partnered", "union_type", if (grouped) "group",
                if ("previous_union" %in% n) "previous_union", "partner_group"),
     transition = c("group", "group_dest", if ("sex" %in% n) "sex",

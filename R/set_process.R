@@ -113,13 +113,13 @@ set_fertility <- function(model, rates, birth_interval = 0.75, ffab = 0.4886,
 #' schedules are returned as tibbles. A `source` attribute on the input table
 #' is copied to the process's `source` field.
 #'
-#' An optional `group` column supplies separate schedules by nonmissing character
-#' label or finite numeric code. Without it, rates apply to all groups. Each
-#' mortality group needs both sexes, and each conditional fertility group needs
-#' both statuses. Overlap is checked within groups.
-#' Simulation requires schedules for every category of the declared group
-#' dimension (see [set_groups()]); a rate table with a `group` column is an
-#' error when no group is declared.
+#' Columns named by declared group dimensions (see [set_groups()]), such as
+#' `race` or `region`, supply separate schedules for each combination of their
+#' categories; dimensions without a column share the schedule. Each mortality
+#' stratum needs both sexes, and each conditional fertility stratum needs both
+#' statuses. Overlap is checked within strata. Simulation requires schedules for
+#' every combination of the categories of the dimensions a table uses; a
+#' table using an undeclared persons column is an error.
 #'
 #' Mortality requires separate schedules for both sexes. Gaps and uncovered
 #' ages are not filled or interpreted as zero rates. Coverage must be specified
@@ -331,16 +331,18 @@ new_rate_process <- function(name, rates) {
 }
 
 validate_rates <- function(rates, mortality) {
-  check_stratified_columns(rates, if (mortality) c("sex", "group") else c("group", "union_type"),
+  check_stratified_columns(rates, if (mortality) "sex" else "union_type",
                            if (mortality) "Mortality" else "Fertility")
   if (validate_calendar_rates(rates, function(x) validate_rates(x, mortality)))
     return(invisible(rates))
   columns <- c("age_start", "age_end", "rate")
   if (mortality) columns <- c("sex", columns)
   check_columns(rates, columns, "rates")
-  if ("group" %in% names(rates)) {
-    for (rows in split_rate_groups(rates)) {
-      schedule <- rates[rows, setdiff(names(rates), "group"), drop = FALSE]
+  # Possible group columns: each stratum is validated as its own schedule.
+  strata <- candidate_strata(rates)
+  if (length(strata)) {
+    for (rows in split_rate_groups(rates, strata)) {
+      schedule <- rates[rows, setdiff(names(rates), strata), drop = FALSE]
       validate_rates(schedule, mortality)
     }
     if (!nrow(rates)) stop("`rates` must contain at least one age interval.", call. = FALSE)

@@ -111,9 +111,10 @@ children who have died. No initial histories are fabricated.
 
 ### Ancestry proportions
 
-An optional `ancestry` tibble stores one row per person with `group_<label>`
-shares and an explicit `unknown` share. Without supplied proportions, grouped
-populations initialize every starting person at 100% of their recorded group,
+Optional ancestry, for dimensions declared with `ancestry = TRUE`, stores one
+tibble per such dimension with one row per person, a share per category and an
+explicit `unknown` share. Without supplied proportions, every starting person
+begins at 100% of their recorded category,
 irrespective of earlier parent histories. Supplied proportions are used as given
 and retained across restarts. Shares must be finite, in `[0,1]`, and sum to one
 within `1e-8`; missing ancestry is represented explicitly as unknown, not NA.

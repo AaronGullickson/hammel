@@ -28,8 +28,9 @@ sibling and last-born-child pointers are omitted. Group labels must be nonempty;
 
 ## Ancestry
 
-An optional `ancestry` tibble has one row per person, including deceased people,
-keyed by `person_id`. Known shares are in `group_<label>` columns; `unknown`
+An optional `ancestry` component is a named list with one tibble per dimension
+declared with `ancestry = TRUE`. Each has one row per person, including deceased
+people, keyed by `person_id`. Known shares are in columns named by category; `unknown`
 records unknown ancestry. Shares are finite and in `[0,1]`, summing to one per
 person within `1e-8`. Supplied rows are aligned to persons; reference groups may
 differ from current identity groups. Without supplied shares, grouped populations

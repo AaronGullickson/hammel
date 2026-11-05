@@ -13,27 +13,12 @@ check_groups <- function(table, name) {
   invisible(table)
 }
 
-split_rate_groups <- function(rates) {
-  check_groups(rates, "rates")
-  if ("group" %in% names(rates))
-    split(seq_len(nrow(rates)), as.character(rates$group), drop = TRUE)
-  else list(seq_len(nrow(rates)))
+# Row sets of each stratum of a rate table, by the given group columns.
+split_rate_groups <- function(rates, columns = "group") {
+  columns <- intersect(columns, names(rates))
+  for (column in columns) check_groups(tibble::tibble(group = rates[[column]]), paste0("rates$", column))
+  if (!length(columns)) return(list(seq_len(nrow(rates))))
+  key <- do.call(paste, c(lapply(rates[columns], as.character), sep = "\r"))
+  split(seq_len(nrow(rates)), key, drop = TRUE)
 }
 
-prepare_group_rates <- function(rates, persons, process,
-                                group_values = if ("group" %in% names(persons)) unique(persons$group) else NULL,
-                                start = -Inf, end = Inf) {
-  rates$.hammel_group <- NULL
-  if (!"group" %in% names(rates)) return(rates)
-  # Simulation has already rejected group rates without a declared group.
-  labels <- as.character(rates$group)
-  groups <- as.character(group_values)
-  missing <- unique(unlist(lapply(calendar_rate_slices(rates, start, end), function(x)
-    if (nrow(x)) setdiff(groups, as.character(x$group)) else character())))
-  if (length(missing)) {
-    stop(sprintf("%s rates are missing schedules for population group(s): %s.",
-                 process, paste(missing, collapse = ", ")), call. = FALSE)
-  }
-  rates$.hammel_group <- match(labels, groups) - 1L
-  rates
-}

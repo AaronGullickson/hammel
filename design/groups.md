@@ -44,33 +44,39 @@ returns two copies of the table, one with `group = "A"` and rates multiplied by
   separate strata, so cells split by those categories (D128) and a weight-model
   term on the same variable cancels with a warning.
 
-`by` may only add stratum columns used by Hammel rate tables (`sex`, `group`,
-`union_type`, `previous_union`, `group_pair`, `group_origin`, `group_dest`);
-other names are errors. `stratify_rates()` cannot know which process a table is
-for, so each process setter checks the table's actual columns, whether they
-came from `stratify_rates()`, an earlier stratification or direct entry, and
-rejects stratum columns its process does not support, naming the columns it
-accepts. Other columns, such as notes or provenance, are carried along and
-ignored:
+`by` may add any valid column name except band, rate and calendar columns.
+Built-in strata are `sex`, `union_type`, `previous_union`, `group_origin` and
+`group_dest`; any other name may be a declared group dimension (D134), such as
+`race`, or for union-level processes its wife's and husband's columns,
+`race_w` and `race_h`. `stratify_rates()` cannot know which process or
+declaration a table is for, so each process setter checks the table's built-in
+stratum columns, whether they came from `stratify_rates()`, an earlier
+stratification or direct entry, and rejects those its process does not
+support. Group columns are checked at simulation against the declaration;
+there an undeclared column is an error. Other columns, such as notes, are
+carried along:
 
 | Process | Stratum columns accepted from `stratify_rates()` |
 | --- | --- |
-| Mortality | `sex`, `group` |
-| Fertility | `group`, `union_type` |
-| Union search (rate mode) | `group`, `previous_union` |
-| Conversion (`union_convert_rate`) | `group` |
-| Dissolution | `group_pair`, `union_type` |
+| Mortality | `sex`, `<group>` |
+| Fertility | `<group>`, `union_type` |
+| Union search (rate mode) | `<group>` (woman's), `previous_union` |
+| Conversion (`union_convert_rate`) | `<group>_w`, `<group>_h` |
+| Dissolution | `<group>_w`, `<group>_h`, `union_type` |
 | Group transitions | `group_origin`, `group_dest`, `sex`, `union_type` |
 
-Category values are then validated as for any supplied table: for example
-`group_pair` labels must be unordered pairs given once, and `union_type` values
-must be valid for the process. Milestone 9's additional group columns will
-extend the list of stratum columns.
+Category values are then validated as for any supplied table: `union_type`
+values must be valid for the process, and group values must be categories of
+the dimension (rows for categories absent from an inferred registry are
+unused).
 
 **Examples.** Group A fertility 10% higher than B: an ASFR of 0.1 becomes 0.11
 for A, and A's cells generate births at 0.11 times their members, exactly as an
-explicit schedule would. Dissolution twice as likely in exogamous unions:
-`stratify_rates(rates, list(group_pair = c("A:A" = 1, "A:B" = 2, "B:B" = 1)))`.
+explicit schedule would. Directional effects multiply: `stratify_rates(rates,
+list(group_w = c(A = 1, B = 1.5), group_h = c(A = 1, B = 2)))`. Effects that
+are not products of partner effects, such as doubling dissolution in exogamous
+unions, are written as an explicit table with one row per wife-husband
+combination.
 Different group effects by union status:
 
 ```r
@@ -214,4 +220,5 @@ the default FALSE pools counts and exposure before calculating rates. See
 
 
 Cohabitation extends fertility input strata to union_type (D086). Type selection probabilities and conversion schedules can
-stratify by the woman's group; dissolution retains symmetric group_pair strata.
+stratify by the woman's group; conversion and dissolution use directional
+`<group>_w`/`<group>_h` strata (D134 stage 2).

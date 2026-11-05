@@ -399,9 +399,9 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' @param rates For `"rate"` initiation, an age-specific female search-hazard
 #'   table with `age_start`, `age_end`, and `rate`, in years and per person-year.
 #'   These specify search attempts, not guaranteed realized union formation.
-#'   An optional `group` column selects the woman's group (requires a declared
-#'   group dimension). Without it, all groups share the schedule. Group does
-#'   not restrict partner matching.
+#'   Columns named by declared group dimensions select the woman's categories;
+#'   without them, all groups share the schedule. Groups do not restrict
+#'   partner matching.
 #'   See [mortality()] for group-label and rate-coverage rules.
 #'   Nonoverlapping bands may have gaps or an open end; gaps and ages outside
 #'   support have zero hazard. Optional `previous_union` supplies either
@@ -433,7 +433,8 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   schedule; NULL shares the general `matching` model active at that search. Marriage, cohabitation and unpartnered father searches calibrate
 #'   weights using their own intensities and share the available male pool.
 #' @param union_convert_rate Optional age- or duration-specific conversion table,
-#'   optionally by woman's group. Duration uses the current cohabitation start.
+#'   optionally by the partners' categories (`<group>_w`, `<group>_h` for a
+#'   declared dimension). Duration uses the current cohabitation start.
 #'   Uses `rate` and either age or duration boundaries, not both clocks, with no
 #'   previous-union axis. NULL gives no conversions and warns at simulation.
 #'   Conversion keeps partners, closes cohab with reason `conversion`, and starts
@@ -580,7 +581,7 @@ expand_previous_union_rates <- function(rates) {
 }
 
 validate_union_search_rates <- function(rates) {
-    check_stratified_columns(rates, c("group", "previous_union"), "Union-search")
+    check_stratified_columns(rates, "previous_union", "Union-search")
     if (has_calendar_rates(rates)) {
       validate_calendar_rates(rates, validate_union_search_rates)
       effective <- expand_previous_union_rates(rates)
@@ -628,7 +629,7 @@ validate_union_search_rates <- function(rates) {
     if (any(!is.finite(starts)) || any(starts < 0) || any(ends <= starts))
       stop("Use valid nonnegative age or duration bands with finite starts and ends greater than starts.",
            call. = FALSE)
-    strata <- split_rate_groups(rates)
+    strata <- split_rate_groups(rates, candidate_strata(rates))
     if ("previous_union" %in% names(rates)) {
       previous <- rates$previous_union
       categories <- c("none", "separated", "widowed", "dissolved")

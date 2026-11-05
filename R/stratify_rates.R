@@ -17,14 +17,16 @@
 #' partnered and unpartnered fertility, stratify each subset and bind the
 #' results with [rbind()].
 #'
-#' Columns in `by` must be stratum columns used by Hammel rate tables:
-#' `sex`, `group`, `union_type`, `previous_union`, `group_pair`,
-#' `group_origin` or `group_dest`. Each process setter checks the table's
-#' columns, however it was built, and rejects stratum columns its process does
-#' not support: mortality accepts `sex` and `group`; fertility `group` and
-#' `union_type`; union searches `group` and `previous_union`; conversion
-#' `group`; dissolution `group_pair` and `union_type`; group transitions
-#' `group_origin`, `group_dest`, `sex` and `union_type`.
+#' Columns in `by` are either built-in strata (`sex`, `union_type`,
+#' `previous_union`, `group_origin`, `group_dest`) or group dimensions
+#' declared with [set_groups()]: a dimension's name (such as `race`) for
+#' person-level rates, or `<name>_w` and `<name>_h` (the wife's and husband's
+#' categories) for dissolution and conversion rates. Band, rate and calendar
+#' columns cannot be added. Process setters reject built-in strata their
+#' process does not support: mortality accepts `sex`; fertility `union_type`;
+#' union searches `previous_union`; dissolution `union_type`; group
+#' transitions `group_origin`, `group_dest`, `sex` and `union_type`. Group
+#' columns are checked against the declaration at simulation.
 #'
 #' @param rates A data frame with a numeric `rate` column, such as a mortality,
 #'   fertility, search, conversion, dissolution or transition rate table.
@@ -37,12 +39,12 @@
 #' @examples
 #' mortality_rates <- data.frame(sex = c("m", "f"), age_start = 0,
 #'   age_end = Inf, rate = c(0.01, 0.008))
-#' # Group A has 20% higher mortality than reference group B.
-#' stratify_rates(mortality_rates, list(group = c(A = 1.2, B = 1)))
+#' # Race A has 20% higher mortality than reference race B.
+#' stratify_rates(mortality_rates, list(race = c(A = 1.2, B = 1)))
 #'
-#' # Exogamous unions dissolve twice as often.
+#' # Unions of an A wife and a B husband dissolve twice as often.
 #' dissolution <- data.frame(dur_start = 0, dur_end = Inf, rate = 0.02)
-#' stratify_rates(dissolution, list(group_pair = c("A:A" = 1, "A:B" = 2, "B:B" = 1)))
+#' stratify_rates(dissolution, list(race_w = c(A = 1, B = 1), race_h = c(A = 2, B = 1)))
 stratify_rates <- function(rates, by) {
   if (!is.data.frame(rates) || !"rate" %in% names(rates) || !is.numeric(rates$rate))
     stop("`rates` must be a data frame with a numeric `rate` column.", call. = FALSE)
@@ -71,21 +73,31 @@ stratify_rates <- function(rates, by) {
   out
 }
 
-# Categorical stratum columns of rate tables across all processes. Other
-# columns (custom notes, provenance) are carried along and ignored.
-stratum_columns <- c("sex", "group", "union_type", "previous_union", "group_pair",
-                     "group_origin", "group_dest")
+# Built-in categorical strata of rate tables; each process accepts some.
+builtin_strata <- c("sex", "union_type", "previous_union", "group_origin", "group_dest")
+
+# Rate-table columns that are not strata: bands, rates and calendar periods.
+rate_schema_columns <- c("age_start", "age_end", "dur_start", "dur_end", "rate", "prob",
+  "time_start", "time_end", "parity_start", "parity_end")
+
+# Columns of a rate table that may be group strata: everything else. Group
+# dimensions are known only once the table meets the population's declaration.
+candidate_strata <- function(rates) {
+  setdiff(names(rates), c(rate_schema_columns, builtin_strata, "union_status",
+                          "marital_status", ".hammel_group"))
+}
 
 validate_strata_factors <- function(by) {
   columns <- names(by)
   if (!is.list(by) || is.data.frame(by) || !length(by) || is.null(columns) ||
       anyNA(columns) || any(!nzchar(trimws(columns))) || anyDuplicated(columns))
     stop("`by` must be a nonempty named list with unique column names.", call. = FALSE)
-  unknown <- setdiff(columns, stratum_columns)
-  if (length(unknown))
-    stop(sprintf("`by` can only add stratum columns (%s), not %s.",
-                 paste0("`", stratum_columns, "`", collapse = ", "),
-                 paste0("`", unknown, "`", collapse = ", ")), call. = FALSE)
+  schema <- intersect(columns, rate_schema_columns)
+  if (length(schema))
+    stop(sprintf("`by` cannot stratify by %s, which are band, rate or calendar columns.",
+                 paste0("`", schema, "`", collapse = ", ")), call. = FALSE)
+  if (any(!grepl("^[A-Za-z][A-Za-z0-9_.]*$", columns)))
+    stop("`by` names must be valid column names.", call. = FALSE)
   for (col in columns) {
     x <- by[[col]]
     labels <- names(x)
@@ -101,7 +113,7 @@ validate_strata_factors <- function(by) {
 # Setters call this with the stratum columns their process supports. It checks
 # the table's actual columns, whether stratified by hand or by stratify_rates().
 check_stratified_columns <- function(rates, allowed, process) {
-  bad <- intersect(setdiff(stratum_columns, allowed), names(rates))
+  bad <- intersect(setdiff(builtin_strata, allowed), names(rates))
   if (length(bad))
     stop(sprintf("%s rates cannot be stratified by %s; supported columns: %s.", process,
                  paste0("`", bad, "`", collapse = ", "),

@@ -26,7 +26,8 @@ fathers, entirely unknown ancestry, and missing hierarchy ranks.}
 (logical union status at birth, including on-demand formation). Nonmarital
 births and unknown fathers give FALSE. Older callbacks without this new
 argument or \code{...} remain supported. Use \code{...} for unused inputs.
-Ancestry vectors have \verb{group_<label>}/\code{unknown} names. A missing father has
+Ancestry vectors (the dimension's own shares, when it tracks ancestry)
+are named by category and \code{unknown}. A missing father has
 NA group and NULL ancestry. Return exactly one nonmissing identity in the
 possible group set. Ordinary R random draws are supported; functions must
 not mutate simulation/global state. Invalid returns and errors fail.}

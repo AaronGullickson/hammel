@@ -39,7 +39,7 @@ test_that("competing outgoing hazards recover analytical destinations and surviv
   expect_lt(max(abs(as.numeric(counts) - expected) / sqrt(expected * (1 - expected) / 12000)), 5)
   expect_equal(nrow(out$transitions), sum(out$persons$group != "A"))
   expect_identical(out$simulation$transitions, nrow(out$transitions))
-  expect_equal(out$ancestry$group_A, rep(1, 12000))
+  expect_equal(out$ancestry$group$A, rep(1, 12000))
   expect_identical(simulate(model, 2, seed = 124), out)
 })
 
@@ -103,7 +103,7 @@ test_that("group changes select new mortality and update only the individual", {
   expect_identical(out$persons$group, c("B", "A"))
   expect_gt(out$persons$death_time[1], out$transitions$time)
   expect_true(is.na(out$persons$death_time[2]))
-  expect_identical(out$ancestry$group_A, c(1, 1))
+  expect_identical(out$ancestry$group$A, c(1, 1))
 })
 
 test_that("a moving man invalidates pair dissolution and union changes refresh his risks", {
@@ -111,14 +111,14 @@ test_that("a moving man invalidates pair dissolution and union changes refresh h
   model$population$persons$sex <- c("f", "m")
   model$population$unions <- data.frame(union_id = 1, wife_id = 1, husband_id = 2,
     start_time = -1, end_time = NA_real_, end_reason = NA_character_)
-  dissolution <- data.frame(group_pair = c("A:A", "A:B", "B:B"),
-    dur_start = 0, dur_end = Inf, rate = c(0, 1e5, 0))
+  dissolution <- directional_pairs(data.frame(group_pair = c("A:A", "A:B", "B:B"),
+    dur_start = 0, dur_end = Inf, rate = c(0, 1e5, 0)))
   model <- set_union_dissolution(model, dissolution)
   transitions <- rbind(transform(transition_rates(1e5), sex = "m", union_type = "partnered"),
     transform(transition_rates(1e5, "B", "C"), sex = "m", union_type = "unpartnered"))
   # C must also have all dissolution pair schedules.
-  dissolution <- rbind(dissolution, data.frame(group_pair = c("A:C", "B:C", "C:C"),
-    dur_start = 0, dur_end = Inf, rate = 0))
+  dissolution <- rbind(dissolution, directional_pairs(data.frame(group_pair = c("A:C", "B:C", "C:C"),
+    dur_start = 0, dur_end = Inf, rate = 0)))
   model <- set_union_dissolution(model, dissolution)
   out <- simulate(set_group_transition(model, transitions), .1, seed = 15)
   expect_equal(out$transitions$group_dest, c("B", "C"))
@@ -195,7 +195,7 @@ test_that("moves refresh available male pools and active fertility/calibration c
 })
 
 test_that("cohabitation conversion refreshes both partners' transition strata", {
-  conversion <- data.frame(group = c("A", "B", "C"), dur_start = 0, dur_end = Inf,
+  conversion <- data.frame(group_w = c("A", "B", "C"), dur_start = 0, dur_end = Inf,
     rate = c(0, 1e5, 0))
   model <- make_rate_model(2, search_rate = 0)
   model$population$persons$group <- c("A", "A")
@@ -222,7 +222,7 @@ test_that("history-only restarts and absent transition processes preserve proven
   out <- simulate(set_group_transition(model, transition_rates(1e5)), .1, seed = 9)
   resumed <- simulate(set_population(model, out), .1, seed = 10)
   expect_identical(resumed$transitions, out$transitions)
-  expect_identical(resumed$ancestry, out$ancestry)
+  expect_identical(resumed$ancestry$group, out$ancestry$group)
   expect_identical(resumed$persons$group, "B")
   expect_null(model$population$transitions)
   expect_identical(model$population$persons$group, "A")

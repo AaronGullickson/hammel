@@ -50,6 +50,9 @@ calculate_transition_rates <- function(population, time_breaks, age_breaks = NUL
   validate_population(population)
   if (!declared_group(population))
     stop("`calculate_transition_rates()` requires a declared group dimension.", call. = FALSE)
+  alias <- observation_alias(population, by)
+  population <- alias$population
+  by <- alias$by
   by <- check_by(by, c("sex", "union_type", "previous_union"), "calculate_transition_rates")
   check_pool_dissolved(pool_dissolved, by)
   if (is.null(age_breaks) == is.null(dur_breaks))

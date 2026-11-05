@@ -222,3 +222,39 @@ union_strata <- function(population, unions, by, stride, typed_split = "union_ty
   list(unions = unions, index = as.integer(index),
        count = combos * if (typed_split) 2L else 1L, dims = dims)
 }
+
+# The calculators split by one internal `group` column. Map a population's
+# single declared dimension to it, so `by` uses the dimension's own name
+# (`"race"`, or `"race_w"`/`"race_h"` for union rates) and outputs keep it.
+# Several dimensions in `by` arrive with milestone 9 stage 4.
+observation_alias <- function(population, by, suffixes = "") {
+  if (!inherits(population, "hammel_population") || !length(population$groups))
+    return(list(population = population, by = by, rename = character()))
+  dims <- names(population$groups)
+  requested <- intersect(by, as.vector(outer(dims, suffixes, paste0)))
+  if (length(dims) > 1L) {
+    if (length(requested))
+      stop("Splitting by group requires exactly one declared group dimension for now.", call. = FALSE)
+    return(list(population = population, by = by, rename = character()))
+  }
+  dim <- dims
+  if (dim != "group") {
+    internal <- paste0("group", suffixes)
+    if (any(internal %in% by))
+      stop(sprintf("Split by the declared group dimension `%s`, not `group`.", dim), call. = FALSE)
+    population$persons$group <- population$persons[[dim]]
+    population$groups <- stats::setNames(population$groups, "group")
+    if (!is.null(population$ancestry)) names(population$ancestry)[names(population$ancestry) == dim] <- "group"
+  }
+  external <- paste0(dim, suffixes)
+  hit <- by %in% external
+  if (any(hit)) by[hit] <- paste0("group", suffixes)[match(by[hit], external)]
+  list(population = population, by = by,
+       rename = stats::setNames(external, paste0("group", suffixes)))
+}
+
+# Rename internal group columns to the dimension's own names.
+rename_group_columns <- function(out, rename) {
+  for (from in names(rename)) names(out)[names(out) == from] <- rename[[from]]
+  out
+}

@@ -26,6 +26,9 @@
 calculate_population_size <- function(population, times, by = NULL, pool_dissolved = FALSE) {
   if (!is.numeric(times) || !is.null(dim(times)) || any(!is.finite(times)))
     stop("`times` must be a numeric vector of finite times in years.", call. = FALSE)
+  alias <- observation_alias(population, by)
+  population <- alias$population
+  by <- alias$by
   by <- check_by(by, c("sex", "group", "union_type", "previous_union"), "calculate_population_size")
   check_pool_dissolved(pool_dissolved, by)
   obs <- person_observation(population, by, if (length(times)) max(times) else -Inf)
@@ -49,7 +52,7 @@ calculate_population_size <- function(population, times, by = NULL, pool_dissolv
   rows <- build_rows(dims)
   out <- finish_rows(rows[!grepl("^\\.key", names(rows))])
   out$population <- as.integer(counts[rows$.index])
-  out
+  rename_group_columns(out, alias$rename)
 }
 
 # Shared validation of period and age breaks; a finite final age gains Inf.
@@ -112,6 +115,9 @@ person_breaks <- function(time_breaks, age_breaks) {
 calculate_mortality_rates <- function(population, time_breaks, age_breaks, by = NULL,
                                       conf.level = NULL, pool_dissolved = FALSE) {
   validate_rate_conf_level(conf.level)
+  alias <- observation_alias(population, by)
+  population <- alias$population
+  by <- alias$by
   by <- check_by(by, c("group", "union_type", "previous_union"), "calculate_mortality_rates")
   check_pool_dissolved(pool_dissolved, by)
   age_breaks <- person_breaks(time_breaks, age_breaks)
@@ -123,7 +129,7 @@ calculate_mortality_rates <- function(population, time_breaks, age_breaks, by = 
   out$rate_mortality <- as.numeric(ifelse(out$person_years > 0,
     out$deaths / out$person_years, NA_real_))
   attr(out, "index") <- NULL
-  add_rate_confidence(out, "deaths", "person_years", conf.level)
+  rename_group_columns(add_rate_confidence(out, "deaths", "person_years", conf.level), alias$rename)
 }
 
 # Rows for person rates: time, sex, age, optional parity, then `by`.
@@ -186,6 +192,9 @@ calculate_fertility_rates <- function(population, time_breaks, age_breaks, by = 
       stop(paste("`unrealized = TRUE` requires a population returned by simulate()",
                  "with an unrealized-births record."), call. = FALSE)
   }
+  alias <- observation_alias(population, by)
+  population <- alias$population
+  by <- alias$by
   by <- check_by(by, c("group", "union_type", "previous_union"), "calculate_fertility_rates")
   check_pool_dissolved(pool_dissolved, by)
   age_breaks <- person_breaks(time_breaks, age_breaks)
@@ -206,10 +215,11 @@ calculate_fertility_rates <- function(population, time_breaks, age_breaks, by = 
   out$rate_fertility <- as.numeric(ifelse(out$person_years > 0,
     out$births / out$person_years, NA_real_))
   attr(out, "index") <- NULL
-  if (unrealized) out <- add_unrealized_births(out, population$simulation)
+  if (unrealized) out <- add_unrealized_births(out, population$simulation, alias$rename)
   attr(out, "unassigned_births") <- tibble::tibble(time_start = head(time_breaks, -1),
     time_end = tail(time_breaks, -1), births = counts$unassigned_births)
-  add_rate_confidence(out, "births", "person_years", conf.level)
+  out <- rename_group_columns(add_rate_confidence(out, "births", "person_years", conf.level), alias$rename)
+  out
 }
 
 # Attribute recorded unrealized births (D101) to observation rows. A record is
@@ -218,8 +228,10 @@ calculate_fertility_rates <- function(population, time_breaks, age_breaks, by = 
 # the row whose period, age, parity, group and union type contain it. Rows that
 # a record only partly overlaps, or that a stratum the schedule did not use
 # would have to split, become NA, as do periods before the run start.
-add_unrealized_births <- function(out, simulation) {
+add_unrealized_births <- function(out, simulation, rename = character()) {
   u <- simulation$unrealized_births
+  # Records name each group dimension; the table uses the internal `group`.
+  for (from in names(rename)) names(u)[names(u) == rename[[from]]] <- from
   n <- nrow(out)
   value <- numeric(n)
   covered <- out$time_start >= simulation$start_time

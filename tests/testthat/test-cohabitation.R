@@ -240,14 +240,14 @@ test_that("typed dissolution retains symmetric pair hazards", {
   model <- initial_cohabs(3,conversion=0,breakup=0)
   model$population$persons$group <- c("A","B","A","A","B","B")
   model$population$groups <- list(group = group())
-  rates <- expand.grid(group_pair=c("A:A","A:B","B:B"),union_type=c("cohab","marriage"),stringsAsFactors=FALSE)
+  rates <- expand.grid(group_w=c("A","B"),group_h=c("A","B"),union_type=c("cohab","marriage"),stringsAsFactors=FALSE)
   rates$dur_start <- 0; rates$dur_end <- Inf
-  rates$rate <- ifelse(rates$union_type=="cohab" & rates$group_pair=="A:B",1e5,0)
+  rates$rate <- ifelse(rates$union_type=="cohab" & rates$group_w!=rates$group_h,1e5,0)
   model <- set_union_dissolution(model,rates)
   result <- simulate(model,.1,42)
   expect_equal(result$simulation$dissolutions,1)
   expect_equal(result$unions$end_reason[1],"dissolution")
-  model <- set_union_dissolution(model,transform(rates,rate=ifelse(group_pair=="A:B",0,rate)))
+  model <- set_union_dissolution(model,transform(rates,rate=ifelse(group_w!=group_h,0,rate)))
   expect_equal(simulate(model,.1,42)$simulation$dissolutions,0)
 })
 

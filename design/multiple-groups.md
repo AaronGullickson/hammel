@@ -1,8 +1,10 @@
 # Milestone 9: multiple group dimensions
 
-Started November 5, 2026. **Status: design decided (D134); stage 1 (the
-declaration) implemented, with one dimension named `group` allowed until stage
-2; later stages not implemented.**
+Started November 5, 2026. **Status: design decided (D134); stages 1 and 2
+implemented: declared dimensions of any name, several at once, in every rate
+table, with per-dimension inheritance and ancestry. Transitions, matching and
+weight-model group effects, inheritance schedules and `by` group splits still
+use a single dimension (stages 3–5).**
 This records the user's decisions as they are made. Milestone 9 was assigned
 multiple group columns by D131. See the [roadmap](roadmap.md#milestone-9-multiple-group-columns)
 for the motivation and the household-move questions retained from D114.
@@ -145,6 +147,37 @@ Step 1, each stage leaving the test suite passing:
 6. Tests, articles and documents.
 
 Step 2: joint matching calibration across dimensions.
+
+### Stage 2 as implemented (November 5, 2026)
+
+User decisions: dissolution and conversion rates use directional
+`<dim>_w`/`<dim>_h` columns (the wife's and husband's categories); the
+symmetric `group_pair` is gone, and symmetric rates list both directions.
+Search rates and cohabitation probabilities use the woman's categories under
+the dimension's own name.
+
+- Each person carries a category per dimension in the engine. Each rate
+  process stratifies by the dimensions its table has columns for, combined in
+  declaration order (wife before husband); cells are only as fine as the rates
+  (D128). Every combination of the used dimensions' categories must be
+  covered. Rows for categories absent from an inferred registry are unused;
+  with declared categories they are errors.
+- Setters cannot know the declaration, so any non-schema column counts as a
+  possible stratum in their overlap checks; at simulation only declared
+  dimensions stratify, and overlapping bands within a real stratum are errors.
+  `stratify_rates()` accepts any name except band, rate and calendar columns.
+- Newborns get each dimension's category from its own rule, in declaration
+  order (one dimension reproduces stage 1 draws exactly). Ancestry is a named
+  list of tibbles, one per tracked dimension, with columns named by category
+  (so tracked dimensions cannot have categories named `unknown` or
+  `person_id`); custom inheritance rules receive that dimension's shares.
+- Unrealized births are reported with a column per dimension.
+- With one dimension, results are bit-identical to stage 1 when both builds
+  disable fused multiply-adds; ordinary optimized builds can differ in the last
+  bit because compilers fuse differently around changed code.
+- With several dimensions, transitions, matching group effects, weight-model
+  group variables, inheritance schedules and `by` group splits stop with a
+  message; with one dimension of any name they work, and `by` uses its name.
 
 ### Stage 1 as implemented (November 5, 2026)
 

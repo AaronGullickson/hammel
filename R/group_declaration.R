@@ -70,10 +70,6 @@ check_group_names <- function(names) {
   if (length(bad))
     stop(sprintf("Group dimension name(s) %s are reserved or not valid names.",
                  paste0("`", bad, "`", collapse = ", ")), call. = FALSE)
-  # Stage 1 of milestone 9 supports one dimension, named `group`; other names
-  # and several dimensions arrive with the rate and engine changes.
-  if (length(names) > 1L || any(names != "group"))
-    stop("Only one group dimension, named `group`, is supported so far.", call. = FALSE)
   invisible(names)
 }
 
@@ -106,8 +102,6 @@ normalize_group_declaration <- function(groups) {
 #' population when both are present and at simulation. Simulated populations
 #' carry it, so analysis and restarts need nothing further.
 #'
-#' Currently one dimension, named `group`, is supported.
-#'
 #' @param model A `hammel_model`.
 #' @param ... Named [group()] objects, one per dimension, named by the persons
 #'   column. No arguments removes the declaration.
@@ -132,7 +126,12 @@ set_groups <- function(model, ...) {
 apply_group_declaration <- function(population, declaration) {
   declaration <- normalize_group_declaration(declaration)
   population$groups <- declaration
-  if (!isTRUE(declaration$group$ancestry)) population$ancestry <- NULL
+  # Keep ancestry only for dimensions that track it.
+  if (!is.null(population$ancestry)) {
+    ancestry <- as_ancestry_list(population$ancestry, declaration)
+    ancestry <- ancestry[intersect(names(ancestry), tracked_ancestry(declaration))]
+    population$ancestry <- if (length(ancestry)) ancestry else NULL
+  }
   validate_group_declaration(declaration, population)
   population
 }
@@ -142,9 +141,17 @@ model_groups <- function(model) {
   if (!is.null(model$groups)) model$groups else model$population$groups
 }
 
-# Is a dimension declared for this population (or bare persons table)?
-declared_group <- function(population, name = "group") {
-  inherits(population, "hammel_population") && name %in% names(population$groups)
+# Is a group dimension (any, or the named one) declared for this population?
+declared_group <- function(population, name = NULL) {
+  inherits(population, "hammel_population") &&
+    (if (is.null(name)) length(population$groups) > 0L else name %in% names(population$groups))
+}
+
+# The name of a population's single declared dimension, for features that use
+# one dimension (transitions, matching, observation by group); NULL otherwise.
+single_dimension <- function(population) {
+  if (inherits(population, "hammel_population") && length(population$groups) == 1L)
+    names(population$groups) else NULL
 }
 
 # Check a declaration against a population's persons and transition history.
@@ -153,8 +160,13 @@ validate_group_declaration <- function(declaration, population) {
   for (name in names(declaration)) {
     if (!name %in% names(persons))
       stop(sprintf("Declared group `%s` is not a persons column.", name), call. = FALSE)
-    check_groups(persons, "persons")
+    check_groups(tibble::tibble(group = persons[[name]]), paste0("persons$", name))
     categories <- declaration[[name]]$categories
+    # Ancestry tables name their columns by category.
+    if (isTRUE(declaration[[name]]$ancestry) &&
+        any(c("unknown", "person_id") %in% as.character(c(persons[[name]], categories))))
+      stop(sprintf("Group `%s` tracks ancestry, so its categories cannot be named `unknown` and `person_id`.",
+                   name), call. = FALSE)
     if (!is.null(categories)) {
       values <- unique(as.character(c(persons[[name]],
         population$transitions$group_origin, population$transitions$group_dest)))
@@ -164,13 +176,19 @@ validate_group_declaration <- function(declaration, population) {
                      paste(missing, collapse = ", ")), call. = FALSE)
     }
   }
-  if (!"group" %in% names(declaration)) {
-    if (!is.null(population$transitions) && nrow(population$transitions))
-      stop("Transition histories require a declared group dimension.", call. = FALSE)
-    if (!is.null(population[["ancestry"]]))
+  if (!length(declaration) && !is.null(population$transitions) && nrow(population$transitions))
+    stop("Transition histories require a declared group dimension.", call. = FALSE)
+  if (!is.null(population[["ancestry"]])) {
+    tracked <- tracked_ancestry(declaration)
+    if (!length(declaration))
       stop("Ancestry requires a declared group dimension with `ancestry = TRUE`.", call. = FALSE)
-  } else if (!is.null(population[["ancestry"]]) && !isTRUE(declaration$group$ancestry)) {
-    stop("An ancestry table requires `ancestry = TRUE` for its group dimension.", call. = FALSE)
+    if (!length(tracked))
+      stop("An ancestry table requires `ancestry = TRUE` for its group dimension.", call. = FALSE)
+    ancestry <- as_ancestry_list(population[["ancestry"]], declaration)
+    extra <- setdiff(names(ancestry), tracked)
+    if (length(extra))
+      stop(sprintf("Ancestry is supplied for %s, which does not track ancestry (`ancestry = TRUE`).",
+                   paste0("`", extra, "`", collapse = ", ")), call. = FALSE)
   }
   invisible(declaration)
 }

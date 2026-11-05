@@ -122,7 +122,7 @@ Grouped populations also have an `ancestry` tibble, or may supply it explicitly
 to `hammel_population(ancestry = ...)`. Initialization uses recorded identities
 only when proportions are absent. The engine keeps call-local row-major numeric
 ancestry shares, appending parental averages at each birth; it returns the table
-in person order with `group_<label>` columns and `unknown`. Missing fathers
+in person order as one tibble per tracked dimension, with a column per category and `unknown`. Missing fathers
 contribute half to unknown. Death and restart retain existing shares. This
 requires work per birth and storage per person proportional to the number of
 components; it does not traverse the genealogy or draw random numbers. See
@@ -147,8 +147,9 @@ its numerator. See [demographic analysis](demographic-analysis.md).
 `set_union_dissolution(model, rates, weights = NULL)` attaches the
 optional duration-hazard process (D078). Public bands use `dur_start` and
 `dur_end`; preparation maps a private copy to duration cells (D128). The
-couple's unordered group pair selects schedules (D079). Public `group_pair`
-labels are normalized; private lookup uses both partners' identity indices.
+wife's and husband's categories select schedules through directional
+`<group>_w`/`<group>_h` columns (D134; this replaced D079's symmetric
+`group_pair`).
 Each active union is a unit in the dissolution cells, unaffected by births;
 birth wins a tie, then dissolution can execute at the same instant. Death
 closes the union and removes it from the cells. Dissolution restores both

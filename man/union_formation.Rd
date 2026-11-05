@@ -56,9 +56,9 @@ with selection weight halving five years on either side.}
 \item{rates}{For \code{"rate"} initiation, an age-specific female search-hazard
 table with \code{age_start}, \code{age_end}, and \code{rate}, in years and per person-year.
 These specify search attempts, not guaranteed realized union formation.
-An optional \code{group} column selects the woman's group (requires a declared
-group dimension). Without it, all groups share the schedule. Group does
-not restrict partner matching.
+Columns named by declared group dimensions select the woman's categories;
+without them, all groups share the schedule. Groups do not restrict
+partner matching.
 See \code{\link[=mortality]{mortality()}} for group-label and rate-coverage rules.
 Nonoverlapping bands may have gaps or an open end; gaps and ages outside
 support have zero hazard. Optional \code{previous_union} supplies either
@@ -122,7 +122,8 @@ schedule; NULL shares the general \code{matching} model active at that search. M
 weights using their own intensities and share the available male pool.}
 
 \item{union_convert_rate}{Optional age- or duration-specific conversion table,
-optionally by woman's group. Duration uses the current cohabitation start.
+optionally by the partners' categories (\verb{<group>_w}, \verb{<group>_h} for a
+declared dimension). Duration uses the current cohabitation start.
 Uses \code{rate} and either age or duration boundaries, not both clocks, with no
 previous-union axis. NULL gives no conversions and warns at simulation.
 Conversion keeps partners, closes cohab with reason \code{conversion}, and starts

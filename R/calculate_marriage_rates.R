@@ -28,7 +28,10 @@
 calculate_marriage_rates <- function(population, time_breaks, age_breaks, by = NULL,
                                      conf.level = NULL, pool_dissolved = FALSE) {
   validate_rate_conf_level(conf.level)
+  alias <- observation_alias(population, by)
+  population <- alias$population
+  by <- alias$by
   by <- check_by(by, c("group", "previous_union"), "calculate_marriage_rates")
-  calculate_entry_rates(population, time_breaks, age_breaks, by, dur_breaks = NULL,
-    marriage_measure = TRUE, conf.level = conf.level, pool_dissolved = pool_dissolved)
+  rename_group_columns(calculate_entry_rates(population, time_breaks, age_breaks, by, dur_breaks = NULL,
+    marriage_measure = TRUE, conf.level = conf.level, pool_dissolved = pool_dissolved), alias$rename)
 }

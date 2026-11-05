@@ -31,6 +31,9 @@ calculate_cohab_convert_rate <- function(population, time_breaks,
                                          dur_breaks = NULL, age_breaks = NULL,
                                          by = NULL, conf.level = NULL) {
   validate_rate_conf_level(conf.level)
+  alias <- observation_alias(population, by, c("_w", "_h"))
+  population <- alias$population
+  by <- alias$by
   by <- check_by(by, c("group_w", "group_h"), "calculate_cohab_convert_rate")
   if (!inherits(population, "hammel_population"))
     stop("`population` must be a hammel_population with typed union histories.", call. = FALSE)
@@ -62,5 +65,5 @@ calculate_cohab_convert_rate <- function(population, time_breaks,
   result$conversions <- counts$dissolutions[rows$.index]
   result$rate_cohab_convert <- as.numeric(ifelse(result$union_years > 0,
     result$conversions / result$union_years, NA_real_))
-  add_rate_confidence(result, "conversions", "union_years", conf.level)
+  rename_group_columns(add_rate_confidence(result, "conversions", "union_years", conf.level), alias$rename)
 }

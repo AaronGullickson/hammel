@@ -12,8 +12,8 @@ histories, such as the result of \code{\link[=simulate]{simulate()}}.}
 }
 \value{
 A separate tibble with all union columns plus \code{birth_time_w},
-\code{death_time_w}, \code{birth_time_h}, and \code{death_time_h}. When group is present,
-also \code{group_w} and \code{group_h}. Suffixes \verb{_w} and \verb{_h} identify wives and
+\code{death_time_w}, \code{birth_time_h}, and \code{death_time_h}, plus \verb{<group>_w} and
+\verb{<group>_h} for each declared group dimension. Suffixes \verb{_w} and \verb{_h} identify wives and
 husbands. Empty union histories retain the enriched column types.
 }
 \description{
@@ -24,7 +24,8 @@ population and its union table are not modified. No known endpoint is needed.
 }
 \details{
 Dates remain in years. Missing death times denote people alive at the recorded
-endpoint. Group columns are omitted unless a group dimension is declared;
+endpoint. Each declared group dimension adds its wife's and husband's
+categories (\verb{<group>_w}, \verb{<group>_h}); undeclared columns are not added;
 otherwise their types are preserved. Groups are reconstructed at each union's
 start from retained transitions; later moves do not relabel earlier unions.
 A transition at the exact formation time follows formation, so its origin

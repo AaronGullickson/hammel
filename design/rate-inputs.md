@@ -23,7 +23,7 @@ columns do not automatically create supported rate strata.
 | Mortality: `set_mortality(model, rates)` | Age only | `sex`: both `m` and `f` | Individual `group` |
 | Fertility: `set_fertility(model, rates)` | Age only | Women; no `sex` column | Mother's `group`; `union_type`; current-parity bands `parity_start`/`parity_end` |
 | Union-search attempts: `set_union_formation(model, "rate", rates = rates)` | Age, or duration since the most recent partnership ended | Currently unpartnered women | Woman's `group`; `previous_union`: `none`, `separated`, `widowed` |
-| Union dissolution: `set_union_dissolution(model, rates)` | Duration since the current union episode began | One risk per union, carried by the woman | Symmetric `group_pair`; `union_type`: `cohab`/`marriage` |
+| Union dissolution: `set_union_dissolution(model, rates)` | Duration since the current union episode began | One risk per union, carried by the woman | Directional `<group>_w`/`<group>_h`; `union_type`: `cohab`/`marriage` |
 | Cohabitation-to-marriage conversion: `union_convert_rate` on union formation | Woman's age or duration since the current cohabitation began | Currently cohabiting women | Woman's `group` |
 | Individual group transitions: `set_group_transition(model, rates)` | Age or duration since latest group entry; age without earlier transition history | Directed `group_origin` and `group_dest` | `sex`; current `union_type` |
 
@@ -91,11 +91,12 @@ See [remarriage schedules](remarriage.md) and [cohabitation](cohabitation.md).
 
 ### Union dissolution
 
-`group_pair` is symmetric: `A:B` and `B:A` select the same rate. Pair-stratified
-tables must cover all unordered pairs in the possible identity registry.
-There are no directional wife-group/husband-group strata. If `union_type` is
-supplied, both `cohab` and `marriage` schedules are required within each pair
-stratum; omission shares rates across types. Duration gaps have zero hazard.
+Group strata are directional: `<group>_w` and `<group>_h` hold the wife's and
+husband's categories of a declared dimension, and either may be omitted to
+pool over it. A symmetric rate lists both directions. Stratified tables must
+cover every combination of the used columns' categories, including future
+identities. If `union_type` is supplied, both `cohab` and `marriage` schedules
+are required within each group stratum; omission shares rates across types. Duration gaps have zero hazard.
 
 Rates are per union-year, with one clock per episode. Conversion closes the
 cohabitation and starts a marriage episode with dissolution duration zero.

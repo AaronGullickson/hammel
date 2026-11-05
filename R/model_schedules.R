@@ -55,14 +55,12 @@ collect_model_bank <- function(arguments) {
 }
 
 # One shared identity registry and model bank for the entire native invocation.
-prepare_model_schedules <- function(arguments, population, start, end) {
-  first <- prepare_group_inheritance(model_at(arguments$inheritance, start), population)
-  values <- first$values
+prepare_model_schedules <- function(arguments, values, components, start, end) {
   matching_bank <- collect_model_bank(arguments[c("matching", "father_matching", "cohab_matching")])
   inheritance_bank <- collect_model_bank(arguments["inheritance"])
   prepared_matching <- lapply(matching_bank, prepare_matching_model, population_groups = values)
   prepared_inheritance <- lapply(inheritance_bank, prepare_group_inheritance,
-    population = population, registry = values)
+    values = values, components = components)
   times <- start
   for (x in arguments) if (is_model_schedule(x)) times <- c(times, x$time_start, x$time_end)
   times <- sort(unique(times[times >= start & (times < end | times == start)]))

@@ -37,22 +37,24 @@ effects within existing strata, for example different group effects for
 partnered and unpartnered fertility, stratify each subset and bind the
 results with \code{\link[=rbind]{rbind()}}.
 
-Columns in \code{by} must be stratum columns used by Hammel rate tables:
-\code{sex}, \code{group}, \code{union_type}, \code{previous_union}, \code{group_pair},
-\code{group_origin} or \code{group_dest}. Each process setter checks the table's
-columns, however it was built, and rejects stratum columns its process does
-not support: mortality accepts \code{sex} and \code{group}; fertility \code{group} and
-\code{union_type}; union searches \code{group} and \code{previous_union}; conversion
-\code{group}; dissolution \code{group_pair} and \code{union_type}; group transitions
-\code{group_origin}, \code{group_dest}, \code{sex} and \code{union_type}.
+Columns in \code{by} are either built-in strata (\code{sex}, \code{union_type},
+\code{previous_union}, \code{group_origin}, \code{group_dest}) or group dimensions
+declared with \code{\link[=set_groups]{set_groups()}}: a dimension's name (such as \code{race}) for
+person-level rates, or \verb{<name>_w} and \verb{<name>_h} (the wife's and husband's
+categories) for dissolution and conversion rates. Band, rate and calendar
+columns cannot be added. Process setters reject built-in strata their
+process does not support: mortality accepts \code{sex}; fertility \code{union_type};
+union searches \code{previous_union}; dissolution \code{union_type}; group
+transitions \code{group_origin}, \code{group_dest}, \code{sex} and \code{union_type}. Group
+columns are checked against the declaration at simulation.
 }
 \examples{
 mortality_rates <- data.frame(sex = c("m", "f"), age_start = 0,
   age_end = Inf, rate = c(0.01, 0.008))
-# Group A has 20\% higher mortality than reference group B.
-stratify_rates(mortality_rates, list(group = c(A = 1.2, B = 1)))
+# Race A has 20\% higher mortality than reference race B.
+stratify_rates(mortality_rates, list(race = c(A = 1.2, B = 1)))
 
-# Exogamous unions dissolve twice as often.
+# Unions of an A wife and a B husband dissolve twice as often.
 dissolution <- data.frame(dur_start = 0, dur_end = Inf, rate = 0.02)
-stratify_rates(dissolution, list(group_pair = c("A:A" = 1, "A:B" = 2, "B:B" = 1)))
+stratify_rates(dissolution, list(race_w = c(A = 1, B = 1), race_h = c(A = 2, B = 1)))
 }

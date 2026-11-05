@@ -18,13 +18,16 @@ test_that("group() validates its settings and normalizes inheritance", {
   expect_error(group(inheritance = "bogus"), "method")
 })
 
-test_that("declarations name one dimension, which must not be reserved", {
+test_that("declarations name dimensions, which must not be reserved", {
   model <- declaration_model()
   expect_error(set_groups(model, sex = group()), "reserved")
   expect_error(set_groups(model, race_w = group()), "reserved")
   expect_error(set_groups(model, partner_race = group()), "reserved")
-  expect_error(set_groups(model, race = group()), "named `group`")
-  expect_error(set_groups(model, group = group(), region = group()), "one group dimension")
+  expect_error(set_groups(model, race = group()), "not a persons column")
+  expect_error(set_groups(model, group = group(), group = group()), "unique")
+  model$population$persons$region <- rep(c("N", "S"), length.out = nrow(model$population$persons))
+  m <- set_groups(model, group = group(), region = group())
+  expect_named(m$population$groups, c("group", "region"))
   expect_error(set_groups(model, group()), "names")
   expect_error(set_groups(model, group = "mother"), "group\\(\\)")
   expect_error(hammel_population(model$population$persons, end_time = 0, groups = 1), "groups")
@@ -94,8 +97,9 @@ test_that("ancestry is tracked only when requested", {
   plain <- simulate(set_groups(model, group = group()), 1, seed = 6)
   expect_null(plain$ancestry)
   tracked <- simulate(set_groups(model, group = group(ancestry = TRUE)), 1, seed = 6)
-  expect_s3_class(tracked$ancestry, "tbl_df")
-  expect_identical(tracked$ancestry$person_id, tracked$persons$person_id)
+  expect_named(tracked$ancestry, "group")
+  expect_s3_class(tracked$ancestry$group, "tbl_df")
+  expect_identical(tracked$ancestry$group$person_id, tracked$persons$person_id)
   expect_identical(histories(plain)[c("persons", "unions")], histories(tracked)[c("persons", "unions")])
   expect_error(simulate(set_groups(model, group = group(inheritance = "ancestry")), 1),
                "ancestry = TRUE")
@@ -115,7 +119,7 @@ test_that("baseline populations sample independent or joint group distributions"
   expect_named(joint$groups, "group")
   for (bad in list(data.frame(group = "A"), data.frame(weight = 1), data.frame(group = "A", weight = -1),
                    data.frame(group = NA, weight = 1), list(), list(group = c(1, 2)),
-                   list(race = c(A = 1)), c(A = 1)))
+                   list(sex = c(A = 1)), c(A = 1)))
     expect_error(create_baseline_population(10, groups = bad))
   # An empty baseline keeps its typed column and declaration.
   empty <- create_baseline_population(0, groups = data.frame(group = c("A", "B"), weight = 1))

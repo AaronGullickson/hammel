@@ -158,8 +158,8 @@ test_that("inheritance switches newborn identity without relabeling older people
   expect_gt(sum(kids$birth_time >= .25), 5)
   expect_true(all(kids$group == ifelse(kids$birth_time < .25, "A", "B")))
   expect_equal(out$persons$group[1:2], c("A", "B"))
-  expect_equal(out$ancestry$group_A[-c(1,2)], rep(.5, nrow(kids)))
-  expect_equal(out$ancestry$group_B[-c(1,2)], rep(.5, nrow(kids)))
+  expect_equal(out$ancestry$group$A[-c(1,2)], rep(.5, nrow(kids)))
+  expect_equal(out$ancestry$group$B[-c(1,2)], rep(.5, nrow(kids)))
   expect_equal(out$unions[, names(m$population$unions)], m$population$unions)
 })
 
@@ -179,7 +179,7 @@ test_that("future custom identities use a common registry and require complete m
   out <- simulate(m, .5, seed = 32)
   kids <- out$persons[out$persons$birth_time >= 0, ]
   expect_true(all(kids$group == ifelse(kids$birth_time < .25, "A", "C")))
-  expect_equal(out$ancestry$group_A[-c(1,2)], rep(.5, nrow(kids)))
+  expect_equal(out$ancestry$group$A[-c(1,2)], rep(.5, nrow(kids)))
   bad <- m
   rates <- bad$processes$mortality$rates
   bad <- set_mortality(bad, rbind(transform(rates, group = "A"), transform(rates, group = "B")))

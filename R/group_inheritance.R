@@ -23,7 +23,8 @@
 #'   (logical union status at birth, including on-demand formation). Nonmarital
 #'   births and unknown fathers give FALSE. Older callbacks without this new
 #'   argument or `...` remain supported. Use `...` for unused inputs.
-#'   Ancestry vectors have `group_<label>`/`unknown` names. A missing father has
+#'   Ancestry vectors (the dimension's own shares, when it tracks ancestry)
+#'   are named by category and `unknown`. A missing father has
 #'   NA group and NULL ancestry. Return exactly one nonmissing identity in the
 #'   possible group set. Ordinary R random draws are supported; functions must
 #'   not mutate simulation/global state. Invalid returns and errors fail.
@@ -105,26 +106,15 @@ extend_identity_groups <- function(values, additions) {
   c(as.character(values), extra)
 }
 
-prepare_group_inheritance <- function(model, population, registry = NULL) {
+# Engine form of one dimension's inheritance rule. `values` are the
+# dimension's categories and `components` its ancestry columns (categories
+# with shares, then unknown), empty when ancestry is not tracked.
+prepare_group_inheritance <- function(model, values, components = character()) {
   model <- normalize_group_inheritance(model)
-  if (!"group" %in% names(population$persons)) {
-    values <- NULL
-  } else {
-    values <- unique(population$persons$group)
-    values <- extend_identity_groups(values, population$.transition_groups)
-    ancestry <- population[["ancestry"]]
-    known <- setdiff(names(ancestry), c("person_id", "unknown"))
-    positive <- known[vapply(ancestry[known], function(x) any(x > 0), logical(1))]
-    values <- extend_identity_groups(values, substring(positive, 7L))
-    # Declared categories are the complete, ordered list.
-    if (!is.null(population$.group_categories)) values <- population$.group_categories
-  }
-  if (!is.null(registry)) values <- registry
   labels <- as.character(values)
-  components <- setdiff(names(population[["ancestry"]]), "person_id")
   ranks <- match(labels, as.character(model$order)) - 1L
   ranks[is.na(ranks)] <- -1L
-  ancestry_groups <- match(substring(setdiff(components, "unknown"), 7L), labels) - 1L
+  ancestry_groups <- match(setdiff(components, "unknown"), labels) - 1L
   ancestry_groups[is.na(ancestry_groups)] <- -1L
   custom <- function(mother, father, sex, maternal, paternal, child, parents_in_union) {
     inputs <- list(

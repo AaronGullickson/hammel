@@ -61,8 +61,8 @@ test_that("built-in inheritance uses parents and newborn sex", {
       same_sex = ifelse(children$sex == "f", "A", "B"),
       opposite_sex = ifelse(children$sex == "f", "B", "A"))
     expect_identical(children$group, expected)
-    shares <- result$ancestry[result$persons$birth_time >= 0, ]
-    expect_true(all(shares$group_A == 0.5 & shares$group_B == 0.5))
+    shares <- result$ancestry$group[result$persons$birth_time >= 0, ]
+    expect_true(all(shares$A == 0.5 & shares$B == 0.5))
   }
 })
 
@@ -124,16 +124,16 @@ test_that("ancestry assignment conditions on known shares and handles all-unknow
   # Both parents identify A, but carry a known B reference component.
   p <- model$population$persons
   p$group <- "A"
-  a <- data.frame(person_id = p$person_id, group_A = 0.35, group_B = 0.15, unknown = 0.5)
+  a <- data.frame(person_id = p$person_id, A = 0.35, B = 0.15, unknown = 0.5)
   model <- set_population(model, hammel_population(p, end_time = 0, ancestry = a,
     groups = list(group = group(ancestry = TRUE))))
   result <- simulate(model, 1, seed = 52)
   children <- inheritance_children(result)
   expect_lt(abs(mean(children$group == "A") - 0.7), 5 * sqrt(0.7*0.3/nrow(children)))
-  expect_true(all(result$ancestry$unknown == 0.5))
-  model$population$ancestry$group_A <- 0
-  model$population$ancestry$group_B <- 0
-  model$population$ancestry$unknown <- 1
+  expect_true(all(result$ancestry$group$unknown == 0.5))
+  model$population$ancestry$group$A <- 0
+  model$population$ancestry$group$B <- 0
+  model$population$ancestry$group$unknown <- 1
   model$processes$fertility$rates$rate <- 20
   maternal <- model; maternal$groups$group$inheritance <- create_group_inheritance()
   expect_identical(histories(simulate(model, 1, seed = 52)), histories(simulate(maternal, 1, seed = 52)))
@@ -143,9 +143,9 @@ test_that("custom callbacks receive copies of all inputs and use the unified R R
   custom <- create_group_inheritance("custom", fun = function(mother_group, father_group,
       mother_ancestry, father_ancestry, child_ancestry, child_sex) {
     stopifnot(mother_group == "A", father_group == "B", child_sex %in% c("m", "f"),
-      identical(names(child_ancestry), c("group_A", "group_B", "unknown")),
-      mother_ancestry[["group_A"]] == 1, father_ancestry[["group_B"]] == 1,
-      child_ancestry[["group_A"]] == 0.5)
+      identical(names(child_ancestry), c("A", "B", "unknown")),
+      mother_ancestry[["A"]] == 1, father_ancestry[["B"]] == 1,
+      child_ancestry[["A"]] == 0.5)
     mother_ancestry[] <- 0 # Copied values cannot alter engine ancestry.
     if (runif(1) < 0.5) mother_group else father_group
   })
@@ -163,7 +163,7 @@ test_that("custom callbacks receive copies of all inputs and use the unified R R
   expect_identical(.Random.seed, after)
   # Multinomial-logit-style ancestry probabilities can be implemented in R.
   rule <- create_group_inheritance("custom", fun = function(child_ancestry, ...) {
-    weights <- exp(c(A = child_ancestry[["group_A"]], B = child_ancestry[["group_B"]]))
+    weights <- exp(c(A = child_ancestry[["A"]], B = child_ancestry[["B"]]))
     sample(names(weights), 1, prob = weights)
   })
   expect_no_error(simulate(inheritance_test_model(rule), 1, seed = 52))
@@ -185,10 +185,10 @@ test_that("custom mixed identities are declared, use their own schedules, and re
   expect_gt(nrow(children), 0)
   expect_true(all(children$group == "AB"))
   expect_true(all(!is.na(children$death_time)))
-  expect_false("group_AB" %in% names(result$ancestry))
-  expect_true(all(result$ancestry$group_A[result$persons$birth_time >= 0] == 0.5))
+  expect_false("AB" %in% names(result$ancestry$group))
+  expect_true(all(result$ancestry$group$A[result$persons$birth_time >= 0] == 0.5))
   continued <- simulate(set_population(model, result), 0.5, seed = 53)
-  expect_identical(continued$ancestry[seq_len(nrow(result$ancestry)), ], result$ancestry)
+  expect_identical(continued$ancestry$group[seq_len(nrow(result$ancestry$group)), ], result$ancestry$group)
 })
 
 test_that("future identities are checked against rates and categorical matching before execution", {
@@ -206,13 +206,12 @@ test_that("future identities are checked against rates and categorical matching 
   # Positive reference shares also infer identities; zero-only columns do not.
   model <- inheritance_test_model()
   model <- set_population(model, hammel_population(model$population$persons, end_time = 0, groups = if ("group" %in% names(model$population$persons)) "group"))
-  model$population$ancestry$group_C <- 0
-  model$population$ancestry$group_D <- 0
-  prepared <- prepare_group_inheritance(model$groups$group$inheritance, model$population)
-  expect_identical(prepared$values, c("A", "B"))
-  model$population$ancestry$group_A[1] <- 0.5
-  model$population$ancestry$group_C[1] <- 0.5
-  expect_identical(prepare_group_inheritance(model$groups$group$inheritance, model$population)$values, c("A", "B", "C"))
+  model$population$ancestry$group$C <- 0
+  model$population$ancestry$group$D <- 0
+  expect_identical(group_registries(model$population)$group, c("A", "B"))
+  model$population$ancestry$group$A[1] <- 0.5
+  model$population$ancestry$group$C[1] <- 0.5
+  expect_identical(group_registries(model$population)$group, c("A", "B", "C"))
 })
 
 test_that("custom errors and invalid returns restore explicit RNG state", {
@@ -256,7 +255,7 @@ test_that("numeric identities remain numeric, and empty populations stay typed",
   result <- simulate(model, 1, seed = 52)
   expect_equal(nrow(result$persons), 0)
   expect_type(result$persons$group, "integer")
-  expect_s3_class(result$ancestry, "tbl_df")
+  expect_s3_class(result$ancestry$group, "tbl_df")
 })
 
 test_that("new AB identities are available to categorical partner matching during the run", {

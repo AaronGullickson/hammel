@@ -55,8 +55,9 @@ status schedules.
 Optional \code{\link[=union_dissolution]{union_dissolution()}} adds one duration-dependent annual hazard per
 union, unaffected by births. It ends the episode with \code{end_reason = "dissolution"}, and restores unpartnered
 availability and fertility/search eligibility. Exact ties select death,
-birth, dissolution, conversion, search, then group transition. Dissolution \code{group_pair} schedules and
-multipliers use symmetric pairings of both partners' groups. Rate-based
+birth, dissolution, conversion, search, then group transition. Dissolution
+and conversion rates may use the wife's and husband's categories
+(\verb{<group>_w}, \verb{<group>_h}). Rate-based
 formation optionally selects age/duration schedules using \code{previous_union}:
 none, separated, or widowed (or pooled none/dissolved). Duration origins and categories are recovered
 from recorded histories.
@@ -90,10 +91,11 @@ cannot occur because a cell has no eligible member are counted in
 \code{simulation$unrealized_births}. Fertility outside supplied bands is zero. Mortality must cover all ages for both sexes, ending at \code{Inf}.
 
 Events are recorded at their sampled times in \verb{[start, start + years)}. Rates and all
-times remain in person-year and year units. Newborn group identity uses
-fertility's inheritance model (random parent by default, with maternal fallback), if groups are present;
-other newborn custom columns are missing. Grouped rate
-tables use each person's group (the woman's group for union searches).
+times remain in person-year and year units. Newborns get a category in each
+declared group dimension from its \code{\link[=group]{group()}} inheritance rule (random parent
+by default, with maternal fallback); other newborn custom columns are
+missing. Rate tables stratify by the dimensions they have columns for (the
+woman's categories for union searches).
 Ungrouped tables apply to everyone. Missing population groups in a grouped
 rate table are errors. Groups must be declared (\code{\link[=set_groups]{set_groups()}}); a grouped
 table without a declared group dimension is an error.

@@ -39,19 +39,18 @@ preserved. Sex, age and union-status columns are rejected. Optional
 `time_start`/`time_end` bands follow [the rate contract](time-varying-rates.md)
 (D118); calendar changes retain the union-duration origin.
 
-An optional `group_pair` column gives symmetric pair labels, e.g. `A:A`,
-`A:B`, `B:B`. Pair order is normalized using character labels in radix order,
-so `B:A` selects the same schedule as `A:B`. A pair-stratified table must cover
-all unordered pairs from the possible identity registry, including future
-identities. Missing pairs error, rather than silently imply zero risk. Within
-each pair, gaps still mean zero risk. Shared rates omit `group_pair`. Bare
-`group`, `group_w`, and `group_h` schedule columns are rejected. Pair names
-require two nonempty colon-free labels separated by a single colon.
+Optional `<group>_w` and `<group>_h` columns, for any declared group dimension
+(D134), select schedules by the wife's and husband's categories. Strata are
+directional: a symmetric rate lists both `A`/`B` and `B`/`A` rows. Either
+column may be omitted to pool over that partner. A stratified table must cover
+every combination of the used columns' categories, including future
+identities. Missing combinations error, rather than silently imply zero risk.
+Within each stratum, gaps still mean zero risk. A bare dimension column or the
+former `group_pair` is an error at simulation, as is a column for an
+undeclared dimension.
 
-Proportional pair effects are written with `stratify_rates()` (D132), for
-example `stratify_rates(rates, list(group_pair = c("A:A" = 1, "A:B" = 2, "B:B" = 1)))`,
-which must list every pair. Without population groups, pair-stratified rates
-warn and use the first canonical pair alphabetically. The input table, its
+Proportional effects are written with `stratify_rates()` (D132), for example
+`stratify_rates(rates, list(group_w = c(A = 1, B = 2)))`. The input table, its
 ordering and provenance remain unchanged.
 
 Illustrative input, not a demographic default:
@@ -197,7 +196,7 @@ or demographic rate is supplied by this implementation.
 
 
 D086 adds optional union_type cohab/marriage strata within each shared or
-symmetric group_pair schedule. Supply both when stratifying; without the column,
+group-stratified schedule. Supply both when stratifying; without the column,
 each episode uses the same dissolution schedule. Conversion is not dissolution:
 it ends the cohab episode and starts marriage with a fresh duration clock.
 

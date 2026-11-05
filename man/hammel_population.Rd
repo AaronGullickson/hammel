@@ -27,14 +27,17 @@ links the same-time marriage through \code{previous_cohab_id}.}
 \item{end_time}{Optional finite simulation endpoint in years. Its calendar origin is supplied by the user. \code{NULL} means
 that the endpoint is unknown.}
 
-\item{ancestry}{Optional data frame with exactly one row per person, keyed
-by \code{person_id}, known shares in \verb{group_<label>} columns, and an \code{unknown}
-share. Numeric shares must be finite, between zero and one, and sum to one
-per row (tolerance \code{1e-8}). Supplied shares are preserved, with rows aligned
-to persons. Without it, grouped persons start with 100\% ancestry in their
-recorded group, regardless of parent histories. Without groups, no ancestry
-table is created automatically. Newborns average parental shares; a missing
-parent contributes its half to \code{unknown}. Identity remains separate.}
+\item{ancestry}{Optional ancestry shares for dimensions declared with
+\code{group(ancestry = TRUE)}: a named list with one data frame per such
+dimension (a bare data frame when only one dimension tracks ancestry),
+each with exactly one row per person, keyed by \code{person_id}, one column of
+shares per category (named by the category) and an \code{unknown} share. Shares
+must be finite, between zero and one, and sum to one per row (tolerance
+\code{1e-8}). Supplied shares are preserved, with rows aligned to persons.
+Without them, people start with all their ancestry in their recorded
+category. Newborns average parental shares; a missing parent contributes
+its half to \code{unknown}. Identity remains separate. Categories of a tracked
+dimension cannot be named \code{unknown} or \code{person_id}.}
 
 \item{transitions}{Optional data frame of individual group changes with
 \code{person_id}, \code{time}, \code{group_origin}, and \code{group_dest}. Histories must chain

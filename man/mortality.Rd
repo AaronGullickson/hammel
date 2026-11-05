@@ -52,13 +52,13 @@ schedules are returned as tibbles. A \code{source} attribute on the input table
 is copied to the process's \code{source} field.
 }
 \details{
-An optional \code{group} column supplies separate schedules by nonmissing character
-label or finite numeric code. Without it, rates apply to all groups. Each
-mortality group needs both sexes, and each conditional fertility group needs
-both statuses. Overlap is checked within groups.
-Simulation requires schedules for every category of the declared group
-dimension (see \code{\link[=set_groups]{set_groups()}}); a rate table with a \code{group} column is an
-error when no group is declared.
+Columns named by declared group dimensions (see \code{\link[=set_groups]{set_groups()}}), such as
+\code{race} or \code{region}, supply separate schedules for each combination of their
+categories; dimensions without a column share the schedule. Each mortality
+stratum needs both sexes, and each conditional fertility stratum needs both
+statuses. Overlap is checked within strata. Simulation requires schedules for
+every combination of the categories of the dimensions a table uses; a
+table using an undeclared persons column is an error.
 
 Mortality requires separate schedules for both sexes. Gaps and uncovered
 ages are not filled or interpreted as zero rates. Coverage must be specified

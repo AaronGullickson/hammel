@@ -52,9 +52,12 @@
 calculate_union_rates <- function(population, time_breaks, age_breaks, by = NULL,
                                   dur_breaks = NULL, conf.level = NULL, pool_dissolved = FALSE) {
   validate_rate_conf_level(conf.level)
+  alias <- observation_alias(population, by)
+  population <- alias$population
+  by <- alias$by
   by <- check_by(by, c("group", "previous_union", "union_type"), "calculate_union_rates")
-  calculate_entry_rates(population, time_breaks, age_breaks, by, dur_breaks,
-    marriage_measure = FALSE, conf.level = conf.level, pool_dissolved = pool_dissolved)
+  rename_group_columns(calculate_entry_rates(population, time_breaks, age_breaks, by, dur_breaks,
+    marriage_measure = FALSE, conf.level = conf.level, pool_dissolved = pool_dissolved), alias$rename)
 }
 
 # Union entry (and marriage entry) rates from the shared engine. Formation

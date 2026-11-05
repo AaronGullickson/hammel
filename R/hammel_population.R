@@ -28,14 +28,17 @@
 #'   `person_id`, `time`, `group_origin`, and `group_dest`. Histories must chain
 #'   to current person groups and lie within life dates and the known endpoint.
 #'   Grouped populations always include this tibble, even when empty.
-#' @param ancestry Optional data frame with exactly one row per person, keyed
-#'   by `person_id`, known shares in `group_<label>` columns, and an `unknown`
-#'   share. Numeric shares must be finite, between zero and one, and sum to one
-#'   per row (tolerance `1e-8`). Supplied shares are preserved, with rows aligned
-#'   to persons. Without it, grouped persons start with 100% ancestry in their
-#'   recorded group, regardless of parent histories. Without groups, no ancestry
-#'   table is created automatically. Newborns average parental shares; a missing
-#'   parent contributes its half to `unknown`. Identity remains separate.
+#' @param ancestry Optional ancestry shares for dimensions declared with
+#'   `group(ancestry = TRUE)`: a named list with one data frame per such
+#'   dimension (a bare data frame when only one dimension tracks ancestry),
+#'   each with exactly one row per person, keyed by `person_id`, one column of
+#'   shares per category (named by the category) and an `unknown` share. Shares
+#'   must be finite, between zero and one, and sum to one per row (tolerance
+#'   `1e-8`). Supplied shares are preserved, with rows aligned to persons.
+#'   Without them, people start with all their ancestry in their recorded
+#'   category. Newborns average parental shares; a missing parent contributes
+#'   its half to `unknown`. Identity remains separate. Categories of a tracked
+#'   dimension cannot be named `unknown` or `person_id`.
 #'
 #' @return A named list of class `hammel_population` with components `persons`,
 #'   `unions`, and `end_time`, plus an `ancestry` tibble when supplied or when
@@ -167,7 +170,7 @@ validate_population <- function(results) {
     stop("Recorded events must not occur after the population's reference time.",
          call. = FALSE)
   }
-  validate_ancestry(results[["ancestry"]], persons)
+  validate_ancestry(results[["ancestry"]], persons, results$groups)
   invisible(results)
 }
 

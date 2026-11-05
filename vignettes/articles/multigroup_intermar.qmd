@@ -88,7 +88,7 @@ inheritance_models <- tibble(
         if (known <= 0) return(mother_group)
 
         # if we are here then assign as a function of group A ancestry
-        prop_A <- child_ancestry[["group_A"]] / known
+        prop_A <- child_ancestry[["A"]] / known
 
         logits <- c(
           A  = -5.138 + 11.88 * prop_A - 15.3 * prop_A^2 + 9.553 * prop_A^3,
@@ -111,7 +111,7 @@ We will use uneven starting groups of A (85%) and B (15%).
 ```{r}
 #| label: set-base-pop
 pop <- create_baseline_population(200000, end_time = 0,
-                                  groups = list(group = c("A" = 0.85, "B" = 0.15)))
+                                  groups = list(race = c("A" = 0.85, "B" = 0.15)))
 ```
 
 In this case, the 100 year run-in to produce a stable population is included already in the input objects. So, we just need to run the simulation for 300 years to produce the desired result. Note that because I set `end_time = 0` in the baseline population, all of our time increments count up from zero.
@@ -123,8 +123,8 @@ model <- hammel_model() |>
   set_population(pop) |>
   set_mortality(mortality_rates) |>
   set_fertility(fertility_rates) |>
-  set_groups(group = group(categories = c("A", "B", "AB"), ancestry = TRUE,
-                           inheritance = inheritance_models)) |>
+  set_groups(race = group(categories = c("A", "B", "AB"), ancestry = TRUE,
+                          inheritance = inheritance_models)) |>
   set_union_formation("on_demand", matching = matching_models)
 
 runtime <- system.time(pop_final <- simulate(model, 300, 42))
@@ -138,12 +138,12 @@ The simulation takes `r runtime[["elapsed"]]` seconds to run.
 #| label: fig-pop-share-groups
 #| fig-cap: Group share across time in simulation
 
-calculate_population_size(pop_final, seq(0, 300, 5), by = "group") |>
+calculate_population_size(pop_final, seq(0, 300, 5), by = "race") |>
   group_by(time) |>
   mutate(prop = population / sum(population)) |>
   ungroup() |>
-  mutate(group = factor(group, levels = c("A", "B", "AB"))) |>
-  ggplot(aes(x = time, y = prop, fill = group))+
+  mutate(race = factor(race, levels = c("A", "B", "AB"))) |>
+  ggplot(aes(x = time, y = prop, fill = race))+
   geom_area()+
   labs(x = "year", y = "group share")
 ```
@@ -158,8 +158,8 @@ crosstabs <- pop_final |>
   get_detailed_unions() |>
   #mutate(time_period = cut(start_time, breaks = seq(0, 300, 5))) |>
   mutate(time_mid = floor(start_time / 5) * 5 + 2.5) |>
-  count(time_mid, group_w, group_h) |>
-  pivot_wider(names_from = c(group_w, group_h), values_from = n) |>
+  count(time_mid, race_w, race_h) |>
+  pivot_wider(names_from = c(race_w, race_h), values_from = n) |>
   mutate(
     log_odds_A_B = log(A_B) + log(B_A) - log(A_A) - log(B_B),
     se_A_B = sqrt(1 / A_B + 1 / B_A + 1 / A_A + 1 / B_B),
@@ -202,8 +202,8 @@ ratio <- pop_final |>
   get_detailed_unions() |>
   #mutate(time_period = cut(start_time, breaks = seq(0, 300, 5))) |>
   mutate(time_mid = floor(start_time / 5) * 5 + 2.5) |>
-  count(time_mid, group_w, group_h) |>
-  pivot_wider(names_from = c(group_w, group_h), values_from = n) |>
+  count(time_mid, race_w, race_h) |>
+  pivot_wider(names_from = c(race_w, race_h), values_from = n) |>
   mutate(
     ratio_A_B = A_B / B_A,
     se_log = sqrt(1 / A_B + 1 / B_A),
@@ -242,41 +242,41 @@ temp <- tibble(
   pivot_longer(
     cols = starts_with("prob_"), 
     names_prefix = "prob_", 
-    names_to = "group", 
+    names_to = "race", 
     values_to = "prop"
   ) |>
   rename(prop_a_group = prop_A)
 
 pop_final$persons |>
   filter(birth_time >= 100) |>
-  left_join(pop_final$ancestry, by = "person_id") |>
+  left_join(select(pop_final$ancestry$race, person_id, A), by = "person_id") |>
   left_join(
     pop_final$persons |> 
-      select(person_id, group) |> 
-      rename(father_id = person_id, group_father = group),
+      select(person_id, race) |> 
+      rename(father_id = person_id, race_father = race),
     by = "father_id"
   ) |>
   left_join(
     pop_final$persons |> 
-      select(person_id, group) |> 
-      rename(mother_id = person_id, group_mother = group),
+      select(person_id, race) |> 
+      rename(mother_id = person_id, race_mother = race),
     by = "mother_id"
   ) |>
-  filter(!is.na(group_father) & !is.na(group_mother) &
-    group_father != group_mother) |>
+  filter(!is.na(race_father) & !is.na(race_mother) &
+    race_father != race_mother) |>
   mutate(
     prop_a_group = cut(
-      group_A,
+      A,
       breaks = seq(0, 1, 0.1),
       labels = FALSE,
       include.lowest = TRUE
     ) * 0.1 - 0.05
   ) |>
-  group_by(prop_a_group, group) |>
+  group_by(prop_a_group, race) |>
   summarize(n = n()) |>
   mutate(prop = n / sum(n), se = sqrt(prop * (1 - prop) / sum(n))) |>
   ungroup() |>
-  ggplot(aes(x = prop_a_group, y = prop, group = group, color = group))+
+  ggplot(aes(x = prop_a_group, y = prop, group = race, color = race))+
   geom_line(data = temp, linetype = 2)+
   geom_point(alpha = 0.8)+
   geom_linerange(aes(ymin = prop - 1.96 * se, ymax = prop + 1.96 * se), 
@@ -311,8 +311,8 @@ model <- hammel_model() |>
   set_population(pop) |>
   set_mortality(mortality_rates) |>
   set_fertility(fertility_rates) |>
-  set_groups(group = group(categories = c("A", "B", "AB"), ancestry = TRUE,
-                           inheritance = inheritance_models)) |>
+  set_groups(race = group(categories = c("A", "B", "AB"), ancestry = TRUE,
+                          inheritance = inheritance_models)) |>
   set_union_formation("on_demand", matching = matching_models) |>
   set_group_transition(trans_rates)
 
@@ -323,12 +323,12 @@ runtime <- system.time(pop_final <- simulate(model, 300, 42))
 #| label: fig-pop-share-groups-trans
 #| fig-cap: Group share across time in simulation with transition rates
 
-calculate_population_size(pop_final, seq(0, 300, 5), by = "group") |>
+calculate_population_size(pop_final, seq(0, 300, 5), by = "race") |>
   group_by(time) |>
   mutate(prop = population / sum(population)) |>
   ungroup() |>
-  mutate(group = factor(group, levels = c("A", "B", "AB"))) |>
-  ggplot(aes(x = time, y = prop, fill = group))+
+  mutate(race = factor(race, levels = c("A", "B", "AB"))) |>
+  ggplot(aes(x = time, y = prop, fill = race))+
   geom_area()+
   labs(x = "year", y = "group share")
 ```

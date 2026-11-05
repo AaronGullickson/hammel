@@ -13,18 +13,17 @@ set_union_dissolution(model, rates, weights = NULL)
 \item{rates}{A nonempty data frame with numeric \code{dur_start}, \code{dur_end}, and
 \code{rate}. Bands are half-open \verb{[dur_start, dur_end)} in years. Starts and
 rates must be finite and nonnegative; ends must exceed starts and may be
-\code{Inf}. Bands cannot overlap within an unordered group pair. Gaps and
+\code{Inf}. Bands cannot overlap within a stratum. Gaps and
 durations outside support have zero hazard. Sex, age and union-status columns
 are not supported. Input order, custom columns and provenance are retained.
-An optional \code{group_pair} column selects an unordered pair such as \code{"A:A"},
-\code{"A:B"}, or \code{"B:B"}; \code{"A:B"} and \code{"B:A"} select the same schedule.
-Optional \code{union_type} supplies both \code{cohab} and \code{marriage} schedules within
-each pair stratum; without it the same duration risk applies to either type.
-Pair names require nonempty colon-free group labels. Pair-stratified tables
-must cover every unordered pair of possible identities, including future
-ones; they require a declared group dimension. Omit \code{group_pair} for shared rates. \code{group}, \code{group_w} and
-\code{group_h} schedule columns are not supported. Use \code{\link[=stratify_rates]{stratify_rates()}} to add
-proportional pair differences.}
+Optional \verb{<group>_w} and \verb{<group>_h} columns (for a declared group dimension
+such as \code{race}: \code{race_w}, \code{race_h}) select the wife's and husband's
+categories; strata are directional, so A-wife/B-husband and B-wife/A-husband
+are separate. Stratified tables must cover every combination of the
+dimension's categories. Optional \code{union_type} supplies both \code{cohab} and
+\code{marriage} schedules within each stratum; without it the same duration risk
+applies to either type. Use \code{\link[=stratify_rates]{stratify_rates()}} to add proportional
+differences, for example by listing both directions of a pair.}
 
 \item{weights}{NULL (default) for unweighted selection, or a
 \code{\link[=create_weight_model]{create_weight_model()}} using union variables, which chooses which union

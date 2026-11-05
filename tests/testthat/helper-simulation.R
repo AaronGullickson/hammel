@@ -117,3 +117,19 @@ set_inheritance <- function(model, rule, extra = NULL) {
                              inheritance = rule)
   do.call(set_groups, c(list(model), declaration))
 }
+
+# Expand symmetric `group_pair` rate rows ("A:B") into directional rows with
+# `group_w` and `group_h`, both directions sharing the row's rate.
+directional_pairs <- function(rates) {
+  out <- do.call(rbind, lapply(seq_len(nrow(rates)), function(i) {
+    p <- strsplit(as.character(rates$group_pair[i]), ":", fixed = TRUE)[[1]]
+    same <- p[1] == p[2]
+    r <- rates[rep(i, if (same) 1L else 2L), , drop = FALSE]
+    r$group_w <- if (same) p[1] else p
+    r$group_h <- if (same) p[2] else rev(p)
+    r$group_pair <- NULL
+    r
+  }))
+  rownames(out) <- NULL
+  out
+}

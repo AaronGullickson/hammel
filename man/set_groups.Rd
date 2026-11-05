@@ -25,9 +25,6 @@ given before or after \code{\link[=set_population]{set_population()}}; it is che
 population when both are present and at simulation. Simulated populations
 carry it, so analysis and restarts need nothing further.
 }
-\details{
-Currently one dimension, named \code{group}, is supported.
-}
 \examples{
 model <- hammel_model() |>
   set_population(create_baseline_population(100, groups = list(group = c(A = .5, B = .5)))) |>

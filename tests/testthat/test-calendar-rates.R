@@ -203,7 +203,7 @@ test_that("directed transitions compete after a fractional rate boundary", {
   expected <- c(exp(-.5), .4 * (1 - exp(-.5)), .6 * (1 - exp(-.5)))
   actual <- as.numeric(table(factor(out$persons$group, levels = c("A", "B", "C")))) / n
   expect_true(all(abs(actual - expected) < 5 * sqrt(expected * (1 - expected) / n)))
-  expect_equal(out$ancestry$group_A, rep(1, n))
+  expect_equal(out$ancestry$group$A, rep(1, n))
 })
 
 test_that("grouped schedules require future group and pair coverage", {
@@ -214,10 +214,10 @@ test_that("grouped schedules require future group and pair coverage", {
     sex = rep(c("m", "f"), 2), age_start = 0, age_end = Inf, rate = 0), c(0, 0))
   r <- r[!(r$time_start == .5 & r$group == "B"), ]
   expect_error(simulate(set_mortality(m, r), 1), "missing schedules.*B")
-  d <- calendar_epochs(data.frame(group_pair = c("A:A", "A:B", "B:B"),
-    dur_start = 0, dur_end = Inf, rate = 0), c(0, 0))
-  d <- d[!(d$time_start == .5 & d$group_pair == "A:B"), ]
-  expect_error(simulate(set_union_dissolution(m, d), 1), "missing schedules.*A:B")
+  d <- calendar_epochs(directional_pairs(data.frame(group_pair = c("A:A", "A:B", "B:B"),
+    dur_start = 0, dur_end = Inf, rate = 0)), c(0, 0))
+  d <- d[!(d$time_start == .5 & d$group_w == "A" & d$group_h == "B"), ]
+  expect_error(simulate(set_union_dissolution(m, d), 1), "missing schedules.*group_w=A, group_h=B")
 })
 
 test_that("probability calendar columns are accepted and empty populations cross changes", {

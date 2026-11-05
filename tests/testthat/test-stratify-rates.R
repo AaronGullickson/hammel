@@ -51,8 +51,11 @@ test_that("stratify_rates validates its inputs", {
                    list(group = setNames(1, "")), list(group = c(A = "1")), list(group = list(A = 1)),
                    c(group = 1), data.frame(group = 1)))
     expect_error(stratify_rates(rates, bad), "by")
-  expect_error(stratify_rates(rates, list(rate = c(A = 1))), "stratum columns")
-  expect_error(stratify_rates(rates, list(education = c(low = 1))), "not `education`")
+  expect_error(stratify_rates(rates, list(rate = c(A = 1))), "band, rate or calendar")
+  expect_error(stratify_rates(rates, list(age_start = c(A = 1))), "band, rate or calendar")
+  expect_error(stratify_rates(rates, list(`1x` = c(A = 1))), "valid column names")
+  # Any other name may be a group dimension, checked at simulation.
+  expect_named(stratify_rates(rates, list(education = c(low = 1))), c(names(rates), "education"))
   expect_error(stratify_rates(rates, list(sex = c(f = 1))), "already has")
   expect_error(stratify_rates(rates$rate, list(group = c(A = 1))), "data frame")
   expect_error(stratify_rates(data.frame(age_start = 0), list(group = c(A = 1))), "rate")
@@ -73,13 +76,13 @@ test_that("setters reject stratified columns their process does not support", {
     union_convert_rate = stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = 0.1),
                                         list(previous_union = c(none = 1)))), "Conversion")
   expect_error(union_dissolution(stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = 0.1),
-                                                list(group = c(A = 1)))), "Union-dissolution")
+                                                list(sex = c(f = 1)))), "Union-dissolution")
   expect_error(group_transition(stratify_rates(data.frame(group_origin = "A", group_dest = "B",
-    age_start = 0, age_end = Inf, rate = 0.1), list(group = c(A = 1)))), "Group-transition")
+    age_start = 0, age_end = Inf, rate = 0.1), list(previous_union = c(none = 1)))), "Group-transition")
   # The check uses the table's columns, however they were added.
   expect_error(mortality(transform(strata_mortality_rates(), union_type = "cohab")),
                "Mortality rates cannot be stratified by `union_type`")
-  expect_error(union_dissolution(data.frame(group = "A", dur_start = 0, dur_end = Inf, rate = 0.1)),
+  expect_error(union_dissolution(data.frame(sex = "f", dur_start = 0, dur_end = Inf, rate = 0.1)),
                "Union-dissolution")
   # Supported columns pass.
   expect_s3_class(mortality(stratify_rates(data.frame(age_start = 0, age_end = Inf, rate = 0.01),

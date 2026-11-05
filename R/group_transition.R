@@ -54,7 +54,7 @@ validate_group_transition <- function(process) {
   age <- all(c("age_start", "age_end") %in% names(r))
   dur <- all(c("dur_start", "dur_end") %in% names(r))
   if (!nrow(r) || age == dur ||
-      any(c("time_start", "time_end", "union_status", "group", "marital_status") %in% names(r)) ||
+      any(c("time_start", "time_end", "union_status", "marital_status") %in% names(r)) ||
       (age && any(c("dur_start", "dur_end") %in% names(r))) ||
       (dur && any(c("age_start", "age_end") %in% names(r))))
     stop("Use one common age or duration band type for all group transitions.", call. = FALSE)
@@ -76,7 +76,7 @@ validate_group_transition <- function(process) {
       any(!r$union_type %in% c("unpartnered", "partnered", "cohab", "marriage")) ||
       ("partnered" %in% r$union_type && any(r$union_type %in% c("cohab", "marriage")))))
     stop("Transition union_type must use unpartnered/partnered or unpartnered/cohab/marriage.", call. = FALSE)
-  keys <- intersect(c("group_origin", "group_dest", "sex", "union_type"), names(r))
+  keys <- c(intersect(c("group_origin", "group_dest", "sex", "union_type"), names(r)), candidate_strata(r))
   strata <- do.call(interaction, c(lapply(r[keys], as.factor), list(drop = TRUE, lex.order = TRUE)))
   for (rows in split(seq_len(nrow(r)), strata)) {
     rows <- rows[order(start[rows])]
@@ -92,9 +92,10 @@ empty_transitions <- function(groups = character()) {
 }
 
 normalize_population_transitions <- function(population) {
-  if (declared_group(population)) {
+  dimension <- single_dimension(population)
+  if (!is.null(dimension)) {
     if (is.null(population$transitions))
-      population$transitions <- empty_transitions(population$persons$group)
+      population$transitions <- empty_transitions(population$persons[[dimension]])
     else population$transitions <- tibble::as_tibble(population$transitions)
   }
   population
@@ -107,6 +108,8 @@ validate_transition_history <- function(population) {
   check_columns(tx, c("person_id", "time", "group_origin", "group_dest"), "transitions")
   if (nrow(tx) && !declared_group(population))
     stop("Transition histories require a declared group dimension.", call. = FALSE)
+  if (nrow(tx) && is.null(single_dimension(population)))
+    stop("Transition histories require exactly one group dimension for now.", call. = FALSE)
   check_numeric_column(tx$person_id, "transitions$person_id", id = TRUE)
   check_numeric_column(tx$time, "transitions$time")
   for (col in c("group_origin", "group_dest")) check_groups(data.frame(group = tx[[col]]), col)
@@ -121,7 +124,8 @@ validate_transition_history <- function(population) {
     if (anyDuplicated(tx$time[rows]) ||
         (length(rows) > 1L && any(as.character(tx$group_dest[head(rows, -1L)]) !=
                                 as.character(tx$group_origin[tail(rows, -1L)]))) ||
-        as.character(tail(tx$group_dest[rows], 1)) != as.character(p$group[i[rows[1]]]))
+        as.character(tail(tx$group_dest[rows], 1)) !=
+          as.character(p[[single_dimension(population)]][i[rows[1]]]))
       stop("Transition history must chain chronologically to each person's current group.", call. = FALSE)
   }
   invisible(population)
