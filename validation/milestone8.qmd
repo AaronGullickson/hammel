@@ -1,5 +1,5 @@
 ---
-title: "Hammel: Milestone 7 Validation"
+title: "Hammel: Milestone 8 Validation"
 author: "Aaron Gullickson"
 date: today
 format:
@@ -54,11 +54,11 @@ Assess whether a switch to one clock and binned draws for events for each proces
 
 ## Overview of Design
 
-### Original approach at the invividual level
+### Original approach at the individual level
 
 Previously, all waiting times except for fertility were decided at the individual level. For each, process, we draw a value from `rexp(1)` which provides the accumulated risk. Notably, this distribution is identical to $-log(U)$ where $U$ is a draw from a random uniform distribution between 0 and 1. This is the same basic approach that SOCSIM uses.
 
-We then followed a person's piecewise constant hazards across age and time within whatever stratified categories they belonged to and those piecewise hazards consume the risk until we reach zero at an exact time. We then chose the event with the shortest waiting time for a person and added it to the queue of events to process and if they are still alive they redraw another next event in the same way (dissolution and cohabitation conversion are union-based processes that are not redrawn at  the individual level). If something changes that would affect a person's relevant hazard (e.g. getting married) then we cancel their next event and redraw another event, relying on the memoryless featureo of the hazard process. 
+We then followed a person's piecewise constant hazards across age and time within whatever stratified categories they belonged to and those piecewise hazards consume the risk until we reach zero at an exact time. We then chose the event with the shortest waiting time for a person and added it to the queue of events to process and if they are still alive they redraw another next event in the same way (dissolution and cohabitation conversion are union-based processes that are not redrawn at  the individual level). If something changes that would affect a person's relevant hazard (e.g. getting married) then we cancel their next event and redraw another event, relying on the memoryless feature of the hazard process. 
 
 ### Changes to a binned approach for the fertility process
 
@@ -74,7 +74,7 @@ This approach to fertility completely resolved the birth interval issue because 
 
 This approach also allowed us to easy include the heterogeneous fertility feature from SOCSIM where each women had a score and that score was treated as a weight when being sampled from a bin. This allowed for greater variance in fertility across women, while preserving the input rates.
 
-If a bin has women but none of them is eligible, it is removed from the clock's total intensity rate, so no birth can be drawn from it. The births it would have produced in that time ($N_i\lambda_i$ times the time spent without an eligible woman) are recorded separately as expected unrealized births.
+If a bin has women but none of them is eligible, it was removed from the clock's total intensity rate, so no birth can be drawn from it. The births it would have produced in that time ($N_i\lambda_i$ times the time spent without an eligible woman) are recorded separately as expected unrealized births.
 
 Although it resolved the birth interval issue, this approach was slower because we have to track potential changes in bin membership for all women at birthdays. Nonetheless, it was considered a major improvement.
 
@@ -91,22 +91,24 @@ This modification is to track a single waiting time clock for each process rathe
 
 $$\gamma = \sum_i N_i\lambda_i$$
 
-Basically, we sum up all the $\gamma_i$ rates for each bin to get a single $gamma$ intensity rate for the process. We can then figure out waiting time until the next event by taking $E/\gamma$ where $E$ is a draw from `rexp(1)`. If $\gamma$ changes later due to a change in underlying $N_i$ values, then we recompute the reamining waiting time $t$ by taking $t (\gamma_{\text{old}}/\gamma_{\text{new}})$. If, $\gamma$ changes due to a change in $\lambda_i$ due to time-varying rates, then we redraw waiting times from scratch. When an event occurs, we then choose which bin it occurs from by drawing bins weighted by their intensity rate $N_i\lambda_i$. Within each bin, we then draw a random person/union. Then the process fires off a new waiting time. 
+Basically, we sum up all the $\gamma_i$ rates for each bin to get a single $\gamma$ intensity rate for the process. We can then figure out waiting time until the next event by taking $E/\gamma$ where $E$ is a draw from `rexp(1)`. If $\gamma$ changes later due to a change in underlying $N_i$ values, then we recompute the remaining waiting time $t$ by taking $t \cdot (\gamma_{\text{old}}/\gamma_{\text{new}})$. If $\gamma$ changes due to a change in $\lambda_i$, then we redraw waiting times from scratch. When an event occurs, we then choose which bin it occurs from by drawing bins weighted by their intensity rate $N_i\lambda_i$. Within each bin, we then draw a random person/union, possibly with weights that are discussed below. Then the process fires off a new waiting time. 
 
 Using a single clock provided a notable speed improvement that also sped up the original fertility process as well. This approach is still likely to be somewhat slower than the individual process when lots of rates are in use, but can also be faster when lots of time-varying rates are provided because it is easier to apply changes across time.
 
-We still make one additional change for the fertility clock that we don't make for other clocks. Because of the birth interval issue, we use single year age bins and single birth parity bins even when the bands provided are wider because eligibility may vary within a band by age. Because other processes have no similar eligibility limitation, we can use the original age or duration bands for the bins. If we add eligilibity rules for other processes later, we made need to use a similar approach.
+We still make one additional change for the fertility clock that we don't make for other clocks. Because of the birth interval issue, we use single year age bins and single birth parity bins even when the bands provided are wider because eligibility may vary within a band by age. Because other processes have no similar eligibility limitation, we can use the original age or duration bands for the bins. If we add eligibility rules for other processes later, we made need to use a similar approach.
 
-### Allowing sampling weights
+We also changed the way unrealized births are drawn in this milestone. Rather than reporting an expected unrealized birth, we allow bins with no eligible women to contribute to the overall intensity rate and to be selected. If they are selected then a single unrealized birth is recorded. Thus, the `unrealized_births` object produced in the output is now a record of single births not realized due to ineligibility. It will be noisier than expected births, but is simpler to code and is more intuitive for users.
 
-To allow users the ability to create fairly complex relationships between rates and individual or union characteristics, we have added a `weight_model` that can be applied to the `weights` argument of every rate process and is used to determine weights that are then used to draw individuals/unions from within a bin.
+### Using bin sampling weights
+
+To allow users the ability to create fairly complex relationships between rates and individual or union characteristics, we have added a `weight_model` that can be applied to the `weights` argument of every rate process and is used to determine weights that are then used to draw individuals/unions from within a bin. These weights build on the work done for heterogeneous fertility in Milestone 5.
 
 Because weights only affect the likelihood of sampling within the bin and not the selection of the bin itself, this approach will preserve the input rate schedule provided while allowing users to create proportional hazards between individuals/unions. This differs from using stratified rate schedules in two ways:
 
 - Stratified rate schedules will preserve the input rates provided across strata but will not preserve the overall rate schedule when the distribution of the strata shift. Weighting will preserve the overall rate schedule but not the stratum-specific rate schedule.
 - The weighting approach can be used to create complex scenarios where strata are not available or sufficient.
 
-The `weight_model` is specified in a manner analagous to the formulas used for matching models but exposes a wider set of variables for use. Formulas are for the log-weight, so that coefficients correspond to log-hazard ratios. For example, the following code can be used to create a 20% higher rate for group B compared to group A on some rate schedule.
+The `weight_model` is specified in a manner analogous to the formulas used for matching models but exposes a wider set of variables for use. Formulas are for the log-weight, so that coefficients correspond to log-hazard ratios. For example, the following code can be used to create a 20% higher rate for group B compared to group A on some rate schedule.
 
 ```r
 create_weight_model(
@@ -147,7 +149,6 @@ Custom functions slow down processing because they use R rather than C++, but th
 
 : Variables available for use in weight models for person-level processes (mortality, fertility, union search, group transitions) {#tbl-person-vars}
 
-#### Union processes (dissolution, conversion)
 
 | Variable | Type | Values / levels | Notes |
 |---|---|---|---|
@@ -165,22 +166,22 @@ One potential limitation of the weighting approach is sparse cells. When a large
 
 ## Vignette Comparison
 
-All three vignettes were re-run using the new approach and the results, while not identical due to new random seed paths, were subtantively the same and showed all output rates falling consistently close to the input rates.
+All three vignettes were re-run using the new approach and the results, while not identical due to new random seed paths, were substantively the same and showed all output rates falling consistently close to the input rates.
 
 ## Computational Time
 
-To test how much the new approach changes computational time, I re-ran the three current vignettes and recorded the processing time under the old and new approaches.
+To test how much the new approach changes computational time, I re-ran the three current vignettes and recorded the processing time under the old and new approaches. These times are shown in @tbl-runtimes.
 
 | Vignette                      | Simulation | Previous Approach | New Approach   | % Change |
 |-------------------------------|------------|-------------------|----------------|----------|
-| Demographic Transition        | Main       | 45.89 seconds     | 29.546 seconds | -35.6%   |
-| Second Demographic Transition | Constant   | 1.263 seconds     | 1.652 seconds  | 30.7%   |
-| Second Demographic Transition | Changing   | 1.811 seconds     | 2.714 seconds  | 49.8%    |
-| Multigroup Inheritance        | Main       | 36.691 seconds    | 48.689 seconds | 32.7%    |
+| Demographic Transition        | Main       | 45.89 seconds     | 30.768 seconds | -32.9%   |
+| Second Demographic Transition | Constant   | 1.263 seconds     | 1.451 seconds  | 14.9%   |
+| Second Demographic Transition | Changing   | 1.811 seconds     | 1.333 seconds  | -26.5%    |
+| Multigroup Inheritance        | Main       | 36.691 seconds    | 48.907 seconds | 33.3%    |
 
-In the demographic transition vignette, the new approach actually reduces overall processing time by 29.5%. This is likely due to the frequency of time changes to the fertility and mortality schedules in that simulation, which can be faster when using the new approach. In contrast, the remaining simulations which have more complex rate inputs were 25% to 36% longer. 
+: Runtimes for different simulations under the previous and new approach to tracking events {#tbl-runtimes}
 
-The increase in processing time is not insubtantial but is counterbalanced by potential improvements for some simulation scenarios. Overall, the processing time of even a lengthy 300 year simulation (as in the case of Multigroup Inheritance) is still very fast under the new approach.
+The new approach is faster in some situations and slower in others, but does not produce a drastic increase in runtime generally. Simulations with frequent calendar time changes in rates are generally faster under the new approach, while runs with larger populations and single year bins for age may be slower.
 
 ## Weighting Models
 
@@ -244,7 +245,7 @@ calculate_fertility_rates(pop_final, c(0, 100), 12:55, conf.level = 0.95) |>
 
 @fig-fert-rates-overall shows that the overall fertility rate is preserved in the simulation as we expected.
 
-### Dissolution differences by age difference
+### Dissolution differences by spousal age gap
 
 In this simulation, we will use a custom function to allow the risk of dissolution to increase by 5% for every year increase in the absolute age gap between partners. 
 
@@ -425,10 +426,6 @@ The models shows the expected results for the 50-100 and 100-150 periods. In the
 
 For the 0-50 period, we observe that the lower risk is only about 13%. This is a result of the bias from sparse cells of partnered individuals in the initial burn in period that is ultimately resolved.
 
-### Gender ratio in group simulations with intermarriage
-
-This milestone included a significant rewrite of our weighted choice method for balancing intermarriage, so its worth checking that the gender ratios are still coming out in the expected directions.
-
 ## Unit Tests
 
 The following tests have been constructed and are currently all passing.
@@ -445,6 +442,9 @@ knitr::kable(
 ```
 ## Conclusions and Unresolved Limitations
 
+This milestone meets all expectation. The new approach to producing events is working as expected and continues to preserve input rates in the output. The new approach increases runtime slightly in some situations but reduces it in other situations. The weight models are producing the expected proportional hazards in the output.
+
+Remaining limitations include the fact that weights may fail to produce expected difference when bins are sparsely populated and the continued issue of unrealized births in sparse bins.
 
 ## Reproducibility record
 
