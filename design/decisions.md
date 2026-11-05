@@ -1,6 +1,6 @@
 # Decision log
 
-Updated November 2, 2026. Entries retain the choices made at their original
+Updated November 5, 2026. Entries retain the choices made at their original
 dates; each numbered entry now states whether and how it remains current.
 Read [the scientific contract](scientific-contract.md) for implemented behavior,
 not a superseded API or timing statement buried in a historical entry.
@@ -19,7 +19,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Union-status summaries and rate-column names | D046–D048; October 17 `overall` label clarification |
 | Default age-gap matching | October 18 default age-gap matching entry below |
 | Shared kinship and generation-distance exclusions | D036 |
-| Person-year inputs and hazard sampling | D005–D007, D013, D024 |
+| Person-year inputs and hazard sampling | D005–D007, D013, D024; cell scheduling D128 |
 | Population representation, sex labels, public tibbles | D012, D015, D016, D023 |
 | Process constructors/setters | D017, D026 |
 | Database rate products and reusable downloads | D018, D025 |
@@ -30,7 +30,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Two-sex union models and union API restructuring (deferred) | D073 |
 | Duration-dependent dissolution and symmetric group pairs | D078–D079 |
 | Age-specific searches by previous union; separate marriage observations | D080 |
-| Actual-hazard intensity tracking and boundary updates | D082 |
+| Actual-hazard calibration contributions | D082, mechanism replaced by cells under D128 |
 | Age/duration remarriage in one rate table | D083 |
 | Optional duration bands for marriage observations | D084 |
 | Cohabitation design and implementation | D085–D086 |
@@ -43,7 +43,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | PATFR helper and automatic TFR dispatch for parity tables | D097 |
 | History-authoritative parity initialization | D098 |
 | Parity schedule validation and history parity in execution | D099 (correction superseded by D101) |
-| Cell-accounted fertility, the only spacing method | D101 |
+| Cell-accounted fertility, the only spacing method | D101; unrealized-birth counts D128 |
 | Persistent lognormal fertility weights and maternal inheritance | D102 |
 | Milestone order and groups-based characteristics scope | D103 |
 | Disabled fertility heterogeneity removes output weights | D104 |
@@ -56,18 +56,22 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Grouped output always includes transition history tibble | D111 |
 | Individual transition implementation, duration and ancestry | D112 |
 | Directed transition Lexis counter | D113 |
-| Household moves deferred; regional applications under tentative multiple-group milestone 10 | D114, D121 |
+| Household moves deferred; regional applications under multiple-group milestone 9 | D114, D121, D131 |
 | Detailed union partner groups refer to formation | D115 |
 | Milestone 6 acceptance; time-varying inputs next | D116 |
 | Two-sex marriage model as tentative milestone 12 | D117, D121 |
 | Calendar-varying rate inputs | D118 |
 | Multi-year HMD/HFD preparation and native HMD shapes | D119 |
 | Optional HMD open-age pooling from deaths and exposure | D120 |
-| Milestone 8 binned-group hazards/formula weights and milestones 9–12 revision | D121 |
+| Milestone 8 direction and milestones 9–12 revision | D121, reordered by D131 |
 | Calendar-varying flat cohabitation probabilities | D122 |
 | Complete matching/inheritance model-list calendar schedules | D123 |
 | Detailed and pooled previous-union inputs and summaries | D126 |
 | Milestone 7 acceptance and retained validation evidence | D127 |
+| Cell scheduling of all rate processes, one clock per process | D128 |
+| Weight models (formulas, custom functions, schedules) | D129 |
+| Milestone 8 acceptance | D130 |
+| Milestones 9–11 reordered: group columns, immigration, then summaries | D131 |
 
 ## Recorded decisions
 
@@ -1642,7 +1646,10 @@ matching specifications override this default. Initiation mode remains explicit.
 
 - **Status:** implementation/performance trial authorized October 28, 2026.
   The user explicitly selected actual current hazards for calibration; no
-  milestone 4 scientific acceptance is inferred.
+  milestone 4 scientific acceptance is inferred. *Current (November 5, 2026):*
+  actual hazards remain the calibration rule, but D128 replaced the per-woman
+  tracker and its boundary queue with contributions taken from the search and
+  fertility cells.
 - **Decision:** maintain individual current female search intensity and sum it
   into group/birth-cohort calibration cells. Replace the previous category
   count arrays and age-band averaging with contributions updated at age-band
@@ -2064,6 +2071,9 @@ See [demographic analysis](demographic-analysis.md#fertility-rates-by-observed-p
 
 ## D101 — Cell-accounted fertility under birth spacing (October 29, 2026)
 
+- **Current (November 5, 2026):** cell accounting and spacing are unchanged;
+  D128 moved births to one fertility clock, pools groups when schedules are
+  not group-specific, and reports unrealized births as counts.
 - **Status:** accepted by the user as a specification; implemented October 29,
   2026, first as the opt-in `spacing_method = "cell"`. After reviewing the
   validation, the user made it the only method on October 29, 2026: midpoint
@@ -2489,9 +2499,11 @@ were explicitly deferred while fixing the getter.
 
 ## D121 — Binned-group hazard direction and roadmap revision (October 31, 2026)
 
-**Status:** user-selected future engine direction and milestone priorities;
-documentation authorized now, implementation and detailed APIs still pending.
-Milestone 7 is not declared complete by this decision.
+**Status:** user-selected engine direction and milestone priorities. *Current
+(November 5, 2026):* implemented under D128/D129 and accepted under D130. The
+single-year subdivision below was revised during implementation: only
+fertility splits to single years (D128). The milestone numbering below was
+reordered by D131.
 
 The user will finish milestone 7 with the current engine, then make milestone 8
 use binned-group hazards for all six existing rate processes and allow custom
@@ -2700,3 +2712,116 @@ thresholds or demographic defaults are inferred.
 **Next priority:** Milestone 8 remains the selected future direction under D121;
 its scientific specification, formula API and unresolved mechanisms require
 separate work and user decisions.
+
+## D128 — Cell scheduling for every rate process (November 4, 2026)
+
+**Status:** User-directed during milestone 8 (step 1 and follow-up directions,
+November 3–4, 2026); accepted with milestone 8 under D130.
+
+**Decision:** Mortality, fertility, rate-mode search, dissolution, conversion
+and each group-transition slot are scheduled by cells of at-risk units
+(persons, or unions for dissolution and conversion). A cell produces events at
+its input rate times its members. Each process keeps one Exp(1) clock spent at
+its total intensity; a fired clock picks a cell in proportion to intensity and
+a unit within it. Band-edge moves are bookkeeping without random draws. The
+engine keeps no individual waiting-time clocks: one approach for every process,
+chosen by the user to simplify the code base rather than keep a hybrid.
+User directions within the decision:
+
+- Only fertility splits bands to single years and actual parity, because
+  spacing is an eligibility rule (D101); other processes use input bands.
+- Cells stratify only as finely as the input rates: by group only when a
+  process's effective schedules are group-specific.
+- Dissolution units are unions, not their female partners.
+- Unrealized births are counted when the clock draws a cell with no eligible
+  woman, by one-year period, group, union type, parity band and age band;
+  `years_without_eligible` and expected-value records are removed (revising
+  D101's reporting; realized births are unchanged in distribution).
+- Calendar rate changes update cell rates in place when the cell layout is
+  unchanged; otherwise cells are rebuilt.
+- Matching calibration takes search and fertility contributions from the cells,
+  replacing D082's per-woman tracker; a probability tracker remains for
+  cohabitation probabilities.
+
+**Rationale and evidence:** Equivalent in distribution to independent
+individual hazards; validated against the previous engine over replications,
+the milestone 5 recovery checks and analytical mortality. Run times were
+measured against the previous engine and SOCSIM 1.9.18: slower for simple
+mortality/fertility models with many birthday moves, faster for models with
+calendar rate changes. See [cell scheduling](binned-group-hazards.md#cell-scheduling-d128).
+
+**Implications:** Fixed-seed histories differ from earlier versions and between
+differently stratified but equivalent models. Same-time ties between processes
+follow death, birth, dissolution, conversion, search, then transitions.
+
+## D129 — Weight models (November 4, 2026)
+
+**Status:** Specified with the user November 4, 2026 and implemented; accepted
+with milestone 8 under D130.
+
+**Decision:** `create_weight_model()` defines log-linear formula weights
+(coefficients, treatment-coded categorical variables with fixed levels,
+`group_levels` for group variables) or a custom function of a cell's members
+and its description. Models attach through `weights` on mortality, fertility,
+rate-mode search, dissolution and transitions, and `weights_conversion`, as one
+model or a calendar schedule using the D123 tibble structure. Weights are
+normalized within cells, so cell intensities are unchanged; exp(beta) is a
+within-cell hazard ratio. Variables are fixed person and union characteristics
+that change only at events; user-supplied columns are excluded. Missing
+formula variables and NA function results contribute zero with a warning;
+non-finite coefficients and infinite results are errors. Fertility weights
+combine with `hetfert` on the log scale. Formula weights are stored and
+selected by rejection sampling; search weights under matching calibration
+enter the calibration sums. Terms that cancel within every cell warn.
+
+**Alternatives deferred:** unnormalized weights (frailty selection),
+eligibility rules beyond spacing, `NULL` schedule entries (only in parallel for
+matching, inheritance and weight schedules), weights varying within bands and
+user-defined characteristics. See
+[weight models](binned-group-hazards.md#weight-models-d129).
+
+## D130 — Milestone 8 accepted complete (November 5, 2026)
+
+**Status:** Accepted complete by the user's explicit request to close the
+milestone as accepted.
+
+**Decision:** Milestone 8 is complete: cell scheduling for every rate process
+(D128) and weight models (D129), carrying out D121's direction.
+
+**Evidence:** The user's [milestone 8 report](../validation/milestone8.qmd) and
+[rendered assessment](../validation/milestone8.html), and the user's explicit
+completion instruction. The code/report revision at acceptance is the
+`milestone8-binned-intensity` commit that adds this entry, following `8ae2209`
+(review fixes in `9176466`, coverage tests in `8ae2209`); the closeout commit
+changes only documentation. Software checks are
+recorded in [testing](testing.md). This documentation update does not rerun
+or rerender the report or independently certify its numerical findings.
+
+**Retained limits:** Weights are normalized within cells, so population-level
+effects depend on cell size, homogeneity and composition change and cannot
+produce frailty selection. Performance depends on model structure; simple
+models with many band-edge moves are slower than the previous engine. Fixed-seed
+histories are not comparable with earlier versions. Fertility spacing remains
+the only eligibility rule. No acceptance thresholds or demographic defaults are
+inferred.
+
+**Next priority:** Milestone 9, multiple group columns, as reordered by D131.
+
+## D131 — Milestones 9–11 reordered (November 5, 2026)
+
+**Status:** User-selected planning priority, at milestone 8 closeout. No scope,
+schema or API is selected by the reordering.
+
+**Decision:** Move multiple group columns from tentative milestone 10 to
+milestone 9, the next milestone, and external immigration from tentative
+milestone 11 to 10. Summaries, diagnostics and post-simulation helpers move
+from milestone 9 to 11. The two-sex marriage model remains tentative milestone
+12. This revises D121's numbering only; D114's household questions remain
+attached to multiple group columns.
+
+| Milestone | Scope | Status |
+| --- | --- | --- |
+| 9 | More than one group column, potentially including regions and internal migration | Next; schema and mechanisms unselected |
+| 10 | External immigration and generation tracking | Tentative |
+| 11 | Summaries, diagnostics and helpers | Proposed details retained |
+| 12 | Two-sex marriage model | Tentative; model and API unselected |

@@ -309,7 +309,7 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' available; surviving husbands return to the pool at widowhood. Death ends affected
 #' unions. In rate mode unpartnered women face competing search events and
 #' use their unpartnered fertility schedule and may give birth without initiating
-#' a search. Failed searches draw another waiting time; formation and widowhood
+#' a search. Failed searches leave the woman searching; formation and widowhood
 #' switch fertility schedules while preserving spacing. An overall fertility
 #' schedule applies to both statuses, with a simulation warning. On-demand mode
 #' requires an overall fertility schedule. Unpartnered rate-mode births use the
@@ -358,8 +358,8 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' @param cancel_birth_if_no_match Logical, default `TRUE`. Cancel a birth when
 #'   its on-demand partner search or rate-mode nonmarital father selection fails.
 #'   Set `FALSE` to allow births with unknown fathers. Historical missing father
-#'   IDs are retained. A cancellation starts no new spacing interval and draws
-#'   fresh waiting times from the failed attempt. Partner scarcity can reduce
+#'   IDs are retained. A cancellation starts no new spacing interval, and the
+#'   attempt is not replaced. Partner scarcity can reduce
 #'   realized fertility below inputs.
 #' @param father_matching Optional matching specification for fathers of
 #'   unpartnered births in rate mode, created by [create_matching_model()], or a
@@ -388,10 +388,10 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' changes precede same-time events and retain duration origins. `cohab_prob`
 #' accepts the same calendar columns, with probabilities selected at the search
 #' instant. Probability-only changes refresh matching calibration without
-#' resampling pending event clocks. All three matching arguments also accept
+#' changing event clocks. All three matching arguments also accept
 #' whole-model schedule tibbles with `time_start`, `time_end`, and list-column
 #' `model`. Model changes update role-specific preferences and calibration before
-#' same-time choices without resampling event clocks. All supplied models,
+#' same-time choices without changing event clocks. All supplied models,
 #' including future intervals, are validated; gaps in a run are errors. NULL
 #' father/cohabitation matching dynamically follows general matching. Other
 #' non-rate arguments remain static.

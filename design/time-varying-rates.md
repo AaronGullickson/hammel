@@ -70,21 +70,23 @@ static. HMD also supports its native grouped age/time products.
 
 Calendar changes take precedence over demographic events at the same instant.
 The run remains `[start, end)`: changes and events at its final endpoint do not
-execute. Pending candidates under an old rate are invalidated at changes;
-new waiting times use attained age/duration and the active rate table. Sampling
-must never execute a future candidate using a superseded rate. The first implementation redraws all pending person and union candidates at
-each calendar rate boundary; conditional exponential resampling after survival
-to that boundary preserves the hazard interpretation. This requires work
-proportional to the population at each boundary. Fixed-seed equality with static
-or split-run alternatives is not promised, including redundant rate boundaries.
+execute. No event may execute under a superseded rate. Since milestone 8
+(D128), a process whose new schedules keep its cells (same strata and nonzero
+band edges) changes its cell rates in place: the clock spends its threshold up
+to the change and continues at the new total intensity, with no draws and no
+membership changes, which is exact for a Poisson process. Otherwise that
+process's cells are rebuilt from the active schedules at attained
+age/duration, with new thresholds valid after survival to the boundary; this
+requires work proportional to the population. Fixed-seed equality with static
+or split-run alternatives is not promised.
 
 The simulation retains its population, histories, ancestry, parity, fertility
 weights, latest actual birth times and all duration origins at boundaries.
 No population restart occurs. New fertility cells use the active input rate
 times their current membership, preserving spacing eligibility. Matching
-calibration uses current search and fertility intensities. Unrealized fertility
-intensity accrued before each change is retained, with observation intervals
-split at fertility schedule changes. Observations continue to use recorded
+calibration uses current search and fertility intensities. Unrealized births
+are counted when the clock draws a cell without an eligible woman, in one-year
+windows from the run start that are not split at changes. Observations continue to use recorded
 events and exposure; rate changes do not create demographic events.
 
 ## Worked examples and validation
@@ -104,8 +106,9 @@ ends at 2019.8. Calendar bounds may also be fractional, such as
   in 2004 at duration three. Marriage conversion still starts a new episode.
 - A woman's last birth at 2004.8 and spacing of 0.75 keep her ineligible until
   2005.55 even if fertility changes in 2005. A cell with one ineligible member
-  and rates 0.2 for half a year then 0.4 for half a year accrues 0.3 unrealized
-  births over that year, if membership and ineligibility persist.
+  and rates 0.2 for half a year then 0.4 for half a year is drawn 0.3 times on
+  average over that year, each draw counted as an unrealized birth, if
+  membership and ineligibility persist.
 - An A-to-B transition rate zero before 2005 becomes positive afterward.
   Duration remains time since the latest recorded entry into A. Existing
   ancestry and historical group observations remain unchanged.

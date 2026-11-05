@@ -1,11 +1,11 @@
 # Development roadmap
 
-Updated November 2, 2026. Milestones 1–7 are complete by user acceptance
-(D029, D050, D077, D093, D105, D116, D127). **Milestone 7 was accepted complete
-on November 2, 2026:** calendar-varying rates (D118), cohabitation probability
-calendars (D122), and matching/inheritance model schedules (D123), retaining
-the current engine and documented limitations. The user selected
-binned-group hazards and formula weights for milestone 8 (D121).
+Updated November 5, 2026. Milestones 1–8 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116, D127, D130). **Milestone 8 was accepted
+complete on November 5, 2026:** cell scheduling for every rate process (D128)
+and weight models (D129), retaining documented limitations. On November 5 the
+user reordered later milestones (D131): multiple group columns (9), external
+immigration (10), then summaries, diagnostics and helpers (11).
 Future entries record planning priorities, not authorization to implement unspecified demographic behavior
 or an unselected public API.
 
@@ -15,15 +15,15 @@ or an unselected public API.
 | 5 | Parity-specific fertility and fertility heterogeneity | Complete (D105); limitations retained |
 | 6 | Group transitions, including categorical characteristics represented by groups | Complete October 30, 2026 (D116); final render active at acceptance |
 | 7 | Time-varying rates, matching, and inheritance within a simulation run | Complete November 2, 2026 (D127); current engine and documented limitations retained |
-| 8 | Binned-group hazards for all rate processes; custom formula weights on all rates | User-selected direction (D121); specification/API and implementation pending |
-| 9 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed; moved from former milestone 8 (D121) |
-| 10 | More than one group column, potentially including regions and internal migration | Tentative (D121); schema and mechanism contracts unselected |
-| 11 | Immigration from outside the system, tracking generation | Tentative; moved from former milestone 9 (D121) |
+| 8 | Cell scheduling for all rate processes; formula and custom weight models | Complete November 5, 2026 (D130); documented limitations retained |
+| 9 | More than one group column, potentially including regions and internal migration | Next (D121, D131); schema and mechanism contracts unselected |
+| 10 | Immigration from outside the system, tracking generation | Tentative (D121, D131) |
+| 11 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed; moved from milestone 9 (D131) |
 | 12 | Two-sex marriage model | Tentative (D117/D121); model and API unselected |
 
 Milestone 6's scope is individual group transitions. Household moves are
 deferred beyond milestone 6 (D114, superseding D109). D121 removes the separate
-regions milestone and places multiple group columns at tentative milestone 10;
+regions milestone and places multiple group columns at milestone 9 (D131);
 regions/internal migration and household moves remain possible applications
 requiring their own specifications. D106–D108 select annual hazards, directed competing
 age- or duration-specific schedules with optional strata,
@@ -141,7 +141,7 @@ D101 cell-accounted fertility replaces D099's preceding-parity spacing
 approximation: cells generate births at input rate times all their members,
 then select an eligible mother. This also handles composition changes during
 start-up, restarts and union-type transitions. Cells without eligible women
-report unrealized intensity. See [parity fertility](parity-fertility.md) and
+count unrealized births (D128). See [parity fertility](parity-fertility.md) and
 [cell accounting](fertility-cell-accounting.md) for the contract and limitations.
 
 D102 implements persistent positive lognormal selection weights through
@@ -167,7 +167,7 @@ characteristics milestone. Education is one example: people could start in a
 minimum category and transition to higher categories over life.
 
 Multiple group columns that represent different dimensions simultaneously are
-now tentative milestone 10 (D121). No schema or public API is selected.
+now milestone 9 (D121, D131). No schema or public API is selected.
 How multiple group types interact in rate stratification, matching, newborn assignment, transitions and
 ancestry remains to be specified. The roadmap does not introduce an arbitrary
 attribute-mutation callback or a continuous-characteristic model.
@@ -176,12 +176,11 @@ Individual transition schedules, age/duration dependence, eligibility, timing,
 event/tracker updates and retained ancestry are implemented under the
 [group-transition contract](group-transitions.md). Household moves remain deferred
 beyond this milestone (D114), with their unresolved questions retained under
-[tentative milestone 10](#tentative-milestone-10-multiple-group-columns) (D121).
+[milestone 9](#milestone-9-multiple-group-columns) (D121, D131).
 The user accepted milestone 6 on October 30, 2026 (D116), based on the [report](../validation/milestone6.qmd); its final render
 was active at acceptance and must be preserved.
 The former standalone regions/internal-migration milestone is removed; those
-applications may be handled through multiple group columns in tentative
-milestone 10. Household and geographic rules remain unselected.
+applications may be handled through multiple group columns in milestone 9. Household and geographic rules remain unselected.
 
 Fixed newborn group assignment (for example all children starting in the minimum
 education category) was deferred to this discussion on October 27, 2026. No
@@ -211,90 +210,24 @@ See [calendar-varying models](time-varying-models.md) for the implemented API,
 coverage rules, callbacks, fallback roles and validation. The schedule remains
 outside each individual model, as selected in D118. Other non-rate arguments,
 including multipliers, spacing, `ffab` and persistent fertility heterogeneity,
-remain static. This work does not introduce the milestone 8 engine change.
+remain static.
 
-## Milestone 8: binned-group hazards and formula weights
+## Milestone 8: cell scheduling and weight models (complete)
 
-The user selected this engine change on October 31, 2026 (D121), after milestone
-7, completed with its current engine (D127). Extend cell-based event scheduling to all
-six existing rate processes and allow custom formula weights to distribute
-individual or union risk within cells while preserving input cell intensities.
-Use single-year age or duration subdivisions, retain fractional input boundaries
-and all other existing rate strata, and preserve fertility's actual-parity rule.
+The user selected this engine change on October 31, 2026 (D121) and accepted it
+complete on November 5, 2026 (D130). Every rate process is scheduled by cells
+with one clock per process (D128), and weight models choose who in a cell
+experiences an event (D129). See [the specification](binned-group-hazards.md)
+and [the validation report](../validation/milestone8.qmd). Deferred items
+(eligibility rules beyond spacing, unnormalized weights, user-defined
+characteristics, weights within bands) are listed in
+[its deferred issues](binned-group-hazards.md#deferred-issues).
 
-See [the discussion and design direction](binned-group-hazards.md) for equations,
-worked examples, the distinction between rate strata and relative weights,
-composition-dependent normalization, possible redundancy warnings, future
-user-defined characteristics, process-specific caveats and proposed validation.
-Formula APIs, safe evaluation, eligibility/failure rules and scheduling details
-still require specification before implementation. This milestone does not
-change the accepted milestone 7 behavior or authorize an unspecified mechanism.
-
-## Proposed milestone 9: summaries, diagnostics, and helpers
-
-Moved from former milestone 8 by D121; its scope and unresolved API choices
-remain as described below.
-
-The user also requested future model diagnostic tools (October 20, 2026),
-including checks that help identify unintentionally omitted group-pair settings.
-No diagnostic interface or implementation is selected.
-
-Add custom print/summary displays for `hammel_model` and simulation results
-(the user's proposed `hammel_simulation` interface). Aim for a clear, polished
-console presentation inspired by usethis, making configured models and results
-easy to inspect. Specific contents and formatting remain to be designed.
-
-Simulation currently returns a `hammel_population` with a `simulation` metadata
-component. The summary proposal does not itself select a new result class or
-authorize changing that return contract. Keep underlying tables and settings
-available as ordinary inspectable R objects.
-
-### Unweighted or default intervals in model schedules
-
-Recorded November 4, 2026, during milestone 8. Calendar model schedules (the
-`time_start`/`time_end`/`model` tibbles) currently require a complete model in
-every interval. For weight schedules, a period without weighting is written as
-a formula with zero coefficients. The user is open to allowing `NULL` entries
-to mean "no model" for an interval (unweighted, or the default model), but only
-if the change applies in parallel to all three schedule types: matching,
-inheritance and weight models. Not selected; the meaning of `NULL` for
-matching and inheritance (for example, falling back to the general or default
-model) needs specification first.
-
-### Post-simulation helpers
-
-Expand the existing extraction/summary functions into a coherent user toolkit
-for useful quantities from simulation histories. Existing functions cover Lexis
-counts, fertility, life tables, population sizes and recorded kin. Identify
-additional quantities and exposure/observation definitions from actual workflows.
-Status-specific exposure, fertility and mortality summaries use
-`calculate_fertility_rates(by_union_type = TRUE)`; formation counts and rates by
-previous union use `calculate_union_rates()` (D080).
-See [demographic analysis](demographic-analysis.md) for their observation rules.
-
-### Living-population extraction after burn-in
-
-On October 29, 2026, the user requested a future helper to truncate a simulated
-population to living individuals, so a burn-in run can provide a new starting
-population without retaining the full initialization history. The desired result
-preserves correct reproductive histories and parent–child relationships, while
-allowing the deeper ancestral kinship history to be discarded. This is a
-milestone 9 proposal; no function name or implementation is selected.
-
-Before implementation, specify how to preserve births to deceased children,
-parity and last-birth dates after removing deceased person records. Simply
-filtering living persons would lose some recorded births and conflict with
-history-derived parity initialization (D098). Also specify handling of removed
-parent IDs, retained parent–child links, ongoing unions, previous-union histories,
-ancestry, observation endpoints and restart validation. The helper must state
-which kinship information has been discarded; it cannot imply complete pedigree
-or historical exposure after truncation. The representation of minimal history
-needed for correct restarting remains to be designed.
-
-## Tentative milestone 10: multiple group columns
+## Milestone 9: multiple group columns
 
 The user assigned the possibility of more than one group column to tentative
-milestone 10 on October 31, 2026 (D121). Different columns could represent
+milestone 10 on October 31, 2026 (D121) and moved it to milestone 9, the next
+milestone, on November 5, 2026 (D131). Different columns could represent
 identity, education or location simultaneously. Representation, supported rate
 strata, matching predictors/restrictions, dimension-specific histories,
 transitions, newborn assignment and ancestry interactions remain to be specified.
@@ -312,7 +245,7 @@ The following D114 questions remain relevant to a future regional application.
 
 D114 deferred household moves from milestone 6 to the former regions milestone.
 D121 removes that standalone milestone while retaining multiple group columns
-as tentative milestone 10. These concerns are retained for a possible regional
+as milestone 9. These concerns are retained for a possible regional
 application; no household mechanism is authorized by this placement. The
 following questions still require a concrete scientific specification.
 
@@ -365,15 +298,76 @@ following questions still require a concrete scientific specification.
   household accounting, linked-event invalidation and the chosen input-rate
   interpretation before assessing demographic performance.
 
-## Tentative milestone 11: immigration from outside the system
+## Tentative milestone 10: immigration from outside the system
 
-Moved from former milestone 9 by D121. Add immigrants within a running
+Moved from former milestone 9 to 11 by D121, then to 10 by D131. Add immigrants within a running
 simulation, rather than requiring a restart.
 The user envisages specifying numbers and an age/sex distribution and tracking
 individual immigrant generational status. Timing (batch dates versus arrivals),
 meaning of supplied numbers, attribute/kin/union initialization, ancestry and
 generation definitions, and interactions with group assignment remain open.
 No emigration process is implied by the immigration request.
+
+## Proposed milestone 11: summaries, diagnostics, and helpers
+
+Moved from former milestone 8 by D121, then from milestone 9 to 11 by D131;
+its scope and unresolved API choices remain as described below.
+
+The user also requested future model diagnostic tools (October 20, 2026),
+including checks that help identify unintentionally omitted group-pair settings.
+No diagnostic interface or implementation is selected.
+
+Add custom print/summary displays for `hammel_model` and simulation results
+(the user's proposed `hammel_simulation` interface). Aim for a clear, polished
+console presentation inspired by usethis, making configured models and results
+easy to inspect. Specific contents and formatting remain to be designed.
+
+Simulation currently returns a `hammel_population` with a `simulation` metadata
+component. The summary proposal does not itself select a new result class or
+authorize changing that return contract. Keep underlying tables and settings
+available as ordinary inspectable R objects.
+
+### Unweighted or default intervals in model schedules
+
+Recorded November 4, 2026, during milestone 8 (D129), for milestone 11 (D131). Calendar model schedules (the
+`time_start`/`time_end`/`model` tibbles) currently require a complete model in
+every interval. For weight schedules, a period without weighting is written as
+a formula with zero coefficients. The user is open to allowing `NULL` entries
+to mean "no model" for an interval (unweighted, or the default model), but only
+if the change applies in parallel to all three schedule types: matching,
+inheritance and weight models. Not selected; the meaning of `NULL` for
+matching and inheritance (for example, falling back to the general or default
+model) needs specification first.
+
+### Post-simulation helpers
+
+Expand the existing extraction/summary functions into a coherent user toolkit
+for useful quantities from simulation histories. Existing functions cover Lexis
+counts, fertility, life tables, population sizes and recorded kin. Identify
+additional quantities and exposure/observation definitions from actual workflows.
+Status-specific exposure, fertility and mortality summaries use
+`calculate_fertility_rates(by_union_type = TRUE)`; formation counts and rates by
+previous union use `calculate_union_rates()` (D080).
+See [demographic analysis](demographic-analysis.md) for their observation rules.
+
+### Living-population extraction after burn-in
+
+On October 29, 2026, the user requested a future helper to truncate a simulated
+population to living individuals, so a burn-in run can provide a new starting
+population without retaining the full initialization history. The desired result
+preserves correct reproductive histories and parent–child relationships, while
+allowing the deeper ancestral kinship history to be discarded. This is a
+milestone 11 proposal; no function name or implementation is selected.
+
+Before implementation, specify how to preserve births to deceased children,
+parity and last-birth dates after removing deceased person records. Simply
+filtering living persons would lose some recorded births and conflict with
+history-derived parity initialization (D098). Also specify handling of removed
+parent IDs, retained parent–child links, ongoing unions, previous-union histories,
+ancestry, observation endpoints and restart validation. The helper must state
+which kinship information has been discarded; it cannot imply complete pedigree
+or historical exposure after truncation. The representation of minimal history
+needed for correct restarting remains to be designed.
 
 ## Tentative milestone 12: two-sex marriage model
 

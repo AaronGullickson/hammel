@@ -345,7 +345,7 @@ demographic validity.
 The user requested female-only age-specific search events competing with death.
 Only living, unpartnered women face the supplied search hazard (per woman-year);
 never-partnered and widowed women use the same schedule. Age-band gaps and
-outside support have zero search hazard, using the shared `waiting_time()`.
+outside support have zero search hazard; searches come from the search cells (D128).
 Men remain available for selection but never initiate a rate search.
 Search execution uses the same sampling, screening, utility and union-creation
 code as on-demand execution, without creating a child at union formation.

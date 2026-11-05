@@ -9,6 +9,11 @@ and the argument. The midpoint comparisons in this document are reproducible at
 commit `89d451b`. After validation the user also revised decision 5: cells are
 age sub-bands of at most one year and, for parity-specific schedules, single
 actual parities. See [implementation and validation](#implementation-and-validation).
+Milestone 8 (D128, accepted under D130) moved births to the fertility process's
+single clock shared by all its cells, pooled groups when fertility schedules
+are not group-specific, and changed unrealized births from expected values to
+counts; this document describes that current behavior. Formula and custom
+fertility weights (D129) combine with `hetfert` on the log scale.
 
 ## Purpose
 
@@ -57,17 +62,18 @@ weights (future heterogeneity) without changing the mechanism.
 1. **Cell intensity.** `Lambda_c = m_c * N_c` (decision 4 below). Expected births per woman-year in the cell therefore
    equal `m_c` at every instant at which the cell has an eligible member with
    positive weight, whatever the mix of eligible and ineligible women.
-2. **Timing.** Each cell has its own birth clock: an exponential waiting time
-   at intensity `Lambda_c`, competing in the ordinary event queue with deaths,
-   searches, dissolutions and conversions.
-3. **Choice of mother.** When a cell's clock fires, one eligible member is
+2. **Timing.** The fertility process has one clock spent at the total
+   intensity `sum_c Lambda_c`, competing with the clocks of the other rate
+   processes (D128). When it fires, a uniform draw picks cell c with
+   probability `Lambda_c / sum Lambda`.
+3. **Choice of mother.** In the chosen cell, one eligible member is
    chosen with probability `w_i / W_c^e`. With all weights 1 this is a uniform
    draw among eligible members.
 4. **Equivalent individual hazard.** Rules 1–3 are equivalent to giving each
    eligible woman the hazard `h_i = Lambda_c * w_i / W_c^e`, and zero during
    spacing. Two eligible women in the same cell therefore have relative risk
    `w_i / w_j` exactly. This form is used for interpretation, matching
-   calibration and validation; the cell clock is the computational form.
+   calibration and validation; the process clock is the computational form.
 5. **After a successful birth.** The mother's parity rises by one if parity is
    tracked, she becomes ineligible until `t + B`, and she moves to the cell for
    her new parity (if different) as an ineligible member. Both affected cells'
@@ -83,7 +89,7 @@ weights (future heterogeneity) without changing the mechanism.
 ## Count updates
 
 `N_c`, `W_c` and the eligible totals change only at these events. After each
-change, the affected cell intensities are recomputed and their clocks updated.
+change, the affected cell intensities are recomputed and the process clock re-timed.
 
 | Event | Effect |
 | --- | --- |
@@ -92,8 +98,8 @@ change, the affected cell intensities are recomputed and their clocks updated.
 | Age-band boundary | Woman moves to the next band's cell, or leaves fertility ages, keeping her eligibility status |
 | Death | Woman leaves her cell |
 | Union formation, dissolution, widowhood, conversion | Woman moves between union-type cells, keeping her eligibility status |
-| Group change (future group transitions) | Woman moves between group cells |
-| Weight change (future heterogeneity) | Totals updated; no cell change |
+| Group change | Woman moves between group cells when cells are group-specific |
+| Weight change (weight-schedule switch) | Stored weights updated; no cell change |
 | Restart | All cells rebuilt from supplied histories; no transient adjustment |
 
 Boundaries reuse the existing bookkeeping-queue pattern from
@@ -101,16 +107,16 @@ Boundaries reuse the existing bookkeeping-queue pattern from
 half-open bands at exact boundaries, at most one pending boundary entry per
 woman. Updates are bookkeeping, not demographic events.
 
-**Clock updates without extra random draws.** Each cell holds an Exp(1)
-threshold, drawn when its clock starts or after it fires, and consumes
-`Lambda_c * elapsed` as time passes. When `Lambda_c` changes, the firing time
-is recomputed from the unused remainder. By memorylessness this has the same
-distribution as redrawing, but random numbers are consumed only at firings and
-mother selection. Fixed-seed histories still differ from D028/D099 because
-births are no longer scheduled per woman.
+**Clock updates without extra random draws.** The process clock holds an
+Exp(1) threshold, drawn when total intensity first becomes positive or after a
+firing, and consumes `sum Lambda * elapsed` as time passes. When any
+`Lambda_c` changes, the firing time is recomputed from the unused remainder. By
+memorylessness this has the same distribution as redrawing, and random numbers
+are consumed only at firings (threshold, cell and mother). See
+[event timing](waiting-time-sampling.md).
 
-**Ties.** Death keeps priority over birth. A woman who dies at the exact time a
-cell fires is removed before the mother is chosen. Other tie rules (birth,
+**Ties.** Death keeps priority over birth. A woman who dies at the exact time
+the fertility clock fires is removed before the mother is chosen. Other tie rules (birth,
 dissolution, conversion, search) apply to the chosen mother as they do now.
 
 ## Implementation and validation
@@ -118,49 +124,28 @@ dissolution, conversion, search) apply to the chosen mother as they do now.
 Implemented October 29, 2026 in `src/simulate.cpp` (`BoundaryQueue`,
 `FertilityCells`, `fertility_strata`) and `R/set_process.R`/`R/simulate.R`.
 
-**Sharing with the matching-calibration tracker.** The user asked that the new
-accounting reuse the existing tracker rather than duplicate code or
-computation.
-
-- `BoundaryQueue` was extracted from `FemaleIntensityTracker` with no behavior
-  change (fixed-seed histories of grouped on-demand, rate/cohabitation and
-  parity runs were identical before and after). Both the calibration tracker
-  and the fertility cells use it.
-- Each keeps its own queue instance rather than one merged queue: under cell
-  mode the calibration tracker no longer tracks fertility boundaries at all
-  (its per-woman fertility channel is empty), so the two queues hold different
-  boundaries and nothing is computed twice.
-- Calibration fertility totals for fertility-driven searches are formed from
-  the cells when a search needs them: each cell keeps the count of unpartnered
-  eligible members per calibration bin, and contributes `Lambda_c / E_c` per
-  member.
-- Cell clocks live in their own indexed binary min-heap over cells (a few
-  hundred entries, updated in place), not in the person event queue; the main
-  loop compares the next cell clock, the next cell boundary and the next person
-  event. Boundaries come first. At an exact tie between a cell clock and person
-  events, a current pending death at that time goes first and the cell birth
-  precedes other person events, preserving the death, birth, dissolution,
-  conversion, search priority. Only events at exactly the tied time are
-  inspected, so the check costs nothing in ordinary runs.
-- Each membership or eligibility change first settles the cell's elapsed
-  interval under the state that held during it (threshold consumption or
-  unrealized intensity), then applies the change and recomputes the clock.
-- Births no longer enter per-person scheduling in cell mode; union changes move
-  a woman between cells instead of resampling a birth time.
-
-**Difference from the calibration tracker's timing.** That tracker processes
-its boundaries lazily, only before a search. Cell clocks depend on current
-membership, so cell boundaries (age bands, spacing release) are processed in
-time order before any event at or after them. At an exact tie the boundary is
-processed first, so the new half-open band applies.
+**Current structure (D128).** Fertility cells are one `FertilityCells`
+process: an `IntensityTree` over cells, one `ProcessClock` and a
+`BoundaryQueue` for age-band moves and spacing releases, which are
+bookkeeping processed in time order before any event at or after them (at an
+exact tie the boundary comes first, so the new half-open band applies). Each
+membership or eligibility change first spends the clock for the elapsed
+interval, then applies the change and re-times the clock. Union changes move a
+woman between cells. Matching calibration forms fertility totals from the
+cells: each cell keeps the weight of unpartnered eligible members per
+calibration bin and contributes `Lambda_c / W_c^e` per unit weight. The
+original October 29 implementation used one clock per cell in an indexed heap
+and shared its boundary queue with the former calibration tracker; Git history
+has its details.
 
 **Mother selection** is uniform among eligible members by default. D102 uses
 a per-cell sum tree over eligible swap-remove slots for selection proportional
-to persistent `hetfert` weights. Insertions/removals update tree ancestors, and
+to persistent `hetfert` weights, combined with any weight model (D129). Insertions/removals update tree ancestors, and
 matching-calibration bins accumulate the same eligible weights. Cell intensity
 remains rate times member count; weights do not rescale it.
 
-**Cell construction.** Zero-rate input bands create no cells and are treated as
+**Cell construction.** Cells split by group only when the effective
+fertility schedules are group-specific (D128). Zero-rate input bands create no cells and are treated as
 gaps, so women there need no membership updates. Input age bands are split at whole ages and band edges;
 upper-open bands are split up to the oldest attainable age in the run (end time
 minus the earliest birth time) and then left open. At the user's request, an
@@ -266,16 +251,19 @@ were regenerated after it.
 If `Lambda_c > 0` but `W_c^e = 0` (no eligible member, or all eligible weights
 zero), the cell cannot produce a birth. This happens briefly in initialized
 cohorts and persistently when the input schedule implies more recent births
-than the cell holds, which a B-year minimum interval makes impossible. Its
-intensity is dropped (decision 2): no birth occurs and none is carried
-forward. The run records the unrealized expected births `integral Lambda_c dt`
-over such periods, by period and cell (decision 6), so that users can see when
-inputs could not be met.
+than the cell holds, which a B-year minimum interval makes impossible. The
+cell keeps its intensity (decision 2, reporting revised by D128): when the
+clock draws it, no birth occurs, nothing is carried forward, and one
+unrealized birth is counted by one-year period from the run start, group,
+union type, parity band and age band, so that users can see when inputs could
+not be met. In a cell shared by groups, the group is drawn in proportion to its
+members. Until November 4, 2026 the run recorded expected values
+`integral Lambda_c dt` instead; realized births are unchanged in distribution.
 
 ## Interaction with existing features
 
 - **Group multipliers** keep their meaning: they scale `m_c` before
-  accounting, and groups have separate cells.
+  accounting, and make the schedules, and so the cells, group-specific.
 - **Parity** cells are single actual parities. A pooled input band applies its
   rate to each contained parity, as in the PATFR and D099 conventions; for
   HFD's 5+ rate, actual parities 4, 5, 6, ... each target that rate.
@@ -295,9 +283,10 @@ inputs could not be met.
   in each calibration bin, and must equal an explicit scan of rule 4.
 - **Zero spacing** (`B = 0`): every member is always eligible, so
   `h_i = m_c * N_c * w_i / W_c`, which is `m_c` when all weights are 1.
-- **Calendar-time rates (D118)**: changes in `m_c` rebuild active cells while
-  preserving weights, parity and spacing. Accrued unrealized intensity is
-  retained; see [calendar-varying rates](time-varying-rates.md).
+- **Calendar-time rates (D118)**: a change that keeps the cell layout updates
+  `m_c` in place and the clock continues; otherwise cells are rebuilt,
+  preserving weights, parity and spacing (D128); see
+  [calendar-varying rates](time-varying-rates.md).
 
 ## Individual weights (D102)
 
@@ -343,14 +332,14 @@ All rates are per woman-year; `B = .75` unless stated.
    her widowhood is handled by a separate precomputed adjustment that does not
    know she is ineligible.
 5. **No eligible women.** Cell [17,18), parity 3+, `m = .4`, 3 members, all
-   within .75 years of a birth. `Lambda = 1.2` cannot be realized; .6 expected
-   births are unrealized if this persists for half a year. Handling per
-   decision 2.
+   within .75 years of a birth. `Lambda = 1.2` cannot be realized; if this
+   persists for half a year, on average .6 draws of this cell are counted as
+   unrealized births. Handling per decision 2.
 6. **Cancelled attempt.** In on-demand mode the parity-0 [22,23) cell fires
    and chooses a woman, but no eligible man is found and the birth is
-   cancelled. Her parity and eligibility are unchanged, the cell's clock
-   restarts with a new threshold, and the attempt is not replaced.
-7. **Weights (future).** A cell with `m = .5` has 4 members: eligible women
+   cancelled. Her parity and eligibility are unchanged, the fertility clock
+   draws a new threshold, and the attempt is not replaced.
+7. **Weights.** A cell with `m = .5` has 4 members: eligible women
    with weights 1, 1 and 2, and an ineligible woman with weight 3. Under
    option A, `Lambda = 2` and hazards are `2*w/4`: .5, .5 and 1.0. Under
    option B, `Lambda = .5*7 = 3.5` and hazards are `3.5*w/4`: .875, .875
@@ -398,7 +387,7 @@ decision 5 was revised by the user after validation.
 2. **Cells with no eligible women.** (a) Drop the intensity and report
    unrealized births; (b) stop with an error; (c) carry the unrealized births
    forward until women become eligible, which changes their timing.
-   *Agreed by the user: (a).* This matches the existing treatment of partner
+   *Agreed by the user: (a),* reported as counts since D128. This matches the existing treatment of partner
    scarcity; an error would make runs fail at random in small populations.
    See the causes below.
 3. **Scope.** Add the new rule as an option alongside D028/D099 first, then
@@ -489,8 +478,8 @@ conditioning of the data. Under option B it would be applied a second time;
 under option A heterogeneity adds variation within cells while input rates are
 still recovered. With unstratified inputs, option B changes ASFRs and TFR
 unless weights are calibrated. Group multipliers already behave like option B
-at the group level, but groups have their own cells, so their targets remain
-exact.
+at the group level, but they make cells group-specific, so their targets
+remain exact.
 
 ## Not covered
 
@@ -503,12 +492,9 @@ lognormal weights and maternal inheritance.
 
 ## Calendar changes and unrealized-birth accounting
 
-Unrealized-birth reporting uses one-year windows anchored at the simulation's
-original start, even when fertility cells are rebuilt after a rate change.
-Only the window containing a change is split into rate-epoch fragments. For a
-run starting at 2000 with a change at 2000.5, the fragments are [2000,2000.5)
-and [2000.5,2001), followed by [2001,2002), not shifted annual windows. The
-same rule applies to fractional run starts, multiple changes within a window,
-partial final windows and changes in cell strata. Fragments are combined
-without redistributing an expected count across unknown exposure patterns.
-This reporting correction does not alter event hazards or random draws.
+Unrealized births are counted in one-year windows anchored at the
+simulation's original start, whatever rate changes occur: a run starting at
+2000 reports [2000,2001), [2001,2002) and so on, including fractional starts
+and partial final windows. Each count is recorded at the time the clock drew
+the cell, so no window is split at rate changes (D128 replaced the earlier
+rate-epoch fragments of expected values).

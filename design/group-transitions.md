@@ -4,8 +4,8 @@ Accepted milestone 6 contract, October 30, 2026 (D116). Implementation follows
 D106–D115 and the user's October 30 request. The accepted
 [report](../validation/milestone6.qmd) was undergoing its final render at
 acceptance; preserve all active intermediates. Household moves are deferred to
-[tentative milestone 10, multiple group columns](roadmap.md#tentative-milestone-10-multiple-group-columns),
-which may include regions/internal-migration applications (D114/D121), and are
+[milestone 9, multiple group columns](roadmap.md#milestone-9-multiple-group-columns),
+which may include regions/internal-migration applications (D114/D121/D131), and are
 excluded here.
 
 `group_transition(rates)` constructs an optional process;
@@ -28,20 +28,21 @@ unions an ongoing union is marriage. Group labels from transition inputs join
 the possible identity registry, so an initially empty destination is allowed;
 other group-specific processes must cover it under their existing rules.
 
-Each living person samples one candidate for each applicable outgoing pair,
-competing with other person events. Duration is time since the latest group
+Each outgoing schedule slot of a group is its own process with cells and one
+clock (D128); a living person is a member of each applicable slot's cells,
+competing with other processes. Duration is time since the latest group
 entry, falling back to birth time without transition history (user confirmed).
-Age is attained age. Changing union type resamples applicable transition risks
-for both partners without resetting group duration. No count-target adjustment
+Age is attained age. Changing union type moves both partners to their applicable
+transition cells without resetting group duration. No count-target adjustment
 is applied. With no transition process, no transition RNG draws occur.
-Same-person exact ties put transitions after death, birth, dissolution,
-conversion and search; tied destinations follow their first appearance in the rate table.
+Exact ties put transitions after death, birth, dissolution, conversion and
+search; tied destinations follow their first appearance in the rate table.
 
 At execution, only the initiator changes group. Record the change, remove old
 pool/calibration contributions, refresh fertility membership and applicable
 hazards, and reinstall contributions under the new group. Refresh an ongoing
-union's pair-dependent dissolution clock and the woman's group-dependent
-conversion clock when applicable; retain union start, birth spacing, parity,
+union's pair-dependent dissolution cell and its group-dependent conversion
+cell when applicable; retain union start, birth spacing, parity,
 parents and individual fertility weights. Ancestry proportions stay unchanged
 (user confirmed). Newborn inheritance continues to use current parental
 identities and the existing ancestry rules.
@@ -51,7 +52,7 @@ moves. Columns are `person_id`, `time`, `group_origin`, `group_dest`; labels
 retain the persons group type. Histories are ordered by time, preserve repeated
 moves, must chain to each person's current group, fall within the person's
 life and known endpoint, and are retained on restart. Duration resumes from
-the latest retained move; pending clocks are redrawn as for other processes.
+the latest retained move; cells are rebuilt as for other processes.
 A transition is effective at its recorded time. Historical observations split
 exposure at moves rather than attribute an entire life to final identity.
 Births/deaths and union events preceding a same-time transition use the origin;

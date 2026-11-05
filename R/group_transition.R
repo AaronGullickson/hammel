@@ -4,7 +4,7 @@
 #' individual changes group; ancestry, parentage and union histories are retained.
 #' Duration is years since the latest recorded transition, or age without one.
 #' Missing directed pairs, strata and gaps have zero risk. Restarts retain
-#' transition histories and redraw pending events.
+#' transition histories and resume durations from them.
 #'
 #' @param weights NULL (default) for unweighted selection, or a
 #'   [create_weight_model()] using person variables and `group_dest`, which

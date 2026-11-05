@@ -1,47 +1,26 @@
-# Milestone 8: binned-group hazards and formula weights
+# Milestone 8: cell scheduling and weight models
 
-Recorded October 31, 2026 (D121). **Status: step 1 (cell scheduling for every
-rate process) is implemented on the `milestone8-binned-intensity` branch and
-not yet accepted; step 2 (weights and eligibility) is not implemented.**
-Milestone 7 was accepted complete with its previous engine (D127, November 2,
-2026). Milestone 8 extends the fertility cell approach to all existing rate
-processes and will allow custom formula weights on those processes. This
-document records the implemented step 1 design, the discussion, selected
-principles, proposed diagnostics and questions still needing a contract. It
-does not select a public API or authorize an unspecified implementation.
+Updated November 5, 2026. **Milestone 8 is accepted complete (D130).** Every
+rate process is scheduled by cells with one clock per process (D128), and
+weight models choose who in a cell experiences an event (D129). This is the
+current specification; the [scientific contract](scientific-contract.md)
+summarizes it, and the user's [validation report](../validation/milestone8.qmd)
+is the acceptance evidence. The direction was selected on October 31, 2026
+(D121); the earlier discussion and the step-by-step development record are in
+Git history.
 
-The engine uses [cell-accounted fertility](fertility-cell-accounting.md) with
-[persistent fertility weights](fertility-heterogeneity-notes.md), and the same
-cell scheduling for the other five processes (see
-[step 1 implementation](#step-1-implementation)). Calendar-varying rates remain
-governed by [the milestone 7 contract](time-varying-rates.md). Other design
-documents that describe individual waiting-time clocks, such as
-[waiting-time sampling](waiting-time-sampling.md), predate step 1 and still
-need revision.
+The work was done in two steps at the user's direction. Step 1 moved all six
+rate processes to cell scheduling with weights of one, and was benchmarked
+against the previous engine and SOCSIM before continuing. Step 2 added weight
+models. One scheduling approach serves all rate processes: the engine keeps no
+individual waiting-time clocks, so as to simplify the code base. Fertility
+keeps its spacing eligibility (D101) and persistent `hetfert` weights (D102).
+Calendar-varying rates remain governed by [their contract](time-varying-rates.md).
 
-## Phasing
+## Cell scheduling (D128)
 
-User direction (November 4, 2026):
-
-1. **Step 1 (implemented):** move every rate process to cell scheduling, then
-   measure performance against the previous engine. Fertility keeps its spacing
-   eligibility and persistent `hetfert` weights unchanged. The other five
-   processes use weights of one and have no eligibility rules. Fertility's cell
-   machinery, including its handling of members crossing age boundaries, is
-   reused and generalized.
-2. **Step 2:** add weighting and eligibility mechanisms. The weight and
-   eligibility material below is notes for this step.
-
-One scheduling approach serves all rate processes. The engine will not keep
-individual clocks for some processes alongside cells for others. The aim is a
-simpler code base. If step 1 performance is unacceptable, the approach may be
-abandoned rather than combined with individual clocks.
-
-## Step 1 implementation
-
-This section describes the engine on the milestone 8 branch (November 4,
-2026). Choices marked *user direction* were selected by the user during step 1;
-the rest are implementation choices within that direction.
+Choices marked *user direction* were selected by the user during the
+milestone; the rest are implementation choices within that direction.
 
 ### Processes, units and cells
 
@@ -107,7 +86,7 @@ rate updates.
 - Each process has a `BoundaryQueue` with at most one pending boundary per
   unit: its next band edge. Boundaries are bookkeeping, consume no randomness,
   and are processed in time order before any event at or after them.
-- The queue is a bucket queue (buckets of 1/365 year over a two-year ring, plus
+- The queue is a bucket queue (buckets of 1/365 year over a 16-year ring, plus
   an overflow heap). Buckets are sorted when reached, so pops follow exactly
   (time, unit) order.
 - `refresh_person()` recomputes a person's membership in every process from
@@ -149,7 +128,7 @@ differently (for example, one shared search schedule against three equal
 previous-union schedules) create different cells and so differ draw by draw,
 while agreeing in distribution.
 
-### Removed with step 1
+### Removed from the previous engine
 
 The per-person event queue and its event versions, `schedule()`, the stored
 per-union dissolution and conversion clocks, the special handling of ties
@@ -170,7 +149,7 @@ identical histories before and after the change, and run time was unchanged.
 simulation-level test exercises every calibration path under
 `hammel.check_cells`.
 
-### Validation and performance (November 4, 2026)
+### Step 1 validation and performance (November 4, 2026)
 
 These are software checks, not user-selected acceptance thresholds.
 
@@ -207,14 +186,11 @@ article's code, extracted with `knitr::purl`.
 Per-boundary updates are the main added cost; calendar rate changes and
 fertility became cheaper.
 
-## Step 2 specification: weight models
+## Weight models (D129)
 
-Drafted November 4, 2026 from decisions the user made in discussion.
-**Status: implemented on the milestone 8 branch (November 4, 2026); not yet
-accepted.** Sections later in this document record the earlier discussion;
-where they differ, this section is current.
+Specified November 4, 2026 from decisions the user made in discussion.
 
-### Scope of this round
+### Scope
 
 Weights apply to mortality, fertility, rate-mode union search,
 dissolution, cohabitation-to-marriage conversion and group transitions.
@@ -316,8 +292,8 @@ excluded, as are user-supplied population columns, which belong to a separate
 characteristics feature. The ancestry shares sum to 1; a formula using all of
 them is collinear, which is harmless with fixed coefficients.
 
-Implementation note: parity is currently tracked only for parity-specific
-fertility. It must be tracked whenever a weight model uses it.
+Parity is tracked whenever a weight model uses it, as well as for
+parity-specific fertility.
 
 ### Cell stratification
 
@@ -372,7 +348,9 @@ the seed.
   stored. A chosen cell picks its member by rejection sampling: a uniform
   candidate is accepted with probability w / bound, where the cell keeps an
   upper bound on its members' weights (raised as weights arrive, reset when
-  the cell empties). This is exact for any bound at or above the largest
+  the cell empties, and reset to the exact largest weight after 32
+  consecutive rejections, so a bound left by a departed extreme-weight member
+  cannot stall selection). This is exact for any bound at or above the largest
   weight; a candidate at the bound is accepted without a further draw, so
   equal weights keep the unweighted pick and its random-number use. No
   structure is updated when units change cells.
@@ -456,79 +434,17 @@ against weight 1.2 for a partnered woman with hetfert 1 and 1 for an
 unpartnered woman with hetfert 1 in the same cell. With union-type-specific
 fertility rates, `partnered` would cancel and trigger the warning.
 
-### Validation targets (to be refined)
+### Validation
 
-Recovery of within-cell hazard ratios; preservation of every cell's input
-rate; how population-level effects shrink with population size; exact
-reproduction of unweighted runs with zero coefficients or constant custom
-weights; the cancellation warnings; NA handling; the custom-function contract
-and RNG reproducibility; and the cost of weighted selection.
-
-## Purpose and selected direction
-
-Separate two aspects of each demographic rate process:
-
-1. The input schedule determines the aggregate event intensity within a cell.
-2. Individual or union weights determine which eligible member experiences an
-   event, preserving relative risks within that cell.
-
-This generalizes the current fertility mechanism. Users can supply detailed
-rate strata, use formulas to distribute risk according to characteristics, or
-combine the two. Formula weighting should preserve the input cell intensity,
-rather than let the cell's covariate composition multiply its aggregate rate.
-
-The intended scope is mortality, fertility, rate-based union-search attempts,
-union dissolution, cohabitation-to-marriage conversion and directed individual
-group transitions. These are the six existing inputs in [the rate census](rate-inputs.md).
-On-demand partner matching remains triggered by a birth attempt; it is not a
-seventh input-rate process. Conditional partner choice and group inheritance
-are separate mechanisms, not replaced by event-weight formulas.
-
-A binned group here means a demographic rate cell. It need not correspond to
-one named population `group`, nor require a grouped population.
-
-## Cell boundaries selected by the user
-
-User direction (November 4, 2026), revising the original single-year rule:
-cells are split to single years only for a process with eligibility rules,
-which is currently fertility alone (spacing; D101 decision 5). The other five
-processes use their input bands as cells. Without eligibility rules every
-member's hazard equals the cell rate whatever the cell's width, so splitting
-cannot change results and only adds boundary updates. In the second
-demographic transition article, single-year splitting roughly doubled the cost
-of a rate-mode model with five-year bands. Weights will not depend on age
-within a band. Step 2 must still consider weights on traits correlated with
-age inside a wide band, which shift events toward the ages where the trait is
-common while keeping the band total.
-
-The rules below describe single-year splitting where it applies:
-
-- Use single-year attained-age or elapsed-duration bands, even when input bands
-  are wider. The process keeps its existing choice of clock; this does not add
-  a joint age-by-duration surface.
-- Preserve every other stratum in the input schedule: sex, group, union type,
-  previous-union category, directed origin/destination pair or symmetric group
-  pair, as applicable to that process.
-- Retain original fractional boundaries. Cells span at most one year: input
-  `[15,20)` gives `[15,16)`, ..., `[19,20)`; `[15.5,17)` gives `[15.5,16)` and
-  `[16,17)`. Duration bands split the same way, measured from each member's
-  own duration origin.
-- Retain fertility's existing actual-parity cells when parity-specific schedules
-  are supplied. An input band covering several parities applies to each
-  contained actual parity, as in D101.
-- Calendar periods select active schedules and trigger updates, as they do now.
-  They are not a persistent additional cross-classification of members by
-  historical period. Past events and exposure retain their recorded dates.
-
-An input age band of five years crossed with two sexes and two input groups
-therefore yields 20 potential cell definitions, before any additional
-input strata. Formula predictors do not automatically create further cells.
-
-For upper-open input ages in fertility, single-year cells are created up to the
-oldest attainable age in the run and the rest stays one open cell. Fertility's
-small-rate open-band tolerance (an open band stays one cell when spacing could
-affect only a negligible share) is retained. The other processes keep each
-upper-open band as one cell.
+The user's [milestone 8 report](../validation/milestone8.qmd) assesses rate
+recovery and within-cell hazard ratios for every process, population-level
+attenuation and performance. The test suite checks every cell's input rate,
+exact reproduction of unweighted runs with zero coefficients or constant
+custom weights, the cancellation warnings, NA handling, the custom-function
+contract, weight schedules, rejection sampling and RNG reproducibility, and
+compares maintained cell and calibration totals with explicit scans under
+`hammel.check_cells`. These are software checks, not user-selected
+acceptance thresholds.
 
 ## Aggregate intensity and relative individual risk
 
@@ -539,7 +455,7 @@ For cell c, let:
 - E_c be the members currently eligible to receive the event;
 - w_i be a member's relative selection weight.
 
-The proposed shared mathematical contract is:
+The contract is:
 
     Lambda_c = m_c * N_c
     P(i | event in c) = w_i / sum(w_j for j in E_c)
@@ -553,14 +469,13 @@ or exact observed rates in every finite cell or time interval.
 
 A process clock generates an event, a cell is chosen in proportion to its
 intensity, and selection assigns the recipient; see
-[step 1 implementation](#step-1-implementation) for the clocks, data
-structures, competing processes and same-time priority. This remains
-continuous-time execution, not annual simulation steps.
+[cell scheduling](#cell-scheduling-d128) for the clocks, data structures,
+competing processes and same-time priority. Execution is continuous, not in
+annual steps.
 
 With all eligible weights one and N_c equal to eligible membership, each member
-has hazard m_c. Aggregate scheduling can then reproduce the current independent
-hazard model in distribution, provided boundaries and competing events are
-handled correctly. Fixed-seed histories need not match after the algorithm changes.
+has hazard m_c, which reproduces the previous independent-hazard engine in
+distribution; fixed-seed histories differ.
 
 ### Worked mortality example
 
@@ -575,14 +490,9 @@ retaining 0.005. This composition dependence is part of preserving the cell targ
 
 ## Interpretation of formulas
 
-A log-linear form was discussed:
-
-    w_i = exp(x_i * beta)
-
-It gives h_i / h_j = exp((x_i - x_j) * beta) for eligible members of the same
-cell at the same instant. Formula syntax, coefficient storage, supported terms
-and whether arbitrary weight expressions will be allowed are not selected.
-The log-linear example is not an implemented API or a demographic coefficient default.
+Formula weights are log-linear, w_i = exp(x_i * beta), so
+h_i / h_j = exp((x_i - x_j) * beta) for eligible members of the same cell at
+the same instant. Coefficients are user inputs; there are no defaults.
 
 The input rate is a cell-average target, not a reference individual's hazard.
 Normalization can change with time and composition, including selective deaths
@@ -592,13 +502,10 @@ relative hazards; comparisons across cells also involve their schedules and
 normalization factors.
 
 For comparison, ordinary unnormalized proportional hazards would use
-h_i = m_c * w_i and total intensity m_c * sum(w_i). That alternative permits
-composition to alter aggregate rates. It was discussed to distinguish computation
-from demographic interpretation; it is not the selected target-preserving
-weight mechanism for milestone 8.
+h_i = m_c * w_i and total intensity m_c * sum(w_i), letting composition alter
+aggregate rates.
 
-User direction (November 4, 2026): the first milestone 8 version offers
-normalized weights only. An unnormalized option may be considered as a later
+User direction (November 4, 2026): milestone 8 offers normalized weights only. An unnormalized option may be considered as a later
 feature, but it needs its own contract first. A consequence to record as a
 limitation: normalized weights cannot produce frailty selection. Under
 normalization, a cell keeps its input rate however its members' weights shift.
@@ -622,11 +529,14 @@ cells are large and mixed in the weighted trait. The same model can show
 smaller effects in a small population than in a large one. Persistent fertility
 weights are already subject to this. Coarser cells for weighted processes are a
 possible later remedy if the effect proves to matter in practice; they are not
-selected.
+selected. Composition change over calendar time has the same effect on
+estimates pooled across periods; estimating within strata (for example age by
+sex by year) and excluding an open top age group recovers the within-cell
+ratio, as the validation report shows.
 
-Existing proportional input-rate multipliers act on m_c and therefore can change
-cell targets. They are conceptually distinct from normalized formula weights.
-Their API relationship to the new weight interface remains to be specified.
+Proportional input-rate multipliers (`group_prop_hazard`) act on m_c and so
+change cell targets; they are distinct from normalized weights. The user plans
+to replace them with a general `stratify()` input.
 
 ## Two ways to express stratification
 
@@ -639,6 +549,8 @@ normalization. In log-linear weights, a main effect of an existing input-rate
 stratum therefore has no additional effect. This was explicitly recognized by
 the user as a potential specification mistake worth warning about.
 
+Here `education` stands for a hypothetical future characteristic:
+
 | Log-weight formula term | If input rates already stratify by group |
 | --- | --- |
 | `group` | Main effect cancels within each cell |
@@ -646,70 +558,13 @@ the user as a potential specification mistake worth warning about.
 | `group + education` | Group main effect cancels; education can remain effective |
 | `group:education` | Can specify different education effects within each group |
 
-### Proposed warning behavior
-
-The user requested consideration of a redundancy warning. The following policy
-was discussed, but its exact implementation and diagnostic rules remain proposals:
-
-- Warn once for a user-specified term whose cancellation is structurally provable.
-- Identify the ineffective term, not the whole formula, and allow other terms to
-  retain their effect. Execution can continue.
-- Do not warn for the ordinary intercept, whose cancellation is expected.
-- Do not infer an error merely because a realized small cell happens to contain
-  identical covariate values.
-- Do not reject or warn about every reference to a stratification variable:
-  interactions can remain effective. Arbitrary custom expressions require
-  algebraic care; a constant additive contribution to raw weights need not
-  cancel like a common multiplicative factor.
-
-Illustrative wording: "The main effect of group has no effect on relative
-hazards because the input rates already stratify by group. Weights are
-normalized separately within each cell."
+Simulation warns about such terms (see [Diagnostics](#diagnostics)).
 
 ## Process-specific exposure and eligibility
 
 A shared scheduler must retain each process's demographic denominator and unit.
 The fertility spacing eligibility rule must not silently become a universal
 eligibility rule for other mechanisms.
-
-### Proposed general eligibility mechanism
-
-Status: deferred until a concrete rule is needed (*user direction, November 4,
-2026*). Fertility birth spacing is the only eligibility rule, and milestone 8
-adds none. The rules below record the proposed direction for a future rule;
-they are not accepted until one is specified. The cell machinery it would
-generalize already exists for fertility: eligible-member lists, unrealized
-intensity and single-year cells. A possible future rule is a grace period after divorce or
-widowhood before a new union search.
-
-Proposed rules:
-
-- **Rates are per member, not per eligible member.** Lambda_c = m_c * N_c counts
-  all reference members, including ineligible ones, as fertility does now
-  (D101). Eligible members' hazards rise to carry the cell's full intensity.
-  This keeps output rates equal to input rates when inputs are observed rates
-  for the whole population at risk. A future rule may choose per-eligible-member
-  rates only through its own decision.
-- **A weight of zero means ineligible.** Weights and eligibility are one
-  mechanism.
-- **A cell with no eligible member produces no events,** and its intensity is
-  reported as unrealized, as with fertility.
-- **Mortality has no eligibility rules,** and any mortality weights must be
-  strictly positive, so that no cell can make its members immortal.
-- **Model checks should warn when a rule and a schedule conflict,** for example
-  when a grace period covers a whole duration band whose input rate is nonzero.
-
-Worked example (illustrative rule, not implemented): the age-60 widowed
-search rate is 0.10 per year. The cell has 100 widows, 20 widowed less than a
-year ago and in a one-year grace period. The cell produces 100 x 0.10 = 10
-searches per year, shared by the 80 eligible widows at 0.125 each. Observed
-output is 10 searches per 100 widow-years, matching the input. Per-eligible-
-member rates would instead give 8 per year and an observed rate of 0.08.
-
-Duration-specific search schedules can already express a delay after a union
-ends: a schedule with `[0,1): 0` gives no searches in the first year
-([remarriage](remarriage.md)). A grace-period rule would add something new only
-for age-based schedules.
 
 | Process | Reference exposure or distinction to preserve |
 | --- | --- |
@@ -720,60 +575,25 @@ for age-based schedules.
 | Conversion | Current cohabitation exposure, with the documented woman's age or episode-duration clock |
 | Group transition | Origin-group exposure for each directed destination risk; destination denominators can share the same members |
 
-Dissolution and conversion units are unions, so future weight predictors need
-not be restricted to the woman's characteristics. Couple covariate names and
-evaluation context remain to be designed.
+## Deferred issues
 
-No feasible recipient or no positive eligible weight sum can make a target
-unattainable. The zero-weight proposal above awaits acceptance; invalid-weight
-policy, reporting and other process-specific failure rules need specification. Existing fertility unrealized-intensity and cancelled-
-birth rules remain current behavior; they are not automatically generalized or
-removed. Failed matching can still reduce union formation or realized births,
-even when their attempt intensities are preserved.
+These are recorded for future work; none is selected or implemented.
 
-## User-defined characteristics
-
-The user identified formula weights as a route to using future individual
-characteristics such as education, income or health without supplying every
-cross-classified rate schedule. Rate formulas determine how current values affect
-relative event risk; characteristic mechanisms determine the values themselves.
-
-This does not implement characteristic initialization, newborn assignment,
-inheritance, longitudinal updates or missing-value handling. Those contracts
-remain separate. Formula evaluation must not permit arbitrary callbacks to mutate
-engine state or bypass event/cell invalidation rules. Multiple independent group
-columns are separately assigned to tentative milestone 10 (D121).
-
-## Scheduling, implementation and validation work still required
-
-Changing weights alone does not change Lambda_c when eligibility and reference
-membership are unchanged. This could permit evaluation of current covariates at
-recipient selection instead of redrawing individual clocks. It is a computational
-opportunity, not a selected evaluation policy or demonstrated speed improvement.
-Time-dependent formulas and efficient weighted selection need investigation.
-
-Before step 2 implementation, specify:
-
-- Formula API, weight scale and validation, supported person/partner/history
-  covariates, persistent heterogeneity interactions and handling of missing values.
-- For each process, exact membership, exposure, eligibility, zero-weight behavior,
-  affected cells after events and duration-origin preservation/reset rules.
-- How weighted selection and eligibility fit the step 1 clocks, trees and
-  updates, including matching-calibration integration.
-- Characteristic/formula update timing and safe evaluation context, including
-  continuously changing age/duration predictors and new people.
-- Diagnostic provenance, observation semantics and any reporting of infeasible
-  target intensity beyond the existing fertility contract.
-
-Validation should include analytical uniform-weight equivalence in distribution,
-within-cell hazard-ratio recovery, how much population-level effects shrink
-across population sizes, cell intensity/exposure accounting, selective
-removal and changing normalization, formula redundancy/interactions, changing
-rates and covariates, duration boundaries, competing destinations, joint union
-state changes, infeasible risks, reproducibility and independence between runs.
-Use replications for comparisons after changed random-number consumption.
-Benchmark performance without assuming cell scheduling is always faster.
-These are proposed verification tasks, not user-selected scientific thresholds.
-
-No milestone 7 result or acceptance claim depends on this engine rewrite.
-Its current validation report and artifacts must be preserved.
+- **Eligibility rules beyond fertility spacing** (user direction, November 4,
+  2026: deferred until a concrete rule is needed, such as a grace period after
+  divorce or widowhood before a new search). The proposed direction keeps rates
+  per member, as fertility does (D101): eligible members carry the cell's full
+  intensity, and a cell with no eligible member would report unrealized events.
+  Duration-specific search schedules can already express a delay after a
+  union ends with a zero-rate first band ([remarriage](remarriage.md)).
+- **`NULL` entries in weight schedules,** to turn weighting off for an
+  interval, only if offered in parallel for matching, inheritance and weight
+  schedules (roadmap, milestone 11). A zero-coefficient formula does this now.
+- **Unnormalized weights,** which would permit frailty selection, need their own
+  contract.
+- **User-defined characteristics** (education, income, health) as weight
+  variables need initialization, inheritance, updating and missing-value
+  contracts; user-supplied population columns are not weight variables.
+  Multiple group columns are milestone 9 (D121, D131).
+- **Weights that vary with exact age or duration within a band** are not
+  offered; a custom function can vary weights by band only.

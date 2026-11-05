@@ -511,8 +511,9 @@ See [parity fertility](parity-fertility.md#observed-fertility-by-parity).
 For populations returned by `simulate()` (D101),
 `calculate_fertility_rates(..., unrealized = TRUE)` adds `unrealized_births`
 and `rate_fertility_adjusted = (births + unrealized_births) / person_years`.
-Unrealized births are the expected births dropped from fertility cells that had
-members but no eligible woman (`simulation$unrealized_births`), so the adjusted
+Unrealized births are counts of the times the fertility clock drew a cell that
+had members but no eligible woman (`simulation$unrealized_births`; D128; before
+November 4, 2026 they were expected values), so the adjusted
 rate shows what the input schedule would have produced without that loss. The
 observed `rate_fertility` remains the simulated outcome.
 
@@ -581,8 +582,8 @@ events in 100 years of exposure gives approximately [0, 0.036889] at 95%.
 Intervals use the final stratum's counts and exposure, after pooling where
 requested. They preserve all existing rate definitions, attributes and ordering.
 Fertility intervals describe observed `births / person_years`, including when
-`unrealized = TRUE`; fractional expected unrealized births are not Poisson
-event counts and do not enter the interval. These are marginal Poisson-model
+`unrealized = TRUE`; unrealized births are would-be events rather than
+observed births and do not enter the interval. These are marginal Poisson-model
 intervals, not simultaneous intervals, Monte Carlo SEs, or a guarantee of
 coverage under demographic feedback, shared partners or endogenous exposure.
 

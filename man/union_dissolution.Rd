@@ -45,19 +45,19 @@ in a cell dissolves without changing the cell's input rate.}
 }
 \description{
 Construct or attach an optional dissolution process. One continuous hazard
-per union is carried by the female partner, using years since the union
+applies per union, using years since the union
 began, independently of either partner's age. Rates are per partnered
 woman-year (equivalently union-year), not annual probabilities. Omitting
 this process retains death-only union endings.
 }
 \details{
-Births preserve the pending dissolution date. Exact same-person ties select
-death, then birth, then dissolution; a tied birth occurs while partnered.
-Dissolution ends the episode, restores both partners' availability, and
-reschedules the woman under her unpartnered fertility and existing search
-rules, retaining birth spacing. Optional age-specific search schedules by
+Births do not affect a union's dissolution risk. Exact ties select death,
+then birth, then dissolution; a tied birth occurs while partnered.
+Dissolution ends the episode, restores both partners' availability, and moves
+the woman to her unpartnered fertility and search risks, retaining birth
+spacing. Optional age-specific search schedules by
 previous union are specified through \code{\link[=union_formation]{union_formation()}}.
-Restarts resample at attained union duration rather than reset duration.
+Restarts resume at attained union duration rather than reset duration.
 }
 \section{Calendar rates}{
 
