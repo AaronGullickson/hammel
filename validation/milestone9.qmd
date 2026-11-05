@@ -81,22 +81,29 @@ model |>
     matching = create_age_gap_matching_model(
       2, 5,
       group_exogamy = list(
-race = c()
+        race = c("white:black" = -4, "white:other" = -2, "black:other" = -3),
+        region = NA
       )
     )
   )
-
 ```
 
-I envision that users will enter groups with a prefix that starts with `group_` to identify group columns (e.g. `group_race`, `group_region`). Stratification could occur within all rate schedules by these specified group columns. As before, groups are not specifically specified in the model but inferred from the initial population and rate schedules.
+This will allow for exogamy rates between each of the three racial groups, while no exogamy will be allowed between regions.
 
-The trickiest points I can think of that will require some rethinking are:
+Transition rate schedules will now apply to specific groups with the `group` argument. `'group_origin` and `group_dest` have been replaced with `origin` and `destination`. The transition rates for one group can be stratified by other groups. So, for example, you could stratify educational transitions to be different by region. Here is an example of how you would set a rate schedule for a specific group:
 
-- group_exogamy in matching models. We need a slightly different format that is specific to each group - that could probably work with a named list of named vectors where the names of the list identify the group. However, that would not allow for cross-group exogamy effects for users who want to get really fancy. I think for a first attempt we don't allow that but maybe possibly allow user specified R functions to allow greater complexity here.
-- inheritance models will need a specific model for each type of group. This could be specified with a list structure.
-- transition rate structure. Should it be separate transition schedules for each group or strack them altogether? I also think it should be possible to stratify one group's transition rates by another group. So educational transition rates might vary by region.
+```r
+model |>
+  set_group_transition(educ_trans_rates, group = "education")
+```
+
+This would set the transition rates for the education group.
 
 ### Changes to helpers
+
+Because of the new structure, we have removed all of the `group_prop_hazard` arguments from the rate processes. Instead, we create a `stratify_rates` function that takes an existing rate object and stratifies it by additional variables using proportional hazards. This can be used for any stratification variable of the user's choice, so it allows users to quickly build up a stratified rate schedule from an initial schedule.
+
+We also adjusted the `calculate_*_rates` functions to take a single `by` argument as a character vector rather than the various boolean by_* that were used across different functions. This allows more flexibility in how users can stratify the lexis counts they desire and makes it easy to inlude group columns that have unique names.
 
 ## Stratifying Rates
 
