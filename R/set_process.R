@@ -21,6 +21,10 @@
 #'   strata. List names must occur in the schedules; omitted entries use 1.0.
 #' @param hetfert NULL (default) for uniform mother selection, or a
 #'   [het_fert()] specification for persistent lognormal selection weights.
+#' @param weights NULL (default) for unweighted selection within rate cells, or
+#'   a [create_weight_model()] specification. Weights choose which member of a
+#'   cell experiences an event without changing the cell's input rate. In
+#'   fertility they combine with `hetfert` on the log scale.
 #' @param ffab Probability that a newborn is female, default `0.4886`.
 #'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
 #' @param inheritance A group identity model from [create_group_inheritance()],
@@ -68,6 +72,7 @@ attach_process <- function(model, process) {
       stop("Built-in process rates must use person-year units.", call. = FALSE)
     }
     validate_rates(process$rates, mortality = name == "mortality")
+    validate_process_weights(process$weights, "person")
     if (name == "fertility") {
       validate_fertility_group_prop_hazard(process$group_prop_hazard, process$rates)
       process$inheritance <- normalize_group_inheritance(process$inheritance)
@@ -90,16 +95,19 @@ attach_process <- function(model, process) {
   }
   if (name == "union_formation") {
     validate_union_formation(process)
+    validate_process_weights(process$weights_conversion, "union")
     if (!is.null(process$rates)) process$rates <- tibble::as_tibble(process$rates)
     for (field in c("matching", "father_matching", "cohab_matching"))
       process[field] <- list(normalize_model_argument(process[[field]]))
   }
   if (name == "group_transition") {
     validate_group_transition(process)
+    validate_process_weights(process$weights, "transition")
     process$rates <- tibble::as_tibble(process$rates)
   }
   if (name == "union_dissolution") {
     validate_union_dissolution(process)
+    validate_process_weights(process$weights, "union")
     process$rates <- tibble::as_tibble(process$rates)
   }
   model$processes[name] <- list(process)
@@ -108,18 +116,19 @@ attach_process <- function(model, process) {
 
 #' @rdname set_process
 #' @export
-set_mortality <- function(model, rates, group_prop_hazard = NULL) {
-  set_process(model, mortality(rates, group_prop_hazard = group_prop_hazard))
+set_mortality <- function(model, rates, group_prop_hazard = NULL, weights = NULL) {
+  set_process(model, mortality(rates, group_prop_hazard = group_prop_hazard, weights = weights))
 }
 
 #' @rdname set_process
 #' @export
 set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard = NULL,
                           inheritance = create_group_inheritance(), ffab = 0.4886,
-                          hetfert = NULL) {
+                          hetfert = NULL, weights = NULL) {
   set_process(model, fertility(rates, birth_interval = birth_interval,
                               group_prop_hazard = group_prop_hazard,
-                              inheritance = inheritance, ffab = ffab, hetfert = hetfert))
+                              inheritance = inheritance, ffab = ffab, hetfert = hetfert,
+                              weights = weights))
 }
 
 #' Specify age-specific demographic rates
@@ -217,6 +226,10 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #'   accept unpartnered/partnered. Omitted types and groups have multiplier 1.
 #' @param hetfert NULL (default) for uniform mother selection, or a
 #'   [het_fert()] specification for persistent lognormal selection weights.
+#' @param weights NULL (default) for unweighted selection within rate cells, or
+#'   a [create_weight_model()] specification. Weights choose which member of a
+#'   cell experiences an event without changing the cell's input rate. In
+#'   fertility they combine with `hetfert` on the log scale.
 #' @param ffab Probability that a newborn is female, default `0.4886`.
 #'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
 #' @param inheritance A group identity model from [create_group_inheritance()],
@@ -244,11 +257,14 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #' model <- hammel_model() |>
 #'   set_process(deaths) |>
 #'   set_process(births)
-mortality <- function(rates, group_prop_hazard = NULL) {
+mortality <- function(rates, group_prop_hazard = NULL, weights = NULL) {
   validate_rates(rates, mortality = TRUE)
   validate_group_prop_hazard(group_prop_hazard)
+  validate_process_weights(weights, "person")
+  warn_cancelled_weight_terms(weights, weight_strata("mortality", rates, group_prop_hazard), "mortality")
   process <- new_rate_process("mortality", rates)
   process$group_prop_hazard <- group_prop_hazard
+  process$weights <- weights
   process
 }
 
@@ -256,8 +272,10 @@ mortality <- function(rates, group_prop_hazard = NULL) {
 #' @export
 fertility <- function(rates, birth_interval = 0.75, group_prop_hazard = NULL,
                       inheritance = create_group_inheritance(), ffab = 0.4886,
-                          hetfert = NULL) {
+                          hetfert = NULL, weights = NULL) {
   validate_rates(rates, mortality = FALSE)
+  validate_process_weights(weights, "person")
+  warn_cancelled_weight_terms(weights, weight_strata("fertility", rates, group_prop_hazard), "fertility")
   validate_fertility_group_prop_hazard(group_prop_hazard, rates)
   inheritance <- normalize_group_inheritance(inheritance)
   validate_birth_interval(birth_interval)
@@ -268,6 +286,7 @@ fertility <- function(rates, birth_interval = 0.75, group_prop_hazard = NULL,
   process$birth_interval <- birth_interval
   process$ffab <- ffab
   process$hetfert <- hetfert
+  process$weights <- weights
   process$group_prop_hazard <- group_prop_hazard
   warn_unreachable_parity_cells(process$rates, birth_interval)
   process

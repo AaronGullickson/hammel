@@ -250,7 +250,13 @@ simulate <- function(model, years, seed = NULL) {
       engine_persons$.group_entry[i] <- as.numeric(latest)
     }
   }
-  if ("previous_union" %in% names(union_rates) || cohab_enabled) {
+  weight_models <- list(mortality = model$processes$mortality$weights,
+    fertility = model$processes$fertility$weights,
+    dissolution = dissolution_process$weights,
+    conversion = union_process$weights_conversion,
+    transition = transition_process$weights)
+  weight_models <- Filter(Negate(is.null), weight_models)
+  if ("previous_union" %in% names(union_rates) || cohab_enabled || length(weight_models)) {
     previous <- previous_union_info_cpp(population$persons, population$unions, counts_cohab)
     engine_persons$.hammel_previous_union <- previous$previous_union
     engine_persons$.hammel_previous_union_end <- previous$end_time
@@ -283,6 +289,17 @@ simulate <- function(model, years, seed = NULL) {
     cohab_matching <- if (scheduled_models) model_context$cohab_matching else
       if (is.null(union_process$cohab_matching)) matching else
         prepare_matching_model(union_process$cohab_matching, group_values)
+    ancestry_labels <- if (is.null(population[["ancestry"]])) character() else
+      setdiff(names(population[["ancestry"]]), "person_id")
+    weight_input <- if (!length(weight_models)) NULL else {
+      types <- c(mortality = "person", fertility = "person", dissolution = "union",
+                 conversion = "union", transition = "transition")
+      prepared <- lapply(names(weight_models), function(name)
+        prepare_weight_model(weight_models[[name]], types[[name]], name, group_values, ancestry_labels))
+      names(prepared) <- names(weight_models)
+      c(prepared, list(group_labels = if (is.null(group_values)) character() else
+        as.character(group_values), ancestry_labels = ancestry_labels))
+    }
     native <- simulate_cpp(engine_persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
                            matching,
@@ -298,7 +315,8 @@ simulate <- function(model, years, seed = NULL) {
                            cohab_matching, counts_cohab,
                            isTRUE(getOption("hammel.check_cells", FALSE)),
                            if (is.null(hetfert)) NULL else unclass(hetfert), transition_rates,
-                           if (scheduled_models) model_context$config else NULL)
+                           if (scheduled_models) model_context$config else NULL,
+                           weight_input)
     if (!isTRUE(native$cells_consistent))
       stop("Internal error: fertility cell counts are inconsistent.", call. = FALSE)
     persons <- population$persons

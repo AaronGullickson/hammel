@@ -444,6 +444,9 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   previous-union axis. NULL gives no conversions and warns at simulation.
 #'   Conversion keeps partners, closes cohab with reason `conversion`, and starts
 #'   a linked marriage with a new dissolution-duration origin.
+#' @param weights_conversion NULL (default) for unweighted selection, or a
+#'   [create_weight_model()] using union variables, which chooses which
+#'   cohabitation in a cell converts without changing the cell's input rate.
 #' @param cohabitation_counts_as_previous_union Logical, default FALSE. FALSE
 #'   restores previous legal-marriage category after a cohabitation ends; TRUE
 #'   classifies cohab breakup/death as separated/widowed. Search duration still
@@ -458,7 +461,8 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
                             diagnostics = FALSE, group_prop_hazard = NULL,
                             cohab_prob = NULL, cohab_matching = NULL, union_convert_rate = NULL,
-                            cohabitation_counts_as_previous_union = FALSE) {
+                            cohabitation_counts_as_previous_union = FALSE,
+                            weights_conversion = NULL) {
   process <- structure(list(
     name = "union_formation", initiation = initiation, matching = matching,
     min_male_age = min_male_age,
@@ -466,9 +470,14 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
     cancel_birth_if_no_match = cancel_birth_if_no_match, diagnostics = diagnostics,
     rates = rates, rate_unit = "person_year", group_prop_hazard = group_prop_hazard,
     cohab_prob = cohab_prob, cohab_matching = cohab_matching, union_convert_rate = union_convert_rate,
-    cohabitation_counts_as_previous_union = cohabitation_counts_as_previous_union
+    cohabitation_counts_as_previous_union = cohabitation_counts_as_previous_union,
+    weights_conversion = weights_conversion
   ), class = c("hammel_union_formation", "hammel_process"))
   validate_union_formation(process)
+  validate_process_weights(weights_conversion, "union")
+  if (!is.null(weights_conversion) && !is.null(union_convert_rate))
+    warn_cancelled_weight_terms(weights_conversion, weight_strata("conversion", union_convert_rate),
+                                "conversion")
   for (field in c("matching", "father_matching", "cohab_matching"))
     process[field] <- list(normalize_model_argument(process[[field]]))
   for (field in c("cohab_prob", "union_convert_rate"))
@@ -488,12 +497,13 @@ set_union_formation <- function(model, initiation, matching = create_age_gap_mat
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
                             diagnostics = FALSE, group_prop_hazard = NULL,
                             cohab_prob = NULL, cohab_matching = NULL, union_convert_rate = NULL,
-                            cohabitation_counts_as_previous_union = FALSE) {
+                            cohabitation_counts_as_previous_union = FALSE,
+                            weights_conversion = NULL) {
   set_process(model, union_formation(initiation, matching, rates,
                                      min_male_age, kinship_generations, father_matching,
                                      cancel_birth_if_no_match, diagnostics, group_prop_hazard,
                                      cohab_prob, cohab_matching, union_convert_rate,
-                                     cohabitation_counts_as_previous_union))
+                                     cohabitation_counts_as_previous_union, weights_conversion))
 }
 
 validate_union_formation <- function(process) {

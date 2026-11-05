@@ -5,9 +5,9 @@
 \alias{set_union_dissolution}
 \title{Specify duration-dependent union dissolution}
 \usage{
-union_dissolution(rates, group_prop_hazard = NULL)
+union_dissolution(rates, group_prop_hazard = NULL, weights = NULL)
 
-set_union_dissolution(model, rates, group_prop_hazard = NULL)
+set_union_dissolution(model, rates, group_prop_hazard = NULL, weights = NULL)
 }
 \arguments{
 \item{rates}{A nonempty data frame with numeric \code{dur_start}, \code{dur_end}, and
@@ -31,6 +31,10 @@ rate multipliers by unordered group pair, e.g. \code{c("A:B" = 1.2)} applies
 in both directions. Omitted pairs use 1; zero suppresses risk. Reversed
 duplicate keys are errors. With no population groups, simulation warns
 and ignores multipliers.}
+
+\item{weights}{NULL (default) for unweighted selection, or a
+\code{\link[=create_weight_model]{create_weight_model()}} using union variables, which chooses which union
+in a cell dissolves without changing the cell's input rate.}
 
 \item{model}{A \code{hammel_model} object.}
 }

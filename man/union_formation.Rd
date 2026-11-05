@@ -18,7 +18,8 @@ union_formation(
   cohab_prob = NULL,
   cohab_matching = NULL,
   union_convert_rate = NULL,
-  cohabitation_counts_as_previous_union = FALSE
+  cohabitation_counts_as_previous_union = FALSE,
+  weights_conversion = NULL
 )
 
 set_union_formation(
@@ -35,7 +36,8 @@ set_union_formation(
   cohab_prob = NULL,
   cohab_matching = NULL,
   union_convert_rate = NULL,
-  cohabitation_counts_as_previous_union = FALSE
+  cohabitation_counts_as_previous_union = FALSE,
+  weights_conversion = NULL
 )
 }
 \arguments{
@@ -138,6 +140,10 @@ restores previous legal-marriage category after a cohabitation ends; TRUE
 classifies cohab breakup/death as separated/widowed. Search duration still
 starts at the latest partnership ending. Only applies to typed unions.}
 
+\item{weights_conversion}{NULL (default) for unweighted selection, or a
+\code{\link[=create_weight_model]{create_weight_model()}} using union variables, which chooses which
+cohabitation in a cell converts without changing the cell's input rate.}
+
 \item{model}{A \code{hammel_model} object.}
 }
 \value{
@@ -212,3 +218,4 @@ including future intervals, are validated; gaps in a run are errors. NULL
 father/cohabitation matching dynamically follows general matching. Other
 non-rate arguments remain static.
 }
+

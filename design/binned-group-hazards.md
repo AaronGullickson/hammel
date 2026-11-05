@@ -175,6 +175,215 @@ article's code, extracted with `knitr::purl`.
 Per-boundary updates are the main added cost; calendar rate changes and
 fertility became cheaper.
 
+## Step 2 specification: weight models
+
+Drafted November 4, 2026 from decisions the user made in discussion.
+**Status: implemented on the milestone 8 branch (November 4, 2026); not yet
+accepted.** Sections later in this document record the earlier discussion;
+where they differ, this section is current.
+
+### Scope of this round
+
+Weights apply to mortality, fertility, dissolution, cohabitation-to-marriage
+conversion and group transitions. **Search weights are deferred**, because
+weighted searches change the intensities that matching calibration solves on;
+they will come with the calibration rework. Eligibility rules are also out of
+scope: every weight is strictly positive. Weight models are fixed over calendar
+time; time-varying weight schedules are deferred.
+
+### Weights and selection
+
+For a unit i in cell c, the weight model gives a log weight eta_i and the
+weight w_i = exp(eta_i). The cell's intensity is unchanged:
+
+    Gamma_c = m_c * N_c
+    P(i | event in c) = w_i / sum(w_j for eligible j in c)
+
+Weights decide who in the cell experiences the event; they never change a
+cell's intensity, the process clock or which cell is chosen. exp(beta) for a
+term is the hazard ratio between two members of the same cell that differ by
+one unit in it. Population-level ratios can be smaller where cells are small
+or homogeneous (see [cell composition](#cell-composition-and-population-level-effects)).
+In fertility only eligible women are weighted and chosen, as now.
+
+### API
+
+    create_weight_model(formula, coefficients, group_levels = NULL)
+    create_weight_model(fun = f)
+
+The formula form mirrors `create_matching_model()`: a one-sided formula, a
+finite named numeric vector of coefficients, and `group_levels` (at least two
+ordered labels) when the formula uses a categorical group variable.
+Categorical variables use treatment coding with fixed levels, and coefficient
+names follow the model-matrix column names (for example `groupB`,
+`union_typecohab`). One `group_levels` applies to every group-valued variable
+(`group`, `partner_group`, `group_dest`, `group_w`, `group_h`), so they share
+the reference group: `~ group + partner_group` with levels `c("A", "B")` has
+coefficients `groupB` and `partner_groupB`. Other categorical variables have
+engine-fixed levels, with the first listed in [Variables](#variables) as the
+reference. The intercept has no effect and is ignored. Non-finite
+coefficients are errors.
+
+Formula terms are main effects of supported variables and their interactions
+(`:` or `*`). Transformations such as `I()` or `log()` are not supported; a
+custom function covers anything else.
+
+Weight models attach to processes through new arguments:
+
+| Process | Argument |
+| --- | --- |
+| Mortality | `set_mortality(model, rates, weights = NULL)` |
+| Fertility | `set_fertility(..., weights = NULL)` |
+| Dissolution | `set_union_dissolution(..., weights = NULL)` |
+| Conversion | `set_union_formation(..., weights_conversion = NULL)` |
+| Group transitions | `set_group_transition(model, rates, weights = NULL)` |
+| Union search (deferred) | `set_union_formation(..., weights = NULL)` |
+
+`NULL` keeps unweighted selection.
+
+### Variables
+
+Person processes (mortality, fertility, transitions) can use:
+
+| Variable | Values |
+| --- | --- |
+| `sex` | `"f"`, `"m"` |
+| `group` | population group (requires `group_levels`) |
+| `union_type` | `"unpartnered"`, `"cohab"`, `"marriage"` |
+| `partnered` | 1 if in a union, else 0 |
+| `parity` | number of births (women; 0 for men) |
+| `previous_union` | `"none"`, `"separated"`, `"widowed"` |
+| `partner_group` | partner's group; NA when unpartnered |
+| `ancestry_<group>`, `ancestry_unknown` | ancestry shares, each in [0, 1] |
+| `group_dest` | transitions only: the destination of the risk |
+
+Union processes (dissolution, conversion) use partner variables with the
+suffix `_w` (wife) or `_h` (husband): `group_w`, `group_h`, `parity_w`,
+`previous_union_w`, `previous_union_h`, `ancestry_<group>_w` and
+`ancestry_<group>_h` (births are counted for mothers only, so there is no
+`parity_h`), plus the couple terms:
+
+| Variable | Values |
+| --- | --- |
+| `same_group` | 1 if both partners are in the same group, else 0 (for group-exogamous unions) |
+| `age_difference` | husband's age minus wife's age, fixed for the union |
+| `union_type` | `"cohab"` or `"marriage"` |
+
+All variables change only at events, so a unit's weight is constant between
+its refreshes. Continuously changing quantities (exact age, durations) are
+excluded, as are user-supplied population columns, which belong to a separate
+characteristics feature. The ancestry shares sum to 1; a formula using all of
+them is collinear, which is harmless with fixed coefficients.
+
+Implementation note: parity is currently tracked only for parity-specific
+fertility. It must be tracked whenever a weight model uses it.
+
+### Cell stratification
+
+*User direction (November 4, 2026):* cells stratify only as finely as the input
+rate schedules. A process whose active rates have no group-specific schedules
+(directly or through `group_prop_hazard`) pools all groups into one set of
+cells, so group terms in its weight model take effect. Multipliers that are all
+one do not stratify. Pooled fertility cells still report unrealized births by
+group: each group's share is the cell rate times its members, so the reported
+values match per-group cells. A woman's matching-calibration bin uses her own
+group. Group transitions always stratify by origin group, and dissolution by
+group pair only when its rates do. Pooling changes cell structure, and so
+fixed-seed histories, for grouped models with shared rates; results are
+equivalent in distribution. The user plans to replace `group_prop_hazard`
+with a general `stratify()` input; the cell rule depends only on the
+stratification of the prepared rate table, so it carries over.
+
+### Missing values
+
+- A formula term whose variable is NA (for example `partner_group` for an
+  unpartnered person) contributes zero to eta. Other terms keep their effect.
+- An NA (or NaN) returned by a custom function gives eta = 0 for that unit.
+- Either case warns once per run, naming the process and variable or function.
+- An infinite value from a custom function is an error.
+
+### Custom functions
+
+`fun(members, bin)` is called with:
+
+- `members`: a tibble with one row per eligible unit in the chosen cell. It
+  holds `person_id` (or `union_id`, `wife_id`, `husband_id` for union
+  processes) and every variable listed above, under the same names.
+- `bin`: a list describing the cell: `process`, its strata (for example sex,
+  group, union type, parity range, previous-union category, group pair or
+  destination) and its band, as `age_start`/`age_end` or `dur_start`/`dur_end`,
+  plus `time_start`/`time_end` of the active rate period (NA for static rates).
+
+No exact times are passed: a function can vary weights by band but not by
+exact age or duration within a band.
+
+It must return a numeric vector of log weights, one per row. A wrong length,
+a non-numeric result or an infinite value is an error; NA follows the rule
+above. The function cannot change engine state. It shares the engine's random
+number stream, as custom inheritance does, so runs remain reproducible from
+the seed.
+
+### Evaluation
+
+- **At selection:** weights are computed only when a cell has been chosen,
+  for that cell's eligible members. Formulas are evaluated natively; custom
+  functions are called once per event.
+- **Fertility with matching calibration:** when weighted matching calibration
+  is active (more than one group and group terms in matching), calibration
+  needs the weighted intensity of unpartnered women by calibration bin at all
+  times. Fertility weights are then computed when each woman is refreshed and
+  kept in the cell's existing weight tree and calibration sums, as `hetfert`
+  is now. A custom function is then called at every refresh of every woman;
+  simulation warns that this can be slow.
+- **`hetfert`:** combines additively on the log scale,
+  eta_i = log(hetfert_i) + x_i * beta, so accepted milestone 5 behavior is
+  unchanged when no fertility weight model is given. Replacing `hetfert` by a
+  formula term may follow once persistent, inherited characteristics exist.
+- **Equal weights reproduce unweighted runs:** a formula whose coefficients
+  are all zero is skipped. When every eligible member of the chosen cell has
+  the same weight, the member is chosen with the unweighted rule and the same
+  uniform draw, so a custom function returning a constant also reproduces the
+  unweighted run.
+
+### Diagnostics
+
+Simulation warns once for each formula term that cancels within every cell
+of its process, because the process's rates already stratify by its
+variables. For example, `group` in mortality, `union_type` in dissolution, or
+`parity` in parity-specific fertility. The warning names the term. Interactions
+with a non-cancelling variable do not warn. Custom functions are not
+inspected.
+
+### Worked examples
+
+*Mortality.* A cell (men aged 70 in group A) has 100 members, 60 of them
+partnered, and death rate m. The formula `~ partnered` with coefficient
+log(0.8) gives weights 0.8 and 1. The cell's intensity stays 100 m. A
+partnered man has hazard 100 m x 0.8 / (60 x 0.8 + 40) = 0.909 m, and an
+unpartnered man 1.136 m. Their ratio is 0.8, and the cell's average hazard is
+still m.
+
+*Dissolution.* `~ age_difference` with coefficient log(1.05) makes a union
+with a five-year age gap 1.05^5 = 1.28 times as likely to be the one dissolved
+as an otherwise similar union with no gap in the same cell. Terms such as
+`same_group` cancel when dissolution rates stratify by group pair, because
+every union in a pair cell shares the same value.
+
+*Fertility with `hetfert`.* Fertility rates are not stratified by union type,
+and the weight model is `~ partnered` with coefficient log(1.2). A partnered,
+eligible woman with hetfert 1.5 has eta = log(1.5) + log(1.2) and weight 1.8,
+against weight 1.2 for a partnered woman with hetfert 1 and 1 for an
+unpartnered woman with hetfert 1 in the same cell. With union-type-specific
+fertility rates, `partnered` would cancel and trigger the warning.
+
+### Validation targets (to be refined)
+
+Recovery of within-cell hazard ratios; preservation of every cell's input
+rate; how population-level effects shrink with population size; exact
+reproduction of unweighted runs with zero coefficients or constant custom
+weights; the cancellation warnings; NA handling; the custom-function contract
+and RNG reproducibility; and the cost of weighted selection.
+
 ## Purpose and selected direction
 
 Separate two aspects of each demographic rate process:

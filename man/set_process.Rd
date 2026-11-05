@@ -8,7 +8,7 @@
 \usage{
 set_process(model, process)
 
-set_mortality(model, rates, group_prop_hazard = NULL)
+set_mortality(model, rates, group_prop_hazard = NULL, weights = NULL)
 
 set_fertility(
   model,
@@ -17,7 +17,8 @@ set_fertility(
   group_prop_hazard = NULL,
   inheritance = create_group_inheritance(),
   ffab = 0.4886,
-  hetfert = NULL
+  hetfert = NULL,
+  weights = NULL
 )
 }
 \arguments{
@@ -34,6 +35,11 @@ accounting. Without population groups, simulation warns and ignores it.
 Fertility also accepts a named list of vectors for \code{partnered} and/or
 \code{unpartnered}, or cohab/marriage when rates include those \code{union_type}
 strata. List names must occur in the schedules; omitted entries use 1.0.}
+
+\item{weights}{NULL (default) for unweighted selection within rate cells, or
+a \code{\link[=create_weight_model]{create_weight_model()}} specification. Weights choose which member of a
+cell experiences an event without changing the cell's input rate. In
+fertility they combine with \code{hetfert} on the log scale.}
 
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
 defaulting to \code{0.75}. Must be finite and nonnegative.}
