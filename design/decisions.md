@@ -74,6 +74,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Milestones 9–11 reordered: group columns, immigration, then summaries | D131 |
 | `stratify_rates()` replaces `group_prop_hazard` | D132 |
 | One `by` argument for rate calculators; shared observation engine | D133 |
+| Multiple group dimensions: declaration, names, staging | D134 |
 
 ## Recorded decisions
 
@@ -2899,3 +2900,33 @@ and the new variables.
 reports for milestones 1 and 3–8 use them and reproduce at their recorded
 commits. See
 [demographic analysis](demographic-analysis.md#stratifying-results-with-by-d133).
+
+## D134 — Multiple group dimensions (November 5, 2026)
+
+**Status:** User-selected design for milestone 9 (D131), decided in discussion
+November 5, 2026. Not yet implemented.
+
+**Decision:** Populations may carry several categorical group dimensions,
+always declared with `set_groups(model, race = group(...), ...)`; there is no
+implicit single `group` column. `group()` holds a dimension's optional ordered
+`categories` (default inferred; replaces inheritance's `groups` and the
+`group_levels` of matching and weight models, with the first category as
+reference), `ancestry` (default `FALSE`) and `inheritance` (moved from
+`set_fertility()`). The declaration is stored with the population and carried
+by results. Dimensions use their own names, with reserved names and derived
+names as listed in the design. Rate tables may be stratified by any declared
+dimension; transitions are set per dimension with
+`set_group_transition(model, rates, group = ...)` and use `origin` and
+`destination`. Matching settings become per-dimension lists, calibrated
+jointly across the dimensions a matching model uses. Baseline populations take
+`groups` as independent weights or a joint table and carry a default
+declaration. Ancestry is a named list of tibbles.
+
+**Staging:** step 1 delivers everything except joint matching calibration,
+with group effects in matching limited to one dimension; step 2 adds joint
+calibration.
+
+**Implications:** Single-group code, tests, articles and reports change
+(`set_groups(model, group = group())` reproduces a single dimension named
+`group`). Accepted reports reproduce at their recorded commits. See
+[multiple group dimensions](multiple-groups.md).
