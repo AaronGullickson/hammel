@@ -477,7 +477,8 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
     rates = rates, rate_unit = "person_year", group_prop_hazard = group_prop_hazard,
     cohab_prob = cohab_prob, cohab_matching = cohab_matching, union_convert_rate = union_convert_rate,
     cohabitation_counts_as_previous_union = cohabitation_counts_as_previous_union,
-    weights_conversion = weights_conversion, weights = weights
+    weights_conversion = normalize_model_argument(weights_conversion),
+    weights = normalize_model_argument(weights)
   ), class = c("hammel_union_formation", "hammel_process"))
   validate_union_formation(process)
   validate_process_weights(weights_conversion, "union")

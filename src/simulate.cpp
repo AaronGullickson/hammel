@@ -2686,7 +2686,37 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     SEXP fun = R_NilValue;
   };
   std::map<std::string, WeightSpec> weight_specs;
+  // Calendar schedules of weight models: intervals and their models. The
+  // active model is copied into weight_specs, so references to it stay valid.
+  struct WeightSchedule {
+    std::vector<double> start, end;
+    std::vector<WeightSpec> models;
+    int active = -1;
+  };
+  std::map<std::string, WeightSchedule> weight_schedules;
   std::vector<std::string> weight_group_labels, weight_ancestry_labels;
+  auto parse_weight_spec = [&](List x, const std::string& name) {
+    WeightSpec spec;
+    spec.process = name;
+    spec.custom = as<bool>(x["custom"]);
+    if (spec.custom) spec.fun = x["fun"];
+    else {
+      spec.coefficients = as<std::vector<double>>(x["coefficients"]);
+      List factors = x["factors"];
+      for (int k = 0; k < factors.size(); ++k) {
+        IntegerMatrix m = factors[k];
+        std::vector<std::array<int, 3>> column;
+        for (int r = 0; r < m.nrow(); ++r) column.push_back({m(r, 0), m(r, 1), m(r, 2)});
+        spec.factors.push_back(column);
+      }
+    }
+    return spec;
+  };
+  auto weight_interval = [&](const WeightSchedule& w, double now) {
+    for (size_t k = 0; k < w.start.size(); ++k)
+      if (w.start[k] <= now && now < w.end[k]) return static_cast<int>(k);
+    return -1;
+  };
   if (weight_input.isNotNull()) {
     List input(weight_input.get());
     weight_group_labels = as<std::vector<std::string>>(input["group_labels"]);
@@ -2694,24 +2724,40 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     for (const char* name : {"mortality", "fertility", "dissolution", "conversion", "transition", "search"}) {
       if (!input.containsElementNamed(name)) continue;
       List x = input[name];
-      WeightSpec spec;
-      spec.process = name;
-      spec.custom = as<bool>(x["custom"]);
-      if (spec.custom) spec.fun = x["fun"];
-      else {
-        spec.coefficients = as<std::vector<double>>(x["coefficients"]);
-        List factors = x["factors"];
-        for (int k = 0; k < factors.size(); ++k) {
-          IntegerMatrix m = factors[k];
-          std::vector<std::array<int, 3>> column;
-          for (int r = 0; r < m.nrow(); ++r) column.push_back({m(r, 0), m(r, 1), m(r, 2)});
-          spec.factors.push_back(column);
-        }
-        if (spec.coefficients.empty()) continue;   // all coefficients zero: unweighted
+      if (x.containsElementNamed("schedule")) {
+        WeightSchedule w;
+        w.start = as<std::vector<double>>(x["time_start"]);
+        w.end = as<std::vector<double>>(x["time_end"]);
+        List models = x["models"];
+        for (int k = 0; k < models.size(); ++k) w.models.push_back(parse_weight_spec(models[k], name));
+        w.active = weight_interval(w, start);
+        if (w.active < 0) stop(std::string("No ") + name + " weight model covers the run start.");
+        // Scheduled models stay installed even when an interval is unweighted.
+        weight_specs[name] = w.models[w.active];
+        for (size_t k = 0; k < w.start.size(); ++k)
+          for (double t : {w.start[k], w.end[k]})
+            if (start < t && t < start + years) calendar_boundaries.insert(t);
+        weight_schedules[name] = w;
+        continue;
       }
+      WeightSpec spec = parse_weight_spec(x, name);
+      if (!spec.custom && spec.coefficients.empty()) continue;   // all coefficients zero: unweighted
       weight_specs[name] = spec;
     }
   }
+  // Switch scheduled weight models at a calendar boundary; true if any changed.
+  auto switch_weights = [&](double now) {
+    bool changed = false;
+    for (auto& entry : weight_schedules) {
+      WeightSchedule& w = entry.second;
+      const int k = weight_interval(w, now);
+      if (k < 0 || k == w.active) continue;
+      w.active = k;
+      weight_specs[entry.first] = w.models[k];
+      changed = true;
+    }
+    return changed;
+  };
   auto weight_spec = [&](const std::string& name) -> WeightSpec* {
     auto found = weight_specs.find(name);
     return found == weight_specs.end() ? nullptr : &found->second;
@@ -3244,12 +3290,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         weight_now = now;
         checkUserInterrupt();
         const bool matching_changed = update_models(now);
+        const bool weights_changed = switch_weights(now);
         const bool probability_changed = calendar_changes_at(all_probability, now);
         const bool rate_change = calendar_changes_at(all_mortality, now) ||
           calendar_changes_at(all_fertility, now) || calendar_changes_at(all_search, now) ||
           calendar_changes_at(all_dissolution, now) || calendar_changes_at(all_conversion, now) ||
           calendar_changes_at(all_transitions, now);
-        if (!rate_change && !matching_changed && !probability_changed) continue;
+        if (!rate_change && !matching_changed && !probability_changed && !weights_changed) continue;
         for (int w = 0; w < static_cast<int>(counted_woman.size()); ++w)
           remove_counted_woman(w);
         if (probability_changed) {
@@ -3263,6 +3310,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
             if (w % 1024 == 0) checkUserInterrupt();
             add_counted_woman(w, now);
           }
+          // New weight models: recompute every stored weight. Intensities and
+          // event clocks are unchanged, so no draws are needed.
+          if (weights_changed)
+            for (int i = 0; i < static_cast<int>(people.size()); ++i) {
+              if (i % 1024 == 0) checkUserInterrupt();
+              if (NumericVector::is_na(people[i].died)) refresh_person(i, now);
+            }
           continue;
         }
         const bool fertility_change = calendar_changes_at(all_fertility, now);

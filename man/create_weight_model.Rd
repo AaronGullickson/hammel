@@ -19,7 +19,16 @@ create_weight_model(
 \item{group_levels}{Ordered group labels, required when the formula uses a
 group-valued variable; the first is the reference.}
 
-\item{fun}{A custom function returning log weights, instead of \code{formula}.}
+\item{fun}{A custom function returning log weights, instead of \code{formula}.
+
+\strong{Calendar schedules.} A process's \code{weights} may instead be a tibble with
+numeric \code{time_start}, \code{time_end} and a list column \code{model} of weight models,
+as for matching and inheritance model schedules. Half-open intervals must
+not overlap and must cover the run; all models in a schedule must be
+formulas or all custom functions. The model active at an instant applies;
+switching models changes only who is chosen within cells, not event clocks
+or cell intensities. A formula with zero coefficients turns weighting off
+for an interval.}
 }
 \value{
 A \code{hammel_weight_model}. This specifies a model; it does not estimate one.

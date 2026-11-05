@@ -314,3 +314,68 @@ test_that("search weights require rate mode and warn about cancelled terms and s
     weights = create_weight_model(fun = function(members, bin) rep(0, nrow(members))))
   expect_warning(simulate(slow, .2, seed = 1), "every refresh of every searching woman")
 })
+
+test_that("weight schedules switch models at calendar boundaries without changing clocks", {
+  n <- 20000
+  half <- create_weight_model(~ partnered, c(partnered = log(.5)))
+  off <- create_weight_model(~ partnered, c(partnered = 0))
+  schedule <- function(a, b) tibble::tibble(time_start = c(0, 1), time_end = c(1, Inf), model = list(a, b))
+  model <- weighted_mortality_model(n)
+  # Identical models in both intervals reproduce the static model exactly.
+  small <- weighted_mortality_model(300)
+  expect_identical(simulate(set_mortality(small, mortality_rates, weights = schedule(half, half)), 2, seed = 4),
+                   simulate(set_mortality(small, mortality_rates, weights = half), 2, seed = 4))
+  out <- simulate(set_mortality(model, mortality_rates, weights = schedule(half, off)), 2, seed = 4)
+  p <- out$persons
+  partner <- c(2 * n + 1:n, rep(NA, n), 1:n, rep(NA, n))
+  part <- !is.na(partner)
+  d <- ifelse(is.na(p$death_time), 2, p$death_time)
+  status_end <- ifelse(is.na(partner), d, pmin(d, d[partner]))
+  log_ratio <- function(a, b) {
+    years <- pmax(0, pmin(status_end, b) - a)
+    died <- !is.na(p$death_time) & p$death_time >= a & p$death_time < b & p$death_time <= status_end
+    c(log(sum(died[part]) / sum(years[part]) / (sum(died[!part]) / sum(years[!part]))),
+      sqrt(1 / sum(died[part]) + 1 / sum(died[!part])))
+  }
+  before <- log_ratio(0, 1)
+  after <- log_ratio(1, 2)
+  expect_lt(abs(before[1] - log(.5)), 4 * before[2])
+  expect_lt(abs(after[1]), 4 * after[2])
+  # Fertility weights stored under matching calibration also switch.
+  rates <- data.frame(age_start = 15, age_end = 50, rate = .5)
+  b2 <- create_weight_model(~ group, c(groupB = log(2)), group_levels = c("A", "B"))
+  b1 <- create_weight_model(~ group, c(groupB = 0), group_levels = c("A", "B"))
+  fert <- set_fertility(weighted_fertility_model(4000, c("A", "B")), rates, birth_interval = 0,
+    weights = tibble::tibble(time_start = c(0, .35), time_end = c(.35, Inf), model = list(b2, b1)))
+  out <- simulate(fert, .7, seed = 21)
+  kids <- out$persons[out$persons$birth_time >= 0, ]
+  group <- out$persons$group[match(kids$mother_id, out$persons$person_id)]
+  early <- table(factor(group[kids$birth_time < .35], levels = c("A", "B")))
+  late <- table(factor(group[kids$birth_time >= .35], levels = c("A", "B")))
+  expect_lt(abs(log(early[["B"]] / early[["A"]]) - log(2)), 4 * sqrt(sum(1 / early)))
+  expect_lt(abs(log(late[["B"]] / late[["A"]])), 4 * sqrt(sum(1 / late)))
+  # Custom-function schedules switch functions.
+  fun_schedule <- tibble::tibble(time_start = c(0, 1), time_end = c(1, Inf), model = list(
+    create_weight_model(fun = function(members, bin) rep(0, nrow(members))),
+    create_weight_model(fun = function(members, bin) log(ifelse(members$partnered == 1, .5, 1)))))
+  expect_s3_class(simulate(set_mortality(small, mortality_rates, weights = fun_schedule), 2, seed = 4),
+                  "hammel_population")
+})
+
+test_that("weight schedules are validated like model schedules", {
+  model <- weighted_mortality_model(20)
+  half <- create_weight_model(~ partnered, c(partnered = log(.5)))
+  custom <- create_weight_model(fun = function(members, bin) 0)
+  expect_error(set_mortality(model, mortality_rates, weights = tibble::tibble(
+    time_start = c(0, 1), time_end = c(1, Inf), model = list(half, custom))), "all be formulas")
+  expect_error(set_mortality(model, mortality_rates, weights = tibble::tibble(
+    time_start = c(0, .5), time_end = c(1, Inf), model = list(half, half))), "overlap")
+  expect_error(set_mortality(model, mortality_rates, weights = tibble::tibble(
+    time_start = 0, time_end = Inf, model = list(create_weight_model(~ parity, c(paritx = 1))))),
+    "weights\\$model\\[\\[1\\]\\]")
+  gap <- set_mortality(model, mortality_rates, weights = tibble::tibble(time_start = 1, time_end = Inf,
+    model = list(half)))
+  expect_error(simulate(gap, 2, seed = 1), "coverage gap")
+  expect_s3_class(set_mortality(model, mortality_rates, weights = data.frame(time_start = 0, time_end = Inf,
+    model = I(list(half))))$processes$mortality$weights, "tbl_df")
+})

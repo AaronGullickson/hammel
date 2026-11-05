@@ -59,7 +59,7 @@ union_dissolution <- function(rates, group_prop_hazard = NULL, weights = NULL) {
   validate_union_dissolution(process)
   validate_process_weights(weights, "union")
   warn_cancelled_weight_terms(weights, weight_strata("dissolution", rates), "dissolution")
-  process$weights <- weights
+  process$weights <- normalize_model_argument(weights)
   process
 }
 

@@ -265,7 +265,7 @@ mortality <- function(rates, group_prop_hazard = NULL, weights = NULL) {
   warn_cancelled_weight_terms(weights, weight_strata("mortality", rates, group_prop_hazard), "mortality")
   process <- new_rate_process("mortality", rates)
   process$group_prop_hazard <- group_prop_hazard
-  process$weights <- weights
+  process$weights <- normalize_model_argument(weights)
   process
 }
 
@@ -287,7 +287,7 @@ fertility <- function(rates, birth_interval = 0.75, group_prop_hazard = NULL,
   process$birth_interval <- birth_interval
   process$ffab <- ffab
   process$hetfert <- hetfert
-  process$weights <- weights
+  process$weights <- normalize_model_argument(weights)
   process$group_prop_hazard <- group_prop_hazard
   warn_unreachable_parity_cells(process$rates, birth_interval)
   process

@@ -186,8 +186,19 @@ where they differ, this section is current.
 
 Weights apply to mortality, fertility, rate-mode union search,
 dissolution, cohabitation-to-marriage conversion and group transitions.
-Eligibility rules are out of scope: every weight is strictly positive. Weight models are fixed over calendar
-time; time-varying weight schedules are deferred.
+Eligibility rules are out of scope: every weight is strictly positive.
+
+*Calendar schedules (user direction, November 4, 2026).* Any `weights` or
+`weights_conversion` argument may be a tibble with `time_start`, `time_end`
+and a list column `model` of weight models, the structure of the matching and
+inheritance model schedules (D123), validated the same way: half-open
+intervals that do not overlap and cover the run, each entry a complete model.
+A schedule's models must all be formulas or all custom functions, because the
+evaluation path is set per process; a formula with zero coefficients turns
+weighting off for an interval. At a boundary the engine switches the active
+model and recomputes every stored weight. Weights never change cell
+intensities, so event clocks are kept and no random draws are used: a
+schedule of identical models reproduces the static model exactly.
 
 ### Weights and selection
 
@@ -631,10 +642,12 @@ eligibility rule for other mechanisms.
 
 ### Proposed general eligibility mechanism
 
-Status: proposal awaiting the user's acceptance. The user wants eligibility as a
-general mechanism, so that rules can be added later without redesigning the
-scheduler. Milestone 8 adds no new eligibility rules; fertility spacing remains
-the only one. A possible future rule is a grace period after divorce or
+Status: deferred until a concrete rule is needed (*user direction, November 4,
+2026*). Fertility birth spacing is the only eligibility rule, and milestone 8
+adds none. The rules below record the proposed direction for a future rule;
+they are not accepted until one is specified. The cell machinery it would
+generalize already exists for fertility: eligible-member lists, unrealized
+intensity and single-year cells. A possible future rule is a grace period after divorce or
 widowhood before a new union search.
 
 Proposed rules:

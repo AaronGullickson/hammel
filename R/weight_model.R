@@ -54,6 +54,15 @@
 #' @param group_levels Ordered group labels, required when the formula uses a
 #'   group-valued variable; the first is the reference.
 #' @param fun A custom function returning log weights, instead of `formula`.
+#'
+#' **Calendar schedules.** A process's `weights` may instead be a tibble with
+#' numeric `time_start`, `time_end` and a list column `model` of weight models,
+#' as for matching and inheritance model schedules. Half-open intervals must
+#' not overlap and must cover the run; all models in a schedule must be
+#' formulas or all custom functions. The model active at an instant applies;
+#' switching models changes only who is chosen within cells, not event clocks
+#' or cell intensities. A formula with zero coefficients turns weighting off
+#' for an interval.
 #' @return A `hammel_weight_model`. This specifies a model; it does not estimate one.
 #' @export
 #' @examples
@@ -201,17 +210,36 @@ weight_design <- function(model, type) {
   columns
 }
 
-# Validate a weight model for a process type when attached to a process.
+# Validate a weight model, or a schedule of weight models, for a process type.
+# A schedule is a tibble with time_start, time_end and a model list column (as
+# for matching and inheritance models); its models must all be formulas or all
+# custom functions.
 validate_process_weights <- function(weights, type) {
   if (is.null(weights)) return(invisible(NULL))
-  validate_weight_model(weights)
-  if (is.null(weights$fun)) weight_design(weights, type)
+  one <- function(model) {
+    validate_weight_model(model)
+    if (is.null(model$fun)) weight_design(model, type)
+    invisible(model)
+  }
+  validate_model_argument(weights, one, "weights")
+  if (is_model_schedule(weights)) {
+    kinds <- vapply(weights$model, function(m) is.null(m$fun), logical(1))
+    if (length(unique(kinds)) > 1L)
+      stop("A weight schedule's models must all be formulas or all be custom functions.", call. = FALSE)
+  }
   invisible(weights)
+}
+weight_models_of <- function(weights) {
+  if (is.null(weights)) list() else if (is_model_schedule(weights)) weights$model else list(weights)
 }
 
 # Warn once for each formula term whose variables are all rate strata of the
 # process: the term is constant within every cell and has no effect.
 warn_cancelled_weight_terms <- function(weights, strata, process) {
+  if (is_model_schedule(weights)) {
+    for (model in weights$model) warn_cancelled_weight_terms(model, strata, process)
+    return(invisible(NULL))
+  }
   if (is.null(weights) || !is.null(weights$fun)) return(invisible(FALSE))
   tt <- stats::terms(weights$formula)
   factors <- attr(tt, "factors")
@@ -250,6 +278,13 @@ weight_strata <- function(process, rates, multipliers = NULL) {
 prepare_weight_model <- function(weights, type, process, group_values, ancestry_labels,
                                  group_labels = group_values) {
   if (is.null(weights)) return(NULL)
+  if (is_model_schedule(weights)) {
+    rows <- order(weights$time_start)
+    return(list(schedule = TRUE, process = process,
+      time_start = weights$time_start[rows], time_end = weights$time_end[rows],
+      models = lapply(weights$model[rows], prepare_weight_model, type = type, process = process,
+                      group_values = group_values, ancestry_labels = ancestry_labels)))
+  }
   if (!is.null(weights$fun)) return(list(custom = TRUE, fun = weights$fun, process = process))
   columns <- weight_design(weights, type)
   if (any(vapply(columns, function(x) any(vapply(x$factors, function(f)

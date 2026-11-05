@@ -257,6 +257,8 @@ simulate <- function(model, years, seed = NULL) {
     transition = transition_process$weights,
     search = union_process$weights)
   weight_models <- Filter(Negate(is.null), weight_models)
+  for (name in names(weight_models))
+    check_model_coverage(weight_models[[name]], start, start + years, paste(name, "weights"))
   if ("previous_union" %in% names(union_rates) || cohab_enabled || length(weight_models)) {
     previous <- previous_union_info_cpp(population$persons, population$unions, counts_cohab)
     engine_persons$.hammel_previous_union <- previous$previous_union
