@@ -297,7 +297,7 @@ test_that("calculate_fertility_rates attributes unrealized births exactly or ret
   expect_true(is.na(both$unrealized_births[both$time_start == 0 & both$age_start == 15]))
   expect_false(is.na(both$unrealized_births[both$time_start == 1.5 & both$age_start == 15]))
   # Overall schedules cannot be split by union type.
-  typed <- calculate_fertility_rates(pop, c(0, 1.5), c(15, 50), by_union_type = TRUE,
+  typed <- calculate_fertility_rates(pop, c(0, 1.5), c(15, 50), by = "union_type",
                                      unrealized = TRUE)
   expect_true(all(is.na(typed$unrealized_births[typed$age_start == 15])))
   # A population that was never simulated has no unrealized record.
@@ -350,8 +350,7 @@ test_that("unrealized births follow group and union-type strata and refuse parit
     set_union_formation("rate", rates = data.frame(age_start = 15, age_end = Inf, rate = 0),
                         cancel_birth_if_no_match = FALSE)
   pop <- simulate(model, 1, seed = 6)
-  r <- calculate_fertility_rates(pop, c(0, 1), c(15, 50), by_group = TRUE,
-                                 by_union_type = TRUE, unrealized = TRUE)
+  r <- calculate_fertility_rates(pop, c(0, 1), c(15, 50), by = c("group", "union_type"), unrealized = TRUE)
   r <- r[r$age_start == 15, ]
   cell <- r$group == "A" & r$union_type == "unpartnered"
   expect_count(r$unrealized_births[cell], .5 * n)

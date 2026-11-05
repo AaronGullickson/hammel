@@ -8,8 +8,7 @@ calculate_marriage_rates(
   population,
   time_breaks,
   age_breaks,
-  by_group = FALSE,
-  by_previous_union = FALSE,
+  by = NULL,
   conf.level = NULL,
   pool_dissolved = FALSE
 )
@@ -23,13 +22,9 @@ a known endpoint. Observation cannot extend beyond that endpoint.}
 \item{age_breaks}{Strictly increasing nonnegative age boundaries in years.
 A finite final boundary gains an open-ended band through Inf.}
 
-\item{by_group}{Logical, default FALSE. With TRUE, require person groups and
-return separate rows by each individual's group. No pooled row is added.}
-
-\item{by_previous_union}{Logical, default FALSE. With TRUE, separate exposure
-and starts by previous union category and include \code{previous_union}. Otherwise
-pool counts and exposure before calculating rates, and omit that column.
-Supplying \code{dur_breaks} automatically enables this option.}
+\item{by}{\code{NULL} (default) or a character vector of variables to split
+results over: \code{"group"} and \code{"previous_union"}, as in
+\code{\link[=calculate_union_rates]{calculate_union_rates()}}.}
 
 \item{conf.level}{NULL (default) to omit confidence intervals, or a finite
 numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
@@ -39,14 +34,12 @@ describe the observed rate, not the unrealized-adjusted rate.}
 
 \item{pool_dissolved}{Logical, default FALSE. With TRUE, return \code{"none"}
 and \code{"dissolved"}, pooling separated and widowed events and exposure before
-calculating rates and confidence intervals. Requires \code{by_previous_union}
-(also enabled by \code{dur_breaks}). With FALSE, stratified output uses the detailed
-\code{"none"}, \code{"separated"}, and \code{"widowed"} categories.}
+calculating rates and confidence intervals. Requires \code{"previous_union"} in
+\code{by} (added automatically with \code{dur_breaks}).}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, \code{sex}, \code{age_start}, \code{age_end},
-\code{person_years}, \code{marriages}, and \code{rate_marriage}, plus \code{group} and
-\code{previous_union} when requested.
+the \code{by} columns, \code{person_years}, \code{marriages}, and \code{rate_marriage}.
 Empty cells are retained. Person-years include cohabiting time.
 With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
 }
@@ -62,7 +55,7 @@ Complete, nonoverlapping histories are required. Cells are half-open; starts
 on boundaries enter the cell beginning there. Exposure is censored at death
 and the observation endpoint. Rates are NA when exposure is zero. This
 age-specific measure does not provide duration strata. With
-\code{by_previous_union = TRUE}, cohabiting exposure and conversion retain the
+\code{by = "previous_union"}, cohabiting exposure and conversion retain the
 category held immediately before that cohabitation began. Ending categories
 follow the recorded cohabitation policy, as in \code{\link[=calculate_union_rates]{calculate_union_rates()}}.
 For entry into any partnership over unpartnered exposure, use

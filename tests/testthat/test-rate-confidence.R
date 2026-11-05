@@ -14,13 +14,13 @@ confidence_population <- function() {
 
 confidence_calls <- function(population) {
   list(
-    mortality = list(calculate_mortality_rates, list(population, c(0, 2, 8), c(0, 20, Inf), by_group = TRUE, by_union_type = TRUE), "deaths", "person_years"),
+    mortality = list(calculate_mortality_rates, list(population, c(0, 2, 8), c(0, 20, Inf), by = c("group", "union_type")), "deaths", "person_years"),
     fertility = list(calculate_fertility_rates, list(population, c(0, 2, 8), c(0, 20, Inf), parity_breaks = c(0, 1, Inf)), "births", "person_years"),
-    union = list(calculate_union_rates, list(population, c(0, 2, 8), c(0, Inf), by_union_type = TRUE, by_previous_union = TRUE), "unions", "person_years"),
-    marriage = list(calculate_marriage_rates, list(population, c(0, 2, 8), c(0, Inf), by_group = TRUE), "marriages", "person_years"),
-    dissolution = list(calculate_dissolution_rates, list(population, c(0, 2, 8), c(0, 2, Inf), by_union_type = TRUE), "dissolutions", "union_years"),
+    union = list(calculate_union_rates, list(population, c(0, 2, 8), c(0, Inf), by = c("union_type", "previous_union")), "unions", "person_years"),
+    marriage = list(calculate_marriage_rates, list(population, c(0, 2, 8), c(0, Inf), by = "group"), "marriages", "person_years"),
+    dissolution = list(calculate_dissolution_rates, list(population, c(0, 2, 8), c(0, 2, Inf), by = "union_type"), "dissolutions", "union_years"),
     conversion = list(calculate_cohab_convert_rate, list(population, c(0, 2, 8), dur_breaks = c(0, 2, Inf)), "conversions", "union_years"),
-    transition = list(calculate_transition_rates, list(population, c(0, 2, 8), age_breaks = c(0, Inf), by_sex = TRUE), "transitions", "person_years")
+    transition = list(calculate_transition_rates, list(population, c(0, 2, 8), age_breaks = c(0, Inf), by = "sex"), "transitions", "person_years")
   )
 }
 
@@ -74,7 +74,10 @@ test_that("empty grouped rate results retain numeric confidence columns", {
   pop$unions <- pop$unions[0, ]
   pop <- hammel_population(pop$persons, pop$unions, end_time = 8)
   for (case in confidence_calls(pop)) {
-    case[[2]]$by_group <- if (identical(case[[1]], calculate_transition_rates)) NULL else TRUE
+    group_by <- if (identical(case[[1]], calculate_transition_rates)) NULL else
+      if (identical(case[[1]], calculate_dissolution_rates)) c("group_w", "group_h") else
+      if (identical(case[[1]], calculate_cohab_convert_rate)) "group_w" else "group"
+    case[[2]]$by <- unique(c(case[[2]]$by, group_by))
     x <- do.call(case[[1]], c(case[[2]], list(conf.level = .95)))
     expect_equal(nrow(x), 0)
     expect_identical(x$conf_low, numeric())

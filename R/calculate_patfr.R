@@ -62,7 +62,8 @@ calculate_patfr <- function(rates) {
   if (any(!is.finite(rates$age_end) & rates$rate_fertility != 0, na.rm = TRUE))
     warning("PATFR omits an open age band with non-zero fertility; PATFR is underestimated over the full age range.", call. = FALSE)
   rates <- rates[is.finite(rates$age_end), , drop = FALSE]
-  groups <- intersect(c("time_start", "time_end", "group", "union_status", "union_type"), names(rates))
+  groups <- intersect(c("time_start", "time_end", "group", "union_status", "union_type",
+                        "previous_union"), names(rates))
   if (!nrow(rates)) {
     result <- tibble::as_tibble(rates[FALSE, c(groups, "age_start", "age_end"), drop = FALSE])
     result$patfr <- numeric()

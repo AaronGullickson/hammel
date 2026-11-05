@@ -139,25 +139,25 @@ transition_observation_population <- function() {
 
 test_that("observations split exposure and attribute events using group history", {
   pop <- transition_observation_population()
-  snapshot <- calculate_population_size(pop, c(0, 1, 2, 5), by_group = TRUE)
+  snapshot <- calculate_population_size(pop, c(0, 1, 2, 5), by = "group")
   expect_equal(snapshot$population[snapshot$group == "B"], c(0, 1, 2, 1))
-  mortality <- calculate_mortality_rates(pop, c(0, 5), c(0, Inf), by_group = TRUE)
+  mortality <- calculate_mortality_rates(pop, c(0, 5), c(0, Inf), by = "group")
   expect_equal(mortality$person_years[mortality$sex == "m" & mortality$group == "A"], 1)
   expect_equal(mortality$person_years[mortality$sex == "m" & mortality$group == "B"], 3)
   expect_equal(mortality$deaths[mortality$sex == "m" & mortality$group == "B"], 1)
-  fertility <- calculate_fertility_rates(pop, c(0, 5), c(0, Inf), by_group = TRUE)
+  fertility <- calculate_fertility_rates(pop, c(0, 5), c(0, Inf), by = "group")
   expect_equal(fertility$births[fertility$group == "A"], 1)
   expect_equal(fertility$births[fertility$group == "B"], 0)
   expect_equal(fertility$person_years[fertility$group == "A"], 6)
-  typed <- calculate_fertility_rates(pop, c(0, 5), c(0, Inf), by_group = TRUE, by_union_type = TRUE)
-  parity <- calculate_fertility_rates(pop, c(0, 5), c(0, Inf), by_group = TRUE, parity_breaks = c(0, 1, Inf))
+  typed <- calculate_fertility_rates(pop, c(0, 5), c(0, Inf), by = c("group", "union_type"))
+  parity <- calculate_fertility_rates(pop, c(0, 5), c(0, Inf), by = "group", parity_breaks = c(0, 1, Inf))
   expect_equal(sum(typed$births), 1)
   expect_equal(sum(typed$person_years), sum(fertility$person_years))
   expect_equal(sum(parity$person_years), sum(fertility$person_years))
   expect_equal(sum(parity$births[parity$group == "A"]), 1)
-  unions <- calculate_union_rates(pop, c(0, 5), c(0, Inf), by_group = TRUE)
+  unions <- calculate_union_rates(pop, c(0, 5), c(0, Inf), by = "group")
   expect_equal(sum(unions$unions[unions$group == "A"]), 2)
-  dissolution <- calculate_dissolution_rates(pop, c(0, 5), c(0, Inf), by_group = TRUE)
+  dissolution <- pair_rates(calculate_dissolution_rates(pop, c(0, 5), c(0, Inf), by = c("group_w", "group_h")))
   expect_equal(dissolution$union_years[dissolution$group_pair == "A:A"], 1)
   expect_equal(dissolution$union_years[dissolution$group_pair == "A:B"], 1)
   expect_equal(dissolution$union_years[dissolution$group_pair == "B:B"], 1)
@@ -186,7 +186,7 @@ test_that("moves refresh available male pools and active fertility/calibration c
   expect_equal(nrow(out$transitions), 2)
   expect_true(all(out$persons$group == "B"))
   expect_true(all(out$persons$birth_time[out$persons$birth_time > 0] > min(out$transitions$time)))
-  f <- calculate_fertility_rates(out, c(0, .3), c(0, Inf), by_group = TRUE)
+  f <- calculate_fertility_rates(out, c(0, .3), c(0, Inf), by = "group")
   expect_equal(f$births[f$group == "A"], 0)
   expect_equal(sum(f$births), out$simulation$births)
 })
@@ -207,9 +207,9 @@ test_that("cohabitation conversion refreshes both partners' transition strata", 
   expect_identical(out$unions$end_reason[1], "conversion")
   expect_gt(out$unions$end_time[1], out$transitions$time[1])
   expect_lt(out$unions$end_time[1], out$transitions$time[2])
-  counts <- calculate_cohab_convert_rate(out, c(0, .1), dur_breaks = c(0, Inf), by_group = TRUE)
-  expect_equal(counts$conversions[counts$group == "B"], 1)
-  expect_equal(counts$union_years[counts$group == "A"], out$transitions$time[1])
+  counts <- calculate_cohab_convert_rate(out, c(0, .1), dur_breaks = c(0, Inf), by = "group_w")
+  expect_equal(counts$conversions[counts$group_w == "B"], 1)
+  expect_equal(counts$union_years[counts$group_w == "A"], out$transitions$time[1])
   expect_equal(sum(counts$union_years), out$unions$end_time[1])
 })
 
@@ -237,7 +237,7 @@ test_that("snapshot event accounting handles repeated moves, deaths and arbitrar
     group_origin = c("B", "C", "A", "A"), group_dest = c("A", "A", "B", "B"))
   pop <- hammel_population(persons, end_time = 6, transitions = tx)
   times <- c(5, -2, 0, 4, 1, 3, 4, 2, 6)
-  out <- calculate_population_size(pop, times, by_group = TRUE)
+  out <- calculate_population_size(pop, times, by = "group")
   # Independently reconstruct identity from each person's ordered history.
   expected <- lapply(times, function(time) {
     living <- which(persons$birth_time <= time & (is.na(persons$death_time) | persons$death_time > time))
@@ -250,11 +250,12 @@ test_that("snapshot event accounting handles repeated moves, deaths and arbitrar
     }, character(1))
     tabulate(match(labels, c("A", "B", "C")), nbins = 3)
   })
-  expect_equal(out$population, as.integer(unlist(expected)))
-  expect_identical(out$time, rep(times, each = 3))
-  expect_equal(as.vector(tapply(out$population, rep(seq_along(times), each = 3), sum)),
+  # Rows vary by time fastest, then group.
+  expect_equal(out$population, as.integer(t(matrix(unlist(expected), nrow = 3))))
+  expect_identical(out$time, rep(times, 3))
+  expect_equal(as.vector(tapply(out$population, rep(seq_along(times), 3), sum)),
     calculate_population_size(pop, times)$population)
-  expect_equal(nrow(calculate_population_size(pop, numeric(), by_group = TRUE)), 0)
+  expect_equal(nrow(calculate_population_size(pop, numeric(), by = "group")), 0)
 })
 
 test_that("edited transition specifications reject incompatible units and unsupported processes", {
@@ -301,7 +302,7 @@ test_that("dissolution observations retain unions whose partners never move", {
   # Only the child moves; neither partner in the recorded union changes group.
   pop$transitions <- tibble::tibble(person_id = 3, time = 2,
     group_origin = "B", group_dest = "A")
-  out <- calculate_dissolution_rates(pop, c(0, 5), c(0, Inf), by_group = TRUE)
+  out <- pair_rates(calculate_dissolution_rates(pop, c(0, 5), c(0, Inf), by = c("group_w", "group_h")))
   expect_equal(out$union_years[out$group_pair == "B:B"], 3)
   expect_equal(out$dissolutions[out$group_pair == "B:B"], 1)
   expect_equal(sum(out$union_years), 3)
@@ -315,7 +316,8 @@ test_that("union observations combine simultaneous partner moves and typed numer
     start_time = 0, end_time = 4, end_reason = "dissolution", union_type = "marriage")
   tx <- data.frame(person_id = c(1, 2), time = 2, group_origin = c(10L, 20L), group_dest = c(20L, 10L))
   pop <- hammel_population(persons, unions, end_time = 5, transitions = tx)
-  out <- calculate_dissolution_rates(pop, c(0, 5), c(0, Inf), by_group = TRUE, by_union_type = TRUE)
+  out <- pair_rates(calculate_dissolution_rates(pop, c(0, 5), c(0, Inf),
+    by = c("group_w", "group_h", "union_type")))
   expect_equal(subset(out, group_pair == "10:20" & union_type == "marriage")$union_years, 4)
   expect_equal(subset(out, group_pair == "10:10" & union_type == "marriage")$union_years, 4)
   expect_equal(sum(out$dissolutions), 2)
@@ -325,8 +327,8 @@ test_that("union observations combine simultaneous partner moves and typed numer
   # For conversion exposure only the woman's moves matter; his simultaneous
   # move must not introduce a second boundary or change her duration origin.
   pop$unions <- transform(pop$unions, union_type = "cohab")
-  conversion <- calculate_cohab_convert_rate(pop, c(0, 5), dur_breaks = c(0, Inf), by_group = TRUE)
-  expect_identical(conversion$group, c(10L, 20L))
+  conversion <- calculate_cohab_convert_rate(pop, c(0, 5), dur_breaks = c(0, Inf), by = "group_w")
+  expect_identical(conversion$group_w, c(10L, 20L))
   expect_equal(conversion$union_years, c(6, 2))
   expect_equal(sum(conversion$conversions), 0)
 })

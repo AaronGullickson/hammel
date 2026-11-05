@@ -9,7 +9,7 @@ calculate_cohab_convert_rate(
   time_breaks,
   dur_breaks = NULL,
   age_breaks = NULL,
-  by_group = FALSE,
+  by = NULL,
   conf.level = NULL
 )
 }
@@ -26,8 +26,10 @@ in years since cohabitation began. Supply exactly one of \code{dur_breaks} and
 \item{age_breaks}{Optional strictly increasing nonnegative boundaries for the
 woman's attained age, matching the conversion schedule's age convention.}
 
-\item{by_group}{Logical, default FALSE. Separate by the woman's group, matching
-conversion input schedules. Require person groups; retain their input type.}
+\item{by}{\code{NULL} (default) or a character vector: \code{"group_w"} (the woman's
+current group, matching conversion input schedules) and \code{"group_h"} (the
+man's). Requires person groups. Rows vary by time fastest, then the axis
+band, then the \code{by} variables in the order given.}
 
 \item{conf.level}{NULL (default) to omit confidence intervals, or a finite
 numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
@@ -37,8 +39,8 @@ describe the observed rate, not the unrealized-adjusted rate.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, \code{dur_start}, \code{dur_end} (or
-\code{age_start}, \code{age_end}), \code{union_years}, \code{conversions}, \code{rate_cohab_convert},
-and optional \code{group}. Empty cells are retained. Rates are conversions per
+\code{age_start}, \code{age_end}), the \code{by} columns, \code{union_years}, \code{conversions}
+and \code{rate_cohab_convert}. Empty cells are retained. Rates are conversions per
 cohabitation union-year, not conversion probabilities with competing risks.
 With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
 }

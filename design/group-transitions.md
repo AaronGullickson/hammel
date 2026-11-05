@@ -97,7 +97,7 @@ union-formation specifications. Replacing age columns with `dur_start` and
 ## Observed transition rates
 
 `calculate_transition_rates(population, time_breaks, age_breaks = NULL,
-dur_breaks = NULL, by_sex = FALSE, by_union_type = FALSE)` returns a tibble
+dur_breaks = NULL, by = NULL)` returns a tibble
 with directed `group_origin`/`group_dest`, calendar bounds, the selected age or
 duration bounds, `person_years`, `transitions`, and `rate_transition`.
 Supply exactly one age or duration axis. Finite final axis breaks gain Inf.

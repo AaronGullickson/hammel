@@ -71,7 +71,7 @@ test_that("conversion preserves partners, resets dissolution duration and links 
   # Current partnership is continuous and conversion is not a second entry.
   rates <- calculate_union_rates(late, c(0,3), c(0,Inf))
   expect_equal(sum(rates$unions), 2)
-  counts <- collect_demographic_counts(late, c(0,3), c(0,Inf), TRUE)
+  counts <- demographic_counts(late, c(0,3), c(0,Inf), by = "union_type")
   expect_equal(sum(subset(counts, union_type != "unpartnered")$person_years), 6)
   schedule <- data.frame(union_type=c("cohab","marriage"),dur_start=c(0,1),dur_end=Inf,rate=c(0,1e5))
   model <- set_union_dissolution(model, schedule)
@@ -259,10 +259,8 @@ test_that("union entry types share exposure and exclude conversion", {
   pop$unions$union_type <- c("cohab", "marriage", "cohab")
   for (previous in c(FALSE, TRUE)) {
     for (duration in list(NULL, c(0, 1, Inf))) {
-      pooled <- calculate_union_rates(pop, c(0, 6), c(0, Inf),
-        by_previous_union = previous, dur_breaks = duration)
-      typed <- calculate_union_rates(pop, c(0, 6), c(0, Inf),
-        by_previous_union = previous, dur_breaks = duration, by_union_type = TRUE)
+      pooled <- calculate_union_rates(pop, c(0, 6), c(0, Inf), dur_breaks = duration, by = if (isTRUE(previous)) "previous_union")
+      typed <- calculate_union_rates(pop, c(0, 6), c(0, Inf), dur_breaks = duration, by = c(if (isTRUE(previous)) "previous_union", "union_type"))
       cohab <- subset(typed, union_type == "cohab")
       marriage <- subset(typed, union_type == "marriage")
       expect_equal(cohab$person_years, pooled$person_years)
@@ -271,16 +269,15 @@ test_that("union entry types share exposure and exclude conversion", {
       expect_equal(cohab$rate_union + marriage$rate_union, pooled$rate_union)
     }
   }
-  grouped <- calculate_union_rates(pop, c(0,6), c(0,Inf), by_group = TRUE,
-    by_previous_union = TRUE, by_union_type = TRUE)
+  grouped <- calculate_union_rates(pop, c(0,6), c(0,Inf), by = c("group", "previous_union", "union_type"))
   expect_equal(sum(grouped$unions), 6)
   expect_equal(sum(grouped$person_years[grouped$union_type == "cohab"]),
     sum(grouped$person_years[grouped$union_type == "marriage"]))
   expect_error(calculate_union_rates(history(), c(0,6), c(0,Inf),
-    by_union_type = TRUE), "typed")
-  expect_error(calculate_union_rates(pop, c(0,6), c(0,Inf), by_union_type = NA), "TRUE or FALSE")
+    by = "union_type"), "typed")
+  expect_error(calculate_union_rates(pop, c(0,6), c(0,Inf), by = NA), "`by` must")
   converted <- simulate(initial_cohabs(conversion = 100, breakup = 0), 1, 42)
-  typed <- calculate_union_rates(converted, c(0,1), c(0,Inf), by_union_type = TRUE)
+  typed <- calculate_union_rates(converted, c(0,1), c(0,Inf), by = "union_type")
   expect_equal(sum(typed$unions), 2) # Existing cohab starts at the window boundary.
   expect_equal(sum(typed$unions[typed$union_type == "marriage"]), 0)
 })

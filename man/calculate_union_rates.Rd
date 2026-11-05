@@ -8,10 +8,8 @@ calculate_union_rates(
   population,
   time_breaks,
   age_breaks,
-  by_group = FALSE,
-  by_previous_union = FALSE,
+  by = NULL,
   dur_breaks = NULL,
-  by_union_type = FALSE,
   conf.level = NULL,
   pool_dissolved = FALSE
 )
@@ -25,24 +23,21 @@ a known endpoint. Observation cannot extend beyond that endpoint.}
 \item{age_breaks}{Strictly increasing nonnegative age boundaries in years.
 A finite final boundary gains an open-ended band through Inf.}
 
-\item{by_group}{Logical, default FALSE. With TRUE, require person groups and
-return separate rows by each individual's group. No pooled row is added.}
-
-\item{by_previous_union}{Logical, default FALSE. With TRUE, separate exposure
-and starts by previous union category and include \code{previous_union}. Otherwise
-pool counts and exposure before calculating rates, and omit that column.
-Supplying \code{dur_breaks} automatically enables this option.}
+\item{by}{\code{NULL} (default) or a character vector of variables to split
+results over: \code{"group"} (each person's own group before formation),
+\code{"previous_union"} (\code{"none"}, \code{"separated"} or \code{"widowed"}, the category
+immediately before formation) and \code{"union_type"} (the type of union
+entered, \code{"cohab"} or \code{"marriage"}; requires typed histories). Both
+\code{union_type} rows share the full unpartnered exposure, which must not be
+summed across them. Rows vary by time fastest, then age (or duration),
+then sex, then the \code{by} variables in the order given.}
 
 \item{dur_breaks}{Optional nonnegative duration boundaries in years. When
 supplied, separated/widowed rows use years since the latest union ending;
-none rows still use \code{age_breaks}. Automatically enables \code{by_previous_union}
-regardless of its supplied value. A finite final boundary gains Inf.
+none rows still use \code{age_breaks}. Adds \code{"previous_union"} to \code{by} (last,
+unless listed). A finite final boundary gains Inf.
 Adds \code{dur_start}/\code{dur_end}, with NA in the unused age/duration pair.
 Duration rows include all ages; this is not an age-by-duration surface.}
-
-\item{by_union_type}{Logical, default FALSE. Separate cohabitation and direct
-marriage entries. Requires typed histories. Both types use the same full
-unpartnered exposure; exposure must not be summed across type rows.}
 
 \item{conf.level}{NULL (default) to omit confidence intervals, or a finite
 numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
@@ -52,15 +47,13 @@ describe the observed rate, not the unrealized-adjusted rate.}
 
 \item{pool_dissolved}{Logical, default FALSE. With TRUE, return \code{"none"}
 and \code{"dissolved"}, pooling separated and widowed events and exposure before
-calculating rates and confidence intervals. Requires \code{by_previous_union}
-(also enabled by \code{dur_breaks}). With FALSE, stratified output uses the detailed
-\code{"none"}, \code{"separated"}, and \code{"widowed"} categories.}
+calculating rates and confidence intervals. Requires \code{"previous_union"} in
+\code{by} (added automatically with \code{dur_breaks}).}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, \code{sex}, \code{age_start}, \code{age_end},
-\code{person_years}, \code{unions}, and \code{rate_union}, plus \code{group} and
-\code{previous_union} when requested, and duration columns when \code{dur_breaks} is
-supplied, and \code{union_type} when requested. Empty cells are retained.
+duration columns when \code{dur_breaks} is supplied, the \code{by} columns,
+\code{person_years}, \code{unions}, and \code{rate_union}. Empty cells are retained.
 With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
 }
 \description{

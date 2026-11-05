@@ -4,32 +4,36 @@
 \alias{calculate_population_size}
 \title{Calculate the living population at time points}
 \usage{
-calculate_population_size(population, times, by_group = FALSE)
+calculate_population_size(population, times, by = NULL, pool_dissolved = FALSE)
 }
 \arguments{
 \item{population}{A \code{hammel_population} or persons data frame representing
 one independent history. For bare tables, ensure follow-up is complete
-through every requested time.}
+through every requested time. Union variables require a population.}
 
 \item{times}{A numeric vector of finite time points in years. A population
 object cannot be queried beyond its known \code{end_time}.}
 
-\item{by_group}{Logical, default \code{FALSE}. With \code{TRUE}, require a persons
-\code{group} column and count separately by group. Groups retain their input type
-and first-occurrence order within each requested time. No pooled group row
-is added. Empty histories return a typed zero-row table.}
+\item{by}{\code{NULL} (default) or a character vector of variables to count
+separately: \code{"sex"}, \code{"group"}, \code{"union_type"} and \code{"previous_union"}. See
+\code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}} for their definitions.}
+
+\item{pool_dissolved}{Logical, default \code{FALSE}. With \code{TRUE} and
+\code{"previous_union"} in \code{by}, combine separated and widowed as \code{"dissolved"}.}
 }
 \value{
-A tibble with \code{time} and \code{population} columns, plus \code{group} when
-\code{by_group = TRUE}.
+A tibble with \code{time}, the \code{by} columns and \code{population}. Rows follow
+the requested times (repeats kept), with time varying fastest and earlier
+\code{by} variables varying faster than later ones.
 }
 \description{
 Count persons with \code{birth_time <= time} and missing \code{death_time} or
 \code{death_time > time}. Counts include births at the requested time and exclude
 deaths at that time, representing the population after recorded events there.
-Results preserve the order of the requested times, including repeated times.
+States in \code{by} are also those after all events at each time.
 }
 \examples{
 population <- create_baseline_population(100, end_time = 0)
 calculate_population_size(population, times = c(-10, -5, 0))
+calculate_population_size(population, times = 0, by = "sex")
 }

@@ -158,21 +158,17 @@ groups_at <- function(population, rows, times, left = FALSE, histories = NULL) {
   out
 }
 
-prepare_union_group_observations <- function(unions, population, groups,
-                                              pair = FALSE, typed = FALSE) {
+# Attach union-level group histories for `mode` 0 (wife), 1 (husband) or 2
+# (both: wife + identities * husband), offset by type when `typed`.
+prepare_union_group_observations <- function(unions, population, mode, typed,
+                                              identity_count, group_count) {
   tx <- population$transitions
   if (is.null(tx) || !nrow(tx) || !nrow(unions)) return(unions)
   persons <- prepare_group_observations(population$persons, population, TRUE)
   identities <- observation_groups(persons, TRUE)
   indices <- match(persons$group, identities) - 1L
-  # Map unordered pair labels once; native history traversal uses integer keys.
-  pair_indices <- if (pair) {
-    grid <- expand.grid(w = seq_along(identities), h = seq_along(identities))
-    matrix(match(canonical_union_pairs(identities[grid$w], identities[grid$h]), groups) - 1L,
-      nrow = length(identities))
-  } else matrix(integer(), 0L, 0L)
-  history <- union_group_history_cpp(persons, unions, indices, pair_indices,
-    pair, typed, length(groups))
+  history <- union_group_history_cpp(persons, unions, indices, as.integer(mode),
+    typed, as.integer(identity_count), as.integer(group_count))
   if (length(history$row)) attr(unions, ".hammel_group_history") <- history
   unions
 }

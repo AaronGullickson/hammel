@@ -8,8 +8,7 @@ calculate_dissolution_rates(
   population,
   time_breaks,
   dur_breaks,
-  by_group = FALSE,
-  by_union_type = FALSE,
+  by = NULL,
   conf.level = NULL
 )
 }
@@ -26,19 +25,16 @@ ensure complete follow-up through the requested endpoint.}
 \item{dur_breaks}{Strictly increasing nonnegative duration boundaries in years.
 If the last boundary is finite, append Inf for an open final band.}
 
-\item{by_group}{Logical, default FALSE. With TRUE, use unordered group pairs
-and return \code{group_pair} (e.g. \code{"A:A"}, \code{"A:B"}, \code{"B:B"}). Both directions
-of a cross-group union share one stratum. Population inputs require person
-groups and retain every unordered pair in the full period/duration grid.
-Bare union tables require \code{group_pair}; reversed labels are normalized.
-Pair labels use nonempty colon-free character representations of groups,
-ordered alphabetically (radix). Empty grouped inputs return a typed zero-row
-tibble; no pooled row is added.}
-
-\item{by_union_type}{Logical, default FALSE. Separate cohabitation and marriage
-episodes using each type's own exposure. Requires a valid \code{union_type} column.
-Conversion stops cohabitation exposure without counting as dissolution;
-duration resets at the start of the linked marriage episode.}
+\item{by}{\code{NULL} (default) or a character vector of variables to split
+results over: \code{"group_w"} and \code{"group_h"} (the wife's and husband's
+current groups, following transition histories; directional, so sum
+A-wife/B-husband and B-wife/A-husband rows for an unordered pair) and
+\code{"union_type"} (cohab or marriage, each with its own exposure;
+conversion stops cohabitation exposure without counting as dissolution,
+and duration resets at the start of the linked marriage). Population
+inputs require person groups for the group variables; bare union tables
+require \code{group_w}, \code{group_h} or \code{union_type} columns. A dissolution counts
+under the groups before any same-time transition.}
 
 \item{conf.level}{NULL (default) to omit confidence intervals, or a finite
 numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
@@ -48,8 +44,9 @@ describe the observed rate, not the unrealized-adjusted rate.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, \code{dur_start}, \code{dur_end},
-\code{union_years}, \code{dissolutions}, and \code{rate_dissolution}, plus \code{group_pair} and
-\code{union_type} when requested. Period varies fastest within duration bands and group blocks.
+the \code{by} columns, \code{union_years}, \code{dissolutions}, and \code{rate_dissolution}.
+Rows vary by time fastest, then duration, then the \code{by} variables in the
+order given.
 With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
 }
 \description{

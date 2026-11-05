@@ -13,9 +13,10 @@ make_lexis_union_history <- function() {
 
 test_that("union type strata conserve demographic counts without overall rows", {
   pop <- make_lexis_union_history()
-  x <- collect_demographic_counts(pop,c(0,3),c(0,20,30,40,Inf),by_union_type=TRUE)
-  expect_identical(x$union_type,rep(c("unpartnered","partnered"),8))
-  pooled <- collect_demographic_counts(pop,c(0,3),c(0,20,30,40,Inf))
+  x <- demographic_counts(pop,c(0,3),c(0,20,30,40,Inf), by = "union_type")
+  # union_type varies slowest: rows follow time, age and sex within each type.
+  expect_identical(x$union_type,rep(c("unpartnered","partnered"),each = 8))
+  pooled <- demographic_counts(pop,c(0,3),c(0,20,30,40,Inf))
   unpartnered <- subset(x,union_type == "unpartnered")
   partnered <- subset(x,union_type == "partnered")
   for (column in c("person_years","births","deaths"))
@@ -30,8 +31,8 @@ test_that("union type strata conserve demographic counts without overall rows", 
 
 test_that("untyped boundaries and overlap merging retain event semantics", {
   pop <- make_lexis_union_history()
-  counts <- collect_demographic_counts(pop,c(0,.5,1.5,2.5,3),
-    c(0,20,20.5,21.5,22.5,30,40,Inf),TRUE)
+  counts <- demographic_counts(pop,c(0,.5,1.5,2.5,3),
+    c(0,20,20.5,21.5,22.5,30,40,Inf), by = "union_type")
   partnered <- subset(counts,union_type == "partnered")
   unpartnered <- subset(counts,union_type == "unpartnered")
   expect_equal(sum(partnered$person_years),3)
@@ -39,34 +40,34 @@ test_that("untyped boundaries and overlap merging retain event semantics", {
   expect_equal(subset(unpartnered,sex == "f" & births > 0)$time_start,c(0,1.5))
   expect_equal(subset(partnered,deaths > 0)$time_start,1.5)
   pop$unions$end_reason[1] <- "dissolution"
-  counts <- collect_demographic_counts(pop,c(1.5,2.5),c(0,Inf),TRUE)
+  counts <- demographic_counts(pop,c(1.5,2.5),c(0,Inf), by = "union_type")
   x <- subset(counts,sex == "f" & union_type == "partnered")
   expect_equal(x$births,1)
   expect_equal(x$person_years,0)
   pop$unions <- rbind(pop$unions,transform(pop$unions[1, ],union_id=3,husband_id=3,start_time=1))
-  duplicate <- collect_demographic_counts(pop,c(1.5,2.5),c(0,Inf),TRUE)
+  duplicate <- demographic_counts(pop,c(1.5,2.5),c(0,Inf), by = "union_type")
   expect_identical(duplicate$births,counts$births)
 })
 
 test_that("union type summaries validate flags and empty histories", {
   pop <- make_lexis_union_history()
-  expect_error(collect_demographic_counts(pop$persons,c(0,3),c(0,Inf),TRUE),"union histories")
-  for (bad in list(NULL,NA,1,"yes",c(TRUE,FALSE),matrix(TRUE)))
-    expect_error(collect_demographic_counts(pop,c(0,3),c(0,Inf),bad),"by_union_type")
+  expect_error(demographic_counts(pop$persons,c(0,3),c(0,Inf), by = "union_type"),"union histories")
+  for (bad in list(NA,1,"yes",TRUE,c("union_type","union_type"),matrix("union_type")))
+    expect_error(demographic_counts(pop,c(0,3),c(0,Inf), by = bad),"by")
   pop$unions <- pop$unions[0, ]
-  x <- collect_demographic_counts(pop,c(0,3),c(0,Inf),TRUE)
+  x <- demographic_counts(pop,c(0,3),c(0,Inf), by = "union_type")
   expect_equal(subset(x,union_type == "partnered")$person_years,c(0,0))
   expect_true(all(is.na(subset(x,union_type == "partnered")$rate_fertility)))
   pop <- hammel_population(pop$persons[0, ],end_time=3)
-  x <- collect_demographic_counts(pop,c(0,3),c(0,Inf),TRUE)
+  x <- demographic_counts(pop,c(0,3),c(0,Inf), by = "union_type")
   expect_s3_class(x,"tbl_df")
   expect_equal(nrow(x),4)
   expect_equal(x$person_years,rep(0,4))
-  expect_equal(x$births,c(NA,NA,0,0))
+  expect_equal(x$births,c(NA,0,NA,0))
 })
 
 test_that("derived measures group by observed union type", {
-  x <- collect_demographic_counts(make_lexis_union_history(),c(0,3),c(0,20,30,40,Inf),TRUE)
+  x <- demographic_counts(make_lexis_union_history(),c(0,3),c(0,20,30,40,Inf), by = "union_type")
   tfr <- calculate_tfr(x)
   expect_identical(tfr$union_type,c("unpartnered","partnered"))
   expect_identical(tfr$tfr,rep(NA_real_,2))

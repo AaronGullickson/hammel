@@ -134,7 +134,7 @@ dissolutions against union-year exposure.
 ## Union-year counts and dissolution rates
 
 Requested by the user October 27, 2026. `calculate_dissolution_rates(population,
-time_breaks, dur_breaks, by_group = FALSE)` returns a tibble with `time_start`,
+time_breaks, dur_breaks, by = NULL)` returns a tibble with `time_start`,
 `time_end`, `dur_start`, `dur_end`, `union_years`, `dissolutions`, and
 `rate_dissolution`. There is no duplicated male/female row: one episode is one
 unit of observation, and repeated episodes contribute separately.
@@ -158,13 +158,13 @@ Do not stack independent replications with repeated union IDs before extraction.
 Use one history per call, then combine the summaries. All grid cells are retained,
 including typed zero-exposure cells for empty ungrouped histories.
 
-With `by_group = TRUE`, population inputs use both partners' recorded groups
-and return `group_pair`, with a full period/duration grid for every unordered
-pair of population groups (including pairs without observed episodes). Labels
-are canonical character strings in radix order, not numeric group codes.
-Bare union tables require `group_pair`; reverse labels are normalized and
-combined. Empty grouped inputs return a typed zero-row tibble. This replaces
-the earlier woman-only grouping; no single-partner option is added (D079).
+`by` accepts `"group_w"`, `"group_h"` and `"union_type"` (D133). The group
+variables are the wife's and husband's current groups, following transition
+histories, with a full period/duration grid for every combination of
+population groups (including combinations without observed episodes). Rows are
+directional; sum both directions for the unordered pairs that dissolution
+inputs use. Bare union tables require `group_w`/`group_h` columns. Empty
+grouped inputs return a typed zero-row tibble.
 
 Worked accounting: U1 starts at 0 and dissolves at 3; U2 starts at 1 and ends
 at 4 through death; U3 starts at 2 and remains ongoing at endpoint 5. Over

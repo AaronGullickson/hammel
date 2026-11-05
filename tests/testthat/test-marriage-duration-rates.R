@@ -26,8 +26,7 @@ test_that("duration breaks select the previous ending clock and enable stratific
     expect_equal(rows$unions, c(0, 0, 1, 0))
     expect_equal(rows$rate_union, c(0, 0, NA, NA))
   }
-  expect_identical(calculate_union_rates(pop, c(0, 6), c(0, 21, Inf),
-    by_previous_union = FALSE, dur_breaks = c(0, .5, 1, 2, Inf)), result)
+  expect_identical(calculate_union_rates(pop, c(0, 6), c(0, 21, Inf), dur_breaks = c(0, .5, 1, 2, Inf)), result)
   # Finite final duration bounds gain Inf.
   expect_identical(calculate_union_rates(pop, c(0, 6), c(0, 21, Inf),
     dur_breaks = c(0, .5, 1, 2)), result)
@@ -55,9 +54,9 @@ test_that("group/sex/period duration cells preserve pooled counts and exposure",
   pop <- make_duration_rate_history()
   pop$persons$group <- c(10, 20, 10, 20)
   times <- c(0, 2, 4, 6)
-  result <- calculate_union_rates(pop, times, c(0, Inf), TRUE,
-    dur_breaks = c(0, .5, 1, 2, Inf))
-  age <- calculate_union_rates(pop, times, c(0, Inf), TRUE, TRUE)
+  result <- calculate_union_rates(pop, times, c(0, Inf),
+    dur_breaks = c(0, .5, 1, 2, Inf), by = "group")
+  age <- calculate_union_rates(pop, times, c(0, Inf), by = c("group", "previous_union"))
   expect_type(result$group, "double")
   for (i in seq_len(nrow(age))) {
     rows <- result$group == age$group[i] & result$sex == age$sex[i] &
@@ -85,7 +84,7 @@ test_that("duration observation handles zero-duration episodes and empty outputs
   expect_true(all(is.na(women$rate_union)))
   pop$persons$group <- "A"
   empty <- hammel_population(pop$persons[FALSE, ], end_time = 6)
-  grouped <- calculate_union_rates(empty, c(0, 6), c(0, Inf), TRUE, dur_breaks = c(0, Inf))
+  grouped <- calculate_union_rates(empty, c(0, 6), c(0, Inf), dur_breaks = c(0, Inf), by = "group")
   expect_equal(nrow(grouped), 0)
   expect_type(grouped$dur_start, "double")
   expect_type(grouped$previous_union, "character")

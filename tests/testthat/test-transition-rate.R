@@ -50,7 +50,7 @@ test_that("sex and union-type components recover pooled counts and exposure", {
   pop <- transition_rate_population()
   original <- pop
   out <- calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf),
-    by_sex = TRUE, by_union_type = TRUE)
+    by = c("sex", "union_type"))
   ab <- subset(out, group_origin == "A" & group_dest == "B" & sex == "f")
   ba <- subset(out, group_origin == "B" & group_dest == "A" & sex == "f")
   expect_equal(ab$person_years, c(2, 1))
@@ -73,14 +73,14 @@ test_that("typed union boundaries classify moves after conversion and dissolutio
   pop$unions <- tibble::tibble(union_id = c(1, 2), wife_id = 11, husband_id = 29,
     start_time = c(1, 2), end_time = c(2, 3), end_reason = c("conversion", "dissolution"),
     union_type = c("cohab", "marriage"), previous_cohab_id = c(NA, 1))
-  out <- calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by_union_type = TRUE)
+  out <- calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "union_type")
   ab <- subset(out, group_origin == "A" & group_dest == "B")
   expect_equal(ab$union_type, c("unpartnered", "cohab", "marriage"))
   expect_equal(ab$person_years, c(2, 1, 0))
   expect_equal(ab$transitions, c(0, 0, 1))
   pop$transitions$time[1] <- 3 # B -> A exactly at dissolution
   pop$transitions$time[2] <- 1 # A -> B exactly at union formation
-  out <- calculate_transition_rates(pop, c(0, 6), dur_breaks = c(0, Inf), by_union_type = TRUE)
+  out <- calculate_transition_rates(pop, c(0, 6), dur_breaks = c(0, Inf), by = "union_type")
   expect_equal(subset(out, group_origin == "A" & group_dest == "B" & union_type == "cohab")$transitions, 1)
   expect_equal(subset(out, group_origin == "B" & group_dest == "A" & union_type == "unpartnered")$transitions, 1)
 })
@@ -106,7 +106,7 @@ test_that("empty histories, empty populations and group label types are retained
   expect_equal(out$rate_transition, c(0, 0))
   pop$persons <- pop$persons[0, ]; pop$unions <- pop$unions[0, ]
   pop$ancestry <- pop$ancestry[0, ]
-  empty <- calculate_transition_rates(pop, c(0, 6), dur_breaks = c(0, Inf), by_sex = TRUE, by_union_type = TRUE)
+  empty <- calculate_transition_rates(pop, c(0, 6), dur_breaks = c(0, Inf), by = c("sex", "union_type"))
   expect_s3_class(empty, "tbl_df")
   expect_equal(nrow(empty), 0)
   expect_type(empty$group_origin, "integer")
@@ -119,14 +119,15 @@ test_that("empty histories, empty populations and group label types are retained
 test_that("transition counter rejects invalid axes, endpoints and flags", {
   pop <- transition_rate_population()
   expect_error(calculate_transition_rates(pop, c(0, 6)), "exactly one")
-  expect_error(calculate_transition_rates(pop, c(0, 6), c(0, Inf), c(0, Inf)), "exactly one")
-  expect_error(calculate_transition_rates(pop, c(0, 7), c(0, Inf)), "endpoint")
-  expect_error(calculate_transition_rates(pop, c(0, 6), c(0, 0)), "increasing")
-  expect_error(calculate_transition_rates(pop, c(0, 6), c(-1, Inf)), "nonnegative")
-  expect_error(calculate_transition_rates(pop, c(0, 6), c(0, Inf), by_sex = NA), "by_sex")
-  expect_error(calculate_transition_rates(pop, c(0, 6), c(0, Inf), by_union_type = 1), "by_union_type")
+  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), dur_breaks = c(0, Inf)), "exactly one")
+  expect_error(calculate_transition_rates(pop, c(0, 7), age_breaks = c(0, Inf)), "endpoint")
+  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, 0)), "increasing")
+  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(-1, Inf)), "nonnegative")
+  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = NA), "`by` must")
+  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = 1), "`by` must")
+  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "group"), "cannot split")
   pop$persons$group <- NULL; pop$transitions <- NULL
-  expect_error(calculate_transition_rates(pop, c(0, 6), c(0, Inf)), "group")
+  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf)), "group")
 })
 
 test_that("simulated competing hazards recover directed rates with shared origin exposure", {
@@ -164,6 +165,6 @@ test_that("transition-rate errors identify the requested observation", {
     "calculate_transition_rates.*requires a persons.*group")
   pop <- transition_rate_population()
   pop$unions <- rbind(pop$unions, transform(pop$unions, union_id = 2, start_time = 2))
-  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by_union_type = TRUE),
-    "Transition-rate observation by union type requires nonoverlapping")
+  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "union_type"),
+    "requires nonoverlapping")
 })

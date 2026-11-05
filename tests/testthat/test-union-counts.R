@@ -67,25 +67,30 @@ test_that("repeated and distinct overlapping union episodes each contribute once
   expect_equal(counts$dissolutions, 3)
 })
 
-test_that("grouped union counts use symmetric pairings and conserve totals", {
+test_that("grouped union counts use wife and husband groups and conserve totals", {
   population <- union_count_population()
-  counts <- calculate_dissolution_rates(population, c(0, 2, 5), c(0, 2, Inf), by_group = TRUE)
-  expect_identical(unique(counts$group_pair), c("10:10", "10:20", "20:20"))
-  expect_equal(vapply(split(counts$union_years, counts$group_pair), sum, numeric(1)),
+  counts <- calculate_dissolution_rates(population, c(0, 2, 5), c(0, 2, Inf),
+                                        by = c("group_w", "group_h"))
+  expect_equal(nrow(counts), 4 * 4)
+  # Directional rows sum to the unordered pairs.
+  pairs <- canonical_union_pairs(counts$group_w, counts$group_h)
+  expect_equal(vapply(split(counts$union_years, pairs), sum, numeric(1)),
                c("10:10" = 3, "10:20" = 3, "20:20" = 3))
-  expect_equal(vapply(split(counts$dissolutions, counts$group_pair), sum, numeric(1)),
+  expect_equal(vapply(split(counts$dissolutions, pairs), sum, numeric(1)),
                c("10:10" = 0, "10:20" = 0, "20:20" = 1))
   pooled <- calculate_dissolution_rates(population, c(0, 2, 5), c(0, 2, Inf))
-  expect_equal(unname(rowsum(counts$union_years, rep(1:4, 3))[, 1]), pooled$union_years)
+  expect_equal(unname(rowsum(counts$union_years, rep(1:4, 4))[, 1]), pooled$union_years)
+  # Wife's group alone, and a bare table with the same group columns.
+  wives <- calculate_dissolution_rates(population, c(0, 2, 5), c(0, 2, Inf), by = "group_w")
+  expect_equal(sum(wives$union_years), sum(pooled$union_years))
   bare <- population$unions
-  bare$group_pair <- c("20:20", "10:10", "20:10")
-  expect_identical(calculate_dissolution_rates(bare, c(0, 2, 5), c(0, 2, Inf), TRUE), counts)
-  # Both directions combine into one cross-pair stratum, including event counts.
-  bare$group_pair <- c("20:10", "10:20", "20:10")
-  grouped <- calculate_dissolution_rates(bare, c(0, 5), c(0, Inf), TRUE)
-  expect_identical(grouped$group_pair, "10:20")
-  expect_equal(grouped$union_years, 9)
-  expect_equal(grouped$dissolutions, 1)
+  persons <- population$persons
+  bare$group_w <- persons$group[match(bare$wife_id, persons$person_id)]
+  bare$group_h <- persons$group[match(bare$husband_id, persons$person_id)]
+  from_bare <- calculate_dissolution_rates(bare, c(0, 2, 5), c(0, 2, Inf), by = c("group_w", "group_h"))
+  key <- function(x) paste(x$time_start, x$dur_start, x$group_w, x$group_h)
+  expect_equal(from_bare$union_years[match(key(counts), key(from_bare))], counts$union_years)
+  expect_equal(from_bare$dissolutions[match(key(counts), key(from_bare))], counts$dissolutions)
 })
 
 test_that("duration tails and empty grids follow Lexis conventions", {
@@ -99,17 +104,17 @@ test_that("duration tails and empty grids follow Lexis conventions", {
   expect_equal(counts$union_years, rep(0, 4))
   expect_equal(counts$dissolutions, rep(0, 4))
   expect_true(all(is.na(counts$rate_dissolution)))
-  empty$group_pair <- character()
-  grouped <- calculate_dissolution_rates(empty, c(0, 5), c(0, Inf), TRUE)
+  empty$group_w <- empty$group_h <- character()
+  grouped <- calculate_dissolution_rates(empty, c(0, 5), c(0, Inf), by = c("group_w", "group_h"))
   expect_equal(nrow(grouped), 0)
-  expect_type(grouped$group_pair, "character")
+  expect_type(grouped$group_w, "character")
   expect_type(grouped$dissolutions, "double")
   # Population groups without union episodes still have explicit empty cells.
   population <- union_count_population()
   population$unions <- population$unions[FALSE, ]
-  grouped <- calculate_dissolution_rates(population, c(0, 5), c(0, Inf), TRUE)
-  expect_equal(nrow(grouped), 3)
-  expect_equal(grouped$union_years, c(0, 0, 0))
+  grouped <- calculate_dissolution_rates(population, c(0, 5), c(0, Inf), by = c("group_w", "group_h"))
+  expect_equal(nrow(grouped), 4)
+  expect_equal(grouped$union_years, c(0, 0, 0, 0))
 })
 
 test_that("union counts validate endpoints, breakpoints, histories and grouping", {
@@ -122,15 +127,15 @@ test_that("union counts validate endpoints, breakpoints, histories and grouping"
     expect_error(calculate_dissolution_rates(unions, breaks, c(0, Inf)), "time_breaks")
   for (breaks in list(c(-1, 1), c(0, 0), c(0, NA), 0, c(1, 0), matrix(c(0, 5))))
     expect_error(calculate_dissolution_rates(unions, c(0, 5), breaks), "dur_breaks")
-  for (flag in list(NA, 1, "yes", c(TRUE, FALSE), matrix(TRUE)))
-    expect_error(calculate_dissolution_rates(unions, c(0, 5), c(0, Inf), flag), "by_group")
-  expect_error(calculate_dissolution_rates(unions, c(0, 5), c(0, Inf), TRUE), "group")
+  for (bad in list(NA, 1, "yes", c("group_w", "group_w"), "group_pair"))
+    expect_error(calculate_dissolution_rates(unions, c(0, 5), c(0, Inf), by = bad), "by")
+  expect_error(calculate_dissolution_rates(unions, c(0, 5), c(0, Inf), by = c("group_w", "group_h")), "group")
   expect_error(calculate_dissolution_rates(rbind(unions, unions), c(0, 5), c(0, Inf)), "unique")
   expect_error(calculate_dissolution_rates(unions[-1], c(0, 5), c(0, Inf)), "missing columns")
   bad <- unions; bad$end_time[1] <- -1
   expect_error(calculate_dissolution_rates(bad, c(0, 5), c(0, Inf)), "precede")
   bad <- unions; bad$end_reason[1] <- NA_character_
   expect_error(calculate_dissolution_rates(bad, c(0, 5), c(0, Inf)), "end reason")
-  bad <- unions; bad$group_pair <- c("A:A", NA, "B:B")
-  expect_error(calculate_dissolution_rates(bad, c(0, 5), c(0, Inf), TRUE), "group")
+  bad <- unions; bad$group_w <- c("A", NA, "B"); bad$group_h <- "A"
+  expect_error(calculate_dissolution_rates(bad, c(0, 5), c(0, Inf), by = c("group_w", "group_h")), "group")
 })

@@ -72,3 +72,27 @@ spacing_population <- function(n, age = 30, sons = -0.1, groups = NULL, end_time
 expect_count <- function(count, expected) {
   expect_lt(abs(sum(count) - expected), 4 * sqrt(expected) + 1e-9)
 }
+
+# Mortality and fertility counts in one table (the shape of the former internal
+# collect_demographic_counts()): births are NA for men.
+demographic_counts <- function(population, time_breaks, age_breaks, by = NULL) {
+  out <- calculate_mortality_rates(population, time_breaks, age_breaks, by = by)
+  births <- calculate_fertility_rates(population, time_breaks, age_breaks, by = by)
+  keys <- setdiff(names(births), c("person_years", "births", "rate_fertility"))
+  key <- function(x) do.call(paste, c(lapply(x[keys], as.character), sep = "\r"))
+  out$births <- births$births[match(key(out), key(births))]
+  out$rate_fertility <- as.numeric(ifelse(out$person_years > 0,
+    out$births / out$person_years, NA_real_))
+  out <- out[c(setdiff(names(out), c("deaths", "births", "rate_mortality", "rate_fertility")),
+               "deaths", "births", "rate_mortality", "rate_fertility")]
+  attr(out, "unassigned_births") <- attr(births, "unassigned_births")
+  out
+}
+
+# Sum directional wife/husband dissolution rows into unordered group pairs.
+pair_rates <- function(x) {
+  x$group_pair <- canonical_union_pairs(x$group_w, x$group_h)
+  keys <- intersect(c("time_start", "time_end", "dur_start", "dur_end", "group_pair", "union_type"),
+                    names(x))
+  aggregate(x[c("union_years", "dissolutions")], x[keys], sum)
+}

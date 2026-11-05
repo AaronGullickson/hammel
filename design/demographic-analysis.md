@@ -1,6 +1,6 @@
 # Demographic analysis
 
-Updated November 1, 2026. All outputs are tibbles; base data frames are valid
+Updated November 5, 2026. All outputs are tibbles; base data frames are valid
 inputs. Dates and age boundaries use years, and exposure uses person-years.
 See the [scientific contract](scientific-contract.md) for model assumptions.
 
@@ -36,22 +36,22 @@ Fertility returns female rows only. Female exposure includes the time
 excluded by birth spacing. Zero events with positive exposure give a zero rate;
 zero exposure gives `NA`. Keep those situations distinct.
 
-`by_group = TRUE` returns a separate grid for every group in the person
-history, preserving character labels or numeric codes. The default FALSE pools
-groups. TRUE requires a `group` column; no pooled group row is added. Exposure
+`by = "group"` returns a separate grid for every group in the person
+history, preserving character labels or numeric codes. The default pools
+groups. It requires a `group` column; no pooled group row is added. Exposure
 and deaths follow each person's group; births follow the mother's group, even
-when the child's group differs. It can be combined with `by_union_type = TRUE`:
+when the child's group differs. It can be combined with `by = "union_type"`:
 each spouse's formations and exposure follow their own group. Complete histories
 are retained during extraction, so cross-group family links remain available.
 
 ```r
 group_counts <- calculate_fertility_rates(
   result, seq(2020, 2100, 20), 0:100,
-  by_group = TRUE, by_union_type = TRUE
+  by = c("group", "union_type")
 )
 group_tfr <- calculate_tfr(group_counts)
 group_mortality <- calculate_mortality_rates(
-  result, seq(2020, 2100, 20), 0:100, by_group = TRUE
+  result, seq(2020, 2100, 20), 0:100, by = "group"
 )
 group_life_tables <- calculate_life_table(group_mortality)
 ```
@@ -64,8 +64,90 @@ Births with unknown mothers cannot be assigned maternal age or group. Their peri
 counts are in `attr(summary, "unassigned_births")`, also a tibble. Initial
 persons born within the observation window can appear there if parents are
 unknown; a baseline is not complete historical birth follow-up. The attribute
-remains one pooled count per period when `by_group = TRUE`; the child's group
+remains one pooled count per period when split by group; the child's group
 does not establish an unknown mother's group.
+
+## Stratifying results with `by` (D133)
+
+Every rate calculator and `calculate_population_size()` take one argument,
+`by`, a character vector of categorical variables to split results over, for
+example `by = c("group", "union_type")`. `NULL` (the default) pools them. Bands
+on continuous scales keep their own arguments (`time_breaks`, `age_breaks`,
+`dur_breaks`, and `parity_breaks` in fertility). `by` replaced the
+`by_group`, `by_union_type`, `by_previous_union` and `by_sex` arguments on
+November 5, 2026.
+
+| Function | `by` values | Always split by |
+| --- | --- | --- |
+| `calculate_mortality_rates()` | `group`, `union_type`, `previous_union` | `sex` |
+| `calculate_fertility_rates()` | `group`, `union_type`, `previous_union` | women only; `parity_breaks` optional |
+| `calculate_union_rates()` | `group`, `previous_union`, `union_type` (type entered) | `sex` |
+| `calculate_marriage_rates()` | `group`, `previous_union` | `sex` |
+| `calculate_transition_rates()` | `sex`, `union_type`, `previous_union` | `group_origin`, `group_dest` |
+| `calculate_population_size()` | `sex`, `group`, `union_type`, `previous_union` | — |
+| `calculate_dissolution_rates()` | `group_w`, `group_h`, `union_type` | — |
+| `calculate_cohab_convert_rate()` | `group_w`, `group_h` | — |
+
+Unknown or repeated names are errors that list the accepted values.
+
+**Variables.** Each is the person's (or union's) state at the time, changing
+only at recorded events:
+
+- `sex`: `m` or `f`.
+- `group`: current group, following the transition history.
+- `union_type`: current union state, `unpartnered`, `cohab` or `marriage` for
+  typed histories and `unpartnered` or `partnered` for untyped ones, always in
+  that order. In `calculate_union_rates()` it is instead the type of union
+  entered, `cohab` or `marriage`: it splits the formations, and both rows share
+  the same unpartnered exposure.
+- `previous_union`: how the most recent ended union ended, `none`,
+  `separated` or `widowed`. Conversion is not an ending, and cohabitation
+  endings follow the population's recorded `cohabitation_counts_as_previous_union`
+  policy (D085). It applies to partnered time too: a woman in her first union
+  is `none`. `pool_dissolved = TRUE` merges `separated` and `widowed` into
+  `dissolved` in any calculator when `previous_union` is in `by`.
+- `group_w`, `group_h`: the wife's and husband's current groups, for
+  union-level rates. Directional: A-wife/B-husband and B-wife/A-husband are
+  separate rows; sum them for an unordered pair.
+
+`group` requires population groups. `union_type` and `previous_union` require
+a `hammel_population` with union histories, and `previous_union` requires
+nonoverlapping histories for each person. Union rates by entry type and
+conversion rates require typed histories. Bare union tables passed to
+`calculate_dissolution_rates()` need `group_w`, `group_h` or `union_type`
+columns for those values.
+
+**Exposure and events.** Exposure is split at every change in the requested
+variables, and each event counts under the state immediately before it in the
+simulation's event order (death, birth, dissolution, conversion, search, group
+transition). Changes at the same instant from earlier events apply first:
+
+- A death counts under the state just before it, with no same-time changes, so
+  a death that ends a union counts as partnered.
+- A birth counts in a union that starts at the same time (on-demand formation
+  happens at the birth) and in a union ending at the same time by dissolution
+  or conversion (birth precedes them), but not in one ending at the same time by
+  the partner's death. It uses the mother's group before any same-time
+  transition. Simultaneous births advance parity one at a time, in row order.
+- A union formation counts under the previous-union category and group before
+  it.
+- A group transition counts under the union state after same-time union
+  changes, which precede transitions.
+- `calculate_population_size()` counts states after all events at each time.
+
+**Row order.** Time varies fastest, then the age or duration band, then `sex`
+(where it is always included), then parity, then the transition destination
+and origin (destinations vary faster, so each origin's rows are adjacent),
+then the `by` variables in the order given, earlier ones varying faster. In `calculate_union_rates()` with `dur_breaks`,
+`previous_union` is added to `by` (last, unless listed), `none` rows use age
+bands and `separated`/`widowed` rows use duration since the union ended.
+
+**Example.** A woman born at 0 starts cohabiting at 20, converts to marriage at
+22, and dissolves the marriage at 30, giving birth at 30. Her exposure by
+`union_type` is unpartnered to 20, cohab 20–22 and marriage 22–30, then
+unpartnered; by `previous_union` it is `none` to 30 and `separated` after.
+The birth at 30 counts as `marriage` and `none`, because it precedes the
+dissolution.
 
 ## Union-years and dissolution rates
 
@@ -93,14 +175,14 @@ Zero exposure gives an NA rate; zero dissolutions with positive exposure gives
 zero. This is a cause-specific rate, not a cumulative probability of dissolution
 when death can also end unions.
 
-`by_group = TRUE` returns symmetric `group_pair` strata such as `A:A`, `A:B`,
-and `B:B` (D079), pooling A-wife/B-husband with B-wife/A-husband. A full
-period/duration grid is retained for every unordered pair of population groups.
+`by = c("group_w", "group_h")` splits by the wife's and husband's current
+groups (D133). Rows are directional: sum A-wife/B-husband and B-wife/A-husband
+rows for the unordered pair that dissolution inputs use (D079). A full
+period/duration grid is retained for every combination of population groups.
 The function also accepts a bare union data frame with `union_id`, `start_time`,
 `end_time`, and `end_reason`; caller-provided follow-up must cover the window.
-Bare tables need a `group_pair` column when grouping is requested; reversed
-labels are normalized. Pair labels are canonical character strings in radix
-order, including when the underlying group identities are numeric. Summarize independent replications separately before binding
+Bare tables need `group_w` and `group_h` columns for those variables, with
+labels sorted in radix order. Summarize independent replications separately before binding
 results, as for person-level Lexis counts. See
 [union dissolution](union-dissolution.md#union-year-counts-and-dissolution-rates)
 for worked accounting and censoring rules.
@@ -182,9 +264,10 @@ population_sizes <- result |>
 
 This returns `time` and `population`. Counts include births and exclude deaths
 at the requested instant, preserving input order and repeated times.
-`calculate_population_size(result, times, by_group = TRUE)` adds `group` and
-counts each group separately. It requires group data, retains the group's input
-type, and lists groups in first-occurrence order within each requested time.
+`calculate_population_size(result, times, by = "group")` adds `group` and
+counts each group separately; `by` also accepts `sex`, `union_type` and
+`previous_union`. Group requires group data, retains the group's input
+type, and lists groups in first-occurrence order; times vary fastest.
 Groups present in the history get zero counts where no members are alive.
 There is no extra pooled row. Empty time vectors and empty group histories
 return zero-row tibbles with the appropriate column types.
@@ -197,8 +280,8 @@ Missing death times are censored there.
 
 ## Replications and interpretation
 
-Analyze each independent history before combining summaries. Group stratification
-is available through `by_group`; arbitrary custom stratification is not supported.
+Analyze each independent history before combining summaries. Stratification
+is available through `by` (D133); arbitrary custom variables are not supported.
 Stacking person tables
 with repeated IDs would make parent references ambiguous and is rejected.
 Retain a replication ID when binding derived tables:
@@ -230,7 +313,7 @@ separate row per status and period, preserving the status column. Each sum is
 conditional TFRs describe continuous exposure to a status, not additive
 components of the overall TFR. Tables without status retain their existing
 behavior; default Lexis summaries use all female exposure, while
-`by_union_type = TRUE` also returns status-specific exposure as described below.
+`by = "union_type"` also returns status-specific exposure as described below.
 
 ## Parent information
 
@@ -284,9 +367,9 @@ detailed_unions <- get_detailed_unions(result)
 
 ### Current union type exposure and events
 
-`by_union_type = TRUE` returns adjacent rows labeled by `union_type`:
-`unpartnered` plus each type discovered in the union histories. Typed histories
-can contain `cohab` and `marriage`; legacy untyped histories use `partnered`.
+`by = "union_type"` returns rows labeled by `union_type`: `unpartnered`,
+`cohab` and `marriage` for typed histories, or `unpartnered` and `partnered`
+for legacy untyped ones, always all of them in that order.
 There is no overall row. Omit the option to obtain pooled demographic rates
 without a type column. Type-specific counts and exposure sum to pooled totals;
 rates must be recomputed after pooling counts and exposure.
@@ -300,7 +383,7 @@ histories must not overlap; untyped overlapping coverage is merged.
 
 ```r
 counts <- calculate_fertility_rates(result, seq(2020, 2100, 20), 0:100,
-                                by_union_type = TRUE)
+                                by = "union_type")
 tfr <- calculate_tfr(counts)
 ```
 
@@ -322,12 +405,11 @@ Use the separate helper for formations per unpartnered person-year:
 
 ```r
 marriages <- calculate_union_rates(result, seq(2025, 2100, 5),
-                                      0:100, by_group = TRUE,
-                                      by_previous_union = TRUE)
+                                      0:100, by = c("group", "previous_union"))
 ```
 
 By default, union counts pool previous categories and omit `previous_union`.
-Set `by_previous_union = TRUE` as above to stratify independently of `by_group`.
+Add `"previous_union"` to `by` as above to stratify independently of group.
 The stratified output returns period, age, sex, `previous_union`, optional individual `group`,
 `person_years`, `unions`, and `rate_union`. Categories are `none`,
 `separated`, and `widowed`, determined by the most recent recorded episode.
@@ -373,7 +455,7 @@ Time/clock bands are half-open; finite final duration breaks gain Inf. With
 `dur_breaks = NULL`, the age-only schema and pooling behavior are unchanged.
 
 
-With typed histories, `by_union_type = TRUE` adds separate `cohab` and `marriage`
+With typed histories, `by = "union_type"` adds separate `cohab` and `marriage`
 rows. The numerator counts entry from an unpartnered state; conversion is
 excluded. Each type uses the same unpartnered exposure, so rates sum to the
 pooled `rate_union`, but repeated exposure must not be summed across types.
@@ -383,7 +465,7 @@ pooled rates only. See [cohabitation](cohabitation.md).
 
 ## Marriage entry including conversion
 
-Use `calculate_marriage_rates(result, time_breaks, age_breaks, by_group = FALSE, by_previous_union = FALSE)`
+Use `calculate_marriage_rates(result, time_breaks, age_breaks, by = NULL)`
 to measure all marriage starts, including conversions from cohabitation. It
 returns `marriages`, `person_years`, and `rate_marriage`. Person-years include
 both unpartnered and cohabiting time, and exclude marriage. This helper supports
@@ -403,8 +485,8 @@ conversion hazard inputs. Age/group composition and failed partner searches
 can affect comparisons with input schedules.
 
 
-Dissolution summaries also accept `by_union_type = TRUE`, optionally combined
-with `by_group = TRUE`. Separate cohabitation and marriage rows use their own
+Dissolution summaries also accept `"union_type"` in `by`, optionally combined
+with `"group_w"` and `"group_h"`. Separate cohabitation and marriage rows use their own
 union-years and dissolution counts; summing counts and exposure across types
 recovers pooled totals. Conversion ends cohabitation exposure without a
 dissolution event. Marriage duration starts at conversion. Typed union histories
@@ -421,12 +503,13 @@ calculate_cohab_convert_rate(result,
 calculate_cohab_convert_rate(result,
   time_breaks = c(2025, 2100),
   age_breaks = seq(15, 70, 5),
-  by_group = TRUE
+  by = "group_w"
 )
 ```
 
 Supply exactly one axis. Duration is time since cohabitation entry; age is
-woman's age, matching conversion schedules. `by_group` uses the woman's group.
+woman's age, matching conversion schedules. `by` accepts `"group_w"` (the
+woman's group, matching conversion inputs) and `"group_h"`.
 Typed population histories are required. Output contains period and selected
 axis boundaries, `union_years`, `conversions`, and `rate_cohab_convert`.
 Exposure is cohabitation only, once per union episode. Only conversions count
@@ -537,7 +620,7 @@ Use `calculate_transition_rates()` with exactly one age or duration axis:
 
 ```r
 calculate_transition_rates(result, time_breaks = seq(2000, 2100, 10),
-  age_breaks = seq(0, 100, 10), by_sex = TRUE, by_union_type = TRUE)
+  age_breaks = seq(0, 100, 10), by = c("sex", "union_type"))
 calculate_transition_rates(result, time_breaks = seq(2000, 2100, 10),
   dur_breaks = c(0, 1, 5, 10, Inf))
 ```
@@ -592,8 +675,8 @@ unrealized outputs, invalid confidence levels and unchanged default outputs.
 ## Detailed and pooled previous unions (D126)
 
 Union and marriage rate calculators use `none`, `separated`, and `widowed`
-when `by_previous_union = TRUE`. Set `pool_dissolved = TRUE` to return
-`none` and `dissolved` instead, together with `by_previous_union = TRUE`.
+when `by = "previous_union"`. Set `pool_dissolved = TRUE` to return
+`none` and `dissolved` instead, together with `by = "previous_union"`.
 Duration breaks also enable previous-union stratification.
 Dissolved pools separation and widowhood. Events and exposure are summed
 within each period, sex, group, age/duration and union-type cell before computing

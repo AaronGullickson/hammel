@@ -73,6 +73,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Milestone 8 acceptance | D130 |
 | Milestones 9–11 reordered: group columns, immigration, then summaries | D131 |
 | `stratify_rates()` replaces `group_prop_hazard` | D132 |
+| One `by` argument for rate calculators; shared observation engine | D133 |
 
 ## Recorded decisions
 
@@ -2860,3 +2861,41 @@ rates, which had no multiplier argument, can now be stratified the same way.
 The accepted milestone 3 report uses `group_prop_hazard` and reproduces at its
 recorded commit, as the milestone 1 report already does.
 See [groups](groups.md#proportional-stratification-with-stratify_rates-d132).
+
+## D133 — One `by` argument for rate calculators (November 5, 2026)
+
+**Status:** User-selected API change in milestone 9, specified in discussion
+November 5, 2026.
+
+**Decision:** Replace the `by_group`, `by_union_type`, `by_previous_union` and
+`by_sex` arguments of every rate calculator and `calculate_population_size()`
+with `by`, a character vector of categorical variables. Variables may go beyond
+what a process accepts as rate strata when they are easily computed from the
+histories. User choices:
+
+- Band arguments (`age_breaks`, `dur_breaks`, `parity_breaks`) stay separate;
+  `by` holds categories only. `parity_breaks` stays in fertility only.
+- Sex stays always split where it is now (mortality, fertility, union and
+  marriage rates) and is a `by` value for transitions and population size.
+- Dissolution and conversion rates use the wife's and husband's groups,
+  `group_w` and `group_h`, instead of the unordered `group_pair`, plus
+  `union_type` for dissolution.
+- `pool_dissolved` stays a separate option, now available wherever
+  `previous_union` is in `by`; `dur_breaks` still adds `previous_union` in
+  union rates.
+- One row-order rule for all calculators.
+- New variables now: `previous_union` for mortality, fertility, transitions and
+  population size; `union_type` for population size.
+
+**Implementation:** A shared native observation engine builds each person's
+timeline of states (group, union type, previous union, parity) with same-time
+changes ordered as in the simulation, and one counter splits exposure and
+assigns events. It replaces the per-calculator counting functions and is the
+basis for milestone 9's additional group columns. Results equal the previous
+calculators' output except for row order, the fixed `union_type` level order
+and the new variables.
+
+**Implications:** The old arguments are removed, not deprecated. Accepted
+reports for milestones 1 and 3–8 use them and reproduce at their recorded
+commits. See
+[demographic analysis](demographic-analysis.md#stratifying-results-with-by-d133).

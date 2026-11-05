@@ -31,7 +31,8 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Simulation validation, RNG isolation, result assembly | `R/simulate.R` |
 | Continuous scheduling and events | `src/simulate.cpp` |
 | Demographic extraction and measures | `src/demography.cpp`, `R/calc_demographic_measures.R` |
-| Directed transition Lexis counts | `R/calculate_transition_rates.R`; `transition_counts_cpp()` in `src/demography.cpp` |
+| Person-level observation engine (`by`, D133) | `R/observation_strata.R`; `person_lexis_cpp()` and `person_snapshot_cpp()` in `src/observation.cpp` |
+| Union-level dissolution and conversion counts | `dissolution_counts_cpp()` and `union_group_history_cpp()` in `src/demography.cpp` |
 | Software and analytical validation | `tests/testthat/` |
 | Replication assessment | `validation/milestone1.qmd` through `validation/milestone8.qmd` |
 
@@ -134,8 +135,8 @@ run boundaries, parent assignment, and restarts.
 ## Union-history observations
 
 `calculate_dissolution_rates()` returns union-years, dissolution counts and rates
-by calendar period and elapsed duration, optionally by symmetric `group_pair`
-strata (A:B includes both partner directions).
+by calendar period and elapsed duration, optionally by the wife's and
+husband's groups and union type (`by`, D133).
 The native `dissolution_counts_cpp()` splits recorded episodes directly at
 period/duration boundaries. This counts each episode once rather than summing
 both partners' exposure. Death censors dissolution exposure without entering
@@ -228,7 +229,7 @@ There is no automatic disk cache or rate refresh.
 `calculate_fertility_rates()`, `calculate_mortality_rates()`, `calculate_tfr()`, `calculate_life_table()`, and
 `calculate_population_size()` operate on inspectable outputs. See
 [demographic analysis](demographic-analysis.md) for exposure, missing cells,
-replications, and age alignment. `calculate_fertility_rates(by_union_type = TRUE)`
+replications, and age alignment. `calculate_fertility_rates(by = "union_type")`
 returns female unpartnered and discovered union-type rows with exposure, births
 and fertility rates, without an overall row. The separate mortality helper
 returns exposure, deaths and mortality rates for both sexes. Optional
@@ -236,7 +237,7 @@ returns exposure, deaths and mortality rates for both sexes. Optional
 use partnered/unpartnered. `calculate_union_rates()` separately returns
 unpartnered exposure, union starts, and partnership-entry rates by sex,
 excluding conversions.
-`by_previous_union = TRUE` adds previous categories; `by_group = TRUE` independently
+`by = "previous_union"` adds previous categories; `by = "group"` independently
 adds individual groups. Both default to FALSE (D080). Optional `dur_breaks`
 automatically separates previous categories and measures separated/widowed rows
 by duration, leaving none rows by age (D084). It requires exclusive union histories.
@@ -274,8 +275,8 @@ not reconstructions of past group transitions. Validation uses shuffled IDs,
 fractional ages, siblings, unknown/deceased parents, optional groups, empty
 tables, and unchanged inputs.
 
-`calculate_fertility_rates(by_group = TRUE)` and
-`calculate_population_size(by_group = TRUE)` optionally split observations by
+`calculate_fertility_rates(by = "group")` and
+`calculate_population_size(by = "group")` optionally split observations by
 recorded group. The native count kernels retain full histories and add a group
 axis to their output arrays, preserving cross-group parent and spouse links.
 TFR and life-table calculations automatically retain input group strata. See

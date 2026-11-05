@@ -588,7 +588,7 @@ The subsequent D080 pooling option passed
 without failures or warnings. Tests cover pooled counts/exposure and rates
 against summed previous-category cells, independently with and without group
 stratification, empty grouped/ungrouped outputs, and invalid option values.
-`by_previous_union` defaults to FALSE; stratified checks explicitly opt in.
+Previous-union strata are off by default; stratified checks explicitly request them.
 
 ## Observation helper names (D081, October 28, 2026)
 

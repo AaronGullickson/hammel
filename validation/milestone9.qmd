@@ -42,13 +42,20 @@ set_theme(theme_bw())
 
 ## Purpose and completion criteria
 
-
+Assess a switch to allow multiple group columns to a simulation to allow more than one group designation within the same simulation.
 
 | Measure | Comparison | Acceptance criterion |
 |---|---|---|
 | Accounting and implementation | Existing tests | Successful unit tests |
 
 ## Overview of Design
+
+The `group` column is intended to be abstract so that users can use it for different kinds of things. For example, it could designate ethnoracial groups, educational categories, or regions. While this is useful, users are still limited to a single group column. So, if they want a simulation that includes both regional migration and ethnoracial breakdowns, they will have a difficult time. While it is possible to hack together a set of categories for a group that are a combination of multiple groups that the user wants, this is not easy or elegant.
+
+However, we have all the internal plumbing to allow for more than one group. Its really just another stratification dimension and we know how to handle those already. So, 
+
+
+### Changes to helpers
 
 ## Stratifying Rates
 
@@ -65,7 +72,7 @@ fertility_rates <- stratify_rates(
     # this is not really a great idea for union type as within union
     # type fertility rates have a totally different age profile, but 
     # ok for testing purposes
-    union_type = c("unpartnered" = 0.3, "cohab" = 0.7, "marriage" = 1.1)
+    union_type = c("unpartnered" = 0.3, "partnered" = 1.3)
   )
 )
 fertility_rates |> calculate_tfr()
@@ -74,11 +81,10 @@ fertility_rates |> calculate_tfr()
 # then stratify further by group
 fertility_rates_by_union_type <- read_csv(
   here(
-  "validation", "data", "england_wales_1992_onward", "fertility_by_union_type_1992.csv"
+  "validation", "data", "usa_2000_2001", "usa_2000_fertility_by_union_status.csv"
   )
 ) |>
-  rename(age_start = denominator_age_start, age_end = denominator_age_end) |>
-  select(union_type, age_start, age_end, rate)
+  rename(union_type = union_status)
 fertility_rates <- stratify_rates(
   fertility_rates_by_union_type,
   by = list(group = c(A = 1.1, B = 1))
@@ -90,17 +96,80 @@ fertility_rates |> calculate_tfr()
 
 fertility_rates <- bind_rows(
   fertility_rates_by_union_type |>
-    filter(union_type == "marriage") |>
+    filter(union_type == "partnered") |>
     stratify_rates(list(group = c(A = 1.05, B = 1))),
   fertility_rates_by_union_type |>
-    filter(union_type == "cohab") |>
-    stratify_rates(list(group = c(A = 1.1, B = 1))),
-  fertility_rates_by_union_type |>
     filter(union_type == "unpartnered") |>
-    stratify_rates(list(group = c(A = 1.15, B = 1)))
+    stratify_rates(list(group = c(A = 1.20, B = 1)))
 )
 fertility_rates |> calculate_tfr()
+
+mortality_rates <- stratify_rates(
+  mortality_rates,
+  list(group = c(A = 1.05, B = 1))
+)
+mortality_rates |>
+  calculate_life_table() |>
+  filter(age_start == 0) |>
+  select(group, sex, ex)
 ```
+
+```{r}
+
+mar_rates <- read_csv(
+  here("validation", "data", "usa_2000_2001", "usa_2001_marriage_rates_female.csv")
+)
+
+
+set.seed(42)
+pop_start <- create_baseline_population(50000, group_weights = c(A = 1, B = 1))
+
+model <- hammel_model() |>
+  set_population(pop_start) |>
+  set_fertility(fertility_rates) |>
+  set_mortality(mortality_rates) |>
+  set_union_formation("rate", rates = mar_rates)
+
+pop_end <- simulate(model, 150, 42)
+```
+
+```{r}
+
+calculate_fertility_rates(pop_end, c(50, 150), seq(15, 45, 5)) |>
+  calculate_tfr()
+
+
+calculate_fertility_rates(pop_end, c(50, 150), seq(15, 45, 5), #by = "group"
+  by_union_type = TRUE,
+  by_group = TRUE,
+  #by = "group"
+) |>
+  calculate_tfr()
+
+calculate_mortality_rates(
+  pop_end, 
+  c(50, 150),
+  0:95,
+  by_group = TRUE,
+  #by = "group"
+) |>
+  calculate_life_table() |>
+  filter(age_start == 0) |>
+  select(group, sex, ex)
+
+calculate_mortality_rates(
+  pop_end, 
+  c(50, 150),
+  0:95,
+  by_group = TRUE,
+  by_union_type = TRUE,
+  by = c("group", "union_type")
+) |>
+  calculate_life_table() |>
+  filter(age_start == 0) |>
+  select(group, union_type, sex, ex)
+```
+
 
 
 

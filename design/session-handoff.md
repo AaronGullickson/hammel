@@ -77,7 +77,7 @@ questions are preserved in the roadmap. No household mechanism is implemented.
 
 D126 uses detailed previous-union categories `none`/`separated`/`widowed`, or
 pooled `none`/`dissolved`, consistently for search and probability inputs.
-Union/marriage calculators use `by_previous_union = TRUE` with optional
+Union/marriage calculators use `by = "previous_union"` with optional
 `pool_dissolved = TRUE`; confidence limits use combined counts/exposure.
 Recent review fixes retain run-anchored unrealized-birth accounting and restrict
 execution group-coverage checks to active run slices. The last recorded full

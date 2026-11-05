@@ -25,145 +25,105 @@
 #' @param time_breaks Strictly increasing finite calendar boundaries in years.
 #' @param age_breaks Strictly increasing nonnegative age boundaries in years.
 #'   A finite final boundary gains an open-ended band through Inf.
-#' @param by_group Logical, default FALSE. With TRUE, require person groups and
-#'   return separate rows by each individual's group. No pooled row is added.
-#' @param by_previous_union Logical, default FALSE. With TRUE, separate exposure
-#'   and starts by previous union category and include `previous_union`. Otherwise
-#'   pool counts and exposure before calculating rates, and omit that column.
-#'   Supplying `dur_breaks` automatically enables this option.
+#' @param by `NULL` (default) or a character vector of variables to split
+#'   results over: `"group"` (each person's own group before formation),
+#'   `"previous_union"` (`"none"`, `"separated"` or `"widowed"`, the category
+#'   immediately before formation) and `"union_type"` (the type of union
+#'   entered, `"cohab"` or `"marriage"`; requires typed histories). Both
+#'   `union_type` rows share the full unpartnered exposure, which must not be
+#'   summed across them. Rows vary by time fastest, then age (or duration),
+#'   then sex, then the `by` variables in the order given.
 #' @param pool_dissolved Logical, default FALSE. With TRUE, return `"none"`
 #'   and `"dissolved"`, pooling separated and widowed events and exposure before
-#'   calculating rates and confidence intervals. Requires `by_previous_union`
-#'   (also enabled by `dur_breaks`). With FALSE, stratified output uses the detailed
-#'   `"none"`, `"separated"`, and `"widowed"` categories.
+#'   calculating rates and confidence intervals. Requires `"previous_union"` in
+#'   `by` (added automatically with `dur_breaks`).
 #' @param dur_breaks Optional nonnegative duration boundaries in years. When
 #'   supplied, separated/widowed rows use years since the latest union ending;
-#'   none rows still use `age_breaks`. Automatically enables `by_previous_union`
-#'   regardless of its supplied value. A finite final boundary gains Inf.
+#'   none rows still use `age_breaks`. Adds `"previous_union"` to `by` (last,
+#'   unless listed). A finite final boundary gains Inf.
 #'   Adds `dur_start`/`dur_end`, with NA in the unused age/duration pair.
 #'   Duration rows include all ages; this is not an age-by-duration surface.
-#' @param by_union_type Logical, default FALSE. Separate cohabitation and direct
-#'   marriage entries. Requires typed histories. Both types use the same full
-#'   unpartnered exposure; exposure must not be summed across type rows.
 #' @inheritParams calculate_mortality_rates
 #' @return A tibble with `time_start`, `time_end`, `sex`, `age_start`, `age_end`,
-#'   `person_years`, `unions`, and `rate_union`, plus `group` and
-#'   `previous_union` when requested, and duration columns when `dur_breaks` is
-#'   supplied, and `union_type` when requested. Empty cells are retained.
+#'   duration columns when `dur_breaks` is supplied, the `by` columns,
+#'   `person_years`, `unions`, and `rate_union`. Empty cells are retained.
 #'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
 #' @export
-calculate_union_rates <- function(population, time_breaks, age_breaks,
-                                     by_group = FALSE, by_previous_union = FALSE,
-                                     dur_breaks = NULL, by_union_type = FALSE,
-                                     conf.level = NULL, pool_dissolved = FALSE) {
+calculate_union_rates <- function(population, time_breaks, age_breaks, by = NULL,
+                                  dur_breaks = NULL, conf.level = NULL, pool_dissolved = FALSE) {
   validate_rate_conf_level(conf.level)
-  calculate_entry_rates(population, time_breaks, age_breaks, by_group,
-    by_previous_union, dur_breaks, by_union_type, marriage_measure = FALSE,
-    conf.level = conf.level, pool_dissolved = pool_dissolved)
+  by <- check_by(by, c("group", "previous_union", "union_type"), "calculate_union_rates")
+  calculate_entry_rates(population, time_breaks, age_breaks, by, dur_breaks,
+    marriage_measure = FALSE, conf.level = conf.level, pool_dissolved = pool_dissolved)
 }
 
-calculate_entry_rates <- function(population, time_breaks, age_breaks,
-                                  by_group, by_previous_union, dur_breaks,
-                                  by_union_type, marriage_measure, conf.level = NULL,
-                                  pool_dissolved = FALSE) {
-  if (!is.logical(pool_dissolved) || length(pool_dissolved) != 1L ||
-      !is.null(dim(pool_dissolved)) || is.na(pool_dissolved))
-    stop("`pool_dissolved` must be TRUE or FALSE.", call. = FALSE)
-  if (!is.logical(by_union_type) || length(by_union_type) != 1L ||
-      !is.null(dim(by_union_type)) || is.na(by_union_type))
-    stop("`by_union_type` must be TRUE or FALSE.", call. = FALSE)
+# Union entry (and marriage entry) rates from the shared engine. Formation
+# kinds: 0 cohabitation, 1 direct marriage, 2 marriage by conversion.
+calculate_entry_rates <- function(population, time_breaks, age_breaks, by, dur_breaks,
+                                  marriage_measure, conf.level = NULL, pool_dissolved = FALSE) {
   if (!inherits(population, "hammel_population"))
     stop("`population` must be a hammel_population with union histories.", call. = FALSE)
-  if (by_union_type && !"union_type" %in% names(population$unions))
-    stop("`by_union_type = TRUE` requires typed union histories.", call. = FALSE)
-  if (!is.logical(by_previous_union) || length(by_previous_union) != 1L ||
-      !is.null(dim(by_previous_union)) || is.na(by_previous_union))
-    stop("`by_previous_union` must be TRUE or FALSE.", call. = FALSE)
   if (!is.null(dur_breaks)) {
     check_demographic_breaks(dur_breaks, "dur_breaks", ages = TRUE)
     if (is.finite(tail(dur_breaks, 1))) dur_breaks <- c(dur_breaks, Inf)
-    by_previous_union <- TRUE
+    if (!"previous_union" %in% by) by <- c(by, "previous_union")
   }
-  if (pool_dissolved && !by_previous_union)
-    stop("`pool_dissolved = TRUE` requires `by_previous_union = TRUE` or `dur_breaks`.", call. = FALSE)
-  validate_population(population)
-  check_demographic_breaks(time_breaks, "time_breaks")
-  check_demographic_breaks(age_breaks, "age_breaks", ages = TRUE)
-  if (is.finite(tail(age_breaks, 1))) age_breaks <- c(age_breaks, Inf)
-  if (is.null(population$end_time) || tail(time_breaks, 1) > population$end_time)
-    stop("Observation requires a known endpoint and cannot extend beyond it.", call. = FALSE)
-  persons <- population$persons
-  persons <- prepare_group_observations(persons, population, by_group)
-  groups <- observation_groups(persons, by_group)
-  group_count <- if (by_group) length(groups) else 1L
-  indices <- if (by_group) match(persons$group, groups) - 1L else rep(0L, nrow(persons))
+  check_pool_dissolved(pool_dissolved, by)
+  age_breaks <- person_breaks(time_breaks, age_breaks)
+  entry_type <- "union_type" %in% by
+  obs <- person_observation(population, by, tail(time_breaks, 1), needs_unions = TRUE,
+                            requires_typed = entry_type)
+  # union_type here splits formations only; exposure is not split by it.
+  state_by <- setdiff(by, "union_type")
+  run <- function(axis, breaks, mask) run_person_lexis(obs, state_by, time_breaks, breaks,
+    axis = axis, sex = TRUE, utype_filter = if (marriage_measure) 2L else 1L,
+    previous_mask = mask, pool_dissolved = pool_dissolved, exclusive = TRUE)
+  kinds <- if (marriage_measure) list(c(1L, 2L)) else if (entry_type) list(0L, 1L) else list(c(0L, 1L))
+  block <- function(counts, breaks, axis_name, previous_codes, source) {
+    s <- counts$strides
+    dims <- c(list(band_dim(time_breaks, "time", 1), band_dim(breaks, axis_name, s[["a"]]),
+      label_dim("sex", c("m", "f"), s[["sex"]])),
+      lapply(by, function(name) if (name == "union_type")
+        label_dim("union_type", c("cohab", "marriage"), counts$cells) else
+        person_by_dims(name, obs, counts, pool_dissolved, previous_codes)[[1]]))
+    rows <- build_rows(dims)
+    rows$.source <- rep(source, nrow(rows))
+    rows
+  }
   if (is.null(dur_breaks)) {
-    grid <- expand.grid(t = seq_len(length(time_breaks) - 1L),
-      a = seq_len(length(age_breaks) - 1L), sex = c("m", "f"),
-      previous = if (by_previous_union) c("none", "separated", "widowed") else "pooled",
-      g = seq_len(group_count), KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
-    result <- tibble::tibble(time_start = time_breaks[grid$t],
-      time_end = time_breaks[grid$t + 1L], sex = grid$sex,
-      age_start = age_breaks[grid$a], age_end = age_breaks[grid$a + 1L])
+    counts <- list(run(0L, age_breaks, c(TRUE, TRUE, TRUE)))
+    rows <- block(counts[[1]], age_breaks, "age", NULL, 1L)
   } else {
-    axis_grid <- function(breaks, categories, duration) {
-      grid <- expand.grid(t = seq_len(length(time_breaks) - 1L),
-        a = seq_len(length(breaks) - 1L), sex = c("m", "f"), previous = categories,
-        KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
-      tibble::tibble(time_start = time_breaks[grid$t], time_end = time_breaks[grid$t + 1L],
-        sex = grid$sex, age_start = if (duration) NA_real_ else breaks[grid$a],
-        age_end = if (duration) NA_real_ else breaks[grid$a + 1L],
-        dur_start = if (duration) breaks[grid$a] else NA_real_,
-        dur_end = if (duration) breaks[grid$a + 1L] else NA_real_,
-        previous_union = grid$previous)
+    counts <- list(run(0L, age_breaks, c(TRUE, FALSE, FALSE)),
+                   run(2L, dur_breaks, c(FALSE, TRUE, TRUE)))
+    later <- if (pool_dissolved) 1L else 1:2
+    a <- block(counts[[1]], age_breaks, "age", 0L, 1L)
+    b <- block(counts[[2]], dur_breaks, "dur", later, 2L)
+    a$dur_start <- a$dur_end <- rep(NA_real_, nrow(a))
+    b$age_start <- b$age_end <- rep(NA_real_, nrow(b))
+    rows <- order_rows_keep(rbind(a, b[names(a)]))
+  }
+  exposure <- numeric(nrow(rows))
+  events <- numeric(nrow(rows))
+  for (k in seq_along(counts)) {
+    here <- rows$.source == k
+    x <- counts[[k]]
+    cells <- x$cells
+    # Formation kind offsets: the union_type dimension codes cohab 0, marriage 1.
+    type <- if (entry_type) (rows$.index[here] - 1) %/% cells else rep(0, sum(here))
+    base <- rows$.index[here] - type * cells
+    exposure[here] <- x$person_years[base]
+    for (j in seq_along(kinds)) {
+      use <- if (entry_type) type == j - 1L else rep(TRUE, length(type))
+      for (kind in kinds[[j]])
+        events[here][use] <- events[here][use] + x$formations[base[use] + cells * kind]
     }
-    one_group <- rbind(axis_grid(age_breaks, "none", FALSE),
-      axis_grid(dur_breaks, c("separated", "widowed"), TRUE))
-    result <- one_group[rep(seq_len(nrow(one_group)), times = group_count), ]
-    grid <- list(previous = result$previous_union,
-      g = rep(seq_len(group_count), each = nrow(one_group)))
   }
-  if (by_previous_union) result$previous_union <- grid$previous
-  if (by_group) result$group <- groups[grid$g]
-  count_type <- function(type = "pooled") marriage_counts_cpp(
-    persons, population$unions, time_breaks, age_breaks,
-    indices, group_count, dur_breaks,
-    isTRUE(population$simulation$cohabitation_counts_as_previous_union), type, marriage_measure)
-  counts <- count_type()
-  if (!by_previous_union) {
-    cells <- (length(time_breaks) - 1L) * (length(age_breaks) - 1L) * 2L
-    pool <- function(values) {
-      values <- matrix(values, nrow = cells * 3L, ncol = group_count)
-      rows <- seq_len(cells)
-      as.numeric(values[rows, , drop = FALSE] +
-        values[rows + cells, , drop = FALSE] + values[rows + 2L * cells, , drop = FALSE])
-    }
-    counts <- lapply(counts, pool)
-  }
-  if (by_union_type) {
-    typed_counts <- lapply(c("cohab", "marriage"), function(type) {
-      x <- count_type(type)
-      if (!by_previous_union) x <- lapply(x, pool)
-      x
-    })
-    n <- nrow(result)
-    result <- result[rep(seq_len(n), 2L), ]
-    result$union_type <- rep(c("cohab", "marriage"), each = n)
-    counts <- list(person_years = unlist(lapply(typed_counts, `[[`, "person_years")),
-                   unions = unlist(lapply(typed_counts, `[[`, "unions")))
-  }
-  result$person_years <- counts$person_years
-  result$unions <- counts$unions
-  if (pool_dissolved) {
-    # Each detailed category uses the same ordered grid of all other strata,
-    # including when duration axes or separate entry types are requested.
-    separated <- which(result$previous_union == "separated")
-    widowed <- which(result$previous_union == "widowed")
-    result$person_years[separated] <- result$person_years[separated] + result$person_years[widowed]
-    result$unions[separated] <- result$unions[separated] + result$unions[widowed]
-    result$previous_union[separated] <- "dissolved"
-    if (length(widowed)) result <- result[-widowed, , drop = FALSE]
-  }
+  columns <- c("time_start", "time_end", "sex", "age_start", "age_end",
+               if (!is.null(dur_breaks)) c("dur_start", "dur_end"), by)
+  result <- tibble::as_tibble(rows[columns])
+  result$person_years <- exposure
+  result$unions <- events
   result$rate_union <- as.numeric(ifelse(result$person_years > 0,
     result$unions / result$person_years, NA_real_))
   if (marriage_measure) {

@@ -9,9 +9,9 @@ calculate_transition_rates(
   time_breaks,
   age_breaks = NULL,
   dur_breaks = NULL,
-  by_sex = FALSE,
-  by_union_type = FALSE,
-  conf.level = NULL
+  by = NULL,
+  conf.level = NULL,
+  pool_dissolved = FALSE
 )
 }
 \arguments{
@@ -26,25 +26,30 @@ complete person, transition and (when requested) union histories.}
 boundaries. Supply exactly one of age_breaks and dur_breaks. A finite final
 axis boundary gains Inf.}
 
-\item{by_sex}{Logical, default FALSE. Disaggregate by \code{sex} (m/f).}
-
-\item{by_union_type}{Logical, default FALSE. Disaggregate exposure and events
-by current union type. Typed histories use unpartnered/cohab/marriage;
-untyped histories use unpartnered/partnered. Requires exclusive histories.}
+\item{by}{\code{NULL} (default) or a character vector of variables to split
+results over: \code{"sex"}, \code{"union_type"} (current union state; typed
+histories use unpartnered/cohab/marriage, untyped unpartnered/partnered)
+and \code{"previous_union"}, as in \code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}. Union
+variables require exclusive histories. A transition counts under the union
+state after same-time union changes, which precede transitions.}
 
 \item{conf.level}{NULL (default) to omit confidence intervals, or a finite
 numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
 from two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} intervals for observed event
 counts over exposure. Bounds are NA at zero exposure. For fertility, these
 describe the observed rate, not the unrealized-adjusted rate.}
+
+\item{pool_dissolved}{Logical, default \code{FALSE}. With \code{TRUE} and
+\code{"previous_union"} in \code{by}, combine separated and widowed as \code{"dissolved"}.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, age or duration bounds,
-\code{group_origin}, \code{group_dest}, optional \code{sex} and \code{union_type}, \code{person_years},
+\code{group_origin}, \code{group_dest}, the \code{by} columns, \code{person_years},
 \code{transitions}, and \code{rate_transition} (NA at zero exposure). All distinct
 directed pairs among current and historical identities are retained,
 including zero-event cells. Fewer than two known groups returns a typed
-empty tibble. Period varies fastest within axis bands and pair blocks.
+empty tibble. Rows vary by time fastest, then the axis band, then origin,
+then destination, then the \code{by} variables in the order given.
 With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
 }
 \description{

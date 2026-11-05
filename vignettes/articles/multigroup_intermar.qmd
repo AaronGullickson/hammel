@@ -137,7 +137,7 @@ The simulation takes `r runtime[["elapsed"]]` seconds to run.
 #| label: fig-pop-share-groups
 #| fig-cap: Group share across time in simulation
 
-calculate_population_size(pop_final, seq(0, 300, 5), by_group = TRUE) |>
+calculate_population_size(pop_final, seq(0, 300, 5), by = "group") |>
   group_by(time) |>
   mutate(prop = population / sum(population)) |>
   ungroup() |>
@@ -320,7 +320,7 @@ runtime <- system.time(pop_final <- simulate(model, 300, 42))
 #| label: fig-pop-share-groups-trans
 #| fig-cap: Group share across time in simulation with transition rates
 
-calculate_population_size(pop_final, seq(0, 300, 5), by_group = TRUE) |>
+calculate_population_size(pop_final, seq(0, 300, 5), by = "group") |>
   group_by(time) |>
   mutate(prop = population / sum(population)) |>
   ungroup() |>

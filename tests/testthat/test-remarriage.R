@@ -143,7 +143,7 @@ test_that("grouped and stratified schedules preserve the explicit hazards", {
   a <- simulate(scaled, 5, 73)
   expect_identical(a, simulate(reference, 5, 73))
   expect_true(any(a$unions$end_reason == "dissolution", na.rm = TRUE))
-  counts <- calculate_union_rates(a, c(0, 5), c(0, Inf), TRUE, by_previous_union = TRUE)
+  counts <- calculate_union_rates(a, c(0, 5), c(0, Inf), by = c("group", "previous_union"))
   expect_gt(sum(counts$unions[counts$previous_union == "separated"]), 0)
   # Shared hazards versus three equal category hazards agree in distribution.
   plain <- set_union_formation(model, "rate", matching,

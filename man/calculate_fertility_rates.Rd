@@ -8,11 +8,11 @@ calculate_fertility_rates(
   population,
   time_breaks,
   age_breaks,
-  by_union_type = FALSE,
-  by_group = FALSE,
+  by = NULL,
   parity_breaks = NULL,
   unrealized = FALSE,
-  conf.level = NULL
+  conf.level = NULL,
+  pool_dissolved = FALSE
 )
 }
 \arguments{
@@ -24,22 +24,9 @@ calculate_fertility_rates(
 If the final boundary is finite, Inf is appended to create an open-ended
 final age band starting at that boundary.}
 
-\item{by_union_type}{Logical, default FALSE. Require population histories and
-return \code{union_type} rows for unpartnered and each discovered union type,
-without overall rows. Untyped histories use partnered/unpartnered. Births
-tied to dissolution or conversion retain the ending type; deaths use the
-type immediately before death. Typed overlapping histories are rejected;
-untyped overlapping coverage is merged. For formation rates use
-\code{\link[=calculate_union_rates]{calculate_union_rates()}} or \code{\link[=calculate_marriage_rates]{calculate_marriage_rates()}}.}
-
-\item{by_group}{Logical, default \code{FALSE}. With \code{TRUE}, require a persons
-\code{group} column and return the complete period/age/sex grid for each group
-appearing in the person history, in first-occurrence order. Labels retain
-their type. Exposure and deaths use the person's group; births use the
-mother's group, even when the child has a different group.
-Combines with \code{by_union_type}. No pooled
-group row is added. Unknown-mother births remain in the single period-level
-\code{unassigned_births} attribute, without a group assignment.}
+\item{by}{\code{NULL} (default) or a character vector of variables to split
+results over: \code{"group"}, \code{"union_type"} and \code{"previous_union"}. See
+below.}
 
 \item{parity_breaks}{NULL to pool parities, or strictly increasing nonnegative
 integer boundaries starting at zero. Bands are half-open. A finite final
@@ -54,17 +41,22 @@ fertility cell had members but no eligible woman, from
 Values are \code{NA} where they cannot be attributed exactly: periods before the
 most recent simulation's start (restarts keep only the latest run's
 record), breaks that cut through a recorded one-year period or fertility
-cell, and \code{union_type} or parity strata the fertility schedule did not use.}
+cell, and \code{by} or parity strata the fertility schedule did not use
+(\code{"previous_union"} always).}
 
 \item{conf.level}{NULL (default) to omit confidence intervals, or a finite
 numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
 from two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} intervals for observed event
 counts over exposure. Bounds are NA at zero exposure. For fertility, these
 describe the observed rate, not the unrealized-adjusted rate.}
+
+\item{pool_dissolved}{Logical, default \code{FALSE}. With \code{TRUE} and
+\code{"previous_union"} in \code{by}, combine separated and widowed as
+\code{"dissolved"}, pooling counts and exposure before calculating rates.}
 }
 \value{
-A tibble with period, age, sex (female), person_years, births and
-rate_fertility; optional parity_start/parity_end, group and union_type, and
+A tibble with period, sex (female), age, optional parity_start and
+parity_end, the \code{by} columns, person_years, births and rate_fertility, and
 with \code{unrealized = TRUE}, unrealized_births and rate_fertility_adjusted.
 Unknown-mother births are in the period-level unassigned_births attribute.
 }
@@ -75,4 +67,8 @@ from all recorded maternal births, including pre-window births and deceased
 children; custom person parity columns are ignored. Each birth counts at the
 parity immediately before it and advances subsequent exposure. Simultaneous
 births progress successively in recorded person-row order.
+}
+\details{
+\code{by} works as in \code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}: births count under the
+mother's state just before them.
 }

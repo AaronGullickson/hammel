@@ -164,8 +164,8 @@ objects, and unchanged behavior without group columns.
 
 ## Group observations
 
-`calculate_fertility_rates(..., by_group = TRUE)` and
-`calculate_population_size(..., by_group = TRUE)` return separate counts for
+`calculate_fertility_rates(..., by = "group")` and
+`calculate_population_size(..., by = "group")` return separate counts for
 each group appearing in current person identities or the retained transition history. Both default to
 FALSE, preserving pooled output. TRUE requires a population/persons `group`
 column; no group identity is inferred when that column is absent. Labels retain
@@ -179,7 +179,7 @@ an input child's group differs. Existing maternal
 age rules, half-open boundaries, and zero-exposure NA rates are unchanged.
 Unknown-mother births stay in the single period-level `unassigned_births`
 attribute and are not assigned a maternal group from the child. Combining
-`by_group = TRUE` and `by_union_type = TRUE` returns unpartnered and discovered
+`by = c("group", "union_type")` returns unpartnered and all
 union-type rows within each group, without an overall row. Each spouse's formation and
 exposure belong to that spouse's group at the event or exposure time, including cross-group unions.
 
@@ -206,8 +206,8 @@ identities, boundary examples, analytical group TFR/life expectancy, and empty
 outputs, as well as unchanged default results.
 
 
-Marriage observations now use `calculate_union_rates(..., by_group = TRUE)`
-(D080), grouping each spouse by their own identity. Set `by_previous_union = TRUE`
+Marriage observations now use `calculate_union_rates(..., by = "group")`
+(D080), grouping each spouse by their own identity. Set `by = "previous_union"`
 to additionally split unpartnered exposure and union starts by previous category;
 the default FALSE pools counts and exposure before calculating rates. See
 [remarriage](remarriage.md).

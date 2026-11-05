@@ -548,9 +548,10 @@ with `set_population(result)` to retain its process specifications.
 
 See [demographic analysis](demographic-analysis.md) for worked workflows.
 Analyze one independent history per call; duplicated IDs from stacked
-replications are invalid. `by_group = TRUE` optionally separates Lexis and
-population-size counts by group at the observation time, splitting exposure
-at recorded transitions. TFR and life tables automatically
+replications are invalid. `by` (D133) optionally separates Lexis and
+population-size counts by group, union type, previous union and (where not
+always included) sex at the observation time, splitting exposure at recorded
+changes. TFR and life tables automatically
 preserve group strata in input tables. Exposure/deaths use the person's group,
 births use the mother's group at birth, and union formations use each spouse's group at formation.
 Unknown-mother births remain in the period-level attribute without assigning a
@@ -559,8 +560,8 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
 
 - `calculate_transition_rates()` counts directed group changes over origin
   person-years by calendar period and either attained age or duration since
-  latest group entry (age without earlier transitions). Optional `by_sex`
-  and `by_union_type` split both numerator and denominator. Each destination
+  latest group entry (age without earlier transitions). `by` can add `sex`,
+  `union_type` and `previous_union`, splitting numerator and denominator. Each destination
   shares its origin's exposure; denominator copies must not be summed across
   destinations. Return `transitions`, `person_years`, and `rate_transition`,
   with NA rates at zero exposure. See [transition observations](group-transitions.md#observed-transition-rates).
@@ -569,7 +570,7 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   age breakpoint automatically gains `Inf`; for example `0:110` ends with
   `[110, Inf)`. Zero exposure yields `NA` rates; zero events with positive
   exposure yields zero. Fertility summaries contain female rows only; mortality retains both sexes.
-- With `by_union_type = TRUE`, demographic rates partition exposure, births and
+- With `by = "union_type"`, demographic rates partition exposure, births and
   deaths into `unpartnered` and discovered union types in `union_type`, without
   an overall row. Untyped histories use partnered/unpartnered. Components sum
   to pooled counts/exposure obtained with FALSE. Deaths use the left-limit type;
@@ -598,8 +599,8 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   with zero terminal hazard gives infinite life expectancy; `ex` is undefined
   at zero survivorship. This is a synthetic period table, not cohort follow-up.
 - `calculate_union_rates()` returns unpartnered person-years, union starts
-  and `rate_union` by period, age and sex. Optional `by_previous_union = TRUE`
-  adds previous categories; `by_group = TRUE` independently adds individual
+  and `rate_union` by period, age and sex. Optional `by = "previous_union"`
+  adds previous categories; `by = "group"` independently adds individual
   groups. Both default to FALSE, pooling counts and exposure before rates. The most recent episode determines category; starts
   use the category immediately before formation. Empty categories remain, with
   NA rates at zero exposure. Complete exclusive histories are required;
@@ -620,8 +621,8 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   not a dissolution event. Missing ends censor at the window endpoint. Duration
   uses each episode's start; boundaries are half-open and finite final duration
   breaks gain `Inf`. Return `rate_dissolution = dissolutions / union_years`,
-  with NA at zero exposure. Optional grouping returns symmetric `group_pair`
-  strata using both partners, with both cross-group directions pooled. Bare
+  with NA at zero exposure. `by` can split by the wife's and husband's groups
+  (`group_w`, `group_h`, directional) and by union type. Bare
   union tables require complete caller-verified follow-up. This cause-specific
   rate is not a cumulative probability with competing deaths.
 - `calculate_population_size()` includes births and excludes deaths at each

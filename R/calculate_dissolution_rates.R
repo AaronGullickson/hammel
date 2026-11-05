@@ -23,22 +23,21 @@
 #' @param time_breaks Strictly increasing finite calendar boundaries in years.
 #' @param dur_breaks Strictly increasing nonnegative duration boundaries in years.
 #'   If the last boundary is finite, append Inf for an open final band.
-#' @param by_group Logical, default FALSE. With TRUE, use unordered group pairs
-#'   and return `group_pair` (e.g. `"A:A"`, `"A:B"`, `"B:B"`). Both directions
-#'   of a cross-group union share one stratum. Population inputs require person
-#'   groups and retain every unordered pair in the full period/duration grid.
-#'   Bare union tables require `group_pair`; reversed labels are normalized.
-#'   Pair labels use nonempty colon-free character representations of groups,
-#'   ordered alphabetically (radix). Empty grouped inputs return a typed zero-row
-#'   tibble; no pooled row is added.
-#' @param by_union_type Logical, default FALSE. Separate cohabitation and marriage
-#'   episodes using each type's own exposure. Requires a valid `union_type` column.
-#'   Conversion stops cohabitation exposure without counting as dissolution;
-#'   duration resets at the start of the linked marriage episode.
+#' @param by `NULL` (default) or a character vector of variables to split
+#'   results over: `"group_w"` and `"group_h"` (the wife's and husband's
+#'   current groups, following transition histories; directional, so sum
+#'   A-wife/B-husband and B-wife/A-husband rows for an unordered pair) and
+#'   `"union_type"` (cohab or marriage, each with its own exposure;
+#'   conversion stops cohabitation exposure without counting as dissolution,
+#'   and duration resets at the start of the linked marriage). Population
+#'   inputs require person groups for the group variables; bare union tables
+#'   require `group_w`, `group_h` or `union_type` columns. A dissolution counts
+#'   under the groups before any same-time transition.
 #' @inheritParams calculate_mortality_rates
 #' @return A tibble with `time_start`, `time_end`, `dur_start`, `dur_end`,
-#'   `union_years`, `dissolutions`, and `rate_dissolution`, plus `group_pair` and
-#'   `union_type` when requested. Period varies fastest within duration bands and group blocks.
+#'   the `by` columns, `union_years`, `dissolutions`, and `rate_dissolution`.
+#'   Rows vary by time fastest, then duration, then the `by` variables in the
+#'   order given.
 #'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
 #' @export
 #' @examples
@@ -46,17 +45,10 @@
 #'   end_time = c(3, 4, NA),
 #'   end_reason = c("dissolution", "death_husband", NA))
 #' calculate_dissolution_rates(unions, c(0, 2, 5), c(0, 2, Inf))
-calculate_dissolution_rates <- function(population, time_breaks, dur_breaks,
-                                   by_group = FALSE, by_union_type = FALSE,
-                                   conf.level = NULL) {
+calculate_dissolution_rates <- function(population, time_breaks, dur_breaks, by = NULL,
+                                        conf.level = NULL) {
   validate_rate_conf_level(conf.level)
-  if (!is.logical(by_group) || length(by_group) != 1L ||
-      !is.null(dim(by_group)) || is.na(by_group))
-    stop("`by_group` must be TRUE or FALSE.", call. = FALSE)
-  if (!is.logical(by_union_type) || length(by_union_type) != 1L ||
-      !is.null(dim(by_union_type)) || is.na(by_union_type))
-    stop("`by_union_type` must be TRUE or FALSE.", call. = FALSE)
-  groups <- NULL
+  by <- check_by(by, c("group_w", "group_h", "union_type"), "calculate_dissolution_rates")
   check_demographic_breaks(time_breaks, "time_breaks")
   check_demographic_breaks(dur_breaks, "dur_breaks", ages = TRUE)
   if (is.finite(tail(dur_breaks, 1))) dur_breaks <- c(dur_breaks, Inf)
@@ -65,17 +57,6 @@ calculate_dissolution_rates <- function(population, time_breaks, dur_breaks,
     if (is.null(population$end_time) || tail(time_breaks, 1) > population$end_time)
       stop("Observation requires a known endpoint and cannot extend beyond it.", call. = FALSE)
     unions <- population$unions
-    if (by_group) {
-      if (!"group" %in% names(population$persons))
-        stop("`by_group = TRUE` requires population group identities.", call. = FALSE)
-      persons <- population$persons
-      persons <- prepare_group_observations(persons, population, TRUE)
-      groups <- possible_union_pairs(observation_groups(persons, TRUE))
-      labels <- canonical_union_pairs(
-        persons$group[match(unions$wife_id, persons$person_id)],
-        persons$group[match(unions$husband_id, persons$person_id)])
-      group_indices <- match(labels, groups) - 1L
-    } else group_indices <- rep(0L, nrow(unions))
   } else {
     unions <- population
     check_columns(unions, c("union_id", "start_time", "end_time", "end_reason"), "unions")
@@ -91,39 +72,17 @@ calculate_dissolution_rates <- function(population, time_breaks, dur_breaks,
         any(!is.na(reason) & !reason %in% c("dissolution", "death_husband", "death_wife", "conversion")) ||
         any(is.na(reason) != is.na(unions$end_time)))
       stop("Ended unions require a valid end reason; ongoing unions require NA end and reason.", call. = FALSE)
-    if (by_group) {
-      if (!"group_pair" %in% names(unions))
-        stop("`by_group = TRUE` requires a union `group_pair` column.", call. = FALSE)
-      labels <- canonical_union_pairs(unions$group_pair)
-      groups <- sort(unique(labels), method = "radix")
-      group_indices <- match(labels, groups) - 1L
-    } else group_indices <- rep(0L, nrow(unions))
   }
-  group_count <- if (by_group) length(groups) else 1L
-  types <- c("cohab", "marriage")
-  if (by_union_type) {
-    if (!"union_type" %in% names(unions))
-      stop("`by_union_type = TRUE` requires a union `union_type` column.", call. = FALSE)
-    if (!is.character(unions$union_type) || !is.null(dim(unions$union_type)) ||
-        anyNA(unions$union_type) || any(!unions$union_type %in% types))
-      stop("`union_type` must contain only cohab or marriage without missing values.", call. = FALSE)
-    group_indices <- group_indices + group_count * (match(unions$union_type, types) - 1L)
-  }
-  grid <- expand.grid(t = seq_len(length(time_breaks) - 1L),
-    d = seq_len(length(dur_breaks) - 1L), g = seq_len(group_count),
-    type = if (by_union_type) types else "pooled",
-    KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
-  result <- tibble::tibble(time_start = time_breaks[grid$t],
-    time_end = time_breaks[grid$t + 1L], dur_start = dur_breaks[grid$d],
-    dur_end = dur_breaks[grid$d + 1L])
-  if (by_group) result$group_pair <- groups[grid$g]
-  if (by_union_type) result$union_type <- grid$type
-  if (by_group && inherits(population, "hammel_population"))
-    unions <- prepare_union_group_observations(unions, population, groups, pair = TRUE, typed = by_union_type)
-  counts <- dissolution_counts_cpp(unions, time_breaks, dur_breaks,
-                                   group_indices, group_count * if (by_union_type) 2L else 1L)
-  result$union_years <- counts$union_years
-  result$dissolutions <- counts$dissolutions
+  nt <- length(time_breaks) - 1L
+  nd <- length(dur_breaks) - 1L
+  strata <- union_strata(population, unions, by, stride = nt * nd)
+  rows <- build_rows(c(list(band_dim(time_breaks, "time", 1), band_dim(dur_breaks, "dur", nt)),
+                       strata$dims))
+  counts <- dissolution_counts_cpp(strata$unions, time_breaks, dur_breaks,
+                                   strata$index, strata$count)
+  result <- tibble::as_tibble(rows[c("time_start", "time_end", "dur_start", "dur_end", by)])
+  result$union_years <- counts$union_years[rows$.index]
+  result$dissolutions <- counts$dissolutions[rows$.index]
   result$rate_dissolution <- as.numeric(ifelse(result$union_years > 0,
     result$dissolutions / result$union_years, NA_real_))
   add_rate_confidence(result, "dissolutions", "union_years", conf.level)
