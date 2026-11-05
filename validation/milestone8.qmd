@@ -23,7 +23,6 @@ execute:
 #| eval: true
 #| include: false
 
-
 library(here)
 # installing will lead to faster computation
 devtools::install(here::here())
@@ -37,15 +36,8 @@ library(tibble)
 library(stringr)
 library(ggplot2)
 library(gt)
-library(furrr)
 library(modelsummary)
 set_theme(theme_bw())
-```
-
-```{r}
-#| label: set-up-parallel-processing
-
-future::plan(future::multicore, workers = 4)
 ```
 
 ## Purpose and completion criteria
@@ -267,7 +259,106 @@ modelsummary(
 )
 ```
 
-The results show that our estimated coefficient is very close to the expected 1.05 ratio and that the confidence interval contains the true value. 
+The results show that our estimated coefficient is very close to the expected 1.05 ratio and that the confidence interval contains the true value.
+
+### Changing weight models over time
+
+For this simulation, I will allow for changing weight models over time. For the first 100 years of the simulation, I will allow mortality to be 20% lower for partnered individuals than unpartnered individuals. Then for the last 50 years of he simulation, I will remove that difference so that both partnered and unpartnered individuals have the same mortality rates.
+
+In addition to allowing us to test changing the weight models over time, this simulation provides an opportunity to demonstrate how sparse cells can affect the expected proportional hazards. Initially, no one in this simulation will be partnered. So, when samples are drawn from bins, you will have many cases in the first part of the simulation where the bin will contain zero partnered individuals and thus the weights won't apply and sampling will be equal across individuals in that cell. This will lead to an underestimate of the total effect because only some of the bins will produce weighted results.
+
+```{r}
+#| label: run-changing-weights-sim
+
+set.seed(51)
+pop <- create_baseline_population(150000)
+
+model <- hammel_model() |>
+  set_population(pop) |>
+  set_fertility(fertility_rates) |>
+  set_mortality(mortality_rates) |>
+  set_mortality(
+    mortality_rates, 
+    weights = tibble(
+      time_start = c(0, 100),
+      time_end = c(100, Inf),
+      model = list(
+        # allow partnered to be different for first part of the period
+        create_weight_model(~ partnered, c(partnered = log(0.8))),
+        create_weight_model(~ partnered, c(partnered = 0))
+      )
+    )
+  ) |>
+  set_union_formation("on_demand")
+
+pop_final <- simulate(model, 150, 42)
+```
+
+I can use the results from `calculate_mortality_rates` to create binned piecewise constant hazard models. To avoid sparseness problems I only include ages between 20 and 85 and I exclude the open ended age category because it mixed different rates. I run models for the 0-50, 50-100, and 100-150 intervals.
+
+```{r}
+#| label: tbl-hazard-model-partnership
+#| tbl-cap: Hazard ratios from piecewise constant hazard models predicting mortality rate by partnership status. All models include controls for sex, age group, and the interaction between sex and age group. 95% confidence intervals are shown below each estimate.
+
+temp <- calculate_mortality_rates(
+    pop_final,
+    c(0, 50),
+    20:85,
+    by_union_type = TRUE
+  ) |>
+  mutate(partnered = union_type == "partnered") |>
+  # remove open ended group
+  filter(age_end != Inf)
+
+model_early <- glm(deaths ~ partnered + factor(age_start) * sex, offset = log(person_years), 
+                   family = poisson, data = temp)
+
+temp <- calculate_mortality_rates(
+    pop_final,
+    c(50, 100),
+    20:85,
+    by_union_type = TRUE
+  ) |>
+  mutate(partnered = union_type == "partnered") |>
+  # remove open ended group
+  filter(age_end != Inf)
+
+model_mid <- glm(deaths ~ partnered + factor(age_start) * sex, offset = log(person_years), 
+                 family = poisson, data = temp)
+
+temp <- calculate_mortality_rates(
+    pop_final,
+    c(100, 150),
+    20:85,
+    by_union_type = TRUE
+  ) |>
+  mutate(partnered = union_type == "partnered") |>
+  # remove open ended group
+  filter(age_end != Inf)
+
+model_late <- glm(deaths ~ partnered + factor(age_start) * sex, offset = log(person_years), 
+                  family = poisson, data = temp)
+
+modelsummary(
+  list(
+    "0-50 time period" = model_early, 
+    "50-100 time period" = model_mid, 
+    "100-150 time period" = model_late
+  ), 
+  coef_map = c("partneredTRUE"),
+  fmt = 4,
+  output = "gt",
+  exponentiate = TRUE,
+  statistic  = "conf.int",
+  ci_method = "wald",
+  coef_omit = "Intercept",
+  gof_map = c("nobs")
+)
+```
+
+The models shows the expected results for the 50-100 and 100-150 periods. In the 50-100 periods, partnered individuals have a 20% lower risk of mortality. In the 100-150 period, there is no difference in mortality risk. Both hazard ratio confidence intervals include the expected values of 0.8 and 1 within their range.
+
+For the 0-50 period, we observe that the lower risk is only about 13%. This is a result of the bias from sparse cells of partnered individuals in the initial burn in period that is ultimately resolved.
 
 ### Gender ratio in group simulations with intermarriage
 
