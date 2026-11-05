@@ -103,6 +103,8 @@ Using a single clock provided a notable speed improvement that also sped up the 
 
 We still make one additional change for the fertility clock that we don't make for other clocks. Because of the birth interval issue, we use single year age bins and single birth parity bins even when the bands provided are wider because eligibility may vary within a band by age. Because other processes have no similar eligibility limitation, we can use the original age or duration bands for the bins. If we add eligilibity rules for other processes later, we made need to use a similar approach.
 
+### Allowing sampling weights
+
 ## Vignette Comparison
 
 All three vignettes were re-run using the new approach and the results, while not identical due to new random seed paths, were subtantively the same and showed all output rates falling consistently close to the input rates.
@@ -121,6 +123,76 @@ To test how much the new approach changes computational time, I re-ran the three
 In the demographic transition vignette, the new approach actually reduces overall processing time by 29.5%. This is likely due to the frequency of time changes to the fertility and mortality schedules in that simulation, which can be faster when using the new approach. In contrast, the remaining simulations which have more complex rate inputs were 25% to 36% longer. 
 
 The increase in processing time is not insubtantial but is counterbalanced by potential improvements for some simulation scenarios. Overall, the processing time of even a lengthy 300 year simulation (as in the case of Multigroup Inheritance) is still very fast under the new approach.
+
+## Weighting Models
+
+### Group differences in fertility
+
+I use a two-group simulation with only fertility and mortality to generate a difference in fertility rates by use of a weighting model. We will allow group B's fertility rates to be 20% higher than group A.
+
+```{r}
+#| label: run-group-fert-diff-sim
+
+fertility_rates <- get_fertility_hfd("USA", 2000)
+mortality_rates <- get_mortality_hmd("USA", 2000)
+
+set.seed(42)
+pop <- create_baseline_population(200000, group_weights = c("A" = 1, "B" = 1))
+
+model <- hammel_model() |>
+  set_population(pop) |>
+  set_fertility(
+    fertility_rates,
+    weights = create_weight_model(
+      ~group, 
+      coefficients = c("groupB" = log(1.2)), 
+      group_levels = c("A", "B")
+    )
+  ) |>
+  set_mortality(mortality_rates) |>
+  set_union_formation("on_demand")
+
+pop_final <- simulate(model, 100, 42)
+```
+
+```{r}
+#| label: fig-fert-ratio
+#| fig-cap: Ratio of age-specific fertility rates between Group B and Group A. Dotted red line shows the expected ratio from the model. 95% confidence intervals are shown. 
+calculate_fertility_rates(pop_final, c(0, 100), 15:45, by_group = TRUE) |>
+  select(age_start, age_end, group, births, rate_fertility) |>
+  pivot_wider(names_from = group, values_from = c(births, rate_fertility)) |>
+  mutate(ratio = rate_fertility_B / rate_fertility_A,
+         se_log = sqrt(1 / births_A + 1 / births_B),
+         lower = ratio * exp(-1.96 * se_log),
+         upper = ratio * exp(1.96 * se_log)) |>
+  ggplot(aes(x = age_start, y = ratio))+
+  geom_ribbon(aes(ymin = lower, ymax = upper), color = NA, fill = "grey70")+
+  geom_point()+
+  geom_hline(yintercept = 1.2, linetype = 2, color = "red")+
+  labs(x = "age", y = "ratio of B/A fertility")
+```
+
+@fig-fert-ratio shows the ratio of A/B fertility rates in the simulation. The ratios in each age group fit closely to the expected ratio of 1.2 and the true value is generally within the 95% confidence interval.
+
+```{r}
+#| label: fig-fert-rates-overall
+#| fig-cap: Estimated overall age-specific fertility rates from simulation pooled across groups. 95% confidence bands shown. The red dotted line shows the input rates.
+calculate_fertility_rates(pop_final, c(0, 100), 12:55, conf.level = 0.95) |>
+  ggplot(aes(x = age_start, y =rate_fertility))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(data = fertility_rates, aes(y = rate), linetype = 2, color = "red")
+```
+
+@fig-fert-rates-overall shows that the overall fertility rate is preserved in the simulation as we expected.
+
+### Dissolution differences by age difference
+
+```{r}
+
+
+```
+
 
 ## Unit Tests
 
