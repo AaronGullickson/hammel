@@ -2926,7 +2926,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     return bin;
   };
   double weight_now = start;   // event time, for custom-function rate periods
-  // Selection within a chosen RateCells cell for one process.
+  // Selection within a chosen RateCells cell by a custom weight function.
   auto make_chooser = [&](WeightSpec* spec, RateCells* process, int slot) {
     return [&, spec, process, slot](int c, const std::vector<int>& members, double uniform) -> size_t {
       const std::string& name = spec->process;
@@ -2934,10 +2934,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       const int stratum = process->cell_stratum(c);
       int dest = -1;
       if (name == "transition") dest = transition_schedules[stratum][slot].dest;
+      // Only custom functions choose this way; formula weights are stored.
       std::vector<double> eta(members.size());
-      if (!spec->custom) {
-        for (size_t k = 0; k < members.size(); ++k) eta[k] = formula_eta(*spec, members[k], is_union, dest);
-      } else {
+      {
         List bin = List::create(_["process"] = name);
         bool duration = false;
         DataFrame all = all_mortality;

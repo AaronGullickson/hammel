@@ -195,9 +195,10 @@ weight_design <- function(model, type) {
     stats::setNames(rep(list("contr.treatment"), length(categorical)), categorical) else NULL
   expected <- colnames(stats::model.matrix(formula, data, contrasts.arg = contrasts))[-1]
   names_found <- vapply(columns, `[[`, "", "name")
-  if (!identical(names_found, expected))
+  # Defensive: the decoding follows R's coding rules, so names should agree.
+  if (!identical(names_found, expected))  # nocov start
     stop("This weight formula structure is not supported; use a custom function (`fun`).",
-         call. = FALSE)
+         call. = FALSE)  # nocov end
   coefficients <- model$coefficients
   missing <- setdiff(expected, names(coefficients))
   extra <- setdiff(names(coefficients), expected)
@@ -228,9 +229,6 @@ validate_process_weights <- function(weights, type) {
       stop("A weight schedule's models must all be formulas or all be custom functions.", call. = FALSE)
   }
   invisible(weights)
-}
-weight_models_of <- function(weights) {
-  if (is.null(weights)) list() else if (is_model_schedule(weights)) weights$model else list(weights)
 }
 
 # Warn once for each formula term whose variables are all rate strata of the
@@ -277,7 +275,6 @@ weight_strata <- function(process, rates, multipliers = NULL) {
 # of (variable code, level code, ancestry component) factors with coefficients.
 prepare_weight_model <- function(weights, type, process, group_values, ancestry_labels,
                                  group_labels = group_values) {
-  if (is.null(weights)) return(NULL)
   if (is_model_schedule(weights)) {
     rows <- order(weights$time_start)
     return(list(schedule = TRUE, process = process,

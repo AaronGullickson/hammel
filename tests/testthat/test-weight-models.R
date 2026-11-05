@@ -411,3 +411,152 @@ test_that("rejection sampling recovers after an extreme-weight member leaves", {
   # The extreme-weight member is chosen first.
   expect_equal(which.min(out$persons$death_time), 1L)
 })
+
+test_that("remaining validation rules for weight models", {
+  expect_error(create_weight_model(fun = "not a function"), "must be a function")
+  expect_error(create_weight_model(y ~ parity, c(parity = 1)), "one-sided")
+  expect_error(create_weight_model(~ parity + offset(parity), c(parity = 1)), "offsets")
+  model <- weighted_mortality_model(10)
+  grouped_formula <- create_weight_model(~ group, c(groupB = 1), group_levels = c("A", "B"))
+  expect_error(simulate(set_mortality(model, mortality_rates, weights = grouped_formula), 1, seed = 1),
+               "require population groups")
+  # A level absent from the population is allowed and simply never matches.
+  grouped <- weighted_mortality_model(200, groups = c("A", "B"))
+  extra <- create_weight_model(~ group, c(groupB = log(2), groupC = log(5)), group_levels = c("A", "B", "C"))
+  expect_s3_class(simulate(set_mortality(grouped, mortality_rates, weights = extra), 1, seed = 1),
+                  "hammel_population")
+  # Ancestry shares must be recorded for the named group.
+  missing <- create_weight_model(~ ancestry_C, c(ancestry_C = 1))
+  expect_error(simulate(set_mortality(grouped, mortality_rates, weights = missing), 1, seed = 1),
+               "No ancestry share")
+})
+
+# Couples in two groups: half the unions are exogamous. No mortality or fertility.
+grouped_union_model <- function(n, type = "marriage") {
+  persons <- data.frame(person_id = 1:(2 * n), sex = rep(c("f", "m"), each = n),
+    birth_time = c(rep(-30, n), rep(c(-30, -35), length.out = n)), death_time = NA_real_,
+    mother_id = NA_integer_, father_id = NA_integer_,
+    group = c(rep(c("A", "B"), length.out = n), rep(c("A", "A", "B", "B"), length.out = n)))
+  unions <- data.frame(union_id = 1:n, wife_id = 1:n, husband_id = n + 1:n, start_time = -1,
+    end_time = NA_real_, end_reason = NA_character_, union_type = type)
+  hammel_model() |>
+    set_population(hammel_population(persons, unions = unions, end_time = 0)) |>
+    set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
+    set_fertility(data.frame(union_type = c("partnered", "unpartnered"), age_start = 15,
+      age_end = 50, rate = 0), birth_interval = 0) |>
+    set_union_formation("rate", rates = data.frame(age_start = 15, age_end = Inf, rate = 0),
+      cohab_prob = data.frame(age_start = 0, age_end = Inf, prob = 1),
+      union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .3),
+      kinship_generations = 0)
+}
+
+test_that("union weight formulas use both partners' variables", {
+  n <- 8000
+  model <- grouped_union_model(n)
+  # Exogamous unions are three times as likely to dissolve within the cell.
+  exo <- create_weight_model(~ same_group, c(same_group = -log(3)))
+  out <- suppressWarnings(simulate(set_union_dissolution(model,
+    data.frame(dur_start = 0, dur_end = Inf, rate = .2), weights = exo), 1, seed = 61))
+  p <- out$persons
+  first <- out$unions[seq_len(n), ]
+  same <- p$group[match(first$wife_id, p$person_id)] == p$group[match(first$husband_id, p$person_id)]
+  ended <- first$end_reason %in% "dissolution"
+  years <- ifelse(is.na(first$end_time), 1, first$end_time)
+  ratio <- (sum(ended[!same]) / sum(years[!same])) / (sum(ended[same]) / sum(years[same]))
+  expect_lt(abs(log(ratio) - log(3)), 4 * sqrt(1 / sum(ended[!same]) + 1 / sum(ended[same])))
+  # Every union variable is accepted and evaluated, for dissolution and conversion.
+  all_terms <- create_weight_model(
+    ~ group_w + group_h + parity_w + previous_union_w + previous_union_h + same_group +
+      age_difference + union_type + ancestry_A_w + ancestry_A_h + ancestry_unknown_w,
+    c(group_wB = .1, group_hB = -.1, parity_w = .05, previous_union_wseparated = .1,
+      previous_union_wwidowed = .1, previous_union_hseparated = -.1, previous_union_hwidowed = -.1,
+      same_group = -.2, age_difference = .02, union_typemarriage = .1, ancestry_A_w = .3,
+      ancestry_A_h = -.3, ancestry_unknown_w = .1), group_levels = c("A", "B"))
+  small <- grouped_union_model(400, type = "cohab")
+  both <- set_union_dissolution(small, data.frame(dur_start = 0, dur_end = Inf, rate = .2),
+    weights = all_terms)
+  both <- set_union_formation(both, "rate", rates = data.frame(age_start = 15, age_end = Inf, rate = 0),
+    cohab_prob = data.frame(age_start = 0, age_end = Inf, prob = 1),
+    union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .3),
+    kinship_generations = 0, weights_conversion = all_terms)
+  withr::local_options(hammel.check_cells = TRUE)
+  out <- suppressWarnings(simulate(both, 2, seed = 62))
+  expect_gt(sum(out$unions$end_reason %in% "dissolution"), 0)
+  expect_gt(sum(out$unions$end_reason %in% "conversion"), 0)
+})
+
+test_that("person formulas use parity, previous unions and ancestry", {
+  model <- weighted_mortality_model(300, groups = c("A", "B"))
+  w <- create_weight_model(~ parity + previous_union + ancestry_A + ancestry_unknown + partner_group,
+    c(parity = .1, previous_unionseparated = .2, previous_unionwidowed = .3, ancestry_A = .5,
+      ancestry_unknown = .1, partner_groupB = .2), group_levels = c("A", "B"))
+  withr::local_options(hammel.check_cells = TRUE)
+  out <- suppressWarnings(simulate(set_mortality(model, mortality_rates, weights = w), 2, seed = 63))
+  expect_gt(out$simulation$deaths, 0)
+  # Group B has no group-A ancestry: a strong ancestry effect shifts deaths to A.
+  strong <- create_weight_model(~ ancestry_A, c(ancestry_A = log(4)))
+  big <- weighted_mortality_model(5000, groups = c("A", "B"))
+  out <- simulate(set_mortality(big, mortality_rates, weights = strong), 1, seed = 64)
+  dead <- out$persons$group[!is.na(out$persons$death_time)]
+  expect_gt(sum(dead == "A") / sum(dead == "B"), 2.5)
+})
+
+test_that("custom functions receive members and cells for every process", {
+  seen <- new.env()
+  record <- function(name) function(members, bin) {
+    if (is.null(seen[[name]])) seen[[name]] <- list(members = members, bin = bin)
+    rep(0, nrow(members))
+  }
+  # Dissolution and conversion: union members and their cells.
+  model <- grouped_union_model(200, type = "cohab")
+  model <- set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = .3),
+    weights = create_weight_model(fun = record("dissolution")))
+  model <- set_union_formation(model, "rate", rates = data.frame(age_start = 15, age_end = Inf, rate = 0),
+    cohab_prob = data.frame(age_start = 0, age_end = Inf, prob = 1),
+    union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .3),
+    kinship_generations = 0, weights_conversion = create_weight_model(fun = record("conversion")))
+  suppressWarnings(simulate(model, 2, seed = 65))
+  for (name in c("dissolution", "conversion")) {
+    expect_true(all(c("union_id", "wife_id", "husband_id", "group_w", "group_h", "parity_w",
+      "previous_union_w", "previous_union_h", "same_group", "age_difference", "union_type",
+      "ancestry_A_w", "ancestry_unknown_h") %in% names(seen[[name]]$members)))
+    expect_true(all(c("dur_start", "dur_end", "time_start", "time_end") %in% names(seen[[name]]$bin)) ||
+                all(c("age_start", "age_end") %in% names(seen[[name]]$bin)))
+  }
+  expect_true("union_type" %in% names(seen$dissolution$bin))
+  # Search without calibration (one group), with calendar rates and previous-union schedules.
+  rates <- data.frame(previous_union = rep(c("none", "separated", "widowed"), 2), age_start = 15,
+    age_end = Inf, rate = .5, time_start = rep(c(0, 1), each = 3), time_end = rep(c(1, Inf), each = 3))
+  search <- make_rate_model(200) |>
+    set_union_formation("rate", rates = rates, kinship_generations = 0,
+      weights = create_weight_model(fun = record("search")))
+  search$population$persons$sex <- rep(c("f", "m"), 100)
+  suppressWarnings(simulate(search, 2, seed = 66))
+  expect_identical(seen$search$bin$process, "search")
+  expect_true(seen$search$bin$previous_union %in% c("none", "separated", "widowed"))
+  expect_equal(c(seen$search$bin$time_start, seen$search$bin$time_end), c(0, 1))
+  # Transitions: the destination appears as a member column and in the cell.
+  persons <- data.frame(person_id = 1:200, sex = rep(c("f", "m"), 100), birth_time = -30,
+    death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_, group = "A")
+  moves <- hammel_model() |>
+    set_population(hammel_population(persons, end_time = 0)) |>
+    set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
+    set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0)) |>
+    set_union_formation("on_demand") |>
+    set_group_transition(data.frame(group_origin = "A", group_dest = "B", sex = c("f", "m"),
+      age_start = 0, age_end = Inf, rate = .5), weights = create_weight_model(fun = record("transition")))
+  simulate(moves, 1, seed = 67)
+  expect_true(all(seen$transition$members$group_dest == "B"))
+  expect_identical(c(seen$transition$bin$group_origin, seen$transition$bin$group_dest), c("A", "B"))
+  expect_true(seen$transition$bin$sex %in% c("f", "m"))
+  # Fertility without calibration: custom weights at selection.
+  fert <- set_fertility(weighted_fertility_model(300), data.frame(age_start = 15, age_end = 50, rate = .5),
+    birth_interval = 0,
+    weights = create_weight_model(fun = function(members, bin) {
+      if (is.null(seen$fertility)) seen$fertility <- list(members = members, bin = bin)
+      log(seq_len(nrow(members)))
+    }))
+  expect_gt(simulate(fert, 1, seed = 68)$simulation$births, 0)
+  expect_identical(seen$fertility$bin$process, "fertility")
+  expect_true(all(c("parity_start", "parity_end", "age_start", "age_end") %in% names(seen$fertility$bin)))
+})
