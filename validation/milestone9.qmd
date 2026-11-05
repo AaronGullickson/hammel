@@ -1,0 +1,83 @@
+---
+title: "Hammel: Milestone 9 Validation"
+author: "Aaron Gullickson"
+date: today
+format:
+  html:
+    toc: true
+    toc-expand: 1
+    toc-depth: 4
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    self-contained: true
+execute:
+  eval: true
+  echo: true
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: setup
+#| eval: true
+#| include: false
+
+library(here)
+# installing will lead to faster computation
+devtools::install(here::here())
+library(hammel)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(purrr)
+library(tibble)
+library(stringr)
+library(ggplot2)
+library(gt)
+library(modelsummary)
+set_theme(theme_bw())
+```
+
+## Purpose and completion criteria
+
+
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| Accounting and implementation | Existing tests | Successful unit tests |
+
+## Overview of Design
+
+
+
+
+## Unit Tests
+
+The following tests have been constructed and are currently all passing.
+
+```{r}
+#| label: test-results
+#| eval: true
+
+test_results <- devtools::test(pkg = here::here(), reporter = "silent")
+test_table <- as.data.frame(test_results)
+knitr::kable(
+  test_table[, c("test", "passed", "failed", "error", "skipped", "warning")]
+)
+```
+## Conclusions and Unresolved Limitations
+
+This milestone meets all expectation. The new approach to producing events is working as expected and continues to preserve input rates in the output. The new approach increases runtime slightly in some situations but reduces it in other situations. The weight models are producing the expected proportional hazards in the output.
+
+Remaining limitations include the fact that weights may fail to produce expected difference when bins are sparsely populated and the continued issue of unrealized births in sparse bins.
+
+## Reproducibility record
+
+```{r}
+#| label: reproducibility
+system2("git", c("-C", shQuote(here::here()), "rev-parse", "HEAD"), stdout = TRUE)
+system2("git", c("-C", shQuote(here::here()), "status", "--short"), stdout = TRUE)
+sessionInfo()
+```
