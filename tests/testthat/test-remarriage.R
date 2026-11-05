@@ -124,7 +124,7 @@ test_that("previous categories contribute the explicit calibrated intensity", {
   expect_equal(zero$target, c(1, 0))
 })
 
-test_that("grouped schedules and multipliers preserve the explicit hazards", {
+test_that("grouped and stratified schedules preserve the explicit hazards", {
   model <- make_rate_model(80, search_rate = 2)
   model$population$persons$sex[1:40] <- "f"
   model$population$persons$group <- rep(c("A", "B"), 40)
@@ -132,8 +132,10 @@ test_that("grouped schedules and multipliers preserve the explicit hazards", {
   rates <- rbind(transform(previous_rates(.8, .4, .2), group = "A"),
     transform(previous_rates(.5, .3, .1), group = "B"))
   matching <- create_matching_model(~ 1, numeric(), group_exogamy = c("A:B" = -1))
-  scaled <- set_union_formation(model, "rate", matching, rates = rates,
-    group_prop_hazard = c(B = 2), diagnostics = TRUE, kinship_generations = 0)
+  stratified_rates <- rbind(stratify_rates(previous_rates(.8, .4, .2), list(group = c(A = 1))),
+    stratify_rates(previous_rates(.5, .3, .1), list(group = c(B = 2))))
+  scaled <- set_union_formation(model, "rate", matching, rates = stratified_rates,
+    diagnostics = TRUE, kinship_generations = 0)
   explicit <- rates
   explicit$rate[explicit$group == "B"] <- 2 * explicit$rate[explicit$group == "B"]
   reference <- set_union_formation(model, "rate", matching, rates = explicit,

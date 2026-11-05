@@ -145,14 +145,13 @@ cohabitation and marriage searches by this probability.
 
 See [cohabitation](cohabitation.md).
 
-## Proportional rate multipliers
+## Proportional stratification
 
-`group_prop_hazard` supplies static, dimensionless multipliers on mortality,
-fertility, union-search and dissolution rates. Mortality, fertility and search
-use individual group labels; dissolution uses symmetric group-pair labels.
-Omitted factors use one. Fertility also permits separate group multiplier
-vectors by the supplied union-type categories. Conversion and group transitions
-have no corresponding multiplier argument.
+`stratify_rates(rates, by)` (D132) adds proportional strata to any rate table
+before it is attached, replacing the former `group_prop_hazard` arguments. It
+works for every rate process, including conversion and transitions, and the
+factors can differ by calendar band because stratified rows keep their bands.
+See [groups](groups.md#proportional-stratification-with-stratify_rates-d132).
 
 These vectors have no age or duration bands of their own; they scale the
 selected rate schedule. They are distinct from matching preferences,

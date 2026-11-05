@@ -5,65 +5,86 @@ Milestone 3 was accepted October 27, 2026 (D077), following the
 the population and its effects belong in the relevant processes (D051).
 Newborn identity rules are specified in [group inheritance](group-inheritance.md).
 
-## Proportional rate multipliers
+## Proportional stratification with `stratify_rates()` (D132)
 
-The user requested optional `group_prop_hazard` named numeric vectors for
-mortality, fertility, and rate-based union formation on October 20, 2026.
-Each vector name identifies a population group, using the same character
-representation as group-rate lookup. Values are dimensionless, finite,
-nonnegative factors; zero suppresses the affected risk and factors are not
-normalized. Names must be unique, nonmissing, and nonempty. NULL means no
-multipliers; a group omitted from the vector receives factor 1.0. Extra names
-do not create population groups.
+`stratify_rates(rates, by)` adds proportional-hazard strata to a rate table
+before it is attached to a process. It replaced the per-process
+`group_prop_hazard` argument on November 5, 2026 (D132). `by` is a named list:
+each name is a column to add, and each element a named numeric vector of
+factors, one per category:
 
-Each process owns its multipliers and preserves its supplied rate table and
-source metadata. Construction, attachment, and simulation validate edited
-vectors. Mortality factors apply to both sex schedules of a group, fertility
-factors apply to both union statuses where present, and search factors use
-the woman's group, across all `previous_union` categories when those are
-supplied (D080). Factors may modify an existing group-specific schedule
-or a shared schedule; they do not supply missing age bands or replace the
-requirement for an explicit matching schedule in grouped rate tables.
+```r
+mortality_rates |> stratify_rates(list(group = c(A = 1.2, B = 1)))
+```
 
-The user selected multiplication of input rates before fertility cell
-accounting. For a group with input ASFR 0.1 and factor 1.1, the effective ASFR
-is 0.11, and the group's cells generate births at 0.11 times their members,
-exactly as for an explicit group schedule of 0.11.
-Mortality 0.02 with factor 0.9 becomes 0.018 per person-year. Search rate 0.2
-with factor zero suppresses searches for that group without altering fertility
-or partner matching. Unspecified groups retain their original rates.
+returns two copies of the table, one with `group = "A"` and rates multiplied by
+1.2, and one with `group = "B"` and rates unchanged. B is then the reference.
 
-Without a population `group` column, warn once per process and ignore its
-multipliers, even for zero-duration simulation. Existing alphabetical fallback
-for grouped rate tables remains independent and emits its own warning. A group
-column on an empty population remains valid and requires no multiplier fallback.
-On-demand formation has no search hazard to multiply; non-NULL multipliers are
-rejected for that mode. The option does not change matching utility.
+**Rules.**
 
-At execution, scale a private rate-table copy before constructing native
-schedules. Reject nonfinite products rather than clipping them. No new random
-draws are introduced. Multipliers of one or equivalent explicit schedules must
-reproduce the same histories under the same seed, including newborns and
-restarts.
+- Every row of the input is copied once per category, with the new column set
+  to the category label (character) and `rate` multiplied by its factor. All
+  other columns, including calendar bands, are copied unchanged.
+- Several columns in `by` are crossed: each combination of categories gets the
+  product of its factors. `by = list(group = c(A = 1.2, B = 1), sex = c(f = 1, m = 1.1))`
+  gives four copies, with A men at 1.32 times the input.
+- Factors are finite and nonnegative; zero suppresses that stratum's risk.
+  They are not normalized. Category names are unique and nonempty, and each
+  column has at least one category. Products that overflow are errors.
+- A column that already exists in `rates` is an error, as is `rate` itself.
+  To give different effects within existing strata, for example different
+  group effects for partnered and unpartnered fertility, stratify each subset
+  separately and bind the results; any interaction can be built this way.
+- `rates` must be a data frame with a `rate` column. The result is a tibble that
+  keeps the input's other attributes, such as database provenance. Empty
+  tables gain the new columns with no rows.
+- The result is an ordinary stratified rate table. Every category the process
+  needs must appear: a group omitted from `by` is a coverage error at
+  simulation, as for any group-specific table. Factors of one still create
+  separate strata, so cells split by those categories (D128) and a weight-model
+  term on the same variable cancels with a warning.
 
-For conditional fertility, `group_prop_hazard` may instead be a named list of
-named vectors, for example `list(partnered = c(A = 1.1, B = 0.9),
-unpartnered = c(A = 1.05))`. List names must occur in the supplied `union_type` rates: either
-`partnered`/`unpartnered` or `unpartnered`/`cohab`/`marriage`, without duplicates. The user selected factor 1.0 for an omitted
-status, as for an omitted group within a status. Each supplied list element
-must be a valid named numeric multiplier vector. A status list requires input
-fertility rates with `union_type`; overall fertility uses a single vector.
-Mortality and union formation accept only a single vector. A single fertility
-vector still applies to every supplied type. For example, partnered A rate 0.1
-becomes 0.11 and unpartnered A rate 0.02 becomes 0.021 with the list above;
-unpartnered B stays unchanged. Each effective group/status schedule then has
-its own fertility cells. Without population groups, ignore the
-entire vector/list and warn once for fertility.
+`by` may only add stratum columns used by Hammel rate tables (`sex`, `group`,
+`union_type`, `previous_union`, `group_pair`, `group_origin`, `group_dest`);
+other names are errors. `stratify_rates()` cannot know which process a table is
+for, so each process setter checks the table's actual columns, whether they
+came from `stratify_rates()`, an earlier stratification or direct entry, and
+rejects stratum columns its process does not support, naming the columns it
+accepts. Other columns, such as notes or provenance, are carried along and
+ignored:
 
-Rate-table summaries (`calculate_tfr()` and `calculate_life_table()`,
-including process inputs) continue to summarize the stored input rate table;
-they do not expand population-dependent multiplier settings. Grouped simulation
-summaries measure the resulting histories normally.
+| Process | Stratum columns accepted from `stratify_rates()` |
+| --- | --- |
+| Mortality | `sex`, `group` |
+| Fertility | `group`, `union_type` |
+| Union search (rate mode) | `group`, `previous_union` |
+| Conversion (`union_convert_rate`) | `group` |
+| Dissolution | `group_pair`, `union_type` |
+| Group transitions | `group_origin`, `group_dest`, `sex`, `union_type` |
+
+Category values are then validated as for any supplied table: for example
+`group_pair` labels must be unordered pairs given once, and `union_type` values
+must be valid for the process. Milestone 9's additional group columns will
+extend the list of stratum columns.
+
+**Examples.** Group A fertility 10% higher than B: an ASFR of 0.1 becomes 0.11
+for A, and A's cells generate births at 0.11 times their members, exactly as an
+explicit schedule would. Dissolution twice as likely in exogamous unions:
+`stratify_rates(rates, list(group_pair = c("A:A" = 1, "A:B" = 2, "B:B" = 1)))`.
+Different group effects by union status:
+
+```r
+rbind(
+  stratify_rates(fert[fert$union_type == "partnered", ], list(group = c(A = 1.1, B = 1))),
+  stratify_rates(fert[fert$union_type == "unpartnered", ], list(group = c(A = 1.05, B = 1))))
+```
+
+**Populations without groups.** A table stratified by `group` follows the
+existing fallback for group-specific rates: simulation warns and uses the
+alphabetically first group's schedule, including its factor.
+
+Rate-table summaries (`calculate_tfr()`, `calculate_life_table()`) summarize
+each stratum of a stratified table like any other stratified input.
 
 ## Lookup and timing
 
@@ -188,14 +209,9 @@ outputs, as well as unchanged default results.
 Marriage observations now use `calculate_union_rates(..., by_group = TRUE)`
 (D080), grouping each spouse by their own identity. Set `by_previous_union = TRUE`
 to additionally split unpartnered exposure and union starts by previous category;
-the default FALSE pools counts and exposure before calculating rates. Search-rate multipliers apply
-across previous categories within each woman's group. See
+the default FALSE pools counts and exposure before calculating rates. See
 [remarriage](remarriage.md).
 
 
-Cohabitation extends fertility input strata to union_type (D086). Lists of
-`group_prop_hazard` use names occurring in the rate table: unpartnered/partnered
-or unpartnered/cohab/marriage. Partial lists are valid and omitted entries use
-1; keys for an absent type are errors. A single group vector still applies
-across every type. Type selection probabilities and conversion schedules can
+Cohabitation extends fertility input strata to union_type (D086). Type selection probabilities and conversion schedules can
 stratify by the woman's group; dissolution retains symmetric group_pair strata.

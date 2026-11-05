@@ -37,12 +37,8 @@
 #'   must cover every unordered pair of possible identities, including future
 #'   ones. Without population groups, warn and use the first canonical pair
 #'   alphabetically. Omit `group_pair` for shared rates. `group`, `group_w` and
-#'   `group_h` schedule columns are not supported.
-#' @param group_prop_hazard Optional named numeric vector of finite nonnegative
-#'   rate multipliers by unordered group pair, e.g. `c("A:B" = 1.2)` applies
-#'   in both directions. Omitted pairs use 1; zero suppresses risk. Reversed
-#'   duplicate keys are errors. With no population groups, simulation warns
-#'   and ignores multipliers.
+#'   `group_h` schedule columns are not supported. Use [stratify_rates()] to add
+#'   proportional pair differences.
 #' @param model A `hammel_model` object.
 #' @return `union_dissolution()` returns an inspectable
 #'   `hammel_union_dissolution` process with a tibble of rates;
@@ -53,9 +49,8 @@
 #' rates <- data.frame(dur_start = c(0, 5), dur_end = c(5, Inf),
 #'                     rate = c(0.04, 0.02))
 #' model <- hammel_model() |> set_union_dissolution(rates)
-union_dissolution <- function(rates, group_prop_hazard = NULL, weights = NULL) {
+union_dissolution <- function(rates, weights = NULL) {
   process <- new_rate_process("union_dissolution", rates)
-  process$group_prop_hazard <- group_prop_hazard
   validate_union_dissolution(process)
   validate_process_weights(weights, "union")
   warn_cancelled_weight_terms(weights, weight_strata("dissolution", rates), "dissolution")
@@ -65,16 +60,16 @@ union_dissolution <- function(rates, group_prop_hazard = NULL, weights = NULL) {
 
 #' @rdname union_dissolution
 #' @export
-set_union_dissolution <- function(model, rates, group_prop_hazard = NULL, weights = NULL) {
-  set_process(model, union_dissolution(rates, group_prop_hazard, weights))
+set_union_dissolution <- function(model, rates, weights = NULL) {
+  set_process(model, union_dissolution(rates, weights))
 }
 
 validate_union_dissolution <- function(process, calendar_interval = NULL) {
   if (!identical(process$name, "union_dissolution") ||
       !identical(process$rate_unit, "person_year"))
     stop("Invalid union-dissolution specification or units.", call. = FALSE)
-  validate_dissolution_multipliers(process$group_prop_hazard)
   rates <- process$rates
+  check_stratified_columns(rates, c("group_pair", "union_type"), "Union-dissolution")
   if (validate_calendar_rates(rates, function(slice, interval) {
       copy <- process
       copy$rates <- slice
@@ -130,8 +125,6 @@ prepare_dissolution_rates <- function(process, persons, group_values, start = -I
   rates$.hammel_group <- NULL
   grouped <- "group_pair" %in% names(rates)
   labels <- if (grouped) canonical_union_pairs(rates$group_pair) else NULL
-  factors <- process$group_prop_hazard
-  if (!is.null(factors)) names(factors) <- canonical_union_pairs(names(factors), name = "group_prop_hazard")
   if (!"group" %in% names(persons)) {
     if (grouped) {
       first <- sort(unique(labels), method = "radix")[1L]
@@ -142,9 +135,7 @@ prepare_dissolution_rates <- function(process, persons, group_values, start = -I
                       first), call. = FALSE)
       rates <- rates[labels == first, , drop = FALSE]
     }
-    if (!is.null(factors))
-      warning("`group_prop_hazard` was specified for union dissolution but no groups found in the population; ignoring multipliers.", call. = FALSE)
-  } else if (grouped || !is.null(factors)) {
+  } else if (grouped) {
     pairs <- possible_union_pairs(group_values)
     if (grouped) {
       missing <- unique(unlist(lapply(calendar_rate_slices(rates, start, end), function(x)
@@ -157,9 +148,7 @@ prepare_dissolution_rates <- function(process, persons, group_values, start = -I
     copies <- list()
     for (male in seq_along(groups)) for (female in seq_along(groups)) {
       key <- canonical_union_pairs(groups[female], groups[male])
-      selected <- if (grouped) rates[labels == key, , drop = FALSE] else rates
-      factor <- if (key %in% names(factors)) unname(factors[[key]]) else 1
-      selected$rate <- selected$rate * factor
+      selected <- rates[labels == key, , drop = FALSE]
       selected$.hammel_group <- (female - 1L) + length(groups) * (male - 1L)
       copies[[length(copies) + 1L]] <- selected
     }
@@ -168,8 +157,6 @@ prepare_dissolution_rates <- function(process, persons, group_values, start = -I
       rates
     }
   }
-  if (any(!is.finite(rates$rate)))
-    stop("Union dissolution rates multiplied by `group_prop_hazard` must remain finite.", call. = FALSE)
   rates$age_start <- rates$dur_start
   rates$age_end <- rates$dur_end
   rates

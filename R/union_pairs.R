@@ -27,11 +27,3 @@ possible_union_pairs <- function(groups) {
   sort(unique(canonical_union_pairs(pairs$first, pairs$second)), method = "radix")
 }
 
-validate_dissolution_multipliers <- function(factors) {
-  validate_group_prop_hazard(factors)
-  if (is.null(factors)) return(invisible(factors))
-  pairs <- canonical_union_pairs(names(factors), name = "group_prop_hazard")
-  if (anyDuplicated(pairs))
-    stop("`group_prop_hazard` must specify each unordered pair once, not both A:B and B:A.", call. = FALSE)
-  invisible(factors)
-}

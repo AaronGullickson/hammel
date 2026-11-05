@@ -255,9 +255,9 @@ warn_cancelled_weight_terms <- function(weights, strata, process) {
 
 # Rate strata of each process, as weight variables constant within a cell.
 # Cells stratify by group only when rates or group multipliers do.
-weight_strata <- function(process, rates, multipliers = NULL) {
+weight_strata <- function(process, rates) {
   n <- names(rates)
-  grouped <- "group" %in% n || (!is.null(multipliers) && any(unlist(multipliers) != 1))
+  grouped <- "group" %in% n
   switch(process,
     mortality = c("sex", if (grouped) "group"),
     fertility = c(if (grouped) "group",

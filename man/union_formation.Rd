@@ -14,7 +14,6 @@ union_formation(
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
   diagnostics = FALSE,
-  group_prop_hazard = NULL,
   cohab_prob = NULL,
   cohab_matching = NULL,
   union_convert_rate = NULL,
@@ -33,7 +32,6 @@ set_union_formation(
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
   diagnostics = FALSE,
-  group_prop_hazard = NULL,
   cohab_prob = NULL,
   cohab_matching = NULL,
   union_convert_rate = NULL,
@@ -110,13 +108,6 @@ columns on newly formed unions: the log group
 weights applied at the search that formed each union (0 for the reference
 group and when calibration cannot affect choices). Use the column for each alternative's
 group as a conditional-logit offset in wife-side choice sets.}
-
-\item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
-search-rate multipliers by the woman's group. Missing groups use 1.0;
-zero suppresses searches. Applies to shared or group-specific input rates.
-Without population groups, simulation warns and ignores multipliers.
-Requires \code{initiation = "rate"}; on-demand formation has no search hazard.
-Matching utilities and input rate tables are unchanged.}
 
 \item{cohab_prob}{Optional age-specific probability table with \code{age_start},
 \code{age_end}, \code{prob}, optionally \code{group} and \code{previous_union}. Enables typed

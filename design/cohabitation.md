@@ -164,25 +164,18 @@ contribution sums at probability boundaries, partner exclusivity, linkage,
 restart/reproducibility and old untyped controls. Use offline synthetic inputs;
 no empirical rates or scientific acceptance thresholds are defaulted.
 
-## Fertility multiplier example
+## Fertility stratification example
 
-Use list names present in the supplied `union_type` schedule:
+Different group effects by union type are built by stratifying each type's
+rows and binding them (D132):
 
 ```r
-set_fertility(model, fertility_rates,
-  group_prop_hazard = list(
-    unpartnered = c(B = 1.1),
-    cohab = c(B = 1.2),
-    marriage = c(B = 0.9)
-  )
-)
+fertility_rates <- rbind(
+  stratify_rates(fert[fert$union_type == "unpartnered", ], list(group = c(A = 1, B = 1.1))),
+  stratify_rates(fert[fert$union_type == "cohab", ], list(group = c(A = 1, B = 1.2))),
+  stratify_rates(fert[fert$union_type == "marriage", ], list(group = c(A = 1, B = 0.9))))
+set_fertility(model, fertility_rates)
 ```
-
-For shared partnered rates, use `list(unpartnered = c(B = 1.1),
-partnered = c(B = 1.2))` instead. Omitted types and omitted groups use 1.
-A single named numeric vector applies to every supplied type. A list naming
-`partnered` against a three-type table, or `cohab` against a shared partnered
-table, errors rather than silently ignoring the factor.
 
 ## Union entry observations (D087)
 

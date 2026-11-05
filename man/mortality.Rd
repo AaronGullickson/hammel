@@ -5,12 +5,11 @@
 \alias{fertility}
 \title{Specify age-specific demographic rates}
 \usage{
-mortality(rates, group_prop_hazard = NULL, weights = NULL)
+mortality(rates, weights = NULL)
 
 fertility(
   rates,
   birth_interval = 0.75,
-  group_prop_hazard = NULL,
   inheritance = create_group_inheritance(),
   ffab = 0.4886,
   hetfert = NULL,
@@ -22,23 +21,8 @@ fertility(
 and \code{rate}. Starts must be finite and nonnegative; ends must exceed starts
 and may be \code{Inf} for upper-open bands. Rates must
 be finite and nonnegative. Mortality additionally
-requires character \code{sex} values \code{"m"} and \code{"f"}, with both represented.}
-
-\item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
-rate multipliers, with unique nonempty group names. Missing groups use 1.0;
-zero suppresses the risk. Values are not normalized. At execution, multiply
-the selected input schedule by the person's group factor, including all
-sex/status strata. Fertility multiplication precedes cell accounting.
-Without population groups, warn and ignore multipliers. Stored rate tables
-and their source metadata are unchanged; rate-table summaries use those
-stored rates, without applying population-dependent multipliers.
-Fertility with \code{union_type} rates also accepts a named list such as
-\code{list(partnered = c(A = 1.1, B = 0.9), unpartnered = c(A = 1.05))}.
-An omitted status or group uses 1.0. A single vector applies to all
-types (or overall fertility). Type lists require \code{union_type} rates and
-their names must match the supplied schedule types. Three-type schedules
-accept lists named unpartnered/cohab/marriage; shared partnered schedules
-accept unpartnered/partnered. Omitted types and groups have multiplier 1.}
+requires character \code{sex} values \code{"m"} and \code{"f"}, with both represented.
+Use \code{\link[=stratify_rates]{stratify_rates()}} to add proportional group differences.}
 
 \item{weights}{NULL (default) for unweighted selection within rate cells, or
 a \code{\link[=create_weight_model]{create_weight_model()}} specification. Weights choose which member of a

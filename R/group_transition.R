@@ -46,6 +46,7 @@ validate_group_transition <- function(process) {
       !identical(process$rate_unit, "person_year"))
     stop("Invalid group-transition specification or units.", call. = FALSE)
   r <- process$rates
+  check_stratified_columns(r, c("group_origin", "group_dest", "sex", "union_type"), "Group-transition")
   if (validate_calendar_rates(r, function(x) {
     copy <- process; copy$rates <- x; validate_group_transition(copy)
   })) return(invisible(process))

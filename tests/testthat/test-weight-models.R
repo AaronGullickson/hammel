@@ -475,10 +475,12 @@ test_that("union weight formulas use both partners' variables", {
   small <- grouped_union_model(400, type = "cohab")
   both <- set_union_dissolution(small, data.frame(dur_start = 0, dur_end = Inf, rate = .2),
     weights = all_terms)
-  both <- set_union_formation(both, "rate", rates = data.frame(age_start = 15, age_end = Inf, rate = 0),
+  # union_type is constant for conversion, so its term cancels with a warning.
+  expect_warning(both <- set_union_formation(both, "rate",
+    rates = data.frame(age_start = 15, age_end = Inf, rate = 0),
     cohab_prob = data.frame(age_start = 0, age_end = Inf, prob = 1),
     union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .3),
-    kinship_generations = 0, weights_conversion = all_terms)
+    kinship_generations = 0, weights_conversion = all_terms), "union_type")
   withr::local_options(hammel.check_cells = TRUE)
   out <- suppressWarnings(simulate(both, 2, seed = 62))
   expect_gt(sum(out$unions$end_reason %in% "dissolution"), 0)

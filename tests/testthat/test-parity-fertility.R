@@ -92,17 +92,19 @@ test_that("absent parity and zero-spacing equal-parity rates give the same ferti
   expect_false("parity" %in% names(simulate(strat,1,42)$persons))
 })
 
-test_that("parity composes with grouped typed fertility, conversion and multipliers", {
+test_that("parity composes with grouped typed fertility, conversion and stratified rates", {
   set.seed(33)
   pop <- create_baseline_population(500,50,0,group_weights=c(A=1,B=1))
   base <- parity_rates(c(.3,.2,.1))
   rates <- rbind(transform(base,union_type="unpartnered"),
     transform(base,union_type="cohab",rate=rate*.8),
     transform(base,union_type="marriage",rate=rate*1.1))
+  b_factor <- c(unpartnered=1.1,cohab=.9,marriage=1.2)
+  stratified <- do.call(rbind,lapply(names(b_factor),function(type)
+    stratify_rates(rates[rates$union_type==type,],list(group=c(A=1,B=b_factor[[type]])))))
   model <- hammel_model() |> set_population(pop) |>
     set_mortality(data.frame(sex=c("m","f"),age_start=0,age_end=Inf,rate=.01)) |>
-    (\(m) quiet_unreachable(set_fertility(m,rates,
-      group_prop_hazard=list(unpartnered=c(B=1.1),cohab=c(B=.9),marriage=c(B=1.2)))))() |>
+    (\(m) quiet_unreachable(set_fertility(m,stratified)))() |>
     set_union_formation("rate",rates=data.frame(age_start=15,age_end=Inf,rate=.4),
       cohab_prob=data.frame(age_start=15,age_end=Inf,prob=.5),
       union_convert_rate=data.frame(dur_start=0,dur_end=Inf,rate=.2),

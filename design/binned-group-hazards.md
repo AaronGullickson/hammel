@@ -299,17 +299,15 @@ parity-specific fertility.
 
 *User direction (November 4, 2026):* cells stratify only as finely as the input
 rate schedules. A process whose active rates have no group-specific schedules
-(directly or through `group_prop_hazard`) pools all groups into one set of
-cells, so group terms in its weight model take effect. Multipliers that are all
-one do not stratify. Pooled fertility cells still report unrealized births by
+pools all groups into one set of cells, so group terms in its weight model take
+effect. Tables from `stratify_rates()` are group-specific even when every
+factor is one (D132). Pooled fertility cells still report unrealized births by
 group: each group's share is the cell rate times its members, so the reported
 values match per-group cells. A woman's matching-calibration bin uses her own
 group. Group transitions always stratify by origin group, and dissolution by
 group pair only when its rates do. Pooling changes cell structure, and so
 fixed-seed histories, for grouped models with shared rates; results are
-equivalent in distribution. The user plans to replace `group_prop_hazard`
-with a general `stratify()` input; the cell rule depends only on the
-stratification of the prepared rate table, so it carries over.
+equivalent in distribution.
 
 ### Missing values
 
@@ -534,9 +532,8 @@ estimates pooled across periods; estimating within strata (for example age by
 sex by year) and excluding an open top age group recovers the within-cell
 ratio, as the validation report shows.
 
-Proportional input-rate multipliers (`group_prop_hazard`) act on m_c and so
-change cell targets; they are distinct from normalized weights. The user plans
-to replace them with a general `stratify()` input.
+Proportional stratification (`stratify_rates()`, D132) acts on m_c and so
+changes cell targets; it is distinct from normalized weights.
 
 ## Two ways to express stratification
 

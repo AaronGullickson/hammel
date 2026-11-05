@@ -422,12 +422,6 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   weights applied at the search that formed each union (0 for the reference
 #'   group and when calibration cannot affect choices). Use the column for each alternative's
 #'   group as a conditional-logit offset in wife-side choice sets.
-#' @param group_prop_hazard Optional named numeric vector of finite nonnegative
-#'   search-rate multipliers by the woman's group. Missing groups use 1.0;
-#'   zero suppresses searches. Applies to shared or group-specific input rates.
-#'   Without population groups, simulation warns and ignores multipliers.
-#'   Requires `initiation = "rate"`; on-demand formation has no search hazard.
-#'   Matching utilities and input rate tables are unchanged.
 #' @param cohab_prob Optional age-specific probability table with `age_start`,
 #'   `age_end`, `prob`, optionally `group` and `previous_union`. Enables typed
 #'   unions only in rate mode. Age gaps mean zero. Optional `time_start` and
@@ -465,7 +459,7 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
                             rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
-                            diagnostics = FALSE, group_prop_hazard = NULL,
+                            diagnostics = FALSE,
                             cohab_prob = NULL, cohab_matching = NULL, union_convert_rate = NULL,
                             cohabitation_counts_as_previous_union = FALSE,
                             weights_conversion = NULL, weights = NULL) {
@@ -474,7 +468,7 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
     min_male_age = min_male_age,
     kinship_generations = kinship_generations, father_matching = father_matching,
     cancel_birth_if_no_match = cancel_birth_if_no_match, diagnostics = diagnostics,
-    rates = rates, rate_unit = "person_year", group_prop_hazard = group_prop_hazard,
+    rates = rates, rate_unit = "person_year",
     cohab_prob = cohab_prob, cohab_matching = cohab_matching, union_convert_rate = union_convert_rate,
     cohabitation_counts_as_previous_union = cohabitation_counts_as_previous_union,
     weights_conversion = normalize_model_argument(weights_conversion),
@@ -486,7 +480,7 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
   if (!is.null(weights) && !identical(initiation, "rate"))
     stop("Search `weights` require rate-based union formation.", call. = FALSE)
   if (!is.null(weights) && !is.null(rates))
-    warn_cancelled_weight_terms(weights, weight_strata("search", rates, group_prop_hazard), "search")
+    warn_cancelled_weight_terms(weights, weight_strata("search", rates), "search")
   if (!is.null(weights_conversion) && !is.null(union_convert_rate))
     warn_cancelled_weight_terms(weights_conversion, weight_strata("conversion", union_convert_rate),
                                 "conversion")
@@ -507,20 +501,19 @@ set_union_formation <- function(model, initiation, matching = create_age_gap_mat
                             rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
-                            diagnostics = FALSE, group_prop_hazard = NULL,
+                            diagnostics = FALSE,
                             cohab_prob = NULL, cohab_matching = NULL, union_convert_rate = NULL,
                             cohabitation_counts_as_previous_union = FALSE,
                             weights_conversion = NULL, weights = NULL) {
   set_process(model, union_formation(initiation, matching, rates,
                                      min_male_age, kinship_generations, father_matching,
-                                     cancel_birth_if_no_match, diagnostics, group_prop_hazard,
+                                     cancel_birth_if_no_match, diagnostics,
                                      cohab_prob, cohab_matching, union_convert_rate,
                                      cohabitation_counts_as_previous_union, weights_conversion,
                                      weights))
 }
 
 validate_union_formation <- function(process) {
-  validate_group_prop_hazard(process$group_prop_hazard)
   validate_cohabitation(process)
   if (!identical(process$name, "union_formation") ||
       !identical(process$rate_unit, "person_year")) {
@@ -549,10 +542,6 @@ validate_union_formation <- function(process) {
   if (!is.null(process$father_matching))
     validate_model_argument(process$father_matching, validate_matching_model, "father_matching")
   if (process$initiation == "on_demand") {
-    if (!is.null(process$group_prop_hazard)) {
-      stop("`group_prop_hazard` requires rate-based union initiation; on-demand formation has no search hazard.",
-           call. = FALSE)
-    }
     if (!is.null(process$rates)) {
       stop("On-demand union formation does not take rates.", call. = FALSE)
     }
@@ -591,6 +580,7 @@ expand_previous_union_rates <- function(rates) {
 }
 
 validate_union_search_rates <- function(rates) {
+    check_stratified_columns(rates, c("group", "previous_union"), "Union-search")
     if (has_calendar_rates(rates)) {
       validate_calendar_rates(rates, validate_union_search_rates)
       effective <- expand_previous_union_rates(rates)

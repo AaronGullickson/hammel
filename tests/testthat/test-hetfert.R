@@ -149,7 +149,7 @@ test_that("weighted hazards integrate with grouped partner/father matching and u
   rates$rate <- .15
   model <- hammel_model() |> set_population(pop) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .01)) |>
-    set_fertility(rates, hetfert = het_fert(1, .5), group_prop_hazard = c(B = 1.4)) |>
+    set_fertility(stratify_rates(rates, list(group = c(A = 1, B = 1.4))), hetfert = het_fert(1, .5)) |>
     set_union_formation("rate", matching = create_age_gap_matching_model(0, 5,
       group_exogamy = c("A:B" = -1)),
       rates = data.frame(age_start = 15, age_end = Inf, rate = .3),

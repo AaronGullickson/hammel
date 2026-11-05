@@ -72,6 +72,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Weight models (formulas, custom functions, schedules) | D129 |
 | Milestone 8 acceptance | D130 |
 | Milestones 9–11 reordered: group columns, immigration, then summaries | D131 |
+| `stratify_rates()` replaces `group_prop_hazard` | D132 |
 
 ## Recorded decisions
 
@@ -2825,3 +2826,37 @@ attached to multiple group columns.
 | 10 | External immigration and generation tracking | Tentative |
 | 11 | Summaries, diagnostics and helpers | Proposed details retained |
 | 12 | Two-sex marriage model | Tentative; model and API unselected |
+
+## D132 — `stratify_rates()` replaces `group_prop_hazard` (November 5, 2026)
+
+**Status:** User-selected API change at the start of milestone 9, specified in
+discussion November 5, 2026. Supersedes the `group_prop_hazard` arguments of
+the October 20 multiplier request, D079's pair multipliers and the fertility
+per-status multiplier lists.
+
+**Decision:** Remove `group_prop_hazard` from every rate process. A new
+function `stratify_rates(rates, by)` adds proportional-hazard strata to a rate
+table: `by` is a named list of named factor vectors, for example
+`list(group = c(A = 1.2, B = 1))`. Each input row is copied per category with
+its rate multiplied by the factor. User choices:
+
+- A column already present in `rates` is an error.
+- Several columns in `by` are crossed, multiplying their factors.
+- The function cannot know the process, so each setter checks the table's
+  actual stratum columns, however they were added, against those its process
+  supports. An attribute recording added columns was rejected, because tables
+  can be pre-stratified or entered directly. `by` may only name stratum
+  columns.
+- Interactions with existing strata, such as different group effects by union
+  status, are built by stratifying subsets and binding them.
+
+**Implications:** Stratified tables are ordinary group-specific tables. Every
+needed category must be listed; an omitted group no longer defaults to factor
+one. Factors of one now split cells by group (D128), so weight terms on that
+variable cancel with a warning. Without population groups, the standard
+alphabetical-first fallback applies instead of ignoring multipliers. Results
+equal the previous multipliers in distribution, with equal rates. Conversion
+rates, which had no multiplier argument, can now be stratified the same way.
+The accepted milestone 3 report uses `group_prop_hazard` and reproduces at its
+recorded commit, as the milestone 1 report already does.
+See [groups](groups.md#proportional-stratification-with-stratify_rates-d132).

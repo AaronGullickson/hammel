@@ -30,7 +30,7 @@ test_that("cohabitation validates probability, conversion, type coverage and rat
   expect_error(set_union_formation(model, "rate", rates = model$processes$union_formation$rates,
     cohab_matching = create_age_gap_matching_model(0,5)), "require.*cohab_prob")
   bad <- model; bad$processes$union_formation$union_convert_rate$previous_union <- "none"
-  expect_error(simulate(bad, 0), "without previous_union")
+  expect_error(simulate(bad, 0), "Conversion rates cannot be stratified by `previous_union`")
   expect_error(fertility(data.frame(age_start=15,age_end=50,rate=.1,union_status="partnered")), "replaced")
   expect_error(fertility(data.frame(age_start=15,age_end=50,rate=.1,union_type=c("unpartnered","cohab"))), "union_type")
   expect_error(union_dissolution(data.frame(dur_start=0,dur_end=Inf,rate=.1,union_type="cohab")), "both cohab and marriage")
@@ -131,24 +131,21 @@ test_that("cohabitation endings restore legal status by default and support the 
   }
 })
 
-test_that("fertility multiplier lists follow the selected type schedule", {
+test_that("type-specific group strata built by binding stratified subsets", {
   model <- cohab_fixture(40)
   model$population$persons$sex[1:20] <- "f"
   model$population$persons$group <- rep(c("A","B"),20)
   typed <- data.frame(age_start=15,age_end=50,union_type=c("unpartnered","cohab","marriage"),rate=c(.03,.15,.1))
-  factors <- list(unpartnered=c(B=.8),cohab=c(A=1.2,B=.9),marriage=c(B=1.1))
-  implicit <- set_fertility(model,typed,group_prop_hazard=factors,birth_interval=.1)
-  explicit <- rbind(transform(typed,group="A"),transform(typed,group="B"))
-  for (i in seq_len(nrow(explicit))) {
-    x <- factors[[explicit$union_type[i]]]
-    if (explicit$group[i] %in% names(x)) explicit$rate[i] <- explicit$rate[i] * x[[explicit$group[i]]]
-  }
-  reference <- set_fertility(model,explicit,birth_interval=.1)
+  factors <- list(unpartnered=c(A=1,B=.8),cohab=c(A=1.2,B=.9),marriage=c(A=1,B=1.1))
+  stratified <- do.call(rbind, lapply(names(factors), function(type)
+    stratify_rates(typed[typed$union_type==type,],list(group=factors[[type]]))))
+  implicit <- set_fertility(model,stratified,birth_interval=.1)
+  explicit <- stratified
+  explicit$rate <- typed$rate[match(explicit$union_type,typed$union_type)] *
+    mapply(function(type,group) factors[[type]][[group]], explicit$union_type, explicit$group)
+  reference <- set_fertility(model,as.data.frame(explicit),birth_interval=.1)
   expect_identical(simulate(implicit,2,617),simulate(reference,2,617))
-  expect_error(fertility(typed,group_prop_hazard=list(partnered=c(A=1.2))),"must occur")
-  shared <- data.frame(age_start=15,age_end=50,union_type=c("unpartnered","partnered"),rate=c(.03,.1))
-  expect_error(fertility(shared,group_prop_hazard=list(cohab=c(A=1.2))),"must occur")
-  expect_s3_class(fertility(typed,group_prop_hazard=list(cohab=c(B=1.1))),"hammel_fertility")
+  expect_error(stratify_rates(typed,list(union_type=c(cohab=1))),"already has")
 })
 
 test_that("cohabitation and marriage use distinct matching and diagnostic weights", {
@@ -236,7 +233,7 @@ test_that("earlier legal history governs subsequent searches after cohabitant de
   }
 })
 
-test_that("typed dissolution retains symmetric pair hazards and multipliers", {
+test_that("typed dissolution retains symmetric pair hazards", {
   model <- initial_cohabs(3,conversion=0,breakup=0)
   model$population$persons$group <- c("A","B","A","A","B","B")
   rates <- expand.grid(group_pair=c("A:A","A:B","B:B"),union_type=c("cohab","marriage"),stringsAsFactors=FALSE)
@@ -246,7 +243,7 @@ test_that("typed dissolution retains symmetric pair hazards and multipliers", {
   result <- simulate(model,.1,42)
   expect_equal(result$simulation$dissolutions,1)
   expect_equal(result$unions$end_reason[1],"dissolution")
-  model <- set_union_dissolution(model,rates,group_prop_hazard=c("B:A"=0))
+  model <- set_union_dissolution(model,transform(rates,rate=ifelse(group_pair=="A:B",0,rate)))
   expect_equal(simulate(model,.1,42)$simulation$dissolutions,0)
 })
 

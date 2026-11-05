@@ -28,8 +28,8 @@ additional random draws. There is no demographic default dissolution rate.
 
 ## Interface and schedules
 
-`union_dissolution(rates, group_prop_hazard = NULL)` constructs a process;
-`set_union_dissolution(model, rates, group_prop_hazard = NULL)` attaches it.
+`union_dissolution(rates, weights = NULL)` constructs a process;
+`set_union_dissolution(model, rates, weights = NULL)` attaches it.
 Rates are a nonempty data frame with `dur_start`, `dur_end`, and `rate`,
 returned/stored as a tibble. Duration bands are half-open `[dur_start, dur_end)`.
 Starts and rates are finite and nonnegative; ends exceed starts and may be
@@ -48,14 +48,11 @@ each pair, gaps still mean zero risk. Shared rates omit `group_pair`. Bare
 `group`, `group_w`, and `group_h` schedule columns are rejected. Pair names
 require two nonempty colon-free labels separated by a single colon.
 
-`group_prop_hazard` is a named numeric vector with the same unordered pair
-names, e.g. `c("A:B" = 1.2)`. Factors are dimensionless, finite and nonnegative;
-omitted pairs use 1, zero suppresses dissolution, and specifying both `A:B`
-and `B:A` is an error. Factors do not introduce identities. With population
-groups, preparation selects each couple's pair and scales an execution-only
-copy. Without population groups, warn and ignore multipliers; pair-stratified
-rates warn and use the first canonical pair alphabetically. The input table,
-its ordering and provenance remain unchanged.
+Proportional pair effects are written with `stratify_rates()` (D132), for
+example `stratify_rates(rates, list(group_pair = c("A:A" = 1, "A:B" = 2, "B:B" = 1)))`,
+which must list every pair. Without population groups, pair-stratified rates
+warn and use the first canonical pair alphabetically. The input table, its
+ordering and provenance remain unchanged.
 
 Illustrative input, not a demographic default:
 

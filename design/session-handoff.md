@@ -39,8 +39,8 @@ reads the cells (the former calibration tracker is gone). Weight models
 choose who in a cell experiences an event (D129). See
 [cell scheduling and weight models](binned-group-hazards.md), including its
 deferred issues. The user plans, after the milestone, to add `set.seed()` to
-the articles and to replace `group_prop_hazard` with a general `stratify()`
-input. The user then reordered the roadmap (D131): multiple group columns are
+the articles; `group_prop_hazard` has since been replaced by
+`stratify_rates()` (D132). The user then reordered the roadmap (D131): multiple group columns are
 next as milestone 9, external immigration is 10, and summaries, diagnostics
 and helpers move to 11. Milestone 9's schema and mechanisms are still to
 specify.

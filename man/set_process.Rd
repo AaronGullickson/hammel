@@ -8,13 +8,12 @@
 \usage{
 set_process(model, process)
 
-set_mortality(model, rates, group_prop_hazard = NULL, weights = NULL)
+set_mortality(model, rates, weights = NULL)
 
 set_fertility(
   model,
   rates,
   birth_interval = 0.75,
-  group_prop_hazard = NULL,
   inheritance = create_group_inheritance(),
   ffab = 0.4886,
   hetfert = NULL,
@@ -27,14 +26,6 @@ set_fertility(
 \item{process}{A \code{hammel_process} specification.}
 
 \item{rates}{An age-specific rate table passed to \code{\link[=mortality]{mortality()}} or \code{\link[=fertility]{fertility()}}.}
-
-\item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
-rate multipliers by group. Missing groups use 1.0; values are not normalized.
-Scales shared or group-specific fertility input rates before cell
-accounting. Without population groups, simulation warns and ignores it.
-Fertility also accepts a named list of vectors for \code{partnered} and/or
-\code{unpartnered}, or cohab/marriage when rates include those \code{union_type}
-strata. List names must occur in the schedules; omitted entries use 1.0.}
 
 \item{weights}{NULL (default) for unweighted selection within rate cells, or
 a \code{\link[=create_weight_model]{create_weight_model()}} specification. Weights choose which member of a

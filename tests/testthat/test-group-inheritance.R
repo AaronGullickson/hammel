@@ -287,7 +287,7 @@ test_that("new AB identities are available to categorical partner matching durin
   expect_true(all(children$group == "AB"))
 })
 
-test_that("future search schedules, group multipliers, and numeric declarations are supported", {
+test_that("future search schedules, stratified rates, and numeric declarations are supported", {
   rule <- create_group_inheritance("custom", groups = "AB", fun = function(...) "AB")
   model <- inheritance_test_model(rule)
   model <- set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
@@ -297,7 +297,8 @@ test_that("future search schedules, group multipliers, and numeric declarations 
   expect_error(simulate(model, 0), "missing schedules.*AB")
   model <- inheritance_test_model(rule)
   model$processes$mortality$rates$rate <- 1e8
-  model$processes$mortality$group_prop_hazard <- c(A = 0, B = 0, AB = 1)
+  model$processes$mortality$rates <- stratify_rates(model$processes$mortality$rates,
+    list(group = c(A = 0, B = 0, AB = 1)))
   result <- simulate(model, 0.5, seed = 52)
   expect_true(all(!is.na(inheritance_children(result)$death_time)))
   model <- inheritance_test_model(create_group_inheritance("custom", groups = 30L, fun = function(...) 30L))

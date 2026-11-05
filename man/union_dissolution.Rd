@@ -5,9 +5,9 @@
 \alias{set_union_dissolution}
 \title{Specify duration-dependent union dissolution}
 \usage{
-union_dissolution(rates, group_prop_hazard = NULL, weights = NULL)
+union_dissolution(rates, weights = NULL)
 
-set_union_dissolution(model, rates, group_prop_hazard = NULL, weights = NULL)
+set_union_dissolution(model, rates, weights = NULL)
 }
 \arguments{
 \item{rates}{A nonempty data frame with numeric \code{dur_start}, \code{dur_end}, and
@@ -24,13 +24,8 @@ Pair names require nonempty colon-free group labels. Pair-stratified tables
 must cover every unordered pair of possible identities, including future
 ones. Without population groups, warn and use the first canonical pair
 alphabetically. Omit \code{group_pair} for shared rates. \code{group}, \code{group_w} and
-\code{group_h} schedule columns are not supported.}
-
-\item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
-rate multipliers by unordered group pair, e.g. \code{c("A:B" = 1.2)} applies
-in both directions. Omitted pairs use 1; zero suppresses risk. Reversed
-duplicate keys are errors. With no population groups, simulation warns
-and ignores multipliers.}
+\code{group_h} schedule columns are not supported. Use \code{\link[=stratify_rates]{stratify_rates()}} to add
+proportional pair differences.}
 
 \item{weights}{NULL (default) for unweighted selection, or a
 \code{\link[=create_weight_model]{create_weight_model()}} using union variables, which chooses which union

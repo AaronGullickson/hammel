@@ -134,7 +134,7 @@ test_that("cell mode runs with groups, union types, cohabitation, matching and r
               transform(fert, union_type = "marriage"))
   mort <- data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .01)
   model <- hammel_model() |> set_population(base) |> set_mortality(mort) |>
-    set_fertility(sf, group_prop_hazard = c(A = 1, B = 1.4)) |>
+    set_fertility(stratify_rates(sf, list(group = c(A = 1, B = 1.4)))) |>
     set_union_formation("rate",
       create_matching_model(~ age_difference, c(age_difference = -.1), group_exogamy = c("A:B" = -1)),
       rates = data.frame(age_start = 15, age_end = Inf, rate = .15),

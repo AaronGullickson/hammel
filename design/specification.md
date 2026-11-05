@@ -82,12 +82,9 @@ process when present. `set_process(model, process)` stores a process under its
 own name. The demographic setters construct and attach it in one operation.
 Replacing a process replaces that specification and retains the others.
 
-Mortality, fertility, and rate-based union formation also accept optional
-`group_prop_hazard` vectors on constructors and setters. The process stores the
-vector separately from its input rates. Execution scales a private schedule
-copy, expanding shared schedules by population group where needed, before
-native schedule and fertility-cell construction. Omitted group factors
-are 1.0; absent population groups cause a warning and the vector is ignored.
+`stratify_rates(rates, by)` in `R/stratify_rates.R` adds proportional strata to
+a rate table before it is attached (D132). Each setter checks the table's
+stratum columns (`stratum_columns`) against those its process supports.
 Conditional fertility may instead store a named list of partnered/unpartnered
 vectors. Omitted statuses also use 1.0; a single vector scales both statuses.
 See [groups](groups.md) for effective-rate examples and validation rules.
@@ -146,17 +143,15 @@ its numerator. See [demographic analysis](demographic-analysis.md).
 
 ## Union dissolution
 
-`set_union_dissolution(model, rates, group_prop_hazard = NULL)` attaches the
+`set_union_dissolution(model, rates, weights = NULL)` attaches the
 optional duration-hazard process (D078). Public bands use `dur_start` and
-`dur_end`; preparation maps a private copy to the shared `Band` sampler. The
-couple's unordered group pair selects schedules and proportional multipliers
-(D079). Public `group_pair` labels are normalized; private lookup uses both
-partners' identity indices.
-Each active union stores one sampled dissolution date, retained through births.
-Her next-event selection competes that date with death/birth; birth wins a tie,
-then dissolution can execute at the same instant. Death closes the union and
-invalidates that risk. Dissolution restores both partners' availability and
-reschedules her status-dependent hazards; the man's death event stays valid.
+`dur_end`; preparation maps a private copy to duration cells (D128). The
+couple's unordered group pair selects schedules (D079). Public `group_pair`
+labels are normalized; private lookup uses both partners' identity indices.
+Each active union is a unit in the dissolution cells, unaffected by births;
+birth wins a tie, then dissolution can execute at the same instant. Death
+closes the union and removes it from the cells. Dissolution restores both
+partners' availability and moves her to her unpartnered cells.
 The process is absent by default, consuming no additional random draws then.
 See [union dissolution](union-dissolution.md) for examples and deferred scope.
 

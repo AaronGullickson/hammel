@@ -217,14 +217,6 @@ simulate <- function(model, years, seed = NULL) {
     data.frame(age_start = numeric(), age_end = numeric(), rate = numeric()) else
     prepare_group_rates(expand_previous_union_rates(union_process$rates),
       population$persons, "union formation", group_values, start, start + years)
-  death_rates <- apply_group_prop_hazard(death_rates, population$persons,
-    model$processes$mortality$group_prop_hazard, "mortality", group_values)
-  birth_rates <- apply_group_prop_hazard(birth_rates, population$persons,
-    model$processes$fertility$group_prop_hazard, "fertility", group_values)
-  if (union_process$initiation == "rate") {
-    union_rates <- apply_group_prop_hazard(union_rates, population$persons,
-      union_process$group_prop_hazard, "union formation", group_values)
-  }
   validate_matching_groups(union_process$matching, group_values)
   if (!is.null(union_process$father_matching))
     validate_matching_groups(union_process$father_matching, group_values)

@@ -50,6 +50,58 @@ set_theme(theme_bw())
 
 ## Overview of Design
 
+## Stratifying Rates
+
+```{r}
+
+
+fertility_rates <- get_fertility_hfd("USA", 2000)
+mortality_rates <- get_mortality_hmd("USA", 2000)
+
+fertility_rates <- stratify_rates(
+  fertility_rates, 
+  by = list(
+    group = c(A = 1.1, B = 1),
+    # this is not really a great idea for union type as within union
+    # type fertility rates have a totally different age profile, but 
+    # ok for testing purposes
+    union_type = c("unpartnered" = 0.3, "cohab" = 0.7, "marriage" = 1.1)
+  )
+)
+fertility_rates |> calculate_tfr()
+
+# a better approach is to start with rates pre-stratified by union type and
+# then stratify further by group
+fertility_rates_by_union_type <- read_csv(
+  here(
+  "validation", "data", "england_wales_1992_onward", "fertility_by_union_type_1992.csv"
+  )
+) |>
+  rename(age_start = denominator_age_start, age_end = denominator_age_end) |>
+  select(union_type, age_start, age_end, rate)
+fertility_rates <- stratify_rates(
+  fertility_rates_by_union_type,
+  by = list(group = c(A = 1.1, B = 1))
+)
+fertility_rates |> calculate_tfr()
+
+# for a more complicated approach, we can break the proportional hazards assumption
+# by stratifying rates by subsets of the rate schedule and then binding back together
+
+fertility_rates <- bind_rows(
+  fertility_rates_by_union_type |>
+    filter(union_type == "marriage") |>
+    stratify_rates(list(group = c(A = 1.05, B = 1))),
+  fertility_rates_by_union_type |>
+    filter(union_type == "cohab") |>
+    stratify_rates(list(group = c(A = 1.1, B = 1))),
+  fertility_rates_by_union_type |>
+    filter(union_type == "unpartnered") |>
+    stratify_rates(list(group = c(A = 1.15, B = 1)))
+)
+fertility_rates |> calculate_tfr()
+```
+
 
 
 

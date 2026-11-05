@@ -328,7 +328,7 @@ type-splitting and spillover interpretations in the econometric literature
 
 ## Interface considerations
 
-`union_formation()` mixes timing (`initiation`, `rates`, `group_prop_hazard`),
+`union_formation()` mixes timing (`initiation`, `rates`),
 partner selection (`matching`), pair eligibility (`min_male_age`,
 `kinship_generations`), unpartnered-birth handling (`father_matching`,
 `cancel_birth_if_no_match`) and diagnostics, with validation and the engine

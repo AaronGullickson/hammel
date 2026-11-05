@@ -170,10 +170,8 @@ TFR uses `rate_fertility` or fertility `rate`; life tables use `mx`, `rate_morta
 table. A bare `rate` column has no such type protection.
 
 Input-rate summaries, including those passed a process object, summarize its
-stored rate table. They do not apply `group_prop_hazard` settings or expand a
-shared table to population groups. Account for those factors when preparing
-effective input-rate comparisons; summaries of simulated histories already
-reflect the configured multipliers.
+stored rate table, including strata added by `stratify_rates()` (D132). They do
+not expand a shared table to population groups.
 
 ## Population size and observation boundaries
 

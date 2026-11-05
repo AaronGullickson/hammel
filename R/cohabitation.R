@@ -27,6 +27,7 @@ validate_cohabitation <- function(process) {
 }
 
 validate_conversion_rates <- function(rates) {
+  check_stratified_columns(rates, "group", "Conversion")
   if (has_calendar_rates(rates)) {
     if (all(c("age_start", "dur_start") %in% names(rates)) &&
         length(unique(!is.na(rates$dur_start))) != 1L)

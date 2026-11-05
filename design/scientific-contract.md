@@ -77,20 +77,16 @@ schedules are group-specific (D128). Group values are
 nonmissing character labels or finite numeric codes, with nonempty labels.
 See [groups](groups.md) for full rules, ordering, examples, and validation scope.
 
-Mortality, fertility, and rate-based union formation optionally accept
-`group_prop_hazard`, a named vector of dimensionless finite nonnegative factors.
-Multiply the selected input rates by the person's group factor (the woman's for
-searches), using 1.0 for omitted groups. Fertility multiplication precedes
-cell accounting, making it equivalent to explicitly scaled input ASFRs. Zero suppresses that risk; factors are not normalized. Without population
-groups, warn and ignore factors. Shared and stratified schedules are supported;
-factors do not supply missing grouped schedules. On-demand union formation has
-no search hazard and rejects this option. Stored input tables remain unchanged;
-overflowing effective rates fail explicitly.
-Conditional fertility also accepts a named list of vectors for partnered and/or
-unpartnered rates. Omitted statuses and omitted groups within a status use 1.0.
-A single vector applies to both statuses; overall fertility requires the vector
-form. Fertility cells split by group only when the effective schedules are
-group-specific; multipliers that are all one do not stratify (D128).
+Proportional differences between strata are written into the rate table with
+`stratify_rates(rates, by)` (D132), which copies each row per category of a new
+column and multiplies its rate by that category's factor, crossing several
+columns. Factors are dimensionless, finite and nonnegative and are not
+normalized; zero suppresses that risk. The result is an ordinary stratified
+table, so every needed category must be listed, and fertility multiplication
+precedes cell accounting exactly as an explicit schedule would. Setters reject
+added columns that a process does not support. Fertility cells split by group
+only when the schedules are group-specific (D128). See
+[groups](groups.md#proportional-stratification-with-stratify_rates-d132).
 
 ## Initialization and population history
 
