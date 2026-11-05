@@ -305,3 +305,25 @@ test_that("fertility can change parity partitions and pooled/typed union rates",
   expect_gte(tail(out$persons$birth_time, 1), .5)
   expect_equal(tail(out$persons$mother_id, 1), 1)
 })
+
+test_that("rate changes recover rates in place and when band layouts change", {
+  n <- 20000
+  check <- function(rates) {
+    out <- simulate(set_mortality(make_model(n, age = 30), rates), 2, seed = 71)
+    d <- out$persons$death_time
+    years <- function(a, b) sum(pmax(0, pmin(ifelse(is.na(d), 2, d), b) - a))
+    deaths <- function(a, b) sum(!is.na(d) & d >= a & d < b)
+    expect_count(deaths(0, 1), .05 * years(0, 1))
+    expect_count(deaths(1, 2), .2 * years(1, 2))
+  }
+  withr::local_options(hammel.check_cells = TRUE)
+  # Same bands in both periods: rates change in place.
+  same <- data.frame(sex = rep(c("m", "f"), 2), age_start = 0, age_end = Inf,
+    rate = c(.05, .05, .2, .2), time_start = rep(c(0, 1), each = 2), time_end = rep(c(1, Inf), each = 2))
+  check(same)
+  # Different band edges after the change: processes are rebuilt.
+  split <- rbind(same[1:2, ],
+    data.frame(sex = rep(c("m", "f"), 2), age_start = rep(c(0, 31.5), each = 2),
+      age_end = rep(c(31.5, Inf), each = 2), rate = .2, time_start = 1, time_end = Inf))
+  check(split)
+})

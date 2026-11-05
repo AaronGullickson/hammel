@@ -121,9 +121,21 @@ Each loop iteration processes the earliest boundary if it is not later than
 the earliest process clock. Otherwise the earliest clock fires. Exact ties
 follow the source order death, birth, dissolution, conversion, search, then
 transition slots. Calendar changes still precede same-time boundaries and
-events. A rate change rebuilds every process from the active schedules and
-re-enters every person and union. New thresholds are valid after survival to
-the boundary, since the clocks are memoryless.
+events.
+
+*In-place rate updates (user direction, November 4, 2026).* At a calendar rate
+change, a process whose new schedules keep its cells (same strata and nonzero
+band edges; for fertility also the same union types, group stratification and
+age splitting, and for transitions the same destination, sex and union type
+per slot) changes its cells' rates in place: the clock spends its threshold up
+to the change, the bins take the new rates, and the clock continues, with no
+draw and no one moving. This is exact, because a Poisson process whose rate
+changes at a known time continues at the new rate. Otherwise that part is
+rebuilt from the active schedules and every living person and ongoing union
+re-enters; the new thresholds are valid after survival to the boundary. With
+yearly rates this cut the demographic transition article's main run from 30.9
+to 25.3 seconds and the second demographic transition's changing-rate run
+from 2.66 to 1.45 seconds (now faster than the previous engine's 1.82).
 
 ### Random-number use
 
