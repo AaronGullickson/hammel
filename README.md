@@ -1,5 +1,5 @@
 
-# hammel
+# hammel <img src="man/figures/logo.png" align="right" width="120" alt="Hammel hex sticker showing a branching kinship network" />
 
 <!-- badges: start -->
 [![Codecov test coverage](https://codecov.io/gh/AaronGullickson/hammel/graph/badge.svg)](https://app.codecov.io/gh/AaronGullickson/hammel)
