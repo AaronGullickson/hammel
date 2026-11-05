@@ -188,11 +188,81 @@ calculate_fertility_rates(pop_final, c(0, 100), 12:55, conf.level = 0.95) |>
 
 ### Dissolution differences by age difference
 
+In this simulation, we will use a custom function to allow the risk of dissolution to increase by 5% for every year increase in the absolute age gap between partners. 
+
 ```{r}
+#| label: run-age-diff-dissolution-sim
 
+marriage_rates <- read_csv(here("validation", "data", "usa_2000_2001", 
+                                "usa_2001_marriage_rates_female.csv"))
 
+dissolution_rates <- tibble(
+  dur_start = c(0, 5, 10, 15),
+  dur_end = c(5, 10, 15, Inf),
+  rate = -log(c(.80, .68, .60, .52) / c(1, .80, .68, .60)) / 5
+)
+
+set.seed(42)
+pop <- create_baseline_population(50000)
+
+model <- hammel_model() |>
+  set_population(pop) |>
+  set_fertility(fertility_rates) |>
+  set_mortality(mortality_rates) |>
+  set_union_formation("rate", rates = marriage_rates) |>
+  set_union_dissolution(
+    rates = dissolution_rates,
+    weights = create_weight_model(
+      fun = function(members, bin) {
+        log(1.05) * abs(members$age_difference)
+      }
+    )
+  )
+
+pop_final <- simulate(model, 100, 42)
 ```
 
+```{r}
+#| label: estimate-gap
+
+# no predefined method so lets set up the data so that we can model it
+u <- pop_final |> get_detailed_unions() |>
+  filter(start_time > 0) |>
+  mutate(gap = abs(birth_time_w - birth_time_h),
+         gap_group = cut(gap, c(0, 2, 5, 10, Inf), right = FALSE),
+         stop = coalesce(end_time, pop_final$end_time),
+         dissolved = end_reason %in% "dissolution")
+
+bands <- tibble(dur_start = c(0, 5, 10, 15), dur_end = c(5, 10, 15, Inf))
+
+# Exposure and dissolutions by duration band and age-gap group.
+by_band <- u |>
+  cross_join(bands) |>
+  mutate(enter = start_time + dur_start,
+         exit = pmin(stop, start_time + dur_end),
+         years = pmax(0, exit - enter),
+         event = dissolved & stop > enter & stop <= start_time + dur_end) |>
+  filter(years > 0) |>
+  group_by(dur_start, gap_group) |>
+  summarise(years = sum(years), dissolutions = sum(event), .groups = "drop") |>
+  mutate(rate = dissolutions / years)
+
+# Pooled per-year effect, within duration bands (target log(1.05) per year).
+split <- u |> cross_join(bands) |>
+  mutate(enter = start_time + dur_start,
+         exit = pmin(stop, start_time + dur_end),
+         years = exit - enter,
+         event = dissolved & stop > enter & stop <= start_time + dur_end) |>
+  filter(years > 0)
+
+fit <- glm(event ~ gap + factor(dur_start), family = poisson,
+           offset = log(years), data = split)
+
+exp(coef(fit)["gap"])
+exp(confint.default(fit)["gap", ])
+```
+
+The results show that our estimated coefficient is very close to the expected 1.05 ratio and that the confidence interval contains the true value. 
 
 ## Unit Tests
 
