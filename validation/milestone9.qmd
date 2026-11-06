@@ -107,11 +107,12 @@ We also adjusted the `calculate_*_rates` functions to take a single `by` argumen
 
 ## Stratifying Rates
 
-```{r}
+We show some examples here of how you can use `stratify_rates` to stratify rates. In the first example, I will take a fertility schedule from the Human Fertility Database and then statify two groups A and B and by union type for unpartnered/partnered.
 
+```{r}
+#| label: stratify-fert-union-type
 
 fertility_rates <- get_fertility_hfd("USA", 2000)
-mortality_rates <- get_mortality_hmd("USA", 2000)
 
 fertility_rates <- stratify_rates(
   fertility_rates, 
@@ -123,10 +124,16 @@ fertility_rates <- stratify_rates(
     union_type = c("unpartnered" = 0.3, "partnered" = 1.3)
   )
 )
-fertility_rates |> calculate_tfr()
 
-# a better approach is to start with rates pre-stratified by union type and
-# then stratify further by group
+fertility_rates |> calculate_tfr()
+```
+
+This approach will work, but this is not the best use of proportional hazards. We know that the age-specific profile of fertility *within* unions is very different than the overall age-specific fertility profile, so the proportional hazards approach will give us some unusual fertility distributions. A better approach would be to start with pre-stratified fertility rates by union type drawn from real data and then apply proportional hazards by group to that data, as I do in the second example.
+
+
+```{r}
+#| label: stratify-pre-strat-fert-by-group
+
 fertility_rates_by_union_type <- read_csv(
   here(
   "validation", "data", "usa_2000_2001", "usa_2000_fertility_by_union_status.csv"
@@ -138,9 +145,12 @@ fertility_rates <- stratify_rates(
   by = list(group = c(A = 1.1, B = 1))
 )
 fertility_rates |> calculate_tfr()
+```
 
-# for a more complicated approach, we can break the proportional hazards assumption
-# by stratifying rates by subsets of the rate schedule and then binding back together
+If we want to relax, the proportional hazards assumption, we could break up the fertility rates by union type, statify with different ratios, and then combine them back together. In the example below, we make the ratio between A and B 1.05 for partnered fertility but 1.2 for unpartnered fertility.
+
+```{r}
+#| label: stratify-fert-non-proportional
 
 fertility_rates <- bind_rows(
   fertility_rates_by_union_type |>
@@ -151,16 +161,38 @@ fertility_rates <- bind_rows(
     stratify_rates(list(group = c(A = 1.20, B = 1)))
 )
 fertility_rates |> calculate_tfr()
-
-mortality_rates <- stratify_rates(
-  mortality_rates,
-  list(group = c(A = 1.05, B = 1))
-)
-mortality_rates |>
-  calculate_life_table() |>
-  filter(age_start == 0) |>
-  select(group, sex, ex)
 ```
+
+
+## Race-Region Simulation
+
+To test out the new capabilities, lets create a simulation with three racial groups (W, B, and O) and four regional groups (NE, MW, S, W). We will allow exogamy between racial groups but will not allow exogamy by region (because marriage markets are generally local).
+
+For this simulation, we will use a rate model for union formation and allow fertility vary by union type, but we won't add the complication of cohabitation. We will also stratify fertility and marriage rates across group dimensions.
+
+```{r}
+#| label: set-fertility-rate
+
+
+fertility_rates_by_union_type <- read_csv(
+  here(
+  "validation", "data", "usa_2000_2001", "usa_2000_fertility_by_union_status.csv"
+  )
+) |>
+  rename(union_type = union_status)
+
+
+fertility_rates <- bind_rows(
+  fertility_rates_by_union_type |>
+    filter(union_type == "partnered") |>
+    stratify_rates(list(group = c(A = 1.05, B = 1))),
+  fertility_rates_by_union_type |>
+    filter(union_type == "unpartnered") |>
+    stratify_rates(list(group = c(A = 1.20, B = 1)))
+)
+```
+
+
 
 ```{r}
 
@@ -199,9 +231,6 @@ calculate_mortality_rates(pop_end, c(50, 150),  0:95, by = "group") |>
   filter(age_start == 0) |>
   select(group, sex, ex)
 ```
-
-
-
 
 
 ## Unit Tests
