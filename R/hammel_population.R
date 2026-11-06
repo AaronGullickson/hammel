@@ -214,7 +214,11 @@ empty_unions <- function() {
 #'   giving the joint distribution of category combinations. Weights are finite
 #'   and nonnegative with at least one positive value, and are normalized.
 #'   Realized counts are random. The population declares each dimension with
-#'   [group()] defaults; [set_groups()] can replace that declaration. `NULL`
+#'   [group()] defaults, except that its `categories` are those given, in
+#'   order: the weights' names, or each dimension's values in order of first
+#'   appearance in the table's rows. The first is the reference category, and
+#'   zero-weight categories are declared (they start empty). [set_groups()] can
+#'   replace that declaration; categories it omits are kept. `NULL`
 #'   (the default) adds no groups and consumes no extra random draws.
 #'
 #' @return A validated `hammel_population` object.
@@ -257,7 +261,8 @@ create_baseline_population <- function(size, max_age = 70, end_time = 0,
   )
   if (!is.null(draw)) for (column in names(drawn <- draw(size))) persons[[column]] <- drawn[[column]]
   hammel_population(persons, end_time = end_time,
-                    groups = if (is.null(draw)) NULL else attr(draw, "dimensions"))
+                    groups = if (is.null(draw)) NULL else
+                      lapply(attr(draw, "categories"), function(x) group(categories = x)))
 }
 
 # Validate baseline group weights and return a function drawing `size` people.
@@ -282,6 +287,7 @@ baseline_group_sampler <- function(groups) {
       rows <- sample.int(nrow(groups), size, replace = TRUE, prob = p)
       lapply(stats::setNames(dimensions, dimensions), function(d) groups[[d]][rows])
     }
+    categories <- lapply(stats::setNames(dimensions, dimensions), function(d) unique(groups[[d]]))
   } else {
     if (!is.list(groups) || !length(groups))
       stop("`groups` must be a named list of weight vectors or a data frame.", call. = FALSE)
@@ -296,7 +302,10 @@ baseline_group_sampler <- function(groups) {
     draw <- function(size) stats::setNames(lapply(seq_along(dimensions), function(k)
       names(groups[[k]])[sample.int(length(groups[[k]]), size, replace = TRUE,
                                     prob = probabilities[[k]])]), dimensions)
+    categories <- lapply(stats::setNames(dimensions, dimensions), function(d) names(groups[[d]]))
   }
   attr(draw, "dimensions") <- dimensions
+  # The declared categories, in the order given (the first is the reference).
+  attr(draw, "categories") <- categories
   draw
 }

@@ -20,7 +20,9 @@ Name the persons columns that are group dimensions and give each its
 settings with \code{\link[=group]{group()}}. Groups are always declared: a column that is not
 declared is an ordinary custom column, kept but never used by any process
 or analysis. The declaration replaces any declaration carried by the
-population (for example from \code{\link[=create_baseline_population]{create_baseline_population()}}) and may be
+population (for example from \code{\link[=create_baseline_population]{create_baseline_population()}}), except that a
+dimension declared without \code{categories} keeps the population's declared
+categories for it; it may be
 given before or after \code{\link[=set_population]{set_population()}}; it is checked against the
 population when both are present and at simulation. Simulated populations
 carry it, so analysis and restarts need nothing further.

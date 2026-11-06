@@ -13,8 +13,10 @@ group(
 \arguments{
 \item{categories}{Optional complete, ordered vector of the dimension's
 categories (character labels or finite numeric codes). \code{NULL} (the
-default) infers them from the population's values in first-occurrence
-order, plus transition destinations and categories with ancestry shares.
+default) keeps the categories the population already declares (such as
+those of \code{\link[=create_baseline_population]{create_baseline_population()}}); without any, they are inferred
+from the population's values in first-occurrence order, plus transition
+destinations and categories with ancestry shares.
 When given, every value in the population and every transition destination
 must be listed; extra categories may start empty, for example the output of
 a custom inheritance rule. Group-specific rate tables must cover every

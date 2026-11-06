@@ -228,6 +228,16 @@ symmetry within combinations under symmetric effects; per-dimension `delta`;
 calendar schedules whose entries use different dimensions; and a benchmark of
 calibration cost as the number of combinations grows.
 
+### Declared categories from baselines (user decision, November 6, 2026)
+
+`create_baseline_population()` declares each dimension's `categories` from
+its input, in the order given (weights' names, including zero-weight
+categories, or first appearance in a joint table), so the reference category
+no longer depends on the random order of persons. A dimension that
+`set_groups()` (or a model-level declaration applied to a population) declares
+without `categories` keeps the population's declared categories, rather than
+inferring them again; explicit `categories` still replace them.
+
 ### Step 2 as implemented (November 6, 2026)
 
 - Matching models naming two or more dimensions are translated to an internal

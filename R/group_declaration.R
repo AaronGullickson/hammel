@@ -8,8 +8,10 @@
 #'
 #' @param categories Optional complete, ordered vector of the dimension's
 #'   categories (character labels or finite numeric codes). `NULL` (the
-#'   default) infers them from the population's values in first-occurrence
-#'   order, plus transition destinations and categories with ancestry shares.
+#'   default) keeps the categories the population already declares (such as
+#'   those of [create_baseline_population()]); without any, they are inferred
+#'   from the population's values in first-occurrence order, plus transition
+#'   destinations and categories with ancestry shares.
 #'   When given, every value in the population and every transition destination
 #'   must be listed; extra categories may start empty, for example the output of
 #'   a custom inheritance rule. Group-specific rate tables must cover every
@@ -97,7 +99,9 @@ normalize_group_declaration <- function(groups) {
 #' settings with [group()]. Groups are always declared: a column that is not
 #' declared is an ordinary custom column, kept but never used by any process
 #' or analysis. The declaration replaces any declaration carried by the
-#' population (for example from [create_baseline_population()]) and may be
+#' population (for example from [create_baseline_population()]), except that a
+#' dimension declared without `categories` keeps the population's declared
+#' categories for it; it may be
 #' given before or after [set_population()]; it is checked against the
 #' population when both are present and at simulation. Simulated populations
 #' carry it, so analysis and restarts need nothing further.
@@ -125,6 +129,11 @@ set_groups <- function(model, ...) {
 # declaration does not track them (and initialized later when it does).
 apply_group_declaration <- function(population, declaration) {
   declaration <- normalize_group_declaration(declaration)
+  # A dimension declared without categories keeps the categories the
+  # population already declares (so turning on ancestry, say, keeps their order).
+  for (d in names(declaration))
+    if (is.null(declaration[[d]]$categories) && !is.null(population$groups[[d]]$categories))
+      declaration[[d]]["categories"] <- list(population$groups[[d]]$categories)
   population$groups <- declaration
   # Keep ancestry only for dimensions that track it.
   if (!is.null(population$ancestry)) {

@@ -17,10 +17,11 @@ for analysis without a model. There is no implicit `group` column: a
 one-dimension model also declares it (it may be named `group`). An undeclared
 column is an ordinary custom column, kept unchanged and `NA` for newborns, and
 any rate table, weight model, matching model or `by` that names it is an error.
-`group()` sets the dimension's optional ordered `categories` (otherwise
-inferred from the population in first-appearance order, plus transition
-categories), whether it tracks `ancestry`, and its `inheritance` rule. The
-first category is the reference level for treatment-coded group terms.
+`group()` sets the dimension's optional ordered `categories` (otherwise kept
+from the population's existing declaration, or, without one, inferred from the
+population in first-appearance order plus transition categories), whether it
+tracks `ancestry`, and its `inheritance` rule. The first category is the
+reference level for treatment-coded group terms.
 Dimension names exclude reserved names (`sex`, `parity`, `origin`, ...) and the
 patterns `partner_*`, `same_*`, `female_*`, `male_*`, `ancestry_*`, `*_w` and
 `*_h`, which name derived variables.
@@ -165,7 +166,12 @@ named weight vectors, one per dimension, drawn independently, such as
 one column per dimension and a `weight` column giving the joint distribution.
 Weights are finite and nonnegative with a positive value, normalized to
 probabilities; realized counts are random, not quotas. The population declares
-each dimension with `group()` defaults, which `set_groups()` can replace.
+each dimension with `group()` defaults, except that its categories are those
+given, in order: the weights' names (zero-weight categories included, starting
+empty), or each dimension's values in order of first appearance in the joint
+table's rows. The reference category therefore does not depend on which person
+happens to come first. `set_groups()` can replace the declaration; a dimension
+it declares without `categories` keeps these (user decision, November 6, 2026).
 Omission adds no groups and consumes no random draws. Sampling uses R's RNG
 and is reproducible with `set.seed()`.
 

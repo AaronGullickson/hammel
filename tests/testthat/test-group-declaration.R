@@ -125,3 +125,35 @@ test_that("baseline populations sample independent or joint group distributions"
   empty <- create_baseline_population(0, groups = data.frame(group = c("A", "B"), weight = 1))
   expect_identical(empty$persons$group, character())
 })
+
+test_that("baselines declare categories in the order given, and set_groups keeps them", {
+  set.seed(3)
+  # B may well appear first in the persons table; the declaration still lists A first.
+  pop <- create_baseline_population(200, groups = list(race = c(A = .1, B = .9, AB = 0)))
+  expect_identical(pop$groups$race$categories, c("A", "B", "AB"))
+  expect_false("AB" %in% pop$persons$race)
+  joint <- create_baseline_population(50, groups = data.frame(race = c("W", "B", "W", "B"),
+    region = c("S", "S", "N", "N"), weight = c(1, 1, 1, 0)))
+  expect_identical(joint$groups$race$categories, c("W", "B"))
+  expect_identical(joint$groups$region$categories, c("S", "N"))
+  codes <- create_baseline_population(20, groups = data.frame(code = c(20L, 10L), weight = 1))
+  expect_identical(codes$groups$code$categories, c(20L, 10L))
+  # Omitted categories are kept, before or after the population is set.
+  model <- hammel_model() |> set_population(pop) |> set_groups(race = group(ancestry = TRUE))
+  expect_identical(model$population$groups$race$categories, c("A", "B", "AB"))
+  expect_true(model$population$groups$race$ancestry)
+  early <- hammel_model() |> set_groups(race = group(inheritance = "mother")) |> set_population(pop)
+  expect_identical(early$population$groups$race$categories, c("A", "B", "AB"))
+  # Explicit categories replace them, and must cover the population.
+  model <- set_groups(model, race = group(categories = c("B", "A", "AB")))
+  expect_identical(model$population$groups$race$categories, c("B", "A", "AB"))
+  expect_error(set_groups(model, race = group(categories = "A")), "missing from its categories")
+  # The kept order sets the reference level at simulation.
+  model <- model |>
+    set_groups(race = group()) |>
+    set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .01),
+                  weights = create_weight_model(~ race, c(raceA = 0, raceAB = 0))) |>
+    set_fertility(data.frame(age_start = 15, age_end = 50, rate = .1)) |>
+    set_union_formation("on_demand")
+  expect_s3_class(simulate(model, 1, seed = 4), "hammel_population")
+})
