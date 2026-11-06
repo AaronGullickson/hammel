@@ -828,7 +828,8 @@ test_that("models naming different dimensions share the combination", {
   expect_true(all(cohab$region_w == cohab$region_h))
   # Calendar schedule entries may name different dimensions.
   schedule <- tibble::tibble(time_start = c(-100, 1), time_end = c(1, Inf), model = list(race, region))
-  expect_warning(out <- simulate(matching_pair_model(schedule), 2, seed = 74), "could not meet male-group targets")
+  # Each region is calibrated as its own market (D138), so targets are met.
+  expect_no_warning(out <- simulate(matching_pair_model(schedule), 2, seed = 74))
   u <- get_detailed_unions(out)
   early <- u$start_time < 1; late <- !early
   expect_gt(sum(early), 30); expect_gt(sum(late), 30)
@@ -840,8 +841,27 @@ test_that("models naming different dimensions share the combination", {
     data.frame(origin = c("N", "S"), destination = c("S", "N"), age_start = 0, age_end = Inf, rate = 2),
     group = "region")
   withr::local_options(hammel.check_cells = TRUE)
-  expect_warning(out <- simulate(moving, 1, seed = 75), "could not meet male-group targets")
+  expect_no_warning(out <- simulate(moving, 1, seed = 75))
   u <- get_detailed_unions(out)
   expect_gt(sum(out$transitions$group == "region"), 50)
   expect_true(all(u$region_w == u$region_h))
+})
+
+test_that("separate markets are calibrated within themselves (D138)", {
+  x <- step2_tables(create_age_gap_matching_model(0, 5,
+    group_exogamy = list(race = c("A:B" = -1), region = NA)))
+  # Combinations A|N, B|N, A|S, B|S (codes 0-3). The South has twice as many
+  # men as women; women search equally everywhere.
+  women <- data.frame(born = -30, group = rep(0:3, c(40, 20, 40, 20)), fertile = TRUE)
+  men <- data.frame(born = -30, group = rep(0:3, c(40, 20, 80, 40)))
+  result <- inspect_weighted_calibration_cpp(women$born, women$group, women$fertile,
+    men$born, men$group, data.frame(age_start = 15, age_end = 50, rate = .1), x$prepared, 4L,
+    0, 15, 0.25, FALSE)
+  expect_false(result$infeasible)
+  expect_equal(result$flow, result$target, tolerance = 1e-8)
+  # Each region receives its women's half of the searching, in proportion to
+  # its men's mirrored targets.
+  expect_equal(sum(result$flow[1:2]), .5, tolerance = 1e-8)
+  expect_equal(result$flow[1] / result$flow[2], 2, tolerance = 1e-6)
+  expect_equal(result$flow[3] / result$flow[4], 2, tolerance = 1e-6)
 })

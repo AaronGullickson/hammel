@@ -176,6 +176,12 @@ double band_rate(const std::vector<Band>& bands, double age) {
 struct LagTable {
   int groups = 0, span = 0;
   std::vector<double> utility, weight; // weight = exp(utility - global maximum)
+  // allowed[female * groups + male]: the pair is not prohibited. block[g]:
+  // the separate market (D138) of group g; groups connected by allowed pairs
+  // share a block.
+  std::vector<char> allowed;
+  std::vector<int> block;
+  int blocks = 1;
   size_t index(int female, int male, int lag) const {
     return (static_cast<size_t>(female) * groups + male) * span + lag;
   }
@@ -213,6 +219,26 @@ LagTable build_lag_table(const List& model, int groups, int bins, double width) 
   table.weight.resize(n);
   for (size_t i = 0; i < n; ++i)
     table.weight[i] = table.utility[i] == R_NegInf ? 0 : std::exp(table.utility[i] - maximum);
+  // Separate markets: connected components of the allowed pairs.
+  table.allowed.assign(static_cast<size_t>(groups) * groups, 0);
+  std::vector<int> parent(groups);
+  for (int g = 0; g < groups; ++g) parent[g] = g;
+  std::function<int(int)> root = [&](int g) { return parent[g] == g ? g : parent[g] = root(parent[g]); };
+  for (int f = 0; f < groups; ++f)
+    for (int m = 0; m < groups; ++m) {
+      const bool excluded = (prevent_all && f != m) || (blocked.nrow() && blocked(f, m));
+      if (excluded) continue;
+      table.allowed[static_cast<size_t>(f) * groups + m] = 1;
+      parent[root(f)] = root(m);
+    }
+  table.block.assign(groups, 0);
+  std::vector<int> label(groups, -1);
+  table.blocks = 0;
+  for (int g = 0; g < groups; ++g) {
+    const int r = root(g);
+    if (label[r] < 0) label[r] = table.blocks++;
+    table.block[g] = label[r];
+  }
   return table;
 }
 
@@ -437,6 +463,8 @@ class WeightCalibrator {
     for (int r = 0; r < R; ++r) {
       double total = 0;
       for (int m = 0; m < G; ++m) {
+        // Prohibited pairs contribute exactly zero.
+        if (!table.allowed[static_cast<size_t>(rows[r].group) * G + m]) continue;
         double sum = sums[(static_cast<size_t>(rows[r].group) * G + m) * bins_ + rows[r].bin];
         if (!(sum >= kPoolSumFloor)) {
           sum = 0;
@@ -464,12 +492,19 @@ class WeightCalibrator {
     std::vector<double> demand(G, 0);
     for (int r = 0; r < R; ++r)
       for (int m = 0; m < G; ++m) demand[m] += rows[r].lambda * S[static_cast<size_t>(r) * G + m];
-    std::vector<int> free_groups;
+    // Each separate market (D138) is solved on its own: its free groups, with
+    // targets normalized within it, over its women's rows. One block is the
+    // whole population, as before.
+    std::vector<std::vector<int>> block_groups(table.blocks), block_rows(table.blocks);
     for (int g = 0; g < G; ++g) {
       if (!(s.target[g] > 0)) s.log_weights[g] = kZeroTargetLogWeight;
       else if (!(demand[g] > 0)) { s.log_weights[g] = kMaxLogWeight; s.infeasible = true; }
-      else free_groups.push_back(g);
+      else block_groups[table.block[g]].push_back(g);
     }
+    for (int r = 0; r < R; ++r) block_rows[table.block[rows[r].group]].push_back(r);
+    for (int b = 0; b < table.blocks; ++b) {
+    const std::vector<int>& free_groups = block_groups[b];
+    const std::vector<int>& block_row_ids = block_rows[b];
     const int n = static_cast<int>(free_groups.size());
     if (n > 1) {
       double target_sum = 0;
@@ -490,7 +525,7 @@ class WeightCalibrator {
         out_hess.assign(static_cast<size_t>(n) * n, 0);
         double objective = 0, lambda_total = 0;
         for (int j = 0; j < n; ++j) weights[j] = std::exp(point[j]);
-        for (int r = 0; r < R; ++r) {
+        for (int r : block_row_ids) {
           double denominator = 0;
           for (int j = 0; j < n; ++j) {
             share[j] = weights[j] * S[static_cast<size_t>(r) * G + free_groups[j]];
@@ -551,6 +586,7 @@ class WeightCalibrator {
       if (!converged) s.infeasible = true;
       for (int j = 0; j < n; ++j) s.log_weights[free_groups[j]] = x[j];
     }
+    }
     // Expected flows under the final weights, in log space so that women whose
     // only allowed men carry near-zero weights still count, as they do in
     // actual selection. Women with no allowed men cannot be matched by any
@@ -574,11 +610,22 @@ class WeightCalibrator {
       for (int m = 0; m < G; ++m) s.flow[m] += rows[r].lambda * share[m] / denominator;
     }
     if (flow_total > 0) {
-      double miss = 0;
-      for (int m = 0; m < G; ++m) {
-        s.flow[m] /= flow_total;
-        miss = std::max(miss, std::abs(s.flow[m] - s.target[m]));
+      for (int m = 0; m < G; ++m) s.flow[m] /= flow_total;
+      // With separate markets, each block's targets are rescaled to its share
+      // of the flow (its women's searching), which is all it can receive.
+      if (table.blocks > 1) {
+        std::vector<double> block_flow(table.blocks, 0), block_target(table.blocks, 0);
+        for (int m = 0; m < G; ++m) {
+          block_flow[table.block[m]] += s.flow[m];
+          block_target[table.block[m]] += s.target[m];
+        }
+        for (int m = 0; m < G; ++m) {
+          const int b = table.block[m];
+          s.target[m] = block_target[b] > 0 ? s.target[m] * block_flow[b] / block_target[b] : 0;
+        }
       }
+      double miss = 0;
+      for (int m = 0; m < G; ++m) miss = std::max(miss, std::abs(s.flow[m] - s.target[m]));
       if (miss > 1e-8) s.infeasible = true;
     }
     warm = s.log_weights;

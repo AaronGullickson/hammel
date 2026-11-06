@@ -267,25 +267,29 @@ calibration cost as the number of combinations grows.
   existing calibration's cost grows steeply with that number (about four to
   five times per doubling). Many matching combinations can therefore be slow;
   this is a limitation of the current calibration, not of combining.
-- **Known limitation: partial prohibitions are slow.** With 16 combinations
-  (4 races x 4 regions, same population and length):
+- **Partial prohibitions and separate markets (D138, November 6, 2026).**
+  Prohibiting some matching dimensions while others carried effects was slow:
+  with region prohibited, each region's men can only be chosen by its own
+  women, so population-wide targets were unreachable; half the solves failed,
+  each spending about 40 step halvings, and prohibited pair sums were
+  recomputed as if they had underflowed. Now each separate market (a block of
+  categories connected by allowed pairs) is calibrated on its own, with
+  targets normalized within it, and prohibited pairs contribute exactly zero.
+  Results are unchanged when there is one block (checked bit-identical).
+  With 16 combinations (4 races x 4 regions, 20,000 people, 20 years):
 
-  | Matching settings | Seconds |
-  | --- | --- |
-  | Race effects + region effects | 72 |
-  | Race effects + region prohibited (`region = NA`) | 997 |
-  | Both prohibited (calibration skipped) | 0.4 |
-  | Race effects only (region not matched; 4 categories) | 3.5 |
+  | Matching settings | Before (s) | Now (s) |
+  | --- | --- | --- |
+  | Race effects + region effects | 72 | 73 |
+  | Race effects + region prohibited | 997 | 12 |
+  | Both prohibited (calibration skipped) | 0.4 | 0.4 |
 
-  Prohibiting some matching dimensions while others carry effects is about
-  14 times slower than finite effects. Unverified hypothesis: per-region
-  targets are sometimes unreachable, so the calibration solver runs to its
-  iteration limit before falling back to capped weights (these runs warn
-  about unmet male-group targets). The same calibration serves one dimension
-  with some pairs prohibited. To investigate before the public release:
-  confirm the cause (solver iterations, unmet-target searches), then
-  consider stopping early when a target is unreachable or solving
-  independent blocks (such as regions under `region = NA`) separately.
+  Symmetry with race A:B = -1 and region prohibited (region associated with
+  race; 6 runs of 60 years): A-wife/B-husband over B-wife/A-husband is 1.02
+  in the North (0.93–1.12), 1.00 in the South (0.94–1.07) and 1.01 pooled
+  (0.96–1.07), with no unions across regions
+  ([script](../validation/milestone9/joint_matching.R)). The cost of finite
+  effects over many combinations (first table) is unchanged.
 
 ### Stage 6 (November 6, 2026)
 

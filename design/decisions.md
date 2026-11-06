@@ -78,6 +78,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Matching prohibitions written as NA in `group_exogamy` | D135 |
 | First public release after milestone 9; immigration and two-sex models post-release | D136 |
 | GitHub milestones and Projects; multiple issues and PRs per milestone | D137 |
+| Matching calibration within separate markets | D138 |
 
 ## Recorded decisions
 
@@ -3023,3 +3024,23 @@ post-release work; an open milestone does not make them release prerequisites.
 The cleanup milestone is a starting point for release planning, whose concrete
 scope and version number remain to be selected. This entry records the
 workflow; it does not claim that GitHub items or a Project have been updated.
+
+## D138 — Matching calibration within separate markets (November 6, 2026)
+
+**Status:** User decision, November 6, 2026.
+
+**Decision:** When matching prohibitions split the matching categories into
+blocks that cannot match across (such as regions under `region = NA`),
+calibrate each block separately, with mirrored male targets normalized
+within the block. Each block is a separate marriage market.
+
+**Rationale:** Women search only within their block, so the block is where
+male selection should be balanced. The previous population-wide targets were
+unreachable whenever a block's men and women differed in their shares, which
+made the solver fail and slowed simulation about 14-fold. Sex symmetry of
+intermarriage is preserved within blocks and so also when summed over them;
+what is given up is only the unreachable population-wide target.
+
+**Implications:** Results change only for models whose prohibitions split the
+categories into several blocks. A block with more men than women of marrying
+age leaves more men unmatched.

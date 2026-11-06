@@ -218,6 +218,34 @@ cannot change her choice. Calibration is skipped for that model, giving
 female choice exactly, with no warnings (D070). Partial restrictions (listed
 pairs) still calibrate.
 
+### Separate markets (D138)
+
+Prohibitions can split the matching categories into blocks that cannot match
+across: two categories are in the same block when women of one may partner
+men of the other, directly or through a chain of allowed pairs. With
+`group_exogamy = list(race = c("A:B" = -1), region = NA)`, each region is a
+block holding its race categories. Men of a block can only be chosen by women
+of the same block, so each block is its own marriage market:
+
+- each block is calibrated separately, using its own women's search
+  intensity, with the mirrored male targets normalized within the block;
+- the share of selections going to a block is set by its women's searching,
+  and a block with more men than women of marrying age leaves more men
+  unmatched (a local market effect);
+- sex symmetry of intermarriage holds within each block, and therefore also
+  summed over blocks.
+
+Without prohibitions, or when prohibitions leave every category connected,
+there is one block and calibration is as before. Prohibited pairs contribute
+exactly zero to the pool sums and are not recomputed.
+
+*Worked example.* Race {A, B} and region {N, S} with `region = NA`; blocks
+{A|N, B|N} and {A|S, B|S}. Suppose northern women do 60% of all searching
+but northern men's mirrored targets add up to 55%. The previous global
+targets were unreachable (the North's men could only ever receive 60%).
+Now the North's targets are rescaled to sum to its 60%, keeping their
+within-North proportions, and likewise for the South.
+
 ### When no solution exists
 
 A male group may have a positive target but no feasible demand, for example
