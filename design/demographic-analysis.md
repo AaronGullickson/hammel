@@ -83,7 +83,7 @@ November 5, 2026.
 | `calculate_fertility_rates()` | `group`, `union_type`, `previous_union` | women only; `parity_breaks` optional |
 | `calculate_union_rates()` | `group`, `previous_union`, `union_type` (type entered) | `sex` |
 | `calculate_marriage_rates()` | `group`, `previous_union` | `sex` |
-| `calculate_transition_rates()` | `sex`, `union_type`, `previous_union` | `group_origin`, `group_dest` |
+| `calculate_transition_rates()` | `sex`, `union_type`, `previous_union` | `origin`, `destination` (the dimension chosen by `group`) |
 | `calculate_population_size()` | `sex`, `group`, `union_type`, `previous_union` | — |
 | `calculate_dissolution_rates()` | `group_w`, `group_h`, `union_type` | — |
 | `calculate_cohab_convert_rate()` | `group_w`, `group_h` | — |

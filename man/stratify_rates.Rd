@@ -38,14 +38,14 @@ partnered and unpartnered fertility, stratify each subset and bind the
 results with \code{\link[=rbind]{rbind()}}.
 
 Columns in \code{by} are either built-in strata (\code{sex}, \code{union_type},
-\code{previous_union}, \code{group_origin}, \code{group_dest}) or group dimensions
+\code{previous_union}, \code{origin}, \code{destination}) or group dimensions
 declared with \code{\link[=set_groups]{set_groups()}}: a dimension's name (such as \code{race}) for
 person-level rates, or \verb{<name>_w} and \verb{<name>_h} (the wife's and husband's
 categories) for dissolution and conversion rates. Band, rate and calendar
 columns cannot be added. Process setters reject built-in strata their
 process does not support: mortality accepts \code{sex}; fertility \code{union_type};
 union searches \code{previous_union}; dissolution \code{union_type}; group
-transitions \code{group_origin}, \code{group_dest}, \code{sex} and \code{union_type}. Group
+transitions \code{origin}, \code{destination}, \code{sex} and \code{union_type}. Group
 columns are checked against the declaration at simulation.
 }
 \examples{

@@ -11,7 +11,8 @@ calculate_transition_rates(
   dur_breaks = NULL,
   by = NULL,
   conf.level = NULL,
-  pool_dissolved = FALSE
+  pool_dissolved = FALSE,
+  group = NULL
 )
 }
 \arguments{
@@ -41,10 +42,13 @@ describe the observed rate, not the unrealized-adjusted rate.}
 
 \item{pool_dissolved}{Logical, default \code{FALSE}. With \code{TRUE} and
 \code{"previous_union"} in \code{by}, combine separated and widowed as \code{"dissolved"}.}
+
+\item{group}{The declared group dimension whose transitions are counted.
+\code{NULL} (default) means the only declared dimension.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, age or duration bounds,
-\code{group_origin}, \code{group_dest}, the \code{by} columns, \code{person_years},
+\code{origin}, \code{destination}, the \code{by} columns, \code{person_years},
 \code{transitions}, and \code{rate_transition} (NA at zero exposure). All distinct
 directed pairs among current and historical identities are retained,
 including zero-event cells. Fewer than two known groups returns a typed
@@ -53,10 +57,12 @@ destination, then origin, then the \code{by} variables in the order given.
 With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
 }
 \description{
-Count individual moves and person-years in their origin group in half-open
+Count individual moves and person-years in their origin category of one
+group dimension in half-open
 Lexis cells. Each outgoing destination shares its origin's exposure: do not
 sum denominators across destinations. Duration is years since the latest
-group entry, or age before the first recorded transition; return moves reset
+entry into a category of this dimension, or age before its first recorded
+transition; return moves reset
 duration and union changes do not. Events use the exiting group's duration.
 Death and competing moves end exposure. Rates are cause-specific hazards,
 not transition probabilities. Internal-boundary events enter the cell
@@ -67,6 +73,6 @@ persons <- data.frame(person_id = 1, sex = "f", birth_time = 0,
   death_time = NA_real_, mother_id = NA_real_, father_id = NA_real_, group = "B")
 population <- hammel_population(persons, end_time = 5,
   transitions = data.frame(person_id = 1, time = 2,
-    group_origin = "A", group_dest = "B"))
+    origin = "A", destination = "B"), groups = "group")
 calculate_transition_rates(population, c(0, 5), age_breaks = c(0, Inf))
 }

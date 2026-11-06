@@ -8,10 +8,19 @@ acceptance; preserve all active intermediates. Household moves are deferred to
 which may include regions/internal-migration applications (D114/D121/D131), and are
 excluded here.
 
-`group_transition(rates)` constructs an optional process;
-`set_group_transition(model, rates)` attaches it. Required columns are
-`group_origin`, `group_dest`, `rate`, and either `age_start`/`age_end` or
-`dur_start`/`dur_end`. One band type applies to the entire table. Rates are
+Milestone 9 (D134, stage 3) made transitions per group dimension; this page
+describes the current behavior.
+
+`group_transition(rates, group = NULL, weights = NULL)` constructs an optional
+process for one declared group dimension; `set_group_transition(model, rates,
+group = NULL, weights = NULL)` attaches it. Each dimension has at most one
+transition process: setting one again for the same dimension replaces it and
+keeps the others. `group = NULL` means the model's only dimension; with several
+declared it is an error naming them. A process stored before the declaration
+exists takes the only dimension at simulation. Required columns are
+`origin`, `destination` (categories of the process's dimension), `rate`, and
+either `age_start`/`age_end` or `dur_start`/`dur_end`. The former
+`group_origin`/`group_dest` names are errors. One band type applies to the entire table. Rates are
 finite nonnegative hazards per person-year. Bands are half-open, start at
 nonnegative finite values, have increasing ends (possibly Inf), and cannot
 overlap within a directed pair/sex/union-type stratum at a given calendar time.
@@ -19,26 +28,41 @@ Self-transitions are rejected. Optional calendar bands are supported under
 [the rate contract](time-varying-rates.md) (D118), without resetting group
 duration. Input tables and provenance are retained.
 
+Columns named by other declared dimensions select schedules by those
+categories (education transitions by `region`); a person's risks change when
+another dimension changes. The process's own dimension cannot be such a column
+(its category is `origin`), and an undeclared column is an error at
+simulation. As for sex and union type, uncovered strata have zero risk.
+
 Optional `sex` uses m/f. Optional `union_type` follows existing conventions:
 unpartnered/partnered, or unpartnered/cohab/marriage, without mixing partnered
 with the two explicit partnered types. Omitted columns apply universally;
 missing pairs, categories and gaps have zero risk. Existing union types select
 actual cohabitation/marriage when explicit types are supplied. Without typed
-unions an ongoing union is marriage. Group labels from transition inputs join
-the possible identity registry, so an initially empty destination is allowed;
-other group-specific processes must cover it under their existing rules.
+unions an ongoing union is marriage. Categories from a dimension's transition
+inputs join that dimension's inferred categories, so an initially empty
+destination is allowed; other group-specific processes must cover it under
+their existing rules.
 
-Each outgoing schedule slot of a group is its own process with cells and one
-clock (D128); a living person is a member of each applicable slot's cells,
-competing with other processes. Duration is time since the latest group
-entry, falling back to birth time without transition history (user confirmed).
+Each outgoing schedule slot of a stratum (origin category and any other
+dimensions the table uses) is its own process with cells and one clock
+(D128); a living person is a member of each applicable slot's cells, competing
+with other processes. Duration is time since the latest entry into the
+person's current category of the process's dimension, falling back to birth
+time without transition history in that dimension (user confirmed); moves in
+other dimensions do not reset it.
 Age is attained age. Changing union type moves both partners to their applicable
 transition cells without resetting group duration. No count-target adjustment
 is applied. With no transition process, no transition RNG draws occur.
 Exact ties put transitions after death, birth, dissolution, conversion and
-search; tied destinations follow their first appearance in the rate table.
+search; transitions in different dimensions follow the declaration order of
+`set_groups()`, and tied destinations follow their first appearance in the
+rate table. Each dimension's process has its own weight model; the weight
+variable `destination` (formerly `group_dest`) is the destination of the risk,
+and custom weight functions receive `origin` and `destination` in `bin` and a
+`destination` member column.
 
-At execution, only the initiator changes group. Record the change, remove old
+At execution, only the initiator changes category, in one dimension. Record the change, remove old
 pool/calibration contributions, refresh fertility membership and applicable
 hazards, and reinstall contributions under the new group. Refresh an ongoing
 union's pair-dependent dissolution cell and its group-dependent conversion
@@ -48,19 +72,23 @@ parents and individual fertility weights. Ancestry proportions stay unchanged
 identities and the existing ancestry rules.
 
 Grouped populations include a `transitions` tibble even with no process or no
-moves. Columns are `person_id`, `time`, `group_origin`, `group_dest`; labels
-retain the persons group type. Histories are ordered by time, preserve repeated
-moves, must chain to each person's current group, fall within the person's
-life and known endpoint, and are retained on restart. Duration resumes from
-the latest retained move; cells are rebuilt as for other processes.
+moves. Columns are `person_id`, `time`, `group` (the dimension), `origin`,
+`destination`; `group`, `origin` and `destination` are character in every
+dimension, since one table holds several dimensions' labels. A supplied
+history may omit `group` when one dimension is declared. Histories preserve
+repeated moves; each person's history in each dimension must chain to their
+current category, fall within the person's life and known endpoint, and is
+retained on restart. Same-time moves in different dimensions are allowed.
+Duration resumes from the latest retained move in each dimension; cells are
+rebuilt as for other processes.
 A transition is effective at its recorded time. Historical observations split
 exposure at moves rather than attribute an entire life to final identity.
 Births/deaths and union events preceding a same-time transition use the origin;
 population snapshots at that time use the destination. No missing prehistory
 is imputed.
 
-`get_detailed_unions()` reconstructs `group_w` and `group_h` at each union's
-start, before a same-time transition, rather than joining final identities.
+`get_detailed_unions()` reconstructs `<group>_w` and `<group>_h` for every
+dimension at each union's start, before a same-time transition, rather than joining final identities.
 Later moves therefore do not relabel the pairings used to assess formation.
 
 Worked examples: A-to-B hazard 0.2 and A-to-C hazard 0.3 give time to either
@@ -82,10 +110,10 @@ Example (illustrative rates, not demographic defaults):
 
 ```r
 rates <- data.frame(
-  group_origin = c("A", "A", "B"), group_dest = c("B", "C", "A"),
+  origin = c("A", "A", "B"), destination = c("B", "C", "A"),
   age_start = 0, age_end = Inf, rate = c(0.2, 0.3, 0.1)
 )
-model <- model |> set_group_transition(rates)
+model <- model |> set_group_transition(rates, group = "race")
 result <- simulate(model, years = 5, seed = 42)
 result$transitions
 ```
@@ -97,8 +125,10 @@ union-formation specifications. Replacing age columns with `dur_start` and
 ## Observed transition rates
 
 `calculate_transition_rates(population, time_breaks, age_breaks = NULL,
-dur_breaks = NULL, by = NULL)` returns a tibble
-with directed `group_origin`/`group_dest`, calendar bounds, the selected age or
+dur_breaks = NULL, by = NULL, conf.level = NULL, pool_dissolved = FALSE,
+group = NULL)` counts one dimension's transitions (`group`, required when
+several are declared) and returns a tibble
+with directed `origin`/`destination`, calendar bounds, the selected age or
 duration bounds, `person_years`, `transitions`, and `rate_transition`.
 Supply exactly one age or duration axis. Finite final axis breaks gain Inf.
 Optional `sex` and `union_type` columns appear only when requested; default

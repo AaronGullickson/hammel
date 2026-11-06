@@ -168,8 +168,9 @@ validate_group_declaration <- function(declaration, population) {
       stop(sprintf("Group `%s` tracks ancestry, so its categories cannot be named `unknown` and `person_id`.",
                    name), call. = FALSE)
     if (!is.null(categories)) {
-      values <- unique(as.character(c(persons[[name]],
-        population$transitions$group_origin, population$transitions$group_dest)))
+      tx <- population$transitions
+      if (!is.null(tx) && "group" %in% names(tx)) tx <- tx[tx$group == name, , drop = FALSE]
+      values <- unique(as.character(c(persons[[name]], tx$origin, tx$destination)))
       missing <- setdiff(values, as.character(categories))
       if (length(missing))
         stop(sprintf("Group `%s` has values missing from its categories: %s.", name,

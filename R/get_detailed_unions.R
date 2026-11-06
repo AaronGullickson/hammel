@@ -37,21 +37,27 @@ get_detailed_unions <- function(population) {
     stop(sprintf("Union columns conflict with partner fields: %s.",
                  paste(conflicts, collapse = ", ")), call. = FALSE)
   }
-  formation_groups <- NULL
-  # Transitions (one dimension for now) are replayed to each union's start.
-  if (length(dims) == 1L && !is.null(population$transitions) && nrow(population$transitions)) {
-    aliased <- observation_alias(population, character())$population
-    indexed <- prepare_group_observations(aliased$persons, aliased, TRUE)
+  # Categories at each union's start, replaying each dimension's transitions.
+  formation <- list()
+  population <- normalize_population_transitions(population)
+  tx <- population$transitions
+  for (d in dims) {
+    if (is.null(tx) || !any(tx$group == d)) next
+    view <- dimension_view(population, d)
+    indexed <- prepare_group_observations(view$persons, view, TRUE)
     groups <- observation_groups(indexed, TRUE)
-    formation_groups <- union_start_groups_cpp(indexed, population$unions,
-      match(aliased$persons$group, groups) - 1L)
+    codes <- union_start_groups_cpp(indexed, population$unions, match(view$persons$group, groups) - 1L)
+    labels <- groups
+    # Histories hold labels as text; keep the persons column's type.
+    if (is.numeric(persons[[d]])) storage.mode(labels) <- storage.mode(persons[[d]])
+    formation[[d]] <- list(w = labels[codes[, 1L] + 1L], h = labels[codes[, 2L] + 1L])
   }
   for (suffix in c("w", "h")) {
     id_column <- if (suffix == "w") "wife_id" else "husband_id"
     rows <- match(result[[id_column]], persons$person_id)
     for (column in columns) {
-      result[[paste0(column, "_", suffix)]] <- if (column %in% dims && !is.null(formation_groups))
-        groups[formation_groups[, if (suffix == "w") 1L else 2L] + 1L] else persons[[column]][rows]
+      result[[paste0(column, "_", suffix)]] <- if (!is.null(formation[[column]]))
+        formation[[column]][[suffix]] else persons[[column]][rows]
     }
   }
   result

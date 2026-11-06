@@ -177,11 +177,11 @@ simulate <- function(model, years, seed = NULL) {
     stop("Unsupported demographic process for this engine.",
          call. = FALSE)
   }
-  transition_process <- model$processes$group_transition
-  if (!is.null(transition_process)) {
-    attach_process(model, transition_process)
-    if (!grouped)
-      stop("Group transitions require a declared group dimension; use set_groups().", call. = FALSE)
+  # One transition process per dimension, in declaration order.
+  transition_list <- resolve_transition_processes(transition_processes(model), declaration)
+  for (x in transition_list) {
+    validate_group_transition(x)
+    validate_process_weights(x$weights, "transition")
   }
   dissolution_process <- model$processes$union_dissolution
   if (!is.null(dissolution_process)) attach_process(model, dissolution_process)
@@ -189,8 +189,10 @@ simulate <- function(model, years, seed = NULL) {
   attach_process(model, union_process)
   calendar_inputs <- list(mortality = death_rates, fertility = birth_rates,
     search = union_process$rates, dissolution = dissolution_process$rates,
-    conversion = union_process$union_convert_rate, transition = transition_process$rates,
+    conversion = union_process$union_convert_rate,
     cohabitation_probability = union_process$cohab_prob)
+  for (d in names(transition_list))
+    calendar_inputs[[paste0("`", d, "` transition")]] <- transition_list[[d]]$rates
   # A rate table stratified by a persons column that is not a declared group.
   for (name in names(calendar_inputs)) {
     columns <- names(calendar_inputs[[name]])
@@ -223,7 +225,7 @@ simulate <- function(model, years, seed = NULL) {
   # Group dimensions (D134): each has its categories (registry), inheritance
   # rule and optional ancestry block. Matching, transitions and weight-model
   # group variables use the single dimension when there is exactly one.
-  registries <- group_registries(population, transition_process$rates)
+  registries <- group_registries(population, lapply(transition_list, `[[`, "rates"))
   group_values <- if (length(dimensions) == 1L) registries[[1]] else NULL
   if (length(dimensions) > 1L) check_single_dimension_features(model, declaration)
   tracked <- tracked_ancestry(declaration)
@@ -236,16 +238,18 @@ simulate <- function(model, years, seed = NULL) {
         identical(m$method, "ancestry"), logical(1))))
       stop("The \"ancestry\" inheritance method requires `ancestry = TRUE` in group().", call. = FALSE)
   model_arguments <- list(matching = union_process$matching,
-    father_matching = union_process$father_matching, cohab_matching = union_process$cohab_matching,
-    inheritance = if (length(dimensions) == 1L) declaration[[1]]$inheritance)
+    father_matching = union_process$father_matching, cohab_matching = union_process$cohab_matching)
+  inheritance_arguments <- lapply(declaration, `[[`, "inheritance")
   for (name in names(model_arguments))
     check_model_coverage(model_arguments[[name]], start, start + years, name)
-  scheduled_models <- any(vapply(model_arguments, is_model_schedule, logical(1)))
+  for (d in dimensions)
+    check_model_coverage(inheritance_arguments[[d]], start, start + years, sprintf("`%s` inheritance", d))
+  scheduled_models <- any(vapply(c(model_arguments, inheritance_arguments), is_model_schedule, logical(1)))
   model_context <- if (scheduled_models)
-    prepare_model_schedules(model_arguments, group_values,
-      if (length(dimensions)) components[[1]] else character(), start, start + years) else NULL
+    prepare_model_schedules(model_arguments, group_values, unname(inheritance_arguments),
+      registries, components, start, start + years) else NULL
   inheritance <- lapply(seq_along(dimensions), function(d) {
-    rule <- if (d == 1L && scheduled_models) model_context$inheritance else
+    rule <- if (scheduled_models) model_context$inheritance[[d]] else
       prepare_group_inheritance(declaration[[d]]$inheritance, registries[[d]], components[[d]])
     c(rule, list(ancestry_offset = as.integer(offsets[d]), ancestry_size = sizes[[d]]))
   })
@@ -282,24 +286,35 @@ simulate <- function(model, years, seed = NULL) {
     list(mortality = death$spec, fertility = birth$spec, search = search$spec,
          probability = cohab$prob_spec, conversion = cohab$conversion_spec,
          dissolution = dissolution$spec))
-  transition_rates <- if (is.null(transition_process)) NULL else transition_process$rates
-  if (!is.null(transition_rates)) {
-    transition_rates$.origin <- match(as.character(transition_rates$group_origin), as.character(group_values)) - 1L
-    transition_rates$.dest <- match(as.character(transition_rates$group_dest), as.character(group_values)) - 1L
-    engine_persons$.group_entry <- engine_persons$birth_time
+  # Each transition process: strata over its own dimension (the origin) and
+  # any other dimensions its table uses; destinations; and each person's
+  # entry time into their current category of that dimension.
+  transition_input <- lapply(names(transition_list), function(d) {
+    rates <- transition_list[[d]]$rates
+    rates[[d]] <- rates$origin
+    prepared <- prepare_strata_rates(rates, sprintf("`%s` transition", d), registries,
+                                     start, start + years, coverage = FALSE)
+    rates <- prepared$rates
+    rates$.dest <- match(as.character(rates$destination), as.character(registries[[d]])) - 1L
+    entry <- population$persons$birth_time
     tx <- population$transitions
+    tx <- tx[tx$group == d, , drop = FALSE]
     if (nrow(tx)) {
       latest <- tapply(tx$time, tx$person_id, max)
-      i <- match(names(latest), as.character(engine_persons$person_id))
-      engine_persons$.group_entry[i] <- as.numeric(latest)
+      i <- match(names(latest), as.character(population$persons$person_id))
+      entry[i] <- as.numeric(latest)
     }
-  }
+    list(dimension = match(d, dimensions) - 1L, rates = rates, spec = prepared$spec,
+         entry = as.numeric(entry))
+  })
+  transition_rates <- if (length(transition_input)) transition_input else NULL
   weight_models <- list(mortality = model$processes$mortality$weights,
     fertility = model$processes$fertility$weights,
     dissolution = dissolution_process$weights,
     conversion = union_process$weights_conversion,
-    transition = transition_process$weights,
     search = union_process$weights)
+  for (k in seq_along(transition_list))
+    weight_models[[paste0("transition_", k)]] <- transition_list[[k]]$weights
   weight_models <- Filter(Negate(is.null), weight_models)
   for (name in names(weight_models))
     check_model_coverage(weight_models[[name]], start, start + years, paste(name, "weights"))
@@ -343,9 +358,12 @@ simulate <- function(model, years, seed = NULL) {
     }
     weight_input <- if (!length(weight_models)) NULL else {
       types <- c(mortality = "person", fertility = "person", dissolution = "union",
-                 conversion = "union", transition = "transition", search = "person")
-      prepared <- lapply(names(weight_models), function(name)
-        prepare_weight_model(weight_models[[name]], types[[name]], name, group_values, ancestry_labels))
+                 conversion = "union", search = "person")
+      prepared <- lapply(names(weight_models), function(name) {
+        transition <- startsWith(name, "transition_")
+        prepare_weight_model(weight_models[[name]], if (transition) "transition" else types[[name]],
+                             if (transition) "transition" else name, group_values, ancestry_labels)
+      })
       names(prepared) <- names(weight_models)
       c(prepared, list(group_labels = if (is.null(group_values)) character() else
         as.character(group_values), ancestry_labels = ancestry_labels))
@@ -377,11 +395,15 @@ simulate <- function(model, years, seed = NULL) {
     for (d in seq_along(dimensions))
       persons[[dimensions[d]]] <- registries[[d]][native$categories[, d] + 1L]
     result$persons <- tibble::as_tibble(persons)
-    if (!is.null(group_values) && !is.null(population$transitions)) {
-      tx <- tibble::as_tibble(native$transitions)
-      tx$group_origin <- group_values[tx$group_origin + 1L]
-      tx$group_dest <- group_values[tx$group_dest + 1L]
-      result$transitions <- tibble::as_tibble(rbind(population$transitions, tx))
+    if (grouped) {
+      tx <- native$transitions
+      d <- tx$dimension + 1L
+      labels <- lapply(registries, as.character)
+      new <- tibble::tibble(person_id = tx$person_id, time = tx$time,
+        group = as.character(dimensions[d]),
+        origin = vapply(seq_along(d), function(k) labels[[d[k]]][tx$origin[k] + 1L], ""),
+        destination = vapply(seq_along(d), function(k) labels[[d[k]]][tx$destination[k] + 1L], ""))
+      result$transitions <- tibble::as_tibble(rbind(population$transitions, new))
     }
     if (length(tracked)) {
       result$ancestry <- list()
@@ -439,7 +461,7 @@ simulate <- function(model, years, seed = NULL) {
     result$simulation$cohabitation_counts_as_previous_union <- counts_cohab
     result$simulation$conversions <- if (years > 0) native$conversions else 0
   }
-  if (!is.null(transition_process))
+  if (length(transition_list))
     result$simulation$transitions <- if (years > 0) nrow(native$transitions) else 0L
   if (!is.null(dissolution_process))
     result$simulation$dissolutions <- if (years > 0) native$dissolutions else 0
@@ -498,13 +520,12 @@ ancestry_matrix <- function(population, tracked) {
   }))
 }
 
-# Matching, transitions and weight-model group variables currently use a
+# Matching group effects and weight-model group variables currently use a
 # single dimension; with several, these features are not yet available.
 check_single_dimension_features <- function(model, declaration) {
   why <- function(what)
     stop(sprintf("%s require exactly one group dimension for now; this model declares %s.",
                  what, paste0("`", names(declaration), "`", collapse = ", ")), call. = FALSE)
-  if (!is.null(model$processes$group_transition)) why("Group transitions")
   union <- model$processes$union_formation
   for (m in c(model_entries(union$matching), model_entries(union$father_matching),
               model_entries(union$cohab_matching)))
@@ -513,10 +534,9 @@ check_single_dimension_features <- function(model, declaration) {
       why("Group effects in matching")
   weights <- list(model$processes$mortality$weights, model$processes$fertility$weights,
     model$processes$union_dissolution$weights, union$weights, union$weights_conversion)
+  weights <- c(weights, lapply(transition_processes(model), `[[`, "weights"))
   for (w in unlist(lapply(weights, model_entries), recursive = FALSE))
-    if (!is.null(w$formula) && any(grepl("group|^ancestry_", all.vars(w$formula))))
+    if (!is.null(w$formula) && any(grepl("group|^ancestry_|^destination$", all.vars(w$formula))))
       why("Group variables in weight models")
-  for (d in names(declaration))
-    if (is_model_schedule(declaration[[d]]$inheritance)) why("Inheritance calendar schedules")
   invisible(NULL)
 }

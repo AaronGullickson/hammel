@@ -24,10 +24,12 @@
 #'   Persons columns that are not declared are ordinary custom columns. Models
 #'   usually declare groups with [set_groups()]; declare them here to analyze a
 #'   population directly, without a model.
-#' @param transitions Optional data frame of individual group changes with
-#'   `person_id`, `time`, `group_origin`, and `group_dest`. Histories must chain
-#'   to current person groups and lie within life dates and the known endpoint.
-#'   Grouped populations always include this tibble, even when empty.
+#' @param transitions Optional data frame of individual category changes with
+#'   `person_id`, `time`, `group` (the dimension; may be omitted when one is
+#'   declared), `origin`, and `destination`. Each person's history in each
+#'   dimension must chain to their current category and lie within life dates
+#'   and the known endpoint. Grouped populations always include this tibble,
+#'   even when empty, with character `group`, `origin` and `destination`.
 #' @param ancestry Optional ancestry shares for dimensions declared with
 #'   `group(ancestry = TRUE)`: a named list with one data frame per such
 #'   dimension (a bare data frame when only one dimension tracks ancestry),

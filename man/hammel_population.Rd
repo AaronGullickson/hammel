@@ -39,10 +39,12 @@ category. Newborns average parental shares; a missing parent contributes
 its half to \code{unknown}. Identity remains separate. Categories of a tracked
 dimension cannot be named \code{unknown} or \code{person_id}.}
 
-\item{transitions}{Optional data frame of individual group changes with
-\code{person_id}, \code{time}, \code{group_origin}, and \code{group_dest}. Histories must chain
-to current person groups and lie within life dates and the known endpoint.
-Grouped populations always include this tibble, even when empty.}
+\item{transitions}{Optional data frame of individual category changes with
+\code{person_id}, \code{time}, \code{group} (the dimension; may be omitted when one is
+declared), \code{origin}, and \code{destination}. Each person's history in each
+dimension must chain to their current category and lie within life dates
+and the known endpoint. Grouped populations always include this tibble,
+even when empty, with character \code{group}, \code{origin} and \code{destination}.}
 
 \item{groups}{Optional group declaration: a character vector of dimension
 names (each with \code{\link[=group]{group()}} defaults) or a named list of \code{\link[=group]{group()}} objects.

@@ -460,10 +460,11 @@ weights are needed. See [weight models](binned-group-hazards.md#weight-models-d1
 
 ## Individual group transitions
 
-`group_transition(rates)` and `set_group_transition(model, rates)` configure
-optional competing person-level moves. Required direction columns are
-`group_origin` and `group_dest`; one age or duration band type applies across
-the table, optionally stratified by `sex` and `union_type`. The transition
+`group_transition(rates, group)` and `set_group_transition(model, rates, group)`
+configure optional competing person-level moves in one group dimension, one
+process per dimension (D134). Required direction columns are `origin` and
+`destination`; one age or duration band type applies across the table,
+optionally stratified by `sex`, `union_type` and other declared dimensions. The transition
 registry includes initially empty groups and all other grouped specifications
 must cover it. Native events update pools, calibration, fertility cells and
 union cells affected by either partner's identity. Duration uses latest entry,

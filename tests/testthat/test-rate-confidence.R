@@ -9,7 +9,7 @@ confidence_population <- function() {
     previous_cohab_id = c(NA, 1, NA))
   hammel_population(persons, unions, end_time = 8,
     transitions = tibble::tibble(person_id = 1, time = 4,
-      group_origin = "B", group_dest = "A"), groups = if ("group" %in% names(persons)) "group")
+      origin = "B", destination = "A"), groups = if ("group" %in% names(persons)) "group")
 }
 
 confidence_calls <- function(population) {

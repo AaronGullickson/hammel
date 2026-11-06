@@ -54,7 +54,7 @@ processes and may use \code{sex} (\code{"f"}, \code{"m"}), \code{group}, \code{u
 (births; 0 for men), \code{previous_union} (\code{"none"}, \code{"separated"},
 \code{"widowed"}), \code{partner_group} (NA when unpartnered) and ancestry shares
 \verb{ancestry_<group>} and \code{ancestry_unknown}. Group transitions may also use
-\code{group_dest}, the destination of the risk. Dissolution and conversion are
+\code{destination}, the destination of the risk. Dissolution and conversion are
 union processes and may use \code{group_w}, \code{group_h}, \code{parity_w},
 \code{previous_union_w}, \code{previous_union_h}, \verb{ancestry_<group>_w},
 \verb{ancestry_<group>_h}, \code{same_group} (0/1), \code{age_difference} (husband's age
@@ -67,7 +67,7 @@ is its reference.
 Categorical variables use treatment coding, and \code{coefficients} must be
 named exactly as the corresponding model-matrix columns, for example
 \code{groupB} or \code{union_typecohab}. One \code{group_levels} applies to every
-group-valued variable (\code{group}, \code{partner_group}, \code{group_dest}, \code{group_w},
+group-valued variable (\code{group}, \code{partner_group}, \code{destination}, \code{group_w},
 \code{group_h}), and must include every population group. The intercept has no
 effect. A term whose variable is missing (such as \code{partner_group} for an
 unpartnered person) contributes zero, with a warning.

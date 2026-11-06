@@ -18,14 +18,14 @@
 #' results with [rbind()].
 #'
 #' Columns in `by` are either built-in strata (`sex`, `union_type`,
-#' `previous_union`, `group_origin`, `group_dest`) or group dimensions
+#' `previous_union`, `origin`, `destination`) or group dimensions
 #' declared with [set_groups()]: a dimension's name (such as `race`) for
 #' person-level rates, or `<name>_w` and `<name>_h` (the wife's and husband's
 #' categories) for dissolution and conversion rates. Band, rate and calendar
 #' columns cannot be added. Process setters reject built-in strata their
 #' process does not support: mortality accepts `sex`; fertility `union_type`;
 #' union searches `previous_union`; dissolution `union_type`; group
-#' transitions `group_origin`, `group_dest`, `sex` and `union_type`. Group
+#' transitions `origin`, `destination`, `sex` and `union_type`. Group
 #' columns are checked against the declaration at simulation.
 #'
 #' @param rates A data frame with a numeric `rate` column, such as a mortality,
@@ -74,7 +74,7 @@ stratify_rates <- function(rates, by) {
 }
 
 # Built-in categorical strata of rate tables; each process accepts some.
-builtin_strata <- c("sex", "union_type", "previous_union", "group_origin", "group_dest")
+builtin_strata <- c("sex", "union_type", "previous_union", "origin", "destination")
 
 # Rate-table columns that are not strata: bands, rates and calendar periods.
 rate_schema_columns <- c("age_start", "age_end", "dur_start", "dur_end", "rate", "prob",

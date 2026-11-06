@@ -234,7 +234,7 @@ ordered labels) when the formula uses a categorical group variable.
 Categorical variables use treatment coding with fixed levels, and coefficient
 names follow the model-matrix column names (for example `groupB`,
 `union_typecohab`). One `group_levels` applies to every group-valued variable
-(`group`, `partner_group`, `group_dest`, `group_w`, `group_h`), so they share
+(`group`, `partner_group`, `destination`, `group_w`, `group_h`), so they share
 the reference group: `~ group + partner_group` with levels `c("A", "B")` has
 coefficients `groupB` and `partner_groupB`. Other categorical variables have
 engine-fixed levels, with the first listed in [Variables](#variables) as the
@@ -272,7 +272,7 @@ Person processes (mortality, fertility, transitions) can use:
 | `previous_union` | `"none"`, `"separated"`, `"widowed"` |
 | `partner_group` | partner's group; NA when unpartnered |
 | `ancestry_<group>`, `ancestry_unknown` | ancestry shares, each in [0, 1] |
-| `group_dest` | transitions only: the destination of the risk |
+| `destination` | transitions only: the destination of the risk (formerly `group_dest`) |
 
 Union processes (dissolution, conversion) use partner variables with the
 suffix `_w` (wife) or `_h` (husband): `group_w`, `group_h`, `parity_w`,

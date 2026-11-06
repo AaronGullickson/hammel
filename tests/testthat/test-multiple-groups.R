@@ -92,8 +92,6 @@ test_that("unrealized births report every dimension", {
 
 test_that("features of a single dimension explain that they are not yet available", {
   model <- two_dimension_model(union = TRUE)
-  transitions <- data.frame(group_origin = "A", group_dest = "B", age_start = 0, age_end = Inf, rate = .1)
-  expect_error(simulate(set_group_transition(model, transitions), 0), "exactly one group dimension")
   exo <- set_union_formation(model, "on_demand", kinship_generations = 0,
     matching = create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1)))
   expect_error(simulate(exo, 0), "Group effects in matching")
@@ -130,10 +128,10 @@ test_that("remaining single-dimension features and ancestry inputs are checked",
   w <- create_weight_model(~ group, c(groupB = 1), group_levels = c("A", "B"))
   expect_error(simulate(set_mortality(model, model$processes$mortality$rates, weights = w), 0),
                "Group variables in weight models")
-  schedule <- tibble::tibble(time_start = c(-100, .5), time_end = c(.5, Inf),
-    model = list(create_group_inheritance("mother"), create_group_inheritance("father")))
-  expect_error(simulate(set_groups(model, race = group(inheritance = schedule), region = group()), 0),
-               "Inheritance calendar schedules")
+  moves <- data.frame(origin = "N", destination = "S", age_start = 0, age_end = Inf, rate = .1)
+  w <- create_weight_model(~ destination, c(destinationS = 1), group_levels = c("N", "S"))
+  expect_warning(weighted <- set_group_transition(model, moves, group = "region", weights = w), "no effect")
+  expect_error(simulate(weighted, 0), "Group variables in weight models")
   # Analysis without group splits works with several dimensions.
   expect_s3_class(calculate_mortality_rates(simulate(model, 1, seed = 8), c(0, 1), c(0, Inf)), "tbl_df")
   # A bare ancestry table needs exactly one tracked dimension.
@@ -153,7 +151,7 @@ test_that("unrealized births follow a woman's current group after a transition",
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = 20), birth_interval = 5) |>
     set_union_formation("on_demand", kinship_generations = 0, cancel_birth_if_no_match = FALSE) |>
-    set_group_transition(data.frame(group_origin = "A", group_dest = "B", age_start = 0, age_end = Inf,
+    set_group_transition(data.frame(origin = "A", destination = "B", age_start = 0, age_end = Inf,
                                     rate = 50))
   withr::local_options(hammel.check_cells = TRUE)
   out <- simulate(model, .5, seed = 9)
@@ -173,7 +171,7 @@ test_that("detailed unions add each dimension's partner categories", {
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .2)) |>
     set_union_formation("on_demand", kinship_generations = 0) |>
-    set_group_transition(data.frame(group_origin = "A", group_dest = "B", age_start = 0,
+    set_group_transition(data.frame(origin = "A", destination = "B", age_start = 0,
                                     age_end = Inf, rate = .5))
   out <- simulate(m, 3, seed = 11)
   u <- get_detailed_unions(out)
@@ -181,4 +179,190 @@ test_that("detailed unions add each dimension's partner categories", {
   moved <- out$transitions$person_id[out$transitions$time > 0]
   late <- u[u$wife_id %in% moved & u$start_time > 0, ]
   expect_true(all(late$race_w %in% c("A", "B")))
+})
+
+# Transitions in each of two dimensions (stage 3).
+transition_pair_model <- function(n = 400) {
+  model <- two_dimension_model(n)
+  set_mortality(model, data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0))
+}
+
+test_that("each dimension has its own transition process, history and duration", {
+  model <- transition_pair_model()
+  race <- data.frame(origin = c("A", "B"), destination = c("B", "A"), age_start = 0, age_end = Inf,
+                     rate = c(.3, .3))
+  region <- data.frame(origin = c("N", "S"), destination = c("S", "N"), dur_start = c(0, 1),
+                       dur_end = c(Inf, Inf), rate = c(.4, 1e8))
+  expect_error(set_group_transition(model, race), "Name the dimension.*\"race\", \"region\"")
+  model <- set_group_transition(model, race, group = "race")
+  model <- set_group_transition(model, region, group = "region")
+  expect_named(model$processes$group_transition, c("race", "region"))
+  # Replacing one dimension's process keeps the other's.
+  replaced <- set_group_transition(model, transform(race, rate = 0), group = "race")
+  expect_identical(replaced$processes$group_transition$region, model$processes$group_transition$region)
+  out <- simulate(model, 4, seed = 21)
+  tx <- out$transitions
+  expect_named(tx, c("person_id", "time", "group", "origin", "destination"))
+  expect_setequal(unique(tx$group), c("race", "region"))
+  expect_true(all(tx$origin[tx$group == "race"] %in% c("A", "B")))
+  expect_true(all(tx$origin[tx$group == "region"] %in% c("N", "S")))
+  # Duration counts from entering the current region only: a return S -> N
+  # happens one year after the move to S, whatever happens to race. People
+  # who start in S have no move to S, so their duration is their age (30).
+  back <- tx[tx$group == "region" & tx$origin == "S", ]
+  arrived <- vapply(seq_len(nrow(back)), function(k) {
+    h <- tx$time[tx$person_id == back$person_id[k] & tx$group == "region" & tx$time < back$time[k]]
+    if (length(h)) max(h) else NA_real_
+  }, 0)
+  expect_gt(sum(!is.na(arrived)), 20)
+  expect_equal(back$time[!is.na(arrived)], arrived[!is.na(arrived)] + 1, tolerance = 1e-6)
+  expect_true(all(back$time[is.na(arrived)] < 1e-6))
+  expect_true(any(tx$group == "race" & tx$person_id %in% back$person_id[!is.na(arrived)]))
+  # Each person's history chains to their current category in each dimension.
+  final <- out$persons
+  for (d in c("race", "region")) {
+    last <- tx[tx$group == d, ]
+    last <- last[order(last$person_id, last$time), ]
+    last <- last[!duplicated(last$person_id, fromLast = TRUE), ]
+    expect_identical(last$destination, final[[d]][match(last$person_id, final$person_id)])
+  }
+  # Restarts validate and continue every dimension's history.
+  again <- simulate(set_population(model, out), 1, seed = 22)
+  expect_identical(again$transitions[seq_len(nrow(tx)), ], tx)
+  broken <- out
+  broken$transitions$destination[which(tx$group == "region")[1]] <- "A"
+  expect_error(set_population(model, broken), "chain")
+  # Transition rates are counted per dimension.
+  expect_error(calculate_transition_rates(out, c(0, 4), age_breaks = c(0, Inf)), "Name the dimension")
+  counts <- calculate_transition_rates(out, c(0, 4), dur_breaks = c(0, 1, Inf), group = "region")
+  expect_named(counts, c("time_start", "time_end", "dur_start", "dur_end", "origin", "destination",
+                         "person_years", "transitions", "rate_transition"))
+  expect_equal(sum(counts$transitions), sum(tx$group == "region"))
+  race_counts <- calculate_transition_rates(out, c(0, 4), age_breaks = c(0, Inf), group = "race")
+  expect_equal(sum(race_counts$transitions), sum(tx$group == "race"))
+  expect_equal(race_counts$rate_transition, c(.3, .3), tolerance = .1)
+})
+
+test_that("transition rates can be stratified by another dimension", {
+  model <- transition_pair_model()
+  # Everyone starts in N; race A -> B happens only in region S.
+  model$population$persons$region <- "N"
+  model <- set_groups(model, race = group(), region = group(categories = c("N", "S")))
+  model <- set_group_transition(model, data.frame(origin = "N", destination = "S",
+    age_start = 0, age_end = Inf, rate = .5), group = "region")
+  model <- set_group_transition(model, data.frame(origin = "A", destination = "B", region = "S",
+    age_start = 0, age_end = Inf, rate = 2), group = "race")
+  out <- simulate(model, 3, seed = 23)
+  tx <- out$transitions
+  moves <- tx[tx$group == "race", ]
+  expect_gt(nrow(moves), 20)
+  arrived <- tx$time[tx$group == "region"][match(moves$person_id, tx$person_id[tx$group == "region"])]
+  expect_true(all(!is.na(arrived) & arrived <= moves$time))
+  # The transition's own dimension is not a stratum; other names must be declared.
+  bad <- set_group_transition(model, data.frame(origin = "A", destination = "B", race = "A",
+    age_start = 0, age_end = Inf, rate = 2), group = "race")
+  expect_error(simulate(bad, 0), "cannot be stratified by `race` itself")
+  undeclared <- set_group_transition(model, data.frame(origin = "A", destination = "B",
+    age_start = 0, age_end = Inf, rate = 2), group = "education")
+  expect_error(simulate(undeclared, 0), "`education`, which is not a declared group dimension")
+  expect_error(group_transition(data.frame(group_origin = "A", group_dest = "B", age_start = 0,
+    age_end = Inf, rate = 1)), "`origin` and `destination`")
+})
+
+test_that("transition weights and custom weight functions are per dimension", {
+  model <- transition_pair_model()
+  seen <- new.env()
+  fun <- function(members, bin) {
+    seen$bins <- c(seen$bins, paste(bin$origin, bin$destination))
+    seen$dest <- c(seen$dest, unique(members$destination))
+    ifelse(members$sex == "f", 2, 0)
+  }
+  model <- set_group_transition(model, data.frame(origin = "N", destination = "S",
+    age_start = 0, age_end = Inf, rate = .5), group = "region",
+    weights = create_weight_model(fun = fun))
+  model <- set_group_transition(model, data.frame(origin = "A", destination = "B",
+    age_start = 0, age_end = Inf, rate = .5), group = "race",
+    weights = create_weight_model(~ sex, c(sexm = 3)))
+  out <- simulate(model, 1, seed = 24)
+  expect_identical(unique(seen$bins), "N S")
+  expect_identical(unique(seen$dest), "S")
+  persons <- out$persons
+  tx <- out$transitions
+  sex <- persons$sex[match(tx$person_id, persons$person_id)]
+  # Region moves favor women; race moves favor men.
+  expect_gt(mean(sex[tx$group == "region"] == "f"), .7)
+  expect_gt(mean(sex[tx$group == "race"] == "m"), .7)
+})
+
+test_that("each dimension's inheritance can follow its own calendar schedule", {
+  model <- two_dimension_model(400, birth_rate = 2)
+  schedule <- tibble::tibble(time_start = c(-100, .5), time_end = c(.5, Inf),
+    model = list(create_group_inheritance("mother"), create_group_inheritance("father")))
+  model <- set_groups(model, race = group(inheritance = "father"), region = group(inheritance = schedule))
+  out <- simulate(model, 1, seed = 25)
+  kids <- out$persons[out$persons$birth_time >= 0, ]
+  mothers <- match(kids$mother_id, out$persons$person_id)
+  fathers <- match(kids$father_id, out$persons$person_id)
+  early <- kids$birth_time < .5
+  expect_gt(sum(early), 20)
+  expect_gt(sum(!early), 20)
+  expect_identical(kids$region[early], out$persons$region[mothers][early])
+  expect_identical(kids$region[!early], out$persons$region[fathers][!early])
+  expect_identical(kids$race, out$persons$race[fathers])
+  gap <- tibble::tibble(time_start = .5, time_end = Inf, model = list(create_group_inheritance("mother")))
+  expect_error(simulate(set_groups(model, race = group(), region = group(inheritance = gap)), 1),
+               "`region` inheritance model schedule has a coverage gap")
+})
+
+test_that("detailed unions replay transitions in every dimension", {
+  model <- set_group_transition(transition_pair_model(),
+    data.frame(origin = "N", destination = "S", age_start = 0, age_end = Inf, rate = 1), group = "region")
+  model <- set_group_transition(model,
+    data.frame(origin = "A", destination = "B", age_start = 0, age_end = Inf, rate = 1), group = "race")
+  model <- set_union_formation(model, "rate", rates = data.frame(age_start = 15, age_end = 50, rate = .5))
+  out <- suppressWarnings(simulate(model, 2, seed = 26))
+  u <- get_detailed_unions(out)
+  expect_gt(nrow(u), 20)
+  tx <- out$transitions
+  # A wife's category at formation: her latest move before it, or her
+  # origin before her first move.
+  at <- function(id, time, d) {
+    h <- tx[tx$person_id == id & tx$group == d, ]
+    h <- h[order(h$time), ]
+    if (!nrow(h)) return(out$persons[[d]][out$persons$person_id == id])
+    if (any(h$time <= time)) tail(h$destination[h$time <= time], 1) else h$origin[1]
+  }
+  for (d in c("race", "region"))
+    expect_identical(u[[paste0(d, "_w")]], mapply(at, u$wife_id, u$start_time, d, USE.NAMES = FALSE))
+})
+
+test_that("transition settings and histories are checked against the declaration", {
+  model <- transition_pair_model()
+  moves <- data.frame(origin = "A", destination = "B", age_start = 0, age_end = Inf, rate = 1)
+  expect_error(group_transition(moves, group = c("race", "region")), "`group` must be NULL")
+  # A process stored before the declaration resolves at simulation.
+  early <- set_group_transition(hammel_model(), moves)
+  expect_named(early$processes$group_transition, ".default")
+  early$population <- model$population
+  early$processes[c("mortality", "fertility", "union_formation")] <-
+    model$processes[c("mortality", "fertility", "union_formation")]
+  expect_error(simulate(early, 0), "without `group` needs exactly one")
+  early$processes$group_transition$race <- group_transition(moves, group = "race")
+  early$processes$group_transition$.default$group <- "race"
+  expect_error(simulate(early, 0), "more than one transition process")
+  # Histories.
+  persons <- model$population$persons
+  tx <- data.frame(person_id = 1, time = -1, origin = "B", destination = "A")
+  expect_error(hammel_population(persons, end_time = 0, transitions = tx, groups = c("race", "region")),
+               "`group` column")
+  expect_no_error(hammel_population(persons, end_time = 0, transitions = tx, groups = "race"))
+  expect_error(hammel_population(persons, end_time = 0, transitions = transform(tx, group = "education"),
+                                 groups = c("race", "region")), "not declared: education")
+  expect_error(hammel_population(persons, end_time = 0,
+    transitions = data.frame(person_id = 1, time = -1, group_origin = "B", group_dest = "A"),
+    groups = "race"), "`origin` and `destination`")
+  expect_error(hammel_population(persons, end_time = 0, transitions = transform(tx, group = "race")),
+               "require a declared group")
+  expect_error(calculate_transition_rates(simulate(model, 0), c(0, 1), age_breaks = c(0, Inf),
+                                          group = "education"), "must name one declared")
 })

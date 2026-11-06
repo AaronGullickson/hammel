@@ -45,8 +45,8 @@ returns two copies of the table, one with `group = "A"` and rates multiplied by
   term on the same variable cancels with a warning.
 
 `by` may add any valid column name except band, rate and calendar columns.
-Built-in strata are `sex`, `union_type`, `previous_union`, `group_origin` and
-`group_dest`; any other name may be a declared group dimension (D134), such as
+Built-in strata are `sex`, `union_type`, `previous_union`, `origin` and
+`destination`; any other name may be a declared group dimension (D134), such as
 `race`, or for union-level processes its wife's and husband's columns,
 `race_w` and `race_h`. `stratify_rates()` cannot know which process or
 declaration a table is for, so each process setter checks the table's built-in
@@ -63,7 +63,7 @@ carried along:
 | Union search (rate mode) | `<group>` (woman's), `previous_union` |
 | Conversion (`union_convert_rate`) | `<group>_w`, `<group>_h` |
 | Dissolution | `<group>_w`, `<group>_h`, `union_type` |
-| Group transitions | `group_origin`, `group_dest`, `sex`, `union_type` |
+| Group transitions | `origin`, `destination`, `sex`, `union_type`, other dimensions |
 
 Category values are then validated as for any supplied table: `union_type`
 values must be valid for the process, and group values must be categories of

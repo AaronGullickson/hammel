@@ -238,14 +238,9 @@ observation_alias <- function(population, by, suffixes = "") {
     return(list(population = population, by = by, rename = character()))
   }
   dim <- dims
-  if (dim != "group") {
-    internal <- paste0("group", suffixes)
-    if (any(internal %in% by))
-      stop(sprintf("Split by the declared group dimension `%s`, not `group`.", dim), call. = FALSE)
-    population$persons$group <- population$persons[[dim]]
-    population$groups <- stats::setNames(population$groups, "group")
-    if (!is.null(population$ancestry)) names(population$ancestry)[names(population$ancestry) == dim] <- "group"
-  }
+  if (dim != "group" && any(paste0("group", suffixes) %in% by))
+    stop(sprintf("Split by the declared group dimension `%s`, not `group`.", dim), call. = FALSE)
+  population <- dimension_view(population, dim)
   external <- paste0(dim, suffixes)
   hit <- by %in% external
   if (any(hit)) by[hit] <- paste0("group", suffixes)[match(by[hit], external)]

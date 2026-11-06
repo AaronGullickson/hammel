@@ -1,10 +1,10 @@
 # Milestone 9: multiple group dimensions
 
-Started November 5, 2026. **Status: design decided (D134); stages 1 and 2
+Started November 5, 2026. **Status: design decided (D134); stages 1–3
 implemented: declared dimensions of any name, several at once, in every rate
-table, with per-dimension inheritance and ancestry. Transitions, matching and
-weight-model group effects, inheritance schedules and `by` group splits still
-use a single dimension (stages 3–5).**
+table, with per-dimension inheritance (including calendar schedules),
+ancestry and transitions. Matching and weight-model group effects and `by`
+group splits still use a single dimension (stages 4–5).**
 This records the user's decisions as they are made. Milestone 9 was assigned
 multiple group columns by D131. See the [roadmap](roadmap.md#milestone-9-multiple-group-columns)
 for the motivation and the household-move questions retained from D114.
@@ -147,6 +147,42 @@ Step 1, each stage leaving the test suite passing:
 6. Tests, articles and documents.
 
 Step 2: joint matching calibration across dimensions.
+
+### Stage 3 as implemented (November 2026)
+
+- `set_group_transition(model, rates, group = NULL, weights = NULL)` keeps one
+  process per dimension in `model$processes$group_transition`, a list keyed by
+  dimension. `group = NULL` takes the only declared dimension; with several it
+  is an error naming them. A process set before the declaration exists is
+  stored under `.default` and resolved at simulation. Setting a dimension
+  again replaces its process.
+- Tables use `origin`/`destination`; `group_origin`/`group_dest` are errors
+  naming the new columns. Other declared dimensions may stratify a table;
+  uncovered strata have zero risk, as for sex and union type. The process's own
+  dimension cannot be a column.
+- The engine runs one transition process per dimension in declaration order,
+  each with strata over its origin and the other dimensions its table uses,
+  its own weight model, and entry times in that dimension only. Same-instant
+  transitions follow declaration order.
+- Histories have `person_id`, `time`, `group`, `origin`, `destination`, all
+  labels character (one table holds every dimension's labels; previously labels
+  kept the persons column's type). A supplied history may omit `group` when one
+  dimension is declared. Validation chains each person's history per dimension.
+- The transition weight variable `group_dest` is now `destination`; custom
+  weight functions see `origin`/`destination` in `bin` and a `destination`
+  member column. Group variables in weight models (including `destination`)
+  still require one dimension (stage 5).
+- Inheritance calendar schedules work for every dimension.
+- `calculate_transition_rates(..., group = NULL)` counts one dimension's
+  transitions, returning `origin`/`destination`. `get_detailed_unions()`
+  replays each dimension's transitions to union start. Analysis code works on a
+  one-dimension view of the population.
+- With one dimension, results are bit-identical to stage 2 when both builds
+  disable fused multiply-adds.
+- Known issue for stage 5: custom weight functions' `bin` for mortality,
+  fertility, search, conversion and dissolution still describes strata by the
+  single dimension (`group`, and a stale `group_pair` for dissolution), which is
+  wrong for directional dissolution strata and for several dimensions.
 
 ### Stage 2 as implemented (November 5, 2026)
 

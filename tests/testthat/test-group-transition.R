@@ -5,7 +5,7 @@ transition_model <- function(n = 1, sex = "m", age = 20) {
   model
 }
 transition_rates <- function(rate = 1, origin = "A", dest = "B") {
-  data.frame(group_origin = origin, group_dest = dest,
+  data.frame(origin = origin, destination = dest,
     age_start = 0, age_end = Inf, rate = rate)
 }
 
@@ -16,10 +16,11 @@ test_that("transition specifications validate common bands and optional strata",
   expect_s3_class(p, "hammel_group_transition")
   expect_s3_class(p$rates, "tbl_df")
   expect_identical(p$source, attr(r, "source"))
-  expect_identical(set_group_transition(hammel_model(), r)$processes$group_transition, p)
+  # Without a declaration the process waits to take the only dimension.
+  expect_identical(set_group_transition(hammel_model(), r)$processes$group_transition, list(.default = p))
   for (bad in list(transform(r, rate = -1), transform(r, rate = Inf),
-                   transform(r, age_end = 0), transform(r, group_dest = "A"),
-                   transform(r, group_dest = NA_character_), transform(r, sex = "x"),
+                   transform(r, age_end = 0), transform(r, destination = "A"),
+                   transform(r, destination = NA_character_), transform(r, sex = "x"),
                    transform(r, union_type = "single"),
                    transform(r, dur_start = 0, dur_end = Inf), rbind(r, r)))
     expect_error(group_transition(bad))
@@ -48,9 +49,9 @@ test_that("grouped outputs always have typed histories, including zero and empty
     model <- transition_model(n)
     out <- simulate(model, 0, seed = 1)
     expect_s3_class(out$transitions, "tbl_df")
-    expect_identical(names(out$transitions), c("person_id", "time", "group_origin", "group_dest"))
+    expect_identical(names(out$transitions), c("person_id", "time", "group", "origin", "destination"))
     expect_equal(nrow(out$transitions), 0)
-    expect_type(out$transitions$group_origin, "character")
+    expect_type(out$transitions$origin, "character")
     expect_s3_class(simulate(model, 1, seed = 1)$transitions, "tbl_df")
   }
   model <- transition_model(2)
@@ -58,7 +59,8 @@ test_that("grouped outputs always have typed histories, including zero and empty
   model$population$groups <- list(group = group())
   out <- simulate(set_group_transition(model, transition_rates(1e5, 10L, 20L)), .1, seed = 1)
   expect_identical(out$persons$group, c(20L, 20L))
-  expect_type(out$transitions$group_origin, "integer")
+  # History labels are text in every dimension; persons keep their type.
+  expect_identical(out$transitions$origin, c("10", "10"))
 })
 
 test_that("age support, sex and union type select actual applicable schedules", {
@@ -87,7 +89,7 @@ test_that("duration resets at moves, survives restarts and falls back to age", {
   expect_identical(second$transitions[1, ], out$transitions)
   expect_identical(second$persons$group, "A")
   expect_error(hammel_population(second$persons, end_time = 3,
-    transitions = transform(second$transitions, group_dest = "C"), groups = if ("group" %in% names(second$persons)) "group"), "chain")
+    transitions = transform(second$transitions, destination = "C"), groups = if ("group" %in% names(second$persons)) "group"), "chain")
 })
 
 test_that("group changes select new mortality and update only the individual", {
@@ -121,7 +123,7 @@ test_that("a moving man invalidates pair dissolution and union changes refresh h
     dur_start = 0, dur_end = Inf, rate = 0)))
   model <- set_union_dissolution(model, dissolution)
   out <- simulate(set_group_transition(model, transitions), .1, seed = 15)
-  expect_equal(out$transitions$group_dest, c("B", "C"))
+  expect_equal(out$transitions$destination, c("B", "C"))
   expect_equal(out$unions$end_reason, "dissolution")
   expect_gt(out$unions$end_time, out$transitions$time[1])
   expect_lt(out$unions$end_time, out$transitions$time[2])
@@ -135,7 +137,7 @@ transition_observation_population <- function() {
     mother_id = c(NA, NA, 1), father_id = c(NA, NA, 2), group = c("B", "B", "A"))
   unions <- data.frame(union_id = 1, wife_id = 1, husband_id = 2,
     start_time = 0, end_time = 3, end_reason = "dissolution")
-  tx <- data.frame(person_id = 1:2, time = c(2, 1), group_origin = "A", group_dest = "B")
+  tx <- data.frame(person_id = 1:2, time = c(2, 1), origin = "A", destination = "B")
   hammel_population(persons, unions, end_time = 5, transitions = tx, groups = if ("group" %in% names(persons)) "group")
 }
 
@@ -207,7 +209,7 @@ test_that("cohabitation conversion refreshes both partners' transition strata", 
   rates <- rbind(transform(transition_rates(1e5), sex = "f", union_type = "cohab"),
     transform(transition_rates(1e5, "A", "C"), sex = "m", union_type = "marriage"))
   out <- simulate(set_group_transition(model, rates), .1, seed = 1)
-  expect_identical(out$transitions$group_dest, c("B", "C"))
+  expect_identical(out$transitions$destination, c("B", "C"))
   expect_identical(out$unions$end_reason[1], "conversion")
   expect_gt(out$unions$end_time[1], out$transitions$time[1])
   expect_lt(out$unions$end_time[1], out$transitions$time[2])
@@ -229,7 +231,7 @@ test_that("history-only restarts and absent transition processes preserve proven
   zero <- simulate(set_group_transition(model, transition_rates(0)), 1, seed = 2)
   expect_equal(nrow(zero$transitions), 0)
   bad <- set_group_transition(model, transition_rates())
-  bad$processes$group_transition$rates$rate <- -1
+  bad$processes$group_transition$group$rates$rate <- -1
   expect_error(simulate(bad, 0), "nonnegative")
 })
 
@@ -238,7 +240,7 @@ test_that("snapshot event accounting handles repeated moves, deaths and arbitrar
     birth_time = c(0, -1, 3), death_time = c(5, NA, NA),
     mother_id = NA_real_, father_id = NA_real_, group = c("A", "B", "C"))
   tx <- data.frame(person_id = c(30, 10, 30, 10), time = c(4, 2, 1, 4),
-    group_origin = c("B", "C", "A", "A"), group_dest = c("A", "A", "B", "B"))
+    origin = c("B", "C", "A", "A"), destination = c("A", "A", "B", "B"))
   pop <- hammel_population(persons, end_time = 6, transitions = tx, groups = if ("group" %in% names(persons)) "group")
   times <- c(5, -2, 0, 4, 1, 3, 4, 2, 6)
   out <- calculate_population_size(pop, times, by = "group")
@@ -250,7 +252,7 @@ test_that("snapshot event accounting handles repeated moves, deaths and arbitrar
       if (!nrow(h)) return(persons$group[i])
       h <- h[order(h$time), ]
       before <- which(h$time <= time)
-      if (length(before)) tail(h$group_dest[before], 1) else h$group_origin[1]
+      if (length(before)) tail(h$destination[before], 1) else h$origin[1]
     }, character(1))
     tabulate(match(labels, c("A", "B", "C")), nbins = 3)
   })
@@ -264,7 +266,7 @@ test_that("snapshot event accounting handles repeated moves, deaths and arbitrar
 
 test_that("edited transition specifications reject incompatible units and unsupported processes", {
   model <- set_group_transition(transition_model(), transition_rates())
-  model$processes$group_transition$rate_unit <- "annual_probability"
+  model$processes$group_transition$group$rate_unit <- "annual_probability"
   expect_error(simulate(model, 0), "specification or units")
   model <- make_model(1)
   model$processes$unimplemented <- structure(list(name = "unimplemented"), class = "hammel_process")
@@ -278,7 +280,7 @@ test_that("transition histories reject invalid references, life dates and missin
     transform(original$transitions, time = c(-21, 1)),
     transform(original$transitions, time = c(2, 4)),
     transform(original$transitions, time = c(6, 1)),
-    transform(original$transitions, group_origin = group_dest)
+    transform(original$transitions, origin = destination)
   )) {
     pop <- original
     pop$transitions <- tx
@@ -306,7 +308,7 @@ test_that("dissolution observations retain unions whose partners never move", {
   pop <- transition_observation_population()
   # Only the child moves; neither partner in the recorded union changes group.
   pop$transitions <- tibble::tibble(person_id = 3, time = 2,
-    group_origin = "B", group_dest = "A")
+    origin = "B", destination = "A")
   out <- pair_rates(calculate_dissolution_rates(pop, c(0, 5), c(0, Inf), by = c("group_w", "group_h")))
   expect_equal(out$union_years[out$group_pair == "B:B"], 3)
   expect_equal(out$dissolutions[out$group_pair == "B:B"], 1)
@@ -319,7 +321,7 @@ test_that("union observations combine simultaneous partner moves and typed numer
     group = c(10L, 10L, 10L, 20L))
   unions <- data.frame(union_id = c(2, 1), wife_id = c(3, 1), husband_id = c(4, 2),
     start_time = 0, end_time = 4, end_reason = "dissolution", union_type = "marriage")
-  tx <- data.frame(person_id = c(1, 2), time = 2, group_origin = c(10L, 20L), group_dest = c(20L, 10L))
+  tx <- data.frame(person_id = c(1, 2), time = 2, origin = c(10L, 20L), destination = c(20L, 10L))
   pop <- hammel_population(persons, unions, end_time = 5, transitions = tx, groups = if ("group" %in% names(persons)) "group")
   out <- pair_rates(calculate_dissolution_rates(pop, c(0, 5), c(0, Inf),
     by = c("group_w", "group_h", "union_type")))

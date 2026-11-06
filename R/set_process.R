@@ -80,6 +80,7 @@ attach_process <- function(model, process) {
     validate_group_transition(process)
     validate_process_weights(process$weights, "transition")
     process$rates <- tibble::as_tibble(process$rates)
+    return(store_transition_process(model, process))
   }
   if (name == "union_dissolution") {
     validate_union_dissolution(process)

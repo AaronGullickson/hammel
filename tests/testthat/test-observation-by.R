@@ -10,7 +10,7 @@ by_history <- function() {
     start_time = c(20, 22, 33), end_time = c(22, 30, 38),
     end_reason = c("conversion", "dissolution", "death_husband"),
     union_type = c("cohab", "marriage", "cohab"), previous_cohab_id = c(NA, 1L, NA))
-  transitions <- tibble::tibble(person_id = 1L, time = 35, group_origin = "A", group_dest = "B")
+  transitions <- tibble::tibble(person_id = 1L, time = 35, origin = "A", destination = "B")
   hammel_population(persons, unions, end_time = 40, transitions = transitions, groups = if ("group" %in% names(persons)) "group")
 }
 
@@ -73,7 +73,7 @@ test_that("transitions split by previous union and union type", {
                                   by = c("previous_union", "union_type"))
   moved <- x[x$transitions > 0, ]
   expect_equal(nrow(moved), 1)
-  expect_identical(c(moved$group_origin, moved$group_dest, moved$previous_union, moved$union_type),
+  expect_identical(c(moved$origin, moved$destination, moved$previous_union, moved$union_type),
                    c("A", "B", "separated", "cohab"))
 })
 

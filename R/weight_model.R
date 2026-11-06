@@ -19,7 +19,7 @@
 #' (births; 0 for men), `previous_union` (`"none"`, `"separated"`,
 #' `"widowed"`), `partner_group` (NA when unpartnered) and ancestry shares
 #' `ancestry_<group>` and `ancestry_unknown`. Group transitions may also use
-#' `group_dest`, the destination of the risk. Dissolution and conversion are
+#' `destination`, the destination of the risk. Dissolution and conversion are
 #' union processes and may use `group_w`, `group_h`, `parity_w`,
 #' `previous_union_w`, `previous_union_h`, `ancestry_<group>_w`,
 #' `ancestry_<group>_h`, `same_group` (0/1), `age_difference` (husband's age
@@ -32,7 +32,7 @@
 #' Categorical variables use treatment coding, and `coefficients` must be
 #' named exactly as the corresponding model-matrix columns, for example
 #' `groupB` or `union_typecohab`. One `group_levels` applies to every
-#' group-valued variable (`group`, `partner_group`, `group_dest`, `group_w`,
+#' group-valued variable (`group`, `partner_group`, `destination`, `group_w`,
 #' `group_h`), and must include every population group. The intercept has no
 #' effect. A term whose variable is missing (such as `partner_group` for an
 #' unpartnered person) contributes zero, with a warning.
@@ -82,7 +82,7 @@ create_weight_model <- function(formula = NULL, coefficients = numeric(),
 
 # Weight variables by process type, with engine codes and categorical levels.
 weight_variable_codes <- c(sex = 0L, group = 1L, union_type = 2L, partnered = 3L,
-  parity = 4L, previous_union = 5L, partner_group = 6L, ancestry = 7L, group_dest = 8L,
+  parity = 4L, previous_union = 5L, partner_group = 6L, ancestry = 7L, destination = 8L,
   group_w = 9L, group_h = 10L, parity_w = 11L, previous_union_w = 12L,
   previous_union_h = 13L, ancestry_w = 14L, ancestry_h = 15L, same_group = 16L,
   age_difference = 17L)
@@ -90,7 +90,7 @@ weight_person_variables <- c("sex", "group", "union_type", "partnered", "parity"
   "previous_union", "partner_group")
 weight_union_variables <- c("group_w", "group_h", "parity_w", "previous_union_w",
   "previous_union_h", "same_group", "age_difference", "union_type")
-weight_group_variables <- c("group", "partner_group", "group_dest", "group_w", "group_h")
+weight_group_variables <- c("group", "partner_group", "destination", "group_w", "group_h")
 weight_fixed_levels <- function(type) list(
   sex = c("f", "m"),
   union_type = if (type == "union") c("cohab", "marriage") else c("unpartnered", "cohab", "marriage"),
@@ -127,7 +127,7 @@ validate_weight_model <- function(model) {
   if (length(factors) && any(!rownames(factors) %in% all.vars(formula)))
     stop(paste("Weight formulas use variables and their interactions only;",
                "use a custom function (`fun`) for transformations such as I()."), call. = FALSE)
-  known <- c(weight_person_variables, weight_union_variables, "group_dest")
+  known <- c(weight_person_variables, weight_union_variables, "destination")
   bad <- all.vars(formula)[!all.vars(formula) %in% known & !grepl("^ancestry_.+", all.vars(formula))]
   if (length(bad))
     stop("Unknown weight variables: ", paste(bad, collapse = ", "), ".", call. = FALSE)
@@ -149,7 +149,7 @@ validate_weight_model <- function(model) {
 # Variables a formula may use for a process type ("person", "transition", "union").
 weight_allowed <- function(name, type) {
   if (type == "union") name %in% weight_union_variables || weight_ancestry_variable(name, "union")
-  else name %in% c(weight_person_variables, if (type == "transition") "group_dest") ||
+  else name %in% c(weight_person_variables, if (type == "transition") "destination") ||
     (weight_ancestry_variable(name, "person") && !grepl("_[wh]$", name))
 }
 
@@ -273,7 +273,7 @@ weight_strata <- function(process, rates) {
                    if (wives && husbands) "same_group"),
     search = c("sex", "partnered", "union_type", if (grouped) "group",
                if ("previous_union" %in% n) "previous_union", "partner_group"),
-    transition = c("group", "group_dest", if ("sex" %in% n) "sex",
+    transition = c("group", "destination", if ("sex" %in% n) "sex",
                    if ("union_type" %in% n) c("union_type", "partnered")))
 }
 

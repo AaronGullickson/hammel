@@ -294,7 +294,7 @@ To test time-varying transition rates, I add transition rates to the simulation 
 #| label: create-transition-rates
 
 trans_rates <- tribble(
-  ~time_start, ~time_end, ~group_origin, ~group_dest, ~age_start, ~age_end, ~rate,
+  ~time_start, ~time_end, ~origin, ~destination, ~age_start, ~age_end, ~rate,
   0,           100,       "AB",           "B",         15,         20,       0.00,
   0,           100,       "AB",           "A",         15,         20,       0.00,
   100,         200,       "AB",           "B",         15,         20,       0.02,
@@ -345,8 +345,8 @@ temp <- calculate_transition_rates(
   age_breaks = c(15, 20),
   conf.level = 0.95
 ) |>
-  filter(group_origin == "AB", age_start == 15) |>
-  select(time_start, time_end, age_start, age_end, group_origin, group_dest, 
+  filter(origin == "AB", age_start == 15) |>
+  select(time_start, time_end, age_start, age_end, origin, destination, 
          rate_transition, conf_low, conf_high) |>
   left_join(trans_rates)
 
@@ -357,8 +357,8 @@ temp |>
     time_end  ~ "Ending time",
     age_start ~ "Age start",
     age_end ~ "Age end",
-    group_origin ~ "Origin",
-    group_dest ~ "Destination",
+    origin ~ "Origin",
+    destination ~ "Destination",
     rate_transition ~ "Observed rate",
     conf_low ~ "Low",
     conf_high ~ "High",

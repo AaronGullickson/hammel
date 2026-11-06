@@ -77,7 +77,7 @@ test_that("setters reject stratified columns their process does not support", {
                                         list(previous_union = c(none = 1)))), "Conversion")
   expect_error(union_dissolution(stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = 0.1),
                                                 list(sex = c(f = 1)))), "Union-dissolution")
-  expect_error(group_transition(stratify_rates(data.frame(group_origin = "A", group_dest = "B",
+  expect_error(group_transition(stratify_rates(data.frame(origin = "A", destination = "B",
     age_start = 0, age_end = Inf, rate = 0.1), list(previous_union = c(none = 1)))), "Group-transition")
   # The check uses the table's columns, however they were added.
   expect_error(mortality(transform(strata_mortality_rates(), union_type = "cohab")),
@@ -92,7 +92,7 @@ test_that("setters reject stratified columns their process does not support", {
   expect_s3_class(union_formation("rate", rates = stratify_rates(base,
     list(previous_union = c(none = 1, separated = 2, widowed = 1)))), "hammel_union_formation")
   expect_s3_class(group_transition(stratify_rates(data.frame(age_start = 0, age_end = Inf, rate = 0.1),
-    list(group_origin = c(A = 1), group_dest = c(B = 1), sex = c(f = 1, m = 2)))), "hammel_group_transition")
+    list(origin = c(A = 1), destination = c(B = 1), sex = c(f = 1, m = 2)))), "hammel_group_transition")
 })
 
 test_that("stratified tables equal explicit schedules for each process and together", {

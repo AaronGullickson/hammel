@@ -194,7 +194,7 @@ test_that("directed transitions compete after a fractional rate boundary", {
   m <- make_model(n)
   m$population$persons$group <- "A"
   m$population$groups <- list(group = group(ancestry = TRUE))
-  r <- data.frame(group_origin = "A", group_dest = c("B", "C"),
+  r <- data.frame(origin = "A", destination = c("B", "C"),
     age_start = 0, age_end = Inf, rate = 0)
   r <- calendar_epochs(r, c(0, 1), c(0, .3, Inf))
   r$rate[3:4] <- c(.2, .3)
@@ -250,7 +250,7 @@ test_that("group-duration transitions preserve latest-entry origin at boundaries
   m <- make_model(1)
   m$population$persons$group <- "A"
   m$population$groups <- list(group = group())
-  r <- data.frame(group_origin = "A", group_dest = "B", dur_start = 20.8,
+  r <- data.frame(origin = "A", destination = "B", dur_start = 20.8,
     dur_end = Inf, rate = 0)
   m <- set_group_transition(m, calendar_epochs(r, c(0, 1e5)))
   out <- simulate(m, 1, seed = 44)
@@ -277,8 +277,8 @@ test_that("asynchronous changes retain parity/type/group accounting and calibrat
     c(0, .1), c(0, .9, Inf)))
   m <- set_union_dissolution(m, calendar_epochs(data.frame(dur_start = 0,
     dur_end = Inf, rate = 0), c(.2, .6), c(0, 1.1, Inf)))
-  m <- set_group_transition(m, calendar_epochs(data.frame(group_origin = c("A", "B"),
-    group_dest = c("B", "A"), age_start = 0, age_end = Inf, rate = 0),
+  m <- set_group_transition(m, calendar_epochs(data.frame(origin = c("A", "B"),
+    destination = c("B", "A"), age_start = 0, age_end = Inf, rate = 0),
     c(.2, .6), c(0, .2, Inf)))
   withr::local_options(hammel.check_cells = TRUE)
   out <- simulate(m, 1.5, seed = 13)

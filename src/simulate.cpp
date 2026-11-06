@@ -2126,14 +2126,15 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
                   NumericMatrix initial_ancestry, List inheritance, double ffab,
                   DataFrame dissolution_rates, DataFrame cohab_prob, DataFrame conversion_rates,
                   List cohab_matching, bool counts_cohab, bool check_cells = false,
-                  Nullable<List> hetfert = R_NilValue, Nullable<DataFrame> transition_input = R_NilValue,
+                  Nullable<List> hetfert = R_NilValue, Nullable<List> transition_input = R_NilValue,
                   Nullable<List> model_schedule_input = R_NilValue,
                   Nullable<List> weight_input = R_NilValue,
                   Nullable<List> group_input = R_NilValue) {
   const bool scheduled_models = model_schedule_input.isNotNull();
   List matching_bank, inheritance_bank;
   NumericVector model_times;
-  IntegerVector general_route, father_route, cohab_route, inheritance_route;
+  IntegerVector general_route, father_route, cohab_route;
+  std::vector<IntegerVector> inheritance_routes;
   int model_epoch = 0, general_id = 0, father_id = 0, cohab_id = 0;
   if (scheduled_models) {
     List config(model_schedule_input.get());
@@ -2142,7 +2143,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     DataFrame epochs = as<DataFrame>(config["epochs"]);
     model_times = epochs["time_start"];
     general_route = epochs["matching"]; father_route = epochs["father_matching"];
-    cohab_route = epochs["cohab_matching"]; inheritance_route = epochs["inheritance"];
+    cohab_route = epochs["cohab_matching"];
+    List routes = config["inheritance_routes"];
+    for (int d = 0; d < routes.size(); ++d) inheritance_routes.push_back(as<IntegerVector>(routes[d]));
     general_id = general_route[0]; father_id = father_route[0]; cohab_id = cohab_route[0];
   }
   // Keep all epochs in call-local tables; the population and its histories
@@ -2150,12 +2153,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   const DataFrame all_mortality = mortality_rates, all_fertility = fertility_rates,
     all_search = union_rates, all_dissolution = dissolution_rates,
     all_conversion = conversion_rates, all_probability = cohab_prob;
-  const DataFrame all_transitions = transition_input.isNotNull() ?
-    DataFrame(transition_input.get()) : DataFrame::create();
-  DataFrame active_transitions = calendar_slice(all_transitions, start);
   std::set<double> calendar_boundaries;
   for (const DataFrame& table : {all_mortality, all_fertility, all_search,
-      all_dissolution, all_conversion, all_transitions, all_probability}) {
+      all_dissolution, all_conversion, all_probability}) {
     if (!table.containsElementNamed("time_start")) continue;
     for (const char* column : {"time_start", "time_end"}) {
       NumericVector times = table[column];
@@ -2220,10 +2220,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   if (match_dim >= 0) for (int i = 0; i < ids.size(); ++i)
     person_groups[i] = cats[static_cast<size_t>(i) * dimensions + match_dim];
   struct StrataSpec { std::vector<int> dims, roles, strides; int count = 1; };
-  auto read_spec = [&](const char* name) {
+  auto parse_spec = [&](List x) {
     StrataSpec spec;
-    if (!groups_in.size() || !groups_in.containsElementNamed(name)) return spec;
-    List x = groups_in[name];
     IntegerVector d = x["dims"], r = x["roles"], st = x["strides"];
     spec.dims.assign(d.begin(), d.end());
     spec.roles.assign(r.begin(), r.end());
@@ -2231,6 +2229,16 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     spec.count = std::max(1, as<int>(x["count"]));
     return spec;
   };
+  auto read_spec = [&](const char* name) {
+    if (!groups_in.size() || !groups_in.containsElementNamed(name)) return StrataSpec();
+    return parse_spec(as<List>(groups_in[name]));
+  };
+  // Category labels by dimension, for custom weight functions' cell descriptions.
+  std::vector<std::vector<std::string>> dim_labels;
+  if (groups_in.size()) {
+    List labels = groups_in["labels"];
+    for (int d = 0; d < labels.size(); ++d) dim_labels.push_back(as<std::vector<std::string>>(labels[d]));
+  }
   const StrataSpec mortality_spec = read_spec("mortality"), fertility_spec = read_spec("fertility"),
     search_spec = read_spec("search"), probability_spec = read_spec("probability"),
     conversion_spec = read_spec("conversion"), dissolution_spec = read_spec("dissolution"),
@@ -2541,7 +2549,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     std::array<bool, 3> duration_search = {false, false, false};
   };
   // One inheritance rule per dimension, each with its own ancestry block (size
-  // zero when untracked). Calendar schedules switch dimension 0's rule.
+  // zero when untracked). Calendar schedules switch each dimension's rule.
   struct InheritanceRule {
     int method = 0, count = 1;
     double passing = 0;
@@ -2665,7 +2673,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         calibrator->refresh();
       }
     }
-    if (dimensions) read_rule(as<List>(inheritance_bank[inheritance_route[model_epoch]]), inheritance_rules[0]);
+    for (int d = 0; d < dimensions; ++d)
+      read_rule(as<List>(inheritance_bank[inheritance_routes[d][model_epoch]]), inheritance_rules[d]);
     return matching_changed;
   };
   const double end = start + years;
@@ -2690,23 +2699,56 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     }
   };
   load_dissolution();
+  // Group transitions: one process per dimension with transitions, in
+  // declaration order. Its strata combine the origin (its own dimension) with
+  // any other dimensions its table uses; each stratum lists its outgoing
+  // schedules (destination, optional sex and union type).
   struct TransitionSchedule { int dest, sex; std::string type; std::vector<Band> bands; };
-  std::vector<std::vector<TransitionSchedule>> transition_schedules(group_count);
-  bool transition_duration = false;
-  const bool has_transition = transition_input.isNotNull();
+  struct TransitionProcess {
+    int dim = 0, own = 0;   // the dimension, and its position in spec
+    StrataSpec spec;
+    DataFrame all, active;
+    bool duration = false;
+    std::vector<std::vector<TransitionSchedule>> schedules;   // per stratum
+    std::vector<double> entry;   // entry time into the current category
+    std::string weight_key;
+  };
+  std::vector<TransitionProcess> tprocs;
+  if (transition_input.isNotNull()) {
+    List input(transition_input.get());
+    for (int t = 0; t < input.size(); ++t) {
+      List x = input[t];
+      TransitionProcess tp;
+      tp.dim = as<int>(x["dimension"]);
+      tp.spec = parse_spec(as<List>(x["spec"]));
+      for (size_t j = 0; j < tp.spec.dims.size(); ++j) if (tp.spec.dims[j] == tp.dim) tp.own = static_cast<int>(j);
+      tp.all = as<DataFrame>(x["rates"]);
+      tp.active = calendar_slice(tp.all, start);
+      tp.entry = as<std::vector<double>>(x["entry"]);
+      tp.weight_key = "transition_" + std::to_string(t + 1);
+      tp.schedules.resize(tp.spec.count);
+      if (tp.all.containsElementNamed("time_start"))
+        for (const char* column : {"time_start", "time_end"}) {
+          NumericVector times = tp.all[column];
+          for (double time : times)
+            if (start < time && time < start + years) calendar_boundaries.insert(time);
+        }
+      tprocs.push_back(tp);
+    }
+  }
   auto load_transitions = [&]() {
-    for (auto& origin : transition_schedules) origin.clear();
-    if (has_transition) {
-      DataFrame input = active_transitions;
-      transition_duration = input.containsElementNamed("dur_start");
-      IntegerVector origins = input[".origin"], destinations = input[".dest"];
-      NumericVector lo = input[transition_duration ? "dur_start" : "age_start"];
-      NumericVector hi = input[transition_duration ? "dur_end" : "age_end"], values = input["rate"];
+    for (auto& tp : tprocs) {
+      for (auto& stratum : tp.schedules) stratum.clear();
+      DataFrame input = tp.active;
+      tp.duration = input.containsElementNamed("dur_start");
+      IntegerVector strata = input[".hammel_group"], destinations = input[".dest"];
+      NumericVector lo = input[tp.duration ? "dur_start" : "age_start"];
+      NumericVector hi = input[tp.duration ? "dur_end" : "age_end"], values = input["rate"];
       const bool sexed = input.containsElementNamed("sex"), typed = input.containsElementNamed("union_type");
       CharacterVector sexes = sexed ? as<CharacterVector>(input["sex"]) : CharacterVector();
       CharacterVector types = typed ? as<CharacterVector>(input["union_type"]) : CharacterVector();
       for (int row = 0; row < input.nrows(); ++row) {
-        auto& schedules = transition_schedules[origins[row]];
+        auto& schedules = tp.schedules[strata[row]];
         const int sex = !sexed ? -1 : (as<std::string>(sexes[row]) == "f" ? 1 : 0);
         const std::string type = typed ? as<std::string>(types[row]) : "";
         auto found = std::find_if(schedules.begin(), schedules.end(), [&](const TransitionSchedule& x) {
@@ -2718,15 +2760,16 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         }
         found->bands.push_back({lo[row], hi[row], values[row]});
       }
-      for (auto& origin : transition_schedules) for (auto& schedule : origin)
+      for (auto& stratum : tp.schedules) for (auto& schedule : stratum)
         std::sort(schedule.bands.begin(), schedule.bands.end(), [](const Band& a, const Band& b) { return a.start < b.start; });
     }
   };
   load_transitions();
-  std::vector<double> group_entry(people.size());
-  if (has_transition) group_entry = as<std::vector<double>>(persons[".group_entry"]);
+  // Each transition RateCells is slot k of process p: in stratum s it carries
+  // the k-th outgoing schedule of s.
+  std::vector<std::pair<int, size_t>> transition_slots;
   std::vector<double> tx_person, tx_time;
-  std::vector<int> tx_origin, tx_dest;
+  std::vector<int> tx_dim, tx_origin, tx_dest;
   // Fertility type labels: overall, unpartnered/partnered, or three types.
   std::vector<std::string> fertility_types;
   bool fertility_grouped = false;   // fertility cells stratify by group
@@ -2780,17 +2823,22 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     List input(weight_input.get());
     weight_group_labels = as<std::vector<std::string>>(input["group_labels"]);
     weight_ancestry_labels = as<std::vector<std::string>>(input["ancestry_labels"]);
-    for (const char* name : {"mortality", "fertility", "dissolution", "conversion", "transition", "search"}) {
-      if (!input.containsElementNamed(name)) continue;
+    std::vector<std::pair<std::string, std::string>> keys;   // input name, process
+    for (const char* name : {"mortality", "fertility", "dissolution", "conversion", "search"})
+      keys.push_back({name, name});
+    for (const auto& tp : tprocs) keys.push_back({tp.weight_key, "transition"});
+    for (const auto& key : keys) {
+      const std::string& name = key.first;
+      if (!input.containsElementNamed(name.c_str())) continue;
       List x = input[name];
       if (x.containsElementNamed("schedule")) {
         WeightSchedule w;
         w.start = as<std::vector<double>>(x["time_start"]);
         w.end = as<std::vector<double>>(x["time_end"]);
         List models = x["models"];
-        for (int k = 0; k < models.size(); ++k) w.models.push_back(parse_weight_spec(models[k], name));
+        for (int k = 0; k < models.size(); ++k) w.models.push_back(parse_weight_spec(models[k], key.second));
         w.active = weight_interval(w, start);
-        if (w.active < 0) stop(std::string("No ") + name + " weight model covers the run start.");
+        if (w.active < 0) stop("No " + key.second + " weight model covers the run start.");
         // Scheduled models stay installed even when an interval is unweighted.
         weight_specs[name] = w.models[w.active];
         for (size_t k = 0; k < w.start.size(); ++k)
@@ -2799,7 +2847,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         weight_schedules[name] = w;
         continue;
       }
-      WeightSpec spec = parse_weight_spec(x, name);
+      WeightSpec spec = parse_weight_spec(x, key.second);
       if (!spec.custom && spec.coefficients.empty()) continue;   // all coefficients zero: unweighted
       weight_specs[name] = spec;
     }
@@ -2826,7 +2874,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     return Rf_mkChar(weight_group_labels[g].c_str());
   };
   // Variable values (codes as in R's weight_variable_codes). NA is NaN.
-  // Person variables take a transition destination for group_dest.
+  // Person variables take a transition destination for `destination`.
   auto person_value = [&](int var, int component, int i, int dest) -> double {
     const Person& p = people[i];
     const int partner = current_partner[i];
@@ -2891,7 +2939,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     return "ancestry_" + base + suffix;
   };
   // The members tibble a custom function receives.
-  auto weight_members = [&](const std::vector<int>& units, bool is_union, int dest) {
+  auto weight_members = [&](const std::vector<int>& units, bool is_union, int dest,
+                            const std::string& dest_label = "") {
     const int n = static_cast<int>(units.size());
     List columns;
     CharacterVector names;
@@ -2920,8 +2969,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         add(ancestry_name(k, ""), share);
       }
       if (dest >= 0) {
-        CharacterVector destination(n, group_label(dest));
-        add("group_dest", destination);
+        CharacterVector destination(n, dest_label.empty() ? group_label(dest) : Rf_mkChar(dest_label.c_str()));
+        add("destination", destination);
       }
     } else {
       NumericVector id(n), wife(n), husband(n), gap(n);
@@ -3005,7 +3054,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       const bool is_union = name == "dissolution" || name == "conversion";
       const int stratum = process->cell_stratum(c);
       int dest = -1;
-      if (name == "transition") dest = transition_schedules[stratum][slot].dest;
+      std::string dest_label;
+      if (name == "transition") {
+        const auto& at = transition_slots[slot];
+        dest = tprocs[at.first].schedules[stratum][at.second].dest;
+        dest_label = dim_labels[tprocs[at.first].dim][dest];
+      }
       // Only custom functions choose this way; formula weights are stored.
       std::vector<double> eta(members.size());
       {
@@ -3031,14 +3085,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
           bin["previous_union"] = Rf_ScalarString(previous_specific ? Rf_mkChar(previous_labels[previous]) : NA_STRING);
           duration = previous_specific && schedules[g].duration_search[previous]; all = all_search;
         } else {
-          const auto& x = transition_schedules[stratum][slot];
-          bin["group_origin"] = Rf_ScalarString(group_label(stratum));
-          bin["group_dest"] = Rf_ScalarString(group_label(x.dest));
+          const auto& at = transition_slots[slot];
+          const TransitionProcess& tp = tprocs[at.first];
+          const auto& x = tp.schedules[stratum][at.second];
+          const auto& labels = dim_labels[tp.dim];
+          const int origin = (stratum / tp.spec.strides[tp.own]) % static_cast<int>(labels.size());
+          bin["origin"] = labels[origin];
+          bin["destination"] = labels[x.dest];
           bin["sex"] = Rf_ScalarString(x.sex < 0 ? NA_STRING : Rf_mkChar(x.sex ? "f" : "m"));
           bin["union_type"] = Rf_ScalarString(x.type.empty() ? NA_STRING : Rf_mkChar(x.type.c_str()));
-          duration = transition_duration; all = all_transitions;
+          duration = tp.duration; all = tp.all;
         }
-        custom_eta(*spec, weight_members(members, is_union, dest),
+        custom_eta(*spec, weight_members(members, is_union, dest, dest_label),
           band_list(bin, duration, process->cell_start(c), process->cell_end(c), all, weight_now), eta);
       }
       return pick_log_weights(eta, uniform);
@@ -3075,7 +3133,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     (calibrator || !fertility_weights_spec->custom);
   WeightSpec* search_weights_spec = weight_spec("search");
   WeightSpec* mortality_weights_spec = weight_spec("mortality");
-  WeightSpec* transition_weights_spec = weight_spec("transition");
+  std::vector<WeightSpec*> transition_weight_specs;
+  for (const auto& tp : tprocs) transition_weight_specs.push_back(weight_spec(tp.weight_key));
   if (search_calibrated && search_weights_spec && search_weights_spec->custom)
     Rcpp::warning("With weighted matching calibration, the custom search weight function is "
                   "evaluated at every refresh of every searching woman, which can be slow.");
@@ -3175,6 +3234,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     std::vector<std::vector<Band>> mortality, search, dissolution, conversion;
     std::vector<std::vector<std::vector<Band>>> transitions;   // per outgoing-schedule slot
     std::vector<std::vector<std::tuple<int, int, std::string>>> transition_layout;
+    std::vector<std::pair<int, size_t>> transition_slots;   // (process, slot) per transition cells
   };
   auto process_strata = [&]() {
     ProcessStrata x;
@@ -3194,19 +3254,22 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       }
     if (cohab_enabled)
       for (int g = 0; g < conversion_spec.count; ++g) x.conversion.push_back(schedules[g].conversion);
-    size_t slots = 0;
-    for (const auto& origin : transition_schedules) slots = std::max(slots, origin.size());
-    for (size_t k = 0; k < slots; ++k) {
-      std::vector<std::vector<Band>> strata;
-      for (int g = 0; g < group_count; ++g)
-        strata.push_back(k < transition_schedules[g].size() ? transition_schedules[g][k].bands :
-                         std::vector<Band>());
-      x.transitions.push_back(strata);
-    }
-    for (const auto& origin : transition_schedules) {
-      std::vector<std::tuple<int, int, std::string>> layout;
-      for (const auto& schedule : origin) layout.emplace_back(schedule.dest, schedule.sex, schedule.type);
-      x.transition_layout.push_back(layout);
+    for (size_t p = 0; p < tprocs.size(); ++p) {
+      const TransitionProcess& tp = tprocs[p];
+      size_t slots = 0;
+      for (const auto& stratum : tp.schedules) slots = std::max(slots, stratum.size());
+      for (size_t k = 0; k < slots; ++k) {
+        std::vector<std::vector<Band>> strata;
+        for (const auto& stratum : tp.schedules)
+          strata.push_back(k < stratum.size() ? stratum[k].bands : std::vector<Band>());
+        x.transitions.push_back(strata);
+        x.transition_slots.push_back({static_cast<int>(p), k});
+      }
+      for (const auto& stratum : tp.schedules) {
+        std::vector<std::tuple<int, int, std::string>> layout;
+        for (const auto& schedule : stratum) layout.emplace_back(schedule.dest, schedule.sex, schedule.type);
+        x.transition_layout.push_back(layout);
+      }
     }
     return x;
   };
@@ -3217,6 +3280,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     };
     const ProcessStrata layout = process_strata();
     transition_layout = layout.transition_layout;
+    transition_slots = layout.transition_slots;
     mortality = make(layout.mortality);
     search.reset();
     if (rate_initiation) {
@@ -3247,7 +3311,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     transitions.clear();
     for (size_t k = 0; k < layout.transitions.size(); ++k) {
       transitions.push_back(make(layout.transitions[k]));
-      if (WeightSpec* spec = weight_spec("transition"))
+      if (WeightSpec* spec = transition_weight_specs[layout.transition_slots[k].first])
         install_weights(spec, transitions.back().get(), static_cast<int>(k));
     }
     if (WeightSpec* spec = weight_spec("mortality")) install_weights(spec, mortality.get(), -1);
@@ -3339,17 +3403,20 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (!transitions.empty()) {
       const std::string type = partner < 0 ? "unpartnered" :
         (union_history[person_unions[i].back()].cohab ? "cohab" : "marriage");
-      const auto& outgoing = transition_schedules[p.group];
-      for (size_t k = 0; k < transitions.size(); ++k) {
+      for (size_t f = 0; f < transitions.size(); ++f) {
+        const auto& at = transition_slots[f];
+        const TransitionProcess& tp = tprocs[at.first];
+        const size_t k = at.second;
+        const int stratum = person_stratum(tp.spec, i);
+        const auto& outgoing = tp.schedules[stratum];
         bool at_risk = alive && k < outgoing.size();
         if (at_risk) {
           const auto& x = outgoing[k];
           if (x.sex >= 0 && x.sex != (p.female ? 1 : 0)) at_risk = false;
           if (!x.type.empty() && x.type != type && !(x.type == "partnered" && partner >= 0)) at_risk = false;
         }
-        transitions[k]->refresh(i, at_risk ? p.group : -1,
-          transition_duration ? group_entry[i] : p.born, now);
-        if (at_risk) stored_weight(transition_weights_spec, transitions[k].get(), i, false, outgoing[k].dest);
+        transitions[f]->refresh(i, at_risk ? stratum : -1, tp.duration ? tp.entry[i] : p.born, now);
+        if (at_risk) stored_weight(transition_weight_specs[at.first], transitions[f].get(), i, false, outgoing[k].dest);
       }
     }
   };
@@ -3398,7 +3465,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         const bool rate_change = calendar_changes_at(all_mortality, now) ||
           calendar_changes_at(all_fertility, now) || calendar_changes_at(all_search, now) ||
           calendar_changes_at(all_dissolution, now) || calendar_changes_at(all_conversion, now) ||
-          calendar_changes_at(all_transitions, now);
+          std::any_of(tprocs.begin(), tprocs.end(), [&](const TransitionProcess& tp) {
+            return calendar_changes_at(tp.all, now); });
         if (!rate_change && !matching_changed && !probability_changed && !weights_changed) continue;
         for (int w = 0; w < static_cast<int>(counted_woman.size()); ++w)
           remove_counted_woman(w);
@@ -3431,7 +3499,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         union_rates = calendar_slice(all_search, now);
         dissolution_rates = calendar_slice(all_dissolution, now);
         conversion_rates = calendar_slice(all_conversion, now);
-        active_transitions = calendar_slice(all_transitions, now);
+        for (auto& tp : tprocs) tp.active = calendar_slice(tp.all, now);
         load_schedules(); load_dissolution(); load_transitions();
         // Rates that keep every cell change in place: clocks continue and
         // nobody moves. A changed layout rebuilds that part, and its new
@@ -3505,15 +3573,19 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       if (x.cells && !x.cells->consistent())
         stop("Internal error: rate cell counts differ from an explicit scan.");
     if (type == EventType::transition) {
-      const int destination = transition_schedules[people[i].group][fired.slot].dest;
-      if (destination == people[i].group) stop("Invalid transition destination.");
+      const auto& at = transition_slots[fired.slot];
+      TransitionProcess& tp = tprocs[at.first];
+      const size_t cell = static_cast<size_t>(i) * dimensions + tp.dim;
+      const int origin = cats[cell];
+      const int destination = tp.schedules[person_stratum(tp.spec, i)][at.second].dest;
+      if (destination == origin) stop("Invalid transition destination.");
       const int partner = current_partner[i];
       if (people[i].female) remove_counted_woman(i); else remove_male(i);
-      tx_person.push_back(people[i].id); tx_time.push_back(now);
-      tx_origin.push_back(people[i].group); tx_dest.push_back(destination);
-      people[i].group = destination;
-      if (match_dim >= 0) cats[static_cast<size_t>(i) * dimensions + match_dim] = destination;
-      group_entry[i] = now;
+      tx_person.push_back(people[i].id); tx_time.push_back(now); tx_dim.push_back(tp.dim);
+      tx_origin.push_back(origin); tx_dest.push_back(destination);
+      cats[cell] = destination;
+      if (tp.dim == match_dim) people[i].group = destination;
+      tp.entry[i] = now;
       if (people[i].female) add_counted_woman(i, now); else add_male(i);
       // A move changes the union's group pair and the partner's partner group.
       refresh_person(i, now);
@@ -3713,7 +3785,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         counted_woman.push_back(0);
         add_counted_woman(child, now);
       }
-      group_entry.push_back(now);
+      for (auto& tp : tprocs) tp.entry.push_back(now);
       ++birth_count;
       // The newborn enters its cells; the mother's spacing (and possibly her
       // union state, in on-demand mode) has changed.
@@ -3806,7 +3878,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),
     _["transitions"] = DataFrame::create(_["person_id"] = wrap(tx_person), _["time"] = wrap(tx_time),
-      _["group_origin"] = wrap(tx_origin), _["group_dest"] = wrap(tx_dest)),
+      _["dimension"] = wrap(tx_dim), _["origin"] = wrap(tx_origin), _["destination"] = wrap(tx_dest)),
     _["groups"] = out_group, _["categories"] = out_categories, _["unions"] = out_unions,
     _["ancestry"] = out_ancestry,
     _["births"] = birth_count, _["deaths"] = death_count,

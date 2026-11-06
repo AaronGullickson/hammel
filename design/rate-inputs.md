@@ -25,7 +25,7 @@ columns do not automatically create supported rate strata.
 | Union-search attempts: `set_union_formation(model, "rate", rates = rates)` | Age, or duration since the most recent partnership ended | Currently unpartnered women | Woman's `group`; `previous_union`: `none`, `separated`, `widowed` |
 | Union dissolution: `set_union_dissolution(model, rates)` | Duration since the current union episode began | One risk per union, carried by the woman | Directional `<group>_w`/`<group>_h`; `union_type`: `cohab`/`marriage` |
 | Cohabitation-to-marriage conversion: `union_convert_rate` on union formation | Woman's age or duration since the current cohabitation began | Currently cohabiting women | Woman's `group` |
-| Individual group transitions: `set_group_transition(model, rates)` | Age or duration since latest group entry; age without earlier transition history | Directed `group_origin` and `group_dest` | `sex`; current `union_type` |
+| Individual group transitions: `set_group_transition(model, rates, group)` | Age or duration since latest entry into the current category of that dimension; age without earlier transition history | Directed `origin` and `destination`; other declared dimensions | `sex`; current `union_type` |
 
 Age bands use `age_start`/`age_end`; duration bands use
 `dur_start`/`dur_end`. No existing input supports a joint age-by-duration

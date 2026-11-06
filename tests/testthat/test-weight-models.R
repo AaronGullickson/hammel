@@ -240,21 +240,21 @@ test_that("transition weights can use person variables and the destination", {
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0)) |>
     set_union_formation("on_demand", kinship_generations = 0)
-  rates <- data.frame(group_origin = "A", group_dest = c("B", "C"), age_start = 0, age_end = Inf, rate = .2)
-  w <- create_weight_model(~ sex:group_dest,
-    c("sexf:group_destA" = 0, "sexm:group_destA" = 0, "sexf:group_destB" = log(2),
-      "sexm:group_destB" = 0, "sexf:group_destC" = 0, "sexm:group_destC" = 0),
+  rates <- data.frame(origin = "A", destination = c("B", "C"), age_start = 0, age_end = Inf, rate = .2)
+  w <- create_weight_model(~ sex:destination,
+    c("sexf:destinationA" = 0, "sexm:destinationA" = 0, "sexf:destinationB" = log(2),
+      "sexm:destinationB" = 0, "sexf:destinationC" = 0, "sexm:destinationC" = 0),
     group_levels = c("A", "B", "C"))
   out <- simulate(set_group_transition(model, rates, weights = w), 1, seed = 41)
   tx <- out$transitions
   sex <- out$persons$sex[match(tx$person_id, out$persons$person_id)]
-  b <- table(factor(sex[tx$group_dest == "B"], levels = c("f", "m")))
-  c_moves <- table(factor(sex[tx$group_dest == "C"], levels = c("f", "m")))
+  b <- table(factor(sex[tx$destination == "B"], levels = c("f", "m")))
+  c_moves <- table(factor(sex[tx$destination == "C"], levels = c("f", "m")))
   # Women are twice as likely as men to be chosen for a move to B, not to C.
   expect_lt(abs(log(b[["f"]] / b[["m"]]) - log(2)), 4 * sqrt(1 / b[["f"]] + 1 / b[["m"]]))
   expect_lt(abs(log(c_moves[["f"]] / c_moves[["m"]])), 4 * sqrt(1 / c_moves[["f"]] + 1 / c_moves[["m"]]))
-  expect_warning(group_transition(rates, weights = create_weight_model(~ group_dest,
-    c(group_destB = 1, group_destC = 1), group_levels = c("A", "B", "C"))), "no effect")
+  expect_warning(group_transition(rates, weights = create_weight_model(~ destination,
+    c(destinationB = 1, destinationC = 1), group_levels = c("A", "B", "C"))), "no effect")
 })
 
 # Unpartnered women aged 22 in two groups, with no mortality or fertility.
@@ -548,11 +548,11 @@ test_that("custom functions receive members and cells for every process", {
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0)) |>
     set_union_formation("on_demand") |>
-    set_group_transition(data.frame(group_origin = "A", group_dest = "B", sex = c("f", "m"),
+    set_group_transition(data.frame(origin = "A", destination = "B", sex = c("f", "m"),
       age_start = 0, age_end = Inf, rate = .5), weights = create_weight_model(fun = record("transition")))
   simulate(moves, 1, seed = 67)
-  expect_true(all(seen$transition$members$group_dest == "B"))
-  expect_identical(c(seen$transition$bin$group_origin, seen$transition$bin$group_dest), c("A", "B"))
+  expect_true(all(seen$transition$members$destination == "B"))
+  expect_identical(c(seen$transition$bin$origin, seen$transition$bin$destination), c("A", "B"))
   expect_true(seen$transition$bin$sex %in% c("f", "m"))
   # Fertility without calibration: custom weights at selection.
   fert <- set_fertility(weighted_fertility_model(300), data.frame(age_start = 15, age_end = 50, rate = .5),

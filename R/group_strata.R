@@ -8,20 +8,20 @@
 # Ordered categories of every declared dimension: declared categories, or
 # the population's values plus transition destinations and categories with
 # ancestry shares, in first-occurrence order.
-group_registries <- function(population, transition_rates = NULL) {
+# `transition_rates` is a list of rate tables keyed by dimension.
+group_registries <- function(population, transition_rates = list()) {
   declaration <- population$groups
   persons <- population$persons
   registries <- stats::setNames(lapply(names(declaration), function(name) {
     categories <- declaration[[name]]$categories
     if (!is.null(categories)) return(categories)
     values <- unique(persons[[name]])
-    # Transitions apply to the single dimension until they are per dimension.
-    if (length(declaration) == 1L) {
-      tx <- population$transitions
-      values <- extend_identity_groups(values, c(as.character(tx$group_origin),
-        as.character(tx$group_dest), as.character(transition_rates$group_origin),
-        as.character(transition_rates$group_dest)))
-    }
+    # Transition histories and this dimension's transition rates.
+    tx <- population$transitions
+    if (!is.null(tx)) tx <- tx[as.character(tx$group) == name, , drop = FALSE]
+    rates <- transition_rates[[name]]
+    values <- extend_identity_groups(values, c(as.character(tx$origin),
+      as.character(tx$destination), as.character(rates$origin), as.character(rates$destination)))
     shares <- population[["ancestry"]][[name]]
     if (!is.null(shares)) {
       known <- setdiff(names(shares), c("person_id", "unknown"))
@@ -55,8 +55,9 @@ rate_strata_columns <- function(rates, registries, union_level = FALSE) {
 # Index each rate row by its stratum and check that every stratum is covered
 # in each active calendar slice. Returns the rates (with `.hammel_group` when
 # stratified) and the engine specification of the process's strata.
+# Without `coverage`, uncovered strata have zero risk (group transitions).
 prepare_strata_rates <- function(rates, process, registries, start = -Inf, end = Inf,
-                                 union_level = FALSE) {
+                                 union_level = FALSE, coverage = TRUE) {
   rates$.hammel_group <- NULL
   # Person-level tables use the dimension's name; union-level tables the
   # wife's and husband's columns.
@@ -102,7 +103,7 @@ prepare_strata_rates <- function(rates, process, registries, start = -Inf, end =
   rates$.hammel_group <- index
   missing <- unique(unlist(lapply(calendar_rate_slices(rates, start, end), function(x)
     if (nrow(x)) setdiff(seq_len(count) - 1L, x$.hammel_group) else integer())))
-  if (length(missing))
+  if (coverage && length(missing))
     stop(sprintf("%s rates are missing schedules for group(s): %s.", process,
                  paste(vapply(sort(missing), label, ""), collapse = "; ")), call. = FALSE)
   check_strata_overlap(rates, process)
@@ -126,6 +127,7 @@ group_engine_input <- function(persons, registries, specs) {
                  strides = as.integer(cumprod(c(1, utils::head(counts, -1)))),
                  count = as.integer(prod(counts)))
   c(list(dimensions = n, categories = categories, counts = unname(counts),
+         labels = unname(lapply(registries, as.character)),
          match_dim = if (n == 1L) 0L else -1L, report = report), specs)
 }
 
@@ -143,7 +145,7 @@ decode_report_strata <- function(index, registries) {
 check_strata_overlap <- function(rates, process) {
   if (!nrow(rates)) return(invisible(rates))
   keys <- intersect(c(".hammel_group", "sex", "union_type", "previous_union", "parity_start",
-                      "time_start"), names(rates))
+                      "destination", "time_start"), names(rates))
   for (axis in c("age", "dur")) {
     lo <- paste0(axis, "_start"); hi <- paste0(axis, "_end")
     if (!lo %in% names(rates)) next
