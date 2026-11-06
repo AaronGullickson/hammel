@@ -7,7 +7,9 @@
 // Private observation adapter: labels are indexed in R, with one row per
 // change. The public population retains the original transition table.
 class GroupHistory {
+public:
   struct Change { double time; int from, to; };
+private:
   std::vector<std::vector<Change>> changes;
   Rcpp::IntegerVector final_group;
 public:
@@ -26,9 +28,12 @@ public:
     if (h.empty()) return final_group[row];
     auto next = std::lower_bound(h.begin(), h.end(), time,
       [](const Change& c, double t) { return c.time < t; });
-    if (!left && next != h.end() && next->time == time) ++next;
+    // A combined history (several dimensions) can hold several changes at
+    // one instant; the state after a time follows all of them.
+    if (!left) while (next != h.end() && next->time == time) ++next;
     return next == h.begin() ? h.front().from : std::prev(next)->to;
   }
+  const std::vector<Change>& of(int row) const { return changes[row]; }
   void append_times(int row, std::vector<double>& times) const {
     for (const auto& change : changes[row]) times.push_back(change.time);
   }

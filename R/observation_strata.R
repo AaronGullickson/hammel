@@ -1,11 +1,20 @@
 # Shared support for the `by` argument of rate calculators (D133).
 
 # Validate `by` against the variables a calculator accepts.
-check_by <- function(by, allowed, fun) {
+# `dims` (declared group dimensions) replaces the internal `group` columns in
+# the list of accepted names.
+check_by <- function(by, allowed, fun, dims = NULL) {
   if (is.null(by)) return(character())
   if (!is.character(by) || !is.null(dim(by)) || anyNA(by) || anyDuplicated(by))
     stop("`by` must be NULL or a character vector of distinct variable names.", call. = FALSE)
   unknown <- setdiff(by, allowed)
+  if (length(unknown) && length(dims)) {
+    shown <- unlist(lapply(allowed, function(a) {
+      suffix <- sub("^group", "", a)
+      if (a %in% c("group", "group_w", "group_h")) paste0(dims, suffix) else a
+    }))
+    allowed <- shown
+  }
   if (length(unknown))
     stop(sprintf("`%s()` cannot split by %s; `by` accepts %s.", fun,
                  paste0("\"", unknown, "\"", collapse = ", "),
@@ -74,7 +83,7 @@ union_type_labels <- function(typed) {
 run_person_lexis <- function(obs, by, time_breaks, axis_breaks, axis = 0L,
                              parity_breaks = numeric(), sex = FALSE, group = "group" %in% by,
                              utype_filter = 0L, previous_mask = c(TRUE, TRUE, TRUE),
-                             pool_dissolved = FALSE, exclusive = NULL) {
+                             pool_dissolved = FALSE, exclusive = NULL, group_target = NULL) {
   utype <- "union_type" %in% by
   previous <- "previous_union" %in% by
   if (is.null(exclusive)) exclusive <- obs$typed || previous || utype_filter > 0L
@@ -83,6 +92,7 @@ run_person_lexis <- function(obs, by, time_breaks, axis_breaks, axis = 0L,
     axis = as.integer(axis), utype_filter = as.integer(utype_filter),
     previous_mask = previous_mask, sex = sex, group = group, union_type = utype,
     previous_union = previous, previous_map = map)
+  if (!is.null(group_target)) options$group_target <- as.integer(group_target)
   ng <- if (is.null(obs$groups)) 1L else length(obs$groups)
   counts <- person_lexis_cpp(obs$persons, obs$unions, obs$group_indices, ng,
     time_breaks, axis_breaks, if (length(parity_breaks)) parity_breaks else numeric(1), options)
@@ -223,29 +233,163 @@ union_strata <- function(population, unions, by, stride, typed_split = "union_ty
        count = combos * if (typed_split) 2L else 1L, dims = dims)
 }
 
-# The calculators split by one internal `group` column. Map a population's
-# single declared dimension to it, so `by` uses the dimension's own name
-# (`"race"`, or `"race_w"`/`"race_h"` for union rates) and outputs keep it.
-# Several dimensions in `by` arrive with milestone 9 stage 4.
-observation_alias <- function(population, by, suffixes = "") {
-  if (!inherits(population, "hammel_population") || !length(population$groups))
-    return(list(population = population, by = by, rename = character()))
+# The calculators split by one internal `group` column (`group_w`/`group_h`
+# for union rates). `by` names declared dimensions (`"race"`, or
+# `"race_w"`/`"race_h"`); with one dimension it maps directly to `group`. With
+# several requested, `group` is a combined code over them (declaration order,
+# first fastest), with a merged history of their moves, and finish_strata()
+# splits it back into one column per dimension. `extra` adds dimensions to
+# the combination (a transition's own dimension, first).
+observation_alias <- function(population, by, suffixes = "", extra = character()) {
+  none <- list(population = population, by = by, rename = character())
+  if (!inherits(population, "hammel_population") || !length(population$groups)) return(none)
   dims <- names(population$groups)
-  requested <- intersect(by, as.vector(outer(dims, suffixes, paste0)))
-  if (length(dims) > 1L) {
-    if (length(requested))
-      stop("Splitting by group requires exactly one declared group dimension for now.", call. = FALSE)
-    return(list(population = population, by = by, rename = character()))
+  none$dims <- dims
+  external <- as.vector(outer(dims, suffixes, paste0))
+  if (length(dims) == 1L && !length(extra)) {
+    dim <- dims
+    if (dim != "group" && any(paste0("group", suffixes) %in% by))
+      stop(sprintf("Split by the declared group dimension `%s`, not `group`.", dim), call. = FALSE)
+    population <- dimension_view(population, dim)
+    hit <- by %in% external
+    if (any(hit)) by[hit] <- paste0("group", suffixes)[match(by[hit], paste0(dim, suffixes))]
+    return(list(population = population, by = by, dims = dims,
+                rename = stats::setNames(paste0(dim, suffixes), paste0("group", suffixes))))
   }
-  dim <- dims
-  if (dim != "group" && any(paste0("group", suffixes) %in% by))
-    stop(sprintf("Split by the declared group dimension `%s`, not `group`.", dim), call. = FALSE)
-  population <- dimension_view(population, dim)
-  external <- paste0(dim, suffixes)
-  hit <- by %in% external
-  if (any(hit)) by[hit] <- paste0("group", suffixes)[match(by[hit], external)]
-  list(population = population, by = by,
-       rename = stats::setNames(external, paste0("group", suffixes)))
+  if (!"group" %in% dims && any(paste0("group", suffixes) %in% by))
+    stop(sprintf("Split by declared group dimensions (%s), not `group`.",
+                 paste0("`", dims, "`", collapse = ", ")), call. = FALSE)
+  requests <- lapply(suffixes, function(x) dims[paste0(dims, x) %in% by])
+  used <- unique(c(extra, dims[dims %in% unlist(requests)]))
+  if (!length(used)) return(none)
+  combined <- combine_dimensions(population, used)
+  view <- population
+  view$persons$group <- combined$current
+  view$groups <- list(group = group())
+  view$transitions <- empty_transitions()
+  view["ancestry"] <- list(NULL)
+  view[[".hammel_combined"]] <- list(values = seq_len(combined$count) - 1L, history = combined$history)
+  # Internal `by`: one combined column per suffix, where its first dimension was.
+  internal <- by
+  for (k in seq_along(suffixes)) {
+    names_k <- paste0(requests[[k]], suffixes[k])
+    if (!length(names_k)) next
+    first <- min(match(names_k, internal))
+    internal[first] <- paste0("group", suffixes[k])
+    internal <- internal[!internal %in% names_k]
+  }
+  list(population = view, by = internal, rename = character(), external = by, dims = dims,
+       suffixes = suffixes, requests = requests,
+       combined = combined, extra = extra)
+}
+
+# A combined code over dimensions `dims` (the first fastest): each person's
+# current code, and a merged history with one row per move in any of them,
+# moves at one instant in declaration order.
+combine_dimensions <- function(population, dims) {
+  persons <- population$persons
+  tx <- population$transitions
+  tx <- if (is.null(tx)) empty_transitions() else tx[tx$group %in% dims, , drop = FALSE]
+  categories <- lapply(stats::setNames(dims, dims), function(d) {
+    x <- tx[tx$group == d, , drop = FALSE]
+    extend_identity_groups(unique(persons[[d]]), c(as.character(x$origin), as.character(x$destination)))
+  })
+  sizes <- vapply(categories, length, integer(1))
+  strides <- as.integer(cumprod(c(1, utils::head(sizes, -1))))
+  code <- function(d, values) match(as.character(values), as.character(categories[[d]])) - 1L
+  current <- Reduce(`+`, lapply(seq_along(dims), function(k) code(dims[k], persons[[dims[k]]]) * strides[k]))
+  history <- data.frame(person_id = numeric(), time = numeric(), from = integer(), to = integer())
+  if (nrow(tx)) {
+    tx <- tx[order(tx$person_id, tx$time, match(tx$group, dims)), , drop = FALSE]
+    n <- nrow(tx)
+    first_row <- !duplicated(tx$person_id)
+    start <- cummax(ifelse(first_row, seq_len(n), 0L))   # each row's person's first row
+    row_person <- match(tx$person_id, persons$person_id)
+    after <- before <- 0L
+    for (k in seq_along(dims)) {
+      d <- dims[k]
+      mine <- tx$group == d
+      # The person's category in d before any move: the origin of their first
+      # move in d, or their current category.
+      first_d <- mine & !duplicated(ifelse(mine, tx$person_id, NA)) & mine
+      initial <- code(d, persons[[d]])[row_person]
+      first_origin <- tapply(code(d, tx$origin[first_d]), tx$person_id[first_d], function(x) x[1])
+      known <- match(as.character(tx$person_id), names(first_origin))
+      initial[!is.na(known)] <- as.integer(first_origin[known[!is.na(known)]])
+      # Category after each row: the latest destination in d so far.
+      last <- cummax(ifelse(mine, seq_len(n), 0L))
+      value_after <- ifelse(last >= start & last > 0L, code(d, tx$destination)[pmax(last, 1L)], initial)
+      previous <- c(NA, value_after[-n])
+      value_before <- ifelse(first_row, initial, previous)
+      after <- after + value_after * strides[k]
+      before <- before + value_before * strides[k]
+    }
+    history <- data.frame(person_id = tx$person_id, time = tx$time, from = as.integer(before),
+                          to = as.integer(after))
+  }
+  decode <- as.data.frame(lapply(seq_along(dims), function(k)
+    categories[[k]][(seq_len(prod(sizes)) - 1L) %/% strides[k] %% sizes[k] + 1L]),
+    stringsAsFactors = FALSE, col.names = dims)
+  list(current = as.integer(current), history = history, count = as.integer(prod(sizes)),
+       categories = categories, decode = decode, dims = dims)
+}
+
+# Encode per-dimension labels (columns named `<dim><suffix>`) as combined codes.
+encode_combined <- function(alias, data, suffix = "") {
+  combined <- alias$combined
+  sizes <- vapply(combined$categories, length, integer(1))
+  strides <- cumprod(c(1, utils::head(sizes, -1)))
+  code <- 0
+  for (k in seq_along(combined$dims)) {
+    column <- paste0(combined$dims[k], suffix)
+    if (!column %in% names(data)) return(rep(NA_integer_, nrow(data)))
+    code <- code + (match(as.character(data[[column]]), as.character(combined$categories[[k]])) - 1L) *
+      strides[k]
+  }
+  as.integer(code)
+}
+
+# Split combined columns back into one column per requested dimension, sum
+# over dimensions combined but not requested (union rates), and order rows and
+# columns by the user's `by`. `events`, `exposure` and `rate` name the count,
+# exposure and rate columns to recompute after summing.
+finish_strata <- function(out, alias, events = NULL, exposure = NULL, rate = NULL) {
+  if (is.null(alias$combined)) return(rename_group_columns(out, alias$rename))
+  internal <- intersect(alias$by, names(out))
+  block <- match(internal, names(out))
+  before <- names(out)[seq_len(min(block) - 1L)]
+  after <- setdiff(names(out)[-seq_len(max(block))], internal)
+  decode <- alias$combined$decode
+  for (k in seq_along(alias$suffixes)) {
+    column <- paste0("group", alias$suffixes[k])
+    if (!column %in% names(out)) next
+    rows <- match(out[[column]], seq_len(nrow(decode)) - 1L)
+    for (d in alias$requests[[k]]) out[[paste0(d, alias$suffixes[k])]] <- decode[[d]][rows]
+  }
+  keys <- c(before, alias$external)
+  out <- out[c(keys, after)]
+  dropped <- any(vapply(seq_along(alias$suffixes), function(k)
+    paste0("group", alias$suffixes[k]) %in% internal &&
+      !setequal(alias$requests[[k]], alias$combined$dims), logical(1)))
+  if (dropped) {
+    key <- do.call(paste, c(lapply(out[keys], as.character), sep = "\r"))
+    first <- !duplicated(key)
+    group <- match(key, key[first])
+    summed <- out[first, , drop = FALSE]
+    summed[[events]] <- as.vector(tapply(out[[events]], group, sum))
+    summed[[exposure]] <- as.vector(tapply(out[[exposure]], group, sum))
+    summed[[rate]] <- as.numeric(ifelse(summed[[exposure]] > 0, summed[[events]] / summed[[exposure]], NA_real_))
+    out <- summed
+  }
+  # The first `by` variable varies fastest; ties keep the calculator's order.
+  order_keys <- lapply(rev(alias$external), function(b) {
+    x <- as.character(out[[b]])
+    dim <- sub("_[wh]$", "", b)
+    levels <- if (dim %in% names(alias$combined$categories)) as.character(alias$combined$categories[[dim]]) else unique(x)
+    match(x, levels)
+  })
+  out <- out[do.call(order, c(order_keys, list(seq_len(nrow(out))))), , drop = FALSE]
+  tibble::as_tibble(out)
 }
 
 # Rename internal group columns to the dimension's own names.

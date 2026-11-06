@@ -25,8 +25,8 @@ If the final boundary is finite, Inf is appended to create an open-ended
 final age band starting at that boundary.}
 
 \item{by}{\code{NULL} (default) or a character vector of variables to split
-results over: \code{"group"}, \code{"union_type"} and \code{"previous_union"}. See
-below.}
+results over: declared group dimensions, \code{"union_type"} and
+\code{"previous_union"}. See below.}
 
 \item{parity_breaks}{NULL to pool parities, or strictly increasing nonnegative
 integer boundaries starting at zero. Bands are half-open. A finite final

@@ -1,10 +1,10 @@
 # Milestone 9: multiple group dimensions
 
-Started November 5, 2026. **Status: design decided (D134); stages 1–3
+Started November 5, 2026. **Status: design decided (D134); stages 1–4
 implemented: declared dimensions of any name, several at once, in every rate
 table, with per-dimension inheritance (including calendar schedules),
-ancestry and transitions. Matching and weight-model group effects and `by`
-group splits still use a single dimension (stages 4–5).**
+ancestry, transitions and analysis splits. Matching and weight-model group
+effects still use a single dimension (stage 5).**
 This records the user's decisions as they are made. Milestone 9 was assigned
 multiple group columns by D131. See the [roadmap](roadmap.md#milestone-9-multiple-group-columns)
 for the motivation and the household-move questions retained from D114.
@@ -147,6 +147,29 @@ Step 1, each stage leaving the test suite passing:
 6. Tests, articles and documents.
 
 Step 2: joint matching calibration across dimensions.
+
+### Stage 4 as implemented (November 2026)
+
+- `by` in every calculator accepts any declared dimensions by name, several at
+  once, and union rates accept any combination of `<dim>_w`/`<dim>_h`.
+  Results have one column per dimension; the grid is the full cross of each
+  dimension's observed categories (first-appearance order, as before).
+- Implementation: the listed dimensions form one combined internal category
+  with a merged history of their moves (same-instant moves in declaration
+  order); results are split back, and union rates sum over partner-dimension
+  combinations not requested. With one dimension the code path is unchanged
+  and results are identical to stage 3.
+- The observation engine now reads a history with several moves at one
+  instant (state after a time follows all of them), and takes an optional map
+  from combined category to one dimension: `calculate_transition_rates(...,
+  group = "race", by = "region")` counts only race moves, with race duration
+  unaffected by region moves.
+- `by` errors list the declared dimension names rather than the internal
+  `group`.
+- Summaries (`calculate_tfr()`, `calculate_life_table()`,
+  `calculate_patfr()`) now keep every non-band, non-measure column as a
+  stratum. Previously only `group` was kept, so a rate table split by a
+  dimension with any other name (possible since stage 2) was pooled or failed.
 
 ### Stage 3 as implemented (November 2026)
 

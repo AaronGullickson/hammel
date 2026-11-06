@@ -21,8 +21,10 @@
 #' @param by `NULL` (default) or a character vector of variables to split
 #'   results over: `"sex"`, `"union_type"` (current union state; typed
 #'   histories use unpartnered/cohab/marriage, untyped unpartnered/partnered)
-#'   and `"previous_union"`, as in [calculate_mortality_rates()]. Union
-#'   variables require exclusive histories. A transition counts under the union
+#'   and `"previous_union"`, as in [calculate_mortality_rates()], and other
+#'   declared group dimensions (the person's category there at the time; only
+#'   moves in `group` count, and duration is unaffected by moves in other
+#'   dimensions). Union variables require exclusive histories. A transition counts under the union
 #'   state after same-time union changes, which precede transitions.
 #' @param group The declared group dimension whose transitions are counted.
 #'   `NULL` (default) means the only declared dimension.
@@ -63,8 +65,21 @@ calculate_transition_rates <- function(population, time_breaks, age_breaks = NUL
   }
   if (!is.character(group) || length(group) != 1L || !group %in% dims)
     stop("`group` must name one declared group dimension.", call. = FALSE)
-  population <- dimension_view(population, group)
-  by <- check_by(by, c("sex", "union_type", "previous_union"), "calculate_transition_rates")
+  if (group %in% by)
+    stop(sprintf("Transitions in `%s` are split by origin and destination, not by `%s` in `by`.",
+                 group, group), call. = FALSE)
+  # Other dimensions in `by` combine with this one: the internal group is
+  # the combination, and only moves in this dimension count.
+  external <- check_by(by, c("sex", "union_type", "previous_union", setdiff(dims, group)),
+                       "calculate_transition_rates")
+  others <- intersect(external, dims)
+  alias <- NULL
+  if (length(others)) {
+    alias <- observation_alias(population, by, extra = group)
+    population <- alias$population
+    by <- setdiff(alias$by, "group")
+  } else population <- dimension_view(population, group)
+  by <- check_by(by, c("sex", "union_type", "previous_union"), "calculate_transition_rates", alias$dims)
   check_pool_dissolved(pool_dissolved, by)
   if (is.null(age_breaks) == is.null(dur_breaks))
     stop("Supply exactly one of `age_breaks` and `dur_breaks`.", call. = FALSE)
@@ -76,9 +91,11 @@ calculate_transition_rates <- function(population, time_breaks, age_breaks = NUL
   obs <- person_observation(population, by, tail(time_breaks, 1), grouped = TRUE,
                             validate = FALSE)
   union_vars <- any(c("union_type", "previous_union") %in% by)
+  size <- if (is.null(alias)) 0L else length(alias$combined$categories[[1]])
   counts <- run_person_lexis(obs, setdiff(by, "sex"), time_breaks, breaks,
     axis = if (duration) 1L else 0L, sex = "sex" %in% by, group = TRUE,
-    pool_dissolved = pool_dissolved, exclusive = union_vars)
+    pool_dissolved = pool_dissolved, exclusive = union_vars,
+    group_target = if (size) obs$groups %% size)
   s <- counts$strides
   groups <- obs$groups
   dims <- c(list(band_dim(time_breaks, "time", 1),
@@ -87,7 +104,12 @@ calculate_transition_rates <- function(population, time_breaks, age_breaks = NUL
     label_dim("origin", groups, s[["group"]])),
     person_by_dims(by, obs, counts, pool_dissolved))
   rows <- build_rows(dims)
-  rows <- rows[rows$origin != rows$destination, , drop = FALSE]
+  if (size) {
+    # Combined codes: keep moves in this dimension only (other dimensions
+    # unchanged), then label each part.
+    o <- rows$origin; d <- rows$destination
+    rows <- rows[o %% size != d %% size & o %/% size == d %/% size, , drop = FALSE]
+  } else rows <- rows[rows$origin != rows$destination, , drop = FALSE]
   dest <- rows$.key3 - 1L
   axis <- if (duration) "dur" else "age"
   out <- tibble::as_tibble(rows[c("time_start", "time_end", paste0(axis, c("_start", "_end")),
@@ -95,5 +117,20 @@ calculate_transition_rates <- function(population, time_breaks, age_breaks = NUL
   out$person_years <- counts$person_years[rows$.index - dest * counts$cells]
   out$transitions <- counts$transitions[rows$.index]
   out$rate_transition <- as.numeric(ifelse(out$person_years > 0, out$transitions / out$person_years, NA_real_))
+  if (size) {
+    decode <- alias$combined$decode
+    code <- out$origin
+    for (d in others) out[[d]] <- decode[[d]][code + 1L]
+    out$origin <- decode[[group]][code + 1L]
+    out$destination <- decode[[group]][out$destination + 1L]
+    out <- out[c("time_start", "time_end", paste0(axis, c("_start", "_end")), "origin", "destination",
+                 external, "person_years", "transitions", "rate_transition")]
+    # The first `by` variable varies fastest; ties keep the calculator's order.
+    keys <- lapply(rev(external), function(b) {
+      x <- as.character(out[[b]])
+      match(x, if (b %in% others) as.character(alias$combined$categories[[b]]) else unique(x))
+    })
+    out <- out[do.call(order, c(keys, list(seq_len(nrow(out))))), , drop = FALSE]
+  }
   add_rate_confidence(out, "transitions", "person_years", conf.level)
 }

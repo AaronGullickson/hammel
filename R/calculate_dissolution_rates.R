@@ -24,13 +24,15 @@
 #' @param dur_breaks Strictly increasing nonnegative duration boundaries in years.
 #'   If the last boundary is finite, append Inf for an open final band.
 #' @param by `NULL` (default) or a character vector of variables to split
-#'   results over: `"group_w"` and `"group_h"` (the wife's and husband's
-#'   current groups, following transition histories; directional, so sum
-#'   A-wife/B-husband and B-wife/A-husband rows for an unordered pair) and
+#'   results over: `"<group>_w"` and `"<group>_h"` for declared group
+#'   dimensions, such as `"race_w"` and `"region_h"` (the wife's and
+#'   husband's current categories, following transition histories;
+#'   directional, so sum A-wife/B-husband and B-wife/A-husband rows for an
+#'   unordered pair; any combination of dimensions and partners) and
 #'   `"union_type"` (cohab or marriage, each with its own exposure;
 #'   conversion stops cohabitation exposure without counting as dissolution,
 #'   and duration resets at the start of the linked marriage). Population
-#'   inputs require person groups for the group variables; bare union tables
+#'   inputs require declared groups for the group variables; bare union tables
 #'   require `group_w`, `group_h` or `union_type` columns. A dissolution counts
 #'   under the groups before any same-time transition.
 #' @inheritParams calculate_mortality_rates
@@ -51,7 +53,7 @@ calculate_dissolution_rates <- function(population, time_breaks, dur_breaks, by 
   alias <- observation_alias(population, by, c("_w", "_h"))
   population <- alias$population
   by <- alias$by
-  by <- check_by(by, c("group_w", "group_h", "union_type"), "calculate_dissolution_rates")
+  by <- check_by(by, c("group_w", "group_h", "union_type"), "calculate_dissolution_rates", alias$dims)
   check_demographic_breaks(time_breaks, "time_breaks")
   check_demographic_breaks(dur_breaks, "dur_breaks", ages = TRUE)
   if (is.finite(tail(dur_breaks, 1))) dur_breaks <- c(dur_breaks, Inf)
@@ -88,5 +90,6 @@ calculate_dissolution_rates <- function(population, time_breaks, dur_breaks, by 
   result$dissolutions <- counts$dissolutions[rows$.index]
   result$rate_dissolution <- as.numeric(ifelse(result$union_years > 0,
     result$dissolutions / result$union_years, NA_real_))
-  rename_group_columns(add_rate_confidence(result, "dissolutions", "union_years", conf.level), alias$rename)
+  result <- finish_strata(result, alias, "dissolutions", "union_years", "rate_dissolution")
+  add_rate_confidence(result, "dissolutions", "union_years", conf.level)
 }

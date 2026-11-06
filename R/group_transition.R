@@ -249,8 +249,18 @@ dimension_view <- function(population, dim) {
 
 # Private observation copies carry indexed histories to all native counters.
 prepare_group_observations <- function(persons, population, by_group) {
+  if (!isTRUE(by_group)) return(persons)
+  # A combined view of several dimensions carries indexed codes directly.
+  combined <- if (inherits(population, "hammel_population")) population[[".hammel_combined"]]
+  if (!is.null(combined)) {
+    attr(persons, ".hammel_group_values") <- combined$values
+    h <- combined$history
+    if (nrow(h)) attr(persons, ".hammel_group_history") <- list(
+      row = match(h$person_id, persons$person_id) - 1L, time = h$time, from = h$from, to = h$to)
+    return(persons)
+  }
   tx <- if (inherits(population, "hammel_population")) population$transitions else NULL
-  if (!isTRUE(by_group) || is.null(tx) || !nrow(tx)) return(persons)
+  if (is.null(tx) || !nrow(tx)) return(persons)
   groups <- extend_identity_groups(unique(persons$group), c(as.character(tx$origin), as.character(tx$destination)))
   attr(persons, ".hammel_group_values") <- groups
   attr(persons, ".hammel_group_history") <- list(
@@ -283,7 +293,9 @@ groups_at <- function(population, rows, times, left = FALSE, histories = NULL) {
 prepare_union_group_observations <- function(unions, population, mode, typed,
                                               identity_count, group_count) {
   tx <- population$transitions
-  if (is.null(tx) || !nrow(tx) || !nrow(unions)) return(unions)
+  combined <- population[[".hammel_combined"]]
+  moves <- if (is.null(combined)) nrow(tx) else nrow(combined$history)
+  if (!length(moves) || !moves || !nrow(unions)) return(unions)
   persons <- prepare_group_observations(population$persons, population, TRUE)
   identities <- observation_groups(persons, TRUE)
   indices <- match(persons$group, identities) - 1L

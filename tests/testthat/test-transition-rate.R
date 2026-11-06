@@ -126,7 +126,9 @@ test_that("transition counter rejects invalid axes, endpoints and flags", {
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(-1, Inf)), "nonnegative")
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = NA), "`by` must")
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = 1), "`by` must")
-  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "group"), "cannot split")
+  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "group"),
+               "not by `group` in `by`")
+  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "region"), "cannot split")
   pop$persons$group <- NULL; pop$transitions <- NULL
   pop$groups <- list(group = group())
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf)), "group")

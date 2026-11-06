@@ -79,22 +79,43 @@ November 5, 2026.
 
 | Function | `by` values | Always split by |
 | --- | --- | --- |
-| `calculate_mortality_rates()` | `group`, `union_type`, `previous_union` | `sex` |
-| `calculate_fertility_rates()` | `group`, `union_type`, `previous_union` | women only; `parity_breaks` optional |
-| `calculate_union_rates()` | `group`, `previous_union`, `union_type` (type entered) | `sex` |
-| `calculate_marriage_rates()` | `group`, `previous_union` | `sex` |
-| `calculate_transition_rates()` | `sex`, `union_type`, `previous_union` | `origin`, `destination` (the dimension chosen by `group`) |
-| `calculate_population_size()` | `sex`, `group`, `union_type`, `previous_union` | — |
-| `calculate_dissolution_rates()` | `group_w`, `group_h`, `union_type` | — |
-| `calculate_cohab_convert_rate()` | `group_w`, `group_h` | — |
+| `calculate_mortality_rates()` | dimensions, `union_type`, `previous_union` | `sex` |
+| `calculate_fertility_rates()` | dimensions, `union_type`, `previous_union` | women only; `parity_breaks` optional |
+| `calculate_union_rates()` | dimensions, `previous_union`, `union_type` (type entered) | `sex` |
+| `calculate_marriage_rates()` | dimensions, `previous_union` | `sex` |
+| `calculate_transition_rates()` | `sex`, `union_type`, `previous_union`, other dimensions | `origin`, `destination` (the dimension chosen by `group`) |
+| `calculate_population_size()` | `sex`, dimensions, `union_type`, `previous_union` | — |
+| `calculate_dissolution_rates()` | `<dim>_w`, `<dim>_h`, `union_type` | — |
+| `calculate_cohab_convert_rate()` | `<dim>_w`, `<dim>_h` | — |
 
-Unknown or repeated names are errors that list the accepted values.
+"Dimensions" are declared group dimensions by name, such as `race` and
+`region` (D134); the examples below use a single dimension named `group`.
+Unknown or repeated names are errors that list the accepted values, naming
+the declared dimensions.
+
+**Several dimensions (D134 stage 4).** Any number of dimensions may be listed,
+each giving its own column; for union rates any combination of partners and
+dimensions, such as `by = c("race_w", "region_h")`. Each dimension's
+categories appear in order of first appearance (in persons, then its
+transition history), as with one dimension, and the output is the full grid
+of their categories, including combinations without exposure. Exposure is
+split at every move in any listed dimension; a person's moves in several
+dimensions at one instant are applied in declaration order. Internally the
+listed dimensions form one combined category with a merged history; results
+are then split back into one column per dimension, and union rates sum over
+partner-dimension combinations that were not requested. Rows follow the
+usual rule: the first `by` variable varies fastest after the fixed columns.
+In `calculate_transition_rates()`, other dimensions in `by` split the origin
+exposure by the person's category there; only moves in the chosen dimension
+count, and duration counts from entering its current category, unaffected by
+moves in other dimensions. The chosen dimension itself cannot be in `by`.
 
 **Variables.** Each is the person's (or union's) state at the time, changing
 only at recorded events:
 
 - `sex`: `m` or `f`.
-- `group`: current group, following the transition history.
+- A dimension's name (such as `race`): the current category, following that
+  dimension's transition history.
 - `union_type`: current union state, `unpartnered`, `cohab` or `marriage` for
   typed histories and `unpartnered` or `partnered` for untyped ones, always in
   that order. In `calculate_union_rates()` it is instead the type of union
@@ -106,11 +127,11 @@ only at recorded events:
   policy (D085). It applies to partnered time too: a woman in her first union
   is `none`. `pool_dissolved = TRUE` merges `separated` and `widowed` into
   `dissolved` in any calculator when `previous_union` is in `by`.
-- `group_w`, `group_h`: the wife's and husband's current groups, for
-  union-level rates. Directional: A-wife/B-husband and B-wife/A-husband are
+- `<dim>_w`, `<dim>_h` (such as `race_w`): the wife's and husband's current
+  categories, for union-level rates. Directional: A-wife/B-husband and B-wife/A-husband are
   separate rows; sum them for an unordered pair.
 
-`group` requires population groups. `union_type` and `previous_union` require
+Dimension names require declared groups. `union_type` and `previous_union` require
 a `hammel_population` with union histories, and `previous_union` requires
 nonoverlapping histories for each person. Union rates by entry type and
 conversion rates require typed histories. Bare union tables passed to
@@ -198,9 +219,12 @@ output_tfr <- fertility_summary |> calculate_tfr()
 and sums ASFR times each finite band's actual width by period. There is no
 `age_range` argument; subset the summary to the desired age range first.
 Remaining bands must be contiguous. The output reports the finite range used.
-A `group` column automatically separates TFR calculations within each period
-and union status, preserving group labels and their type. This applies to
-process rates as well as Lexis summaries; groups are not averaged together.
+Any column that is not a band or measure, such as a group dimension (`race`,
+`region`), automatically separates TFR calculations within each period and
+union status, preserving labels and their type. This applies to process rates
+as well as Lexis summaries; groups are not averaged together. Life tables and
+PATFRs separate strata the same way. (Before stage 4 only a column named
+`group` did, so tables split by a dimension with another name were pooled.)
 
 If any ASFR in the included finite age bands is missing, TFR is `NA` for
 that period/group/status, including when all ASFRs are missing. Known zero

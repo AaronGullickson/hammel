@@ -58,11 +58,16 @@ struct Histories {
   std::vector<std::vector<Formation>> formations;
   std::vector<std::vector<int>> children;  // child rows, by mother
   std::vector<int> mother_row;
-  std::vector<std::vector<std::pair<double, int>>> moves;  // time, destination
+  struct Move { double time; int from, to; };
+  std::vector<std::vector<Move>> moves;
 };
 
+// `target` maps each group index to a category of the dimension whose entry
+// starts group duration (empty: every group change does). It is used when a
+// group index combines several dimensions.
 Histories build_histories(DataFrame persons, DataFrame unions, IntegerVector groups,
-                          bool typed, bool exclusive, bool counts_cohab) {
+                          bool typed, bool exclusive, bool counts_cohab,
+                          const std::vector<int>& target = std::vector<int>()) {
   Histories h;
   h.ids = persons["person_id"]; h.born = persons["birth_time"];
   h.died = persons["death_time"]; h.mothers = persons["mother_id"];
@@ -152,24 +157,25 @@ Histories build_histories(DataFrame persons, DataFrame unions, IntegerVector gro
       }
     }
     for (int child : h.children[i]) changes.push_back({h.born[child], kBirth, 3, 0, 0});
-    std::vector<double> times;
-    group_history.append_times(i, times);
-    for (double t : times) {
-      const int to = group_history.at(i, t);
-      changes.push_back({t, kTransition, 0, to, 0});
-      h.moves[i].push_back({t, to});
+    const auto& moved = group_history.of(i);
+    for (const auto& m : moved) {
+      changes.push_back({m.time, kTransition, 0, m.to, 0});
+      h.moves[i].push_back({m.time, m.from, m.to});
     }
     std::stable_sort(changes.begin(), changes.end(), [](const Change& a, const Change& b) {
       return a.time < b.time || (a.time == b.time && a.rank < b.rank);
     });
     State s;
-    s.group = times.empty() ? groups[i] : group_history.at(i, h.born[i], true);
+    s.group = moved.empty() ? groups[i] : group_history.at(i, h.born[i], true);
     s.group_entry = h.born[i];
     auto& line = h.timelines[i];
     line.push_back({R_NegInf, -1, s});
     for (const auto& c : changes) {
       switch (c.kind) {
-        case 0: s.group = c.value; s.group_entry = c.time; break;
+        case 0:
+          if (target.empty() || target[s.group] != target[c.value]) s.group_entry = c.time;
+          s.group = c.value;
+          break;
         case 1: s.utype = typed ? c.value : 1; break;
         case 2:
           s.utype = 0;
@@ -237,7 +243,10 @@ List person_lexis_cpp(DataFrame persons, DataFrame unions, IntegerVector groups,
   L.ng = L.group ? group_count : 1; L.nk = L.utype ? (typed ? 3 : 2) : 1;
   L.nr = L.previous ? max(L.previous_map) + 1 : 1;
   const double horizon = time_breaks[L.nt];
-  Histories h = build_histories(persons, unions, groups, typed, exclusive, counts_cohab);
+  std::vector<int> target;
+  if (options.containsElementNamed("group_target"))
+    target = as<std::vector<int>>(options["group_target"]);
+  Histories h = build_histories(persons, unions, groups, typed, exclusive, counts_cohab, target);
   const R_xlen_t cells = L.cells();
   NumericVector exposure(cells), deaths(cells), births(cells), formations(cells * 3),
     transitions(cells * group_count), unknown(L.nt);
@@ -321,14 +330,18 @@ List person_lexis_cpp(DataFrame persons, DataFrame unions, IntegerVector groups,
         formations[L.cell(t, a, s, p, y) + cells * f.kind] += 1;
       }
     }
-    // Group transitions, from the origin group.
+    // Group transitions, from the origin group. With a combined group index,
+    // only changes in the target dimension count; a same-instant change in
+    // another dimension may precede it, so the origin is the move's own.
     for (const auto& m : h.moves[i]) {
-      const State& x = state_at(line, m.first, kTransitionEvent);
-      const int t = observation_bin(m.first, time_breaks);
-      const int a = observation_bin(m.first - origin_of(i, x), axis_breaks);
+      if (!target.empty() && target[m.from] == target[m.to]) continue;
+      State x = state_at(line, m.time, kTransitionEvent);
+      x.group = m.from;
+      const int t = observation_bin(m.time, time_breaks);
+      const int a = observation_bin(m.time - origin_of(i, x), axis_breaks);
       const int p = parity_bin(x.parity);
       if (t >= 0 && a >= 0 && p >= 0 && included(x))
-        transitions[L.cell(t, a, s, p, x) + cells * m.second] += 1;
+        transitions[L.cell(t, a, s, p, x) + cells * m.to] += 1;
     }
   }
   // Births with unknown mothers, by period.

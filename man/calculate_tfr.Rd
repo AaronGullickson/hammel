@@ -16,7 +16,8 @@ fertility rates; mortality processes are not valid inputs.}
 With parity columns, the result of \code{\link[=calculate_patfr]{calculate_patfr()}} with \code{patfr}.
 Otherwise, a tibble with period columns, \code{union_type}, \code{previous_union} or
 legacy \code{union_status} when supplied,
-\code{group} when supplied, \code{age_start}, \code{age_end}, and \code{tfr}.
+other stratum columns (such as group dimensions) when supplied,
+\code{age_start}, \code{age_end}, and \code{tfr}.
 If \code{sex} is present, only female rows are used.
 }
 \description{
@@ -31,7 +32,8 @@ When \code{union_type}, \code{previous_union} (or a legacy \code{union_status} c
 present, calculate a separate sum for each stratum
 within each period. These conditional sums describe fertility under continuous
 exposure to that status; they are not components to add into an overall TFR.
-A \code{group} column automatically adds separate group strata, with its type and
-labels preserved; groups are not pooled. Age bands are checked independently
-within each period/group/status combination.
+Any other column that is not an age band or a measure, such as a group
+dimension (\code{race}, \code{region}), adds separate strata, with its type and labels
+preserved; strata are not pooled. Age bands are checked independently within
+each stratum.
 }

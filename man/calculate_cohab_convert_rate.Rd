@@ -26,9 +26,10 @@ in years since cohabitation began. Supply exactly one of \code{dur_breaks} and
 \item{age_breaks}{Optional strictly increasing nonnegative boundaries for the
 woman's attained age, matching the conversion schedule's age convention.}
 
-\item{by}{\code{NULL} (default) or a character vector: \code{"group_w"} (the woman's
-current group, matching conversion input schedules) and \code{"group_h"} (the
-man's). Requires person groups. Rows vary by time fastest, then the axis
+\item{by}{\code{NULL} (default) or a character vector of \code{"<group>_w"} (the
+woman's current category in a declared group dimension, such as
+\code{"race_w"}, matching conversion input schedules) and \code{"<group>_h"} (the
+man's), in any combination of dimensions. Rows vary by time fastest, then the axis
 band, then the \code{by} variables in the order given.}
 
 \item{conf.level}{NULL (default) to omit confidence intervals, or a finite

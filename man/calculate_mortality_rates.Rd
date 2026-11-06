@@ -23,8 +23,8 @@ If the final boundary is finite, Inf is appended to create an open-ended
 final age band starting at that boundary.}
 
 \item{by}{\code{NULL} (default) or a character vector of variables to split
-results over: \code{"group"}, \code{"union_type"} and \code{"previous_union"}. See
-below.}
+results over: declared group dimensions, \code{"union_type"} and
+\code{"previous_union"}. See below.}
 
 \item{conf.level}{NULL (default) to omit confidence intervals, or a finite
 numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
@@ -48,8 +48,10 @@ Report deaths per person-year, with exact half-open period and age splitting.
 \code{by} lists categorical variables to split exposure and events over. Each is
 the person's state at the time, changing only at recorded events:
 \itemize{
-\item \code{"group"}: current group, following the transition history. Requires a
-declared group dimension (see \code{\link[=set_groups]{set_groups()}}).
+\item A declared group dimension's name (such as \code{"race"}; see
+\code{\link[=set_groups]{set_groups()}}): the current category, following that dimension's
+transition history. Several dimensions may be listed; each gets its own
+column, with categories in order of first appearance.
 \item \code{"union_type"}: current union state, \code{"unpartnered"}, \code{"cohab"} or
 \code{"marriage"} for typed histories, or \code{"unpartnered"} and \code{"partnered"}
 for untyped ones.

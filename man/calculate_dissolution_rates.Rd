@@ -26,13 +26,15 @@ ensure complete follow-up through the requested endpoint.}
 If the last boundary is finite, append Inf for an open final band.}
 
 \item{by}{\code{NULL} (default) or a character vector of variables to split
-results over: \code{"group_w"} and \code{"group_h"} (the wife's and husband's
-current groups, following transition histories; directional, so sum
-A-wife/B-husband and B-wife/A-husband rows for an unordered pair) and
+results over: \code{"<group>_w"} and \code{"<group>_h"} for declared group
+dimensions, such as \code{"race_w"} and \code{"region_h"} (the wife's and
+husband's current categories, following transition histories;
+directional, so sum A-wife/B-husband and B-wife/A-husband rows for an
+unordered pair; any combination of dimensions and partners) and
 \code{"union_type"} (cohab or marriage, each with its own exposure;
 conversion stops cohabitation exposure without counting as dissolution,
 and duration resets at the start of the linked marriage). Population
-inputs require person groups for the group variables; bare union tables
+inputs require declared groups for the group variables; bare union tables
 require \code{group_w}, \code{group_h} or \code{union_type} columns. A dissolution counts
 under the groups before any same-time transition.}
 

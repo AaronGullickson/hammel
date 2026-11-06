@@ -28,7 +28,8 @@
 #' @param rates A fertility process or a table with `age_start`, `age_end`,
 #'   `parity_start`, `parity_end` and `rate` or `rate_fertility` in births per
 #'   woman-year at that current parity. Optional `time_start`, `time_end`,
-#'   `group`, `union_type` and legacy `union_status` define separate strata.
+#'   `union_type`, legacy `union_status` and any other non-measure column (such
+#'   as a group dimension) define separate strata.
 #' @return A tibble with the supplied stratification columns, finite `age_start`,
 #'   `age_end`, and `patfr`. Empty results retain their column types. A supplied
 #'   `unassigned_births` attribute is preserved.
@@ -62,8 +63,7 @@ calculate_patfr <- function(rates) {
   if (any(!is.finite(rates$age_end) & rates$rate_fertility != 0, na.rm = TRUE))
     warning("PATFR omits an open age band with non-zero fertility; PATFR is underestimated over the full age range.", call. = FALSE)
   rates <- rates[is.finite(rates$age_end), , drop = FALSE]
-  groups <- intersect(c("time_start", "time_end", "group", "union_status", "union_type",
-                        "previous_union"), names(rates))
+  groups <- summary_strata(rates, by_union_status = TRUE)
   if (!nrow(rates)) {
     result <- tibble::as_tibble(rates[FALSE, c(groups, "age_start", "age_end"), drop = FALSE])
     result$patfr <- numeric()

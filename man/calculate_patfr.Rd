@@ -10,7 +10,8 @@ calculate_patfr(rates)
 \item{rates}{A fertility process or a table with \code{age_start}, \code{age_end},
 \code{parity_start}, \code{parity_end} and \code{rate} or \code{rate_fertility} in births per
 woman-year at that current parity. Optional \code{time_start}, \code{time_end},
-\code{group}, \code{union_type} and legacy \code{union_status} define separate strata.}
+\code{union_type}, legacy \code{union_status} and any other non-measure column (such
+as a group dimension) define separate strata.}
 }
 \value{
 A tibble with the supplied stratification columns, finite \code{age_start},

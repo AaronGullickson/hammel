@@ -24,7 +24,8 @@ a known endpoint. Observation cannot extend beyond that endpoint.}
 A finite final boundary gains an open-ended band through Inf.}
 
 \item{by}{\code{NULL} (default) or a character vector of variables to split
-results over: \code{"group"} (each person's own group before formation),
+results over: declared group dimensions (each person's own categories
+before formation),
 \code{"previous_union"} (\code{"none"}, \code{"separated"} or \code{"widowed"}, the category
 immediately before formation) and \code{"union_type"} (the type of union
 entered, \code{"cohab"} or \code{"marriage"}; requires typed histories). Both

@@ -16,9 +16,10 @@
 #'   `age_breaks`. A finite final boundary gains an open-ended band through Inf.
 #' @param age_breaks Optional strictly increasing nonnegative boundaries for the
 #'   woman's attained age, matching the conversion schedule's age convention.
-#' @param by `NULL` (default) or a character vector: `"group_w"` (the woman's
-#'   current group, matching conversion input schedules) and `"group_h"` (the
-#'   man's). Requires person groups. Rows vary by time fastest, then the axis
+#' @param by `NULL` (default) or a character vector of `"<group>_w"` (the
+#'   woman's current category in a declared group dimension, such as
+#'   `"race_w"`, matching conversion input schedules) and `"<group>_h"` (the
+#'   man's), in any combination of dimensions. Rows vary by time fastest, then the axis
 #'   band, then the `by` variables in the order given.
 #' @inheritParams calculate_mortality_rates
 #' @return A tibble with `time_start`, `time_end`, `dur_start`, `dur_end` (or
@@ -34,7 +35,7 @@ calculate_cohab_convert_rate <- function(population, time_breaks,
   alias <- observation_alias(population, by, c("_w", "_h"))
   population <- alias$population
   by <- alias$by
-  by <- check_by(by, c("group_w", "group_h"), "calculate_cohab_convert_rate")
+  by <- check_by(by, c("group_w", "group_h"), "calculate_cohab_convert_rate", alias$dims)
   if (!inherits(population, "hammel_population"))
     stop("`population` must be a hammel_population with typed union histories.", call. = FALSE)
   if (is.null(dur_breaks) == is.null(age_breaks))
@@ -65,5 +66,6 @@ calculate_cohab_convert_rate <- function(population, time_breaks,
   result$conversions <- counts$dissolutions[rows$.index]
   result$rate_cohab_convert <- as.numeric(ifelse(result$union_years > 0,
     result$conversions / result$union_years, NA_real_))
-  rename_group_columns(add_rate_confidence(result, "conversions", "union_years", conf.level), alias$rename)
+  result <- finish_strata(result, alias, "conversions", "union_years", "rate_cohab_convert")
+  add_rate_confidence(result, "conversions", "union_years", conf.level)
 }

@@ -18,7 +18,7 @@
 #'
 #' @inheritParams calculate_union_rates
 #' @param by `NULL` (default) or a character vector of variables to split
-#'   results over: `"group"` and `"previous_union"`, as in
+#'   results over: declared group dimensions and `"previous_union"`, as in
 #'   [calculate_union_rates()].
 #' @return A tibble with `time_start`, `time_end`, `sex`, `age_start`, `age_end`,
 #'   the `by` columns, `person_years`, `marriages`, and `rate_marriage`.
@@ -31,7 +31,7 @@ calculate_marriage_rates <- function(population, time_breaks, age_breaks, by = N
   alias <- observation_alias(population, by)
   population <- alias$population
   by <- alias$by
-  by <- check_by(by, c("group", "previous_union"), "calculate_marriage_rates")
-  rename_group_columns(calculate_entry_rates(population, time_breaks, age_breaks, by, dur_breaks = NULL,
-    marriage_measure = TRUE, conf.level = conf.level, pool_dissolved = pool_dissolved), alias$rename)
+  by <- check_by(by, c("group", "previous_union"), "calculate_marriage_rates", alias$dims)
+  finish_strata(calculate_entry_rates(population, time_breaks, age_breaks, by, dur_breaks = NULL,
+    marriage_measure = TRUE, conf.level = conf.level, pool_dissolved = pool_dissolved), alias)
 }

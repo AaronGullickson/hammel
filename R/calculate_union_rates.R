@@ -26,7 +26,8 @@
 #' @param age_breaks Strictly increasing nonnegative age boundaries in years.
 #'   A finite final boundary gains an open-ended band through Inf.
 #' @param by `NULL` (default) or a character vector of variables to split
-#'   results over: `"group"` (each person's own group before formation),
+#'   results over: declared group dimensions (each person's own categories
+#'   before formation),
 #'   `"previous_union"` (`"none"`, `"separated"` or `"widowed"`, the category
 #'   immediately before formation) and `"union_type"` (the type of union
 #'   entered, `"cohab"` or `"marriage"`; requires typed histories). Both
@@ -55,9 +56,9 @@ calculate_union_rates <- function(population, time_breaks, age_breaks, by = NULL
   alias <- observation_alias(population, by)
   population <- alias$population
   by <- alias$by
-  by <- check_by(by, c("group", "previous_union", "union_type"), "calculate_union_rates")
-  rename_group_columns(calculate_entry_rates(population, time_breaks, age_breaks, by, dur_breaks,
-    marriage_measure = FALSE, conf.level = conf.level, pool_dissolved = pool_dissolved), alias$rename)
+  by <- check_by(by, c("group", "previous_union", "union_type"), "calculate_union_rates", alias$dims)
+  finish_strata(calculate_entry_rates(population, time_breaks, age_breaks, by, dur_breaks,
+    marriage_measure = FALSE, conf.level = conf.level, pool_dissolved = pool_dissolved), alias)
 }
 
 # Union entry (and marriage entry) rates from the shared engine. Formation

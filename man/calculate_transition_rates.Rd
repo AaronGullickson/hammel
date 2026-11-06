@@ -30,8 +30,10 @@ axis boundary gains Inf.}
 \item{by}{\code{NULL} (default) or a character vector of variables to split
 results over: \code{"sex"}, \code{"union_type"} (current union state; typed
 histories use unpartnered/cohab/marriage, untyped unpartnered/partnered)
-and \code{"previous_union"}, as in \code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}. Union
-variables require exclusive histories. A transition counts under the union
+and \code{"previous_union"}, as in \code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}, and other
+declared group dimensions (the person's category there at the time; only
+moves in \code{group} count, and duration is unaffected by moves in other
+dimensions). Union variables require exclusive histories. A transition counts under the union
 state after same-time union changes, which precede transitions.}
 
 \item{conf.level}{NULL (default) to omit confidence intervals, or a finite

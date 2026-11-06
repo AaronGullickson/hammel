@@ -88,6 +88,14 @@ test_that("unrealized births report every dimension", {
   expect_true(all(c("race", "region") %in% names(u)))
   expect_gt(sum(u$unrealized_births), 0)
   expect_setequal(unique(u$race), c("A", "B"))
+  # Split by both dimensions, each record lands in its own row.
+  rates <- calculate_fertility_rates(out, c(0, 1), c(15, 50), by = c("region", "race"), unrealized = TRUE)
+  rates <- rates[rates$age_start == 15, ]
+  for (k in seq_len(nrow(rates))) {
+    mine <- u$race == rates$race[k] & u$region == rates$region[k]
+    expect_equal(rates$unrealized_births[k], sum(u$unrealized_births[mine]))
+  }
+  expect_equal(sum(rates$unrealized_births), sum(u$unrealized_births))
 })
 
 test_that("features of a single dimension explain that they are not yet available", {
@@ -95,8 +103,6 @@ test_that("features of a single dimension explain that they are not yet availabl
   exo <- set_union_formation(model, "on_demand", kinship_generations = 0,
     matching = create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1)))
   expect_error(simulate(exo, 0), "Group effects in matching")
-  expect_error(calculate_mortality_rates(simulate(model, 1, seed = 6), c(0, 1), c(0, Inf), by = "race"),
-               "exactly one declared group dimension")
 })
 
 test_that("a single dimension may have any name, including in analysis", {
@@ -365,4 +371,196 @@ test_that("transition settings and histories are checked against the declaration
                "require a declared group")
   expect_error(calculate_transition_rates(simulate(model, 0), c(0, 1), age_breaks = c(0, Inf),
                                           group = "education"), "must name one declared")
+})
+
+# Stage 4: splitting analysis by several dimensions. The reference is the same
+# population with one combined column, `rr` ("A.N"), whose history merges the
+# race and region moves (computed independently here).
+combined_reference <- function(out) {
+  persons <- out$persons
+  persons$rr <- paste(persons$race, persons$region, sep = ".")
+  tx <- out$transitions
+  rows <- list()
+  for (id in unique(tx$person_id)) {
+    h <- tx[tx$person_id == id, ]
+    h <- h[order(h$time, match(h$group, c("race", "region"))), ]
+    state <- c(race = NA, region = NA)
+    for (d in names(state)) {
+      first <- h[h$group == d, ]
+      state[[d]] <- if (nrow(first)) first$origin[1] else persons[[d]][persons$person_id == id]
+    }
+    for (k in seq_len(nrow(h))) {
+      from <- paste(state[["race"]], state[["region"]], sep = ".")
+      state[[h$group[k]]] <- h$destination[k]
+      rows[[length(rows) + 1L]] <- data.frame(person_id = id, time = h$time[k], group = "rr",
+        origin = from, destination = paste(state[["race"]], state[["region"]], sep = "."))
+    }
+  }
+  merged <- if (length(rows)) do.call(rbind, rows) else NULL
+  # Same-instant moves merge into one move in the single combined column.
+  if (!is.null(merged)) {
+    key <- paste(merged$person_id, merged$time)
+    first <- !duplicated(key); last <- !duplicated(key, fromLast = TRUE)
+    merged <- data.frame(person_id = merged$person_id[first], time = merged$time[first], group = "rr",
+      origin = merged$origin[first], destination = merged$destination[last])
+  }
+  hammel_population(persons, unions = out$unions, end_time = out$end_time,
+                    transitions = merged, groups = "rr")
+}
+
+split_rr <- function(x, suffix = "") {
+  column <- paste0("rr", suffix)
+  parts <- do.call(rbind, strsplit(x[[column]], ".", fixed = TRUE))
+  x[[paste0("race", suffix)]] <- parts[, 1]; x[[paste0("region", suffix)]] <- parts[, 2]
+  x[[column]] <- NULL
+  x
+}
+
+# Sum a table's counts and exposures within the given key columns.
+sum_by <- function(x, keys, values) {
+  key <- do.call(paste, c(lapply(x[keys], as.character), sep = "|"))
+  out <- x[!duplicated(key), keys]
+  for (v in values) out[[v]] <- as.vector(tapply(x[[v]], factor(key, unique(key)), sum))
+  out
+}
+
+compare_split <- function(ours, reference, keys, values) {
+  ours <- as.data.frame(ours); reference <- as.data.frame(reference)
+  k1 <- do.call(paste, c(lapply(ours[keys], as.character), sep = "|"))
+  k2 <- do.call(paste, c(lapply(reference[keys], as.character), sep = "|"))
+  # Our grid is the full cross of categories; the reference has observed
+  # combinations only. Rows missing there have no exposure or events.
+  expect_true(all(k2 %in% k1))
+  missing <- !k1 %in% k2
+  for (v in values) {
+    expect_equal(ours[[v]][match(k2, k1)], reference[[v]], tolerance = 1e-9)
+    expect_true(all(ours[[v]][missing] == 0))
+  }
+}
+
+split_model <- function() {
+  model <- two_dimension_model(600, birth_rate = .3)
+  model <- set_mortality(model, data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .03))
+  model <- set_group_transition(model, data.frame(origin = c("A", "B"), destination = c("B", "A"),
+    age_start = 0, age_end = Inf, rate = c(.2, .1)), group = "race")
+  set_group_transition(model, data.frame(origin = c("N", "S"), destination = c("S", "N"),
+    age_start = 0, age_end = Inf, rate = c(.15, .25)), group = "region")
+}
+
+test_that("person-level rates split by several dimensions match a combined column", {
+  out <- simulate(split_model(), 4, seed = 31)
+  # A same-instant move in both dimensions.
+  p <- out$persons[out$persons$birth_time < 0 & is.na(out$persons$death_time), ][1, ]
+  extra <- data.frame(person_id = p$person_id, time = 3.5, group = c("race", "region"),
+    origin = c(p$race, p$region), destination = c(setdiff(c("A", "B"), p$race), setdiff(c("N", "S"), p$region)))
+  out$transitions <- rbind(out$transitions, extra)
+  out$persons$race[out$persons$person_id == p$person_id] <- extra$destination[1]
+  out$persons$region[out$persons$person_id == p$person_id] <- extra$destination[2]
+  out <- hammel_population(out$persons, unions = out$unions, end_time = out$end_time,
+                           transitions = out$transitions, groups = c("race", "region"))
+  ref <- combined_reference(out)
+  times <- c(0, 1.5, 3.5, 4)
+  ours <- calculate_population_size(out, times, by = c("race", "sex", "region"))
+  expect_named(ours, c("time", "race", "sex", "region", "population"))
+  # The first `by` variable varies fastest after time; categories keep the
+  # order of their first appearance, as with one dimension.
+  expect_identical(ours$race[1:8], rep(unique(ours$race), each = 4))
+  expect_identical(ours$sex[1:16], rep(unique(ours$sex), each = 8))
+  expect_identical(ours$region, rep(unique(ours$region), each = 16))
+  compare_split(ours, split_rr(calculate_population_size(ref, times, by = c("rr", "sex"))),
+                c("time", "race", "sex", "region"), "population")
+  ours <- calculate_mortality_rates(out, c(0, 2, 4), c(0, 40, Inf), by = c("region", "race"))
+  expect_named(ours, c("time_start", "time_end", "sex", "age_start", "age_end", "region", "race",
+                       "person_years", "deaths", "rate_mortality"))
+  compare_split(ours, split_rr(calculate_mortality_rates(ref, c(0, 2, 4), c(0, 40, Inf), by = "rr")),
+                c("time_start", "age_start", "sex", "region", "race"), c("person_years", "deaths"))
+  ours <- calculate_fertility_rates(out, c(0, 4), c(15, 30, 50), by = c("race", "region"))
+  compare_split(ours, split_rr(calculate_fertility_rates(ref, c(0, 4), c(15, 30, 50), by = "rr")),
+                c("time_start", "age_start", "race", "region"), c("person_years", "births"))
+  ours <- calculate_union_rates(out, c(0, 4), c(15, 50), by = c("region", "race"))
+  compare_split(ours, split_rr(calculate_union_rates(ref, c(0, 4), c(15, 50), by = "rr")),
+                c("time_start", "age_start", "sex", "region", "race"), c("person_years", "unions"))
+  ours <- calculate_population_size(out, times, by = "region")
+  reference <- sum_by(split_rr(calculate_population_size(ref, times, by = "rr")), c("time", "region"), "population")
+  compare_split(ours, reference, c("time", "region"), "population")
+})
+
+test_that("union rates split by each partner's dimensions match a combined column", {
+  model <- split_model()
+  model <- set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = .2))
+  out <- simulate(model, 4, seed = 32)
+  ref <- combined_reference(out)
+  reference <- split_rr(split_rr(calculate_dissolution_rates(ref, c(0, 2, 4), c(0, Inf),
+    by = c("rr_w", "rr_h")), "_w"), "_h")
+  ours <- calculate_dissolution_rates(out, c(0, 2, 4), c(0, Inf), by = c("race_w", "region_h"))
+  expect_named(ours, c("time_start", "time_end", "dur_start", "dur_end", "race_w", "region_h",
+                       "union_years", "dissolutions", "rate_dissolution"))
+  expect_equal(nrow(ours), 2 * 2 * 2)
+  compare_split(ours, sum_by(reference, c("time_start", "race_w", "region_h"), c("union_years", "dissolutions")),
+                c("time_start", "race_w", "region_h"), c("union_years", "dissolutions"))
+  expect_equal(ours$rate_dissolution, ours$dissolutions / ours$union_years)
+  ours <- calculate_dissolution_rates(out, c(0, 4), c(0, Inf), by = c("region_w", "race_w", "race_h"),
+                                      conf.level = .95)
+  compare_split(ours, sum_by(reference, c("region_w", "race_w", "race_h"), c("union_years", "dissolutions")),
+                c("region_w", "race_w", "race_h"), c("union_years", "dissolutions"))
+  expect_true(all(ours$conf_low <= ours$rate_dissolution))
+})
+
+test_that("transition rates split by another dimension count only their own moves", {
+  out <- simulate(split_model(), 4, seed = 33)
+  ref <- combined_reference(out)
+  ours <- calculate_transition_rates(out, c(0, 4), age_breaks = c(0, 40, Inf), by = c("region", "sex"),
+                                     group = "race")
+  expect_named(ours, c("time_start", "time_end", "age_start", "age_end", "origin", "destination",
+                       "region", "sex", "person_years", "transitions", "rate_transition"))
+  # Reference rows: origin/destination are combined labels; race moves keep region.
+  r <- as.data.frame(calculate_transition_rates(ref, c(0, 4), age_breaks = c(0, 40, Inf), by = "sex"))
+  o <- do.call(rbind, strsplit(r$origin, ".", fixed = TRUE))
+  d <- do.call(rbind, strsplit(r$destination, ".", fixed = TRUE))
+  keep <- o[, 2] == d[, 2] & o[, 1] != d[, 1]
+  r <- data.frame(age_start = r$age_start[keep], origin = o[keep, 1], destination = d[keep, 1],
+                  region = o[keep, 2], sex = r$sex[keep], person_years = r$person_years[keep],
+                  transitions = r$transitions[keep])
+  compare_split(ours, r, c("age_start", "origin", "destination", "region", "sex"),
+                c("person_years", "transitions"))
+  expect_equal(sum(ours$transitions), sum(out$transitions$group == "race"))
+  expect_error(calculate_transition_rates(out, c(0, 4), age_breaks = c(0, Inf), by = "race", group = "race"),
+               "not by `race` in `by`")
+})
+
+test_that("durations by another dimension count from entering this dimension's category", {
+  persons <- data.frame(person_id = 1, sex = "f", birth_time = -10, death_time = NA_real_,
+    mother_id = NA_real_, father_id = NA_real_, race = "B", region = "S")
+  # Race A -> B at 1; region N -> S at 2 (does not reset race duration).
+  tx <- data.frame(person_id = 1, time = c(1, 2), group = c("race", "region"),
+                   origin = c("A", "N"), destination = c("B", "S"))
+  pop <- hammel_population(persons, end_time = 4, transitions = tx, groups = c("race", "region"))
+  out <- calculate_transition_rates(pop, c(0, 4), dur_breaks = c(0, 1, 2, Inf), by = "region", group = "race")
+  b <- out[out$origin == "B", ]
+  # In B from 1: duration [0,1) in N (time 1-2), [1,2) in S (2-3), [2,Inf) in S (3-4).
+  expect_equal(b$person_years[b$region == "N"], c(1, 0, 0))
+  expect_equal(b$person_years[b$region == "S"], c(0, 1, 1))
+  a <- out[out$origin == "A", ]
+  expect_equal(sum(a$transitions[a$region == "N"]), 1)
+  expect_equal(a$person_years[a$region == "N"], c(0, 0, 1))   # age 10-11 in A before the move
+})
+
+test_that("summaries keep group dimension columns and errors name the dimensions", {
+  out <- simulate(split_model(), 3, seed = 34)
+  asfr <- calculate_fertility_rates(out, c(0, 3), seq(15, 50, 5), by = c("race", "region"))
+  tfr <- calculate_tfr(asfr)
+  expect_named(tfr, c("time_start", "time_end", "race", "region", "age_start", "age_end", "tfr"))
+  expect_equal(nrow(tfr), 4)
+  one <- asfr[asfr$race == tfr$race[1] & asfr$region == tfr$region[1], ]
+  expect_equal(tfr$tfr[1], sum(one$rate_fertility * 5))
+  mx <- calculate_mortality_rates(out, c(0, 3), c(0, 1, seq(5, 85, 5), Inf), by = "region")
+  life <- calculate_life_table(mx)
+  expect_true(all(c("sex", "region") %in% names(life)))
+  expect_equal(sum(life$age_start == 0), 4)
+  expect_error(calculate_mortality_rates(out, c(0, 3), c(0, Inf), by = "education"),
+               "`by` accepts \"race\", \"region\", \"union_type\"")
+  expect_error(calculate_dissolution_rates(out, c(0, 3), c(0, Inf), by = "race"),
+               "accepts \"race_w\", \"region_w\", \"race_h\", \"region_h\"")
+  expect_error(calculate_mortality_rates(out, c(0, 3), c(0, Inf), by = "group"),
+               "not `group`")
 })

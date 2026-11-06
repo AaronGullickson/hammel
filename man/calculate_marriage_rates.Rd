@@ -23,7 +23,7 @@ a known endpoint. Observation cannot extend beyond that endpoint.}
 A finite final boundary gains an open-ended band through Inf.}
 
 \item{by}{\code{NULL} (default) or a character vector of variables to split
-results over: \code{"group"} and \code{"previous_union"}, as in
+results over: declared group dimensions and \code{"previous_union"}, as in
 \code{\link[=calculate_union_rates]{calculate_union_rates()}}.}
 
 \item{conf.level}{NULL (default) to omit confidence intervals, or a finite
