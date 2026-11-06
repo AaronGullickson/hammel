@@ -200,9 +200,10 @@ test_that("future identities are checked against rates and categorical matching 
     edited$processes[[name]]$rates <- rbind(transform(rates, group = "A"), transform(rates, group = "B"))
     expect_error(simulate(edited, 0), "missing schedules.*AB")
   }
-  expect_warning(matching <- create_matching_model(~ male_group, c(male_groupB = 0), group_levels = c("A", "B")), "male_group are absorbed")
+  expect_warning(matching <- create_matching_model(~ male_group, c(male_groupB = 0)), "male_group` are absorbed")
   model$processes$union_formation$matching <- matching
-  expect_error(simulate(model, 0), "covered.*group_levels")
+  # Declared categories include AB, so its coefficient is required.
+  expect_error(simulate(model, 0), "coefficient names.*male_groupAB")
   # Positive reference shares also infer identities; zero-only columns do not.
   model <- inheritance_test_model()
   model <- set_population(model, hammel_population(model$population$persons, end_time = 0, groups = if ("group" %in% names(model$population$persons)) "group"))
@@ -267,8 +268,8 @@ test_that("new AB identities are available to categorical partner matching durin
   model <- set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
     age_start = 15, age_end = 50, rate = c(0, 20)), 0, ffab = 0)
   expect_warning(matching <- create_matching_model(~ male_group,
-    c(male_groupB = 0, male_groupAB = .5), group_levels = c("A", "B", "AB"),
-    delta = c(AB = 20)), "male_group are absorbed")
+    c(male_groupB = 0, male_groupAB = .5),
+    delta = c(AB = 20)), "male_group` are absorbed")
   model <- set_union_formation(model, "rate", matching, rates = data.frame(
     age_start = 0, age_end = Inf, rate = 0), min_male_age = 0, kinship_generations = 0,
     cancel_birth_if_no_match = FALSE)

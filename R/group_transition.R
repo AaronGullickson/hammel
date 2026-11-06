@@ -44,7 +44,7 @@ group_transition <- function(rates, group = NULL, weights = NULL) {
   process$group <- check_transition_group(group)
   validate_group_transition(process)
   validate_process_weights(weights, "transition")
-  warn_cancelled_weight_terms(weights, weight_strata("transition", rates), "group transition")
+  warn_cancelled_weight_terms(weights, weight_strata("transition", rates, group), "group transition")
   process$weights <- normalize_model_argument(weights)
   process
 }

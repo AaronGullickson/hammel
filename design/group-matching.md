@@ -9,7 +9,18 @@ acceptance retains the documented limitations.
 
 ## Pair effects
 
-`create_matching_model(..., group_exogamy = NULL, group_levels = NULL)` accepts
+Since D134 (stage 5), group predictors and settings name a declared group
+dimension: predictors `female_<dim>`, `male_<dim>` and `same_<dim>`, and
+`group_exogamy`, `prevent_exogamy` and `delta` as lists keyed by dimension,
+such as `group_exogamy = list(race = c("A:B" = -1))`; a bare value applies to
+the only declared dimension. A model's group effects use one dimension for
+now, and all matching models of a run (general, father, cohabitation, and
+schedule entries) must use the same one; it becomes the engine's matching
+dimension. At simulation each model is translated to the internal
+one-dimension form described here, with `group` standing for that dimension.
+The examples below use a dimension named `group`.
+
+`create_matching_model(..., group_exogamy = NULL)` accepts
 finite additive log-selection-weight effects as a named numeric vector.
 `"A:B"` supplies the same value for female A/male B and female B/male A.
 For example, `c("A:B" = -1, "A:C" = -0.8)`. Directional pair effects and
@@ -67,9 +78,10 @@ population groups and are harmless when absent from the population.
 Matching formulas may use `age_difference`, `female_group`, `male_group`, and
 `same_group`. Ages remain male minus female in continuous years. `same_group`
 is numeric 1 for equal recorded identities and 0 otherwise. The two group
-variables are unordered factors with fixed levels from explicit `group_levels`;
-the first level is the treatment reference. Categorical group formulas require
-at least two declared levels, covering every population group. Fixed treatment
+variables are unordered factors whose levels are the dimension's categories
+(declared, or in order of first appearance); the first is the treatment
+reference. Categorical group formulas require at least two categories, and
+their coefficient names are checked against the categories at simulation. Fixed treatment
 contrasts and retained levels prevent a candidate sample from changing model
 columns or reference categories. Unknown levels error, not imputation.
 Formulas using only `same_group` do not require declared categorical levels.

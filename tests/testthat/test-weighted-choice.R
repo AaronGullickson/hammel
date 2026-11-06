@@ -307,8 +307,8 @@ test_that("removed method arguments are rejected and delta inputs validated", {
 })
 
 test_that("male-group formula terms warn about absorbed utilities", {
-  expect_warning(create_matching_model(~ male_group, c(male_groupB = 1), group_levels = c("A", "B")),
-                 "male_group are absorbed")
+  expect_warning(create_matching_model(~ male_group, c(male_groupB = 1)),
+                 "male_group` are absorbed")
   expect_silent(create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -3)))
   expect_silent(create_matching_model(~ same_group, c(same_group = 1)))
 })

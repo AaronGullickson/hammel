@@ -55,12 +55,13 @@ availability and renewed female rate searches after widowhood are implemented. T
 ## Implemented construction interface
 
 `create_matching_model(formula, coefficients, group_exogamy = NULL,
-group_levels = NULL, prevent_exogamy = FALSE, delta = NULL)` stores a
+prevent_exogamy = FALSE, delta = NULL)` stores a
 one-sided R formula and finite named coefficients
 matching its non-intercept model-matrix columns. Predictors include
-`age_difference` (male minus female age in continuous years), `female_group`,
-`male_group`, and numeric `same_group`. Categorical group terms require explicit
-fixed `group_levels`. Optional symmetric pair effects (`A:B` in both directions) add to the formula
+`age_difference` (male minus female age in continuous years) and, for a
+declared dimension such as `race`, `female_race`, `male_race` and numeric
+`same_race`. Categorical group terms use the dimension's categories as levels
+(D134). Optional symmetric pair effects (`A:B` in both directions) add to the formula
 score. See [group matching](group-matching.md) for syntax, factor contrasts, and
 worked probabilities. Ordinary R formula transformations are supported. An
 intercept is ignored because it cancels from partner-only choice probabilities;

@@ -6,23 +6,31 @@
 #' `I(age_difference^2)` and `abs(age_difference)` are supported through
 #' [stats::model.matrix()]. An intercept is ignored because it cancels from
 #' partner-only conditional-logit probabilities. No wait alternative is included.
-#' `female_group` and `male_group` are factors with explicit `group_levels` and
-#' fixed treatment contrasts (first level is reference). `same_group` is numeric
-#' 1 for equal identities, 0 otherwise. Pair effects are added after the formula,
-#' including custom formulas. Group effects require population identities.
+#' Group predictors are named by a declared group dimension (see
+#' [set_groups()]): for a dimension `race`, `female_race` and `male_race` are
+#' factors over its categories with treatment contrasts (the first category is
+#' the reference), and `same_race` is 1 for partners in the same category, 0
+#' otherwise. Pair effects are added after the formula, including custom
+#' formulas. For now, a matching model's group predictors and settings use one
+#' dimension; matching models of a run must all use the same one.
 #' These modify relative candidate weights, not search hazards or eligibility.
 #'
-#' Coefficient names must match the non-intercept model-matrix columns exactly.
+#' Coefficient names must match the non-intercept model-matrix columns exactly,
+#' for example `female_raceB`. Names involving group predictors are checked
+#' when the model meets the group declaration at simulation.
 #' Supply all coefficients explicitly; no demographic coefficients are defaulted.
 #' Formula functions must be deterministic and must not mutate simulation state.
 #' Data-dependent transformations can change with the candidate pool; use fixed
 #' transformations when coefficients should have a fixed interpretation.
 #'
-#' @param formula A one-sided R formula using `age_difference`, `female_group`,
-#'   `male_group`, and/or `same_group`. Use `~ 1` and `numeric()` coefficients
-#'   for pair-effects-only matching.
+#' @param formula A one-sided R formula using `age_difference` and group
+#'   predictors `female_<group>`, `male_<group>` and `same_<group>`. Use `~ 1`
+#'   and `numeric()` coefficients for pair-effects-only matching.
 #' @param coefficients A finite named numeric vector of utility coefficients.
-#' @param group_exogamy Optional finite named numeric vector of symmetric
+#' @param group_exogamy Optional symmetric pair effects for one dimension, as a
+#'   named list keyed by dimension, such as `list(race = c("A:B" = -1))`; a
+#'   bare value applies to the only declared dimension. Each value is a finite
+#'   named numeric vector of symmetric
 #'   group-pair effects: `"A:B"` applies the same log-weight effect to female
 #'   A/male B and female B/male A. Specify each unordered pair once; reverse
 #'   duplicates and `::` syntax are errors. Omitted pairs have zero effect;
@@ -30,12 +38,9 @@
 #'   `female_group`, `male_group`, and `log_odds`; each row specifies an unordered
 #'   pair and expands symmetrically, including for colon-containing labels.
 #'   Effects add to formula scores and do not prohibit matches.
-#' @param group_levels Optional ordered vector of group labels (character or
-#'   numeric codes). Required with at least two levels when the formula uses
-#'   `female_group` or `male_group`; must cover population groups. Sets fixed
-#'   treatment reference/columns, independent of the available pool. Not required
-#'   for `same_group` or pair effects alone.
-#' @param prevent_exogamy `FALSE` (default) for no group restrictions; `TRUE`
+#' @param prevent_exogamy Group restrictions, as a named list keyed by
+#'   dimension or a bare value for the only declared dimension. Each value is
+#'   `FALSE` (default) for no group restrictions; `TRUE`
 #'   excludes all different-group candidates. A character vector such as
 #'   `c("A::B", "A:C")` excludes selected pairs with female-first `:` and
 #'   symmetric `::` notation. Alternatively supply a directional data frame
@@ -45,13 +50,15 @@
 #'   existing failed-search and birth cancellation rules. Restrictions override
 #'   finite preferences, require population identities, and do not invalidate
 #'   existing partners.
-#' @param delta Optional finite numeric vector with unique group names.
+#' @param delta Optional male-target adjustments, as a named list keyed by
+#'   dimension or a bare value for the only declared dimension: a finite
+#'   numeric vector with unique category names.
 #'   Multiply mirrored male targets by `exp(delta)`
 #'   and normalize. Omitted groups have zero adjustment. Positive values raise
 #'   the male target relative to baseline and other groups; negative values
 #'   lower it. Only differences matter. Does not set pair-specific ratios or
-#'   change female search rates. Names must belong to the population's identity
-#'   registry (including declared future groups).
+#'   change female search rates. Names must be categories of the dimension
+#'   (including declared future categories).
 #' @return An inspectable `hammel_matching_model` list containing `formula`
 #'   and `coefficients`. This specifies a model; it does not estimate one.
 #' @export
@@ -61,11 +68,10 @@
 #'   ~ age_difference + I(age_difference^2),
 #'   c(age_difference = 0.1, "I(age_difference^2)" = -0.02)
 #' )
-create_matching_model <- function(formula, coefficients, group_exogamy = NULL, group_levels = NULL, prevent_exogamy = FALSE,
+create_matching_model <- function(formula, coefficients, group_exogamy = NULL, prevent_exogamy = FALSE,
                                   delta = NULL) {
   model <- structure(list(formula = formula, coefficients = coefficients,
-                          group_exogamy = group_exogamy, group_levels = group_levels,
-                          prevent_exogamy = prevent_exogamy,
+                          group_exogamy = group_exogamy, prevent_exogamy = prevent_exogamy,
                           delta = delta),
                      class = "hammel_matching_model")
   validate_matching_model(model)
@@ -75,10 +81,11 @@ create_matching_model <- function(formula, coefficients, group_exogamy = NULL, g
 
 # Male-group formula effects can be absorbed by calibrated target weights.
 warn_absorbed_group_formula <- function(model) {
-  if (!"male_group" %in% all.vars(model$formula)) return(invisible(FALSE))
-  warning(paste("Formula terms using male_group are absorbed by calibrated group weights:",
+  male <- grep("^male_.+", all.vars(model$formula), value = TRUE)
+  if (!length(male)) return(invisible(FALSE))
+  warning(sprintf(paste("Formula terms using %s are absorbed by calibrated group weights:",
     "main effects have no effect and interactions are only partly reflected.",
-    "Use delta to adjust male-group targets."), call. = FALSE)
+    "Use delta to adjust male-group targets."), paste0("`", male, "`", collapse = ", ")), call. = FALSE)
   invisible(TRUE)
 }
 
@@ -137,10 +144,48 @@ validate_delta <- function(x) {
   invisible(x)
 }
 
+# A public matching model: predictors and settings named by dimension. Checks
+# that need the declaration (coefficient names of group predictors, setting
+# categories) happen when it is translated at simulation.
 validate_matching_model <- function(model) {
   if (!inherits(model, "hammel_matching_model") || !is.list(model)) {
     stop("`matching` must be created with create_matching_model().", call. = FALSE)
   }
+  formula <- model$formula
+  vars <- if (inherits(formula, "formula")) all.vars(formula) else character()
+  if (!inherits(formula, "formula") || length(formula) != 2L ||
+      any(vars != "age_difference" & !grepl("^(female|male|same)_.+", vars)))
+    stop(paste("Use a one-sided matching formula with `age_difference` and group predictors",
+               "`female_<group>`, `male_<group>` or `same_<group>`."), call. = FALSE)
+  if (length(attr(stats::terms(formula), "offset")))
+    stop("Matching formula offsets are not supported.", call. = FALSE)
+  beta <- model$coefficients
+  if (!is.numeric(beta) || is.complex(beta) || !is.null(dim(beta)) || any(!is.finite(beta)) ||
+      (length(beta) && is.null(names(beta))) || anyNA(names(beta)) || any(!nzchar(names(beta))) ||
+      anyDuplicated(names(beta)))
+    stop("`coefficients` must be a finite numeric vector with unique nonempty names.", call. = FALSE)
+  for (field in c("group_exogamy", "prevent_exogamy", "delta")) {
+    x <- model[[field]]
+    values <- if (is_dimension_list(x)) {
+      if (is.null(names(x)) || anyNA(names(x)) || any(!nzchar(names(x))) || anyDuplicated(names(x)))
+        stop(sprintf("A list `%s` must be named by group dimension, once each.", field), call. = FALSE)
+      x
+    } else list(x)
+    for (v in values) switch(field, group_exogamy = expand_group_exogamy(v),
+                             prevent_exogamy = expand_prevent_exogamy(v), delta = validate_delta(v))
+  }
+  # Without group predictors, coefficient names can be checked now.
+  if (!any(grepl("^(female|male|same)_.+", vars))) {
+    design <- matching_design_matrix(formula, data.frame(age_difference = seq(-50, 50, length.out = 101)))
+    if (!setequal(colnames(design), names(beta)))
+      stop("Coefficient names must match all non-intercept model-matrix columns.", call. = FALSE)
+  }
+  invisible(model)
+}
+
+# The internal one-dimension form (predictors `female_group`, `male_group`,
+# `same_group` and explicit `group_levels`), built at simulation.
+validate_internal_matching <- function(model) {
   validate_delta(model$delta)
   formula <- model$formula
   if (!inherits(formula, "formula") || length(formula) != 2L ||
@@ -167,7 +212,7 @@ validate_matching_model <- function(model) {
   }
   categorical <- any(all.vars(formula) %in% c("female_group", "male_group"))
   if (categorical && length(levels) < 2L)
-    stop("Categorical matching formulas require at least two explicit `group_levels`.", call. = FALSE)
+    stop("Categorical matching predictors require a group dimension with at least two categories.", call. = FALSE)
   # A fixed validation grid covers both sexes' group levels, equality, and gaps.
   data <- data.frame(age_difference = seq(-50, 50, length.out = 101))
   if (matching_has_group_formula(model)) {

@@ -186,8 +186,8 @@ test_that("future custom identities use a common registry and require complete m
   expect_error(simulate(bad, .1), "missing schedules.*C")
   bad <- m
   bad$processes$union_formation$matching <- create_matching_model(~ female_group,
-    c(female_groupB = 0), group_levels = c("A", "B"))
-  expect_error(simulate(bad, .1), "group_levels")
+    c(female_groupB = 0))
+  expect_error(simulate(bad, .1), "coefficient names.*female_groupC")
 })
 
 test_that("inheritance boundaries do not call custom functions without a birth", {

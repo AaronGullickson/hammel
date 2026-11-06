@@ -142,3 +142,109 @@ matching_group_allowed <- function(matching, female_group, male_group) {
   }
   allowed
 }
+
+# Matching models name group predictors and settings by dimension (D134):
+# `female_race`, `male_race`, `same_race`, and `group_exogamy`,
+# `prevent_exogamy` and `delta` as lists keyed by dimension (a bare value
+# means the only declared dimension). At simulation each model is translated
+# to the internal one-dimension form used by the engine.
+is_dimension_list <- function(x) is.list(x) && !is.data.frame(x)
+
+matching_settings <- c("group_exogamy", "prevent_exogamy", "delta")
+
+# The dimensions a matching model's group effects use.
+matching_dimensions <- function(model, dims) {
+  vars <- grep("^(female|male|same)_.+", all.vars(model$formula), value = TRUE)
+  used <- sub("^(female|male|same)_", "", vars)
+  bare <- FALSE
+  for (field in matching_settings) {
+    x <- model[[field]]
+    if (is_dimension_list(x)) used <- c(used, names(x))
+    else if (!is.null(x) && !identical(x, FALSE) && length(x)) bare <- TRUE
+  }
+  if (bare) {
+    if (length(dims) != 1L)
+      stop(if (!length(dims)) "Group effects in matching require a declared group dimension; use set_groups()." else
+        sprintf(paste("Name the dimension of matching group settings with a list, such as",
+                      "`group_exogamy = list(%s = ...)`; this model declares %s."),
+                dims[1], paste0("`", dims, "`", collapse = ", ")), call. = FALSE)
+    used <- c(used, dims)
+  }
+  used <- unique(used)
+  if (length(used) && !length(dims))
+    stop("Group effects in matching require a declared group dimension; use set_groups().", call. = FALSE)
+  unknown <- setdiff(used, dims)
+  if (length(unknown))
+    stop(sprintf("Matching uses %s, which is not a declared group dimension.",
+                 paste0("`", unknown, "`", collapse = ", ")), call. = FALSE)
+  used
+}
+
+# The internal model for dimension `dim` (NULL: no group effects), with
+# categories as `group_levels`.
+internal_matching_model <- function(model, dim, categories) {
+  pick <- function(x) if (is_dimension_list(x)) x[[dim]] else x
+  if (is.null(dim)) {
+    internal <- structure(list(formula = model$formula, coefficients = model$coefficients,
+      group_exogamy = NULL, group_levels = NULL, prevent_exogamy = FALSE, delta = NULL),
+      class = "hammel_matching_model")
+    validate_internal_matching(internal)
+    return(internal)
+  }
+  public <- paste0(c("female_", "male_", "same_"), dim)
+  private <- c("female_group", "male_group", "same_group")
+  formula <- model$formula
+  renamed <- stats::as.formula(call("~", do.call(substitute, list(formula[[2L]],
+    stats::setNames(lapply(private, as.name), public)))), env = environment(formula))
+  coefficients <- model$coefficients
+  vars <- intersect(public, all.vars(formula))
+  if (any(public[1:2] %in% vars) && length(categories) < 2L)
+    stop("Categorical matching predictors require a group dimension with at least two categories.", call. = FALSE)
+  if (length(vars)) {
+    # Map coefficient names through the two model matrices' columns.
+    labels <- as.character(categories)
+    n <- max(2L, length(labels))
+    data <- data.frame(age_difference = seq_len(n))
+    data[[public[1]]] <- factor(rep(labels, length.out = n), levels = labels)
+    data[[public[2]]] <- factor(rep(rev(labels), length.out = n), levels = labels)
+    data[[public[3]]] <- rep(c(0, 1), length.out = n)
+    original <- colnames(matching_design_matrix(formula, data))
+    names(data)[match(public, names(data))] <- private
+    translated <- colnames(matching_design_matrix(renamed, data))
+    if (!setequal(original, names(coefficients)))
+      stop(sprintf("Matching coefficient names must match the model-matrix columns: %s.",
+                   paste(original, collapse = ", ")), call. = FALSE)
+    names(coefficients) <- translated[match(names(coefficients), original)]
+  }
+  internal <- structure(list(formula = renamed, coefficients = coefficients,
+    group_exogamy = pick(model$group_exogamy),
+    group_levels = if (any(c("female_group", "male_group") %in% all.vars(renamed))) categories,
+    prevent_exogamy = if (is.null(pick(model$prevent_exogamy))) FALSE else pick(model$prevent_exogamy),
+    delta = pick(model$delta)), class = "hammel_matching_model")
+  validate_internal_matching(internal)
+  internal
+}
+
+# Translate a union process's matching models (and their schedules). Returns
+# the process with internal models and the matching dimension (NULL: none).
+resolve_matching_models <- function(process, declaration, registries) {
+  dims <- names(declaration)
+  fields <- c("matching", "father_matching", "cohab_matching")
+  used <- unique(unlist(lapply(fields, function(f)
+    lapply(model_entries(process[[f]]), matching_dimensions, dims = dims))))
+  if (length(used) > 1L)
+    stop(sprintf(paste("Group effects in matching use one group dimension for now;",
+                       "the matching models use %s."), paste0("`", used, "`", collapse = ", ")),
+         call. = FALSE)
+  dim <- if (length(used)) used else NULL
+  categories <- if (is.null(dim)) NULL else registries[[dim]]
+  convert <- function(model) internal_matching_model(model,
+    if (length(matching_dimensions(model, dims))) dim, categories)
+  for (f in fields) {
+    x <- process[[f]]
+    if (is.null(x)) next
+    if (is_model_schedule(x)) x$model <- lapply(x$model, convert) else x <- convert(x)
+    process[f] <- list(x)
+  }
+  list(process = process, dim = dim)
+}

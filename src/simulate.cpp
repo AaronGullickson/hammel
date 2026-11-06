@@ -2235,10 +2235,18 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   };
   // Category labels by dimension, for custom weight functions' cell descriptions.
   std::vector<std::vector<std::string>> dim_labels;
+  std::vector<std::string> dim_names;
   if (groups_in.size()) {
     List labels = groups_in["labels"];
     for (int d = 0; d < labels.size(); ++d) dim_labels.push_back(as<std::vector<std::string>>(labels[d]));
+    dim_names = as<std::vector<std::string>>(groups_in["names"]);
   }
+  // A category label of dimension d (NA when out of range).
+  auto dim_label = [&](int d, int category) -> SEXP {
+    if (d < 0 || d >= static_cast<int>(dim_labels.size()) || category < 0 ||
+        category >= static_cast<int>(dim_labels[d].size())) return NA_STRING;
+    return Rf_mkChar(dim_labels[d][category].c_str());
+  };
   const StrataSpec mortality_spec = read_spec("mortality"), fertility_spec = read_spec("fertility"),
     search_spec = read_spec("search"), probability_spec = read_spec("probability"),
     conversion_spec = read_spec("conversion"), dissolution_spec = read_spec("dissolution"),
@@ -2580,13 +2588,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::vector<GroupSchedules> schedules(schedule_count);
   const bool status_fertility = fertility_rates.containsElementNamed("union_type");
   bool typed_fertility = false;
-  // Cells stratify by group only when a process's active rates do (directly
-  // or through group multipliers); otherwise groups share one set of cells.
-  bool mortality_grouped = false, search_grouped = false, conversion_grouped = false;
   auto load_schedules = [&]() {
-    mortality_grouped = mortality_rates.containsElementNamed(".hammel_group");
-    search_grouped = union_rates.containsElementNamed(".hammel_group");
-    conversion_grouped = conversion_rates.containsElementNamed(".hammel_group");
     for (int group = 0; group < schedule_count; ++group) {
       auto& rates = schedules[group];
       rates.male = read_bands(mortality_rates, "m", "", group);
@@ -2796,7 +2798,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     int active = -1;
   };
   std::map<std::string, WeightSchedule> weight_schedules;
-  std::vector<std::string> weight_group_labels, weight_ancestry_labels;
+  std::vector<std::string> weight_ancestry_labels;
   auto parse_weight_spec = [&](List x, const std::string& name) {
     WeightSpec spec;
     spec.process = name;
@@ -2821,7 +2823,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   };
   if (weight_input.isNotNull()) {
     List input(weight_input.get());
-    weight_group_labels = as<std::vector<std::string>>(input["group_labels"]);
     weight_ancestry_labels = as<std::vector<std::string>>(input["ancestry_labels"]);
     std::vector<std::pair<std::string, std::string>> keys;   // input name, process
     for (const char* name : {"mortality", "fertility", "dissolution", "conversion", "search"})
@@ -2869,9 +2870,25 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     auto found = weight_specs.find(name);
     return found == weight_specs.end() ? nullptr : &found->second;
   };
-  auto group_label = [&](int g) -> SEXP {
-    if (g < 0 || g >= static_cast<int>(weight_group_labels.size())) return NA_STRING;
-    return Rf_mkChar(weight_group_labels[g].c_str());
+  // A person's category in dimension d.
+  auto category = [&](int i, int d) { return cats[static_cast<size_t>(i) * dimensions + d]; };
+  // Describe a process stratum k by its dimensions: each declared dimension
+  // (with `_w`/`_h` for union strata) is its category's label, or NA when the
+  // process does not stratify by it. `skip` omits one dimension.
+  auto strata_bin = [&](List& bin, const StrataSpec& spec, int k, bool union_level, int skip = -1) {
+    for (int d = 0; d < dimensions; ++d) {
+      if (d == skip) continue;
+      std::vector<std::string> names = union_level ?
+        std::vector<std::string>{dim_names[d] + "_w", dim_names[d] + "_h"} :
+        std::vector<std::string>{dim_names[d]};
+      for (size_t role = 0; role < names.size(); ++role) {
+        SEXP value = NA_STRING;
+        for (size_t j = 0; j < spec.dims.size(); ++j)
+          if (spec.dims[j] == d && static_cast<size_t>(spec.roles[j]) == role)
+            value = dim_label(d, (k / spec.strides[j]) % static_cast<int>(dim_labels[d].size()));
+        bin[names[role]] = Rf_ScalarString(value);
+      }
+    }
   };
   // Variable values (codes as in R's weight_variable_codes). NA is NaN.
   // Person variables take a transition destination for `destination`.
@@ -2880,12 +2897,12 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     const int partner = current_partner[i];
     switch (var) {
       case 0: return p.female ? 1 : 0;
-      case 1: return p.group;
+      case 1: return category(i, component);
       case 2: return partner < 0 ? 0 : (union_history[person_unions[i].back()].cohab ? 1 : 2);
       case 3: return partner >= 0 ? 1 : 0;
       case 4: return parity[i];
       case 5: return previous_union[i];
-      case 6: return partner < 0 ? R_NaN : people[partner].group;
+      case 6: return partner < 0 ? R_NaN : category(partner, component);
       case 7: return ancestry[static_cast<size_t>(i) * ancestry_components + component];
       case 8: return dest;
     }
@@ -2897,14 +2914,14 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     const Person& h = people[x.husband];
     switch (var) {
       case 2: return x.cohab ? 1 : 2;
-      case 9: return w.group;
-      case 10: return h.group;
+      case 9: return category(x.wife, component);
+      case 10: return category(x.husband, component);
       case 11: return parity[x.wife];
       case 12: return previous_union[x.wife];
       case 13: return previous_union[x.husband];
       case 14: return ancestry[static_cast<size_t>(x.wife) * ancestry_components + component];
       case 15: return ancestry[static_cast<size_t>(x.husband) * ancestry_components + component];
-      case 16: return w.group == h.group ? 1 : 0;
+      case 16: return category(x.wife, component) == category(x.husband, component) ? 1 : 0;
       case 17: return w.born - h.born;   // husband's age minus wife's age
     }
     stop("Internal error: unknown union weight variable.");
@@ -2934,9 +2951,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   const std::array<const char*, 3> union_type_labels = {"unpartnered", "cohab", "marriage"};
   const std::array<const char*, 3> previous_labels = {"none", "separated", "widowed"};
   auto ancestry_name = [&](size_t k, const std::string& suffix) {
-    const std::string& label = weight_ancestry_labels[k];
-    const std::string base = label.rfind("group_", 0) == 0 ? label.substr(6) : label;
-    return "ancestry_" + base + suffix;
+    return weight_ancestry_labels[k] + suffix;
   };
   // The members tibble a custom function receives.
   auto weight_members = [&](const std::vector<int>& units, bool is_union, int dest,
@@ -2946,49 +2961,66 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     CharacterVector names;
     auto add = [&](const std::string& name, SEXP value) { columns.push_back(value); names.push_back(name); };
     if (!is_union) {
-      NumericVector id(n); CharacterVector sex(n), group(n), type(n), previous(n), partner_group(n);
+      NumericVector id(n); CharacterVector sex(n), type(n), previous(n);
       IntegerVector partnered(n), births(n);
+      std::vector<CharacterVector> own(dimensions, CharacterVector(n)), partners(dimensions, CharacterVector(n));
+      for (int d = 0; d < dimensions; ++d) { own[d] = CharacterVector(n); partners[d] = CharacterVector(n); }
       for (int r = 0; r < n; ++r) {
         const int i = units[r];
         const int partner = current_partner[i];
         id[r] = people[i].id;
         sex[r] = people[i].female ? "f" : "m";
-        group[r] = group_label(people[i].group);
         type[r] = union_type_labels[static_cast<int>(person_value(2, 0, i, -1))];
         partnered[r] = partner >= 0;
         births[r] = parity[i];
         previous[r] = previous_labels[previous_union[i]];
-        partner_group[r] = partner < 0 ? NA_STRING : group_label(people[partner].group);
+        for (int d = 0; d < dimensions; ++d) {
+          own[d][r] = dim_label(d, category(i, d));
+          partners[d][r] = partner < 0 ? NA_STRING : dim_label(d, category(partner, d));
+        }
       }
-      add("person_id", id); add("sex", sex); add("group", group); add("union_type", type);
+      add("person_id", id); add("sex", sex);
+      for (int d = 0; d < dimensions; ++d) add(dim_names[d], own[d]);
+      add("union_type", type);
       add("partnered", partnered); add("parity", births); add("previous_union", previous);
-      add("partner_group", partner_group);
+      for (int d = 0; d < dimensions; ++d) add("partner_" + dim_names[d], partners[d]);
       for (size_t k = 0; k < ancestry_components; ++k) {
         NumericVector share(n);
         for (int r = 0; r < n; ++r) share[r] = person_value(7, static_cast<int>(k), units[r], -1);
         add(ancestry_name(k, ""), share);
       }
       if (dest >= 0) {
-        CharacterVector destination(n, dest_label.empty() ? group_label(dest) : Rf_mkChar(dest_label.c_str()));
+        CharacterVector destination(n, Rf_mkChar(dest_label.c_str()));
         add("destination", destination);
       }
     } else {
       NumericVector id(n), wife(n), husband(n), gap(n);
-      CharacterVector group_w(n), group_h(n), previous_w(n), previous_h(n), type(n);
-      IntegerVector parity_w(n), same(n);
+      CharacterVector previous_w(n), previous_h(n), type(n);
+      IntegerVector parity_w(n);
+      std::vector<CharacterVector> wives(dimensions), husbands(dimensions);
+      std::vector<IntegerVector> same(dimensions);
+      for (int d = 0; d < dimensions; ++d) {
+        wives[d] = CharacterVector(n); husbands[d] = CharacterVector(n); same[d] = IntegerVector(n);
+      }
       for (int r = 0; r < n; ++r) {
         const UnionRecord& x = union_history[units[r]];
         id[r] = x.id; wife[r] = people[x.wife].id; husband[r] = people[x.husband].id;
-        group_w[r] = group_label(people[x.wife].group); group_h[r] = group_label(people[x.husband].group);
+        for (int d = 0; d < dimensions; ++d) {
+          wives[d][r] = dim_label(d, category(x.wife, d));
+          husbands[d][r] = dim_label(d, category(x.husband, d));
+          same[d][r] = category(x.wife, d) == category(x.husband, d);
+        }
         parity_w[r] = parity[x.wife];
         previous_w[r] = previous_labels[previous_union[x.wife]];
         previous_h[r] = previous_labels[previous_union[x.husband]];
-        same[r] = people[x.wife].group == people[x.husband].group;
         gap[r] = people[x.wife].born - people[x.husband].born;
         type[r] = x.cohab ? "cohab" : "marriage";
       }
       add("union_id", id); add("wife_id", wife); add("husband_id", husband);
-      add("group_w", group_w); add("group_h", group_h); add("parity_w", parity_w);
+      for (int d = 0; d < dimensions; ++d) {
+        add(dim_names[d] + "_w", wives[d]); add(dim_names[d] + "_h", husbands[d]);
+      }
+      add("parity_w", parity_w);
       add("previous_union_w", previous_w); add("previous_union_h", previous_h);
       for (const std::string suffix : {"_w", "_h"})
         for (size_t k = 0; k < ancestry_components; ++k) {
@@ -2997,7 +3029,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
             share[r] = union_value(suffix == "_w" ? 14 : 15, static_cast<int>(k), units[r]);
           add(ancestry_name(k, suffix), share);
         }
-      add("same_group", same); add("age_difference", gap); add("union_type", type);
+      for (int d = 0; d < dimensions; ++d) add("same_" + dim_names[d], same[d]);
+      add("age_difference", gap); add("union_type", type);
     }
     columns.attr("names") = names;
     columns.attr("class") = CharacterVector::create("tbl_df", "tbl", "data.frame");
@@ -3068,20 +3101,19 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         DataFrame all = all_mortality;
         if (name == "mortality") {
           bin["sex"] = stratum % 2 ? "f" : "m";
-          bin["group"] = Rf_ScalarString(mortality_grouped ? group_label(stratum / 2) : NA_STRING);
+          strata_bin(bin, mortality_spec, stratum / 2, false);
         } else if (name == "dissolution") {
           const int pair = stratum / 2;
-          bin["group_pair"] = Rf_ScalarString(dissolution_schedules.size() == 1 ? NA_STRING : Rf_mkChar(
-            (weight_group_labels[pair % group_count] + ":" + weight_group_labels[pair / group_count]).c_str()));
+          strata_bin(bin, dissolution_spec, pair, true);
           bin["union_type"] = stratum % 2 ? "cohab" : "marriage";
           duration = true; all = all_dissolution;
         } else if (name == "conversion") {
-          bin["group"] = Rf_ScalarString(conversion_grouped ? group_label(stratum) : NA_STRING);
+          strata_bin(bin, conversion_spec, stratum, true);
           duration = schedules[stratum].duration_conversion; all = all_conversion;
         } else if (name == "search") {
           const int g = previous_specific ? stratum / 3 : stratum;
           const int previous = previous_specific ? stratum % 3 : 0;
-          bin["group"] = Rf_ScalarString(search_grouped ? group_label(g) : NA_STRING);
+          strata_bin(bin, search_spec, g, false);
           bin["previous_union"] = Rf_ScalarString(previous_specific ? Rf_mkChar(previous_labels[previous]) : NA_STRING);
           duration = previous_specific && schedules[g].duration_search[previous]; all = all_search;
         } else {
@@ -3092,6 +3124,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
           const int origin = (stratum / tp.spec.strides[tp.own]) % static_cast<int>(labels.size());
           bin["origin"] = labels[origin];
           bin["destination"] = labels[x.dest];
+          strata_bin(bin, tp.spec, stratum, false, tp.dim);
           bin["sex"] = Rf_ScalarString(x.sex < 0 ? NA_STRING : Rf_mkChar(x.sex ? "f" : "m"));
           bin["union_type"] = Rf_ScalarString(x.type.empty() ? NA_STRING : Rf_mkChar(x.type.c_str()));
           duration = tp.duration; all = tp.all;
@@ -3117,7 +3150,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   auto fertility_bin = [&](int c) {
     const auto info = cells->cell_info(c);
     List bin = List::create(_["process"] = "fertility");
-    bin["group"] = Rf_ScalarString(fertility_grouped ? group_label(info.group) : NA_STRING);
+    strata_bin(bin, fertility_spec, info.group, false);
     const std::string& type = fertility_types[info.type];
     bin["union_type"] = Rf_ScalarString(type.empty() ? NA_STRING : Rf_mkChar(type.c_str()));
     bin["parity_start"] = info.parity_start;
@@ -3149,7 +3182,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       const int stratum = search->cell_stratum(c);
       const int g = previous_specific ? stratum / 3 : stratum;
       const int previous = previous_specific ? stratum % 3 : 0;
-      bin["group"] = Rf_ScalarString(search_grouped ? group_label(g) : NA_STRING);
+      strata_bin(bin, search_spec, g, false);
       bin["previous_union"] = Rf_ScalarString(previous_specific ? Rf_mkChar(previous_labels[previous]) : NA_STRING);
       custom_eta(*search_weights_spec, weight_members(one, false, -1),
         band_list(bin, previous_specific && schedules[g].duration_search[previous],
@@ -3513,7 +3546,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
           }
           const bool same = typed == typed_fertility &&
             fertility_rates.containsElementNamed(".hammel_group") == fertility_grouped &&
-            cells->update_rates(fertility_strata(fertility_rates, fertility_grouped ? group_count : 1,
+            cells->update_rates(fertility_strata(fertility_rates, fertility_spec.count,
                                                  fertility_types), now);
           if (!same) { load_cells(now); rebuilt = true; }
         }

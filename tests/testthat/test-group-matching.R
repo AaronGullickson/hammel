@@ -55,7 +55,8 @@ test_that("categorical group predictors have stable treatment contrasts and inte
     female_group = factor(c("A", "B"), levels = c("A", "B")))
   names <- colnames(stats::model.matrix(formula, data))[-1]
   beta <- setNames(seq_along(names)/10, names)
-  expect_warning(matching <- create_matching_model(formula, beta, group_levels = c("A", "B")), "male_group are absorbed")
+  expect_warning(public <- create_matching_model(formula, beta), "male_group` are absorbed")
+  matching <- internal_matching_model(public, "group", c("A", "B"))
   gaps <- c(1, 3)
   supplied <- data.frame(age_difference = gaps,
     female_group = factor(c("B", "B"), levels = c("A", "B")),
@@ -66,8 +67,10 @@ test_that("categorical group predictors have stable treatment contrasts and inte
   # Session contrast settings must not change these specified coefficients.
   old <- options(contrasts = c("contr.sum", "contr.poly")); on.exit(options(old))
   expect_equal(calculate_matching_utilities(matching, gaps, "B", c("A", "A")), unname(expected))
-  expect_error(create_matching_model(~ male_group, c(male_groupB = 1)), "group_levels")
-  expect_error(create_matching_model(~ male_group, c(male_groupB = 1), group_levels = "A"), "two")
+  # Categories come from the declaration and are checked when the model meets it.
+  expect_error(internal_matching_model(public, "group", c("A", "B", "C")), "coefficient names")
+  one <- suppressWarnings(create_matching_model(~ male_group, numeric()))
+  expect_error(internal_matching_model(one, "group", "A"), "at least two categories")
   expect_error(prepare_matching_model(matching, c("A", "C")), "covered")
   expect_error(calculate_matching_utilities(matching, 1, "A", "C"), "undeclared")
 })
@@ -108,7 +111,7 @@ test_that("group matching validates edited models and missing identities even at
   matching <- create_matching_model(~ same_group, c(same_group = 1))
   model <- make_model(0)
   model$processes$union_formation$matching <- matching
-  expect_error(simulate(model, 0), "group identities")
+  expect_error(simulate(model, 0), "declared group dimension")
   model$population$persons$group <- character()
   model$population$groups <- list(group = group())
   expect_no_error(simulate(model, 1))
@@ -132,9 +135,9 @@ test_that("zero or absent pair effects preserve histories and RNG consumption", 
 })
 
 test_that("custom group comparisons work with absent candidate levels", {
-  matching <- suppressWarnings(create_matching_model(~ age_difference + I(male_group == "B"),
-    c(age_difference = 0.1, "I(male_group == \"B\")TRUE" = log(2)),
-    group_levels = c("A", "B")))
+  matching <- internal_matching_model(suppressWarnings(create_matching_model(
+    ~ age_difference + I(male_group == "B"),
+    c(age_difference = 0.1, "I(male_group == \"B\")TRUE" = log(2)))), "group", c("A", "B"))
   prepared <- prepare_matching_model(matching, c("A", "B"))
   expect_equal(inspect_group_matching_cpp(c(1, 3), prepared, 0L, c(0L, 0L)),
                c(0.1, 0.3))

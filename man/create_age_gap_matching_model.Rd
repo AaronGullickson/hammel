@@ -24,13 +24,15 @@ preferred gap at which selection weight halves.}
 \item{prevent_exogamy}{Optional hard group restrictions passed to
 \code{\link[=create_matching_model]{create_matching_model()}}. Defaults to \code{FALSE}.}
 
-\item{delta}{Optional finite numeric vector with unique group names.
+\item{delta}{Optional male-target adjustments, as a named list keyed by
+dimension or a bare value for the only declared dimension: a finite
+numeric vector with unique category names.
 Multiply mirrored male targets by \code{exp(delta)}
 and normalize. Omitted groups have zero adjustment. Positive values raise
 the male target relative to baseline and other groups; negative values
 lower it. Only differences matter. Does not set pair-specific ratios or
-change female search rates. Names must belong to the population's identity
-registry (including declared future groups).}
+change female search rates. Names must be categories of the dimension
+(including declared future categories).}
 }
 \value{
 A \code{hammel_matching_model} with linear and quadratic age-difference terms.

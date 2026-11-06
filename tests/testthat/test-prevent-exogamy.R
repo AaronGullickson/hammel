@@ -121,7 +121,7 @@ test_that("restriction tables and missing or empty group populations validate", 
   expect_true(matching_group_allowed(matching, "C::D", "A:B"))
   model <- make_model(0)
   model$processes$union_formation$matching <- create_age_gap_matching_model(0, 5, prevent_exogamy = TRUE)
-  expect_error(simulate(model, 0), "group identities")
+  expect_error(simulate(model, 0), "declared group dimension")
   model$population$persons$group <- character()
   model$population$groups <- list(group = group())
   expect_no_error(simulate(model, 1))

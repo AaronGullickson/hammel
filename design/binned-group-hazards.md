@@ -225,18 +225,20 @@ In fertility only eligible women are weighted and chosen, as now.
 
 ### API
 
-    create_weight_model(formula, coefficients, group_levels = NULL)
+    create_weight_model(formula, coefficients)
     create_weight_model(fun = f)
 
 The formula form mirrors `create_matching_model()`: a one-sided formula, a
-finite named numeric vector of coefficients, and `group_levels` (at least two
-ordered labels) when the formula uses a categorical group variable.
+finite named numeric vector of coefficients.
 Categorical variables use treatment coding with fixed levels, and coefficient
-names follow the model-matrix column names (for example `groupB`,
-`union_typecohab`). One `group_levels` applies to every group-valued variable
-(`group`, `partner_group`, `destination`, `group_w`, `group_h`), so they share
-the reference group: `~ group + partner_group` with levels `c("A", "B")` has
-coefficients `groupB` and `partner_groupB`. Other categorical variables have
+names follow the model-matrix column names (for example `raceB`,
+`union_typecohab`). Group variables are named by declared dimension (D134,
+stage 5), and a group-valued variable's levels are its dimension's categories
+(declared, or in order of first appearance), so variables of one dimension
+share its reference: `~ race + partner_race` with categories A and B has
+coefficients `raceB` and `partner_raceB`. Names that could be group variables
+are resolved, and their coefficients checked, when the model meets the
+declaration at simulation; other names are checked when the model is set. Other categorical variables have
 engine-fixed levels, with the first listed in [Variables](#variables) as the
 reference. The intercept has no effect and is ignored. Non-finite
 coefficients are errors.
@@ -265,24 +267,24 @@ Person processes (mortality, fertility, transitions) can use:
 | Variable | Values |
 | --- | --- |
 | `sex` | `"f"`, `"m"` |
-| `group` | population group (requires `group_levels`) |
+| `<dim>` (e.g. `race`) | the person's category in a declared dimension |
 | `union_type` | `"unpartnered"`, `"cohab"`, `"marriage"` |
 | `partnered` | 1 if in a union, else 0 |
 | `parity` | number of births (women; 0 for men) |
 | `previous_union` | `"none"`, `"separated"`, `"widowed"` |
-| `partner_group` | partner's group; NA when unpartnered |
-| `ancestry_<group>`, `ancestry_unknown` | ancestry shares, each in [0, 1] |
-| `destination` | transitions only: the destination of the risk (formerly `group_dest`) |
+| `partner_<dim>` | partner's category; NA when unpartnered |
+| `ancestry_<dim>_<category>`, `ancestry_<dim>_unknown` | ancestry shares of a tracked dimension, each in [0, 1] |
+| `destination` | transitions only: the destination of the risk in the transition's dimension (formerly `group_dest`) |
 
 Union processes (dissolution, conversion) use partner variables with the
-suffix `_w` (wife) or `_h` (husband): `group_w`, `group_h`, `parity_w`,
-`previous_union_w`, `previous_union_h`, `ancestry_<group>_w` and
-`ancestry_<group>_h` (births are counted for mothers only, so there is no
+suffix `_w` (wife) or `_h` (husband): `<dim>_w`, `<dim>_h`, `parity_w`,
+`previous_union_w`, `previous_union_h`, `ancestry_<dim>_<category>_w` and
+`ancestry_<dim>_<category>_h` (births are counted for mothers only, so there is no
 `parity_h`), plus the couple terms:
 
 | Variable | Values |
 | --- | --- |
-| `same_group` | 1 if both partners are in the same group, else 0 (for group-exogamous unions) |
+| `same_<dim>` | 1 if both partners are in the same category of the dimension, else 0 |
 | `age_difference` | husband's age minus wife's age, fixed for the union |
 | `union_type` | `"cohab"` or `"marriage"` |
 

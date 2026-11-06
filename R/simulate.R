@@ -223,11 +223,14 @@ simulate <- function(model, years, seed = NULL) {
                   "supply separate schedules using `union_type`."), call. = FALSE)
   }
   # Group dimensions (D134): each has its categories (registry), inheritance
-  # rule and optional ancestry block. Matching, transitions and weight-model
-  # group variables use the single dimension when there is exactly one.
+  # rule and optional ancestry block. Matching group effects use one
+  # dimension (the only one, or the one the matching models name); its
+  # categories are `group_values`.
   registries <- group_registries(population, lapply(transition_list, `[[`, "rates"))
-  group_values <- if (length(dimensions) == 1L) registries[[1]] else NULL
-  if (length(dimensions) > 1L) check_single_dimension_features(model, declaration)
+  resolved <- resolve_matching_models(union_process, declaration, registries)
+  union_process <- resolved$process
+  match_name <- if (!is.null(resolved$dim)) resolved$dim else if (length(dimensions) == 1L) dimensions
+  group_values <- if (is.null(match_name)) NULL else registries[[match_name]]
   tracked <- tracked_ancestry(declaration)
   components <- lapply(dimensions, function(d)
     if (d %in% tracked) setdiff(names(population$ancestry[[d]]), "person_id") else character())
@@ -282,7 +285,7 @@ simulate <- function(model, years, seed = NULL) {
   if (cohab_enabled && !"previous_cohab_id" %in% names(population$unions))
     population$unions$previous_cohab_id <- rep(NA_real_, nrow(population$unions))
   engine_persons <- population$persons
-  group_input <- if (!grouped) NULL else group_engine_input(population$persons, registries,
+  group_input <- if (!grouped) NULL else group_engine_input(population$persons, registries, match_name,
     list(mortality = death$spec, fertility = birth$spec, search = search$spec,
          probability = cohab$prob_spec, conversion = cohab$conversion_spec,
          dissolution = dissolution$spec))
@@ -318,6 +321,25 @@ simulate <- function(model, years, seed = NULL) {
   weight_models <- Filter(Negate(is.null), weight_models)
   for (name in names(weight_models))
     check_model_coverage(weight_models[[name]], start, start + years, paste(name, "weights"))
+  # Weight variables resolve against the declaration (D134): each dimension's
+  # categories, and ancestry variables `ancestry_<dim>_<category>` in engine
+  # column order.
+  ancestry_names <- unlist(lapply(seq_along(dimensions), function(k)
+    if (sizes[k]) paste0("ancestry_", dimensions[k], "_", components[[k]])))
+  weight_context <- list(categories = registries, ancestry = as.character(ancestry_names))
+  weight_input <- if (!length(weight_models)) NULL else {
+    types <- c(mortality = "person", fertility = "person", dissolution = "union",
+               conversion = "union", search = "person")
+    prepared <- lapply(names(weight_models), function(name) {
+      transition <- startsWith(name, "transition_")
+      context <- weight_context
+      if (transition) context$transition_dim <- names(transition_list)[as.integer(sub("transition_", "", name))]
+      prepare_weight_model(weight_models[[name]], if (transition) "transition" else types[[name]],
+                           if (transition) "transition" else name, context)
+    })
+    names(prepared) <- names(weight_models)
+    c(prepared, list(ancestry_labels = as.character(ancestry_names)))
+  }
   if ("previous_union" %in% names(union_rates) || cohab_enabled || length(weight_models)) {
     previous <- previous_union_info_cpp(population$persons, population$unions, counts_cohab)
     engine_persons$.hammel_previous_union <- previous$previous_union
@@ -351,23 +373,6 @@ simulate <- function(model, years, seed = NULL) {
     cohab_matching <- if (scheduled_models) model_context$cohab_matching else
       if (is.null(union_process$cohab_matching)) matching else
         prepare_matching_model(union_process$cohab_matching, group_values)
-    # Weight models use the single dimension's ancestry block.
-    ancestry_labels <- if (length(dimensions) != 1L || !sizes[1]) character() else {
-      known <- setdiff(components[[1]], "unknown")
-      c(paste0("group_", known), "unknown")
-    }
-    weight_input <- if (!length(weight_models)) NULL else {
-      types <- c(mortality = "person", fertility = "person", dissolution = "union",
-                 conversion = "union", search = "person")
-      prepared <- lapply(names(weight_models), function(name) {
-        transition <- startsWith(name, "transition_")
-        prepare_weight_model(weight_models[[name]], if (transition) "transition" else types[[name]],
-                             if (transition) "transition" else name, group_values, ancestry_labels)
-      })
-      names(prepared) <- names(weight_models)
-      c(prepared, list(group_labels = if (is.null(group_values)) character() else
-        as.character(group_values), ancestry_labels = ancestry_labels))
-    }
     native <- simulate_cpp(engine_persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
                            matching,
@@ -520,23 +525,3 @@ ancestry_matrix <- function(population, tracked) {
   }))
 }
 
-# Matching group effects and weight-model group variables currently use a
-# single dimension; with several, these features are not yet available.
-check_single_dimension_features <- function(model, declaration) {
-  why <- function(what)
-    stop(sprintf("%s require exactly one group dimension for now; this model declares %s.",
-                 what, paste0("`", names(declaration), "`", collapse = ", ")), call. = FALSE)
-  union <- model$processes$union_formation
-  for (m in c(model_entries(union$matching), model_entries(union$father_matching),
-              model_entries(union$cohab_matching)))
-    if (length(m$group_exogamy) || !identical(m$prevent_exogamy, FALSE) || length(m$delta) ||
-        any(c("female_group", "male_group", "same_group") %in% all.vars(m$formula)))
-      why("Group effects in matching")
-  weights <- list(model$processes$mortality$weights, model$processes$fertility$weights,
-    model$processes$union_dissolution$weights, union$weights, union$weights_conversion)
-  weights <- c(weights, lapply(transition_processes(model), `[[`, "weights"))
-  for (w in unlist(lapply(weights, model_entries), recursive = FALSE))
-    if (!is.null(w$formula) && any(grepl("group|^ancestry_|^destination$", all.vars(w$formula))))
-      why("Group variables in weight models")
-  invisible(NULL)
-}

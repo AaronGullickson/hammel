@@ -4,20 +4,12 @@
 \alias{create_weight_model}
 \title{Create a weight model for selection within rate cells}
 \usage{
-create_weight_model(
-  formula = NULL,
-  coefficients = numeric(),
-  group_levels = NULL,
-  fun = NULL
-)
+create_weight_model(formula = NULL, coefficients = numeric(), fun = NULL)
 }
 \arguments{
 \item{formula}{A one-sided formula of weight variables.}
 
 \item{coefficients}{A finite named numeric vector of log hazard ratios.}
-
-\item{group_levels}{Ordered group labels, required when the formula uses a
-group-valued variable; the first is the reference.}
 
 \item{fun}{A custom function returning log weights, instead of \code{formula}.
 
@@ -48,35 +40,41 @@ Attach a weight model with the \code{weights} argument of \code{\link[=set_morta
 \code{\link[=set_union_formation]{set_union_formation()}} (searches), or \code{weights_conversion} of
 \code{\link[=set_union_formation]{set_union_formation()}}.
 
-\strong{Variables.} Mortality, fertility and group transitions are person
-processes and may use \code{sex} (\code{"f"}, \code{"m"}), \code{group}, \code{union_type}
+\strong{Variables.} Group variables are named by the declared group dimensions
+(see \code{\link[=set_groups]{set_groups()}}); for a dimension \code{race} with categories A and B:
+Mortality, fertility and group transitions are person
+processes and may use \code{sex} (\code{"f"}, \code{"m"}), \code{race}, \code{union_type}
 (\code{"unpartnered"}, \code{"cohab"}, \code{"marriage"}), \code{partnered} (0/1), \code{parity}
 (births; 0 for men), \code{previous_union} (\code{"none"}, \code{"separated"},
-\code{"widowed"}), \code{partner_group} (NA when unpartnered) and ancestry shares
-\verb{ancestry_<group>} and \code{ancestry_unknown}. Group transitions may also use
-\code{destination}, the destination of the risk. Dissolution and conversion are
-union processes and may use \code{group_w}, \code{group_h}, \code{parity_w},
-\code{previous_union_w}, \code{previous_union_h}, \verb{ancestry_<group>_w},
-\verb{ancestry_<group>_h}, \code{same_group} (0/1), \code{age_difference} (husband's age
-minus wife's age) and \code{union_type} (\code{"cohab"}, \code{"marriage"}). All variables
-change only at events. The first listed level of each categorical variable
-is its reference.
+\code{"widowed"}), \code{partner_race} (NA when unpartnered) and, when the dimension
+tracks ancestry, shares \code{ancestry_race_A} and \code{ancestry_race_unknown}.
+Group transitions may also use \code{destination}, the destination of the risk
+in the transition's dimension. Dissolution and conversion are union
+processes and may use \code{race_w}, \code{race_h}, \code{parity_w}, \code{previous_union_w},
+\code{previous_union_h}, \code{ancestry_race_A_w}, \code{ancestry_race_A_h}, \code{same_race}
+(0/1), \code{age_difference} (husband's age minus wife's age) and \code{union_type}
+(\code{"cohab"}, \code{"marriage"}). All variables change only at events. The first
+listed level of each categorical variable is its reference; for a group
+dimension it is its first category (declared, or first in the population).
 
 \strong{Formulas.} Terms are main effects of these variables and interactions
 (\code{:} or \code{*}); transformations such as \code{I()} are not supported (use \code{fun}).
 Categorical variables use treatment coding, and \code{coefficients} must be
 named exactly as the corresponding model-matrix columns, for example
-\code{groupB} or \code{union_typecohab}. One \code{group_levels} applies to every
-group-valued variable (\code{group}, \code{partner_group}, \code{destination}, \code{group_w},
-\code{group_h}), and must include every population group. The intercept has no
-effect. A term whose variable is missing (such as \code{partner_group} for an
-unpartnered person) contributes zero, with a warning.
+\code{raceB} or \code{union_typecohab}. A group-valued variable's levels are its
+dimension's categories. Group variable names and their coefficients are
+checked when the model meets the group declaration at simulation; other
+names are checked when the model is set. The intercept has no effect. A
+term whose variable is missing (such as \code{partner_race} for an unpartnered
+person) contributes zero, with a warning.
 
 \strong{Custom functions.} \code{fun(members, bin)} receives a tibble with one row per
-eligible member of the chosen cell, holding the variables above (with labels
-for categorical variables) and identifiers (\code{person_id}, or \code{union_id},
-\code{wife_id} and \code{husband_id}), and a list \code{bin} describing the cell: its
-\code{process}, strata, band (\code{age_start}/\code{age_end} or \code{dur_start}/\code{dur_end}) and
+eligible member of the chosen cell, holding the variables above for every
+declared dimension (with labels for categorical variables) and identifiers
+(\code{person_id}, or \code{union_id}, \code{wife_id} and \code{husband_id}), and a list \code{bin}
+describing the cell: its \code{process}, strata (each dimension's category, or
+\verb{<dim>_w}/\verb{<dim>_h} for union processes, NA when the rates do not stratify
+by it; \code{origin} and \code{destination} for transitions), band (\code{age_start}/\code{age_end} or \code{dur_start}/\code{dur_end}) and
 the active rate period \code{time_start}/\code{time_end} (NA for static rates). Exact
 ages and times are not passed. It must return one finite log weight per row;
 NA gives zero, with a warning. It shares the simulation's random-number

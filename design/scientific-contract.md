@@ -307,9 +307,9 @@ are finite log-scale additions after the full formula score. An omitted pair
 has odds ratio 1.0 (zero log effect). Within-group effects are allowed; overlaps
 after symmetric expansion are errors. A pair table is also accepted
 for labels containing colons; each row expands in both directions. These are selection preferences, not hazards or
-prohibitions. `female_group`, `male_group`, and numeric 0/1 `same_group` are
-available in formulas; categorical terms require fixed declared `group_levels`
-with treatment contrasts. Missing population identity data errors when a model
+prohibitions. For a declared dimension such as `race`, `female_race`,
+`male_race`, and numeric 0/1 `same_race` are available in formulas;
+categorical terms use the dimension's categories with treatment contrasts. Missing population identity data errors when a model
 uses group effects. See [group matching](group-matching.md) for worked cases.
 
 Matching models also accept `prevent_exogamy = FALSE` (no restrictions), TRUE

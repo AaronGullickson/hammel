@@ -43,6 +43,7 @@ test_that("cell search intensities match explicit scans through every state chan
     cohab_prob = data.frame(age_start = c(0, 25), age_end = c(25, Inf), prob = c(.6, .3)),
     union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .1),
     kinship_generations = 0,
-    weights = create_weight_model(~ group, c(groupB = log(2)), group_levels = c("A", "B")))
+    # B is listed first in this population, so A is the non-reference level.
+    weights = create_weight_model(~ group, c(groupA = -log(2))))
   expect_s3_class(simulate(weighted, 3, seed = 33), "hammel_population")
 })

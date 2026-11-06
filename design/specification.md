@@ -344,7 +344,8 @@ model's restrictions. See [group matching](group-matching.md).
 
 `create_matching_model()` accepts a formula with age and group predictors,
 named utility coefficients, and optional symmetric additive pair effects (`A:B` in both directions).
-Categorical group formulas declare fixed `group_levels`; see
+Group predictors are named by dimension (`female_race`, `same_race`) with the
+dimension's categories as levels (D134); see
 [group matching](group-matching.md). `union_formation()` and `set_union_formation()` specify initiation
 and a matching specification. The C++ on-demand path creates unions at births
 using conditional-logit selection over all living, unpartnered men who pass
@@ -445,7 +446,7 @@ per-generation marginal normalization is imposed. See [the specification](fertil
 
 ## Weight models (D129)
 
-`create_weight_model(formula, coefficients, group_levels)` or
+`create_weight_model(formula, coefficients)` or
 `create_weight_model(fun = f)` builds a weight model, validated by
 `validate_weight_model()`; `weights` arguments on `set_mortality()`,
 `set_fertility()`, `set_union_dissolution()`, `set_group_transition()` and

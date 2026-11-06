@@ -1,10 +1,12 @@
 # Milestone 9: multiple group dimensions
 
-Started November 5, 2026. **Status: design decided (D134); stages 1–4
+Started November 5, 2026. **Status: design decided (D134); stages 1–5
 implemented: declared dimensions of any name, several at once, in every rate
 table, with per-dimension inheritance (including calendar schedules),
-ancestry, transitions and analysis splits. Matching and weight-model group
-effects still use a single dimension (stage 5).**
+ancestry, transitions, analysis splits and weight-model variables, and
+matching group effects in any one dimension. Remaining: stage 6 (tests,
+articles and documents) and step 2 (joint matching calibration across
+dimensions).**
 This records the user's decisions as they are made. Milestone 9 was assigned
 multiple group columns by D131. See the [roadmap](roadmap.md#milestone-9-multiple-group-columns)
 for the motivation and the household-move questions retained from D114.
@@ -147,6 +149,49 @@ Step 1, each stage leaving the test suite passing:
 6. Tests, articles and documents.
 
 Step 2: joint matching calibration across dimensions.
+
+### Stage 5 as implemented (November 6, 2026)
+
+- **Matching.** Predictors are `female_<dim>`, `male_<dim>` and `same_<dim>`;
+  `group_exogamy`, `prevent_exogamy` and `delta` are lists keyed by dimension,
+  or a bare value for the only declared dimension (a convenience, like
+  `group = NULL` for transitions). `group_levels` is removed: levels are the
+  dimension's categories, the first being the reference. A model's group
+  effects may use one dimension, and every matching model of a run must use
+  the same one; using two is an error (joint effects are step 2). That
+  dimension becomes the engine's matching dimension (pools, pair effects,
+  restrictions, `delta`, calibration). Without group effects and with several
+  dimensions there is none. Coefficient names of group predictors are checked
+  at simulation, when the categories are known. At simulation each public
+  model is translated to the internal one-dimension form (`female_group`,
+  explicit levels), so the engine path is unchanged.
+- **Weight models.** Variables are named by dimension: `race`,
+  `partner_race`, `ancestry_race_A`, `ancestry_race_unknown` (person and
+  transition processes), `destination` (transitions, in their own
+  dimension), and `race_w`, `race_h`, `same_race`, `ancestry_race_A_w`,
+  `ancestry_race_A_h` (union processes), for any declared dimension and in
+  any combination. `group_levels` is removed; levels are the categories.
+  Names that could be group variables are resolved and their coefficients
+  checked at simulation (also for zero-year runs); other names still fail
+  when the model is set. In the engine a group variable's factor carries its
+  dimension's index.
+- **Custom weight functions.** Members have a column per dimension
+  (`race`, `partner_race`; `race_w`, `race_h`, `same_race`); without declared
+  groups there are no group columns. `bin` describes the cell's strata by
+  dimension (`race`, or `race_w`/`race_h` for union processes; NA when the
+  rates do not stratify by it; `origin`/`destination` and other dimensions for
+  transitions). This fixes the stale stage 2 `group_pair` label for
+  dissolution.
+- **Bug fixed.** A calendar change in fertility rates sized the fertility
+  strata by the matching dimension's categories instead of the fertility
+  table's own strata (equal with one dimension).
+- With one dimension named `group`, results (persons, unions, ancestry,
+  transitions, custom-function calls) are bit-identical to stage 4 for a model
+  using matching pair effects, restrictions, `delta`, categorical predictors,
+  calibration, and formula and custom weights on every process, when both
+  builds disable fused multiply-adds. Undeclared categories follow first
+  appearance, so a reference level that came from `group_levels` order may
+  now need declared `categories`.
 
 ### Stage 4 as implemented (November 2026)
 
