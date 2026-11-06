@@ -1,10 +1,12 @@
 
-# hammel <img src="man/figures/logo.png" align="right" width="120" alt="Hammel hex sticker showing a branching kinship network" />
+# Hammel 
 
 <!-- badges: start -->
 [![Codecov test coverage](https://codecov.io/gh/AaronGullickson/hammel/graph/badge.svg)](https://app.codecov.io/gh/AaronGullickson/hammel)
 [![R-CMD-check](https://github.com/AaronGullickson/hammel/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/AaronGullickson/hammel/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
+
+<img src="man/figures/logo.png" align="right" width="120" alt="Hammel hex sticker showing a branching kinship network" />
 
 Hammel is a standalone demographic microsimulator with an R interface and a
 C++17 engine. It models continuous-time mortality, fertility, and union
