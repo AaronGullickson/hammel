@@ -519,10 +519,12 @@ class WeightCalibrator {
       }
       x[0] = 0;
       std::vector<double> share(n), phi, hess, weights(n);
+      // Objective, gradient (phi) and, when `with_hess`, the Hessian. Line
+      // search trials need only the objective and gradient.
       auto evaluate = [&](const std::vector<double>& point, std::vector<double>& out_phi,
-                          std::vector<double>& out_hess) {
+                          std::vector<double>& out_hess, bool with_hess) {
         out_phi.assign(n, 0);
-        out_hess.assign(static_cast<size_t>(n) * n, 0);
+        if (with_hess) out_hess.assign(static_cast<size_t>(n) * n, 0);
         double objective = 0, lambda_total = 0;
         for (int j = 0; j < n; ++j) weights[j] = std::exp(point[j]);
         for (int r : block_row_ids) {
@@ -538,13 +540,14 @@ class WeightCalibrator {
           for (int j = 0; j < n; ++j) {
             const double p = share[j] / denominator;
             out_phi[j] += lambda * p;
-            for (int k = 0; k < n; ++k)
-              out_hess[static_cast<size_t>(j) * n + k] +=
-                lambda * ((j == k ? p : 0) - p * share[k] / denominator);
+            if (with_hess)
+              for (int k = 0; k < n; ++k)
+                out_hess[static_cast<size_t>(j) * n + k] +=
+                  lambda * ((j == k ? p : 0) - p * share[k] / denominator);
           }
         }
         for (double& value : out_phi) value /= lambda_total;
-        for (double& value : out_hess) value /= lambda_total;
+        if (with_hess) for (double& value : out_hess) value /= lambda_total;
         objective /= lambda_total;
         for (int j = 0; j < n; ++j) objective -= tau[j] * point[j];
         return objective;
@@ -552,7 +555,7 @@ class WeightCalibrator {
       bool converged = false;
       std::vector<double> trial(n), trial_phi, trial_hess, step;
       for (int iteration = 0; iteration < 100; ++iteration) {
-        const double objective = evaluate(x, phi, hess);
+        const double objective = evaluate(x, phi, hess, true);
         double error = 0;
         for (int j = 0; j < n; ++j) error = std::max(error, std::abs(phi[j] - tau[j]));
         if (error < 1e-10) { converged = true; break; }
@@ -574,7 +577,7 @@ class WeightCalibrator {
           trial[0] = 0;
           for (int j = 0; j < m; ++j)
             trial[j + 1] = std::max(-kMaxLogWeight, std::min(kMaxLogWeight, x[j + 1] + length * step[j]));
-          const double trial_objective = evaluate(trial, trial_phi, trial_hess);
+          const double trial_objective = evaluate(trial, trial_phi, trial_hess, false);
           double trial_error = 0;
           for (int j = 0; j < n; ++j) trial_error = std::max(trial_error, std::abs(trial_phi[j] - tau[j]));
           if (trial_objective < objective || trial_error < error) { moved = true; break; }

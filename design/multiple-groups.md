@@ -256,17 +256,22 @@ calibration cost as the number of combinations grows.
   associated with race: all 12 ratios lie between 0.92 and 1.12; two 95%
   intervals touch 1 at their edge (1.12, 1.00–1.26; 1.09, 1.00–1.19), in line
   with chance over 12 comparisons.
-- **Cost** (20,000 people, 20 years; seconds):
+- **Cost.** Combining dimensions costs the same as one dimension with that
+  many categories (measured side by side), but calibration cost grows steeply
+  with the number of categories. Timings, 20,000 people, 20 years, finite
+  effects in every dimension, measured on an otherwise idle machine
+  (November 6, 2026; earlier figures recorded here were inflated about
+  six- to eightfold by other load and are withdrawn):
 
   | Matching categories | 2 | 4 | 8 | 16 | 32 |
   | --- | --- | --- | --- | --- | --- |
-  | Two dimensions combined | 1.1 | 3.4 | 14.6 | 72 | 338 |
-  | One dimension, same count | 1.1 | 3.4 | 14.6 | 71 | 337 |
+  | Before the solver change (s) | 0.22 | 0.55 | 2.0 | 9.1 | 43 |
+  | After (s) | 0.23 | 0.51 | 1.6 | 6.5 | 28 |
 
-  Combining dimensions adds no cost beyond the number of categories, but the
-  existing calibration's cost grows steeply with that number (about four to
-  five times per doubling). Many matching combinations can therefore be slow;
-  this is a limitation of the current calibration, not of combining.
+  The solver change: line-search trial points no longer compute the Hessian,
+  which they never used. Results are bit-identical (checked with fused
+  multiply-adds off, for one and two dimensions). Cost still grows about
+  4 to 4.5 times per doubling of categories.
 - **Partial prohibitions and separate markets (D138, November 6, 2026).**
   Prohibiting some matching dimensions while others carried effects was slow:
   with region prohibited, each region's men can only be chosen by its own
@@ -276,13 +281,13 @@ calibration cost as the number of combinations grows.
   categories connected by allowed pairs) is calibrated on its own, with
   targets normalized within it, and prohibited pairs contribute exactly zero.
   Results are unchanged when there is one block (checked bit-identical).
-  With 16 combinations (4 races x 4 regions, 20,000 people, 20 years):
+  With 16 combinations (4 races x 4 regions, 20,000 people, 20 years, idle
+  machine):
 
-  | Matching settings | Before (s) | Now (s) |
+  | Matching settings | Before D138 (s) | After (s) |
   | --- | --- | --- |
-  | Race effects + region effects | 72 | 73 |
-  | Race effects + region prohibited | 997 | 12 |
-  | Both prohibited (calibration skipped) | 0.4 | 0.4 |
+  | Race effects + region effects | 9.0 | 9.1 |
+  | Race effects + region prohibited | 86 | 1.6 |
 
   Symmetry with race A:B = -1 and region prohibited (region associated with
   race; 6 runs of 60 years): A-wife/B-husband over B-wife/A-husband is 1.02

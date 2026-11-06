@@ -3037,7 +3037,7 @@ within the block. Each block is a separate marriage market.
 **Rationale:** Women search only within their block, so the block is where
 male selection should be balanced. The previous population-wide targets were
 unreachable whenever a block's men and women differed in their shares, which
-made the solver fail and slowed simulation about 14-fold. Sex symmetry of
+made the solver fail and slowed simulation about tenfold. Sex symmetry of
 intermarriage is preserved within blocks and so also when summed over them;
 what is given up is only the unreachable population-wide target.
 
