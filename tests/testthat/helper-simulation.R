@@ -133,3 +133,11 @@ directional_pairs <- function(rates) {
   rownames(out) <- NULL
   out
 }
+
+# Translate a public matching model for a single dimension named `group` with
+# categories `labels`, as simulate() does, for tests of internal helpers.
+as_internal_matching <- function(model, labels) {
+  if (is.null(labels)) return(internal_matching_model(model, NULL, NULL))
+  dim <- if (length(matching_dimensions(model, "group"))) "group"
+  internal_matching_model(model, dim, labels)
+}

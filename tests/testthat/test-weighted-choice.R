@@ -2,7 +2,7 @@
 # each search so expected male group flows meet the mirrored target.
 
 prepare_weighted <- function(model, groups) {
-  prepare_matching_model(model, groups)
+  prepare_matching_model(as_internal_matching(model, groups), groups)
 }
 
 calibrate <- function(women, men, matching, rates, groups, now = 0, cutoff = 15,
@@ -164,7 +164,7 @@ test_that("three-group calibration meets targets and handles zero and unattainab
   # Men of a group with no eligible women still receive the population-wide
   # per-capita rate; with all exogamy prevented they cannot be reached.
   women$group <- 0L
-  blocked <- create_matching_model(~ 1, numeric(), prevent_exogamy = TRUE)
+  blocked <- create_matching_model(~ 1, numeric(), group_exogamy = NA)
   result <- calibrate(women, men, blocked, rates, c("A", "B", "C"))
   expect_true(result$infeasible)
   expect_equal(result$log_weights[2:3], c(50, 50))
@@ -173,7 +173,7 @@ test_that("three-group calibration meets targets and handles zero and unattainab
                               age_end = 50, rate = c(.1, 0, 0))
   women_zero <- women
   women_zero$group <- rep(0:2, length.out = nrow(women_zero))
-  zero <- create_matching_model(~ 1, numeric(), prevent_exogamy = TRUE,
+  zero <- create_matching_model(~ 1, numeric(), group_exogamy = NA,
                                  delta = c(B = 10, C = 10))
   result_zero <- calibrate(women_zero, men, zero, grouped_rates, c("A", "B", "C"))
   expect_equal(result_zero$target, c(1, 0, 0))
@@ -278,7 +278,7 @@ test_that("weighted choice warns once when weights must be approximated", {
   population <- hammel_population(persons, population$unions, end_time = 0, groups = if ("group" %in% names(persons)) "group")
   # A partial restriction keeps calibration active (full prevention skips it).
   matching <- create_matching_model(~ age_difference, c(age_difference = 0),
-                                    prevent_exogamy = "A::B")
+                                    group_exogamy = c("A:B" = NA))
   model <- weighted_model(population, matching = matching)
   warnings <- character()
   withCallingHandlers(simulate(model, 10, seed = 908),
@@ -315,7 +315,7 @@ test_that("male-group formula terms warn about absorbed utilities", {
 
 test_that("strict endogamy has zero group log weights even with delta adjustments", {
   population <- weighted_population(600, c(A = 3, B = 1))
-  matching <- create_age_gap_matching_model(0, 5, prevent_exogamy = TRUE)
+  matching <- create_age_gap_matching_model(0, 5, group_exogamy = NA)
   for (initiation in c("on_demand", "rate")) {
     baseline <- simulate(weighted_model(population, initiation, matching = matching,
                                         diagnostics = TRUE), 15, seed = 912)
@@ -390,12 +390,12 @@ test_that("diagnostics record the group log weights applied at each union", {
 
 test_that("unmet targets hidden by near-zero weights are reported as approximate", {
   # B women are present but inactive, so B men's target is zero; C women can
-  # only partner B men (C:A prohibited, no C men), so that target cannot hold.
+  # only partner B men (A:C prohibited, no C men), so that target cannot hold.
   women <- data.frame(born = c(rep(-30, 60), rep(-60, 20), rep(-30, 20)),
                       group = rep(0:2, c(60, 20, 20)), fertile = TRUE)
   men <- data.frame(born = -30, group = rep(0:1, c(60, 20)))
   rates <- data.frame(age_start = 15, age_end = 50, rate = 0.1)
-  matching <- create_age_gap_matching_model(0, 5, prevent_exogamy = "C:A")
+  matching <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:C" = NA))
   result <- calibrate(women, men, matching, rates, c("A", "B", "C"))
   expect_equal(result$target, c(1, 0, 0))
   expect_true(result$infeasible)

@@ -27,29 +27,22 @@
 #'   predictors `female_<group>`, `male_<group>` and `same_<group>`. Use `~ 1`
 #'   and `numeric()` coefficients for pair-effects-only matching.
 #' @param coefficients A finite named numeric vector of utility coefficients.
-#' @param group_exogamy Optional symmetric pair effects for one dimension, as a
-#'   named list keyed by dimension, such as `list(race = c("A:B" = -1))`; a
-#'   bare value applies to the only declared dimension. Each value is a finite
-#'   named numeric vector of symmetric
-#'   group-pair effects: `"A:B"` applies the same log-weight effect to female
-#'   A/male B and female B/male A. Specify each unordered pair once; reverse
-#'   duplicates and `::` syntax are errors. Omitted pairs have zero effect;
-#'   within-group entries are allowed. Alternatively provide a data frame with
-#'   `female_group`, `male_group`, and `log_odds`; each row specifies an unordered
-#'   pair and expands symmetrically, including for colon-containing labels.
-#'   Effects add to formula scores and do not prohibit matches.
-#' @param prevent_exogamy Group restrictions, as a named list keyed by
-#'   dimension or a bare value for the only declared dimension. Each value is
-#'   `FALSE` (default) for no group restrictions; `TRUE`
-#'   excludes all different-group candidates. A character vector such as
-#'   `c("A::B", "A:C")` excludes selected pairs with female-first `:` and
-#'   symmetric `::` notation. Alternatively supply a directional data frame
-#'   with `female_group` and `male_group`. Pairs must join different groups.
-#'   Restricted men are ineligible, alongside age and kinship exclusions. A
-#'   search fails only when no eligible man exists in the whole pool, following
-#'   existing failed-search and birth cancellation rules. Restrictions override
-#'   finite preferences, require population identities, and do not invalidate
-#'   existing partners.
+#' @param group_exogamy Optional symmetric pair effects and prohibitions
+#'   (D135), as a named list keyed by dimension, such as
+#'   `list(race = c("A:B" = -2, "B:C" = NA))`; a bare value applies to the only
+#'   declared dimension. Each value is a named vector over unordered pairs:
+#'   `"A:B"` applies to female A/male B and female B/male A alike. A finite
+#'   value is an additive log-weight effect; NA prohibits the pair. `NA` alone
+#'   prohibits every union between different categories of the dimension.
+#'   Specify each unordered pair once; reverse duplicates and `::` syntax are
+#'   errors. Omitted pairs have no effect. Finite within-category entries
+#'   (`"A:A"`) are allowed; within-category prohibitions are errors.
+#'   Alternatively provide a data frame with `female_group`, `male_group`, and
+#'   `log_odds` (NA prohibits); each row is an unordered pair, for labels
+#'   containing colons. Prohibited men are ineligible, alongside age and
+#'   kinship exclusions. A search fails only when no eligible man exists in the
+#'   whole pool, following existing failed-search and birth cancellation rules.
+#'   Prohibitions override finite preferences and do not end existing unions.
 #' @param delta Optional male-target adjustments, as a named list keyed by
 #'   dimension or a bare value for the only declared dimension: a finite
 #'   numeric vector with unique category names.
@@ -68,11 +61,9 @@
 #'   ~ age_difference + I(age_difference^2),
 #'   c(age_difference = 0.1, "I(age_difference^2)" = -0.02)
 #' )
-create_matching_model <- function(formula, coefficients, group_exogamy = NULL, prevent_exogamy = FALSE,
-                                  delta = NULL) {
+create_matching_model <- function(formula, coefficients, group_exogamy = NULL, delta = NULL) {
   model <- structure(list(formula = formula, coefficients = coefficients,
-                          group_exogamy = group_exogamy, prevent_exogamy = prevent_exogamy,
-                          delta = delta),
+                          group_exogamy = group_exogamy, delta = delta),
                      class = "hammel_matching_model")
   validate_matching_model(model)
   warn_absorbed_group_formula(model)
@@ -101,10 +92,8 @@ warn_absorbed_group_formula <- function(model) {
 #' coefficient is `-2 * preferred_age_gap * quadratic`. This specifies relative
 #' selection weights, not a halving of utility or a realized standard deviation.
 #' @param preferred_age_gap Finite numeric scalar in years; negative values allowed.
-#' @param group_exogamy Optional additive group-pair effects passed to
-#'   [create_matching_model()].
-#' @param prevent_exogamy Optional hard group restrictions passed to
-#'   [create_matching_model()]. Defaults to `FALSE`.
+#' @param group_exogamy Optional group-pair effects and prohibitions passed
+#'   to [create_matching_model()].
 #' @param half_weight_distance Finite positive numeric scalar in years from the
 #'   preferred gap at which selection weight halves.
 #' @inheritParams create_matching_model
@@ -113,7 +102,7 @@ warn_absorbed_group_formula <- function(model) {
 #' @examples
 #' # Illustrative preferences, not demographic defaults.
 #' matching <- create_age_gap_matching_model(3, 5)
-create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL, prevent_exogamy = FALSE,
+create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL,
                                           delta = NULL) {
   for (name in c("preferred_age_gap", "half_weight_distance")) {
     value <- get(name)
@@ -131,8 +120,7 @@ create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distanc
          call. = FALSE)
   create_matching_model(~ age_difference + I(age_difference^2),
     c(age_difference = unname(linear), "I(age_difference^2)" = unname(quadratic)),
-    group_exogamy = group_exogamy, prevent_exogamy = prevent_exogamy,
-    delta = delta)
+    group_exogamy = group_exogamy, delta = delta)
 }
 
 validate_delta <- function(x) {
@@ -164,15 +152,14 @@ validate_matching_model <- function(model) {
       (length(beta) && is.null(names(beta))) || anyNA(names(beta)) || any(!nzchar(names(beta))) ||
       anyDuplicated(names(beta)))
     stop("`coefficients` must be a finite numeric vector with unique nonempty names.", call. = FALSE)
-  for (field in c("group_exogamy", "prevent_exogamy", "delta")) {
+  for (field in c("group_exogamy", "delta")) {
     x <- model[[field]]
     values <- if (is_dimension_list(x)) {
       if (is.null(names(x)) || anyNA(names(x)) || any(!nzchar(names(x))) || anyDuplicated(names(x)))
         stop(sprintf("A list `%s` must be named by group dimension, once each.", field), call. = FALSE)
       x
     } else list(x)
-    for (v in values) switch(field, group_exogamy = expand_group_exogamy(v),
-                             prevent_exogamy = expand_prevent_exogamy(v), delta = validate_delta(v))
+    for (v in values) switch(field, group_exogamy = split_group_exogamy(v), delta = validate_delta(v))
   }
   # Without group predictors, coefficient names can be checked now.
   if (!any(grepl("^(female|male|same)_.+", vars))) {

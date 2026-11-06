@@ -181,7 +181,7 @@ test_that("fertility weights select mothers at selection and at refresh under ca
   restricted <- weighted_fertility_model(n, c("A", "B"))
   restricted <- set_union_formation(restricted, "on_demand", kinship_generations = 0,
     cancel_birth_if_no_match = FALSE,
-    matching = create_matching_model(~ age_difference, c(age_difference = 0), prevent_exogamy = TRUE))
+    matching = create_matching_model(~ age_difference, c(age_difference = 0), group_exogamy = NA))
   check(set_fertility(restricted, rates, birth_interval = 0, weights = w), n)
   # A fertility weight model combines with hetfert, and zero coefficients keep it.
   model <- set_fertility(weighted_fertility_model(300, c("A", "B")), rates, hetfert = het_fert(.5, 1))
@@ -296,7 +296,7 @@ test_that("search weights select searchers with and without matching calibration
   r <- first_union_ratio(suppressWarnings(simulate(calibrated, 1, seed = 3)))
   expect_lt(abs(r[["log_ratio"]] - log(2)), 4 * r[["se"]])
   # Matching within groups only: no calibration, weights at selection.
-  within <- create_matching_model(~ age_difference, c(age_difference = 0), prevent_exogamy = TRUE)
+  within <- create_matching_model(~ age_difference, c(age_difference = 0), group_exogamy = NA)
   restricted <- set_union_formation(weighted_search_model(n), "rate", rates = rates,
     matching = within, kinship_generations = 0, weights = w)
   r <- first_union_ratio(suppressWarnings(simulate(restricted, 1, seed = 4)))

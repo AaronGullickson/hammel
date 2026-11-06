@@ -111,6 +111,8 @@ validate_matching_groups <- function(matching, population_groups) {
   invisible(matching)
 }
 
+# The internal model's restriction field (FALSE, TRUE or a directed pair
+# table), built from NA entries of the public `group_exogamy` (D135).
 expand_prevent_exogamy <- function(x) {
   empty <- expand_matching_pairs(NULL)[c("female_group", "male_group")]
   if (is.null(x)) x <- FALSE
@@ -145,12 +147,51 @@ matching_group_allowed <- function(matching, female_group, male_group) {
 
 # Matching models name group predictors and settings by dimension (D134):
 # `female_race`, `male_race`, `same_race`, and `group_exogamy`,
-# `prevent_exogamy` and `delta` as lists keyed by dimension (a bare value
+# and `delta` as lists keyed by dimension (a bare value
 # means the only declared dimension). At simulation each model is translated
 # to the internal one-dimension form used by the engine.
 is_dimension_list <- function(x) is.list(x) && !is.data.frame(x)
 
-matching_settings <- c("group_exogamy", "prevent_exogamy", "delta")
+matching_settings <- c("group_exogamy", "delta")
+
+# Split one dimension's `group_exogamy` (D135) into finite pair effects and
+# prohibitions: NA prohibits an unordered pair, and a bare NA every union
+# between different categories. Returns the effects (NULL when none) and the
+# internal restriction: FALSE, TRUE, or a directed table of prohibited pairs.
+split_group_exogamy <- function(x) {
+  out <- list(effects = NULL, prevent = FALSE)
+  if (is.null(x)) return(out)
+  if (!is.data.frame(x) && length(x) == 1L && is.null(names(x)) && is.atomic(x) && is.na(x)) {
+    out$prevent <- TRUE
+    return(out)
+  }
+  if (is.data.frame(x)) {
+    check_columns(x, c("female_group", "male_group", "log_odds"), "group_exogamy")
+    blocked <- is.na(x$log_odds)
+    effects <- x[!blocked, , drop = FALSE]
+    banned <- x[blocked, , drop = FALSE]
+    banned$log_odds <- rep(0, nrow(banned))
+    if (!nrow(effects)) effects <- NULL
+  } else {
+    if (!(is.numeric(x) || is.logical(x)) || is.complex(x) || !is.null(dim(x)) ||
+        (length(x) && (is.null(names(x)) || anyNA(names(x)) || any(!nzchar(names(x))))))
+      stop(paste("`group_exogamy` must be a named vector of finite effects and NA prohibitions,",
+                 "NA, or a pair table."), call. = FALSE)
+    blocked <- is.na(x)
+    effects <- if (any(!blocked)) stats::setNames(as.numeric(x[!blocked]), names(x)[!blocked])
+    banned <- stats::setNames(rep(0, sum(blocked)), names(x)[blocked])
+  }
+  pairs <- expand_group_exogamy(effects)
+  prohibited <- expand_group_exogamy(if (length(banned) || is.data.frame(banned)) banned)
+  if (any(prohibited$female_group == prohibited$male_group))
+    stop("`group_exogamy` cannot prohibit unions within a category (such as `\"A:A\" = NA`).", call. = FALSE)
+  key <- function(t) paste(t$female_group, t$male_group, sep = "\r")
+  if (any(key(prohibited) %in% key(pairs)))
+    stop("Conflicting or overlapping unordered pairs in `group_exogamy`.", call. = FALSE)
+  out$effects <- effects
+  if (nrow(prohibited)) out$prevent <- as.data.frame(prohibited[c("female_group", "male_group")])
+  out
+}
 
 # The dimensions a matching model's group effects use.
 matching_dimensions <- function(model, dims) {
@@ -216,10 +257,11 @@ internal_matching_model <- function(model, dim, categories) {
                    paste(original, collapse = ", ")), call. = FALSE)
     names(coefficients) <- translated[match(names(coefficients), original)]
   }
+  exogamy <- split_group_exogamy(pick(model$group_exogamy))
   internal <- structure(list(formula = renamed, coefficients = coefficients,
-    group_exogamy = pick(model$group_exogamy),
+    group_exogamy = exogamy$effects,
     group_levels = if (any(c("female_group", "male_group") %in% all.vars(renamed))) categories,
-    prevent_exogamy = if (is.null(pick(model$prevent_exogamy))) FALSE else pick(model$prevent_exogamy),
+    prevent_exogamy = exogamy$prevent,
     delta = pick(model$delta)), class = "hammel_matching_model")
   validate_internal_matching(internal)
   internal

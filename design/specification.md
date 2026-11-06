@@ -334,8 +334,9 @@ choice exactly. See [weighted-choice matching](weighted-choice-matching.md).
 
 ## Hard group restrictions
 
-Matching models support `prevent_exogamy`: all exogamy or selected directed/
-symmetric pairs are ineligible, alongside age and kin restrictions. Compiled
+Matching models prohibit pairs through NA in `group_exogamy` (D135): all
+exogamy in a dimension (`NA`) or selected symmetric pairs (`"B:C" = NA`) are
+ineligible, alongside age and kin restrictions. Compiled
 specifications carry either a same-group flag or blocked-pair matrix; the
 exact draw skips restricted cells. Partner/father searches use their applicable
 model's restrictions. See [group matching](group-matching.md).

@@ -87,7 +87,7 @@ is kept.
 - **Validation against the declaration.** Everything that names a dimension or
   a category outside `set_groups()` is checked against it, at simulation and
   earlier when the declaration is already present: matching settings
-  (`group_exogamy`, `prevent_exogamy`, group formula terms, per dimension),
+  (`group_exogamy`, `delta`, group formula terms, per dimension),
   rate-table group columns and coverage, transition tables, weight-model
   variables and `by`. Unknown dimensions are errors naming them.
 - **Transitions** stay a separate rate process, one call per dimension:
@@ -105,9 +105,12 @@ is kept.
   declarations.
 - **Matching** settings are per dimension. Formula predictors take the
   dimension's name: `female_race`, `male_race`, `same_race`, with the first
-  category as reference. `group_exogamy`, `prevent_exogamy` and `delta` become
-  named lists keyed by dimension, for example
+  category as reference. `group_exogamy` and `delta` become named lists keyed
+  by dimension, for example
   `group_exogamy = list(race = c("A:B" = -1), region = c("N:S" = -2))`.
+  Since D135, NA in `group_exogamy` prohibits a pair (`"B:C" = NA`) or, for a
+  whole dimension (`region = NA`), every union across its categories; the
+  former `prevent_exogamy` argument is removed.
   Effects from different dimensions add; a candidate excluded in any dimension
   is ineligible; per-dimension `delta` values add for each combination of
   categories. Calibration works jointly over the cross-classification of the
@@ -189,7 +192,7 @@ Step 2: joint matching calibration across dimensions.
 ### Stage 5 as implemented (November 6, 2026)
 
 - **Matching.** Predictors are `female_<dim>`, `male_<dim>` and `same_<dim>`;
-  `group_exogamy`, `prevent_exogamy` and `delta` are lists keyed by dimension,
+  `group_exogamy` (effects and, since D135, NA prohibitions) and `delta` are lists keyed by dimension,
   or a bare value for the only declared dimension (a convenience, like
   `group = NULL` for transitions). `group_levels` is removed: levels are the
   dimension's categories, the first being the reference. A model's group

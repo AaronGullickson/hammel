@@ -46,7 +46,7 @@ We can set up a specific matching model for a given time period with the needed 
 ```{r}
 #| label: setup-matching-models
 
-m <- list(create_age_gap_matching_model(2, 5, prevent_exogamy = TRUE))
+m <- list(create_age_gap_matching_model(2, 5, group_exogamy = NA))
 lodds <- -5
 for (i in 1:11) {
   m[[length(m) + 1L]] <- create_age_gap_matching_model(

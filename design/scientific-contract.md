@@ -314,9 +314,9 @@ prohibitions. For a declared dimension such as `race`, `female_race`,
 categorical terms use the dimension's categories with treatment contrasts. Missing population identity data errors when a model
 uses group effects. See [group matching](group-matching.md) for worked cases.
 
-Matching models also accept `prevent_exogamy = FALSE` (no restrictions), TRUE
-(only same-group candidates), or selected cross-group pairs with female-first
-`:` and symmetric `::` notation. Restricted men are ineligible, alongside the
+Matching models also prohibit pairs through NA in `group_exogamy` (D135): `NA`
+for a dimension allows only same-category candidates, and `"A:B" = NA`
+prohibits that unordered pair in both directions. Restricted men are ineligible, alongside the
 age and kinship exclusions below. A search fails only when no eligible man
 exists in the whole pool; existing retry/cancellation rules then apply.
 Restrictions override finite scores, apply to the selected father or partner

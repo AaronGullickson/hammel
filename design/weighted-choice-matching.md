@@ -211,7 +211,8 @@ fixed-seed histories relative to the first implementation.
 
 ### Strict endogamy
 
-When a matching model sets `prevent_exogamy = TRUE`, every woman sees only men
+When a matching model prohibits all exogamy (`group_exogamy = NA` for its
+dimension, D135; formerly `prevent_exogamy = TRUE`), every woman sees only men
 of her own group, so a group weight scales all her candidates equally and
 cannot change her choice. Calibration is skipped for that model, giving
 female choice exactly, with no warnings (D070). Partial restrictions (listed
@@ -220,7 +221,7 @@ pairs) still calibrate.
 ### When no solution exists
 
 A male group may have a positive target but no feasible demand, for example
-under `prevent_exogamy` when no compatible women have positive intensity. Its
+under prohibitions when no compatible women have positive intensity. Its
 log weight is set to 50 and the search is counted as approximate; Newton
 non-convergence within 100 iterations is counted likewise. After solving,
 expected flows are recomputed in log space with every woman who has an

@@ -154,7 +154,7 @@ test_that("cohabitation and marriage use distinct matching and diagnostic weight
   model$population$persons$sex[1:300] <- "f"
   model$population$persons$group <- rep(c("A","B"),300)
   model$population$groups <- list(group = group())
-  model$processes$union_formation$matching <- create_matching_model(~1,numeric(),prevent_exogamy=TRUE)
+  model$processes$union_formation$matching <- create_matching_model(~1,numeric(),group_exogamy = NA)
   model$processes$union_formation$cohab_matching <- create_matching_model(~1,numeric(),group_exogamy=c("A:B"=10))
   model$processes$union_formation$diagnostics <- TRUE
   result <- simulate(model,.3,713)

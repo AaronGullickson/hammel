@@ -11,7 +11,7 @@ acceptance retains the documented limitations.
 
 Since D134 (stage 5), group predictors and settings name a declared group
 dimension: predictors `female_<dim>`, `male_<dim>` and `same_<dim>`, and
-`group_exogamy`, `prevent_exogamy` and `delta` as lists keyed by dimension,
+`group_exogamy` and `delta` as lists keyed by dimension,
 such as `group_exogamy = list(race = c("A:B" = -1))`; a bare value applies to
 the only declared dimension. A model's group effects use one dimension for
 now, and all matching models of a run (general, father, cohabitation, and
@@ -33,21 +33,34 @@ It is not a target intergroup union proportion or a marriage hazard multiplier.
 
 Reject repeated unordered pairs, including `A:B` with `B:A`, even with equal
 values. `A:A` describes one within-group pair. Reject malformed separators,
-missing labels, nonfinite values, and unnamed vectors. Finite values do not
-prohibit matches;
-multiple identities remain outside this increment. Hard group restrictions are
-specified separately below.
+missing labels, infinite values, and unnamed vectors. Finite values do not
+prohibit matches; NA does (below).
 
 ## Hard group restrictions
 
 The user selected hard restrictions on October 20, 2026; since D072 they apply
-to the whole eligible pool rather than to a candidate sample.
-`prevent_exogamy = FALSE` on a matching model imposes none. TRUE excludes
-every different-group candidate. A character vector such as
-`c("A::B", "A:C")` excludes selected cross-group pairs, using female-first `:` and symmetric `::` notation. Restrictions are
-eligibility rules and retain this distinct directional syntax. A directional table with
-`female_group` and `male_group` is also accepted for colon-containing labels.
-Listed pairs must join different groups; overlapping entries are errors.
+to the whole eligible pool rather than to a candidate sample. Since D135
+(November 6, 2026) they are written in `group_exogamy` itself; the separate
+`prevent_exogamy` argument and its directional syntax are removed, so every
+pair, effect or prohibition, is symmetric:
+
+```r
+group_exogamy = list(race = c("A:B" = -2, "B:C" = NA), region = NA)
+```
+
+- `"A:B" = -2`: an effect of -2 for female A/male B and female B/male A.
+- `"B:C" = NA`: B–C unions are prohibited in both directions.
+- An unlisted pair (here A:C) has no effect.
+- A whole dimension set to NA (`region = NA`) prohibits every union between
+  different categories of it; within-category unions are allowed.
+
+With one declared dimension a bare value works the same way:
+`group_exogamy = c("A:B" = -2, "B:C" = NA)` or `group_exogamy = NA`. A
+within-category prohibition (`"A:A" = NA`) is an error, since it is not
+exogamy; a finite `"A:A"` effect remains allowed. In the pair-table form an NA
+`log_odds` prohibits that unordered pair. Until step 2 of D134, a matching
+model's effects and prohibitions all use one dimension, so the example above,
+which names race and region, is not yet available.
 
 Restricted men are ineligible, alongside age and kinship exclusions; the exact
 draw skips restricted group cells. Group restrictions win over any finite
@@ -60,8 +73,8 @@ its own restrictions.
 
 With equally aged compatible A and incompatible B men, an A woman under a
 prohibition always finds the A man. A finite penalty of -10 still selects B
-when B men are the only ones available, whereas prohibiting A:B makes the
-search fail. FALSE imposes no restriction.
+when B men are the only ones available, whereas prohibiting A:B (`"A:B" = NA`)
+makes the search fail. Without NA entries there is no restriction.
 
 For labels containing colons, accept a data frame with `female_group`,
 `male_group`, and `log_odds`. These column names are retained for compatibility,

@@ -198,7 +198,7 @@ test_that("inheritance boundaries do not call custom functions without a birth",
 })
 
 test_that("weighted calibration switches from hard within-group matching and back", {
-  early <- create_age_gap_matching_model(0, 5, prevent_exogamy = TRUE)
+  early <- create_age_gap_matching_model(0, 5, group_exogamy = NA)
   late <- create_matching_model(~ 1, numeric(), delta = c(A = log(3)))
   for (reverse in c(FALSE, TRUE)) {
     before <- if (reverse) late else early
@@ -287,7 +287,7 @@ test_that("constant schedules preserve direct-model behavior and existing unions
   m <- model_inheritance_fixture(create_group_inheritance("mother"))
   m$processes$fertility$rates$rate <- 0
   m$processes$union_formation$matching <- model_calendar(mm,
-    create_age_gap_matching_model(0, 5, prevent_exogamy = TRUE), .1)
+    create_age_gap_matching_model(0, 5, group_exogamy = NA), .1)
   out <- simulate(m, .5, seed = 3)
   expect_equal(out$unions[, names(m$population$unions)], m$population$unions)
 })

@@ -121,7 +121,7 @@ pair_categories <- function(out, d) {
 test_that("matching group effects use one named dimension among several", {
   # Restrict region only: every union joins one region, races mix.
   out <- simulate(matching_pair_model(create_age_gap_matching_model(0, 5,
-    prevent_exogamy = list(region = TRUE))), 2, seed = 41)
+    group_exogamy = list(region = NA))), 2, seed = 41)
   expect_gt(nrow(out$unions), 100)
   region <- pair_categories(out, "region"); race <- pair_categories(out, "race")
   expect_true(all(region$w == region$h))
@@ -149,7 +149,7 @@ test_that("matching settings must name one declared dimension", {
   expect_error(simulate(matching_pair_model(bare), 0),
                "Name the dimension.*group_exogamy = list\\(race")
   both <- create_matching_model(~ same_race, c(same_race = 1),
-                                prevent_exogamy = list(region = TRUE))
+                                group_exogamy = list(region = NA))
   expect_error(simulate(matching_pair_model(both), 0), "one group dimension for now.*`race`, `region`")
   race <- create_matching_model(~ same_race, c(same_race = 1))
   region <- create_matching_model(~ same_region, c(same_region = 1))

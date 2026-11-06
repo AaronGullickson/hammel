@@ -8,7 +8,6 @@ create_matching_model(
   formula,
   coefficients,
   group_exogamy = NULL,
-  prevent_exogamy = FALSE,
   delta = NULL
 )
 }
@@ -19,30 +18,22 @@ and \code{numeric()} coefficients for pair-effects-only matching.}
 
 \item{coefficients}{A finite named numeric vector of utility coefficients.}
 
-\item{group_exogamy}{Optional symmetric pair effects for one dimension, as a
-named list keyed by dimension, such as \code{list(race = c("A:B" = -1))}; a
-bare value applies to the only declared dimension. Each value is a finite
-named numeric vector of symmetric
-group-pair effects: \code{"A:B"} applies the same log-weight effect to female
-A/male B and female B/male A. Specify each unordered pair once; reverse
-duplicates and \code{::} syntax are errors. Omitted pairs have zero effect;
-within-group entries are allowed. Alternatively provide a data frame with
-\code{female_group}, \code{male_group}, and \code{log_odds}; each row specifies an unordered
-pair and expands symmetrically, including for colon-containing labels.
-Effects add to formula scores and do not prohibit matches.}
-
-\item{prevent_exogamy}{Group restrictions, as a named list keyed by
-dimension or a bare value for the only declared dimension. Each value is
-\code{FALSE} (default) for no group restrictions; \code{TRUE}
-excludes all different-group candidates. A character vector such as
-\code{c("A::B", "A:C")} excludes selected pairs with female-first \code{:} and
-symmetric \code{::} notation. Alternatively supply a directional data frame
-with \code{female_group} and \code{male_group}. Pairs must join different groups.
-Restricted men are ineligible, alongside age and kinship exclusions. A
-search fails only when no eligible man exists in the whole pool, following
-existing failed-search and birth cancellation rules. Restrictions override
-finite preferences, require population identities, and do not invalidate
-existing partners.}
+\item{group_exogamy}{Optional symmetric pair effects and prohibitions
+(D135), as a named list keyed by dimension, such as
+\code{list(race = c("A:B" = -2, "B:C" = NA))}; a bare value applies to the only
+declared dimension. Each value is a named vector over unordered pairs:
+\code{"A:B"} applies to female A/male B and female B/male A alike. A finite
+value is an additive log-weight effect; NA prohibits the pair. \code{NA} alone
+prohibits every union between different categories of the dimension.
+Specify each unordered pair once; reverse duplicates and \code{::} syntax are
+errors. Omitted pairs have no effect. Finite within-category entries
+(\code{"A:A"}) are allowed; within-category prohibitions are errors.
+Alternatively provide a data frame with \code{female_group}, \code{male_group}, and
+\code{log_odds} (NA prohibits); each row is an unordered pair, for labels
+containing colons. Prohibited men are ineligible, alongside age and
+kinship exclusions. A search fails only when no eligible man exists in the
+whole pool, following existing failed-search and birth cancellation rules.
+Prohibitions override finite preferences and do not end existing unions.}
 
 \item{delta}{Optional male-target adjustments, as a named list keyed by
 dimension or a bare value for the only declared dimension: a finite

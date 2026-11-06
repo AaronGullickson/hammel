@@ -175,7 +175,7 @@ test_that("moves refresh available male pools and active fertility/calibration c
   model$population$persons$group <- c("B", "A")
   model$population$groups <- list(group = group())
   model <- set_union_formation(model, "rate",
-    matching = create_age_gap_matching_model(0, 5, prevent_exogamy = TRUE),
+    matching = create_age_gap_matching_model(0, 5, group_exogamy = NA),
     rates = data.frame(age_start = 21, age_end = Inf, rate = 1e5))
   out <- simulate(set_group_transition(model, transform(transition_rates(1e5), sex = "m")), 1.1, seed = 33)
   expect_equal(nrow(out$unions), 1)
