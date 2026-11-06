@@ -1,6 +1,6 @@
 # Hammel project brief
 
-Updated November 5, 2026. The user accepted milestone 1 (mortality/fertility)
+Updated November 6, 2026. The user accepted milestone 1 (mortality/fertility)
 on October 15, 2026 (D029), milestone 2 (union formation) on October 19,
 2026 (D050), milestone 3 (groups) on October 27, 2026 (D077), and milestone 4
 (dissolution/remarriage/cohabitation) on October 29, 2026 (D093). Milestone 5
@@ -111,12 +111,13 @@ belongs to the user; completion does not establish universal accuracy or remove
 sparse-cell, calibration, or fertility-transition limitations. Weighted matching
 does not model marriage squeezes; fuller two-sex models remain future work.
 
-The [roadmap](roadmap.md) records group transitions complete (milestone 6),
-calendar-varying inputs (milestone 7), cell scheduling and weight models
-(milestone 8), then multiple group columns (9), external immigration (10),
-summaries/helpers (11) and a two-sex marriage model (12), under D121 as
-reordered by D131. The two-sex model and API remain unselected (D117). No future
-feature is authorized by milestone completion. Fixed newborn assignment was
+The [roadmap](roadmap.md) records multiple group columns as the current
+milestone 9 (D131/D134). Under D136, once it is completed and accepted, work
+turns to the first version bump and public release. External immigration and
+two-sex marriage models are post-release projects. The release version,
+criteria and scope of proposed summaries/helpers remain unselected; the
+two-sex model and API also remain unselected (D117). No future feature or
+publication is authorized by milestone completion. Fixed newborn assignment was
 explicitly deferred to the group-transitions discussion; custom inheritance
 already supports assignment of mixed-parent births to a specified category.
 

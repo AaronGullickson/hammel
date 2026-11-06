@@ -1,6 +1,6 @@
 # Decision log
 
-Updated November 5, 2026. Entries retain the choices made at their original
+Updated November 6, 2026. Entries retain the choices made at their original
 dates; each numbered entry now states whether and how it remains current.
 Read [the scientific contract](scientific-contract.md) for implemented behavior,
 not a superseded API or timing statement buried in a historical entry.
@@ -75,6 +75,9 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | `stratify_rates()` replaces `group_prop_hazard` | D132 |
 | One `by` argument for rate calculators; shared observation engine | D133 |
 | Multiple group dimensions: declaration, names, staging | D134 |
+| Matching prohibitions written as NA in `group_exogamy` | D135 |
+| First public release after milestone 9; immigration and two-sex models post-release | D136 |
+| GitHub milestones and Projects; multiple issues and PRs per milestone | D137 |
 
 ## Recorded decisions
 
@@ -2948,3 +2951,72 @@ stratum.
 (`set_groups(model, group = group())` reproduces a single dimension named
 `group`). Accepted reports reproduce at their recorded commits. See
 [multiple group dimensions](multiple-groups.md).
+
+## D135 — Prohibitions as NA in `group_exogamy` (November 6, 2026)
+
+**Status:** User decision, November 6, 2026.
+
+**Decision:** Remove `prevent_exogamy`. `group_exogamy` carries both pair
+effects and prohibitions: a finite value is a symmetric log-odds effect, NA
+prohibits that unordered pair in both directions, and NA for a whole dimension
+(`list(region = NA)`, or a bare `NA` with one dimension) prohibits every union
+between different categories. Unlisted pairs have no effect. A within-category
+prohibition is an error.
+
+**Rationale:** One argument, and one meaning of `:`. `prevent_exogamy` was
+directional (`"A:B"` female-first, `"A::B"` both), unlike the symmetric pair
+effects of D075, which was inconsistent.
+
+**Supersedes:** the directional restriction syntax and the separate
+`prevent_exogamy` argument (October 20, 2026 restrictions; D072's pool-wide
+eligibility rule is unchanged). Directional prohibitions are no longer
+available.
+
+
+## D136 — First public release after the current milestone (November 6, 2026)
+
+**Status:** User decision, November 6, 2026.
+
+**Decision:** Finish the current milestone (9, multiple group dimensions),
+then work toward the first version bump, coinciding with the first public
+release. External immigration and two-sex marriage models move to post-release
+projects; they are not prerequisites for this release.
+
+**Rationale:** The user considers the current feature set sufficiently close
+to the intended SOCSIM scope, with added flexibility, to prioritize a public
+release over these additional mechanisms. This is a scope judgment, not a
+verified claim of complete SOCSIM equivalence.
+
+**Implications:** Supersedes D131's immediate post-milestone-9 sequence and
+D117/D121's placement of two-sex marriage models before the first release.
+Milestone 9 still requires completion and user acceptance. The version number,
+release channel, release criteria, and the scope/timing of proposed summaries
+and helpers remain unselected. This decision does not authorize publication.
+Existing immigration, family-population construction and generation discussions
+remain future design material; no immigration mechanism or API is implemented
+or authorized by this decision.
+
+
+## D137 — Align development with GitHub milestones and Projects (November 6, 2026)
+
+**Status:** User decision, November 6, 2026.
+
+**Decision:** Use GitHub milestones and Projects to organize development. A
+milestone may be delivered through multiple issues and pull requests; it does
+not require a single PR or a branch spanning the entire milestone.
+
+**Working approach:** Milestones group work toward a feature or release goal.
+Issues describe bounded tasks, their dependencies and completion criteria. PRs
+deliver reviewable changes and link the relevant issues. Projects track the
+status and priority of that work. Keep scientific contracts, worked examples,
+accepted decisions and validation evidence in the repository, with links from
+GitHub items rather than duplicate specifications. Merging a component PR does
+not establish scientific acceptance of the milestone.
+
+**Current mapping:** GitHub has open milestones for multiple groups (9),
+external immigration (10), cleanup/documentation/helpers/polish (11), and
+two-sex marriage (12). Under D136, immigration and two-sex marriage are
+post-release work; an open milestone does not make them release prerequisites.
+The cleanup milestone is a starting point for release planning, whose concrete
+scope and version number remain to be selected. This entry records the
+workflow; it does not claim that GitHub items or a Project have been updated.
