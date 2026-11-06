@@ -101,10 +101,14 @@ the user's agreement.
   8, cell scheduling for every rate process (D128) and weight models (D129),
   was accepted complete on November 5, 2026 (D130), based on
   `validation/milestone8.qmd`; see `design/binned-group-hazards.md`.
-  Under D131, multiple group columns are next as milestone 9; external
+  Under D131, multiple group columns are milestone 9; external
   immigration is 10; summaries/helpers are 11; the two-sex model is 12. The
   separate regions milestone is removed, with its unresolved applications
-  retained under 9.
+  retained under 9. Milestone 9 follows the user's D134 design in
+  `design/multiple-groups.md`: step 1 (declared dimensions in rates,
+  inheritance, ancestry, transitions, analysis, weights, and matching effects
+  in one dimension) is implemented; step 2, joint matching calibration across
+  dimensions, remains. It is not yet accepted.
   Distinguish current
   specifications from deferred mechanisms and future proposals.
 - `validation/milestone1.qmd` is the accepted historical assessment; reproduce it
@@ -137,8 +141,7 @@ the user's agreement.
   with regional applications retained under milestone 9's multiple
   group columns (D121, D131). Calendar-time rates follow `design/time-varying-rates.md`
   (D118); matching and inheritance model schedules are implemented under D123. Most categorical characteristics should
-  use groups; multiple group columns are milestone 9 with their
-  schema still unselected.
+  use groups; multiple group dimensions follow D134.
 - Use `devtools::test()` for the testthat suite. Live database tests require
   explicit opt-in; ordinary verification must not download rates or expose
   credentials. See `design/testing.md` for commands and evidence.

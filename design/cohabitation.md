@@ -214,11 +214,12 @@ without an additional partnership entry.
 ## Dissolution observations by type
 
 `calculate_dissolution_rates(..., by = "union_type")` returns separate cohab
-and marriage rows, optionally crossed with `group_w` and `group_h`. Each episode contributes
+and marriage rows, optionally crossed with partners' categories such as
+`race_w` and `race_h`. Each episode contributes
 its own type's union-years and dissolution events. Conversion ends cohabitation
 exposure without counting as dissolution, and the linked marriage starts at
 duration zero. Both types and empty cells are retained; zero exposure gives NA.
-The default FALSE pools counts and exposure before calculating rates. Splitting
+Without `union_type` in `by`, counts and exposure are pooled before calculating rates. Splitting
 requires a valid `union_type` column, including for bare union tables.
 
 

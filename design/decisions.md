@@ -2904,7 +2904,10 @@ commits. See
 ## D134 — Multiple group dimensions (November 5, 2026)
 
 **Status:** User-selected design for milestone 9 (D131), decided in discussion
-November 5, 2026. Not yet implemented.
+November 5, 2026. Step 1 implemented in stages 1–5 (November 5–6, 2026), each
+committed by the user; stage 6 (tests, articles, documents) in progress.
+Step 2 (joint matching calibration) not yet implemented. Not yet accepted as
+complete.
 
 **Decision:** Populations may carry several categorical group dimensions,
 always declared with `set_groups(model, race = group(...), ...)`; there is no
@@ -2925,6 +2928,21 @@ declaration. Ancestry is a named list of tibbles.
 **Staging:** step 1 delivers everything except joint matching calibration,
 with group effects in matching limited to one dimension; step 2 adds joint
 calibration.
+
+**Later user decisions (stage 2, November 5, 2026):** dissolution and
+conversion rates are directional, with `<dim>_w` and `<dim>_h` columns (the
+wife's and husband's categories); the symmetric `group_pair` is removed, and a
+symmetric rate lists both directions. Search rates and cohabitation
+probabilities use the dimension's own name (the woman's category).
+
+**Implementation choices** (detailed in [multiple group dimensions](multiple-groups.md)):
+one transition process per dimension, stored by dimension, with histories
+holding `group`, `origin` and `destination` as character labels; uncovered
+transition strata have zero risk; analysis splits by several dimensions
+through one combined internal category; matching models are translated at
+simulation to an internal one-dimension form; a bare matching setting applies
+to the only declared dimension; summaries keep every non-measure column as a
+stratum.
 
 **Implications:** Single-group code, tests, articles and reports change
 (`set_groups(model, group = group())` reproduces a single dimension named

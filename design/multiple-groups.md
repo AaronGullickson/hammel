@@ -4,9 +4,9 @@ Started November 5, 2026. **Status: design decided (D134); stages 1–5
 implemented: declared dimensions of any name, several at once, in every rate
 table, with per-dimension inheritance (including calendar schedules),
 ancestry, transitions, analysis splits and weight-model variables, and
-matching group effects in any one dimension. Remaining: stage 6 (tests,
-articles and documents) and step 2 (joint matching calibration across
-dimensions).**
+matching group effects in any one dimension. Stage 6 (tests, articles and
+documents) is in progress; step 2 (joint matching calibration across
+dimensions) remains.**
 This records the user's decisions as they are made. Milestone 9 was assigned
 multiple group columns by D131. See the [roadmap](roadmap.md#milestone-9-multiple-group-columns)
 for the motivation and the household-move questions retained from D114.
@@ -149,6 +149,42 @@ Step 1, each stage leaving the test suite passing:
 6. Tests, articles and documents.
 
 Step 2: joint matching calibration across dimensions.
+
+### Stage 6 (November 6, 2026)
+
+- Documents reconciled with declared dimensions: [groups](groups.md), the
+  scientific contract, cohabitation, the decision log (D134 status and the
+  stage 2 user decisions), roadmap, README, the documentation index and
+  AGENTS.md.
+- New article `vignettes/articles/multiple_dimensions.qmd`: race and region
+  with rates by dimension, migration stratified by race, matching in race,
+  dissolution weights by `same_race`, and analysis by several dimensions. It
+  uses synthetic rates, so it renders without database credentials. The
+  intermarriage article runs unchanged (checked on synthetic rates without
+  rendering, since it downloads HMD/HFD data).
+- New tests: calendar bands with rates by two dimensions, and cohabitation
+  probabilities and conversion by declared dimensions.
+- **Sex symmetry check**
+  ([script](../validation/milestone9/intermarriage_symmetry.R)). With a race
+  pair effect (A:B = -1, race A 85%) and a second dimension, region, without
+  matching effects, A-wife/B-husband versus B-wife/A-husband unions formed
+  after year 10 of 60:
+
+  | Setting | Unions compared | AB / BA | 95% interval |
+  | --- | --- | --- | --- |
+  | Race only (4 runs) | all | 0.98 | 0.93–1.03 |
+  | Region independent of race (4 runs) | all | 0.98 | 0.93–1.03 |
+  | Region independent of race | both partners in N / S | 0.95 / 0.99 | 0.85–1.05 / 0.90–1.10 |
+  | Region associated with race (10 runs) | all | 1.03 | 1.00–1.06 |
+  | Region associated with race | both partners in N / S | 1.00 / 1.04 | 0.93–1.06 / 0.94–1.15 |
+
+  The independent case reproduces the race-only counts exactly (R's weighted
+  sampling assigns the same races, and region does not enter matching). Ratios
+  by the wife's region alone are not comparable when region and race are
+  associated, since B wives are concentrated where B is common. Calibration
+  balances race over the whole population, not within regions; these runs
+  show no sign of asymmetry within regions, but that is not guaranteed in
+  general.
 
 ### Stage 5 as implemented (November 6, 2026)
 

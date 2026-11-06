@@ -64,15 +64,17 @@ not a probability. There is no requirement to convert to monthly units.
 
 ## Group-specific schedules
 
-Population persons and mortality, fertility, and female union-search rate tables
-may contain `group`. Ungrouped rate tables apply to everyone; grouped tables
-must cover every population group. Without population groups, use each table's
-alphabetically first group and emit a simulation warning. Group does not affect
-matching eligibility. Optional group formula predictors and symmetric
-pair effects can change utility. Newborns select either parent's group with equal probability by default
-(with maternal fallback for unknown fathers)
-or the configured inheritance rule, entering the assigned group's mortality
-schedule immediately. Rate cells split by group only when a process's effective
+Populations may declare any number of group dimensions (D134), such as `race`
+and `region`. Rate tables may stratify by any of them (union rates by the
+wife's and husband's categories, `race_w`, `race_h`); tables without a
+dimension's column apply to all its categories, and tables with it must cover
+every category combination they use. A table naming an undeclared column is
+an error. Group does not affect matching eligibility unless restrictions are
+specified. Optional group formula predictors and symmetric pair effects in one
+named dimension can change utility. Newborns receive each dimension's category
+from its inheritance rule, by default either parent's with equal probability
+(with maternal fallback for unknown fathers), entering the assigned
+categories' mortality schedules immediately. Rate cells split by group only when a process's effective
 schedules are group-specific (D128). Group values are
 nonmissing character labels or finite numeric codes, with nonempty labels.
 See [groups](groups.md) for full rules, ordering, examples, and validation scope.

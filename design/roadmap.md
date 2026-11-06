@@ -16,7 +16,7 @@ or an unselected public API.
 | 6 | Group transitions, including categorical characteristics represented by groups | Complete October 30, 2026 (D116); final render active at acceptance |
 | 7 | Time-varying rates, matching, and inheritance within a simulation run | Complete November 2, 2026 (D127); current engine and documented limitations retained |
 | 8 | Cell scheduling for all rate processes; formula and custom weight models | Complete November 5, 2026 (D130); documented limitations retained |
-| 9 | More than one group column, potentially including regions and internal migration | Next (D121, D131); schema and mechanism contracts unselected |
+| 9 | More than one group column, potentially including regions and internal migration | In progress (D134): step 1 implemented, step 2 joint matching calibration remains; not yet accepted |
 | 10 | Immigration from outside the system, tracking generation | Tentative (D121, D131) |
 | 11 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed; moved from milestone 9 (D131) |
 | 12 | Two-sex marriage model | Tentative (D117/D121); model and API unselected |
@@ -228,11 +228,14 @@ characteristics, weights within bands) are listed in
 The user assigned the possibility of more than one group column to tentative
 milestone 10 on October 31, 2026 (D121) and moved it to milestone 9, the next
 milestone, on November 5, 2026 (D131). Different columns could represent
-identity, education or location simultaneously. Representation, supported rate
-strata, matching predictors/restrictions, dimension-specific histories,
-transitions, newborn assignment and ancestry interactions remain to be specified.
-No naming convention, default dimension or independent-dimension assumption is
-selected.
+identity, education or location simultaneously. The design was decided on
+November 5, 2026 (D134) and is recorded in
+[multiple group dimensions](multiple-groups.md): declared dimensions with
+their own names, rate strata, inheritance, ancestry, transitions, analysis
+splits, weight-model variables and per-dimension matching settings. Step 1 is
+implemented, with matching group effects in one dimension at a time; step 2,
+joint matching calibration across dimensions, remains. Cross-dimension
+matching interactions are not offered.
 
 The former separate milestone for internal migration and regions is removed.
 Location may be represented as one group dimension, with internal migration as

@@ -691,3 +691,48 @@ test_that("custom weight functions see every dimension in members and cells", {
   expect_null(t$bin$region)
   expect_identical(unique(t$members$destination), "S")
 })
+
+test_that("calendar bands switch rates stratified by several dimensions", {
+  model <- two_dimension_model(400)
+  persons <- model$population$persons
+  # Before time 1 only region S dies; from time 1 only race B.
+  early <- stratify_rates(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 1e8,
+    time_start = -100, time_end = 1), list(race = c(A = 1, B = 1), region = c(N = 0, S = 1)))
+  late <- stratify_rates(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 1e8,
+    time_start = 1, time_end = Inf), list(race = c(A = 0, B = 1), region = c(N = 1, S = 1)))
+  out <- simulate(set_mortality(model, rbind(early, late)), 2, seed = 61)
+  died <- out$persons$death_time[seq_len(nrow(persons))]
+  expect_true(all(died[persons$region == "S"] < 1e-6))
+  expect_true(all(abs(died[persons$region == "N" & persons$race == "B"] - 1) < 1e-6))
+  expect_true(all(is.na(died[persons$region == "N" & persons$race == "A"])))
+  # Every active slice must cover each combination.
+  gap <- rbind(early, late[!(late$race == "A" & late$region == "S"), ])
+  expect_error(simulate(set_mortality(model, gap), 2), "missing schedules.*race=A, region=S")
+})
+
+test_that("cohabitation probabilities and conversion use declared dimensions", {
+  model <- matching_pair_model(create_age_gap_matching_model(0, 5))
+  model <- set_union_formation(model, "rate",
+    rates = data.frame(age_start = 0, age_end = Inf, rate = 2),
+    cohab_prob = data.frame(race = c("A", "B"), age_start = 0, age_end = Inf, prob = c(1, 0)),
+    union_convert_rate = stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = 1e8),
+                                        list(region_h = c(N = 1, S = 0))),
+    kinship_generations = 0)
+  model <- set_fertility(model, data.frame(union_type = c("unpartnered", "cohab", "marriage"),
+    age_start = 15, age_end = 50, rate = 0))
+  out <- simulate(model, 1, seed = 62)
+  u <- get_detailed_unions(out)
+  first <- u[is.na(u$previous_cohab_id), ]
+  expect_gt(nrow(first), 50)
+  # Women of race A cohabit, women of race B marry.
+  expect_true(all(first$union_type[first$race_w == "A"] == "cohab"))
+  expect_true(all(first$union_type[first$race_w == "B"] == "marriage"))
+  # Cohabitations with a northern husband convert at once; southern ones never.
+  cohab <- first[first$union_type == "cohab", ]
+  expect_true(all(cohab$end_reason[cohab$region_h == "N"] %in% "conversion"))
+  expect_true(all(is.na(cohab$end_reason[cohab$region_h == "S"])))
+  rates <- calculate_cohab_convert_rate(out, c(0, 1), dur_breaks = c(0, Inf), by = c("region_h", "race_w"))
+  expect_named(rates, c("time_start", "time_end", "dur_start", "dur_end", "region_h", "race_w",
+                        "union_years", "conversions", "rate_cohab_convert"))
+  expect_equal(sum(rates$conversions), sum(cohab$region_h == "N"))
+})

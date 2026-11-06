@@ -17,6 +17,9 @@ milestone 9's multiple-group/regions applications (D114/D121/D131).
 for every rate process with one clock per process (D128) and weight models
 (D129).** See the [specification](binned-group-hazards.md) and the
 [validation report](../validation/milestone8.qmd).
+**Milestone 9, multiple group dimensions, is in progress (D134):** step 1 is
+implemented (see [multiple group dimensions](multiple-groups.md)); step 2,
+joint matching calibration across dimensions, remains.
 
 ## Reading order
 
@@ -32,12 +35,13 @@ for every rate process with one clock per process (D128) and weight models
 | [Rate input census](rate-inputs.md) | Existing rate schedules, age/duration bands, supported strata and multipliers |
 | [Population schema](population-schema.md) | Person/union tables and structural validation |
 | [Group transitions](group-transitions.md) | Individual transitions, histories, state updates and age/duration Lexis rates |
-| [Groups](groups.md) | Group-specific schedules, multipliers, newborn identity, and baseline sampling |
+| [Groups](groups.md) | Declared group dimensions, group-specific schedules, multipliers, newborn categories, and baseline sampling |
+| [Multiple group dimensions](multiple-groups.md) | Milestone 9 decisions (D134), naming rules, and what each stage implemented |
 | [Ancestry](ancestry.md) | Starting proportions, parental averaging, unknown shares, and restarts |
 | [Group inheritance](group-inheritance.md) | Built-in/custom identity rules, passing, and possible groups |
 | [Calibration intensity updates](calibration-intensity.md) | Actual female hazards from search and fertility cells (D082/D128) |
 | [Weighted-choice matching](weighted-choice-matching.md) | Calibrated male-group weights and delta target adjustments (D074/D075) |
-| [Group matching](group-matching.md) | Symmetric pair effects and fixed group formula predictors |
+| [Group matching](group-matching.md) | Symmetric pair effects and group formula predictors, by dimension |
 | [Demographic analysis](demographic-analysis.md) | Separate mortality/fertility rates, parity ASFRs, union rates, TFR, and life tables |
 | [Cell-accounted fertility](fertility-cell-accounting.md) | Birth-spacing mechanism (D101): cells, unrealized births, validation |
 | [Parity spacing investigation](parity-spacing-investigation.md) | Evidence that led to D101, including the SOCSIM reference |

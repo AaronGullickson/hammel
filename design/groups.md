@@ -3,7 +3,27 @@
 Milestone 3 was accepted October 27, 2026 (D077), following the
 [user-authored validation report](../validation/milestone3.qmd). Group data belongs in
 the population and its effects belong in the relevant processes (D051).
-Newborn identity rules are specified in [group inheritance](group-inheritance.md).
+Milestone 9 (D134) generalized groups to any number of declared dimensions,
+such as `race` and `region`; this page describes the current behavior, and
+[multiple group dimensions](multiple-groups.md) records the decisions and the
+stages that implemented them. Newborn identity rules are specified in
+[group inheritance](group-inheritance.md).
+
+## Declaring dimensions
+
+Group dimensions are persons columns declared with `set_groups(model, race =
+group(...), region = group(...))`, or with `hammel_population(..., groups =)`
+for analysis without a model. There is no implicit `group` column: a
+one-dimension model also declares it (it may be named `group`). An undeclared
+column is an ordinary custom column, kept unchanged and `NA` for newborns, and
+any rate table, weight model, matching model or `by` that names it is an error.
+`group()` sets the dimension's optional ordered `categories` (otherwise
+inferred from the population in first-appearance order, plus transition
+categories), whether it tracks `ancestry`, and its `inheritance` rule. The
+first category is the reference level for treatment-coded group terms.
+Dimension names exclude reserved names (`sex`, `parity`, `origin`, ...) and the
+patterns `partner_*`, `same_*`, `female_*`, `male_*`, `ancestry_*`, `*_w` and
+`*_h`, which name derived variables.
 
 ## Proportional stratification with `stratify_rates()` (D132)
 
@@ -85,98 +105,101 @@ rbind(
   stratify_rates(fert[fert$union_type == "unpartnered", ], list(group = c(A = 1.05, B = 1))))
 ```
 
-**Populations without groups.** A table stratified by `group` follows the
-existing fallback for group-specific rates: simulation warns and uses the
-alphabetically first group's schedule, including its factor.
-
 Rate-table summaries (`calculate_tfr()`, `calculate_life_table()`) summarize
 each stratum of a stratified table like any other stratified input.
 
 ## Lookup and timing
 
-An optional `group` column identifies each person's current group. Values must be
-nonmissing character labels or finite numeric codes; character labels must be
-nonempty. Types are preserved in population results. Comparisons use character
-representations, including when numeric codes are matched to labels. Alphabetical
-selection uses radix order on those representations: codes `10` and `2` select
-`10` first when the population has no groups. Mortality,
-fertility, and female union-search rate tables may independently include
-`group`. A table without that column applies to everyone, including a grouped
-population. A grouped table selects the person's own group; union-search rates
-use the woman's group. Every population group must have an explicit schedule
-in each grouped table, or simulation fails. Extra rate groups are permitted.
+A rate table stratifies by the declared dimensions it has columns for: the
+dimension's name for person-level rates (mortality, fertility, union search,
+cohabitation probability, group transitions), meaning the person's (or
+searching woman's) category, and `<dim>_w`/`<dim>_h` for union-level rates
+(dissolution, conversion), meaning the wife's and husband's categories.
+Dimensions without a column share the schedule, so a table without group
+columns applies to everyone. Each process's cells are only as fine as its
+rates (D128). Every combination of the categories of the dimensions a table
+uses must have a schedule, including categories that are empty at the start,
+or simulation fails; group transitions instead treat uncovered strata as zero
+risk. With declared `categories`, rate rows for other categories are errors;
+with inferred ones they are unused. Values are compared through their
+character representations, and labels keep their persons-column type in
+results.
 
-Without a population `group` column, each grouped rate table independently
-uses its alphabetically first group and simulation emits a warning identifying
-the process and selected group. Selection is independent of input row order.
-This does not assign group identities to the population.
-
-Age-band overlap is checked within group and sex for mortality, within group
-and union status for conditional fertility, and within group for overall
-fertility and searches. Each mortality group needs both sex schedules, with
-complete coverage of `[0, Inf)` at execution. Each conditional fertility group
-needs both statuses. Fertility and search gaps continue to mean zero risk.
-Units remain events per person-year and all times remain continuous years.
-Fertility cells are built separately for each group/status schedule (D101).
+Age-band overlap is checked within each stratum: sex for mortality, union
+status for conditional fertility, and the group strata of every table. Each
+mortality stratum needs both sex schedules, with complete coverage of
+`[0, Inf)` at execution. Each conditional fertility stratum needs both
+statuses. Fertility and search gaps continue to mean zero risk. Units remain
+events per person-year and all times remain continuous years. Fertility
+cells are built separately for each stratum and status schedule (D101).
 
 ## Births and unions
 
-Newborns select either parent's group with equal probability by default,
-falling back to the mother when the father is unknown. Fertility may attach a
-`create_group_inheritance()` object for other parental, ancestry, hierarchy,
-or custom assignment rules. The child's assigned schedule applies from birth,
-including neonatal mortality. Possible identities include initial identities,
-positive reference ancestry groups, transition origins/destinations, and explicitly declared outputs; grouped
-schedules and categorical matching must cover the full set before execution.
-The father need not share that group by default. Optional `prevent_exogamy`
-restrictions make men of prohibited groups ineligible. Group formula terms and symmetric pair effects
-can change matching utilities; see [group matching](group-matching.md).
-Other eligibility rules remain.
-Group identity changes only through the optional [group-transition process](group-transitions.md); current identity and transition history are retained across restarts. Ancestry
-proportions are tracked separately in the population's `ancestry` tibble;
-see [ancestry](ancestry.md) for initialization, averaging, and unknown shares.
-See [group inheritance](group-inheritance.md) for fallbacks, passing, and custom
-assignment of mixed identities such as AB.
+Newborns receive a category in every declared dimension, each from its own
+`group(inheritance = ...)` rule (random parent with maternal fallback by
+default; parental, ancestry, hierarchy, custom and calendar-scheduled rules
+are available). The child's categories apply from birth, including neonatal
+mortality. Possible categories include declared ones, initial ones, positive
+ancestry shares and transition origins and destinations; group-specific
+schedules must cover them all before execution.
+
+Partners need not share a category. Matching group effects (formula
+predictors such as `female_race`, symmetric pair effects, `prevent_exogamy`
+restrictions and `delta`) use one named dimension for now; see
+[group matching](group-matching.md). Other eligibility rules remain.
+Categories change only through the optional
+[group-transition processes](group-transitions.md), one per dimension; current
+categories and transition histories are retained across restarts. Ancestry
+shares are tracked for dimensions declared with `ancestry = TRUE`, one tibble
+each in the population's `ancestry` list; see [ancestry](ancestry.md). See
+[group inheritance](group-inheritance.md) for fallbacks, passing, and custom
+assignment of mixed categories such as AB.
 
 ## Baseline initialization
 
-`create_baseline_population(group_weights = NULL)` optionally takes a named
-numeric vector. Names are unique, nonmissing, nonempty group labels; weights
-are finite, nonnegative, and include at least one positive value. Normalize
-weights to probabilities and independently sample a group for every person,
-after generating sex and age. For example, `c(A = 2, B = 1)` gives each person
-probability 2/3 of A and 1/3 of B; realized counts are random, not quotas.
-Zero weights are permitted. Omission adds no group column or random draws.
-An empty population with weights has a zero-length character `group` column.
-Sampling uses R's RNG and is reproducible with `set.seed()`. Initialization
-does not associate group with age or sex.
+`create_baseline_population(groups = NULL)` optionally samples group
+dimensions, independently of age and sex. `groups` is either a named list of
+named weight vectors, one per dimension, drawn independently, such as
+`list(race = c(A = 2, B = 1), region = c(N = 1, S = 1))`, or a data frame with
+one column per dimension and a `weight` column giving the joint distribution.
+Weights are finite and nonnegative with a positive value, normalized to
+probabilities; realized counts are random, not quotas. The population declares
+each dimension with `group()` defaults, which `set_groups()` can replace.
+Omission adds no groups and consumes no random draws. Sampling uses R's RNG
+and is reproducible with `set.seed()`.
 
 ## Worked cases and validation
 
-- Population groups A and B with an ungrouped mortality schedule both use it.
+- Populations in A and B with a mortality schedule without group columns both
+  use it.
 - Group A mortality is zero and B mortality is positive: only B can die.
-- Rate rows list B before A but the population has no group column: A is used,
-  with a warning, and no population group column is created.
-- A mother in A and father in B may form a union; their child belongs to A.
+- A rate table with a column for an undeclared persons column is an error that
+  asks for the dimension to be declared.
+- A mother in A and father in B may form a union; their child's category comes
+  from the inheritance rule (random parent by default).
 - Fertility is zero for A and positive for B: only B mothers can give birth.
-- A grouped table containing A alone cannot serve a population containing B;
+- A group table containing A alone cannot serve a population containing B;
   validation fails rather than assuming a rate or treating B as zero risk.
+- Rates by `race` and `region` together need a schedule for every race and
+  region combination; rates by `race` alone apply to every region.
 - Identical group schedules must reproduce the ungrouped demographic histories
   with the same seed; adding group labels consumes no random draws.
 
-Validation covers these cases, group/status fertility cells, search selection,
-newborn schedule selection, empty populations, restart persistence, edited
-objects, and unchanged behavior without group columns.
+Validation covers these cases, several dimensions in rates, inheritance,
+ancestry, transitions, analysis, weights and matching, fertility cells,
+search selection, newborn schedule selection, empty populations, restart
+persistence, edited objects, and unchanged behavior without groups.
 
 ## Group observations
 
-`calculate_fertility_rates(..., by = "group")` and
-`calculate_population_size(..., by = "group")` return separate counts for
-each group appearing in current person identities or the retained transition history. Both default to
-FALSE, preserving pooled output. TRUE requires a population/persons `group`
-column; no group identity is inferred when that column is absent. Labels retain
-their input type; current groups appear in first-occurrence order, followed by any historical groups absent from current identities. No extra pooled
-group rows or groups absent from the history are added.
+The calculators' `by` argument (D133) names declared dimensions:
+`calculate_population_size(..., by = "race")`,
+`calculate_fertility_rates(..., by = c("race", "region"))`, and
+`<dim>_w`/`<dim>_h` for union rates. Results get one column per dimension,
+covering every category in current categories or the retained transition
+history (first-appearance order), with the full grid of combinations. No
+category is inferred when no dimension is declared. See
+[demographic analysis](demographic-analysis.md) for the shared rules.
 
 Lexis counts retain the full period/age/sex grid in every group, including
 zero-exposure cells. Exposure is split at group transitions, deaths use the
@@ -185,15 +208,16 @@ an input child's group differs. Existing maternal
 age rules, half-open boundaries, and zero-exposure NA rates are unchanged.
 Unknown-mother births stay in the single period-level `unassigned_births`
 attribute and are not assigned a maternal group from the child. Combining
-`by = c("group", "union_type")` returns unpartnered and all
+`by = c("race", "union_type")` returns unpartnered and all
 union-type rows within each group, without an overall row. Each spouse's formation and
 exposure belong to that spouse's group at the event or exposure time, including cross-group unions.
 
-`calculate_tfr()` and `calculate_life_table()` automatically treat an input
-`group` column as an additional stratum alongside periods and union status
-(and sex for life tables). Age-contiguity checks, missing-rate rules, and
-life-table assumptions apply independently within each stratum. The group
-column is preserved, including in empty outputs; no averaging or pooling is
+`calculate_tfr()`, `calculate_patfr()` and `calculate_life_table()`
+automatically treat any column that is not a band or measure, such as a group
+dimension, as an additional stratum alongside periods and union status (and
+sex for life tables). Age-contiguity checks, missing-rate rules, and
+life-table assumptions apply independently within each stratum. Stratum
+columns are preserved, including in empty outputs; no averaging or pooling is
 performed across groups.
 
 Population sizes retain requested time order and repeated times, with groups
@@ -212,13 +236,13 @@ identities, boundary examples, analytical group TFR/life expectancy, and empty
 outputs, as well as unchanged default results.
 
 
-Marriage observations now use `calculate_union_rates(..., by = "group")`
-(D080), grouping each spouse by their own identity. Set `by = "previous_union"`
-to additionally split unpartnered exposure and union starts by previous category;
-the default FALSE pools counts and exposure before calculating rates. See
-[remarriage](remarriage.md).
+Marriage observations use `calculate_union_rates(..., by = "race")`
+(D080), grouping each spouse by their own category. Add `"previous_union"` to
+`by` to additionally split unpartnered exposure and union starts by previous
+category; without it, counts and exposure are pooled before calculating rates.
+See [remarriage](remarriage.md).
 
 
-Cohabitation extends fertility input strata to union_type (D086). Type selection probabilities and conversion schedules can
-stratify by the woman's group; conversion and dissolution use directional
+Cohabitation extends fertility input strata to union_type (D086). Type selection probabilities
+stratify by the woman's categories; conversion and dissolution use directional
 `<group>_w`/`<group>_h` strata (D134 stage 2).
