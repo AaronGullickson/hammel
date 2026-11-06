@@ -13,10 +13,12 @@ Since D134 (stage 5), group predictors and settings name a declared group
 dimension: predictors `female_<dim>`, `male_<dim>` and `same_<dim>`, and
 `group_exogamy` and `delta` as lists keyed by dimension,
 such as `group_exogamy = list(race = c("A:B" = -1))`; a bare value applies to
-the only declared dimension. A model's group effects use one dimension for
-now, and all matching models of a run (general, father, cohabitation, and
-schedule entries) must use the same one; it becomes the engine's matching
-dimension. At simulation each model is translated to the internal
+the only declared dimension. The matching dimensions are every dimension any
+matching model of the run names (general, father, cohabitation, and schedule
+entries); the engine's matching category is their combination, and effects
+from different dimensions add (step 2 of D134, specified in
+[multiple group dimensions](multiple-groups.md#step-2-specification-matching-across-several-dimensions)).
+With one matching dimension, each model is translated to the internal
 one-dimension form described here, with `group` standing for that dimension.
 The examples below use a dimension named `group`.
 
@@ -58,9 +60,10 @@ With one declared dimension a bare value works the same way:
 `group_exogamy = c("A:B" = -2, "B:C" = NA)` or `group_exogamy = NA`. A
 within-category prohibition (`"A:A" = NA`) is an error, since it is not
 exogamy; a finite `"A:A"` effect remains allowed. In the pair-table form an NA
-`log_odds` prohibits that unordered pair. Until step 2 of D134, a matching
-model's effects and prohibitions all use one dimension, so the example above,
-which names race and region, is not yet available.
+`log_odds` prohibits that unordered pair. With several dimensions, a pair of
+combinations is prohibited when any dimension prohibits its categories, so in
+the example above unions across regions are prohibited while race pairs carry
+their effects.
 
 Restricted men are ineligible, alongside age and kinship exclusions; the exact
 draw skips restricted group cells. Group restrictions win over any finite

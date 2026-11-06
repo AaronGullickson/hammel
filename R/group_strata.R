@@ -116,7 +116,9 @@ prepare_strata_rates <- function(rates, process, registries, start = -Inf, end =
 # The engine's view of every dimension: each person's category codes, the
 # reporting strata over all dimensions (unrealized births), and per-process
 # strata.
-group_engine_input <- function(persons, registries, match_name, specs) {
+# `match_dims` are the matching dimensions: the engine's matching category is
+# their combination (first fastest), as for rate strata.
+group_engine_input <- function(persons, registries, match_dims, specs) {
   n <- length(registries)
   categories <- matrix(0L, nrow(persons), n)
   for (d in seq_len(n))
@@ -128,8 +130,17 @@ group_engine_input <- function(persons, registries, match_name, specs) {
                  count = as.integer(prod(counts)))
   c(list(dimensions = n, categories = categories, counts = unname(counts),
          labels = unname(lapply(registries, as.character)), names = names(registries),
-         match_dim = if (is.null(match_name)) -1L else match(match_name, names(registries)) - 1L,
+         matching = strata_spec(match(match_dims, names(registries)) - 1L, counts[match_dims]),
          report = report), specs)
+}
+
+# A person-level strata specification over dimensions (0-based) of given
+# category counts.
+strata_spec <- function(dims, counts) {
+  counts <- as.integer(counts)
+  list(dims = as.integer(dims), roles = integer(length(dims)),
+       strides = as.integer(cumprod(c(1, utils::head(counts, -1))))[seq_along(dims)],
+       count = as.integer(prod(counts)))
 }
 
 # Decode reporting strata (all dimensions) into one column per dimension.

@@ -2908,9 +2908,12 @@ commits. See
 
 **Status:** User-selected design for milestone 9 (D131), decided in discussion
 November 5, 2026. Step 1 implemented in stages 1–5 (November 5–6, 2026), each
-committed by the user; stage 6 (tests, articles, documents) in progress.
-Step 2 (joint matching calibration) not yet implemented. Not yet accepted as
-complete.
+committed by the user, and stage 6 (tests, articles, documents). Step 2
+(matching across several dimensions, calibrated over their combinations)
+implemented November 6, 2026, following the user's choices recorded in
+`multiple-groups.md`: the combination covers every dimension any matching
+model of the run uses, effects add, and custom cross-dimension functions are
+left for later. Not yet accepted as complete.
 
 **Decision:** Populations may carry several categorical group dimensions,
 always declared with `set_groups(model, race = group(...), ...)`; there is no

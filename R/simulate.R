@@ -229,8 +229,9 @@ simulate <- function(model, years, seed = NULL) {
   registries <- group_registries(population, lapply(transition_list, `[[`, "rates"))
   resolved <- resolve_matching_models(union_process, declaration, registries)
   union_process <- resolved$process
-  match_name <- if (!is.null(resolved$dim)) resolved$dim else if (length(dimensions) == 1L) dimensions
-  group_values <- if (is.null(match_name)) NULL else registries[[match_name]]
+  match_dims <- if (length(resolved$dims)) resolved$dims else if (length(dimensions) == 1L) dimensions
+  group_values <- if (length(resolved$dims)) resolved$values else
+    if (length(match_dims)) registries[[match_dims]]
   tracked <- tracked_ancestry(declaration)
   components <- lapply(dimensions, function(d)
     if (d %in% tracked) setdiff(names(population$ancestry[[d]]), "person_id") else character())
@@ -285,7 +286,7 @@ simulate <- function(model, years, seed = NULL) {
   if (cohab_enabled && !"previous_cohab_id" %in% names(population$unions))
     population$unions$previous_cohab_id <- rep(NA_real_, nrow(population$unions))
   engine_persons <- population$persons
-  group_input <- if (!grouped) NULL else group_engine_input(population$persons, registries, match_name,
+  group_input <- if (!grouped) NULL else group_engine_input(population$persons, registries, match_dims,
     list(mortality = death$spec, fertility = birth$spec, search = search$spec,
          probability = cohab$prob_spec, conversion = cohab$conversion_spec,
          dissolution = dissolution$spec))

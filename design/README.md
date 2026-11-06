@@ -17,9 +17,9 @@ milestone 9's multiple-group/regions applications (D114/D121/D131).
 for every rate process with one clock per process (D128) and weight models
 (D129).** See the [specification](binned-group-hazards.md) and the
 [validation report](../validation/milestone8.qmd).
-**Milestone 9, multiple group dimensions, is in progress (D134):** step 1 is
-implemented (see [multiple group dimensions](multiple-groups.md)); step 2,
-joint matching calibration across dimensions, remains.
+**Milestone 9, multiple group dimensions, is implemented and awaiting
+acceptance (D134):** steps 1 and 2, including matching across several
+dimensions (see [multiple group dimensions](multiple-groups.md)).
 
 ## Reading order
 

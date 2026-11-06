@@ -144,16 +144,10 @@ test_that("matching group effects use one named dimension among several", {
   expect_error(simulate(matching_pair_model(wrong), 0), "coefficient names.*female_raceB:age_difference")
 })
 
-test_that("matching settings must name one declared dimension", {
+test_that("matching settings must name declared dimensions", {
   bare <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1))
   expect_error(simulate(matching_pair_model(bare), 0),
                "Name the dimension.*group_exogamy = list\\(race")
-  both <- create_matching_model(~ same_race, c(same_race = 1),
-                                group_exogamy = list(region = NA))
-  expect_error(simulate(matching_pair_model(both), 0), "one group dimension for now.*`race`, `region`")
-  race <- create_matching_model(~ same_race, c(same_race = 1))
-  region <- create_matching_model(~ same_region, c(same_region = 1))
-  expect_error(simulate(matching_pair_model(race, father_matching = region), 0), "one group dimension")
   expect_error(simulate(matching_pair_model(create_matching_model(~ same_education,
     c(same_education = 1))), 0), "`education`, which is not a declared group dimension")
   expect_error(create_matching_model(~ age_difference, c(age_difference = 0),
@@ -735,4 +729,119 @@ test_that("cohabitation probabilities and conversion use declared dimensions", {
   expect_named(rates, c("time_start", "time_end", "dur_start", "dur_end", "region_h", "race_w",
                         "union_years", "conversions", "rate_cohab_convert"))
   expect_equal(sum(rates$conversions), sum(cohab$region_h == "N"))
+})
+
+# Step 2: matching across several dimensions. Combinations of race {A, B}
+# and region {N, S}, race fastest: A|N, B|N, A|S, B|S.
+step2_tables <- function(model, father = NULL) {
+  persons <- data.frame(person_id = 1:8, sex = rep(c("f", "m"), 4), birth_time = -30,
+    death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_,
+    race = rep(c("A", "A", "B", "B"), 2), region = rep(c("N", "S"), each = 4))
+  population <- hammel_population(persons, end_time = 0, groups = c("race", "region"))
+  process <- union_formation("on_demand", matching = model, father_matching = father)
+  resolved <- resolve_matching_models(process, population$groups, group_registries(population))
+  internal <- resolved$process$matching
+  list(labels = resolved$values, dims = resolved$dims, internal = internal,
+       prepared = prepare_matching_model(internal, resolved$values))
+}
+
+test_that("pair effects, prohibitions and delta combine across dimensions as specified", {
+  # Worked example 1: effects add.
+  x <- step2_tables(create_age_gap_matching_model(0, 5,
+    group_exogamy = list(race = c("A:B" = -2), region = c("N:S" = -1))))
+  expect_identical(x$labels, c("A|N", "B|N", "A|S", "B|S"))
+  expect_identical(x$dims, c("race", "region"))
+  expect_equal(x$prepared$pair_offsets[1, ], c(0, -2, -1, -3))
+  expect_equal(x$prepared$pair_offsets, t(x$prepared$pair_offsets))
+  expect_false(x$prepared$prevent_exogamy_all)
+  # Example 2: a region prohibition with a race effect.
+  x <- step2_tables(create_age_gap_matching_model(0, 5,
+    group_exogamy = list(race = c("A:B" = -2), region = NA)))
+  expect_equal(x$prepared$pair_offsets[1, 1:2], c(0, -2))
+  expect_identical(x$prepared$blocked_pairs[1, ], c(FALSE, FALSE, TRUE, TRUE))
+  expect_identical(x$prepared$blocked_pairs, t(x$prepared$blocked_pairs))
+  # Prohibiting every dimension prohibits every different combination.
+  x <- step2_tables(create_age_gap_matching_model(0, 5, group_exogamy = list(race = NA, region = NA)))
+  expect_true(x$prepared$prevent_exogamy_all)
+  # Example 3: formula predictors from both dimensions.
+  x <- step2_tables(create_matching_model(~ same_race + same_region, c(same_race = 1, same_region = .5)))
+  expect_equal(calculate_matching_utilities(x$internal, rep(0, 4), "A|N", x$labels), c(1.5, .5, 1, 0))
+  x <- step2_tables(create_matching_model(~ female_race:same_region,
+    c("female_raceA:same_region" = 1, "female_raceB:same_region" = 2)))
+  expect_equal(calculate_matching_utilities(x$internal, rep(0, 4), "B|S", x$labels), c(0, 0, 2, 2))
+  expect_error(step2_tables(create_matching_model(~ female_race + same_region, c(same_region = 1))),
+               "coefficient names.*female_raceB")
+  # Example 4: delta adds per combination.
+  x <- step2_tables(create_age_gap_matching_model(0, 5,
+    delta = list(race = c(B = .5), region = c(S = .2))))
+  expect_equal(x$prepared$delta, c(0, .5, .2, .7))
+  expect_error(step2_tables(create_age_gap_matching_model(0, 5,
+    delta = list(race = c(C = 1), region = c(S = .2)))), "categories of `race`")
+})
+
+step2_model <- function(matching, father_matching = NULL, cohab = FALSE) {
+  model <- matching_pair_model(matching, father_matching)
+  if (cohab) model <- set_union_formation(model, "rate", matching = matching,
+    father_matching = father_matching, rates = data.frame(age_start = 0, age_end = Inf, rate = 1),
+    cohab_prob = data.frame(age_start = 0, age_end = Inf, prob = .5),
+    union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .1),
+    cohab_matching = create_age_gap_matching_model(0, 5, group_exogamy = list(region = NA)),
+    kinship_generations = 0)
+  model
+}
+
+test_that("one matching model can combine a race effect with a region prohibition", {
+  out <- simulate(step2_model(create_age_gap_matching_model(0, 5,
+    group_exogamy = list(race = c("A:B" = -30), region = NA))), 2, seed = 71)
+  expect_gt(nrow(out$unions), 100)
+  race <- pair_categories(out, "race"); region <- pair_categories(out, "region")
+  expect_true(all(region$w == region$h))
+  expect_true(all(race$w == race$h))
+  # Diagnostics name combinations.
+  diag <- simulate(set_union_formation(step2_model(create_age_gap_matching_model(0, 5,
+    group_exogamy = list(race = c("A:B" = -1), region = c("N:S" = -1)))), "on_demand",
+    matching = create_age_gap_matching_model(0, 5, group_exogamy = list(race = c("A:B" = -1),
+      region = c("N:S" = -1))), kinship_generations = 0, diagnostics = TRUE), .5, seed = 72)
+  expect_true(all(paste0(".log_weight_", c("A|N", "B|N", "A|S", "B|S")) %in% names(diag$unions)))
+})
+
+test_that("models naming different dimensions share the combination", {
+  # Example 5: the general model uses race and the father model region.
+  race <- create_age_gap_matching_model(0, 5, group_exogamy = list(race = c("A:B" = -30)))
+  region <- create_age_gap_matching_model(0, 5, group_exogamy = list(region = NA))
+  x <- step2_tables(race, father = region)
+  expect_identical(x$labels, c("A|N", "B|N", "A|S", "B|S"))
+  expect_equal(x$prepared$pair_offsets[1, ], c(0, -30, 0, -30))
+  expect_false(any(x$prepared$blocked_pairs))
+  # Near-prohibitive effects can leave some combinations' targets unmet; the
+  # engine warns and uses capped weights, as with one dimension.
+  out <- suppressWarnings(simulate(step2_model(race, father_matching = region, cohab = TRUE), 1, seed = 73))
+  # Marriages formed directly (converted cohabitations keep their partners).
+  direct <- out$unions$union_type == "marriage" & is.na(out$unions$previous_cohab_id)
+  race_pairs <- pair_categories(out, "race")[direct, ]
+  expect_gt(nrow(race_pairs), 30)
+  expect_true(all(race_pairs$w == race_pairs$h))
+  # Cohabitations use the cohabitation model's region prohibition.
+  u <- get_detailed_unions(out)
+  cohab <- u[u$union_type == "cohab", ]
+  expect_gt(nrow(cohab), 10)
+  expect_true(all(cohab$region_w == cohab$region_h))
+  # Calendar schedule entries may name different dimensions.
+  schedule <- tibble::tibble(time_start = c(-100, 1), time_end = c(1, Inf), model = list(race, region))
+  expect_warning(out <- simulate(matching_pair_model(schedule), 2, seed = 74), "could not meet male-group targets")
+  u <- get_detailed_unions(out)
+  early <- u$start_time < 1; late <- !early
+  expect_gt(sum(early), 30); expect_gt(sum(late), 30)
+  expect_true(all(u$race_w[early] == u$race_h[early]))
+  expect_true(all(u$region_w[late] == u$region_h[late]))
+  # A person's combination follows moves in either dimension.
+  moving <- set_group_transition(step2_model(create_age_gap_matching_model(0, 5,
+    group_exogamy = list(region = NA, race = c("A:B" = -30)))),
+    data.frame(origin = c("N", "S"), destination = c("S", "N"), age_start = 0, age_end = Inf, rate = 2),
+    group = "region")
+  withr::local_options(hammel.check_cells = TRUE)
+  expect_warning(out <- simulate(moving, 1, seed = 75), "could not meet male-group targets")
+  u <- get_detailed_unions(out)
+  expect_gt(sum(out$transitions$group == "region"), 50)
+  expect_true(all(u$region_w == u$region_h))
 })

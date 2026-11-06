@@ -106,9 +106,9 @@ the user's agreement.
   separate regions milestone is removed, with its unresolved applications
   retained under 9. Milestone 9 follows the user's D134 design in
   `design/multiple-groups.md`: step 1 (declared dimensions in rates,
-  inheritance, ancestry, transitions, analysis, weights, and matching effects
-  in one dimension) is implemented; step 2, joint matching calibration across
-  dimensions, remains. It is not yet accepted.
+  inheritance, ancestry, transitions, analysis, weights) and step 2
+  (matching across several dimensions, calibrated over their combinations)
+  are implemented. It is not yet accepted.
   Distinguish current
   specifications from deferred mechanisms and future proposals.
 - `validation/milestone1.qmd` is the accepted historical assessment; reproduce it

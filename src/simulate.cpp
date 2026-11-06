@@ -2213,12 +2213,6 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     for (int i = 0; i < ids.size(); ++i) for (int d = 0; d < dimensions; ++d)
       cats[static_cast<size_t>(i) * dimensions + d] = input(i, d);
   }
-  const int match_dim = groups_in.size() ? as<int>(groups_in["match_dim"]) : -1;
-  const int group_count = match_dim >= 0 ?
-    std::max(1, as<IntegerVector>(groups_in["counts"])[match_dim]) : 1;
-  IntegerVector person_groups(ids.size(), 0);
-  if (match_dim >= 0) for (int i = 0; i < ids.size(); ++i)
-    person_groups[i] = cats[static_cast<size_t>(i) * dimensions + match_dim];
   struct StrataSpec { std::vector<int> dims, roles, strides; int count = 1; };
   auto parse_spec = [&](List x) {
     StrataSpec spec;
@@ -2247,6 +2241,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         category >= static_cast<int>(dim_labels[d].size())) return NA_STRING;
     return Rf_mkChar(dim_labels[d][category].c_str());
   };
+  // The matching category: the combination of the matching dimensions (none:
+  // one category). Pools, pair effects and calibration use it.
+  const StrataSpec matching_spec = read_spec("matching");
+  const int group_count = matching_spec.count;
+  // Whether dimension d is part of the matching category.
+  std::vector<char> matching_dim(dimensions, 0);
+  for (int d : matching_spec.dims) matching_dim[d] = 1;
   const StrataSpec mortality_spec = read_spec("mortality"), fertility_spec = read_spec("fertility"),
     search_spec = read_spec("search"), probability_spec = read_spec("probability"),
     conversion_spec = read_spec("conversion"), dissolution_spec = read_spec("dissolution"),
@@ -2258,6 +2259,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       k += cats[static_cast<size_t>(i) * dimensions + spec.dims[j]] * spec.strides[j];
     return k;
   };
+  IntegerVector person_groups(ids.size(), 0);
+  for (int i = 0; i < ids.size(); ++i) person_groups[i] = person_stratum(matching_spec, i);
   // A union's stratum: the wife's (role 0) and husband's (role 1) categories.
   auto union_stratum = [&](const StrataSpec& spec, int wife, int husband) {
     int k = 0;
@@ -3617,7 +3620,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       tx_person.push_back(people[i].id); tx_time.push_back(now); tx_dim.push_back(tp.dim);
       tx_origin.push_back(origin); tx_dest.push_back(destination);
       cats[cell] = destination;
-      if (tp.dim == match_dim) people[i].group = destination;
+      if (matching_dim[tp.dim]) people[i].group = person_stratum(matching_spec, i);
       tp.entry[i] = now;
       if (people[i].female) add_counted_woman(i, now); else add_male(i);
       // A move changes the union's group pair and the partner's partner group.
@@ -3802,7 +3805,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         if (child_group < 0 || child_group >= rule.count) stop("Invalid newborn group index.");
         cats[static_cast<size_t>(child) * dimensions + d] = child_group;
       }
-      const int child_group = match_dim >= 0 ? cats[static_cast<size_t>(child) * dimensions + match_dim] : 0;
+      const int child_group = person_stratum(matching_spec, child);
       people[child].group = child_group;
       kinship.append(i, father_position);
       if (!female) {

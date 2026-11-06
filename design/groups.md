@@ -145,7 +145,8 @@ schedules must cover them all before execution.
 
 Partners need not share a category. Matching group effects (formula
 predictors such as `female_race`, symmetric pair effects and NA prohibitions
-in `group_exogamy`, and `delta`) use one named dimension for now; see
+in `group_exogamy`, and `delta`) may use several dimensions, whose effects add
+over their combinations; see
 [group matching](group-matching.md). Other eligibility rules remain.
 Categories change only through the optional
 [group-transition processes](group-transitions.md), one per dimension; current

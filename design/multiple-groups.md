@@ -4,9 +4,9 @@ Started November 5, 2026. **Status: design decided (D134); stages 1–5
 implemented: declared dimensions of any name, several at once, in every rate
 table, with per-dimension inheritance (including calendar schedules),
 ancestry, transitions, analysis splits and weight-model variables, and
-matching group effects in any one dimension. Stage 6 (tests, articles and
-documents) is in progress; step 2 (joint matching calibration across
-dimensions) remains.**
+matching group effects. Step 1 (stages 1–6) and step 2 (matching across
+several dimensions, with calibration over their combinations) are
+implemented; the milestone is not yet accepted.**
 This records the user's decisions as they are made. Milestone 9 was assigned
 multiple group columns by D131. See the [roadmap](roadmap.md#milestone-9-multiple-group-columns)
 for the motivation and the household-move questions retained from D114.
@@ -152,6 +152,140 @@ Step 1, each stage leaving the test suite passing:
 6. Tests, articles and documents.
 
 Step 2: joint matching calibration across dimensions.
+
+## Step 2 specification: matching across several dimensions
+
+*User decisions, November 6, 2026:* the matching combination covers every
+dimension used by any matching model of the run; effects from different
+dimensions add; custom cross-dimension functions are left out of step 2, and
+the design must let them fill the same tables later without new calibration.
+**Status: implemented November 6, 2026** (see "Step 2 as implemented" below).
+
+**Matching category.** The engine's matching category becomes the combination
+of the matching dimensions: every dimension named by any matching model of the
+run (general, father, cohabitation, and every calendar-schedule entry), in
+declaration order, the first varying fastest. With race {A, B} and region
+{N, S} the combinations are A-N, B-N, A-S, B-S, including combinations with no
+members. Pools of available men, pair effects, prohibitions, `delta` and
+calibration are all keyed by combination. With one matching dimension this is
+the current behavior; with none (and several declared dimensions) there is no
+matching category, as now. Dimensions outside the combination have no matching
+role. Each dimension keeps its own rates, inheritance, transitions and
+analysis; a person's combination changes whenever one of its dimensions does.
+
+**Effects.** Each matching model is translated, before the run, into one
+table of pair effects over the combinations, with prohibited pairs marked, and
+one target adjustment per combination:
+
+- *Pair effects add.* The effect for a woman in combination w and a man in m
+  is the sum over the model's dimensions of that dimension's `group_exogamy`
+  effect for their two categories (zero when unlisted).
+- *Prohibitions combine.* A pair is prohibited when any dimension prohibits
+  its two categories (a listed NA pair, or NA for the whole dimension).
+- *`delta` adds.* A combination's target adjustment is the sum of each
+  dimension's `delta` for its category.
+- *Formula predictors* may name several dimensions (`same_race + same_region`,
+  `female_race:same_region`); each is evaluated from the partners'
+  combinations.
+- A model has no effect in matching dimensions it does not name.
+
+The engine only sees the tables, so a later custom function for
+cross-dimension interactions would fill the same tables and need no new
+calibration. Such functions are not part of step 2.
+
+**Calibration.** As now (D066, D075), each male combination has a weight,
+solved so that men of each combination are chosen at the target mirrored from
+women's search intensity in the same combination, times `exp(delta)`. With
+symmetric effects this gives the same kind of sex symmetry as one dimension,
+now within each combination. Calibration is skipped (strict endogamy, D070)
+only when every pair of different combinations is prohibited, that is, when
+every matching dimension is prohibited as a whole.
+
+**Worked examples** (race {A, B}, region {N, S}; a woman in A-N; log-weight
+contributions before the age terms and calibration weights):
+
+1. `group_exogamy = list(race = c("A:B" = -2), region = c("N:S" = -1))`:
+   A-N 0, B-N -2, A-S -1, B-S -3.
+2. `group_exogamy = list(race = c("A:B" = -2), region = NA)`: A-N 0, B-N -2;
+   A-S and B-S are prohibited, so she never partners a southern man, and a
+   search with only southern men available fails.
+3. `~ same_race + same_region` with coefficients 1 and 0.5: A-N 1.5, B-N 0.5,
+   A-S 1, B-S 0.
+4. `delta = list(race = c(B = 0.5), region = c(S = 0.2))`: male targets are
+   multiplied by 1 (A-N), exp(0.5) (B-N), exp(0.2) (A-S) and exp(0.7) (B-S),
+   then normalized.
+5. A general model with race effects and a father model with region effects:
+   the combination is race x region; the general model's effects ignore
+   region, and the father model's ignore race.
+
+**Diagnostics.** Matching diagnostics name combinations by their categories
+joined with `|` (`.log_weight_A|N`); with one dimension, names are unchanged.
+
+**Validation.** One-dimension runs bit-identical to the current version;
+pair tables for the worked examples; simulated unions with a race effect and
+a region prohibition (no cross-region unions, race effect present); sex
+symmetry within combinations under symmetric effects; per-dimension `delta`;
+calendar schedules whose entries use different dimensions; and a benchmark of
+calibration cost as the number of combinations grows.
+
+### Step 2 as implemented (November 6, 2026)
+
+- Matching models naming two or more dimensions are translated to an internal
+  model over the combinations: one table of summed pair effects, the
+  prohibited pairs, `delta` summed per combination, and a decode table so
+  formula predictors (`same_region`, `female_race`, ...) are evaluated from
+  combinations. With one matching dimension the previous translation is kept,
+  and runs are bit-identical to before (checked with fused multiply-adds off,
+  for matching pair effects, prohibitions, `delta`, categorical predictors,
+  calibration and weights).
+- The engine's matching category is a strata specification over the matching
+  dimensions, recomputed when a person's category in any of them changes
+  (transitions) and at birth. Pools, pair tables and calibration are
+  unchanged and simply see more categories.
+- Combination labels join categories with `|` (`A|N`), as in diagnostics
+  columns `.log_weight_A|N`.
+- Tests check the worked examples' tables exactly, simulated unions under a
+  race effect with a region prohibition, models (general, father,
+  cohabitation, schedule entries) naming different dimensions, and moves that
+  change a person's combination.
+- **Symmetry within combinations**
+  ([script](../validation/milestone9/joint_matching.R)): with symmetric
+  effects in both dimensions (race A:B = -1, region N:S = -1; race A 85%),
+  wife-in-w/husband-in-h unions against the reverse for every pair of
+  different combinations, 6 runs of 60 years each, region independent of or
+  associated with race: all 12 ratios lie between 0.92 and 1.12; two 95%
+  intervals touch 1 at their edge (1.12, 1.00–1.26; 1.09, 1.00–1.19), in line
+  with chance over 12 comparisons.
+- **Cost** (20,000 people, 20 years; seconds):
+
+  | Matching categories | 2 | 4 | 8 | 16 | 32 |
+  | --- | --- | --- | --- | --- | --- |
+  | Two dimensions combined | 1.1 | 3.4 | 14.6 | 72 | 338 |
+  | One dimension, same count | 1.1 | 3.4 | 14.6 | 71 | 337 |
+
+  Combining dimensions adds no cost beyond the number of categories, but the
+  existing calibration's cost grows steeply with that number (about four to
+  five times per doubling). Many matching combinations can therefore be slow;
+  this is a limitation of the current calibration, not of combining.
+- **Known limitation: partial prohibitions are slow.** With 16 combinations
+  (4 races x 4 regions, same population and length):
+
+  | Matching settings | Seconds |
+  | --- | --- |
+  | Race effects + region effects | 72 |
+  | Race effects + region prohibited (`region = NA`) | 997 |
+  | Both prohibited (calibration skipped) | 0.4 |
+  | Race effects only (region not matched; 4 categories) | 3.5 |
+
+  Prohibiting some matching dimensions while others carry effects is about
+  14 times slower than finite effects. Unverified hypothesis: per-region
+  targets are sometimes unreachable, so the calibration solver runs to its
+  iteration limit before falling back to capped weights (these runs warn
+  about unmet male-group targets). The same calibration serves one dimension
+  with some pairs prohibited. To investigate before the public release:
+  confirm the cause (solver iterations, unmet-target searches), then
+  consider stopping early when a target is unreachable or solving
+  independent blocks (such as regions under `region = NA`) separately.
 
 ### Stage 6 (November 6, 2026)
 

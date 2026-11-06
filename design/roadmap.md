@@ -19,7 +19,7 @@ or an unselected public API.
 | 6 | Group transitions, including categorical characteristics represented by groups | Complete October 30, 2026 (D116); final render active at acceptance |
 | 7 | Time-varying rates, matching, and inheritance within a simulation run | Complete November 2, 2026 (D127); current engine and documented limitations retained |
 | 8 | Cell scheduling for all rate processes; formula and custom weight models | Complete November 5, 2026 (D130); documented limitations retained |
-| 9 | More than one group column, potentially including regions and internal migration | In progress (D134): step 1 implemented, step 2 joint matching calibration remains; not yet accepted |
+| 9 | More than one group column, potentially including regions and internal migration | Implemented (D134), steps 1 and 2; not yet accepted |
 | Post-release | Immigration from outside the system, tracking generation (formerly 10) | Deferred until after first public release (D136) |
 | Release preparation | First version bump and public release after milestone 9 | User-selected next focus (D136); version number and release criteria unselected |
 | Unassigned | Polished summaries, diagnostic checks, and post-simulation helpers (formerly 11) | Proposed; scope and timing to select during release planning |
@@ -247,10 +247,10 @@ identity, education or location simultaneously. The design was decided on
 November 5, 2026 (D134) and is recorded in
 [multiple group dimensions](multiple-groups.md): declared dimensions with
 their own names, rate strata, inheritance, ancestry, transitions, analysis
-splits, weight-model variables and per-dimension matching settings. Step 1 is
-implemented, with matching group effects in one dimension at a time; step 2,
-joint matching calibration across dimensions, remains. Cross-dimension
-matching interactions are not offered.
+splits, weight-model variables and per-dimension matching settings. Steps 1
+and 2 are implemented; matching may combine effects from several dimensions,
+calibrated over their combinations. Cross-dimension matching interactions
+are not offered.
 
 The former separate milestone for internal migration and regions is removed.
 Location may be represented as one group dimension, with internal migration as

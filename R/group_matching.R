@@ -52,7 +52,7 @@ expand_matching_pairs <- function(effects, symmetric = FALSE) {
 expand_group_exogamy <- function(effects) expand_matching_pairs(effects, symmetric = TRUE)
 
 matching_has_group_formula <- function(matching) {
-  any(all.vars(matching$formula) %in% c("female_group", "male_group", "same_group"))
+  any(grepl("^(female|male|same)_.+", all.vars(matching$formula)))
 }
 
 matching_predictor_data <- function(matching, gaps, female_group = NULL, male_group = NULL) {
@@ -66,6 +66,20 @@ matching_predictor_data <- function(matching, gaps, female_group = NULL, male_gr
   if (!length(female) %in% c(1L, length(gaps)) || length(male) != length(gaps))
     stop("Supply one female group per search (or candidate) and one male group per candidate.", call. = FALSE)
   female <- rep(female, length.out = length(gaps))
+  # A combined matching category (several dimensions): decode each
+  # dimension's predictors from the partners' combinations.
+  if (!is.null(matching$decode)) {
+    f <- match(female, matching$group_levels)
+    m <- match(male, matching$group_levels)
+    if (anyNA(f) || anyNA(m)) stop("Matching group data contain unknown combinations.", call. = FALSE)
+    for (d in names(matching$categories)) {
+      levels <- as.character(matching$categories[[d]])
+      data[[paste0("female_", d)]] <- factor(matching$decode[[d]][f], levels = levels)
+      data[[paste0("male_", d)]] <- factor(matching$decode[[d]][m], levels = levels)
+      data[[paste0("same_", d)]] <- as.numeric(matching$decode[[d]][f] == matching$decode[[d]][m])
+    }
+    return(data)
+  }
   data$same_group <- as.numeric(female == male)
   if (any(all.vars(matching$formula) %in% c("female_group", "male_group"))) {
     levels <- as.character(matching$group_levels)
@@ -267,26 +281,121 @@ internal_matching_model <- function(model, dim, categories) {
   internal
 }
 
-# Translate a union process's matching models (and their schedules). Returns
-# the process with internal models and the matching dimension (NULL: none).
+# The internal model over combinations of several matching dimensions (step 2
+# of D134): one table of summed pair effects over combinations, prohibited
+# pairs (any dimension prohibiting them), `delta` summed per combination, and
+# a decode table so formula predictors are evaluated from combinations.
+# `categories` lists every matching dimension's categories (declaration
+# order, first varying fastest); `labels` names the combinations.
+combined_matching_model <- function(model, categories, labels) {
+  dims <- names(categories)
+  sizes <- vapply(categories, length, integer(1))
+  strides <- cumprod(c(1, utils::head(sizes, -1)))
+  k <- length(labels)
+  decode <- stats::setNames(lapply(seq_along(dims), function(j)
+    as.character(categories[[j]])[(seq_len(k) - 1L) %/% strides[j] %% sizes[j] + 1L]), dims)
+  own <- matching_dimensions(model, dims)
+  pick <- function(x, d) if (is_dimension_list(x)) x[[d]] else NULL
+  effects <- matrix(0, k, k)
+  blocked <- matrix(FALSE, k, k)
+  for (d in own) {
+    exogamy <- split_group_exogamy(pick(model$group_exogamy, d))
+    pairs <- expand_group_exogamy(exogamy$effects)
+    for (r in seq_len(nrow(pairs))) {
+      f <- decode[[d]] == as.character(pairs$female_group[r])
+      m <- decode[[d]] == as.character(pairs$male_group[r])
+      effects[f, m] <- effects[f, m] + pairs$log_odds[r]
+    }
+    if (isTRUE(exogamy$prevent)) blocked <- blocked | outer(decode[[d]], decode[[d]], `!=`)
+    else if (is.data.frame(exogamy$prevent)) for (r in seq_len(nrow(exogamy$prevent))) {
+      f <- decode[[d]] == as.character(exogamy$prevent$female_group[r])
+      m <- decode[[d]] == as.character(exogamy$prevent$male_group[r])
+      blocked[f, m] <- TRUE
+    }
+  }
+  # Unordered pairs with an effect (the table is symmetric).
+  upper <- which(upper.tri(effects, diag = TRUE) & effects != 0, arr.ind = TRUE)
+  table <- if (nrow(upper)) data.frame(female_group = labels[upper[, 1]], male_group = labels[upper[, 2]],
+                                       log_odds = effects[upper], stringsAsFactors = FALSE)
+  off <- row(blocked) != col(blocked)
+  prevent <- if (all(blocked[off])) TRUE else if (any(blocked)) {
+    pairs <- which(blocked, arr.ind = TRUE)
+    data.frame(female_group = labels[pairs[, 1]], male_group = labels[pairs[, 2]], stringsAsFactors = FALSE)
+  } else FALSE
+  delta <- numeric(k)
+  for (d in own) {
+    x <- pick(model$delta, d)
+    if (is.null(x)) next
+    unknown <- setdiff(names(x), as.character(categories[[d]]))
+    if (length(unknown))
+      stop(sprintf("`delta` names must be categories of `%s`; unknown: %s.", d,
+                   paste(unknown, collapse = ", ")), call. = FALSE)
+    delta <- delta + unname(x[decode[[d]]] %|na|% 0)
+  }
+  internal <- structure(list(formula = model$formula, coefficients = model$coefficients,
+    group_exogamy = table, group_levels = labels, prevent_exogamy = prevent,
+    delta = if (any(delta != 0)) stats::setNames(delta, labels),
+    decode = decode, categories = categories), class = "hammel_matching_model")
+  vars <- grep("^(female|male|same)_.+", all.vars(model$formula), value = TRUE)
+  if (length(vars)) {
+    categorical <- vars[grepl("^(female|male)_", vars)]
+    small <- sub("^(female|male)_", "", categorical)
+    if (any(sizes[small] < 2L))
+      stop("Categorical matching predictors require a group dimension with at least two categories.", call. = FALSE)
+    n <- max(2L, k)
+    female <- labels[(seq_len(n) - 1L) %% k + 1L]
+    male <- labels[(seq_len(n)) %% k + 1L]
+    male[seq_len(n) %% 2L == 0L] <- female[seq_len(n) %% 2L == 0L]
+    data <- matching_predictor_data(internal, seq_len(n), female, male)
+    columns <- colnames(matching_design_matrix(model$formula, data))
+    if (!setequal(columns, names(model$coefficients)))
+      stop(sprintf("Matching coefficient names must match the model-matrix columns: %s.",
+                   paste(columns, collapse = ", ")), call. = FALSE)
+  }
+  internal
+}
+
+`%|na|%` <- function(x, y) ifelse(is.na(x), y, x)
+
+# Labels of combinations: categories joined with `|` (first dimension first).
+combination_labels <- function(categories) {
+  sizes <- vapply(categories, length, integer(1))
+  strides <- cumprod(c(1, utils::head(sizes, -1)))
+  k <- prod(sizes)
+  parts <- lapply(seq_along(categories), function(j)
+    as.character(categories[[j]])[(seq_len(k) - 1L) %/% strides[j] %% sizes[j] + 1L])
+  labels <- do.call(paste, c(parts, sep = "|"))
+  if (anyDuplicated(labels)) labels <- paste0("combination_", seq_len(k))
+  labels
+}
+
+# Translate a union process's matching models (and their schedules). The
+# matching dimensions are every dimension any model uses (declaration order).
+# With one, models use the one-dimension form; with several, the combined
+# form over their combinations. Returns the process, the matching dimensions
+# and the category labels the engine uses (NULL when there are none).
 resolve_matching_models <- function(process, declaration, registries) {
   dims <- names(declaration)
   fields <- c("matching", "father_matching", "cohab_matching")
   used <- unique(unlist(lapply(fields, function(f)
     lapply(model_entries(process[[f]]), matching_dimensions, dims = dims))))
-  if (length(used) > 1L)
-    stop(sprintf(paste("Group effects in matching use one group dimension for now;",
-                       "the matching models use %s."), paste0("`", used, "`", collapse = ", ")),
-         call. = FALSE)
-  dim <- if (length(used)) used else NULL
-  categories <- if (is.null(dim)) NULL else registries[[dim]]
-  convert <- function(model) internal_matching_model(model,
-    if (length(matching_dimensions(model, dims))) dim, categories)
+  used <- dims[dims %in% used]
+  if (length(used) > 1L) {
+    categories <- lapply(stats::setNames(used, used), function(d) registries[[d]])
+    labels <- combination_labels(categories)
+    convert <- function(model) combined_matching_model(model, categories, labels)
+  } else {
+    dim <- if (length(used)) used else NULL
+    categories <- if (is.null(dim)) NULL else registries[[dim]]
+    labels <- categories
+    convert <- function(model) internal_matching_model(model,
+      if (length(matching_dimensions(model, dims))) dim, categories)
+  }
   for (f in fields) {
     x <- process[[f]]
     if (is.null(x)) next
     if (is_model_schedule(x)) x$model <- lapply(x$model, convert) else x <- convert(x)
     process[f] <- list(x)
   }
-  list(process = process, dim = dim)
+  list(process = process, dims = used, values = labels)
 }

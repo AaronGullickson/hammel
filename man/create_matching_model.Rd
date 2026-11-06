@@ -61,8 +61,11 @@ Group predictors are named by a declared group dimension (see
 factors over its categories with treatment contrasts (the first category is
 the reference), and \code{same_race} is 1 for partners in the same category, 0
 otherwise. Pair effects are added after the formula, including custom
-formulas. For now, a matching model's group predictors and settings use one
-dimension; matching models of a run must all use the same one.
+formulas. Predictors and settings may name several dimensions: the
+engine's matching category is the combination of every dimension any
+matching model of the run names, pair effects from different dimensions
+add, a pair prohibited in any dimension is prohibited, \code{delta} values add,
+and calibration balances male selection within each combination.
 These modify relative candidate weights, not search hazards or eligibility.
 }
 \details{
