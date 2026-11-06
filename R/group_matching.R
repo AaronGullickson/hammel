@@ -180,7 +180,8 @@ split_group_exogamy <- function(x) {
     return(out)
   }
   if (is.data.frame(x)) {
-    check_columns(x, c("female_group", "male_group", "log_odds"), "group_exogamy")
+    if (!all(c("female_group", "male_group", "log_odds") %in% names(x)))
+      stop("Internal error: pair tables reach split_group_exogamy() only from tables.", call. = FALSE)
     blocked <- is.na(x$log_odds)
     effects <- x[!blocked, , drop = FALSE]
     banned <- x[blocked, , drop = FALSE]
@@ -207,6 +208,42 @@ split_group_exogamy <- function(x) {
   out
 }
 
+# The table form of `group_exogamy` (D139): `<dim>_x`/`<dim>_y` columns and
+# `log_odds`, one unordered pair of combinations per row, NA prohibiting.
+# Returns the table's dimensions (in column order).
+exogamy_table_dimensions <- function(x) {
+  columns <- setdiff(names(x), "log_odds")
+  if (any(c("female_group", "male_group") %in% names(x)))
+    stop(paste("A `group_exogamy` table uses `<group>_x` and `<group>_y` columns and `log_odds`,",
+               "such as `race_x`, `race_y`; the female_group/male_group form is removed."), call. = FALSE)
+  if (!"log_odds" %in% names(x) || !length(columns) || any(!grepl("_[xy]$", columns)))
+    stop("A `group_exogamy` table needs `<group>_x` and `<group>_y` columns and `log_odds`, and no others.",
+         call. = FALSE)
+  dims <- unique(sub("_[xy]$", "", columns))
+  if (!setequal(columns, c(paste0(dims, "_x"), paste0(dims, "_y"))))
+    stop("Each dimension in a `group_exogamy` table needs both `<group>_x` and `<group>_y` columns.",
+         call. = FALSE)
+  dims
+}
+
+# Validate a table; returns it with character categories.
+validate_exogamy_table <- function(x) {
+  dims <- exogamy_table_dimensions(x)
+  for (column in setdiff(names(x), "log_odds"))
+    check_groups(tibble::tibble(group = x[[column]]), paste0("group_exogamy$", column))
+  v <- x$log_odds
+  if (!(is.numeric(v) || is.logical(v)) || is.complex(v) || !is.null(dim(v)) || any(is.infinite(v)))
+    stop("`group_exogamy$log_odds` must be finite effects or NA prohibitions.", call. = FALSE)
+  side <- function(s) do.call(paste, c(lapply(dims, function(d) as.character(x[[paste0(d, "_", s)]])), sep = "\r"))
+  a <- side("x"); b <- side("y")
+  key <- ifelse(a <= b, paste(a, b, sep = "\n"), paste(b, a, sep = "\n"))
+  if (anyDuplicated(key))
+    stop("A `group_exogamy` table lists a pair more than once (in either order).", call. = FALSE)
+  if (any(is.na(v) & a == b))
+    stop("A `group_exogamy` table cannot prohibit unions within a combination of categories.", call. = FALSE)
+  invisible(dims)
+}
+
 # The dimensions a matching model's group effects use.
 matching_dimensions <- function(model, dims) {
   vars <- grep("^(female|male|same)_.+", all.vars(model$formula), value = TRUE)
@@ -214,7 +251,8 @@ matching_dimensions <- function(model, dims) {
   bare <- FALSE
   for (field in matching_settings) {
     x <- model[[field]]
-    if (is_dimension_list(x)) used <- c(used, names(x))
+    if (field == "group_exogamy" && is.data.frame(x)) used <- c(used, exogamy_table_dimensions(x))
+    else if (is_dimension_list(x)) used <- c(used, names(x))
     else if (!is.null(x) && !identical(x, FALSE) && length(x)) bare <- TRUE
   }
   if (bare) {
@@ -271,7 +309,12 @@ internal_matching_model <- function(model, dim, categories) {
                    paste(original, collapse = ", ")), call. = FALSE)
     names(coefficients) <- translated[match(names(coefficients), original)]
   }
-  exogamy <- split_group_exogamy(pick(model$group_exogamy))
+  exogamy <- if (is.data.frame(model$group_exogamy)) {
+    table <- model$group_exogamy
+    split_group_exogamy(data.frame(female_group = as.character(table[[paste0(dim, "_x")]]),
+      male_group = as.character(table[[paste0(dim, "_y")]]), log_odds = as.numeric(table$log_odds),
+      stringsAsFactors = FALSE))
+  } else split_group_exogamy(pick(model$group_exogamy))
   internal <- structure(list(formula = renamed, coefficients = coefficients,
     group_exogamy = exogamy$effects,
     group_levels = if (any(c("female_group", "male_group") %in% all.vars(renamed))) categories,
@@ -298,7 +341,28 @@ combined_matching_model <- function(model, categories, labels) {
   pick <- function(x, d) if (is_dimension_list(x)) x[[d]] else NULL
   effects <- matrix(0, k, k)
   blocked <- matrix(FALSE, k, k)
-  for (d in own) {
+  if (is.data.frame(model$group_exogamy)) {
+    # A full table over combinations of the table's dimensions; dimensions it
+    # does not name do not matter. Rows naming absent categories are unused.
+    table <- model$group_exogamy
+    table_dims <- exogamy_table_dimensions(table)
+    for (r in seq_len(nrow(table))) {
+      f <- m <- rep(TRUE, k)
+      for (d in table_dims) {
+        f <- f & decode[[d]] == as.character(table[[paste0(d, "_x")]][r])
+        m <- m & decode[[d]] == as.character(table[[paste0(d, "_y")]][r])
+      }
+      if (!any(f) || !any(m)) next
+      if (is.na(table$log_odds[r])) {
+        blocked[f, m] <- TRUE
+        blocked[m, f] <- TRUE
+      } else {
+        effects[f, m] <- effects[f, m] + table$log_odds[r]
+        if (!identical(f, m)) effects[m, f] <- effects[m, f] + table$log_odds[r]
+      }
+    }
+  }
+  for (d in if (is.data.frame(model$group_exogamy)) character() else own) {
     exogamy <- split_group_exogamy(pick(model$group_exogamy, d))
     pairs <- expand_group_exogamy(exogamy$effects)
     for (r in seq_len(nrow(pairs))) {

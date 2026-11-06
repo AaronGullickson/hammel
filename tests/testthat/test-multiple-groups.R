@@ -865,3 +865,72 @@ test_that("separate markets are calibrated within themselves (D138)", {
   expect_equal(result$flow[1] / result$flow[2], 2, tolerance = 1e-6)
   expect_equal(result$flow[3] / result$flow[4], 2, tolerance = 1e-6)
 })
+
+# D139: the table form of group_exogamy. Combinations A|N, B|N, A|S, B|S.
+test_that("a group_exogamy table fully specifies pair effects over combinations", {
+  # Worked example: an effect within S, a prohibition across regions for A,
+  # and an effect within N; unlisted pairs are zero.
+  table <- data.frame(race_x = c("A", "A", "A"), region_x = c("S", "S", "N"),
+                      race_y = c("B", "A", "B"), region_y = c("S", "N", "N"),
+                      log_odds = c(-5, NA, -4))
+  x <- step2_tables(create_age_gap_matching_model(0, 5, group_exogamy = table))
+  expect_identical(x$dims, c("race", "region"))
+  # Woman A|S: A|N prohibited, A|S 0, B|S -5, B|N 0.
+  expect_equal(x$prepared$pair_offsets["A|S" == x$labels, ][c(2, 3, 4)], c(0, 0, -5))
+  expect_identical(x$prepared$blocked_pairs[3, ], c(TRUE, FALSE, FALSE, FALSE))
+  expect_equal(x$prepared$pair_offsets[1, 2], -4)
+  expect_equal(x$prepared$pair_offsets, t(x$prepared$pair_offsets))
+  expect_identical(x$prepared$blocked_pairs, t(x$prepared$blocked_pairs))
+  # A table with the list form's values gives the same tables and histories.
+  labels <- expand.grid(race = c("A", "B"), region = c("N", "S"), stringsAsFactors = FALSE)
+  pairs <- which(upper.tri(diag(4), diag = TRUE), arr.ind = TRUE)
+  full <- data.frame(race_x = labels$race[pairs[, 1]], region_x = labels$region[pairs[, 1]],
+                     race_y = labels$race[pairs[, 2]], region_y = labels$region[pairs[, 2]])
+  full$log_odds <- -2 * (full$race_x != full$race_y) - 1 * (full$region_x != full$region_y)
+  listed <- create_age_gap_matching_model(0, 5, group_exogamy = list(race = c("A:B" = -2), region = c("N:S" = -1)))
+  tabled <- create_age_gap_matching_model(0, 5, group_exogamy = full)
+  expect_equal(step2_tables(tabled)$prepared$pair_offsets, step2_tables(listed)$prepared$pair_offsets)
+  expect_identical(histories(simulate(matching_pair_model(tabled), 1, seed = 81)),
+                   histories(simulate(matching_pair_model(listed), 1, seed = 81)))
+  # A one-dimension table in a two-dimension model.
+  x <- step2_tables(create_age_gap_matching_model(0, 5,
+    group_exogamy = data.frame(race_x = "A", race_y = "B", log_odds = -3)))
+  expect_identical(x$dims, "race")
+  expect_equal(x$prepared$pair_offsets[1, ], c(0, -3))
+})
+
+test_that("tables give cross-dimension effects, such as race exogamy that differs by region", {
+  # Interracial unions prohibited in the South only; no unions across regions.
+  cross <- expand.grid(race_x = c("A", "B"), race_y = c("A", "B"), stringsAsFactors = FALSE)
+  table <- rbind(data.frame(race_x = "A", region_x = "S", race_y = "B", region_y = "S", log_odds = NA),
+                 data.frame(race_x = cross$race_x, region_x = "N", race_y = cross$race_y, region_y = "S",
+                            log_odds = NA))
+  out <- simulate(matching_pair_model(create_age_gap_matching_model(0, 5, group_exogamy = table)), 2, seed = 82)
+  u <- get_detailed_unions(out)
+  expect_gt(nrow(u), 100)
+  expect_true(all(u$region_w == u$region_h))
+  south <- u$region_w == "S"; north <- !south
+  expect_true(all(u$race_w[south] == u$race_h[south]))
+  expect_gt(sum(u$race_w[north] != u$race_h[north]), 10)
+})
+
+test_that("group_exogamy tables are validated", {
+  base <- data.frame(race_x = "A", race_y = "B", log_odds = -1)
+  bad <- list(
+    rbind(base, data.frame(race_x = "B", race_y = "A", log_odds = -1)),     # reverse duplicate
+    data.frame(race_x = "A", race_y = "A", log_odds = NA),                  # within a combination
+    data.frame(race_x = "A", log_odds = -1),                                # missing _y
+    transform(base, note = "x"),                                            # extra column
+    transform(base, log_odds = -Inf),
+    data.frame(race_x = NA, race_y = "B", log_odds = -1),
+    base[c("race_x", "race_y")])
+  for (x in bad) expect_error(create_age_gap_matching_model(0, 5, group_exogamy = x))
+  # Dimensions are checked against the declaration at simulation.
+  expect_error(simulate(matching_pair_model(create_age_gap_matching_model(0, 5,
+    group_exogamy = data.frame(caste_x = "A", caste_y = "B", log_odds = -1))), 0),
+    "`caste`, which is not a declared group dimension")
+  # Rows naming absent categories are unused.
+  x <- step2_tables(create_age_gap_matching_model(0, 5,
+    group_exogamy = data.frame(race_x = c("A", "Z"), race_y = c("B", "A"), log_odds = c(-1, -9))))
+  expect_equal(x$prepared$pair_offsets[1, ], c(0, -1))
+})

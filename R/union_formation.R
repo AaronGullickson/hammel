@@ -30,22 +30,32 @@
 #'   predictors `female_<group>`, `male_<group>` and `same_<group>`. Use `~ 1`
 #'   and `numeric()` coefficients for pair-effects-only matching.
 #' @param coefficients A finite named numeric vector of utility coefficients.
-#' @param group_exogamy Optional symmetric pair effects and prohibitions
-#'   (D135), as a named list keyed by dimension, such as
-#'   `list(race = c("A:B" = -2, "B:C" = NA))`; a bare value applies to the only
-#'   declared dimension. Each value is a named vector over unordered pairs:
-#'   `"A:B"` applies to female A/male B and female B/male A alike. A finite
-#'   value is an additive log-weight effect; NA prohibits the pair. `NA` alone
-#'   prohibits every union between different categories of the dimension.
+#' @param group_exogamy Optional symmetric pair effects and prohibitions, in
+#'   one of two forms. **List form** (D135): a named list keyed by dimension,
+#'   such as `list(race = c("A:B" = -2, "B:C" = NA), region = NA)`; a bare
+#'   value applies to the only declared dimension. Each value is a named vector
+#'   over unordered pairs (`"A:B"` applies to female A/male B and female
+#'   B/male A alike): a finite value is an additive log-weight effect and NA
+#'   prohibits the pair; `NA` alone prohibits every union between different
+#'   categories of the dimension. Effects from different dimensions add.
 #'   Specify each unordered pair once; reverse duplicates and `::` syntax are
 #'   errors. Omitted pairs have no effect. Finite within-category entries
 #'   (`"A:A"`) are allowed; within-category prohibitions are errors.
-#'   Alternatively provide a data frame with `female_group`, `male_group`, and
-#'   `log_odds` (NA prohibits); each row is an unordered pair, for labels
-#'   containing colons. Prohibited men are ineligible, alongside age and
-#'   kinship exclusions. A search fails only when no eligible man exists in the
-#'   whole pool, following existing failed-search and birth cancellation rules.
+#'   **Table form** (D139), for cross-dimension effects: a data frame with
+#'   `<group>_x` and `<group>_y` columns for each dimension it uses and
+#'   `log_odds`, such as
+#'   `data.frame(race_x = "W", region_x = "S", race_y = "B", region_y = "S", log_odds = -5)`.
+#'   Each row is one unordered pair of category combinations, applied in both
+#'   directions; NA prohibits it; unlisted pairs have no effect; a pair may be
+#'   listed once; every row names a category in each of the table's
+#'   dimensions. The table fully specifies the effects: it is not combined
+#'   with the list form. Rows naming absent categories are unused.
+#'   Prohibited men are ineligible, alongside age and kinship exclusions. A
+#'   search fails only when no eligible man exists in the whole pool,
+#'   following existing failed-search and birth cancellation rules.
 #'   Prohibitions override finite preferences and do not end existing unions.
+#'   Both forms are applied natively during partner draws, unlike formula
+#'   group terms, which are evaluated in R.
 #' @param delta Optional male-target adjustments, as a named list keyed by
 #'   dimension or a bare value for the only declared dimension: a finite
 #'   numeric vector with unique category names.
@@ -155,14 +165,21 @@ validate_matching_model <- function(model) {
       (length(beta) && is.null(names(beta))) || anyNA(names(beta)) || any(!nzchar(names(beta))) ||
       anyDuplicated(names(beta)))
     stop("`coefficients` must be a finite numeric vector with unique nonempty names.", call. = FALSE)
+  if (is.data.frame(model$group_exogamy)) validate_exogamy_table(model$group_exogamy)
   for (field in c("group_exogamy", "delta")) {
     x <- model[[field]]
+    if (field == "group_exogamy" && is.data.frame(x)) next
     values <- if (is_dimension_list(x)) {
       if (is.null(names(x)) || anyNA(names(x)) || any(!nzchar(names(x))) || anyDuplicated(names(x)))
         stop(sprintf("A list `%s` must be named by group dimension, once each.", field), call. = FALSE)
       x
     } else list(x)
-    for (v in values) switch(field, group_exogamy = split_group_exogamy(v), delta = validate_delta(v))
+    for (v in values) {
+      if (is.data.frame(v))
+        stop(paste("A dimension's `group_exogamy` entry is a named vector or NA; give pair tables",
+                   "as the whole `group_exogamy` (with `<group>_x`/`<group>_y` columns)."), call. = FALSE)
+      switch(field, group_exogamy = split_group_exogamy(v), delta = validate_delta(v))
+    }
   }
   # Without group predictors, coefficient names can be checked now.
   if (!any(grepl("^(female|male|same)_.+", vars))) {

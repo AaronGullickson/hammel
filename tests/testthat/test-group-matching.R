@@ -146,13 +146,18 @@ test_that("custom group comparisons work with absent candidate levels", {
 })
 
 test_that("pair tables support numeric and colon-containing group labels", {
-  matching <- create_matching_model(~ same_group, c(same_group = 0.2),
-    group_exogamy = data.frame(female_group = 20, male_group = 10, log_odds = log(2)))
+  matching <- as_internal_matching(create_matching_model(~ same_group, c(same_group = 0.2),
+    group_exogamy = data.frame(group_x = 20, group_y = 10, log_odds = log(2))), c(20, 10))
   prepared <- prepare_matching_model(matching, c(20, 10))
   expect_equal(inspect_group_matching_cpp(c(0, 0), prepared, 0L, 0:1), c(0.2, log(2)))
   expect_equal(calculate_matching_utilities(matching, c(0, 0), 20, c(20, 10)), c(0.2, log(2)))
-  matching <- create_matching_model(~ 1, numeric(), group_exogamy = data.frame(
-    female_group = "A:B", male_group = "C::D", log_odds = -1))
+  matching <- as_internal_matching(create_matching_model(~ 1, numeric(), group_exogamy = data.frame(
+    group_x = "A:B", group_y = "C::D", log_odds = -1)), c("A:B", "C::D"))
   prepared <- prepare_matching_model(matching, c("A:B", "C::D"))
   expect_equal(inspect_group_matching_cpp(c(0, 0), prepared, 0L, 0:1), c(0, -1))
+  # The removed female_group/male_group form points to the table form.
+  expect_error(create_matching_model(~ 1, numeric(), group_exogamy = data.frame(
+    female_group = "A", male_group = "B", log_odds = -1)), "_x` and `<group>_y")
+  expect_error(create_matching_model(~ 1, numeric(), group_exogamy = list(group = data.frame(
+    group_x = "A", group_y = "B", log_odds = -1))), "whole `group_exogamy`")
 })

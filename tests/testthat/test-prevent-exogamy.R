@@ -126,7 +126,7 @@ test_that("existing partners remain and disabled restrictions preserve RNG and h
 
 test_that("restriction tables and missing or empty group populations validate", {
   matching <- as_internal_matching(create_age_gap_matching_model(0, 5, group_exogamy = data.frame(
-    female_group = c("A:B", "A:B"), male_group = c("C::D", "E"), log_odds = c(NA, -1))), c("A:B", "C::D", "E"))
+    group_x = c("A:B", "A:B"), group_y = c("C::D", "E"), log_odds = c(NA, -1))), c("A:B", "C::D", "E"))
   expect_false(matching_group_allowed(matching, "A:B", "C::D"))
   expect_false(matching_group_allowed(matching, "C::D", "A:B"))
   expect_true(matching_group_allowed(matching, "A:B", "E"))

@@ -79,6 +79,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | First public release after milestone 9; immigration and two-sex models post-release | D136 |
 | GitHub milestones and Projects; multiple issues and PRs per milestone | D137 |
 | Matching calibration within separate markets | D138 |
+| `group_exogamy` table form for cross-dimension pair effects (`_x`/`_y` columns) | D139 |
 
 ## Recorded decisions
 
@@ -3044,3 +3045,22 @@ what is given up is only the unreachable population-wide target.
 **Implications:** Results change only for models whose prohibitions split the
 categories into several blocks. A block with more men than women of marrying
 age leaves more men unmatched.
+
+## D139 — Table form of `group_exogamy` for cross-dimension effects (November 6, 2026)
+
+**Status:** User decision, November 6, 2026.
+
+**Decision:** `group_exogamy` takes either the list form (per-dimension named
+vectors or NA, adding across dimensions) or a table form: a data frame with
+`<dim>_x`/`<dim>_y` columns and `log_odds` that fully specifies symmetric
+pair effects over combinations of categories, NA prohibiting. The forms are
+not combined. Each row is one unordered pair; unlisted pairs have no effect;
+rows have no wildcards. The earlier per-dimension pair table
+(`female_group`/`male_group`) is removed.
+
+**Rationale:** One place per model for pair effects. Combining a table with
+per-dimension vectors (each adding to the other) was judged easy to misread;
+the list form remains the shortcut when there are no cross-dimension effects.
+Neutral `_x`/`_y` names keep the symmetry visible. The table is translated
+into the same native effect table, so it is faster than formula group terms,
+which are evaluated in R during draws.

@@ -79,11 +79,49 @@ prohibition always finds the A man. A finite penalty of -10 still selects B
 when B men are the only ones available, whereas prohibiting A:B (`"A:B" = NA`)
 makes the search fail. Without NA entries there is no restriction.
 
-For labels containing colons, accept a data frame with `female_group`,
-`male_group`, and `log_odds`. These column names are retained for compatibility,
-but each row denotes an unordered pair and supplies the effect in both
-directions. Duplicate unordered pairs are errors. Numeric group codes
-are compared through their character representation, as in group-rate lookup.
+Numeric group codes are compared through their character representation, as
+in group-rate lookup.
+
+## Table form: full pair specification (D139)
+
+Since D139 (November 6, 2026) `group_exogamy` takes one of two forms. The
+**list form** above gives per-dimension effects and prohibitions that add
+across dimensions, with no cross-dimension interactions. The **table form**
+is a data frame that fully specifies pair effects over combinations of
+categories, including cross-dimension interactions:
+
+```r
+group_exogamy = data.frame(
+  race_x = c("W", "W", "W"), region_x = c("S", "S", "NE"),
+  race_y = c("B", "W", "B"), region_y = c("S", "NE", "NE"),
+  log_odds = c(-5, NA, -4))
+```
+
+- Columns are `<dim>_x` and `<dim>_y` for each dimension the table uses, plus
+  `log_odds`; no other columns. The neutral `_x`/`_y` names reflect that a row
+  is a pair of people, not a woman and a man.
+- Each row is one unordered pair of combinations, applied in both directions
+  (here W in S with B in S, in either sex order, gets -5). Listing a pair
+  twice, in either order, is an error.
+- `log_odds` is a finite effect, or NA to prohibit the pair. Prohibiting a
+  pair within one combination is an error, as for `"A:A" = NA`.
+- Unlisted pairs have no effect. Every row names a category in each of the
+  table's dimensions; there are no wildcards, so each pair has one value. A
+  table with only `race_x` and `race_y` is a one-dimension table, and also
+  serves labels containing colons.
+- Rows naming categories absent from the population are unused.
+
+The table replaces the list form; the two are not combined. It is
+translated, like the list form, into one effect table over the matching
+combinations before the run, so draws read it natively and calibration,
+separate markets (D138) and cost are unchanged. The earlier pair-table form
+(a `female_group`/`male_group` data frame inside a dimension's list entry) is
+removed; such a data frame is an error pointing to the table form. `delta`
+keeps its per-dimension form.
+
+*Worked example.* With the table above and race {W, B}, region {NE, S}: a
+woman W|S choosing among men W|S 0, B|S -5, W|NE prohibited, B|NE 0
+(unlisted); a woman W|NE: W|S prohibited, B|NE -4, others 0.
 `create_age_gap_matching_model(..., group_exogamy = NULL)` also accepts effects.
 Pair effects require population group identities; missing group data errors
 at execution, including zero-duration calls. Extra pair labels do not create
