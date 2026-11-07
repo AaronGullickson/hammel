@@ -2333,6 +2333,16 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     next_id = std::max(next_id, ids[i]);
     min_birth = std::min(min_birth, births[i]);
   }
+  // Parent positions (-1 unknown or outside the history) and each person's
+  // children, for household moves (D140).
+  std::vector<int> mother_of(people.size(), -1), father_of(people.size(), -1);
+  std::vector<std::vector<int>> kids(people.size());
+  for (int i = 0; i < static_cast<int>(people.size()); ++i) {
+    auto found = NumericVector::is_na(people[i].mother) ? index.end() : index.find(people[i].mother);
+    if (found != index.end()) { mother_of[i] = found->second; kids[found->second].push_back(i); }
+    found = NumericVector::is_na(people[i].father) ? index.end() : index.find(people[i].father);
+    if (found != index.end()) { father_of[i] = found->second; kids[found->second].push_back(i); }
+  }
   // Parity selects fertility cells when schedules are parity-specific; it is
   // tracked always because weight models may use it.
   std::vector<int> parity(people.size(), 0);
@@ -2767,6 +2777,10 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     std::vector<std::vector<TransitionSchedule>> schedules;   // per stratum
     std::vector<double> entry;   // entry time into the current category
     std::string weight_key;
+    // Household moves (D140): strata [count, 2 * count) mirror the schedules
+    // for dependents, with no risk below the dependent age.
+    bool household = false;
+    double dependent_age = 18;
   };
   std::vector<TransitionProcess> tprocs;
   if (transition_input.isNotNull()) {
@@ -2781,7 +2795,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       tp.active = calendar_slice(tp.all, start);
       tp.entry = as<std::vector<double>>(x["entry"]);
       tp.weight_key = "transition_" + std::to_string(t + 1);
-      tp.schedules.resize(tp.spec.count);
+      if (x.containsElementNamed("household")) {
+        tp.household = as<bool>(x["household"]);
+        tp.dependent_age = as<double>(x["dependent_age"]);
+      }
+      tp.schedules.resize(static_cast<size_t>(tp.spec.count) * (tp.household ? 2 : 1));
       if (tp.all.containsElementNamed("time_start"))
         for (const char* column : {"time_start", "time_end"}) {
           NumericVector times = tp.all[column];
@@ -2817,13 +2835,45 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       }
       for (auto& stratum : tp.schedules) for (auto& schedule : stratum)
         std::sort(schedule.bands.begin(), schedule.bands.end(), [](const Band& a, const Band& b) { return a.start < b.start; });
+      // Dependents' mirror strata: the same schedules from the dependent age on.
+      if (tp.household)
+        for (int st = 0; st < tp.spec.count; ++st) {
+          auto& mirror = tp.schedules[st + tp.spec.count];
+          mirror = tp.schedules[st];
+          for (auto& schedule : mirror) {
+            std::vector<Band> kept;
+            for (Band band : schedule.bands) {
+              if (band.end <= tp.dependent_age) continue;
+              band.start = std::max(band.start, tp.dependent_age);
+              kept.push_back(band);
+            }
+            schedule.bands = kept;
+          }
+        }
     }
   };
   load_transitions();
   // Each transition RateCells is slot k of process p: in stratum s it carries
   // the k-th outgoing schedule of s.
   std::vector<std::pair<int, size_t>> transition_slots;
-  std::vector<double> tx_person, tx_time;
+  std::vector<double> tx_person, tx_time, tx_move, tx_initiator;
+  double move_count = 0;
+  bool any_household = false;
+  for (const auto& tp : tprocs) any_household = any_household || tp.household;
+  // A living child's attached parent for household moves: the living mother,
+  // otherwise the living father (-1: independent).
+  auto attached_parent = [&](int c) {
+    const int m = mother_of[c], f = father_of[c];
+    if (m >= 0 && NumericVector::is_na(people[m].died)) return m;
+    if (f >= 0 && NumericVector::is_na(people[f].died)) return f;
+    return -1;
+  };
+  // A dependent: alive, unpartnered, below the process's dependent age and
+  // attached to a living parent.
+  auto is_dependent = [&](const TransitionProcess& tp, int c, double now) {
+    return NumericVector::is_na(people[c].died) && current_partner[c] < 0 &&
+      people[c].born + tp.dependent_age > now && attached_parent(c) >= 0;
+  };
   std::vector<int> tx_dim, tx_origin, tx_dest;
   // Fertility type labels: overall, unpartnered/partnered, or three types.
   std::vector<std::string> fertility_types;
@@ -3174,10 +3224,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
           const TransitionProcess& tp = tprocs[at.first];
           const auto& x = tp.schedules[stratum][at.second];
           const auto& labels = dim_labels[tp.dim];
-          const int origin = (stratum / tp.spec.strides[tp.own]) % static_cast<int>(labels.size());
+          const int base = stratum % tp.spec.count;   // dependents' mirror strata
+          const int origin = (base / tp.spec.strides[tp.own]) % static_cast<int>(labels.size());
           bin["origin"] = labels[origin];
           bin["destination"] = labels[x.dest];
-          strata_bin(bin, tp.spec, stratum, false, tp.dim);
+          strata_bin(bin, tp.spec, base, false, tp.dim);
           bin["sex"] = Rf_ScalarString(x.sex < 0 ? NA_STRING : Rf_mkChar(x.sex ? "f" : "m"));
           bin["union_type"] = Rf_ScalarString(x.type.empty() ? NA_STRING : Rf_mkChar(x.type.c_str()));
           duration = tp.duration; all = tp.all;
@@ -3493,9 +3544,13 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         const auto& at = transition_slots[f];
         const TransitionProcess& tp = tprocs[at.first];
         const size_t k = at.second;
-        const int stratum = person_stratum(tp.spec, i);
+        // Household moves: one clock per household, carried by the woman in a
+        // union; dependents use the mirror strata (no risk before the
+        // dependent age).
+        const int stratum = person_stratum(tp.spec, i) +
+          (tp.household && is_dependent(tp, i, now) ? tp.spec.count : 0);
         const auto& outgoing = tp.schedules[stratum];
-        bool at_risk = alive && k < outgoing.size();
+        bool at_risk = alive && k < outgoing.size() && !(tp.household && !p.female && partner >= 0);
         if (at_risk) {
           const auto& x = outgoing[k];
           if (x.sex >= 0 && x.sex != (p.female ? 1 : 0)) at_risk = false;
@@ -3661,21 +3716,40 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     if (type == EventType::transition) {
       const auto& at = transition_slots[fired.slot];
       TransitionProcess& tp = tprocs[at.first];
-      const size_t cell = static_cast<size_t>(i) * dimensions + tp.dim;
-      const int origin = cats[cell];
       const int destination = tp.schedules[person_stratum(tp.spec, i)][at.second].dest;
-      if (destination == origin) stop("Invalid transition destination.");
-      const int partner = current_partner[i];
-      if (people[i].female) remove_counted_woman(i); else remove_male(i);
-      tx_person.push_back(people[i].id); tx_time.push_back(now); tx_dim.push_back(tp.dim);
-      tx_origin.push_back(origin); tx_dest.push_back(destination);
-      cats[cell] = destination;
-      if (matching_dim[tp.dim]) people[i].group = person_stratum(matching_spec, i);
-      tp.entry[i] = now;
-      if (people[i].female) add_counted_woman(i, now); else add_male(i);
-      // A move changes the union's group pair and the partner's partner group.
-      refresh_person(i, now);
-      if (partner >= 0) refresh_person(partner, now);
+      if (destination == cats[static_cast<size_t>(i) * dimensions + tp.dim]) stop("Invalid transition destination.");
+      // The moving party: the mover, and for household moves (D140) their
+      // partner and the dependents attached to either of them.
+      std::vector<int> party = {i};
+      if (tp.household) {
+        if (current_partner[i] >= 0) party.push_back(current_partner[i]);
+        const size_t heads = party.size();
+        for (size_t h = 0; h < heads; ++h)
+          for (int c : kids[party[h]])
+            if (is_dependent(tp, c, now) && attached_parent(c) == party[h]) party.push_back(c);
+      }
+      ++move_count;
+      std::vector<int> moved;
+      for (int m : party) {
+        const size_t cell = static_cast<size_t>(m) * dimensions + tp.dim;
+        const int origin = cats[cell];
+        if (origin == destination) continue;   // already there
+        if (people[m].female) remove_counted_woman(m); else remove_male(m);
+        tx_person.push_back(people[m].id); tx_time.push_back(now); tx_dim.push_back(tp.dim);
+        tx_origin.push_back(origin); tx_dest.push_back(destination);
+        tx_move.push_back(move_count); tx_initiator.push_back(people[i].id);
+        cats[cell] = destination;
+        if (matching_dim[tp.dim]) people[m].group = person_stratum(matching_spec, m);
+        tp.entry[m] = now;
+        if (people[m].female) add_counted_woman(m, now); else add_male(m);
+        moved.push_back(m);
+      }
+      // A move changes union strata and the partner's partner variables.
+      for (int m : moved) {
+        const int partner = current_partner[m];
+        refresh_person(m, now);
+        if (partner >= 0) refresh_person(partner, now);
+      }
     } else if (type == EventType::death) {
       // Retain the person's history, record death, and leave every process.
       people[i].died = now;
@@ -3701,6 +3775,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       refresh_person(i, now);
       for (int survivor : widowed) refresh_person(survivor, now);
       for (int u : ended) refresh_union(u, now);
+      // Children may now be attached to the other parent, or independent.
+      if (any_household)
+        for (int c : kids[i]) if (NumericVector::is_na(people[c].died)) refresh_person(c, now);
       ++death_count;
     } else if (type == EventType::dissolution) {
       const int partner = current_partner[i];
@@ -3772,6 +3849,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       int child = static_cast<int>(people.size());
       people.push_back({++next_id, now, NA_REAL, mother, father,
                         -std::numeric_limits<double>::infinity(), female, 0});
+      mother_of.push_back(i);
+      father_of.push_back(father_position);
+      kids.emplace_back();
+      kids[i].push_back(child);
+      if (father_position >= 0) kids[father_position].push_back(child);
       parity.push_back(0);
       if (heterogeneous) fertility_weights.push_back(female ?
         inherit_fertility_weight(fertility_weights[i], fertility_variance, fertility_alpha) : NA_REAL);
@@ -3964,7 +4046,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
     _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
     _["death_time"] = out_death, _["mother_id"] = out_mother, _["father_id"] = out_father),
     _["transitions"] = DataFrame::create(_["person_id"] = wrap(tx_person), _["time"] = wrap(tx_time),
-      _["dimension"] = wrap(tx_dim), _["origin"] = wrap(tx_origin), _["destination"] = wrap(tx_dest)),
+      _["dimension"] = wrap(tx_dim), _["origin"] = wrap(tx_origin), _["destination"] = wrap(tx_dest),
+      _["move_id"] = wrap(tx_move), _["initiator_id"] = wrap(tx_initiator)),
     _["groups"] = out_group, _["categories"] = out_categories, _["unions"] = out_unions,
     _["ancestry"] = out_ancestry,
     _["births"] = birth_count, _["deaths"] = death_count,

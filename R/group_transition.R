@@ -33,15 +33,27 @@
 #' @param weights NULL (default) for unweighted selection, or a
 #'   [create_weight_model()] using person variables and `destination`, which
 #'   chooses who in a cell moves without changing the cell's input rate.
+#' @param household `NULL` (default): each person moves individually. A
+#'   [household()]: a move carries the mover's household (D140). One clock
+#'   per household: a woman in a union carries it, while her partner and
+#'   dependents have none; everyone else has their own. When a carrier moves,
+#'   their partner and the dependents attached to either of them move to the
+#'   same destination, from wherever they are (members already there stay).
+#'   Requires age bands.
 #' @param model A `hammel_model`.
 #' @return `group_transition()` returns a process with a rates tibble;
 #'   `set_group_transition()` returns the updated model. Grouped simulation
 #'   output always includes a `transitions` tibble with `person_id`, `time`,
-#'   `group` (the dimension), `origin`, and `destination`, including when empty.
+#'   `group` (the dimension), `origin`, `destination`, `move_id` (shared by the
+#'   rows of one move) and `initiator_id` (the person whose clock fired),
+#'   including when empty.
 #' @export
-group_transition <- function(rates, group = NULL, weights = NULL) {
+group_transition <- function(rates, group = NULL, weights = NULL, household = NULL) {
   process <- new_rate_process("group_transition", rates)
   process$group <- check_transition_group(group)
+  if (!is.null(household) && !inherits(household, "hammel_household"))
+    stop("`household` must be NULL or created with household().", call. = FALSE)
+  process["household"] <- list(household)
   validate_group_transition(process)
   validate_process_weights(weights, "transition")
   warn_cancelled_weight_terms(weights, weight_strata("transition", rates, group), "group transition")
@@ -51,8 +63,36 @@ group_transition <- function(rates, group = NULL, weights = NULL) {
 
 #' @rdname group_transition
 #' @export
-set_group_transition <- function(model, rates, group = NULL, weights = NULL) {
-  set_process(model, group_transition(rates, group = group, weights = weights))
+set_group_transition <- function(model, rates, group = NULL, weights = NULL, household = NULL) {
+  set_process(model, group_transition(rates, group = group, weights = weights, household = household))
+}
+
+#' Define who moves together in household moves
+#'
+#' A household rule describes a household for [set_group_transition()] (D140).
+#' There is no household identifier or residence record: when someone moves,
+#' the moving party is assembled from current union and parent links. A
+#' person's household is their current partner (married or cohabiting) and the
+#' dependents attached to either of them. A dependent is alive, unpartnered,
+#' younger than `age_independence`, and attached to their mother while she is
+#' alive, otherwise to their father while he is alive. People with neither
+#' parent alive are independent; grandparents, stepparents and other relatives
+#' do not take dependents. A person under `age_independence` who leaves a union is
+#' a dependent again if a parent is alive.
+#'
+#' @param age_independence Age in years at which a child stops being a
+#'   dependent: below it, an unpartnered child with a living parent is a
+#'   dependent. Defaults to 18.
+#' @return A `hammel_household`, to pass as `household` to
+#'   [set_group_transition()]. Each transition process may use its own rule.
+#' @export
+#' @examples
+#' household(age_independence = 18)
+household <- function(age_independence = 18) {
+  if (!is.numeric(age_independence) || length(age_independence) != 1L || !is.finite(age_independence) ||
+      age_independence < 0)
+    stop("`age_independence` must be a finite nonnegative number of years.", call. = FALSE)
+  structure(list(age_independence = as.numeric(age_independence)), class = "hammel_household")
 }
 
 check_transition_group <- function(group) {
@@ -127,6 +167,8 @@ validate_group_transition <- function(process) {
   check_columns(r, c("origin", "destination", "rate"), "rates")
   age <- all(c("age_start", "age_end") %in% names(r))
   dur <- all(c("dur_start", "dur_end") %in% names(r))
+  if (!is.null(process$household) && dur)
+    stop("Household moves need age bands: dependents reach their own clock at a set age.", call. = FALSE)
   if (!nrow(r) || age == dur ||
       any(c("time_start", "time_end", "union_status", "marital_status") %in% names(r)) ||
       (age && any(c("dur_start", "dur_end") %in% names(r))) ||
@@ -162,7 +204,8 @@ validate_group_transition <- function(process) {
 
 empty_transitions <- function() {
   tibble::tibble(person_id = numeric(), time = numeric(), group = character(),
-                 origin = character(), destination = character())
+                 origin = character(), destination = character(),
+                 move_id = numeric(), initiator_id = numeric())
 }
 
 # Grouped populations always carry a transitions tibble. A history without a
@@ -182,6 +225,9 @@ normalize_population_transitions <- function(population) {
   }
   for (column in intersect(c("group", "origin", "destination"), names(tx)))
     if (is.factor(tx[[column]]) || is.numeric(tx[[column]])) tx[[column]] <- as.character(tx[[column]])
+  # Move identifiers (D140); unknown for supplied rows without them.
+  for (column in c("move_id", "initiator_id"))
+    if (!column %in% names(tx)) tx[[column]] <- rep(NA_real_, nrow(tx))
   population$transitions <- tx
   population
 }
@@ -204,6 +250,8 @@ validate_transition_history <- function(population) {
   check_columns(tx, c("person_id", "time", "origin", "destination"), "transitions")
   check_numeric_column(tx$person_id, "transitions$person_id", id = TRUE)
   check_numeric_column(tx$time, "transitions$time")
+  for (column in intersect(c("move_id", "initiator_id"), names(tx)))
+    check_numeric_column(tx[[column]], paste0("transitions$", column), missing = TRUE)
   for (col in c("origin", "destination")) check_groups(data.frame(group = tx[[col]]), col)
   if (!nrow(tx)) return(invisible(population))
   unknown <- setdiff(unique(as.character(tx$group)), names(population$groups))

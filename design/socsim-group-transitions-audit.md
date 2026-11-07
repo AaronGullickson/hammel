@@ -9,6 +9,12 @@ was executed for this audit; source defects and their possible consequences
 below have not been measured in population experiments. No Hammel transition
 semantics or API are selected by these findings.
 
+The November 6 [focused household audit](socsim-household-transitions-audit.md)
+rechecks membership in this same source and adds 13 executable fixtures using
+the unmodified selection functions. These confirm function-level membership,
+including the child-age defect; they do not test full simulation behavior,
+queue effects or population-level migration outcomes.
+
 Pinned sources (line numbers below refer to this commit):
 
 - [Event scheduling](https://github.com/MPIDR/rsocsim/blob/125450cff968bb3ff762fa99d4c926a8136062a2/src/src/events.cpp)

@@ -3,10 +3,9 @@
 Accepted milestone 6 contract, October 30, 2026 (D116). Implementation follows
 D106–D115 and the user's October 30 request. The accepted
 [report](../validation/milestone6.qmd) was undergoing its final render at
-acceptance; preserve all active intermediates. Household moves are deferred to
-[milestone 9, multiple group columns](roadmap.md#milestone-9-multiple-group-columns),
-which may include regions/internal-migration applications (D114/D121/D131), and are
-excluded here.
+acceptance; preserve all active intermediates. Household moves, deferred by
+D114 and excluded from milestone 6, were added in milestone 9 (D140); see
+[household moves](#household-moves-d140) below.
 
 Milestone 9 (D134, stage 3) made transitions per group dimension; this page
 describes the current behavior.
@@ -121,6 +120,94 @@ result$transitions
 The model must already contain grouped population, mortality, fertility and
 union-formation specifications. Replacing age columns with `dur_start` and
 `dur_end` selects duration for the whole transition table.
+
+## Household moves (D140)
+
+*User decisions, November 6, 2026; informed by the
+[SOCSIM household audit](socsim-household-transitions-audit.md).*
+**Status: implemented November 6, 2026.**
+
+`set_group_transition(model, rates, group, weights, household = NULL)`, where
+`household` is `NULL` (each person moves individually, the default) or a rule
+from `household(age_independence = 18)`. With a rule, a move in that
+process's dimension carries the mover's household along. The rule is its own
+object so it can serve other features later; each process takes its own. Each transition process has
+its own flag, so region moves can be household moves while other dimensions'
+transitions stay individual. There is no household identifier or residence
+record: the moving party is assembled from current union and parent links at
+the move, as in SOCSIM, with the rules below in place of SOCSIM's.
+
+**Dependents.** A person is a dependent while they are alive, younger than
+`age_independence` (default 18, in years), not in a union (marriage or
+cohabitation), and have a living parent to be attached to. A dependent is
+attached to their mother while she is alive, otherwise to their father while
+he is alive. A dependent with neither parent alive is independent; there is no
+attachment to grandparents, stepparents or other relatives. A person under
+the cutoff who leaves a union is a dependent again if a parent is alive.
+
+**Who carries a clock (one per household).** In a household process:
+
+- a woman in a union carries the household's clock, with her own
+  characteristics (age, union type, other dimensions) selecting her schedule;
+- a man in a union has no clock while the union lasts;
+- dependents have no clock;
+- everyone else, including single adults, adults past the cutoff living with
+  a parent, and independent people under the cutoff, carries their own clock.
+
+So each person's move rate is the input rate at the carrier's age, and
+observed individual migration rates can be used as input without double
+counting moves by partners and children. Children move at their mother's (or
+father's) rate, not at a rate for their own age. This holds when households
+live together: a partner or child already in the destination does not move, so
+in split households (for example, matching that ignores region, or newborns
+taking a random parent's region) followers move less often than the input
+rate. Keeping households together, with a region prohibition in matching and
+mothers passing on their region, gives every person the input rate (checked:
+with a constant 0.05, women, men and children of every age moved at
+0.049–0.052; with region ignored in matching and random-parent inheritance,
+partnered men aged 18–40 moved at 0.039).
+
+**The moving party.** When a carrier moves from origin to destination in the
+dimension, the party is the carrier, their partner (if any), and the
+dependents attached to either of them. Each member whose category in that
+dimension differs from the destination moves there, including a partner or
+child in a different origin; members already at the destination stay and are
+not recorded. Each mover's time in the dimension restarts at the move; ages,
+union durations, parity, birth spacing and ancestry are unchanged. All members
+are updated at once before any other event: rate cells, fertility cells,
+matching pools and calibration, and union strata.
+
+**Reaching the cutoff.** A dependent has no clock until `age_independence`; then
+they have their own clock at the ordinary rate for their age. Becoming a
+dependent or independent at other times follows births, deaths and union
+changes.
+
+**Records.** The transitions history gains `move_id` (shared by all rows of
+one move) and `initiator_id` (the carrier who moved). Individual processes
+fill them too (one row per move, initiator = the person). Supplied histories
+may omit them; they are then NA.
+
+**Limitation.** Household processes require age bands: with duration bands
+there is no shared time at which dependents reach their own clock.
+`calculate_transition_rates()` counts every individual move (followers
+included) over each person's exposure, so it measures individual rates; moves
+counted once per household are the rows with `person_id == initiator_id`.
+
+**Worked examples** (one region dimension; household process; ages in years):
+
+1. A woman W (34) and her husband H (36), their child C (10), and H's son S
+   (12) by his first wife, who died. W carries the clock; H, C and S have
+   none. W moves N to S: four rows with one `move_id` and `initiator_id` W.
+2. W's daughter D (19, unpartnered) lives with them: she is past the cutoff,
+   carries her own clock, and stays when W moves.
+3. C turns 18: from then C carries a clock at the input rate for 18, still in
+   the region where the household left them.
+4. H already lives in S (the couple formed across regions): W moves N to S;
+   C and S move, H does not, so three rows.
+5. W and H separate: H carries his own clock again; C stays attached to W and
+   S to H.
+6. W dies: C is attached to H (C's father). If H also dies, C and S are
+   independent and carry their own clocks.
 
 ## Observed transition rates
 

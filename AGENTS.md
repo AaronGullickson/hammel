@@ -137,9 +137,10 @@ the user's agreement.
   intermediates until rendering finishes, including milestone 5's active final
   render at closeout and milestone 6's active final render. Parity, fertility
   heterogeneity and individual group transitions are implemented and accepted.
-  See `design/group-transitions.md`; household moves remain deferred (D114),
-  with regional applications retained under milestone 9's multiple
-  group columns (D121, D131). Calendar-time rates follow `design/time-varying-rates.md`
+  See `design/group-transitions.md`; household moves, deferred by D114, are
+  implemented in milestone 9 as `household()` on a transition process
+  (D140), with regional applications under multiple group columns (D121,
+  D131). Calendar-time rates follow `design/time-varying-rates.md`
   (D118); matching and inheritance model schedules are implemented under D123. Most categorical characteristics should
   use groups; multiple group dimensions follow D134.
 - Use `devtools::test()` for the testthat suite. Live database tests require

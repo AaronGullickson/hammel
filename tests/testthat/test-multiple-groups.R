@@ -256,7 +256,10 @@ test_that("each dimension has its own transition process, history and duration",
   expect_identical(replaced$processes$group_transition$region, model$processes$group_transition$region)
   out <- simulate(model, 4, seed = 21)
   tx <- out$transitions
-  expect_named(tx, c("person_id", "time", "group", "origin", "destination"))
+  expect_named(tx, c("person_id", "time", "group", "origin", "destination", "move_id", "initiator_id"))
+  # Individual moves: one row per move, initiated by the mover.
+  expect_identical(tx$initiator_id, tx$person_id)
+  expect_false(anyDuplicated(tx$move_id) > 0)
   expect_setequal(unique(tx$group), c("race", "region"))
   expect_true(all(tx$origin[tx$group == "race"] %in% c("A", "B")))
   expect_true(all(tx$origin[tx$group == "region"] %in% c("N", "S")))
@@ -500,7 +503,8 @@ test_that("person-level rates split by several dimensions match a combined colum
   # A same-instant move in both dimensions.
   p <- out$persons[out$persons$birth_time < 0 & is.na(out$persons$death_time), ][1, ]
   extra <- data.frame(person_id = p$person_id, time = 3.5, group = c("race", "region"),
-    origin = c(p$race, p$region), destination = c(setdiff(c("A", "B"), p$race), setdiff(c("N", "S"), p$region)))
+    origin = c(p$race, p$region), destination = c(setdiff(c("A", "B"), p$race), setdiff(c("N", "S"), p$region)),
+    move_id = NA_real_, initiator_id = NA_real_)
   out$transitions <- rbind(out$transitions, extra)
   out$persons$race[out$persons$person_id == p$person_id] <- extra$destination[1]
   out$persons$region[out$persons$person_id == p$person_id] <- extra$destination[2]

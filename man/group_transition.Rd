@@ -5,9 +5,15 @@
 \alias{set_group_transition}
 \title{Specify individual group transitions}
 \usage{
-group_transition(rates, group = NULL, weights = NULL)
+group_transition(rates, group = NULL, weights = NULL, household = NULL)
 
-set_group_transition(model, rates, group = NULL, weights = NULL)
+set_group_transition(
+  model,
+  rates,
+  group = NULL,
+  weights = NULL,
+  household = NULL
+)
 }
 \arguments{
 \item{rates}{A nonempty data frame requiring \code{origin}, \code{destination},
@@ -34,13 +40,23 @@ dimension, and is an error when several are declared.}
 \code{\link[=create_weight_model]{create_weight_model()}} using person variables and \code{destination}, which
 chooses who in a cell moves without changing the cell's input rate.}
 
+\item{household}{\code{NULL} (default): each person moves individually. A
+\code{\link[=household]{household()}}: a move carries the mover's household (D140). One clock
+per household: a woman in a union carries it, while her partner and
+dependents have none; everyone else has their own. When a carrier moves,
+their partner and the dependents attached to either of them move to the
+same destination, from wherever they are (members already there stay).
+Requires age bands.}
+
 \item{model}{A \code{hammel_model}.}
 }
 \value{
 \code{group_transition()} returns a process with a rates tibble;
 \code{set_group_transition()} returns the updated model. Grouped simulation
 output always includes a \code{transitions} tibble with \code{person_id}, \code{time},
-\code{group} (the dimension), \code{origin}, and \code{destination}, including when empty.
+\code{group} (the dimension), \code{origin}, \code{destination}, \code{move_id} (shared by the
+rows of one move) and \code{initiator_id} (the person whose clock fired),
+including when empty.
 }
 \description{
 Construct or attach competing origin-to-destination hazards for one group

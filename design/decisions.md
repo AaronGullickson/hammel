@@ -80,6 +80,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | GitHub milestones and Projects; multiple issues and PRs per milestone | D137 |
 | Matching calibration within separate markets | D138 |
 | `group_exogamy` table form for cross-dimension pair effects (`_x`/`_y` columns) | D139 |
+| Household moves for group transitions | D140 |
 
 ## Recorded decisions
 
@@ -3064,3 +3065,32 @@ the list form remains the shortcut when there are no cross-dimension effects.
 Neutral `_x`/`_y` names keep the symmetry visible. The table is translated
 into the same native effect table, so it is faster than formula group terms,
 which are evaluated in R during draws.
+
+## D140 — Household moves (November 6, 2026)
+
+**Status:** User decision, November 6, 2026. Specified in
+[group transitions](group-transitions.md#household-moves-d140); implemented
+November 6, 2026, with the rule as its own object (`household()`, per
+the user) and the cutoff named `age_independence`.
+
+**Decision:** A household rule (`household = household(age_independence = 18)` on
+`set_group_transition()`, `NULL` by default for individual moves; each process
+takes its own) makes a move carry the mover's partner and dependents. Dependents are living,
+unpartnered people under `age_independence` (user-settable, default 18) attached
+to their mother while she lives, otherwise to their father; people with
+neither parent alive are independent (no grandparents or stepparents). One
+clock per household: the woman in a union carries it, a partnered man and
+dependents have none, everyone else has their own. The moving party is the
+carrier, their partner and the dependents of either. The transitions history
+gains `move_id` and `initiator_id`.
+
+**Rationale:** Household moves were deferred by D114 with open questions.
+SOCSIM's assembly (audited November 6, 2026) has no household entity, lets
+every member initiate (so input rates are initiation rates and moves are
+double counted relative to observed individual rates), uses different rules
+for male and female movers, and has a defective child-age test. One clock per
+household lets observed individual rates be used as input; one attachment
+rule (mother, then father) treats children consistently.
+
+**Supersedes:** the deferral in D114 for transitions; household moves remain
+unavailable for other processes.

@@ -49,7 +49,7 @@ test_that("grouped outputs always have typed histories, including zero and empty
     model <- transition_model(n)
     out <- simulate(model, 0, seed = 1)
     expect_s3_class(out$transitions, "tbl_df")
-    expect_identical(names(out$transitions), c("person_id", "time", "group", "origin", "destination"))
+    expect_identical(names(out$transitions), c("person_id", "time", "group", "origin", "destination", "move_id", "initiator_id"))
     expect_equal(nrow(out$transitions), 0)
     expect_type(out$transitions$origin, "character")
     expect_s3_class(simulate(model, 1, seed = 1)$transitions, "tbl_df")

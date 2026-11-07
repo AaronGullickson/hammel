@@ -11,8 +11,8 @@ rates (D118), cohabitation probabilities (D122), and matching/inheritance model
 schedules (D123).** See the [validation report](../validation/milestone7.qmd)
 and [rendered assessment](../validation/milestone7.html).
 See the [rate contract](time-varying-rates.md) and
-[group-transition contract](group-transitions.md). Household moves are deferred to
-milestone 9's multiple-group/regions applications (D114/D121/D131).
+[group-transition contract](group-transitions.md). Household moves, deferred by
+D114, are implemented in milestone 9 (D140).
 **Milestone 8 is accepted complete, November 5, 2026 (D130): cell scheduling
 for every rate process with one clock per process (D128) and weight models
 (D129).** See the [specification](binned-group-hazards.md) and the
@@ -75,6 +75,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [SOCSIM dissolution and remarriage](socsim-dissolution-audit.md) | Pinned static divorce clocks, remarriage schedules, state updates, and cohabitation findings |
 | [SOCSIM cohabitation](socsim-cohabitation-audit.md) | Pinned static formation/type assignment, conversion, breakup, legal history and output trace |
 | [SOCSIM group transitions](socsim-group-transitions-audit.md) | Pinned static transition clocks, household moves, histories, rescheduling and source caveats |
+| [SOCSIM household membership](socsim-household-transitions-audit.md) | Initiator-specific family-following rules, child-age defect, rate interpretation and 13 executable selection fixtures |
 
 Git retains earlier specifications and verification records; do not keep
 snapshot copies in the docs tree. The decision log records rationale and

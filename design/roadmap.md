@@ -28,8 +28,8 @@ or an unselected public API.
 Milestone 6's scope is individual group transitions. Household moves are
 deferred beyond milestone 6 (D114, superseding D109). D121 removes the separate
 regions milestone and places multiple group columns at milestone 9 (D131);
-regions/internal migration and household moves remain possible applications
-requiring their own specifications. D106–D108 select annual hazards, directed competing
+regions/internal migration are applications of multiple group columns, and
+household moves are implemented for group transitions in milestone 9 (D140). D106–D108 select annual hazards, directed competing
 age- or duration-specific schedules with optional strata,
 and no transition-count target adjustment. The implemented contract is in [group transitions](group-transitions.md).
 D110 requires `group_origin`, `group_dest`, `rate`, and one common age or
@@ -260,6 +260,12 @@ direction; it does not implement or settle any geographic or household behavior.
 The following D114 questions remain relevant to a future regional application.
 
 ### Household moves: deferred design questions (D114)
+
+*Resolved for group transitions by D140 (November 6, 2026): see
+[household moves](group-transitions.md#household-moves-d140). The questions
+below are retained as the record of what that specification answers; any
+household rules beyond D140 (grandparents, stepparent custody, coresidence)
+remain open.*
 
 D114 deferred household moves from milestone 6 to the former regions milestone.
 D121 removes that standalone milestone while retaining multiple group columns

@@ -308,8 +308,10 @@ simulate <- function(model, years, seed = NULL) {
       i <- match(names(latest), as.character(population$persons$person_id))
       entry[i] <- as.numeric(latest)
     }
+    rule <- transition_list[[d]]$household
     list(dimension = match(d, dimensions) - 1L, rates = rates, spec = prepared$spec,
-         entry = as.numeric(entry))
+         entry = as.numeric(entry), household = !is.null(rule),
+         dependent_age = if (is.null(rule)) 0 else rule$age_independence)
   })
   transition_rates <- if (length(transition_input)) transition_input else NULL
   weight_models <- list(mortality = model$processes$mortality$weights,
@@ -409,6 +411,10 @@ simulate <- function(model, years, seed = NULL) {
         group = as.character(dimensions[d]),
         origin = vapply(seq_along(d), function(k) labels[[d[k]]][tx$origin[k] + 1L], ""),
         destination = vapply(seq_along(d), function(k) labels[[d[k]]][tx$destination[k] + 1L], ""))
+      # Move identifiers continue after any already in the history.
+      previous <- suppressWarnings(max(c(0, population$transitions$move_id), na.rm = TRUE))
+      new$move_id <- tx$move_id + previous
+      new$initiator_id <- tx$initiator_id
       result$transitions <- tibble::as_tibble(rbind(population$transitions, new))
     }
     if (length(tracked)) {
