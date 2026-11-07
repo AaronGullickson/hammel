@@ -12,8 +12,9 @@ get_parent_info(population)
 }
 \value{
 A separate tibble containing all person columns plus \code{age_mother}
-and \code{age_father}, measured at that person's birth. When groups are present,
-also \code{group_mother} and \code{group_father}. Empty populations retain the
+and \code{age_father}, measured at that person's birth, and for each declared
+group dimension \verb{<group>_mother} and \verb{<group>_father} (such as
+\code{race_mother}). Empty populations retain the
 enriched column types.
 }
 \description{
@@ -24,8 +25,9 @@ population is not modified and no known endpoint is required.
 }
 \details{
 Ages are in continuous years: the child's birth time minus the parent's birth
-time. Unknown parents yield missing ages and groups. Group fields are omitted
-unless a group dimension is declared; otherwise its type is preserved. These
+time. Unknown parents yield missing ages and groups. Each declared group
+dimension adds the parents' recorded categories, with their type preserved;
+undeclared columns are not added. These
 are recorded identities, not reconstructions of historical group transitions.
 Existing columns that conflict with the added fields cause an error.
 }

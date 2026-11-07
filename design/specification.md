@@ -265,7 +265,8 @@ and leaves the population unchanged. See [demographic analysis](demographic-anal
 
 `get_parent_info(population)` returns a separate tibble preserving all persons
 and their columns, adding `age_mother` and `age_father` in years at each
-person's birth, plus `group_mother` and `group_father` when groups are recorded.
+person's birth, plus `<group>_mother` and `<group>_father` for each declared
+group dimension (such as `race_mother`).
 Parents are matched by ID, including deceased parents; unknown parents yield
 missing fields. Row order and group types are preserved, conflicting column
 names are rejected, and no endpoint is required. For example, a person born

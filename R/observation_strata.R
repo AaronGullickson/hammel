@@ -270,14 +270,16 @@ observation_alias <- function(population, by, suffixes = "", extra = character()
   view["ancestry"] <- list(NULL)
   view[[".hammel_combined"]] <- list(values = seq_len(combined$count) - 1L, history = combined$history)
   # Internal `by`: one combined column per suffix, where its first dimension was.
+  # Positions, not names, so a dimension named `group` is replaced correctly.
   internal <- by
+  drop <- rep(FALSE, length(by))
   for (k in seq_along(suffixes)) {
-    names_k <- paste0(requests[[k]], suffixes[k])
-    if (!length(names_k)) next
-    first <- min(match(names_k, internal))
-    internal[first] <- paste0("group", suffixes[k])
-    internal <- internal[!internal %in% names_k]
+    hits <- which(by %in% paste0(requests[[k]], suffixes[k]))
+    if (!length(hits)) next
+    internal[hits[1]] <- paste0("group", suffixes[k])
+    drop[hits[-1]] <- TRUE
   }
+  internal <- internal[!drop]
   list(population = view, by = internal, rename = character(), external = by, dims = dims,
        suffixes = suffixes, requests = requests,
        combined = combined, extra = extra)

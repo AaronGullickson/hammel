@@ -938,3 +938,40 @@ test_that("group_exogamy tables are validated", {
     group_exogamy = data.frame(race_x = c("A", "Z"), race_y = c("B", "A"), log_odds = c(-1, -9))))
   expect_equal(x$prepared$pair_offsets[1, ], c(0, -1))
 })
+
+test_that("review regressions: absent-category schedules, dimensions named group, parent info", {
+  base <- function(pop) hammel_model() |> set_population(pop) |>
+    set_fertility(data.frame(age_start = 15, age_end = 45, rate = .1)) |>
+    set_union_formation("on_demand", kinship_generations = 0)
+  # Rows naming only categories the population lacks still leave its
+  # categories without schedules (with inferred categories).
+  set.seed(1)
+  pop <- create_baseline_population(200, groups = list(race = c(A = 1)))
+  pop$groups$race["categories"] <- list(NULL)
+  model <- set_mortality(base(pop), data.frame(sex = c("m", "f"), race = "B", age_start = 0, age_end = Inf,
+                                               rate = 1e8))
+  expect_error(simulate(model, 1, seed = 2), "missing schedules for group\\(s\\): A")
+  calendar <- data.frame(sex = c("m", "f", "m", "f"), race = c("A", "A", "B", "B"), age_start = 0,
+    age_end = Inf, rate = .01, time_start = c(-10, -10, 1, 1), time_end = c(1, 1, Inf, Inf))
+  expect_error(simulate(set_mortality(base(pop), calendar), 2, seed = 2), "missing schedules.*A")
+  # A dimension named `group` alongside another.
+  set.seed(1)
+  pop <- create_baseline_population(200, groups = list(group = c(A = .5, B = .5), region = c(N = .5, S = .5)))
+  sizes <- calculate_population_size(pop, 0, by = c("group", "region"))
+  expect_named(sizes, c("time", "group", "region", "population"))
+  expect_equal(sum(sizes$population), 200)
+  expect_named(calculate_population_size(pop, 0, by = c("region", "sex", "group")),
+               c("time", "region", "sex", "group", "population"))
+  # Parent information for every declared dimension, ignoring undeclared columns.
+  set.seed(1)
+  pop <- create_baseline_population(300, groups = list(race = c(A = .5, B = .5), region = c(N = .5, S = .5)))
+  pop$persons$group <- "undeclared"
+  out <- simulate(set_mortality(base(pop), data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .01)),
+                  3, seed = 3)
+  expect_no_warning(info <- get_parent_info(out))
+  expect_true(all(c("race_mother", "race_father", "region_mother", "region_father") %in% names(info)))
+  expect_false(any(c("group_mother", "group_father") %in% names(info)))
+  kids <- !is.na(info$mother_id)
+  expect_gt(sum(kids), 10)
+  expect_identical(info$race_mother[kids], out$persons$race[match(info$mother_id[kids], out$persons$person_id)])
+})

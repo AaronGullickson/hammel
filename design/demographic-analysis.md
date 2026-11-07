@@ -343,7 +343,8 @@ behavior; default Lexis summaries use all female exposure, while
 
 `get_parent_info(population)` enriches the full persons table with
 `age_mother` and `age_father` at each person's birth, in years, and
-`group_mother` and `group_father` when the population records groups.
+`<group>_mother` and `<group>_father` for each declared dimension (such as
+`race_mother`; `group_mother` for a dimension named `group`).
 Parents are matched by ID, including deceased parents. Unknown parents yield
 missing values; founder rows remain present. For example, birth in 2000.5
 and maternal birth in 1975.25 give `age_mother = 25.25`.

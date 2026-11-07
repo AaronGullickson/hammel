@@ -93,9 +93,9 @@ model <- set_group_transition(model, migration, group = "region")
 
 Duration in a transition schedule counts from entering the current category of that dimension only, so moves in other dimensions do not reset it.
 
-## Matching within one dimension
+## Matching by dimension
 
-Matching group effects are named by dimension. Pair effects, restrictions and `delta` take a list keyed by dimension, and formula predictors are written `female_race`, `male_race` and `same_race`. For now, one dimension can carry matching effects (here race), and every matching model in a run must use the same one. Region has no matching effect, so partners' regions match only as often as availability makes them.
+Matching group effects are named by dimension. Pair effects, prohibitions (NA) and `delta` take a list keyed by dimension, and formula predictors are written `female_race`, `male_race` and `same_race`. A model can combine dimensions, such as `group_exogamy = list(race = c("A:B" = -2), region = NA)`, which penalizes interracial unions and prohibits unions across regions; effects from different dimensions add, and calibration then balances matching within each race and region combination. Here only race has a matching effect, so partners' regions match only as often as availability makes them.
 
 ```{r}
 #| label: matching
@@ -186,5 +186,5 @@ calculate_dissolution_rates(result, c(0, 40), c(0, Inf), by = c("race_w", "race_
 
 ## Current limits
 
-- Matching group effects use one dimension at a time. Joint calibration of matching across dimensions is planned; cross-dimension interactions, such as race exogamy that differs by region, are not available.
+- Matching effects from different dimensions add. Cross-dimension interactions, such as race exogamy that differs by region, are not available.
 - Transition strata that a table does not cover have zero risk, unlike other rate tables, which must cover every category combination they use.

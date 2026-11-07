@@ -93,16 +93,18 @@ prepare_strata_rates <- function(rates, process, registries, start = -Inf, end =
     keep <- keep & !is.na(code)
     index <- index + code * strides[k]
   }
-  rates <- rates[keep, , drop = FALSE]
-  index <- index[keep]
   count <- as.integer(prod(counts))
   label <- function(k) paste(vapply(seq_along(columns), function(j) {
     value <- as.character(registries[[columns[[j]]$dim]])[(k %/% strides[j]) %% counts[j] + 1L]
     if (length(columns) == 1L) value else paste0(columns[[j]]$column, "=", value)
   }, ""), collapse = ", ")
+  # Coverage is checked before rows for absent categories are dropped, so a
+  # slice whose rows all name absent categories still reports every stratum
+  # as missing (rather than looking empty).
   rates$.hammel_group <- index
   missing <- unique(unlist(lapply(calendar_rate_slices(rates, start, end), function(x)
-    if (nrow(x)) setdiff(seq_len(count) - 1L, x$.hammel_group) else integer())))
+    if (nrow(x)) setdiff(seq_len(count) - 1L, x$.hammel_group[!is.na(x$.hammel_group)]) else integer())))
+  rates <- rates[keep, , drop = FALSE]
   if (coverage && length(missing))
     stop(sprintf("%s rates are missing schedules for group(s): %s.", process,
                  paste(vapply(sort(missing), label, ""), collapse = "; ")), call. = FALSE)
