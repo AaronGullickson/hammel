@@ -128,3 +128,95 @@ test_that("with households living together, everyone moves at the input rate", {
   expect_equal(agg$transitions / agg$person_years, rep(.05, 6), tolerance = .2)
   expect_lt(length(unique(out$transitions$move_id)), nrow(out$transitions))
 })
+
+test_that("households that start together stay together through a long run", {
+  # Households start together (no initial unions or parents), unions cannot
+  # cross regions, and children take their mother's region. Then every couple
+  # shares a region, and every dependent shares one with the parent they are
+  # attached to, at the end of a run with births, unions, separations, deaths
+  # and many household moves.
+  set.seed(21)
+  pop <- create_baseline_population(4000, groups = list(region = c(N = .4, S = .3, W = .3)))
+  regions <- c("N", "S", "W")
+  moves <- expand.grid(origin = regions, destination = regions, stringsAsFactors = FALSE)
+  moves <- moves[moves$origin != moves$destination, ]
+  moves$age_start <- 0; moves$age_end <- Inf; moves$rate <- .1
+  model <- hammel_model() |> set_population(pop) |>
+    set_groups(region = group(inheritance = "mother")) |>
+    set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .02)) |>
+    set_fertility(data.frame(union_type = c("unpartnered", "partnered"), age_start = 15, age_end = 45,
+                             rate = c(.02, .15))) |>
+    set_union_formation("rate", rates = data.frame(age_start = 15, age_end = 60, rate = .2),
+      matching = create_age_gap_matching_model(2, 5, group_exogamy = list(region = NA)),
+      kinship_generations = 0) |>
+    set_union_dissolution(data.frame(dur_start = 0, dur_end = Inf, rate = .05)) |>
+    set_group_transition(moves, group = "region", household = household())
+  withr::local_options(hammel.check_cells = TRUE)
+  out <- simulate(model, 30, seed = 22)
+  persons <- out$persons
+  alive <- is.na(persons$death_time)
+  region <- setNames(persons$region, persons$person_id)
+  # Couples share a region.
+  current <- out$unions[is.na(out$unions$end_time), ]
+  expect_gt(nrow(current), 200)
+  expect_identical(unname(region[as.character(current$wife_id)]), unname(region[as.character(current$husband_id)]))
+  # Dependents share their attached parent's region.
+  partnered <- c(current$wife_id, current$husband_id)
+  living <- function(id) !is.na(id) & id %in% persons$person_id[alive]
+  attached <- ifelse(living(persons$mother_id), persons$mother_id,
+                     ifelse(living(persons$father_id), persons$father_id, NA))
+  dependent <- alive & persons$birth_time > out$end_time - 18 & !persons$person_id %in% partnered &
+    !is.na(attached)
+  expect_gt(sum(dependent), 300)
+  expect_identical(unname(persons$region[dependent]), unname(region[as.character(attached[dependent])]))
+  # Many moves carried others along.
+  tx <- out$transitions
+  expect_gt(sum(tx$person_id != tx$initiator_id), 500)
+})
+
+test_that("dependents bring their own dependents, recursively", {
+  # G (40) is single; her daughter T (17, unpartnered) is a dependent with a
+  # baby B. When G moves, T and B both follow.
+  persons <- data.frame(person_id = 1:3, sex = c("f", "f", "m"), birth_time = c(-40, -17, -.5),
+    death_time = NA_real_, mother_id = c(NA, 1, 2), father_id = NA_real_, region = "N")
+  pop <- hammel_population(persons, end_time = 0, groups = "region")
+  tx <- moves(simulate(household_model(pop, adult_moves[0, ] |>
+    rbind(data.frame(origin = "N", destination = "S", age_start = 35, age_end = 45, rate = 1e8))), .5, seed = 31))
+  expect_identical(tx$person_id, c(1, 2, 3))
+  expect_identical(unique(tx$initiator_id), 1)
+})
+
+test_that("a child joins the parent they re-attach to, recorded as that parent's move", {
+  # Mother M (N) and father P (S) are separated; their child K (8) lives with
+  # M in N. M dies at 0.5: K joins P in S at that moment.
+  persons <- data.frame(person_id = 1:3, sex = c("f", "m", "m"), birth_time = c(-35, -37, -8),
+    death_time = NA_real_, mother_id = c(NA, NA, 1), father_id = c(NA, NA, 2),
+    region = c("N", "S", "N"))
+  unions <- data.frame(union_id = 1, wife_id = 1, husband_id = 2, start_time = -10, end_time = -2,
+                       end_reason = "dissolution")
+  pop <- hammel_population(persons, unions = unions, end_time = 0, groups = "region")
+  model <- household_model(pop, data.frame(origin = "N", destination = "S", age_start = 0,
+                                           age_end = 1, rate = 0))
+  # Only M can die, at a known time: mortality by sex and age, very high for her.
+  model <- set_mortality(model, data.frame(sex = c("f", "f", "m"), age_start = c(0, 35, 0),
+    age_end = c(35, Inf, Inf), rate = c(0, 1e8, 0)))
+  out <- simulate(model, 1, seed = 32)
+  tx <- out$transitions
+  expect_identical(tx$person_id, 3)
+  expect_identical(tx$initiator_id, 2)
+  expect_identical(c(tx$origin, tx$destination), c("N", "S"))
+  expect_equal(tx$time, out$persons$death_time[1])
+  expect_identical(out$persons$region[3], "S")
+  # A young woman whose union ends is a dependent again and rejoins her mother.
+  persons <- data.frame(person_id = 1:3, sex = c("f", "f", "m"), birth_time = c(-40, -17, -19),
+    death_time = NA_real_, mother_id = c(NA, 1, NA), father_id = NA_real_, region = c("N", "S", "S"))
+  unions <- data.frame(union_id = 1, wife_id = 2, husband_id = 3, start_time = -1, end_time = NA_real_,
+                       end_reason = NA_character_)
+  pop <- hammel_population(persons, unions = unions, end_time = 0, groups = "region")
+  model <- household_model(pop, data.frame(origin = "N", destination = "S", age_start = 0, age_end = 1, rate = 0)) |>
+    set_union_dissolution(data.frame(dur_start = 0, dur_end = Inf, rate = 1e8))
+  tx <- simulate(model, .5, seed = 33)$transitions
+  expect_identical(tx$person_id, 2)
+  expect_identical(tx$initiator_id, 1)
+  expect_identical(tx$destination, "N")
+})

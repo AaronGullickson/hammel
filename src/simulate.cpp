@@ -3561,6 +3561,57 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       }
     }
   };
+  // Household moves (D140). A party grows from its heads by adding the
+  // dependents attached to any member, recursively (a dependent's own child
+  // follows them).
+  auto household_party = [&](const TransitionProcess& tp, std::vector<int> party, double now) {
+    for (size_t h = 0; h < party.size(); ++h)
+      for (int c : kids[party[h]])
+        if (is_dependent(tp, c, now) && attached_parent(c) == party[h] &&
+            std::find(party.begin(), party.end(), c) == party.end())
+          party.push_back(c);
+    return party;
+  };
+  // Move a party to a destination in tp's dimension as one recorded move;
+  // members already there stay and are not recorded.
+  auto move_party = [&](TransitionProcess& tp, const std::vector<int>& party, int destination,
+                        double initiator, double now) {
+    ++move_count;
+    std::vector<int> moved;
+    for (int m : party) {
+      const size_t cell = static_cast<size_t>(m) * dimensions + tp.dim;
+      const int origin = cats[cell];
+      if (origin == destination) continue;
+      if (people[m].female) remove_counted_woman(m); else remove_male(m);
+      tx_person.push_back(people[m].id); tx_time.push_back(now); tx_dim.push_back(tp.dim);
+      tx_origin.push_back(origin); tx_dest.push_back(destination);
+      tx_move.push_back(move_count); tx_initiator.push_back(initiator);
+      cats[cell] = destination;
+      if (matching_dim[tp.dim]) people[m].group = person_stratum(matching_spec, m);
+      tp.entry[m] = now;
+      if (people[m].female) add_counted_woman(m, now); else add_male(m);
+      moved.push_back(m);
+    }
+    // A move changes union strata and the partner's partner variables.
+    for (int m : moved) {
+      const int partner = current_partner[m];
+      refresh_person(m, now);
+      if (partner >= 0) refresh_person(partner, now);
+    }
+  };
+  // A dependent whose attachment changed (a mother's death, the end of their
+  // own union) joins the parent they now depend on, with their own
+  // dependents, recorded as a move initiated by that parent.
+  auto rejoin = [&](int c, double now) {
+    if (!any_household || !NumericVector::is_na(people[c].died)) return;
+    for (auto& tp : tprocs) {
+      if (!tp.household || !is_dependent(tp, c, now)) continue;
+      const int parent = attached_parent(c);
+      const int destination = cats[static_cast<size_t>(parent) * dimensions + tp.dim];
+      if (cats[static_cast<size_t>(c) * dimensions + tp.dim] == destination) continue;
+      move_party(tp, household_party(tp, {c}, now), destination, people[parent].id, now);
+    }
+  };
   load_processes(start);
   for (int i = 0; i < static_cast<int>(people.size()); ++i) {
     if (i % 1024 == 0) checkUserInterrupt();
@@ -3719,37 +3770,11 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       const int destination = tp.schedules[person_stratum(tp.spec, i)][at.second].dest;
       if (destination == cats[static_cast<size_t>(i) * dimensions + tp.dim]) stop("Invalid transition destination.");
       // The moving party: the mover, and for household moves (D140) their
-      // partner and the dependents attached to either of them.
-      std::vector<int> party = {i};
-      if (tp.household) {
-        if (current_partner[i] >= 0) party.push_back(current_partner[i]);
-        const size_t heads = party.size();
-        for (size_t h = 0; h < heads; ++h)
-          for (int c : kids[party[h]])
-            if (is_dependent(tp, c, now) && attached_parent(c) == party[h]) party.push_back(c);
-      }
-      ++move_count;
-      std::vector<int> moved;
-      for (int m : party) {
-        const size_t cell = static_cast<size_t>(m) * dimensions + tp.dim;
-        const int origin = cats[cell];
-        if (origin == destination) continue;   // already there
-        if (people[m].female) remove_counted_woman(m); else remove_male(m);
-        tx_person.push_back(people[m].id); tx_time.push_back(now); tx_dim.push_back(tp.dim);
-        tx_origin.push_back(origin); tx_dest.push_back(destination);
-        tx_move.push_back(move_count); tx_initiator.push_back(people[i].id);
-        cats[cell] = destination;
-        if (matching_dim[tp.dim]) people[m].group = person_stratum(matching_spec, m);
-        tp.entry[m] = now;
-        if (people[m].female) add_counted_woman(m, now); else add_male(m);
-        moved.push_back(m);
-      }
-      // A move changes union strata and the partner's partner variables.
-      for (int m : moved) {
-        const int partner = current_partner[m];
-        refresh_person(m, now);
-        if (partner >= 0) refresh_person(partner, now);
-      }
+      // partner and, recursively, the dependents attached to party members.
+      std::vector<int> heads = {i};
+      if (tp.household && current_partner[i] >= 0) heads.push_back(current_partner[i]);
+      move_party(tp, tp.household ? household_party(tp, heads, now) : heads, destination,
+                 people[i].id, now);
     } else if (type == EventType::death) {
       // Retain the person's history, record death, and leave every process.
       people[i].died = now;
@@ -3775,9 +3800,16 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       refresh_person(i, now);
       for (int survivor : widowed) refresh_person(survivor, now);
       for (int u : ended) refresh_union(u, now);
-      // Children may now be attached to the other parent, or independent.
-      if (any_household)
-        for (int c : kids[i]) if (NumericVector::is_na(people[c].died)) refresh_person(c, now);
+      // Children may now be attached to the other parent (joining them), or
+      // independent; a widowed survivor under the age of independence may be
+      // a dependent again.
+      if (any_household) {
+        for (int c : kids[i]) if (NumericVector::is_na(people[c].died)) {
+          refresh_person(c, now);
+          rejoin(c, now);
+        }
+        for (int survivor : widowed) rejoin(survivor, now);
+      }
       ++death_count;
     } else if (type == EventType::dissolution) {
       const int partner = current_partner[i];
@@ -3796,6 +3828,9 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
       refresh_union(unit, now);
       refresh_person(i, now);
       refresh_person(partner, now);
+      // A partner under the age of independence may be a dependent again.
+      rejoin(i, now);
+      rejoin(partner, now);
     } else if (type == EventType::conversion) {
       const int partner = current_partner[i];
       const int old = unit;

@@ -169,13 +169,21 @@ partnered men aged 18–40 moved at 0.039).
 
 **The moving party.** When a carrier moves from origin to destination in the
 dimension, the party is the carrier, their partner (if any), and the
-dependents attached to either of them. Each member whose category in that
+dependents attached to any member of the party, recursively: a teenage
+dependent who has a child brings that child along. Each member whose category in that
 dimension differs from the destination moves there, including a partner or
 child in a different origin; members already at the destination stay and are
 not recorded. Each mover's time in the dimension restarts at the move; ages,
 union durations, parity, birth spacing and ancestry are unchanged. All members
 are updated at once before any other event: rate cells, fertility cells,
 matching pools and calibration, and union strata.
+
+**Re-attachment.** When a dependent's attachment changes so that they now
+depend on a parent living elsewhere in a household dimension, they join that
+parent at once, with their own dependents. This happens when a mother dies
+and her child re-attaches to the father, and when a person under the age of
+independence leaves a union (separation or widowhood) and is a dependent of a
+parent again. The move is recorded with the parent as `initiator_id`.
 
 **Reaching the cutoff.** A dependent has no clock until `age_independence`; then
 they have their own clock at the ordinary rate for their age. Becoming a
@@ -208,6 +216,18 @@ counted once per household are the rows with `person_id == initiator_id`.
    S to H.
 6. W dies: C is attached to H (C's father). If H also dies, C and S are
    independent and carry their own clocks.
+7. A single woman G (40) has a daughter T (17, unpartnered, so a dependent)
+   with a baby B. G moves: T and B both move.
+8. A mother in N and the separated father in S; their child (8) lives with the
+   mother. The mother dies: the child moves to S at that moment, recorded with
+   the father as initiator.
+
+*Found in testing (November 6, 2026):* a long run first showed dependents
+apart from the parent they were attached to: a teenage mother's baby left
+behind (the party was not built recursively) and children of a dead mother
+staying while the father lived elsewhere. The user chose the recursive party
+and re-attachment moves; with both, households that start together stay
+together through births, unions, separations, deaths and moves (tested).
 
 ## Observed transition rates
 

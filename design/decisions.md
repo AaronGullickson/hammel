@@ -3070,7 +3070,10 @@ which are evaluated in R during draws.
 
 **Status:** User decision, November 6, 2026. Specified in
 [group transitions](group-transitions.md#household-moves-d140); implemented
-November 6, 2026, with the rule as its own object (`household()`, per
+November 6, 2026, with two user additions after testing (the party is built
+recursively, so a dependent's own dependents follow; a dependent re-attached
+to a parent elsewhere joins that parent at once, recorded as the parent's
+move), with the rule as its own object (`household()`, per
 the user) and the cutoff named `age_independence`.
 
 **Decision:** A household rule (`household = household(age_independence = 18)` on
