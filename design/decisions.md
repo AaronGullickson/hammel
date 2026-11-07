@@ -81,6 +81,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Matching calibration within separate markets | D138 |
 | `group_exogamy` table form for cross-dimension pair effects (`_x`/`_y` columns) | D139 |
 | Household moves for group transitions | D140 |
+| Milestone 9 accepted complete | D141 |
 
 ## Recorded decisions
 
@@ -2916,7 +2917,7 @@ committed by the user, and stage 6 (tests, articles, documents). Step 2
 implemented November 6, 2026, following the user's choices recorded in
 `multiple-groups.md`: the combination covers every dimension any matching
 model of the run uses, effects add, and custom cross-dimension functions are
-left for later. Not yet accepted as complete.
+left for later. Accepted complete November 6, 2026 (D141).
 
 **Decision:** Populations may carry several categorical group dimensions,
 always declared with `set_groups(model, race = group(...), ...)`; there is no
@@ -3097,3 +3098,35 @@ rule (mother, then father) treats children consistently.
 
 **Supersedes:** the deferral in D114 for transitions; household moves remain
 unavailable for other processes.
+
+## D141 — Milestone 9 accepted complete (November 6, 2026)
+
+**Status:** User decision, November 6, 2026.
+
+**Decision:** The user accepted milestone 9, multiple group dimensions, as
+complete, following the user-authored assessment in
+[`validation/milestone9.qmd`](../validation/milestone9.qmd), which the user
+maintains and renders. Scope accepted: declared group dimensions (D134, steps
+1 and 2), directional union strata, `stratify_rates()` (D132) and one `by`
+argument (D133), NA prohibitions in `group_exogamy` (D135), separate-market
+calibration (D138), the table form of `group_exogamy` (D139), household moves
+(D140), and baseline populations declaring their categories. Code at
+acceptance: `fc4b9dbf29dba9782cec9265704f9e87fef4022c` plus the closeout
+documentation.
+
+**Limitations retained:**
+
+- Matching calibration cost grows steeply with the number of matching
+  category combinations (about 4 to 4.5 times per doubling); separate markets
+  (D138) make prohibited dimensions cheap.
+- Household moves (D140) require age bands, and followers move less often
+  than the input rate when households are split across regions.
+- Uncovered transition strata have zero risk, unlike other rate tables.
+- Matching formula group terms are evaluated in R during draws (slower than
+  `group_exogamy`) and can express directional effects; there are no custom
+  cross-dimension matching functions (the table form covers pair effects).
+- Transition history labels are always character.
+
+**Also recorded (user preference):** the user writes all vignettes and
+articles and makes all edits to the top-level `README.md`; agents do not edit
+them.

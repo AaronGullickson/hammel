@@ -1,12 +1,11 @@
 # Milestone 9: multiple group dimensions
 
-Started November 5, 2026. **Status: design decided (D134); stages 1–5
-implemented: declared dimensions of any name, several at once, in every rate
+Started November 5, 2026. **Status: accepted complete November 6, 2026
+(D141).** Declared dimensions of any name, several at once, in every rate
 table, with per-dimension inheritance (including calendar schedules),
-ancestry, transitions, analysis splits and weight-model variables, and
-matching group effects. Step 1 (stages 1–6) and step 2 (matching across
-several dimensions, with calibration over their combinations) are
-implemented; the milestone is not yet accepted.**
+ancestry, transitions (with optional household moves, D140), analysis splits,
+weight-model variables, and matching group effects across several dimensions
+calibrated over their combinations.
 This records the user's decisions as they are made. Milestone 9 was assigned
 multiple group columns by D131. See the [roadmap](roadmap.md#milestone-9-multiple-group-columns)
 for the motivation and the household-move questions retained from D114.
@@ -312,12 +311,10 @@ inferring them again; explicit `categories` still replace them.
   scientific contract, cohabitation, the decision log (D134 status and the
   stage 2 user decisions), roadmap, README, the documentation index and
   AGENTS.md.
-- New article `vignettes/articles/multiple_dimensions.qmd`: race and region
-  with rates by dimension, migration stratified by race, matching in race,
-  dissolution weights by `same_race`, and analysis by several dimensions. It
-  uses synthetic rates, so it renders without database credentials. The
-  intermarriage article runs unchanged (checked on synthetic rates without
-  rendering, since it downloads HMD/HFD data).
+- An agent-written article on several dimensions was added and later removed
+  by the user, who writes the package's articles. The intermarriage article
+  runs unchanged (checked on synthetic rates without rendering, since it
+  downloads HMD/HFD data).
 - New tests: calendar bands with rates by two dimensions, and cohabitation
   probabilities and conversion by declared dimensions.
 - **Sex symmetry check**

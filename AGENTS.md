@@ -101,14 +101,12 @@ the user's agreement.
   8, cell scheduling for every rate process (D128) and weight models (D129),
   was accepted complete on November 5, 2026 (D130), based on
   `validation/milestone8.qmd`; see `design/binned-group-hazards.md`.
-  Under D131, multiple group columns are milestone 9; external
-  immigration is 10; summaries/helpers are 11; the two-sex model is 12. The
-  separate regions milestone is removed, with its unresolved applications
-  retained under 9. Milestone 9 follows the user's D134 design in
-  `design/multiple-groups.md`: step 1 (declared dimensions in rates,
-  inheritance, ancestry, transitions, analysis, weights) and step 2
-  (matching across several dimensions, calibrated over their combinations)
-  are implemented. It is not yet accepted.
+  Milestone 9, multiple group dimensions (D134; see
+  `design/multiple-groups.md`), including matching across several dimensions,
+  separate-market calibration (D138) and household moves (D140), was accepted
+  complete on November 6, 2026 (D141), based on `validation/milestone9.qmd`.
+  Under D136 the next focus is the first public release; external immigration
+  and the two-sex model are post-release projects.
   Distinguish current
   specifications from deferred mechanisms and future proposals.
 - `validation/milestone1.qmd` is the accepted historical assessment; reproduce it
@@ -122,8 +120,10 @@ the user's agreement.
   assessment. `validation/milestone6.qmd` is the accepted individual-transition
   assessment (D116), with its final render active at acceptance.
   `validation/milestone7.qmd` and `validation/milestone8.qmd` are the accepted
-  calendar-input and cell-scheduling/weight-model assessments. Preserve all
-  eight reports, rendered artifacts and any active render intermediates; do not
+  calendar-input and cell-scheduling/weight-model assessments, and
+  `validation/milestone9.qmd` the accepted multiple-dimension assessment.
+  Preserve all nine reports, rendered artifacts and any active render
+  intermediates; do not
   fabricate results or set scientific acceptance thresholds. Milestone
   completion retains documented limitations and does not authorize future features.
 - Milestone 4 includes duration-dependent dissolution, age/duration searches by
@@ -147,7 +147,9 @@ the user's agreement.
   explicit opt-in; ordinary verification must not download rates or expose
   credentials. See `design/testing.md` for commands and evidence.
 - Treat session handoffs as dated status records, not standing pause instructions.
-  The current user request controls work. Preserve the user's edits, including
+  The current user request controls work. The user writes all vignettes and
+  articles (`vignettes/`) and makes all edits to the top-level `README.md`
+  (D141); do not edit them unless asked. Preserve the user's edits, including
   explanatory source comments and the accepted reports. Fixed newborn assignment
   remains unselected future work beyond accepted milestone 6; custom inheritance already supports assigning
   mixed-parent births to a specified category.

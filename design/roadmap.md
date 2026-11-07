@@ -1,7 +1,8 @@
 # Development roadmap
 
-Updated November 6, 2026. Milestones 1–8 are complete by user acceptance
-(D029, D050, D077, D093, D105, D116, D127, D130). **Milestone 8 was accepted
+Updated November 6, 2026. Milestones 1–9 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116, D127, D130, D141). **Milestone 9,
+multiple group dimensions, was accepted complete on November 6, 2026.** **Milestone 8 was accepted
 complete on November 5, 2026:** cell scheduling for every rate process (D128)
 and weight models (D129), retaining documented limitations. On November 5 the
 user reordered later milestones (D131). On November 6, D136 superseded that
@@ -19,7 +20,7 @@ or an unselected public API.
 | 6 | Group transitions, including categorical characteristics represented by groups | Complete October 30, 2026 (D116); final render active at acceptance |
 | 7 | Time-varying rates, matching, and inheritance within a simulation run | Complete November 2, 2026 (D127); current engine and documented limitations retained |
 | 8 | Cell scheduling for all rate processes; formula and custom weight models | Complete November 5, 2026 (D130); documented limitations retained |
-| 9 | More than one group column, potentially including regions and internal migration | Implemented (D134), steps 1 and 2; not yet accepted |
+| 9 | More than one group column, potentially including regions and internal migration | Complete November 6, 2026 (D141); documented limitations retained |
 | Post-release | Immigration from outside the system, tracking generation (formerly 10) | Deferred until after first public release (D136) |
 | Release preparation | First version bump and public release after milestone 9 | User-selected next focus (D136); version number and release criteria unselected |
 | Unassigned | Polished summaries, diagnostic checks, and post-simulation helpers (formerly 11) | Proposed; scope and timing to select during release planning |

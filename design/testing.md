@@ -1,9 +1,38 @@
 # Testing and milestone validation
 
-Updated November 5, 2026. Milestones 1–8 are accepted as complete (D029,
-D050, D077, D093, D105, D116, D127, D130). Software test history and the user's demographic assessment
+Updated November 6, 2026. Milestones 1–9 are accepted as complete (D029,
+D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the user's demographic assessment
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
+
+## Milestone 9 accepted assessment and closeout
+
+The user accepted milestone 9 as complete on November 6, 2026 (D141),
+following the user-authored [assessment](../validation/milestone9.qmd), which
+the user maintains and renders. The report's settings and findings remain
+authoritative; this closeout neither reruns nor renders it. Code at
+acceptance: `fc4b9dbf29dba9782cec9265704f9e87fef4022c` plus closeout
+documentation.
+
+Software checks at closeout (November 6, 2026, local; GitHub CI did not run,
+because the account's Actions minutes were exhausted):
+
+- The full offline suite (`devtools::test()`) passed all 551 tests with no
+  failures or warnings, also with `options(hammel.check_cells = TRUE)`.
+- `R CMD check` (`devtools::check()`): 0 errors, 0 warnings, 1 note about
+  non-portable compiler flags from the local R configuration (not the package).
+- Coverage (`covr::package_coverage(type = "tests")`): 97.8%.
+- With one dimension, results were checked bit-identical to the preceding
+  stage at each stage (builds with fused multiply-adds disabled), and
+  combined-dimension analysis, matching and household moves have exact
+  worked-example tests; see [multiple group dimensions](multiple-groups.md)
+  and [household moves](group-transitions.md#household-moves-d140).
+- Sex symmetry of intermarriage with a second dimension, within combinations
+  and within separate markets, and calibration cost, are recorded in
+  [multiple group dimensions](multiple-groups.md) with their scripts in
+  `validation/milestone9/`.
+
+Limitations retained at acceptance are listed in D141.
 
 ## Milestone 8 accepted assessment and closeout
 

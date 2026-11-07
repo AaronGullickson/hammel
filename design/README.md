@@ -1,7 +1,7 @@
 # Hammel documentation
 
-Updated November 5, 2026. Milestones 1–8 are complete by user acceptance
-(D029, D050, D077, D093, D105, D116, D127, D130), including individual group transitions, parity-specific fertility,
+Updated November 6, 2026. Milestones 1–9 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116, D127, D130, D141), including individual group transitions, parity-specific fertility,
 cell-accounted birth spacing and persistent lognormal fertility weights.
 Current behavior uses continuous event times with no monthly grid. Acceptance
 is based on the user-authored validation reports and retains their limitations.
@@ -17,9 +17,10 @@ D114, are implemented in milestone 9 (D140).
 for every rate process with one clock per process (D128) and weight models
 (D129).** See the [specification](binned-group-hazards.md) and the
 [validation report](../validation/milestone8.qmd).
-**Milestone 9, multiple group dimensions, is implemented and awaiting
-acceptance (D134):** steps 1 and 2, including matching across several
-dimensions (see [multiple group dimensions](multiple-groups.md)).
+**Milestone 9 is accepted complete, November 6, 2026 (D141): multiple group
+dimensions (D134), including matching across several dimensions and household
+moves (D140).** See [multiple group dimensions](multiple-groups.md) and the
+[validation report](../validation/milestone9.qmd).
 
 ## Reading order
 
