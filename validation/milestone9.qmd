@@ -168,7 +168,11 @@ fertility_rates |> calculate_tfr()
 
 To test out the new capabilities, lets create a simulation with three racial groups (W, B, and O) and four regional groups (NE, MW, S, W). We will allow exogamy between racial groups but will not allow exogamy by region (because marriage markets are generally local).
 
-For this simulation, we will use a rate model for union formation and allow fertility vary by union type, but we won't add the complication of cohabitation. We will also stratify fertility and marriage rates across group dimensions.
+For this simulation, we will use a rate model for union formation and allow fertility vary by union type, but we won't add the complication of cohabitation. We will also stratify all input rats across group dimensions.
+
+### Fertility inputs
+
+We will use 2000 US fertility rates split by partnered status. We will apply proportional hazards by region, but allow the hazards to vary by union type for race.
 
 ```{r}
 #| label: set-fertility-rate
@@ -185,53 +189,383 @@ fertility_rates_by_union_type <- read_csv(
 fertility_rates <- bind_rows(
   fertility_rates_by_union_type |>
     filter(union_type == "partnered") |>
-    stratify_rates(list(group = c(A = 1.05, B = 1))),
+    stratify_rates(list(race = c(W = 1, B = 1.05, O = 1.05))),
   fertility_rates_by_union_type |>
     filter(union_type == "unpartnered") |>
-    stratify_rates(list(group = c(A = 1.20, B = 1)))
+    stratify_rates(list(race = c(W = 1, B = 1.2, O = 1.05)))
+) |>
+  stratify_rates(list(region = c(NE = 1, MW = 1.05, S = 1.1, W = 1)))
+
+fertility_rates |> calculate_tfr()
+```
+
+### Mortality inputs
+
+We use 2000 US mortality rates, truncated at 95. We allow these to vary by region and race slightly
+
+```{r}
+# label: set-mortality-rates
+
+mortality_rates <- get_mortality_hmd("USA", 2000, open_age = 95)
+
+mortality_rates <- mortality_rates |> stratify_rates(
+  list(race = c(W = 0.97, B =1.07, O = 1), region = c(NE = 1, MW = 1, S = 1.05, W = 0.96))
 )
+
+mortality_rates |> calculate_life_table() |>
+  filter(age_start == 0) |>
+  select(race, region, sex, ex)
+```
+
+### Marriage inputs
+
+We will use a single set of marriage rates drawn from the US 2000-2001. I will allow these to vary by race as well, but we will use weight models to accomplish that so that the overall marriage rates are preserved in the simulation 
+
+```{r}
+#| label: set-mar-rates
+
+marriage_rates <- read_csv(
+  here("validation", "data", "usa_2000_2001", "usa_2001_marriage_rates_female.csv")
+)
+```
+
+### Migration inputs
+
+In terms of transition rates, we will not allow any transitions between racial groups, but we will allow transitions between regions which indicates internal migration rates. We use reprorts from US Census 2000 to construct plausible age-specific migration rates.
+
+**TODO:** For now individuals migrate, but this obviously causes problems for married couples and their children. We will add household level moves in a later feature and when we do we will need to adjust these rates to avoid double jeopardy  - If you can move when your partner/parent/child moves then overall migration rates will be overstated. The easiest way to do this would be to set moving under a certain age to zero so that it needs to be sparked by parents and set one sex to zero or halve the rates.
+
+```{r}
+#| label: set-migration-rates
+
+migration_rates <- read_csv("validation/data/usa_2000_2001/usa_2000_regional_migration.csv")
 ```
 
 
 
+### Running the model
+
+For the starter population, I want to start with uneven weights by race-region combination, so I will first set up that joint distribution. Values are loosely modeled on US 2000 racial distributions by race.
+
 ```{r}
-
-mar_rates <- read_csv(
-  here("validation", "data", "usa_2000_2001", "usa_2001_marriage_rates_female.csv")
+region_race_dist <- tribble(
+  ~race, ~region, ~weight,
+  "W",   "NE",    0.145,
+  "W",   "MW",    0.190,
+  "W",   "S",     0.257,
+  "W",   "W",     0.152,
+  "B",   "NE",    0.022,
+  "B",   "MW",    0.023,
+  "B",   "S",     0.067,
+  "B",   "W",     0.019,
+  "O",   "NE",    0.021,
+  "O",   "MW",    0.014,
+  "O",   "S",     0.030,
+  "O",   "W",     0.060,
 )
+sum(region_race_dist$weight)
+```
 
+Now lets create the starter population.
+
+```{r}
+#| label: create-starter-pop
 
 set.seed(42)
-pop_start <- create_baseline_population(50000, group_weights = c(A = 1, B = 1))
+pop_start <- create_baseline_population(100000, groups = region_race_dist)
+```
+
+Now we are ready to set up the model.
+
+```{r}
+
 
 model <- hammel_model() |>
   set_population(pop_start) |>
   set_fertility(fertility_rates) |>
   set_mortality(mortality_rates) |>
-  set_union_formation("rate", rates = mar_rates)
+  set_union_formation(
+    "rate", 
+    rates = marriage_rates,
+    matching = create_age_gap_matching_model(
+      2, 5,
+      group_exogamy = list(
+        race = c("W:B" = -4, "W:O" = -2, "B:O" = -3),
+        # marriage markets are local so no cross-region marriages
+        region = NA
+      )
+    ),
+    # make B group have marriage rates 10% lower than other groups
+    weights = create_weight_model(~ race, c(raceB = log(0.9), raceO = 0))
+  ) |>
+  set_groups(
+    # we don't need to set categories here because they are defined from the population
+    race = group(ancestry = TRUE, inheritance = "ancestry"),
+    region = group(inheritance = "mother")
+  ) |>
+  set_group_transition(migration_rates, group = "region", household = household())
 
-pop_end <- simulate(model, 150, 42)
+system.time(pop_end <- simulate(model, 100, 42))
+```
+
+```{r}
+calculate_population_size(pop_end, seq(0, 100, 5), by = c("race")) |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ggplot(aes(x = time, y = prop, group = race, fill = race))+
+  geom_area()
 ```
 
 ```{r}
 
-calculate_fertility_rates(pop_end, c(50, 150), seq(15, 45, 5)) |>
-  calculate_tfr()
-
-calculate_fertility_rates(pop_end, c(50, 150), seq(15, 45, 5), 
-                          by = "group") |>
-  calculate_tfr()
-
-calculate_fertility_rates(pop_end, c(50, 150), seq(15, 45, 5), 
-                          by = c("group", "union_type")) |>
-  calculate_tfr()
-
-calculate_mortality_rates(pop_end, c(50, 150),  0:95, by = "group") |>
-  calculate_life_table() |>
-  filter(age_start == 0) |>
-  select(group, sex, ex)
+calculate_population_size(pop_end, seq(0, 100, 5), by = c("region")) |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ggplot(aes(x = time, y = prop, group = region, fill = region))+
+  geom_area()
 ```
 
+```{r}
+
+calculate_population_size(pop_end, seq(0, 100, 5), by = c("region")) |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ggplot(aes(x = time, y = prop, group = region, color = region))+
+  geom_line()+
+  scale_y_continuous(limits = c(0, NA))
+```
+
+What else?
+
+- check intermarriage rates
+- check fertility rates, mortality rates, and marriage rates by group and region and overall
+- check transition rates. They should match for women over age 18.
+
+```{r}
+calculate_fertility_rates(
+  pop_end,
+  time_breaks = c(0, 100),
+  age_breaks = seq(15, 45, 5),
+  by = c("union_type", "race", "region"),
+  conf.level = 0.95
+) |>
+  ggplot(aes(x = age_start, y = rate_fertility, color = union_type))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high, fill = union_type), color = NA, alpha = 0.3)+
+  geom_point(size = 0.5)+
+  geom_line(data = fertility_rates, aes(y = rate), linetype = 2)+
+  facet_grid(region~race)
+```
+
+```{r}
+calculate_mortality_rates(
+  pop_end,
+  time_breaks = c(0, 100),
+  age_breaks = 50:95,
+  by = c("race", "region"),
+  conf.level = 0.95
+) |>
+  ggplot(aes(x = age_start, y = rate_mortality, color = sex))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high, fill = sex), color = NA, alpha = 0.3)+
+  geom_point(size = 0.5)+
+  geom_line(data = mortality_rates |> filter(age_start >= 50), aes(y = rate), linetype = 2, linesize = 1.5)+
+  facet_grid(region~race)+
+  scale_y_log10()
+```
+
+```{r}
+calculate_marriage_rates(
+  pop_end,
+  time_breaks = c(0, 100),
+  age_breaks = seq(15, 70, 5),
+  conf.level = 0.95
+) |>
+  filter(sex == "f") |>
+  ggplot(aes(x = age_start, y = rate_marriage))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), fill = "grey60", color = NA, alpha = 0.3)+
+  geom_point(size = 0.5)+
+  geom_line(data = marriage_rates, aes(y = rate), linetype = 2)
+```
+
+```{r}
+df_hazard <- calculate_marriage_rates(
+  pop_end,
+  time_breaks = c(25, 100),
+  age_breaks = seq(15, 70, 5),
+  by = "race"
+) |>
+  filter(sex == "f") |>
+  mutate(group_b = race == "B")
+
+model <- glm(marriages ~ factor(age_start) + group_b + offset(log(person_years)), 
+             family = poisson, data = df_hazard)
+
+modelsummary(
+  list("exp(beta)" = model),
+  out = "gt",
+  coef_map = c("group_bTRUE" = "Group B"),
+  statistic = "conf.int",
+  exponentiate = TRUE,
+  gof_map = c("nobs"), 
+  notes = "Note: Model also includes age group dummies"
+)
+```
+
+Show that no marriages occurred across regions.
+
+```{r}
+pop_end |>
+  get_detailed_unions() |>
+  count(region_w, region_h)
+```
+
+
+```{r}
+
+expected <- tibble(
+  pair = c("W:B", "W:O", "B:O"),
+  expected = c(-4, -2, -3) * 2
+)
+
+pop_end |>
+  get_detailed_unions() |>
+  #filter(start_time > 25) |>
+  count(race_w, race_h) |>
+  pivot_wider(names_from = c(race_w, race_h), values_from = n) |>
+  mutate(
+    log_odds_W_B = log(W_B) + log(B_W) - log(W_W) - log(B_B),
+    se_W_B = sqrt(1 / W_B + 1 / B_W + 1 / W_W + 1 / B_B),
+    log_odds_W_O = log(W_O) + log(O_W) - log(W_W) - log(O_O),
+    se_W_O = sqrt(1 / W_O + 1 / O_W + 1 / W_W + 1 / O_O),
+    log_odds_B_O = log(B_O) + log(O_B) - log(B_B) - log(O_O),
+    se_B_O = sqrt(1 / B_O + 1 / O_B + 1 / B_B + 1 / O_O)
+  ) |>
+  select(starts_with("log_odds"), starts_with("se_")) |>
+  pivot_longer(
+    everything(),
+    names_to = c(".value", "pair"),
+    names_pattern = "(log_odds|se)_(.*)"
+  ) |>
+  mutate(pair = str_replace(pair, "_", ":")) |>
+  left_join(expected, by = "pair") |>
+  ggplot(aes(x = pair, y = log_odds))+
+  geom_point()+
+  geom_linerange(aes(ymin = log_odds - 1.96 * se, ymax = log_odds + 1.96 * se))+
+  geom_point(aes(y = expected), color = "red", alpha = 0.7)+
+  coord_flip()+
+  labs(x = "interracial pairing", y = "log-odds")
+```
+
+```{r}
+
+pop_end |>
+  get_detailed_unions() |>
+  #filter(start_time > 25) |>
+  count(region_w, race_w, race_h) |>
+  pivot_wider(names_from = c(race_w, race_h), values_from = n) |>
+  mutate(
+    log_odds_W_B = log(W_B) + log(B_W) - log(W_W) - log(B_B),
+    se_W_B = sqrt(1 / W_B + 1 / B_W + 1 / W_W + 1 / B_B),
+    log_odds_W_O = log(W_O) + log(O_W) - log(W_W) - log(O_O),
+    se_W_O = sqrt(1 / W_O + 1 / O_W + 1 / W_W + 1 / O_O),
+    log_odds_B_O = log(B_O) + log(O_B) - log(B_B) - log(O_O),
+    se_B_O = sqrt(1 / B_O + 1 / O_B + 1 / B_B + 1 / O_O)
+  ) |>
+  select("region_w", starts_with("log_odds"), starts_with("se_")) |>
+  pivot_longer(
+    !starts_with("region"),
+    names_to = c(".value", "pair"),
+    names_pattern = "(log_odds|se)_(.*)"
+  ) |>
+  mutate(pair = str_replace(pair, "_", ":")) |>
+  left_join(expected, by = "pair") |>
+  ggplot(aes(x = pair, y = log_odds,))+
+  geom_point()+
+  geom_linerange(aes(ymin = log_odds - 1.96 * se, ymax = log_odds + 1.96 * se))+
+  geom_point(aes(y = expected), color = "red", alpha = 0.7)+
+  facet_wrap(~region_w)+
+  coord_flip()+
+  labs(x = "interracial pairing", y = "log-odds")
+```
+
+
+```{r}
+
+pop_end |>
+  get_detailed_unions() |>
+  #filter(start_time > 25) |>
+  count(race_w, race_h) |>
+  pivot_wider(names_from = c(race_w, race_h), values_from = n) |>
+  mutate(
+    ratio_W_B = W_B / B_W,
+    se_log_W_B = sqrt(1 / W_B + 1 / B_W),
+    ratio_W_O = W_O / O_W,
+    se_log_W_O = sqrt(1 / W_O + 1 / O_W),
+    ratio_B_O = B_O / O_B,
+    se_log_B_O = sqrt(1 / B_O + 1 / O_B)
+  ) |>
+  select(starts_with("ratio_"), starts_with("se_log_")) |>
+  pivot_longer(
+    everything(),
+    names_to = c(".value", "pair"),
+    names_pattern = "(ratio|se_log)_(.*)"
+  ) |>
+  mutate(pair = str_replace(pair, "_", ":")) |>
+  ggplot(aes(x = pair, y = ratio))+
+  geom_point()+
+  geom_linerange(aes(ymin = ratio * exp(-1.96 * se_log), ymax = ratio * exp(1.96 * se_log)))+
+  geom_hline(yintercept = 1, linetype = 2)+
+  coord_flip()+
+  labs(x = "interracial pairing", y = "ratio")
+```
+
+
+```{r}
+
+pop_end |>
+  get_detailed_unions() |>
+  count(region_w, race_w, race_h) |>
+  pivot_wider(names_from = c(race_w, race_h), values_from = n) |>
+  mutate(
+    ratio_W_B = W_B / B_W,
+    se_log_W_B = sqrt(1 / W_B + 1 / B_W),
+    ratio_W_O = W_O / O_W,
+    se_log_W_O = sqrt(1 / W_O + 1 / O_W),
+    ratio_B_O = B_O / O_B,
+    se_log_B_O = sqrt(1 / B_O + 1 / O_B)
+  ) |>
+  select("region_w", starts_with("ratio_"), starts_with("se_log_")) |>
+  pivot_longer(
+    !starts_with("region"),
+    names_to = c(".value", "pair"),
+    names_pattern = "(ratio|se_log)_(.*)"
+  ) |>
+  mutate(pair = str_replace(pair, "_", ":")) |>
+  ggplot(aes(x = pair, y = ratio, color = region_w))+
+  geom_point(position = position_dodge(0.5))+
+  geom_linerange(aes(ymin = ratio * exp(-1.96 * se_log), ymax = ratio * exp(1.96 * se_log)),
+                 position = position_dodge(0.5))+
+  geom_hline(yintercept = 1, linetype = 2)+
+  coord_flip()+
+  labs(x = "interracial pairing", y = "ratio")
+```
+
+```{r}
+
+calculate_transition_rates(
+  pop_end,
+  group = "region",
+  time_breaks = c(0, 100),
+  age_breaks = c(seq(0, 35, 5), seq(45, 85, 10)),
+  conf.level = 0.95
+) |>
+  ggplot(aes(x = age_start, y = rate_transition))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey60")+
+  geom_point(size = 0.5)+
+  geom_line(data = migration_rates, aes(y = rate), linetype = 2, color = "red")+
+  geom_vline(xintercept = 18, linetype = 2)+
+  facet_grid(origin~destination)
+
+```
 
 ## Unit Tests
 
