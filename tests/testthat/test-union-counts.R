@@ -73,7 +73,7 @@ test_that("grouped union counts use wife and husband groups and conserve totals"
                                         by = c("group_w", "group_h"))
   expect_equal(nrow(counts), 4 * 4)
   # Directional rows sum to the unordered pairs.
-  pairs <- canonical_union_pairs(counts$group_w, counts$group_h)
+  pairs <- unordered_pair(counts$group_w, counts$group_h)
   expect_equal(vapply(split(counts$union_years, pairs), sum, numeric(1)),
                c("10:10" = 3, "10:20" = 3, "20:20" = 3))
   expect_equal(vapply(split(counts$dissolutions, pairs), sum, numeric(1)),

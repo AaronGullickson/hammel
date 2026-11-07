@@ -89,9 +89,15 @@ demographic_counts <- function(population, time_breaks, age_breaks, by = NULL) {
   out
 }
 
+# An unordered pair label for two group labels, such as "A:B" for B and A.
+unordered_pair <- function(a, b) {
+  a <- as.character(a); b <- as.character(b)
+  ifelse(a <= b, paste(a, b, sep = ":"), paste(b, a, sep = ":"))
+}
+
 # Sum directional wife/husband dissolution rows into unordered group pairs.
 pair_rates <- function(x) {
-  x$group_pair <- canonical_union_pairs(x$group_w, x$group_h)
+  x$group_pair <- unordered_pair(x$group_w, x$group_h)
   keys <- intersect(c("time_start", "time_end", "dur_start", "dur_end", "group_pair", "union_type"),
                     names(x))
   aggregate(x[c("union_years", "dissolutions")], x[keys], sum)

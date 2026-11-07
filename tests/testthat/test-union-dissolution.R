@@ -270,9 +270,6 @@ test_that("directional group columns are validated", {
   }
   expect_error(simulate(set_mortality(model, transform(model$processes$mortality$rates, group_w = "A")), 0),
                "own name")
-  expect_identical(canonical_union_pairs(c("20:10", "10:20")), rep("10:20", 2))
-  expect_identical(canonical_union_pairs(c("A+B:C.D", "C.D:A+B")), rep("A+B:C.D", 2))
-  expect_error(canonical_union_pairs("A:B", "C"), "colon-free")
   expect_error(stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = 1e308),
     list(group_w = c(A = 2))), "remain finite")
 })
