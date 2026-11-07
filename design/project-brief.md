@@ -118,8 +118,8 @@ two-sex marriage models are post-release projects. The release version,
 criteria and scope of proposed summaries/helpers remain unselected; the
 two-sex model and API also remain unselected (D117). No future feature or
 publication is authorized by milestone completion. Fixed newborn assignment was
-explicitly deferred to the group-transitions discussion; custom inheritance
-already supports assignment of mixed-parent births to a specified category.
+selected November 7, 2026 (D142), using an explicit category per dimension; see
+[group inheritance](group-inheritance.md).
 
 ## Milestone 4 complete
 

@@ -151,5 +151,5 @@ the user's agreement.
   articles (`vignettes/`) and makes all edits to the top-level `README.md`
   (D141); do not edit them unless asked. Preserve the user's edits, including
   explanatory source comments and the accepted reports. Fixed newborn assignment
-  remains unselected future work beyond accepted milestone 6; custom inheritance already supports assigning
+  is available through `create_group_inheritance("fixed", fixed_value = ...)` (D142); custom inheritance already supports assigning
   mixed-parent births to a specified category.

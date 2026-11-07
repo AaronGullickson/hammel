@@ -185,7 +185,11 @@ nonnegative intervals are allowed; there is no whole-month restriction.
 
 ### Newborn group identity
 
-Fertility holds a `create_group_inheritance()` object, defaulting to `random_parent`.
+Each declared dimension holds a `create_group_inheritance()` object through
+`group(inheritance = ...)`, defaulting to `random_parent`.
+The `"fixed"` method (D142) assigns every newborn the explicitly specified
+`fixed_value` category, regardless of parents or sex, with no identity RNG draw.
+The category must belong to the registry; existing people are not reassigned.
 Other built-in methods follow mother, father, same/opposite-sex parent,
 known ancestry shares, or a strict hierarchy of parental identities. Required
 missing inputs fall back to the mother. Ancestry sampling conditions out unknown

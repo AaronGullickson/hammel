@@ -111,7 +111,7 @@ boundary and the next process clock; `refresh_person()` and `refresh_union()`
 update a unit's memberships in every process after each state change.
 R validates inputs and assembles the returned `hammel_population`, retaining
 histories and existing extra person columns. Newborn group identity follows
-the fertility inheritance model (random parent by default, with maternal fallback); other custom attributes are
+the dimension's inheritance model (random parent by default, with maternal fallback); other custom attributes are
 missing. Group-specific schedules and baseline group sampling are documented in
 [groups](groups.md). The `simulation` component records `start_time`, `end_time`,
 `birth_interval`, `ffab`, `births`, and `deaths` for the latest run, plus
@@ -159,7 +159,9 @@ See [union dissolution](union-dissolution.md) for examples and deferred scope.
 
 ## Newborn identity configuration
 
-`create_group_inheritance()` attaches through fertility's `inheritance` argument.
+`create_group_inheritance()` attaches per dimension through `group(inheritance = ...)`.
+The `"fixed"` method (D142) uses an explicit `fixed_value` category, validated against
+the registry and assigned in C++ with no callback or identity random draw.
 R validates the mode, possible identity registry, grouped schedule coverage,
 and matching levels. Native built-ins assign identity after sex and ancestry
 are known, then schedule with the selected group's rates. Custom R functions

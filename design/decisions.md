@@ -3130,3 +3130,21 @@ documentation.
 **Also recorded (user preference):** the user writes all vignettes and
 articles and makes all edits to the top-level `README.md`; agents do not edit
 them.
+
+## D142 — Fixed newborn group category (November 7, 2026)
+
+**Status:** User decision, November 7, 2026.
+
+**Decision:** Add a built-in rule assigning every newborn to a user-specified
+category of a group dimension. The motivating case is education: all children
+start in the bottom education category regardless of parental education.
+Existing identities and ancestry averaging are unchanged; later transitions
+remain available. Assignment requires no R callback or identity random draw.
+
+**Interface:** `create_group_inheritance("fixed", fixed_value = "none")`, attached
+through `group(inheritance = ...)`. `fixed_value` names a category in the dimension's
+registry, rather than implicitly selecting the first category. Calendar schedules
+use the ordinary birth-time selection contract. See [the specification](group-inheritance.md).
+
+**Supersedes:** earlier deferral of fixed newborn assignment; random-parent
+inheritance remains the default for dimensions without an explicit rule.

@@ -302,3 +302,68 @@ test_that("future search schedules, stratified rates, and numeric declarations a
   expect_type(result$persons$group, "integer")
   expect_true(all(inheritance_children(result)$group == 30L))
 })
+
+test_that("fixed inheritance validates a single explicit category", {
+  for (value in list(NULL, character(), c("A", "B"), NA_character_, "", " ", Inf,
+                     TRUE, matrix("A"), 1 + 1i))
+    expect_error(create_group_inheritance("fixed", fixed_value = value), "value")
+  expect_error(create_group_inheritance("mother", fixed_value = "A"), "only to fixed")
+  expect_error(inheritance_test_model("fixed"), "value")
+  model <- inheritance_test_model(create_group_inheritance("fixed", fixed_value = "none"))
+  expect_error(simulate(model, 0), "undeclared")
+})
+
+test_that("fixed newborn categories preserve founders, ancestry and deterministic RNG", {
+  fixed <- create_group_inheritance("fixed", fixed_value = "none")
+  custom <- create_group_inheritance("custom", fun = function(...) "none")
+  categories <- c("A", "B", "none")
+  model <- inheritance_test_model(fixed, categories = categories)
+  reference <- inheritance_test_model(custom, categories = categories)
+  set.seed(726)
+  result <- simulate(model, 1)
+  after <- .Random.seed
+  set.seed(726)
+  expected <- simulate(reference, 1)
+  expect_identical(.Random.seed, after)
+  expect_identical(result[c("persons", "unions", "ancestry", "transitions")],
+                   expected[c("persons", "unions", "ancestry", "transitions")])
+  children <- inheritance_children(result)
+  expect_gt(nrow(children), 5)
+  expect_true(all(c("m", "f") %in% children$sex))
+  expect_true(all(children$group == "none"))
+  expect_identical(result$persons$group[1:2], c("A", "B"))
+  shares <- result$ancestry$group[result$persons$birth_time >= 0, ]
+  expect_true(all(shares$A == .5 & shares$B == .5))
+  expect_identical(simulate(model, 1, seed = 726), simulate(model, 1, seed = 726))
+
+  model$population$persons <- model$population$persons[1, ]
+  model <- set_union_formation(model, "rate", rates = data.frame(
+    age_start = 0, age_end = Inf, rate = 0), cancel_birth_if_no_match = FALSE)
+  result <- suppressWarnings(simulate(model, 1, seed = 726))
+  children <- inheritance_children(result)
+  expect_gt(nrow(children), 0)
+  expect_true(all(is.na(children$father_id)))
+  expect_true(all(children$group == "none"))
+})
+
+test_that("fixed inheritance supports numeric categories and calendar switches", {
+  model <- inheritance_test_model()
+  model$population$persons$group <- c(1, 2)
+  model <- set_groups(model, group = group(categories = c(0, 1, 2),
+    inheritance = create_group_inheritance("fixed", fixed_value = 0)))
+  children <- inheritance_children(simulate(model, 1, seed = 726))
+  expect_gt(nrow(children), 0)
+  expect_identical(children$group, rep(0, nrow(children)))
+
+  schedule <- tibble::tibble(time_start = c(0, .5), time_end = c(.5, Inf),
+    model = list(create_group_inheritance("fixed", fixed_value = "none"),
+                 create_group_inheritance("fixed", fixed_value = "primary")))
+  model <- inheritance_test_model(schedule, birth_rate = 100,
+                                  categories = c("A", "B", "none", "primary"))
+  children <- inheritance_children(simulate(model, 1, seed = 726))
+  expect_true(any(children$birth_time < .5))
+  expect_true(any(children$birth_time >= .5))
+  expect_identical(children$group, ifelse(children$birth_time < .5, "none", "primary"))
+  model$groups$group$inheritance$model[[2]] <- create_group_inheritance("fixed", fixed_value = "other")
+  expect_error(simulate(model, .1), "undeclared")
+})

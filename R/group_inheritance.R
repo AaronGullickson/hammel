@@ -11,7 +11,7 @@
 #' later in [group()].
 #'
 #' @param method One of `"mother"`, `"father"`, `"random_parent"`, `"same_sex"`,
-#'   `"opposite_sex"`, `"ancestry"`, `"hierarchy"`, or `"custom"`.
+#'   `"opposite_sex"`, `"ancestry"`, `"hierarchy"`, `"custom"`, or `"fixed"`.
 #'   Random parent chooses each with probability 0.5. Same/opposite sex chooses
 #'   the parent whose sex matches/differs from the child's. Ancestry samples
 #'   known child shares, conditioning out unknown ancestry. Missing information
@@ -33,9 +33,13 @@
 #' @param passing For `"hierarchy"`, probability in `[0,1]` of reversing the
 #'   order for a birth. Defaults to zero. Equal parental identities and missing
 #'   ranks/parents retain maternal assignment without a passing draw.
+#' @param fixed_value For `"fixed"`, one category label or finite numeric code in
+#'   the dimension's categories. Every newborn receives this category, regardless
+#'   of parents or sex, without an identity random draw or R callback.
 #' @return An inspectable `hammel_group_inheritance` object.
 #' @export
 #' @examples
+#' create_group_inheritance("fixed", fixed_value = "none")
 #' create_group_inheritance("mother")
 #' create_group_inheritance("hierarchy", order = c("A", "B"), passing = 0.05)
 #' create_group_inheritance("custom",
@@ -43,15 +47,15 @@
 #'     if (is.na(father_group) || mother_group == father_group) mother_group else "mixed"
 #'   })
 create_group_inheritance <- function(method = "random_parent", fun = NULL,
-                                     order = NULL, passing = 0) {
+                                     order = NULL, passing = 0, fixed_value = NULL) {
   model <- structure(list(method = method, fun = fun,
-                          order = order, passing = passing), class = "hammel_group_inheritance")
+                          order = order, passing = passing, fixed_value = fixed_value), class = "hammel_group_inheritance")
   validate_group_inheritance(model)
   model
 }
 
 inheritance_methods <- function() {
-  c("mother", "father", "random_parent", "same_sex", "opposite_sex", "ancestry", "hierarchy", "custom")
+  c("mother", "father", "random_parent", "same_sex", "opposite_sex", "ancestry", "hierarchy", "custom", "fixed")
 }
 
 normalize_group_inheritance <- function(model) {
@@ -89,6 +93,13 @@ validate_group_inheritance <- function(model) {
   if (model$method == "custom") {
     if (!is.function(model$fun)) stop("Custom inheritance requires a function in `fun`.", call. = FALSE)
   } else if (!is.null(model$fun)) stop("`fun` applies only to custom inheritance.", call. = FALSE)
+  if (model$method == "fixed") {
+    value <- model$fixed_value
+    if (!(is.character(value) || is.numeric(value)) || is.complex(value) ||
+        !is.null(dim(value)) || length(value) != 1L || anyNA(value) ||
+        !nzchar(trimws(as.character(value))) || (is.numeric(value) && !is.finite(value)))
+      stop("Fixed inheritance requires one nonmissing category in `fixed_value`.", call. = FALSE)
+  } else if (!is.null(model$fixed_value)) stop("`fixed_value` applies only to fixed inheritance.", call. = FALSE)
   invisible(model)
 }
 
@@ -112,6 +123,8 @@ extend_identity_groups <- function(values, additions) {
 prepare_group_inheritance <- function(model, values, components = character()) {
   model <- normalize_group_inheritance(model)
   labels <- as.character(values)
+  fixed <- if (model$method == "fixed") match(as.character(model$fixed_value), labels) - 1L else -1L
+  if (is.na(fixed)) stop("Fixed inheritance `fixed_value` is an undeclared group identity; declare it in group(categories = ...).", call. = FALSE)
   ranks <- match(labels, as.character(model$order)) - 1L
   ranks[is.na(ranks)] <- -1L
   ancestry_groups <- match(setdiff(components, "unknown"), labels) - 1L
@@ -135,5 +148,5 @@ prepare_group_inheritance <- function(model, values, components = character()) {
     as.integer(code)
   }
   list(values = values, group_count = length(values), method = match(model$method, inheritance_methods()) - 1L,
-       passing = model$passing, ranks = ranks, ancestry_groups = ancestry_groups, custom = custom)
+       fixed = as.integer(fixed), passing = model$passing, ranks = ranks, ancestry_groups = ancestry_groups, custom = custom)
 }

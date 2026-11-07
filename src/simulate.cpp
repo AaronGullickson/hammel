@@ -2622,7 +2622,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   // One inheritance rule per dimension, each with its own ancestry block (size
   // zero when untracked). Calendar schedules switch each dimension's rule.
   struct InheritanceRule {
-    int method = 0, count = 1;
+    int method = 0, count = 1, fixed = -1;
     double passing = 0;
     IntegerVector ranks, ancestry_groups;
     SEXP custom = R_NilValue;
@@ -2631,6 +2631,7 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
   std::vector<InheritanceRule> inheritance_rules(dimensions);
   auto read_rule = [&](List x, InheritanceRule& rule) {
     rule.method = as<int>(x["method"]);
+    rule.fixed = as<int>(x["fixed"]);
     rule.passing = as<double>(x["passing"]);
     rule.ranks = as<IntegerVector>(x["ranks"]);
     rule.ancestry_groups = as<IntegerVector>(x["ancestry_groups"]);
@@ -3915,7 +3916,8 @@ List simulate_cpp(DataFrame persons, DataFrame mortality_rates,
         const int paternal_group = father_position < 0 ? -1 :
           cats[static_cast<size_t>(father_position) * dimensions + d];
         int child_group = maternal_group;
-        if (rule.method == 1 && paternal_group >= 0) child_group = paternal_group;
+        if (rule.method == 8) child_group = rule.fixed;
+        else if (rule.method == 1 && paternal_group >= 0) child_group = paternal_group;
         else if (rule.method == 2 && paternal_group >= 0 && paternal_group != maternal_group)
           child_group = R::runif(0, 1) < 0.5 ? maternal_group : paternal_group;
         else if (rule.method == 3 && !female && paternal_group >= 0) child_group = paternal_group;

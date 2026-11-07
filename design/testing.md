@@ -5,6 +5,21 @@ D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the u
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## Fixed newborn assignment (November 7, 2026)
+
+D142 adds native fixed-category inheritance. `devtools::test(filter =
+"group-inheritance")` passed 149 expectations with no failures or warnings.
+The full offline `devtools::test()` run passed 6,496 expectations with no
+failures; the live database test was skipped as intended. One environment
+warning came from HMDHFDplus loading `timedatectl`, whose system bus access
+was denied in the sandbox. No live rates were downloaded.
+
+The added cases verify fixed assignment for either sex and an unknown father,
+unchanged founders and ancestry, numeric categories, calendar switches,
+invalid/undeclared values, reproducibility, and exact event-history/RNG agreement
+with an equivalent deterministic custom rule. The implementation avoids the
+R callback; no runtime speedup was benchmarked.
+
 ## Milestone 9 accepted assessment and closeout
 
 The user accepted milestone 9 as complete on November 6, 2026 (D141),

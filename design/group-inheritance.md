@@ -10,10 +10,9 @@ acceptance retains the documented limitations.
 
 ## Interface and rules
 
-`create_group_inheritance(method = "random_parent", fun = NULL, groups = NULL,
-order = NULL, passing = 0)` constructs an inspectable inheritance object.
-`fertility(..., inheritance = create_group_inheritance())` and its setter attach
-it. Unspecified inheritance, including older specifications without this field,
+`create_group_inheritance(method = "random_parent", fun = NULL,
+order = NULL, passing = 0, fixed_value = NULL)` constructs an inspectable inheritance object.
+`group(inheritance = create_group_inheritance())` attaches it to a declared dimension. Unspecified inheritance, including older specifications without this field,
 uses random-parent assignment with maternal fallback when the father is unknown.
 Configuration is validated
 at construction, attachment, and execution.
@@ -21,10 +20,10 @@ at construction, attachment, and execution.
 For rules requiring no additional parameters, `inheritance` also accepts a
 method name: `"mother"`, `"father"`, `"random_parent"`, `"same_sex"`,
 `"opposite_sex"`, or `"ancestry"`. For example,
-`set_fertility(model, rates, inheritance = "father")` is equivalent to using
+`group(inheritance = "father")` is equivalent to using
 `create_group_inheritance("father")`. Stored process specifications contain the
-full model object. Hierarchy and custom rules still require the constructor
-to supply `order` or `fun`; their bare names produce the corresponding error.
+full model object. Hierarchy, custom and fixed rules require the constructor
+to supply `order`, `fun` or `fixed_value`; their bare names produce the corresponding error.
 
 | Method | Identity assignment |
 | --- | --- |
@@ -36,9 +35,11 @@ to supply `order` or `fun`; their bare names produce the corresponding error.
 | `ancestry` | Sample using the child's known ancestry shares |
 | `hierarchy` | Choose the higher-ranked parental identity in `order` |
 | `custom` | Call `fun` and validate its returned identity |
+| `fixed` | Assign the category specified by `fixed_value` to every newborn |
 
 Missing information required by a built-in rule falls back to the mother.
-Missing fathers therefore never create an unknown identity. Ancestry sampling
+Missing fathers therefore never create an unknown identity. The fixed rule
+always uses its configured category, including when the father is missing. Ancestry sampling
 conditions on known ancestry: divide known shares by `1 - unknown`. Entirely
 unknown ancestry falls back to the mother. A hierarchy compares identities,
 not ancestry. Missing parental ranks fall back to the mother. Its strict order
@@ -57,22 +58,40 @@ inheritance are valid and have no effect on identity or random-number consumptio
 
 ## Possible identities and coverage
 
-Infer possible identities from all starting identities plus reference ancestry
-groups with any positive initial share. Explicit `groups` extends this set with
-identities a custom function may introduce; it never removes inferred groups.
-All-zero ancestry columns cannot introduce a group through parental averaging.
-Keep this registry fixed during a run. Validate grouped mortality/fertility/
-search coverage and categorical matching levels against the full registry,
-including identities not yet present. Shared schedules cover everyone and group
-rate multipliers use 1.0 when omitted. Newborn identity selects all subsequent
-demographic schedules, matching effects and eligibility rules immediately.
+Each dimension uses its declared `group(categories = ...)` registry. Without
+explicit categories, infer them from starting identities, transition destinations
+and ancestry categories. Fixed and custom outputs must belong to this registry;
+explicitly declare a category that would otherwise be absent. All group-specific
+schedules and categorical matching must cover the registry, including categories
+not yet present. Newborn identity immediately selects subsequent schedules,
+matching effects and eligibility rules. Identity assignment does not add ancestry
+components or alter ancestry shares.
 
-Declared identities do not add ancestry components. A new `mixed` identity may
-have ancestry expressed entirely in A and B. Preserve existing group-column
-types when the extended labels can be represented in that type; otherwise
-promote identity labels to character. Restarts infer the registry again from
-their population and configured rule; callers reusing custom rules retain the
-explicit declaration of possible outputs.
+## Fixed newborn category (D142)
+
+`create_group_inheritance("fixed", fixed_value = "none")` assigns every newborn
+`"none"` in this dimension, independently of parental categories, father availability
+and the child's sex. The user specifies the category; there is no automatic
+choice of the first or lowest category. Existing people retain their categories.
+Later group transitions may change the child's category normally.
+
+`fixed_value` must be one nonmissing, nonempty character label or finite numeric code
+in the dimension's registry. It is required for `fixed` and invalid for other
+methods. Assignment occurs at birth before newborn cells and matching lookups,
+uses native C++, and consumes no identity RNG draw. Ancestry averaging is unchanged.
+Calendar schedules can select different fixed categories or other inheritance
+methods; the half-open interval containing the birth selects the rule.
+
+Worked example: declare education categories `c("none", "primary", "secondary")`
+and attach a fixed rule with `fixed_value = "none"`. Parents with primary and secondary
+education have a child with education `"none"`, for either sex. If the father
+is unknown, the child still receives `"none"`. Their ancestry, if tracked, is
+averaged under the ordinary ancestry contract. Subsequent education transitions
+can promote the child. An undeclared fixed value fails before execution.
+
+Validation checks these cases, unchanged founders and ancestry, numeric labels,
+calendar switches, reproducibility and exact event/RNG agreement with an equivalent
+deterministic custom rule.
 
 ## Custom functions and timing
 
@@ -112,7 +131,7 @@ shares are unaffected by identity assignment. Existing people are not reassigned
 - Parents both identify as A but have B ancestry: ancestry sampling can assign B.
 - Hierarchy A/B with A first and passing 1 always gives B; missing rank gives
   the maternal identity.
-- A custom function may return `mixed` only if inferred or declared in `groups`.
+- A custom function may return `mixed` only if inferred or declared in `group(categories = ...)`.
   All grouped schedules and categorical matching must cover it before execution.
 
 Tests cover each rule and fallback, analytical sampling probabilities, passing,
@@ -153,7 +172,7 @@ balance or absence of sensitivity to starting populations. See the
 
 ## Calendar-varying inheritance (D123)
 
-Fertility's `inheritance` argument also accepts a tibble with `time_start`,
+A dimension's `group(inheritance = ...)` argument also accepts a tibble with `time_start`,
 `time_end` and list-column `model`, containing complete inheritance objects.
 Select the active rule at birth, without reassigning existing identities or
 changing ancestry. All declared possible identities from all intervals enter

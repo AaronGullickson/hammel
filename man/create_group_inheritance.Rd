@@ -8,12 +8,13 @@ create_group_inheritance(
   method = "random_parent",
   fun = NULL,
   order = NULL,
-  passing = 0
+  passing = 0,
+  fixed_value = NULL
 )
 }
 \arguments{
 \item{method}{One of \code{"mother"}, \code{"father"}, \code{"random_parent"}, \code{"same_sex"},
-\code{"opposite_sex"}, \code{"ancestry"}, \code{"hierarchy"}, or \code{"custom"}.
+\code{"opposite_sex"}, \code{"ancestry"}, \code{"hierarchy"}, \code{"custom"}, or \code{"fixed"}.
 Random parent chooses each with probability 0.5. Same/opposite sex chooses
 the parent whose sex matches/differs from the child's. Ancestry samples
 known child shares, conditioning out unknown ancestry. Missing information
@@ -38,6 +39,10 @@ Choose between parental identities, not ancestry. Complex orders use \code{fun}.
 \item{passing}{For \code{"hierarchy"}, probability in \verb{[0,1]} of reversing the
 order for a birth. Defaults to zero. Equal parental identities and missing
 ranks/parents retain maternal assignment without a passing draw.}
+
+\item{fixed_value}{For \code{"fixed"}, one category label or finite numeric code in
+the dimension's categories. Every newborn receives this category, regardless
+of parents or sex, without an identity random draw or R callback.}
 }
 \value{
 An inspectable \code{hammel_group_inheritance} object.
@@ -54,6 +59,7 @@ one of the dimension's categories; declare categories that may only appear
 later in \code{\link[=group]{group()}}.
 }
 \examples{
+create_group_inheritance("fixed", fixed_value = "none")
 create_group_inheritance("mother")
 create_group_inheritance("hierarchy", order = c("A", "B"), passing = 0.05)
 create_group_inheritance("custom",
