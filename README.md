@@ -8,7 +8,15 @@
 
 <img src="man/figures/logo.png" align="left" width="200" alt="Hammel hex sticker showing a branching kinship network" />
 
-Hammel is a standalone demographic microsimulator with an R interface and a
+Hammel is a demographic microsimulator written as an R package. Hammel is a spiritual successor to the venerable SOCSIM program but provides a modern interface, enhanced features, greater user customization, and faster computation. Hammel models demographic processes in continuous time and features:
+
+- fertility and mortality
+- union formation, including union dissolution, cohabitation, and remarriage
+- inclusion of multiple user-defined group identifiers (e.g. race, education, region) complete with age or duration-specific transition rates, customizable partner matching rules across groups, customizable inheritance rules for newborns, and ancestry tracking.
+- stratification of rate processes by a variety of characteristics. 
+
+
+with an R interface and a
 C++17 engine. It models continuous-time mortality, fertility, and union
 formation, dissolution, remarriage, and optional cohabitation/conversion, with
 group-specific rates, individual group transitions, partner matching, ancestry,
