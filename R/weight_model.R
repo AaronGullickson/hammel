@@ -13,35 +13,41 @@
 #' [set_union_formation()] (searches), or `weights_conversion` of
 #' [set_union_formation()].
 #'
-#' **Variables.** Mortality, fertility and group transitions are person
-#' processes and may use `sex` (`"f"`, `"m"`), `group`, `union_type`
+#' **Variables.** Group variables are named by the declared group dimensions
+#' (see [set_groups()]); for a dimension `race` with categories A and B:
+#' Mortality, fertility and group transitions are person
+#' processes and may use `sex` (`"f"`, `"m"`), `race`, `union_type`
 #' (`"unpartnered"`, `"cohab"`, `"marriage"`), `partnered` (0/1), `parity`
 #' (births; 0 for men), `previous_union` (`"none"`, `"separated"`,
-#' `"widowed"`), `partner_group` (NA when unpartnered) and ancestry shares
-#' `ancestry_<group>` and `ancestry_unknown`. Group transitions may also use
-#' `group_dest`, the destination of the risk. Dissolution and conversion are
-#' union processes and may use `group_w`, `group_h`, `parity_w`,
-#' `previous_union_w`, `previous_union_h`, `ancestry_<group>_w`,
-#' `ancestry_<group>_h`, `same_group` (0/1), `age_difference` (husband's age
-#' minus wife's age) and `union_type` (`"cohab"`, `"marriage"`). All variables
-#' change only at events. The first listed level of each categorical variable
-#' is its reference.
+#' `"widowed"`), `partner_race` (NA when unpartnered) and, when the dimension
+#' tracks ancestry, shares `ancestry_race_A` and `ancestry_race_unknown`.
+#' Group transitions may also use `destination`, the destination of the risk
+#' in the transition's dimension. Dissolution and conversion are union
+#' processes and may use `race_w`, `race_h`, `parity_w`, `previous_union_w`,
+#' `previous_union_h`, `ancestry_race_A_w`, `ancestry_race_A_h`, `same_race`
+#' (0/1), `age_difference` (husband's age minus wife's age) and `union_type`
+#' (`"cohab"`, `"marriage"`). All variables change only at events. The first
+#' listed level of each categorical variable is its reference; for a group
+#' dimension it is its first category (declared, or first in the population).
 #'
 #' **Formulas.** Terms are main effects of these variables and interactions
 #' (`:` or `*`); transformations such as `I()` are not supported (use `fun`).
 #' Categorical variables use treatment coding, and `coefficients` must be
 #' named exactly as the corresponding model-matrix columns, for example
-#' `groupB` or `union_typecohab`. One `group_levels` applies to every
-#' group-valued variable (`group`, `partner_group`, `group_dest`, `group_w`,
-#' `group_h`), and must include every population group. The intercept has no
-#' effect. A term whose variable is missing (such as `partner_group` for an
-#' unpartnered person) contributes zero, with a warning.
+#' `raceB` or `union_typecohab`. A group-valued variable's levels are its
+#' dimension's categories. Group variable names and their coefficients are
+#' checked when the model meets the group declaration at simulation; other
+#' names are checked when the model is set. The intercept has no effect. A
+#' term whose variable is missing (such as `partner_race` for an unpartnered
+#' person) contributes zero, with a warning.
 #'
 #' **Custom functions.** `fun(members, bin)` receives a tibble with one row per
-#' eligible member of the chosen cell, holding the variables above (with labels
-#' for categorical variables) and identifiers (`person_id`, or `union_id`,
-#' `wife_id` and `husband_id`), and a list `bin` describing the cell: its
-#' `process`, strata, band (`age_start`/`age_end` or `dur_start`/`dur_end`) and
+#' eligible member of the chosen cell, holding the variables above for every
+#' declared dimension (with labels for categorical variables) and identifiers
+#' (`person_id`, or `union_id`, `wife_id` and `husband_id`), and a list `bin`
+#' describing the cell: its `process`, strata (each dimension's category, or
+#' `<dim>_w`/`<dim>_h` for union processes, NA when the rates do not stratify
+#' by it; `origin` and `destination` for transitions), band (`age_start`/`age_end` or `dur_start`/`dur_end`) and
 #' the active rate period `time_start`/`time_end` (NA for static rates). Exact
 #' ages and times are not passed. It must return one finite log weight per row;
 #' NA gives zero, with a warning. It shares the simulation's random-number
@@ -51,8 +57,6 @@
 #'
 #' @param formula A one-sided formula of weight variables.
 #' @param coefficients A finite named numeric vector of log hazard ratios.
-#' @param group_levels Ordered group labels, required when the formula uses a
-#'   group-valued variable; the first is the reference.
 #' @param fun A custom function returning log weights, instead of `formula`.
 #'
 #' **Calendar schedules.** A process's `weights` may instead be a tibble with
@@ -70,42 +74,90 @@
 #' partnered_mortality <- create_weight_model(~ partnered, c(partnered = log(0.8)))
 #' gap_dissolution <- create_weight_model(~ age_difference,
 #'   c(age_difference = log(1.05)))
-create_weight_model <- function(formula = NULL, coefficients = numeric(),
-                                group_levels = NULL, fun = NULL) {
+create_weight_model <- function(formula = NULL, coefficients = numeric(), fun = NULL) {
   if (is.null(formula) == is.null(fun))
     stop("Supply exactly one of `formula` or `fun`.", call. = FALSE)
-  model <- structure(list(formula = formula, coefficients = coefficients,
-    group_levels = group_levels, fun = fun), class = "hammel_weight_model")
+  model <- structure(list(formula = formula, coefficients = coefficients, fun = fun),
+                     class = "hammel_weight_model")
   validate_weight_model(model)
   model
 }
 
-# Weight variables by process type, with engine codes and categorical levels.
+# Engine codes of weight variables. Group variables (codes 1, 6, 9, 10, 16)
+# carry their dimension's index as the factor component; ancestry variables
+# (7, 14, 15) carry the ancestry column.
 weight_variable_codes <- c(sex = 0L, group = 1L, union_type = 2L, partnered = 3L,
-  parity = 4L, previous_union = 5L, partner_group = 6L, ancestry = 7L, group_dest = 8L,
+  parity = 4L, previous_union = 5L, partner_group = 6L, ancestry = 7L, destination = 8L,
   group_w = 9L, group_h = 10L, parity_w = 11L, previous_union_w = 12L,
   previous_union_h = 13L, ancestry_w = 14L, ancestry_h = 15L, same_group = 16L,
   age_difference = 17L)
-weight_person_variables <- c("sex", "group", "union_type", "partnered", "parity",
-  "previous_union", "partner_group")
-weight_union_variables <- c("group_w", "group_h", "parity_w", "previous_union_w",
-  "previous_union_h", "same_group", "age_difference", "union_type")
-weight_group_variables <- c("group", "partner_group", "group_dest", "group_w", "group_h")
-weight_fixed_levels <- function(type) list(
-  sex = c("f", "m"),
-  union_type = if (type == "union") c("cohab", "marriage") else c("unpartnered", "cohab", "marriage"),
-  previous_union = c("none", "separated", "widowed"),
-  previous_union_w = c("none", "separated", "widowed"),
-  previous_union_h = c("none", "separated", "widowed"))
-# Engine codes of categorical levels: sex is 1 for female; union types 0
-# unpartnered, 1 cohab, 2 marriage; previous categories 0 none, 1 separated,
-# 2 widowed. Group levels map to engine group indices at simulation.
-weight_level_codes <- list(sex = c(f = 1L, m = 0L),
-  union_type = c(unpartnered = 0L, cohab = 1L, marriage = 2L),
-  previous_union = c(none = 0L, separated = 1L, widowed = 2L))
 
-weight_ancestry_variable <- function(name, type) {
-  if (type == "union") grepl("^ancestry_.+_[wh]$", name) else grepl("^ancestry_.+", name)
+# Built-in weight variables of a process type, with engine codes and, for
+# categorical variables, their levels (the first is the reference) and the
+# engine code of each level.
+weight_builtins <- function(type) {
+  previous <- list(levels = c("none", "separated", "widowed"),
+                   level_codes = c(none = 0L, separated = 1L, widowed = 2L))
+  if (type == "union") return(list(
+    union_type = list(code = 2L, levels = c("cohab", "marriage"),
+                      level_codes = c(cohab = 1L, marriage = 2L)),
+    parity_w = list(code = 11L),
+    previous_union_w = c(list(code = 12L), previous),
+    previous_union_h = c(list(code = 13L), previous),
+    age_difference = list(code = 17L)))
+  list(sex = list(code = 0L, levels = c("f", "m"), level_codes = c(f = 1L, m = 0L)),
+       union_type = list(code = 2L, levels = c("unpartnered", "cohab", "marriage"),
+                         level_codes = c(unpartnered = 0L, cohab = 1L, marriage = 2L)),
+       partnered = list(code = 3L), parity = list(code = 4L),
+       previous_union = c(list(code = 5L), previous))
+}
+
+# Resolve a weight variable for a process type ("person", "transition",
+# "union"): its engine code, component and levels, or NULL when unavailable.
+# Group variables are named by declared dimension (D134), so they resolve only
+# with `context` (at simulation): `categories` (each dimension's categories,
+# named by dimension), `ancestry` (ancestry variable names, in engine column
+# order) and `transition_dim`.
+weight_variable <- function(name, type, context = NULL) {
+  builtin <- weight_builtins(type)[[name]]
+  if (!is.null(builtin)) return(builtin)
+  if (is.null(context)) return(NULL)
+  dims <- names(context$categories)
+  group_info <- function(code, d) list(code = code, component = match(d, dims) - 1L,
+                                       levels = as.character(context$categories[[d]]))
+  if (type != "union") {
+    if (name %in% dims) return(group_info(1L, name))
+    partner <- sub("^partner_", "", name)
+    if (startsWith(name, "partner_") && partner %in% dims) return(group_info(6L, partner))
+    if (type == "transition" && name == "destination") return(group_info(8L, context$transition_dim))
+    k <- match(name, context$ancestry)
+    if (!is.na(k)) return(list(code = 7L, component = k - 1L))
+    return(NULL)
+  }
+  same <- sub("^same_", "", name)
+  if (startsWith(name, "same_") && same %in% dims) return(list(code = 16L, component = match(same, dims) - 1L))
+  if (!grepl("_[wh]$", name)) return(NULL)
+  base <- sub("_[wh]$", "", name)
+  wife <- endsWith(name, "_w")
+  if (base %in% dims) return(group_info(if (wife) 9L else 10L, base))
+  k <- match(base, context$ancestry)
+  if (!is.na(k)) return(list(code = if (wife) 14L else 15L, component = k - 1L))
+  NULL
+}
+
+# Could `name` be a group variable for this process type, for some declared
+# dimension? Dimension names follow check_group_names().
+weight_group_name_possible <- function(name, type) {
+  dim_ok <- function(x) !x %in% reserved_group_names &&
+    !grepl("^(partner|same|female|male|ancestry)_", x) && !grepl("_(w|h)$", x) &&
+    grepl("^[A-Za-z][A-Za-z0-9_.]*$", x)
+  if (type == "union") {
+    base <- sub("_[wh]$", "", name)
+    return((grepl("_[wh]$", name) && (dim_ok(base) || grepl("^ancestry_.+_.+", base))) ||
+           (startsWith(name, "same_") && dim_ok(sub("^same_", "", name))))
+  }
+  dim_ok(name) || (startsWith(name, "partner_") && dim_ok(sub("^partner_", "", name))) ||
+    (grepl("^ancestry_.+_.+", name)) || (type == "transition" && name == "destination")
 }
 
 validate_weight_model <- function(model) {
@@ -127,45 +179,32 @@ validate_weight_model <- function(model) {
   if (length(factors) && any(!rownames(factors) %in% all.vars(formula)))
     stop(paste("Weight formulas use variables and their interactions only;",
                "use a custom function (`fun`) for transformations such as I()."), call. = FALSE)
-  known <- c(weight_person_variables, weight_union_variables, "group_dest")
-  bad <- all.vars(formula)[!all.vars(formula) %in% known & !grepl("^ancestry_.+", all.vars(formula))]
-  if (length(bad))
-    stop("Unknown weight variables: ", paste(bad, collapse = ", "), ".", call. = FALSE)
   coefficients <- model$coefficients
   if (!is.numeric(coefficients) || any(!is.finite(coefficients)) ||
       (length(coefficients) && (is.null(names(coefficients)) || anyNA(names(coefficients)) ||
        any(!nzchar(names(coefficients))) || anyDuplicated(names(coefficients)))))
     stop("`coefficients` must be a finite numeric vector with unique nonempty names.", call. = FALSE)
-  if (any(all.vars(formula) %in% weight_group_variables)) {
-    levels <- model$group_levels
-    if (is.null(levels) || length(levels) < 2L || anyNA(levels) ||
-        anyDuplicated(as.character(levels)) || any(!nzchar(as.character(levels))))
-      stop("Weight formulas with group variables require at least two unique `group_levels`.",
-           call. = FALSE)
-  }
   invisible(model)
-}
-
-# Variables a formula may use for a process type ("person", "transition", "union").
-weight_allowed <- function(name, type) {
-  if (type == "union") name %in% weight_union_variables || weight_ancestry_variable(name, "union")
-  else name %in% c(weight_person_variables, if (type == "transition") "group_dest") ||
-    (weight_ancestry_variable(name, "person") && !grepl("_[wh]$", name))
 }
 
 # Decode a formula into model-matrix columns. Each column is a product of
 # factors: a numeric variable, or an indicator of one level of a categorical
 # variable. Follows R's coding (attr(terms, "factors"): 1 = contrasts,
 # 2 = all levels) and checks the names against model.matrix().
-weight_design <- function(model, type) {
+# Without `context` (before the declaration is known), returns NULL when the
+# formula uses variables that may be group variables, deferring the check.
+weight_design <- function(model, type, context = NULL) {
   formula <- model$formula
   vars <- all.vars(formula)
-  bad <- vars[!vapply(vars, weight_allowed, logical(1), type = type)]
+  info <- lapply(stats::setNames(vars, vars), weight_variable, type = type, context = context)
+  bad <- vars[vapply(info, is.null, logical(1))]
+  # Before the declaration is known, defer names that could be group variables.
+  if (length(bad) && is.null(context) &&
+      all(vapply(bad, weight_group_name_possible, logical(1), type = type))) return(NULL)
   if (length(bad))
     stop("Weight variables not available for this process: ", paste(bad, collapse = ", "),
          ".", call. = FALSE)
-  levels <- weight_fixed_levels(type)
-  for (v in intersect(vars, weight_group_variables)) levels[[v]] <- as.character(model$group_levels)
+  levels <- Filter(Negate(is.null), lapply(info, `[[`, "levels"))
   tt <- stats::terms(formula)
   labels <- attr(tt, "term.labels")
   factors <- attr(tt, "factors")
@@ -254,70 +293,51 @@ warn_cancelled_weight_terms <- function(weights, strata, process) {
 }
 
 # Rate strata of each process, as weight variables constant within a cell.
-# Cells stratify by group only when rates or group multipliers do.
-weight_strata <- function(process, rates, multipliers = NULL) {
+# Group columns are known only from the declaration; at construction any
+# possible group column is taken to be a dimension. A transition's own
+# dimension (`group`) is constant within its cells.
+weight_strata <- function(process, rates, group = NULL) {
   n <- names(rates)
-  grouped <- "group" %in% n || (!is.null(multipliers) && any(unlist(multipliers) != 1))
+  strata <- candidate_strata(rates)
+  wives <- sub("_w$", "", grep("_w$", strata, value = TRUE))
+  husbands <- sub("_h$", "", grep("_h$", strata, value = TRUE))
+  union <- c(paste0(wives, if (length(wives)) "_w"), paste0(husbands, if (length(husbands)) "_h"),
+             paste0("same_", intersect(wives, husbands)))
   switch(process,
-    mortality = c("sex", if (grouped) "group"),
-    fertility = c(if (grouped) "group",
-                  if ("union_type" %in% n) c("union_type", "partnered"),
+    mortality = c("sex", strata),
+    fertility = c(strata, if ("union_type" %in% n) c("union_type", "partnered"),
                   if ("parity_start" %in% n) "parity"),
-    dissolution = c(if ("union_type" %in% n) "union_type", if ("group_pair" %in% n) "same_group"),
-    conversion = c("union_type", if ("group" %in% n) "group_w"),
-    search = c("sex", "partnered", "union_type", if (grouped) "group",
-               if ("previous_union" %in% n) "previous_union", "partner_group"),
-    transition = c("group", "group_dest", if ("sex" %in% n) "sex",
+    dissolution = c(if ("union_type" %in% n) "union_type", union),
+    conversion = c("union_type", union),
+    search = c("sex", "partnered", "union_type", strata,
+               if ("previous_union" %in% n) "previous_union", paste0("partner_", strata)),
+    transition = c(group, "destination", strata, if ("sex" %in% n) "sex",
                    if ("union_type" %in% n) c("union_type", "partnered")))
 }
 
 # Engine specification of a weight model: NULL, a custom function, or columns
-# of (variable code, level code, ancestry component) factors with coefficients.
-prepare_weight_model <- function(weights, type, process, group_values, ancestry_labels,
-                                 group_labels = group_values) {
+# of (variable code, level code, component) factors with coefficients.
+# `context` is described at weight_variable().
+prepare_weight_model <- function(weights, type, process, context) {
   if (is_model_schedule(weights)) {
     rows <- order(weights$time_start)
     return(list(schedule = TRUE, process = process,
       time_start = weights$time_start[rows], time_end = weights$time_end[rows],
       models = lapply(weights$model[rows], prepare_weight_model, type = type, process = process,
-                      group_values = group_values, ancestry_labels = ancestry_labels)))
+                      context = context)))
   }
   if (!is.null(weights$fun)) return(list(custom = TRUE, fun = weights$fun, process = process))
-  columns <- weight_design(weights, type)
-  if (any(vapply(columns, function(x) any(vapply(x$factors, function(f)
-      f$var %in% weight_group_variables, logical(1))), logical(1)))) {
-    if (is.null(group_values))
-      stop("Weight formulas with group variables require population groups.", call. = FALSE)
-    missing <- setdiff(as.character(group_values), as.character(weights$group_levels))
-    if (length(missing))
-      stop("Weight `group_levels` must include every population group; missing ",
-           paste(missing, collapse = ", "), ".", call. = FALSE)
-  }
+  columns <- weight_design(weights, type, context)
   active <- Filter(function(x) x$coefficient != 0, columns)
   encode <- function(f) {
-    v <- f$var
-    if (grepl("^ancestry_", v)) {
-      suffix <- if (type == "union") sub("^.*_([wh])$", "\\1", v) else ""
-      label <- if (type == "union") sub("^ancestry_(.*)_[wh]$", "\\1", v) else sub("^ancestry_", "", v)
-      column <- if (label == "unknown") "unknown" else paste0("group_", label)
-      component <- match(column, ancestry_labels) - 1L
-      if (is.na(component))
-        stop("No ancestry share is recorded for weight variable `", v, "`.", call. = FALSE)
-      code <- weight_variable_codes[[if (suffix == "w") "ancestry_w" else if (suffix == "h")
-        "ancestry_h" else "ancestry"]]
-      return(c(code, -1L, component))
-    }
+    info <- weight_variable(f$var, type, context)
     level <- -1L
-    if (!is.na(f$level)) {
-      level <- if (v %in% weight_group_variables) match(f$level, as.character(group_values)) - 1L else
-        weight_level_codes[[sub("_[wh]$", "", v)]][[f$level]]
-      # A group level absent from the population never matches anyone.
-      if (is.na(level)) level <- -2L
-    }
-    c(weight_variable_codes[[v]], level, 0L)
+    if (!is.na(f$level))
+      level <- if (!is.null(info$level_codes)) info$level_codes[[f$level]] else
+        match(f$level, info$levels) - 1L
+    c(info$code, level, if (is.null(info$component)) 0L else info$component)
   }
   list(custom = FALSE, process = process,
        coefficients = vapply(active, `[[`, 0, "coefficient"),
-       factors = lapply(active, function(x) do.call(rbind, lapply(x$factors, encode))),
-       group_labels = as.character(group_labels))
+       factors = lapply(active, function(x) do.call(rbind, lapply(x$factors, encode))))
 }

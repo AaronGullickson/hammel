@@ -14,7 +14,6 @@ union_formation(
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
   diagnostics = FALSE,
-  group_prop_hazard = NULL,
   cohab_prob = NULL,
   cohab_matching = NULL,
   union_convert_rate = NULL,
@@ -33,7 +32,6 @@ set_union_formation(
   father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
   diagnostics = FALSE,
-  group_prop_hazard = NULL,
   cohab_prob = NULL,
   cohab_matching = NULL,
   union_convert_rate = NULL,
@@ -58,9 +56,9 @@ with selection weight halving five years on either side.}
 \item{rates}{For \code{"rate"} initiation, an age-specific female search-hazard
 table with \code{age_start}, \code{age_end}, and \code{rate}, in years and per person-year.
 These specify search attempts, not guaranteed realized union formation.
-An optional \code{group} column selects the woman's group. Without it, all groups
-share the schedule. Group does not restrict partner matching. With no
-population groups, simulation warns and selects the first alphabetical group.
+Columns named by declared group dimensions select the woman's categories;
+without them, all groups share the schedule. Groups do not restrict
+partner matching.
 See \code{\link[=mortality]{mortality()}} for group-label and rate-coverage rules.
 Nonoverlapping bands may have gaps or an open end; gaps and ages outside
 support have zero hazard. Optional \code{previous_union} supplies either
@@ -111,13 +109,6 @@ weights applied at the search that formed each union (0 for the reference
 group and when calibration cannot affect choices). Use the column for each alternative's
 group as a conditional-logit offset in wife-side choice sets.}
 
-\item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
-search-rate multipliers by the woman's group. Missing groups use 1.0;
-zero suppresses searches. Applies to shared or group-specific input rates.
-Without population groups, simulation warns and ignores multipliers.
-Requires \code{initiation = "rate"}; on-demand formation has no search hazard.
-Matching utilities and input rate tables are unchanged.}
-
 \item{cohab_prob}{Optional age-specific probability table with \code{age_start},
 \code{age_end}, \code{prob}, optionally \code{group} and \code{previous_union}. Enables typed
 unions only in rate mode. Age gaps mean zero. Optional \code{time_start} and
@@ -131,7 +122,8 @@ schedule; NULL shares the general \code{matching} model active at that search. M
 weights using their own intensities and share the available male pool.}
 
 \item{union_convert_rate}{Optional age- or duration-specific conversion table,
-optionally by woman's group. Duration uses the current cohabitation start.
+optionally by the partners' categories (\verb{<group>_w}, \verb{<group>_h} for a
+declared dimension). Duration uses the current cohabitation start.
 Uses \code{rate} and either age or duration boundaries, not both clocks, with no
 previous-union axis. NULL gives no conversions and warns at simulation.
 Conversion keeps partners, closes cohab with reason \code{conversion}, and starts

@@ -89,7 +89,7 @@ Accepted complete sets per group are {unpartnered,partnered} or
 {unpartnered,cohab,marriage}; no mixed or partial set. Shared partnered rates
 apply to both types. Omission means overall fertility as before. The old input
 column errors with migration guidance. Demographic observation strata use
-`union_type` with `by_union_type = TRUE`. Fertility cells are separate per effective schedule and
+`union_type` with `by = "union_type"`. Fertility cells are separate per effective schedule and
 actual birth spacing persists across all transitions; cell accounting covers them (D101).
 Type-specific fertility requires cohabitation mode. On-demand stays overall-only.
 
@@ -164,31 +164,24 @@ contribution sums at probability boundaries, partner exclusivity, linkage,
 restart/reproducibility and old untyped controls. Use offline synthetic inputs;
 no empirical rates or scientific acceptance thresholds are defaulted.
 
-## Fertility multiplier example
+## Fertility stratification example
 
-Use list names present in the supplied `union_type` schedule:
+Different group effects by union type are built by stratifying each type's
+rows and binding them (D132):
 
 ```r
-set_fertility(model, fertility_rates,
-  group_prop_hazard = list(
-    unpartnered = c(B = 1.1),
-    cohab = c(B = 1.2),
-    marriage = c(B = 0.9)
-  )
-)
+fertility_rates <- rbind(
+  stratify_rates(fert[fert$union_type == "unpartnered", ], list(group = c(A = 1, B = 1.1))),
+  stratify_rates(fert[fert$union_type == "cohab", ], list(group = c(A = 1, B = 1.2))),
+  stratify_rates(fert[fert$union_type == "marriage", ], list(group = c(A = 1, B = 0.9))))
+set_fertility(model, fertility_rates)
 ```
-
-For shared partnered rates, use `list(unpartnered = c(B = 1.1),
-partnered = c(B = 1.2))` instead. Omitted types and omitted groups use 1.
-A single named numeric vector applies to every supplied type. A list naming
-`partnered` against a three-type table, or `cohab` against a shared partnered
-table, errors rather than silently ignoring the factor.
 
 ## Union entry observations (D087)
 
 `calculate_union_rates()` replaces `calculate_marriage_rates()` and returns
 `rate_union`. By default entries pool direct marriages and cohabitations.
-`by_union_type = TRUE` requires typed histories and returns both types, including
+`by = "union_type"` requires typed histories and returns both types, including
 zero-entry cells. Each uses the same unpartnered person-years within its age,
 period, sex, group and previous-union stratum. Thus type-specific rates sum to
 the pooled rate wherever exposure is positive; exposure is repeated, not divided
@@ -198,7 +191,7 @@ supported for pooled observation but cannot establish a type split.
 
 ## Marriage entry observations (D088)
 
-`calculate_marriage_rates(population, time_breaks, age_breaks, by_group = FALSE, by_previous_union = FALSE)`
+`calculate_marriage_rates(population, time_breaks, age_breaks, by = NULL)`
 counts every marriage start, including conversion, over person-years outside
 marriage. Cohabitation contributes exposure continuously until conversion,
 dissolution, partner death or observation censoring. Direct marriages and
@@ -220,18 +213,19 @@ without an additional partnership entry.
 
 ## Dissolution observations by type
 
-`calculate_dissolution_rates(..., by_union_type = TRUE)` returns separate cohab
-and marriage rows, optionally crossed with `group_pair`. Each episode contributes
+`calculate_dissolution_rates(..., by = "union_type")` returns separate cohab
+and marriage rows, optionally crossed with partners' categories such as
+`race_w` and `race_h`. Each episode contributes
 its own type's union-years and dissolution events. Conversion ends cohabitation
 exposure without counting as dissolution, and the linked marriage starts at
 duration zero. Both types and empty cells are retained; zero exposure gives NA.
-The default FALSE pools counts and exposure before calculating rates. Splitting
+Without `union_type` in `by`, counts and exposure are pooled before calculating rates. Splitting
 requires a valid `union_type` column, including for bare union tables.
 
 
 ## Demographic rates by current union type
 
-`calculate_fertility_rates(..., by_union_type = TRUE)` replaces `include_unions`.
+`calculate_fertility_rates(..., by = "union_type")` replaces `include_unions`.
 It returns a disjoint partition labeled `union_type`: unpartnered plus the types
 discovered in union histories, without overall rows. Untyped histories retain
 partnered/unpartnered; typed empty histories have only unpartnered. FALSE keeps
@@ -245,7 +239,7 @@ typed histories are rejected; untyped overlap merging remains supported.
 ## Cohabitation conversion observations
 
 `calculate_cohab_convert_rate(population, time_breaks, dur_breaks = NULL,
-age_breaks = NULL, by_group = FALSE)` requires typed population histories and
+age_breaks = NULL, by = NULL)` requires typed population histories and
 exactly one duration/age axis. Duration is elapsed years since each cohabitation
 began; age is the woman's attained age, matching the conversion input schedule.
 Each cohabitation contributes union-years once, ending at conversion,

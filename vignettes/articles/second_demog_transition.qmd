@@ -371,7 +371,7 @@ calculate_marriage_rates(
   pop_start,
   time_breaks = c(1942, 1992),
   age_breaks = c(16, seq(20, 60, 5), 70, 80, Inf),
-  by_previous_union = TRUE
+  by = "previous_union"
 ) |>
   filter(sex == "f", previous_union == "none") |>
   left_join(
@@ -533,7 +533,7 @@ calculate_fertility_rates(
   pop_change, 
   age_breaks = c(16, 20, 25, 30, 35, 40, 45),
   time_breaks = c(1992, 2019), 
-  by_union_type = TRUE
+  by = "union_type"
 ) |>
   calculate_tfr()
 ```
@@ -548,7 +548,7 @@ calculate_dissolution_rates(
   pop_change,
   1992:2019,
   dur_breaks = seq(0, 45, 5),
-  by_union_type = TRUE,
+  by = "union_type",
   conf.level = 0.95
 ) |>
   filter(union_type == "marriage", time_start %in% c(1992, 2000, 2010, 2018)) |>
@@ -574,7 +574,7 @@ calculate_dissolution_rates(
   pop_change,
   c(1992, 1998, 2005, 2019),
   dur_breaks = c(0, 5),
-  by_union_type = TRUE,
+  by = "union_type",
   conf.level = 0.95
 ) |>
   filter(union_type == "cohab") |>
@@ -600,7 +600,7 @@ mar_rates_observed <- calculate_union_rates(
   pop_change,
   1992:2019,
   c(16, seq(20, 60, 5), 70, 80),
-  by_previous_union = TRUE,
+  by = "previous_union",
   conf.level = 0.95,
   pool_dissolved = TRUE
 ) |>
@@ -631,7 +631,7 @@ calculate_union_rates(
   pop_change,
   c(1992, 1995:2019),
   c(0, Inf),
-  by_union_type = TRUE,
+  by = "union_type",
   conf.level = 0.95
 ) |>
   filter(sex == "f") |>

@@ -5,7 +5,7 @@ parity_observation_history <- function() {
     death_time = c(NA, NA, -.5, NA, NA),
     mother_id = c(NA, NA, 10, 10, 10), father_id = NA_real_,
     group = c("A", "B", "B", "B", "A"), parity = 99L)
-  hammel_population(persons, end_time = 3)
+  hammel_population(persons, end_time = 3, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("separate rates contain only their process summaries", {
@@ -42,9 +42,9 @@ test_that("parity pools across group, time, age and union type exactly", {
     previous_cohab_id=c(NA,1))
   # Both births are birth-first ties: cohab at conversion, marriage at dissolution.
   x <- calculate_fertility_rates(pop,c(0,1,2,3),c(0,20,22,Inf),
-    by_group=TRUE,by_union_type=TRUE,parity_breaks=0:3)
+    by = c("group", "union_type"),parity_breaks=0:3)
   pooled <- calculate_fertility_rates(pop,c(0,1,2,3),c(0,20,22,Inf),
-    by_group=TRUE,by_union_type=TRUE)
+    by = c("group", "union_type"))
   cols <- c("time_start","time_end","age_start","age_end","group","union_type")
   # Summing parity rows within each stratum recovers the pooled table (base R,
   # so tests need no packages beyond those declared in DESCRIPTION).
@@ -64,8 +64,8 @@ test_that("parity boundaries and empty histories are validated", {
   pop <- parity_observation_history()
   for (bad in list(c(1,2),c(0,.5,Inf),c(0,0,Inf),c(0,NA,Inf),c(-1,0,Inf)))
     expect_error(calculate_fertility_rates(pop,c(0,3),c(0,Inf),parity_breaks=bad),"parity_breaks")
-  empty <- hammel_population(pop$persons[FALSE,],end_time=3)
-  x <- calculate_fertility_rates(empty,c(0,3),c(0,Inf),by_group=TRUE,parity_breaks=c(0,Inf))
+  empty <- hammel_population(pop$persons[FALSE,],end_time=3, groups = if ("group" %in% names(pop$persons[FALSE,])) "group")
+  x <- calculate_fertility_rates(empty,c(0,3),c(0,Inf),by = "group",parity_breaks=c(0,Inf))
   expect_s3_class(x,"tbl_df")
   expect_equal(nrow(x),0L)
   expect_type(x$rate_fertility,"double")

@@ -9,9 +9,10 @@ calculate_transition_rates(
   time_breaks,
   age_breaks = NULL,
   dur_breaks = NULL,
-  by_sex = FALSE,
-  by_union_type = FALSE,
-  conf.level = NULL
+  by = NULL,
+  conf.level = NULL,
+  pool_dissolved = FALSE,
+  group = NULL
 )
 }
 \arguments{
@@ -26,32 +27,44 @@ complete person, transition and (when requested) union histories.}
 boundaries. Supply exactly one of age_breaks and dur_breaks. A finite final
 axis boundary gains Inf.}
 
-\item{by_sex}{Logical, default FALSE. Disaggregate by \code{sex} (m/f).}
-
-\item{by_union_type}{Logical, default FALSE. Disaggregate exposure and events
-by current union type. Typed histories use unpartnered/cohab/marriage;
-untyped histories use unpartnered/partnered. Requires exclusive histories.}
+\item{by}{\code{NULL} (default) or a character vector of variables to split
+results over: \code{"sex"}, \code{"union_type"} (current union state; typed
+histories use unpartnered/cohab/marriage, untyped unpartnered/partnered)
+and \code{"previous_union"}, as in \code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}, and other
+declared group dimensions (the person's category there at the time; only
+moves in \code{group} count, and duration is unaffected by moves in other
+dimensions). Union variables require exclusive histories. A transition counts under the union
+state after same-time union changes, which precede transitions.}
 
 \item{conf.level}{NULL (default) to omit confidence intervals, or a finite
 numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
 from two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} intervals for observed event
 counts over exposure. Bounds are NA at zero exposure. For fertility, these
 describe the observed rate, not the unrealized-adjusted rate.}
+
+\item{pool_dissolved}{Logical, default \code{FALSE}. With \code{TRUE} and
+\code{"previous_union"} in \code{by}, combine separated and widowed as \code{"dissolved"}.}
+
+\item{group}{The declared group dimension whose transitions are counted.
+\code{NULL} (default) means the only declared dimension.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, age or duration bounds,
-\code{group_origin}, \code{group_dest}, optional \code{sex} and \code{union_type}, \code{person_years},
+\code{origin}, \code{destination}, the \code{by} columns, \code{person_years},
 \code{transitions}, and \code{rate_transition} (NA at zero exposure). All distinct
 directed pairs among current and historical identities are retained,
 including zero-event cells. Fewer than two known groups returns a typed
-empty tibble. Period varies fastest within axis bands and pair blocks.
+empty tibble. Rows vary by time fastest, then the axis band, then
+destination, then origin, then the \code{by} variables in the order given.
 With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
 }
 \description{
-Count individual moves and person-years in their origin group in half-open
+Count individual moves and person-years in their origin category of one
+group dimension in half-open
 Lexis cells. Each outgoing destination shares its origin's exposure: do not
 sum denominators across destinations. Duration is years since the latest
-group entry, or age before the first recorded transition; return moves reset
+entry into a category of this dimension, or age before its first recorded
+transition; return moves reset
 duration and union changes do not. Events use the exiting group's duration.
 Death and competing moves end exposure. Rates are cause-specific hazards,
 not transition probabilities. Internal-boundary events enter the cell
@@ -62,6 +75,6 @@ persons <- data.frame(person_id = 1, sex = "f", birth_time = 0,
   death_time = NA_real_, mother_id = NA_real_, father_id = NA_real_, group = "B")
 population <- hammel_population(persons, end_time = 5,
   transitions = data.frame(person_id = 1, time = 2,
-    group_origin = "A", group_dest = "B"))
+    origin = "A", destination = "B"), groups = "group")
 calculate_transition_rates(population, c(0, 5), age_breaks = c(0, Inf))
 }

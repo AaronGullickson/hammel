@@ -1,13 +1,14 @@
 #' Specify newborn group identity inheritance
 #'
 #' Assign one group independently of genealogical ancestry shares. Attach this
-#' object with [fertility()] or [set_fertility()]. The default selects either
+#' object to a dimension with [group()]. The default selects either
 #' parent with equal probability, with maternal fallback.
 #' Existing people are not reassigned, and ancestry is unchanged by assignment.
-#' Fertility also accepts a schedule tibble with `time_start`, `time_end`, and a
+#' [group()] also accepts a schedule tibble with `time_start`, `time_end`, and a
 #' `model` list column containing complete inheritance objects. Half-open
-#' absolute-year intervals select the model at birth; all scheduled possible
-#' identities enter one shared registry before execution. See [fertility()].
+#' absolute-year intervals select the model at birth. A custom rule must return
+#' one of the dimension's categories; declare categories that may only appear
+#' later in [group()].
 #'
 #' @param method One of `"mother"`, `"father"`, `"random_parent"`, `"same_sex"`,
 #'   `"opposite_sex"`, `"ancestry"`, `"hierarchy"`, or `"custom"`.
@@ -22,14 +23,11 @@
 #'   (logical union status at birth, including on-demand formation). Nonmarital
 #'   births and unknown fathers give FALSE. Older callbacks without this new
 #'   argument or `...` remain supported. Use `...` for unused inputs.
-#'   Ancestry vectors have `group_<label>`/`unknown` names. A missing father has
+#'   Ancestry vectors (the dimension's own shares, when it tracks ancestry)
+#'   are named by category and `unknown`. A missing father has
 #'   NA group and NULL ancestry. Return exactly one nonmissing identity in the
 #'   possible group set. Ordinary R random draws are supported; functions must
 #'   not mutate simulation/global state. Invalid returns and errors fail.
-#' @param groups Optional unique group labels extending the inferred possible
-#'   identities (starting groups plus ancestry groups with positive shares).
-#'   Declare any additional custom outputs here. Grouped rates and categorical
-#'   matching levels must cover the complete set before simulation.
 #' @param order For `"hierarchy"`, unique group labels, highest-ranked first.
 #'   Choose between parental identities, not ancestry. Complex orders use `fun`.
 #' @param passing For `"hierarchy"`, probability in `[0,1]` of reversing the
@@ -40,13 +38,13 @@
 #' @examples
 #' create_group_inheritance("mother")
 #' create_group_inheritance("hierarchy", order = c("A", "B"), passing = 0.05)
-#' create_group_inheritance("custom", groups = "mixed",
+#' create_group_inheritance("custom",
 #'   fun = function(mother_group, father_group, ...) {
 #'     if (is.na(father_group) || mother_group == father_group) mother_group else "mixed"
 #'   })
-create_group_inheritance <- function(method = "random_parent", fun = NULL, groups = NULL,
+create_group_inheritance <- function(method = "random_parent", fun = NULL,
                                      order = NULL, passing = 0) {
-  model <- structure(list(method = method, fun = fun, groups = groups,
+  model <- structure(list(method = method, fun = fun,
                           order = order, passing = passing), class = "hammel_group_inheritance")
   validate_group_inheritance(model)
   model
@@ -73,7 +71,7 @@ validate_group_inheritance <- function(model) {
     stop("`inheritance` must be created with create_group_inheritance().", call. = FALSE)
   if (!is.character(model$method) || length(model$method) != 1L || is.na(model$method) ||
       !model$method %in% inheritance_methods()) stop("Invalid group inheritance method.", call. = FALSE)
-  for (field in c("groups", "order")) {
+  for (field in "order") {
     value <- model[[field]]
     if (!is.null(value)) {
       check_groups(tibble::tibble(group = value), field)
@@ -108,26 +106,15 @@ extend_identity_groups <- function(values, additions) {
   c(as.character(values), extra)
 }
 
-prepare_group_inheritance <- function(model, population, registry = NULL) {
+# Engine form of one dimension's inheritance rule. `values` are the
+# dimension's categories and `components` its ancestry columns (categories
+# with shares, then unknown), empty when ancestry is not tracked.
+prepare_group_inheritance <- function(model, values, components = character()) {
   model <- normalize_group_inheritance(model)
-  if (!"group" %in% names(population$persons)) {
-    if (!model$method %in% c("mother", "random_parent") || length(model$groups))
-      stop("Group inheritance requires population group identities.", call. = FALSE)
-    values <- NULL
-  } else {
-    values <- unique(population$persons$group)
-    values <- extend_identity_groups(values, population$.transition_groups)
-    ancestry <- population[["ancestry"]]
-    known <- setdiff(names(ancestry), c("person_id", "unknown"))
-    positive <- known[vapply(ancestry[known], function(x) any(x > 0), logical(1))]
-    values <- extend_identity_groups(values, c(substring(positive, 7L), as.character(model$groups)))
-  }
-  if (!is.null(registry)) values <- registry
   labels <- as.character(values)
-  components <- setdiff(names(population[["ancestry"]]), "person_id")
   ranks <- match(labels, as.character(model$order)) - 1L
   ranks[is.na(ranks)] <- -1L
-  ancestry_groups <- match(substring(setdiff(components, "unknown"), 7L), labels) - 1L
+  ancestry_groups <- match(setdiff(components, "unknown"), labels) - 1L
   ancestry_groups[is.na(ancestry_groups)] <- -1L
   custom <- function(mother, father, sex, maternal, paternal, child, parents_in_union) {
     inputs <- list(

@@ -6,7 +6,7 @@ marriage_entry_history <- function() {
     start_time = c(1, 3), end_time = c(3, NA),
     end_reason = c("conversion", NA), union_type = c("cohab", "marriage"),
     previous_cohab_id = c(NA_integer_, 1L))
-  hammel_population(persons, unions, end_time = 5)
+  hammel_population(persons, unions, end_time = 5, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("marriage entry includes conversion and nonmarried exposure", {
@@ -19,7 +19,7 @@ test_that("marriage entry includes conversion and nonmarried exposure", {
   expect_equal(marriage$rate_marriage, c(1/3,1/3))
   expect_equal(union$person_years, c(1,1))
   expect_equal(union$unions, c(1,1))
-  grouped <- calculate_marriage_rates(pop, c(0,5), c(0,Inf), by_group = TRUE)
+  grouped <- calculate_marriage_rates(pop, c(0,5), c(0,Inf), by = "group")
   expect_equal(sum(grouped$marriages), 2)
   expect_equal(sum(grouped$person_years), 6)
   expect_equal(grouped$group, rep(c("A", "B"), each = 2))
@@ -63,7 +63,7 @@ test_that("direct and legacy marriages retain existing exposure accounting", {
   expect_equal(x$person_years,c(5,2))
   expect_equal(x$marriages,c(0,0))
   expect_error(calculate_marriage_rates(pop,c(0,6),c(0,Inf)),"endpoint")
-  expect_error(calculate_marriage_rates(pop,c(0,5),c(0,Inf),by_group=NA),"by_group")
+  expect_error(calculate_marriage_rates(pop,c(0,5),c(0,Inf), by = NA), "`by` must")
   pop$persons <- pop$persons[0, ]
   pop$ancestry <- pop$ancestry[0, ]
   expect_s3_class(calculate_marriage_rates(pop,c(0,5),c(0,Inf)),"tbl_df")
@@ -94,15 +94,13 @@ test_that("marriage previous categories include cohabiting exposure and conversi
   prior$previous_cohab_id <- NA_integer_
   pop$unions <- rbind(prior, pop$unions)
   for (grouped in c(FALSE, TRUE)) {
-    pooled <- calculate_marriage_rates(pop,c(0,5),c(0,Inf),by_group=grouped)
-    split <- calculate_marriage_rates(pop,c(0,5),c(0,Inf),by_group=grouped,
-      by_previous_union=TRUE)
+    pooled <- calculate_marriage_rates(pop,c(0,5),c(0,Inf), by = if (isTRUE(grouped)) "group")
+    split <- calculate_marriage_rates(pop,c(0,5),c(0,Inf), by = c(if (isTRUE(grouped)) "group", "previous_union"))
     expect_equal(sum(split$person_years),sum(pooled$person_years))
     expect_equal(sum(split$marriages),sum(pooled$marriages))
     expect_equal(sum(split$person_years[split$previous_union == "separated"]),6)
     expect_equal(sum(split$marriages[split$previous_union == "separated"]),2)
     expect_equal(sum(split$person_years[split$previous_union != "separated"]),0)
   }
-  expect_error(calculate_marriage_rates(pop,c(0,5),c(0,Inf),
-    by_previous_union=NA),"TRUE or FALSE")
+  expect_error(calculate_marriage_rates(pop,c(0,5),c(0,Inf), by = NA), "`by` must")
 })

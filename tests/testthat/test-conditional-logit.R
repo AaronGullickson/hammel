@@ -21,7 +21,8 @@ exact_draws <- function(matching, gaps, draws, groups = 1L, male_group = integer
                         female_group = 0L, log_weights = numeric(groups), excluded = logical(length(gaps)),
                         labels = NULL, female_born = -20) {
   inspect_exact_draw_cpp(female_born - gaps, male_group, excluded, female_born, female_group, log_weights,
-                         prepare_matching_model(matching, labels), groups, 0, 15, draws)
+                         prepare_matching_model(as_internal_matching(matching, labels), labels),
+                         groups, 0, 15, draws)
 }
 
 test_that("exact full-pool draws follow conditional-logit probabilities, including rare men", {
@@ -64,8 +65,7 @@ test_that("exact draws handle pools, age edges, kin, group weights and custom fo
   expect_equal(exact_draws(matching, gaps, 10, excluded = rep(TRUE, length(gaps)))$failures, 10L)
   expect_equal(exact_draws(matching, numeric(), 3)$failures, 3L)
   # Group weights and hard restrictions enter the exact probabilities.
-  pair <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1),
-    prevent_exogamy = "A:C")
+  pair <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1, "A:C" = NA))
   groups <- rep(0:2, 100)
   result <- exact_draws(pair, gaps[1:300], 150000, groups = 3L, male_group = groups,
                         log_weights = c(0, 0.7, 0.2), labels = c("A", "B", "C"))

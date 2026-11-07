@@ -39,8 +39,8 @@ reads the cells (the former calibration tracker is gone). Weight models
 choose who in a cell experiences an event (D129). See
 [cell scheduling and weight models](binned-group-hazards.md), including its
 deferred issues. The user plans, after the milestone, to add `set.seed()` to
-the articles and to replace `group_prop_hazard` with a general `stratify()`
-input. The user then reordered the roadmap (D131): multiple group columns are
+the articles; `group_prop_hazard` has since been replaced by
+`stratify_rates()` (D132). The user then reordered the roadmap (D131): multiple group columns are
 next as milestone 9, external immigration is 10, and summaries, diagnostics
 and helpers move to 11. Milestone 9's schema and mechanisms are still to
 specify.
@@ -77,7 +77,7 @@ questions are preserved in the roadmap. No household mechanism is implemented.
 
 D126 uses detailed previous-union categories `none`/`separated`/`widowed`, or
 pooled `none`/`dissolved`, consistently for search and probability inputs.
-Union/marriage calculators use `by_previous_union = TRUE` with optional
+Union/marriage calculators use `by = "previous_union"` with optional
 `pool_dissolved = TRUE`; confidence limits use combined counts/exposure.
 Recent review fixes retain run-anchored unrealized-birth accounting and restrict
 execution group-coverage checks to active run slices. The last recorded full

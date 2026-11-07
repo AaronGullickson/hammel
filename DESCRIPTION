@@ -4,7 +4,7 @@ Version: 0.0.0.9000
 Authors@R: 
     person("Aaron", "Gullickson", , "aarongullickson@gmail.com", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0001-7237-8131"))
-Description: Demographic micro-simulation in the spirit of SOCSIM but with modern tools 
+Description: Demographic micro-simulation in the spirit of SOCSIM but with modern tools.
 License: MIT + file LICENSE
 Depends:
     R (>= 4.1.0)

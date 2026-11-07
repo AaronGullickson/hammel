@@ -5,7 +5,7 @@ cell_model <- function(n = 2000, rate = .2, spacing = .75, age = 20,
   people <- data.frame(person_id = seq_len(n), sex = "f", birth_time = -age,
     death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
   hammel_model() |>
-    set_population(hammel_population(people, end_time = 0)) |>
+    set_population(hammel_population(people, end_time = 0, groups = if ("group" %in% names(people)) "group")) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(rates, birth_interval = spacing) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
@@ -128,13 +128,14 @@ test_that("cell mode runs with groups, union types, cohabitation, matching and r
   set.seed(5)
   base <- create_baseline_population(1500, max_age = 60)
   base$persons$group <- sample(c("A", "B"), 1500, TRUE)
+  base$groups <- list(group = group())
   fert <- data.frame(age_start = c(15, 25, 35), age_end = c(25, 35, 50), rate = c(.1, .12, .04))
   sf <- rbind(transform(fert, union_type = "unpartnered", rate = rate * .3),
               transform(fert, union_type = "cohab", rate = rate * .8),
               transform(fert, union_type = "marriage"))
   mort <- data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .01)
   model <- hammel_model() |> set_population(base) |> set_mortality(mort) |>
-    set_fertility(sf, group_prop_hazard = c(A = 1, B = 1.4)) |>
+    set_fertility(stratify_rates(sf, list(group = c(A = 1, B = 1.4)))) |>
     set_union_formation("rate",
       create_matching_model(~ age_difference, c(age_difference = -.1), group_exogamy = c("A:B" = -1)),
       rates = data.frame(age_start = 15, age_end = Inf, rate = .15),
@@ -242,7 +243,7 @@ test_that("released eligibility does not consume blocked time or force a birth",
   one <- data.frame(person_id = 1, sex = "f", birth_time = -15, death_time = NA_real_,
                     mother_id = NA_real_, father_id = NA_real_)
   long <- hammel_model() |>
-    set_population(hammel_population(one, end_time = 0)) |>
+    set_population(hammel_population(one, end_time = 0, groups = if ("group" %in% names(one)) "group")) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 1000, rate = 2),
                   birth_interval = .75, ffab = 0) |>
@@ -297,7 +298,7 @@ test_that("calculate_fertility_rates attributes unrealized births exactly or ret
   expect_true(is.na(both$unrealized_births[both$time_start == 0 & both$age_start == 15]))
   expect_false(is.na(both$unrealized_births[both$time_start == 1.5 & both$age_start == 15]))
   # Overall schedules cannot be split by union type.
-  typed <- calculate_fertility_rates(pop, c(0, 1.5), c(15, 50), by_union_type = TRUE,
+  typed <- calculate_fertility_rates(pop, c(0, 1.5), c(15, 50), by = "union_type",
                                      unrealized = TRUE)
   expect_true(all(is.na(typed$unrealized_births[typed$age_start == 15])))
   # A population that was never simulated has no unrealized record.
@@ -350,8 +351,7 @@ test_that("unrealized births follow group and union-type strata and refuse parit
     set_union_formation("rate", rates = data.frame(age_start = 15, age_end = Inf, rate = 0),
                         cancel_birth_if_no_match = FALSE)
   pop <- simulate(model, 1, seed = 6)
-  r <- calculate_fertility_rates(pop, c(0, 1), c(15, 50), by_group = TRUE,
-                                 by_union_type = TRUE, unrealized = TRUE)
+  r <- calculate_fertility_rates(pop, c(0, 1), c(15, 50), by = c("group", "union_type"), unrealized = TRUE)
   r <- r[r$age_start == 15, ]
   cell <- r$group == "A" & r$union_type == "unpartnered"
   expect_count(r$unrealized_births[cell], .5 * n)

@@ -23,9 +23,9 @@ columns do not automatically create supported rate strata.
 | Mortality: `set_mortality(model, rates)` | Age only | `sex`: both `m` and `f` | Individual `group` |
 | Fertility: `set_fertility(model, rates)` | Age only | Women; no `sex` column | Mother's `group`; `union_type`; current-parity bands `parity_start`/`parity_end` |
 | Union-search attempts: `set_union_formation(model, "rate", rates = rates)` | Age, or duration since the most recent partnership ended | Currently unpartnered women | Woman's `group`; `previous_union`: `none`, `separated`, `widowed` |
-| Union dissolution: `set_union_dissolution(model, rates)` | Duration since the current union episode began | One risk per union, carried by the woman | Symmetric `group_pair`; `union_type`: `cohab`/`marriage` |
+| Union dissolution: `set_union_dissolution(model, rates)` | Duration since the current union episode began | One risk per union, carried by the woman | Directional `<group>_w`/`<group>_h`; `union_type`: `cohab`/`marriage` |
 | Cohabitation-to-marriage conversion: `union_convert_rate` on union formation | Woman's age or duration since the current cohabitation began | Currently cohabiting women | Woman's `group` |
-| Individual group transitions: `set_group_transition(model, rates)` | Age or duration since latest group entry; age without earlier transition history | Directed `group_origin` and `group_dest` | `sex`; current `union_type` |
+| Individual group transitions: `set_group_transition(model, rates, group)` | Age or duration since latest entry into the current category of that dimension; age without earlier transition history | Directed `origin` and `destination`; other declared dimensions | `sex`; current `union_type` |
 
 Age bands use `age_start`/`age_end`; duration bands use
 `dur_start`/`dur_end`. No existing input supports a joint age-by-duration
@@ -91,11 +91,12 @@ See [remarriage schedules](remarriage.md) and [cohabitation](cohabitation.md).
 
 ### Union dissolution
 
-`group_pair` is symmetric: `A:B` and `B:A` select the same rate. Pair-stratified
-tables must cover all unordered pairs in the possible identity registry.
-There are no directional wife-group/husband-group strata. If `union_type` is
-supplied, both `cohab` and `marriage` schedules are required within each pair
-stratum; omission shares rates across types. Duration gaps have zero hazard.
+Group strata are directional: `<group>_w` and `<group>_h` hold the wife's and
+husband's categories of a declared dimension, and either may be omitted to
+pool over it. A symmetric rate lists both directions. Stratified tables must
+cover every combination of the used columns' categories, including future
+identities. If `union_type` is supplied, both `cohab` and `marriage` schedules
+are required within each group stratum; omission shares rates across types. Duration gaps have zero hazard.
 
 Rates are per union-year, with one clock per episode. Conversion closes the
 cohabitation and starts a marriage episode with dissolution duration zero.
@@ -145,14 +146,13 @@ cohabitation and marriage searches by this probability.
 
 See [cohabitation](cohabitation.md).
 
-## Proportional rate multipliers
+## Proportional stratification
 
-`group_prop_hazard` supplies static, dimensionless multipliers on mortality,
-fertility, union-search and dissolution rates. Mortality, fertility and search
-use individual group labels; dissolution uses symmetric group-pair labels.
-Omitted factors use one. Fertility also permits separate group multiplier
-vectors by the supplied union-type categories. Conversion and group transitions
-have no corresponding multiplier argument.
+`stratify_rates(rates, by)` (D132) adds proportional strata to any rate table
+before it is attached, replacing the former `group_prop_hazard` arguments. It
+works for every rate process, including conversion and transitions, and the
+factors can differ by calendar band because stratified rows keep their bands.
+See [groups](groups.md#proportional-stratification-with-stratify_rates-d132).
 
 These vectors have no age or duration bands of their own; they scale the
 selected rate schedule. They are distinct from matching preferences,

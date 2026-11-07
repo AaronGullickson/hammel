@@ -30,7 +30,7 @@ test_that("cohabitation validates probability, conversion, type coverage and rat
   expect_error(set_union_formation(model, "rate", rates = model$processes$union_formation$rates,
     cohab_matching = create_age_gap_matching_model(0,5)), "require.*cohab_prob")
   bad <- model; bad$processes$union_formation$union_convert_rate$previous_union <- "none"
-  expect_error(simulate(bad, 0), "without previous_union")
+  expect_error(simulate(bad, 0), "Conversion rates cannot be stratified by `previous_union`")
   expect_error(fertility(data.frame(age_start=15,age_end=50,rate=.1,union_status="partnered")), "replaced")
   expect_error(fertility(data.frame(age_start=15,age_end=50,rate=.1,union_type=c("unpartnered","cohab"))), "union_type")
   expect_error(union_dissolution(data.frame(dur_start=0,dur_end=Inf,rate=.1,union_type="cohab")), "both cohab and marriage")
@@ -71,7 +71,7 @@ test_that("conversion preserves partners, resets dissolution duration and links 
   # Current partnership is continuous and conversion is not a second entry.
   rates <- calculate_union_rates(late, c(0,3), c(0,Inf))
   expect_equal(sum(rates$unions), 2)
-  counts <- collect_demographic_counts(late, c(0,3), c(0,Inf), TRUE)
+  counts <- demographic_counts(late, c(0,3), c(0,Inf), by = "union_type")
   expect_equal(sum(subset(counts, union_type != "unpartnered")$person_years), 6)
   schedule <- data.frame(union_type=c("cohab","marriage"),dur_start=c(0,1),dur_end=Inf,rate=c(0,1e5))
   model <- set_union_dissolution(model, schedule)
@@ -131,31 +131,30 @@ test_that("cohabitation endings restore legal status by default and support the 
   }
 })
 
-test_that("fertility multiplier lists follow the selected type schedule", {
+test_that("type-specific group strata built by binding stratified subsets", {
   model <- cohab_fixture(40)
   model$population$persons$sex[1:20] <- "f"
   model$population$persons$group <- rep(c("A","B"),20)
+  model$population$groups <- list(group = group())
   typed <- data.frame(age_start=15,age_end=50,union_type=c("unpartnered","cohab","marriage"),rate=c(.03,.15,.1))
-  factors <- list(unpartnered=c(B=.8),cohab=c(A=1.2,B=.9),marriage=c(B=1.1))
-  implicit <- set_fertility(model,typed,group_prop_hazard=factors,birth_interval=.1)
-  explicit <- rbind(transform(typed,group="A"),transform(typed,group="B"))
-  for (i in seq_len(nrow(explicit))) {
-    x <- factors[[explicit$union_type[i]]]
-    if (explicit$group[i] %in% names(x)) explicit$rate[i] <- explicit$rate[i] * x[[explicit$group[i]]]
-  }
-  reference <- set_fertility(model,explicit,birth_interval=.1)
+  factors <- list(unpartnered=c(A=1,B=.8),cohab=c(A=1.2,B=.9),marriage=c(A=1,B=1.1))
+  stratified <- do.call(rbind, lapply(names(factors), function(type)
+    stratify_rates(typed[typed$union_type==type,],list(group=factors[[type]]))))
+  implicit <- set_fertility(model,stratified,birth_interval=.1)
+  explicit <- stratified
+  explicit$rate <- typed$rate[match(explicit$union_type,typed$union_type)] *
+    mapply(function(type,group) factors[[type]][[group]], explicit$union_type, explicit$group)
+  reference <- set_fertility(model,as.data.frame(explicit),birth_interval=.1)
   expect_identical(simulate(implicit,2,617),simulate(reference,2,617))
-  expect_error(fertility(typed,group_prop_hazard=list(partnered=c(A=1.2))),"must occur")
-  shared <- data.frame(age_start=15,age_end=50,union_type=c("unpartnered","partnered"),rate=c(.03,.1))
-  expect_error(fertility(shared,group_prop_hazard=list(cohab=c(A=1.2))),"must occur")
-  expect_s3_class(fertility(typed,group_prop_hazard=list(cohab=c(B=1.1))),"hammel_fertility")
+  expect_error(stratify_rates(typed,list(union_type=c(cohab=1))),"already has")
 })
 
 test_that("cohabitation and marriage use distinct matching and diagnostic weights", {
   model <- cohab_fixture(600,.5)
   model$population$persons$sex[1:300] <- "f"
   model$population$persons$group <- rep(c("A","B"),300)
-  model$processes$union_formation$matching <- create_matching_model(~1,numeric(),prevent_exogamy=TRUE)
+  model$population$groups <- list(group = group())
+  model$processes$union_formation$matching <- create_matching_model(~1,numeric(),group_exogamy = NA)
   model$processes$union_formation$cohab_matching <- create_matching_model(~1,numeric(),group_exogamy=c("A:B"=10))
   model$processes$union_formation$diagnostics <- TRUE
   result <- simulate(model,.3,713)
@@ -174,6 +173,7 @@ test_that("cohab probabilities select group and previous category and require co
   model <- cohab_fixture(200)
   model$population$persons$sex[1:100] <- "f"
   model$population$persons$group <- rep(c("A","B"),100)
+  model$population$groups <- list(group = group())
   p <- expand.grid(group=c("A","B"),previous_union=c("none","separated","widowed"),stringsAsFactors=FALSE)
   p$age_start <- 15; p$age_end <- Inf
   p$prob <- as.numeric(p$group=="B" & p$previous_union=="none")
@@ -236,17 +236,18 @@ test_that("earlier legal history governs subsequent searches after cohabitant de
   }
 })
 
-test_that("typed dissolution retains symmetric pair hazards and multipliers", {
+test_that("typed dissolution retains symmetric pair hazards", {
   model <- initial_cohabs(3,conversion=0,breakup=0)
   model$population$persons$group <- c("A","B","A","A","B","B")
-  rates <- expand.grid(group_pair=c("A:A","A:B","B:B"),union_type=c("cohab","marriage"),stringsAsFactors=FALSE)
+  model$population$groups <- list(group = group())
+  rates <- expand.grid(group_w=c("A","B"),group_h=c("A","B"),union_type=c("cohab","marriage"),stringsAsFactors=FALSE)
   rates$dur_start <- 0; rates$dur_end <- Inf
-  rates$rate <- ifelse(rates$union_type=="cohab" & rates$group_pair=="A:B",1e5,0)
+  rates$rate <- ifelse(rates$union_type=="cohab" & rates$group_w!=rates$group_h,1e5,0)
   model <- set_union_dissolution(model,rates)
   result <- simulate(model,.1,42)
   expect_equal(result$simulation$dissolutions,1)
   expect_equal(result$unions$end_reason[1],"dissolution")
-  model <- set_union_dissolution(model,rates,group_prop_hazard=c("B:A"=0))
+  model <- set_union_dissolution(model,transform(rates,rate=ifelse(group_w!=group_h,0,rate)))
   expect_equal(simulate(model,.1,42)$simulation$dissolutions,0)
 })
 
@@ -257,15 +258,13 @@ test_that("union entry types share exposure and exclude conversion", {
       mother_id = NA_integer_, father_id = NA_integer_, group = c("A", "B", "A", "B")),
     data.frame(union_id = 1:3, wife_id = 1, husband_id = 2:4,
       start_time = c(1, 3, 5), end_time = c(2, 4, NA),
-      end_reason = c("dissolution", "death_husband", NA)), end_time = 6)
+      end_reason = c("dissolution", "death_husband", NA)), end_time = 6, groups = "group")
   pop <- history()
   pop$unions$union_type <- c("cohab", "marriage", "cohab")
   for (previous in c(FALSE, TRUE)) {
     for (duration in list(NULL, c(0, 1, Inf))) {
-      pooled <- calculate_union_rates(pop, c(0, 6), c(0, Inf),
-        by_previous_union = previous, dur_breaks = duration)
-      typed <- calculate_union_rates(pop, c(0, 6), c(0, Inf),
-        by_previous_union = previous, dur_breaks = duration, by_union_type = TRUE)
+      pooled <- calculate_union_rates(pop, c(0, 6), c(0, Inf), dur_breaks = duration, by = if (isTRUE(previous)) "previous_union")
+      typed <- calculate_union_rates(pop, c(0, 6), c(0, Inf), dur_breaks = duration, by = c(if (isTRUE(previous)) "previous_union", "union_type"))
       cohab <- subset(typed, union_type == "cohab")
       marriage <- subset(typed, union_type == "marriage")
       expect_equal(cohab$person_years, pooled$person_years)
@@ -274,16 +273,15 @@ test_that("union entry types share exposure and exclude conversion", {
       expect_equal(cohab$rate_union + marriage$rate_union, pooled$rate_union)
     }
   }
-  grouped <- calculate_union_rates(pop, c(0,6), c(0,Inf), by_group = TRUE,
-    by_previous_union = TRUE, by_union_type = TRUE)
+  grouped <- calculate_union_rates(pop, c(0,6), c(0,Inf), by = c("group", "previous_union", "union_type"))
   expect_equal(sum(grouped$unions), 6)
   expect_equal(sum(grouped$person_years[grouped$union_type == "cohab"]),
     sum(grouped$person_years[grouped$union_type == "marriage"]))
   expect_error(calculate_union_rates(history(), c(0,6), c(0,Inf),
-    by_union_type = TRUE), "typed")
-  expect_error(calculate_union_rates(pop, c(0,6), c(0,Inf), by_union_type = NA), "TRUE or FALSE")
+    by = "union_type"), "typed")
+  expect_error(calculate_union_rates(pop, c(0,6), c(0,Inf), by = NA), "`by` must")
   converted <- simulate(initial_cohabs(conversion = 100, breakup = 0), 1, 42)
-  typed <- calculate_union_rates(converted, c(0,1), c(0,Inf), by_union_type = TRUE)
+  typed <- calculate_union_rates(converted, c(0,1), c(0,Inf), by = "union_type")
   expect_equal(sum(typed$unions), 2) # Existing cohab starts at the window boundary.
   expect_equal(sum(typed$unions[typed$union_type == "marriage"]), 0)
 })

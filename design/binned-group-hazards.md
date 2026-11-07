@@ -225,18 +225,20 @@ In fertility only eligible women are weighted and chosen, as now.
 
 ### API
 
-    create_weight_model(formula, coefficients, group_levels = NULL)
+    create_weight_model(formula, coefficients)
     create_weight_model(fun = f)
 
 The formula form mirrors `create_matching_model()`: a one-sided formula, a
-finite named numeric vector of coefficients, and `group_levels` (at least two
-ordered labels) when the formula uses a categorical group variable.
+finite named numeric vector of coefficients.
 Categorical variables use treatment coding with fixed levels, and coefficient
-names follow the model-matrix column names (for example `groupB`,
-`union_typecohab`). One `group_levels` applies to every group-valued variable
-(`group`, `partner_group`, `group_dest`, `group_w`, `group_h`), so they share
-the reference group: `~ group + partner_group` with levels `c("A", "B")` has
-coefficients `groupB` and `partner_groupB`. Other categorical variables have
+names follow the model-matrix column names (for example `raceB`,
+`union_typecohab`). Group variables are named by declared dimension (D134,
+stage 5), and a group-valued variable's levels are its dimension's categories
+(declared, or in order of first appearance), so variables of one dimension
+share its reference: `~ race + partner_race` with categories A and B has
+coefficients `raceB` and `partner_raceB`. Names that could be group variables
+are resolved, and their coefficients checked, when the model meets the
+declaration at simulation; other names are checked when the model is set. Other categorical variables have
 engine-fixed levels, with the first listed in [Variables](#variables) as the
 reference. The intercept has no effect and is ignored. Non-finite
 coefficients are errors.
@@ -265,24 +267,24 @@ Person processes (mortality, fertility, transitions) can use:
 | Variable | Values |
 | --- | --- |
 | `sex` | `"f"`, `"m"` |
-| `group` | population group (requires `group_levels`) |
+| `<dim>` (e.g. `race`) | the person's category in a declared dimension |
 | `union_type` | `"unpartnered"`, `"cohab"`, `"marriage"` |
 | `partnered` | 1 if in a union, else 0 |
 | `parity` | number of births (women; 0 for men) |
 | `previous_union` | `"none"`, `"separated"`, `"widowed"` |
-| `partner_group` | partner's group; NA when unpartnered |
-| `ancestry_<group>`, `ancestry_unknown` | ancestry shares, each in [0, 1] |
-| `group_dest` | transitions only: the destination of the risk |
+| `partner_<dim>` | partner's category; NA when unpartnered |
+| `ancestry_<dim>_<category>`, `ancestry_<dim>_unknown` | ancestry shares of a tracked dimension, each in [0, 1] |
+| `destination` | transitions only: the destination of the risk in the transition's dimension (formerly `group_dest`) |
 
 Union processes (dissolution, conversion) use partner variables with the
-suffix `_w` (wife) or `_h` (husband): `group_w`, `group_h`, `parity_w`,
-`previous_union_w`, `previous_union_h`, `ancestry_<group>_w` and
-`ancestry_<group>_h` (births are counted for mothers only, so there is no
+suffix `_w` (wife) or `_h` (husband): `<dim>_w`, `<dim>_h`, `parity_w`,
+`previous_union_w`, `previous_union_h`, `ancestry_<dim>_<category>_w` and
+`ancestry_<dim>_<category>_h` (births are counted for mothers only, so there is no
 `parity_h`), plus the couple terms:
 
 | Variable | Values |
 | --- | --- |
-| `same_group` | 1 if both partners are in the same group, else 0 (for group-exogamous unions) |
+| `same_<dim>` | 1 if both partners are in the same category of the dimension, else 0 |
 | `age_difference` | husband's age minus wife's age, fixed for the union |
 | `union_type` | `"cohab"` or `"marriage"` |
 
@@ -299,17 +301,15 @@ parity-specific fertility.
 
 *User direction (November 4, 2026):* cells stratify only as finely as the input
 rate schedules. A process whose active rates have no group-specific schedules
-(directly or through `group_prop_hazard`) pools all groups into one set of
-cells, so group terms in its weight model take effect. Multipliers that are all
-one do not stratify. Pooled fertility cells still report unrealized births by
+pools all groups into one set of cells, so group terms in its weight model take
+effect. Tables from `stratify_rates()` are group-specific even when every
+factor is one (D132). Pooled fertility cells still report unrealized births by
 group: each group's share is the cell rate times its members, so the reported
 values match per-group cells. A woman's matching-calibration bin uses her own
 group. Group transitions always stratify by origin group, and dissolution by
 group pair only when its rates do. Pooling changes cell structure, and so
 fixed-seed histories, for grouped models with shared rates; results are
-equivalent in distribution. The user plans to replace `group_prop_hazard`
-with a general `stratify()` input; the cell rule depends only on the
-stratification of the prepared rate table, so it carries over.
+equivalent in distribution.
 
 ### Missing values
 
@@ -534,9 +534,8 @@ estimates pooled across periods; estimating within strata (for example age by
 sex by year) and excluding an open top age group recovers the within-cell
 ratio, as the validation report shows.
 
-Proportional input-rate multipliers (`group_prop_hazard`) act on m_c and so
-change cell targets; they are distinct from normalized weights. The user plans
-to replace them with a general `stratify()` input.
+Proportional stratification (`stratify_rates()`, D132) acts on m_c and so
+changes cell targets; it is distinct from normalized weights.
 
 ## Two ways to express stratification
 

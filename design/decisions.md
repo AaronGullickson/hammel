@@ -1,6 +1,6 @@
 # Decision log
 
-Updated November 5, 2026. Entries retain the choices made at their original
+Updated November 6, 2026. Entries retain the choices made at their original
 dates; each numbered entry now states whether and how it remains current.
 Read [the scientific contract](scientific-contract.md) for implemented behavior,
 not a superseded API or timing statement buried in a historical entry.
@@ -72,6 +72,16 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Weight models (formulas, custom functions, schedules) | D129 |
 | Milestone 8 acceptance | D130 |
 | Milestones 9–11 reordered: group columns, immigration, then summaries | D131 |
+| `stratify_rates()` replaces `group_prop_hazard` | D132 |
+| One `by` argument for rate calculators; shared observation engine | D133 |
+| Multiple group dimensions: declaration, names, staging | D134 |
+| Matching prohibitions written as NA in `group_exogamy` | D135 |
+| First public release after milestone 9; immigration and two-sex models post-release | D136 |
+| GitHub milestones and Projects; multiple issues and PRs per milestone | D137 |
+| Matching calibration within separate markets | D138 |
+| `group_exogamy` table form for cross-dimension pair effects (`_x`/`_y` columns) | D139 |
+| Household moves for group transitions | D140 |
+| Milestone 9 accepted complete | D141 |
 
 ## Recorded decisions
 
@@ -2825,3 +2835,298 @@ attached to multiple group columns.
 | 10 | External immigration and generation tracking | Tentative |
 | 11 | Summaries, diagnostics and helpers | Proposed details retained |
 | 12 | Two-sex marriage model | Tentative; model and API unselected |
+
+## D132 — `stratify_rates()` replaces `group_prop_hazard` (November 5, 2026)
+
+**Status:** User-selected API change at the start of milestone 9, specified in
+discussion November 5, 2026. Supersedes the `group_prop_hazard` arguments of
+the October 20 multiplier request, D079's pair multipliers and the fertility
+per-status multiplier lists.
+
+**Decision:** Remove `group_prop_hazard` from every rate process. A new
+function `stratify_rates(rates, by)` adds proportional-hazard strata to a rate
+table: `by` is a named list of named factor vectors, for example
+`list(group = c(A = 1.2, B = 1))`. Each input row is copied per category with
+its rate multiplied by the factor. User choices:
+
+- A column already present in `rates` is an error.
+- Several columns in `by` are crossed, multiplying their factors.
+- The function cannot know the process, so each setter checks the table's
+  actual stratum columns, however they were added, against those its process
+  supports. An attribute recording added columns was rejected, because tables
+  can be pre-stratified or entered directly. `by` may only name stratum
+  columns.
+- Interactions with existing strata, such as different group effects by union
+  status, are built by stratifying subsets and binding them.
+
+**Implications:** Stratified tables are ordinary group-specific tables. Every
+needed category must be listed; an omitted group no longer defaults to factor
+one. Factors of one now split cells by group (D128), so weight terms on that
+variable cancel with a warning. Without population groups, the standard
+alphabetical-first fallback applies instead of ignoring multipliers. Results
+equal the previous multipliers in distribution, with equal rates. Conversion
+rates, which had no multiplier argument, can now be stratified the same way.
+The accepted milestone 3 report uses `group_prop_hazard` and reproduces at its
+recorded commit, as the milestone 1 report already does.
+See [groups](groups.md#proportional-stratification-with-stratify_rates-d132).
+
+## D133 — One `by` argument for rate calculators (November 5, 2026)
+
+**Status:** User-selected API change in milestone 9, specified in discussion
+November 5, 2026.
+
+**Decision:** Replace the `by_group`, `by_union_type`, `by_previous_union` and
+`by_sex` arguments of every rate calculator and `calculate_population_size()`
+with `by`, a character vector of categorical variables. Variables may go beyond
+what a process accepts as rate strata when they are easily computed from the
+histories. User choices:
+
+- Band arguments (`age_breaks`, `dur_breaks`, `parity_breaks`) stay separate;
+  `by` holds categories only. `parity_breaks` stays in fertility only.
+- Sex stays always split where it is now (mortality, fertility, union and
+  marriage rates) and is a `by` value for transitions and population size.
+- Dissolution and conversion rates use the wife's and husband's groups,
+  `group_w` and `group_h`, instead of the unordered `group_pair`, plus
+  `union_type` for dissolution.
+- `pool_dissolved` stays a separate option, now available wherever
+  `previous_union` is in `by`; `dur_breaks` still adds `previous_union` in
+  union rates.
+- One row-order rule for all calculators.
+- New variables now: `previous_union` for mortality, fertility, transitions and
+  population size; `union_type` for population size.
+
+**Implementation:** A shared native observation engine builds each person's
+timeline of states (group, union type, previous union, parity) with same-time
+changes ordered as in the simulation, and one counter splits exposure and
+assigns events. It replaces the per-calculator counting functions and is the
+basis for milestone 9's additional group columns. Results equal the previous
+calculators' output except for row order, the fixed `union_type` level order
+and the new variables.
+
+**Implications:** The old arguments are removed, not deprecated. Accepted
+reports for milestones 1 and 3–8 use them and reproduce at their recorded
+commits. See
+[demographic analysis](demographic-analysis.md#stratifying-results-with-by-d133).
+
+## D134 — Multiple group dimensions (November 5, 2026)
+
+**Status:** User-selected design for milestone 9 (D131), decided in discussion
+November 5, 2026. Step 1 implemented in stages 1–5 (November 5–6, 2026), each
+committed by the user, and stage 6 (tests, articles, documents). Step 2
+(matching across several dimensions, calibrated over their combinations)
+implemented November 6, 2026, following the user's choices recorded in
+`multiple-groups.md`: the combination covers every dimension any matching
+model of the run uses, effects add, and custom cross-dimension functions are
+left for later. Accepted complete November 6, 2026 (D141).
+
+**Decision:** Populations may carry several categorical group dimensions,
+always declared with `set_groups(model, race = group(...), ...)`; there is no
+implicit single `group` column. `group()` holds a dimension's optional ordered
+`categories` (default inferred; replaces inheritance's `groups` and the
+`group_levels` of matching and weight models, with the first category as
+reference), `ancestry` (default `FALSE`) and `inheritance` (moved from
+`set_fertility()`). The declaration is stored with the population and carried
+by results. Dimensions use their own names, with reserved names and derived
+names as listed in the design. Rate tables may be stratified by any declared
+dimension; transitions are set per dimension with
+`set_group_transition(model, rates, group = ...)` and use `origin` and
+`destination`. Matching settings become per-dimension lists, calibrated
+jointly across the dimensions a matching model uses. Baseline populations take
+`groups` as independent weights or a joint table and carry a default
+declaration. Ancestry is a named list of tibbles.
+
+**Staging:** step 1 delivers everything except joint matching calibration,
+with group effects in matching limited to one dimension; step 2 adds joint
+calibration.
+
+**Later user decisions (stage 2, November 5, 2026):** dissolution and
+conversion rates are directional, with `<dim>_w` and `<dim>_h` columns (the
+wife's and husband's categories); the symmetric `group_pair` is removed, and a
+symmetric rate lists both directions. Search rates and cohabitation
+probabilities use the dimension's own name (the woman's category).
+
+**Implementation choices** (detailed in [multiple group dimensions](multiple-groups.md)):
+one transition process per dimension, stored by dimension, with histories
+holding `group`, `origin` and `destination` as character labels; uncovered
+transition strata have zero risk; analysis splits by several dimensions
+through one combined internal category; matching models are translated at
+simulation to an internal one-dimension form; a bare matching setting applies
+to the only declared dimension; summaries keep every non-measure column as a
+stratum.
+
+**Implications:** Single-group code, tests, articles and reports change
+(`set_groups(model, group = group())` reproduces a single dimension named
+`group`). Accepted reports reproduce at their recorded commits. See
+[multiple group dimensions](multiple-groups.md).
+
+## D135 — Prohibitions as NA in `group_exogamy` (November 6, 2026)
+
+**Status:** User decision, November 6, 2026.
+
+**Decision:** Remove `prevent_exogamy`. `group_exogamy` carries both pair
+effects and prohibitions: a finite value is a symmetric log-odds effect, NA
+prohibits that unordered pair in both directions, and NA for a whole dimension
+(`list(region = NA)`, or a bare `NA` with one dimension) prohibits every union
+between different categories. Unlisted pairs have no effect. A within-category
+prohibition is an error.
+
+**Rationale:** One argument, and one meaning of `:`. `prevent_exogamy` was
+directional (`"A:B"` female-first, `"A::B"` both), unlike the symmetric pair
+effects of D075, which was inconsistent.
+
+**Supersedes:** the directional restriction syntax and the separate
+`prevent_exogamy` argument (October 20, 2026 restrictions; D072's pool-wide
+eligibility rule is unchanged). Directional prohibitions are no longer
+available.
+
+
+## D136 — First public release after the current milestone (November 6, 2026)
+
+**Status:** User decision, November 6, 2026.
+
+**Decision:** Finish the current milestone (9, multiple group dimensions),
+then work toward the first version bump, coinciding with the first public
+release. External immigration and two-sex marriage models move to post-release
+projects; they are not prerequisites for this release.
+
+**Rationale:** The user considers the current feature set sufficiently close
+to the intended SOCSIM scope, with added flexibility, to prioritize a public
+release over these additional mechanisms. This is a scope judgment, not a
+verified claim of complete SOCSIM equivalence.
+
+**Implications:** Supersedes D131's immediate post-milestone-9 sequence and
+D117/D121's placement of two-sex marriage models before the first release.
+Milestone 9 still requires completion and user acceptance. The version number,
+release channel, release criteria, and the scope/timing of proposed summaries
+and helpers remain unselected. This decision does not authorize publication.
+Existing immigration, family-population construction and generation discussions
+remain future design material; no immigration mechanism or API is implemented
+or authorized by this decision.
+
+
+## D137 — Align development with GitHub milestones and Projects (November 6, 2026)
+
+**Status:** User decision, November 6, 2026.
+
+**Decision:** Use GitHub milestones and Projects to organize development. A
+milestone may be delivered through multiple issues and pull requests; it does
+not require a single PR or a branch spanning the entire milestone.
+
+**Working approach:** Milestones group work toward a feature or release goal.
+Issues describe bounded tasks, their dependencies and completion criteria. PRs
+deliver reviewable changes and link the relevant issues. Projects track the
+status and priority of that work. Keep scientific contracts, worked examples,
+accepted decisions and validation evidence in the repository, with links from
+GitHub items rather than duplicate specifications. Merging a component PR does
+not establish scientific acceptance of the milestone.
+
+**Current mapping:** GitHub has open milestones for multiple groups (9),
+external immigration (10), cleanup/documentation/helpers/polish (11), and
+two-sex marriage (12). Under D136, immigration and two-sex marriage are
+post-release work; an open milestone does not make them release prerequisites.
+The cleanup milestone is a starting point for release planning, whose concrete
+scope and version number remain to be selected. This entry records the
+workflow; it does not claim that GitHub items or a Project have been updated.
+
+## D138 — Matching calibration within separate markets (November 6, 2026)
+
+**Status:** User decision, November 6, 2026.
+
+**Decision:** When matching prohibitions split the matching categories into
+blocks that cannot match across (such as regions under `region = NA`),
+calibrate each block separately, with mirrored male targets normalized
+within the block. Each block is a separate marriage market.
+
+**Rationale:** Women search only within their block, so the block is where
+male selection should be balanced. The previous population-wide targets were
+unreachable whenever a block's men and women differed in their shares, which
+made the solver fail and slowed simulation about tenfold. Sex symmetry of
+intermarriage is preserved within blocks and so also when summed over them;
+what is given up is only the unreachable population-wide target.
+
+**Implications:** Results change only for models whose prohibitions split the
+categories into several blocks. A block with more men than women of marrying
+age leaves more men unmatched.
+
+## D139 — Table form of `group_exogamy` for cross-dimension effects (November 6, 2026)
+
+**Status:** User decision, November 6, 2026.
+
+**Decision:** `group_exogamy` takes either the list form (per-dimension named
+vectors or NA, adding across dimensions) or a table form: a data frame with
+`<dim>_x`/`<dim>_y` columns and `log_odds` that fully specifies symmetric
+pair effects over combinations of categories, NA prohibiting. The forms are
+not combined. Each row is one unordered pair; unlisted pairs have no effect;
+rows have no wildcards. The earlier per-dimension pair table
+(`female_group`/`male_group`) is removed.
+
+**Rationale:** One place per model for pair effects. Combining a table with
+per-dimension vectors (each adding to the other) was judged easy to misread;
+the list form remains the shortcut when there are no cross-dimension effects.
+Neutral `_x`/`_y` names keep the symmetry visible. The table is translated
+into the same native effect table, so it is faster than formula group terms,
+which are evaluated in R during draws.
+
+## D140 — Household moves (November 6, 2026)
+
+**Status:** User decision, November 6, 2026. Specified in
+[group transitions](group-transitions.md#household-moves-d140); implemented
+November 6, 2026, with two user additions after testing (the party is built
+recursively, so a dependent's own dependents follow; a dependent re-attached
+to a parent elsewhere joins that parent at once, recorded as the parent's
+move), with the rule as its own object (`household()`, per
+the user) and the cutoff named `age_independence`.
+
+**Decision:** A household rule (`household = household(age_independence = 18)` on
+`set_group_transition()`, `NULL` by default for individual moves; each process
+takes its own) makes a move carry the mover's partner and dependents. Dependents are living,
+unpartnered people under `age_independence` (user-settable, default 18) attached
+to their mother while she lives, otherwise to their father; people with
+neither parent alive are independent (no grandparents or stepparents). One
+clock per household: the woman in a union carries it, a partnered man and
+dependents have none, everyone else has their own. The moving party is the
+carrier, their partner and the dependents of either. The transitions history
+gains `move_id` and `initiator_id`.
+
+**Rationale:** Household moves were deferred by D114 with open questions.
+SOCSIM's assembly (audited November 6, 2026) has no household entity, lets
+every member initiate (so input rates are initiation rates and moves are
+double counted relative to observed individual rates), uses different rules
+for male and female movers, and has a defective child-age test. One clock per
+household lets observed individual rates be used as input; one attachment
+rule (mother, then father) treats children consistently.
+
+**Supersedes:** the deferral in D114 for transitions; household moves remain
+unavailable for other processes.
+
+## D141 — Milestone 9 accepted complete (November 6, 2026)
+
+**Status:** User decision, November 6, 2026.
+
+**Decision:** The user accepted milestone 9, multiple group dimensions, as
+complete, following the user-authored assessment in
+[`validation/milestone9.qmd`](../validation/milestone9.qmd), which the user
+maintains and renders. Scope accepted: declared group dimensions (D134, steps
+1 and 2), directional union strata, `stratify_rates()` (D132) and one `by`
+argument (D133), NA prohibitions in `group_exogamy` (D135), separate-market
+calibration (D138), the table form of `group_exogamy` (D139), household moves
+(D140), and baseline populations declaring their categories. Code at
+acceptance: `fc4b9dbf29dba9782cec9265704f9e87fef4022c` plus the closeout
+documentation.
+
+**Limitations retained:**
+
+- Matching calibration cost grows steeply with the number of matching
+  category combinations (about 4 to 4.5 times per doubling); separate markets
+  (D138) make prohibited dimensions cheap.
+- Household moves (D140) require age bands, and followers move less often
+  than the input rate when households are split across regions.
+- Uncovered transition strata have zero risk, unlike other rate tables.
+- Matching formula group terms are evaluated in R during draws (slower than
+  `group_exogamy`) and can express directional effects; there are no custom
+  cross-dimension matching functions (the table form covers pair effects).
+- Transition history labels are always character.
+
+**Also recorded (user preference):** the user writes all vignettes and
+articles and makes all edits to the top-level `README.md`; agents do not edit
+them.

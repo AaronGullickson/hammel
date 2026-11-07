@@ -9,7 +9,8 @@ hammel_population(
   unions = NULL,
   end_time = NULL,
   ancestry = NULL,
-  transitions = NULL
+  transitions = NULL,
+  groups = NULL
 )
 }
 \arguments{
@@ -26,19 +27,30 @@ links the same-time marriage through \code{previous_cohab_id}.}
 \item{end_time}{Optional finite simulation endpoint in years. Its calendar origin is supplied by the user. \code{NULL} means
 that the endpoint is unknown.}
 
-\item{ancestry}{Optional data frame with exactly one row per person, keyed
-by \code{person_id}, known shares in \verb{group_<label>} columns, and an \code{unknown}
-share. Numeric shares must be finite, between zero and one, and sum to one
-per row (tolerance \code{1e-8}). Supplied shares are preserved, with rows aligned
-to persons. Without it, grouped persons start with 100\% ancestry in their
-recorded group, regardless of parent histories. Without groups, no ancestry
-table is created automatically. Newborns average parental shares; a missing
-parent contributes its half to \code{unknown}. Identity remains separate.}
+\item{ancestry}{Optional ancestry shares for dimensions declared with
+\code{group(ancestry = TRUE)}: a named list with one data frame per such
+dimension (a bare data frame when only one dimension tracks ancestry),
+each with exactly one row per person, keyed by \code{person_id}, one column of
+shares per category (named by the category) and an \code{unknown} share. Shares
+must be finite, between zero and one, and sum to one per row (tolerance
+\code{1e-8}). Supplied shares are preserved, with rows aligned to persons.
+Without them, people start with all their ancestry in their recorded
+category. Newborns average parental shares; a missing parent contributes
+its half to \code{unknown}. Identity remains separate. Categories of a tracked
+dimension cannot be named \code{unknown} or \code{person_id}.}
 
-\item{transitions}{Optional data frame of individual group changes with
-\code{person_id}, \code{time}, \code{group_origin}, and \code{group_dest}. Histories must chain
-to current person groups and lie within life dates and the known endpoint.
-Grouped populations always include this tibble, even when empty.}
+\item{transitions}{Optional data frame of individual category changes with
+\code{person_id}, \code{time}, \code{group} (the dimension; may be omitted when one is
+declared), \code{origin}, and \code{destination}. Each person's history in each
+dimension must chain to their current category and lie within life dates
+and the known endpoint. Grouped populations always include this tibble,
+even when empty, with character \code{group}, \code{origin} and \code{destination}.}
+
+\item{groups}{Optional group declaration: a character vector of dimension
+names (each with \code{\link[=group]{group()}} defaults) or a named list of \code{\link[=group]{group()}} objects.
+Persons columns that are not declared are ordinary custom columns. Models
+usually declare groups with \code{\link[=set_groups]{set_groups()}}; declare them here to analyze a
+population directly, without a model.}
 }
 \value{
 A named list of class \code{hammel_population} with components \code{persons},
@@ -49,10 +61,11 @@ persons has groups, and a \code{transitions} tibble when groups are present. Anc
 Collect person and union histories in an inspectable population object.
 This constructor does not run a simulation. It validates
 consistent tables against the population schema. Custom columns are retained.
-An optional \code{group} column contains nonmissing character labels or finite
-numeric codes (character labels must be nonempty). Newborns inherit their
-group from either parent with equal probability by default, with maternal fallback,
-or use fertility's configured inheritance model.
+A declared group dimension (see \code{groups} and \code{\link[=set_groups]{set_groups()}}) is a persons
+column of nonmissing character labels or finite numeric codes (character
+labels must be nonempty). Newborns are assigned by its \code{\link[=group]{group()}}
+inheritance rule. Undeclared columns, including one named \code{group}, are
+ordinary custom columns.
 }
 \examples{
 sim <- hammel_population(

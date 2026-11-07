@@ -124,16 +124,19 @@ test_that("previous categories contribute the explicit calibrated intensity", {
   expect_equal(zero$target, c(1, 0))
 })
 
-test_that("grouped schedules and multipliers preserve the explicit hazards", {
+test_that("grouped and stratified schedules preserve the explicit hazards", {
   model <- make_rate_model(80, search_rate = 2)
   model$population$persons$sex[1:40] <- "f"
   model$population$persons$group <- rep(c("A", "B"), 40)
+  model$population$groups <- list(group = group())
   model <- set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = .8))
   rates <- rbind(transform(previous_rates(.8, .4, .2), group = "A"),
     transform(previous_rates(.5, .3, .1), group = "B"))
   matching <- create_matching_model(~ 1, numeric(), group_exogamy = c("A:B" = -1))
-  scaled <- set_union_formation(model, "rate", matching, rates = rates,
-    group_prop_hazard = c(B = 2), diagnostics = TRUE, kinship_generations = 0)
+  stratified_rates <- rbind(stratify_rates(previous_rates(.8, .4, .2), list(group = c(A = 1))),
+    stratify_rates(previous_rates(.5, .3, .1), list(group = c(B = 2))))
+  scaled <- set_union_formation(model, "rate", matching, rates = stratified_rates,
+    diagnostics = TRUE, kinship_generations = 0)
   explicit <- rates
   explicit$rate[explicit$group == "B"] <- 2 * explicit$rate[explicit$group == "B"]
   reference <- set_union_formation(model, "rate", matching, rates = explicit,
@@ -141,7 +144,7 @@ test_that("grouped schedules and multipliers preserve the explicit hazards", {
   a <- simulate(scaled, 5, 73)
   expect_identical(a, simulate(reference, 5, 73))
   expect_true(any(a$unions$end_reason == "dissolution", na.rm = TRUE))
-  counts <- calculate_union_rates(a, c(0, 5), c(0, Inf), TRUE, by_previous_union = TRUE)
+  counts <- calculate_union_rates(a, c(0, 5), c(0, Inf), by = c("group", "previous_union"))
   expect_gt(sum(counts$unions[counts$previous_union == "separated"]), 0)
   # Shared hazards versus three equal category hazards agree in distribution.
   plain <- set_union_formation(model, "rate", matching,

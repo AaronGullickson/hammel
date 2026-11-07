@@ -1,11 +1,15 @@
 # Development roadmap
 
-Updated November 5, 2026. Milestones 1–8 are complete by user acceptance
-(D029, D050, D077, D093, D105, D116, D127, D130). **Milestone 8 was accepted
+Updated November 6, 2026. Milestones 1–9 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116, D127, D130, D141). **Milestone 9,
+multiple group dimensions, was accepted complete on November 6, 2026.** **Milestone 8 was accepted
 complete on November 5, 2026:** cell scheduling for every rate process (D128)
 and weight models (D129), retaining documented limitations. On November 5 the
-user reordered later milestones (D131): multiple group columns (9), external
-immigration (10), then summaries, diagnostics and helpers (11).
+user reordered later milestones (D131). On November 6, D136 superseded that
+sequence: finish milestone 9, then prepare the first version bump and public
+release. External immigration and two-sex marriage models are post-release
+projects. Summaries, diagnostics and helpers remain proposed; their release
+scope has not yet been selected.
 Future entries record planning priorities, not authorization to implement unspecified demographic behavior
 or an unselected public API.
 
@@ -16,16 +20,17 @@ or an unselected public API.
 | 6 | Group transitions, including categorical characteristics represented by groups | Complete October 30, 2026 (D116); final render active at acceptance |
 | 7 | Time-varying rates, matching, and inheritance within a simulation run | Complete November 2, 2026 (D127); current engine and documented limitations retained |
 | 8 | Cell scheduling for all rate processes; formula and custom weight models | Complete November 5, 2026 (D130); documented limitations retained |
-| 9 | More than one group column, potentially including regions and internal migration | Next (D121, D131); schema and mechanism contracts unselected |
-| 10 | Immigration from outside the system, tracking generation | Tentative (D121, D131) |
-| 11 | Polished summaries, diagnostic checks, and post-simulation helpers | Proposed; moved from milestone 9 (D131) |
-| 12 | Two-sex marriage model | Tentative (D117/D121); model and API unselected |
+| 9 | More than one group column, potentially including regions and internal migration | Complete November 6, 2026 (D141); documented limitations retained |
+| Post-release | Immigration from outside the system, tracking generation (formerly 10) | Deferred until after first public release (D136) |
+| Release preparation | First version bump and public release after milestone 9 | User-selected next focus (D136); version number and release criteria unselected |
+| Unassigned | Polished summaries, diagnostic checks, and post-simulation helpers (formerly 11) | Proposed; scope and timing to select during release planning |
+| Post-release | Two-sex marriage model (formerly 12) | Deferred until after first public release (D136); model and API unselected |
 
 Milestone 6's scope is individual group transitions. Household moves are
 deferred beyond milestone 6 (D114, superseding D109). D121 removes the separate
 regions milestone and places multiple group columns at milestone 9 (D131);
-regions/internal migration and household moves remain possible applications
-requiring their own specifications. D106–D108 select annual hazards, directed competing
+regions/internal migration are applications of multiple group columns, and
+household moves are implemented for group transitions in milestone 9 (D140). D106–D108 select annual hazards, directed competing
 age- or duration-specific schedules with optional strata,
 and no transition-count target adjustment. The implemented contract is in [group transitions](group-transitions.md).
 D110 requires `group_origin`, `group_dest`, `rate`, and one common age or
@@ -33,6 +38,17 @@ duration band type across the transition table, with optional `sex` and
 `union_type` columns; absent stratification columns apply universally.
 Grouped simulation output must always include a `transitions` history tibble,
 even with no configured transition process or no observed moves (D111).
+
+## GitHub development workflow (D137)
+
+Use GitHub milestones to group related issues and PRs, and Projects to track
+work status and priority. Split a milestone into bounded issues and reviewable
+PRs as appropriate; no one-PR-per-milestone requirement applies. Link issues
+and PRs to the relevant repository specifications and validation evidence.
+Component merges do not replace the user's milestone acceptance. Existing
+GitHub milestones 10 and 12 represent post-release work under D136; milestone
+11 (cleanup, documentation, helpers and polish) provides a starting point for
+release planning without selecting its full scope as release requirements.
 
 ## Milestone 3: groups (complete)
 
@@ -228,11 +244,14 @@ characteristics, weights within bands) are listed in
 The user assigned the possibility of more than one group column to tentative
 milestone 10 on October 31, 2026 (D121) and moved it to milestone 9, the next
 milestone, on November 5, 2026 (D131). Different columns could represent
-identity, education or location simultaneously. Representation, supported rate
-strata, matching predictors/restrictions, dimension-specific histories,
-transitions, newborn assignment and ancestry interactions remain to be specified.
-No naming convention, default dimension or independent-dimension assumption is
-selected.
+identity, education or location simultaneously. The design was decided on
+November 5, 2026 (D134) and is recorded in
+[multiple group dimensions](multiple-groups.md): declared dimensions with
+their own names, rate strata, inheritance, ancestry, transitions, analysis
+splits, weight-model variables and per-dimension matching settings. Steps 1
+and 2 are implemented; matching may combine effects from several dimensions,
+calibrated over their combinations. Cross-dimension matching interactions
+are not offered.
 
 The former separate milestone for internal migration and regions is removed.
 Location may be represented as one group dimension, with internal migration as
@@ -242,6 +261,12 @@ direction; it does not implement or settle any geographic or household behavior.
 The following D114 questions remain relevant to a future regional application.
 
 ### Household moves: deferred design questions (D114)
+
+*Resolved for group transitions by D140 (November 6, 2026): see
+[household moves](group-transitions.md#household-moves-d140). The questions
+below are retained as the record of what that specification answers; any
+household rules beyond D140 (grandparents, stepparent custody, coresidence)
+remain open.*
 
 D114 deferred household moves from milestone 6 to the former regions milestone.
 D121 removes that standalone milestone while retaining multiple group columns
@@ -298,9 +323,10 @@ following questions still require a concrete scientific specification.
   household accounting, linked-event invalidation and the chosen input-rate
   interpretation before assessing demographic performance.
 
-## Tentative milestone 10: immigration from outside the system
+## Post-release: immigration from outside the system
 
-Moved from former milestone 9 to 11 by D121, then to 10 by D131. Add immigrants within a running
+Formerly milestone 10 under D131; deferred until after the first public release
+by D136. Add immigrants within a running
 simulation, rather than requiring a restart.
 The user envisages specifying numbers and an age/sex distribution and tracking
 individual immigrant generational status. Timing (batch dates versus arrivals),
@@ -308,10 +334,12 @@ meaning of supplied numbers, attribute/kin/union initialization, ancestry and
 generation definitions, and interactions with group assignment remain open.
 No emigration process is implied by the immigration request.
 
-## Proposed milestone 11: summaries, diagnostics, and helpers
+## Proposed summaries, diagnostics, and helpers
 
 Moved from former milestone 8 by D121, then from milestone 9 to 11 by D131;
-its scope and unresolved API choices remain as described below.
+D136 makes release preparation the next focus after milestone 9. The scope
+and timing of these helpers remain to be selected; they are not automatically
+requirements for the first public release.
 
 The user also requested future model diagnostic tools (October 20, 2026),
 including checks that help identify unintentionally omitted group-pair settings.
@@ -346,7 +374,7 @@ for useful quantities from simulation histories. Existing functions cover Lexis
 counts, fertility, life tables, population sizes and recorded kin. Identify
 additional quantities and exposure/observation definitions from actual workflows.
 Status-specific exposure, fertility and mortality summaries use
-`calculate_fertility_rates(by_union_type = TRUE)`; formation counts and rates by
+`calculate_fertility_rates(by = "union_type")`; formation counts and rates by
 previous union use `calculate_union_rates()` (D080).
 See [demographic analysis](demographic-analysis.md) for their observation rules.
 
@@ -369,7 +397,7 @@ which kinship information has been discarded; it cannot imply complete pedigree
 or historical exposure after truncation. The representation of minimal history
 needed for correct restarting remains to be designed.
 
-## Tentative milestone 12: two-sex marriage model
+## Post-release: two-sex marriage model
 
 Originally assigned tentative milestone 11 on October 30, 2026 (D117), then
 moved to tentative milestone 12 on October 31 (D121), following the October 24
@@ -385,6 +413,17 @@ nonmarital father selection must be designed consistently with any two-sex
 model. The union-formation API stays unchanged until a single working
 implementation incorporates all union-formation components. No model,
 parameterization or API has been selected.
+
+## First public release (D136)
+
+After milestone 9 is completed and accepted, focus on the first version bump
+and public release. The version number, distribution channel and concrete
+release criteria remain to be selected. Release planning should assess the
+existing API, documentation/examples, package metadata and licensing, checks
+and retained validation evidence, and clearly describe supported behavior and
+limitations. This is a planning direction, not authorization to publish or a
+claim of comprehensive SOCSIM equivalence. Immigration and two-sex marriage
+models are not prerequisites for this release.
 
 ## Preparing input schedules
 

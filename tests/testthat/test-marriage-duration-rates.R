@@ -5,7 +5,7 @@ make_duration_rate_history <- function() {
   unions <- data.frame(union_id = 1:3, wife_id = 1, husband_id = 2:4,
     start_time = c(1, 3, 5), end_time = c(2, 4, NA),
     end_reason = c("dissolution", "death_husband", NA))
-  hammel_population(persons, unions, end_time = 6)
+  hammel_population(persons, unions, end_time = 6, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("duration breaks select the previous ending clock and enable stratification", {
@@ -26,8 +26,7 @@ test_that("duration breaks select the previous ending clock and enable stratific
     expect_equal(rows$unions, c(0, 0, 1, 0))
     expect_equal(rows$rate_union, c(0, 0, NA, NA))
   }
-  expect_identical(calculate_union_rates(pop, c(0, 6), c(0, 21, Inf),
-    by_previous_union = FALSE, dur_breaks = c(0, .5, 1, 2, Inf)), result)
+  expect_identical(calculate_union_rates(pop, c(0, 6), c(0, 21, Inf), dur_breaks = c(0, .5, 1, 2, Inf)), result)
   # Finite final duration bounds gain Inf.
   expect_identical(calculate_union_rates(pop, c(0, 6), c(0, 21, Inf),
     dur_breaks = c(0, .5, 1, 2)), result)
@@ -54,10 +53,11 @@ test_that("duration exposure uses history before the window and resets after eac
 test_that("group/sex/period duration cells preserve pooled counts and exposure", {
   pop <- make_duration_rate_history()
   pop$persons$group <- c(10, 20, 10, 20)
+  pop$groups <- list(group = group())
   times <- c(0, 2, 4, 6)
-  result <- calculate_union_rates(pop, times, c(0, Inf), TRUE,
-    dur_breaks = c(0, .5, 1, 2, Inf))
-  age <- calculate_union_rates(pop, times, c(0, Inf), TRUE, TRUE)
+  result <- calculate_union_rates(pop, times, c(0, Inf),
+    dur_breaks = c(0, .5, 1, 2, Inf), by = "group")
+  age <- calculate_union_rates(pop, times, c(0, Inf), by = c("group", "previous_union"))
   expect_type(result$group, "double")
   for (i in seq_len(nrow(age))) {
     rows <- result$group == age$group[i] & result$sex == age$sex[i] &
@@ -84,8 +84,9 @@ test_that("duration observation handles zero-duration episodes and empty outputs
   expect_equal(women$person_years, c(0, 0))
   expect_true(all(is.na(women$rate_union)))
   pop$persons$group <- "A"
-  empty <- hammel_population(pop$persons[FALSE, ], end_time = 6)
-  grouped <- calculate_union_rates(empty, c(0, 6), c(0, Inf), TRUE, dur_breaks = c(0, Inf))
+  pop$groups <- list(group = group())
+  empty <- hammel_population(pop$persons[FALSE, ], end_time = 6, groups = if ("group" %in% names(pop$persons)) "group")
+  grouped <- calculate_union_rates(empty, c(0, 6), c(0, Inf), dur_breaks = c(0, Inf), by = "group")
   expect_equal(nrow(grouped), 0)
   expect_type(grouped$dur_start, "double")
   expect_type(grouped$previous_union, "character")

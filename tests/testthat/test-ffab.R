@@ -82,9 +82,10 @@ test_that("configured sex is available to built-in and custom inheritance", {
       model <- make_model(2, birth_rate = 20, birth_interval = 0)
       model$population$persons$sex <- c("f", "m")
       model$population$persons$group <- c("A", "B")
+      model$population$groups <- list(group = group())
       model <- model |>
         set_fertility(data.frame(age_start = 15, age_end = 50, rate = 20),
-          birth_interval = 0, inheritance = inheritance, ffab = probability)
+          birth_interval = 0, ffab = probability) |> set_inheritance(inheritance)
       result <- simulate(model, 0.3, seed = 654)
       children <- result$persons$birth_time >= 0
       expect_true(any(children))

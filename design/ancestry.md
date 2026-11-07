@@ -11,16 +11,19 @@ acceptance retains the documented limitations.
 
 ## Initialization and public table
 
-`hammel_population(persons, ..., ancestry = NULL)` accepts an optional ancestry
-data frame. The public `ancestry` component is a tibble with one row per person,
-including deceased people, keyed by `person_id`. Known ancestry columns have
-names `group_<label>`, using the character representation of each reference
-group; `unknown` is a separate share. For groups A and B, columns are
-`person_id`, `group_A`, `group_B`, and `unknown`. Prefixing known groups keeps
-labels such as `unknown` or `person_id` unambiguous. Labels may be numeric codes.
+Ancestry is tracked only for dimensions declared with `group(ancestry = TRUE)`
+(D134). `hammel_population(persons, ..., ancestry = NULL)` accepts a named list
+of ancestry data frames, one per tracked dimension (a bare data frame when only
+one dimension tracks ancestry). The public `ancestry` component is a named list
+of tibbles, each with one row per person, including deceased people, keyed by
+`person_id`. Known ancestry columns are named by category; `unknown` is a
+separate share. For a dimension `race` with categories A and B,
+`ancestry$race` has columns `person_id`, `A`, `B`, and `unknown`. Categories of
+a tracked dimension therefore cannot be named `unknown` or `person_id`.
+Labels may be numeric codes.
 
-Without supplied proportions, if persons has a `group` column, every initial
-person receives 1.0 in their recorded group and zero elsewhere, including zero
+Without supplied proportions, every initial person receives 1.0 in their
+recorded category of each tracked dimension and zero elsewhere, including zero
 unknown share. This applies to all starting people, regardless of known parent
 histories: do not trace existing ancestors to replace the requested starting
 reference. Reference group columns follow first occurrence in the input history.

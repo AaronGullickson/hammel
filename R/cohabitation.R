@@ -27,6 +27,7 @@ validate_cohabitation <- function(process) {
 }
 
 validate_conversion_rates <- function(rates) {
+  check_stratified_columns(rates, character(), "Conversion")
   if (has_calendar_rates(rates)) {
     if (all(c("age_start", "dur_start") %in% names(rates)) &&
         length(unique(!is.na(rates$dur_start))) != 1L)
@@ -36,7 +37,7 @@ validate_conversion_rates <- function(rates) {
   }
   check_columns(rates, "rate", "union_convert_rate")
   if (any(c("previous_union", "sex", "time_start", "time_end", "union_type") %in% names(rates)))
-    stop("Conversion rates allow age or duration and optional group, without previous_union, sex, type or calendar strata.", call. = FALSE)
+    stop("Conversion rates allow age or duration and optional `<group>_w`/`<group>_h` strata, without previous_union, sex, type or calendar strata.", call. = FALSE)
   # Reuse search validation with a synthetic previous category for each row;
   # conversion uses one clock across the entire table, not a previous axis.
   x <- rates
@@ -59,22 +60,26 @@ validate_conversion_rates <- function(rates) {
   invisible(rates)
 }
 
-prepare_cohabitation <- function(process, population, groups, start = -Inf, end = Inf) {
+# Cohabitation probabilities (by the woman) and conversion rates (by both
+# partners) with their group strata; `strata` prepares one rate table.
+prepare_cohabitation <- function(process, strata) {
   empty <- data.frame(age_start = numeric(), age_end = numeric(), rate = numeric())
-  if (is.null(process$cohab_prob)) return(list(enabled = FALSE, prob = empty, conversion = empty))
-  prob <- prepare_group_rates(expand_previous_union_rates(process$cohab_prob),
-    population$persons, "cohabitation probability", groups, start, end)
-  prob$rate <- prob$prob # private Band convention
+  none <- strata(data.frame(rate = numeric()), "cohabitation")$spec
+  if (is.null(process$cohab_prob))
+    return(list(enabled = FALSE, prob = empty, conversion = empty, prob_spec = none, conversion_spec = none))
+  prob <- strata(expand_previous_union_rates(process$cohab_prob), "cohabitation probability")
+  prob$rates$rate <- prob$rates$prob # private Band convention
   conversion <- process$union_convert_rate
   if (is.null(conversion)) {
     warning("Cohabitation is enabled without `union_convert_rate`; no conversions will occur.", call. = FALSE)
-    conversion <- empty
+    conversion <- list(rates = empty, spec = none)
   } else {
-    conversion <- prepare_group_rates(conversion, population$persons, "cohabitation conversion", groups, start, end)
-    if (!"age_start" %in% names(conversion)) conversion$age_start <- NA_real_
-    if (!"age_end" %in% names(conversion)) conversion$age_end <- NA_real_
+    conversion <- strata(conversion, "cohabitation conversion", union_level = TRUE)
+    if (!"age_start" %in% names(conversion$rates)) conversion$rates$age_start <- NA_real_
+    if (!"age_end" %in% names(conversion$rates)) conversion$rates$age_end <- NA_real_
   }
-  list(enabled = TRUE, prob = prob, conversion = conversion)
+  list(enabled = TRUE, prob = prob$rates, conversion = conversion$rates,
+       prob_spec = prob$spec, conversion_spec = conversion$spec)
 }
 
 validate_union_types <- function(unions) {

@@ -12,13 +12,6 @@
 #' @param rates An age-specific rate table passed to [mortality()] or [fertility()].
 #' @param birth_interval Minimum maternal birth-to-birth interval in years,
 #'   defaulting to `0.75`. Must be finite and nonnegative.
-#' @param group_prop_hazard Optional named numeric vector of finite nonnegative
-#'   rate multipliers by group. Missing groups use 1.0; values are not normalized.
-#'   Scales shared or group-specific fertility input rates before cell
-#'   accounting. Without population groups, simulation warns and ignores it.
-#'   Fertility also accepts a named list of vectors for `partnered` and/or
-#'   `unpartnered`, or cohab/marriage when rates include those `union_type`
-#'   strata. List names must occur in the schedules; omitted entries use 1.0.
 #' @param hetfert NULL (default) for uniform mother selection, or a
 #'   [het_fert()] specification for persistent lognormal selection weights.
 #' @param weights NULL (default) for unweighted selection within rate cells, or
@@ -27,18 +20,6 @@
 #'   fertility they combine with `hetfert` on the log scale.
 #' @param ffab Probability that a newborn is female, default `0.4886`.
 #'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
-#' @param inheritance A group identity model from [create_group_inheritance()],
-#'   or a tibble with numeric `time_start`, `time_end` and list-column `model`
-#'   containing complete inheritance models. Intervals are half-open absolute
-#'   years, must not overlap and must cover the requested run. Select the active
-#'   model at each birth; older identities and ancestry remain unchanged.
-#'   Base data frames with list columns are accepted. All declared possible
-#'   identities across scheduled models join the simulation-wide registry.
-#'   Static inputs may also be a method name requiring no additional parameters: `"mother"`, `"father"`,
-#'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
-#'   Applies to fertility and defaults to selecting either parent with equal
-#'   probability, with maternal fallback. Assignment is independent of recorded
-#'   ancestry proportions.
 #'
 #' @return An updated `hammel_model`. The input model is not modified.
 #' @export
@@ -74,12 +55,6 @@ attach_process <- function(model, process) {
     validate_rates(process$rates, mortality = name == "mortality")
     validate_process_weights(process$weights, "person")
     if (name == "fertility") {
-      validate_fertility_group_prop_hazard(process$group_prop_hazard, process$rates)
-      process$inheritance <- normalize_group_inheritance(process$inheritance)
-    } else {
-      validate_group_prop_hazard(process$group_prop_hazard)
-    }
-    if (name == "fertility") {
       validate_birth_interval(process$birth_interval)
       if (!"ffab" %in% names(process)) process$ffab <- 0.4886
       validate_ffab(process$ffab)
@@ -105,6 +80,7 @@ attach_process <- function(model, process) {
     validate_group_transition(process)
     validate_process_weights(process$weights, "transition")
     process$rates <- tibble::as_tibble(process$rates)
+    return(store_transition_process(model, process))
   }
   if (name == "union_dissolution") {
     validate_union_dissolution(process)
@@ -117,19 +93,16 @@ attach_process <- function(model, process) {
 
 #' @rdname set_process
 #' @export
-set_mortality <- function(model, rates, group_prop_hazard = NULL, weights = NULL) {
-  set_process(model, mortality(rates, group_prop_hazard = group_prop_hazard, weights = weights))
+set_mortality <- function(model, rates, weights = NULL) {
+  set_process(model, mortality(rates, weights = weights))
 }
 
 #' @rdname set_process
 #' @export
-set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard = NULL,
-                          inheritance = create_group_inheritance(), ffab = 0.4886,
+set_fertility <- function(model, rates, birth_interval = 0.75, ffab = 0.4886,
                           hetfert = NULL, weights = NULL) {
   set_process(model, fertility(rates, birth_interval = birth_interval,
-                              group_prop_hazard = group_prop_hazard,
-                              inheritance = inheritance, ffab = ffab, hetfert = hetfert,
-                              weights = weights))
+                              ffab = ffab, hetfert = hetfert, weights = weights))
 }
 
 #' Specify age-specific demographic rates
@@ -141,13 +114,13 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #' schedules are returned as tibbles. A `source` attribute on the input table
 #' is copied to the process's `source` field.
 #'
-#' An optional `group` column supplies separate schedules by nonmissing character
-#' label or finite numeric code. Without it, rates apply to all groups. Each
-#' mortality group needs both sexes, and each conditional fertility group needs
-#' both statuses. Overlap is checked within groups.
-#' Simulation requires schedules for every population group. Without population
-#' groups, simulation warns and uses the first group alphabetically (radix order
-#' of character representations, including numeric codes).
+#' Columns named by declared group dimensions (see [set_groups()]), such as
+#' `race` or `region`, supply separate schedules for each combination of their
+#' categories; dimensions without a column share the schedule. Each mortality
+#' stratum needs both sexes, and each conditional fertility stratum needs both
+#' statuses. Overlap is checked within strata. Simulation requires schedules for
+#' every combination of the categories of the dimensions a table uses; a
+#' table using an undeclared persons column is an error.
 #'
 #' Mortality requires separate schedules for both sexes. Gaps and uncovered
 #' ages are not filled or interpreted as zero rates. Coverage must be specified
@@ -208,24 +181,10 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #'   and may be `Inf` for upper-open bands. Rates must
 #'   be finite and nonnegative. Mortality additionally
 #'   requires character `sex` values `"m"` and `"f"`, with both represented.
+#'   Use [stratify_rates()] to add proportional group differences.
 #' @param birth_interval Minimum maternal birth-to-birth interval in years,
 #'   defaulting to `0.75`. Must be finite and nonnegative. Applies to fertility
 #'   only; see cell-accounted fertility below.
-#' @param group_prop_hazard Optional named numeric vector of finite nonnegative
-#'   rate multipliers, with unique nonempty group names. Missing groups use 1.0;
-#'   zero suppresses the risk. Values are not normalized. At execution, multiply
-#'   the selected input schedule by the person's group factor, including all
-#'   sex/status strata. Fertility multiplication precedes cell accounting.
-#'   Without population groups, warn and ignore multipliers. Stored rate tables
-#'   and their source metadata are unchanged; rate-table summaries use those
-#'   stored rates, without applying population-dependent multipliers.
-#'   Fertility with `union_type` rates also accepts a named list such as
-#'   `list(partnered = c(A = 1.1, B = 0.9), unpartnered = c(A = 1.05))`.
-#'   An omitted status or group uses 1.0. A single vector applies to all
-#'   types (or overall fertility). Type lists require `union_type` rates and
-#'   their names must match the supplied schedule types. Three-type schedules
-#'   accept lists named unpartnered/cohab/marriage; shared partnered schedules
-#'   accept unpartnered/partnered. Omitted types and groups have multiplier 1.
 #' @param hetfert NULL (default) for uniform mother selection, or a
 #'   [het_fert()] specification for persistent lognormal selection weights.
 #' @param weights NULL (default) for unweighted selection within rate cells, or
@@ -234,20 +193,6 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #'   fertility they combine with `hetfert` on the log scale.
 #' @param ffab Probability that a newborn is female, default `0.4886`.
 #'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
-#' @param inheritance A group identity model from [create_group_inheritance()],
-#'   or a tibble with numeric `time_start`, `time_end` and list-column `model`
-#'   containing complete inheritance models. Intervals are half-open absolute
-#'   years, must not overlap and must cover the requested run. Select the active
-#'   model at each birth; older identities and ancestry remain unchanged.
-#'   Base data frames with list columns are accepted. All declared possible
-#'   identities across scheduled models join the simulation-wide registry.
-#'   Static inputs may also be a method name requiring no additional parameters: `"mother"`, `"father"`,
-#'   `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
-#'   Fertility defaults to selecting either parent with equal probability,
-#'   with maternal fallback. Other parental, ancestry,
-#'   hierarchy, and custom rules assign identity after child sex and ancestry
-#'   are calculated. Possible identities are checked against grouped schedules
-#'   and categorical matching levels before execution. Applies to fertility only.
 #' @return A named list containing `name`, `rates`, and `rate_unit`, plus
 #'   `birth_interval` and `ffab` for fertility, inheriting
 #'   from `hammel_mortality` or `hammel_fertility` and `hammel_process`.
@@ -259,37 +204,30 @@ set_fertility <- function(model, rates, birth_interval = 0.75, group_prop_hazard
 #' model <- hammel_model() |>
 #'   set_process(deaths) |>
 #'   set_process(births)
-mortality <- function(rates, group_prop_hazard = NULL, weights = NULL) {
+mortality <- function(rates, weights = NULL) {
   validate_rates(rates, mortality = TRUE)
-  validate_group_prop_hazard(group_prop_hazard)
   validate_process_weights(weights, "person")
-  warn_cancelled_weight_terms(weights, weight_strata("mortality", rates, group_prop_hazard), "mortality")
+  warn_cancelled_weight_terms(weights, weight_strata("mortality", rates), "mortality")
   process <- new_rate_process("mortality", rates)
-  process$group_prop_hazard <- group_prop_hazard
   process$weights <- normalize_model_argument(weights)
   process
 }
 
 #' @rdname mortality
 #' @export
-fertility <- function(rates, birth_interval = 0.75, group_prop_hazard = NULL,
-                      inheritance = create_group_inheritance(), ffab = 0.4886,
-                          hetfert = NULL, weights = NULL) {
+fertility <- function(rates, birth_interval = 0.75, ffab = 0.4886,
+                      hetfert = NULL, weights = NULL) {
   validate_rates(rates, mortality = FALSE)
   validate_process_weights(weights, "person")
-  warn_cancelled_weight_terms(weights, weight_strata("fertility", rates, group_prop_hazard), "fertility")
-  validate_fertility_group_prop_hazard(group_prop_hazard, rates)
-  inheritance <- normalize_group_inheritance(inheritance)
+  warn_cancelled_weight_terms(weights, weight_strata("fertility", rates), "fertility")
   validate_birth_interval(birth_interval)
   validate_ffab(ffab)
   validate_het_fert(hetfert)
   process <- new_rate_process("fertility", rates)
-  process$inheritance <- if (is.null(inheritance)) create_group_inheritance() else inheritance
   process$birth_interval <- birth_interval
   process$ffab <- ffab
   process$hetfert <- hetfert
   process$weights <- normalize_model_argument(weights)
-  process$group_prop_hazard <- group_prop_hazard
   warn_unreachable_parity_cells(process$rates, birth_interval)
   process
 }
@@ -394,14 +332,18 @@ new_rate_process <- function(name, rates) {
 }
 
 validate_rates <- function(rates, mortality) {
+  check_stratified_columns(rates, if (mortality) "sex" else "union_type",
+                           if (mortality) "Mortality" else "Fertility")
   if (validate_calendar_rates(rates, function(x) validate_rates(x, mortality)))
     return(invisible(rates))
   columns <- c("age_start", "age_end", "rate")
   if (mortality) columns <- c("sex", columns)
   check_columns(rates, columns, "rates")
-  if ("group" %in% names(rates)) {
-    for (rows in split_rate_groups(rates)) {
-      schedule <- rates[rows, setdiff(names(rates), "group"), drop = FALSE]
+  # Possible group columns: each stratum is validated as its own schedule.
+  strata <- candidate_strata(rates)
+  if (length(strata)) {
+    for (rows in split_rate_groups(rates, strata)) {
+      schedule <- rates[rows, setdiff(names(rates), strata), drop = FALSE]
       validate_rates(schedule, mortality)
     }
     if (!nrow(rates)) stop("`rates` must contain at least one age interval.", call. = FALSE)

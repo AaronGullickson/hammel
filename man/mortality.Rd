@@ -5,13 +5,11 @@
 \alias{fertility}
 \title{Specify age-specific demographic rates}
 \usage{
-mortality(rates, group_prop_hazard = NULL, weights = NULL)
+mortality(rates, weights = NULL)
 
 fertility(
   rates,
   birth_interval = 0.75,
-  group_prop_hazard = NULL,
-  inheritance = create_group_inheritance(),
   ffab = 0.4886,
   hetfert = NULL,
   weights = NULL
@@ -22,23 +20,8 @@ fertility(
 and \code{rate}. Starts must be finite and nonnegative; ends must exceed starts
 and may be \code{Inf} for upper-open bands. Rates must
 be finite and nonnegative. Mortality additionally
-requires character \code{sex} values \code{"m"} and \code{"f"}, with both represented.}
-
-\item{group_prop_hazard}{Optional named numeric vector of finite nonnegative
-rate multipliers, with unique nonempty group names. Missing groups use 1.0;
-zero suppresses the risk. Values are not normalized. At execution, multiply
-the selected input schedule by the person's group factor, including all
-sex/status strata. Fertility multiplication precedes cell accounting.
-Without population groups, warn and ignore multipliers. Stored rate tables
-and their source metadata are unchanged; rate-table summaries use those
-stored rates, without applying population-dependent multipliers.
-Fertility with \code{union_type} rates also accepts a named list such as
-\code{list(partnered = c(A = 1.1, B = 0.9), unpartnered = c(A = 1.05))}.
-An omitted status or group uses 1.0. A single vector applies to all
-types (or overall fertility). Type lists require \code{union_type} rates and
-their names must match the supplied schedule types. Three-type schedules
-accept lists named unpartnered/cohab/marriage; shared partnered schedules
-accept unpartnered/partnered. Omitted types and groups have multiplier 1.}
+requires character \code{sex} values \code{"m"} and \code{"f"}, with both represented.
+Use \code{\link[=stratify_rates]{stratify_rates()}} to add proportional group differences.}
 
 \item{weights}{NULL (default) for unweighted selection within rate cells, or
 a \code{\link[=create_weight_model]{create_weight_model()}} specification. Weights choose which member of a
@@ -48,21 +31,6 @@ fertility they combine with \code{hetfert} on the log scale.}
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
 defaulting to \code{0.75}. Must be finite and nonnegative. Applies to fertility
 only; see cell-accounted fertility below.}
-
-\item{inheritance}{A group identity model from \code{\link[=create_group_inheritance]{create_group_inheritance()}},
-or a tibble with numeric \code{time_start}, \code{time_end} and list-column \code{model}
-containing complete inheritance models. Intervals are half-open absolute
-years, must not overlap and must cover the requested run. Select the active
-model at each birth; older identities and ancestry remain unchanged.
-Base data frames with list columns are accepted. All declared possible
-identities across scheduled models join the simulation-wide registry.
-Static inputs may also be a method name requiring no additional parameters: \code{"mother"}, \code{"father"},
-\code{"random_parent"}, \code{"same_sex"}, \code{"opposite_sex"}, or \code{"ancestry"}.
-Fertility defaults to selecting either parent with equal probability,
-with maternal fallback. Other parental, ancestry,
-hierarchy, and custom rules assign identity after child sex and ancestry
-are calculated. Possible identities are checked against grouped schedules
-and categorical matching levels before execution. Applies to fertility only.}
 
 \item{ffab}{Probability that a newborn is female, default \code{0.4886}.
 Must be a finite numeric scalar in \verb{[0, 1]}. Applies to fertility only.}
@@ -84,13 +52,13 @@ schedules are returned as tibbles. A \code{source} attribute on the input table
 is copied to the process's \code{source} field.
 }
 \details{
-An optional \code{group} column supplies separate schedules by nonmissing character
-label or finite numeric code. Without it, rates apply to all groups. Each
-mortality group needs both sexes, and each conditional fertility group needs
-both statuses. Overlap is checked within groups.
-Simulation requires schedules for every population group. Without population
-groups, simulation warns and uses the first group alphabetically (radix order
-of character representations, including numeric codes).
+Columns named by declared group dimensions (see \code{\link[=set_groups]{set_groups()}}), such as
+\code{race} or \code{region}, supply separate schedules for each combination of their
+categories; dimensions without a column share the schedule. Each mortality
+stratum needs both sexes, and each conditional fertility stratum needs both
+statuses. Overlap is checked within strata. Simulation requires schedules for
+every combination of the categories of the dimensions a table uses; a
+table using an undeclared persons column is an error.
 
 Mortality requires separate schedules for both sexes. Gaps and uncovered
 ages are not filled or interpreted as zero rates. Coverage must be specified

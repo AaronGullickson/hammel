@@ -32,8 +32,9 @@
 #' Optional [union_dissolution()] adds one duration-dependent annual hazard per
 #' union, unaffected by births. It ends the episode with `end_reason = "dissolution"`, and restores unpartnered
 #' availability and fertility/search eligibility. Exact ties select death,
-#' birth, dissolution, conversion, search, then group transition. Dissolution `group_pair` schedules and
-#' multipliers use symmetric pairings of both partners' groups. Rate-based
+#' birth, dissolution, conversion, search, then group transition. Dissolution
+#' and conversion rates may use the wife's and husband's categories
+#' (`<group>_w`, `<group>_h`). Rate-based
 #' formation optionally selects age/duration schedules using `previous_union`:
 #' none, separated, or widowed (or pooled none/dissolved). Duration origins and categories are recovered
 #' from recorded histories.
@@ -66,13 +67,14 @@
 #' `simulation$unrealized_births`. Fertility outside supplied bands is zero. Mortality must cover all ages for both sexes, ending at `Inf`.
 #'
 #' Events are recorded at their sampled times in `[start, start + years)`. Rates and all
-#' times remain in person-year and year units. Newborn group identity uses
-#' fertility's inheritance model (random parent by default, with maternal fallback), if groups are present;
-#' other newborn custom columns are missing. Grouped rate
-#' tables use each person's group (the woman's group for union searches).
+#' times remain in person-year and year units. Newborns get a category in each
+#' declared group dimension from its [group()] inheritance rule (random parent
+#' by default, with maternal fallback); other newborn custom columns are
+#' missing. Rate tables stratify by the dimensions they have columns for (the
+#' woman's categories for union searches).
 #' Ungrouped tables apply to everyone. Missing population groups in a grouped
-#' rate table are errors. Without population groups, each grouped table uses its
-#' first alphabetical group with a warning; this does not create group identities.
+#' rate table are errors. Groups must be declared ([set_groups()]); a grouped
+#' table without a declared group dimension is an error.
 #' Matching can use group predictors and pair effects. Existing custom columns and histories are preserved. Restarting samples new
 #' pending events and does not reproduce an uninterrupted run exactly.
 #' When ancestry is tracked, each newborn receives half of each parent's shares,
@@ -122,9 +124,22 @@ simulate <- function(model, years, seed = NULL) {
          call. = FALSE)
   }
   population <- model$population
+  population <- apply_group_declaration(population, model_groups(model))
   validate_population(population)
   population <- normalize_population_transitions(population)
   population <- normalize_population_ancestry(population)
+  declaration <- population$groups
+  dimensions <- names(declaration)
+  grouped <- length(dimensions) > 0L
+  # An undeclared `group` column is an ordinary custom column: hide it from
+  # the engine and restore it afterwards, with NA for newborns.
+  undeclared <- setdiff(names(population$persons), c("person_id", "sex", "birth_time",
+    "death_time", "mother_id", "father_id", "hetfert", dimensions))
+  hidden_group <- NULL
+  if (!"group" %in% dimensions && "group" %in% names(population$persons)) {
+    hidden_group <- population$persons$group
+    population$persons$group <- NULL
+  }
   start <- population$end_time
   if (is.null(start)) stop("The population needs a finite `end_time`.", call. = FALSE)
   if (!is.numeric(years) || length(years) != 1L || !is.finite(years) || years < 0) {
@@ -144,7 +159,7 @@ simulate <- function(model, years, seed = NULL) {
   if (!is.null(hetfert)) validate_fertility_weights(population$persons)
   for (death_slice in calendar_rate_slices(death_rates, start, start + years)) {
     if (!nrow(death_slice)) next
-    for (rows in split_rate_groups(death_slice)) {
+    for (rows in split_rate_groups(death_slice, c(dimensions, "group", undeclared))) {
       for (sex in c("m", "f")) {
         schedule <- death_slice[rows, , drop = FALSE]
         schedule <- schedule[schedule$sex == sex, , drop = FALSE]
@@ -162,11 +177,11 @@ simulate <- function(model, years, seed = NULL) {
     stop("Unsupported demographic process for this engine.",
          call. = FALSE)
   }
-  transition_process <- model$processes$group_transition
-  if (!is.null(transition_process)) {
-    attach_process(model, transition_process)
-    if (!"group" %in% names(population$persons))
-      stop("Group transitions require population group identities.", call. = FALSE)
+  # One transition process per dimension, in declaration order.
+  transition_list <- resolve_transition_processes(transition_processes(model), declaration)
+  for (x in transition_list) {
+    validate_group_transition(x)
+    validate_process_weights(x$weights, "transition")
   }
   dissolution_process <- model$processes$union_dissolution
   if (!is.null(dissolution_process)) attach_process(model, dissolution_process)
@@ -174,8 +189,19 @@ simulate <- function(model, years, seed = NULL) {
   attach_process(model, union_process)
   calendar_inputs <- list(mortality = death_rates, fertility = birth_rates,
     search = union_process$rates, dissolution = dissolution_process$rates,
-    conversion = union_process$union_convert_rate, transition = transition_process$rates,
+    conversion = union_process$union_convert_rate,
     cohabitation_probability = union_process$cohab_prob)
+  for (d in names(transition_list))
+    calendar_inputs[[paste0("`", d, "` transition")]] <- transition_list[[d]]$rates
+  # A rate table stratified by a persons column that is not a declared group.
+  for (name in names(calendar_inputs)) {
+    columns <- names(calendar_inputs[[name]])
+    bad <- c(intersect(undeclared, columns), if (!grouped && any(c("group", "group_pair") %in% columns))
+      intersect(c("group", "group_pair"), columns))
+    if (length(bad))
+      stop(sprintf("The %s rates use %s, which is not a declared group dimension; declare it with set_groups().",
+                   name, paste0("`", unique(bad), "`", collapse = ", ")), call. = FALSE)
+  }
   for (name in names(calendar_inputs))
     check_calendar_coverage(calendar_inputs[[name]], start, start + years, name)
   cohab_enabled <- !is.null(union_process$cohab_prob)
@@ -196,41 +222,63 @@ simulate <- function(model, years, seed = NULL) {
                   "partnered and unpartnered women. To make fertility depend on union status,",
                   "supply separate schedules using `union_type`."), call. = FALSE)
   }
-  registry_population <- population
-  registry_population$.transition_groups <- unique(c(
-    as.character(population$transitions$group_origin), as.character(population$transitions$group_dest),
-    as.character(transition_process$rates$group_origin), as.character(transition_process$rates$group_dest)))
+  # Group dimensions (D134): each has its categories (registry), inheritance
+  # rule and optional ancestry block. Matching group effects use one
+  # dimension (the only one, or the one the matching models name); its
+  # categories are `group_values`.
+  registries <- group_registries(population, lapply(transition_list, `[[`, "rates"))
+  resolved <- resolve_matching_models(union_process, declaration, registries)
+  union_process <- resolved$process
+  match_dims <- if (length(resolved$dims)) resolved$dims else if (length(dimensions) == 1L) dimensions
+  group_values <- if (length(resolved$dims)) resolved$values else
+    if (length(match_dims)) registries[[match_dims]]
+  tracked <- tracked_ancestry(declaration)
+  components <- lapply(dimensions, function(d)
+    if (d %in% tracked) setdiff(names(population$ancestry[[d]]), "person_id") else character())
+  sizes <- vapply(components, length, integer(1))
+  offsets <- cumsum(c(0L, utils::head(sizes, -1)))
+  for (d in dimensions)
+    if (!d %in% tracked && any(vapply(model_entries(declaration[[d]]$inheritance), function(m)
+        identical(m$method, "ancestry"), logical(1))))
+      stop("The \"ancestry\" inheritance method requires `ancestry = TRUE` in group().", call. = FALSE)
   model_arguments <- list(matching = union_process$matching,
-    father_matching = union_process$father_matching, cohab_matching = union_process$cohab_matching,
-    inheritance = model$processes$fertility$inheritance)
+    father_matching = union_process$father_matching, cohab_matching = union_process$cohab_matching)
+  inheritance_arguments <- lapply(declaration, `[[`, "inheritance")
   for (name in names(model_arguments))
     check_model_coverage(model_arguments[[name]], start, start + years, name)
-  scheduled_models <- any(vapply(model_arguments, is_model_schedule, logical(1)))
+  for (d in dimensions)
+    check_model_coverage(inheritance_arguments[[d]], start, start + years, sprintf("`%s` inheritance", d))
+  scheduled_models <- any(vapply(c(model_arguments, inheritance_arguments), is_model_schedule, logical(1)))
   model_context <- if (scheduled_models)
-    prepare_model_schedules(model_arguments, registry_population, start, start + years) else NULL
-  inheritance <- if (scheduled_models) model_context$inheritance else
-    prepare_group_inheritance(model$processes$fertility$inheritance, registry_population)
-  group_values <- inheritance$values
-  death_rates <- prepare_group_rates(death_rates, population$persons, "mortality", group_values, start, start + years)
-  birth_rates <- prepare_group_rates(birth_rates, population$persons, "fertility", group_values, start, start + years)
-  union_rates <- if (is.null(union_process$rates))
-    data.frame(age_start = numeric(), age_end = numeric(), rate = numeric()) else
-    prepare_group_rates(expand_previous_union_rates(union_process$rates),
-      population$persons, "union formation", group_values, start, start + years)
-  death_rates <- apply_group_prop_hazard(death_rates, population$persons,
-    model$processes$mortality$group_prop_hazard, "mortality", group_values)
-  birth_rates <- apply_group_prop_hazard(birth_rates, population$persons,
-    model$processes$fertility$group_prop_hazard, "fertility", group_values)
-  if (union_process$initiation == "rate") {
-    union_rates <- apply_group_prop_hazard(union_rates, population$persons,
-      union_process$group_prop_hazard, "union formation", group_values)
-  }
+    prepare_model_schedules(model_arguments, group_values, unname(inheritance_arguments),
+      registries, components, start, start + years) else NULL
+  inheritance <- lapply(seq_along(dimensions), function(d) {
+    rule <- if (scheduled_models) model_context$inheritance[[d]] else
+      prepare_group_inheritance(declaration[[d]]$inheritance, registries[[d]], components[[d]])
+    c(rule, list(ancestry_offset = as.integer(offsets[d]), ancestry_size = sizes[[d]]))
+  })
+  strata <- function(rates, process, union_level = FALSE)
+    prepare_strata_rates(rates, process, registries, start, start + years, union_level)
+  death <- strata(death_rates, "mortality")
+  death_rates <- death$rates
+  birth <- strata(birth_rates, "fertility")
+  birth_rates <- birth$rates
+  search <- if (is.null(union_process$rates))
+    list(rates = data.frame(age_start = numeric(), age_end = numeric(), rate = numeric()),
+         spec = strata(data.frame(rate = numeric()), "search")$spec) else
+    strata(expand_previous_union_rates(union_process$rates), "union formation")
+  union_rates <- search$rates
   validate_matching_groups(union_process$matching, group_values)
   if (!is.null(union_process$father_matching))
     validate_matching_groups(union_process$father_matching, group_values)
-  dissolution_rates <- prepare_dissolution_rates(dissolution_process,
-    population$persons, group_values, start, start + years)
-  cohab <- prepare_cohabitation(union_process, population, group_values, start, start + years)
+  dissolution <- if (is.null(dissolution_process))
+    list(rates = data.frame(age_start = numeric(), age_end = numeric(), rate = numeric()),
+         spec = strata(data.frame(rate = numeric()), "dissolution")$spec) else
+    strata(dissolution_process$rates, "Union dissolution", union_level = TRUE)
+  dissolution_rates <- dissolution$rates
+  dissolution_rates$age_start <- dissolution_rates$dur_start
+  dissolution_rates$age_end <- dissolution_rates$dur_end
+  cohab <- prepare_cohabitation(union_process, strata)
   if (!is.null(union_process$cohab_matching))
     validate_matching_groups(union_process$cohab_matching, group_values)
   if (cohab_enabled && !"union_type" %in% names(population$unions))
@@ -238,29 +286,63 @@ simulate <- function(model, years, seed = NULL) {
   if (cohab_enabled && !"previous_cohab_id" %in% names(population$unions))
     population$unions$previous_cohab_id <- rep(NA_real_, nrow(population$unions))
   engine_persons <- population$persons
-  engine_persons$.hammel_group <- if (is.null(group_values)) rep(0L, nrow(engine_persons)) else
-    match(as.character(engine_persons$group), as.character(group_values)) - 1L
-  transition_rates <- if (is.null(transition_process)) NULL else transition_process$rates
-  if (!is.null(transition_rates)) {
-    transition_rates$.origin <- match(as.character(transition_rates$group_origin), as.character(group_values)) - 1L
-    transition_rates$.dest <- match(as.character(transition_rates$group_dest), as.character(group_values)) - 1L
-    engine_persons$.group_entry <- engine_persons$birth_time
+  group_input <- if (!grouped) NULL else group_engine_input(population$persons, registries, match_dims,
+    list(mortality = death$spec, fertility = birth$spec, search = search$spec,
+         probability = cohab$prob_spec, conversion = cohab$conversion_spec,
+         dissolution = dissolution$spec))
+  # Each transition process: strata over its own dimension (the origin) and
+  # any other dimensions its table uses; destinations; and each person's
+  # entry time into their current category of that dimension.
+  transition_input <- lapply(names(transition_list), function(d) {
+    rates <- transition_list[[d]]$rates
+    rates[[d]] <- rates$origin
+    prepared <- prepare_strata_rates(rates, sprintf("`%s` transition", d), registries,
+                                     start, start + years, coverage = FALSE)
+    rates <- prepared$rates
+    rates$.dest <- match(as.character(rates$destination), as.character(registries[[d]])) - 1L
+    entry <- population$persons$birth_time
     tx <- population$transitions
+    tx <- tx[tx$group == d, , drop = FALSE]
     if (nrow(tx)) {
       latest <- tapply(tx$time, tx$person_id, max)
-      i <- match(names(latest), as.character(engine_persons$person_id))
-      engine_persons$.group_entry[i] <- as.numeric(latest)
+      i <- match(names(latest), as.character(population$persons$person_id))
+      entry[i] <- as.numeric(latest)
     }
-  }
+    rule <- transition_list[[d]]$household
+    list(dimension = match(d, dimensions) - 1L, rates = rates, spec = prepared$spec,
+         entry = as.numeric(entry), household = !is.null(rule),
+         dependent_age = if (is.null(rule)) 0 else rule$age_independence)
+  })
+  transition_rates <- if (length(transition_input)) transition_input else NULL
   weight_models <- list(mortality = model$processes$mortality$weights,
     fertility = model$processes$fertility$weights,
     dissolution = dissolution_process$weights,
     conversion = union_process$weights_conversion,
-    transition = transition_process$weights,
     search = union_process$weights)
+  for (k in seq_along(transition_list))
+    weight_models[[paste0("transition_", k)]] <- transition_list[[k]]$weights
   weight_models <- Filter(Negate(is.null), weight_models)
   for (name in names(weight_models))
     check_model_coverage(weight_models[[name]], start, start + years, paste(name, "weights"))
+  # Weight variables resolve against the declaration (D134): each dimension's
+  # categories, and ancestry variables `ancestry_<dim>_<category>` in engine
+  # column order.
+  ancestry_names <- unlist(lapply(seq_along(dimensions), function(k)
+    if (sizes[k]) paste0("ancestry_", dimensions[k], "_", components[[k]])))
+  weight_context <- list(categories = registries, ancestry = as.character(ancestry_names))
+  weight_input <- if (!length(weight_models)) NULL else {
+    types <- c(mortality = "person", fertility = "person", dissolution = "union",
+               conversion = "union", search = "person")
+    prepared <- lapply(names(weight_models), function(name) {
+      transition <- startsWith(name, "transition_")
+      context <- weight_context
+      if (transition) context$transition_dim <- names(transition_list)[as.integer(sub("transition_", "", name))]
+      prepare_weight_model(weight_models[[name]], if (transition) "transition" else types[[name]],
+                           if (transition) "transition" else name, context)
+    })
+    names(prepared) <- names(weight_models)
+    c(prepared, list(ancestry_labels = as.character(ancestry_names)))
+  }
   if ("previous_union" %in% names(union_rates) || cohab_enabled || length(weight_models)) {
     previous <- previous_union_info_cpp(population$persons, population$unions, counts_cohab)
     engine_persons$.hammel_previous_union <- previous$previous_union
@@ -294,17 +376,6 @@ simulate <- function(model, years, seed = NULL) {
     cohab_matching <- if (scheduled_models) model_context$cohab_matching else
       if (is.null(union_process$cohab_matching)) matching else
         prepare_matching_model(union_process$cohab_matching, group_values)
-    ancestry_labels <- if (is.null(population[["ancestry"]])) character() else
-      setdiff(names(population[["ancestry"]]), "person_id")
-    weight_input <- if (!length(weight_models)) NULL else {
-      types <- c(mortality = "person", fertility = "person", dissolution = "union",
-                 conversion = "union", transition = "transition", search = "person")
-      prepared <- lapply(names(weight_models), function(name)
-        prepare_weight_model(weight_models[[name]], types[[name]], name, group_values, ancestry_labels))
-      names(prepared) <- names(weight_models)
-      c(prepared, list(group_labels = if (is.null(group_values)) character() else
-        as.character(group_values), ancestry_labels = ancestry_labels))
-    }
     native <- simulate_cpp(engine_persons, death_rates, birth_rates,
                            start, years, birth_interval, population$unions,
                            matching,
@@ -313,15 +384,13 @@ simulate <- function(model, years, seed = NULL) {
                            union_process$initiation == "rate",
                            union_rates, father_matching,
                            union_process$cancel_birth_if_no_match, union_process$diagnostics,
-                           if (is.null(population[["ancestry"]]))
-                             matrix(numeric(), nrow = nrow(engine_persons), ncol = 0L) else
-                             as.matrix(population[["ancestry"]][setdiff(names(population[["ancestry"]]), "person_id")]),
+                           ancestry_matrix(population, tracked),
                            inheritance, ffab, dissolution_rates, cohab$prob, cohab$conversion,
                            cohab_matching, counts_cohab,
                            isTRUE(getOption("hammel.check_cells", FALSE)),
                            if (is.null(hetfert)) NULL else unclass(hetfert), transition_rates,
                            if (scheduled_models) model_context$config else NULL,
-                           weight_input)
+                           weight_input, group_input)
     if (!isTRUE(native$cells_consistent))
       stop("Internal error: fertility cell counts are inconsistent.", call. = FALSE)
     persons <- population$persons
@@ -331,19 +400,31 @@ simulate <- function(model, years, seed = NULL) {
     }
     for (column in names(native$persons)) persons[[column]] <- native$persons[[column]]
     if (!is.null(hetfert)) persons$hetfert <- native$hetfert
-    if (!is.null(group_values)) persons$group <- group_values[native$groups + 1L]
+    for (d in seq_along(dimensions))
+      persons[[dimensions[d]]] <- registries[[d]][native$categories[, d] + 1L]
     result$persons <- tibble::as_tibble(persons)
-    if (!is.null(group_values)) {
-      tx <- tibble::as_tibble(native$transitions)
-      tx$group_origin <- group_values[tx$group_origin + 1L]
-      tx$group_dest <- group_values[tx$group_dest + 1L]
-      result$transitions <- tibble::as_tibble(rbind(population$transitions, tx))
+    if (grouped) {
+      tx <- native$transitions
+      d <- tx$dimension + 1L
+      labels <- lapply(registries, as.character)
+      new <- tibble::tibble(person_id = tx$person_id, time = tx$time,
+        group = as.character(dimensions[d]),
+        origin = vapply(seq_along(d), function(k) labels[[d[k]]][tx$origin[k] + 1L], ""),
+        destination = vapply(seq_along(d), function(k) labels[[d[k]]][tx$destination[k] + 1L], ""))
+      # Move identifiers continue after any already in the history.
+      previous <- suppressWarnings(max(c(0, population$transitions$move_id), na.rm = TRUE))
+      new$move_id <- tx$move_id + previous
+      new$initiator_id <- tx$initiator_id
+      result$transitions <- tibble::as_tibble(rbind(population$transitions, new))
     }
-    if (!is.null(population[["ancestry"]])) {
-      ancestry <- tibble::as_tibble(native$ancestry, .name_repair = "minimal")
-      names(ancestry) <- setdiff(names(population[["ancestry"]]), "person_id")
-      result$ancestry <- tibble::tibble(person_id = persons$person_id)
-      for (column in names(ancestry)) result$ancestry[[column]] <- ancestry[[column]]
+    if (length(tracked)) {
+      result$ancestry <- list()
+      for (k in seq_along(dimensions)) {
+        if (!sizes[k]) next
+        table <- tibble::tibble(person_id = persons$person_id)
+        for (j in seq_len(sizes[k])) table[[components[[k]][j]]] <- native$ancestry[, offsets[k] + j]
+        result$ancestry[[dimensions[k]]] <- table
+      }
     }
     unions <- result$unions
     added_unions <- nrow(native$unions) - nrow(unions)
@@ -387,15 +468,17 @@ simulate <- function(model, years, seed = NULL) {
     births = births, deaths = deaths)
   if (!is.null(hetfert)) result$simulation$hetfert <- hetfert
   result$simulation$unrealized_births <- format_unrealized_births(
-    if (years > 0) native$unrealized else NULL, birth_rates, group_values)
+    if (years > 0) native$unrealized else NULL, birth_rates, registries)
   if (cohab_enabled) {
     result$simulation$cohabitation_counts_as_previous_union <- counts_cohab
     result$simulation$conversions <- if (years > 0) native$conversions else 0
   }
-  if (!is.null(transition_process))
+  if (length(transition_list))
     result$simulation$transitions <- if (years > 0) nrow(native$transitions) else 0L
   if (!is.null(dissolution_process))
     result$simulation$dissolutions <- if (years > 0) native$dissolutions else 0
+  if (!is.null(hidden_group))
+    result$persons$group <- c(hidden_group, hidden_group[rep(NA_integer_, nrow(result$persons) - length(hidden_group))])
   result$persons <- tibble::as_tibble(result$persons)
   result$unions <- tibble::as_tibble(result$unions)
   validate_population(result)
@@ -415,7 +498,7 @@ validate_birth_interval <- function(duration) {
 # (D101), by one-year period from the run start and cell. Columns mirror the
 # fertility table's strata: group, union_type and parity bounds appear only
 # when the schedules use them. Always a tibble, possibly with zero rows.
-format_unrealized_births <- function(native, rates, group_values) {
+format_unrealized_births <- function(native, rates, registries) {
   if (is.null(native) || !length(native$period_start)) {
     native <- data.frame(period_start = numeric(), period_end = numeric(),
       group = integer(), union_type = character(), parity_start = numeric(),
@@ -423,7 +506,10 @@ format_unrealized_births <- function(native, rates, group_values) {
       unrealized_births = numeric())
   }
   out <- tibble::tibble(period_start = native$period_start, period_end = native$period_end)
-  if (!is.null(group_values)) out$group <- group_values[native$group + 1L]
+  # The reporting index combines every group dimension's category.
+  if (length(registries))
+    for (column in names(decoded <- decode_report_strata(native$group, registries)))
+      out[[column]] <- decoded[[column]]
   if ("union_type" %in% names(rates)) out$union_type <- as.character(native$union_type)
   if ("parity_start" %in% names(rates)) {
     out$parity_start <- native$parity_start
@@ -434,3 +520,15 @@ format_unrealized_births <- function(native, rates, group_values) {
   out$unrealized_births <- native$unrealized_births
   out
 }
+
+# Initial ancestry shares for the engine: each tracked dimension's block of
+# category shares and unknown, in declaration order.
+ancestry_matrix <- function(population, tracked) {
+  n <- nrow(population$persons)
+  if (!length(tracked)) return(matrix(numeric(), nrow = n, ncol = 0L))
+  do.call(cbind, lapply(tracked, function(d) {
+    x <- population$ancestry[[d]]
+    as.matrix(x[setdiff(names(x), "person_id")])
+  }))
+}
+

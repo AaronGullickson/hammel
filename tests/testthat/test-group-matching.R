@@ -55,7 +55,8 @@ test_that("categorical group predictors have stable treatment contrasts and inte
     female_group = factor(c("A", "B"), levels = c("A", "B")))
   names <- colnames(stats::model.matrix(formula, data))[-1]
   beta <- setNames(seq_along(names)/10, names)
-  expect_warning(matching <- create_matching_model(formula, beta, group_levels = c("A", "B")), "male_group are absorbed")
+  expect_warning(public <- create_matching_model(formula, beta), "male_group` are absorbed")
+  matching <- internal_matching_model(public, "group", c("A", "B"))
   gaps <- c(1, 3)
   supplied <- data.frame(age_difference = gaps,
     female_group = factor(c("B", "B"), levels = c("A", "B")),
@@ -66,8 +67,10 @@ test_that("categorical group predictors have stable treatment contrasts and inte
   # Session contrast settings must not change these specified coefficients.
   old <- options(contrasts = c("contr.sum", "contr.poly")); on.exit(options(old))
   expect_equal(calculate_matching_utilities(matching, gaps, "B", c("A", "A")), unname(expected))
-  expect_error(create_matching_model(~ male_group, c(male_groupB = 1)), "group_levels")
-  expect_error(create_matching_model(~ male_group, c(male_groupB = 1), group_levels = "A"), "two")
+  # Categories come from the declaration and are checked when the model meets it.
+  expect_error(internal_matching_model(public, "group", c("A", "B", "C")), "coefficient names")
+  one <- suppressWarnings(create_matching_model(~ male_group, numeric()))
+  expect_error(internal_matching_model(one, "group", "A"), "at least two categories")
   expect_error(prepare_matching_model(matching, c("A", "C")), "covered")
   expect_error(calculate_matching_utilities(matching, 1, "A", "C"), "undeclared")
 })
@@ -76,6 +79,7 @@ group_choice_model <- function(initiation = "on_demand", matching, father_matchi
   model <- make_model(3, birth_rate = 20, birth_interval = 0)
   model$population$persons$sex <- c("f", "m", "m")
   model$population$persons$group <- c("A", "A", "B")
+  model$population$groups <- list(group = group())
   if (initiation == "rate") {
     model <- identity(set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
       age_start = 15, age_end = 50, rate = c(0, 20)), 0))
@@ -107,8 +111,9 @@ test_that("group matching validates edited models and missing identities even at
   matching <- create_matching_model(~ same_group, c(same_group = 1))
   model <- make_model(0)
   model$processes$union_formation$matching <- matching
-  expect_error(simulate(model, 0), "group identities")
+  expect_error(simulate(model, 0), "declared group dimension")
   model$population$persons$group <- character()
+  model$population$groups <- list(group = group())
   expect_no_error(simulate(model, 1))
   matching <- create_matching_model(~ age_difference, c(age_difference = 0), group_exogamy = c("A:B" = 0))
   matching$group_exogamy <- c("A:B" = 0, "B:A" = 0)
@@ -130,9 +135,9 @@ test_that("zero or absent pair effects preserve histories and RNG consumption", 
 })
 
 test_that("custom group comparisons work with absent candidate levels", {
-  matching <- suppressWarnings(create_matching_model(~ age_difference + I(male_group == "B"),
-    c(age_difference = 0.1, "I(male_group == \"B\")TRUE" = log(2)),
-    group_levels = c("A", "B")))
+  matching <- internal_matching_model(suppressWarnings(create_matching_model(
+    ~ age_difference + I(male_group == "B"),
+    c(age_difference = 0.1, "I(male_group == \"B\")TRUE" = log(2)))), "group", c("A", "B"))
   prepared <- prepare_matching_model(matching, c("A", "B"))
   expect_equal(inspect_group_matching_cpp(c(1, 3), prepared, 0L, c(0L, 0L)),
                c(0.1, 0.3))
@@ -141,13 +146,18 @@ test_that("custom group comparisons work with absent candidate levels", {
 })
 
 test_that("pair tables support numeric and colon-containing group labels", {
-  matching <- create_matching_model(~ same_group, c(same_group = 0.2),
-    group_exogamy = data.frame(female_group = 20, male_group = 10, log_odds = log(2)))
+  matching <- as_internal_matching(create_matching_model(~ same_group, c(same_group = 0.2),
+    group_exogamy = data.frame(group_x = 20, group_y = 10, log_odds = log(2))), c(20, 10))
   prepared <- prepare_matching_model(matching, c(20, 10))
   expect_equal(inspect_group_matching_cpp(c(0, 0), prepared, 0L, 0:1), c(0.2, log(2)))
   expect_equal(calculate_matching_utilities(matching, c(0, 0), 20, c(20, 10)), c(0.2, log(2)))
-  matching <- create_matching_model(~ 1, numeric(), group_exogamy = data.frame(
-    female_group = "A:B", male_group = "C::D", log_odds = -1))
+  matching <- as_internal_matching(create_matching_model(~ 1, numeric(), group_exogamy = data.frame(
+    group_x = "A:B", group_y = "C::D", log_odds = -1)), c("A:B", "C::D"))
   prepared <- prepare_matching_model(matching, c("A:B", "C::D"))
   expect_equal(inspect_group_matching_cpp(c(0, 0), prepared, 0L, 0:1), c(0, -1))
+  # The removed female_group/male_group form points to the table form.
+  expect_error(create_matching_model(~ 1, numeric(), group_exogamy = data.frame(
+    female_group = "A", male_group = "B", log_odds = -1)), "_x` and `<group>_y")
+  expect_error(create_matching_model(~ 1, numeric(), group_exogamy = list(group = data.frame(
+    group_x = "A", group_y = "B", log_odds = -1))), "whole `group_exogamy`")
 })

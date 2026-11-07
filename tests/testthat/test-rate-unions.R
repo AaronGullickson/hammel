@@ -86,7 +86,7 @@ test_that("husband death cancels pending births and widowhood permits another se
   # No replacement partner: all post-widowhood births must be suppressed,
   # including any candidate already queued while the husband was alive.
   model <- set_population(model, hammel_population(model$population$persons[1:2, ],
-    model$population$unions, end_time = 0))
+    model$population$unions, end_time = 0, groups = if ("group" %in% names(model$population$persons[1:2, ])) "group"))
   result <- simulate(model, 1, seed = 52)
   children <- result$persons[result$persons$birth_time >= 0, ]
   expect_true(all(children$birth_time < result$persons$death_time[2]))

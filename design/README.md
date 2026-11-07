@@ -1,7 +1,7 @@
 # Hammel documentation
 
-Updated November 5, 2026. Milestones 1–8 are complete by user acceptance
-(D029, D050, D077, D093, D105, D116, D127, D130), including individual group transitions, parity-specific fertility,
+Updated November 6, 2026. Milestones 1–9 are complete by user acceptance
+(D029, D050, D077, D093, D105, D116, D127, D130, D141), including individual group transitions, parity-specific fertility,
 cell-accounted birth spacing and persistent lognormal fertility weights.
 Current behavior uses continuous event times with no monthly grid. Acceptance
 is based on the user-authored validation reports and retains their limitations.
@@ -11,12 +11,16 @@ rates (D118), cohabitation probabilities (D122), and matching/inheritance model
 schedules (D123).** See the [validation report](../validation/milestone7.qmd)
 and [rendered assessment](../validation/milestone7.html).
 See the [rate contract](time-varying-rates.md) and
-[group-transition contract](group-transitions.md). Household moves are deferred to
-milestone 9's multiple-group/regions applications (D114/D121/D131).
+[group-transition contract](group-transitions.md). Household moves, deferred by
+D114, are implemented in milestone 9 (D140).
 **Milestone 8 is accepted complete, November 5, 2026 (D130): cell scheduling
 for every rate process with one clock per process (D128) and weight models
 (D129).** See the [specification](binned-group-hazards.md) and the
 [validation report](../validation/milestone8.qmd).
+**Milestone 9 is accepted complete, November 6, 2026 (D141): multiple group
+dimensions (D134), including matching across several dimensions and household
+moves (D140).** See [multiple group dimensions](multiple-groups.md) and the
+[validation report](../validation/milestone9.qmd).
 
 ## Reading order
 
@@ -32,12 +36,13 @@ for every rate process with one clock per process (D128) and weight models
 | [Rate input census](rate-inputs.md) | Existing rate schedules, age/duration bands, supported strata and multipliers |
 | [Population schema](population-schema.md) | Person/union tables and structural validation |
 | [Group transitions](group-transitions.md) | Individual transitions, histories, state updates and age/duration Lexis rates |
-| [Groups](groups.md) | Group-specific schedules, multipliers, newborn identity, and baseline sampling |
+| [Groups](groups.md) | Declared group dimensions, group-specific schedules, multipliers, newborn categories, and baseline sampling |
+| [Multiple group dimensions](multiple-groups.md) | Milestone 9 decisions (D134), naming rules, and what each stage implemented |
 | [Ancestry](ancestry.md) | Starting proportions, parental averaging, unknown shares, and restarts |
 | [Group inheritance](group-inheritance.md) | Built-in/custom identity rules, passing, and possible groups |
 | [Calibration intensity updates](calibration-intensity.md) | Actual female hazards from search and fertility cells (D082/D128) |
 | [Weighted-choice matching](weighted-choice-matching.md) | Calibrated male-group weights and delta target adjustments (D074/D075) |
-| [Group matching](group-matching.md) | Symmetric pair effects and fixed group formula predictors |
+| [Group matching](group-matching.md) | Symmetric pair effects and group formula predictors, by dimension |
 | [Demographic analysis](demographic-analysis.md) | Separate mortality/fertility rates, parity ASFRs, union rates, TFR, and life tables |
 | [Cell-accounted fertility](fertility-cell-accounting.md) | Birth-spacing mechanism (D101): cells, unrealized births, validation |
 | [Parity spacing investigation](parity-spacing-investigation.md) | Evidence that led to D101, including the SOCSIM reference |
@@ -71,6 +76,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [SOCSIM dissolution and remarriage](socsim-dissolution-audit.md) | Pinned static divorce clocks, remarriage schedules, state updates, and cohabitation findings |
 | [SOCSIM cohabitation](socsim-cohabitation-audit.md) | Pinned static formation/type assignment, conversion, breakup, legal history and output trace |
 | [SOCSIM group transitions](socsim-group-transitions-audit.md) | Pinned static transition clocks, household moves, histories, rescheduling and source caveats |
+| [SOCSIM household membership](socsim-household-transitions-audit.md) | Initiator-specific family-following rules, child-age defect, rate interpretation and 13 executable selection fixtures |
 
 Git retains earlier specifications and verification records; do not keep
 snapshot copies in the docs tree. The decision log records rationale and

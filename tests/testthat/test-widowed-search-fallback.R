@@ -56,6 +56,7 @@ test_that("search rates and cohabitation probabilities accept the same complete 
   }
   m <- make_rate_model(4)
   m$population$persons$group <- c("A","A","B","B")
+  m$population$groups <- list(group = group())
   m$population$unions <- tibble::tibble(union_id=1,wife_id=1,husband_id=2,
     start_time=-5,end_time=-1,end_reason="death_husband")
   m$population$persons$death_time[2] <- -1

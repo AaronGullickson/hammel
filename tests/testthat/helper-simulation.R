@@ -6,7 +6,7 @@ make_model <- function(n = 1000, sex = "m", age = 20, death_rate = 0,
   birth_time = rep(-age, n), death_time = rep(NA_real_, n),
   mother_id = rep(NA_integer_, n), father_id = rep(NA_integer_, n))
  hammel_model() |>
-  set_population(hammel_population(persons, end_time = 0)) |>
+  set_population(hammel_population(persons, end_time = 0, groups = if ("group" %in% names(persons)) "group")) |>
   set_mortality(data.frame(sex = c("m", "f"), age_start = 0,
               age_end = Inf, rate = death_rate)) |>
   set_fertility(data.frame(age_start = 15, age_end = 50, rate = birth_rate),
@@ -66,9 +66,84 @@ spacing_population <- function(n, age = 30, sons = -0.1, groups = NULL, end_time
     mother_id = c(rep(NA_real_, n), rep(seq_len(n), each = k)),
     father_id = NA_real_)
   if (!is.null(groups)) persons$group <- c(rep(groups[1], n), rep(groups[2], n * k))
-  hammel_population(persons, end_time = end_time)
+  hammel_population(persons, end_time = end_time, groups = if ("group" %in% names(persons)) "group")
 }
 # Poisson check of a count against its expected value.
 expect_count <- function(count, expected) {
   expect_lt(abs(sum(count) - expected), 4 * sqrt(expected) + 1e-9)
+}
+
+# Mortality and fertility counts in one table (the shape of the former internal
+# collect_demographic_counts()): births are NA for men.
+demographic_counts <- function(population, time_breaks, age_breaks, by = NULL) {
+  out <- calculate_mortality_rates(population, time_breaks, age_breaks, by = by)
+  births <- calculate_fertility_rates(population, time_breaks, age_breaks, by = by)
+  keys <- setdiff(names(births), c("person_years", "births", "rate_fertility"))
+  key <- function(x) do.call(paste, c(lapply(x[keys], as.character), sep = "\r"))
+  out$births <- births$births[match(key(out), key(births))]
+  out$rate_fertility <- as.numeric(ifelse(out$person_years > 0,
+    out$births / out$person_years, NA_real_))
+  out <- out[c(setdiff(names(out), c("deaths", "births", "rate_mortality", "rate_fertility")),
+               "deaths", "births", "rate_mortality", "rate_fertility")]
+  attr(out, "unassigned_births") <- attr(births, "unassigned_births")
+  out
+}
+
+# An unordered pair label for two group labels, such as "A:B" for B and A.
+unordered_pair <- function(a, b) {
+  a <- as.character(a); b <- as.character(b)
+  ifelse(a <= b, paste(a, b, sep = ":"), paste(b, a, sep = ":"))
+}
+
+# Sum directional wife/husband dissolution rows into unordered group pairs.
+pair_rates <- function(x) {
+  x$group_pair <- unordered_pair(x$group_w, x$group_h)
+  keys <- intersect(c("time_start", "time_end", "dur_start", "dur_end", "group_pair", "union_type"),
+                    names(x))
+  aggregate(x[c("union_years", "dissolutions")], x[keys], sum)
+}
+
+# The recorded histories of a result, without its group declaration (which
+# records the inheritance rule and so differs between equivalent models).
+histories <- function(x) x[intersect(c("persons", "unions", "ancestry", "transitions"), names(x))]
+
+# Change the inheritance rule of a model's (single) declared group dimension.
+# `extra` appends categories (such as a custom rule's outputs) to the current
+# ones, or to the population's values when none are listed.
+set_inheritance <- function(model, rule, extra = NULL) {
+  declaration <- hammel:::model_groups(model)
+  if (is.null(declaration)) declaration <- list(group = group())
+  current <- declaration$group
+  categories <- current$categories
+  if (!is.null(extra)) {
+    if (is.null(categories)) categories <- unique(model$population$persons$group)
+    categories <- c(categories, extra)
+  }
+  declaration$group <- group(categories = categories, ancestry = current$ancestry,
+                             inheritance = rule)
+  do.call(set_groups, c(list(model), declaration))
+}
+
+# Expand symmetric `group_pair` rate rows ("A:B") into directional rows with
+# `group_w` and `group_h`, both directions sharing the row's rate.
+directional_pairs <- function(rates) {
+  out <- do.call(rbind, lapply(seq_len(nrow(rates)), function(i) {
+    p <- strsplit(as.character(rates$group_pair[i]), ":", fixed = TRUE)[[1]]
+    same <- p[1] == p[2]
+    r <- rates[rep(i, if (same) 1L else 2L), , drop = FALSE]
+    r$group_w <- if (same) p[1] else p
+    r$group_h <- if (same) p[2] else rev(p)
+    r$group_pair <- NULL
+    r
+  }))
+  rownames(out) <- NULL
+  out
+}
+
+# Translate a public matching model for a single dimension named `group` with
+# categories `labels`, as simulate() does, for tests of internal helpers.
+as_internal_matching <- function(model, labels) {
+  if (is.null(labels)) return(internal_matching_model(model, NULL, NULL))
+  dim <- if (length(matching_dimensions(model, "group"))) "group"
+  internal_matching_model(model, dim, labels)
 }

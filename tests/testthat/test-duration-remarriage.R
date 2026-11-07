@@ -129,6 +129,7 @@ test_that("each new ending resets duration and widowhood starts at partner death
 test_that("grouped duration calibration matches the equivalent age hazards", {
   model <- ended_union_model(30, ended = -2)
   model$population$persons$group <- rep(c("A", "B"), 30)
+  model$population$groups <- list(group = group())
   duration <- duration_search_rates(.4)
   duration$dur_start[2:3] <- 3
   age <- duration
@@ -137,7 +138,7 @@ test_that("grouped duration calibration matches the equivalent age hazards", {
   age$dur_start <- age$dur_end <- NULL
   matching <- create_matching_model(~ 1, numeric(), group_exogamy = c("A:B" = -2))
   configure <- function(rates) set_union_formation(model, "rate", matching,
-    rates = rates, group_prop_hazard = c(B = 1.3), diagnostics = TRUE,
+    rates = stratify_rates(rates, list(group = c(A = 1, B = 1.3))), diagnostics = TRUE,
     kinship_generations = 0L)
   set.seed(87); rng <- .Random.seed
   a <- simulate(configure(duration), 4, 71)

@@ -31,7 +31,8 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Simulation validation, RNG isolation, result assembly | `R/simulate.R` |
 | Continuous scheduling and events | `src/simulate.cpp` |
 | Demographic extraction and measures | `src/demography.cpp`, `R/calc_demographic_measures.R` |
-| Directed transition Lexis counts | `R/calculate_transition_rates.R`; `transition_counts_cpp()` in `src/demography.cpp` |
+| Person-level observation engine (`by`, D133) | `R/observation_strata.R`; `person_lexis_cpp()` and `person_snapshot_cpp()` in `src/observation.cpp` |
+| Union-level dissolution and conversion counts | `dissolution_counts_cpp()` and `union_group_history_cpp()` in `src/demography.cpp` |
 | Software and analytical validation | `tests/testthat/` |
 | Replication assessment | `validation/milestone1.qmd` through `validation/milestone8.qmd` |
 
@@ -82,12 +83,9 @@ process when present. `set_process(model, process)` stores a process under its
 own name. The demographic setters construct and attach it in one operation.
 Replacing a process replaces that specification and retains the others.
 
-Mortality, fertility, and rate-based union formation also accept optional
-`group_prop_hazard` vectors on constructors and setters. The process stores the
-vector separately from its input rates. Execution scales a private schedule
-copy, expanding shared schedules by population group where needed, before
-native schedule and fertility-cell construction. Omitted group factors
-are 1.0; absent population groups cause a warning and the vector is ignored.
+`stratify_rates(rates, by)` in `R/stratify_rates.R` adds proportional strata to
+a rate table before it is attached (D132). Each setter checks the table's
+stratum columns (`stratum_columns`) against those its process supports.
 Conditional fertility may instead store a named list of partnered/unpartnered
 vectors. Omitted statuses also use 1.0; a single vector scales both statuses.
 See [groups](groups.md) for effective-rate examples and validation rules.
@@ -124,7 +122,7 @@ Grouped populations also have an `ancestry` tibble, or may supply it explicitly
 to `hammel_population(ancestry = ...)`. Initialization uses recorded identities
 only when proportions are absent. The engine keeps call-local row-major numeric
 ancestry shares, appending parental averages at each birth; it returns the table
-in person order with `group_<label>` columns and `unknown`. Missing fathers
+in person order as one tibble per tracked dimension, with a column per category and `unknown`. Missing fathers
 contribute half to unknown. Death and restart retain existing shares. This
 requires work per birth and storage per person proportional to the number of
 components; it does not traverse the genealogy or draw random numbers. See
@@ -137,8 +135,8 @@ run boundaries, parent assignment, and restarts.
 ## Union-history observations
 
 `calculate_dissolution_rates()` returns union-years, dissolution counts and rates
-by calendar period and elapsed duration, optionally by symmetric `group_pair`
-strata (A:B includes both partner directions).
+by calendar period and elapsed duration, optionally by the wife's and
+husband's groups and union type (`by`, D133).
 The native `dissolution_counts_cpp()` splits recorded episodes directly at
 period/duration boundaries. This counts each episode once rather than summing
 both partners' exposure. Death censors dissolution exposure without entering
@@ -146,17 +144,16 @@ its numerator. See [demographic analysis](demographic-analysis.md).
 
 ## Union dissolution
 
-`set_union_dissolution(model, rates, group_prop_hazard = NULL)` attaches the
+`set_union_dissolution(model, rates, weights = NULL)` attaches the
 optional duration-hazard process (D078). Public bands use `dur_start` and
-`dur_end`; preparation maps a private copy to the shared `Band` sampler. The
-couple's unordered group pair selects schedules and proportional multipliers
-(D079). Public `group_pair` labels are normalized; private lookup uses both
-partners' identity indices.
-Each active union stores one sampled dissolution date, retained through births.
-Her next-event selection competes that date with death/birth; birth wins a tie,
-then dissolution can execute at the same instant. Death closes the union and
-invalidates that risk. Dissolution restores both partners' availability and
-reschedules her status-dependent hazards; the man's death event stays valid.
+`dur_end`; preparation maps a private copy to duration cells (D128). The
+wife's and husband's categories select schedules through directional
+`<group>_w`/`<group>_h` columns (D134; this replaced D079's symmetric
+`group_pair`).
+Each active union is a unit in the dissolution cells, unaffected by births;
+birth wins a tie, then dissolution can execute at the same instant. Death
+closes the union and removes it from the cells. Dissolution restores both
+partners' availability and moves her to her unpartnered cells.
 The process is absent by default, consuming no additional random draws then.
 See [union dissolution](union-dissolution.md) for examples and deferred scope.
 
@@ -233,7 +230,7 @@ There is no automatic disk cache or rate refresh.
 `calculate_fertility_rates()`, `calculate_mortality_rates()`, `calculate_tfr()`, `calculate_life_table()`, and
 `calculate_population_size()` operate on inspectable outputs. See
 [demographic analysis](demographic-analysis.md) for exposure, missing cells,
-replications, and age alignment. `calculate_fertility_rates(by_union_type = TRUE)`
+replications, and age alignment. `calculate_fertility_rates(by = "union_type")`
 returns female unpartnered and discovered union-type rows with exposure, births
 and fertility rates, without an overall row. The separate mortality helper
 returns exposure, deaths and mortality rates for both sexes. Optional
@@ -241,7 +238,7 @@ returns exposure, deaths and mortality rates for both sexes. Optional
 use partnered/unpartnered. `calculate_union_rates()` separately returns
 unpartnered exposure, union starts, and partnership-entry rates by sex,
 excluding conversions.
-`by_previous_union = TRUE` adds previous categories; `by_group = TRUE` independently
+`by = "previous_union"` adds previous categories; `by = "group"` independently
 adds individual groups. Both default to FALSE (D080). Optional `dur_breaks`
 automatically separates previous categories and measures separated/widowed rows
 by duration, leaving none rows by age (D084). It requires exclusive union histories.
@@ -268,7 +265,8 @@ and leaves the population unchanged. See [demographic analysis](demographic-anal
 
 `get_parent_info(population)` returns a separate tibble preserving all persons
 and their columns, adding `age_mother` and `age_father` in years at each
-person's birth, plus `group_mother` and `group_father` when groups are recorded.
+person's birth, plus `<group>_mother` and `<group>_father` for each declared
+group dimension (such as `race_mother`).
 Parents are matched by ID, including deceased parents; unknown parents yield
 missing fields. Row order and group types are preserved, conflicting column
 names are rejected, and no endpoint is required. For example, a person born
@@ -279,8 +277,8 @@ not reconstructions of past group transitions. Validation uses shuffled IDs,
 fractional ages, siblings, unknown/deceased parents, optional groups, empty
 tables, and unchanged inputs.
 
-`calculate_fertility_rates(by_group = TRUE)` and
-`calculate_population_size(by_group = TRUE)` optionally split observations by
+`calculate_fertility_rates(by = "group")` and
+`calculate_population_size(by = "group")` optionally split observations by
 recorded group. The native count kernels retain full histories and add a group
 axis to their output arrays, preserving cross-group parent and spouse links.
 TFR and life-table calculations automatically retain input group strata. See
@@ -337,8 +335,9 @@ choice exactly. See [weighted-choice matching](weighted-choice-matching.md).
 
 ## Hard group restrictions
 
-Matching models support `prevent_exogamy`: all exogamy or selected directed/
-symmetric pairs are ineligible, alongside age and kin restrictions. Compiled
+Matching models prohibit pairs through NA in `group_exogamy` (D135): all
+exogamy in a dimension (`NA`) or selected symmetric pairs (`"B:C" = NA`) are
+ineligible, alongside age and kin restrictions. Compiled
 specifications carry either a same-group flag or blocked-pair matrix; the
 exact draw skips restricted cells. Partner/father searches use their applicable
 model's restrictions. See [group matching](group-matching.md).
@@ -347,7 +346,8 @@ model's restrictions. See [group matching](group-matching.md).
 
 `create_matching_model()` accepts a formula with age and group predictors,
 named utility coefficients, and optional symmetric additive pair effects (`A:B` in both directions).
-Categorical group formulas declare fixed `group_levels`; see
+Group predictors are named by dimension (`female_race`, `same_race`) with the
+dimension's categories as levels (D134); see
 [group matching](group-matching.md). `union_formation()` and `set_union_formation()` specify initiation
 and a matching specification. The C++ on-demand path creates unions at births
 using conditional-logit selection over all living, unpartnered men who pass
@@ -448,7 +448,7 @@ per-generation marginal normalization is imposed. See [the specification](fertil
 
 ## Weight models (D129)
 
-`create_weight_model(formula, coefficients, group_levels)` or
+`create_weight_model(formula, coefficients)` or
 `create_weight_model(fun = f)` builds a weight model, validated by
 `validate_weight_model()`; `weights` arguments on `set_mortality()`,
 `set_fertility()`, `set_union_dissolution()`, `set_group_transition()` and
@@ -463,10 +463,11 @@ weights are needed. See [weight models](binned-group-hazards.md#weight-models-d1
 
 ## Individual group transitions
 
-`group_transition(rates)` and `set_group_transition(model, rates)` configure
-optional competing person-level moves. Required direction columns are
-`group_origin` and `group_dest`; one age or duration band type applies across
-the table, optionally stratified by `sex` and `union_type`. The transition
+`group_transition(rates, group)` and `set_group_transition(model, rates, group)`
+configure optional competing person-level moves in one group dimension, one
+process per dimension (D134). Required direction columns are `origin` and
+`destination`; one age or duration band type applies across the table,
+optionally stratified by `sex`, `union_type` and other declared dimensions. The transition
 registry includes initially empty groups and all other grouped specifications
 must cover it. Native events update pools, calibration, fertility cells and
 union cells affected by either partner's identity. Duration uses latest entry,

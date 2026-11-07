@@ -6,52 +6,65 @@
 #' `I(age_difference^2)` and `abs(age_difference)` are supported through
 #' [stats::model.matrix()]. An intercept is ignored because it cancels from
 #' partner-only conditional-logit probabilities. No wait alternative is included.
-#' `female_group` and `male_group` are factors with explicit `group_levels` and
-#' fixed treatment contrasts (first level is reference). `same_group` is numeric
-#' 1 for equal identities, 0 otherwise. Pair effects are added after the formula,
-#' including custom formulas. Group effects require population identities.
+#' Group predictors are named by a declared group dimension (see
+#' [set_groups()]): for a dimension `race`, `female_race` and `male_race` are
+#' factors over its categories with treatment contrasts (the first category is
+#' the reference), and `same_race` is 1 for partners in the same category, 0
+#' otherwise. Pair effects are added after the formula, including custom
+#' formulas. Predictors and settings may name several dimensions: the
+#' engine's matching category is the combination of every dimension any
+#' matching model of the run names, pair effects from different dimensions
+#' add, a pair prohibited in any dimension is prohibited, `delta` values add,
+#' and calibration balances male selection within each combination.
 #' These modify relative candidate weights, not search hazards or eligibility.
 #'
-#' Coefficient names must match the non-intercept model-matrix columns exactly.
+#' Coefficient names must match the non-intercept model-matrix columns exactly,
+#' for example `female_raceB`. Names involving group predictors are checked
+#' when the model meets the group declaration at simulation.
 #' Supply all coefficients explicitly; no demographic coefficients are defaulted.
 #' Formula functions must be deterministic and must not mutate simulation state.
 #' Data-dependent transformations can change with the candidate pool; use fixed
 #' transformations when coefficients should have a fixed interpretation.
 #'
-#' @param formula A one-sided R formula using `age_difference`, `female_group`,
-#'   `male_group`, and/or `same_group`. Use `~ 1` and `numeric()` coefficients
-#'   for pair-effects-only matching.
+#' @param formula A one-sided R formula using `age_difference` and group
+#'   predictors `female_<group>`, `male_<group>` and `same_<group>`. Use `~ 1`
+#'   and `numeric()` coefficients for pair-effects-only matching.
 #' @param coefficients A finite named numeric vector of utility coefficients.
-#' @param group_exogamy Optional finite named numeric vector of symmetric
-#'   group-pair effects: `"A:B"` applies the same log-weight effect to female
-#'   A/male B and female B/male A. Specify each unordered pair once; reverse
-#'   duplicates and `::` syntax are errors. Omitted pairs have zero effect;
-#'   within-group entries are allowed. Alternatively provide a data frame with
-#'   `female_group`, `male_group`, and `log_odds`; each row specifies an unordered
-#'   pair and expands symmetrically, including for colon-containing labels.
-#'   Effects add to formula scores and do not prohibit matches.
-#' @param group_levels Optional ordered vector of group labels (character or
-#'   numeric codes). Required with at least two levels when the formula uses
-#'   `female_group` or `male_group`; must cover population groups. Sets fixed
-#'   treatment reference/columns, independent of the available pool. Not required
-#'   for `same_group` or pair effects alone.
-#' @param prevent_exogamy `FALSE` (default) for no group restrictions; `TRUE`
-#'   excludes all different-group candidates. A character vector such as
-#'   `c("A::B", "A:C")` excludes selected pairs with female-first `:` and
-#'   symmetric `::` notation. Alternatively supply a directional data frame
-#'   with `female_group` and `male_group`. Pairs must join different groups.
-#'   Restricted men are ineligible, alongside age and kinship exclusions. A
-#'   search fails only when no eligible man exists in the whole pool, following
-#'   existing failed-search and birth cancellation rules. Restrictions override
-#'   finite preferences, require population identities, and do not invalidate
-#'   existing partners.
-#' @param delta Optional finite numeric vector with unique group names.
+#' @param group_exogamy Optional symmetric pair effects and prohibitions, in
+#'   one of two forms. **List form** (D135): a named list keyed by dimension,
+#'   such as `list(race = c("A:B" = -2, "B:C" = NA), region = NA)`; a bare
+#'   value applies to the only declared dimension. Each value is a named vector
+#'   over unordered pairs (`"A:B"` applies to female A/male B and female
+#'   B/male A alike): a finite value is an additive log-weight effect and NA
+#'   prohibits the pair; `NA` alone prohibits every union between different
+#'   categories of the dimension. Effects from different dimensions add.
+#'   Specify each unordered pair once; reverse duplicates and `::` syntax are
+#'   errors. Omitted pairs have no effect. Finite within-category entries
+#'   (`"A:A"`) are allowed; within-category prohibitions are errors.
+#'   **Table form** (D139), for cross-dimension effects: a data frame with
+#'   `<group>_x` and `<group>_y` columns for each dimension it uses and
+#'   `log_odds`, such as
+#'   `data.frame(race_x = "W", region_x = "S", race_y = "B", region_y = "S", log_odds = -5)`.
+#'   Each row is one unordered pair of category combinations, applied in both
+#'   directions; NA prohibits it; unlisted pairs have no effect; a pair may be
+#'   listed once; every row names a category in each of the table's
+#'   dimensions. The table fully specifies the effects: it is not combined
+#'   with the list form. Rows naming absent categories are unused.
+#'   Prohibited men are ineligible, alongside age and kinship exclusions. A
+#'   search fails only when no eligible man exists in the whole pool,
+#'   following existing failed-search and birth cancellation rules.
+#'   Prohibitions override finite preferences and do not end existing unions.
+#'   Both forms are applied natively during partner draws, unlike formula
+#'   group terms, which are evaluated in R.
+#' @param delta Optional male-target adjustments, as a named list keyed by
+#'   dimension or a bare value for the only declared dimension: a finite
+#'   numeric vector with unique category names.
 #'   Multiply mirrored male targets by `exp(delta)`
 #'   and normalize. Omitted groups have zero adjustment. Positive values raise
 #'   the male target relative to baseline and other groups; negative values
 #'   lower it. Only differences matter. Does not set pair-specific ratios or
-#'   change female search rates. Names must belong to the population's identity
-#'   registry (including declared future groups).
+#'   change female search rates. Names must be categories of the dimension
+#'   (including declared future categories).
 #' @return An inspectable `hammel_matching_model` list containing `formula`
 #'   and `coefficients`. This specifies a model; it does not estimate one.
 #' @export
@@ -61,12 +74,9 @@
 #'   ~ age_difference + I(age_difference^2),
 #'   c(age_difference = 0.1, "I(age_difference^2)" = -0.02)
 #' )
-create_matching_model <- function(formula, coefficients, group_exogamy = NULL, group_levels = NULL, prevent_exogamy = FALSE,
-                                  delta = NULL) {
+create_matching_model <- function(formula, coefficients, group_exogamy = NULL, delta = NULL) {
   model <- structure(list(formula = formula, coefficients = coefficients,
-                          group_exogamy = group_exogamy, group_levels = group_levels,
-                          prevent_exogamy = prevent_exogamy,
-                          delta = delta),
+                          group_exogamy = group_exogamy, delta = delta),
                      class = "hammel_matching_model")
   validate_matching_model(model)
   warn_absorbed_group_formula(model)
@@ -75,10 +85,11 @@ create_matching_model <- function(formula, coefficients, group_exogamy = NULL, g
 
 # Male-group formula effects can be absorbed by calibrated target weights.
 warn_absorbed_group_formula <- function(model) {
-  if (!"male_group" %in% all.vars(model$formula)) return(invisible(FALSE))
-  warning(paste("Formula terms using male_group are absorbed by calibrated group weights:",
+  male <- grep("^male_.+", all.vars(model$formula), value = TRUE)
+  if (!length(male)) return(invisible(FALSE))
+  warning(sprintf(paste("Formula terms using %s are absorbed by calibrated group weights:",
     "main effects have no effect and interactions are only partly reflected.",
-    "Use delta to adjust male-group targets."), call. = FALSE)
+    "Use delta to adjust male-group targets."), paste0("`", male, "`", collapse = ", ")), call. = FALSE)
   invisible(TRUE)
 }
 
@@ -94,10 +105,8 @@ warn_absorbed_group_formula <- function(model) {
 #' coefficient is `-2 * preferred_age_gap * quadratic`. This specifies relative
 #' selection weights, not a halving of utility or a realized standard deviation.
 #' @param preferred_age_gap Finite numeric scalar in years; negative values allowed.
-#' @param group_exogamy Optional additive group-pair effects passed to
-#'   [create_matching_model()].
-#' @param prevent_exogamy Optional hard group restrictions passed to
-#'   [create_matching_model()]. Defaults to `FALSE`.
+#' @param group_exogamy Optional group-pair effects and prohibitions passed
+#'   to [create_matching_model()].
 #' @param half_weight_distance Finite positive numeric scalar in years from the
 #'   preferred gap at which selection weight halves.
 #' @inheritParams create_matching_model
@@ -106,7 +115,7 @@ warn_absorbed_group_formula <- function(model) {
 #' @examples
 #' # Illustrative preferences, not demographic defaults.
 #' matching <- create_age_gap_matching_model(3, 5)
-create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL, prevent_exogamy = FALSE,
+create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL,
                                           delta = NULL) {
   for (name in c("preferred_age_gap", "half_weight_distance")) {
     value <- get(name)
@@ -124,8 +133,7 @@ create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distanc
          call. = FALSE)
   create_matching_model(~ age_difference + I(age_difference^2),
     c(age_difference = unname(linear), "I(age_difference^2)" = unname(quadratic)),
-    group_exogamy = group_exogamy, prevent_exogamy = prevent_exogamy,
-    delta = delta)
+    group_exogamy = group_exogamy, delta = delta)
 }
 
 validate_delta <- function(x) {
@@ -137,10 +145,54 @@ validate_delta <- function(x) {
   invisible(x)
 }
 
+# A public matching model: predictors and settings named by dimension. Checks
+# that need the declaration (coefficient names of group predictors, setting
+# categories) happen when it is translated at simulation.
 validate_matching_model <- function(model) {
   if (!inherits(model, "hammel_matching_model") || !is.list(model)) {
     stop("`matching` must be created with create_matching_model().", call. = FALSE)
   }
+  formula <- model$formula
+  vars <- if (inherits(formula, "formula")) all.vars(formula) else character()
+  if (!inherits(formula, "formula") || length(formula) != 2L ||
+      any(vars != "age_difference" & !grepl("^(female|male|same)_.+", vars)))
+    stop(paste("Use a one-sided matching formula with `age_difference` and group predictors",
+               "`female_<group>`, `male_<group>` or `same_<group>`."), call. = FALSE)
+  if (length(attr(stats::terms(formula), "offset")))
+    stop("Matching formula offsets are not supported.", call. = FALSE)
+  beta <- model$coefficients
+  if (!is.numeric(beta) || is.complex(beta) || !is.null(dim(beta)) || any(!is.finite(beta)) ||
+      (length(beta) && is.null(names(beta))) || anyNA(names(beta)) || any(!nzchar(names(beta))) ||
+      anyDuplicated(names(beta)))
+    stop("`coefficients` must be a finite numeric vector with unique nonempty names.", call. = FALSE)
+  if (is.data.frame(model$group_exogamy)) validate_exogamy_table(model$group_exogamy)
+  for (field in c("group_exogamy", "delta")) {
+    x <- model[[field]]
+    if (field == "group_exogamy" && is.data.frame(x)) next
+    values <- if (is_dimension_list(x)) {
+      if (is.null(names(x)) || anyNA(names(x)) || any(!nzchar(names(x))) || anyDuplicated(names(x)))
+        stop(sprintf("A list `%s` must be named by group dimension, once each.", field), call. = FALSE)
+      x
+    } else list(x)
+    for (v in values) {
+      if (is.data.frame(v))
+        stop(paste("A dimension's `group_exogamy` entry is a named vector or NA; give pair tables",
+                   "as the whole `group_exogamy` (with `<group>_x`/`<group>_y` columns)."), call. = FALSE)
+      switch(field, group_exogamy = split_group_exogamy(v), delta = validate_delta(v))
+    }
+  }
+  # Without group predictors, coefficient names can be checked now.
+  if (!any(grepl("^(female|male|same)_.+", vars))) {
+    design <- matching_design_matrix(formula, data.frame(age_difference = seq(-50, 50, length.out = 101)))
+    if (!setequal(colnames(design), names(beta)))
+      stop("Coefficient names must match all non-intercept model-matrix columns.", call. = FALSE)
+  }
+  invisible(model)
+}
+
+# The internal one-dimension form (predictors `female_group`, `male_group`,
+# `same_group` and explicit `group_levels`), built at simulation.
+validate_internal_matching <- function(model) {
   validate_delta(model$delta)
   formula <- model$formula
   if (!inherits(formula, "formula") || length(formula) != 2L ||
@@ -167,7 +219,7 @@ validate_matching_model <- function(model) {
   }
   categorical <- any(all.vars(formula) %in% c("female_group", "male_group"))
   if (categorical && length(levels) < 2L)
-    stop("Categorical matching formulas require at least two explicit `group_levels`.", call. = FALSE)
+    stop("Categorical matching predictors require a group dimension with at least two categories.", call. = FALSE)
   # A fixed validation grid covers both sexes' group levels, equality, and gaps.
   data <- data.frame(age_difference = seq(-50, 50, length.out = 101))
   if (matching_has_group_formula(model)) {
@@ -399,9 +451,9 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #' @param rates For `"rate"` initiation, an age-specific female search-hazard
 #'   table with `age_start`, `age_end`, and `rate`, in years and per person-year.
 #'   These specify search attempts, not guaranteed realized union formation.
-#'   An optional `group` column selects the woman's group. Without it, all groups
-#'   share the schedule. Group does not restrict partner matching. With no
-#'   population groups, simulation warns and selects the first alphabetical group.
+#'   Columns named by declared group dimensions select the woman's categories;
+#'   without them, all groups share the schedule. Groups do not restrict
+#'   partner matching.
 #'   See [mortality()] for group-label and rate-coverage rules.
 #'   Nonoverlapping bands may have gaps or an open end; gaps and ages outside
 #'   support have zero hazard. Optional `previous_union` supplies either
@@ -422,12 +474,6 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   weights applied at the search that formed each union (0 for the reference
 #'   group and when calibration cannot affect choices). Use the column for each alternative's
 #'   group as a conditional-logit offset in wife-side choice sets.
-#' @param group_prop_hazard Optional named numeric vector of finite nonnegative
-#'   search-rate multipliers by the woman's group. Missing groups use 1.0;
-#'   zero suppresses searches. Applies to shared or group-specific input rates.
-#'   Without population groups, simulation warns and ignores multipliers.
-#'   Requires `initiation = "rate"`; on-demand formation has no search hazard.
-#'   Matching utilities and input rate tables are unchanged.
 #' @param cohab_prob Optional age-specific probability table with `age_start`,
 #'   `age_end`, `prob`, optionally `group` and `previous_union`. Enables typed
 #'   unions only in rate mode. Age gaps mean zero. Optional `time_start` and
@@ -439,7 +485,8 @@ quadratic = quadratic, has_squared = "I(age_difference^2)" %in% columns,
 #'   schedule; NULL shares the general `matching` model active at that search. Marriage, cohabitation and unpartnered father searches calibrate
 #'   weights using their own intensities and share the available male pool.
 #' @param union_convert_rate Optional age- or duration-specific conversion table,
-#'   optionally by woman's group. Duration uses the current cohabitation start.
+#'   optionally by the partners' categories (`<group>_w`, `<group>_h` for a
+#'   declared dimension). Duration uses the current cohabitation start.
 #'   Uses `rate` and either age or duration boundaries, not both clocks, with no
 #'   previous-union axis. NULL gives no conversions and warns at simulation.
 #'   Conversion keeps partners, closes cohab with reason `conversion`, and starts
@@ -465,7 +512,7 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
                             rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
-                            diagnostics = FALSE, group_prop_hazard = NULL,
+                            diagnostics = FALSE,
                             cohab_prob = NULL, cohab_matching = NULL, union_convert_rate = NULL,
                             cohabitation_counts_as_previous_union = FALSE,
                             weights_conversion = NULL, weights = NULL) {
@@ -474,7 +521,7 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
     min_male_age = min_male_age,
     kinship_generations = kinship_generations, father_matching = father_matching,
     cancel_birth_if_no_match = cancel_birth_if_no_match, diagnostics = diagnostics,
-    rates = rates, rate_unit = "person_year", group_prop_hazard = group_prop_hazard,
+    rates = rates, rate_unit = "person_year",
     cohab_prob = cohab_prob, cohab_matching = cohab_matching, union_convert_rate = union_convert_rate,
     cohabitation_counts_as_previous_union = cohabitation_counts_as_previous_union,
     weights_conversion = normalize_model_argument(weights_conversion),
@@ -486,7 +533,7 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
   if (!is.null(weights) && !identical(initiation, "rate"))
     stop("Search `weights` require rate-based union formation.", call. = FALSE)
   if (!is.null(weights) && !is.null(rates))
-    warn_cancelled_weight_terms(weights, weight_strata("search", rates, group_prop_hazard), "search")
+    warn_cancelled_weight_terms(weights, weight_strata("search", rates), "search")
   if (!is.null(weights_conversion) && !is.null(union_convert_rate))
     warn_cancelled_weight_terms(weights_conversion, weight_strata("conversion", union_convert_rate),
                                 "conversion")
@@ -507,20 +554,19 @@ set_union_formation <- function(model, initiation, matching = create_age_gap_mat
                             rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
-                            diagnostics = FALSE, group_prop_hazard = NULL,
+                            diagnostics = FALSE,
                             cohab_prob = NULL, cohab_matching = NULL, union_convert_rate = NULL,
                             cohabitation_counts_as_previous_union = FALSE,
                             weights_conversion = NULL, weights = NULL) {
   set_process(model, union_formation(initiation, matching, rates,
                                      min_male_age, kinship_generations, father_matching,
-                                     cancel_birth_if_no_match, diagnostics, group_prop_hazard,
+                                     cancel_birth_if_no_match, diagnostics,
                                      cohab_prob, cohab_matching, union_convert_rate,
                                      cohabitation_counts_as_previous_union, weights_conversion,
                                      weights))
 }
 
 validate_union_formation <- function(process) {
-  validate_group_prop_hazard(process$group_prop_hazard)
   validate_cohabitation(process)
   if (!identical(process$name, "union_formation") ||
       !identical(process$rate_unit, "person_year")) {
@@ -549,10 +595,6 @@ validate_union_formation <- function(process) {
   if (!is.null(process$father_matching))
     validate_model_argument(process$father_matching, validate_matching_model, "father_matching")
   if (process$initiation == "on_demand") {
-    if (!is.null(process$group_prop_hazard)) {
-      stop("`group_prop_hazard` requires rate-based union initiation; on-demand formation has no search hazard.",
-           call. = FALSE)
-    }
     if (!is.null(process$rates)) {
       stop("On-demand union formation does not take rates.", call. = FALSE)
     }
@@ -591,6 +633,7 @@ expand_previous_union_rates <- function(rates) {
 }
 
 validate_union_search_rates <- function(rates) {
+    check_stratified_columns(rates, "previous_union", "Union-search")
     if (has_calendar_rates(rates)) {
       validate_calendar_rates(rates, validate_union_search_rates)
       effective <- expand_previous_union_rates(rates)
@@ -638,7 +681,7 @@ validate_union_search_rates <- function(rates) {
     if (any(!is.finite(starts)) || any(starts < 0) || any(ends <= starts))
       stop("Use valid nonnegative age or duration bands with finite starts and ends greater than starts.",
            call. = FALSE)
-    strata <- split_rate_groups(rates)
+    strata <- split_rate_groups(rates, candidate_strata(rates))
     if ("previous_union" %in% names(rates)) {
       previous <- rates$previous_union
       categories <- c("none", "separated", "widowed", "dissolved")

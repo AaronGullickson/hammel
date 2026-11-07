@@ -5,7 +5,7 @@ dissolution_model <- function(n = 1L, duration = 0, rate = 0.1) {
   model <- set_population(model, hammel_population(p, unions = data.frame(
     union_id = seq_len(n), wife_id = seq.int(1L, 2L*n, 2L),
     husband_id = seq.int(2L, 2L*n, 2L), start_time = -duration,
-    end_time = NA_real_, end_reason = NA_character_), end_time = 0))
+    end_time = NA_real_, end_reason = NA_character_), end_time = 0, groups = if ("group" %in% names(p)) "group"))
   set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = rate))
 }
 
@@ -18,9 +18,9 @@ test_that("dissolution constructors validate duration schedules and retain prove
   expect_identical(p$rates$dur_start, rates$dur_start)
   expect_identical(p$source, attr(rates, "source"))
   expect_identical(set_process(hammel_model(), p), set_union_dissolution(hammel_model(), rates))
-  for (column in c("sex", "age_start", "age_end", "union_status", "group", "group_w", "group_h")) {
+  for (column in c("sex", "age_start", "age_end", "union_status")) {
     bad <- rates; bad[[column]] <- 0
-    expect_error(union_dissolution(bad), "duration bands")
+    expect_error(union_dissolution(bad), "duration bands|cannot be stratified")
   }
   for (column in c("time_start", "time_end")) {
     bad <- rates; bad[[column]] <- 0
@@ -36,8 +36,13 @@ test_that("dissolution constructors validate duration schedules and retain prove
   }
   expect_error(union_dissolution(rates[FALSE, ]))
   expect_error(union_dissolution(transform(rates, dur_end = dur_start)))
-  expect_error(union_dissolution(transform(rates, dur_end = Inf)), "overlap")
-  expect_error(union_dissolution(rates, c(A = -1)), "group_prop_hazard")
+  expect_error(union_dissolution(transform(rates[c("dur_start", "dur_end", "rate")], dur_end = Inf)), "overlap")
+  # A custom column may be a group column, so it separates strata at construction;
+  # at simulation only declared group dimensions stratify rates.
+  noted <- union_dissolution(transform(rates, dur_end = Inf))
+  model <- dissolution_model()
+  model$processes$union_dissolution <- noted
+  expect_error(simulate(model, 0), "overlapping bands within a stratum")
   model <- dissolution_model()
   model$processes$union_dissolution$rates$rate <- -1
   expect_error(simulate(model, 0), "duration bands")
@@ -93,7 +98,7 @@ test_that("birth ties retain the pending dissolution and death wins same-person 
   expect_equal(kids$father_id, 2)
   expect_equal(tied$unions$end_time, .5, tolerance = 0)
   expect_identical(tied$unions$end_reason, "dissolution")
-  counts <- collect_demographic_counts(tied, c(0, .5, 1.5), c(0, Inf), by_union_type = TRUE)
+  counts <- demographic_counts(tied, c(0, .5, 1.5), c(0, Inf), by = "union_type")
   maternal <- subset(counts, sex == "f" & time_start == .5)
   expect_equal(maternal$births[maternal$union_type == "partnered"], 1)
   expect_equal(maternal$births[maternal$union_type == "unpartnered"], 0)
@@ -164,39 +169,50 @@ test_that("dissolution restores matching availability and repeat episodes start 
   }
 })
 
-test_that("dissolution uses symmetric pair schedules and multipliers with future coverage", {
+test_that("dissolution uses directional group strata with future coverage", {
   model <- dissolution_model(4)
   model$population$persons$group <- c("A", "A", "A", "B", "B", "A", "B", "B")
+  model$population$groups <- list(group = group())
   model <- set_population(model, model$population)
-  model <- set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = 1e4),
-    group_prop_hazard = c("A:A" = 0, "A:B" = 1, "B:B" = 0))
+  # Symmetric rates: cross-group unions in either direction dissolve.
+  rates <- directional_pairs(data.frame(group_pair = c("A:A", "A:B", "B:B"),
+    dur_start = 0, dur_end = Inf, rate = c(0, 1e4, 0)))
+  model <- set_union_dissolution(model, rates)
   result <- simulate(model, 1, seed = 52)
   expect_true(all(is.na(result$unions$end_time[c(1, 4)])))
   expect_true(all(result$unions$end_time[c(2, 3)] < 1))
-  stratified <- set_union_dissolution(model, data.frame(group_pair = c("A:A", "B:A", "B:B"),
-    dur_start = 0, dur_end = Inf, rate = c(0, 1e4, 0)))
-  expect_identical(simulate(stratified, 1, seed = 52), result)
-  # Swapping wives' and husbands' group identities must not change their risk.
-  reversed <- stratified
+  # Swapping wives' and husbands' identities keeps their (symmetric) risk.
+  reversed <- model
   reversed$population$persons$group <- c("A", "A", "B", "A", "A", "B", "B", "B")
-  expect_identical(simulate(reversed, 1, seed = 52)$unions, result$unions)
-  reverse_factors <- model
-  names(reverse_factors$processes$union_dissolution$group_prop_hazard)[2] <- "B:A"
-  expect_identical(simulate(reverse_factors, 1, seed = 52), result)
-  expect_equal(model$processes$union_dissolution$rates$rate, 1e4)
-  scaled <- set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = .2),
-    c("A:A" = 2, "B:A" = .5, "B:B" = 3))
-  explicit <- set_union_dissolution(model, data.frame(group_pair = c("A:A", "A:B", "B:B"),
-    dur_start = 0, dur_end = Inf, rate = c(.4, .1, .6)))
-  expect_equal(simulate(scaled, 5, seed = 52), simulate(explicit, 5, seed = 52),
+  reversed$population$groups <- list(group = group())
+  # Directions are separate cells, so the draws differ but the same unions dissolve.
+  expect_identical(!is.na(simulate(reversed, 1, seed = 52)$unions$end_time), !is.na(result$unions$end_time))
+  # Directional rates: only one direction is at risk.
+  persons <- result$persons
+  wife <- persons$group[match(result$unions$wife_id, persons$person_id)]
+  husband <- persons$group[match(result$unions$husband_id, persons$person_id)]
+  one_way <- set_union_dissolution(model, transform(rates,
+    rate = ifelse(group_w == "A" & group_h == "B", 1e4, 0)))
+  out <- simulate(one_way, 1, seed = 52)
+  expect_identical(!is.na(out$unions$end_time), wife == "A" & husband == "B")
+  # Proportional strata from stratify_rates equal the explicit table.
+  scaled <- set_union_dissolution(model, stratify_rates(
+    data.frame(dur_start = 0, dur_end = Inf, rate = .2),
+    list(group_w = c(A = 2, B = 1), group_h = c(A = 1, B = 3))))
+  explicit <- set_union_dissolution(model, data.frame(group_w = c("A", "B", "A", "B"),
+    group_h = c("A", "A", "B", "B"), dur_start = 0, dur_end = Inf, rate = .2 * c(2, 1, 6, 3)))
+  expect_equal(histories(simulate(scaled, 5, seed = 52)), histories(simulate(explicit, 5, seed = 52)),
                tolerance = 1e-12)
-  expect_identical(stratified$processes$union_dissolution$rates$group_pair, c("A:A", "B:A", "B:B"))
-  model <- set_union_dissolution(model, data.frame(group_pair = "A:A", dur_start = 0, dur_end = Inf, rate = 0))
-  expect_error(simulate(model, 0), "missing schedules.*A:B")
+  # Every combination must be covered, including future identities.
+  partial <- set_union_dissolution(model, data.frame(group_w = "A", group_h = "A",
+    dur_start = 0, dur_end = Inf, rate = 0))
+  expect_error(simulate(partial, 0), "missing schedules.*group_w=B")
   model <- dissolution_model()
   model$population$persons$group <- "A"
-  model$processes$fertility$inheritance <- create_group_inheritance("custom", groups = "AB", fun = function(...) "AB")
-  model <- set_union_dissolution(model, data.frame(group_pair = "A:A", dur_start = 0, dur_end = Inf, rate = 0))
+  model$population$groups <- list(group = group())
+  model <- set_inheritance(model, create_group_inheritance("custom", fun = function(...) "AB"), extra = "AB")
+  model <- set_union_dissolution(model, data.frame(group_w = "A", group_h = "A",
+    dur_start = 0, dur_end = Inf, rate = 0))
   expect_error(simulate(model, 0), "missing schedules.*AB")
 })
 
@@ -214,16 +230,13 @@ test_that("optional process, zero-duration runs, empty populations and fallbacks
   expect_s3_class(out$unions, "tbl_df")
   fallback <- set_union_dissolution(model, data.frame(group_pair = c("B:B", "A:A"), dur_start = 0,
     dur_end = Inf, rate = c(1e4, 0)))
-  expect_warning(out <- simulate(fallback, 1, seed = 52), "first alphabetically")
-  expect_equal(out$simulation$dissolutions, 0)
-  fallback <- set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = 0), c("A:B" = 2))
-  expect_warning(simulate(fallback, 0), "ignoring multipliers")
+  expect_error(simulate(fallback, 1, seed = 52), "not a declared group dimension")
 })
 
 test_that("dissolution histories conserve partnered exposure and survive later deaths", {
   model <- dissolution_model(100, rate = 2)
   result <- simulate(model, 1, seed = 52)
-  counts <- collect_demographic_counts(result, c(0, 1), c(0, Inf), by_union_type = TRUE)
+  counts <- demographic_counts(result, c(0, 1), c(0, Inf), by = "union_type")
   partnered <- subset(counts, union_type == "partnered")
   unpartnered <- subset(counts, union_type == "unpartnered")
   expected <- sum(ifelse(is.na(result$unions$end_time), 1, result$unions$end_time))
@@ -241,27 +254,22 @@ test_that("dissolution histories conserve partnered exposure and survive later d
 })
 
 
-test_that("unordered pair syntax, overlap, multipliers and literal labels are validated", {
-  rates <- data.frame(group_pair = c("A:B", "B:A"), dur_start = c(0, 1),
+test_that("directional group columns are validated", {
+  rates <- data.frame(group_w = c("A", "B"), group_h = c("B", "A"), dur_start = c(0, 1),
                       dur_end = c(1, Inf), rate = c(.1, .2))
   expect_no_error(union_dissolution(rates))
-  expect_error(union_dissolution(transform(rates, dur_start = 0)), "overlap")
-  for (key in c("A", "A::B", ":B", "A:", " :B", "A:B:C", NA_character_)) {
-    bad <- rates; bad$group_pair <- key
-    expect_error(union_dissolution(bad))
+  expect_error(union_dissolution(transform(rates, group_w = "A", group_h = "B", dur_start = 0)), "overlap")
+  # Unordered pairs and person-level group columns are not union strata.
+  model <- dissolution_model(4)
+  model$population$persons$group <- c("A", "A", "A", "B", "B", "A", "B", "B")
+  model$population$groups <- list(group = group())
+  shared <- data.frame(dur_start = 0, dur_end = Inf, rate = .1)
+  for (column in c("group_pair", "group")) {
+    bad <- shared; bad[[column]] <- "A"
+    expect_error(simulate(set_union_dissolution(model, bad), 0), "_w`")
   }
-  shared <- rates[1, c("dur_start", "dur_end", "rate")]
-  expect_error(union_dissolution(shared, c("A:B" = 1, "B:A" = 2)), "unordered pair")
-  expect_error(union_dissolution(shared, c(A = 2)), "single-colon")
-  expect_error(union_dissolution(shared, list(group_w = c(A = 2))), "group_prop_hazard")
-  expect_identical(canonical_union_pairs(c("20:10", "10:20")), rep("10:20", 2))
-  expect_identical(possible_union_pairs(c("C", "A", "B")),
-    c("A:A", "A:B", "A:C", "B:B", "B:C", "C:C"))
-  expect_identical(canonical_union_pairs(c("A+B:C.D", "C.D:A+B")), rep("A+B:C.D", 2))
-  expect_error(canonical_union_pairs("A:B", "C"), "colon-free")
-  model <- dissolution_model()
-  model$population$persons$group <- c("A", "B")
-  model <- set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = 1e308),
-    c("A:B" = 2))
-  expect_error(simulate(model, 0), "remain finite")
+  expect_error(simulate(set_mortality(model, transform(model$processes$mortality$rates, group_w = "A")), 0),
+               "own name")
+  expect_error(stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = 1e308),
+    list(group_w = c(A = 2))), "remain finite")
 })

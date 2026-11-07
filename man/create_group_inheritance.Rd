@@ -7,7 +7,6 @@
 create_group_inheritance(
   method = "random_parent",
   fun = NULL,
-  groups = NULL,
   order = NULL,
   passing = 0
 )
@@ -27,15 +26,11 @@ fathers, entirely unknown ancestry, and missing hierarchy ranks.}
 (logical union status at birth, including on-demand formation). Nonmarital
 births and unknown fathers give FALSE. Older callbacks without this new
 argument or \code{...} remain supported. Use \code{...} for unused inputs.
-Ancestry vectors have \verb{group_<label>}/\code{unknown} names. A missing father has
+Ancestry vectors (the dimension's own shares, when it tracks ancestry)
+are named by category and \code{unknown}. A missing father has
 NA group and NULL ancestry. Return exactly one nonmissing identity in the
 possible group set. Ordinary R random draws are supported; functions must
 not mutate simulation/global state. Invalid returns and errors fail.}
-
-\item{groups}{Optional unique group labels extending the inferred possible
-identities (starting groups plus ancestry groups with positive shares).
-Declare any additional custom outputs here. Grouped rates and categorical
-matching levels must cover the complete set before simulation.}
 
 \item{order}{For \code{"hierarchy"}, unique group labels, highest-ranked first.
 Choose between parental identities, not ancestry. Complex orders use \code{fun}.}
@@ -49,18 +44,19 @@ An inspectable \code{hammel_group_inheritance} object.
 }
 \description{
 Assign one group independently of genealogical ancestry shares. Attach this
-object with \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}}. The default selects either
+object to a dimension with \code{\link[=group]{group()}}. The default selects either
 parent with equal probability, with maternal fallback.
 Existing people are not reassigned, and ancestry is unchanged by assignment.
-Fertility also accepts a schedule tibble with \code{time_start}, \code{time_end}, and a
+\code{\link[=group]{group()}} also accepts a schedule tibble with \code{time_start}, \code{time_end}, and a
 \code{model} list column containing complete inheritance objects. Half-open
-absolute-year intervals select the model at birth; all scheduled possible
-identities enter one shared registry before execution. See \code{\link[=fertility]{fertility()}}.
+absolute-year intervals select the model at birth. A custom rule must return
+one of the dimension's categories; declare categories that may only appear
+later in \code{\link[=group]{group()}}.
 }
 \examples{
 create_group_inheritance("mother")
 create_group_inheritance("hierarchy", order = c("A", "B"), passing = 0.05)
-create_group_inheritance("custom", groups = "mixed",
+create_group_inheritance("custom",
   fun = function(mother_group, father_group, ...) {
     if (is.na(father_group) || mother_group == father_group) mother_group else "mixed"
   })

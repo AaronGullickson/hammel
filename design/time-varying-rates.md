@@ -59,8 +59,10 @@ keeps the existing rate rescheduling, with both changes effective first.
 See [the cohabitation contract](cohabitation.md#calendar-varying-type-probabilities-d122).
 
 Matching and inheritance accept complete-model schedule tibbles under D123;
-see [their contract](time-varying-models.md). `group_prop_hazard`, birth spacing,
-`ffab`, `hetfert` and previous-union classification settings remain static.
+see [their contract](time-varying-models.md). Birth spacing, `ffab`, `hetfert`
+and previous-union classification settings remain static; proportional strata
+from `stratify_rates()` are part of the rate table and so can vary by calendar
+band (D132).
 
 The database getters can prepare these calendars directly from year vectors;
 see [HMD/HFD preparation](database-rates.md) (D119). Single-year requests remain

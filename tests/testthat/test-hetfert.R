@@ -3,7 +3,7 @@ het_model <- function(n = 100L, specification = het_fert(.5, .4), rate = .2,
   p <- tibble::tibble(person_id = seq_len(n), sex = rep("f", n),
     birth_time = rep(-20.1, n), death_time = rep(NA_real_, n),
     mother_id = rep(NA_real_, n), father_id = rep(NA_real_, n))
-  hammel_model() |> set_population(hammel_population(p, end_time = 0)) |>
+  hammel_model() |> set_population(hammel_population(p, end_time = 0, groups = if ("group" %in% names(p)) "group")) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = rate),
       hetfert = specification, birth_interval = interval, ffab = ffab) |>
@@ -142,6 +142,7 @@ test_that("weighted hazards integrate with grouped partner/father matching and u
   set.seed(81)
   pop <- create_baseline_population(1000, max_age = 45)
   pop$persons$group <- rep(c("A", "B"), 500)
+  pop$groups <- list(group = group())
   rates <- expand.grid(union_type = c("unpartnered", "cohab", "marriage"),
     parity_start = 0:1, stringsAsFactors = FALSE)
   rates$parity_end <- ifelse(rates$parity_start == 0, 1, Inf)
@@ -149,7 +150,7 @@ test_that("weighted hazards integrate with grouped partner/father matching and u
   rates$rate <- .15
   model <- hammel_model() |> set_population(pop) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .01)) |>
-    set_fertility(rates, hetfert = het_fert(1, .5), group_prop_hazard = c(B = 1.4)) |>
+    set_fertility(stratify_rates(rates, list(group = c(A = 1, B = 1.4))), hetfert = het_fert(1, .5)) |>
     set_union_formation("rate", matching = create_age_gap_matching_model(0, 5,
       group_exogamy = c("A:B" = -1)),
       rates = data.frame(age_start = 15, age_end = Inf, rate = .3),
@@ -221,7 +222,7 @@ test_that("weight validation handles missing sex and logical NA placeholders cle
   expect_error(validate_fertility_weights(p), "nonmissing.*sex")
   p$sex[] <- "m"; p$hetfert <- c(NA, NA)
   expect_no_error(validate_fertility_weights(p))
-  m <- set_population(het_model(2), hammel_population(p, end_time = 0))
+  m <- set_population(het_model(2), hammel_population(p, end_time = 0, groups = if ("group" %in% names(p)) "group"))
   out <- simulate(m, 0, 1)
   expect_identical(out$persons$hetfert, c(NA_real_, NA_real_))
   p$sex[1] <- "f"

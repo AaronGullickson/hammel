@@ -10,7 +10,7 @@ unpartnered_birth_history <- function() {
     end_reason=c("dissolution","death_husband","conversion","dissolution"),
     union_type=c("marriage","cohab","cohab","marriage"),
     previous_cohab_id=c(NA_integer_,NA_integer_,NA_integer_,3L))
-  hammel_population(persons,unions,end_time=9)
+  hammel_population(persons,unions,end_time=9, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("unpartnered births exclude all partnership types with exact birth ties", {
@@ -44,6 +44,7 @@ test_that("missing parents, overlapping histories and untyped histories are hand
   pop$unions$end_reason[3] <- "dissolution"
   expect_equal(get_unpartnered_births(pop)$birth_time,c(0,2.5,4,4.5,7.5,8))
   pop$persons$group <- NULL
+  pop$groups <- NULL
   x <- get_unpartnered_births(pop)
   expect_false(any(c("group_mother","group_father") %in% names(x)))
 })

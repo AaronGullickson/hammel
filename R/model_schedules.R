@@ -55,18 +55,14 @@ collect_model_bank <- function(arguments) {
 }
 
 # One shared identity registry and model bank for the entire native invocation.
-prepare_model_schedules <- function(arguments, population, start, end) {
-  first <- prepare_group_inheritance(model_at(arguments$inheritance, start), population)
-  values <- first$values
-  for (m in model_entries(arguments$inheritance))
-    if (!is.null(values)) values <- extend_identity_groups(values, as.character(m$groups))
+# `inheritance` is a list of each dimension's inheritance argument; all
+# dimensions' rules share one bank, with a route of bank ids per dimension.
+prepare_model_schedules <- function(arguments, values, inheritance, registries, components,
+                                    start, end) {
   matching_bank <- collect_model_bank(arguments[c("matching", "father_matching", "cohab_matching")])
-  inheritance_bank <- collect_model_bank(arguments["inheritance"])
   prepared_matching <- lapply(matching_bank, prepare_matching_model, population_groups = values)
-  prepared_inheritance <- lapply(inheritance_bank, prepare_group_inheritance,
-    population = population, registry = values)
   times <- start
-  for (x in arguments) if (is_model_schedule(x)) times <- c(times, x$time_start, x$time_end)
+  for (x in c(arguments, inheritance)) if (is_model_schedule(x)) times <- c(times, x$time_start, x$time_end)
   times <- sort(unique(times[times >= start & (times < end | times == start)]))
   id <- function(model, bank) which(vapply(bank, identical, logical(1), y = model))[1L] - 1L
   matching_ids <- vapply(times, function(t) id(model_at(arguments$matching, t), matching_bank), integer(1))
@@ -74,15 +70,22 @@ prepare_model_schedules <- function(arguments, population, start, end) {
     if (is.null(arguments[[role]])) matching_ids else
       vapply(times, function(t) id(model_at(arguments[[role]], t), matching_bank), integer(1))
   }
-  inheritance_ids <- vapply(times, function(t)
-    id(model_at(arguments$inheritance, t), inheritance_bank), integer(1))
+  prepared_inheritance <- list()
+  routes <- list()
+  for (d in seq_along(inheritance)) {
+    bank <- collect_model_bank(inheritance[d])
+    offset <- length(prepared_inheritance)
+    prepared_inheritance <- c(prepared_inheritance, lapply(bank, prepare_group_inheritance,
+      values = registries[[d]], components = components[[d]]))
+    routes[[d]] <- vapply(times, function(t) id(model_at(inheritance[[d]], t), bank), integer(1)) + offset
+  }
   list(values = values,
     matching = prepared_matching[[matching_ids[1] + 1L]],
     father_matching = prepared_matching[[role_ids("father_matching")[1] + 1L]],
     cohab_matching = prepared_matching[[role_ids("cohab_matching")[1] + 1L]],
-    inheritance = prepared_inheritance[[inheritance_ids[1] + 1L]],
+    inheritance = lapply(routes, function(r) prepared_inheritance[[r[1] + 1L]]),
     config = list(matching_models = prepared_matching, inheritance_models = prepared_inheritance,
+      inheritance_routes = routes,
       epochs = tibble::tibble(time_start = times, matching = matching_ids,
-        father_matching = role_ids("father_matching"), cohab_matching = role_ids("cohab_matching"),
-        inheritance = inheritance_ids)))
+        father_matching = role_ids("father_matching"), cohab_matching = role_ids("cohab_matching"))))
 }

@@ -92,6 +92,13 @@ latent inheritance, with reproductive selection explicitly unresolved.
 
 ## Group transitions investigation
 
+The November 6 [focused household follow-up](socsim-household-transitions-audit.md)
+details the initiator-specific partner/child selection and lack of a persistent
+household definition. Thirteen direct-function fixtures confirm membership
+rules and the child-age defect in the same pinned source. Full transition
+execution, queue behavior and population-level migration effects remain
+unverified by those fixtures.
+
 The October 29 [group transitions audit](socsim-group-transitions-audit.md)
 traces origin/destination schedules, age and latest-transition duration clocks,
 competing destinations, individual and optional household changes, history I/O,

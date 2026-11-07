@@ -4,7 +4,7 @@ parent_info_population <- function() {
     death_time = c(NA, 2003, 2010, NA),
     mother_id = c(70, NA, NA, 70), father_id = c(10, NA, NA, NA),
     group = c(30L, 10L, 20L, 20L), note = c("child", "father", "mother", "half sibling"))
-  hammel_population(persons, end_time = 2020)
+  hammel_population(persons, end_time = 2020, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("parent information matches IDs and preserves person histories", {
@@ -27,10 +27,12 @@ test_that("parent information matches IDs and preserves person histories", {
 test_that("parent groups are optional and retain their types", {
   population <- parent_info_population()
   population$persons$group <- c("AB", "A", "B", "B")
+  population$groups <- list(group = group())
   result <- get_parent_info(population)
   expect_identical(result$group_mother, c("B", NA_character_, NA_character_, "B"))
   expect_identical(result$group_father, c("A", NA_character_, NA_character_, NA_character_))
   population$persons$group <- NULL
+  population$groups <- NULL
   result <- get_parent_info(population)
   expect_named(result, c(names(population$persons), "age_mother", "age_father"))
   expect_identical(result$age_mother, c(25.25, NA_real_, NA_real_, 26.75))

@@ -23,14 +23,15 @@ model_choice_fixture <- function(role = "matching", specification, static_genera
   }
   do.call(set_union_formation, args)
 }
-model_inheritance_fixture <- function(inheritance) {
+model_inheritance_fixture <- function(inheritance, extra = NULL) {
   m <- make_model(2, sex = "f", birth_rate = 100, birth_interval = 0)
   m$population$persons$sex <- c("f", "m")
   m$population$persons$group <- c("A", "B")
+  m$population$groups <- list(group = group(ancestry = TRUE))
   m$population$unions <- tibble::tibble(union_id = 1, wife_id = 1, husband_id = 2,
     start_time = -1, end_time = NA_real_, end_reason = NA_character_)
-  set_fertility(m, m$processes$fertility$rates, birth_interval = 0,
-    inheritance = inheritance, ffab = 1)
+  set_inheritance(set_fertility(m, m$processes$fertility$rates, birth_interval = 0, ffab = 1),
+                  inheritance, extra = extra)
 }
 
 test_that("model arguments accept direct objects and inspectable model-list tibbles", {
@@ -46,8 +47,8 @@ test_that("model arguments accept direct objects and inspectable model-list tibb
   }
   p <- model_calendar(inheritance)
   m <- model_inheritance_fixture(as.data.frame(p))
-  expect_s3_class(m$processes$fertility$inheritance, "tbl_df")
-  expect_identical(m$processes$fertility$inheritance$model[[1]], inheritance)
+  expect_s3_class(m$groups$group$inheritance, "tbl_df")
+  expect_identical(m$groups$group$inheritance$model[[1]], inheritance)
   expect_s3_class(model_inheritance_fixture("mother"), "hammel_model")
 })
 
@@ -157,8 +158,8 @@ test_that("inheritance switches newborn identity without relabeling older people
   expect_gt(sum(kids$birth_time >= .25), 5)
   expect_true(all(kids$group == ifelse(kids$birth_time < .25, "A", "B")))
   expect_equal(out$persons$group[1:2], c("A", "B"))
-  expect_equal(out$ancestry$group_A[-c(1,2)], rep(.5, nrow(kids)))
-  expect_equal(out$ancestry$group_B[-c(1,2)], rep(.5, nrow(kids)))
+  expect_equal(out$ancestry$group$A[-c(1,2)], rep(.5, nrow(kids)))
+  expect_equal(out$ancestry$group$B[-c(1,2)], rep(.5, nrow(kids)))
   expect_equal(out$unions[, names(m$population$unions)], m$population$unions)
 })
 
@@ -172,21 +173,21 @@ test_that("inheritance applies the new model at an exact tied birth", {
 })
 
 test_that("future custom identities use a common registry and require complete model coverage", {
-  late <- create_group_inheritance("custom", groups = "C", fun = function(...) "C")
+  late <- create_group_inheritance("custom", fun = function(...) "C")
   s <- model_calendar(create_group_inheritance("mother"), late, .25)
-  m <- model_inheritance_fixture(s)
+  m <- model_inheritance_fixture(s, extra = "C")
   out <- simulate(m, .5, seed = 32)
   kids <- out$persons[out$persons$birth_time >= 0, ]
   expect_true(all(kids$group == ifelse(kids$birth_time < .25, "A", "C")))
-  expect_equal(out$ancestry$group_A[-c(1,2)], rep(.5, nrow(kids)))
+  expect_equal(out$ancestry$group$A[-c(1,2)], rep(.5, nrow(kids)))
   bad <- m
   rates <- bad$processes$mortality$rates
   bad <- set_mortality(bad, rbind(transform(rates, group = "A"), transform(rates, group = "B")))
   expect_error(simulate(bad, .1), "missing schedules.*C")
   bad <- m
   bad$processes$union_formation$matching <- create_matching_model(~ female_group,
-    c(female_groupB = 0), group_levels = c("A", "B"))
-  expect_error(simulate(bad, .1), "group_levels")
+    c(female_groupB = 0))
+  expect_error(simulate(bad, .1), "coefficient names.*female_groupC")
 })
 
 test_that("inheritance boundaries do not call custom functions without a birth", {
@@ -197,7 +198,7 @@ test_that("inheritance boundaries do not call custom functions without a birth",
 })
 
 test_that("weighted calibration switches from hard within-group matching and back", {
-  early <- create_age_gap_matching_model(0, 5, prevent_exogamy = TRUE)
+  early <- create_age_gap_matching_model(0, 5, group_exogamy = NA)
   late <- create_matching_model(~ 1, numeric(), delta = c(A = log(3)))
   for (reverse in c(FALSE, TRUE)) {
     before <- if (reverse) late else early
@@ -205,6 +206,7 @@ test_that("weighted calibration switches from hard within-group matching and bac
     m <- make_rate_model(400, search_rate = .4)
     m$population$persons$sex <- rep(c("f", "m"), each = 200)
     m$population$persons$group <- rep(c("A", "B"), 200)
+    m$population$groups <- list(group = group())
     m$processes$union_formation$diagnostics <- TRUE
     m$processes$union_formation$matching <- model_calendar(before, after, 1e-6)
     reference <- m; reference$processes$union_formation$matching <- after
@@ -254,20 +256,21 @@ test_that("inheritance schedules update hierarchy ranks and passing parameters",
 
 test_that("different custom inheritance intervals share identity indices and callback RNG", {
   for (labels in list(c("A", "B", "C", "D"), c(10L, 20L, 30L, 40L))) {
-    first <- create_group_inheritance("custom", groups = labels[3],
+    first <- create_group_inheritance("custom",
       fun = local({value <- labels[3]; function(...) value}))
-    second <- create_group_inheritance("custom", groups = labels[4],
+    second <- create_group_inheritance("custom",
       fun = local({value <- labels[4]; function(...) value}))
     m <- model_inheritance_fixture(model_calendar(first, second, .25))
     m$population$persons$group <- labels[1:2]
+    m <- set_groups(m, group = group(categories = labels, inheritance = model_calendar(first, second, .25)))
     out <- simulate(m, .5, seed = 981)
     kids <- out$persons[out$persons$birth_time >= 0, ]
     expect_equal(kids$group, ifelse(kids$birth_time < .25, labels[3], labels[4]))
     expect_identical(typeof(kids$group), typeof(labels))
   }
-  late <- create_group_inheritance("custom", groups = "C",
+  late <- create_group_inheritance("custom",
     fun = function(...) sample(c("A", "C"), 1))
-  m <- model_inheritance_fixture(model_calendar(create_group_inheritance("mother"), late, .1))
+  m <- model_inheritance_fixture(model_calendar(create_group_inheritance("mother"), late, .1), extra = "C")
   set.seed(12); before <- .Random.seed
   a <- simulate(m, .5, seed = 51)
   expect_identical(.Random.seed, before)
@@ -284,7 +287,7 @@ test_that("constant schedules preserve direct-model behavior and existing unions
   m <- model_inheritance_fixture(create_group_inheritance("mother"))
   m$processes$fertility$rates$rate <- 0
   m$processes$union_formation$matching <- model_calendar(mm,
-    create_age_gap_matching_model(0, 5, prevent_exogamy = TRUE), .1)
+    create_age_gap_matching_model(0, 5, group_exogamy = NA), .1)
   out <- simulate(m, .5, seed = 3)
   expect_equal(out$unions[, names(m$population$unions)], m$population$unions)
 })
@@ -318,10 +321,9 @@ test_that("inheritance-only boundaries preserve matching execution without birth
   m <- make_rate_model(100,search_rate=.4)
   m$population$persons$sex <- rep(c("f","m"),each=50)
   m$population$persons$group <- rep(c("A","B"),50)
-  m <- set_fertility(m,m$processes$fertility$rates,
-    inheritance=create_group_inheritance("mother"))
-  scheduled <- set_fertility(m,m$processes$fertility$rates,
-    inheritance=model_calendar(create_group_inheritance("mother"),
+  m$population$groups <- list(group = group())
+  m <- set_inheritance(set_fertility(m,m$processes$fertility$rates), create_group_inheritance("mother"))
+  scheduled <- set_inheritance(set_fertility(m,m$processes$fertility$rates), model_calendar(create_group_inheritance("mother"),
       create_group_inheritance("father"),boundary=.25))
   actual <- simulate(scheduled,2,seed=812)
   expected <- simulate(m,2,seed=812)

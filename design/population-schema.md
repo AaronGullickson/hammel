@@ -28,8 +28,9 @@ sibling and last-born-child pointers are omitted. Group labels must be nonempty;
 
 ## Ancestry
 
-An optional `ancestry` tibble has one row per person, including deceased people,
-keyed by `person_id`. Known shares are in `group_<label>` columns; `unknown`
+An optional `ancestry` component is a named list with one tibble per dimension
+declared with `ancestry = TRUE`. Each has one row per person, including deceased
+people, keyed by `person_id`. Known shares are in columns named by category; `unknown`
 records unknown ancestry. Shares are finite and in `[0,1]`, summing to one per
 person within `1e-8`. Supplied rows are aligned to persons; reference groups may
 differ from current identity groups. Without supplied shares, grouped populations
@@ -123,10 +124,11 @@ Re-enabling from that output draws fresh weights for every woman. See
 ## Group-transition histories
 
 Grouped populations always include `transitions`, a tibble with columns
-`person_id`, `time` (years), `group_origin`, and `group_dest`. It contains one
-row per individual move, preserves all earlier rows across restarts, and has
-the same schema when empty. Group labels use the persons group type. Histories
-are validated against life dates, the known endpoint, chronological chaining
-and current group identity. `hammel_population(..., transitions = ...)` accepts
+`person_id`, `time` (years), `group` (the dimension), `origin`, and
+`destination`. It contains one row per individual move, preserves all earlier
+rows across restarts, and has the same schema when empty. `group`, `origin`
+and `destination` are character. Histories are validated against life dates,
+the known endpoint, and chronological chaining to the current category in each
+dimension. `hammel_population(..., transitions = ...)` accepts
 base data frames. See [group transitions](group-transitions.md) for event and
 observation semantics. Ancestry proportions are unaffected by moves.

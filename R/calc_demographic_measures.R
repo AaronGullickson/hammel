@@ -3,213 +3,153 @@
 #' Count persons with `birth_time <= time` and missing `death_time` or
 #' `death_time > time`. Counts include births at the requested time and exclude
 #' deaths at that time, representing the population after recorded events there.
-#' Results preserve the order of the requested times, including repeated times.
+#' States in `by` are also those after all events at each time.
 #'
 #' @param population A `hammel_population` or persons data frame representing
 #'   one independent history. For bare tables, ensure follow-up is complete
-#'   through every requested time.
+#'   through every requested time. Union variables require a population.
 #' @param times A numeric vector of finite time points in years. A population
 #'   object cannot be queried beyond its known `end_time`.
-#' @param by_group Logical, default `FALSE`. With `TRUE`, require a persons
-#'   `group` column and count separately by group. Groups retain their input type
-#'   and first-occurrence order within each requested time. No pooled group row
-#'   is added. Empty histories return a typed zero-row table.
-#' @return A tibble with `time` and `population` columns, plus `group` when
-#'   `by_group = TRUE`.
+#' @param by `NULL` (default) or a character vector of variables to count
+#'   separately: `"sex"`, declared group dimensions (such as `"race"`),
+#'   `"union_type"` and `"previous_union"`. See
+#'   [calculate_mortality_rates()] for their definitions.
+#' @param pool_dissolved Logical, default `FALSE`. With `TRUE` and
+#'   `"previous_union"` in `by`, combine separated and widowed as `"dissolved"`.
+#' @return A tibble with `time`, the `by` columns and `population`. Rows follow
+#'   the requested times (repeats kept), with time varying fastest and earlier
+#'   `by` variables varying faster than later ones.
 #' @export
 #' @examples
 #' population <- create_baseline_population(100, end_time = 0)
 #' calculate_population_size(population, times = c(-10, -5, 0))
-calculate_population_size <- function(population, times, by_group = FALSE) {
+#' calculate_population_size(population, times = 0, by = "sex")
+calculate_population_size <- function(population, times, by = NULL, pool_dissolved = FALSE) {
   if (!is.numeric(times) || !is.null(dim(times)) || any(!is.finite(times)))
     stop("`times` must be a numeric vector of finite times in years.", call. = FALSE)
-  if (inherits(population, "hammel_population")) {
-    validate_population(population)
-    if (is.null(population$end_time) || any(times > population$end_time))
-      stop("Observation requires a known endpoint and cannot extend beyond it.", call. = FALSE)
-    persons <- population$persons
-  } else {
-    if (!is.data.frame(population))
-      stop("`population` must be a hammel_population or persons data frame.", call. = FALSE)
-    persons <- population
-    hammel_population(persons)
-  }
-  persons <- prepare_group_observations(persons, population, by_group)
-  groups <- observation_groups(persons, by_group)
-  if (by_group) {
-    if (inherits(population, "hammel_population") && !is.null(population$transitions) && nrow(population$transitions)) {
-      # Births enter the initial group, deaths leave the final group, and
-      # every transition adds one arrival and one departure. Count sorted
-      # event dates instead of rebuilding each person's identity per snapshot.
-      tx <- population$transitions
-      history <- attr(persons, ".hammel_group_history")
-      initial <- match(persons$group, groups)
-      ordered <- order(tx$time)
-      first <- ordered[!duplicated(history$row[ordered])]
-      initial[history$row[first] + 1L] <- history$from[first] + 1L
-      final <- match(persons$group, groups)
-      counts <- lapply(seq_along(groups), function(g) {
-        enter <- sort(c(persons$birth_time[initial == g], tx$time[history$to == g - 1L]))
-        exit <- sort(c(persons$death_time[final == g & !is.na(persons$death_time)],
-                       tx$time[history$from == g - 1L]))
-        findInterval(times, enter) - findInterval(times, exit)
-      })
-      grid <- expand.grid(g = seq_along(groups), t = seq_along(times), KEEP.OUT.ATTRS = FALSE)
-      indices <- grid$t + length(times) * (grid$g - 1L)
-      return(tibble::tibble(time = times[grid$t], group = groups[grid$g],
-        population = as.integer(unlist(counts, use.names = FALSE)[indices])))
-    }
-    grid <- expand.grid(g = seq_along(groups), t = seq_along(times),
-                        KEEP.OUT.ATTRS = FALSE)
-    counts <- lapply(seq_along(groups), function(g) {
-      rows <- persons$group == groups[g]
-      born <- sort(persons$birth_time[rows])
-      died <- sort(persons$death_time[rows & !is.na(persons$death_time)])
-      findInterval(times, born) - findInterval(times, died)
-    })
-    # Each group vector follows requested time order; the grid interleaves groups.
-    indices <- grid$t + length(times) * (grid$g - 1L)
-    return(tibble::tibble(time = times[grid$t], group = groups[grid$g],
-      population = as.integer(unlist(counts, use.names = FALSE)[indices])))
-  }
-  # Sorted event dates let us count each time without scanning every person.
-  born <- sort(persons$birth_time)
-  died <- sort(persons$death_time[!is.na(persons$death_time)])
-  counts <- findInterval(times, born) - findInterval(times, died)
-  tibble::tibble(time = times, population = counts)
+  alias <- observation_alias(population, by)
+  population <- alias$population
+  by <- alias$by
+  by <- check_by(by, c("sex", "group", "union_type", "previous_union"), "calculate_population_size", alias$dims)
+  check_pool_dissolved(pool_dissolved, by)
+  obs <- person_observation(population, by, if (length(times)) max(times) else -Inf)
+  previous <- "previous_union" %in% by
+  utype <- "union_type" %in% by
+  map <- if (pool_dissolved) c(0L, 1L, 1L) else 0:2
+  ng <- if (is.null(obs$groups)) 1L else length(obs$groups)
+  options <- list(typed = obs$typed, exclusive = obs$typed || previous,
+    counts_cohab = obs$counts_cohab, sex = "sex" %in% by, group = "group" %in% by,
+    union_type = utype, previous_union = previous, previous_map = map)
+  counts <- person_snapshot_cpp(obs$persons, obs$unions, obs$group_indices, ng,
+    as.numeric(times), options)
+  sizes <- c(t = length(times), a = 1L, sex = if ("sex" %in% by) 2L else 1L, parity = 1L,
+    group = if ("group" %in% by) ng else 1L,
+    union_type = if (utype) length(union_type_labels(obs$typed)) else 1L,
+    previous_union = if (previous) length(unique(map)) else 1L)
+  strides <- cumprod(c(1, head(sizes, -1)))
+  names(strides) <- names(sizes)
+  dims <- c(list(dim_of(data.frame(time = times), stride = 1)),
+    person_by_dims(by, obs, list(strides = strides), pool_dissolved))
+  rows <- build_rows(dims)
+  out <- finish_rows(rows[!grepl("^\\.key", names(rows))])
+  out$population <- as.integer(counts[rows$.index])
+  finish_strata(out, alias)
 }
 
-# Shared validation, grids, and native observation counts for process summaries.
-collect_demographic_counts <- function(population, time_breaks, age_breaks,
-                                   by_union_type = FALSE, by_group = FALSE) {
-  if (!is.logical(by_union_type) || length(by_union_type) != 1L ||
-      !is.null(dim(by_union_type)) || is.na(by_union_type))
-    stop("`by_union_type` must be TRUE or FALSE.", call. = FALSE)
-  if (by_union_type && !inherits(population, "hammel_population"))
-    stop("`by_union_type = TRUE` requires a hammel_population with union histories.",
-         call. = FALSE)
+# Shared validation of period and age breaks; a finite final age gains Inf.
+person_breaks <- function(time_breaks, age_breaks) {
   check_demographic_breaks(time_breaks, "time_breaks")
   check_demographic_breaks(age_breaks, "age_breaks", ages = TRUE)
   if (is.finite(tail(age_breaks, 1))) age_breaks <- c(age_breaks, Inf)
-  if (inherits(population, "hammel_population")) {
-    validate_population(population)
-    if (is.null(population$end_time) || tail(time_breaks, 1) > population$end_time)
-      stop("Observation requires a known endpoint and cannot extend beyond it.", call. = FALSE)
-    persons <- population$persons
-  } else {
-    if (!is.data.frame(population))
-      stop("`population` must be a hammel_population or persons data frame.", call. = FALSE)
-    persons <- population
-    hammel_population(persons)
-  }
-  persons <- prepare_group_observations(persons, population, by_group)
-  groups <- observation_groups(persons, by_group)
-  group_count <- if (by_group) length(groups) else 1L
-  group_indices <- if (by_group) match(persons$group, groups) - 1L else
-    rep(0L, nrow(persons))
-  nt <- length(time_breaks) - 1L
-  na <- length(age_breaks) - 1L
-  grid <- expand.grid(t = seq_len(nt), a = seq_len(na), sex = c("m", "f"),
-                      g = seq_len(group_count),
-                      KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
-  table <- tibble::tibble(time_start = time_breaks[grid$t], time_end = time_breaks[grid$t + 1L],
-    sex = grid$sex, age_start = age_breaks[grid$a], age_end = age_breaks[grid$a + 1L])
-  if (by_group) table$group <- groups[grid$g]
-  counts <- demographic_counts_cpp(persons, time_breaks, age_breaks,
-                                   group_indices, group_count)
-  for (column in c("person_years", "deaths", "births")) table[[column]] <- counts[[column]]
-  table$births[table$sex == "m"] <- NA_real_
-  table$rate_mortality <- as.numeric(ifelse(table$person_years > 0,
-                                table$deaths / table$person_years, NA_real_))
-  table$rate_fertility <- as.numeric(ifelse(table$person_years > 0,
-                                table$births / table$person_years, NA_real_))
-  if (by_union_type) {
-    total <- table
-    typed <- "union_type" %in% names(population$unions)
-    types <- if (typed) unique(population$unions$union_type) else "partnered"
-    if (typed) {
-      split <- typed_demographic_counts_cpp(persons, population$unions,
-        time_breaks, age_breaks, group_indices, group_count, types)
-    } else {
-      x <- union_counts_cpp(persons, population$unions, time_breaks, age_breaks,
-        group_indices, group_count)
-      split <- list(person_years = x$person_years_partnered,
-        births = x$births_partnered, deaths = x$deaths_partnered)
-    }
-    parts <- lapply(seq_along(types), function(k) {
-      x <- total
-      rows <- seq_len(nrow(total)) + (k - 1L) * nrow(total)
-      for (column in c("person_years", "births", "deaths"))
-        x[[column]] <- split[[column]][rows]
-      x$union_type <- types[k]
-      x
-    })
-    unpartnered <- total
-    for (column in c("person_years", "births", "deaths")) {
-      used <- Reduce(`+`, lapply(parts, `[[`, column), init = rep(0, nrow(total)))
-      unpartnered[[column]] <- total[[column]] - used
-    }
-    unpartnered$person_years <- pmax(0, unpartnered$person_years)
-    unpartnered$union_type <- "unpartnered"
-    parts <- c(list(unpartnered), parts)
-    table <- do.call(rbind, parts)
-    # Keep types adjacent within each original demographic cell.
-    order <- as.vector(t(matrix(seq_len(nrow(table)), nrow = nrow(total),
-      ncol = length(parts))))
-    table <- table[order, ]
-    table$births[table$sex == "m"] <- NA_real_
-    table$rate_mortality <- as.numeric(ifelse(table$person_years > 0,
-      table$deaths / table$person_years, NA_real_))
-    table$rate_fertility <- as.numeric(ifelse(table$person_years > 0,
-      table$births / table$person_years, NA_real_))
-    table <- table[c("time_start", "time_end", "sex", "age_start", "age_end",
-      if (by_group) "group", "union_type", "person_years", "deaths", "births", "rate_mortality", "rate_fertility")]
-  }
-  attr(table, "unassigned_births") <- tibble::tibble(time_start = head(time_breaks, -1),
-    time_end = tail(time_breaks, -1), births = counts$unassigned_births)
-  table
+  age_breaks
 }
 
 #' Calculate age-specific mortality rates
 #'
 #' Report deaths per person-year, with exact half-open period and age splitting.
+#'
+#' @section Stratification with `by`:
+#' `by` lists categorical variables to split exposure and events over. Each is
+#' the person's state at the time, changing only at recorded events:
+#' * A declared group dimension's name (such as `"race"`; see
+#'   [set_groups()]): the current category, following that dimension's
+#'   transition history. Several dimensions may be listed; each gets its own
+#'   column, with categories in order of first appearance.
+#' * `"union_type"`: current union state, `"unpartnered"`, `"cohab"` or
+#'   `"marriage"` for typed histories, or `"unpartnered"` and `"partnered"`
+#'   for untyped ones.
+#' * `"previous_union"`: how the most recent ended union ended, `"none"`,
+#'   `"separated"` or `"widowed"`, including during later unions. Conversion
+#'   is not an ending; cohabitation endings follow the population's
+#'   cohabitation policy.
+#'
+#' Union variables require a `hammel_population` with union histories;
+#' `"previous_union"` (and typed `"union_type"`) require nonoverlapping
+#' histories for each person. Each event counts under the state just before it
+#' in the simulation's event order: deaths see no same-time changes, so a death
+#' that ends a union counts as partnered; births count in a union starting at
+#' the same time and in one ending then by dissolution or conversion, but not
+#' one ending by the partner's death, and use the mother's group before any
+#' same-time transition.
+#'
+#' Rows vary by time fastest, then age, then sex, then the `by` variables in
+#' the order given, earlier ones varying faster. Strata sum to pooled counts and
+#' exposure; recompute rates after pooling.
+#'
 #' @param population A hammel_population or persons data frame.
 #' @param time_breaks Strictly increasing finite period boundaries in years.
 #' @param age_breaks Strictly increasing nonnegative age boundaries in years.
 #'   If the final boundary is finite, Inf is appended to create an open-ended
 #'   final age band starting at that boundary.
-#' @param by_union_type Logical, default FALSE. Require population histories and
-#'   return `union_type` rows for unpartnered and each discovered union type,
-#'   without overall rows. Untyped histories use partnered/unpartnered. Births
-#'   tied to dissolution or conversion retain the ending type; deaths use the
-#'   type immediately before death. Typed overlapping histories are rejected;
-#'   untyped overlapping coverage is merged. For formation rates use
-#'   [calculate_union_rates()] or [calculate_marriage_rates()].
-#' @param by_group Logical, default `FALSE`. With `TRUE`, require a persons
-#'   `group` column and return the complete period/age/sex grid for each group
-#'   appearing in the person history, in first-occurrence order. Labels retain
-#'   their type. Exposure and deaths use the person's group; births use the
-#'   mother's group, even when the child has a different group.
-#'   Combines with `by_union_type`. No pooled
-#'   group row is added. Unknown-mother births remain in the single period-level
-#'   `unassigned_births` attribute, without a group assignment.
+#' @param by `NULL` (default) or a character vector of variables to split
+#'   results over: declared group dimensions, `"union_type"` and
+#'   `"previous_union"`. See below.
 #' @param conf.level NULL (default) to omit confidence intervals, or a finite
 #'   numeric scalar strictly between 0 and 1. Adds `conf_low` and `conf_high`
 #'   from two-sided exact [stats::poisson.test()] intervals for observed event
 #'   counts over exposure. Bounds are NA at zero exposure. For fertility, these
 #'   describe the observed rate, not the unrealized-adjusted rate.
-#' @return A tibble containing period, age, sex, person_years, deaths and
-#'   rate_mortality, with optional group and union_type strata.
+#' @param pool_dissolved Logical, default `FALSE`. With `TRUE` and
+#'   `"previous_union"` in `by`, combine separated and widowed as
+#'   `"dissolved"`, pooling counts and exposure before calculating rates.
+#' @return A tibble containing period, sex, age, the `by` columns,
+#'   person_years, deaths and rate_mortality.
 #' @export
-calculate_mortality_rates <- function(population, time_breaks, age_breaks,
-                                     by_union_type = FALSE, by_group = FALSE,
-                                     conf.level = NULL) {
+calculate_mortality_rates <- function(population, time_breaks, age_breaks, by = NULL,
+                                      conf.level = NULL, pool_dissolved = FALSE) {
   validate_rate_conf_level(conf.level)
-  x <- collect_demographic_counts(population, time_breaks, age_breaks,
-                            by_union_type, by_group)
-  x$births <- x$rate_fertility <- NULL
-  attr(x, "unassigned_births") <- NULL
-  add_rate_confidence(x, "deaths", "person_years", conf.level)
+  alias <- observation_alias(population, by)
+  population <- alias$population
+  by <- alias$by
+  by <- check_by(by, c("group", "union_type", "previous_union"), "calculate_mortality_rates", alias$dims)
+  check_pool_dissolved(pool_dissolved, by)
+  age_breaks <- person_breaks(time_breaks, age_breaks)
+  obs <- person_observation(population, by, tail(time_breaks, 1))
+  counts <- run_person_lexis(obs, by, time_breaks, age_breaks, sex = TRUE,
+                             pool_dissolved = pool_dissolved)
+  out <- person_rate_rows(obs, by, counts, time_breaks, age_breaks, c("m", "f"), pool_dissolved)
+  out$deaths <- counts$deaths[attr(out, "index")]
+  out$rate_mortality <- as.numeric(ifelse(out$person_years > 0,
+    out$deaths / out$person_years, NA_real_))
+  attr(out, "index") <- NULL
+  finish_strata(add_rate_confidence(out, "deaths", "person_years", conf.level), alias)
+}
+
+# Rows for person rates: time, sex, age, optional parity, then `by`.
+person_rate_rows <- function(obs, by, counts, time_breaks, age_breaks, sexes,
+                             pool_dissolved, parity_breaks = NULL) {
+  s <- counts$strides
+  sex_dim <- label_dim("sex", sexes, s[["sex"]], code = match(sexes, c("m", "f")) - 1L)
+  dims <- c(list(band_dim(time_breaks, "time", 1), band_dim(age_breaks, "age", s[["a"]]), sex_dim),
+    if (!is.null(parity_breaks)) list(band_dim(parity_breaks, "parity", s[["parity"]])),
+    person_by_dims(by, obs, counts, pool_dissolved))
+  rows <- build_rows(dims)
+  columns <- c("time_start", "time_end", "sex", "age_start", "age_end",
+    if (!is.null(parity_breaks)) c("parity_start", "parity_end"), by)
+  out <- tibble::as_tibble(rows[columns])
+  out$person_years <- counts$person_years[rows$.index]
+  attr(out, "index") <- rows$.index
+  out
 }
 
 #' Calculate age-specific fertility rates, optionally by current parity
@@ -220,6 +160,9 @@ calculate_mortality_rates <- function(population, time_breaks, age_breaks,
 #' children; custom person parity columns are ignored. Each birth counts at the
 #' parity immediately before it and advances subsequent exposure. Simultaneous
 #' births progress successively in recorded person-row order.
+#'
+#' `by` works as in [calculate_mortality_rates()]: births count under the
+#' mother's state just before them.
 #' @inheritParams calculate_mortality_rates
 #' @param parity_breaks NULL to pool parities, or strictly increasing nonnegative
 #'   integer boundaries starting at zero. Bands are half-open. A finite final
@@ -233,16 +176,16 @@ calculate_mortality_rates <- function(population, time_breaks, age_breaks,
 #'   Values are `NA` where they cannot be attributed exactly: periods before the
 #'   most recent simulation's start (restarts keep only the latest run's
 #'   record), breaks that cut through a recorded one-year period or fertility
-#'   cell, and `union_type` or parity strata the fertility schedule did not use.
-#' @return A tibble with period, age, sex (female), person_years, births and
-#'   rate_fertility; optional parity_start/parity_end, group and union_type, and
+#'   cell, and `by` or parity strata the fertility schedule did not use
+#'   (`"previous_union"` always).
+#' @return A tibble with period, sex (female), age, optional parity_start and
+#'   parity_end, the `by` columns, person_years, births and rate_fertility, and
 #'   with `unrealized = TRUE`, unrealized_births and rate_fertility_adjusted.
 #'   Unknown-mother births are in the period-level unassigned_births attribute.
 #' @export
-calculate_fertility_rates <- function(population, time_breaks, age_breaks,
-                                     by_union_type = FALSE, by_group = FALSE,
-                                     parity_breaks = NULL, unrealized = FALSE,
-                                     conf.level = NULL) {
+calculate_fertility_rates <- function(population, time_breaks, age_breaks, by = NULL,
+                                      parity_breaks = NULL, unrealized = FALSE,
+                                      conf.level = NULL, pool_dissolved = FALSE) {
   validate_rate_conf_level(conf.level)
   if (!is.logical(unrealized) || length(unrealized) != 1L || is.na(unrealized))
     stop("`unrealized` must be TRUE or FALSE.", call. = FALSE)
@@ -252,49 +195,34 @@ calculate_fertility_rates <- function(population, time_breaks, age_breaks,
       stop(paste("`unrealized = TRUE` requires a population returned by simulate()",
                  "with an unrealized-births record."), call. = FALSE)
   }
-  # Shared validation and pooled schema; retain complete family/union histories.
-  pooled <- collect_demographic_counts(population, time_breaks, age_breaks,
-                                 by_union_type, by_group)
-  unknown <- attr(pooled, "unassigned_births")
-  female <- pooled[pooled$sex == "f", ]
-  female$deaths <- female$rate_mortality <- NULL
-  if (is.null(parity_breaks)) {
-    if (unrealized) female <- add_unrealized_births(female, population$simulation)
-    return(add_rate_confidence(female, "births", "person_years", conf.level))
+  alias <- observation_alias(population, by)
+  population <- alias$population
+  by <- alias$by
+  by <- check_by(by, c("group", "union_type", "previous_union"), "calculate_fertility_rates", alias$dims)
+  check_pool_dissolved(pool_dissolved, by)
+  age_breaks <- person_breaks(time_breaks, age_breaks)
+  if (!is.null(parity_breaks)) {
+    check_demographic_breaks(parity_breaks, "parity_breaks", ages = TRUE)
+    finite <- parity_breaks[is.finite(parity_breaks)]
+    if (parity_breaks[1] != 0 || any(finite != floor(finite)))
+      stop("`parity_breaks` must start at zero and contain integer boundaries or Inf.", call. = FALSE)
+    if (is.finite(tail(parity_breaks, 1))) parity_breaks <- c(parity_breaks, Inf)
   }
-  check_demographic_breaks(parity_breaks, "parity_breaks", ages = TRUE)
-  finite <- parity_breaks[is.finite(parity_breaks)]
-  if (parity_breaks[1] != 0 || any(finite != floor(finite)))
-    stop("`parity_breaks` must start at zero and contain integer boundaries or Inf.", call. = FALSE)
-  if (is.finite(tail(parity_breaks, 1))) parity_breaks <- c(parity_breaks, Inf)
-  if (is.finite(tail(age_breaks, 1))) age_breaks <- c(age_breaks, Inf)
-  persons <- if (inherits(population, "hammel_population")) population$persons else population
-  persons <- prepare_group_observations(persons, population, by_group)
-  groups <- observation_groups(persons, by_group)
-  ng <- if (by_group) length(groups) else 1L
-  gi <- if (by_group) match(persons$group, groups) - 1L else rep(0L, nrow(persons))
-  types <- if (by_union_type) unique(female$union_type) else "pooled"
-  # Empty grouped populations still return the full typed schema.
-  grid <- expand.grid(t = seq_len(length(time_breaks)-1L),
-    a = seq_len(length(age_breaks)-1L), g = seq_len(ng),
-    p = seq_len(length(parity_breaks)-1L), k = seq_along(types))
-  unions <- if (by_union_type) population$unions else data.frame()
-  counts <- fertility_parity_counts_cpp(persons, unions, time_breaks,
-    age_breaks, parity_breaks, gi, ng, types, by_union_type)
-  out <- tibble::tibble(time_start = time_breaks[grid$t],
-    time_end = time_breaks[grid$t+1L], sex = rep("f", nrow(grid)),
-    age_start = age_breaks[grid$a], age_end = age_breaks[grid$a+1L])
-  if (by_group) out$group <- groups[grid$g]
-  if (by_union_type) out$union_type <- types[grid$k]
-  out$parity_start <- parity_breaks[grid$p]
-  out$parity_end <- parity_breaks[grid$p+1L]
-  out$person_years <- counts$person_years
-  out$births <- counts$births
+  obs <- person_observation(population, by, tail(time_breaks, 1))
+  counts <- run_person_lexis(obs, by, time_breaks, age_breaks, sex = TRUE,
+    parity_breaks = if (is.null(parity_breaks)) numeric() else parity_breaks,
+    pool_dissolved = pool_dissolved)
+  out <- person_rate_rows(obs, by, counts, time_breaks, age_breaks, "f", pool_dissolved,
+                          parity_breaks)
+  out$births <- counts$births[attr(out, "index")]
   out$rate_fertility <- as.numeric(ifelse(out$person_years > 0,
     out$births / out$person_years, NA_real_))
-  if (unrealized) out <- add_unrealized_births(out, population$simulation)
-  attr(out, "unassigned_births") <- unknown
-  add_rate_confidence(out, "births", "person_years", conf.level)
+  attr(out, "index") <- NULL
+  if (unrealized) out <- add_unrealized_births(out, population$simulation, alias)
+  attr(out, "unassigned_births") <- tibble::tibble(time_start = head(time_breaks, -1),
+    time_end = tail(time_breaks, -1), births = counts$unassigned_births)
+  out <- finish_strata(add_rate_confidence(out, "births", "person_years", conf.level), alias)
+  out
 }
 
 # Attribute recorded unrealized births (D101) to observation rows. A record is
@@ -303,8 +231,12 @@ calculate_fertility_rates <- function(population, time_breaks, age_breaks,
 # the row whose period, age, parity, group and union type contain it. Rows that
 # a record only partly overlaps, or that a stratum the schedule did not use
 # would have to split, become NA, as do periods before the run start.
-add_unrealized_births <- function(out, simulation) {
+add_unrealized_births <- function(out, simulation, alias = list()) {
   u <- simulation$unrealized_births
+  # Records name each group dimension; the table uses the internal `group`
+  # (a combined code when several dimensions are requested).
+  if (!is.null(alias$combined)) u$group <- encode_combined(alias, u)
+  else for (from in names(alias$rename)) names(u)[names(u) == alias$rename[[from]]] <- from
   n <- nrow(out)
   value <- numeric(n)
   covered <- out$time_start >= simulation$start_time
@@ -336,6 +268,8 @@ add_unrealized_births <- function(out, simulation) {
       keys <- c(keys, list(as.character(u$group)))
       row_keys <- c(row_keys, list(as.character(out$group)))
     }
+    # The fertility schedule never splits by previous union.
+    if ("previous_union" %in% names(out)) ok[] <- FALSE
     if ("union_type" %in% names(out)) {
       if ("union_type" %in% names(u)) {
         ok <- ok & u$union_type %in% out$union_type
@@ -368,10 +302,23 @@ add_unrealized_births <- function(out, simulation) {
   out
 }
 
-# Summary calculations use explicit built-in grouping columns.
+# Bands and measures of rate tables; summaries treat any other column (such
+# as a group dimension, `race` or `region`) as identifying a stratum.
+summary_measures <- c("age_start", "age_end", "parity_start", "parity_end", "dur_start", "dur_end",
+  "mx", "rate", "rate_mortality", "rate_fertility", "rate_fertility_adjusted", "person_years",
+  "deaths", "births", "unrealized_births", "conf_low", "conf_high")
+
+# A summary table's stratum columns, in table order: period, sex (when kept),
+# union status (when kept) and every other non-measure column.
+summary_strata <- function(table, by_sex = FALSE, by_union_status = FALSE) {
+  status <- c("union_status", "union_type", "previous_union")
+  keep <- c("time_start", "time_end", if (by_sex) "sex", if (by_union_status) status,
+            setdiff(names(table), c(summary_measures, "time_start", "time_end", "sex", status)))
+  names(table)[names(table) %in% keep]
+}
+
 summary_rows <- function(table, by_sex = FALSE, by_union_status = FALSE) {
-  columns <- intersect(c("time_start", "time_end", "group", if (by_sex) "sex",
-                         if (by_union_status) c("union_status", "union_type")), names(table))
+  columns <- summary_strata(table, by_sex, by_union_status)
   if (!length(columns)) return(list(seq_len(nrow(table))))
   codes <- lapply(table[columns], function(column) match(column, unique(column)))
   keys <- do.call(paste, c(codes, sep = ":"))
@@ -387,21 +334,23 @@ summary_rows <- function(table, by_sex = FALSE, by_union_status = FALSE) {
 #' and nonzero that TFR underestimates fertility over the full age range. Zero or
 #' missing omitted rates do not trigger that warning. The remaining finite, contiguous age range
 #' defines the TFR reported. Any missing ASFR in those bands makes the TFR missing.
-#' When `union_type` (or a legacy `union_status` column) is present, calculate
-#' a separate sum for each stratum
+#' When `union_type`, `previous_union` (or a legacy `union_status` column) is
+#' present, calculate a separate sum for each stratum
 #' within each period. These conditional sums describe fertility under continuous
 #' exposure to that status; they are not components to add into an overall TFR.
-#' A `group` column automatically adds separate group strata, with its type and
-#' labels preserved; groups are not pooled. Age bands are checked independently
-#' within each period/group/status combination.
+#' Any other column that is not an age band or a measure, such as a group
+#' dimension (`race`, `region`), adds separate strata, with its type and labels
+#' preserved; strata are not pooled. Age bands are checked independently within
+#' each stratum.
 #' @param rates A table returned by [calculate_fertility_rates()], a fertility
 #'   process object, or a data frame with `age_start`, `age_end`, and `rate_fertility`
 #'   or `rate` in births per woman-year. Bare `rate` tables are interpreted as
 #'   fertility rates; mortality processes are not valid inputs.
 #' @return With parity columns, the result of [calculate_patfr()] with `patfr`.
-#'   Otherwise, a tibble with period columns, `union_type` or legacy `union_status`
-#'   when supplied,
-#'   `group` when supplied, `age_start`, `age_end`, and `tfr`.
+#'   Otherwise, a tibble with period columns, `union_type`, `previous_union` or
+#'   legacy `union_status` when supplied,
+#'   other stratum columns (such as group dimensions) when supplied,
+#'   `age_start`, `age_end`, and `tfr`.
 #'   If `sex` is present, only female rows are used.
 #' @export
 calculate_tfr <- function(rates) {
@@ -429,7 +378,7 @@ calculate_tfr <- function(rates) {
   if (any(!is.finite(rates$age_end) & rates$rate_fertility != 0, na.rm = TRUE))
     warning("TFR omits an open age band with non-zero fertility; TFR is underestimated over the full age range.", call. = FALSE)
   rates <- rates[is.finite(rates$age_end), , drop = FALSE]
-  groups <- intersect(c("time_start", "time_end", "group", "union_status", "union_type"), names(rates))
+  groups <- summary_strata(rates, by_union_status = TRUE)
   if (!nrow(rates)) {
     result <- rates[FALSE, c(groups, "age_start", "age_end"), drop = FALSE]
     result$tfr <- numeric()
@@ -489,7 +438,7 @@ calculate_life_table <- function(rates, radix = 1) {
   if (any(rates$mx < 0, na.rm = TRUE)) stop("Mortality rates must be nonnegative.", call. = FALSE)
   if (!is.numeric(radix) || length(radix) != 1L || !is.finite(radix) || radix <= 0)
     stop("`radix` must be positive and finite.", call. = FALSE)
-  rates <- rates[c(intersect(c("time_start", "time_end", "sex", "group", "union_status", "union_type"), names(rates)),
+  rates <- rates[c(summary_strata(rates, by_sex = TRUE, by_union_status = TRUE),
                    "age_start", "age_end", "mx")]
   if (!nrow(rates)) {
     for (column in c("n", "ax", "qx", "lx", "lx_end", "dx", "Lx", "Tx", "ex"))

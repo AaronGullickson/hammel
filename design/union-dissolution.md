@@ -28,8 +28,8 @@ additional random draws. There is no demographic default dissolution rate.
 
 ## Interface and schedules
 
-`union_dissolution(rates, group_prop_hazard = NULL)` constructs a process;
-`set_union_dissolution(model, rates, group_prop_hazard = NULL)` attaches it.
+`union_dissolution(rates, weights = NULL)` constructs a process;
+`set_union_dissolution(model, rates, weights = NULL)` attaches it.
 Rates are a nonempty data frame with `dur_start`, `dur_end`, and `rate`,
 returned/stored as a tibble. Duration bands are half-open `[dur_start, dur_end)`.
 Starts and rates are finite and nonnegative; ends exceed starts and may be
@@ -39,23 +39,19 @@ preserved. Sex, age and union-status columns are rejected. Optional
 `time_start`/`time_end` bands follow [the rate contract](time-varying-rates.md)
 (D118); calendar changes retain the union-duration origin.
 
-An optional `group_pair` column gives symmetric pair labels, e.g. `A:A`,
-`A:B`, `B:B`. Pair order is normalized using character labels in radix order,
-so `B:A` selects the same schedule as `A:B`. A pair-stratified table must cover
-all unordered pairs from the possible identity registry, including future
-identities. Missing pairs error, rather than silently imply zero risk. Within
-each pair, gaps still mean zero risk. Shared rates omit `group_pair`. Bare
-`group`, `group_w`, and `group_h` schedule columns are rejected. Pair names
-require two nonempty colon-free labels separated by a single colon.
+Optional `<group>_w` and `<group>_h` columns, for any declared group dimension
+(D134), select schedules by the wife's and husband's categories. Strata are
+directional: a symmetric rate lists both `A`/`B` and `B`/`A` rows. Either
+column may be omitted to pool over that partner. A stratified table must cover
+every combination of the used columns' categories, including future
+identities. Missing combinations error, rather than silently imply zero risk.
+Within each stratum, gaps still mean zero risk. A bare dimension column or the
+former `group_pair` is an error at simulation, as is a column for an
+undeclared dimension.
 
-`group_prop_hazard` is a named numeric vector with the same unordered pair
-names, e.g. `c("A:B" = 1.2)`. Factors are dimensionless, finite and nonnegative;
-omitted pairs use 1, zero suppresses dissolution, and specifying both `A:B`
-and `B:A` is an error. Factors do not introduce identities. With population
-groups, preparation selects each couple's pair and scales an execution-only
-copy. Without population groups, warn and ignore multipliers; pair-stratified
-rates warn and use the first canonical pair alphabetically. The input table,
-its ordering and provenance remain unchanged.
+Proportional effects are written with `stratify_rates()` (D132), for example
+`stratify_rates(rates, list(group_w = c(A = 1, B = 2)))`. The input table, its
+ordering and provenance remain unchanged.
 
 Illustrative input, not a demographic default:
 
@@ -137,7 +133,7 @@ dissolutions against union-year exposure.
 ## Union-year counts and dissolution rates
 
 Requested by the user October 27, 2026. `calculate_dissolution_rates(population,
-time_breaks, dur_breaks, by_group = FALSE)` returns a tibble with `time_start`,
+time_breaks, dur_breaks, by = NULL)` returns a tibble with `time_start`,
 `time_end`, `dur_start`, `dur_end`, `union_years`, `dissolutions`, and
 `rate_dissolution`. There is no duplicated male/female row: one episode is one
 unit of observation, and repeated episodes contribute separately.
@@ -161,13 +157,13 @@ Do not stack independent replications with repeated union IDs before extraction.
 Use one history per call, then combine the summaries. All grid cells are retained,
 including typed zero-exposure cells for empty ungrouped histories.
 
-With `by_group = TRUE`, population inputs use both partners' recorded groups
-and return `group_pair`, with a full period/duration grid for every unordered
-pair of population groups (including pairs without observed episodes). Labels
-are canonical character strings in radix order, not numeric group codes.
-Bare union tables require `group_pair`; reverse labels are normalized and
-combined. Empty grouped inputs return a typed zero-row tibble. This replaces
-the earlier woman-only grouping; no single-partner option is added (D079).
+`by` accepts `"group_w"`, `"group_h"` and `"union_type"` (D133). The group
+variables are the wife's and husband's current groups, following transition
+histories, with a full period/duration grid for every combination of
+population groups (including combinations without observed episodes). Rows are
+directional; sum both directions for the unordered pairs that dissolution
+inputs use. Bare union tables require `group_w`/`group_h` columns. Empty
+grouped inputs return a typed zero-row tibble.
 
 Worked accounting: U1 starts at 0 and dissolves at 3; U2 starts at 1 and ends
 at 4 through death; U3 starts at 2 and remains ongoing at endpoint 5. Over
@@ -200,7 +196,7 @@ or demographic rate is supplied by this implementation.
 
 
 D086 adds optional union_type cohab/marriage strata within each shared or
-symmetric group_pair schedule. Supply both when stratifying; without the column,
+group-stratified schedule. Supply both when stratifying; without the column,
 each episode uses the same dissolution schedule. Conversion is not dissolution:
 it ends the cohab episode and starts marriage with a fresh duration clock.
 

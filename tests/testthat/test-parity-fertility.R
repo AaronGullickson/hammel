@@ -42,7 +42,7 @@ test_that("birth history initializes parity without custom column overrides", {
   child$death_time <- -.5; child$mother_id <- 1L
   people <- rbind(people,child)
   people$parity <- 99L
-  model <- set_population(model,hammel_population(people,end_time=0))
+  model <- set_population(model,hammel_population(people,end_time=0, groups = if ("group" %in% names(people)) "group"))
   result <- simulate(model,1,42)
   born <- subset(result$persons,birth_time>=0)
   expect_equal(nrow(born),1)
@@ -92,17 +92,19 @@ test_that("absent parity and zero-spacing equal-parity rates give the same ferti
   expect_false("parity" %in% names(simulate(strat,1,42)$persons))
 })
 
-test_that("parity composes with grouped typed fertility, conversion and multipliers", {
+test_that("parity composes with grouped typed fertility, conversion and stratified rates", {
   set.seed(33)
-  pop <- create_baseline_population(500,50,0,group_weights=c(A=1,B=1))
+  pop <- create_baseline_population(500,50,0,groups = list(group = c(A=1,B=1)))
   base <- parity_rates(c(.3,.2,.1))
   rates <- rbind(transform(base,union_type="unpartnered"),
     transform(base,union_type="cohab",rate=rate*.8),
     transform(base,union_type="marriage",rate=rate*1.1))
+  b_factor <- c(unpartnered=1.1,cohab=.9,marriage=1.2)
+  stratified <- do.call(rbind,lapply(names(b_factor),function(type)
+    stratify_rates(rates[rates$union_type==type,],list(group=c(A=1,B=b_factor[[type]])))))
   model <- hammel_model() |> set_population(pop) |>
     set_mortality(data.frame(sex=c("m","f"),age_start=0,age_end=Inf,rate=.01)) |>
-    (\(m) quiet_unreachable(set_fertility(m,rates,
-      group_prop_hazard=list(unpartnered=c(B=1.1),cohab=c(B=.9),marriage=c(B=1.2)))))() |>
+    (\(m) quiet_unreachable(set_fertility(m,stratified)))() |>
     set_union_formation("rate",rates=data.frame(age_start=15,age_end=Inf,rate=.4),
       cohab_prob=data.frame(age_start=15,age_end=Inf,prob=.5),
       union_convert_rate=data.frame(dur_start=0,dur_end=Inf,rate=.2),
@@ -121,7 +123,7 @@ test_that("parity composes with grouped typed fertility, conversion and multipli
 
 test_that("grouped zero-spacing parity schedules match shared rates in distribution", {
   set.seed(123)
-  pop <- create_baseline_population(400,50,0,group_weights=c(A=1,B=1))
+  pop <- create_baseline_population(400,50,0,groups = list(group = c(A=1,B=1)))
   base <- data.frame(age_start=15,age_end=50,union_type=c("unpartnered","partnered"),rate=.2)
   model <- hammel_model() |> set_population(pop) |>
     set_mortality(data.frame(sex=c("m","f"),age_start=0,age_end=Inf,rate=.01)) |>

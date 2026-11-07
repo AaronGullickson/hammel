@@ -64,33 +64,31 @@ not a probability. There is no requirement to convert to monthly units.
 
 ## Group-specific schedules
 
-Population persons and mortality, fertility, and female union-search rate tables
-may contain `group`. Ungrouped rate tables apply to everyone; grouped tables
-must cover every population group. Without population groups, use each table's
-alphabetically first group and emit a simulation warning. Group does not affect
-matching eligibility. Optional group formula predictors and symmetric
-pair effects can change utility. Newborns select either parent's group with equal probability by default
-(with maternal fallback for unknown fathers)
-or the configured inheritance rule, entering the assigned group's mortality
-schedule immediately. Rate cells split by group only when a process's effective
+Populations may declare any number of group dimensions (D134), such as `race`
+and `region`. Rate tables may stratify by any of them (union rates by the
+wife's and husband's categories, `race_w`, `race_h`); tables without a
+dimension's column apply to all its categories, and tables with it must cover
+every category combination they use. A table naming an undeclared column is
+an error. Group does not affect matching eligibility unless restrictions are
+specified. Optional group formula predictors and symmetric pair effects in one
+named dimension can change utility. Newborns receive each dimension's category
+from its inheritance rule, by default either parent's with equal probability
+(with maternal fallback for unknown fathers), entering the assigned
+categories' mortality schedules immediately. Rate cells split by group only when a process's effective
 schedules are group-specific (D128). Group values are
 nonmissing character labels or finite numeric codes, with nonempty labels.
 See [groups](groups.md) for full rules, ordering, examples, and validation scope.
 
-Mortality, fertility, and rate-based union formation optionally accept
-`group_prop_hazard`, a named vector of dimensionless finite nonnegative factors.
-Multiply the selected input rates by the person's group factor (the woman's for
-searches), using 1.0 for omitted groups. Fertility multiplication precedes
-cell accounting, making it equivalent to explicitly scaled input ASFRs. Zero suppresses that risk; factors are not normalized. Without population
-groups, warn and ignore factors. Shared and stratified schedules are supported;
-factors do not supply missing grouped schedules. On-demand union formation has
-no search hazard and rejects this option. Stored input tables remain unchanged;
-overflowing effective rates fail explicitly.
-Conditional fertility also accepts a named list of vectors for partnered and/or
-unpartnered rates. Omitted statuses and omitted groups within a status use 1.0.
-A single vector applies to both statuses; overall fertility requires the vector
-form. Fertility cells split by group only when the effective schedules are
-group-specific; multipliers that are all one do not stratify (D128).
+Proportional differences between strata are written into the rate table with
+`stratify_rates(rates, by)` (D132), which copies each row per category of a new
+column and multiplies its rate by that category's factor, crossing several
+columns. Factors are dimensionless, finite and nonnegative and are not
+normalized; zero suppresses that risk. The result is an ordinary stratified
+table, so every needed category must be listed, and fertility multiplication
+precedes cell accounting exactly as an explicit schedule would. Setters reject
+added columns that a process does not support. Fertility cells split by group
+only when the schedules are group-specific (D128). See
+[groups](groups.md#proportional-stratification-with-stratify_rates-d132).
 
 ## Initialization and population history
 
@@ -115,9 +113,10 @@ children who have died. No initial histories are fabricated.
 
 ### Ancestry proportions
 
-An optional `ancestry` tibble stores one row per person with `group_<label>`
-shares and an explicit `unknown` share. Without supplied proportions, grouped
-populations initialize every starting person at 100% of their recorded group,
+Optional ancestry, for dimensions declared with `ancestry = TRUE`, stores one
+tibble per such dimension with one row per person, a share per category and an
+explicit `unknown` share. Without supplied proportions, every starting person
+begins at 100% of their recorded category,
 irrespective of earlier parent histories. Supplied proportions are used as given
 and retained across restarts. Shares must be finite, in `[0,1]`, and sum to one
 within `1e-8`; missing ancestry is represented explicitly as unknown, not NA.
@@ -310,14 +309,14 @@ are finite log-scale additions after the full formula score. An omitted pair
 has odds ratio 1.0 (zero log effect). Within-group effects are allowed; overlaps
 after symmetric expansion are errors. A pair table is also accepted
 for labels containing colons; each row expands in both directions. These are selection preferences, not hazards or
-prohibitions. `female_group`, `male_group`, and numeric 0/1 `same_group` are
-available in formulas; categorical terms require fixed declared `group_levels`
-with treatment contrasts. Missing population identity data errors when a model
+prohibitions. For a declared dimension such as `race`, `female_race`,
+`male_race`, and numeric 0/1 `same_race` are available in formulas;
+categorical terms use the dimension's categories with treatment contrasts. Missing population identity data errors when a model
 uses group effects. See [group matching](group-matching.md) for worked cases.
 
-Matching models also accept `prevent_exogamy = FALSE` (no restrictions), TRUE
-(only same-group candidates), or selected cross-group pairs with female-first
-`:` and symmetric `::` notation. Restricted men are ineligible, alongside the
+Matching models also prohibit pairs through NA in `group_exogamy` (D135): `NA`
+for a dimension allows only same-category candidates, and `"A:B" = NA`
+prohibits that unordered pair in both directions. Restricted men are ineligible, alongside the
 age and kinship exclusions below. A search fails only when no eligible man
 exists in the whole pool; existing retry/cancellation rules then apply.
 Restrictions override finite scores, apply to the selected father or partner
@@ -552,9 +551,10 @@ with `set_population(result)` to retain its process specifications.
 
 See [demographic analysis](demographic-analysis.md) for worked workflows.
 Analyze one independent history per call; duplicated IDs from stacked
-replications are invalid. `by_group = TRUE` optionally separates Lexis and
-population-size counts by group at the observation time, splitting exposure
-at recorded transitions. TFR and life tables automatically
+replications are invalid. `by` (D133) optionally separates Lexis and
+population-size counts by group, union type, previous union and (where not
+always included) sex at the observation time, splitting exposure at recorded
+changes. TFR and life tables automatically
 preserve group strata in input tables. Exposure/deaths use the person's group,
 births use the mother's group at birth, and union formations use each spouse's group at formation.
 Unknown-mother births remain in the period-level attribute without assigning a
@@ -563,8 +563,8 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
 
 - `calculate_transition_rates()` counts directed group changes over origin
   person-years by calendar period and either attained age or duration since
-  latest group entry (age without earlier transitions). Optional `by_sex`
-  and `by_union_type` split both numerator and denominator. Each destination
+  latest group entry (age without earlier transitions). `by` can add `sex`,
+  `union_type` and `previous_union`, splitting numerator and denominator. Each destination
   shares its origin's exposure; denominator copies must not be summed across
   destinations. Return `transitions`, `person_years`, and `rate_transition`,
   with NA rates at zero exposure. See [transition observations](group-transitions.md#observed-transition-rates).
@@ -573,7 +573,7 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   age breakpoint automatically gains `Inf`; for example `0:110` ends with
   `[110, Inf)`. Zero exposure yields `NA` rates; zero events with positive
   exposure yields zero. Fertility summaries contain female rows only; mortality retains both sexes.
-- With `by_union_type = TRUE`, demographic rates partition exposure, births and
+- With `by = "union_type"`, demographic rates partition exposure, births and
   deaths into `unpartnered` and discovered union types in `union_type`, without
   an overall row. Untyped histories use partnered/unpartnered. Components sum
   to pooled counts/exposure obtained with FALSE. Deaths use the left-limit type;
@@ -602,8 +602,8 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   with zero terminal hazard gives infinite life expectancy; `ex` is undefined
   at zero survivorship. This is a synthetic period table, not cohort follow-up.
 - `calculate_union_rates()` returns unpartnered person-years, union starts
-  and `rate_union` by period, age and sex. Optional `by_previous_union = TRUE`
-  adds previous categories; `by_group = TRUE` independently adds individual
+  and `rate_union` by period, age and sex. Optional `by = "previous_union"`
+  adds previous categories; `by = "group"` independently adds individual
   groups. Both default to FALSE, pooling counts and exposure before rates. The most recent episode determines category; starts
   use the category immediately before formation. Empty categories remain, with
   NA rates at zero exposure. Complete exclusive histories are required;
@@ -624,8 +624,8 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   not a dissolution event. Missing ends censor at the window endpoint. Duration
   uses each episode's start; boundaries are half-open and finite final duration
   breaks gain `Inf`. Return `rate_dissolution = dissolutions / union_years`,
-  with NA at zero exposure. Optional grouping returns symmetric `group_pair`
-  strata using both partners, with both cross-group directions pooled. Bare
+  with NA at zero exposure. `by` can split by the wife's and husband's groups
+  (`group_w`, `group_h`, directional) and by union type. Bare
   union tables require complete caller-verified follow-up. This cause-specific
   rate is not a cumulative probability with competing deaths.
 - `calculate_population_size()` includes births and excludes deaths at each

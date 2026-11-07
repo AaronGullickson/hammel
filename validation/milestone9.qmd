@@ -1,0 +1,662 @@
+---
+title: "Hammel: Milestone 9 Validation"
+author: "Aaron Gullickson"
+date: today
+format:
+  html:
+    toc: true
+    toc-expand: 1
+    toc-depth: 4
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    self-contained: true
+execute:
+  eval: true
+  echo: true
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: setup
+#| eval: true
+#| include: false
+
+library(here)
+# installing will lead to faster computation
+devtools::install(here::here())
+library(hammel)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(purrr)
+library(tibble)
+library(stringr)
+library(ggplot2)
+library(gt)
+library(modelsummary)
+set_theme(theme_bw())
+```
+
+## Purpose and completion criteria
+
+Assess a switch to allow multiple group columns to a simulation to allow more than one group designation within the same simulation.
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| Age-specific rates | Output rates vs. input rates stratified by group | Input rates should generally fall within the 95% Poisson-based confidence intervals for the rate, although we don't expect complete coverage |
+| Hazard ratios | Hazard ratios across categories used in weight models | Observed hazard ratios should be close to expected values from the input data |
+| Log odds/gender ratios | Output log odds ratios vs input exogamy parameters | Should generally be consistent with double the input exogamy values; gender ratios should be close to one |
+| Accounting and implementation | Existing tests | Successful unit tests |
+
+## Overview of Design
+
+The `group` column is intended to be abstract so that users can use it for different kinds of things. For example, it could designate ethnoracial groups, educational categories, or regions. While this is useful, users are still limited to a single group column. So, if they want a simulation that includes both regional migration and ethnoracial breakdowns, for example, they will have a difficult time. While it is possible to hack together a set of categories for a group that are a combination of multiple groups that the user wants, this approach is not easy or elegant.
+
+However, we have all the internal plumbing to allow for more than one group. It is really just another stratification dimension and we know how to handle those already. The biggest change is to the calibration method for group weighting used for intergroup partnership, which I discuss below.
+
+To allow for multiple groups, we have created a separate `set_groups` argument for building the model. This is a change from the program inferring groups from the `group` column. Now, users can use any name they want to identify a group column (e.g. race, region, education) and then explicitly define it as a group column with the `group()` function. The inheritance model also now belongs to this `group()` output. Users can also specify explicit categories for the group in `group` rather than in the inheritance model, but if they don't, categories will be inferred from the data. So, here is an example setup:
+
+```r
+model |>
+  set_groups(
+   race = group(
+      categories = c("white", "black", "other"),
+      ancestry = TRUE,
+      inheritance = create_group_inheritance("random_parent")
+    ),
+   region = group(
+      categories = c("NE", "MW", "S", "W"),
+      ancestry = FALSE,
+      inheritance = create_group_inheritance("mother")
+    )
+  )
+```
+
+Group exogamy parameters still live in the matching model but are now specified with a named list structure where names identify which group's exogamy is being considered. So:
+
+```r
+model |>
+  set_union_formation(
+    "on_demand", 
+    matching = create_age_gap_matching_model(
+      2, 5,
+      group_exogamy = list(
+        race = c("white:black" = -4, "white:other" = -2, "black:other" = -3),
+        region = NA
+      )
+    )
+  )
+```
+
+This will allow for exogamy rates between each of the three racial groups, while no exogamy will be allowed between regions. It is also possible to create cross-group exogamy patterns. To do so, users need to input a data.frame instead of a named vector where the name of the group with `_x` and `_y` suffixes identify the partners (these must be gender symmetric).
+
+Transition rate schedules will now apply to specific groups with the `group` argument. `'group_origin` and `group_dest` have been replaced with `origin` and `destination`. The transition rates for one group can be stratified by other groups. So, for example, you could stratify educational transitions to be different by region. Here is an example of how you would set a rate schedule for a specific group:
+
+```r
+model |>
+  set_group_transition(educ_trans_rates, group = "education")
+```
+
+This would set the transition rates for the education group.
+
+Additionally, users can set the transition so that it applies to households rather than individual people. To do so, simply specify a `household()` for the household argument, like:
+
+```r
+model |>
+  set_group_transition(migration_rates, group = "region", household = household())
+```
+
+Households are defined by the partner of the ego person as well as dependent children. Children follow mothers when they are still alive for parents who are not in a union. The age of independence is set as 18 by default but can be controlled by the `age_independence` argument to `household`.
+
+Because transitions are a household feature, only independent people and one member of larger households are tracked for clock timing of transition events. Thus for non-dependents, transition rates should fit to input rates, but they might not fit to input rates under the age of independence.
+
+## Calibrating group weights
+
+Calibrating group weights for the weighted choice approach to group exogamy is more complicated with multiple groups, but we can do it by creating compound groups for all groups with exogamy rates. Notably, the number of compound groups increases multiplicatively with more groups, so adding a lot of groups that all have exogamy levels will lead to longer runtimes. However, if some groups are set to not allow exogamy then this will not affect speed. So, for example, including region as a group but disallowing exogamy between regions as in the code example above will not lead to an increase in runtime due to the need to calibrate group weights, over a model with just race.
+
+### Changes to helpers
+
+Because of the new structure, we have removed all of the `group_prop_hazard` arguments from the rate processes. Instead, we create a `stratify_rates` function that takes an existing rate object and stratifies it by additional variables using proportional hazards. This can be used for any stratification variable of the user's choice, so it allows users to quickly build up a stratified rate schedule from an initial schedule.
+
+We also adjusted the `calculate_*_rates` functions to take a single `by` argument as a character vector rather than the various boolean by_* that were used across different functions. This allows more flexibility in how users can stratify the lexis counts they desire and makes it easy to inlude group columns that have unique names.
+
+## Stratifying Rates
+
+We show some examples here of how you can use `stratify_rates` to stratify rates. In the first example, I will take a fertility schedule from the Human Fertility Database and then statify two groups A and B and by union type for unpartnered/partnered.
+
+```{r}
+#| label: stratify-fert-union-type
+
+fertility_rates <- get_fertility_hfd("USA", 2000)
+
+fertility_rates <- stratify_rates(
+  fertility_rates, 
+  by = list(
+    group = c(A = 1.1, B = 1),
+    # this is not really a great idea for union type as within union
+    # type fertility rates have a totally different age profile, but 
+    # ok for testing purposes
+    union_type = c("unpartnered" = 0.3, "partnered" = 1.3)
+  )
+)
+
+fertility_rates |> calculate_tfr()
+```
+
+This approach will work, but this is not the best use of proportional hazards. We know that the age-specific profile of fertility *within* unions is very different than the overall age-specific fertility profile, so the proportional hazards approach will give us some unusual fertility distributions. A better approach would be to start with pre-stratified fertility rates by union type drawn from real data and then apply proportional hazards by group to that data, as I do in the second example.
+
+
+```{r}
+#| label: stratify-pre-strat-fert-by-group
+
+fertility_rates_by_union_type <- read_csv(
+  here(
+  "validation", "data", "usa_2000_2001", "usa_2000_fertility_by_union_status.csv"
+  )
+) |>
+  rename(union_type = union_status)
+fertility_rates <- stratify_rates(
+  fertility_rates_by_union_type,
+  by = list(group = c(A = 1.1, B = 1))
+)
+fertility_rates |> calculate_tfr()
+```
+
+If we want to relax, the proportional hazards assumption, we could break up the fertility rates by union type, statify with different ratios, and then combine them back together. In the example below, we make the ratio between A and B 1.05 for partnered fertility but 1.2 for unpartnered fertility.
+
+```{r}
+#| label: stratify-fert-non-proportional
+
+fertility_rates <- bind_rows(
+  fertility_rates_by_union_type |>
+    filter(union_type == "partnered") |>
+    stratify_rates(list(group = c(A = 1.05, B = 1))),
+  fertility_rates_by_union_type |>
+    filter(union_type == "unpartnered") |>
+    stratify_rates(list(group = c(A = 1.20, B = 1)))
+)
+fertility_rates |> calculate_tfr()
+```
+
+
+## Race-Region Simulation
+
+To test out the new capabilities, lets create a simulation with three racial groups (W, B, and O) and four regional groups (NE, MW, S, W). We will allow exogamy between racial groups but will not allow exogamy by region (because marriage markets are generally local).
+
+For this simulation, we will use a rate model for union formation and allow fertility vary by union type, but we won't add the complication of cohabitation. We will also stratify all input rats across group dimensions.
+
+### Fertility inputs
+
+We will use 2000 US fertility rates split by partnered status. We will apply proportional hazards by region, but allow the hazards to vary by union type for race.
+
+```{r}
+#| label: set-fertility-rate
+
+fertility_rates_by_union_type <- read_csv(
+  here(
+  "validation", "data", "usa_2000_2001", "usa_2000_fertility_by_union_status.csv"
+  )
+) |>
+  rename(union_type = union_status)
+
+fertility_rates <- bind_rows(
+  fertility_rates_by_union_type |>
+    filter(union_type == "partnered") |>
+    stratify_rates(list(race = c(W = 1, B = 1.05, O = 1.05))),
+  fertility_rates_by_union_type |>
+    filter(union_type == "unpartnered") |>
+    stratify_rates(list(race = c(W = 1, B = 1.2, O = 1.05)))
+) |>
+  stratify_rates(list(region = c(NE = 1, MW = 1.05, S = 1.1, W = 1)))
+```
+
+### Mortality inputs
+
+We use 2000 US mortality rates, truncated at 95. We allow these to vary by region and race slightly
+
+```{r}
+#| label: set-mortality-rates
+
+mortality_rates <- get_mortality_hmd("USA", 2000, open_age = 95)
+
+mortality_rates <- mortality_rates |> stratify_rates(
+  list(race = c(W = 0.97, B =1.07, O = 1), region = c(NE = 1, MW = 1, S = 1.05, W = 0.96))
+)
+```
+
+### Marriage inputs
+
+We will use a single set of marriage rates drawn from the US 2000-2001. I will allow these to vary by race as well, but we will use weight models to accomplish that so that the overall marriage rates are preserved in the simulation 
+
+```{r}
+#| label: set-mar-rates
+
+marriage_rates <- read_csv(
+  here("validation", "data", "usa_2000_2001", "usa_2001_marriage_rates_female.csv")
+)
+```
+
+### Migration inputs
+
+In terms of transition rates, we will not allow any transitions between racial groups, but we will allow transitions between regions which indicates internal migration rates. We use reports from US Census 2000 to construct plausible age-specific migration rates.
+
+```{r}
+#| label: set-migration-rates
+
+migration_rates <- read_csv(here("validation", "data", "usa_2000_2001", "usa_2000_regional_migration.csv"))
+```
+
+### Running the model
+
+For the starter population, I want to start with uneven weights by race-region combination, so I will first set up that joint distribution. Values are loosely modeled on US 2000 racial distributions by race.
+
+```{r}
+#| label: set-region-race-dist
+
+region_race_dist <- tribble(
+  ~race, ~region, ~weight,
+  "W",   "NE",    0.145,
+  "W",   "MW",    0.190,
+  "W",   "S",     0.257,
+  "W",   "W",     0.152,
+  "B",   "NE",    0.022,
+  "B",   "MW",    0.023,
+  "B",   "S",     0.067,
+  "B",   "W",     0.019,
+  "O",   "NE",    0.021,
+  "O",   "MW",    0.014,
+  "O",   "S",     0.030,
+  "O",   "W",     0.060,
+)
+sum(region_race_dist$weight)
+```
+
+Now lets create the starter population by feeding in the weights.
+
+```{r}
+#| label: create-starter-pop
+
+set.seed(42)
+pop_start <- create_baseline_population(100000, groups = region_race_dist)
+```
+
+Now we are ready to set up the model.
+
+```{r}
+#| label: run-simulation
+
+model <- hammel_model() |>
+  set_population(pop_start) |>
+  set_fertility(fertility_rates) |>
+  set_mortality(mortality_rates) |>
+  set_union_formation(
+    "rate", 
+    rates = marriage_rates,
+    matching = create_age_gap_matching_model(
+      2, 5,
+      group_exogamy = list(
+        race = c("W:B" = -4, "W:O" = -2, "B:O" = -3),
+        # marriage markets are local so no cross-region marriages
+        region = NA
+      )
+    ),
+    # make B group have marriage rates 10% lower than other groups
+    weights = create_weight_model(~ race, c(raceB = log(0.9), raceO = 0))
+  ) |>
+  set_groups(
+    # we don't need to set categories here because they are defined from the population
+    race = group(ancestry = TRUE, inheritance = "ancestry"),
+    region = group(inheritance = "mother")
+  ) |>
+  set_group_transition(migration_rates, group = "region", household = household())
+
+runtime <- system.time(pop_end <- simulate(model, 100, 42))
+```
+
+The simulation took `r runtime[["elapsed"]]` seconds to run.
+
+### Analyzing simulation results
+
+```{r}
+#| label: fig-pop-by-race
+#| fig-cap: Share of each racial group in the population over the simulation run time
+
+calculate_population_size(pop_end, seq(0, 100, 5), by = c("race")) |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ggplot(aes(x = time, y = prop, group = race, color = race))+
+  geom_line()+
+  scale_y_continuous(limits = c(0, NA))+
+  labs(x = "year", y = "share of population")
+```
+
+@fig-pop-by-race shows how the racial distribution changed over the simulation. The W group got smaller while the B and O groups increased slightly.
+
+```{r}
+#| label: fig-pop-by-region
+#| fig-cap: Share of each region in the population over the simulation run time
+
+calculate_population_size(pop_end, seq(0, 100, 5), by = c("region")) |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ggplot(aes(x = time, y = prop, group = region, color = region))+
+  geom_line()+
+  labs(x = "year", y = "share of population")
+```
+
+@fig-pop-by-region shows the distribution of population by region over the simulation. The South and Midwest are growing relative to the Northeast and West.
+
+```{r}
+#| label: fig-pop-by-race-region
+#| fig-cap: Share of each race in the population by region over the simulation run time
+
+calculate_population_size(pop_end, seq(0, 100, 5), by = c("race", "region")) |>
+  group_by(time, region) |>
+  mutate(prop = population / sum(population)) |>
+  ggplot(aes(x = time, y = prop, group = race, color = race))+
+  geom_line()+
+  facet_wrap(~region)+
+  labs(x = "year", y = "share of population")
+```
+
+We can also use the `by` argument to look at more than one group count at a time. In @fig-pop-by-race-region, I use that to look at changing distributions of race within each region. The biggest divergence is in the West where the O group declines as it is distributed more evenly across the other regions over time.
+
+
+```{r}
+#| label: fig-fertility
+#| fig-cap: Age-specific fertility rates estimated from the simulation, by union type, race, and region. Dotted lines show the input rates. 95% confidence band shown.
+
+calculate_fertility_rates(
+  pop_end,
+  time_breaks = c(0, 100),
+  age_breaks = seq(15, 45, 5),
+  by = c("union_type", "race", "region"),
+  conf.level = 0.95
+) |>
+  ggplot(aes(x = age_start, y = rate_fertility, color = union_type))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high, fill = union_type), color = NA, alpha = 0.3)+
+  geom_point(size = 0.5)+
+  geom_line(data = fertility_rates, aes(y = rate), linetype = 2)+
+  facet_grid(region~race)+
+  labs(x = "age", y = "fertility rate", color = "union type")
+```
+
+@fig-fertility compares the output fertility rates by union type, race, and region to the expected input rates. There is a very close match.
+
+```{r}
+#| label: fig-mortality
+#| fig-cap: Age-specific mortality rates estimated from the simulation, by union type, race, and region, for all ages after 49. Dotted lines show the input rates. 95% confidence band shown.
+
+calculate_mortality_rates(
+  pop_end,
+  time_breaks = c(0, 100),
+  age_breaks = 50:95,
+  by = c("race", "region"),
+  conf.level = 0.95
+) |>
+  ggplot(aes(x = age_start, y = rate_mortality, color = sex))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high, fill = sex), color = NA, alpha = 0.3)+
+  geom_point(size = 0.5)+
+  geom_line(data = mortality_rates |> filter(age_start >= 50), aes(y = rate), linetype = 2, linesize = 1.5)+
+  facet_grid(region~race)+
+  scale_y_log10()+
+  labs(x = "age", y = "mortality rate")
+```
+
+Single year of time and age estimated mortality rates can be noisy at young ages due to the low rates, so we only look at mortality after age 49 in @fig-mortality. The empirically estimated rates closely match the expected input rates across sex, race, and region.
+
+```{r}
+#| label: fig-marriage
+#| fig-cap: Age-specific marriage rates estimated from the simulation. Dotted lines show the input rates. 95% confidence band shown.
+
+calculate_marriage_rates(
+  pop_end,
+  time_breaks = c(0, 100),
+  age_breaks = seq(15, 70, 5),
+  conf.level = 0.95
+) |>
+  filter(sex == "f") |>
+  ggplot(aes(x = age_start, y = rate_marriage))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), fill = "grey60", color = NA, alpha = 0.3)+
+  geom_point(size = 0.5)+
+  geom_line(data = marriage_rates, aes(y = rate), linetype = 2)+
+  labs(x = "age", y = "marriage rate")
+```
+
+@fig-marriage shows age-specific marriage rates from the simulation. Because we use a single rate schedule for all races and regions and only modify it by race using weights, the overall marriage rate from the output should match the overall marriage rate from the input, which it does.
+
+```{r}
+#| label: tbl-model-hazard
+#| tbl-cap: Hazaard ratio from piecewise-constant hazard model predicting marriage hazard by group B status.
+
+df_hazard <- calculate_marriage_rates(
+  pop_end,
+  time_breaks = c(25, 100),
+  age_breaks = seq(15, 70, 5),
+  by = "race"
+) |>
+  filter(sex == "f") |>
+  mutate(group_b = race == "B")
+
+model <- glm(marriages ~ factor(age_start) + group_b + offset(log(person_years)), 
+             family = poisson, data = df_hazard)
+
+modelsummary(
+  list("exp(beta)" = model),
+  out = "gt",
+  coef_map = c("group_bTRUE" = "Group B"),
+  statistic = "conf.int",
+  exponentiate = TRUE,
+  gof_map = c("nobs"), 
+  notes = "Note: Model also includes age group dummies. 95% confidence interval shown in brackets."
+)
+```
+
+To test whether the weights are working correctly, I stratify the output marriage rates by race and then run a piecewise-constant hazard model by group B status. The results in @tbl-model-hazard show that the estimate from the model matches closely to the expected value of 0.9 from the input. 
+
+I show that no marriages occurred across regions by tabulating marriages by husband and wife regions.
+
+```{r}
+#| label: crosstab-region
+
+pop_end |>
+  get_detailed_unions() |>
+  count(region_w, region_h)
+```
+
+
+```{r}
+#| label: fig-odds-ratio
+#| fig-cap: Observed log odds ratio of interracial marriage by pairing with 95% confidence interval. Red dot shows expected value from input.
+
+expected <- tibble(
+  pair = c("W:B", "W:O", "B:O"),
+  expected = c(-4, -2, -3) * 2
+)
+
+pop_end |>
+  get_detailed_unions() |>
+  #filter(start_time > 25) |>
+  count(race_w, race_h) |>
+  pivot_wider(names_from = c(race_w, race_h), values_from = n) |>
+  mutate(
+    log_odds_W_B = log(W_B) + log(B_W) - log(W_W) - log(B_B),
+    se_W_B = sqrt(1 / W_B + 1 / B_W + 1 / W_W + 1 / B_B),
+    log_odds_W_O = log(W_O) + log(O_W) - log(W_W) - log(O_O),
+    se_W_O = sqrt(1 / W_O + 1 / O_W + 1 / W_W + 1 / O_O),
+    log_odds_B_O = log(B_O) + log(O_B) - log(B_B) - log(O_O),
+    se_B_O = sqrt(1 / B_O + 1 / O_B + 1 / B_B + 1 / O_O)
+  ) |>
+  select(starts_with("log_odds"), starts_with("se_")) |>
+  pivot_longer(
+    everything(),
+    names_to = c(".value", "pair"),
+    names_pattern = "(log_odds|se)_(.*)"
+  ) |>
+  mutate(pair = str_replace(pair, "_", ":")) |>
+  left_join(expected, by = "pair") |>
+  ggplot(aes(x = pair, y = log_odds))+
+  geom_point()+
+  geom_linerange(aes(ymin = log_odds - 1.96 * se, ymax = log_odds + 1.96 * se))+
+  geom_point(aes(y = expected), color = "red", alpha = 0.7)+
+  coord_flip()+
+  labs(x = "interracial pairing", y = "log-odds")
+```
+
+@fig-odds-ratio shows the observed log odds ratio of an interracial pairing in comparison to that expected from the input rates. They closely align.
+
+```{r}
+#| label: fig-odds-ratio-region
+#| fig-cap: Observed log odds ratio of interracial marriage by pairing and region with 95% confidence interval. Red dot shows expected value from input.
+
+pop_end |>
+  get_detailed_unions() |>
+  #filter(start_time > 25) |>
+  count(region_w, race_w, race_h) |>
+  pivot_wider(names_from = c(race_w, race_h), values_from = n) |>
+  mutate(
+    log_odds_W_B = log(W_B) + log(B_W) - log(W_W) - log(B_B),
+    se_W_B = sqrt(1 / W_B + 1 / B_W + 1 / W_W + 1 / B_B),
+    log_odds_W_O = log(W_O) + log(O_W) - log(W_W) - log(O_O),
+    se_W_O = sqrt(1 / W_O + 1 / O_W + 1 / W_W + 1 / O_O),
+    log_odds_B_O = log(B_O) + log(O_B) - log(B_B) - log(O_O),
+    se_B_O = sqrt(1 / B_O + 1 / O_B + 1 / B_B + 1 / O_O)
+  ) |>
+  select("region_w", starts_with("log_odds"), starts_with("se_")) |>
+  pivot_longer(
+    !starts_with("region"),
+    names_to = c(".value", "pair"),
+    names_pattern = "(log_odds|se)_(.*)"
+  ) |>
+  mutate(pair = str_replace(pair, "_", ":")) |>
+  left_join(expected, by = "pair") |>
+  ggplot(aes(x = pair, y = log_odds,))+
+  geom_point()+
+  geom_linerange(aes(ymin = log_odds - 1.96 * se, ymax = log_odds + 1.96 * se))+
+  geom_point(aes(y = expected), color = "red", alpha = 0.7)+
+  facet_wrap(~region_w)+
+  coord_flip()+
+  labs(x = "interracial pairing", y = "log-odds")
+```
+
+@fig-odds-ratio-region shows the same figure as before but divided by region. Within each region, the fits is very close.
+
+```{r}
+#| label: fig-gender-ratio
+#| fig-cap: Observed gender ratio of interracial marriage by pairing with 95% confidence interval.
+
+pop_end |>
+  get_detailed_unions() |>
+  #filter(start_time > 25) |>
+  count(race_w, race_h) |>
+  pivot_wider(names_from = c(race_w, race_h), values_from = n) |>
+  mutate(
+    ratio_W_B = W_B / B_W,
+    se_log_W_B = sqrt(1 / W_B + 1 / B_W),
+    ratio_W_O = W_O / O_W,
+    se_log_W_O = sqrt(1 / W_O + 1 / O_W),
+    ratio_B_O = B_O / O_B,
+    se_log_B_O = sqrt(1 / B_O + 1 / O_B)
+  ) |>
+  select(starts_with("ratio_"), starts_with("se_log_")) |>
+  pivot_longer(
+    everything(),
+    names_to = c(".value", "pair"),
+    names_pattern = "(ratio|se_log)_(.*)"
+  ) |>
+  mutate(pair = str_replace(pair, "_", ":")) |>
+  ggplot(aes(x = pair, y = ratio))+
+  geom_point()+
+  geom_linerange(aes(ymin = ratio * exp(-1.96 * se_log), ymax = ratio * exp(1.96 * se_log)))+
+  geom_hline(yintercept = 1, linetype = 2)+
+  coord_flip()+
+  labs(x = "interracial pairing", y = "ratio")
+```
+
+@fig-gender-ratio shows the observed gender ratio of each interracial pairing. The expected value is 1 and all three confidence intervals overlap with 1.
+
+```{r}
+#| label: fig-gender-ratio-region
+#| fig-cap: Observed gender ratio of interracial marriage by pairing and region with 95% confidence interval.
+
+pop_end |>
+  get_detailed_unions() |>
+  count(region_w, race_w, race_h) |>
+  pivot_wider(names_from = c(race_w, race_h), values_from = n) |>
+  mutate(
+    ratio_W_B = W_B / B_W,
+    se_log_W_B = sqrt(1 / W_B + 1 / B_W),
+    ratio_W_O = W_O / O_W,
+    se_log_W_O = sqrt(1 / W_O + 1 / O_W),
+    ratio_B_O = B_O / O_B,
+    se_log_B_O = sqrt(1 / B_O + 1 / O_B)
+  ) |>
+  select("region_w", starts_with("ratio_"), starts_with("se_log_")) |>
+  pivot_longer(
+    !starts_with("region"),
+    names_to = c(".value", "pair"),
+    names_pattern = "(ratio|se_log)_(.*)"
+  ) |>
+  mutate(pair = str_replace(pair, "_", ":")) |>
+  ggplot(aes(x = pair, y = ratio, color = region_w))+
+  geom_point(position = position_dodge(0.5))+
+  geom_linerange(aes(ymin = ratio * exp(-1.96 * se_log), ymax = ratio * exp(1.96 * se_log)),
+                 position = position_dodge(0.5))+
+  geom_hline(yintercept = 1, linetype = 2)+
+  coord_flip()+
+  labs(x = "interracial pairing", y = "ratio")
+```
+
+@fig-gender-ratio-region shows the same figure by region. There is a bit more noise here but the fit is generally close.
+
+```{r}
+#| label: fig-migration-rates
+#| fig-cap: Age-specific migration rates by origin and destination region with 95% confidence band. Red dotted line shows input rates.
+
+calculate_transition_rates(
+  pop_end,
+  group = "region",
+  time_breaks = c(0, 100),
+  age_breaks = c(seq(0, 35, 5), seq(45, 85, 10)),
+  conf.level = 0.95
+) |>
+  ggplot(aes(x = age_start, y = rate_transition))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey60")+
+  geom_point(size = 0.5)+
+  geom_line(data = migration_rates, aes(y = rate), linetype = 2, color = "red")+
+  geom_vline(xintercept = 18, linetype = 2)+
+  facet_grid(origin~destination)+
+  labs(x = "age", y = "migration rate")
+```
+
+@fig-migration-rates shows the age-specific migration rates from the simulation in comparison to the input rates. Because dependents travel with their household, not independently, we don't expect the values to match under age 18. Beyond that age range, the values fit closely to the input rates.
+
+## Unit Tests
+
+The following tests have been constructed and are currently all passing.
+
+```{r}
+#| label: test-results
+#| eval: true
+
+test_results <- devtools::test(pkg = here::here(), reporter = "silent")
+test_table <- as.data.frame(test_results)
+knitr::kable(
+  test_table[, c("test", "passed", "failed", "error", "skipped", "warning")]
+)
+```
+## Conclusions and Unresolved Limitations
+
+This milestone meets all expectations. The major remaining limitation is that simulations with a lot of combined group categories can experience substantially longer run times.
+
+## Reproducibility record
+
+```{r}
+#| label: reproducibility
+system2("git", c("-C", shQuote(here::here()), "rev-parse", "HEAD"), stdout = TRUE)
+system2("git", c("-C", shQuote(here::here()), "status", "--short"), stdout = TRUE)
+sessionInfo()
+```

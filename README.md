@@ -15,10 +15,15 @@ group-specific rates, individual group transitions, partner matching, ancestry,
 and newborn identity inheritance. Results expose person, union, and transition
 histories as tibbles.
 
-Milestones 1–6 are complete by user acceptance: mortality/fertility, union
+Milestones 1–8 are complete by user acceptance: mortality/fertility, union
 formation, groups, dissolution/remarriage/cohabitation, parity-specific
-fertility with persistent fertility heterogeneity, and individual group
-transitions (D116). Milestone 7, time-varying inputs, is next. See the [documentation index](design/README.md),
+fertility with persistent fertility heterogeneity, individual group
+transitions, calendar-varying inputs, and cell scheduling with weight models
+(D130). Milestone 9, multiple group dimensions (D134), is in progress: a
+population can declare several dimensions, such as race and region, each with
+its own rates, inheritance, ancestry, transitions and analysis splits, with
+matching group effects in one dimension; joint matching across dimensions
+remains. See the [documentation index](design/README.md),
 [scientific contract](design/scientific-contract.md), and
 [validation record](design/testing.md) for implemented behavior and limitations.
 Future mechanisms are listed in the [roadmap](design/roadmap.md).

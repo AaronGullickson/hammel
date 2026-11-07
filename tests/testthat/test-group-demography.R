@@ -10,13 +10,12 @@ make_group_history <- function() {
     group = c("A", "B", "B", "A", "B", "B"))
   unions <- data.frame(union_id = 1, wife_id = 10, husband_id = 20,
     start_time = 0.25, end_time = 0.75, end_reason = "death_husband")
-  hammel_population(persons, unions, end_time = 1)
+  hammel_population(persons, unions, end_time = 1, groups = if ("group" %in% names(persons)) "group")
 }
 
 test_that("group Lexis counts preserve exact maternal and spouse classification", {
   p <- make_group_history()
-  counts <- collect_demographic_counts(p, c(0, 1), c(0, Inf),
-                                   by_union_type = TRUE, by_group = TRUE)
+  counts <- demographic_counts(p, c(0, 1), c(0, Inf), by = c("union_type", "group"))
   expect_s3_class(counts, "tbl_df")
   expect_identical(unique(counts$group), c("A", "B"))
   a <- subset(counts, group == "A" & sex == "f")
@@ -38,10 +37,10 @@ test_that("group Lexis counts preserve exact maternal and spouse classification"
 test_that("group exposure and events conserve pooled cells across boundaries", {
   p <- make_group_history()
   for (by_union_type in c(FALSE, TRUE)) {
-    counts <- collect_demographic_counts(p, c(0, 0.25, 0.5, 0.75, 1),
-      c(0, 0.5, 20, 20.5, 30, 40, Inf), by_union_type, by_group = TRUE)
-    pooled <- collect_demographic_counts(p, c(0, 0.25, 0.5, 0.75, 1),
-      c(0, 0.5, 20, 20.5, 30, 40, Inf), by_union_type)
+    counts <- demographic_counts(p, c(0, 0.25, 0.5, 0.75, 1),
+      c(0, 0.5, 20, 20.5, 30, 40, Inf), by = c(if (by_union_type) "union_type", "group"))
+    pooled <- demographic_counts(p, c(0, 0.25, 0.5, 0.75, 1),
+      c(0, 0.5, 20, 20.5, 30, 40, Inf), by = if (by_union_type) "union_type")
     a <- subset(counts, group == "A")
     b <- subset(counts, group == "B")
     for (column in intersect(c("person_years", "births", "deaths", "unions"), names(pooled)))
@@ -50,11 +49,11 @@ test_that("group exposure and events conserve pooled cells across boundaries", {
     expect_equal(a$rate_mortality[a$person_years > 0],
                  a$deaths[a$person_years > 0] / a$person_years[a$person_years > 0])
     expect_true(all(is.na(counts$rate_mortality[counts$person_years == 0])))
-    expect_identical(collect_demographic_counts(p, c(0, 0.25, 0.5, 0.75, 1),
-      c(0, 0.5, 20, 20.5, 30, 40, Inf), by_union_type, by_group = FALSE), pooled)
+    expect_identical(demographic_counts(p, c(0, 0.25, 0.5, 0.75, 1),
+      c(0, 0.5, 20, 20.5, 30, 40, Inf), by = if (by_union_type) "union_type"), pooled)
     if (by_union_type) {
-      overall <- collect_demographic_counts(p, c(0, 0.25, 0.5, 0.75, 1),
-        c(0, 0.5, 20, 20.5, 30, 40, Inf), by_group = TRUE)
+      overall <- demographic_counts(p, c(0, 0.25, 0.5, 0.75, 1),
+        c(0, 0.5, 20, 20.5, 30, 40, Inf), by = "group")
       partnered <- subset(counts, union_type == "partnered")
       unpartnered <- subset(counts, union_type == "unpartnered")
       for (column in c("person_years", "births", "deaths"))
@@ -68,28 +67,31 @@ test_that("group exposure and events conserve pooled cells across boundaries", {
 test_that("population sizes preserve time order and count each person's group", {
   p <- make_group_history()
   times <- c(1, 0, 0.5, 0.75, 0.5)
-  sizes <- calculate_population_size(p, times, by_group = TRUE)
+  sizes <- calculate_population_size(p, times, by = "group")
   expect_s3_class(sizes, "tbl_df")
-  expect_identical(sizes$time, rep(times, each = 2))
-  expect_identical(sizes$group, rep(c("A", "B"), length(times)))
+  # Time varies fastest, then group.
+  expect_identical(sizes$time, rep(times, 2))
+  expect_identical(sizes$group, rep(c("A", "B"), each = length(times)))
   expect_equal(subset(sizes, group == "A")$population, c(2, 1, 1, 2, 1))
   expect_equal(subset(sizes, group == "B")$population, c(1, 3, 3, 2, 3))
   pooled <- calculate_population_size(p, times)
-  expect_equal(rowSums(matrix(sizes$population, ncol = 2, byrow = TRUE)), pooled$population)
-  expect_identical(calculate_population_size(p$persons, times, TRUE), sizes)
-  expect_identical(calculate_population_size(p, times, FALSE), pooled)
+  expect_equal(rowSums(matrix(sizes$population, ncol = 2)), pooled$population)
+  # A bare persons table has no declaration, so it cannot be split by group.
+  expect_error(calculate_population_size(p$persons, times, by = "group"), "declared group")
+  expect_identical(calculate_population_size(p, times), pooled)
 })
 
 test_that("numeric group types persist and bare histories keep maternal links", {
   p <- make_group_history()
   p$persons$group <- ifelse(p$persons$group == "A", 20L, 10L)
-  counts <- collect_demographic_counts(p$persons, c(0, 1), c(0, Inf), by_group = TRUE)
+  p$groups <- list(group = group())
+  counts <- demographic_counts(p, c(0, 1), c(0, Inf), by = "group")
   expect_type(counts$group, "integer")
   expect_identical(unique(counts$group), c(20L, 10L))
   expect_equal(subset(counts, group == 20L & sex == "f")$births, 2)
-  sizes <- calculate_population_size(p, c(0, 1), TRUE)
+  sizes <- calculate_population_size(p, c(0, 1), by = "group")
   expect_type(sizes$group, "integer")
-  expect_identical(sizes$group, c(20L, 10L, 20L, 10L))
+  expect_identical(sizes$group, c(20L, 20L, 10L, 10L))
 })
 
 test_that("TFR separates groups jointly with periods and union statuses", {
@@ -148,8 +150,7 @@ test_that("group life tables follow analytical constant-hazard survival", {
 })
 
 test_that("Lexis group identifiers flow through derived measures", {
-  counts <- collect_demographic_counts(make_group_history(), c(0, 1), c(0, 20, 40, Inf),
-                                   by_union_type = TRUE, by_group = TRUE)
+  counts <- demographic_counts(make_group_history(), c(0, 1), c(0, 20, 40, Inf), by = c("union_type", "group"))
   tfr <- calculate_tfr(counts)
   expect_equal(nrow(tfr), 4)
   expect_identical(unique(tfr$group), c("A", "B"))
@@ -161,15 +162,16 @@ test_that("Lexis group identifiers flow through derived measures", {
 
 test_that("group observations validate flags and required group data", {
   p <- make_group_history()
-  for (bad in list(NULL, NA, 1, "yes", c(TRUE, FALSE), matrix(TRUE))) {
-    expect_error(collect_demographic_counts(p, c(0, 1), c(0, Inf), by_group = bad), "by_group")
-    expect_error(calculate_population_size(p, 0, by_group = bad), "by_group")
+  for (bad in list(NA, 1, "yes", c("group", "group"), TRUE, matrix("group"))) {
+    expect_error(demographic_counts(p, c(0, 1), c(0, Inf), by = bad), "by")
+    expect_error(calculate_population_size(p, 0, by = bad), "by")
   }
   p$persons$group <- NULL
-  expect_error(collect_demographic_counts(p, c(0, 1), c(0, Inf), by_group = TRUE), "group.*column")
-  expect_error(calculate_population_size(p, 0, by_group = TRUE), "group.*column")
-  expect_error(calculate_population_size(make_group_history(), 2, TRUE), "endpoint")
-  expect_error(collect_demographic_counts(make_group_history(), c(0, 2), c(0, Inf), by_group = TRUE), "endpoint")
+  p$groups <- NULL
+  expect_error(demographic_counts(p, c(0, 1), c(0, Inf), by = "group"), "declared group")
+  expect_error(calculate_population_size(p, 0, by = "group"), "declared group")
+  expect_error(calculate_population_size(make_group_history(), 2, by = "group"), "endpoint")
+  expect_error(demographic_counts(make_group_history(), c(0, 2), c(0, Inf), by = "group"), "endpoint")
   rates <- data.frame(group = NA_character_, age_start = 0, age_end = Inf, rate = 0.1)
   expect_error(calculate_life_table(rates), "group")
   rates$age_end <- 5
@@ -178,17 +180,17 @@ test_that("group observations validate flags and required group data", {
 
 test_that("group observations return typed empty outputs", {
   p <- make_group_history()
-  empty_times <- calculate_population_size(p, numeric(), by_group = TRUE)
+  empty_times <- calculate_population_size(p, numeric(), by = "group")
   expect_s3_class(empty_times, "tbl_df")
   expect_equal(nrow(empty_times), 0)
   p$persons <- p$persons[FALSE, ]
   p$ancestry <- p$ancestry[FALSE, ]
   p$unions <- p$unions[FALSE, ]
-  sizes <- calculate_population_size(p, c(0, 1), TRUE)
+  sizes <- calculate_population_size(p, c(0, 1), by = "group")
   expect_equal(nrow(sizes), 0)
   expect_type(sizes$group, "character")
   for (by_union_type in c(FALSE, TRUE)) {
-    counts <- collect_demographic_counts(p, c(0, 1), c(0, Inf), by_union_type, TRUE)
+    counts <- demographic_counts(p, c(0, 1), c(0, Inf), by = c(if (by_union_type) "union_type", "group"))
     expect_s3_class(counts, "tbl_df")
     expect_equal(nrow(counts), 0)
     expect_type(counts$group, "character")
@@ -203,9 +205,9 @@ test_that("group observations return typed empty outputs", {
 test_that("groups with no survivors retain zero cells and boundary deaths", {
   p <- make_group_history()
   p$persons$death_time[p$persons$group == "B"] <- 0.75
-  sizes <- calculate_population_size(p, c(0.75, 1), TRUE)
+  sizes <- calculate_population_size(p, c(0.75, 1), by = "group")
   expect_equal(subset(sizes, group == "B")$population, c(0L, 0L))
-  counts <- collect_demographic_counts(p, c(0.75, 1), c(0, Inf), by_group = TRUE)
+  counts <- demographic_counts(p, c(0.75, 1), c(0, Inf), by = "group")
   b <- subset(counts, group == "B")
   expect_equal(b$person_years, c(0, 0))
   expect_equal(sum(b$deaths), 4)

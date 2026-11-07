@@ -7,7 +7,7 @@ grouped by country and period:
 | --- | --- |
 | [england_wales_1992_onward](england_wales_1992_onward/README.md) | Partnership, fertility and divorce evidence for the second-transition demonstration |
 | [england_wales_2015_2019](england_wales_2015_2019/england_wales_2015_rates.README.md) | Earlier fertility-by-marital-status example, marriage rates for 2015/2019 and their archived ONS sources |
-| [usa_2000_2001](usa_2000_2001/usa_2000_rates.README.md) | Fertility in 2000, marriage transitions/rates in 2001, original sources and preparation script |
+| [usa_2000_2001](usa_2000_2001/usa_2000_rates.README.md) | Fertility in 2000, marriage transitions/rates in 2001, original sources and preparation script; ballpark [regional migration rates](usa_2000_2001/usa_2000_regional_migration.README.md) by age, around 2000 |
 | [usa_1980_2019](usa_1980_2019/usa_1980_2019_marital_rates.README.md) | Early/recent first-marriage, remarriage and divorce schedules, plus the pooled 2018 marriage schedule |
 | [niger_2012](niger_2012) | WPP 2024 age-specific fertility estimates for Niger in 2012, with source metadata |
 
