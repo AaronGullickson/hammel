@@ -11,14 +11,15 @@ set_mortality(model, rates, weights = NULL)
 }
 \arguments{
 \item{rates}{A nonempty data frame containing numeric \code{age_start}, \code{age_end},
-and \code{rate}, and character \code{sex} values \code{"m"} and \code{"f"}, with both represented.
-Starts must be finite and nonnegative; ends must exceed starts and may be
-\code{Inf} for upper-open bands. Rates must be finite and nonnegative, per
-person-year. Use \code{\link[=stratify_rates]{stratify_rates()}} to add proportional group differences.}
+and \code{rate}, and character \code{sex} values \code{"m"} and \code{"f"}, with both
+represented. Starts must be finite and nonnegative; ends must exceed starts
+and may be \code{Inf} for upper-open bands. Rates must be finite and
+nonnegative, per person-year. Use \code{\link[=stratify_rates]{stratify_rates()}} to add proportional
+group differences.}
 
 \item{weights}{NULL (default) for unweighted selection within rate cells, or
-a \code{\link[=weight_model]{weight_model()}} specification. Weights choose which member of a
-cell experiences an event without changing the cell's input rate.}
+a \code{\link[=weight_model]{weight_model()}} specification. Weights choose which member of a cell
+experiences an event without changing the cell's input rate.}
 
 \item{model}{A \code{hammel_model} object, used by \code{set_mortality()}.}
 }
@@ -28,25 +29,25 @@ cell experiences an event without changing the cell's input rate.}
 and \code{weights}. \code{set_mortality()} returns an updated \code{hammel_model}.
 }
 \description{
-\code{mortality()} constructs a process specification without running a simulation.
-\code{set_mortality()} constructs the same specification and attaches it to a
-model, equivalent to \code{set_process(model, mortality(rates, weights))}.
+\code{mortality()} constructs a process specification without running a
+simulation. \code{set_mortality()} constructs the same specification and attaches
+it to a model, equivalent to \code{set_process(model, mortality(rates, weights))}.
 The input model is not modified and neither function runs a simulation.
 }
 \details{
 Rates are piecewise constant annual hazards over half-open age intervals.
 Supply separate schedules for both sexes. Overlapping intervals are rejected;
 adjacent intervals are allowed. Gaps and uncovered ages are not filled or
-interpreted as zero rates. Simulation requires coverage of [0, Inf).
-Input order and custom columns are preserved, rate tables become tibbles,
-and a \code{source} attribute on the input is copied into the process.
+interpreted as zero rates. Simulation requires coverage of [0, Inf). Input
+order and custom columns are preserved, rate tables become tibbles, and a
+\code{source} attribute on the input is copied into the process.
 
 Columns named by declared group dimensions (see \code{\link[=set_groups]{set_groups()}}), such as
 \code{race} or \code{region}, supply separate schedules for each combination of their
 categories. Dimensions without a column share the schedule. Each stratum
 needs both sexes; overlap is checked within strata. Simulation requires
-schedules for every combination of categories of the dimensions a table
-uses. A table using an undeclared persons column is an error.
+schedules for every combination of categories of the dimensions a table uses.
+A table using an undeclared persons column is an error.
 }
 \section{Calendar rates}{
 
@@ -59,8 +60,10 @@ changes precede same-time events and preserve recorded histories.
 }
 
 \examples{
-rates <- data.frame(sex = c("m", "f"), age_start = 0,
-  age_end = Inf, rate = c(0.01, 0.008))
+rates <- data.frame(
+  sex = c("m", "f"), age_start = 0,
+  age_end = Inf, rate = c(0.01, 0.008)
+)
 process <- mortality(rates)
 model <- hammel_model() |> set_process(process)
 # Equivalent convenience setter:

@@ -14,10 +14,11 @@
 #'
 #' Returns the closest common ancestors by minimum sum of the two distances
 #' within the requested bounds. Equally close ancestors have separate rows;
-#' count distinct relative IDs when counting people. Does not assign relationship
-#' categories or infer full versus half kin from missing links. The ego itself
-#' is excluded. Includes deceased and living people in recorded history, without
-#' automatic filtering to a census date or living kin. Ancestry cycles are errors.
+#' count distinct relative IDs when counting people. Does not assign
+#' relationship categories or infer full versus half kin from missing links. The
+#' ego itself is excluded. Includes deceased and living people in recorded
+#' history, without automatic filtering to a census date or living kin. Ancestry
+#' cycles are errors.
 #'
 #' @param population A `hammel_population` or a persons data frame, including
 #'   deceased persons and recorded parent IDs. No known endpoint is required.
@@ -36,12 +37,19 @@
 #'   tied ancestor IDs are sorted.
 #' @export
 #' @examples
-#' persons <- data.frame(person_id = c(10, 20, 30), sex = c("f", "m", "f"),
+#' persons <- data.frame(
+#'   person_id = c(10, 20, 30), sex = c("f", "m", "f"),
 #'   birth_time = c(-50, -50, -20), death_time = NA_real_,
-#'   mother_id = c(NA, NA, 10), father_id = c(NA, NA, 20))
+#'   mother_id = c(NA, NA, 10), father_id = c(NA, NA, 20)
+#' )
 #' population <- hammel_population(persons, end_time = 0)
 #' extract_kin(population, ego_ids = 30)
-extract_kin <- function(population, ego_ids, generations = 2, relative_ids = NULL) {
+extract_kin <- function(
+  population,
+  ego_ids,
+  generations = 2,
+  relative_ids = NULL
+) {
   if (is.data.frame(population)) population <- hammel_population(population)
   validate_population(population)
   validate_kinship_generations(generations, "generations")
@@ -51,20 +59,34 @@ extract_kin <- function(population, ego_ids, generations = 2, relative_ids = NUL
     values <- get(name)
     check_numeric_column(values, name, id = TRUE)
     if (anyDuplicated(values) || any(!values %in% ids)) {
-      stop(sprintf("`%s` must contain unique IDs present in the population.", name), call. = FALSE)
+      stop(sprintf(
+        "`%s` must contain unique IDs present in the population.",
+        name
+      ), call. = FALSE)
     }
   }
-  tibble::as_tibble(extract_kin_cpp(population$persons, ego_ids, relative_ids,
-                                   as.integer(generations)))
+  tibble::as_tibble(extract_kin_cpp(
+    population$persons, ego_ids, relative_ids,
+    as.integer(generations)
+  ))
 }
 
 # HELPER FUNCTIONS ---------------------------------------------------------
 
-validate_kinship_generations <- function(generations, name = "kinship_generations") {
+validate_kinship_generations <- function(
+  generations,
+  name = "kinship_generations"
+) {
   if (!is.numeric(generations) || length(generations) != 1L ||
-      !is.null(dim(generations)) || !is.finite(generations) || generations < 0 ||
-      generations != floor(generations) || generations > .Machine$integer.max) {
-    stop(sprintf("`%s` must be a nonnegative whole number within integer range.", name), call. = FALSE)
+    !is.null(dim(generations)) || !is.finite(generations) || generations <
+    0 ||
+    generations != floor(generations) || generations > .Machine$integer.max) {
+    stop(
+      sprintf(
+        "`%s` must be a nonnegative whole number within integer range.", name
+      ),
+      call. = FALSE
+    )
   }
   invisible(generations)
 }

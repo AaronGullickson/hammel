@@ -12,38 +12,40 @@ age_gap_matching_model(
 )
 }
 \arguments{
-\item{preferred_age_gap}{Finite numeric scalar in years; negative values allowed.}
+\item{preferred_age_gap}{Finite numeric scalar in years; negative values
+allowed.}
 
 \item{half_weight_distance}{Finite positive numeric scalar in years from the
 preferred gap at which selection weight halves.}
 
-\item{group_exogamy}{Optional group-pair effects and prohibitions passed
-to \code{\link[=matching_model]{matching_model()}}.}
+\item{group_exogamy}{Optional group-pair effects and prohibitions passed to
+\code{\link[=matching_model]{matching_model()}}.}
 
 \item{delta}{Optional male-target adjustments, as a named list keyed by
-dimension or a bare value for the only declared dimension: a finite
-numeric vector with unique category names.
-Multiply mirrored male targets by \code{exp(delta)}
-and normalize. Omitted groups have zero adjustment. Positive values raise
-the male target relative to baseline and other groups; negative values
-lower it. Only differences matter. Does not set pair-specific ratios or
-change female search rates. Names must be categories of the dimension
-(including declared future categories).}
+dimension or a bare value for the only declared dimension: a finite numeric
+vector with unique category names. Multiply mirrored male targets by
+\code{exp(delta)} and normalize. Omitted groups have zero adjustment. Positive
+values raise the male target relative to baseline and other groups;
+negative values lower it. Only differences matter. Does not set
+pair-specific ratios or change female search rates. Names must be
+categories of the dimension (including declared future categories).}
 }
 \value{
-A \code{hammel_matching_model} with linear and quadratic age-difference terms.
+A \code{hammel_matching_model} with linear and quadratic age-difference
+terms.
 }
 \description{
 Convert a preferred age gap and a symmetric half-weight distance into a
-formula and coefficients for \code{\link[=matching_model]{matching_model()}}. Age difference is
-male age minus female age. Candidates at the preferred gap plus or minus
+formula and coefficients for \code{\link[=matching_model]{matching_model()}}. Age difference is male age
+minus female age. Candidates at the preferred gap plus or minus
 \code{half_weight_distance} receive half the selection weight of a candidate at
 the preferred gap. Availability and eligibility also affect realized gaps.
 }
 \details{
-The quadratic coefficient is \code{-log(2) / half_weight_distance^2} and the linear
-coefficient is \code{-2 * preferred_age_gap * quadratic}. This specifies relative
-selection weights, not a halving of utility or a realized standard deviation.
+The quadratic coefficient is \code{-log(2) / half_weight_distance^2} and the
+linear coefficient is \code{-2 * preferred_age_gap * quadratic}. This specifies
+relative selection weights, not a halving of utility or a realized standard
+deviation.
 }
 \examples{
 # Illustrative preferences, not demographic defaults.

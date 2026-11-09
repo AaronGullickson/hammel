@@ -26,12 +26,12 @@ fathers, entirely unknown ancestry, and missing hierarchy ranks.}
 \code{child_ancestry}, \code{child_sex} (\code{"f"}/\code{"m"}), and \code{parents_in_union}
 (logical union status at birth, including on-demand formation). Nonmarital
 births and unknown fathers give FALSE. Older callbacks without this new
-argument or \code{...} remain supported. Use \code{...} for unused inputs.
-Ancestry vectors (the dimension's own shares, when it tracks ancestry)
-are named by category and \code{unknown}. A missing father has
-NA group and NULL ancestry. Return exactly one nonmissing identity in the
-possible group set. Ordinary R random draws are supported; functions must
-not mutate simulation/global state. Invalid returns and errors fail.}
+argument or \code{...} remain supported. Use \code{...} for unused inputs. Ancestry
+vectors (the dimension's own shares, when it tracks ancestry) are named by
+category and \code{unknown}. A missing father has NA group and NULL ancestry.
+Return exactly one nonmissing identity in the possible group set. Ordinary
+R random draws are supported; functions must not mutate simulation/global
+state. Invalid returns and errors fail.}
 
 \item{order}{For \code{"hierarchy"}, unique group labels, highest-ranked first.
 Choose between parental identities, not ancestry. Complex orders use \code{fun}.}
@@ -40,23 +40,23 @@ Choose between parental identities, not ancestry. Complex orders use \code{fun}.
 order for a birth. Defaults to zero. Equal parental identities and missing
 ranks/parents retain maternal assignment without a passing draw.}
 
-\item{fixed_value}{For \code{"fixed"}, one category label or finite numeric code in
-the dimension's categories. Every newborn receives this category, regardless
-of parents or sex, without an identity random draw or R callback.}
+\item{fixed_value}{For \code{"fixed"}, one category label or finite numeric code
+in the dimension's categories. Every newborn receives this category,
+regardless of parents or sex, without an identity random draw or R
+callback.}
 }
 \value{
 An inspectable \code{hammel_group_inheritance} object.
 }
 \description{
 Assign one group independently of genealogical ancestry shares. Attach this
-object to a dimension with \code{\link[=group]{group()}}. The default selects either
-parent with equal probability, with maternal fallback.
-Existing people are not reassigned, and ancestry is unchanged by assignment.
-\code{\link[=group]{group()}} also accepts a schedule tibble with \code{time_start}, \code{time_end}, and a
-\code{model} list column containing complete inheritance objects. Half-open
-absolute-year intervals select the model at birth. A custom rule must return
-one of the dimension's categories; declare categories that may only appear
-later in \code{\link[=group]{group()}}.
+object to a dimension with \code{\link[=group]{group()}}. The default selects either parent with
+equal probability, with maternal fallback. Existing people are not
+reassigned, and ancestry is unchanged by assignment. \code{\link[=group]{group()}} also accepts a
+schedule tibble with \code{time_start}, \code{time_end}, and a \code{model} list column
+containing complete inheritance objects. Half-open absolute-year intervals
+select the model at birth. A custom rule must return one of the dimension's
+categories; declare categories that may only appear later in \code{\link[=group]{group()}}.
 }
 \examples{
 group_inheritance("fixed", fixed_value = "none")
@@ -64,6 +64,8 @@ group_inheritance("mother")
 group_inheritance("hierarchy", order = c("A", "B"), passing = 0.05)
 group_inheritance("custom",
   fun = function(mother_group, father_group, ...) {
-    if (is.na(father_group) || mother_group == father_group) mother_group else "mixed"
-  })
+    if (is.na(father_group) ||
+      mother_group == father_group) mother_group else "mixed"
+  }
+)
 }

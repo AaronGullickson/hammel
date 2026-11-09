@@ -3219,3 +3219,12 @@ Keep `create_baseline_population()` unchanged. Verbs remain appropriate for pipe
 **Decision:** Rename Hammel's `conf.level` argument to `conf_level` on all seven observed event-rate calculators and their internal helpers. Update tests, generated help, diagnostics, and current specifications. Keep the external `stats::poisson.test(conf.level = conf_level)` call intact. This is a direct pre-release argument rename without an alias for the former spelling; default output, interval calculation, column names, and exports are unchanged. This supersedes the argument spelling in D124, not its statistical contract.
 
 **Review:** Check the public API and hand-maintained R code against tidyverse naming, function-writing, and syntax conventions, retaining the user's noun constructors, purpose comments, and uppercase section headings. Record the scope, findings, and limits in [R source organization](r-source-organization.md). Broader formatting and unrelated API changes are not part of the confidence-argument rename. User-owned articles and historical validation evidence remain intact.
+
+
+## D149 — Eighty-column R source convention (November 9, 2026)
+
+**Status:** User instruction and implementation authorization, November 9, 2026.
+
+**Decision:** Wrap hand-maintained `R/` source to at most 80 characters per line, including comments and roxygen documentation, and follow this convention in future R code. For long function signatures use one argument per line with a two-space indent. Wrap long calls and expressions at syntax boundaries; preserve explanatory comments, public-first sectioning, documentation content, names, defaults, and demographic behavior. Generated wrappers and user-owned articles/README/historical validation evidence remain untouched. Markdown prose need not be hard-wrapped.
+
+Long diagnostic literals may use `paste0()` of literal pieces so their complete text is unchanged. Small braced branches are permitted where needed to lay out long conditional expressions. Verify the parsed expressions modulo constant string concatenation and single-expression conditional braces, compare generated help content and example expressions, and run the offline suite. The tooling may use a temporary formatting library/cache without adding a package dependency. Other control-flow style findings from D148 remain separate work.

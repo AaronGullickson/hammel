@@ -20,21 +20,20 @@ get_mortality_hmd(
 years. For grouped HMD periods, supply their starting years. All requested
 years must exist in the product; duplicates are rejected.}
 
-\item{username}{Database username. Defaults to the \code{HMD_USERNAME}
-environment variable.}
+\item{username}{Database username. Defaults to the \code{HMD_USERNAME} environment
+variable.}
 
-\item{password}{Database password. Defaults to the \code{HMD_PASSWORD}
-environment variable.}
+\item{password}{Database password. Defaults to the \code{HMD_PASSWORD} environment
+variable.}
 
 \item{shape}{Native HMD age-by-period shape: \code{"1x1"} (default), \code{"1x5"},
 \code{"1x10"}, \code{"5x1"}, \code{"5x5"}, or \code{"5x10"}. This selects \verb{Mx_<shape>};
 \code{open_age} can separately pool the final age band.}
 
 \item{open_age}{Optional nonnegative whole age at a native age-band start.
-Default NULL keeps the source age layout. Otherwise retain rates below
-this age and pool \verb{Deaths_<shape>} and \verb{Exposures_<shape>} into one
-\verb{[open_age, Inf)} rate for each sex and source period: total deaths divided
-by total person-years. This requires two additional product downloads.
+Default NULL keeps the source age layout. Otherwise retain rates below this
+age and pool \verb{Deaths_<shape>} and \verb{Exposures_<shape>} into one \verb{[open_age, Inf)} rate for each sex and source period: total deaths divided by total
+person-years. This requires two additional product downloads.
 Counts/exposures must be finite and nonnegative with positive pooled
 exposure; individual zero-exposure cells may contribute zero. No missing
 counts/exposures are imputed. Cutoffs must align with source bands (0, 1,
@@ -55,10 +54,11 @@ and exposure into a final open age band, permitting missing Mx in that tail.
 }
 \details{
 A single requested year returns a static schedule without calendar columns.
-Multiple years return \code{time_start}/\code{time_end} for the selected source periods,
-in chronological order. For grouped-time shapes, \code{year} selects period starts:
-for example, 2000 selects the source interval 2000-2004 in a five-year product.
-Nonconsecutive requests retain calendar gaps; no rates are carried forward.
+Multiple years return \code{time_start}/\code{time_end} for the selected source
+periods, in chronological order. For grouped-time shapes, \code{year} selects
+period starts: for example, 2000 selects the source interval 2000-2004 in a
+five-year product. Nonconsecutive requests retain calendar gaps; no rates are
+carried forward.
 
 Native five-year ages are 0, 1-4, 5-9, etc.; returned bands are [0,1), [1,5),
 [5,10), etc. Upper-open ages end at Inf. Source period ends are inclusive and
@@ -74,7 +74,9 @@ rates <- get_mortality_hmd("USA", year = 2000)
 saveRDS(rates, "rates.rds")
 model <- hammel_model() |> set_mortality(readRDS("rates.rds"))
 history <- get_mortality_hmd("SWE", year = 1891:2000, open_age = 95)
-grouped <- get_mortality_hmd("SWE", year = seq(1900, 1995, 5),
-  shape = "5x5", open_age = 95)
+grouped <- get_mortality_hmd("SWE",
+  year = seq(1900, 1995, 5),
+  shape = "5x5", open_age = 95
+)
 }
 }

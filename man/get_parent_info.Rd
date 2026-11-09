@@ -11,25 +11,24 @@ get_parent_info(population)
 \code{\link[=simulate]{simulate()}}.}
 }
 \value{
-A separate tibble containing all person columns plus \code{age_mother}
-and \code{age_father}, measured at that person's birth, and for each declared
-group dimension \verb{<group>_mother} and \verb{<group>_father} (such as
-\code{race_mother}). Empty populations retain the
-enriched column types.
+A separate tibble containing all person columns plus \code{age_mother} and
+\code{age_father}, measured at that person's birth, and for each declared group
+dimension \verb{<group>_mother} and \verb{<group>_father} (such as \code{race_mother}).
+Empty populations retain the enriched column types.
 }
 \description{
 Match mothers and fathers by person ID and append their ages at each child's
-birth and their optional recorded groups. All persons, including founders
-and deceased persons, retain their original row order and columns. The input
+birth and their optional recorded groups. All persons, including founders and
+deceased persons, retain their original row order and columns. The input
 population is not modified and no known endpoint is required.
 }
 \details{
 Ages are in continuous years: the child's birth time minus the parent's birth
 time. Unknown parents yield missing ages and groups. Each declared group
 dimension adds the parents' recorded categories, with their type preserved;
-undeclared columns are not added. These
-are recorded identities, not reconstructions of historical group transitions.
-Existing columns that conflict with the added fields cause an error.
+undeclared columns are not added. These are recorded identities, not
+reconstructions of historical group transitions. Existing columns that
+conflict with the added fields cause an error.
 }
 \examples{
 population <- create_baseline_population(10)

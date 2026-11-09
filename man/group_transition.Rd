@@ -16,37 +16,35 @@ set_group_transition(
 )
 }
 \arguments{
-\item{rates}{A nonempty data frame requiring \code{origin}, \code{destination},
-\code{rate}, and either \code{age_start}/\code{age_end} or \code{dur_start}/\code{dur_end} throughout.
+\item{rates}{A nonempty data frame requiring \code{origin}, \code{destination}, \code{rate},
+and either \code{age_start}/\code{age_end} or \code{dur_start}/\code{dur_end} throughout.
 \code{origin} and \code{destination} are categories of the transition's dimension.
 Half-open bands use years; rates are finite nonnegative hazards per
 person-year. Ends may be \code{Inf}. Bands cannot overlap within a stratum.
 Self-transitions are invalid. Optional \code{sex} is m/f. Optional \code{union_type}
 is unpartnered/partnered or unpartnered/cohab/marriage. Columns named by
 other declared group dimensions give separate schedules by those
-categories; the transition's own dimension cannot be such a column.
-Omitted columns apply universally. Destinations may initially be empty;
-other configured group-specific processes must cover all possible
-categories. Optional \code{time_start}/\code{time_end} specify half-open absolute
-calendar-year bands, including fractional years. Every active slice must
-be valid and the table must cover the requested run. Rate changes do not
-reset duration.}
+categories; the transition's own dimension cannot be such a column. Omitted
+columns apply universally. Destinations may initially be empty; other
+configured group-specific processes must cover all possible categories.
+Optional \code{time_start}/\code{time_end} specify half-open absolute calendar-year
+bands, including fractional years. Every active slice must be valid and the
+table must cover the requested run. Rate changes do not reset duration.}
 
 \item{group}{The name of the declared group dimension (see \code{\link[=set_groups]{set_groups()}})
-whose categories change. \code{NULL} (default) means the model's only
-dimension, and is an error when several are declared.}
+whose categories change. \code{NULL} (default) means the model's only dimension,
+and is an error when several are declared.}
 
-\item{weights}{NULL (default) for unweighted selection, or a
-\code{\link[=weight_model]{weight_model()}} using person variables and \code{destination}, which
-chooses who in a cell moves without changing the cell's input rate.}
+\item{weights}{NULL (default) for unweighted selection, or a \code{\link[=weight_model]{weight_model()}}
+using person variables and \code{destination}, which chooses who in a cell moves
+without changing the cell's input rate.}
 
 \item{household}{\code{NULL} (default): each person moves individually. A
-\code{\link[=household]{household()}}: a move carries the mover's household (D140). One clock
-per household: a woman in a union carries it, while her partner and
-dependents have none; everyone else has their own. When a carrier moves,
-their partner and the dependents attached to either of them move to the
-same destination, from wherever they are (members already there stay).
-Requires age bands.}
+\code{\link[=household]{household()}}: a move carries the mover's household (D140). One clock per
+household: a woman in a union carries it, while her partner and dependents
+have none; everyone else has their own. When a carrier moves, their partner
+and the dependents attached to either of them move to the same destination,
+from wherever they are (members already there stay). Requires age bands.}
 
 \item{model}{A \code{hammel_model}.}
 }
@@ -69,8 +67,8 @@ transition histories and resume durations from them.
 \details{
 Each dimension has its own transition process: calling
 \code{set_group_transition()} again for the same dimension replaces it, and other
-dimensions' processes are kept. Transitions at the same instant in
-different dimensions follow the declaration order of \code{\link[=set_groups]{set_groups()}}.
+dimensions' processes are kept. Transitions at the same instant in different
+dimensions follow the declaration order of \code{\link[=set_groups]{set_groups()}}.
 
 \code{group_transition()} creates the process specification;
 \code{set_group_transition()} creates it and attaches it to a model through

@@ -13,21 +13,21 @@ set_union_dissolution(model, rates, weights = NULL)
 \item{rates}{A nonempty data frame with numeric \code{dur_start}, \code{dur_end}, and
 \code{rate}. Bands are half-open \verb{[dur_start, dur_end)} in years. Starts and
 rates must be finite and nonnegative; ends must exceed starts and may be
-\code{Inf}. Bands cannot overlap within a stratum. Gaps and
-durations outside support have zero hazard. Sex, age and union-status columns
-are not supported. Input order, custom columns and provenance are retained.
-Optional \verb{<group>_w} and \verb{<group>_h} columns (for a declared group dimension
-such as \code{race}: \code{race_w}, \code{race_h}) select the wife's and husband's
-categories; strata are directional, so A-wife/B-husband and B-wife/A-husband
-are separate. Stratified tables must cover every combination of the
-dimension's categories. Optional \code{union_type} supplies both \code{cohab} and
-\code{marriage} schedules within each stratum; without it the same duration risk
-applies to either type. Use \code{\link[=stratify_rates]{stratify_rates()}} to add proportional
-differences, for example by listing both directions of a pair.}
+\code{Inf}. Bands cannot overlap within a stratum. Gaps and durations outside
+support have zero hazard. Sex, age and union-status columns are not
+supported. Input order, custom columns and provenance are retained.
+Optional \verb{<group>_w} and \verb{<group>_h} columns (for a declared group
+dimension such as \code{race}: \code{race_w}, \code{race_h}) select the wife's and
+husband's categories; strata are directional, so A-wife/B-husband and
+B-wife/A-husband are separate. Stratified tables must cover every
+combination of the dimension's categories. Optional \code{union_type} supplies
+both \code{cohab} and \code{marriage} schedules within each stratum; without it the
+same duration risk applies to either type. Use \code{\link[=stratify_rates]{stratify_rates()}} to add
+proportional differences, for example by listing both directions of a pair.}
 
-\item{weights}{NULL (default) for unweighted selection, or a
-\code{\link[=weight_model]{weight_model()}} using union variables, which chooses which union
-in a cell dissolves without changing the cell's input rate.}
+\item{weights}{NULL (default) for unweighted selection, or a \code{\link[=weight_model]{weight_model()}}
+using union variables, which chooses which union in a cell dissolves
+without changing the cell's input rate.}
 
 \item{model}{A \code{hammel_model} object.}
 }
@@ -38,26 +38,26 @@ in a cell dissolves without changing the cell's input rate.}
 }
 \description{
 Construct or attach an optional dissolution process. One continuous hazard
-applies per union, using years since the union
-began, independently of either partner's age. Rates are per partnered
-woman-year (equivalently union-year), not annual probabilities. Omitting
-this process retains death-only union endings.
+applies per union, using years since the union began, independently of either
+partner's age. Rates are per partnered woman-year (equivalently union-year),
+not annual probabilities. Omitting this process retains death-only union
+endings.
 }
 \details{
 Births do not affect a union's dissolution risk. Exact ties select death,
 then birth, then dissolution; a tied birth occurs while partnered.
 Dissolution ends the episode, restores both partners' availability, and moves
 the woman to her unpartnered fertility and search risks, retaining birth
-spacing. Optional age-specific search schedules by
-previous union are specified through \code{\link[=union_formation]{union_formation()}}.
-Restarts resume at attained union duration rather than reset duration.
+spacing. Optional age-specific search schedules by previous union are
+specified through \code{\link[=union_formation]{union_formation()}}. Restarts resume at attained union
+duration rather than reset duration.
 }
 \section{Calendar rates}{
 
-Optional \code{time_start}/\code{time_end} select half-open absolute calendar-year bands,
-including fractional years. Active slices retain the existing strata rules
-and must cover the requested run. Changes precede same-time events without
-resetting the union-duration origin. Other arguments remain static.
+Optional \code{time_start}/\code{time_end} select half-open absolute calendar-year
+bands, including fractional years. Active slices retain the existing strata
+rules and must cover the requested run. Changes precede same-time events
+without resetting the union-duration origin. Other arguments remain static.
 
 \code{union_dissolution()} creates the process specification;
 \code{set_union_dissolution()} creates it and attaches it to a model through
@@ -66,7 +66,9 @@ resetting the union-duration origin. Other arguments remain static.
 
 \examples{
 # Illustrative rates, not demographic defaults.
-rates <- data.frame(dur_start = c(0, 5), dur_end = c(5, Inf),
-                    rate = c(0.04, 0.02))
+rates <- data.frame(
+  dur_start = c(0, 5), dur_end = c(5, Inf),
+  rate = c(0.04, 0.02)
+)
 model <- hammel_model() |> set_union_dissolution(rates)
 }

@@ -4,25 +4,24 @@
 
 #' Create a Hammel population
 #'
-#' Collect person and union histories in an inspectable population object.
-#' This constructor does not run a simulation. It validates
-#' consistent tables against the population schema. Custom columns are retained.
-#' A declared group dimension (see `groups` and [set_groups()]) is a persons
-#' column of nonmissing character labels or finite numeric codes (character
-#' labels must be nonempty). Newborns are assigned by its [group()]
-#' inheritance rule. Undeclared columns, including one named `group`, are
-#' ordinary custom columns.
+#' Collect person and union histories in an inspectable population object. This
+#' constructor does not run a simulation. It validates consistent tables against
+#' the population schema. Custom columns are retained. A declared group
+#' dimension (see `groups` and [set_groups()]) is a persons column of nonmissing
+#' character labels or finite numeric codes (character labels must be nonempty).
+#' Newborns are assigned by its [group()] inheritance rule. Undeclared columns,
+#' including one named `group`, are ordinary custom columns.
 #'
 #' @param persons A data frame with one row per person, including deceased
 #'   persons. Columns are preserved and the table is returned as a tibble.
-#' @param unions A data frame with one row per union episode, or `NULL`
-#'   for no unions. `wife_id` references the female partner and `husband_id`
-#'   the male partner; these roles do not imply legal marriage. An empty data
-#'   frame is normalized to the union schema. Optional `union_type` is cohab or
-#'   marriage. A conversion closes cohab with `end_reason = "conversion"` and
-#'   links the same-time marriage through `previous_cohab_id`.
-#' @param end_time Optional finite simulation endpoint in years. Its calendar origin is supplied by the user. `NULL` means
-#'   that the endpoint is unknown.
+#' @param unions A data frame with one row per union episode, or `NULL` for no
+#'   unions. `wife_id` references the female partner and `husband_id` the male
+#'   partner; these roles do not imply legal marriage. An empty data frame is
+#'   normalized to the union schema. Optional `union_type` is cohab or marriage.
+#'   A conversion closes cohab with `end_reason = "conversion"` and links the
+#'   same-time marriage through `previous_cohab_id`.
+#' @param end_time Optional finite simulation endpoint in years. Its calendar
+#'   origin is supplied by the user. `NULL` means that the endpoint is unknown.
 #' @param groups Optional group declaration: a character vector of dimension
 #'   names (each with [group()] defaults) or a named list of [group()] objects.
 #'   Persons columns that are not declared are ordinary custom columns. Models
@@ -36,34 +35,46 @@
 #'   even when empty, with character `group`, `origin` and `destination`.
 #' @param ancestry Optional ancestry shares for dimensions declared with
 #'   `group(ancestry = TRUE)`: a named list with one data frame per such
-#'   dimension (a bare data frame when only one dimension tracks ancestry),
-#'   each with exactly one row per person, keyed by `person_id`, one column of
-#'   shares per category (named by the category) and an `unknown` share. Shares
-#'   must be finite, between zero and one, and sum to one per row (tolerance
-#'   `1e-8`). Supplied shares are preserved, with rows aligned to persons.
-#'   Without them, people start with all their ancestry in their recorded
-#'   category. Newborns average parental shares; a missing parent contributes
-#'   its half to `unknown`. Identity remains separate. Categories of a tracked
-#'   dimension cannot be named `unknown` or `person_id`.
+#'   dimension (a bare data frame when only one dimension tracks ancestry), each
+#'   with exactly one row per person, keyed by `person_id`, one column of shares
+#'   per category (named by the category) and an `unknown` share. Shares must be
+#'   finite, between zero and one, and sum to one per row (tolerance `1e-8`).
+#'   Supplied shares are preserved, with rows aligned to persons. Without them,
+#'   people start with all their ancestry in their recorded category. Newborns
+#'   average parental shares; a missing parent contributes its half to
+#'   `unknown`. Identity remains separate. Categories of a tracked dimension
+#'   cannot be named `unknown` or `person_id`.
 #'
 #' @return A named list of class `hammel_population` with components `persons`,
 #'   `unions`, and `end_time`, plus an `ancestry` tibble when supplied or when
-#'   persons has groups, and a `transitions` tibble when groups are present. Ancestry is retained across restarts and deaths.
+#'   persons has groups, and a `transitions` tibble when groups are present.
+#'   Ancestry is retained across restarts and deaths.
 #' @export
 #'
 #' @examples
 #' sim <- hammel_population(
-#'   persons = data.frame(person_id = 1:2, sex = c("m", "f"),
+#'   persons = data.frame(
+#'     person_id = 1:2, sex = c("m", "f"),
 #'     birth_time = c(-25, -23), death_time = NA_real_,
-#'     mother_id = NA_integer_, father_id = NA_integer_),
+#'     mother_id = NA_integer_, father_id = NA_integer_
+#'   ),
 #'   end_time = 0
 #' )
 #' sim$persons
 #' sim$unions
-hammel_population <- function(persons, unions = NULL, end_time = NULL, ancestry = NULL,
-                              transitions = NULL, groups = NULL) {
+hammel_population <- function(
+  persons,
+  unions = NULL,
+  end_time = NULL,
+  ancestry = NULL,
+  transitions = NULL,
+  groups = NULL
+) {
   results <- structure(
-    list(persons = persons, unions = normalize_unions(unions), end_time = end_time),
+    list(
+      persons = persons, unions = normalize_unions(unions),
+      end_time = end_time
+    ),
     class = "hammel_population"
   )
   results$groups <- normalize_group_declaration(groups)
@@ -81,31 +92,41 @@ hammel_population <- function(persons, unions = NULL, end_time = NULL, ancestry 
 
 #' Validate a Hammel population
 #'
-#' Check the population structure, population schemas, IDs, relationship references,
-#' and date consistency. This function does not normalize or change the object.
-#' Invalid objects raise an error; valid objects are returned invisibly.
+#' Check the population structure, population schemas, IDs, relationship
+#' references, and date consistency. This function does not normalize or change
+#' the object. Invalid objects raise an error; valid objects are returned
+#' invisibly.
 #'
 #' @param results A `hammel_population` object.
 #' @return The supplied object, invisibly and unchanged.
 #' @export
 #' @examples
-#' persons <- data.frame(person_id = 1L, sex = "f", birth_time = -20,
-#'   death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
+#' persons <- data.frame(
+#'   person_id = 1L, sex = "f", birth_time = -20,
+#'   death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_
+#' )
 #' results <- hammel_population(persons, end_time = 0)
 #' validate_population(results)
 validate_population <- function(results) {
   if (!inherits(results, "hammel_population") || !is.list(results) ||
-      anyDuplicated(names(results)) ||
-      !all(c("persons", "unions", "end_time") %in% names(results))) {
-    stop("`results` must be a hammel_population object with persons, unions, and end_time components.",
-         call. = FALSE)
+    anyDuplicated(names(results)) ||
+    !all(c("persons", "unions", "end_time") %in% names(results))) {
+    stop(
+      paste0(
+        "`results` must be a hammel_population object with ",
+        "persons, unions, and end_time components."
+      ),
+      call. = FALSE
+    )
   }
   persons <- results$persons
   unions <- results$unions
   time <- results$end_time
   check_time(time, "end_time")
-  check_columns(persons, c("person_id", "sex", "birth_time", "death_time",
-                          "mother_id", "father_id"), "persons")
+  check_columns(persons, c(
+    "person_id", "sex", "birth_time", "death_time",
+    "mother_id", "father_id"
+  ), "persons")
   validate_group_declaration(results$groups, results)
   validate_transition_history(results)
   check_columns(unions, names(empty_unions()), "unions")
@@ -114,22 +135,34 @@ validate_population <- function(results) {
     stop("`persons$person_id` must be unique.", call. = FALSE)
   }
   if (!is.character(persons$sex) || !is.null(dim(persons$sex)) ||
-      anyNA(persons$sex) || any(!persons$sex %in% c("m", "f"))) {
-    stop('`persons$sex` must contain "m" (male) or "f" (female).', call. = FALSE)
+    anyNA(persons$sex) || any(!persons$sex %in% c("m", "f"))) {
+    stop('`persons$sex` must contain "m" (male) or "f" (female).',
+      call. =
+        FALSE
+    )
   }
   for (field in c("birth_time", "death_time")) {
     check_numeric_column(persons[[field]], paste0("persons$", field),
-                         missing = field == "death_time")
+      missing = field == "death_time"
+    )
   }
   if (any(persons$death_time < persons$birth_time, na.rm = TRUE)) {
     stop("Death times must not precede birth times.", call. = FALSE)
   }
   for (field in c("mother_id", "father_id")) {
     x <- persons[[field]]
-    check_numeric_column(x, paste0("persons$", field), missing = TRUE, id = TRUE)
+    check_numeric_column(x, paste0("persons$", field),
+      missing = TRUE,
+      id = TRUE
+    )
     if (any(!is.na(x) & (!x %in% persons$person_id | x == persons$person_id))) {
-      stop(sprintf("`persons$%s` must refer to another person or be NA.", field),
-           call. = FALSE)
+      stop(
+        sprintf(
+          "`persons$%s` must refer to another person or be NA.",
+          field
+        ),
+        call. = FALSE
+      )
     }
   }
   for (field in c("union_id", "wife_id", "husband_id")) {
@@ -139,15 +172,20 @@ validate_population <- function(results) {
     stop("`unions$union_id` must be unique.", call. = FALSE)
   }
   if (any(!unions$wife_id %in% persons$person_id |
-          !unions$husband_id %in% persons$person_id |
-          unions$wife_id == unions$husband_id)) {
+    !unions$husband_id %in% persons$person_id |
+    unions$wife_id == unions$husband_id)) {
     stop("Union partners must refer to two distinct persons.", call. = FALSE)
   }
   wife_sex <- persons$sex[match(unions$wife_id, persons$person_id)]
   husband_sex <- persons$sex[match(unions$husband_id, persons$person_id)]
   if (any(wife_sex != "f" | husband_sex != "m")) {
-    stop('`wife_id` must reference a female person and `husband_id` a male person.',
-         call. = FALSE)
+    stop(
+      paste0(
+        "`wife_id` must reference a female person and ",
+        "`husband_id` a male person."
+      ),
+      call. = FALSE
+    )
   }
   check_numeric_column(unions$start_time, "unions$start_time")
   check_numeric_column(unions$end_time, "unions$end_time", missing = TRUE)
@@ -156,25 +194,49 @@ validate_population <- function(results) {
   }
   reason <- unions$end_reason
   if (!is.character(reason) || !is.null(dim(reason)) ||
-      any(!is.na(reason) & !reason %in% c("death_husband", "death_wife", "dissolution", "conversion")) ||
-      any(is.na(reason) != is.na(unions$end_time))) {
-    stop("`unions$end_reason` must be death_husband, death_wife, dissolution, or conversion for ended unions, and NA for ongoing unions.",
-         call. = FALSE)
+    any(!is.na(reason) & !reason %in% c(
+      "death_husband", "death_wife",
+      "dissolution", "conversion"
+    )) ||
+    any(is.na(reason) != is.na(unions$end_time))) {
+    stop(
+      paste0(
+        "`unions$end_reason` must be death_husband, ",
+        "death_wife, dissolution, or conversion for ended ",
+        "unions, and NA for ongoing unions."
+      ),
+      call. = FALSE
+    )
   }
   validate_union_types(unions)
-  if (any(reason == "conversion", na.rm = TRUE) && !"union_type" %in% names(unions))
-    stop("Conversion records require union_type and conversion links.", call. = FALSE)
+  if (any(reason == "conversion", na.rm = TRUE) && !"union_type" %in% names(
+    unions
+  ))
+    stop("Conversion records require union_type and conversion links.",
+      call. =
+        FALSE
+    )
   for (partner in c("wife_id", "husband_id")) {
     born <- persons$birth_time[match(unions[[partner]], persons$person_id)]
     if (any(unions$start_time < born)) {
-      stop("Unions must not start before either partner's birth.", call. = FALSE)
+      stop("Unions must not start before either partner's birth.",
+        call. =
+          FALSE
+      )
     }
   }
   if (!is.null(time) &&
-      any(c(persons$birth_time, persons$death_time, unions$start_time,
-            unions$end_time) > time, na.rm = TRUE)) {
-    stop("Recorded events must not occur after the population's reference time.",
-         call. = FALSE)
+    any(c(
+      persons$birth_time, persons$death_time, unions$start_time,
+      unions$end_time
+    ) > time, na.rm = TRUE)) {
+    stop(
+      paste0(
+        "Recorded events must not occur after the population's ",
+        "reference time."
+      ),
+      call. = FALSE
+    )
   }
   validate_ancestry(results[["ancestry"]], persons, results$groups)
   invisible(results)
@@ -184,7 +246,7 @@ validate_population <- function(results) {
 
 normalize_unions <- function(unions) {
   if (is.null(unions) ||
-      (is.data.frame(unions) && nrow(unions) == 0L && ncol(unions) == 0L)) {
+    (is.data.frame(unions) && nrow(unions) == 0L && ncol(unions) == 0L)) {
     return(empty_unions())
   }
   unions
@@ -200,22 +262,39 @@ empty_unions <- function() {
 validate_union_types <- function(unions) {
   if (!"union_type" %in% names(unions)) return(invisible(unions))
   x <- unions$union_type
-  if (!is.character(x) || !is.null(dim(x)) || anyNA(x) || any(!x %in% c("cohab", "marriage")))
-    stop("`unions$union_type` must contain 'cohab' or 'marriage'.", call. = FALSE)
+  if (!is.character(x) || !is.null(dim(x)) || anyNA(x) || any(!x %in% c(
+    "cohab",
+    "marriage"
+  )))
+    stop("`unions$union_type` must contain 'cohab' or 'marriage'.",
+      call. =
+        FALSE
+    )
   if (!"previous_cohab_id" %in% names(unions)) {
     if (any(unions$end_reason == "conversion", na.rm = TRUE))
-      stop("Conversion histories require `previous_cohab_id` links.", call. = FALSE)
+      stop("Conversion histories require `previous_cohab_id` links.",
+        call. =
+          FALSE
+      )
     return(invisible(unions))
   }
   links <- unions$previous_cohab_id
   check_numeric_column(links, "previous_cohab_id", missing = TRUE, id = TRUE)
   rows <- which(!is.na(links)); parent <- match(links[rows], unions$union_id)
-  if (anyNA(parent) || anyDuplicated(parent) || any(unions$union_type[rows] != "marriage") ||
-      any(unions$union_type[parent] != "cohab") ||
-      any(is.na(unions$end_reason[parent]) | unions$end_reason[parent] != "conversion") ||
-      any(is.na(unions$end_time[parent]) | unions$end_time[parent] != unions$start_time[rows]) ||
-      any(unions$wife_id[parent] != unions$wife_id[rows] | unions$husband_id[parent] != unions$husband_id[rows]) ||
-      any(!which(unions$end_reason == "conversion") %in% parent))
-    stop("Conversions require unique same-partner cohab-to-marriage links at the same time.", call. = FALSE)
+  if (anyNA(parent) || anyDuplicated(parent) || any(unions$union_type[rows] !=
+    "marriage") ||
+    any(unions$union_type[parent] != "cohab") ||
+    any(is.na(unions$end_reason[parent]) | unions$end_reason[parent] !=
+      "conversion") ||
+    any(is.na(unions$end_time[parent]) | unions$end_time[parent] !=
+      unions$start_time[rows]) ||
+    any(unions$wife_id[parent] != unions$wife_id[rows] | unions$husband_id[
+      parent
+    ] != unions$husband_id[rows]) ||
+    any(!which(unions$end_reason == "conversion") %in% parent))
+    stop(paste0(
+      "Conversions require unique same-partner ",
+      "cohab-to-marriage links at the same time."
+    ), call. = FALSE)
   invisible(unions)
 }

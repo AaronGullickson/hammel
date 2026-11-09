@@ -5,8 +5,8 @@
 #' Set a demographic process specification
 #'
 #' Store a process specification under its name, replacing an existing process
-#' with the same name. Other processes are retained. Built-in rate schedules
-#' are validated again when attached. No simulation is executed.
+#' with the same name. Other processes are retained. Built-in rate schedules are
+#' validated again when attached. No simulation is executed.
 #'
 #' Use this function to attach an already-created process. The convenience
 #' setters [set_mortality()], [set_fertility()], [set_union_formation()],
@@ -20,8 +20,10 @@
 #'   [union_dissolution()], [group_transition()]
 #' @export
 #' @examples
-#' mortality_rates <- data.frame(sex = c("m", "f"), age_start = 0,
-#'   age_end = Inf, rate = c(0.01, 0.008))
+#' mortality_rates <- data.frame(
+#'   sex = c("m", "f"), age_start = 0,
+#'   age_end = Inf, rate = c(0.01, 0.008)
+#' )
 #' process <- mortality(mortality_rates)
 #' model <- hammel_model() |> set_process(process)
 #' model$processes
@@ -42,7 +44,7 @@ attach_process <- function(model, process) {
   }
   name <- process$name
   if (!is.character(name) || length(name) != 1L || is.na(name) ||
-      !nzchar(trimws(name))) {
+    !nzchar(trimws(name))) {
     stop("`name` must be a single nonempty string.", call. = FALSE)
   }
   if (name %in% c("mortality", "fertility")) {
@@ -59,8 +61,10 @@ attach_process <- function(model, process) {
       # Specifications saved while midpoint compensation existed (before D101
       # became the only method) may carry a spacing_method field.
       if (identical(process$spacing_method, "midpoint"))
-        warning(paste('`spacing_method = "midpoint"` is no longer available;',
-                      "cell-accounted fertility is used."), call. = FALSE)
+        warning(paste(
+          '`spacing_method = "midpoint"` is no longer available;',
+          "cell-accounted fertility is used."
+        ), call. = FALSE)
       process$spacing_method <- NULL
     }
     process$rates <- tibble::as_tibble(process$rates)
@@ -69,7 +73,9 @@ attach_process <- function(model, process) {
     validate_union_formation(process)
     validate_process_weights(process$weights_conversion, "union")
     validate_process_weights(process$weights, "person")
-    if (!is.null(process$rates)) process$rates <- tibble::as_tibble(process$rates)
+    if (!is.null(process$rates)) process$rates <- tibble::as_tibble(
+      process$rates
+    )
     for (field in c("matching", "father_matching", "cohab_matching"))
       process[field] <- list(normalize_model_argument(process[[field]]))
   }
@@ -89,8 +95,12 @@ attach_process <- function(model, process) {
 }
 
 new_rate_process <- function(name, rates) {
-  fields <- list(name = name, rates = tibble::as_tibble(rates), rate_unit = "person_year")
+  fields <- list(
+    name = name, rates = tibble::as_tibble(rates),
+    rate_unit = "person_year"
+  )
   if (!is.null(attr(rates, "source"))) fields$source <- attr(rates, "source")
   structure(fields,
-            class = c(paste0("hammel_", name), "hammel_process"))
+    class = c(paste0("hammel_", name), "hammel_process")
+  )
 }

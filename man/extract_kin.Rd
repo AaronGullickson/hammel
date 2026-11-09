@@ -40,15 +40,18 @@ Great-grandparents and first cousins once removed require depth three.
 \details{
 Returns the closest common ancestors by minimum sum of the two distances
 within the requested bounds. Equally close ancestors have separate rows;
-count distinct relative IDs when counting people. Does not assign relationship
-categories or infer full versus half kin from missing links. The ego itself
-is excluded. Includes deceased and living people in recorded history, without
-automatic filtering to a census date or living kin. Ancestry cycles are errors.
+count distinct relative IDs when counting people. Does not assign
+relationship categories or infer full versus half kin from missing links. The
+ego itself is excluded. Includes deceased and living people in recorded
+history, without automatic filtering to a census date or living kin. Ancestry
+cycles are errors.
 }
 \examples{
-persons <- data.frame(person_id = c(10, 20, 30), sex = c("f", "m", "f"),
+persons <- data.frame(
+  person_id = c(10, 20, 30), sex = c("f", "m", "f"),
   birth_time = c(-50, -50, -20), death_time = NA_real_,
-  mother_id = c(NA, NA, 10), father_id = c(NA, NA, 20))
+  mother_id = c(NA, NA, 10), father_id = c(NA, NA, 20)
+)
 population <- hammel_population(persons, end_time = 0)
 extract_kin(population, ego_ids = 30)
 }

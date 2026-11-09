@@ -45,6 +45,11 @@ be made autonomously; record choices with substantial architectural consequences
   `age_gap_matching_model()`, `weight_model()`, and `group_inheritance()`.
   Prefer verbs for pipeable actions such as `set_population()`. Keep
   `create_baseline_population()` as the explicitly retained exception.
+- Keep hand-maintained `R/` source lines at most 80 characters, including
+  comments and roxygen documentation. Follow the same limit for new or edited
+  R code elsewhere. Wrap long calls and use one argument per line with a
+  two-space indent for long function signatures. Split long diagnostic strings
+  without changing their text. Leave generated wrappers untouched.
 - Use snake_case for package-owned function and argument names (for example,
   `conf_level`). Preserve external APIs when calling them, such as
   `stats::poisson.test(conf.level = conf_level)`. Follow tidyverse function-writing

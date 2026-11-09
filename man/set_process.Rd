@@ -16,8 +16,8 @@ An updated \code{hammel_model}. The input model is not modified.
 }
 \description{
 Store a process specification under its name, replacing an existing process
-with the same name. Other processes are retained. Built-in rate schedules
-are validated again when attached. No simulation is executed.
+with the same name. Other processes are retained. Built-in rate schedules are
+validated again when attached. No simulation is executed.
 }
 \details{
 Use this function to attach an already-created process. The convenience
@@ -26,8 +26,10 @@ setters \code{\link[=set_mortality]{set_mortality()}}, \code{\link[=set_fertilit
 the corresponding process in one call.
 }
 \examples{
-mortality_rates <- data.frame(sex = c("m", "f"), age_start = 0,
-  age_end = Inf, rate = c(0.01, 0.008))
+mortality_rates <- data.frame(
+  sex = c("m", "f"), age_start = 0,
+  age_end = Inf, rate = c(0.01, 0.008)
+)
 process <- mortality(mortality_rates)
 model <- hammel_model() |> set_process(process)
 model$processes

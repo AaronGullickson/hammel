@@ -5,6 +5,27 @@ D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the u
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## Eighty-column R source formatting (November 9, 2026)
+
+D149 wraps all 33 hand-maintained `R/` files to at most 80 characters per line, including comments and roxygen text. Generated `RcppExports.R` is byte-identical to the preceding version. Long top-level function signatures use one argument per line with a two-space indent; long messages use literal-only `paste0()` pieces without changing the resulting message. Styler 1.11.0 and its formatting dependencies were installed only into a temporary `/tmp` library/cache; package dependencies are unchanged.
+
+Before/after parsing confirmed equivalent expressions after folding literal-only `paste0()` calls and normalizing single-expression conditional braces. Explanatory non-roxygen comments were preserved, allowing whitespace reflow. All regenerated help pages passed Rd validation and retained identical non-whitespace content, while examples parsed identically. Zero- and three-year before/after simulations produced identical complete outputs and RNG states. Exports are unchanged.
+
+The full offline `devtools::test()` run passed 6,496 expectations with zero failures in 109.6 seconds. The live database test was skipped; one existing environment warning concerned HMDHFDplus/lubridate's `timedatectl` access to the system bus. Final whitespace refinements were rechecked by parsing and by the complete source-width scan. `git diff --check` passed. User-owned README/vignettes, historical validation evidence, and native sources were untouched.
+
+To check the width convention without an additional package:
+
+```r
+files <- setdiff(
+  list.files("R", pattern = "[.]R$", full.names = TRUE),
+  "R/RcppExports.R"
+)
+for (file in files) {
+  lines <- readLines(file)
+  stopifnot(all(nchar(lines, type = "width") <= 80L))
+}
+```
+
 ## Snake-case confidence argument and style review (November 9, 2026)
 
 D148 changes the seven rate calculators and three internal confidence/entry helpers to `conf_level`. The external `stats::poisson.test()` call and the independent test reference keep the required `conf.level` spelling. Regenerated help passed Rd validation and documents `conf_level` rather than the former public argument. Exports are unchanged.

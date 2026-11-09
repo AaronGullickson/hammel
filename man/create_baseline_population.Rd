@@ -20,8 +20,8 @@ create_baseline_population(
 \item{end_time}{Reference time in years, finite. Birth times are this value
 minus the sampled ages. Defaults to a relative time origin of zero.}
 
-\item{female_probability}{Probability of assigning sex "f" (female).
-The other sex value is "m" (male). This does not enforce exact proportions.}
+\item{female_probability}{Probability of assigning sex "f" (female). The
+other sex value is "m" (male). This does not enforce exact proportions.}
 
 \item{groups}{Optional group dimensions to sample, independently of age and
 sex. Either a named list with one named numeric vector of weights per
@@ -30,20 +30,20 @@ data frame with one column per dimension and a numeric \code{weight} column,
 giving the joint distribution of category combinations. Weights are finite
 and nonnegative with at least one positive value, and are normalized.
 Realized counts are random. The population declares each dimension with
-\code{\link[=group]{group()}} defaults, except that its \code{categories} are those given, in
-order: the weights' names, or each dimension's values in order of first
-appearance in the table's rows. The first is the reference category, and
-zero-weight categories are declared (they start empty). \code{\link[=set_groups]{set_groups()}} can
-replace that declaration; categories it omits are kept. \code{NULL}
-(the default) adds no groups and consumes no extra random draws.}
+\code{\link[=group]{group()}} defaults, except that its \code{categories} are those given, in order:
+the weights' names, or each dimension's values in order of first appearance
+in the table's rows. The first is the reference category, and zero-weight
+categories are declared (they start empty). \code{\link[=set_groups]{set_groups()}} can replace that
+declaration; categories it omits are kept. \code{NULL} (the default) adds no
+groups and consumes no extra random draws.}
 }
 \value{
 A validated \code{hammel_population} object.
 }
 \description{
 Create a starter population with independent uniformly distributed ages,
-randomly assigned sex, unknown parents, and no unions. Everyone is alive
-at the reference time. This is not a stable or stationary population.
+randomly assigned sex, unknown parents, and no unions. Everyone is alive at
+the reference time. This is not a stable or stationary population.
 }
 \details{
 Ages are sampled in continuous years without rounding to simulation steps.

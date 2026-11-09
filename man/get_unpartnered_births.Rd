@@ -12,9 +12,9 @@ histories, such as the result of \code{\link[=simulate]{simulate()}}.}
 }
 \value{
 A separate tibble containing selected person rows and \code{age_mother},
-\code{age_father}, plus \code{group_mother} and \code{group_father} when groups are present.
-Input order, column types and custom person columns are preserved. Empty
-results retain the enriched schema. The population is not modified.
+\code{age_father}, plus \code{group_mother} and \code{group_father} when groups are
+present. Input order, column types and custom person columns are preserved.
+Empty results retain the enriched schema. The population is not modified.
 }
 \description{
 Return births where the mother was outside both cohabitation and marriage,
@@ -29,7 +29,8 @@ coverage is half-open: births at formation are partnered. Births exactly at
 dissolution or conversion retain the ending partnership (birth-first ties).
 Births at death endings are unpartnered unless another episode covers that
 time. Overlapping episodes do not duplicate births. Untyped partnerships are
-treated as partnered too. No time window is imposed and no endpoint is needed.
+treated as partnered too. No time window is imposed and no endpoint is
+needed.
 }
 \examples{
 population <- create_baseline_population(10)

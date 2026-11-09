@@ -34,31 +34,31 @@ rather than falling back to unconditional rates.}
 \value{
 A fertility rate tibble with a \code{source} attribute recording selected
 years and source periods. Multiple years include \code{time_start}/\code{time_end};
-length-one requests omit them. Total-rate tables
-are validated for execution. Parity tables use half-open age/parity bounds;
-unavailable conditional rates are zero-filled.
+length-one requests omit them. Total-rate tables are validated for
+execution. Parity tables use half-open age/parity bounds; unavailable
+conditional rates are zero-filled.
 }
 \description{
 Download total period age-specific fertility rates (\code{asfrRR}) through
-HMDHFDplus and select one year or a vector of years from one download.
-Rates remain births per woman-year. One year gives a static schedule without
+HMDHFDplus and select one year or a vector of years from one download. Rates
+remain births per woman-year. One year gives a static schedule without
 calendar columns; multiple years give chronological \code{time_start}/\code{time_end}
-bands [year, year + 1). Nonconsecutive years retain gaps. Birth-order-specific
-columns are not used by default. Missing total rates are rejected. These HFD
-products use their native annual, single-age layout; HMD-style \code{shape}
-options are not available.
-With \code{by_parity = TRUE}, request conditional age/parity rates (\code{mi}) instead:
-first births map to parity [0,1), through fifth-or-higher births at [4,Inf).
-Missing conditional cells are replaced with zero; source metadata records
-that policy and the number of replacements across the selected years.
-Parity tables can be supplied to fertility constructors for parity-dependent
-execution. Parity initializes from recorded maternal birth histories.
+bands [year, year + 1). Nonconsecutive years retain gaps.
+Birth-order-specific columns are not used by default. Missing total rates are
+rejected. These HFD products use their native annual, single-age layout;
+HMD-style \code{shape} options are not available. With \code{by_parity = TRUE}, request
+conditional age/parity rates (\code{mi}) instead: first births map to parity
+[0,1), through fifth-or-higher births at [4,Inf). Missing conditional cells
+are replaced with zero; source metadata records that policy and the number of
+replacements across the selected years. Parity tables can be supplied to
+fertility constructors for parity-dependent execution. Parity initializes
+from recorded maternal birth histories.
 }
 \details{
 HFD endpoint rows are retained: \verb{12-} is represented as \verb{[12,13)} using its
-supplied rate, and \verb{55+} as \verb{[55,Inf)}. TFR omits the upper-open band and warns
-if its rate is nonzero. No rates are supplied outside the represented schedule.
-Credentials are never retained in the table.
+supplied rate, and \verb{55+} as \verb{[55,Inf)}. TFR omits the upper-open band and
+warns if its rate is nonzero. No rates are supplied outside the represented
+schedule. Credentials are never retained in the table.
 }
 \examples{
 \dontrun{

@@ -16,8 +16,8 @@
 #'   object cannot be queried beyond its known `end_time`.
 #' @param by `NULL` (default) or a character vector of variables to count
 #'   separately: `"sex"`, declared group dimensions (such as `"race"`),
-#'   `"union_type"` and `"previous_union"`. See
-#'   [calculate_mortality_rates()] for their definitions.
+#'   `"union_type"` and `"previous_union"`. See [calculate_mortality_rates()]
+#'   for their definitions.
 #' @param pool_dissolved Logical, default `FALSE`. With `TRUE` and
 #'   `"previous_union"` in `by`, combine separated and widowed as `"dissolved"`.
 #' @return A tibble with `time`, the `by` columns and `population`. Rows follow
@@ -28,32 +28,54 @@
 #' population <- create_baseline_population(100, end_time = 0)
 #' calculate_population_size(population, times = c(-10, -5, 0))
 #' calculate_population_size(population, times = 0, by = "sex")
-calculate_population_size <- function(population, times, by = NULL, pool_dissolved = FALSE) {
+calculate_population_size <- function(
+  population,
+  times,
+  by = NULL,
+  pool_dissolved = FALSE
+) {
   if (!is.numeric(times) || !is.null(dim(times)) || any(!is.finite(times)))
-    stop("`times` must be a numeric vector of finite times in years.", call. = FALSE)
+    stop("`times` must be a numeric vector of finite times in years.",
+      call. =
+        FALSE
+    )
   alias <- observation_alias(population, by)
   population <- alias$population
   by <- alias$by
-  by <- check_by(by, c("sex", "group", "union_type", "previous_union"), "calculate_population_size", alias$dims)
+  by <- check_by(
+    by, c("sex", "group", "union_type", "previous_union"),
+    "calculate_population_size", alias$dims
+  )
   check_pool_dissolved(pool_dissolved, by)
-  obs <- person_observation(population, by, if (length(times)) max(times) else -Inf)
+  obs <- person_observation(population, by, if (length(times)) max(times) else -
+    Inf)
   previous <- "previous_union" %in% by
   utype <- "union_type" %in% by
   map <- if (pool_dissolved) c(0L, 1L, 1L) else 0:2
   ng <- if (is.null(obs$groups)) 1L else length(obs$groups)
-  options <- list(typed = obs$typed, exclusive = obs$typed || previous,
-    counts_cohab = obs$counts_cohab, sex = "sex" %in% by, group = "group" %in% by,
-    union_type = utype, previous_union = previous, previous_map = map)
-  counts <- person_snapshot_cpp(obs$persons, obs$unions, obs$group_indices, ng,
-    as.numeric(times), options)
-  sizes <- c(t = length(times), a = 1L, sex = if ("sex" %in% by) 2L else 1L, parity = 1L,
+  options <- list(
+    typed = obs$typed, exclusive = obs$typed || previous,
+    counts_cohab = obs$counts_cohab, sex = "sex" %in% by, group = "group" %in%
+      by,
+    union_type = utype, previous_union = previous, previous_map = map
+  )
+  counts <- person_snapshot_cpp(
+    obs$persons, obs$unions, obs$group_indices, ng,
+    as.numeric(times), options
+  )
+  sizes <- c(
+    t = length(times), a = 1L, sex = if ("sex" %in% by) 2L else 1L,
+    parity = 1L,
     group = if ("group" %in% by) ng else 1L,
     union_type = if (utype) length(union_type_labels(obs$typed)) else 1L,
-    previous_union = if (previous) length(unique(map)) else 1L)
+    previous_union = if (previous) length(unique(map)) else 1L
+  )
   strides <- cumprod(c(1, head(sizes, -1)))
   names(strides) <- names(sizes)
-  dims <- c(list(dim_of(data.frame(time = times), stride = 1)),
-    person_by_dims(by, obs, list(strides = strides), pool_dissolved))
+  dims <- c(
+    list(dim_of(data.frame(time = times), stride = 1)),
+    person_by_dims(by, obs, list(strides = strides), pool_dissolved)
+  )
   rows <- build_rows(dims)
   out <- finish_rows(rows[!grepl("^\\.key", names(rows))])
   out$population <- as.integer(counts[rows$.index])

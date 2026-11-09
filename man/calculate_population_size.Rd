@@ -16,8 +16,8 @@ object cannot be queried beyond its known \code{end_time}.}
 
 \item{by}{\code{NULL} (default) or a character vector of variables to count
 separately: \code{"sex"}, declared group dimensions (such as \code{"race"}),
-\code{"union_type"} and \code{"previous_union"}. See
-\code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}} for their definitions.}
+\code{"union_type"} and \code{"previous_union"}. See \code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}
+for their definitions.}
 
 \item{pool_dissolved}{Logical, default \code{FALSE}. With \code{TRUE} and
 \code{"previous_union"} in \code{by}, combine separated and widowed as \code{"dissolved"}.}

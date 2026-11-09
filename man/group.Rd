@@ -11,15 +11,14 @@ set_groups(model, ...)
 }
 \arguments{
 \item{categories}{Optional complete, ordered vector of the dimension's
-categories (character labels or finite numeric codes). \code{NULL} (the
-default) keeps the categories the population already declares (such as
-those of \code{\link[=create_baseline_population]{create_baseline_population()}}); without any, they are inferred
-from the population's values in first-occurrence order, plus transition
-destinations and categories with ancestry shares.
-When given, every value in the population and every transition destination
-must be listed; extra categories may start empty, for example the output of
-a custom inheritance rule. Group-specific rate tables must cover every
-category.}
+categories (character labels or finite numeric codes). \code{NULL} (the default)
+keeps the categories the population already declares (such as those of
+\code{\link[=create_baseline_population]{create_baseline_population()}}); without any, they are inferred from the
+population's values in first-occurrence order, plus transition destinations
+and categories with ancestry shares. When given, every value in the
+population and every transition destination must be listed; extra
+categories may start empty, for example the output of a custom inheritance
+rule. Group-specific rate tables must cover every category.}
 
 \item{ancestry}{Logical, default \code{FALSE}. Track ancestry shares for this
 dimension: the population then has an \code{ancestry} table, newborns average
@@ -27,8 +26,8 @@ their parents' shares, and the \code{"ancestry"} inheritance method becomes
 available.}
 
 \item{inheritance}{How newborns are assigned to a category: a
-\code{\link[=group_inheritance]{group_inheritance()}} object, a method name such as \code{"mother"}, or
-a calendar schedule tibble with \code{time_start}, \code{time_end} and list-column
+\code{\link[=group_inheritance]{group_inheritance()}} object, a method name such as \code{"mother"}, or a
+calendar schedule tibble with \code{time_start}, \code{time_end} and list-column
 \code{model}. The default selects either parent with equal probability, with
 maternal fallback.}
 
@@ -49,23 +48,27 @@ dimension. Neither function runs a simulation.
 }
 \section{Declaring model dimensions}{
 
-Name the persons columns that are group dimensions and give each its
-settings with \code{\link[=group]{group()}}. Groups are always declared: a column that is not
-declared is an ordinary custom column, kept but never used by any process
-or analysis. The declaration replaces any declaration carried by the
-population (for example from \code{\link[=create_baseline_population]{create_baseline_population()}}), except that a
-dimension declared without \code{categories} keeps the population's declared
-categories for it; it may be
-given before or after \code{\link[=set_population]{set_population()}}; it is checked against the
-population when both are present and at simulation. Simulated populations
+Name the persons columns that are group dimensions and give each its settings
+with \code{\link[=group]{group()}}. Groups are always declared: a column that is not declared is
+an ordinary custom column, kept but never used by any process or analysis.
+The declaration replaces any declaration carried by the population (for
+example from \code{\link[=create_baseline_population]{create_baseline_population()}}), except that a dimension
+declared without \code{categories} keeps the population's declared categories for
+it; it may be given before or after \code{\link[=set_population]{set_population()}}; it is checked against
+the population when both are present and at simulation. Simulated populations
 carry it, so analysis and restarts need nothing further.
 }
 
 \examples{
-group(categories = c("A", "B", "AB"), ancestry = TRUE,
-      inheritance = group_inheritance("mother"))
+group(
+  categories = c("A", "B", "AB"), ancestry = TRUE,
+  inheritance = group_inheritance("mother")
+)
 model <- hammel_model() |>
-  set_population(create_baseline_population(100, groups = list(group = c(A = .5, B = .5)))) |>
+  set_population(create_baseline_population(
+    100,
+    groups = list(group = c(A = .5, B = .5))
+  )) |>
   set_groups(group = group(inheritance = "mother"))
 }
 \seealso{

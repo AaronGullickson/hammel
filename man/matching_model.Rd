@@ -13,74 +13,71 @@ and \code{numeric()} coefficients for pair-effects-only matching.}
 
 \item{coefficients}{A finite named numeric vector of utility coefficients.}
 
-\item{group_exogamy}{Optional symmetric pair effects and prohibitions, in
-one of two forms. \strong{List form} (D135): a named list keyed by dimension,
-such as \code{list(race = c("A:B" = -2, "B:C" = NA), region = NA)}; a bare
-value applies to the only declared dimension. Each value is a named vector
-over unordered pairs (\code{"A:B"} applies to female A/male B and female
-B/male A alike): a finite value is an additive log-weight effect and NA
-prohibits the pair; \code{NA} alone prohibits every union between different
-categories of the dimension. Effects from different dimensions add.
-Specify each unordered pair once; reverse duplicates and \code{::} syntax are
-errors. Omitted pairs have no effect. Finite within-category entries
-(\code{"A:A"}) are allowed; within-category prohibitions are errors.
-\strong{Table form} (D139), for cross-dimension effects: a data frame with
-\verb{<group>_x} and \verb{<group>_y} columns for each dimension it uses and
-\code{log_odds}, such as
-\code{data.frame(race_x = "W", region_x = "S", race_y = "B", region_y = "S", log_odds = -5)}.
-Each row is one unordered pair of category combinations, applied in both
-directions; NA prohibits it; unlisted pairs have no effect; a pair may be
-listed once; every row names a category in each of the table's
-dimensions. The table fully specifies the effects: it is not combined
-with the list form. Rows naming absent categories are unused.
+\item{group_exogamy}{Optional symmetric pair effects and prohibitions, in one
+of two forms. \strong{List form} (D135): a named list keyed by dimension, such
+as \code{list(race = c("A:B" = -2, "B:C" = NA), region = NA)}; a bare value
+applies to the only declared dimension. Each value is a named vector over
+unordered pairs (\code{"A:B"} applies to female A/male B and female B/male A
+alike): a finite value is an additive log-weight effect and NA prohibits
+the pair; \code{NA} alone prohibits every union between different categories of
+the dimension. Effects from different dimensions add. Specify each
+unordered pair once; reverse duplicates and \code{::} syntax are errors. Omitted
+pairs have no effect. Finite within-category entries (\code{"A:A"}) are allowed;
+within-category prohibitions are errors. \strong{Table form} (D139), for
+cross-dimension effects: a data frame with \verb{<group>_x} and \verb{<group>_y}
+columns for each dimension it uses and \code{log_odds}, such as
+\code{data.frame(race_x = "W", region_x = "S", race_y = "B", region_y = "S", log_odds = -5)}. Each row is one unordered pair of category combinations,
+applied in both directions; NA prohibits it; unlisted pairs have no effect;
+a pair may be listed once; every row names a category in each of the
+table's dimensions. The table fully specifies the effects: it is not
+combined with the list form. Rows naming absent categories are unused.
 Prohibited men are ineligible, alongside age and kinship exclusions. A
-search fails only when no eligible man exists in the whole pool,
-following existing failed-search and birth cancellation rules.
-Prohibitions override finite preferences and do not end existing unions.
-Both forms are applied natively during partner draws, unlike formula
-group terms, which are evaluated in R.}
+search fails only when no eligible man exists in the whole pool, following
+existing failed-search and birth cancellation rules. Prohibitions override
+finite preferences and do not end existing unions. Both forms are applied
+natively during partner draws, unlike formula group terms, which are
+evaluated in R.}
 
 \item{delta}{Optional male-target adjustments, as a named list keyed by
-dimension or a bare value for the only declared dimension: a finite
-numeric vector with unique category names.
-Multiply mirrored male targets by \code{exp(delta)}
-and normalize. Omitted groups have zero adjustment. Positive values raise
-the male target relative to baseline and other groups; negative values
-lower it. Only differences matter. Does not set pair-specific ratios or
-change female search rates. Names must be categories of the dimension
-(including declared future categories).}
+dimension or a bare value for the only declared dimension: a finite numeric
+vector with unique category names. Multiply mirrored male targets by
+\code{exp(delta)} and normalize. Omitted groups have zero adjustment. Positive
+values raise the male target relative to baseline and other groups;
+negative values lower it. Only differences matter. Does not set
+pair-specific ratios or change female search rates. Names must be
+categories of the dimension (including declared future categories).}
 }
 \value{
-An inspectable \code{hammel_matching_model} list containing \code{formula}
-and \code{coefficients}. This specifies a model; it does not estimate one.
+An inspectable \code{hammel_matching_model} list containing \code{formula} and
+\code{coefficients}. This specifies a model; it does not estimate one.
 }
 \description{
 Define relative partner utilities with an R formula and named coefficients.
-Predictors include \code{age_difference}: male age minus female age,
-in continuous years at the search time. Formula transformations such as
+Predictors include \code{age_difference}: male age minus female age, in continuous
+years at the search time. Formula transformations such as
 \code{I(age_difference^2)} and \code{abs(age_difference)} are supported through
 \code{\link[stats:model.matrix]{stats::model.matrix()}}. An intercept is ignored because it cancels from
-partner-only conditional-logit probabilities. No wait alternative is included.
-Group predictors are named by a declared group dimension (see
+partner-only conditional-logit probabilities. No wait alternative is
+included. Group predictors are named by a declared group dimension (see
 \code{\link[=set_groups]{set_groups()}}): for a dimension \code{race}, \code{female_race} and \code{male_race} are
 factors over its categories with treatment contrasts (the first category is
 the reference), and \code{same_race} is 1 for partners in the same category, 0
 otherwise. Pair effects are added after the formula, including custom
-formulas. Predictors and settings may name several dimensions: the
-engine's matching category is the combination of every dimension any
-matching model of the run names, pair effects from different dimensions
-add, a pair prohibited in any dimension is prohibited, \code{delta} values add,
-and calibration balances male selection within each combination.
-These modify relative candidate weights, not search hazards or eligibility.
+formulas. Predictors and settings may name several dimensions: the engine's
+matching category is the combination of every dimension any matching model of
+the run names, pair effects from different dimensions add, a pair prohibited
+in any dimension is prohibited, \code{delta} values add, and calibration balances
+male selection within each combination. These modify relative candidate
+weights, not search hazards or eligibility.
 }
 \details{
 Coefficient names must match the non-intercept model-matrix columns exactly,
-for example \code{female_raceB}. Names involving group predictors are checked
-when the model meets the group declaration at simulation.
-Supply all coefficients explicitly; no demographic coefficients are defaulted.
-Formula functions must be deterministic and must not mutate simulation state.
-Data-dependent transformations can change with the candidate pool; use fixed
-transformations when coefficients should have a fixed interpretation.
+for example \code{female_raceB}. Names involving group predictors are checked when
+the model meets the group declaration at simulation. Supply all coefficients
+explicitly; no demographic coefficients are defaulted. Formula functions must
+be deterministic and must not mutate simulation state. Data-dependent
+transformations can change with the candidate pool; use fixed transformations
+when coefficients should have a fixed interpretation.
 }
 \examples{
 # Illustrative coefficients, not demographic defaults.

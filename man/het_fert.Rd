@@ -11,12 +11,12 @@ het_fert(cv, alpha)
 fresh weights are one, with no random draw.}
 
 \item{alpha}{Finite scalar in \verb{[0,1]}. Zero gives independent daughters; one
-copies maternal weights exactly. At zero CV the log-space formula gives
-W_d = W_m^alpha for supplied nonunit weights, without random innovation.}
+copies maternal weights exactly. At zero CV the log-space formula gives W_d
+= W_m^alpha for supplied nonunit weights, without random innovation.}
 }
 \value{
-A \code{hammel_het_fert} specification for \code{\link[=set_fertility]{set_fertility()}} or \code{\link[=fertility]{fertility()}}.
-Construction consumes no random draws.
+A \code{hammel_het_fert} specification for \code{\link[=set_fertility]{set_fertility()}} or
+\code{\link[=fertility]{fertility()}}. Construction consumes no random draws.
 }
 \description{
 Weights redistribute births among eligible women within a fertility cell;
