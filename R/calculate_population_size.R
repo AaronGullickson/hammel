@@ -37,24 +37,25 @@ calculate_population_size <- function(
   use_detailed_previous_union = TRUE
 ) {
   if (!is.numeric(times) || !is.null(dim(times)) || any(!is.finite(times))) {
-    stop("`times` must be a numeric vector of finite times in years.",
-      call. =
-        FALSE
+    stop(
+      "`times` must be a numeric vector of finite times in years.",
+      call. =FALSE
     )
   }
   alias <- observation_alias(population, by)
   population <- alias$population
   by <- alias$by
   by <- check_by(
-    by, c("sex", "group", "union_type", "previous_union"),
-    "calculate_population_size", alias$dims
+    by,
+    c("sex", "group", "union_type", "previous_union"),
+    "calculate_population_size",
+    alias$dims
   )
   check_detailed_previous_union(use_detailed_previous_union, by)
   obs <- person_observation(population, by, if (length(times)) {
     max(times)
   } else {
-    -
-      Inf
+    -Inf
   })
   previous <- "previous_union" %in% by
   utype <- "union_type" %in% by
@@ -62,13 +63,15 @@ calculate_population_size <- function(
   ng <- if (is.null(obs$groups)) 1L else length(obs$groups)
   options <- list(
     typed = obs$typed, exclusive = obs$typed || previous,
-    counts_cohab = obs$counts_cohab, sex = "sex" %in% by, group = "group" %in%
-      by,
-    union_type = utype, previous_union = previous, previous_map = map
+    counts_cohab = obs$counts_cohab,
+    sex = "sex" %in% by,
+    group = "group" %in% by,
+    union_type = utype,
+    previous_union = previous,
+    previous_map = map
   )
   counts <- person_snapshot_cpp(
-    obs$persons, obs$unions, obs$group_indices, ng,
-    as.numeric(times), options
+    obs$persons, obs$unions, obs$group_indices, ng, as.numeric(times), options
   )
   sizes <- c(
     t = length(times), a = 1L, sex = if ("sex" %in% by) 2L else 1L,
