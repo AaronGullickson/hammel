@@ -3311,10 +3311,14 @@ Keep `mx` in life-table output, preserving D048's output naming. Mortality proce
 **Scope:** Direct pre-release rename with no alias for the old name. Package code, internal helpers (`check_detailed_previous_union()`), tests, generated help and current specifications are updated. Decision-log entries, session handoffs, testing records and accepted validation reports keep the old name as historical evidence. The user-maintained article `vignettes/articles/second_demog_transition.qmd` still calls `pool_dissolved = TRUE` and needs `use_detailed_previous_union = FALSE`.
 
 
-## D159 — Person-level summaries require a population object (November 9, 2026)
+## D159 — Population and rate calculators require a population object (November 9, 2026)
 
 **Status:** User decision and implementation authorization, November 9, 2026.
 
 **Decision:** `calculate_population_size()`, `calculate_mortality_rates()` and `calculate_fertility_rates()` no longer accept a bare persons data frame. Like the union, marriage, transition and entry calculators, they require a `hammel_population`, and stop with an error suggesting `hammel_population(persons, end_time = ...)` otherwise. A bare table has no recorded endpoint, so these functions could not check that follow-up reached the requested times, and counts past the end of the data were silently too low. Requiring the object makes that check always apply.
 
-**Scope:** The shared observation helper drops its bare-table branch, including its internal `needs_unions` argument and `inherits()` checks that only guarded that branch. `calculate_dissolution_rates()` still accepts a bare union table, which is a different input. Tests that used bare tables for convenience now wrap them in `hammel_population()`; tests of the old bare-table errors now expect the new error.
+**Scope:** The shared observation helper drops its bare-table branch, including its internal `needs_unions` argument and `inherits()` checks that only guarded that branch. Tests that used bare tables for convenience now wrap them in `hammel_population()`; tests of the old bare-table errors now expect the new error.
+
+**Extension (same day):** `calculate_dissolution_rates()` also no longer accepts a bare union table, for the same reason, and requires a `hammel_population`. Its bare-table validation and the union-table branch of the internal `union_strata()` (which read `group_w`/`group_h` columns from the union table) are removed; partner groups always come from the population's declared groups. Dissolution tests build minimal populations around their union records with a test helper, `union_population()`, keeping the same expected values. Checks of bare union-table columns are dropped because `hammel_population()` validates those records.
+
+**Related:** `calculate_union_rates()` now takes `dur_breaks` before `by`, like the other calculators' duration breaks. No existing call passed either argument by position. `calculate_fertility_rates()` still lists `parity_breaks` after `by`.

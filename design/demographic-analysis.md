@@ -135,9 +135,7 @@ only at recorded events:
 Dimension names require declared groups. `union_type` and `previous_union` require
 a `hammel_population` with union histories, and `previous_union` requires
 nonoverlapping histories for each person. Union rates by entry type and
-conversion rates require typed histories. Bare union tables passed to
-`calculate_dissolution_rates()` need `group_w`, `group_h` or `union_type`
-columns for those values.
+conversion rates require typed histories.
 
 **Exposure and events.** Exposure is split at every change in the requested
 variables, and each event counts under the state immediately before it in the
@@ -201,10 +199,8 @@ when death can also end unions.
 groups (D133). Rows are directional: sum A-wife/B-husband and B-wife/A-husband
 rows for the unordered pair that dissolution inputs use (D079). A full
 period/duration grid is retained for every combination of population groups.
-The function also accepts a bare union data frame with `union_id`, `start_time`,
-`end_time`, and `end_reason`; caller-provided follow-up must cover the window.
-Bare tables need `group_w` and `group_h` columns for those variables, with
-labels sorted in radix order. Summarize independent replications separately before binding
+The function requires a `hammel_population` with a known endpoint covering the
+window; bare union tables are not accepted (D159). Summarize independent replications separately before binding
 results, as for person-level Lexis counts. See
 [union dissolution](union-dissolution.md#union-year-counts-and-dissolution-rates)
 for worked accounting and censoring rules.

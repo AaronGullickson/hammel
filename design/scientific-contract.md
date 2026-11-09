@@ -632,8 +632,8 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   uses each episode's start; boundaries are half-open and finite final duration
   breaks gain `Inf`. Return `rate_dissolution = dissolutions / union_years`,
   with NA at zero exposure. `by` can split by the wife's and husband's groups
-  (`group_w`, `group_h`, directional) and by union type. Bare
-  union tables require complete caller-verified follow-up. This cause-specific
+  (`group_w`, `group_h`, directional) and by union type. Input must be a
+  population object with a known endpoint (D159). This cause-specific
   rate is not a cumulative probability with competing deaths.
 - `calculate_population_size()` includes births and excludes deaths at each
   requested instant. It preserves requested order and repeated times.

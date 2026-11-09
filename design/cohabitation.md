@@ -220,7 +220,7 @@ its own type's union-years and dissolution events. Conversion ends cohabitation
 exposure without counting as dissolution, and the linked marriage starts at
 duration zero. Both types and empty cells are retained; zero exposure gives NA.
 Without `union_type` in `by`, counts and exposure are pooled before calculating rates. Splitting
-requires a valid `union_type` column, including for bare union tables.
+requires a valid `union_type` column in the population's union histories.
 
 
 ## Demographic rates by current union type

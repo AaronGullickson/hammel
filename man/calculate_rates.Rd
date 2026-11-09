@@ -35,8 +35,8 @@ calculate_union_rates(
   population,
   time_breaks,
   age_breaks,
-  by = NULL,
   dur_breaks = NULL,
+  by = NULL,
   conf_level = NULL,
   use_detailed_previous_union = TRUE
 )
@@ -82,9 +82,8 @@ calculate_transition_rates(
 \item{population}{One independent history. All functions accept a
 \code{hammel_population} with the required histories and a known endpoint;
 observation cannot extend beyond it. Wrap a persons table with
-\code{\link[=hammel_population]{hammel_population()}} and its \code{end_time}. Dissolution also accepts a bare
-union table, for which the caller must ensure complete follow-up. See
-each calculator's section for its required histories and table columns.}
+\code{\link[=hammel_population]{hammel_population()}} and its \code{end_time}. See each calculator's section
+for its required histories.}
 
 \item{time_breaks}{Strictly increasing finite calendar boundaries in years.
 Cells are half-open: events at internal boundaries enter the cell starting
@@ -330,13 +329,8 @@ Rates are dissolutions per union-year: zero with positive exposure and no
 events, and NA when exposure is zero. This is a cause-specific rate, not the
 probability of dissolution in the presence of competing partner deaths.
 
-\strong{\code{population}:} A \code{hammel_population}, or a union data frame
-containing unique positive whole-number \code{union_id}, \code{start_time}, \code{end_time},
-and \code{end_reason}. Ends and reasons are NA for ongoing episodes; ended reasons
-are \code{"dissolution"}, \code{"death_husband"}, \code{"death_wife"}, or \code{"conversion"}.
-Population objects need a known endpoint; observation cannot extend beyond
-it. For bare tables, ensure complete follow-up through the requested
-endpoint.
+\strong{\code{population}:} A \code{hammel_population} with union histories
+and a known endpoint; observation cannot extend beyond it.
 
 \strong{\code{dur_breaks}:} Strictly increasing nonnegative duration
 boundaries in years. If the last boundary is finite, append Inf for an open
@@ -350,9 +344,8 @@ A-wife/B-husband and B-wife/A-husband rows for an unordered pair; any
 combination of dimensions and partners) and \code{"union_type"} (cohab or
 marriage, each with its own exposure; conversion stops cohabitation exposure
 without counting as dissolution, and duration resets at the start of the
-linked marriage). Population inputs require declared groups for the group
-variables; bare union tables require \code{group_w}, \code{group_h} or \code{union_type}
-columns. A dissolution counts under the groups before any same-time
+linked marriage). The group variables require declared groups. A
+dissolution counts under the groups before any same-time
 transition.
 
 \strong{Output:} A tibble with \code{time_start}, \code{time_end}, \code{dur_start},

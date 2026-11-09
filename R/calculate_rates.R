@@ -14,9 +14,8 @@
 #' @param population One independent history. All functions accept a
 #'   `hammel_population` with the required histories and a known endpoint;
 #'   observation cannot extend beyond it. Wrap a persons table with
-#'   [hammel_population()] and its `end_time`. Dissolution also accepts a bare
-#'   union table, for which the caller must ensure complete follow-up. See
-#'   each calculator's section for its required histories and table columns.
+#'   [hammel_population()] and its `end_time`. See each calculator's section
+#'   for its required histories.
 #' @param time_breaks Strictly increasing finite calendar boundaries in years.
 #'   Cells are half-open: events at internal boundaries enter the cell starting
 #'   there; the final calendar boundary is excluded.
@@ -230,13 +229,8 @@
 #' events, and NA when exposure is zero. This is a cause-specific rate, not the
 #' probability of dissolution in the presence of competing partner deaths.
 #'
-#' \strong{\code{population}:} A `hammel_population`, or a union data frame
-#' containing unique positive whole-number `union_id`, `start_time`, `end_time`,
-#' and `end_reason`. Ends and reasons are NA for ongoing episodes; ended reasons
-#' are `"dissolution"`, `"death_husband"`, `"death_wife"`, or `"conversion"`.
-#' Population objects need a known endpoint; observation cannot extend beyond
-#' it. For bare tables, ensure complete follow-up through the requested
-#' endpoint.
+#' \strong{\code{population}:} A `hammel_population` with union histories
+#' and a known endpoint; observation cannot extend beyond it.
 #'
 #' \strong{\code{dur_breaks}:} Strictly increasing nonnegative duration
 #' boundaries in years. If the last boundary is finite, append Inf for an open
@@ -250,9 +244,8 @@
 #' combination of dimensions and partners) and `"union_type"` (cohab or
 #' marriage, each with its own exposure; conversion stops cohabitation exposure
 #' without counting as dissolution, and duration resets at the start of the
-#' linked marriage). Population inputs require declared groups for the group
-#' variables; bare union tables require `group_w`, `group_h` or `union_type`
-#' columns. A dissolution counts under the groups before any same-time
+#' linked marriage). The group variables require declared groups. A
+#' dissolution counts under the groups before any same-time
 #' transition.
 #'
 #' \strong{Output:} A tibble with `time_start`, `time_end`, `dur_start`,
@@ -627,45 +620,17 @@ calculate_dissolution_rates <- function(
   if (is.finite(tail(dur_breaks, 1))) {
     dur_breaks <- c(dur_breaks, Inf)
   }
-  if (inherits(population, "hammel_population")) {
-    validate_population(population)
-    if (is.null(population$end_time) || tail(time_breaks, 1) >
-      population$end_time) {
-      stop("Observation requires a known endpoint and cannot extend beyond it.",
-        call. = FALSE
-      )
-    }
-    unions <- population$unions
-  } else {
-    unions <- population
-    check_columns(
-      unions, c("union_id", "start_time", "end_time", "end_reason"),
-      "unions"
-    )
-    check_numeric_column(unions$union_id, "unions$union_id", id = TRUE)
-    if (anyDuplicated(unions$union_id)) {
-      stop("`unions$union_id` must be unique; analyze replications separately.",
-        call. = FALSE
-      )
-    }
-    check_numeric_column(unions$start_time, "unions$start_time")
-    check_numeric_column(unions$end_time, "unions$end_time", missing = TRUE)
-    if (any(unions$end_time < unions$start_time, na.rm = TRUE)) {
-      stop("Union end times must not precede start times.", call. = FALSE)
-    }
-    reason <- unions$end_reason
-    if (!is.character(reason) || !is.null(dim(reason)) ||
-      any(!is.na(reason) & !reason %in% c(
-        "dissolution", "death_husband",
-        "death_wife", "conversion"
-      )) ||
-      any(is.na(reason) != is.na(unions$end_time))) {
-      stop(paste0(
-        "Ended unions require a valid end reason; ongoing ",
-        "unions require NA end and reason."
-      ), call. = FALSE)
-    }
+  if (!inherits(population, "hammel_population")) {
+    stop("`population` must be a hammel_population.", call. = FALSE)
   }
+  validate_population(population)
+  if (is.null(population$end_time) || tail(time_breaks, 1) >
+    population$end_time) {
+    stop("Observation requires a known endpoint and cannot extend beyond it.",
+      call. = FALSE
+    )
+  }
+  unions <- population$unions
   nt <- length(time_breaks) - 1L
   nd <- length(dur_breaks) - 1L
   strata <- union_strata(population, unions, by, stride = nt * nd)
@@ -892,8 +857,8 @@ calculate_union_rates <- function(
   population,
   time_breaks,
   age_breaks,
-  by = NULL,
   dur_breaks = NULL,
+  by = NULL,
   conf_level = NULL,
   use_detailed_previous_union = TRUE
 ) {
@@ -1349,54 +1314,25 @@ union_strata <- function(
   identities <- NULL
   w <- h <- rep(0L, nrow(unions))
   if (wives || husbands) {
-    if (inherits(population, "hammel_population")) {
-      if (!declared_group(population)) {
-        stop(paste0(
-          "Splitting by \"group_w\" or \"group_h\" requires a ",
-          "declared group dimension."
-        ), call. = FALSE)
-      }
-      persons <- prepare_group_observations(
-        population$persons, population,
-        TRUE
-      )
-      identities <- observation_groups(persons, TRUE)
-      w <- match(
-        persons$group[match(unions$wife_id, persons$person_id)],
-        identities
-      ) - 1L
-      h <- match(
-        persons$group[match(unions$husband_id, persons$person_id)],
-        identities
-      ) - 1L
-    } else {
-      needed <- c(if (wives) "group_w", if (husbands) "group_h")
-      missing <- setdiff(needed, names(unions))
-      if (length(missing)) {
-        stop(sprintf(
-          "Splitting a union table by %s requires union column(s) %s.",
-          paste0("\"", needed, "\"", collapse = " and "),
-          paste0("`", missing, "`", collapse = ", ")
-        ), call. = FALSE)
-      }
-      values <- c(if (wives) as.character(unions$group_w), if (
-        husbands) {
-        as.character(unions$group_h)
-      })
-      if (anyNA(values) || any(!nzchar(trimws(values)))) {
-        stop(paste0(
-          "Union `group_w` and `group_h` must contain ",
-          "nonmissing, nonempty labels."
-        ), call. = FALSE)
-      }
-      identities <- sort(unique(values), method = "radix")
-      if (wives) {
-        w <- match(as.character(unions$group_w), identities) - 1L
-      }
-      if (husbands) {
-        h <- match(as.character(unions$group_h), identities) - 1L
-      }
+    if (!declared_group(population)) {
+      stop(paste0(
+        "Splitting by \"group_w\" or \"group_h\" requires a ",
+        "declared group dimension."
+      ), call. = FALSE)
     }
+    persons <- prepare_group_observations(
+      population$persons, population,
+      TRUE
+    )
+    identities <- observation_groups(persons, TRUE)
+    w <- match(
+      persons$group[match(unions$wife_id, persons$person_id)],
+      identities
+    ) - 1L
+    h <- match(
+      persons$group[match(unions$husband_id, persons$person_id)],
+      identities
+    ) - 1L
   }
   ng <- if (is.null(identities)) 1L else length(identities)
   combos <- if (mode == 2L) ng * ng else if (wives || husbands) ng else 1L
@@ -1417,7 +1353,7 @@ union_strata <- function(
     }
     index <- index + combos * (match(unions$union_type, types) - 1L)
   }
-  if ((wives || husbands) && inherits(population, "hammel_population")) {
+  if (wives || husbands) {
     unions <- prepare_union_group_observations(
       unions, population, mode,
       typed_split, ng, combos

@@ -122,7 +122,8 @@ sex-specific widowhood, grouping, empty histories, and invalid histories.
 
 ## Marriage observations
 
-`calculate_union_rates(population, time_breaks, age_breaks, by = NULL)`
+`calculate_union_rates(population, time_breaks, age_breaks, dur_breaks = NULL,
+by = NULL)`
 returns `person_years`, `unions`, and `rate_union`, split by period, age and sex. Set
 `by = "previous_union"` to add the three previous-union categories; otherwise
 counts and exposure are pooled before calculating rates and that column is omitted. All exposure is unpartnered; no additional `union_status`
