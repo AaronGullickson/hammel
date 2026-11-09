@@ -8,32 +8,22 @@
 #' with the same name. Other processes are retained. Built-in rate schedules
 #' are validated again when attached. No simulation is executed.
 #'
-#' `set_mortality()` and `set_fertility()` construct the corresponding process
-#' and delegate to `set_process()`.
+#' Use this function to attach an already-created process. The convenience
+#' setters [set_mortality()], [set_fertility()], [set_union_formation()],
+#' [set_union_dissolution()], and [set_group_transition()] construct and attach
+#' the corresponding process in one call.
 #'
 #' @param model A `hammel_model` object.
 #' @param process A `hammel_process` specification.
-#' @param rates An age-specific rate table passed to [mortality()] or [fertility()].
-#' @param birth_interval Minimum maternal birth-to-birth interval in years,
-#'   defaulting to `0.75`. Must be finite and nonnegative.
-#' @param hetfert NULL (default) for uniform mother selection, or a
-#'   [het_fert()] specification for persistent lognormal selection weights.
-#' @param weights NULL (default) for unweighted selection within rate cells, or
-#'   a [create_weight_model()] specification. Weights choose which member of a
-#'   cell experiences an event without changing the cell's input rate. In
-#'   fertility they combine with `hetfert` on the log scale.
-#' @param ffab Probability that a newborn is female, default `0.4886`.
-#'   Must be a finite numeric scalar in `[0, 1]`. Applies to fertility only.
-#'
 #' @return An updated `hammel_model`. The input model is not modified.
+#' @seealso [mortality()], [fertility()], [union_formation()],
+#'   [union_dissolution()], [group_transition()]
 #' @export
 #' @examples
 #' mortality_rates <- data.frame(sex = c("m", "f"), age_start = 0,
 #'   age_end = Inf, rate = c(0.01, 0.008))
-#' fertility_rates <- data.frame(age_start = 15, age_end = 50, rate = 0.1)
-#' model <- hammel_model() |>
-#'   set_mortality(mortality_rates) |>
-#'   set_fertility(fertility_rates)
+#' process <- mortality(mortality_rates)
+#' model <- hammel_model() |> set_process(process)
 #' model$processes
 #' @order 0
 set_process <- function(model, process) {

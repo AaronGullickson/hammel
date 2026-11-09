@@ -200,6 +200,10 @@ on the man's group, so they do not change the association between partners'
 characteristics in the static group-only illustration. With one group,
 all group weights are one. When no
 exact weights exist, approximate weights are used with a warning.
+
+\code{union_formation()} creates the process specification;
+\code{set_union_formation()} creates it and attaches it to a model through
+\code{\link[=set_process]{set_process()}}. Neither function runs a simulation.
 }
 \section{Calendar rates}{
 

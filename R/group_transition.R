@@ -16,6 +16,10 @@
 #' dimensions' processes are kept. Transitions at the same instant in
 #' different dimensions follow the declaration order of [set_groups()].
 #'
+#' `group_transition()` creates the process specification;
+#' `set_group_transition()` creates it and attaches it to a model through
+#' [set_process()]. Neither function runs a simulation.
+#'
 #' @param rates A nonempty data frame requiring `origin`, `destination`,
 #'   `rate`, and either `age_start`/`age_end` or `dur_start`/`dur_end` throughout.
 #'   `origin` and `destination` are categories of the transition's dimension.

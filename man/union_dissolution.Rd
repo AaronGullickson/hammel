@@ -58,6 +58,10 @@ Optional \code{time_start}/\code{time_end} select half-open absolute calendar-ye
 including fractional years. Active slices retain the existing strata rules
 and must cover the requested run. Changes precede same-time events without
 resetting the union-duration origin. Other arguments remain static.
+
+\code{union_dissolution()} creates the process specification;
+\code{set_union_dissolution()} creates it and attaches it to a model through
+\code{\link[=set_process]{set_process()}}. Neither function runs a simulation.
 }
 
 \examples{

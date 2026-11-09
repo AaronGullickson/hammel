@@ -52,6 +52,10 @@
 #' all group weights are one. When no
 #' exact weights exist, approximate weights are used with a warning.
 #'
+#' `union_formation()` creates the process specification;
+#' `set_union_formation()` creates it and attaches it to a model through
+#' [set_process()]. Neither function runs a simulation.
+#'
 #' @param initiation Either `"on_demand"` for birth-triggered searches or
 #'   `"rate"` for scheduled searches. No default is selected.
 #' @param matching A specification created by [create_matching_model()], or a

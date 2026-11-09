@@ -16,7 +16,7 @@ Agreed by the user and implemented November 9, 2026 (D143). This guide defines w
 
 6. Keep the existing flat `R/` directory and ordinary package namespace. Filenames group source for readers; they do not create isolated modules. Do not introduce manual sourcing or load-order conventions to enforce this map.
 
-7. Keep source organization independent of help topics and pkgdown reference sections. Preserve existing roxygen topic assignments in the first pass.
+7. Keep source organization independent of help topics and pkgdown reference sections. Each demographic process constructor shares a help topic with its convenience setter: `mortality()`/`set_mortality()`, `fertility()`/`set_fertility()`, `union_formation()`/`set_union_formation()`, `union_dissolution()`/`set_union_dissolution()`, and `group_transition()`/`set_group_transition()`. Explain the specification once and distinguish the returned process from the updated model. Keep generic `set_process()` on its own topic, linking to these pairs (D144).
 
 8. Start each hand-maintained R file with a brief comment describing its purpose, above the section headings. Place exported functions first under `# PUBLIC FUNCTIONS ------`, followed by any `# INTERNAL CONSTANTS ------` and `# HELPER FUNCTIONS ------` sections. Omit sections with no contents. Preserve relative order within each group and keep explanatory comments and roxygen blocks with their definitions. Internal-only files need only the applicable internal sections. Keep generated wrappers generated; do not manually reorder or section `RcppExports.R`. Package roxygen metadata uses `# PACKAGE DOCUMENTATION ------`.
 
@@ -256,7 +256,7 @@ For a future mechanical reorganization, preserve whole function definitions, con
 
 Do not combine file moves with function renaming, algorithm changes, defaults, or scientific-contract changes. Any later refactor of `simulate()` needs separate review of its inputs, outputs, validation order, and RNG boundaries, with exact before/after result and RNG comparisons. Preserve user-owned README/vignettes and historical validation reports.
 
-Pkgdown reference grouping and help-topic redesign remain separate follow-up choices. This reorganization preserves the existing help topics and does not change the site’s reference groups.
+Pkgdown reference grouping remains a separate follow-up choice. The source reorganization preserved help topics; D144 subsequently grouped process constructors with their setters as described above. The site’s reference groups are unchanged.
 
 ## Verification
 

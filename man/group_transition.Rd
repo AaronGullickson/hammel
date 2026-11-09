@@ -71,4 +71,8 @@ Each dimension has its own transition process: calling
 \code{set_group_transition()} again for the same dimension replaces it, and other
 dimensions' processes are kept. Transitions at the same instant in
 different dimensions follow the declaration order of \code{\link[=set_groups]{set_groups()}}.
+
+\code{group_transition()} creates the process specification;
+\code{set_group_transition()} creates it and attaches it to a model through
+\code{\link[=set_process]{set_process()}}. Neither function runs a simulation.
 }

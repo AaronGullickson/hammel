@@ -24,6 +24,10 @@
 #' and must cover the requested run. Changes precede same-time events without
 #' resetting the union-duration origin. Other arguments remain static.
 #'
+#' `union_dissolution()` creates the process specification;
+#' `set_union_dissolution()` creates it and attaches it to a model through
+#' [set_process()]. Neither function runs a simulation.
+#'
 #' @param weights NULL (default) for unweighted selection, or a
 #'   [create_weight_model()] using union variables, which chooses which union
 #'   in a cell dissolves without changing the cell's input rate.

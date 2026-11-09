@@ -5,6 +5,10 @@ D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the u
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## Shared process help topics (November 9, 2026)
+
+D144 pairs each demographic process constructor with its convenience setter on one help topic, with separate mortality and fertility pages and a standalone generic `set_process()` page. `devtools::document()` completed successfully. All six affected topics passed Rd validation and alias checks; every available example on those topics executed successfully after `pkgload::load_all()`. Union formation and group transitions have no examples in these topics. Comparing parsed R expressions against the preceding commit confirmed that all executable definitions are unchanged, and `NAMESPACE` is unchanged. `git diff --check` passed. The simulation suite was not rerun for this documentation-only change.
+
 ## Within-file ordering and section headings (November 9, 2026)
 
 Following the user's instruction under D143, each hand-maintained R file now starts with a purpose comment, followed by exported functions and then internal constants/helpers under `# SECTION NAME ------` headings. Generated wrappers remain untouched. Before/after parsing confirmed that every function and constant is unchanged and remains in its original file; all exported functions precede helpers. Explanatory comments and roxygen blocks were retained, and section headings were updated where necessary.
