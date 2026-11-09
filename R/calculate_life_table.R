@@ -71,19 +71,13 @@ calculate_life_table <- function(rates, radix = 1) {
   )
   rates$mx <- rates[[rate_column]]
   if (any(rates$mx < 0, na.rm = TRUE)) {
-    stop(
-      "Mortality rates must be nonnegative.",
-      call. = FALSE
-    )
+    stop("Mortality rates must be nonnegative.", call. = FALSE)
   }
   if (!is.numeric(radix) || length(radix) != 1L || !is.finite(radix) ||
       radix <= 0) {
     stop("`radix` must be positive and finite.", call. = FALSE)
   }
-  rates <- rates[c(
-    summary_strata(rates),
-    "age_start", "age_end", "mx"
-  )]
+  rates <- rates[c(summary_strata(rates), "age_start", "age_end", "mx")]
   if (!nrow(rates)) {
     stop("A rate table needs at least one age band.", call. = FALSE)
   }
