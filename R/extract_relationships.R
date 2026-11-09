@@ -1,3 +1,7 @@
+# Extract parent, partner, and unpartnered-birth information from histories.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Add recorded partner information to union histories
 #'
 #' Match wives and husbands to the population's person table by ID and return

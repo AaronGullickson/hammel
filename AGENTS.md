@@ -37,6 +37,10 @@ be made autonomously; record choices with substantial architectural consequences
   functions in an existing file when its responsibility fits. If no existing
   file is a logical home, explain the proposed responsibility and filename and
   ask the user before creating a new R script; do not create one automatically.
+- Start each hand-maintained R file with a brief purpose comment. Place
+  exported functions first and internal
+  constants/helpers below, using `# SECTION NAME ------` headings. Preserve
+  documentation blocks and leave generated wrappers untouched.
 - Prefer verb-based names for user-facing action functions, such as `create_baseline_population()` and `set_population()`.
 - Return all public tables as tibbles, including empty tables, population histories,
   process schedules, and demographic summaries. Accept base data frames as inputs.

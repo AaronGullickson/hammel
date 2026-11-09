@@ -1,3 +1,7 @@
+# Construct and validate union-formation processes and search rate schedules.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Specify a union-formation process
 #'
 #' Construct or attach a union-formation specification without executing it.
@@ -216,6 +220,8 @@ set_union_formation <- function(model, initiation, matching = create_age_gap_mat
                                      cohabitation_counts_as_previous_union, weights_conversion,
                                      weights))
 }
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 validate_union_formation <- function(process) {
   validate_cohabitation(process)

@@ -1,3 +1,7 @@
+# Construct, validate, evaluate, and prepare partner-matching models.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Specify a conditional-logit matching model
 #'
 #' Define relative partner utilities with an R formula and named coefficients.
@@ -83,16 +87,6 @@ create_matching_model <- function(formula, coefficients, group_exogamy = NULL, d
   model
 }
 
-# Male-group formula effects can be absorbed by calibrated target weights.
-warn_absorbed_group_formula <- function(model) {
-  male <- grep("^male_.+", all.vars(model$formula), value = TRUE)
-  if (!length(male)) return(invisible(FALSE))
-  warning(sprintf(paste("Formula terms using %s are absorbed by calibrated group weights:",
-    "main effects have no effect and interactions are only partly reflected.",
-    "Use delta to adjust male-group targets."), paste0("`", male, "`", collapse = ", ")), call. = FALSE)
-  invisible(TRUE)
-}
-
 #' Create a quadratic matching model from interpretable age-gap preferences
 #'
 #' Convert a preferred age gap and a symmetric half-weight distance into a
@@ -134,6 +128,18 @@ create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distanc
   create_matching_model(~ age_difference + I(age_difference^2),
     c(age_difference = unname(linear), "I(age_difference^2)" = unname(quadratic)),
     group_exogamy = group_exogamy, delta = delta)
+}
+
+# HELPER FUNCTIONS ---------------------------------------------------------
+
+# Male-group formula effects can be absorbed by calibrated target weights.
+warn_absorbed_group_formula <- function(model) {
+  male <- grep("^male_.+", all.vars(model$formula), value = TRUE)
+  if (!length(male)) return(invisible(FALSE))
+  warning(sprintf(paste("Formula terms using %s are absorbed by calibrated group weights:",
+    "main effects have no effect and interactions are only partly reflected.",
+    "Use delta to adjust male-group targets."), paste0("`", male, "`", collapse = ", ")), call. = FALSE)
+  invisible(TRUE)
 }
 
 validate_delta <- function(x) {

@@ -1,3 +1,11 @@
+# Resolve group effects and category combinations for partner matching.
+
+# INTERNAL CONSTANTS -------------------------------------------------------
+
+matching_settings <- c("group_exogamy", "delta")
+
+# HELPER FUNCTIONS ---------------------------------------------------------
+
 matching_group_labels <- function(x, name) {
   check_groups(tibble::tibble(group = x), name)
   as.character(x)
@@ -165,8 +173,6 @@ matching_group_allowed <- function(matching, female_group, male_group) {
 # means the only declared dimension). At simulation each model is translated
 # to the internal one-dimension form used by the engine.
 is_dimension_list <- function(x) is.list(x) && !is.data.frame(x)
-
-matching_settings <- c("group_exogamy", "delta")
 
 # Split one dimension's `group_exogamy` (D135) into finite pair effects and
 # prohibitions: NA prohibits an unordered pair, and a bare NA every union

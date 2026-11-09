@@ -1,12 +1,6 @@
-# Observed event rates and their rate-specific calculation helpers.
+# Calculate observed demographic event rates from population histories and exposure.
 
-# Shared validation of period and age breaks; a finite final age gains Inf.
-person_breaks <- function(time_breaks, age_breaks) {
-  check_demographic_breaks(time_breaks, "time_breaks")
-  check_demographic_breaks(age_breaks, "age_breaks", ages = TRUE)
-  if (is.finite(tail(age_breaks, 1))) age_breaks <- c(age_breaks, Inf)
-  age_breaks
-}
+# PUBLIC FUNCTIONS ---------------------------------------------------------
 
 #' Calculate age-specific mortality rates
 #'
@@ -77,23 +71,6 @@ calculate_mortality_rates <- function(population, time_breaks, age_breaks, by = 
     out$deaths / out$person_years, NA_real_))
   attr(out, "index") <- NULL
   finish_strata(add_rate_confidence(out, "deaths", "person_years", conf.level), alias)
-}
-
-# Rows for person rates: time, sex, age, optional parity, then `by`.
-person_rate_rows <- function(obs, by, counts, time_breaks, age_breaks, sexes,
-                             pool_dissolved, parity_breaks = NULL) {
-  s <- counts$strides
-  sex_dim <- label_dim("sex", sexes, s[["sex"]], code = match(sexes, c("m", "f")) - 1L)
-  dims <- c(list(band_dim(time_breaks, "time", 1), band_dim(age_breaks, "age", s[["a"]]), sex_dim),
-    if (!is.null(parity_breaks)) list(band_dim(parity_breaks, "parity", s[["parity"]])),
-    person_by_dims(by, obs, counts, pool_dissolved))
-  rows <- build_rows(dims)
-  columns <- c("time_start", "time_end", "sex", "age_start", "age_end",
-    if (!is.null(parity_breaks)) c("parity_start", "parity_end"), by)
-  out <- tibble::as_tibble(rows[columns])
-  out$person_years <- counts$person_years[rows$.index]
-  attr(out, "index") <- rows$.index
-  out
 }
 
 #' Calculate age-specific fertility rates, optionally by current parity
@@ -167,94 +144,6 @@ calculate_fertility_rates <- function(population, time_breaks, age_breaks, by = 
     time_end = tail(time_breaks, -1), births = counts$unassigned_births)
   out <- finish_strata(add_rate_confidence(out, "births", "person_years", conf.level), alias)
   out
-}
-
-# Attribute recorded unrealized births (D101) to observation rows. A record is
-# one run-anchored annual period (or a fragment split at a fertility-rate
-# change) and one fertility cell; it is added to
-# the row whose period, age, parity, group and union type contain it. Rows that
-# a record only partly overlaps, or that a stratum the schedule did not use
-# would have to split, become NA, as do periods before the run start.
-add_unrealized_births <- function(out, simulation, alias = list()) {
-  u <- simulation$unrealized_births
-  # Records name each group dimension; the table uses the internal `group`
-  # (a combined code when several dimensions are requested).
-  if (!is.null(alias$combined)) u$group <- encode_combined(alias, u)
-  else for (from in names(alias$rename)) names(u)[names(u) == alias$rename[[from]]] <- from
-  n <- nrow(out)
-  value <- numeric(n)
-  covered <- out$time_start >= simulation$start_time
-  unknown <- !covered
-  if (nrow(u) && n) {
-    # Interval indices of each record's bounds within each observation axis.
-    within <- function(lo, hi, starts, ends) {
-      breaks <- sort(unique(c(starts, ends)))
-      i <- findInterval(lo, breaks)
-      j <- findInterval(hi, breaks, left.open = TRUE)
-      list(lo = breaks[pmax(i, 1L)], ok = i >= 1L & i == j & i < length(breaks))
-    }
-    t <- within(u$period_start, u$period_end, out$time_start, out$time_end)
-    a <- within(u$age_start, u$age_end, out$age_start, out$age_end)
-    keys <- list(t$lo, a$lo)
-    row_keys <- list(out$time_start, out$age_start)
-    ok <- t$ok & a$ok
-    # Records outside every observation row contribute nothing anywhere.
-    inside <- u$period_start < max(out$time_end) & u$period_end > min(out$time_start) &
-      u$age_start < max(out$age_end) & u$age_end > min(out$age_start)
-    if ("parity_start" %in% names(out)) {
-      if ("parity_start" %in% names(u)) {
-        p <- within(u$parity_start, u$parity_end, out$parity_start, out$parity_end)
-        keys <- c(keys, list(p$lo)); row_keys <- c(row_keys, list(out$parity_start))
-        ok <- ok & p$ok
-      } else ok[] <- FALSE # pooled-parity schedule cannot be split by parity
-    }
-    if ("group" %in% names(out)) {
-      keys <- c(keys, list(as.character(u$group)))
-      row_keys <- c(row_keys, list(as.character(out$group)))
-    }
-    # The fertility schedule never splits by previous union.
-    if ("previous_union" %in% names(out)) ok[] <- FALSE
-    if ("union_type" %in% names(out)) {
-      if ("union_type" %in% names(u)) {
-        ok <- ok & u$union_type %in% out$union_type
-        keys <- c(keys, list(u$union_type)); row_keys <- c(row_keys, list(out$union_type))
-      } else ok[] <- FALSE # overall schedule cannot be split by union type
-    }
-    key <- do.call(paste, c(keys, sep = "\r"))
-    row_key <- do.call(paste, c(row_keys, sep = "\r"))
-    row <- match(key, row_key)
-    exact <- inside & ok & !is.na(row)
-    sums <- tapply(u$unrealized_births[exact], row[exact], sum)
-    value[as.integer(names(sums))] <- as.numeric(sums)
-    # Records that overlap rows without fitting one row make those rows unknown.
-    for (r in which(inside & !exact)) {
-      hit <- out$time_start < u$period_end[r] & out$time_end > u$period_start[r] &
-        out$age_start < u$age_end[r] & out$age_end > u$age_start[r]
-      if ("parity_start" %in% names(out) && "parity_start" %in% names(u))
-        hit <- hit & out$parity_start < u$parity_end[r] & out$parity_end > u$parity_start[r]
-      if ("group" %in% names(out)) hit <- hit & as.character(out$group) == as.character(u$group[r])
-      if ("union_type" %in% names(out) && "union_type" %in% names(u) &&
-          u$union_type[r] %in% out$union_type)
-        hit <- hit & out$union_type == u$union_type[r]
-      unknown <- unknown | hit
-    }
-  }
-  value[unknown] <- NA_real_
-  out$unrealized_births <- value
-  out$rate_fertility_adjusted <- as.numeric(ifelse(out$person_years > 0,
-    (out$births + out$unrealized_births) / out$person_years, NA_real_))
-  out
-}
-
-check_demographic_breaks <- function(breaks, name, ages = FALSE) {
-  if (!is.numeric(breaks) || !is.null(dim(breaks)) || length(breaks) < 2L || anyNA(breaks) ||
-      any(!is.finite(head(breaks, -1))) || any(diff(breaks) <= 0) ||
-      (!ages && !is.finite(tail(breaks, 1))) || (ages && breaks[1] < 0)) {
-    stop(sprintf("`%s` must be strictly increasing %sboundaries.", name,
-                 if (ages) {
-                   if (name == "dur_breaks") "nonnegative duration " else "nonnegative age "
-                 } else "finite time "), call. = FALSE)
-  }
 }
 
 #' Calculate cohabitation-to-marriage conversion rates
@@ -661,6 +550,123 @@ calculate_union_rates <- function(population, time_breaks, age_breaks, by = NULL
   by <- check_by(by, c("group", "previous_union", "union_type"), "calculate_union_rates", alias$dims)
   finish_strata(calculate_entry_rates(population, time_breaks, age_breaks, by, dur_breaks,
     marriage_measure = FALSE, conf.level = conf.level, pool_dissolved = pool_dissolved), alias)
+}
+
+# HELPER FUNCTIONS ---------------------------------------------------------
+
+# Observed event rates and their rate-specific calculation helpers.
+
+# Shared validation of period and age breaks; a finite final age gains Inf.
+person_breaks <- function(time_breaks, age_breaks) {
+  check_demographic_breaks(time_breaks, "time_breaks")
+  check_demographic_breaks(age_breaks, "age_breaks", ages = TRUE)
+  if (is.finite(tail(age_breaks, 1))) age_breaks <- c(age_breaks, Inf)
+  age_breaks
+}
+
+# Rows for person rates: time, sex, age, optional parity, then `by`.
+person_rate_rows <- function(obs, by, counts, time_breaks, age_breaks, sexes,
+                             pool_dissolved, parity_breaks = NULL) {
+  s <- counts$strides
+  sex_dim <- label_dim("sex", sexes, s[["sex"]], code = match(sexes, c("m", "f")) - 1L)
+  dims <- c(list(band_dim(time_breaks, "time", 1), band_dim(age_breaks, "age", s[["a"]]), sex_dim),
+    if (!is.null(parity_breaks)) list(band_dim(parity_breaks, "parity", s[["parity"]])),
+    person_by_dims(by, obs, counts, pool_dissolved))
+  rows <- build_rows(dims)
+  columns <- c("time_start", "time_end", "sex", "age_start", "age_end",
+    if (!is.null(parity_breaks)) c("parity_start", "parity_end"), by)
+  out <- tibble::as_tibble(rows[columns])
+  out$person_years <- counts$person_years[rows$.index]
+  attr(out, "index") <- rows$.index
+  out
+}
+
+# Attribute recorded unrealized births (D101) to observation rows. A record is
+# one run-anchored annual period (or a fragment split at a fertility-rate
+# change) and one fertility cell; it is added to
+# the row whose period, age, parity, group and union type contain it. Rows that
+# a record only partly overlaps, or that a stratum the schedule did not use
+# would have to split, become NA, as do periods before the run start.
+add_unrealized_births <- function(out, simulation, alias = list()) {
+  u <- simulation$unrealized_births
+  # Records name each group dimension; the table uses the internal `group`
+  # (a combined code when several dimensions are requested).
+  if (!is.null(alias$combined)) u$group <- encode_combined(alias, u)
+  else for (from in names(alias$rename)) names(u)[names(u) == alias$rename[[from]]] <- from
+  n <- nrow(out)
+  value <- numeric(n)
+  covered <- out$time_start >= simulation$start_time
+  unknown <- !covered
+  if (nrow(u) && n) {
+    # Interval indices of each record's bounds within each observation axis.
+    within <- function(lo, hi, starts, ends) {
+      breaks <- sort(unique(c(starts, ends)))
+      i <- findInterval(lo, breaks)
+      j <- findInterval(hi, breaks, left.open = TRUE)
+      list(lo = breaks[pmax(i, 1L)], ok = i >= 1L & i == j & i < length(breaks))
+    }
+    t <- within(u$period_start, u$period_end, out$time_start, out$time_end)
+    a <- within(u$age_start, u$age_end, out$age_start, out$age_end)
+    keys <- list(t$lo, a$lo)
+    row_keys <- list(out$time_start, out$age_start)
+    ok <- t$ok & a$ok
+    # Records outside every observation row contribute nothing anywhere.
+    inside <- u$period_start < max(out$time_end) & u$period_end > min(out$time_start) &
+      u$age_start < max(out$age_end) & u$age_end > min(out$age_start)
+    if ("parity_start" %in% names(out)) {
+      if ("parity_start" %in% names(u)) {
+        p <- within(u$parity_start, u$parity_end, out$parity_start, out$parity_end)
+        keys <- c(keys, list(p$lo)); row_keys <- c(row_keys, list(out$parity_start))
+        ok <- ok & p$ok
+      } else ok[] <- FALSE # pooled-parity schedule cannot be split by parity
+    }
+    if ("group" %in% names(out)) {
+      keys <- c(keys, list(as.character(u$group)))
+      row_keys <- c(row_keys, list(as.character(out$group)))
+    }
+    # The fertility schedule never splits by previous union.
+    if ("previous_union" %in% names(out)) ok[] <- FALSE
+    if ("union_type" %in% names(out)) {
+      if ("union_type" %in% names(u)) {
+        ok <- ok & u$union_type %in% out$union_type
+        keys <- c(keys, list(u$union_type)); row_keys <- c(row_keys, list(out$union_type))
+      } else ok[] <- FALSE # overall schedule cannot be split by union type
+    }
+    key <- do.call(paste, c(keys, sep = "\r"))
+    row_key <- do.call(paste, c(row_keys, sep = "\r"))
+    row <- match(key, row_key)
+    exact <- inside & ok & !is.na(row)
+    sums <- tapply(u$unrealized_births[exact], row[exact], sum)
+    value[as.integer(names(sums))] <- as.numeric(sums)
+    # Records that overlap rows without fitting one row make those rows unknown.
+    for (r in which(inside & !exact)) {
+      hit <- out$time_start < u$period_end[r] & out$time_end > u$period_start[r] &
+        out$age_start < u$age_end[r] & out$age_end > u$age_start[r]
+      if ("parity_start" %in% names(out) && "parity_start" %in% names(u))
+        hit <- hit & out$parity_start < u$parity_end[r] & out$parity_end > u$parity_start[r]
+      if ("group" %in% names(out)) hit <- hit & as.character(out$group) == as.character(u$group[r])
+      if ("union_type" %in% names(out) && "union_type" %in% names(u) &&
+          u$union_type[r] %in% out$union_type)
+        hit <- hit & out$union_type == u$union_type[r]
+      unknown <- unknown | hit
+    }
+  }
+  value[unknown] <- NA_real_
+  out$unrealized_births <- value
+  out$rate_fertility_adjusted <- as.numeric(ifelse(out$person_years > 0,
+    (out$births + out$unrealized_births) / out$person_years, NA_real_))
+  out
+}
+
+check_demographic_breaks <- function(breaks, name, ages = FALSE) {
+  if (!is.numeric(breaks) || !is.null(dim(breaks)) || length(breaks) < 2L || anyNA(breaks) ||
+      any(!is.finite(head(breaks, -1))) || any(diff(breaks) <= 0) ||
+      (!ages && !is.finite(tail(breaks, 1))) || (ages && breaks[1] < 0)) {
+    stop(sprintf("`%s` must be strictly increasing %sboundaries.", name,
+                 if (ages) {
+                   if (name == "dur_breaks") "nonnegative duration " else "nonnegative age "
+                 } else "finite time "), call. = FALSE)
+  }
 }
 
 # Union entry (and marriage entry) rates from the shared engine. Formation

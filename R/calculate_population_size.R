@@ -1,3 +1,7 @@
+# Count living persons at requested times and within requested strata.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Calculate the living population at time points
 #'
 #' Count persons with `birth_time <= time` and missing `death_time` or

@@ -1,3 +1,7 @@
+# Calculate TFR and parity-adjusted TFR from fertility rate schedules.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Calculate total fertility rates
 #'
 #' Sum age-specific fertility rates times their actual interval widths.
@@ -168,6 +172,8 @@ calculate_patfr <- function(rates) {
   attr(result, "unassigned_births") <- unknown
   result
 }
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 patfr_midpoint <- function(hazard, widths) {
   n <- ncol(hazard)

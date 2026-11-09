@@ -1,3 +1,7 @@
+# Construct mortality processes and attach them to model specifications.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Specify age-specific demographic rates
 #'
 #' Construct a process specification without running a simulation. Rates are

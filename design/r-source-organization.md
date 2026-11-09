@@ -18,7 +18,7 @@ Agreed by the user and implemented November 9, 2026 (D143). This guide defines w
 
 7. Keep source organization independent of help topics and pkgdown reference sections. Preserve existing roxygen topic assignments in the first pass.
 
-8. Keep generated wrappers generated. Preserve explanatory source comments and documentation blocks with the code they explain.
+8. Start each hand-maintained R file with a brief comment describing its purpose, above the section headings. Place exported functions first under `# PUBLIC FUNCTIONS ------`, followed by any `# INTERNAL CONSTANTS ------` and `# HELPER FUNCTIONS ------` sections. Omit sections with no contents. Preserve relative order within each group and keep explanatory comments and roxygen blocks with their definitions. Internal-only files need only the applicable internal sections. Keep generated wrappers generated; do not manually reorder or section `RcppExports.R`. Package roxygen metadata uses `# PACKAGE DOCUMENTATION ------`.
 
 For a new function, first identify its responsibility and closest existing consumer. Extend that file if the responsibility fits. If no existing file is a logical home, explain the proposed responsibility and filename and ask the user before creating a new R script. Do not create one automatically. The user’s authorization of this reorganization covers the files listed below; future additions follow this rule.
 

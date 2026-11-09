@@ -1,3 +1,7 @@
+# Declare group dimensions and apply their definitions to models and populations.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 # Group dimensions are always declared (D134). A declaration is a named list
 # of `hammel_group` objects, one per dimension, keyed by the persons column.
 
@@ -40,59 +44,6 @@ group <- function(categories = NULL, ancestry = FALSE,
   x
 }
 
-validate_group <- function(x, name = "group") {
-  if (!inherits(x, "hammel_group") || !is.list(x))
-    stop(sprintf("Group dimension `%s` must be created with group().", name), call. = FALSE)
-  if (!is.null(x$categories)) {
-    check_groups(tibble::tibble(group = x$categories), "categories")
-    if (!length(x$categories) || anyDuplicated(as.character(x$categories)))
-      stop(sprintf("`categories` of group `%s` must be a nonempty vector of unique labels.", name),
-           call. = FALSE)
-  }
-  if (!is.logical(x$ancestry) || length(x$ancestry) != 1L || is.na(x$ancestry))
-    stop(sprintf("`ancestry` of group `%s` must be TRUE or FALSE.", name), call. = FALSE)
-  if (is_model_schedule(x$inheritance))
-    validate_model_argument(x$inheritance, validate_group_inheritance, "inheritance")
-  else validate_group_inheritance(x$inheritance)
-  invisible(x)
-}
-
-# Names Hammel uses for its own variables and columns, and patterns that would
-# make derived names ambiguous.
-reserved_group_names <- c("person_id", "sex", "birth_time", "death_time", "mother_id",
-  "father_id", "union_type", "previous_union", "parity", "partnered", "age_difference",
-  "origin", "destination", "hetfert", "unknown", "time", "rate")
-
-check_group_names <- function(names) {
-  if (is.null(names) || anyNA(names) || any(!nzchar(names)) || anyDuplicated(names))
-    stop("Group dimensions must have unique, nonempty names.", call. = FALSE)
-  bad <- names[names %in% reserved_group_names |
-    grepl("^(partner|same|female|male|ancestry)_", names) | grepl("_(w|h)$", names) |
-    !grepl("^[A-Za-z][A-Za-z0-9_.]*$", names)]
-  if (length(bad))
-    stop(sprintf("Group dimension name(s) %s are reserved or not valid names.",
-                 paste0("`", bad, "`", collapse = ", ")), call. = FALSE)
-  invisible(names)
-}
-
-# Accept NULL, a character vector of dimension names (default settings) or a
-# named list of group() objects.
-normalize_group_declaration <- function(groups) {
-  if (is.null(groups) || (is.list(groups) && !length(groups))) return(NULL)
-  if (is.character(groups)) {
-    check_group_names(groups)
-    return(stats::setNames(lapply(groups, function(name) group()), groups))
-  }
-  if (!is.list(groups) || inherits(groups, "hammel_group"))
-    stop("`groups` must be dimension names or a named list of group() objects.", call. = FALSE)
-  check_group_names(names(groups))
-  for (name in names(groups)) {
-    validate_group(groups[[name]], name)
-    groups[[name]]["inheritance"] <- list(normalize_group_inheritance(groups[[name]]$inheritance))
-  }
-  groups
-}
-
 #' Declare a model's group dimensions
 #'
 #' Name the persons columns that are group dimensions and give each its
@@ -123,6 +74,63 @@ set_groups <- function(model, ...) {
   # Ancestry shares and empty transition histories are built at simulation.
   if (!is.null(model$population)) model$population <- apply_group_declaration(model$population, declaration)
   model
+}
+
+# INTERNAL CONSTANTS -------------------------------------------------------
+
+# Names Hammel uses for its own variables and columns, and patterns that would
+# make derived names ambiguous.
+reserved_group_names <- c("person_id", "sex", "birth_time", "death_time", "mother_id",
+  "father_id", "union_type", "previous_union", "parity", "partnered", "age_difference",
+  "origin", "destination", "hetfert", "unknown", "time", "rate")
+
+# HELPER FUNCTIONS ---------------------------------------------------------
+
+validate_group <- function(x, name = "group") {
+  if (!inherits(x, "hammel_group") || !is.list(x))
+    stop(sprintf("Group dimension `%s` must be created with group().", name), call. = FALSE)
+  if (!is.null(x$categories)) {
+    check_groups(tibble::tibble(group = x$categories), "categories")
+    if (!length(x$categories) || anyDuplicated(as.character(x$categories)))
+      stop(sprintf("`categories` of group `%s` must be a nonempty vector of unique labels.", name),
+           call. = FALSE)
+  }
+  if (!is.logical(x$ancestry) || length(x$ancestry) != 1L || is.na(x$ancestry))
+    stop(sprintf("`ancestry` of group `%s` must be TRUE or FALSE.", name), call. = FALSE)
+  if (is_model_schedule(x$inheritance))
+    validate_model_argument(x$inheritance, validate_group_inheritance, "inheritance")
+  else validate_group_inheritance(x$inheritance)
+  invisible(x)
+}
+
+check_group_names <- function(names) {
+  if (is.null(names) || anyNA(names) || any(!nzchar(names)) || anyDuplicated(names))
+    stop("Group dimensions must have unique, nonempty names.", call. = FALSE)
+  bad <- names[names %in% reserved_group_names |
+    grepl("^(partner|same|female|male|ancestry)_", names) | grepl("_(w|h)$", names) |
+    !grepl("^[A-Za-z][A-Za-z0-9_.]*$", names)]
+  if (length(bad))
+    stop(sprintf("Group dimension name(s) %s are reserved or not valid names.",
+                 paste0("`", bad, "`", collapse = ", ")), call. = FALSE)
+  invisible(names)
+}
+
+# Accept NULL, a character vector of dimension names (default settings) or a
+# named list of group() objects.
+normalize_group_declaration <- function(groups) {
+  if (is.null(groups) || (is.list(groups) && !length(groups))) return(NULL)
+  if (is.character(groups)) {
+    check_group_names(groups)
+    return(stats::setNames(lapply(groups, function(name) group()), groups))
+  }
+  if (!is.list(groups) || inherits(groups, "hammel_group"))
+    stop("`groups` must be dimension names or a named list of group() objects.", call. = FALSE)
+  check_group_names(names(groups))
+  for (name in names(groups)) {
+    validate_group(groups[[name]], name)
+    groups[[name]]["inheritance"] <- list(normalize_group_inheritance(groups[[name]]$inheritance))
+  }
+  groups
 }
 
 # Replace a population's declaration. Ancestry shares are dropped when the new

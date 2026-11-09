@@ -5,6 +5,12 @@ D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the u
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## Within-file ordering and section headings (November 9, 2026)
+
+Following the user's instruction under D143, each hand-maintained R file now starts with a purpose comment, followed by exported functions and then internal constants/helpers under `# SECTION NAME ------` headings. Generated wrappers remain untouched. Before/after parsing confirmed that every function and constant is unchanged and remains in its original file; all exported functions precede helpers. Explanatory comments and roxygen blocks were retained, and section headings were updated where necessary.
+
+`devtools::document()` produced no help-page or export changes. The full offline `devtools::test()` run passed 6,496 expectations with zero failures in 108.8 seconds, with the live database test skipped. The same environment warning about `timedatectl` system-bus access occurred while loading HMDHFDplus/lubridate. The final purpose comments and heading adjustments were checked by parsing again and `git diff --check`; they do not change executable R expressions.
+
 ## R source organization (November 9, 2026)
 
 D143 reorganizes the R files according to the user-agreed [source organization guide](r-source-organization.md). Before/after parsing confirmed that all 226 function definitions, six shared constants, and package metadata are identical as R expressions. Every original source comment was retained. The resulting 34 R files match the agreed map; `simulate()` is unchanged, and `model_schedules.R`, `hammel_model.R`, generated wrappers, and native sources are unchanged.

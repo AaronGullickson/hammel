@@ -1,3 +1,7 @@
+# Prepare population histories, strata, and output tables for demographic analysis.
+
+# HELPER FUNCTIONS ---------------------------------------------------------
+
 # Shared history preparation and stratification for demographic analysis.
 # Used by rate calculations, population counts, and relationship extraction.
 

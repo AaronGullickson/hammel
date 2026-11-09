@@ -1,3 +1,7 @@
+# Validate and prepare cohabitation settings and conversion rate schedules.
+
+# HELPER FUNCTIONS ---------------------------------------------------------
+
 # Cohabitation input helpers: no demographic defaults beyond the accepted
 # zero probability in gaps and shared matching/rates when explicitly unstratified.
 validate_cohabitation <- function(process) {

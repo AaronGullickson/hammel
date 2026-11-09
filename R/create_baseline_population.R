@@ -1,3 +1,7 @@
+# Generate baseline populations and sample their declared group categories.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Generate a simple baseline population
 #'
 #' Create a starter population with independent uniformly distributed ages,
@@ -71,6 +75,8 @@ create_baseline_population <- function(size, max_age = 70, end_time = 0,
                     groups = if (is.null(draw)) NULL else
                       lapply(attr(draw, "categories"), function(x) group(categories = x)))
 }
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 # Validate baseline group weights and return a function drawing `size` people.
 baseline_group_sampler <- function(groups) {

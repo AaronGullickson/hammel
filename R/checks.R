@@ -1,3 +1,7 @@
+# Provide general checks for table columns, numeric values, and times.
+
+# HELPER FUNCTIONS ---------------------------------------------------------
+
 # General validation helpers shared across package components.
 # Domain-specific checks stay with the API they validate.
 

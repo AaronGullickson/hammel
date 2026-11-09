@@ -1,3 +1,7 @@
+# Construct and validate union-dissolution process specifications.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Specify duration-dependent union dissolution
 #'
 #' Construct or attach an optional dissolution process. One continuous hazard
@@ -62,6 +66,8 @@ set_union_dissolution <- function(model, rates, weights = NULL) {
   set_process(model, union_dissolution(rates, weights))
 }
 
+# HELPER FUNCTIONS ---------------------------------------------------------
+
 validate_union_dissolution <- function(process, calendar_interval = NULL) {
   if (!identical(process$name, "union_dissolution") ||
       !identical(process$rate_unit, "person_year"))
@@ -113,4 +119,3 @@ validate_union_dissolution <- function(process, calendar_interval = NULL) {
   }
   invisible(process)
 }
-

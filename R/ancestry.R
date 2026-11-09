@@ -1,3 +1,7 @@
+# Validate, normalize, and prepare ancestry shares for populations and simulations.
+
+# HELPER FUNCTIONS ---------------------------------------------------------
+
 # Ancestry shares are independent of current group identity. Each dimension
 # declared with `ancestry = TRUE` has its own table (D134): `person_id`, one
 # column per category and `unknown`. Missing ancestry belongs in the explicit

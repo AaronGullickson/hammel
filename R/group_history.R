@@ -1,3 +1,7 @@
+# Normalize, validate, and query recorded group-transition histories.
+
+# HELPER FUNCTIONS ---------------------------------------------------------
+
 empty_transitions <- function() {
   tibble::tibble(person_id = numeric(), time = numeric(), group = character(),
                  origin = character(), destination = character(),

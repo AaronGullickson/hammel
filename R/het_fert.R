@@ -1,3 +1,7 @@
+# Specify persistent fertility heterogeneity and initialize individual weights.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Specify persistent fertility weights and maternal inheritance
 #'
 #' Weights redistribute births among eligible women within a fertility cell;
@@ -32,6 +36,8 @@ het_fert <- function(cv, alpha) {
   validate_het_fert(model)
   model
 }
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 validate_het_fert <- function(model) {
   if (is.null(model)) return(invisible(NULL))

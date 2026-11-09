@@ -1,3 +1,7 @@
+# Create model specifications and attach their starting populations.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Create an empty Hammel model specification
 #'
 #' Set the starting population and demographic processes using pipeable setters.
@@ -57,6 +61,8 @@ set_population <- function(model, population) {
   model$population <- population
   model
 }
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 check_model <- function(model) {
   if (!inherits(model, "hammel_model") || !is.list(model)) {

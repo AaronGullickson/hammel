@@ -1,3 +1,7 @@
+# Validate, select, and prepare calendar schedules of component models.
+
+# HELPER FUNCTIONS ---------------------------------------------------------
+
 # Public arguments retain direct model objects or ordinary inspectable tibbles.
 is_model_schedule <- function(x) is.data.frame(x)
 

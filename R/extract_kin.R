@@ -1,3 +1,7 @@
+# Extract recorded kin and validate kinship generation limits.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Extract known kin within generation-distance bounds
 #'
 #' Find recorded common ancestors within `generations` parent steps of both an
@@ -53,6 +57,8 @@ extract_kin <- function(population, ego_ids, generations = 2, relative_ids = NUL
   tibble::as_tibble(extract_kin_cpp(population$persons, ego_ids, relative_ids,
                                    as.integer(generations)))
 }
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 validate_kinship_generations <- function(generations, name = "kinship_generations") {
   if (!is.numeric(generations) || length(generations) != 1L ||

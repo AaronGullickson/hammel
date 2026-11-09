@@ -3161,3 +3161,6 @@ Observed event-rate calculators and rate-specific helpers share `calculate_rates
 **Future additions:** When a new function has no logical home in an existing R file, explain the proposed responsibility and filename and ask the user before creating a new R script. Do not create one automatically. This requirement is also in `AGENTS.md`.
 
 **Scope:** Mechanical organization, preserving function definitions, constants, source comments, exports, and help topics. Help-topic redesign, pkgdown reference grouping, new demographic behavior, and simulation-body refactoring are separate work. Explicit roxygen ordering preserves the existing shared-help display order after files are split.
+
+
+**Within-file organization (user instruction, November 9, 2026):** Start each hand-maintained R script with a brief purpose comment above the section headings. Put exported functions before internal constants and helper functions, with `# PUBLIC FUNCTIONS ------`, `# INTERNAL CONSTANTS ------`, and `# HELPER FUNCTIONS ------` headings where applicable. Preserve function bodies and documentation blocks. Keep generated wrappers untouched; package documentation uses its own section.

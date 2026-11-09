@@ -1,3 +1,7 @@
+# Construct, validate, and prepare newborn group inheritance models.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Specify newborn group identity inheritance
 #'
 #' Assign one group independently of genealogical ancestry shares. Attach this
@@ -53,6 +57,8 @@ create_group_inheritance <- function(method = "random_parent", fun = NULL,
   validate_group_inheritance(model)
   model
 }
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 inheritance_methods <- function() {
   c("mother", "father", "random_parent", "same_sex", "opposite_sex", "ancestry", "hierarchy", "custom", "fixed")

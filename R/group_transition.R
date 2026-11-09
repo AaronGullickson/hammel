@@ -1,3 +1,7 @@
+# Construct and validate group-transition processes and household move rules.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Specify individual group transitions
 #'
 #' Construct or attach competing origin-to-destination hazards for one group
@@ -94,6 +98,8 @@ household <- function(age_independence = 18) {
     stop("`age_independence` must be a finite nonnegative number of years.", call. = FALSE)
   structure(list(age_independence = as.numeric(age_independence)), class = "hammel_household")
 }
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 check_transition_group <- function(group) {
   if (is.null(group)) return(NULL)

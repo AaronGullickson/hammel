@@ -1,3 +1,7 @@
+# Validate and attach demographic process specifications to models.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Set a demographic process specification
 #'
 #' Store a process specification under its name, replacing an existing process
@@ -36,6 +40,8 @@ set_process <- function(model, process) {
   model <- attach_process(model, process)
   model
 }
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 # Validate and store a process without user-facing advisory warnings; used by
 # set_process() and by simulate()'s re-validation of edited specifications.

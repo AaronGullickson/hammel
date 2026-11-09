@@ -1,3 +1,7 @@
+# Construct, validate, and prepare models for selection within event cells.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Create a weight model for selection within rate cells
 #'
 #' A weight model decides which member of a rate cell experiences an event,
@@ -83,6 +87,8 @@ create_weight_model <- function(formula = NULL, coefficients = numeric(), fun = 
   model
 }
 
+# INTERNAL CONSTANTS -------------------------------------------------------
+
 # Engine codes of weight variables. Group variables (codes 1, 6, 9, 10, 16)
 # carry their dimension's index as the factor component; ancestry variables
 # (7, 14, 15) carry the ancestry column.
@@ -91,6 +97,8 @@ weight_variable_codes <- c(sex = 0L, group = 1L, union_type = 2L, partnered = 3L
   group_w = 9L, group_h = 10L, parity_w = 11L, previous_union_w = 12L,
   previous_union_h = 13L, ancestry_w = 14L, ancestry_h = 15L, same_group = 16L,
   age_difference = 17L)
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 # Built-in weight variables of a process type, with engine codes and, for
 # categorical variables, their levels (the first is the reference) and the

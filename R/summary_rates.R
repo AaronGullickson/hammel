@@ -1,8 +1,14 @@
+# Identify strata and validate intervals for summaries of rate schedules.
+
+# INTERNAL CONSTANTS -------------------------------------------------------
+
 # Bands and measures of rate tables; summaries treat any other column (such
 # as a group dimension, `race` or `region`) as identifying a stratum.
 summary_measures <- c("age_start", "age_end", "parity_start", "parity_end", "dur_start", "dur_end",
   "mx", "rate", "rate_mortality", "rate_fertility", "rate_fertility_adjusted", "person_years",
   "deaths", "births", "unrealized_births", "conf_low", "conf_high")
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 # A summary table's stratum columns, in table order: period, sex (when kept),
 # union status (when kept) and every other non-measure column.

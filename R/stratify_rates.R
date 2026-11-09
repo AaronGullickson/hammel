@@ -1,3 +1,7 @@
+# Create proportional strata in input rate tables and check supported stratum columns.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Add proportional strata to a rate table
 #'
 #' Copy each row of a rate table once per category of one or more new columns,
@@ -73,12 +77,16 @@ stratify_rates <- function(rates, by) {
   out
 }
 
+# INTERNAL CONSTANTS -------------------------------------------------------
+
 # Built-in categorical strata of rate tables; each process accepts some.
 builtin_strata <- c("sex", "union_type", "previous_union", "origin", "destination")
 
 # Rate-table columns that are not strata: bands, rates and calendar periods.
 rate_schema_columns <- c("age_start", "age_end", "dur_start", "dur_end", "rate", "prob",
   "time_start", "time_end", "parity_start", "parity_end")
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 # Columns of a rate table that may be group strata: everything else. Group
 # dimensions are known only once the table meets the population's declaration.

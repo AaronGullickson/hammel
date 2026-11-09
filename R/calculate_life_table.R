@@ -1,3 +1,7 @@
+# Calculate period life tables from mortality rate schedules.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Construct period life tables from mortality rates
 #'
 #' Treat mortality rates as piecewise constant hazards. Closed-interval survival

@@ -1,3 +1,7 @@
+# Construct fertility processes and validate fertility settings and feasibility.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' @rdname mortality
 #' @export
 #' @order 2
@@ -26,6 +30,8 @@ set_fertility <- function(model, rates, birth_interval = 0.75, ffab = 0.4886,
   set_process(model, fertility(rates, birth_interval = birth_interval,
                               ffab = ffab, hetfert = hetfert, weights = weights))
 }
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 # Positive parity-specific rates in one-year age cells (the fertility cells of
 # D101) that no woman can occupy while eligible, given the

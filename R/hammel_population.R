@@ -1,3 +1,7 @@
+# Construct and validate population objects and their union histories.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Create a Hammel population
 #'
 #' Collect person and union histories in an inspectable population object.
@@ -175,6 +179,8 @@ validate_population <- function(results) {
   validate_ancestry(results[["ancestry"]], persons, results$groups)
   invisible(results)
 }
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 normalize_unions <- function(unions) {
   if (is.null(unions) ||

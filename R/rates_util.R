@@ -1,6 +1,10 @@
+# Validate input rate schedules and prepare calendar and group strata for execution.
+
+# HELPER FUNCTIONS ---------------------------------------------------------
+
 # Shared validation and engine preparation of input rate schedules.
 
-# Calendar schedules and coverage ----------------------------------
+# CALENDAR SCHEDULES AND COVERAGE ------------------------------------------
 
 # Shared calendar validation for flat rate tables. Each active slice follows
 # the existing demographic validator; time gaps are checked against the run.
@@ -57,7 +61,7 @@ check_calendar_coverage <- function(rates, start, end, name) {
     sprintf("%s rates have a calendar coverage gap", name))
 }
 
-# Group registries and engine strata -------------------------------
+# GROUP REGISTRIES AND ENGINE STRATA ---------------------------------------
 
 # Group dimensions in rate tables and the engine (D134). Each declared
 # dimension has a registry: its ordered categories. A rate table stratifies by
@@ -237,7 +241,7 @@ check_strata_overlap <- function(rates, process) {
   invisible(rates)
 }
 
-# Group labels and schedule splitting ------------------------------
+# GROUP LABELS AND SCHEDULE SPLITTING --------------------------------------
 
 # Shared group validation and execution-only schedule indexing. Public labels
 # and their types are preserved; the engine uses compact integer indices.
@@ -263,7 +267,7 @@ split_rate_groups <- function(rates, columns = "group") {
   split(seq_len(nrow(rates)), key, drop = TRUE)
 }
 
-# Mortality and fertility schedule validation ----------------------
+# MORTALITY AND FERTILITY SCHEDULE VALIDATION ------------------------------
 
 validate_rates <- function(rates, mortality) {
   check_stratified_columns(rates, if (mortality) "sex" else "union_type",

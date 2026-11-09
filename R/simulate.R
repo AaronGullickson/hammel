@@ -1,3 +1,7 @@
+# Prepare and run simulations and assemble their population histories and diagnostics.
+
+# PUBLIC FUNCTIONS ---------------------------------------------------------
+
 #' Run a demographic simulation
 #'
 #' Advance a configured model and return a population that can initialize a
@@ -484,6 +488,8 @@ simulate <- function(model, years, seed = NULL) {
   validate_population(result)
   result
 }
+
+# HELPER FUNCTIONS ---------------------------------------------------------
 
 # Counts of unrealized births from cells with members but no eligible woman
 # (D101), by one-year period from the run start and cell. Columns mirror the
