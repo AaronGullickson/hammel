@@ -19,8 +19,11 @@ restored afterward. With \code{NULL}, the simulation advances the current RNG.}
 }
 \value{
 A \code{hammel_population} with updated histories and endpoint, plus a
-\code{simulation} component recording run settings and birth/death counts, plus
-\code{dissolutions} when a dissolution process is configured.
+\code{simulation} component recording the latest run's settings and
+birth/death counts, plus \code{dissolutions} when a dissolution process is
+configured. \code{unrealized_births} records births that could not occur, by
+period and fertility cell, accumulated across runs since
+\code{unrealized_since}, the start of the first simulated run.
 }
 \description{
 Advance a configured model and return a population that can initialize a
@@ -85,7 +88,7 @@ cell-accounted fertility (D101; see \code{\link[=fertility]{fertility()}}): each
 age/parity/union-type/group cell produces births at its input rate times all
 its members, assigned to an eligible member uniformly or proportionally to
 \code{hetfert} weights when enabled. Births that cannot occur because a cell has
-no eligible member are counted in \code{simulation$unrealized_births}. Fertility
+no eligible member are counted in \code{unrealized_births}. Fertility
 outside supplied bands is zero. Mortality must cover all ages for both sexes,
 ending at \code{Inf}.
 

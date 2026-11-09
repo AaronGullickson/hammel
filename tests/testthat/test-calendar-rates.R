@@ -107,7 +107,7 @@ test_that("fertility changes retain spacing, weights and count unrealized births
   m <- set_fertility(m, r, birth_interval = 2, hetfert = het_fert(cv = 0, alpha = 1))
   m$population$persons$hetfert <- c(rep(2, n), rep(NA, n))
   out <- run_simulation(m, 1, seed = 81)
-  u <- out$simulation$unrealized_births
+  u <- out$unrealized_births
   expect_count(u$unrealized_births, (.2 * .5 + .4 * .5) * n)
   # Counts sit on the one-year grid from the run start, across the rate change.
   expect_equal(u$period_start, 0)
@@ -116,7 +116,21 @@ test_that("fertility changes retain spacing, weights and count unrealized births
   expect_equal(out$simulation$births, 0)
   expect_equal(out$persons$mother_id, m$population$persons$mother_id)
   restarted <- run_simulation(set_population(m, out), .5, seed = 82)
-  expect_count(restarted$simulation$unrealized_births$unrealized_births, .4 * .5 * n)
+  # The restart keeps the first run's records and appends its own.
+  record <- restarted$unrealized_births
+  expect_identical(record[seq_len(nrow(u)), ], u)
+  expect_equal(restarted$unrealized_since, 0)
+  later <- record[record$period_start >= 1, ]
+  expect_count(later$unrealized_births, .4 * .5 * n)
+  # Adjusted rates now cover periods before the restart.
+  rates <- calculate_fertility_rates(
+    restarted, c(0, 1, 1.5), c(15, 50), unrealized = TRUE
+  )
+  by_period <- tapply(rates$unrealized_births, rates$time_start, sum)
+  expect_equal(as.vector(by_period), c(
+    sum(record$unrealized_births[record$period_start < 1]),
+    sum(later$unrealized_births)
+  ))
 })
 
 test_that("cell birth counts recover rates on either side of a calendar change", {

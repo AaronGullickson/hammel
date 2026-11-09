@@ -66,7 +66,7 @@
 #' age/parity/union-type/group cell produces births at its input rate times all
 #' its members, assigned to an eligible member uniformly or proportionally to
 #' `hetfert` weights when enabled. Births that cannot occur because a cell has
-#' no eligible member are counted in `simulation$unrealized_births`. Fertility
+#' no eligible member are counted in `unrealized_births`. Fertility
 #' outside supplied bands is zero. Mortality must cover all ages for both sexes,
 #' ending at `Inf`.
 #'
@@ -106,8 +106,11 @@
 #' @param seed Optional integer seed. With a seed, the caller's RNG state is
 #'   restored afterward. With `NULL`, the simulation advances the current RNG.
 #' @return A `hammel_population` with updated histories and endpoint, plus a
-#'   `simulation` component recording run settings and birth/death counts, plus
-#'   `dissolutions` when a dissolution process is configured.
+#'   `simulation` component recording the latest run's settings and
+#'   birth/death counts, plus `dissolutions` when a dissolution process is
+#'   configured. `unrealized_births` records births that could not occur, by
+#'   period and fertility cell, accumulated across runs since
+#'   `unrealized_since`, the start of the first simulated run.
 #' @export
 #' @examples
 #' population <- generate_uniform_population(100, max_age = 50)
@@ -786,9 +789,19 @@ run_simulation <- function(model, years, seed = NULL) {
   if (!is.null(hetfert)) {
     result$simulation$hetfert <- hetfert
   }
-  result$simulation$unrealized_births <- format_unrealized_births(
+  # Unrealized births are part of the population's history: append this run's
+  # records to any earlier ones. `unrealized_since` is when the record starts.
+  unrealized <- format_unrealized_births(
     if (years > 0) native$unrealized else NULL, birth_rates, registries
   )
+  if (is.null(population$unrealized_births)) {
+    result$unrealized_births <- unrealized
+    result$unrealized_since <- start
+  } else {
+    result$unrealized_births <- bind_unrealized_births(
+      population$unrealized_births, unrealized
+    )
+  }
   if (cohab_enabled) {
     result$simulation$cohabitation_counts_as_previous_union <- counts_cohab
     result$simulation$conversions <- if (years > 0) native$conversions else 0
@@ -822,6 +835,20 @@ run_simulation <- function(model, years, seed = NULL) {
 # (D101), by one-year period from the run start and cell. Columns mirror the
 # fertility table's strata: group, union_type and parity bounds appear only
 # when the schedules use them. Always a tibble, possibly with zero rows.
+# Append unrealized-birth records whose stratum columns differ between runs;
+# a column a run did not use is NA (pooled) in that run's rows.
+bind_unrealized_births <- function(old, new) {
+  columns <- union(names(old), names(new))
+  columns <- c(setdiff(columns, "unrealized_births"), "unrealized_births")
+  for (column in setdiff(columns, names(old))) {
+    old[[column]] <- new[[column]][rep(NA_integer_, nrow(old))]
+  }
+  for (column in setdiff(columns, names(new))) {
+    new[[column]] <- old[[column]][rep(NA_integer_, nrow(new))]
+  }
+  tibble::as_tibble(rbind(old[columns], new[columns]))
+}
+
 format_unrealized_births <- function(native, rates, registries) {
   if (is.null(native) || !length(native$period_start)) {
     native <- data.frame(

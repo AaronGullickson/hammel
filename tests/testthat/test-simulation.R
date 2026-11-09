@@ -156,7 +156,9 @@ test_that("fractional run durations and tibble outputs are supported", {
   result <- run_simulation(make_model(), 0.123, seed = 42)
   expect_equal(result$end_time, 0.123, tolerance = 0)
   expect_identical(names(result$simulation), c("start_time", "end_time", "birth_interval",
-    "ffab", "births", "deaths", "unrealized_births"))
+    "ffab", "births", "deaths"))
+  expect_s3_class(result$unrealized_births, "tbl_df")
+  expect_equal(result$unrealized_since, 0)
   expect_error(run_simulation(make_model(), -1))
   expect_error(run_simulation(make_model(), 1, step_duration = 1))
   expect_true(tibble::is_tibble(result$persons))

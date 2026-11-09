@@ -218,7 +218,7 @@ Shared input-rate validation, calendar coverage, group strata, and engine encodi
 
 Orchestrate validation, preparation, RNG handling, execution, and result assembly.
 
-- Functions: **`run_simulation()`**, `format_unrealized_births()`.
+- Functions: **`run_simulation()`**, `bind_unrealized_births()`, `format_unrealized_births()`.
 
 ### `R/set_process.R`
 

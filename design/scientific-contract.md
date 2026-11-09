@@ -230,9 +230,10 @@ schedules or intervals, union-type transitions), at cell resolution, while a
 cell has an eligible member. Within a one-year cell, selection does not vary
 with exact age. A cell with members but none eligible keeps its intensity; when
 the birth clock draws it, no child is born and one unrealized birth is counted
-in `simulation$unrealized_births` (a tibble of counts by one-year period from
-the run start, group, union type, parity band and age band; D128 revises D101's
-expected-value reporting). In a cell shared by groups, the draw that would pick
+in the population's `unrealized_births` (a tibble of counts by one-year period
+from the run start, group, union type, parity band and age band; D128 revises
+D101's expected-value reporting). The record accumulates across restarts from
+`unrealized_since` (D160). In a cell shared by groups, the draw that would pick
 a mother picks the group in proportion to its members.
 `calculate_fertility_rates(unrealized = TRUE)` attributes the counts to
 observation rows. Cancelled attempts keep their spent intensity. Union changes move a woman between cells; restarts rebuild cells

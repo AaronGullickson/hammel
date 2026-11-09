@@ -79,63 +79,53 @@ calculate_transition_rates(
 )
 }
 \arguments{
-\item{population}{One independent history. All functions accept a
-\code{hammel_population} with the required histories and a known endpoint;
-observation cannot extend beyond it. Wrap a persons table with
-\code{\link[=hammel_population]{hammel_population()}} and its \code{end_time}. See each calculator's section
-for its required histories.}
+\item{population}{A \code{hammel_population} object returned from
+\code{\link[=run_simulation]{run_simulation()}}.}
 
-\item{time_breaks}{Strictly increasing finite calendar boundaries in years.
-Cells are half-open: events at internal boundaries enter the cell starting
-there; the final calendar boundary is excluded.}
+\item{time_breaks}{Strictly increasing finite calendar boundaries in years or
+fractions of years that define the time intervals of the Lexis surface.}
 
-\item{age_breaks}{Strictly increasing nonnegative age boundaries in years. A
-finite final boundary gains Inf, creating an open final band starting
-there. Required for mortality, fertility, union formation, and marriage.
-Conversion and group transitions require exactly one of \code{age_breaks} and
-\code{dur_breaks}; conversion uses the woman's attained age.}
+\item{age_breaks}{Strictly increasing nonnegative age boundaries in years or
+fractions of years that define the age intervals of the Lexis surface. If
+the last boundary is finite, an open-ended age interval extended to Inf is
+added. Required for mortality, fertility, union formation, and marriage.
+Cohabitation conversion and group transitions require exactly one of
+\code{age_breaks} and \code{dur_breaks}.}
 
-\item{by}{\code{NULL} (default) or a character vector of variables to split
-results over. Accepted variables and their event-time interpretation differ
-by calculator; see the sections below. Declared group dimensions must be
-named explicitly, for example \code{"race"}, \code{"race_w"}, or \code{"race_h"}.}
+\item{by}{Character vector of variables to stratify rates across. Defaults to
+\code{NULL} for no stratification. Accepted stratification variables differ by
+calculator; see the sections below.}
 
 \item{conf_level}{NULL (default) to omit confidence intervals, or a finite
-numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
-from two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} intervals for observed event
-counts over exposure. Bounds are NA at zero exposure. For fertility, these
+numeric scalar strictly between 0 and 1 indicating the level of confidence
+to use for rate confidence intervals. Adds \code{conf_low} and \code{conf_high} from
+two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} intervals for observed event counts
+over exposure. Bounds are NA at zero exposure. For fertility, these
 describe the observed rate, not the unrealized-adjusted rate.}
 
-\item{use_detailed_previous_union}{Logical, default \code{TRUE}, which reports
-\code{"previous_union"} as \code{"none"}, \code{"separated"} and \code{"widowed"}. With
-\code{FALSE} and \code{"previous_union"} in \code{by}, separated and widowed are combined
-as \code{"dissolved"}, pooling counts and exposure before calculating rates and
-confidence intervals. Union formation adds
-\code{"previous_union"} automatically when \code{dur_breaks} is supplied.}
+\item{use_detailed_previous_union}{Logical value that indicates whether
+stratification by \code{"previous_union"} will use \code{"separated"} and \code{"widowed"}
+or a combined \code{"dissolved"} category.}
 
 \item{parity_breaks}{For fertility only: NULL to pool parities, or strictly
-increasing nonnegative integer boundaries starting at zero. Bands are
-half-open. A finite final boundary receives Inf, as for age breaks.}
+increasing nonnegative integer boundaries starting at zero that define
+categories for stratifying by parity.}
 
-\item{unrealized}{For fertility only: logical, default \code{FALSE}. With \code{TRUE},
-the population must come from \code{run_simulation()}; add \code{unrealized_births}
-(counted births that could not occur because their fertility cell had
-members but no eligible woman, from \code{simulation$unrealized_births}) and
-\code{rate_fertility_adjusted = (births + unrealized_births) / person_years}.
-Values are \code{NA} where they cannot be attributed exactly: periods before the
-most recent simulation's start (restarts keep only the latest run's
-record), breaks that cut through a recorded one-year period or fertility
-cell, and \code{by} or parity strata the fertility schedule did not use
-(\code{"previous_union"} always).}
+\item{unrealized}{For fertility only: logical, default \code{FALSE}. When \code{TRUE},
+adds a column for \code{rate_fertility_adjusted} that gives the fertility rate
+when unrealized births (counted births that could not be realized because
+their fertility cell had members but no eligible women).}
 
 \item{dur_breaks}{Strictly increasing nonnegative duration boundaries in
-years. A finite final boundary gains Inf. Required for dissolution;
-optional for union formation; an alternative to age for conversion and
-group transitions. The duration origin and union-formation mixed
-age/duration output are described in the corresponding sections below.}
+years or fractions of years that define the duration intervals of the Lexis
+surface. If the last boundary is finite, an open-ended duration interval
+extended to Inf is added. Required for union dissolution; optional for
+union formation; an alternative to age for cohabitation conversion and
+group transitions.}
 
-\item{group}{The declared group dimension whose transitions are counted.
-\code{NULL} (default) means the only declared dimension.}
+\item{group}{For group transitions only. The declared group dimension whose
+transitions are counted. \code{NULL} (default) means the only declared
+dimension and will only work when one group is defined.}
 }
 \value{
 A tibble containing calendar bands, age or duration bands where
@@ -144,14 +134,24 @@ rate. Rates are NA at zero exposure; zero events with positive exposure
 give zero. Confidence limits are included only when requested. Person-based
 exposure uses \code{person_years} (woman-years for fertility); union-based
 exposure uses \code{union_years}. Each calculator's section specifies its
-count/rate columns, row ordering, and additional output.
+count/rate columns, and additional output.
 }
 \description{
-Calculate mortality, fertility, union formation, marriage, dissolution,
-cohabitation conversion, and group-transition rates from recorded population
-histories. Each function counts its events and divides by its own risk
-exposure; the denominators are not interchangeable. These functions analyze
-histories without running a simulation or changing the population.
+Calculate age-specific mortality, fertility, union formation, dissolution,
+cohabitation conversion, and group transition rates from simulated data by
+time intervals. Rates can be stratified across a variety of dimensions.
+}
+\details{
+Rates are calculated by counting person-years and events within a given Lexis
+triangle from a Lexis surface. Some rates allow for either \code{age_breaks} or
+\code{dur_breaks} but one most always be provided. \code{time_breaks} are also always
+required but users can specify a single time interval for the entire
+simulation.
+
+All breaks defined by the function use half-open intervals that are inclusive
+at the lower bound and exclusive at the upper bound.
+
+For more details on each rate, see below.
 }
 \section{Choosing a calculator}{
 
@@ -169,9 +169,9 @@ category
 }
 
 \section{Person-state stratification}{
-
-\code{by} lists categorical variables to split exposure and events over. Each is
-the person's state at the time, changing only at recorded events:
+ \code{by} lists categorical variables to
+split exposure and events over. Each is the person's state at the time,
+changing only at recorded events:
 \itemize{
 \item A declared group dimension's name (such as \code{"race"}; see \code{\link[=set_groups]{set_groups()}}):
 the current category, following that dimension's transition history.
@@ -184,47 +184,45 @@ untyped ones.
 \code{"separated"} or \code{"widowed"}, including during later unions. Conversion is
 not an ending; cohabitation endings follow the population's cohabitation
 policy.
-}
 
 Union variables require a \code{hammel_population} with union histories;
 \code{"previous_union"} (and typed \code{"union_type"}) require nonoverlapping
 histories for each person. Each event counts under the state just before it
-in the simulation's event order: deaths see no same-time changes, so a death
-that ends a union counts as partnered; births count in a union starting at
-the same time and in one ending then by dissolution or conversion, but not
-one ending by the partner's death, and use the mother's group before any
-same-time transition.
+in the simulation's event order: deaths see no same-time changes, so a
+death that ends a union counts as partnered; births count in a union
+starting at the same time and in one ending then by dissolution or
+conversion, but not one ending by the partner's death, and use the mother's
+group before any same-time transition.
 
-For mortality and fertility, rows vary by time fastest, then age (and parity
-when requested), then sex, then the \code{by} variables in the order given,
-earlier ones varying faster. Strata sum to pooled counts and exposure;
-recompute rates after pooling.
+For mortality and fertility, rows vary by time fastest, then age (and
+parity when requested), then sex, then the \code{by} variables in the order
+given, earlier ones varying faster. Strata sum to pooled counts and
+exposure; recompute rates after pooling.
 
 For mortality and fertility, \code{by} selects declared group dimensions,
-\code{"union_type"}, and \code{"previous_union"}. Group transitions additionally allow
-\code{"sex"}. Union entry and union-level rates have the distinct interpretations
-described in their own sections. Do not sum shared exposure across
-union-entry types or group-transition destinations.
+\code{"union_type"}, and \code{"previous_union"}. Group transitions additionally
+allow \code{"sex"}. Union entry and union-level rates have the distinct
+interpretations described in their own sections. Do not sum shared exposure
+across union-entry types or group-transition destinations.
+}
 }
 
 \section{Mortality}{
-
-\code{calculate_mortality_rates()}: Report deaths per person-year, with exact
-half-open period and age splitting.
+ \code{calculate_mortality_rates()}: Report deaths per
+person-year, with exact half-open period and age splitting.
 
 \strong{Output:} A tibble containing period, sex, age, the \code{by} columns,
 person_years, deaths and rate_mortality.
 }
 
 \section{Fertility}{
-
-\code{calculate_fertility_rates()}: Report maternal births per woman-year,
-including time excluded by minimum birth spacing. Only female rows are
-returned. Current parity is reconstructed from all recorded maternal births,
-including pre-window births and deceased children; custom person parity
-columns are ignored. Each birth counts at the parity immediately before it
-and advances subsequent exposure. Simultaneous births progress successively
-in recorded person-row order.
+ \code{calculate_fertility_rates()}: Report maternal births per
+woman-year, including time excluded by minimum birth spacing. Only female
+rows are returned. Current parity is reconstructed from all recorded
+maternal births, including pre-window births and deceased children; custom
+person parity columns are ignored. Each birth counts at the parity
+immediately before it and advances subsequent exposure. Simultaneous births
+progress successively in recorded person-row order.
 
 \code{by} works as in \code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}: births count under the
 mother's state just before them.
@@ -237,21 +235,20 @@ unassigned_births attribute.
 }
 
 \section{Union formation}{
+ \code{calculate_union_rates()}: Count union starts and
+unpartnered person-years by age, period, sex, and optionally
+\code{previous_union}: \code{"none"}, \code{"separated"}, or \code{"widowed"}. The most recent
+episode's ending determines the category; each start counts in the category
+immediately before formation. Partnered time contributes no exposure. Men
+describe realized matching outcomes, not a male search-rate input. Typed
+entries pool cohabitation and direct marriage; conversion is excluded
+because partners remain partnered. Previous-category classification follows
+the population's recorded cohabitation policy, default FALSE without
+metadata. With \code{dur_breaks}, only none rows use age; separated/widowed rows
+use duration since the most recent ending; \code{use_detailed_previous_union = FALSE} combines them.
 
-\code{calculate_union_rates()}: Count union starts and unpartnered person-years by
-age, period, sex, and optionally \code{previous_union}: \code{"none"}, \code{"separated"},
-or \code{"widowed"}. The most recent episode's ending determines the category;
-each start counts in the category immediately before formation. Partnered
-time contributes no exposure. Men describe realized matching outcomes, not a
-male search-rate input. Typed entries pool cohabitation and direct marriage;
-conversion is excluded because partners remain partnered. Previous-category
-classification follows the population's recorded cohabitation policy, default
-FALSE without metadata. With \code{dur_breaks}, only none rows use age;
-separated/widowed rows use duration since the most recent ending;
-\code{use_detailed_previous_union = FALSE} combines them.
-
-Histories must be complete for the intended interpretation. \code{"none"} means no
-recorded earlier union; omitted history cannot establish never-partnered
+Histories must be complete for the intended interpretation. \code{"none"} means
+no recorded earlier union; omitted history cannot establish never-partnered
 status. Overlapping episodes are rejected. Touching episodes are allowed;
 tied starts follow union ID order. Time and age cells are half-open, with
 events on internal boundaries assigned to the cell beginning there. Every
@@ -268,69 +265,71 @@ split results over: declared group dimensions (each person's own categories
 before formation), \code{"previous_union"} (\code{"none"}, \code{"separated"} or
 \code{"widowed"}, the category immediately before formation) and \code{"union_type"}
 (the type of union entered, \code{"cohab"} or \code{"marriage"}; requires typed
-histories). Both \code{union_type} rows share the full unpartnered exposure, which
-must not be summed across them. Rows vary by time fastest, then age (or
-duration), then sex, then the \code{by} variables in the order given.
+histories). Both \code{union_type} rows share the full unpartnered exposure,
+which must not be summed across them. Rows vary by time fastest, then age
+(or duration), then sex, then the \code{by} variables in the order given.
 
 \strong{\code{dur_breaks}:} Optional nonnegative duration boundaries in
-years. When supplied, separated/widowed rows use years since the latest union
-ending; none rows still use \code{age_breaks}. Adds \code{"previous_union"} to \code{by}
-(last, unless listed). A finite final boundary gains Inf. Adds
-\code{dur_start}/\code{dur_end}, with NA in the unused age/duration pair. Duration rows
-include all ages; this is not an age-by-duration surface.
+years. When supplied, separated/widowed rows use years since the latest
+union ending; none rows still use \code{age_breaks}. Adds \code{"previous_union"} to
+\code{by} (last, unless listed). A finite final boundary gains Inf. Adds
+\code{dur_start}/\code{dur_end}, with NA in the unused age/duration pair. Duration
+rows include all ages; this is not an age-by-duration surface.
 
-\strong{Output:} A tibble with \code{time_start}, \code{time_end}, \code{sex}, \code{age_start},
-\code{age_end}, duration columns when \code{dur_breaks} is supplied, the \code{by} columns,
-\code{person_years}, \code{unions}, and \code{rate_union}. Empty cells are retained. With
-non-NULL \code{conf_level}, also includes \code{conf_low} and \code{conf_high}.
+\strong{Output:} A tibble with \code{time_start}, \code{time_end}, \code{sex},
+\code{age_start}, \code{age_end}, duration columns when \code{dur_breaks} is supplied, the
+\code{by} columns, \code{person_years}, \code{unions}, and \code{rate_union}. Empty cells are
+retained. With non-NULL \code{conf_level}, also includes \code{conf_low} and
+\code{conf_high}.
 }
 
 \section{Marriage}{
+ \code{calculate_marriage_rates()}: Count direct marriages and
+conversions to marriage over nonmarried person-years: unpartnered and
+cohabiting time both contribute exposure. Married time contributes none.
+Each marriage episode counts once per spouse, including a marriage
+beginning at conversion. Untyped unions are interpreted as marriages. Men
+describe realized outcomes, not male search-rate inputs.
 
-\code{calculate_marriage_rates()}: Count direct marriages and conversions to
-marriage over nonmarried person-years: unpartnered and cohabiting time both
-contribute exposure. Married time contributes none. Each marriage episode
-counts once per spouse, including a marriage beginning at conversion. Untyped
-unions are interpreted as marriages. Men describe realized outcomes, not male
-search-rate inputs.
-
-Complete, nonoverlapping histories are required. Cells are half-open; starts
-on boundaries enter the cell beginning there. Exposure is censored at death
-and the observation endpoint. Rates are NA when exposure is zero. This
-age-specific measure does not provide duration strata. With \code{by = "previous_union"}, cohabiting exposure and conversion retain the category
-held immediately before that cohabitation began. Ending categories follow the
-recorded cohabitation policy, as in \code{\link[=calculate_union_rates]{calculate_union_rates()}}. For entry into
-any partnership over unpartnered exposure, use \code{\link[=calculate_union_rates]{calculate_union_rates()}}.
+Complete, nonoverlapping histories are required. Cells are half-open;
+starts on boundaries enter the cell beginning there. Exposure is censored
+at death and the observation endpoint. Rates are NA when exposure is zero.
+This age-specific measure does not provide duration strata. With \code{by = "previous_union"}, cohabiting exposure and conversion retain the category
+held immediately before that cohabitation began. Ending categories follow
+the recorded cohabitation policy, as in \code{\link[=calculate_union_rates]{calculate_union_rates()}}. For
+entry into any partnership over unpartnered exposure, use
+\code{\link[=calculate_union_rates]{calculate_union_rates()}}.
 
 \strong{\code{by}:} \code{NULL} (default) or a character vector of variables to
 split results over: declared group dimensions and \code{"previous_union"}, as in
 \code{\link[=calculate_union_rates]{calculate_union_rates()}}.
 
-\strong{Output:} A tibble with \code{time_start}, \code{time_end}, \code{sex}, \code{age_start},
-\code{age_end}, the \code{by} columns, \code{person_years}, \code{marriages}, and
+\strong{Output:} A tibble with \code{time_start}, \code{time_end}, \code{sex},
+\code{age_start}, \code{age_end}, the \code{by} columns, \code{person_years}, \code{marriages}, and
 \code{rate_marriage}. Empty cells are retained. Person-years include cohabiting
 time. With non-NULL \code{conf_level}, also includes \code{conf_low} and \code{conf_high}.
 }
 
 \section{Dissolution}{
-
-\code{calculate_dissolution_rates()}: Split each union episode across calendar
-periods and elapsed-duration bands, counting union-years once per episode,
-not once per spouse. Death and dissolution both stop exposure, but only
-\code{end_reason = "dissolution"} counts toward dissolutions. Missing ends are
-censored at the observation endpoint. Repeated episodes are separate
-observations; distinct overlapping records are not merged. Analyze one
-independent history per call, then combine counts.
+ \code{calculate_dissolution_rates()}: Split each union
+episode across calendar periods and elapsed-duration bands, counting
+union-years once per episode, not once per spouse. Death and dissolution
+both stop exposure, but only \code{end_reason = "dissolution"} counts toward
+dissolutions. Missing ends are censored at the observation endpoint.
+Repeated episodes are separate observations; distinct overlapping records
+are not merged. Analyze one independent history per call, then combine
+counts.
 
 Exposure and event cells are half-open. Dissolutions at internal boundaries
-belong to the cell beginning there, and events at the last time boundary are
-excluded. Zero-duration episodes may contribute events with no exposure.
-Rates are dissolutions per union-year: zero with positive exposure and no
-events, and NA when exposure is zero. This is a cause-specific rate, not the
-probability of dissolution in the presence of competing partner deaths.
+belong to the cell beginning there, and events at the last time boundary
+are excluded. Zero-duration episodes may contribute events with no
+exposure. Rates are dissolutions per union-year: zero with positive
+exposure and no events, and NA when exposure is zero. This is a
+cause-specific rate, not the probability of dissolution in the presence of
+competing partner deaths.
 
-\strong{\code{population}:} A \code{hammel_population} with union histories
-and a known endpoint; observation cannot extend beyond it.
+\strong{\code{population}:} A \code{hammel_population} with union histories and
+a known endpoint; observation cannot extend beyond it.
 
 \strong{\code{dur_breaks}:} Strictly increasing nonnegative duration
 boundaries in years. If the last boundary is finite, append Inf for an open
@@ -342,11 +341,10 @@ dimensions, such as \code{"race_w"} and \code{"region_h"} (the wife's and husban
 current categories, following transition histories; directional, so sum
 A-wife/B-husband and B-wife/A-husband rows for an unordered pair; any
 combination of dimensions and partners) and \code{"union_type"} (cohab or
-marriage, each with its own exposure; conversion stops cohabitation exposure
-without counting as dissolution, and duration resets at the start of the
-linked marriage). The group variables require declared groups. A
-dissolution counts under the groups before any same-time
-transition.
+marriage, each with its own exposure; conversion stops cohabitation
+exposure without counting as dissolution, and duration resets at the start
+of the linked marriage). The group variables require declared groups. A
+dissolution counts under the groups before any same-time transition.
 
 \strong{Output:} A tibble with \code{time_start}, \code{time_end}, \code{dur_start},
 \code{dur_end}, the \code{by} columns, \code{union_years}, \code{dissolutions}, and
@@ -356,29 +354,28 @@ variables in the order given. With non-NULL \code{conf_level}, also includes
 }
 
 \section{Cohabitation conversion}{
+ \code{calculate_cohab_convert_rate()}: Count
+conversions over cohabitation union-years, once per episode. Marriage
+episodes contribute neither exposure nor events. Conversion, dissolution
+and partner death end cohabitation exposure; only \code{end_reason = "conversion"} counts as an event. Ongoing episodes are censored at the
+observation endpoint. Cells are half-open; boundary events enter the cell
+beginning there, and events at the final time boundary are excluded.
+Zero-duration episodes can contribute events without exposure. Rates are NA
+when exposure is zero.
 
-\code{calculate_cohab_convert_rate()}: Count conversions over cohabitation
-union-years, once per episode. Marriage episodes contribute neither exposure
-nor events. Conversion, dissolution and partner death end cohabitation
-exposure; only \code{end_reason = "conversion"} counts as an event. Ongoing
-episodes are censored at the observation endpoint. Cells are half-open;
-boundary events enter the cell beginning there, and events at the final time
-boundary are excluded. Zero-duration episodes can contribute events without
-exposure. Rates are NA when exposure is zero.
+\strong{\code{population}:} A \code{hammel_population} with typed union
+histories and a known endpoint. Observation cannot extend beyond it.
 
-\strong{\code{population}:} A \code{hammel_population} with typed union histories
-and a known endpoint. Observation cannot extend beyond it.
-
-\strong{\code{dur_breaks}:} Optional strictly increasing nonnegative duration
-boundaries, in years since cohabitation began. Supply exactly one of
-\code{dur_breaks} and \code{age_breaks}. A finite final boundary gains an open-ended
-band through Inf.
+\strong{\code{dur_breaks}:} Optional strictly increasing nonnegative
+duration boundaries, in years since cohabitation began. Supply exactly one
+of \code{dur_breaks} and \code{age_breaks}. A finite final boundary gains an
+open-ended band through Inf.
 
 \strong{\code{by}:} \code{NULL} (default) or a character vector of \code{"<group>_w"}
 (the woman's current category in a declared group dimension, such as
 \code{"race_w"}, matching conversion input schedules) and \code{"<group>_h"} (the
-man's), in any combination of dimensions. Rows vary by time fastest, then the
-axis band, then the \code{by} variables in the order given.
+man's), in any combination of dimensions. Rows vary by time fastest, then
+the axis band, then the \code{by} variables in the order given.
 
 \strong{Output:} A tibble with \code{time_start}, \code{time_end}, \code{dur_start},
 \code{dur_end} (or \code{age_start}, \code{age_end}), the \code{by} columns, \code{union_years},
@@ -389,42 +386,43 @@ competing risks. With non-NULL \code{conf_level}, also includes \code{conf_low} 
 }
 
 \section{Group transitions}{
-
-\code{calculate_transition_rates()}: Count individual moves and person-years in
-their origin category of one group dimension in half-open Lexis cells. Each
-outgoing destination shares its origin's exposure: do not sum denominators
-across destinations. Duration is years since the latest entry into a category
-of this dimension, or age before its first recorded transition; return moves
-reset duration and union changes do not. Events use the exiting group's
-duration. Death and competing moves end exposure. Rates are cause-specific
-hazards, not transition probabilities. Internal-boundary events enter the
-cell starting there; the final calendar boundary is excluded.
+ \code{calculate_transition_rates()}: Count individual
+moves and person-years in their origin category of one group dimension in
+half-open Lexis cells. Each outgoing destination shares its origin's
+exposure: do not sum denominators across destinations. Duration is years
+since the latest entry into a category of this dimension, or age before its
+first recorded transition; return moves reset duration and union changes do
+not. Events use the exiting group's duration. Death and competing moves end
+exposure. Rates are cause-specific hazards, not transition probabilities.
+Internal-boundary events enter the cell starting there; the final calendar
+boundary is excluded.
 
 \strong{\code{population}:} A grouped \code{hammel_population} with a known
 endpoint and complete person, transition and (when requested) union
 histories.
 
 \strong{\code{dur_breaks}:} Optional strictly increasing nonnegative
-group-duration boundaries. Supply exactly one of age_breaks and dur_breaks. A
-finite final axis boundary gains Inf.
+group-duration boundaries. Supply exactly one of age_breaks and dur_breaks.
+A finite final axis boundary gains Inf.
 
 \strong{\code{by}:} \code{NULL} (default) or a character vector of variables to
 split results over: \code{"sex"}, \code{"union_type"} (current union state; typed
-histories use unpartnered/cohab/marriage, untyped unpartnered/partnered) and
-\code{"previous_union"}, as in \code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}, and other declared
-group dimensions (the person's category there at the time; only moves in
-\code{group} count, and duration is unaffected by moves in other dimensions).
-Union variables require exclusive histories. A transition counts under the
-union state after same-time union changes, which precede transitions.
+histories use unpartnered/cohab/marriage, untyped unpartnered/partnered)
+and \code{"previous_union"}, as in \code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}, and other
+declared group dimensions (the person's category there at the time; only
+moves in \code{group} count, and duration is unaffected by moves in other
+dimensions). Union variables require exclusive histories. A transition
+counts under the union state after same-time union changes, which precede
+transitions.
 
 \strong{Output:} A tibble with \code{time_start}, \code{time_end}, age or duration
 bounds, \code{origin}, \code{destination}, the \code{by} columns, \code{person_years},
 \code{transitions}, and \code{rate_transition} (NA at zero exposure). All distinct
 directed pairs among current and historical identities are retained,
-including zero-event cells. Fewer than two known groups returns a typed empty
-tibble. Rows vary by time fastest, then the axis band, then destination, then
-origin, then the \code{by} variables in the order given. With non-NULL
-\code{conf_level}, also includes \code{conf_low} and \code{conf_high}.
+including zero-event cells. Fewer than two known groups returns a typed
+empty tibble. Rows vary by time fastest, then the axis band, then
+destination, then origin, then the \code{by} variables in the order given. With
+non-NULL \code{conf_level}, also includes \code{conf_low} and \code{conf_high}.
 }
 
 \examples{

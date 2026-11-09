@@ -88,7 +88,7 @@ test_that("unrealized births report every dimension", {
   model <- two_dimension_model(400, birth_rate = 3)
   model <- set_fertility(model, data.frame(age_start = 15, age_end = 50, rate = 3), birth_interval = 5)
   out <- run_simulation(model, 1, seed = 5)
-  u <- out$simulation$unrealized_births
+  u <- out$unrealized_births
   expect_true(all(c("race", "region") %in% names(u)))
   expect_gt(sum(u$unrealized_births), 0)
   expect_setequal(unique(u$race), c("A", "B"))
@@ -222,7 +222,7 @@ test_that("unrealized births follow a woman's current group after a transition",
   withr::local_options(hammel.check_cells = TRUE)
   out <- run_simulation(model, .5, seed = 9)
   expect_true(all(out$persons$group[1:20] == "B"))
-  u <- out$simulation$unrealized_births
+  u <- out$unrealized_births
   expect_gt(sum(u$unrealized_births[u$group == "B"]), sum(u$unrealized_births[u$group == "A"]))
 })
 

@@ -3322,3 +3322,12 @@ Keep `mx` in life-table output, preserving D048's output naming. Mortality proce
 **Extension (same day):** `calculate_dissolution_rates()` also no longer accepts a bare union table, for the same reason, and requires a `hammel_population`. Its bare-table validation and the union-table branch of the internal `union_strata()` (which read `group_w`/`group_h` columns from the union table) are removed; partner groups always come from the population's declared groups. Dissolution tests build minimal populations around their union records with a test helper, `union_population()`, keeping the same expected values. Checks of bare union-table columns are dropped because `hammel_population()` validates those records.
 
 **Related:** `calculate_union_rates()` now takes `dur_breaks` before `by`, like the other calculators' duration breaks. No existing call passed either argument by position. `calculate_fertility_rates()` still lists `parity_breaks` after `by`.
+
+
+## D160 — Unrealized births are part of the population history (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Move the unrealized-births record from the run metadata, `simulation$unrealized_births`, to the population itself as `unrealized_births`, beside `persons`, `unions` and `transitions`. Each run appends its records to the input population's record instead of replacing it, so restarts keep earlier periods. `unrealized_since` records the start of the first simulated run, the time from which the record is complete. `calculate_fertility_rates(unrealized = TRUE)` reads this record, so adjusted rates for periods before a restart are now known rather than `NA`; periods before `unrealized_since` remain `NA`. `simulation` keeps only the latest run's settings and event counts.
+
+When runs use different fertility schedules, each run's rows keep the stratum columns that run used and have `NA` in the others (for example, `parity_start` is `NA` for a run with a pooled schedule). Attribution treats such rows as pooled over that stratum, so observation rows that split by it are `NA`, as for a single pooled run. This supersedes the "non-checkpoint restarts" limitation for unrealized births recorded at milestone 5 (D105); other per-run counters in `simulation` remain per run, since the histories hold the totals.

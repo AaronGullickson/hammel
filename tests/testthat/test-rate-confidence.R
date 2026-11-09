@@ -90,9 +90,10 @@ test_that("empty grouped rate results retain numeric confidence columns", {
 
 test_that("fertility intervals use observed births with pooled or unrealized output", {
   pop <- confidence_population()
-  pop$simulation <- list(start_time = 0, unrealized_births = tibble::tibble(
+  pop$unrealized_since <- 0
+  pop$unrealized_births <- tibble::tibble(
     period_start = 0, period_end = 2, age_start = 20, age_end = 21,
-    unrealized_births = 2.5))
+    unrealized_births = 2.5)
   for (parity in list(NULL, c(0, 1, Inf))) {
     x <- calculate_fertility_rates(pop, c(0, 2, 8), c(0, Inf),
       parity_breaks = parity, unrealized = TRUE, conf_level = .95)

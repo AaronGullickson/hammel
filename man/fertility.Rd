@@ -111,7 +111,7 @@ then equal inputs in expectation for any population composition, including
 after restarts and union-type changes, while a cell has an eligible member. A
 cell with members but none eligible keeps its intensity; when it would
 produce a birth, no child is born and the event is counted in
-\code{simulation$unrealized_births}. An individual woman's hazard depends on
+the population's \code{unrealized_births}. An individual woman's hazard depends on
 recent births by others in her cell; this is a calibration device. Upper-open
 age bands stay one cell when \code{birth_interval * rate} is below 0.001 and are
 otherwise split yearly. Zero-rate bands form no cells.

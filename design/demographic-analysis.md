@@ -626,7 +626,8 @@ For populations returned by `run_simulation()` (D101),
 `calculate_fertility_rates(..., unrealized = TRUE)` adds `unrealized_births`
 and `rate_fertility_adjusted = (births + unrealized_births) / person_years`.
 Unrealized births are counts of the times the fertility clock drew a cell that
-had members but no eligible woman (`simulation$unrealized_births`; D128; before
+had members but no eligible woman (the population's `unrealized_births`; D128,
+D160; before
 November 4, 2026 they were expected values), so the adjusted
 rate shows what the input schedule would have produced without that loss. The
 observed `rate_fertility` remains the simulated outcome.
@@ -635,10 +636,13 @@ Each record covers one one-year period from the run start and one fertility
 cell (an age year, actual parity when schedules are parity-specific, group and
 union type). A record is added to the observation row that contains it, so
 actual parities pool into broader parity bands and age years into wider age
-bands. Values are `NA`, rather than approximated, for periods before the most
-recent simulation's start (a restarted population keeps only its latest run's
-record), for time or age breaks that cut through a record, and for union-type or
-parity strata the fertility schedule did not use. Populations without an
+bands. The record accumulates across restarts, like persons, unions and
+transitions, and `unrealized_since` gives the start of the first simulated run
+(D160). Values are `NA`, rather than approximated, for periods before
+`unrealized_since`, for time or age breaks that cut through a record, and for
+union-type or parity strata that the fertility schedule in force at the time
+did not use. When runs use different schedules, a stratum column is `NA` in
+the rows of a run that pooled it. Populations without an
 unrealized-births record (never simulated, or simulated before D101) are
 rejected.
 

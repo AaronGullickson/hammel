@@ -432,22 +432,11 @@ calculate_fertility_rates <- function(
     length(unrealized) != 1L || is.na(unrealized)) {
     stop("`unrealized` must be TRUE or FALSE.", call. = FALSE)
   }
-  if (unrealized) {
-    record <- if (inherits(
-      population,
-      "hammel_population"
-    )) {
-      population$simulation
-    } else {
-      NULL
-    }
-    if (is.null(record$unrealized_births)) {
-      stop(paste(
-        "`unrealized = TRUE` requires a population returned by",
-        "run_simulation()",
-        "with an unrealized-births record."
-      ), call. = FALSE)
-    }
+  if (unrealized && is.null(population$unrealized_births)) {
+    stop(paste(
+      "`unrealized = TRUE` requires a population returned by",
+      "run_simulation(), which records unrealized births."
+    ), call. = FALSE)
   }
   alias <- observation_alias(population, by)
   population <- alias$population
@@ -491,10 +480,7 @@ calculate_fertility_rates <- function(
   ))
   attr(out, "index") <- NULL
   if (unrealized) {
-    out <- add_unrealized_births(
-      out, population$simulation,
-      alias
-    )
+    out <- add_unrealized_births(out, population, alias)
   }
   attr(out, "unassigned_births") <- tibble::tibble(
     time_start = head(
@@ -938,9 +924,10 @@ person_rate_rows <- function(
 # change) and one fertility cell; it is added to
 # the row whose period, age, parity, group and union type contain it. Rows that
 # a record only partly overlaps, or that a stratum the schedule did not use
-# would have to split, become NA, as do periods before the run start.
-add_unrealized_births <- function(out, simulation, alias = list()) {
-  u <- simulation$unrealized_births
+# would have to split, become NA, as do periods before the record starts. NA
+# parity or union type in a record means that run's schedule pooled it.
+add_unrealized_births <- function(out, population, alias = list()) {
+  u <- population$unrealized_births
   # Records name each group dimension; the table uses the internal `group`
   # (a combined code when several dimensions are requested).
   if (!is.null(alias$combined)) {
@@ -954,7 +941,7 @@ add_unrealized_births <- function(out, simulation, alias = list()) {
   }
   n <- nrow(out)
   value <- numeric(n)
-  covered <- out$time_start >= simulation$start_time
+  covered <- out$time_start >= population$unrealized_since
   unknown <- !covered
   if (nrow(u) && n) {
     # Interval indices of each record's bounds within each observation axis.
@@ -982,7 +969,7 @@ add_unrealized_births <- function(out, simulation, alias = list()) {
         )
         keys <- c(keys, list(p$lo))
         row_keys <- c(row_keys, list(out$parity_start))
-        ok <- ok & p$ok
+        ok <- ok & !is.na(u$parity_start) & p$ok %in% TRUE
       } else {
         ok[] <- FALSE
       } # pooled-parity schedule cannot be split by parity
@@ -1016,7 +1003,8 @@ add_unrealized_births <- function(out, simulation, alias = list()) {
         r
       ] &
         out$age_start < u$age_end[r] & out$age_end > u$age_start[r]
-      if ("parity_start" %in% names(out) && "parity_start" %in% names(u)) {
+      if ("parity_start" %in% names(out) && "parity_start" %in% names(u) &&
+        !is.na(u$parity_start[r])) {
         hit <- hit & out$parity_start < u$parity_end[r] & out$parity_end >
           u$parity_start[r]
       }

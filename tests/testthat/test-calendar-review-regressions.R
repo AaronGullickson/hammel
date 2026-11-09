@@ -16,7 +16,7 @@ test_that("fractional fertility epochs retain the run-start accounting grid", {
     }))
     m <- set_fertility(m,epochs,birth_interval=10)
     out <- run_simulation(m,3.4,seed=42)
-    u <- out$simulation$unrealized_births
+    u <- out$unrealized_births
     expect_true(all(u$period_end<=origin+ceiling(u$period_end-origin)))
     # Records do not bridge any run-anchored annual boundary.
     expect_true(all(floor(u$period_start-origin+1e-9)==ceiling(u$period_end-origin-1e-9)-1))
