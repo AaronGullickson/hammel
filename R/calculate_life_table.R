@@ -81,7 +81,7 @@ calculate_life_table <- function(rates, radix = 1) {
     stop("`radix` must be positive and finite.", call. = FALSE)
   }
   rates <- rates[c(
-    summary_strata(rates, by_sex = TRUE, by_union_status = TRUE),
+    summary_strata(rates),
     "age_start", "age_end", "mx"
   )]
   if (!nrow(rates)) {
@@ -89,15 +89,21 @@ calculate_life_table <- function(rates, radix = 1) {
   }
   # split rates by stratifying variables
   tables <- lapply(
-    summary_rows(rates, by_sex = TRUE, by_union_status = TRUE),
+    summary_rows(rates),
     function(rows) {
       r <- rates[rows, , drop = FALSE]
-      check_summary_intervals(
-        r,
-        open = TRUE,
-        strata = summary_strata(r, by_sex = TRUE, by_union_status = TRUE)
-      )
+      strata <- summary_strata(r)
+      check_summary_intervals(r, strata = strata)
       r <- r[order(r$age_start), , drop = FALSE]
+      if (r$age_start[1] != 0 || tail(r$age_end, 1) != Inf) {
+        stop(
+          paste0(
+            "Life tables require ages from zero through an ",
+            "explicit open interval", stratum_label(r, strata), "."
+          ),
+          call. = FALSE
+        )
+      }
       n <- r$age_end - r$age_start
       m <- r$mx
       size <- nrow(r)

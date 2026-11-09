@@ -14,25 +14,14 @@ summary_measures <- c(
 
 # HELPER FUNCTIONS ---------------------------------------------------------
 
-# A summary table's stratum columns, in table order: period, sex (when kept),
-# union status (when kept) and every other non-measure column.
-summary_strata <- function(table, by_sex = FALSE, by_union_status = FALSE) {
-  status <- c("union_status", "union_type", "previous_union")
-  keep <- c(
-    "time_start", "time_end", if (by_sex) "sex", if (
-      by_union_status) {
-      status
-    },
-    setdiff(names(table), c(
-      summary_measures, "time_start", "time_end",
-      "sex", status
-    ))
-  )
-  names(table)[names(table) %in% keep]
+# A summary table's stratum columns, in table order: every column other than
+# bands and measures, such as period, sex, union status and group dimensions.
+summary_strata <- function(table) {
+  setdiff(names(table), summary_measures)
 }
 
-summary_rows <- function(table, by_sex = FALSE, by_union_status = FALSE) {
-  columns <- summary_strata(table, by_sex, by_union_status)
+summary_rows <- function(table) {
+  columns <- summary_strata(table)
   if (!length(columns)) {
     return(list(seq_len(nrow(table))))
   }
@@ -43,9 +32,10 @@ summary_rows <- function(table, by_sex = FALSE, by_union_status = FALSE) {
   split(seq_len(nrow(table)), factor(keys, levels = unique(keys)))
 }
 
-# Validate one stratum's age bands. `strata` names the stratum columns so that
-# errors identify the failing stratum.
-check_summary_intervals <- function(rates, open, strata = character()) {
+# Validate that one stratum's age bands are valid, contiguous and
+# nonoverlapping. `strata` names the stratum columns so that errors identify
+# the failing stratum.
+check_summary_intervals <- function(rates, strata = character()) {
   where <- stratum_label(rates, strata)
   if (!nrow(rates)) {
     stop("A rate table needs at least one age band.",
@@ -68,20 +58,6 @@ check_summary_intervals <- function(rates, open, strata = character()) {
         "Age intervals must be contiguous and nonoverlapping",
         where, "."
       ),
-      call. = FALSE
-    )
-  }
-  if (open && (ordered$age_start[1] != 0 || tail(ordered$age_end, 1) != Inf)) {
-    stop(
-      paste0(
-        "Life tables require ages from zero through an ",
-        "explicit open interval", where, "."
-      ),
-      call. = FALSE
-    )
-  }
-  if (!open && any(!is.finite(ends))) {
-    stop(paste0("TFR requires finite age intervals", where, "."),
       call. = FALSE
     )
   }

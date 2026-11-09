@@ -124,7 +124,10 @@ calculate_tfr <- function(rates) {
   }
   unknown <- attr(rates, "unassigned_births")
   if ("sex" %in% names(rates)) {
-    rates <- rates[rates$sex == "f", , drop = FALSE]
+    # TFR describes women only, so sex is never a stratum or output column.
+    rates <- rates[rates$sex == "f", setdiff(names(rates), "sex"),
+      drop = FALSE
+    ]
   }
   check_numeric_column(rates$age_start, "rates$age_start")
   if (!is.numeric(rates$age_end) || anyNA(rates$age_end)) {
@@ -154,16 +157,16 @@ calculate_tfr <- function(rates) {
     ), call. = FALSE)
   }
   rates <- rates[is.finite(rates$age_end), , drop = FALSE]
-  groups <- summary_strata(rates, by_union_status = TRUE)
+  groups <- summary_strata(rates)
   if (!nrow(rates)) {
     stop(
       "TFR needs at least one female age band with a finite end.",
       call. = FALSE
     )
   }
-  tables <- lapply(summary_rows(rates, by_union_status = TRUE), function(rows) {
+  tables <- lapply(summary_rows(rates), function(rows) {
     r <- rates[rows, , drop = FALSE]
-    check_summary_intervals(r, open = FALSE, strata = groups)
+    check_summary_intervals(r, strata = groups)
     key <- r[1, groups, drop = FALSE]
     cbind(key, data.frame(
       age_start = min(r$age_start), age_end = max(
@@ -214,7 +217,10 @@ calculate_patfr <- function(rates) {
   }
   unknown <- attr(rates, "unassigned_births")
   if ("sex" %in% names(rates)) {
-    rates <- rates[rates$sex == "f", , drop = FALSE]
+    # TFR describes women only, so sex is never a stratum or output column.
+    rates <- rates[rates$sex == "f", setdiff(names(rates), "sex"),
+      drop = FALSE
+    ]
   }
   check_numeric_column(rates$age_start, "rates$age_start")
   if (!is.numeric(rates$age_end) || !is.null(dim(rates$age_end)) || anyNA(
@@ -256,14 +262,14 @@ calculate_patfr <- function(rates) {
     ), call. = FALSE)
   }
   rates <- rates[is.finite(rates$age_end), , drop = FALSE]
-  groups <- summary_strata(rates, by_union_status = TRUE)
+  groups <- summary_strata(rates)
   if (!nrow(rates)) {
     stop(
       "PATFR needs at least one female age band with a finite end.",
       call. = FALSE
     )
   }
-  tables <- lapply(summary_rows(rates, by_union_status = TRUE), function(rows) {
+  tables <- lapply(summary_rows(rates), function(rows) {
     r <- rates[rows, , drop = FALSE]
     lower <- min(r$age_start); upper <- max(r$age_end)
     parity <- sort(unique(c(r$parity_start, r$parity_end[is.finite(
