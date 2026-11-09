@@ -56,7 +56,7 @@ For a new function, first identify its responsibility and closest existing consu
 
 ## Current file map
 
-Every top-level R function has one home below. **Bold names are exported**, including `validate_population()`; plain names are internal. Package roxygen metadata stays in `hammel-package.R` (it defines no functions). Shared constants stay with the responsibility they support: `summary_measures` in `summary_rates.R`, `reserved_group_names` in `group.R`, `matching_settings` in `matching_groups.R`, `weight_variable_codes` in `weight_model.R`, and `builtin_strata`/`rate_schema_columns` in `stratify_rates.R`.
+Every top-level R function has one home below. **Bold names are exported**, including `validate_population()`; plain names are internal. Package roxygen metadata stays in `hammel-package.R` (it defines no functions). Documentation for bundled datasets stays in `data.R`, under `# DATASETS ------`; `data-raw/` scripts build those datasets. Shared constants stay with the responsibility they support: `summary_measures` in `summary_rates.R`, `reserved_group_names` in `group.R`, `matching_settings` in `matching_groups.R`, `weight_variable_codes` in `weight_model.R`, and `builtin_strata`/`rate_schema_columns` in `stratify_rates.R`.
 
 ### `R/RcppExports.R`
 
