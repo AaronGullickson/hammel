@@ -1,3 +1,75 @@
+#' Calculate total fertility rates
+#'
+#' Sum age-specific fertility rates times their actual interval widths.
+#' If parity-bound columns are present, delegate to [calculate_patfr()] instead
+#' and return its `patfr` column rather than `tfr`, with the same other strata.
+#' Open-ended age bands are omitted, warning if an omitted female rate is known
+#' and nonzero that TFR underestimates fertility over the full age range. Zero or
+#' missing omitted rates do not trigger that warning. The remaining finite, contiguous age range
+#' defines the TFR reported. Any missing ASFR in those bands makes the TFR missing.
+#' When `union_type`, `previous_union` (or a legacy `union_status` column) is
+#' present, calculate a separate sum for each stratum
+#' within each period. These conditional sums describe fertility under continuous
+#' exposure to that status; they are not components to add into an overall TFR.
+#' Any other column that is not an age band or a measure, such as a group
+#' dimension (`race`, `region`), adds separate strata, with its type and labels
+#' preserved; strata are not pooled. Age bands are checked independently within
+#' each stratum.
+#' @param rates A table returned by [calculate_fertility_rates()], a fertility
+#'   process object, or a data frame with `age_start`, `age_end`, and `rate_fertility`
+#'   or `rate` in births per woman-year. Bare `rate` tables are interpreted as
+#'   fertility rates; mortality processes are not valid inputs.
+#' @return With parity columns, the result of [calculate_patfr()] with `patfr`.
+#'   Otherwise, a tibble with period columns, `union_type`, `previous_union` or
+#'   legacy `union_status` when supplied,
+#'   other stratum columns (such as group dimensions) when supplied,
+#'   `age_start`, `age_end`, and `tfr`.
+#'   If `sex` is present, only female rows are used.
+#' @export
+calculate_tfr <- function(rates) {
+  if (inherits(rates, "hammel_process")) {
+    if (!identical(rates$name, "fertility") ||
+        !identical(rates$rate_unit, "person_year"))
+      stop("TFR requires a fertility process with person-year rates.", call. = FALSE)
+    rates <- rates$rates
+  }
+  if (any(c("parity_start", "parity_end") %in% names(rates)))
+    return(calculate_patfr(rates))
+  check_columns(rates, c("age_start", "age_end"), "rates")
+  if (!"rate_fertility" %in% names(rates)) {
+    if (!"rate" %in% names(rates)) stop("Supply `rate_fertility` or fertility `rate`.", call. = FALSE)
+    rates$rate_fertility <- rates$rate
+  }
+  check_groups(rates, "rates")
+  unknown <- attr(rates, "unassigned_births")
+  if ("sex" %in% names(rates)) rates <- rates[rates$sex == "f", , drop = FALSE]
+  check_numeric_column(rates$age_start, "rates$age_start")
+  if (!is.numeric(rates$age_end) || anyNA(rates$age_end))
+    stop("`age_end` must contain numeric age boundaries without missing values.", call. = FALSE)
+  check_numeric_column(rates$rate_fertility, "rates$rate_fertility", missing = TRUE)
+  if (any(rates$rate_fertility < 0, na.rm = TRUE)) stop("ASFRs must be nonnegative.", call. = FALSE)
+  if (any(!is.finite(rates$age_end) & rates$rate_fertility != 0, na.rm = TRUE))
+    warning("TFR omits an open age band with non-zero fertility; TFR is underestimated over the full age range.", call. = FALSE)
+  rates <- rates[is.finite(rates$age_end), , drop = FALSE]
+  groups <- summary_strata(rates, by_union_status = TRUE)
+  if (!nrow(rates)) {
+    result <- rates[FALSE, c(groups, "age_start", "age_end"), drop = FALSE]
+    result$tfr <- numeric()
+    return(tibble::as_tibble(result))
+  }
+  tables <- lapply(summary_rows(rates, by_union_status = TRUE), function(rows) {
+    r <- rates[rows, , drop = FALSE]
+    check_summary_intervals(r, open = FALSE)
+    key <- r[1, groups, drop = FALSE]
+    cbind(key, data.frame(age_start = min(r$age_start), age_end = max(r$age_end),
+                         tfr = sum(r$rate_fertility * (r$age_end - r$age_start))))
+  })
+  result <- do.call(rbind, tables)
+  result <- tibble::as_tibble(result)
+  attr(result, "unassigned_births") <- unknown
+  result
+}
+
 #' Calculate parity- and age-adjusted total fertility rates
 #'
 #' Progress a synthetic cohort from parity zero through conditional age/parity

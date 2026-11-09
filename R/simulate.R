@@ -485,15 +485,6 @@ simulate <- function(model, years, seed = NULL) {
   result
 }
 
-validate_birth_interval <- function(duration) {
-  if (!is.numeric(duration) || !is.null(dim(duration)) || length(duration) != 1L ||
-      !is.finite(duration) || duration < 0) {
-    stop("`birth_interval` must be a finite nonnegative number of years.",
-         call. = FALSE)
-  }
-  invisible(duration)
-}
-
 # Counts of unrealized births from cells with members but no eligible woman
 # (D101), by one-year period from the run start and cell. Columns mirror the
 # fertility table's strata: group, union_type and parity bounds appear only
@@ -520,15 +511,3 @@ format_unrealized_births <- function(native, rates, registries) {
   out$unrealized_births <- native$unrealized_births
   out
 }
-
-# Initial ancestry shares for the engine: each tracked dimension's block of
-# category shares and unknown, in declaration order.
-ancestry_matrix <- function(population, tracked) {
-  n <- nrow(population$persons)
-  if (!length(tracked)) return(matrix(numeric(), nrow = n, ncol = 0L))
-  do.call(cbind, lapply(tracked, function(d) {
-    x <- population$ancestry[[d]]
-    as.matrix(x[setdiff(names(x), "person_id")])
-  }))
-}
-

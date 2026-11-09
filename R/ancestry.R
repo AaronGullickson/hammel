@@ -82,3 +82,14 @@ normalize_population_ancestry <- function(population) {
   population$ancestry <- out
   population
 }
+
+# Initial ancestry shares for the engine: each tracked dimension's block of
+# category shares and unknown, in declaration order.
+ancestry_matrix <- function(population, tracked) {
+  n <- nrow(population$persons)
+  if (!length(tracked)) return(matrix(numeric(), nrow = n, ncol = 0L))
+  do.call(cbind, lapply(tracked, function(d) {
+    x <- population$ancestry[[d]]
+    as.matrix(x[setdiff(names(x), "person_id")])
+  }))
+}

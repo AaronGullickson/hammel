@@ -1,6 +1,6 @@
 # Design and implemented interface
 
-Updated November 5, 2026. Milestones 1–8 are complete by user acceptance
+Updated November 9, 2026. Milestones 1–8 are complete by user acceptance
 (D029, D050, D077, D093, D105, D116, D127, D130). Individual group transitions are accepted
 under D116; milestone 7 calendar-varying rates are implemented under D118,
 accepted complete November 2, 2026 (D127). D123 implements matching/inheritance model
@@ -16,25 +16,31 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Responsibility | Implementation |
 | --- | --- |
 | Model construction and population attachment | `R/hammel_model.R` |
-| Group validation and rate lookup | `R/groups.R` |
+| Population schema and baseline generation | `R/hammel_population.R`, `R/create_baseline_population.R`, `R/checks.R` |
+| Group declarations and histories | `R/group.R`, `R/group_history.R` |
 | Ancestry schema and initialization | `R/ancestry.R` |
-| Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
-| Mortality/fertility specification and rate validation | `R/set_process.R` |
-| Shared model schedules and registry preparation | `R/model_schedules.R`; model caches and switches in `src/simulate.cpp` |
-| Shared calendar-rate validation | `R/calendar_rates.R`; boundaries and active slices in `src/simulate.cpp` |
-| Individual transition specification and history | `R/group_transition.R`; events in `src/simulate.cpp`; observation splitting in `src/group_history.h` |
-| Persistent fertility weights and specification | `R/het_fert.R`; cell weight trees in `src/simulate.cpp` |
-| Weight models (formulas, custom functions, schedules) | `R/weight_model.R`; stored weights and selection in `src/simulate.cpp` (`RateCells`, `FertilityCells`) |
-| Union formation/matching and dissolution specifications | `R/union_formation.R`, `R/union_dissolution.R` |
-| Shared kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/kinship.R` |
-| HMD/HFD downloads and preparation | `R/construct_demographic_rates.R`, `R/database_intervals.R`, `R/hmd_open_age.R` |
-| Simulation validation, RNG isolation, result assembly | `R/simulate.R` |
+| Process attachment | `R/set_process.R` |
+| Mortality/fertility specifications | `R/mortality.R`, `R/fertility.R` |
+| Input-rate validation, calendar coverage, group strata and engine encoding | `R/rates_util.R` |
+| Proportional input-rate stratification | `R/stratify_rates.R` |
+| Calendar model schedules and engine preparation | `R/model_schedules.R`; switches in `src/simulate.cpp` |
+| Group transition and household specifications | `R/group_transition.R`; events in `src/simulate.cpp` |
+| Persistent fertility heterogeneity | `R/het_fert.R`; cell weight trees in `src/simulate.cpp` |
+| Weight models | `R/create_weight_model.R`; stored weights and selection in `src/simulate.cpp` |
+| Union formation, dissolution and cohabitation settings | `R/union_formation.R`, `R/union_dissolution.R`, `R/cohabitation.R` |
+| Matching and inheritance models | `R/create_matching_model.R`, `R/matching_groups.R`, `R/create_group_inheritance.R` |
+| Kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/extract_kin.R` |
+| HMD/HFD downloads, conversion and provenance | `R/get_database_rates.R` |
+| Simulation validation, RNG isolation and result assembly | `R/simulate.R` |
 | Continuous scheduling and events | `src/simulate.cpp` |
-| Demographic extraction and measures | `src/demography.cpp`, `R/calc_demographic_measures.R` |
-| Person-level observation engine (`by`, D133) | `R/observation_strata.R`; `person_lexis_cpp()` and `person_snapshot_cpp()` in `src/observation.cpp` |
-| Union-level dissolution and conversion counts | `dissolution_counts_cpp()` and `union_group_history_cpp()` in `src/demography.cpp` |
+| Shared history preparation and analysis strata | `R/analysis_utils.R`; native observation in `src/observation.cpp` |
+| Observed event-rate calculations | `R/calculate_rates.R`; native counts in `src/observation.cpp` and `src/demography.cpp` |
+| Population counts and rate summaries | `R/calculate_population_size.R`, `R/calculate_tfr.R`, `R/calculate_life_table.R`, `R/summary_rates.R` |
+| Relationship extraction | `R/extract_relationships.R` |
 | Software and analytical validation | `tests/testthat/` |
-| Replication assessment | `validation/milestone1.qmd` through `validation/milestone8.qmd` |
+| Replication assessment | `validation/milestone1.qmd` through `validation/milestone9.qmd` |
+
+See [R source organization](r-source-organization.md) for the complete function map and placement rules (D143).
 
 The engine is C++17 with Rcpp. R exposes ordinary list objects and tibbles.
 Grouped dissolution and conversion observations build union-level group

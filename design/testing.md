@@ -5,6 +5,14 @@ D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the u
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## R source organization (November 9, 2026)
+
+D143 reorganizes the R files according to the user-agreed [source organization guide](r-source-organization.md). Before/after parsing confirmed that all 226 function definitions, six shared constants, and package metadata are identical as R expressions. Every original source comment was retained. The resulting 34 R files match the agreed map; `simulate()` is unchanged, and `model_schedules.R`, `hammel_model.R`, generated wrappers, and native sources are unchanged.
+
+`devtools::document()` completed successfully. All 43 exports are unchanged, and every generated help page is identical except for its source-file pointer. Explicit roxygen `@order` tags preserve the original order of functions and parameters in the shared mortality/fertility and process-setter topics.
+
+The full offline `devtools::test()` run passed 6,496 expectations with zero failures in 108 seconds. The opt-in live database test was skipped. One environment warning occurred while loading HMDHFDplus/lubridate: `timedatectl` could not access the system bus in the sandbox, as in the preceding recorded run. No rates were downloaded and no credentials were exposed. `git diff --check` passed. This mechanical reorganization does not change demographic behavior or rerun the user-owned milestone reports.
+
 ## Fixed newborn assignment (November 7, 2026)
 
 D142 adds native fixed-category inheritance. `devtools::test(filter =

@@ -81,26 +81,3 @@ prepare_cohabitation <- function(process, strata) {
   list(enabled = TRUE, prob = prob$rates, conversion = conversion$rates,
        prob_spec = prob$spec, conversion_spec = conversion$spec)
 }
-
-validate_union_types <- function(unions) {
-  if (!"union_type" %in% names(unions)) return(invisible(unions))
-  x <- unions$union_type
-  if (!is.character(x) || !is.null(dim(x)) || anyNA(x) || any(!x %in% c("cohab", "marriage")))
-    stop("`unions$union_type` must contain 'cohab' or 'marriage'.", call. = FALSE)
-  if (!"previous_cohab_id" %in% names(unions)) {
-    if (any(unions$end_reason == "conversion", na.rm = TRUE))
-      stop("Conversion histories require `previous_cohab_id` links.", call. = FALSE)
-    return(invisible(unions))
-  }
-  links <- unions$previous_cohab_id
-  check_numeric_column(links, "previous_cohab_id", missing = TRUE, id = TRUE)
-  rows <- which(!is.na(links)); parent <- match(links[rows], unions$union_id)
-  if (anyNA(parent) || anyDuplicated(parent) || any(unions$union_type[rows] != "marriage") ||
-      any(unions$union_type[parent] != "cohab") ||
-      any(is.na(unions$end_reason[parent]) | unions$end_reason[parent] != "conversion") ||
-      any(is.na(unions$end_time[parent]) | unions$end_time[parent] != unions$start_time[rows]) ||
-      any(unions$wife_id[parent] != unions$wife_id[rows] | unions$husband_id[parent] != unions$husband_id[rows]) ||
-      any(!which(unions$end_reason == "conversion") %in% parent))
-    stop("Conversions require unique same-partner cohab-to-marriage links at the same time.", call. = FALSE)
-  invisible(unions)
-}

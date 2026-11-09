@@ -3148,3 +3148,16 @@ use the ordinary birth-time selection contract. See [the specification](group-in
 
 **Supersedes:** earlier deferral of fixed newborn assignment; random-parent
 inheritance remains the default for dimensions without an explicit rule.
+
+
+## D143 — R source organization (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Organize R source files by cohesive responsibility, keeping related public functions and their specific helpers together. Use the exact lead function name for a filename when there is a clear lead, preferring the constructor over its convenience setter; otherwise use a descriptive responsibility name. The agreed map is implemented in [R source organization](r-source-organization.md).
+
+Observed event-rate calculators and rate-specific helpers share `calculate_rates.R`. Shared history-analysis preparation lives in `analysis_utils.R`; input-rate validation and engine encoding live in `rates_util.R`. HMD/HFD import functions and all their helpers share `get_database_rates.R`. TFR/PATFR share `calculate_tfr.R`. Matching is separate from union-formation process configuration; transition histories are separate from transition-process configuration. Keep `model_schedules.R` and `set_population()` in `hammel_model.R` as agreed. The `simulate()` body remains intact.
+
+**Future additions:** When a new function has no logical home in an existing R file, explain the proposed responsibility and filename and ask the user before creating a new R script. Do not create one automatically. This requirement is also in `AGENTS.md`.
+
+**Scope:** Mechanical organization, preserving function definitions, constants, source comments, exports, and help topics. Help-topic redesign, pkgdown reference grouping, new demographic behavior, and simulation-body refactoring are separate work. Explicit roxygen ordering preserves the existing shared-help display order after files are split.
