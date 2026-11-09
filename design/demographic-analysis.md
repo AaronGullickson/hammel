@@ -665,7 +665,7 @@ for endpoint, empty-output and history-completeness rules.
 
 All seven event-rate calculators (mortality, fertility, union formation,
 marriage, dissolution, cohabitation conversion and group transitions) accept
-`conf.level = NULL` by default, retaining their existing output. A finite numeric
+`conf_level = NULL` by default, retaining their existing output. A finite numeric
 scalar strictly between zero and one requests two-sided exact Poisson intervals
 at that confidence level, appended as numeric `conf_low` and `conf_high` columns.
 For example:
@@ -673,12 +673,12 @@ For example:
 ```r
 calculate_fertility_rates(
   result, time_breaks = c(2000, 2010), age_breaks = c(15, 20, 25, 30, 35, 40, 45, 50),
-  conf.level = 0.95
+  conf_level = 0.95
 )
 ```
 
 This requests 95% intervals. Each positive-exposure
-row uses `stats::poisson.test(x = events, T = exposure, conf.level = conf.level)`.
+row uses `stats::poisson.test(x = events, T = exposure, conf.level = conf_level)`.
 Exposure is person-years or union-years according to the existing measure.
 Zero exposure produces two NA bounds, even when an endpoint event is recorded;
 empty results retain numeric zero-length confidence columns. Zero events with

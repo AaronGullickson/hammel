@@ -232,7 +232,7 @@ together through births, unions, separations, deaths and moves (tested).
 ## Observed transition rates
 
 `calculate_transition_rates(population, time_breaks, age_breaks = NULL,
-dur_breaks = NULL, by = NULL, conf.level = NULL, pool_dissolved = FALSE,
+dur_breaks = NULL, by = NULL, conf_level = NULL, pool_dissolved = FALSE,
 group = NULL)` counts one dimension's transitions (`group`, required when
 several are declared) and returns a tibble
 with directed `origin`/`destination`, calendar bounds, the selected age or

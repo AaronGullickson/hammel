@@ -881,7 +881,7 @@ examples, calibration updates, callback constraints and validation.
 
 ## Optional uncertainty for observed rates (D124)
 
-All event-rate calculators accept `conf.level = NULL` (unchanged default output)
+All event-rate calculators accept `conf_level = NULL` (unchanged default output)
 or a confidence level strictly between zero and one. Non-NULL values append
 `conf_low` and `conf_high`, using the row's observed count and its existing
 exposure in `stats::poisson.test()`. Zero exposure yields NA bounds. Fertility

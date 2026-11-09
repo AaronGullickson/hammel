@@ -25,7 +25,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Noun names for specification constructors | D147 |
 | Database rate products and reusable downloads | D018, D025 |
 | Demographic extraction and function names | D020–D022, D081 and missing-ASFR clarification |
-| Optional Poisson intervals for observed rates | D124 |
+| Optional Poisson intervals for observed rates | D124; argument name D148 |
 | Continuous execution | D024 |
 | Fertility spacing (cell accounting) | D026, D101 (superseding D027/D028/D099 compensation) |
 | Two-sex union models and union API restructuring (deferred) | D073 |
@@ -3210,3 +3210,12 @@ Combine `group()` and `set_groups()` on the `group` help topic, distinguishing a
 Keep `create_baseline_population()` unchanged. Verbs remain appropriate for pipeable actions such as `set_population()`; standalone specification constructors use nouns. Rename the three corresponding source files to match their lead functions. Matching constructors retain separate help topics, as requested under D146.
 
 **Compatibility and scope:** This is a direct pre-release API rename, without aliases under the former names. Defaults, classes, validation rules, stochastic behavior, and model semantics remain unchanged. Update package code, tests, generated help, and current design specifications. Preserve user-maintained README/vignettes, historical validation reports and supporting scripts, and dated verification/handoff records. Those sources can retain historical calls; running them against the renamed API requires updating the calls or using their recorded software version. Earlier decision entries retain their original constructor spellings; this entry governs current names.
+
+
+## D148 — Snake-case confidence argument and function-style review (November 9, 2026)
+
+**Status:** User instruction and implementation authorization, November 9, 2026.
+
+**Decision:** Rename Hammel's `conf.level` argument to `conf_level` on all seven observed event-rate calculators and their internal helpers. Update tests, generated help, diagnostics, and current specifications. Keep the external `stats::poisson.test(conf.level = conf_level)` call intact. This is a direct pre-release argument rename without an alias for the former spelling; default output, interval calculation, column names, and exports are unchanged. This supersedes the argument spelling in D124, not its statistical contract.
+
+**Review:** Check the public API and hand-maintained R code against tidyverse naming, function-writing, and syntax conventions, retaining the user's noun constructors, purpose comments, and uppercase section headings. Record the scope, findings, and limits in [R source organization](r-source-organization.md). Broader formatting and unrelated API changes are not part of the confidence-argument rename. User-owned articles and historical validation evidence remain intact.

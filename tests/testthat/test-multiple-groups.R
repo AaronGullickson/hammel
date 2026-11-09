@@ -552,7 +552,7 @@ test_that("union rates split by each partner's dimensions match a combined colum
                 c("time_start", "race_w", "region_h"), c("union_years", "dissolutions"))
   expect_equal(ours$rate_dissolution, ours$dissolutions / ours$union_years)
   ours <- calculate_dissolution_rates(out, c(0, 4), c(0, Inf), by = c("region_w", "race_w", "race_h"),
-                                      conf.level = .95)
+                                      conf_level = .95)
   compare_split(ours, sum_by(reference, c("region_w", "race_w", "race_h"), c("union_years", "dissolutions")),
                 c("region_w", "race_w", "race_h"), c("union_years", "dissolutions"))
   expect_true(all(ours$conf_low <= ours$rate_dissolution))

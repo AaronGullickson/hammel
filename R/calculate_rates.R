@@ -34,7 +34,7 @@
 #'   over. Accepted variables and their event-time interpretation differ by
 #'   calculator; see the sections below. Declared group dimensions must be named
 #'   explicitly, for example `"race"`, `"race_w"`, or `"race_h"`.
-#' @param conf.level NULL (default) to omit confidence intervals, or a finite
+#' @param conf_level NULL (default) to omit confidence intervals, or a finite
 #'   numeric scalar strictly between 0 and 1. Adds `conf_low` and `conf_high`
 #'   from two-sided exact [stats::poisson.test()] intervals for observed event
 #'   counts over exposure. Bounds are NA at zero exposure. For fertility, these
@@ -186,7 +186,7 @@
 #' \strong{Output:} A tibble with `time_start`, `time_end`, `sex`, `age_start`, `age_end`,
 #'   duration columns when `dur_breaks` is supplied, the `by` columns,
 #'   `person_years`, `unions`, and `rate_union`. Empty cells are retained.
-#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#'   With non-NULL `conf_level`, also includes `conf_low` and `conf_high`.
 #'
 #' @section Marriage:
 #' `calculate_marriage_rates()`:
@@ -213,7 +213,7 @@
 #' \strong{Output:} A tibble with `time_start`, `time_end`, `sex`, `age_start`, `age_end`,
 #'   the `by` columns, `person_years`, `marriages`, and `rate_marriage`.
 #'   Empty cells are retained. Person-years include cohabiting time.
-#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#'   With non-NULL `conf_level`, also includes `conf_low` and `conf_high`.
 #'
 #' @section Dissolution:
 #' `calculate_dissolution_rates()`:
@@ -258,7 +258,7 @@
 #'   the `by` columns, `union_years`, `dissolutions`, and `rate_dissolution`.
 #'   Rows vary by time fastest, then duration, then the `by` variables in the
 #'   order given.
-#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#'   With non-NULL `conf_level`, also includes `conf_low` and `conf_high`.
 #'
 #' @section Cohabitation conversion:
 #' `calculate_cohab_convert_rate()`:
@@ -287,7 +287,7 @@
 #'   `age_start`, `age_end`), the `by` columns, `union_years`, `conversions`
 #'   and `rate_cohab_convert`. Empty cells are retained. Rates are conversions per
 #'   cohabitation union-year, not conversion probabilities with competing risks.
-#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#'   With non-NULL `conf_level`, also includes `conf_low` and `conf_high`.
 #'
 #' @section Group transitions:
 #' `calculate_transition_rates()`:
@@ -325,7 +325,7 @@
 #'   including zero-event cells. Fewer than two known groups returns a typed
 #'   empty tibble. Rows vary by time fastest, then the axis band, then
 #'   destination, then origin, then the `by` variables in the order given.
-#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#'   With non-NULL `conf_level`, also includes `conf_low` and `conf_high`.
 #'
 #' @seealso [calculate_population_size()], [calculate_tfr()],
 #'   [calculate_patfr()], [calculate_life_table()]
@@ -366,8 +366,8 @@
 #' calculate_dissolution_rates(population, c(0, 5), c(0, Inf))
 #' calculate_cohab_convert_rate(population, c(0, 5), dur_breaks = c(0, Inf))
 calculate_mortality_rates <- function(population, time_breaks, age_breaks, by = NULL,
-                                      conf.level = NULL, pool_dissolved = FALSE) {
-  validate_rate_conf_level(conf.level)
+                                      conf_level = NULL, pool_dissolved = FALSE) {
+  validate_rate_conf_level(conf_level)
   alias <- observation_alias(population, by)
   population <- alias$population
   by <- alias$by
@@ -382,7 +382,7 @@ calculate_mortality_rates <- function(population, time_breaks, age_breaks, by = 
   out$rate_mortality <- as.numeric(ifelse(out$person_years > 0,
     out$deaths / out$person_years, NA_real_))
   attr(out, "index") <- NULL
-  finish_strata(add_rate_confidence(out, "deaths", "person_years", conf.level), alias)
+  finish_strata(add_rate_confidence(out, "deaths", "person_years", conf_level), alias)
 }
 
 #' @rdname calculate_rates
@@ -390,8 +390,8 @@ calculate_mortality_rates <- function(population, time_breaks, age_breaks, by = 
 #' @export
 calculate_fertility_rates <- function(population, time_breaks, age_breaks, by = NULL,
                                       parity_breaks = NULL, unrealized = FALSE,
-                                      conf.level = NULL, pool_dissolved = FALSE) {
-  validate_rate_conf_level(conf.level)
+                                      conf_level = NULL, pool_dissolved = FALSE) {
+  validate_rate_conf_level(conf_level)
   if (!is.logical(unrealized) || length(unrealized) != 1L || is.na(unrealized))
     stop("`unrealized` must be TRUE or FALSE.", call. = FALSE)
   if (unrealized) {
@@ -426,7 +426,7 @@ calculate_fertility_rates <- function(population, time_breaks, age_breaks, by = 
   if (unrealized) out <- add_unrealized_births(out, population$simulation, alias)
   attr(out, "unassigned_births") <- tibble::tibble(time_start = head(time_breaks, -1),
     time_end = tail(time_breaks, -1), births = counts$unassigned_births)
-  out <- finish_strata(add_rate_confidence(out, "births", "person_years", conf.level), alias)
+  out <- finish_strata(add_rate_confidence(out, "births", "person_years", conf_level), alias)
   out
 }
 
@@ -435,8 +435,8 @@ calculate_fertility_rates <- function(population, time_breaks, age_breaks, by = 
 #' @export
 calculate_cohab_convert_rate <- function(population, time_breaks,
                                          dur_breaks = NULL, age_breaks = NULL,
-                                         by = NULL, conf.level = NULL) {
-  validate_rate_conf_level(conf.level)
+                                         by = NULL, conf_level = NULL) {
+  validate_rate_conf_level(conf_level)
   alias <- observation_alias(population, by, c("_w", "_h"))
   population <- alias$population
   by <- alias$by
@@ -472,15 +472,15 @@ calculate_cohab_convert_rate <- function(population, time_breaks,
   result$rate_cohab_convert <- as.numeric(ifelse(result$union_years > 0,
     result$conversions / result$union_years, NA_real_))
   result <- finish_strata(result, alias, "conversions", "union_years", "rate_cohab_convert")
-  add_rate_confidence(result, "conversions", "union_years", conf.level)
+  add_rate_confidence(result, "conversions", "union_years", conf_level)
 }
 
 #' @rdname calculate_rates
 #' @order 5
 #' @export
 calculate_dissolution_rates <- function(population, time_breaks, dur_breaks, by = NULL,
-                                        conf.level = NULL) {
-  validate_rate_conf_level(conf.level)
+                                        conf_level = NULL) {
+  validate_rate_conf_level(conf_level)
   alias <- observation_alias(population, by, c("_w", "_h"))
   population <- alias$population
   by <- alias$by
@@ -522,30 +522,30 @@ calculate_dissolution_rates <- function(population, time_breaks, dur_breaks, by 
   result$rate_dissolution <- as.numeric(ifelse(result$union_years > 0,
     result$dissolutions / result$union_years, NA_real_))
   result <- finish_strata(result, alias, "dissolutions", "union_years", "rate_dissolution")
-  add_rate_confidence(result, "dissolutions", "union_years", conf.level)
+  add_rate_confidence(result, "dissolutions", "union_years", conf_level)
 }
 
 #' @rdname calculate_rates
 #' @order 4
 #' @export
 calculate_marriage_rates <- function(population, time_breaks, age_breaks, by = NULL,
-                                     conf.level = NULL, pool_dissolved = FALSE) {
-  validate_rate_conf_level(conf.level)
+                                     conf_level = NULL, pool_dissolved = FALSE) {
+  validate_rate_conf_level(conf_level)
   alias <- observation_alias(population, by)
   population <- alias$population
   by <- alias$by
   by <- check_by(by, c("group", "previous_union"), "calculate_marriage_rates", alias$dims)
   finish_strata(calculate_entry_rates(population, time_breaks, age_breaks, by, dur_breaks = NULL,
-    marriage_measure = TRUE, conf.level = conf.level, pool_dissolved = pool_dissolved), alias)
+    marriage_measure = TRUE, conf_level = conf_level, pool_dissolved = pool_dissolved), alias)
 }
 
 #' @rdname calculate_rates
 #' @order 7
 #' @export
 calculate_transition_rates <- function(population, time_breaks, age_breaks = NULL,
-                                       dur_breaks = NULL, by = NULL, conf.level = NULL,
+                                       dur_breaks = NULL, by = NULL, conf_level = NULL,
                                        pool_dissolved = FALSE, group = NULL) {
-  validate_rate_conf_level(conf.level)
+  validate_rate_conf_level(conf_level)
   if (!inherits(population, "hammel_population"))
     stop("`population` must be a grouped hammel_population.", call. = FALSE)
   validate_population(population)
@@ -627,21 +627,21 @@ calculate_transition_rates <- function(population, time_breaks, age_breaks = NUL
     })
     out <- out[do.call(order, c(keys, list(seq_len(nrow(out))))), , drop = FALSE]
   }
-  add_rate_confidence(out, "transitions", "person_years", conf.level)
+  add_rate_confidence(out, "transitions", "person_years", conf_level)
 }
 
 #' @rdname calculate_rates
 #' @order 3
 #' @export
 calculate_union_rates <- function(population, time_breaks, age_breaks, by = NULL,
-                                  dur_breaks = NULL, conf.level = NULL, pool_dissolved = FALSE) {
-  validate_rate_conf_level(conf.level)
+                                  dur_breaks = NULL, conf_level = NULL, pool_dissolved = FALSE) {
+  validate_rate_conf_level(conf_level)
   alias <- observation_alias(population, by)
   population <- alias$population
   by <- alias$by
   by <- check_by(by, c("group", "previous_union", "union_type"), "calculate_union_rates", alias$dims)
   finish_strata(calculate_entry_rates(population, time_breaks, age_breaks, by, dur_breaks,
-    marriage_measure = FALSE, conf.level = conf.level, pool_dissolved = pool_dissolved), alias)
+    marriage_measure = FALSE, conf_level = conf_level, pool_dissolved = pool_dissolved), alias)
 }
 
 # HELPER FUNCTIONS ---------------------------------------------------------
@@ -764,7 +764,7 @@ check_demographic_breaks <- function(breaks, name, ages = FALSE) {
 # Union entry (and marriage entry) rates from the shared engine. Formation
 # kinds: 0 cohabitation, 1 direct marriage, 2 marriage by conversion.
 calculate_entry_rates <- function(population, time_breaks, age_breaks, by, dur_breaks,
-                                  marriage_measure, conf.level = NULL, pool_dissolved = FALSE) {
+                                  marriage_measure, conf_level = NULL, pool_dissolved = FALSE) {
   if (!inherits(population, "hammel_population"))
     stop("`population` must be a hammel_population with union histories.", call. = FALSE)
   if (!is.null(dur_breaks)) {
@@ -835,7 +835,7 @@ calculate_entry_rates <- function(population, time_breaks, age_breaks, by, dur_b
     names(result)[names(result) == "rate_union"] <- "rate_marriage"
   }
   add_rate_confidence(result, if (marriage_measure) "marriages" else "unions",
-    "person_years", conf.level)
+    "person_years", conf_level)
 }
 
 # Attach union-level group histories for `mode` 0 (wife), 1 (husband) or 2
@@ -970,23 +970,23 @@ encode_combined <- function(alias, data, suffix = "") {
 }
 
 # Shared by public event-rate summaries, after their final aggregation.
-validate_rate_conf_level <- function(conf.level) {
-  if (!is.null(conf.level) && (!is.numeric(conf.level) ||
-      length(conf.level) != 1L || !is.null(dim(conf.level)) ||
-      !is.finite(conf.level) || conf.level <= 0 || conf.level >= 1))
-    stop("`conf.level` must be NULL or a finite numeric scalar strictly between 0 and 1.",
+validate_rate_conf_level <- function(conf_level) {
+  if (!is.null(conf_level) && (!is.numeric(conf_level) ||
+      length(conf_level) != 1L || !is.null(dim(conf_level)) ||
+      !is.finite(conf_level) || conf_level <= 0 || conf_level >= 1))
+    stop("`conf_level` must be NULL or a finite numeric scalar strictly between 0 and 1.",
       call. = FALSE)
   invisible(NULL)
 }
 
-add_rate_confidence <- function(table, events, exposure, conf.level) {
-  validate_rate_conf_level(conf.level)
-  if (is.null(conf.level)) return(table)
+add_rate_confidence <- function(table, events, exposure, conf_level) {
+  validate_rate_conf_level(conf_level)
+  if (is.null(conf_level)) return(table)
   table$conf_low <- rep(NA_real_, nrow(table))
   table$conf_high <- rep(NA_real_, nrow(table))
   for (i in which(table[[exposure]] > 0)) {
     limits <- stats::poisson.test(x = table[[events]][i], T = table[[exposure]][i],
-      conf.level = conf.level)$conf.int
+      conf.level = conf_level)$conf.int
     table$conf_low[i] <- limits[1L]
     table$conf_high[i] <- limits[2L]
   }

@@ -17,7 +17,7 @@ test_that("pooled previous-union summaries sum exposure and events before exact 
     for (duration in if(marriage) list(NULL) else list(NULL,c(0,1,Inf))) {
       for (typed in if(marriage) FALSE else c(FALSE,TRUE)) {
         args <- list(population=pop,time_breaks=0:3,age_breaks=c(0,21,Inf),
-          by = c("previous_union", if (grouped) "group", if (typed) "union_type"),conf.level=.95)
+          by = c("previous_union", if (grouped) "group", if (typed) "union_type"),conf_level=.95)
         if(!marriage) args <- c(args,list(dur_breaks=duration))
         detailed <- do.call(fun,args)
         pooled <- do.call(fun,c(args,list(pool_dissolved=TRUE)))
@@ -58,7 +58,7 @@ test_that("pooling requires previous strata and validates its option", {
     expect_setequal(x$previous_union,c("none","dissolved"))
     expect_false("conf_low" %in% names(x))
     empty <- hammel_population(pop$persons[FALSE,],end_time=3, groups = if ("group" %in% names(pop$persons)) "group")
-    x <- fun(empty,c(0,3),c(0,Inf),by = "previous_union",pool_dissolved=TRUE,conf.level=.95)
+    x <- fun(empty,c(0,3),c(0,Inf),by = "previous_union",pool_dissolved=TRUE,conf_level=.95)
     expect_true(all(x$person_years==0 & is.na(x$conf_low) & is.na(x$conf_high)))
   }
 })

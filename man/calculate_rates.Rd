@@ -16,7 +16,7 @@ calculate_mortality_rates(
   time_breaks,
   age_breaks,
   by = NULL,
-  conf.level = NULL,
+  conf_level = NULL,
   pool_dissolved = FALSE
 )
 
@@ -27,7 +27,7 @@ calculate_fertility_rates(
   by = NULL,
   parity_breaks = NULL,
   unrealized = FALSE,
-  conf.level = NULL,
+  conf_level = NULL,
   pool_dissolved = FALSE
 )
 
@@ -37,7 +37,7 @@ calculate_union_rates(
   age_breaks,
   by = NULL,
   dur_breaks = NULL,
-  conf.level = NULL,
+  conf_level = NULL,
   pool_dissolved = FALSE
 )
 
@@ -46,7 +46,7 @@ calculate_marriage_rates(
   time_breaks,
   age_breaks,
   by = NULL,
-  conf.level = NULL,
+  conf_level = NULL,
   pool_dissolved = FALSE
 )
 
@@ -55,7 +55,7 @@ calculate_dissolution_rates(
   time_breaks,
   dur_breaks,
   by = NULL,
-  conf.level = NULL
+  conf_level = NULL
 )
 
 calculate_cohab_convert_rate(
@@ -64,7 +64,7 @@ calculate_cohab_convert_rate(
   dur_breaks = NULL,
   age_breaks = NULL,
   by = NULL,
-  conf.level = NULL
+  conf_level = NULL
 )
 
 calculate_transition_rates(
@@ -73,7 +73,7 @@ calculate_transition_rates(
   age_breaks = NULL,
   dur_breaks = NULL,
   by = NULL,
-  conf.level = NULL,
+  conf_level = NULL,
   pool_dissolved = FALSE,
   group = NULL
 )
@@ -102,7 +102,7 @@ over. Accepted variables and their event-time interpretation differ by
 calculator; see the sections below. Declared group dimensions must be named
 explicitly, for example \code{"race"}, \code{"race_w"}, or \code{"race_h"}.}
 
-\item{conf.level}{NULL (default) to omit confidence intervals, or a finite
+\item{conf_level}{NULL (default) to omit confidence intervals, or a finite
 numeric scalar strictly between 0 and 1. Adds \code{conf_low} and \code{conf_high}
 from two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} intervals for observed event
 counts over exposure. Bounds are NA at zero exposure. For fertility, these
@@ -284,7 +284,7 @@ Duration rows include all ages; this is not an age-by-duration surface.
 \strong{Output:} A tibble with \code{time_start}, \code{time_end}, \code{sex}, \code{age_start}, \code{age_end},
 duration columns when \code{dur_breaks} is supplied, the \code{by} columns,
 \code{person_years}, \code{unions}, and \code{rate_union}. Empty cells are retained.
-With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
+With non-NULL \code{conf_level}, also includes \code{conf_low} and \code{conf_high}.
 }
 
 \section{Marriage}{
@@ -313,7 +313,7 @@ results over: declared group dimensions and \code{"previous_union"}, as in
 \strong{Output:} A tibble with \code{time_start}, \code{time_end}, \code{sex}, \code{age_start}, \code{age_end},
 the \code{by} columns, \code{person_years}, \code{marriages}, and \code{rate_marriage}.
 Empty cells are retained. Person-years include cohabiting time.
-With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
+With non-NULL \code{conf_level}, also includes \code{conf_low} and \code{conf_high}.
 }
 
 \section{Dissolution}{
@@ -360,7 +360,7 @@ under the groups before any same-time transition.
 the \code{by} columns, \code{union_years}, \code{dissolutions}, and \code{rate_dissolution}.
 Rows vary by time fastest, then duration, then the \code{by} variables in the
 order given.
-With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
+With non-NULL \code{conf_level}, also includes \code{conf_low} and \code{conf_high}.
 }
 
 \section{Cohabitation conversion}{
@@ -391,7 +391,7 @@ band, then the \code{by} variables in the order given.
 \code{age_start}, \code{age_end}), the \code{by} columns, \code{union_years}, \code{conversions}
 and \code{rate_cohab_convert}. Empty cells are retained. Rates are conversions per
 cohabitation union-year, not conversion probabilities with competing risks.
-With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
+With non-NULL \code{conf_level}, also includes \code{conf_low} and \code{conf_high}.
 }
 
 \section{Group transitions}{
@@ -431,7 +431,7 @@ directed pairs among current and historical identities are retained,
 including zero-event cells. Fewer than two known groups returns a typed
 empty tibble. Rows vary by time fastest, then the axis band, then
 destination, then origin, then the \code{by} variables in the order given.
-With non-NULL \code{conf.level}, also includes \code{conf_low} and \code{conf_high}.
+With non-NULL \code{conf_level}, also includes \code{conf_low} and \code{conf_high}.
 }
 
 \examples{

@@ -5,6 +5,14 @@ D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the u
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## Snake-case confidence argument and style review (November 9, 2026)
+
+D148 changes the seven rate calculators and three internal confidence/entry helpers to `conf_level`. The external `stats::poisson.test()` call and the independent test reference keep the required `conf.level` spelling. Regenerated help passed Rd validation and documents `conf_level` rather than the former public argument. Exports are unchanged.
+
+A parsed-expression comparison against the pre-change working tree confirmed only the intended argument/diagnostic rename. Before/after outputs for all seven calculators were identical at `NULL`, 0.8, and 0.95 confidence settings, including attributes and empty cells supplied by the shared confidence fixture. The full offline `devtools::test()` run passed 6,496 expectations with zero failures in 108.0 seconds; the live database test was skipped. One existing warning concerned `timedatectl` system-bus access during HMDHFDplus/lubridate loading. `git diff --check` passed.
+
+The accompanying [function-style review](r-source-organization.md#function-writing-conventions-and-review) used parsed definitions and source inspection across all 33 hand-maintained R files. Public naming now follows snake_case. Formatting findings and explicit project exceptions are recorded there; no package-wide formatting or additional dependency was introduced. User-maintained README/vignettes and historical validation evidence were not edited.
+
 ## Noun-based specification constructors (November 9, 2026)
 
 D147 renames the matching, age-gap matching, weight, and group-inheritance constructors, retaining `create_baseline_population()`. A parsed-expression comparison against the pre-rename working tree confirmed that executable R definitions differ only by those four name replacements, including updated calls and diagnostic messages. Export checks confirmed exactly those replacements, with 43 exports overall and no aliases under the old names.

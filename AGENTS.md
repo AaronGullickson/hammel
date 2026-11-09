@@ -45,6 +45,11 @@ be made autonomously; record choices with substantial architectural consequences
   `age_gap_matching_model()`, `weight_model()`, and `group_inheritance()`.
   Prefer verbs for pipeable actions such as `set_population()`. Keep
   `create_baseline_population()` as the explicitly retained exception.
+- Use snake_case for package-owned function and argument names (for example,
+  `conf_level`). Preserve external APIs when calling them, such as
+  `stats::poisson.test(conf.level = conf_level)`. Follow tidyverse function-writing
+  conventions subject to the explicit project naming and section-heading rules;
+  see the source organization guide for the current style review.
 - Return all public tables as tibbles, including empty tables, population histories,
   process schedules, and demographic summaries. Accept base data frames as inputs.
 - Keep model construction separate from simulation execution. Aim for composable R workflows and R-native, inspectable results at the user-facing boundary. This does not require an R-only implementation: performance-critical computation and internal state may use compiled code, such as C++, with results exposed as ordinary R objects for inspection and analysis.

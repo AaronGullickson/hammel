@@ -36,9 +36,9 @@ check_rate_intervals <- function(x, events, exposure, level) {
 test_that("all rate calculators append exact intervals without changing other output", {
   for (case in confidence_calls(confidence_population())) {
     baseline <- do.call(case[[1]], case[[2]])
-    expect_identical(do.call(case[[1]], c(case[[2]], list(conf.level = NULL))), baseline)
+    expect_identical(do.call(case[[1]], c(case[[2]], list(conf_level = NULL))), baseline)
     for (level in c(.95, .8)) {
-      x <- do.call(case[[1]], c(case[[2]], list(conf.level = level)))
+      x <- do.call(case[[1]], c(case[[2]], list(conf_level = level)))
       expect_identical(x[names(baseline)], baseline)
       expect_identical(tail(names(x), 2), c("conf_low", "conf_high"))
       check_rate_intervals(x, case[[3]], case[[4]], level)
@@ -50,19 +50,19 @@ test_that("all calculators reject invalid confidence levels", {
   bad <- list(0, 1, -.1, 1.1, NA_real_, NaN, Inf, "0.95", TRUE,
     numeric(), c(.9, .95), matrix(.95))
   for (case in confidence_calls(confidence_population())) for (level in bad)
-    expect_error(do.call(case[[1]], c(case[[2]], list(conf.level = level))), "conf.level")
+    expect_error(do.call(case[[1]], c(case[[2]], list(conf_level = level))), "conf_level")
 })
 
 test_that("zero events have positive upper limits and zero exposure has NA bounds", {
   persons <- tibble::tibble(person_id = 1, sex = "f", birth_time = 0,
     death_time = NA_real_, mother_id = NA_real_, father_id = NA_real_)
-  x <- calculate_mortality_rates(persons, c(0, 100), c(0, Inf), conf.level = .95)
+  x <- calculate_mortality_rates(persons, c(0, 100), c(0, Inf), conf_level = .95)
   expect_equal(x$conf_low[x$sex == "f"], 0)
   expect_equal(x$conf_high[x$sex == "f"], -log(.025) / 100)
   expect_true(all(is.na(x$conf_high[x$person_years == 0])))
   # The conversion at the left endpoint has a count but no exposure in this band.
   x <- calculate_cohab_convert_rate(confidence_population(), c(2, 3),
-    dur_breaks = c(0, 2, Inf), conf.level = .95)
+    dur_breaks = c(0, 2, Inf), conf_level = .95)
   expect_true(any(x$conversions > 0 & x$union_years == 0))
   expect_true(all(is.na(x$conf_low)))
   expect_true(all(is.na(x$conf_high)))
@@ -78,7 +78,7 @@ test_that("empty grouped rate results retain numeric confidence columns", {
       if (identical(case[[1]], calculate_dissolution_rates)) c("group_w", "group_h") else
       if (identical(case[[1]], calculate_cohab_convert_rate)) "group_w" else "group"
     case[[2]]$by <- unique(c(case[[2]]$by, group_by))
-    x <- do.call(case[[1]], c(case[[2]], list(conf.level = .95)))
+    x <- do.call(case[[1]], c(case[[2]], list(conf_level = .95)))
     expect_equal(nrow(x), 0)
     expect_identical(x$conf_low, numeric())
     expect_identical(x$conf_high, numeric())
@@ -92,7 +92,7 @@ test_that("fertility intervals use observed births with pooled or unrealized out
     unrealized_births = 2.5))
   for (parity in list(NULL, c(0, 1, Inf))) {
     x <- calculate_fertility_rates(pop, c(0, 2, 8), c(0, Inf),
-      parity_breaks = parity, unrealized = TRUE, conf.level = .95)
+      parity_breaks = parity, unrealized = TRUE, conf_level = .95)
     check_rate_intervals(x, "births", "person_years", .95)
     expect_true("rate_fertility_adjusted" %in% names(x))
     if (is.null(parity)) {
