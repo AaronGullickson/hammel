@@ -39,8 +39,9 @@ test_that("set_groups works before or after the population and replaces its decl
   before <- set_population(before, model$population)
   before$processes <- model$processes
   after <- set_groups(model, group = group(inheritance = "mother"))
-  expect_identical(histories(simulate(before, 1, seed = 3)), histories(simulate(after, 1, seed = 3)))
-  out <- simulate(after, 1, seed = 3)
+  expect_identical(histories(run_simulation(before, 1, seed = 3)), histories(
+    run_simulation(after, 1, seed = 3)))
+  out <- run_simulation(after, 1, seed = 3)
   expect_identical(out$groups$group$inheritance$method, "mother")
   kids <- out$persons[out$persons$birth_time >= 0, ]
   moms <- out$persons$group[match(kids$mother_id, out$persons$person_id)]
@@ -59,7 +60,7 @@ test_that("set_groups works before or after the population and replaces its decl
 
 test_that("an undeclared group column is an inert custom column", {
   model <- declaration_model()
-  out <- simulate(model, 1, seed = 4)
+  out <- run_simulation(model, 1, seed = 4)
   expect_null(out$groups)
   expect_null(out$ancestry)
   expect_null(out$transitions)
@@ -70,7 +71,8 @@ test_that("an undeclared group column is an inert custom column", {
   stratified <- model
   stratified$processes$mortality$rates <- stratify_rates(model$processes$mortality$rates,
     list(group = c(A = 1, B = 1)))
-  expect_error(simulate(stratified, 1), "not a declared group dimension.*set_groups")
+  expect_error(run_simulation(stratified, 1),
+    "not a declared group dimension.*set_groups")
   expect_error(calculate_mortality_rates(out, c(0, 1), c(0, Inf), by = "group"), "declared group")
 })
 
@@ -81,27 +83,30 @@ test_that("categories fix the complete ordered list", {
   m <- set_groups(model, group = group(categories = c("B", "A", "C")))
   m$processes$mortality$rates <- stratify_rates(model$processes$mortality$rates,
     list(group = c(A = 1, B = 1)))
-  expect_error(simulate(m, 0), "missing schedules.*C")
+  expect_error(run_simulation(m, 0), "missing schedules.*C")
   m$processes$mortality$rates <- stratify_rates(model$processes$mortality$rates,
     list(group = c(A = 1, B = 1, C = 1)))
-  out <- simulate(m, 1, seed = 5)
+  out <- run_simulation(m, 1, seed = 5)
   expect_identical(out$groups$group$categories, c("B", "A", "C"))
   # A custom rule must return a listed category.
   rule <- group_inheritance("custom", fun = function(...) "D")
-  expect_error(simulate(set_groups(model, group = group(inheritance = rule)), 1, seed = 5),
+  expect_error(run_simulation(set_groups(model, group = group(inheritance =
+    rule)), 1, seed = 5),
                "undeclared group identity")
 })
 
 test_that("ancestry is tracked only when requested", {
   model <- declaration_model()
-  plain <- simulate(set_groups(model, group = group()), 1, seed = 6)
+  plain <- run_simulation(set_groups(model, group = group()), 1, seed = 6)
   expect_null(plain$ancestry)
-  tracked <- simulate(set_groups(model, group = group(ancestry = TRUE)), 1, seed = 6)
+  tracked <- run_simulation(set_groups(model, group = group(ancestry = TRUE)),
+    1, seed = 6)
   expect_named(tracked$ancestry, "group")
   expect_s3_class(tracked$ancestry$group, "tbl_df")
   expect_identical(tracked$ancestry$group$person_id, tracked$persons$person_id)
   expect_identical(histories(plain)[c("persons", "unions")], histories(tracked)[c("persons", "unions")])
-  expect_error(simulate(set_groups(model, group = group(inheritance = "ancestry")), 1),
+  expect_error(run_simulation(set_groups(model, group = group(inheritance =
+    "ancestry")), 1),
                "ancestry = TRUE")
   # Turning tracking off drops an existing table.
   expect_null(set_groups(set_population(hammel_model(), tracked), group = group())$population$ancestry)
@@ -155,5 +160,5 @@ test_that("baselines declare categories in the order given, and set_groups keeps
                   weights = weight_model(~ race, c(raceA = 0, raceAB = 0))) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .1)) |>
     set_union_formation("on_demand")
-  expect_s3_class(simulate(model, 1, seed = 4), "hammel_population")
+  expect_s3_class(run_simulation(model, 1, seed = 4), "hammel_population")
 })

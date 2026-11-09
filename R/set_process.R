@@ -36,7 +36,8 @@ set_process <- function(model, process) {
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 # Validate and store a process without user-facing advisory warnings; used by
-# set_process() and by simulate()'s re-validation of edited specifications.
+# set_process() and by run_simulation()'s re-validation of edited
+# specifications.
 attach_process <- function(model, process) {
   check_model(model)
   if (!inherits(process, "hammel_process") || !is.list(process)) {

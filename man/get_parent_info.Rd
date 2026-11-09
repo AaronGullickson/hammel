@@ -8,7 +8,7 @@ get_parent_info(population)
 }
 \arguments{
 \item{population}{A validated \code{hammel_population}, such as the result of
-\code{\link[=simulate]{simulate()}}.}
+\code{\link[=run_simulation]{run_simulation()}}.}
 }
 \value{
 A separate tibble containing all person columns plus \code{age_mother} and

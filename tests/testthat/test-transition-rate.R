@@ -140,7 +140,7 @@ test_that("simulated competing hazards recover directed rates with shared origin
   model$population$groups <- list(group = group())
   model <- set_group_transition(model, data.frame(origin = "A", destination = c("B", "C"),
     age_start = 0, age_end = Inf, rate = c(.2, .3)))
-  pop <- simulate(model, 2, seed = 317)
+  pop <- run_simulation(model, 2, seed = 317)
   out <- calculate_transition_rates(pop, c(0, 2), age_breaks = c(0, Inf))
   a <- subset(out, origin == "A")
   expect_equal(a$person_years[1], a$person_years[2])

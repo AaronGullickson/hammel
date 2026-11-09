@@ -2,13 +2,13 @@ test_that("minimum male age excludes boys while preserving births and unknown fa
   model <- make_model(2, birth_rate = 20, birth_interval = 0)
   model$population$persons$sex[1] <- "f"
   model$population$persons$birth_time[2] <- -14
-  result <- simulate(model, 0.5, seed = 52)
+  result <- run_simulation(model, 0.5, seed = 52)
   expect_gt(result$simulation$births, 0)
   expect_equal(nrow(result$unions), 0)
   expect_true(all(is.na(result$persons$father_id)))
-  expect_identical(result, simulate(model, 0.5, seed = 52))
+  expect_identical(result, run_simulation(model, 0.5, seed = 52))
   model$processes$union_formation$min_male_age <- NA_real_
-  expect_error(simulate(model, 1), "min_male_age")
+  expect_error(run_simulation(model, 1), "min_male_age")
 })
 
 test_that("exact and fractional age thresholds govern searches without rounding", {
@@ -20,7 +20,7 @@ test_that("exact and fractional age thresholds govern searches without rounding"
   model$population$persons$sex[1] <- "f"
   model$population$persons$birth_time <- c(-20, -16.25, -16.249)
   model$processes$union_formation$min_male_age <- 16.5
-  result <- simulate(model, 0.3, seed = 52)
+  result <- run_simulation(model, 0.3, seed = 52)
   expect_equal(result$unions$start_time, 0.25)
   expect_equal(result$unions$husband_id, 2)
   expect_true(all(result$persons$father_id[result$persons$mother_id %in% 1] == 2))
@@ -30,7 +30,7 @@ test_that("boys age into eligibility during a run", {
   model <- make_model(2, birth_rate = 20, birth_interval = 0)
   model$population$persons$sex[1] <- "f"
   model$population$persons$birth_time[2] <- -14.5
-  result <- simulate(model, 1, seed = 52)
+  result <- run_simulation(model, 1, seed = 52)
   expect_equal(nrow(result$unions), 1)
   expect_gte(result$unions$start_time, 0.5)
   children <- result$persons[result$persons$mother_id %in% 1, ]
@@ -43,7 +43,8 @@ test_that("an under-age man never blocks an eligible adult elsewhere in the pool
   model <- make_model(3, birth_rate = 20, birth_interval = 0)
   model$population$persons$sex[1] <- "f"
   model$population$persons$birth_time <- c(-20, -1, -25)
-  results <- lapply(1:50, function(seed) simulate(model, 0.1, seed = seed))
+  results <- lapply(1:50, function(seed) run_simulation(model, 0.1, seed =
+    seed))
   first_fathers <- vapply(results, function(result) {
     children <- result$persons[result$persons$mother_id %in% 1, ]
     if (!nrow(children)) return(-1)
@@ -63,14 +64,14 @@ test_that("existing partners are retained and women have no additional age restr
                           birth_interval = 0)
   model$population$unions <- tibble::tibble(union_id = 1, wife_id = 1,
     husband_id = 2, start_time = -0.1, end_time = NA_real_, end_reason = NA_character_)
-  result <- simulate(model, 0.1, seed = 52)
+  result <- run_simulation(model, 0.1, seed = 52)
   expect_gt(result$simulation$births, 0)
   expect_identical(result$unions, model$population$unions)
   expect_true(all(result$persons$father_id[result$persons$mother_id %in% 1] == 2))
   # Without a supplied union, the same young woman can search for an adult man.
   model$population$unions <- create_baseline_population(0)$unions
   model$population$persons$birth_time[2] <- -20
-  result <- simulate(model, 0.1, seed = 52)
+  result <- run_simulation(model, 0.1, seed = 52)
   expect_equal(result$unions$wife_id, 1)
   expect_equal(result$unions$husband_id, 2)
 })

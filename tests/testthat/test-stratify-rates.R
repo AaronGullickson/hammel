@@ -105,7 +105,8 @@ test_that("stratified tables equal explicit schedules for each process and toget
       stratified$processes[[name]]$rates <- stratify_rates(rates, list(group = factors))
       explicit$processes[[name]]$rates <- explicit_strata(rates, factors)
     }
-    expect_identical(simulate(stratified, 20, seed = 654), simulate(explicit, 20, seed = 654))
+    expect_identical(run_simulation(stratified, 20, seed = 654), run_simulation(
+      explicit, 20, seed = 654))
   }
 })
 
@@ -115,7 +116,7 @@ test_that("zero factors suppress only the selected risk", {
   model$population$groups <- list(group = group())
   model$processes$mortality$rates <- stratify_rates(model$processes$mortality$rates,
                                                     list(group = c(A = 0, B = 1)))
-  result <- simulate(model, 1, seed = 654)
+  result <- run_simulation(model, 1, seed = 654)
   expect_true(is.na(result$persons$death_time[1]))
   expect_false(is.na(result$persons$death_time[2]))
   model <- make_rate_model(2, search_rate = 1e8)
@@ -123,19 +124,19 @@ test_that("zero factors suppress only the selected risk", {
   model$population$groups <- list(group = group())
   search <- model$processes$union_formation$rates
   model$processes$union_formation$rates <- stratify_rates(search, list(group = c(A = 0, B = 1)))
-  expect_equal(nrow(simulate(model, 1, seed = 654)$unions), 0)
+  expect_equal(nrow(run_simulation(model, 1, seed = 654)$unions), 0)
   model$processes$union_formation$rates <- stratify_rates(search, list(group = c(A = 1, B = 0)))
-  expect_equal(nrow(simulate(model, 1, seed = 654)$unions), 1)
+  expect_equal(nrow(run_simulation(model, 1, seed = 654)$unions), 1)
 })
 
 test_that("every group must be listed and groups must be declared", {
   model <- strata_model()
   model$processes$mortality$rates <- stratify_rates(model$processes$mortality$rates,
                                                     list(group = c(A = 1.2, B = 1)))
-  expect_error(simulate(model, 0), "missing schedules.*C")
+  expect_error(run_simulation(model, 0), "missing schedules.*C")
   model$population$persons$group <- NULL
   model$population$groups <- NULL
-  expect_error(simulate(model, 0), "not a declared group dimension")
+  expect_error(run_simulation(model, 0), "not a declared group dimension")
 })
 
 test_that("stratified tables support numeric group codes and restarts", {
@@ -149,8 +150,9 @@ test_that("stratified tables support numeric group codes and restarts", {
     model$processes[[name]]$rates <- stratify_rates(rates, list(group = factors))
     explicit$processes[[name]]$rates <- explicit_strata(rates, factors)
   }
-  result <- simulate(model, 5, seed = 654)
-  expect_identical(result, simulate(explicit, 5, seed = 654))
-  expect_identical(simulate(set_population(model, result), 5, seed = 123),
-                   simulate(set_population(explicit, result), 5, seed = 123))
+  result <- run_simulation(model, 5, seed = 654)
+  expect_identical(result, run_simulation(explicit, 5, seed = 654))
+  expect_identical(run_simulation(set_population(model, result), 5, seed = 123),
+                   run_simulation(set_population(explicit, result), 5, seed =
+                     123))
 })

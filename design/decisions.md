@@ -26,7 +26,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Database rate products and reusable downloads | D018, D025 |
 | Demographic extraction and function names | D020–D022, D081 and missing-ASFR clarification |
 | Optional Poisson intervals for observed rates | D124; argument name D148 |
-| Continuous execution | D024 |
+| Continuous execution | D024; execution function name D152 |
 | Fertility spacing (cell accounting) | D026, D101 (superseding D027/D028/D099 compensation) |
 | Two-sex union models and union API restructuring (deferred) | D073 |
 | Duration-dependent dissolution and symmetric group pairs | D078–D079 |
@@ -3237,3 +3237,21 @@ Long diagnostic literals may use `paste0()` of literal pieces so their complete 
 **Decision:** Apply the general tidyverse brace rules to hand-maintained R source: brace every loop body and all statement-style or multiline conditional branches, including early returns, errors, and loop exits. Keep `else` beside the preceding closing brace. Preserve compact, single-line conditional value expressions when they contain no assignments, side effects, or control-flow modifiers. Brace multiline control-flow callbacks and error-handler bodies. Put `return()`, `stop()`, `break`, and `next` on their own lines within the relevant block. Apply the convention to documentation examples and retain the D149 80-column limit.
 
 **Scope and verification:** This is control-flow grouping and formatting, not a change to conditions, event order, random draws, values, or demographic semantics. Preserve comments, exports, defaults, documentation content, and generated wrappers. Verify parsed expressions after normalizing added single-expression branch/loop/function braces, compare before/after simulation outputs and RNG states, and run the offline suite. Broader changes to condition coercion, error APIs, or model behavior are not authorized by this formatting task.
+
+
+## D151 — Defer output-presentation work (November 9, 2026)
+
+**Status:** User direction, November 9, 2026.
+
+**Decision:** Leave diagnostic-presentation changes for now and revisit them as part of a project to improve output presentation, likely after the first release milestone. Consider tidyverse-style diagnostic bullets, condition classes, and rich model/result summaries and printing together in that project. These improvements are not first-release requirements.
+
+**Unselected:** Exact timing, summary content and interfaces, condition taxonomy, migration scope, and dependencies such as `cli` or `rlang`. This direction does not authorize implementation, dependency additions, or rewriting the existing diagnostic sites. It does not defer unrelated correctness fixes or determine the scope of other model-checking and post-simulation analysis proposals. Preserve inspectable underlying data and the current simulation return contract when presentation work is designed.
+
+
+## D152 — Rename execution to run_simulation (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Rename Hammel's standalone `simulate(model, years, seed = NULL)` action to `run_simulation(model, years, seed = NULL)`, with source file `R/run_simulation.R` and help topic `run_simulation`. Remove the former export and help alias. Do not implement `simulate.hammel_model()` or reinterpret the `stats::simulate()` generic's `nsim` argument: the user judged that generic unrelated to Hammel's execution interface. The existing stats generic remains available without being masked by Hammel.
+
+**Scope:** Direct pre-release API rename without a compatibility alias. Preserve arguments, defaults, population/result classes, RNG behavior, event timing, and native engine entry points and filenames. Update package calls, tests, generated help, and current design specifications; preserve historical decision/verification records, validation evidence, and user-maintained README/articles. Calls using the old name in those sources need updating before execution against the current API. No new demographic or replication mechanism is selected.

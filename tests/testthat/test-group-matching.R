@@ -91,19 +91,21 @@ group_choice_model <- function(initiation = "on_demand", matching, father_matchi
 
 test_that("pair effects drive both union modes and father choice", {
   matching <- matching_model(~ age_difference, c(age_difference = 0), group_exogamy = c("A:B" = 3), delta = c(B = 1000))
-  result <- simulate(group_choice_model(matching = matching), 0.3, seed = 52)
+  result <- run_simulation(group_choice_model(matching = matching), 0.3, seed =
+    52)
   expect_equal(result$unions$husband_id, 3)
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 3))
   model <- group_choice_model("rate", matching)
-  result <- simulate(model, 0.3, seed = 52)
+  result <- run_simulation(model, 0.3, seed = 52)
   expect_equal(nrow(result$unions), 0)
   expect_true(any(result$persons$birth_time >= 0))
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 3))
   model$processes$union_formation$rates$rate <- 1e8
-  result <- simulate(model, 0.3, seed = 52)
+  result <- run_simulation(model, 0.3, seed = 52)
   expect_equal(result$unions$husband_id, 3)
   opposite <- matching_model(~ age_difference, c(age_difference = 0), group_exogamy = c("A:A" = 3), delta = c(B = -1000))
-  result <- simulate(group_choice_model("rate", matching, father_matching = opposite), 0.3, seed = 52)
+  result <- run_simulation(group_choice_model("rate", matching,
+    father_matching = opposite), 0.3, seed = 52)
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 2))
 })
 
@@ -111,26 +113,26 @@ test_that("group matching validates edited models and missing identities even at
   matching <- matching_model(~ same_group, c(same_group = 1))
   model <- make_model(0)
   model$processes$union_formation$matching <- matching
-  expect_error(simulate(model, 0), "declared group dimension")
+  expect_error(run_simulation(model, 0), "declared group dimension")
   model$population$persons$group <- character()
   model$population$groups <- list(group = group())
-  expect_no_error(simulate(model, 1))
+  expect_no_error(run_simulation(model, 1))
   matching <- matching_model(~ age_difference, c(age_difference = 0), group_exogamy = c("A:B" = 0))
   matching$group_exogamy <- c("A:B" = 0, "B:A" = 0)
   expect_error(set_union_formation(make_model(0), "on_demand", matching), "overlapping")
   model$processes$union_formation$matching <- matching
-  expect_error(simulate(model, 0), "overlapping")
+  expect_error(run_simulation(model, 0), "overlapping")
 })
 
 test_that("zero or absent pair effects preserve histories and RNG consumption", {
   matching <- age_gap_matching_model(0, 5)
   model <- group_choice_model(matching = matching)
   set.seed(654)
-  original <- simulate(model, 1)
+  original <- run_simulation(model, 1)
   state <- .Random.seed
   model$processes$union_formation$matching$group_exogamy <- c("A:B" = 0, "absent:C" = 5)
   set.seed(654)
-  expect_identical(simulate(model, 1), original)
+  expect_identical(run_simulation(model, 1), original)
   expect_identical(.Random.seed, state)
 })
 

@@ -26,6 +26,8 @@ Agreed by the user and implemented November 9, 2026 (D143). This guide defines w
 
 11. Use braces for every loop body and for statement-style or multiline `if`/`else` branches. Keep `else` on the line containing the preceding closing brace, including `} else if (...) {` chains. A compact, single-line conditional used only to choose a value may remain unbraced when it has no side effects, assignments, or control-flow modifiers. Put `return()`, `stop()`, `break`, and `next` on their own lines inside the relevant block. Brace multiline callback bodies that contain control flow and error-handler bodies that raise errors. Apply the same convention to documentation examples (D150).
 
+12. Execute models with `run_simulation(model, years, seed = NULL)`. Keep it a standalone action rather than a method of `stats::simulate()`; the latter remains available for its existing modeling uses. The former Hammel name `simulate()` is not retained as an alias (D152).
+
 For a new function, first identify its responsibility and closest existing consumer. Extend that file if the responsibility fits. If no existing file is a logical home, explain the proposed responsibility and filename and ask the user before creating a new R script. Do not create one automatically. The user’s authorization of this reorganization covers the files listed below; future additions follow this rule.
 
 ## Responsibility boundaries
@@ -44,7 +46,7 @@ For a new function, first identify its responsibility and closest existing consu
 
 - **Cohabitation:** keep its settings/conversion helpers together even though cohabitation is configured through the union-formation process, rather than introducing a new process or public constructor.
 
-- **Simulation:** `simulate()` retains validation, preparation, execution, and result assembly in one function. Its fertility-setting validator lives in `fertility.R` and ancestry encoder in `ancestry.R`. Keep `format_unrealized_births()` with result assembly in `simulate.R`. Extracting preparation/result assembly from the body could be a later refactor after explicit inputs, outputs, validation order, and RNG boundaries have been mapped; it is separate work from file organization.
+- **Simulation:** `run_simulation()` retains validation, preparation, execution, and result assembly in one function. Its fertility-setting validator lives in `fertility.R` and ancestry encoder in `ancestry.R`. Keep `format_unrealized_births()` with result assembly in `run_simulation.R`. Extracting preparation/result assembly from the body could be a later refactor after explicit inputs, outputs, validation order, and RNG boundaries have been mapped; it is separate work from file organization.
 
 - **General checks:** retain the three genuinely general checks in `checks.R`. Domain validation stays with its domain; this file must not become a catch-all.
 
@@ -212,17 +214,17 @@ Shared input-rate validation, calendar coverage, group strata, and engine encodi
 
 - Functions: `has_calendar_rates()`, `calendar_rate_segments()`, `calendar_rate_slices()`, `validate_calendar_rates()`, `check_time_coverage()`, `check_calendar_coverage()`, `group_registries()`, `rate_strata_columns()`, `prepare_strata_rates()`, `group_engine_input()`, `strata_spec()`, `decode_report_strata()`, `check_strata_overlap()`, `check_groups()`, `split_rate_groups()`, `validate_rates()`.
 
+### `R/run_simulation.R`
+
+Orchestrate validation, preparation, RNG handling, execution, and result assembly.
+
+- Functions: **`run_simulation()`**, `format_unrealized_births()`.
+
 ### `R/set_process.R`
 
 Attach and revalidate process specifications; construct their common representation.
 
 - Functions: **`set_process()`**, `attach_process()`, `new_rate_process()`.
-
-### `R/simulate.R`
-
-Orchestrate validation, preparation, RNG handling, execution, and result assembly.
-
-- Functions: **`simulate()`**, `format_unrealized_births()`.
 
 ### `R/stratify_rates.R`
 
@@ -260,7 +262,7 @@ Use the placement rules above when adding functions. Keep constructors and their
 
 For a future mechanical reorganization, preserve whole function definitions, constants, explanatory comments, and roxygen blocks. Compare parsed definitions before and after, check package loading, and run `devtools::test()` with live database tests opted out. Regenerate documentation and verify that exports and help topics are preserved. Shared-topic `@order` tags in the mortality/fertility constructors and setters preserve help display order independently of source-file ordering.
 
-Do not combine file moves with function renaming, algorithm changes, defaults, or scientific-contract changes. Any later refactor of `simulate()` needs separate review of its inputs, outputs, validation order, and RNG boundaries, with exact before/after result and RNG comparisons. Preserve user-owned README/vignettes and historical validation reports.
+Do not combine file moves with function renaming, algorithm changes, defaults, or scientific-contract changes. Any later refactor of `run_simulation()` needs separate review of its inputs, outputs, validation order, and RNG boundaries, with exact before/after result and RNG comparisons. Preserve user-owned README/vignettes and historical validation reports.
 
 Pkgdown reference grouping remains a separate follow-up choice. The source reorganization preserved help topics; D144 subsequently grouped process constructors with their setters, and D145 combined the observed event-rate help pages as described above. The site’s reference groups are unchanged.
 
@@ -281,7 +283,7 @@ Review on November 9, 2026, updated after the confidence-argument rename and 80-
 | Long lines | All lines in the 33 hand-maintained `R/` files, including comments and roxygen, are at most 80 characters after D149. Generated wrappers are excluded. |
 | Control-flow braces | All 127 loop bodies are braced. Statement-style and multiline conditional branches are braced, as are early-return/error branches and control-flow callbacks. The 109 remaining unbraced conditionals are compact, single-line value expressions; else-if chains retain their normal chained syntax. Documentation examples follow the same rule (D150). |
 | Multiline definitions | Top-level function signatures that exceed one line now use one argument per line with a two-space indent. Indentation and wrapped calls were normalized as part of D149; short definitions remain on one line. |
-| Diagnostic formatting | Existing validation uses base R errors, typically with `call. = FALSE`. This review did not introduce a new error/condition framework or a dependency merely to obtain tidyverse-style diagnostics. |
+| Diagnostic formatting | Existing validation uses base R errors, typically with `call. = FALSE`. Rich diagnostic bullets, condition classes, and polished summaries are deferred to an output-presentation project, likely after the first release milestone (D151). No error framework or presentation dependency is selected. |
 
 The review examined all 33 hand-maintained R files (211 top-level functions); generated `RcppExports.R` was excluded. Naming and control-flow counts came from parsed R expressions; long-line counts came from source text. Argument roles, returns, and representative signature formatting were also inspected. `lintr` was not installed. D149 used styler 1.11.0 and its formatting-only dependencies from a temporary `/tmp` library and cache; no package dependency was added. This is a targeted source/API audit and width check, not certification against a complete lint rule set or an exhaustive check of every local variable and function call.
 

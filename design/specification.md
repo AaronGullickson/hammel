@@ -31,7 +31,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Matching and inheritance models | `R/matching_model.R`, `R/matching_groups.R`, `R/group_inheritance.R` |
 | Kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/extract_kin.R` |
 | HMD/HFD downloads, conversion and provenance | `R/get_database_rates.R` |
-| Simulation validation, RNG isolation and result assembly | `R/simulate.R` |
+| Simulation validation, RNG isolation and result assembly | `R/run_simulation.R` |
 | Continuous scheduling and events | `src/simulate.cpp` |
 | Shared history preparation and analysis strata | `R/analysis_utils.R`; native observation in `src/observation.cpp` |
 | Observed event-rate calculations | `R/calculate_rates.R`; native counts in `src/observation.cpp` and `src/demography.cpp` |
@@ -70,7 +70,7 @@ model <- hammel_model() |>
   set_union_formation("on_demand",
     matching_model(~ age_difference, c(age_difference = 0)))
 
-result <- simulate(model, years = 10, seed = 123)
+result <- run_simulation(model, years = 10, seed = 123)
 ```
 
 `hammel_model()` stores `population` and a named `processes` list.
@@ -107,7 +107,7 @@ duration-dependent union dissolution. Optional `group_transition()` is also supp
 
 ## Execution and output
 
-`simulate(model, years, seed = NULL)` requires population, mortality,
+`run_simulation(model, years, seed = NULL)` requires population, mortality,
 fertility, and an explicit union-formation process. It uses continuous years, with no `dt`, execution step, monthly
 compensation grid, or birth-spacing argument on the execution function.
 
@@ -180,7 +180,7 @@ calls. See [group inheritance](group-inheritance.md).
 ```r
 continued <- model |>
   set_population(result) |>
-  simulate(years = 5, seed = 124)
+  run_simulation(years = 5, seed = 124)
 ```
 
 Reusing the original model retains its processes. Building a new model from

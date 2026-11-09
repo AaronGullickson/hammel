@@ -8,7 +8,7 @@ get_unpartnered_births(population)
 }
 \arguments{
 \item{population}{A validated \code{hammel_population} with person and union
-histories, such as the result of \code{\link[=simulate]{simulate()}}.}
+histories, such as the result of \code{\link[=run_simulation]{run_simulation()}}.}
 }
 \value{
 A separate tibble containing selected person rows and \code{age_mother},

@@ -50,8 +50,9 @@ test_that("single search tables permit one clock per previous category", {
   expect_error(union_formation("rate", rates = rbind(rates, rates[2, ])), "overlap")
   all_age <- data.frame(age_start = 15, age_end = Inf, rate = .1)
   expect_silent(union_formation("rate", rates = transform(all_age, dur_start = NA, dur_end = NA)))
-  expect_identical(simulate(set_union_formation(make_rate_model(), "rate", rates = all_age), 2, 42),
-    simulate(set_union_formation(make_rate_model(), "rate", rates =
+  expect_identical(run_simulation(set_union_formation(make_rate_model(), "rate",
+    rates = all_age), 2, 42),
+    run_simulation(set_union_formation(make_rate_model(), "rate", rates =
       transform(all_age, dur_start = NA, dur_end = NA)), 2, 42))
 })
 
@@ -60,23 +61,24 @@ test_that("duration search clocks resume attained duration rather than age", {
   rates <- duration_search_rates(1e5)
   rates$dur_start[2:3] <- 5
   model <- set_union_formation(model, "rate", rates = rates)
-  early <- simulate(model, 2, 42)
+  early <- run_simulation(model, 2, 42)
   expect_equal(nrow(early$unions), 1)
-  late <- simulate(set_population(model, early), 2, 43)
+  late <- run_simulation(set_population(model, early), 2, 43)
   expect_equal(nrow(late$unions), 2)
   expect_gte(late$unions$start_time[2], 3)
   expect_lt(late$unions$start_time[2], 4)
   # Changing age leaves a duration-specific waiting time unchanged.
   older <- model; older$population$persons$birth_time <- -80
-  expect_identical(simulate(model, 4, 43)$unions, simulate(older, 4, 43)$unions)
+  expect_identical(run_simulation(model, 4, 43)$unions, run_simulation(older, 4,
+    43)$unions)
   # Input history order does not change either the previous category or origin.
   more <- model
   more$population$unions <- rbind(more$population$unions,
     transform(more$population$unions, union_id = 2, start_time = -12,
       end_time = -10, end_reason = "dissolution"))
-  a <- simulate(more, 4, 43)
+  a <- run_simulation(more, 4, 43)
   more$population$unions <- more$population$unions[2:1, ]
-  b <- simulate(more, 4, 43)
+  b <- run_simulation(more, 4, 43)
   expect_equal(tail(a$unions, 1), tail(b$unions, 1))
 })
 
@@ -90,7 +92,7 @@ test_that("duration hazards agree with analytical cumulative hazard across gaps"
   dissolved$rate <- c(.1, .2, .4)
   model <- set_union_formation(model, "rate", rates = rbind(rates[c(1, 3), ], dissolved),
     kinship_generations = 0L)
-  result <- simulate(model, 3, 813)
+  result <- run_simulation(model, 3, 813)
   # Starting at duration 2: .2 over [2,3), zero over [3,4), .4 over [4,5).
   probability <- 1 - exp(-.6)
   starts <- subset(result$unions, start_time >= 0)
@@ -104,7 +106,7 @@ test_that("each new ending resets duration and widowhood starts at partner death
   rates$dur_start[2:3] <- 1
   model <- set_union_formation(model, "rate", rates = rates)
   model <- set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = 1e5))
-  result <- simulate(model, 3.5, 71)
+  result <- run_simulation(model, 3.5, 71)
   # The input episode ended two years ago, so first remarriage has no delay.
   # Every subsequent ending imposes a fresh year before the next search.
   expect_gte(nrow(result$unions), 4)
@@ -118,7 +120,7 @@ test_that("each new ending resets duration and widowhood starts at partner death
   widow <- set_union_formation(widow, "rate", rates = rates)
   widow <- set_mortality(widow, data.frame(sex = c("f", "m", "m"),
     age_start = c(0, 0, 30), age_end = c(Inf, 30, Inf), rate = c(0, 0, 1e5)))
-  result <- simulate(widow, 2, 71)
+  result <- run_simulation(widow, 2, 71)
   expect_equal(nrow(result$unions), 2)
   expect_gte(result$unions$start_time[2] - result$unions$end_time[1], 1)
   expect_lt(result$unions$start_time[2], 2)
@@ -141,13 +143,13 @@ test_that("grouped duration calibration matches the equivalent age hazards", {
     rates = stratify_rates(rates, list(group = c(A = 1, B = 1.3))), diagnostics = TRUE,
     kinship_generations = 0L)
   set.seed(87); rng <- .Random.seed
-  a <- simulate(configure(duration), 4, 71)
-  b <- simulate(configure(age), 4, 71)
+  a <- run_simulation(configure(duration), 4, 71)
+  b <- run_simulation(configure(age), 4, 71)
   expect_identical(a, b)
   expect_identical(.Random.seed, rng)
   expect_true(all(a$unions$start_time[a$unions$start_time >= 0] >= 1))
   expect_true(all(is.finite(a$unions$.log_weight_B[-seq_len(30)])))
-  expect_identical(simulate(configure(duration), 4, 71), a)
+  expect_identical(run_simulation(configure(duration), 4, 71), a)
 })
 
 test_that("duration searches calibrate on their ending origins", {
@@ -170,7 +172,7 @@ test_that("unpartnered births do not reset the remarriage duration clock", {
   model <- set_union_formation(model, "rate", rates = rates, kinship_generations = 0L)
   model <- set_fertility(model, data.frame(age_start = 15, age_end = 50,
     union_type = c("partnered", "unpartnered"), rate = c(0, 20)), birth_interval = 0)
-  result <- simulate(model, 1.1, 317)
+  result <- run_simulation(model, 1.1, 317)
   children <- subset(result$persons, birth_time >= 0)
   expect_gt(nrow(children), 0)
   expect_equal(nrow(result$unions), 2)
@@ -189,7 +191,7 @@ test_that("failed searches retain duration until an eligible man becomes availab
   rates$dur_start[2:3] <- .1
   rates$dur_end[2:3] <- .75
   model <- set_union_formation(model, "rate", rates = rates, kinship_generations = 0L)
-  result <- simulate(model, 1, 617)
+  result <- run_simulation(model, 1, 617)
   expect_equal(nrow(result$unions), 2)
   expect_equal(result$unions$husband_id[2], 3)
   expect_gte(result$unions$start_time[2], .5)

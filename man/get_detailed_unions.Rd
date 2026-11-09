@@ -8,7 +8,7 @@ get_detailed_unions(population)
 }
 \arguments{
 \item{population}{A validated \code{hammel_population} containing person and union
-histories, such as the result of \code{\link[=simulate]{simulate()}}.}
+histories, such as the result of \code{\link[=run_simulation]{run_simulation()}}.}
 }
 \value{
 A separate tibble with all union columns plus \code{birth_time_w},

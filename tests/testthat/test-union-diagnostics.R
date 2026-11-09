@@ -7,7 +7,7 @@ test_that("diagnostics validate and pass through the setter", {
     expect_error(union_formation("on_demand", matching, diagnostics = bad), "diagnostics")
     model <- make_model(0)
     model$processes$union_formation$diagnostics <- bad
-    expect_error(simulate(model, 0), "diagnostics")
+    expect_error(run_simulation(model, 0), "diagnostics")
   }
 })
 
@@ -17,9 +17,9 @@ test_that("diagnostics add no candidate-set columns and do not change draws", {
       make_model(5, birth_rate = 100, birth_interval = 0)
     model$population$persons$sex[1] <- "f"
     model$population$persons$birth_time <- c(-25, -20, -25, -30, -5)
-    plain <- simulate(model, 0.1, seed = 92)
+    plain <- run_simulation(model, 0.1, seed = 92)
     model$processes$union_formation$diagnostics <- TRUE
-    observed <- simulate(model, 0.1, seed = 92)
+    observed <- run_simulation(model, 0.1, seed = 92)
     expect_identical(observed, plain)
     expect_false(any(c(".n_eligible", ".utility_rank") %in% names(observed$unions)))
   }

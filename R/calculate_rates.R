@@ -49,7 +49,7 @@
 #'   increasing nonnegative integer boundaries starting at zero. Bands are
 #'   half-open. A finite final boundary receives Inf, as for age breaks.
 #' @param unrealized For fertility only: logical, default `FALSE`. With `TRUE`,
-#'   the population must come from `simulate()`; add `unrealized_births`
+#'   the population must come from `run_simulation()`; add `unrealized_births`
 #'   (counted births that could not occur because their fertility cell had
 #'   members but no eligible woman, from `simulation$unrealized_births`) and
 #'   `rate_fertility_adjusted = (births + unrealized_births) / person_years`.
@@ -447,7 +447,8 @@ calculate_fertility_rates <- function(
     }
     if (is.null(record$unrealized_births)) {
       stop(paste(
-        "`unrealized = TRUE` requires a population returned by simulate()",
+        "`unrealized = TRUE` requires a population returned by",
+        "run_simulation()",
         "with an unrealized-births record."
       ), call. = FALSE)
     }

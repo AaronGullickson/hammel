@@ -113,7 +113,7 @@ rates <- data.frame(
   age_start = 0, age_end = Inf, rate = c(0.2, 0.3, 0.1)
 )
 model <- model |> set_group_transition(rates, group = "race")
-result <- simulate(model, years = 5, seed = 42)
+result <- run_simulation(model, years = 5, seed = 42)
 result$transitions
 ```
 

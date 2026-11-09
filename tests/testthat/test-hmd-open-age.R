@@ -146,7 +146,7 @@ test_that("pooled complete schedules run directly in the continuous engine", {
   m <- make_model(1000, age = 2, death_rate = 0)
   m$population$persons$birth_time <- 1998
   m$population$end_time <- 2000
-  out <- simulate(set_mortality(m, r), 2, seed = 911)
+  out <- run_simulation(set_mortality(m, r), 2, seed = 911)
   expected <- exp(-5 / 120 - 10 / 60)
   expect_lt(abs(mean(is.na(out$persons$death_time)) - expected),
     5 * sqrt(expected * (1 - expected) / 1000))

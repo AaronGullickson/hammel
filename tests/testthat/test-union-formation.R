@@ -70,7 +70,8 @@ test_that("union process validation and execution boundaries are explicit", {
                             age_end = Inf, rate = 0.01)) |>
     set_fertility(data.frame(age_start = 20, age_end = 30, rate = 0.1)) |>
     set_union_formation("rate", matching, rates = rates)
-  expect_warning(result <- simulate(model, years = 1), "overall fertility schedule")
+  expect_warning(result <- run_simulation(model, years = 1),
+    "overall fertility schedule")
   expect_equal(nrow(result$unions), 0)
 })
 

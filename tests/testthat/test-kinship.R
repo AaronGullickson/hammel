@@ -104,7 +104,7 @@ test_that("ancestry cycles fail and deep traversal is iterative", {
   model$population$persons$mother_id <- c(2, 1)
   expect_error(extract_kin(model$population, 1), "cycle")
   expect_error(extract_kin(model$population, 1, generations = 0), "cycle")
-  expect_error(simulate(model, 1), "cycle")
+  expect_error(run_simulation(model, 1), "cycle")
   n <- 5000
   ids <- seq_len(n) * 10
   persons <- data.frame(person_id = ids, sex = "f", birth_time = -10,

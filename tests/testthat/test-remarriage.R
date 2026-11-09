@@ -20,7 +20,7 @@ test_that("previous-union schedules require complete valid strata within groups"
   expect_silent(union_formation("rate", rates = rates))
   model <- make_rate_model()
   model$processes$union_formation$rates <- rates[-1, ]
-  expect_error(simulate(model, 0), "all three")
+  expect_error(run_simulation(model, 0), "all three")
 })
 
 test_that("latest recorded union selects the search schedule on restart", {
@@ -33,12 +33,12 @@ test_that("latest recorded union selects the search schedule on restart", {
     rates <- previous_rates()
     rates$rate[rates$previous_union == category] <- 1e4
     m <- set_union_formation(model, "rate", rates = rates, kinship_generations = 0)
-    result <- simulate(m, .1, 42)
+    result <- run_simulation(m, .1, 42)
     expect_equal(nrow(result$unions), if (category == "separated") 3 else 2)
     if (category == "separated") expect_lt(tail(result$unions$start_time, 1), .1)
     # Reversing the input rows leaves execution unchanged.
     m$population$unions <- m$population$unions[2:1, ]
-    other <- simulate(m, .1, 42)
+    other <- run_simulation(m, .1, 42)
     expect_equal(result$persons, other$persons)
     expect_equal(result$unions[order(result$unions$union_id), ],
                  other$unions[order(other$unions$union_id), ])
@@ -51,18 +51,18 @@ test_that("dissolution and widowhood enable their own remarriage schedules", {
     husband_id = 2, start_time = -1, end_time = NA_real_, end_reason = NA_character_)
   model <- set_union_formation(model, "rate", rates = previous_rates(0, 100, 0))
   model <- set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = 10))
-  result <- simulate(model, 1, 12)
+  result <- run_simulation(model, 1, 12)
   expect_gt(nrow(result$unions), 2)
   expect_true(all(head(result$unions$end_reason, -1) == "dissolution"))
   expect_equal(previous_union_state_cpp(result$persons, result$unions)[1], 1L)
-  restarted <- simulate(set_population(model, result), 1, 13)
+  restarted <- run_simulation(set_population(model, result), 1, 13)
   expect_gt(nrow(restarted$unions), nrow(result$unions))
   model$processes$union_dissolution <- NULL
   model <- set_mortality(model, data.frame(sex = c("f", "m", "m"),
     age_start = c(0, 0, 30), age_end = c(Inf, 30, Inf), rate = c(0, 0, 1e5)))
   model$population$persons$birth_time[2] <- -29.5
   model <- set_union_formation(model, "rate", rates = previous_rates(0, 0, 1e5))
-  widowed <- simulate(model, .75, 42)
+  widowed <- run_simulation(model, .75, 42)
   expect_equal(nrow(widowed$unions), 2)
   expect_equal(widowed$unions$end_reason[1], "death_husband")
   expect_gte(widowed$unions$start_time[2], widowed$unions$end_time[1])
@@ -83,7 +83,7 @@ test_that("each previous-category hazard agrees with analytical incidence", {
   rates <- c(.1, .3, .7)
   model <- set_union_formation(model, "rate",
     rates = previous_rates(rates[1], rates[2], rates[3]), kinship_generations = 0)
-  result <- simulate(model, 2, 502)
+  result <- run_simulation(model, 2, 502)
   starts <- subset(result$unions, start_time >= 0)
   for (category in 0:2) {
     p <- 1 - exp(-rates[category + 1L] * 2)
@@ -141,8 +141,8 @@ test_that("grouped and stratified schedules preserve the explicit hazards", {
   explicit$rate[explicit$group == "B"] <- 2 * explicit$rate[explicit$group == "B"]
   reference <- set_union_formation(model, "rate", matching, rates = explicit,
     diagnostics = TRUE, kinship_generations = 0)
-  a <- simulate(scaled, 5, 73)
-  expect_identical(a, simulate(reference, 5, 73))
+  a <- run_simulation(scaled, 5, 73)
+  expect_identical(a, run_simulation(reference, 5, 73))
   expect_true(any(a$unions$end_reason == "dissolution", na.rm = TRUE))
   counts <- calculate_union_rates(a, c(0, 5), c(0, Inf), by = c("group", "previous_union"))
   expect_gt(sum(counts$unions[counts$previous_union == "separated"]), 0)
@@ -158,5 +158,5 @@ test_that("grouped and stratified schedules preserve the explicit hazards", {
   bad$population$unions <- data.frame(union_id = 1:2, wife_id = 1,
     husband_id = c(41, 43), start_time = c(-2, -1.5), end_time = c(-1, -.5),
     end_reason = "dissolution")
-  expect_error(simulate(bad, 1, 42), "nonoverlapping")
+  expect_error(run_simulation(bad, 1, 42), "nonoverlapping")
 })

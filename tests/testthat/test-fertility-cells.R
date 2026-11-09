@@ -30,7 +30,7 @@ test_that("older specifications carrying spacing_method are accepted", {
 })
 
 test_that("simulations report unrealized births as a typed tibble", {
-  result <- simulate(cell_model(20), 0, seed = 1)
+  result <- run_simulation(cell_model(20), 0, seed = 1)
   out <- result$simulation$unrealized_births
   expect_s3_class(out, "tbl_df")
   expect_identical(nrow(out), 0L)
@@ -49,7 +49,7 @@ test_that("cells without an eligible woman count unrealized births", {
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .5),
                   birth_interval = 2) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
-  result <- simulate(model, 1.5, seed = 4)
+  result <- run_simulation(model, 1.5, seed = 4)
   out <- result$simulation$unrealized_births
   expect_equal(nrow(result$persons), 2 * n)
   expect_equal(out$period_start, c(0, 1))
@@ -75,7 +75,7 @@ test_that("cells split ages at whole years and pooled parity bands by actual par
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
   expect_warning(fertility(rates, birth_interval = 2),
                  "parity 2 at ages \\[15, 19\\) \\(earliest eligible age 19\\)")
-  out <- simulate(model, 1, seed = 7)$simulation$unrealized_births
+  out <- run_simulation(model, 1, seed = 7)$simulation$unrealized_births
   expect_equal(out$parity_start, c(4, 4))
   expect_equal(out$parity_end, c(5, 5))
   expect_equal(out$age_start, c(20, 21))
@@ -86,7 +86,7 @@ test_that("cells split ages at whole years and pooled parity bands by actual par
 
 test_that("zero spacing generates births at the input rate", {
   n <- 3000; years <- 2
-  pop <- simulate(cell_model(n, rate = .1, spacing = 0), years, seed = 21)
+  pop <- run_simulation(cell_model(n, rate = .1, spacing = 0), years, seed = 21)
   births <- sum(pop$persons$mother_id %in% seq_len(n))
   expected <- .1 * n * years
   expect_lt(abs(births - expected), 4 * sqrt(expected))
@@ -98,10 +98,11 @@ test_that("unstratified cell accounting recovers the input rate from a no-histor
   # share from the first instant, so the first year is not inflated.
   n <- 10000
   first_year <- function(pop) sum(pop$persons$mother_id %in% seq_len(n)) / n
-  expect_lt(abs(first_year(simulate(cell_model(n, rate = .3), 1, seed = 31)) - .3),
+  expect_lt(abs(first_year(run_simulation(cell_model(n, rate = .3), 1, seed =
+    31)) - .3),
             4 * sqrt(.3 / n))
   n <- 3000
-  longer <- simulate(cell_model(n, rate = .3), 3, seed = 32)
+  longer <- run_simulation(cell_model(n, rate = .3), 3, seed = 32)
   expect_lt(abs(founder_rate(longer, n, 3) - .3), 4 * sqrt(.3 / (3 * n)))
 })
 
@@ -109,7 +110,8 @@ test_that("parity cells recover the pooled upper parity rate in an initialized c
   n <- 3000
   rates <- data.frame(age_start = 15, age_end = Inf, parity_start = 0:2,
     parity_end = c(1, 2, Inf), rate = c(.2, .3, .4))
-  pop <- simulate(quiet_unreachable(cell_model(n, rates = rates)), 10, seed = 41)
+  pop <- run_simulation(quiet_unreachable(cell_model(n, rates = rates)), 10,
+    seed = 41)
   observed <- calculate_fertility_rates(pop, age_breaks = c(15, Inf), time_breaks = c(0, 10),
                                         parity_breaks = c(0, 1, 2))
   top <- observed[observed$parity_start == 2, ]
@@ -143,11 +145,11 @@ test_that("cell mode runs with groups, union types, cohabitation, matching and r
       union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .2)) |>
     set_union_dissolution(data.frame(dur_start = 0, dur_end = Inf, rate = c(.1, .03),
                                      union_type = c("cohab", "marriage")))
-  first <- simulate(model, 5, seed = 51)
-  expect_identical(first, simulate(model, 5, seed = 51))
+  first <- run_simulation(model, 5, seed = 51)
+  expect_identical(first, run_simulation(model, 5, seed = 51))
   expect_gt(first$simulation$births, 0)
   expect_true(all(c("group", "union_type") %in% names(first$simulation$unrealized_births)))
-  restarted <- simulate(set_population(model, first), 3, seed = 52)
+  restarted <- run_simulation(set_population(model, first), 3, seed = 52)
   expect_equal(restarted$simulation$start_time, 5)
   expect_true(all(restarted$simulation$unrealized_births$period_start >= 5))
   # Grouped on-demand mode exercises cell-derived calibration totals.
@@ -155,11 +157,12 @@ test_that("cell mode runs with groups, union types, cohabitation, matching and r
     set_fertility(fert) |>
     set_union_formation("on_demand",
       matching_model(~ age_difference, c(age_difference = -.1), group_exogamy = c("A:B" = -1)))
-  expect_gt(simulate(od, 5, seed = 53)$simulation$births, 0)
+  expect_gt(run_simulation(od, 5, seed = 53)$simulation$births, 0)
 })
 
 test_that("cancelled attempts keep eligibility and do not create births", {
-  pop <- simulate(set_union_formation(cell_model(50, rate = .5), "on_demand",
+  pop <- run_simulation(set_union_formation(cell_model(50, rate = .5),
+    "on_demand",
                                       cancel_birth_if_no_match = TRUE), 2, seed = 61)
   expect_identical(pop$simulation$births, 0)
   expect_identical(nrow(pop$simulation$unrealized_births), 0L)
@@ -208,7 +211,7 @@ test_that("upper-open bands stay one cell only when interval x rate is very smal
       set_fertility(data.frame(age_start = 15, age_end = Inf, rate = rate),
                     birth_interval = 2) |>
       set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
-    simulate(model, 1.5, seed = 8)$simulation$unrealized_births
+    run_simulation(model, 1.5, seed = 8)$simulation$unrealized_births
   }
   small <- open_case(.0004, 50000) # 2 * .0004 = .0008 < .001: one open cell
   expect_equal(small$age_start, c(15, 15))
@@ -233,7 +236,7 @@ test_that("released eligibility does not consume blocked time or force a birth",
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .5),
                   birth_interval = .75) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
-  result <- simulate(model, .9, seed = 2)
+  result <- run_simulation(model, .9, seed = 2)
   expect_count(result$simulation$unrealized_births$unrealized_births, .5 * .65 * n)
   # After release at .65 the women give births at the input rate.
   released <- sum(result$persons$birth_time >= .65 & result$persons$mother_id %in% seq_len(n))
@@ -248,7 +251,7 @@ test_that("released eligibility does not consume blocked time or force a birth",
     set_fertility(data.frame(age_start = 15, age_end = 1000, rate = 2),
                   birth_interval = .75, ffab = 0) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
-  pop <- simulate(long, 300, seed = 3)
+  pop <- run_simulation(long, 300, seed = 3)
   times <- sort(pop$persons$birth_time[pop$persons$mother_id %in% 1])
   gaps <- diff(times)
   expect_gt(length(gaps), 200)
@@ -276,7 +279,7 @@ test_that("calculate_fertility_rates attributes unrealized births exactly or ret
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .5),
                   birth_interval = 2) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
-  pop <- simulate(model, 1.5, seed = 4)
+  pop <- run_simulation(model, 1.5, seed = 4)
   r <- calculate_fertility_rates(pop, c(0, 1, 1.5), c(15, 50), unrealized = TRUE)
   r <- r[r$age_start == 15, ]
   expect_count(r$unrealized_births[1], .5 * n)
@@ -293,7 +296,7 @@ test_that("calculate_fertility_rates attributes unrealized births exactly or ret
   expect_true(all(is.na(ages$unrealized_births[ages$age_start %in% c(15, 30.5)])))
   expect_equal(ages$unrealized_births[ages$age_start == 50], 0)
   # Restarts keep only the latest run: earlier periods are unknown.
-  later <- simulate(set_population(model, pop), 1, seed = 5)
+  later <- run_simulation(set_population(model, pop), 1, seed = 5)
   both <- calculate_fertility_rates(later, c(0, 1.5, 2.5), c(15, 50), unrealized = TRUE)
   expect_true(is.na(both$unrealized_births[both$time_start == 0 & both$age_start == 15]))
   expect_false(is.na(both$unrealized_births[both$time_start == 1.5 & both$age_start == 15]))
@@ -318,7 +321,7 @@ test_that("unrealized births pool into observed parity bands and restore cohort 
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     (\(m) quiet_unreachable(set_fertility(m, rates, birth_interval = 2)))() |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
-  pop <- simulate(model, 1, seed = 7)
+  pop <- run_simulation(model, 1, seed = 7)
   r <- calculate_fertility_rates(pop, c(0, 1), c(15, Inf), parity_breaks = c(0, 2),
                                  unrealized = TRUE)
   expect_count(r$unrealized_births[r$parity_start == 2], .4 * n)
@@ -330,7 +333,8 @@ test_that("unrealized births pool into observed parity bands and restore cohort 
   n <- 3000
   cohort <- data.frame(age_start = 15, age_end = Inf, parity_start = 0:2,
                        parity_end = c(1, 2, Inf), rate = c(.2, .3, .4))
-  out <- simulate(quiet_unreachable(cell_model(n, rates = cohort)), 10, seed = 41)
+  out <- run_simulation(quiet_unreachable(cell_model(n, rates = cohort)), 10,
+    seed = 41)
   adj <- calculate_fertility_rates(out, c(0, 10), c(15, Inf), parity_breaks = c(0, 1, 2),
                                    unrealized = TRUE)
   adj <- adj[adj$time_start == 0, ]
@@ -350,7 +354,7 @@ test_that("unrealized births follow group and union-type strata and refuse parit
     set_fertility(rates, birth_interval = 2) |>
     set_union_formation("rate", rates = data.frame(age_start = 15, age_end = Inf, rate = 0),
                         cancel_birth_if_no_match = FALSE)
-  pop <- simulate(model, 1, seed = 6)
+  pop <- run_simulation(model, 1, seed = 6)
   r <- calculate_fertility_rates(pop, c(0, 1), c(15, 50), by = c("group", "union_type"), unrealized = TRUE)
   r <- r[r$age_start == 15, ]
   cell <- r$group == "A" & r$union_type == "unpartnered"
@@ -373,7 +377,7 @@ test_that("a cut period makes only the overlapping parity rows unknown", {
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     (\(m) quiet_unreachable(set_fertility(m, rates, birth_interval = 2)))() |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
-  pop <- simulate(model, 1, seed = 7)
+  pop <- run_simulation(model, 1, seed = 7)
   r <- calculate_fertility_rates(pop, c(0, .5, 1), c(15, Inf), parity_breaks = c(0, 2),
                                  unrealized = TRUE)
   r <- r[r$age_start == 15, ]

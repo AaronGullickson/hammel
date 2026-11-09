@@ -11,7 +11,7 @@ test_that("failed-match cancellation defaults on and validates logical scalars",
     process$cancel_birth_if_no_match <- bad
     expect_error(set_process(model, process), "cancel_birth_if_no_match")
     model$processes$union_formation <- process
-    expect_error(simulate(model, 0), "cancel_birth_if_no_match")
+    expect_error(run_simulation(model, 0), "cancel_birth_if_no_match")
   }
 })
 
@@ -27,14 +27,14 @@ test_that("both initiation modes cancel unmatched births unless explicitly allow
     model$processes$union_formation$cancel_birth_if_no_match <- TRUE
     set.seed(381)
     rng <- .Random.seed
-    result <- simulate(model, 1, seed = 52)
+    result <- run_simulation(model, 1, seed = 52)
     expect_identical(.Random.seed, rng)
     expect_equal(result$persons, tibble::as_tibble(model$population$persons))
     expect_equal(result$simulation$births, 0)
     expect_equal(nrow(result$unions), 0)
-    expect_identical(result, simulate(model, 1, seed = 52))
+    expect_identical(result, run_simulation(model, 1, seed = 52))
     model$processes$union_formation$cancel_birth_if_no_match <- FALSE
-    allowed <- simulate(model, 1, seed = 52)
+    allowed <- run_simulation(model, 1, seed = 52)
     expect_gt(allowed$simulation$births, 0)
     expect_true(all(is.na(allowed$persons$father_id)))
   }
@@ -55,7 +55,7 @@ test_that("cancelled attempts do not create spacing, IDs or kinship and can late
     # Birth hazard 10/year (an eligible woman alone in her cell faces the input
     # rate). Many early failed attempts; the man becomes eligible at .5.
     # Applying .9 spacing after failure would delay success.
-    result <- simulate(model, 0.9, seed = 52)
+    result <- run_simulation(model, 0.9, seed = 52)
     children <- result$persons[result$persons$birth_time >= 0, ]
     expect_equal(nrow(children), 1)
     expect_equal(children$person_id, 3)
@@ -64,7 +64,7 @@ test_that("cancelled attempts do not create spacing, IDs or kinship and can late
     expect_equal(children$father_id, 2)
     kin <- extract_kin(result, 2, relative_ids = 3)
     expect_equal(kin$relative_distance, 1)
-    continued <- simulate(set_population(model, result), 0.2, seed = 53)
+    continued <- run_simulation(set_population(model, result), 0.2, seed = 53)
     expect_equal(continued$simulation$births, 0)
   }
 })
@@ -92,11 +92,11 @@ test_that("default cancellation covers samples rejected by eligibility in both m
           age_start = 15, age_end = 50, rate = 20), 0)
       } else model <- set_union_formation(model, "on_demand", matching)
       expect_true(model$processes$union_formation$cancel_birth_if_no_match)
-      result <- simulate(model, 0.5, seed = 52)
+      result <- run_simulation(model, 0.5, seed = 52)
       expect_equal(result$simulation$births, 0)
       expect_equal(nrow(result$unions), nrow(model$population$unions))
       model$processes$union_formation$cancel_birth_if_no_match <- FALSE
-      result <- simulate(model, 0.5, seed = 52)
+      result <- run_simulation(model, 0.5, seed = 52)
       expect_gt(result$simulation$births, 0)
     }
   }

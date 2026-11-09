@@ -42,10 +42,10 @@ test_that("dissolution constructors validate duration schedules and retain prove
   noted <- union_dissolution(transform(rates, dur_end = Inf))
   model <- dissolution_model()
   model$processes$union_dissolution <- noted
-  expect_error(simulate(model, 0), "overlapping bands within a stratum")
+  expect_error(run_simulation(model, 0), "overlapping bands within a stratum")
   model <- dissolution_model()
   model$processes$union_dissolution$rates$rate <- -1
-  expect_error(simulate(model, 0), "duration bands")
+  expect_error(run_simulation(model, 0), "duration bands")
   expect_error(set_process(model, model$processes$union_dissolution), "duration bands")
 })
 
@@ -53,12 +53,12 @@ test_that("one annual dissolution hazard per couple matches analytical survival"
   n <- 8000L
   model <- dissolution_model(n, duration = 8, rate = .2)
   set.seed(123); original_rng <- .Random.seed
-  result <- simulate(model, 2, seed = 52)
+  result <- run_simulation(model, 2, seed = 52)
   expected <- exp(-.4)
   survived <- is.na(result$unions$end_time)
   expect_lt(abs(mean(survived) - expected), 6 * sqrt(expected * (1 - expected) / n))
   expect_identical(.Random.seed, original_rng)
-  expect_identical(result, simulate(model, 2, seed = 52))
+  expect_identical(result, run_simulation(model, 2, seed = 52))
   expect_equal(result$simulation$dissolutions, sum(!survived))
   expect_true(all(result$unions$end_reason[!survived] == "dissolution"))
   expect_true(all(result$unions$end_time[!survived] >= 0 & result$unions$end_time[!survived] < 2))
@@ -69,17 +69,17 @@ test_that("one annual dissolution hazard per couple matches analytical survival"
 test_that("duration bands use union duration, gaps and attained restart duration", {
   model <- dissolution_model(100, duration = 0)
   model <- set_union_dissolution(model, data.frame(dur_start = 5, dur_end = Inf, rate = 1e4))
-  early <- simulate(model, 4, seed = 52)
+  early <- run_simulation(model, 4, seed = 52)
   expect_true(all(is.na(early$unions$end_time)))
-  later <- simulate(set_population(model, early), 2, seed = 53)
+  later <- run_simulation(set_population(model, early), 2, seed = 53)
   expect_true(all(later$unions$end_time >= 5 & later$unions$end_time < 6))
   expect_equal(later$simulation$dissolutions, 100)
   # Old input unions use duration six immediately, independently of age.
   model$population$unions$start_time <- -6
-  old <- simulate(model, 1, seed = 52)
+  old <- run_simulation(model, 1, seed = 52)
   expect_true(all(old$unions$end_time < 1))
   model$population$persons$birth_time <- -40
-  expect_identical(simulate(model, 1, seed = 52)$unions, old$unions)
+  expect_identical(run_simulation(model, 1, seed = 52)$unions, old$unions)
 })
 
 test_that("birth ties retain the pending dissolution and death wins same-person ties", {
@@ -91,7 +91,7 @@ test_that("birth ties retain the pending dissolution and death wins same-person 
   model <- dissolution_model(rate = draws[2] / .5)
   model <- set_fertility(model, data.frame(age_start = 15, age_end = 50,
     union_type = c("partnered", "unpartnered"), rate = c(draws[1] / .5, 0)), birth_interval = 0)
-  tied <- simulate(model, 1.5, seed = seed)
+  tied <- run_simulation(model, 1.5, seed = seed)
   kids <- tied$persons[tied$persons$birth_time >= 0, ]
   expect_equal(nrow(kids), 1)
   expect_equal(kids$birth_time, .5, tolerance = 0)
@@ -104,14 +104,14 @@ test_that("birth ties retain the pending dissolution and death wins same-person 
   expect_equal(maternal$births[maternal$union_type == "unpartnered"], 0)
   expect_equal(maternal$person_years[maternal$union_type == "partnered"], 0)
   # Observation endpoint is exclusive even for an exact tied event.
-  endpoint <- simulate(model, .5, seed = seed)
+  endpoint <- run_simulation(model, .5, seed = seed)
   expect_equal(endpoint$simulation$births, 0)
   expect_equal(endpoint$simulation$dissolutions, 0)
   # Her positive death rate now draws second, so dissolution draws third.
   model <- set_mortality(model, data.frame(sex = c("f", "m"),
     age_start = 0, age_end = Inf, rate = c(draws[2] / .5, 0)))
   model$processes$union_dissolution$rates$rate <- draws[3] / .5
-  dead <- simulate(model, 1.5, seed = seed)
+  dead <- run_simulation(model, 1.5, seed = seed)
   expect_equal(dead$simulation$births, 0)
   expect_equal(dead$simulation$dissolutions, 0)
   expect_identical(dead$unions$end_reason, "death_wife")
@@ -129,7 +129,7 @@ test_that("widowhood invalidates pending dissolution in both initiation modes", 
     }
     model <- set_mortality(model, data.frame(sex = c("f", "m"),
       age_start = 0, age_end = Inf, rate = c(0, draws[2] * 2)))
-    result <- simulate(model, 1.5, seed = 71)
+    result <- run_simulation(model, 1.5, seed = 71)
     expect_equal(result$persons$death_time[2], .5, tolerance = 0)
     expect_identical(result$unions$end_reason, "death_husband")
     expect_equal(result$simulation$dissolutions, 0)
@@ -143,8 +143,8 @@ test_that("births do not reset the union dissolution clock", {
     union_type = c("partnered", "unpartnered"), rate = c(1e-12, 0)), birth_interval = 0)
   busy <- set_fertility(model, data.frame(age_start = 15, age_end = 50,
     union_type = c("partnered", "unpartnered"), rate = c(20, 0)), birth_interval = 0)
-  quiet <- simulate(model, 10, seed = 52)
-  result <- simulate(busy, 10, seed = 52)
+  quiet <- run_simulation(model, 10, seed = 52)
+  result <- run_simulation(busy, 10, seed = 52)
   expect_gt(result$simulation$births, 0)
   expect_identical(result$unions, quiet$unions)
   births <- result$persons$birth_time[result$persons$birth_time >= 0]
@@ -157,7 +157,7 @@ test_that("dissolution restores matching availability and repeat episodes start 
     model$population$persons$sex <- c("f", "m")
     if (mode == "rate") model <- make_rate_model(2, search_rate = 50, birth_rate = 5, birth_interval = .1)
     model <- set_union_dissolution(model, data.frame(dur_start = .1, dur_end = Inf, rate = 1e4))
-    result <- simulate(model, 2, seed = 52)
+    result <- run_simulation(model, 2, seed = 52)
     expect_gt(nrow(result$unions), 1)
     expect_true(all(result$unions$wife_id == 1 & result$unions$husband_id == 2))
     ended <- !is.na(result$unions$end_time)
@@ -178,7 +178,7 @@ test_that("dissolution uses directional group strata with future coverage", {
   rates <- directional_pairs(data.frame(group_pair = c("A:A", "A:B", "B:B"),
     dur_start = 0, dur_end = Inf, rate = c(0, 1e4, 0)))
   model <- set_union_dissolution(model, rates)
-  result <- simulate(model, 1, seed = 52)
+  result <- run_simulation(model, 1, seed = 52)
   expect_true(all(is.na(result$unions$end_time[c(1, 4)])))
   expect_true(all(result$unions$end_time[c(2, 3)] < 1))
   # Swapping wives' and husbands' identities keeps their (symmetric) risk.
@@ -186,14 +186,15 @@ test_that("dissolution uses directional group strata with future coverage", {
   reversed$population$persons$group <- c("A", "A", "B", "A", "A", "B", "B", "B")
   reversed$population$groups <- list(group = group())
   # Directions are separate cells, so the draws differ but the same unions dissolve.
-  expect_identical(!is.na(simulate(reversed, 1, seed = 52)$unions$end_time), !is.na(result$unions$end_time))
+  expect_identical(!is.na(run_simulation(reversed, 1, seed =
+    52)$unions$end_time), !is.na(result$unions$end_time))
   # Directional rates: only one direction is at risk.
   persons <- result$persons
   wife <- persons$group[match(result$unions$wife_id, persons$person_id)]
   husband <- persons$group[match(result$unions$husband_id, persons$person_id)]
   one_way <- set_union_dissolution(model, transform(rates,
     rate = ifelse(group_w == "A" & group_h == "B", 1e4, 0)))
-  out <- simulate(one_way, 1, seed = 52)
+  out <- run_simulation(one_way, 1, seed = 52)
   expect_identical(!is.na(out$unions$end_time), wife == "A" & husband == "B")
   # Proportional strata from stratify_rates equal the explicit table.
   scaled <- set_union_dissolution(model, stratify_rates(
@@ -201,41 +202,43 @@ test_that("dissolution uses directional group strata with future coverage", {
     list(group_w = c(A = 2, B = 1), group_h = c(A = 1, B = 3))))
   explicit <- set_union_dissolution(model, data.frame(group_w = c("A", "B", "A", "B"),
     group_h = c("A", "A", "B", "B"), dur_start = 0, dur_end = Inf, rate = .2 * c(2, 1, 6, 3)))
-  expect_equal(histories(simulate(scaled, 5, seed = 52)), histories(simulate(explicit, 5, seed = 52)),
+  expect_equal(histories(run_simulation(scaled, 5, seed = 52)), histories(
+    run_simulation(explicit, 5, seed = 52)),
                tolerance = 1e-12)
   # Every combination must be covered, including future identities.
   partial <- set_union_dissolution(model, data.frame(group_w = "A", group_h = "A",
     dur_start = 0, dur_end = Inf, rate = 0))
-  expect_error(simulate(partial, 0), "missing schedules.*group_w=B")
+  expect_error(run_simulation(partial, 0), "missing schedules.*group_w=B")
   model <- dissolution_model()
   model$population$persons$group <- "A"
   model$population$groups <- list(group = group())
   model <- set_inheritance(model, group_inheritance("custom", fun = function(...) "AB"), extra = "AB")
   model <- set_union_dissolution(model, data.frame(group_w = "A", group_h = "A",
     dur_start = 0, dur_end = Inf, rate = 0))
-  expect_error(simulate(model, 0), "missing schedules.*AB")
+  expect_error(run_simulation(model, 0), "missing schedules.*AB")
 })
 
 test_that("optional process, zero-duration runs, empty populations and fallbacks work", {
   model <- dissolution_model()
-  expect_equal(simulate(model, 0)$simulation$dissolutions, 0)
+  expect_equal(run_simulation(model, 0)$simulation$dissolutions, 0)
   model$processes$union_dissolution <- NULL
-  absent <- simulate(model, 2, seed = 52)
+  absent <- run_simulation(model, 2, seed = 52)
   expect_null(absent$simulation$dissolutions)
   expect_true(all(is.na(absent$unions$end_time)))
   empty <- make_model(0)
   empty <- set_union_dissolution(empty, data.frame(dur_start = 0, dur_end = Inf, rate = .1))
-  out <- simulate(empty, 2, seed = 52)
+  out <- run_simulation(empty, 2, seed = 52)
   expect_equal(out$simulation$dissolutions, 0)
   expect_s3_class(out$unions, "tbl_df")
   fallback <- set_union_dissolution(model, data.frame(group_pair = c("B:B", "A:A"), dur_start = 0,
     dur_end = Inf, rate = c(1e4, 0)))
-  expect_error(simulate(fallback, 1, seed = 52), "not a declared group dimension")
+  expect_error(run_simulation(fallback, 1, seed = 52),
+    "not a declared group dimension")
 })
 
 test_that("dissolution histories conserve partnered exposure and survive later deaths", {
   model <- dissolution_model(100, rate = 2)
-  result <- simulate(model, 1, seed = 52)
+  result <- run_simulation(model, 1, seed = 52)
   counts <- demographic_counts(result, c(0, 1), c(0, Inf), by = "union_type")
   partnered <- subset(counts, union_type == "partnered")
   unpartnered <- subset(counts, union_type == "unpartnered")
@@ -248,7 +251,7 @@ test_that("dissolution histories conserve partnered exposure and survive later d
   continuation <- set_population(model, result)
   continuation <- set_mortality(continuation,
     data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 1e4))
-  continued <- simulate(continuation, 1, seed = 53)
+  continued <- run_simulation(continuation, 1, seed = 53)
   ended <- !is.na(result$unions$end_time)
   expect_identical(continued$unions[ended, ], result$unions[ended, ])
 })
@@ -266,9 +269,10 @@ test_that("directional group columns are validated", {
   shared <- data.frame(dur_start = 0, dur_end = Inf, rate = .1)
   for (column in c("group_pair", "group")) {
     bad <- shared; bad[[column]] <- "A"
-    expect_error(simulate(set_union_dissolution(model, bad), 0), "_w`")
+    expect_error(run_simulation(set_union_dissolution(model, bad), 0), "_w`")
   }
-  expect_error(simulate(set_mortality(model, transform(model$processes$mortality$rates, group_w = "A")), 0),
+  expect_error(run_simulation(set_mortality(model, transform(
+    model$processes$mortality$rates, group_w = "A")), 0),
                "own name")
   expect_error(stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = 1e308),
     list(group_w = c(A = 2))), "remain finite")

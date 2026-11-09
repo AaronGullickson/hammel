@@ -5,6 +5,14 @@ D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the u
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## Execution renamed to run_simulation (November 9, 2026)
+
+D152 renames the standalone execution function and source/help file to `run_simulation`, removing Hammel's `simulate` export and alias. A clean second `devtools::document()` pass completed successfully; the renamed help topic passed Rd validation and its example executed successfully. Current API references and test calls were updated, with renamed long test-call lines wrapped to 80 columns. Native entry points and source filenames are unchanged.
+
+Before/after parsed expressions confirmed only the intended name/diagnostic substitution, allowing equivalent concatenation of literal message fragments. Existing test expressions are unchanged apart from the function rename and formatting. Zero- and three-year execution outputs and RNG states matched exactly. Export checks confirmed the single name replacement, and an added regression checks that unqualified `simulate` still resolves to `stats::simulate()` and runs an ordinary linear-model simulation.
+
+The full offline `devtools::test()` run passed 6,498 expectations with zero failures in 108.6 seconds. The live database test was skipped; one existing environment warning concerned HMDHFDplus/lubridate's `timedatectl` system-bus access. All hand-maintained `R/` files and newly added/edited test lines remain within 80 columns, and `git diff --check` passed. User-owned README/vignettes and historical validation evidence remain untouched; their old execution calls require updating for the current API.
+
 ## Control-flow braces (November 9, 2026)
 
 D150 braces all loop bodies and statement-style or multiline conditional branches in hand-maintained R source, including early returns, error paths, loop exits, and control-flow/error-handler callbacks. All 127 loops are braced. A parser-based review retains 109 compact, single-line conditional value expressions and finds no remaining unbraced loop or statement/multiline conditional requiring expansion. The group-inheritance callback example follows the same rule. Control-flow modifiers formerly sharing a semicolon-separated line are on their own lines.

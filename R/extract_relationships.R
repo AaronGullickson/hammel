@@ -21,7 +21,7 @@
 #' error.
 #'
 #' @param population A validated `hammel_population` containing person and union
-#'   histories, such as the result of [simulate()].
+#'   histories, such as the result of [run_simulation()].
 #' @return A separate tibble with all union columns plus `birth_time_w`,
 #'   `death_time_w`, `birth_time_h`, and `death_time_h`, plus `<group>_w` and
 #'   `<group>_h` for each declared group dimension. Suffixes `_w` and `_h`
@@ -102,7 +102,7 @@ get_detailed_unions <- function(population) {
 #' conflict with the added fields cause an error.
 #'
 #' @param population A validated `hammel_population`, such as the result of
-#'   [simulate()].
+#'   [run_simulation()].
 #' @return A separate tibble containing all person columns plus `age_mother` and
 #'   `age_father`, measured at that person's birth, and for each declared group
 #'   dimension `<group>_mother` and `<group>_father` (such as `race_mother`).
@@ -158,7 +158,7 @@ get_parent_info <- function(population) {
 #' needed.
 #'
 #' @param population A validated `hammel_population` with person and union
-#'   histories, such as the result of [simulate()].
+#'   histories, such as the result of [run_simulation()].
 #' @return A separate tibble containing selected person rows and `age_mother`,
 #'   `age_father`, plus `group_mother` and `group_father` when groups are
 #'   present. Input order, column types and custom person columns are preserved.

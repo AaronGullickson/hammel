@@ -43,12 +43,13 @@ test_that("birth history initializes parity without custom column overrides", {
   people <- rbind(people,child)
   people$parity <- 99L
   model <- set_population(model,hammel_population(people,end_time=0, groups = if ("group" %in% names(people)) "group"))
-  result <- simulate(model,1,42)
+  result <- run_simulation(model,1,42)
   born <- subset(result$persons,birth_time>=0)
   expect_equal(nrow(born),1)
   expect_equal(born$mother_id,1)
   expect_equal(result$persons$parity[1:3],rep(99L,3)) # Custom field is not authoritative.
-  expect_equal(simulate(set_population(model,result),1,43)$simulation$births,0)
+  expect_equal(run_simulation(set_population(model,result),1,
+    43)$simulation$births,0)
 })
 
 test_that("successful births increment parity and retain actual birth spacing", {
@@ -56,12 +57,12 @@ test_that("successful births increment parity and retain actual birth spacing", 
   # Large positive prior rates are infeasible for compensation, so use zero
   # spacing for this high-hazard birth-count limit; test spacing separately.
   model <- set_fertility(model,parity_rates(c(20,20,0)),birth_interval=0)
-  result <- simulate(model,1,42)
+  result <- run_simulation(model,1,42)
   counts <- table(result$persons$mother_id)
   expect_true(all(counts<=2))
   expect_equal(sum(counts),100)
   spaced <- parity_model(c(.6,.6,.6),interval=.75,n=300)
-  x <- simulate(spaced,8,100)
+  x <- run_simulation(spaced,8,100)
   times <- split(x$persons$birth_time[!is.na(x$persons$mother_id)],
     x$persons$mother_id[!is.na(x$persons$mother_id)])
   differences <- unlist(lapply(times,function(t) diff(sort(t))))
@@ -72,10 +73,10 @@ test_that("successful births increment parity and retain actual birth spacing", 
 test_that("cancelled births and initial nulliparity do not advance parity", {
   model <- parity_model(c(.8,0),n=20)
   model <- set_union_formation(model,"on_demand",cancel_birth_if_no_match=TRUE)
-  x <- simulate(model,3,42)
+  x <- run_simulation(model,3,42)
   expect_equal(x$simulation$births,0)
   model <- set_population(parity_model(c(.8,0),n=20),x)
-  y <- simulate(model,3,43)
+  y <- run_simulation(model,3,43)
   expect_gt(y$simulation$births,0)
   expect_true(all(table(y$persons$mother_id)<=1))
 })
@@ -87,9 +88,10 @@ test_that("absent parity and zero-spacing equal-parity rates give the same ferti
   plain <- make_model(n,sex="f",birth_rate=.2,birth_interval=0)
   strat <- set_fertility(plain,parity_rates(rep(.2,3)),birth_interval=0)
   founders <- function(x) sum(x$persons$mother_id %in% seq_len(n))
-  a <- founders(simulate(plain,4,42)); b <- founders(simulate(strat,4,43))
+  a <- founders(run_simulation(plain,4,42)); b <- founders(run_simulation(strat,
+    4,43))
   expect_lt(abs(a - b), 4 * sqrt(2 * .2 * 4 * n))
-  expect_false("parity" %in% names(simulate(strat,1,42)$persons))
+  expect_false("parity" %in% names(run_simulation(strat,1,42)$persons))
 })
 
 test_that("parity composes with grouped typed fertility, conversion and stratified rates", {
@@ -114,8 +116,8 @@ test_that("parity composes with grouped typed fertility, conversion and stratifi
   factor <- c(unpartnered=1.1,cohab=.9,marriage=1.2)[explicit$union_type]
   explicit$rate <- explicit$rate * ifelse(explicit$group=="B",factor,1)
   equivalent <- quiet_unreachable(set_fertility(model,explicit))
-  x <- simulate(model,8,44)
-  expect_identical(simulate(equivalent,8,44),x)
+  x <- run_simulation(model,8,44)
+  expect_identical(run_simulation(equivalent,8,44),x)
   expect_gt(x$simulation$births,0)
   expect_gt(x$simulation$conversions,0)
   expect_false(anyNA(x$unions$wife_id))
@@ -131,20 +133,21 @@ test_that("grouped zero-spacing parity schedules match shared rates in distribut
     set_union_formation("rate",rates=data.frame(age_start=15,age_end=Inf,rate=.3),kinship_generations=0L)
   rates <- do.call(rbind,lapply(0:2,function(k) transform(base,parity_start=k,parity_end=if(k==2) Inf else k+1)))
   # Different cell structure, same intensity: compare birth counts statistically.
-  a <- simulate(set_fertility(model,rates,birth_interval=0),8,44)$simulation$births
-  b <- simulate(model,8,45)$simulation$births
+  a <- run_simulation(set_fertility(model,rates,birth_interval=0),8,
+    44)$simulation$births
+  b <- run_simulation(model,8,45)$simulation$births
   expect_lt(abs(a - b), 4 * sqrt(a + b))
 })
 
 test_that("history parity is recovered even when the preceding run was unstratified", {
   base <- make_model(100,sex="f",age=20,birth_rate=.3,birth_interval=0)
-  burned <- simulate(base,5,42)
+  burned <- run_simulation(base,5,42)
   observed <- table(burned$persons$mother_id)
   model <- set_population(parity_model(c(0,0,0),interval=.75,n=0),burned)
-  expect_equal(simulate(model,1,43)$simulation$births,0)
+  expect_equal(run_simulation(model,1,43)$simulation$births,0)
   # Only women with exactly one recorded birth may give a further birth.
   model <- set_fertility(model,parity_rates(c(0,20,0)),birth_interval=0)
-  x <- simulate(model,1,44)
+  x <- run_simulation(model,1,44)
   mothers <- x$persons$mother_id[x$persons$birth_time>=5]
   mothers <- mothers[!is.na(mothers)]
   expect_gt(length(mothers),0)
@@ -154,10 +157,10 @@ test_that("history parity is recovered even when the preceding run was unstratif
 test_that("edited parity schedules are revalidated and broad bands run", {
   model <- parity_model()
   model$processes$fertility$rates <- model$processes$fertility$rates[-1, ]
-  expect_error(simulate(model,0),"cover")
+  expect_error(run_simulation(model,0),"cover")
   # Very broad parity bands need no per-parity storage until women reach them.
   rates <- data.frame(age_start=15,age_end=Inf,parity_start=c(0,1000000),
     parity_end=c(1000000,Inf),rate=c(.1,.2))
   broad <- quiet_unreachable(set_fertility(make_model(20,sex="f",age=20),rates))
-  expect_gt(simulate(broad,5,3)$simulation$births,0)
+  expect_gt(run_simulation(broad,5,3)$simulation$births,0)
 })

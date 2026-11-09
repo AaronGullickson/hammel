@@ -614,7 +614,7 @@ See [parity fertility](parity-fertility.md#observed-fertility-by-parity).
 
 ## Unrealized births under cell accounting
 
-For populations returned by `simulate()` (D101),
+For populations returned by `run_simulation()` (D101),
 `calculate_fertility_rates(..., unrealized = TRUE)` adds `unrealized_births`
 and `rate_fertility_adjusted = (births + unrealized_births) / person_years`.
 Unrealized births are counts of the times the fertility clock drew a cell that

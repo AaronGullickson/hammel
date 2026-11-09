@@ -122,9 +122,9 @@
 #'     "on_demand",
 #'     matching_model(~age_difference, c(age_difference = 0))
 #'   )
-#' result <- simulate(model, years = 2, seed = 42)
+#' result <- run_simulation(model, years = 2, seed = 42)
 #' result$simulation
-simulate <- function(model, years, seed = NULL) {
+run_simulation <- function(model, years, seed = NULL) {
   check_model(model)
   if (is.null(model$population) || is.null(model$processes$mortality) ||
     is.null(model$processes$fertility) || is.null(

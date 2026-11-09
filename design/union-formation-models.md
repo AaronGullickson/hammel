@@ -384,7 +384,7 @@ woman-year in the indicated status; an overall schedule applies to all women.
 
 On-demand initiation requires an overall schedule and rejects conditional
 schedules at simulation validation, including zero-duration runs. Rate initiation
-accepts either form. With overall rates it emits one warning per simulate call
+accepts either form. With overall rates it emits one warning per `run_simulation()` call
 that the same schedule applies to both statuses. This replaces D038's temporary
 suppression of all unpartnered births in rate mode.
 

@@ -16,21 +16,22 @@ test_that("fertility stores and validates the female-birth probability", {
     expect_error(set_process(hammel_model(), process), "ffab")
     model <- make_model(0)
     model$processes$fertility <- process
-    expect_error(simulate(model, 0, seed = 1), "ffab")
+    expect_error(run_simulation(model, 0, seed = 1), "ffab")
   }
 })
 
 test_that("default and older fertility specifications preserve seeded runs", {
   model <- make_model(40, sex = "f", birth_rate = 1)
-  expected <- simulate(model, 2, seed = 735)
+  expected <- run_simulation(model, 2, seed = 735)
   explicit <- set_fertility(model, model$processes$fertility$rates, ffab = 0.4886)
-  expect_identical(simulate(explicit, 2, seed = 735), expected)
+  expect_identical(run_simulation(explicit, 2, seed = 735), expected)
   older <- model
   older$processes$fertility$ffab <- NULL
   expect_identical(set_process(older, older$processes$fertility), model)
-  expect_identical(simulate(older, 2, seed = 735), expected)
+  expect_identical(run_simulation(older, 2, seed = 735), expected)
   expect_identical(expected$simulation$ffab, 0.4886)
-  expect_identical(simulate(set_fertility(model, model$processes$fertility$rates,
+  expect_identical(run_simulation(set_fertility(model,
+    model$processes$fertility$rates,
     ffab = 0.5), 0)$simulation$ffab, 0.5)
 })
 
@@ -49,14 +50,14 @@ test_that("ffab endpoints control newborn sex in both initiation modes", {
       model$processes$fertility$ffab <- probability
       set.seed(123)
       rng <- .Random.seed
-      result <- simulate(model, 1, seed = 736)
+      result <- run_simulation(model, 1, seed = 736)
       expect_identical(.Random.seed, rng)
       children <- result$persons$birth_time >= 0
       expect_gt(sum(children), 0)
       expect_true(all(result$persons$sex[children] == if (probability == 1) "f" else "m"))
       expect_identical(result$persons$sex[!children], model$population$persons$sex)
       expect_identical(result$simulation$ffab, probability)
-      expect_identical(simulate(model, 1, seed = 736), result)
+      expect_identical(run_simulation(model, 1, seed = 736), result)
     }
   }
 })
@@ -64,7 +65,7 @@ test_that("ffab endpoints control newborn sex in both initiation modes", {
 test_that("newborn sex follows a nondefault Bernoulli probability", {
   model <- make_model(2000, sex = "f", birth_rate = 1, birth_interval = 0)
   model$processes$fertility$ffab <- 0.25
-  result <- simulate(model, 1, seed = 737)
+  result <- run_simulation(model, 1, seed = 737)
   children <- result$persons$birth_time >= 0
   n <- sum(children)
   expect_gt(n, 1000)
@@ -86,7 +87,7 @@ test_that("configured sex is available to built-in and custom inheritance", {
       model <- model |>
         set_fertility(data.frame(age_start = 15, age_end = 50, rate = 20),
           birth_interval = 0, ffab = probability) |> set_inheritance(inheritance)
-      result <- simulate(model, 0.3, seed = 654)
+      result <- run_simulation(model, 0.3, seed = 654)
       children <- result$persons$birth_time >= 0
       expect_true(any(children))
       expected_group <- if (probability == 1) "A" else "B"
@@ -99,15 +100,15 @@ test_that("configured sex is available to built-in and custom inheritance", {
 test_that("changing ffab affects only subsequent births and independent runs", {
   model <- make_model(20, sex = "f", birth_rate = 20, birth_interval = 0)
   model$processes$fertility$ffab <- 1
-  first <- simulate(model, 0.3, seed = 738)
+  first <- run_simulation(model, 0.3, seed = 738)
   continued_model <- set_population(model, first)
   continued_model$processes$fertility$ffab <- 0
-  continued <- simulate(continued_model, 0.3, seed = 739)
+  continued <- run_simulation(continued_model, 0.3, seed = 739)
   new <- continued$persons$birth_time >= first$end_time
   expect_true(any(new))
   expect_true(all(continued$persons$sex[new] == "m"))
   expect_identical(continued$persons$sex[!new], first$persons$sex)
   expect_identical(continued$simulation$ffab, 0)
   expect_identical(model$processes$fertility$ffab, 1)
-  expect_identical(simulate(model, 0.3, seed = 738), first)
+  expect_identical(run_simulation(model, 0.3, seed = 738), first)
 })

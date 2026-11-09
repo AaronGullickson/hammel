@@ -28,7 +28,7 @@ test_that("cell search intensities match explicit scans through every state chan
       kinship_generations = 0) |>
     set_union_dissolution(data.frame(dur_start = 0, dur_end = Inf, rate = .1))
   withr::local_options(hammel.check_cells = TRUE)
-  out <- simulate(model, 6, seed = 32)
+  out <- run_simulation(model, 6, seed = 32)
   starts <- out$unions$start_time >= 0
   expect_gt(sum(starts), 500)
   expect_gt(sum(out$unions$union_type[starts] == "cohab"), 100)
@@ -45,5 +45,5 @@ test_that("cell search intensities match explicit scans through every state chan
     kinship_generations = 0,
     # The baseline declares its categories in the order given (A, B).
     weights = weight_model(~ group, c(groupB = log(2))))
-  expect_s3_class(simulate(weighted, 3, seed = 33), "hammel_population")
+  expect_s3_class(run_simulation(weighted, 3, seed = 33), "hammel_population")
 })

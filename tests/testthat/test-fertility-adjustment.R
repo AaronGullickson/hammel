@@ -6,10 +6,10 @@ test_that("explicit zero fertility tails preserve histories and positive tails e
   model <- make_model(50,sex="f",age=45,birth_rate=.1)
   rates <- model$processes$fertility$rates
   zero <- set_fertility(model,rbind(rates,data.frame(age_start=50,age_end=Inf,rate=0)))
-  expect_identical(simulate(model,10,42),simulate(zero,10,42))
+  expect_identical(run_simulation(model,10,42),run_simulation(zero,10,42))
   positive <- make_model(100,sex="f",age=60,birth_rate=0)
   positive <- set_fertility(positive,data.frame(age_start=55,age_end=Inf,rate=.2))
-  result <- simulate(positive,2,42)
+  result <- run_simulation(positive,2,42)
   expect_gt(result$simulation$births,0)
 })
 
@@ -17,7 +17,7 @@ test_that("independent mortality preserves constant fertility after burn-in", {
   n <- 10000
   model <- make_model(n, sex = "f", death_rate = 0.1, birth_rate = 0.2,
                       birth_interval = 0.37)
-  result <- simulate(model, 20, seed = 456)
+  result <- run_simulation(model, 20, seed = 456)
   deaths <- result$persons$death_time[seq_len(n)]
   deaths[is.na(deaths)] <- 20
   exposure <- sum(pmax(0, pmin(deaths, 20) - 5))

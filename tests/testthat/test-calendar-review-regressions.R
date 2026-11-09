@@ -15,7 +15,7 @@ test_that("fractional fertility epochs retain the run-start accounting grid", {
       rbind(transform(x,union_type="partnered"),transform(x,union_type="unpartnered"))
     }))
     m <- set_fertility(m,epochs,birth_interval=10)
-    out <- simulate(m,3.4,seed=42)
+    out <- run_simulation(m,3.4,seed=42)
     u <- out$simulation$unrealized_births
     expect_true(all(u$period_end<=origin+ceiling(u$period_end-origin)))
     # Records do not bridge any run-anchored annual boundary.
@@ -52,18 +52,18 @@ test_that("execution population coverage checks ignore unreachable historical an
     transform(pairs,time_start=1950,time_end=2010),
     transform(pairs[3,],time_start=2010,time_end=2100))
   m <- set_union_dissolution(m,dissolution)
-  expect_s3_class(simulate(m,10,seed=42),"hammel_population")
-  expect_s3_class(simulate(m,0,seed=42),"hammel_population")
-  expect_error(simulate(m,10.1,seed=42),"Mortality schedules")
+  expect_s3_class(run_simulation(m,10,seed=42),"hammel_population")
+  expect_s3_class(run_simulation(m,0,seed=42),"hammel_population")
+  expect_error(run_simulation(m,10.1,seed=42),"Mortality schedules")
   full_age <- m
   fixed <- m$processes$mortality$rates
   fixed$age_end[fixed$time_start==2010] <- Inf
   full_age <- set_mortality(full_age,fixed)
-  expect_error(simulate(full_age,10.1,seed=42),"missing schedules")
+  expect_error(run_simulation(full_age,10.1,seed=42),"missing schedules")
   old <- m
   old$population$end_time <- 1940
   old$population$persons$birth_time <- old$population$persons$birth_time-60
-  expect_error(simulate(old,1,seed=42),"Mortality schedules")
+  expect_error(run_simulation(old,1,seed=42),"Mortality schedules")
   # Unreachable malformed rows still fail construction.
   invalid <- m$processes$mortality$rates
   invalid$age_end[1] <- -1

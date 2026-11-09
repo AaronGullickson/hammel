@@ -258,7 +258,7 @@ any flow missing its target by more than 1e-8 also marks the search
 approximate (D071). Women with no allowed man are left out, since no weights
 can match them. A group with zero
 target receives log weight -1000. If no women have positive intensity, all
-weights are 1. As selected by the user, `simulate()` warns once, reporting the
+weights are 1. As selected by the user, `run_simulation()` warns once, reporting the
 number of searches that used approximate weights.
 
 ## Worked examples

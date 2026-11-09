@@ -51,7 +51,7 @@ input order and extra columns; native scheduling sorts its own copy.
 | Additional setting | None | `birth_interval`, finite nonnegative scalar years; default 0.75 |
 
 Mortality constructors validate structure without requiring full coverage;
-`simulate()` checks complete schedules. Specifying and attaching processes does
+`run_simulation()` checks complete schedules. Specifying and attaching processes does
 not execute a simulation. Edited built-in specifications are revalidated at
 attachment and execution. Fertility schedules need no feasibility check under
 cell accounting; parity schedules with unreachable cells receive a warning.
@@ -525,7 +525,7 @@ and the distinction between evidence and proof of unrelatedness.
 
 ## Execution, competition, and random numbers
 
-`simulate(model, years, seed = NULL)` processes `[start, start + years)`.
+`run_simulation(model, years, seed = NULL)` processes `[start, start + years)`.
 Duration is finite and nonnegative; zero duration returns the population with
 updated run metadata. Times that cannot be represented at the chosen numeric
 scale are rejected. Candidates exactly at the run endpoint are excluded.

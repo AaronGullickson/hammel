@@ -188,12 +188,12 @@ test_that("prepared multi-year rates execute directly with native bands", {
   m$population$end_time <- 2000
   m <- set_mortality(m, mortality_from_hmd(hmd, 2000:2001)$rates)
   m <- set_fertility(m, fertility_from_hfd(hfd, 2000:2001)$rates, birth_interval = 2)
-  out <- simulate(m, 2, seed = 91)
+  out <- run_simulation(m, 2, seed = 91)
   expect_equal(out$simulation$births, 1)
   expect_gte(tail(out$persons$birth_time, 1), 2001)
   expect_lt(tail(out$persons$birth_time, 1), 2002)
   # Selecting separated years leaves a real gap; preparation never fills it.
   hmd$Year[hmd$Year == 2001] <- 2002
   m <- set_mortality(m, mortality_from_hmd(hmd, c(2000, 2002))$rates)
-  expect_error(simulate(m, 2), "calendar coverage gap")
+  expect_error(run_simulation(m, 2), "calendar coverage gap")
 })

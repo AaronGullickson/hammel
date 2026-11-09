@@ -25,18 +25,19 @@ test_that("conditional fertility validates labels, completeness and per-status b
   edited$rates$union_type[2] <- "total"
   expect_error(set_process(model, edited), "union_type")
   model$processes$fertility <- edited
-  expect_error(simulate(model, 0), "union_type")
+  expect_error(run_simulation(model, 0), "union_type")
 })
 
 test_that("on-demand rejects status schedules, rate overall warns exactly once", {
   model <- set_fertility(make_model(), status_rates())
-  expect_error(simulate(model, 0), "overall fertility schedule")
-  expect_error(simulate(model, 1), "overall fertility schedule")
+  expect_error(run_simulation(model, 0), "overall fertility schedule")
+  expect_error(run_simulation(model, 1), "overall fertility schedule")
   model <- make_rate_model(1, search_rate = 0)
   model <- set_fertility(model, data.frame(age_start = 15, age_end = 50, rate = 20),
                          birth_interval = 0)
   warnings <- character()
-  result <- withCallingHandlers(simulate(model, 1, seed = 52), warning = function(w) {
+  result <- withCallingHandlers(run_simulation(model, 1, seed = 52), warning =
+    function(w) {
     warnings <<- c(warnings, conditionMessage(w))
     invokeRestart("muffleWarning")
   })
@@ -45,16 +46,16 @@ test_that("on-demand rejects status schedules, rate overall warns exactly once",
   expect_gt(result$simulation$births, 0)
   expect_true(all(is.na(result$persons$father_id)))
   expect_equal(nrow(result$unions), 0)
-  expect_warning(simulate(model, 0), "overall fertility schedule")
+  expect_warning(run_simulation(model, 0), "overall fertility schedule")
 })
 
 test_that("unpartnered births select fathers without triggering unions", {
   model <- set_fertility(make_rate_model(search_rate = 0), status_rates(0, 20), 0)
-  expect_no_warning(result <- simulate(model, 1, seed = 52))
+  expect_no_warning(result <- run_simulation(model, 1, seed = 52))
   expect_gt(result$simulation$births, 0)
   expect_equal(nrow(result$unions), 0)
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 2))
-  expect_identical(result, simulate(model, 1, seed = 52))
+  expect_identical(result, run_simulation(model, 1, seed = 52))
 })
 
 test_that("formation and widowhood switch fertility schedules without bypassing spacing", {
@@ -68,7 +69,7 @@ test_that("formation and widowhood switch fertility schedules without bypassing 
   # A high partnered rate makes births near-certain once spacing ends, so the
   # check does not depend on the seed and several births must respect spacing.
   model <- set_fertility(model, status_rates(5, 0), 0.5)
-  result <- simulate(model, 2, seed = 52)
+  result <- run_simulation(model, 2, seed = 52)
   expect_lt(result$unions$start_time[1], 0.5)
   children <- result$persons[result$persons$person_id > 3, ]
   expect_gt(nrow(children), 0)
@@ -84,12 +85,12 @@ test_that("formation and widowhood switch fertility schedules without bypassing 
   model <- set_fertility(model, status_rates(0, 20), 0)
   model <- set_mortality(model, data.frame(sex = c("f", "m", "m"),
     age_start = c(0, 0, 30.3), age_end = c(Inf, 30.3, Inf), rate = c(0, 0, 1e8)))
-  result <- simulate(model, 1, seed = 52)
+  result <- run_simulation(model, 1, seed = 52)
   children <- result$persons[result$persons$birth_time >= 0, ]
   expect_gt(nrow(children), 0)
   expect_true(all(children$birth_time > result$persons$death_time[2]))
   expect_true(all(is.na(children$father_id)))
-  continued <- simulate(set_population(model, result), 0.2, seed = 53)
+  continued <- run_simulation(set_population(model, result), 0.2, seed = 53)
   expect_identical(continued$unions, result$unions)
   expect_gt(continued$simulation$births, 0)
 })
@@ -99,12 +100,12 @@ test_that("fertility compensation and different age bands remain separate by sta
   model$population$persons$birth_time[1] <- -20
   # Both schedules would be infeasible if mistakenly integrated together.
   model <- set_fertility(model, status_rates(0.8, 0.8), 0.75)
-  expect_no_error(simulate(model, 1, seed = 52))
+  expect_no_error(run_simulation(model, 1, seed = 52))
   rates <- status_rates(20, 20)
   rates$age_start <- c(30, 15)
   rates$age_end <- c(40, 19)
   model <- set_fertility(model, rates, 0)
-  expect_equal(simulate(model, 1, seed = 52)$simulation$births, 0)
+  expect_equal(run_simulation(model, 1, seed = 52)$simulation$births, 0)
 })
 
 test_that("constant status-specific fertility gives the corresponding birth counts", {
@@ -114,7 +115,7 @@ test_that("constant status-specific fertility gives the corresponding birth coun
     wife_id = 1:1500, husband_id = 3001:4500, start_time = -1,
     end_time = NA_real_, end_reason = NA_character_)
   model <- set_fertility(model, status_rates(0.3, 0.1), 0)
-  result <- simulate(model, 1, seed = 137)
+  result <- run_simulation(model, 1, seed = 137)
   children <- result$persons[result$persons$birth_time >= 0, ]
   partnered <- children$mother_id <= 1500
   expect_lt(abs(sum(partnered) - 450), 6 * sqrt(450))

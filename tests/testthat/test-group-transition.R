@@ -25,7 +25,8 @@ test_that("transition specifications validate common bands and optional strata",
                    transform(r, dur_start = 0, dur_end = Inf), rbind(r, r)))
     expect_error(group_transition(bad))
   expect_s3_class(group_transition(transform(r, sex = "f", union_type = "cohab")), "hammel_process")
-  expect_error(simulate(set_group_transition(make_model(1), r), 1), "declared group")
+  expect_error(run_simulation(set_group_transition(make_model(1), r), 1),
+    "declared group")
 })
 
 test_that("competing outgoing hazards recover analytical destinations and survival", {
@@ -33,7 +34,7 @@ test_that("competing outgoing hazards recover analytical destinations and surviv
   model <- set_group_transition(model, rbind(transition_rates(.2), transition_rates(.3, dest = "C")))
   set.seed(982)
   before <- .Random.seed
-  out <- simulate(model, 2, seed = 124)
+  out <- run_simulation(model, 2, seed = 124)
   expect_identical(.Random.seed, before)
   counts <- table(factor(out$persons$group, levels = c("A", "B", "C"))) / 12000
   expected <- c(exp(-1), .4 * (1 - exp(-1)), .6 * (1 - exp(-1)))
@@ -41,23 +42,24 @@ test_that("competing outgoing hazards recover analytical destinations and surviv
   expect_equal(nrow(out$transitions), sum(out$persons$group != "A"))
   expect_identical(out$simulation$transitions, nrow(out$transitions))
   expect_equal(out$ancestry$group$A, rep(1, 12000))
-  expect_identical(simulate(model, 2, seed = 124), out)
+  expect_identical(run_simulation(model, 2, seed = 124), out)
 })
 
 test_that("grouped outputs always have typed histories, including zero and empty runs", {
   for (n in c(0, 2)) {
     model <- transition_model(n)
-    out <- simulate(model, 0, seed = 1)
+    out <- run_simulation(model, 0, seed = 1)
     expect_s3_class(out$transitions, "tbl_df")
     expect_identical(names(out$transitions), c("person_id", "time", "group", "origin", "destination", "move_id", "initiator_id"))
     expect_equal(nrow(out$transitions), 0)
     expect_type(out$transitions$origin, "character")
-    expect_s3_class(simulate(model, 1, seed = 1)$transitions, "tbl_df")
+    expect_s3_class(run_simulation(model, 1, seed = 1)$transitions, "tbl_df")
   }
   model <- transition_model(2)
   model$population$persons$group <- c(10L, 10L)
   model$population$groups <- list(group = group())
-  out <- simulate(set_group_transition(model, transition_rates(1e5, 10L, 20L)), .1, seed = 1)
+  out <- run_simulation(set_group_transition(model, transition_rates(1e5, 10L,
+    20L)), .1, seed = 1)
   expect_identical(out$persons$group, c(20L, 20L))
   # History labels are text in every dimension; persons keep their type.
   expect_identical(out$transitions$origin, c("10", "10"))
@@ -67,11 +69,12 @@ test_that("age support, sex and union type select actual applicable schedules", 
   model <- transition_model(2)
   model$population$persons$sex <- c("m", "f")
   r <- transform(transition_rates(1e5), age_start = 21, sex = "f", union_type = "unpartnered")
-  out <- simulate(set_group_transition(model, r), 1.5, seed = 1)
+  out <- run_simulation(set_group_transition(model, r), 1.5, seed = 1)
   expect_equal(out$transitions$person_id, 2)
   expect_gte(out$transitions$time, 1)
   expect_identical(out$persons$group, c("A", "B"))
-  expect_equal(nrow(simulate(set_group_transition(model, transform(r, union_type = "partnered")), 2, seed = 1)$transitions), 0)
+  expect_equal(nrow(run_simulation(set_group_transition(model, transform(r,
+    union_type = "partnered")), 2, seed = 1)$transitions), 0)
 })
 
 test_that("duration resets at moves, survives restarts and falls back to age", {
@@ -80,10 +83,10 @@ test_that("duration resets at moves, survives restarts and falls back to age", {
   names(r)[names(r) == "age_end"] <- "dur_end"
   r$dur_start <- 2
   model <- set_group_transition(transition_model(), r)
-  out <- simulate(model, 1, seed = 2)
+  out <- run_simulation(model, 1, seed = 2)
   expect_equal(nrow(out$transitions), 1)
   expect_identical(out$persons$group, "B")
-  second <- simulate(set_population(model, out), 2, seed = 3)
+  second <- run_simulation(set_population(model, out), 2, seed = 3)
   expect_equal(nrow(second$transitions), 2)
   expect_gte(diff(second$transitions$time), 2)
   expect_identical(second$transitions[1, ], out$transitions)
@@ -100,7 +103,8 @@ test_that("group changes select new mortality and update only the individual", {
   death <- rbind(transform(model$processes$mortality$rates, group = "A"),
     transform(model$processes$mortality$rates, group = "B", rate = 1e5))
   model <- set_mortality(model, death)
-  out <- simulate(set_group_transition(model, transform(transition_rates(1e5), sex = "f")), .1, seed = 1)
+  out <- run_simulation(set_group_transition(model, transform(transition_rates(
+    1e5), sex = "f")), .1, seed = 1)
   expect_equal(out$transitions$person_id, 1)
   expect_identical(out$persons$group, c("B", "A"))
   expect_gt(out$persons$death_time[1], out$transitions$time)
@@ -122,7 +126,7 @@ test_that("a moving man invalidates pair dissolution and union changes refresh h
   dissolution <- rbind(dissolution, directional_pairs(data.frame(group_pair = c("A:C", "B:C", "C:C"),
     dur_start = 0, dur_end = Inf, rate = 0)))
   model <- set_union_dissolution(model, dissolution)
-  out <- simulate(set_group_transition(model, transitions), .1, seed = 15)
+  out <- run_simulation(set_group_transition(model, transitions), .1, seed = 15)
   expect_equal(out$transitions$destination, c("B", "C"))
   expect_equal(out$unions$end_reason, "dissolution")
   expect_gt(out$unions$end_time, out$transitions$time[1])
@@ -177,7 +181,8 @@ test_that("moves refresh available male pools and active fertility/calibration c
   model <- set_union_formation(model, "rate",
     matching = age_gap_matching_model(0, 5, group_exogamy = NA),
     rates = data.frame(age_start = 21, age_end = Inf, rate = 1e5))
-  out <- simulate(set_group_transition(model, transform(transition_rates(1e5), sex = "m")), 1.1, seed = 33)
+  out <- run_simulation(set_group_transition(model, transform(transition_rates(
+    1e5), sex = "m")), 1.1, seed = 33)
   expect_equal(nrow(out$unions), 1)
   expect_equal(out$transitions$person_id, 2)
   expect_gt(out$unions$start_time, out$transitions$time)
@@ -186,7 +191,8 @@ test_that("moves refresh available male pools and active fertility/calibration c
   rates <- rbind(data.frame(group = "A", age_start = 15, age_end = 50, rate = 0),
                  data.frame(group = "B", age_start = 15, age_end = 50, rate = 30))
   model <- set_inheritance(set_fertility(model, rates, birth_interval = 0), "mother")
-  out <- simulate(set_group_transition(model, transform(transition_rates(1e5), age_end = 21)), .3, seed = 51)
+  out <- run_simulation(set_group_transition(model, transform(transition_rates(
+    1e5), age_end = 21)), .3, seed = 51)
   expect_gt(out$simulation$births, 0)
   expect_equal(nrow(out$transitions), 2)
   expect_true(all(out$persons$group == "B"))
@@ -208,7 +214,7 @@ test_that("cohabitation conversion refreshes both partners' transition strata", 
     cohab_prob = data.frame(age_start = 0, age_end = Inf, prob = 1), union_convert_rate = conversion)
   rates <- rbind(transform(transition_rates(1e5), sex = "f", union_type = "cohab"),
     transform(transition_rates(1e5, "A", "C"), sex = "m", union_type = "marriage"))
-  out <- simulate(set_group_transition(model, rates), .1, seed = 1)
+  out <- run_simulation(set_group_transition(model, rates), .1, seed = 1)
   expect_identical(out$transitions$destination, c("B", "C"))
   expect_identical(out$unions$end_reason[1], "conversion")
   expect_gt(out$unions$end_time[1], out$transitions$time[1])
@@ -221,18 +227,20 @@ test_that("cohabitation conversion refreshes both partners' transition strata", 
 
 test_that("history-only restarts and absent transition processes preserve provenance", {
   model <- transition_model()
-  out <- simulate(set_group_transition(model, transition_rates(1e5)), .1, seed = 9)
-  resumed <- simulate(set_population(model, out), .1, seed = 10)
+  out <- run_simulation(set_group_transition(model, transition_rates(1e5)), .1,
+    seed = 9)
+  resumed <- run_simulation(set_population(model, out), .1, seed = 10)
   expect_identical(resumed$transitions, out$transitions)
   expect_identical(resumed$ancestry$group, out$ancestry$group)
   expect_identical(resumed$persons$group, "B")
   expect_null(model$population$transitions)
   expect_identical(model$population$persons$group, "A")
-  zero <- simulate(set_group_transition(model, transition_rates(0)), 1, seed = 2)
+  zero <- run_simulation(set_group_transition(model, transition_rates(0)), 1,
+    seed = 2)
   expect_equal(nrow(zero$transitions), 0)
   bad <- set_group_transition(model, transition_rates())
   bad$processes$group_transition$group$rates$rate <- -1
-  expect_error(simulate(bad, 0), "nonnegative")
+  expect_error(run_simulation(bad, 0), "nonnegative")
 })
 
 test_that("snapshot event accounting handles repeated moves, deaths and arbitrary time order", {
@@ -267,10 +275,10 @@ test_that("snapshot event accounting handles repeated moves, deaths and arbitrar
 test_that("edited transition specifications reject incompatible units and unsupported processes", {
   model <- set_group_transition(transition_model(), transition_rates())
   model$processes$group_transition$group$rate_unit <- "annual_probability"
-  expect_error(simulate(model, 0), "specification or units")
+  expect_error(run_simulation(model, 0), "specification or units")
   model <- make_model(1)
   model$processes$unimplemented <- structure(list(name = "unimplemented"), class = "hammel_process")
-  expect_error(simulate(model, 0), "Unsupported demographic process")
+  expect_error(run_simulation(model, 0), "Unsupported demographic process")
 })
 
 test_that("transition histories reject invalid references, life dates and missing identities", {

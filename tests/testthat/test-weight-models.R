@@ -31,7 +31,8 @@ test_that("weight models validate formulas, coefficients and variables", {
   # Names that could be group variables are checked against the declaration
   # at simulation; others fail when the model is set.
   education <- set_mortality(model, mortality_rates, weights = weight_model(~ education, c(education = 1)))
-  expect_error(simulate(education, 0), "not available for this process: education")
+  expect_error(run_simulation(education, 0),
+    "not available for this process: education")
   expect_error(set_mortality(model, mortality_rates,
     weights = weight_model(~ parity, c(paritx = 1))), "missing parity; unknown paritx")
   expect_error(set_mortality(model, mortality_rates,
@@ -64,7 +65,7 @@ test_that("mortality weights give within-cell hazard ratios and keep the cell ra
   n <- 20000
   model <- set_mortality(weighted_mortality_model(n), mortality_rates,
     weights = weight_model(~ partnered, c(partnered = log(0.5))))
-  out <- simulate(model, 1, seed = 11)
+  out <- run_simulation(model, 1, seed = 11)
   p <- out$persons
   d <- ifelse(is.na(p$death_time), 1, p$death_time)
   partner <- c(2 * n + 1:n, rep(NA, n), 1:n, rep(NA, n))
@@ -82,13 +83,13 @@ test_that("mortality weights give within-cell hazard ratios and keep the cell ra
 
 test_that("zero coefficients and constant custom weights reproduce unweighted runs", {
   model <- weighted_mortality_model(500)
-  plain <- simulate(model, 2, seed = 5)
+  plain <- run_simulation(model, 2, seed = 5)
   zero <- set_mortality(model, mortality_rates,
     weights = weight_model(~ partnered, c(partnered = 0)))
-  expect_identical(simulate(zero, 2, seed = 5), plain)
+  expect_identical(run_simulation(zero, 2, seed = 5), plain)
   constant <- set_mortality(model, mortality_rates,
     weights = weight_model(fun = function(members, bin) rep(3, nrow(members))))
-  expect_identical(simulate(constant, 2, seed = 5), plain)
+  expect_identical(run_simulation(constant, 2, seed = 5), plain)
 })
 
 test_that("custom functions receive members and the cell, without exact times", {
@@ -98,7 +99,8 @@ test_that("custom functions receive members and the cell, without exact times", 
     if (is.null(seen)) seen <<- list(members = members, bin = bin)
     log(ifelse(members$partnered == 1, .5, 1))
   }
-  out <- simulate(set_mortality(model, mortality_rates, weights = weight_model(fun = f)), 1, seed = 3)
+  out <- run_simulation(set_mortality(model, mortality_rates, weights =
+    weight_model(fun = f)), 1, seed = 3)
   expect_s3_class(seen$members, "tbl_df")
   expect_true(all(c("person_id", "sex", "union_type", "partnered", "parity",
     "previous_union") %in% names(seen$members)))
@@ -116,37 +118,45 @@ test_that("custom functions receive members and the cell, without exact times", 
     mean(dead$person_id %in% c(seq_len(200), 400 + seq_len(200)))   # partnered share
   }
   runs <- 1:15
-  custom_share <- vapply(runs, function(s) share(simulate(set_mortality(model, mortality_rates,
+  custom_share <- vapply(runs, function(s) share(run_simulation(set_mortality(
+    model, mortality_rates,
     weights = weight_model(fun = f)), 1, seed = s)), 0)
-  formula_share <- vapply(runs, function(s) share(simulate(formula, 1, seed = s)), 0)
+  formula_share <- vapply(runs, function(s) share(run_simulation(formula, 1,
+    seed = s)), 0)
   expect_lt(abs(mean(custom_share) - mean(formula_share)),
             4 * sqrt(var(custom_share) / 15 + var(formula_share) / 15) + 1e-9)
   bad_length <- weight_model(fun = function(members, bin) 0)
-  expect_error(simulate(set_mortality(model, mortality_rates, weights = bad_length), 1, seed = 3),
+  expect_error(run_simulation(set_mortality(model, mortality_rates, weights =
+    bad_length), 1, seed = 3),
     "returned 1 values")
   infinite <- weight_model(fun = function(members, bin) rep(Inf, nrow(members)))
-  expect_error(simulate(set_mortality(model, mortality_rates, weights = infinite), 1, seed = 3), "infinite")
+  expect_error(run_simulation(set_mortality(model, mortality_rates, weights =
+    infinite), 1, seed = 3), "infinite")
   # Draws inside the function share the simulation stream reproducibly.
   noisy <- set_mortality(model, mortality_rates,
     weights = weight_model(fun = function(members, bin) rnorm(nrow(members))))
-  expect_identical(simulate(noisy, 1, seed = 8), simulate(noisy, 1, seed = 8))
+  expect_identical(run_simulation(noisy, 1, seed = 8), run_simulation(noisy, 1,
+    seed = 8))
 })
 
 test_that("missing variables contribute zero with one warning", {
   model <- weighted_mortality_model(200, groups = c("A", "B"))
   w <- weight_model(~ partner_group + partnered,
     c(partner_groupB = 1, partnered = 1))
-  expect_warning(simulate(set_mortality(model, mortality_rates, weights = w), 1, seed = 2),
+  expect_warning(run_simulation(set_mortality(model, mortality_rates, weights =
+    w), 1, seed = 2),
     "Missing values in the mortality weight formula")
   na_fun <- weight_model(fun = function(members, bin) rep(NA_real_, nrow(members)))
   model <- weighted_mortality_model(200)
-  expect_warning(out <- simulate(set_mortality(model, mortality_rates, weights = na_fun), 1, seed = 2),
+  expect_warning(out <- run_simulation(set_mortality(model, mortality_rates,
+    weights = na_fun), 1, seed = 2),
     "function result")
-  expect_identical(out, simulate(model, 1, seed = 2))
+  expect_identical(out, run_simulation(model, 1, seed = 2))
   # Coefficients name the dimension's categories (the first is the reference).
   partial <- weight_model(~ group, c(groupC = 1))
   grouped <- weighted_mortality_model(20, groups = c("A", "B"))
-  expect_error(simulate(set_mortality(grouped, mortality_rates, weights = partial), 1),
+  expect_error(run_simulation(set_mortality(grouped, mortality_rates, weights =
+    partial), 1),
     "groupB; missing groupB; unknown groupC")
 })
 
@@ -164,7 +174,7 @@ weighted_fertility_model <- function(n, groups = NULL) {
 test_that("fertility weights select mothers at selection and at refresh under calibration", {
   rates <- data.frame(age_start = 15, age_end = 50, rate = .5)
   check <- function(model, n) {
-    out <- simulate(model, .7, seed = 21)
+    out <- run_simulation(model, .7, seed = 21)
     p <- out$persons
     births <- table(factor(p$group[match(p$mother_id[p$birth_time >= 0], p$person_id)],
                            levels = c("A", "B")))
@@ -187,8 +197,10 @@ test_that("fertility weights select mothers at selection and at refresh under ca
   model <- set_fertility(weighted_fertility_model(300, c("A", "B")), rates, hetfert = het_fert(.5, 1))
   zero <- set_fertility(model, rates, hetfert = het_fert(.5, 1),
     weights = weight_model(~ group, c(groupB = 0)))
-  expect_identical(simulate(zero, 1, seed = 4), simulate(model, 1, seed = 4))
-  expect_warning(simulate(set_fertility(model, rates, weights = weight_model(
+  expect_identical(run_simulation(zero, 1, seed = 4), run_simulation(model, 1,
+    seed = 4))
+  expect_warning(run_simulation(set_fertility(model, rates, weights =
+    weight_model(
     fun = function(members, bin) rep(0, nrow(members)))), .1, seed = 4), "every refresh")
 })
 
@@ -222,7 +234,7 @@ test_that("dissolution and conversion weights act on unions", {
     set_union_formation("rate", rates = data.frame(age_start = 15, age_end = Inf, rate = 0),
       kinship_generations = 0) |>
     set_union_dissolution(data.frame(dur_start = 0, dur_end = Inf, rate = .3), weights = w)
-  out <- suppressWarnings(simulate(model, 1, seed = 31))
+  out <- suppressWarnings(run_simulation(model, 1, seed = 31))
   r <- gap_ratio(out$unions, n, "dissolution")
   expect_lt(abs(r[["log_ratio"]] - 5 * log(1.2)), 4 * r[["se"]])
   cohabs <- weighted_union_model(n, "cohab") |>
@@ -230,7 +242,7 @@ test_that("dissolution and conversion weights act on unions", {
       cohab_prob = data.frame(age_start = 0, age_end = Inf, prob = 1),
       union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .3),
       kinship_generations = 0, weights_conversion = w)
-  out <- suppressWarnings(simulate(cohabs, 1, seed = 32))
+  out <- suppressWarnings(run_simulation(cohabs, 1, seed = 32))
   r <- gap_ratio(out$unions, n, "conversion")
   expect_lt(abs(r[["log_ratio"]] - 5 * log(1.2)), 4 * r[["se"]])
 })
@@ -248,7 +260,8 @@ test_that("transition weights can use person variables and the destination", {
   w <- weight_model(~ sex:destination,
     c("sexf:destinationA" = 0, "sexm:destinationA" = 0, "sexf:destinationB" = log(2),
       "sexm:destinationB" = 0, "sexf:destinationC" = 0, "sexm:destinationC" = 0))
-  out <- simulate(set_group_transition(model, rates, weights = w), 1, seed = 41)
+  out <- run_simulation(set_group_transition(model, rates, weights = w), 1,
+    seed = 41)
   tx <- out$transitions
   sex <- out$persons$sex[match(tx$person_id, out$persons$person_id)]
   b <- table(factor(sex[tx$destination == "B"], levels = c("f", "m")))
@@ -293,19 +306,22 @@ test_that("search weights select searchers with and without matching calibration
   withr::local_options(hammel.check_cells = TRUE)
   calibrated <- set_union_formation(weighted_search_model(n), "rate", rates = rates,
     kinship_generations = 0, weights = w)
-  r <- first_union_ratio(suppressWarnings(simulate(calibrated, 1, seed = 3)))
+  r <- first_union_ratio(suppressWarnings(run_simulation(calibrated, 1, seed =
+    3)))
   expect_lt(abs(r[["log_ratio"]] - log(2)), 4 * r[["se"]])
   # Matching within groups only: no calibration, weights at selection.
   within <- matching_model(~ age_difference, c(age_difference = 0), group_exogamy = NA)
   restricted <- set_union_formation(weighted_search_model(n), "rate", rates = rates,
     matching = within, kinship_generations = 0, weights = w)
-  r <- first_union_ratio(suppressWarnings(simulate(restricted, 1, seed = 4)))
+  r <- first_union_ratio(suppressWarnings(run_simulation(restricted, 1, seed =
+    4)))
   expect_lt(abs(r[["log_ratio"]] - log(2)), 4 * r[["se"]])
   withr::local_options(hammel.check_cells = FALSE)
   plain <- set_union_formation(weighted_search_model(500), "rate", rates = rates, kinship_generations = 0)
   zero <- set_union_formation(weighted_search_model(500), "rate", rates = rates, kinship_generations = 0,
     weights = weight_model(~ group, c(groupB = 0)))
-  expect_identical(suppressWarnings(simulate(zero, 1, seed = 5)), suppressWarnings(simulate(plain, 1, seed = 5)))
+  expect_identical(suppressWarnings(run_simulation(zero, 1, seed = 5)),
+    suppressWarnings(run_simulation(plain, 1, seed = 5)))
 })
 
 test_that("search weights require rate mode and warn about cancelled terms and slow paths", {
@@ -317,7 +333,8 @@ test_that("search weights require rate mode and warn about cancelled terms and s
     weights = weight_model(~ partnered, c(partnered = 1))), "`partnered` has no effect")
   slow <- set_union_formation(model, "rate", rates = rates, kinship_generations = 0,
     weights = weight_model(fun = function(members, bin) rep(0, nrow(members))))
-  expect_warning(simulate(slow, .2, seed = 1), "every refresh of every searching woman")
+  expect_warning(run_simulation(slow, .2, seed = 1),
+    "every refresh of every searching woman")
 })
 
 test_that("weight schedules switch models at calendar boundaries without changing clocks", {
@@ -328,9 +345,12 @@ test_that("weight schedules switch models at calendar boundaries without changin
   model <- weighted_mortality_model(n)
   # Identical models in both intervals reproduce the static model exactly.
   small <- weighted_mortality_model(300)
-  expect_identical(simulate(set_mortality(small, mortality_rates, weights = schedule(half, half)), 2, seed = 4),
-                   simulate(set_mortality(small, mortality_rates, weights = half), 2, seed = 4))
-  out <- simulate(set_mortality(model, mortality_rates, weights = schedule(half, off)), 2, seed = 4)
+  expect_identical(run_simulation(set_mortality(small, mortality_rates,
+    weights = schedule(half, half)), 2, seed = 4),
+                   run_simulation(set_mortality(small, mortality_rates,
+                     weights = half), 2, seed = 4))
+  out <- run_simulation(set_mortality(model, mortality_rates, weights =
+    schedule(half, off)), 2, seed = 4)
   p <- out$persons
   partner <- c(2 * n + 1:n, rep(NA, n), 1:n, rep(NA, n))
   part <- !is.na(partner)
@@ -352,7 +372,7 @@ test_that("weight schedules switch models at calendar boundaries without changin
   b1 <- weight_model(~ group, c(groupB = 0))
   fert <- set_fertility(weighted_fertility_model(4000, c("A", "B")), rates, birth_interval = 0,
     weights = tibble::tibble(time_start = c(0, .35), time_end = c(.35, Inf), model = list(b2, b1)))
-  out <- simulate(fert, .7, seed = 21)
+  out <- run_simulation(fert, .7, seed = 21)
   kids <- out$persons[out$persons$birth_time >= 0, ]
   group <- out$persons$group[match(kids$mother_id, out$persons$person_id)]
   early <- table(factor(group[kids$birth_time < .35], levels = c("A", "B")))
@@ -363,7 +383,8 @@ test_that("weight schedules switch models at calendar boundaries without changin
   fun_schedule <- tibble::tibble(time_start = c(0, 1), time_end = c(1, Inf), model = list(
     weight_model(fun = function(members, bin) rep(0, nrow(members))),
     weight_model(fun = function(members, bin) log(ifelse(members$partnered == 1, .5, 1)))))
-  expect_s3_class(simulate(set_mortality(small, mortality_rates, weights = fun_schedule), 2, seed = 4),
+  expect_s3_class(run_simulation(set_mortality(small, mortality_rates, weights =
+    fun_schedule), 2, seed = 4),
                   "hammel_population")
 })
 
@@ -380,7 +401,7 @@ test_that("weight schedules are validated like model schedules", {
     "weights\\$model\\[\\[1\\]\\]")
   gap <- set_mortality(model, mortality_rates, weights = tibble::tibble(time_start = 1, time_end = Inf,
     model = list(half)))
-  expect_error(simulate(gap, 2, seed = 1), "coverage gap")
+  expect_error(run_simulation(gap, 2, seed = 1), "coverage gap")
   expect_s3_class(set_mortality(model, mortality_rates, weights = data.frame(time_start = 0, time_end = Inf,
     model = I(list(half))))$processes$mortality$weights, "tbl_df")
 })
@@ -395,8 +416,10 @@ test_that("weight switches refresh stored weights when rates also change in plac
     weight_model(~ partnered, c(partnered = 0))))
   split <- data.frame(sex = rep(c("m", "f"), 2), age_start = 0, age_end = Inf, rate = .05,
     time_start = rep(c(0, 1), each = 2), time_end = rep(c(1, Inf), each = 2))
-  expect_identical(simulate(set_mortality(model, split, weights = w), 2, seed = 9)$persons,
-                   simulate(set_mortality(model, mortality_rates, weights = w), 2, seed = 9)$persons)
+  expect_identical(run_simulation(set_mortality(model, split, weights = w), 2,
+    seed = 9)$persons,
+                   run_simulation(set_mortality(model, mortality_rates,
+                     weights = w), 2, seed = 9)$persons)
 })
 
 test_that("rejection sampling recovers after an extreme-weight member leaves", {
@@ -412,7 +435,7 @@ test_that("rejection sampling recovers after an extreme-weight member leaves", {
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0)) |>
     set_union_formation("on_demand")
   withr::local_options(hammel.check_cells = TRUE)
-  out <- simulate(model, 20, seed = 1)
+  out <- run_simulation(model, 20, seed = 1)
   expect_equal(out$simulation$deaths, 4)
   # The extreme-weight member is chosen first.
   expect_equal(which.min(out$persons$death_time), 1L)
@@ -424,19 +447,23 @@ test_that("remaining validation rules for weight models", {
   expect_error(weight_model(~ parity + offset(parity), c(parity = 1)), "offsets")
   model <- weighted_mortality_model(10)
   grouped_formula <- weight_model(~ group, c(groupB = 1))
-  expect_error(simulate(set_mortality(model, mortality_rates, weights = grouped_formula), 1, seed = 1),
+  expect_error(run_simulation(set_mortality(model, mortality_rates, weights =
+    grouped_formula), 1, seed = 1),
                "not available for this process: group")
   # Group levels are the dimension's categories; coefficients must name them.
   grouped <- weighted_mortality_model(200, groups = c("A", "B"))
   extra <- weight_model(~ group, c(groupB = log(2), groupC = log(5)))
-  expect_error(simulate(set_mortality(grouped, mortality_rates, weights = extra), 1, seed = 1),
+  expect_error(run_simulation(set_mortality(grouped, mortality_rates, weights =
+    extra), 1, seed = 1),
                "unknown groupC")
   declared <- set_groups(grouped, group = group(categories = c("A", "B", "C")))
-  expect_s3_class(simulate(set_mortality(declared, mortality_rates, weights = extra), 1, seed = 1),
+  expect_s3_class(run_simulation(set_mortality(declared, mortality_rates,
+    weights = extra), 1, seed = 1),
                   "hammel_population")
   # Ancestry variables need a tracked dimension and a known category.
   missing <- weight_model(~ ancestry_group_C, c(ancestry_group_C = 1))
-  expect_error(simulate(set_mortality(grouped, mortality_rates, weights = missing), 1, seed = 1),
+  expect_error(run_simulation(set_mortality(grouped, mortality_rates, weights =
+    missing), 1, seed = 1),
                "not available for this process: ancestry_group_C")
 })
 
@@ -465,7 +492,7 @@ test_that("union weight formulas use both partners' variables", {
   model <- grouped_union_model(n)
   # Exogamous unions are three times as likely to dissolve within the cell.
   exo <- weight_model(~ same_group, c(same_group = -log(3)))
-  out <- suppressWarnings(simulate(set_union_dissolution(model,
+  out <- suppressWarnings(run_simulation(set_union_dissolution(model,
     data.frame(dur_start = 0, dur_end = Inf, rate = .2), weights = exo), 1, seed = 61))
   p <- out$persons
   first <- out$unions[seq_len(n), ]
@@ -492,7 +519,7 @@ test_that("union weight formulas use both partners' variables", {
     union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .3),
     kinship_generations = 0, weights_conversion = all_terms), "union_type")
   withr::local_options(hammel.check_cells = TRUE)
-  out <- suppressWarnings(simulate(both, 2, seed = 62))
+  out <- suppressWarnings(run_simulation(both, 2, seed = 62))
   expect_gt(sum(out$unions$end_reason %in% "dissolution"), 0)
   expect_gt(sum(out$unions$end_reason %in% "conversion"), 0)
 })
@@ -503,12 +530,14 @@ test_that("person formulas use parity, previous unions and ancestry", {
     c(parity = .1, previous_unionseparated = .2, previous_unionwidowed = .3, ancestry_group_A = .5,
       ancestry_group_unknown = .1, partner_groupB = .2))
   withr::local_options(hammel.check_cells = TRUE)
-  out <- suppressWarnings(simulate(set_mortality(model, mortality_rates, weights = w), 2, seed = 63))
+  out <- suppressWarnings(run_simulation(set_mortality(model, mortality_rates,
+    weights = w), 2, seed = 63))
   expect_gt(out$simulation$deaths, 0)
   # Group B has no group-A ancestry: a strong ancestry effect shifts deaths to A.
   strong <- weight_model(~ ancestry_group_A, c(ancestry_group_A = log(4)))
   big <- weighted_mortality_model(5000, groups = c("A", "B"))
-  out <- simulate(set_mortality(big, mortality_rates, weights = strong), 1, seed = 64)
+  out <- run_simulation(set_mortality(big, mortality_rates, weights = strong),
+    1, seed = 64)
   dead <- out$persons$group[!is.na(out$persons$death_time)]
   expect_gt(sum(dead == "A") / sum(dead == "B"), 2.5)
 })
@@ -527,7 +556,7 @@ test_that("custom functions receive members and cells for every process", {
     cohab_prob = data.frame(age_start = 0, age_end = Inf, prob = 1),
     union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .3),
     kinship_generations = 0, weights_conversion = weight_model(fun = record("conversion")))
-  suppressWarnings(simulate(model, 2, seed = 65))
+  suppressWarnings(run_simulation(model, 2, seed = 65))
   for (name in c("dissolution", "conversion")) {
     expect_true(all(c("union_id", "wife_id", "husband_id", "group_w", "group_h", "parity_w",
       "previous_union_w", "previous_union_h", "same_group", "age_difference", "union_type",
@@ -543,7 +572,7 @@ test_that("custom functions receive members and cells for every process", {
     set_union_formation("rate", rates = rates, kinship_generations = 0,
       weights = weight_model(fun = record("search")))
   search$population$persons$sex <- rep(c("f", "m"), 100)
-  suppressWarnings(simulate(search, 2, seed = 66))
+  suppressWarnings(run_simulation(search, 2, seed = 66))
   expect_identical(seen$search$bin$process, "search")
   expect_true(seen$search$bin$previous_union %in% c("none", "separated", "widowed"))
   expect_equal(c(seen$search$bin$time_start, seen$search$bin$time_end), c(0, 1))
@@ -557,7 +586,7 @@ test_that("custom functions receive members and cells for every process", {
     set_union_formation("on_demand") |>
     set_group_transition(data.frame(origin = "A", destination = "B", sex = c("f", "m"),
       age_start = 0, age_end = Inf, rate = .5), weights = weight_model(fun = record("transition")))
-  simulate(moves, 1, seed = 67)
+  run_simulation(moves, 1, seed = 67)
   expect_true(all(seen$transition$members$destination == "B"))
   expect_identical(c(seen$transition$bin$origin, seen$transition$bin$destination), c("A", "B"))
   expect_true(seen$transition$bin$sex %in% c("f", "m"))
@@ -568,7 +597,7 @@ test_that("custom functions receive members and cells for every process", {
       if (is.null(seen$fertility)) seen$fertility <- list(members = members, bin = bin)
       log(seq_len(nrow(members)))
     }))
-  expect_gt(simulate(fert, 1, seed = 68)$simulation$births, 0)
+  expect_gt(run_simulation(fert, 1, seed = 68)$simulation$births, 0)
   expect_identical(seen$fertility$bin$process, "fertility")
   expect_true(all(c("parity_start", "parity_end", "age_start", "age_end") %in% names(seen$fertility$bin)))
 })
