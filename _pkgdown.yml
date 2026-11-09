@@ -4,3 +4,69 @@ template:
 authors:
   Aaron Gullickson:
     href: https://aarongullickson.github.io
+
+reference:
+  - title: Model setup and simulation
+    desc: Construct a model, attach its population and processes, and run a simulation.
+    contents:
+      - hammel_model
+      - set_population
+      - set_groups
+      - set_process
+      - simulate
+
+  - title: Population preparation
+    desc: Create and validate starting populations and describe their group dimensions.
+    contents:
+      - hammel_population
+      - create_baseline_population
+      - validate_population
+      - group
+
+  - title: Rate preparation
+    desc: Import demographic rates and prepare proportional rate strata.
+    contents:
+      - get_mortality_hmd
+      - get_fertility_hfd
+      - stratify_rates
+
+  - title: Demographic processes
+    desc: Specify mortality, fertility, unions, and group transitions.
+    contents:
+      - mortality
+      - het_fert
+      - union_formation
+      - union_dissolution
+      - group_transition
+      - household
+
+  - title: Matching, inheritance, and weight models
+    desc: Configure partner selection, newborn group inheritance, and selection within rate cells.
+    contents:
+      - create_matching_model
+      - create_age_gap_matching_model
+      - create_group_inheritance
+      - create_weight_model
+
+  - title: Demographic summaries
+    desc: Calculate population sizes, observed event rates, and synthetic demographic measures.
+    contents:
+      - calculate_population_size
+      - calculate_mortality_rates
+      - calculate_life_table
+      - calculate_fertility_rates
+      - calculate_tfr
+      - calculate_patfr
+      - calculate_union_rates
+      - calculate_marriage_rates
+      - calculate_dissolution_rates
+      - calculate_cohab_convert_rate
+      - calculate_transition_rates
+
+  - title: Family and union histories
+    desc: Extract kin relationships and enrich recorded person, birth, and union histories.
+    contents:
+      - extract_kin
+      - get_parent_info
+      - get_detailed_unions
+      - get_unpartnered_births
