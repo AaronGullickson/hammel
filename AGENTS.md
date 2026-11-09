@@ -50,6 +50,12 @@ be made autonomously; record choices with substantial architectural consequences
   R code elsewhere. Wrap long calls and use one argument per line with a
   two-space indent for long function signatures. Split long diagnostic strings
   without changing their text. Leave generated wrappers untouched.
+- Use braces for all loop bodies and statement-style or multiline `if`/`else`
+  branches. Keep `else` on the same line as the preceding closing brace.
+  Compact, single-line conditional value expressions may remain unbraced when
+  they have no side effects or control-flow modifiers. Put `return()`, `stop()`,
+  `break`, and `next` on their own lines inside the relevant block; brace
+  control-flow/error-handler callback bodies as well.
 - Use snake_case for package-owned function and argument names (for example,
   `conf_level`). Preserve external APIs when calling them, such as
   `stats::poisson.test(conf.level = conf_level)`. Follow tidyverse function-writing

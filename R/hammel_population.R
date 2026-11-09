@@ -78,11 +78,17 @@ hammel_population <- function(
     class = "hammel_population"
   )
   results$groups <- normalize_group_declaration(groups)
-  if (!is.null(transitions)) results$transitions <- transitions
+  if (!is.null(transitions)) {
+    results$transitions <- transitions
+  }
   validate_group_declaration(results$groups, results)
-  if (!is.null(transitions)) results$transitions <- transitions
+  if (!is.null(transitions)) {
+    results$transitions <- transitions
+  }
   results <- normalize_population_transitions(results)
-  if (!is.null(ancestry)) results$ancestry <- ancestry
+  if (!is.null(ancestry)) {
+    results$ancestry <- ancestry
+  }
   validate_population(results)
   results <- normalize_population_ancestry(results)
   results$persons <- tibble::as_tibble(results$persons)
@@ -211,11 +217,12 @@ validate_population <- function(results) {
   validate_union_types(unions)
   if (any(reason == "conversion", na.rm = TRUE) && !"union_type" %in% names(
     unions
-  ))
+  )) {
     stop("Conversion records require union_type and conversion links.",
       call. =
         FALSE
     )
+  }
   for (partner in c("wife_id", "husband_id")) {
     born <- persons$birth_time[match(unions[[partner]], persons$person_id)]
     if (any(unions$start_time < born)) {
@@ -260,22 +267,26 @@ empty_unions <- function() {
 }
 
 validate_union_types <- function(unions) {
-  if (!"union_type" %in% names(unions)) return(invisible(unions))
+  if (!"union_type" %in% names(unions)) {
+    return(invisible(unions))
+  }
   x <- unions$union_type
   if (!is.character(x) || !is.null(dim(x)) || anyNA(x) || any(!x %in% c(
     "cohab",
     "marriage"
-  )))
+  ))) {
     stop("`unions$union_type` must contain 'cohab' or 'marriage'.",
       call. =
         FALSE
     )
+  }
   if (!"previous_cohab_id" %in% names(unions)) {
-    if (any(unions$end_reason == "conversion", na.rm = TRUE))
+    if (any(unions$end_reason == "conversion", na.rm = TRUE)) {
       stop("Conversion histories require `previous_cohab_id` links.",
         call. =
           FALSE
       )
+    }
     return(invisible(unions))
   }
   links <- unions$previous_cohab_id
@@ -291,10 +302,11 @@ validate_union_types <- function(unions) {
     any(unions$wife_id[parent] != unions$wife_id[rows] | unions$husband_id[
       parent
     ] != unions$husband_id[rows]) ||
-    any(!which(unions$end_reason == "conversion") %in% parent))
+    any(!which(unions$end_reason == "conversion") %in% parent)) {
     stop(paste0(
       "Conversions require unique same-partner ",
       "cohab-to-marriage links at the same time."
     ), call. = FALSE)
+  }
   invisible(unions)
 }

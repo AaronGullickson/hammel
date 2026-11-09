@@ -82,8 +82,9 @@
 #'   c(age_difference = log(1.05))
 #' )
 weight_model <- function(formula = NULL, coefficients = numeric(), fun = NULL) {
-  if (is.null(formula) == is.null(fun))
+  if (is.null(formula) == is.null(fun)) {
     stop("Supply exactly one of `formula` or `fun`.", call. = FALSE)
+  }
   model <- structure(
     list(
       formula = formula, coefficients = coefficients,
@@ -120,16 +121,18 @@ weight_builtins <- function(type) {
     levels = c("none", "separated", "widowed"),
     level_codes = c(none = 0L, separated = 1L, widowed = 2L)
   )
-  if (type == "union") return(list(
-    union_type = list(
-      code = 2L, levels = c("cohab", "marriage"),
-      level_codes = c(cohab = 1L, marriage = 2L)
-    ),
-    parity_w = list(code = 11L),
-    previous_union_w = c(list(code = 12L), previous),
-    previous_union_h = c(list(code = 13L), previous),
-    age_difference = list(code = 17L)
-  ))
+  if (type == "union") {
+    return(list(
+      union_type = list(
+        code = 2L, levels = c("cohab", "marriage"),
+        level_codes = c(cohab = 1L, marriage = 2L)
+      ),
+      parity_w = list(code = 11L),
+      previous_union_w = c(list(code = 12L), previous),
+      previous_union_h = c(list(code = 13L), previous),
+      age_difference = list(code = 17L)
+    ))
+  }
   list(
     sex = list(code = 0L, levels = c("f", "m"), level_codes = c(
       f = 1L,
@@ -158,8 +161,12 @@ weight_builtins <- function(type) {
 # order) and `transition_dim`.
 weight_variable <- function(name, type, context = NULL) {
   builtin <- weight_builtins(type)[[name]]
-  if (!is.null(builtin)) return(builtin)
-  if (is.null(context)) return(NULL)
+  if (!is.null(builtin)) {
+    return(builtin)
+  }
+  if (is.null(context)) {
+    return(NULL)
+  }
   dims <- names(context$categories)
   group_info <- function(code, d) list(
     code = code, component = match(d, dims) -
@@ -169,31 +176,47 @@ weight_variable <- function(name, type, context = NULL) {
     )
   )
   if (type != "union") {
-    if (name %in% dims) return(group_info(1L, name))
+    if (name %in% dims) {
+      return(group_info(1L, name))
+    }
     partner <- sub("^partner_", "", name)
-    if (startsWith(name, "partner_") && partner %in% dims) return(group_info(
-      6L,
-      partner
-    ))
-    if (type == "transition" && name == "destination") return(group_info(
-      8L,
-      context$transition_dim
-    ))
+    if (startsWith(name, "partner_") && partner %in% dims) {
+      return(group_info(
+        6L,
+        partner
+      ))
+    }
+    if (type == "transition" && name == "destination") {
+      return(group_info(
+        8L,
+        context$transition_dim
+      ))
+    }
     k <- match(name, context$ancestry)
-    if (!is.na(k)) return(list(code = 7L, component = k - 1L))
+    if (!is.na(k)) {
+      return(list(code = 7L, component = k - 1L))
+    }
     return(NULL)
   }
   same <- sub("^same_", "", name)
-  if (startsWith(name, "same_") && same %in% dims) return(list(
-    code = 16L,
-    component = match(same, dims) - 1L
-  ))
-  if (!grepl("_[wh]$", name)) return(NULL)
+  if (startsWith(name, "same_") && same %in% dims) {
+    return(list(
+      code = 16L,
+      component = match(same, dims) - 1L
+    ))
+  }
+  if (!grepl("_[wh]$", name)) {
+    return(NULL)
+  }
   base <- sub("_[wh]$", "", name)
   wife <- endsWith(name, "_w")
-  if (base %in% dims) return(group_info(if (wife) 9L else 10L, base))
+  if (base %in% dims) {
+    return(group_info(if (wife) 9L else 10L, base))
+  }
   k <- match(base, context$ancestry)
-  if (!is.na(k)) return(list(code = if (wife) 14L else 15L, component = k - 1L))
+  if (!is.na(k)) {
+    return(list(code = if (wife) 14L else 15L, component = k - 1L))
+  }
   NULL
 }
 
@@ -223,27 +246,33 @@ weight_group_name_possible <- function(name, type) {
 }
 
 validate_weight_model <- function(model) {
-  if (!inherits(model, "hammel_weight_model"))
+  if (!inherits(model, "hammel_weight_model")) {
     stop("`weights` must be created with weight_model().", call. = FALSE)
+  }
   if (!is.null(model$fun)) {
-    if (!is.function(model$fun)) stop("`fun` must be a function.",
-      call. =
-        FALSE
-    )
+    if (!is.function(model$fun)) {
+      stop("`fun` must be a function.",
+        call. =
+          FALSE
+      )
+    }
     return(invisible(model))
   }
   formula <- model$formula
-  if (!inherits(formula, "formula") || length(formula) != 2L)
+  if (!inherits(formula, "formula") || length(formula) != 2L) {
     stop("Use a one-sided weight formula.", call. = FALSE)
+  }
   tt <- stats::terms(formula)
-  if (attr(tt, "intercept") != 1L)
+  if (attr(tt, "intercept") != 1L) {
     stop("Weight formulas cannot remove the intercept; it has no effect.",
       call. = FALSE
     )
-  if (!is.null(attr(tt, "offset")))
+  }
+  if (!is.null(attr(tt, "offset"))) {
     stop("Weight formula offsets are not supported.", call. = FALSE)
+  }
   factors <- attr(tt, "factors")
-  if (length(factors) && any(!rownames(factors) %in% all.vars(formula)))
+  if (length(factors) && any(!rownames(factors) %in% all.vars(formula))) {
     stop(paste(
       "Weight formulas use variables and their interactions only;",
       paste0(
@@ -251,6 +280,7 @@ validate_weight_model <- function(model) {
         "such as I()."
       )
     ), call. = FALSE)
+  }
   coefficients <- model$coefficients
   if (!is.numeric(coefficients) || any(!is.finite(coefficients)) ||
     (length(coefficients) && (is.null(names(coefficients)) || anyNA(names(
@@ -258,11 +288,12 @@ validate_weight_model <- function(model) {
     )) ||
       any(!nzchar(names(coefficients))) || anyDuplicated(names(
       coefficients
-    )))))
+    ))))) {
     stop(paste0(
       "`coefficients` must be a finite numeric vector ",
       "with unique nonempty names."
     ), call. = FALSE)
+  }
   invisible(model)
 }
 
@@ -285,14 +316,17 @@ weight_design <- function(model, type, context = NULL) {
     all(vapply(bad, weight_group_name_possible, logical(1),
       type =
         type
-    ))) return(NULL)
-  if (length(bad))
+    ))) {
+    return(NULL)
+  }
+  if (length(bad)) {
     stop("Weight variables not available for this process: ", paste(bad,
       collapse = ", "
     ),
     ".",
     call. = FALSE
     )
+  }
   levels <- Filter(Negate(is.null), lapply(info, `[[`, "levels"))
   tt <- stats::terms(formula)
   labels <- attr(tt, "term.labels")
@@ -301,12 +335,16 @@ weight_design <- function(model, type, context = NULL) {
   for (j in seq_along(labels)) {
     in_term <- rownames(factors)[factors[, j] > 0]
     parts <- lapply(in_term, function(v) {
-      if (!v %in% names(levels)) return(list(list(
-        var = v,
-        level = NA_character_, name = v
-      )))
+      if (!v %in% names(levels)) {
+        return(list(list(
+          var = v,
+          level = NA_character_, name = v
+        )))
+      }
       lv <- levels[[v]]
-      if (factors[v, j] == 1) lv <- lv[-1]
+      if (factors[v, j] == 1) {
+        lv <- lv[-1]
+      }
       lapply(lv, function(l) list(var = v, level = l, name = paste0(v, l)))
     })
     grid <- expand.grid(lapply(parts, seq_along), KEEP.OUT.ATTRS = FALSE)
@@ -319,47 +357,62 @@ weight_design <- function(model, type, context = NULL) {
     }
   }
   # Check against R's own column names.
-  data <- lapply(vars, function(v) if (v %in% names(levels))
-    factor(levels[[v]][1], levels = levels[[v]]) else 0)
+  data <- lapply(vars, function(v) {
+    if (v %in% names(levels)) {
+      factor(levels[[v]][1], levels = levels[[v]])
+    } else {
+      0
+    }
+  })
   names(data) <- vars
   data <- as.data.frame(data, stringsAsFactors = FALSE)
   categorical <- intersect(vars, names(levels))
-  contrasts <- if (length(categorical))
+  contrasts <- if (length(categorical)) {
     stats::setNames(
       rep(list("contr.treatment"), length(categorical)),
       categorical
-    ) else NULL
+    )
+  } else {
+    NULL
+  }
   expected <- colnames(stats::model.matrix(formula, data,
     contrasts.arg =
       contrasts
   ))[-1]
   names_found <- vapply(columns, `[[`, "", "name")
   # Defensive: the decoding follows R's coding rules, so names should agree.
-  if (!identical(names_found, expected)) # nocov start
+  if (!identical(names_found, expected)) {
+    # nocov start
     stop(
       paste0(
         "This weight formula structure is not supported; ",
         "use a custom function (`fun`)."
       ),
       call. = FALSE
-    ) # nocov end
+    )
+  } # nocov end
   coefficients <- model$coefficients
   missing <- setdiff(expected, names(coefficients))
   extra <- setdiff(names(coefficients), expected)
-  if (length(missing) || length(extra))
+  if (length(missing) || length(extra)) {
     stop("Weight coefficients must be named for each model column: ",
       paste(expected, collapse = ", "),
-      if (length(missing)) paste0("; missing ", paste(missing,
-        collapse =
-          ", "
-      )),
+      if (length(missing)) {
+        paste0("; missing ", paste(missing,
+          collapse =
+            ", "
+        ))
+      },
       if (length(extra)) paste0("; unknown ", paste(extra, collapse = ", ")),
       ".",
       call. = FALSE
     )
-  for (k in seq_along(columns)) columns[[k]]$coefficient <- unname(coefficients[
-    columns[[k]]$name
-  ])
+  }
+  for (k in seq_along(columns)) {
+    columns[[k]]$coefficient <- unname(coefficients[
+      columns[[k]]$name
+    ])
+  }
   columns
 }
 
@@ -368,20 +421,25 @@ weight_design <- function(model, type, context = NULL) {
 # for matching and inheritance models); its models must all be formulas or all
 # custom functions.
 validate_process_weights <- function(weights, type) {
-  if (is.null(weights)) return(invisible(NULL))
+  if (is.null(weights)) {
+    return(invisible(NULL))
+  }
   one <- function(model) {
     validate_weight_model(model)
-    if (is.null(model$fun)) weight_design(model, type)
+    if (is.null(model$fun)) {
+      weight_design(model, type)
+    }
     invisible(model)
   }
   validate_model_argument(weights, one, "weights")
   if (is_model_schedule(weights)) {
     kinds <- vapply(weights$model, function(m) is.null(m$fun), logical(1))
-    if (length(unique(kinds)) > 1L)
+    if (length(unique(kinds)) > 1L) {
       stop(paste0(
         "A weight schedule's models must all be formulas ",
         "or all be custom functions."
       ), call. = FALSE)
+    }
   }
   invisible(weights)
 }
@@ -390,24 +448,30 @@ validate_process_weights <- function(weights, type) {
 # process: the term is constant within every cell and has no effect.
 warn_cancelled_weight_terms <- function(weights, strata, process) {
   if (is_model_schedule(weights)) {
-    for (model in weights$model) warn_cancelled_weight_terms(
-      model, strata,
-      process
-    )
+    for (model in weights$model) {
+      warn_cancelled_weight_terms(
+        model, strata,
+        process
+      )
+    }
     return(invisible(NULL))
   }
-  if (is.null(weights) || !is.null(weights$fun)) return(invisible(FALSE))
+  if (is.null(weights) || !is.null(weights$fun)) {
+    return(invisible(FALSE))
+  }
   tt <- stats::terms(weights$formula)
   factors <- attr(tt, "factors")
   cancelled <- character()
   for (j in seq_along(attr(tt, "term.labels"))) {
     in_term <- rownames(factors)[factors[, j] > 0]
-    if (all(in_term %in% strata)) cancelled <- c(cancelled, attr(
-      tt,
-      "term.labels"
-    )[j])
+    if (all(in_term %in% strata)) {
+      cancelled <- c(cancelled, attr(
+        tt,
+        "term.labels"
+      )[j])
+    }
   }
-  for (term in cancelled)
+  for (term in cancelled) {
     warning(
       sprintf(paste(
         "The %s weight term `%s` has no effect: the input rates already",
@@ -421,6 +485,7 @@ warn_cancelled_weight_terms <- function(weights, strata, process) {
       ), process, term),
       call. = FALSE
     )
+  }
   invisible(length(cancelled) > 0L)
 }
 
@@ -435,7 +500,9 @@ weight_strata <- function(process, rates, group = NULL) {
   husbands <- sub("_h$", "", grep("_h$", strata, value = TRUE))
   union <- c(
     paste0(wives, if (length(wives)) "_w"), paste0(husbands, if (
-      length(husbands)) "_h"),
+      length(husbands)) {
+      "_h"
+    }),
     paste0("same_", intersect(wives, husbands))
   )
   switch(process,
@@ -476,18 +543,24 @@ prepare_weight_model <- function(weights, type, process, context) {
       )
     ))
   }
-  if (!is.null(weights$fun)) return(list(
-    custom = TRUE, fun = weights$fun,
-    process = process
-  ))
+  if (!is.null(weights$fun)) {
+    return(list(
+      custom = TRUE, fun = weights$fun,
+      process = process
+    ))
+  }
   columns <- weight_design(weights, type, context)
   active <- Filter(function(x) x$coefficient != 0, columns)
   encode <- function(f) {
     info <- weight_variable(f$var, type, context)
     level <- -1L
-    if (!is.na(f$level))
-      level <- if (!is.null(info$level_codes)) info$level_codes[[f$level]] else
+    if (!is.na(f$level)) {
+      level <- if (!is.null(info$level_codes)) {
+        info$level_codes[[f$level]]
+      } else {
         match(f$level, info$levels) - 1L
+      }
+    }
     c(info$code, level, if (is.null(info$component)) 0L else info$component)
   }
   list(

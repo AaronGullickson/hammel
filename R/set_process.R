@@ -55,16 +55,19 @@ attach_process <- function(model, process) {
     validate_process_weights(process$weights, "person")
     if (name == "fertility") {
       validate_birth_interval(process$birth_interval)
-      if (!"ffab" %in% names(process)) process$ffab <- 0.4886
+      if (!"ffab" %in% names(process)) {
+        process$ffab <- 0.4886
+      }
       validate_ffab(process$ffab)
       validate_het_fert(process$hetfert)
       # Specifications saved while midpoint compensation existed (before D101
       # became the only method) may carry a spacing_method field.
-      if (identical(process$spacing_method, "midpoint"))
+      if (identical(process$spacing_method, "midpoint")) {
         warning(paste(
           '`spacing_method = "midpoint"` is no longer available;',
           "cell-accounted fertility is used."
         ), call. = FALSE)
+      }
       process$spacing_method <- NULL
     }
     process$rates <- tibble::as_tibble(process$rates)
@@ -73,11 +76,14 @@ attach_process <- function(model, process) {
     validate_union_formation(process)
     validate_process_weights(process$weights_conversion, "union")
     validate_process_weights(process$weights, "person")
-    if (!is.null(process$rates)) process$rates <- tibble::as_tibble(
-      process$rates
-    )
-    for (field in c("matching", "father_matching", "cohab_matching"))
+    if (!is.null(process$rates)) {
+      process$rates <- tibble::as_tibble(
+        process$rates
+      )
+    }
+    for (field in c("matching", "father_matching", "cohab_matching")) {
       process[field] <- list(normalize_model_argument(process[[field]]))
+    }
   }
   if (name == "group_transition") {
     validate_group_transition(process)
@@ -99,7 +105,9 @@ new_rate_process <- function(name, rates) {
     name = name, rates = tibble::as_tibble(rates),
     rate_unit = "person_year"
   )
-  if (!is.null(attr(rates, "source"))) fields$source <- attr(rates, "source")
+  if (!is.null(attr(rates, "source"))) {
+    fields$source <- attr(rates, "source")
+  }
   structure(fields,
     class = c(paste0("hammel_", name), "hammel_process")
   )

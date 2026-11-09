@@ -86,13 +86,18 @@ group <- function(
 set_groups <- function(model, ...) {
   check_model(model)
   groups <- list(...)
-  declaration <- if (length(groups)) normalize_group_declaration(groups) else
+  declaration <- if (length(groups)) {
+    normalize_group_declaration(groups)
+  } else {
     NULL
+  }
   model["groups"] <- list(declaration)
   # Ancestry shares and empty transition histories are built at simulation.
-  if (!is.null(model$population)) model$population <- apply_group_declaration(
-    model$population, declaration
-  )
+  if (!is.null(model$population)) {
+    model$population <- apply_group_declaration(
+      model$population, declaration
+    )
+  }
   model
 }
 
@@ -111,13 +116,14 @@ reserved_group_names <- c(
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 validate_group <- function(x, name = "group") {
-  if (!inherits(x, "hammel_group") || !is.list(x))
+  if (!inherits(x, "hammel_group") || !is.list(x)) {
     stop(sprintf("Group dimension `%s` must be created with group().", name),
       call. = FALSE
     )
+  }
   if (!is.null(x$categories)) {
     check_groups(tibble::tibble(group = x$categories), "categories")
-    if (!length(x$categories) || anyDuplicated(as.character(x$categories)))
+    if (!length(x$categories) || anyDuplicated(as.character(x$categories))) {
       stop(
         sprintf(paste0(
           "`categories` of group `%s` must be a nonempty ",
@@ -125,51 +131,61 @@ validate_group <- function(x, name = "group") {
         ), name),
         call. = FALSE
       )
+    }
   }
-  if (!is.logical(x$ancestry) || length(x$ancestry) != 1L || is.na(x$ancestry))
+  if (!is.logical(x$ancestry) ||
+    length(x$ancestry) != 1L || is.na(x$ancestry)) {
     stop(sprintf("`ancestry` of group `%s` must be TRUE or FALSE.", name),
       call. = FALSE
     )
-  if (is_model_schedule(x$inheritance))
+  }
+  if (is_model_schedule(x$inheritance)) {
     validate_model_argument(
       x$inheritance, validate_group_inheritance,
       "inheritance"
     )
-  else validate_group_inheritance(x$inheritance)
+  } else {
+    validate_group_inheritance(x$inheritance)
+  }
   invisible(x)
 }
 
 check_group_names <- function(names) {
   if (is.null(names) || anyNA(names) || any(!nzchar(names)) || anyDuplicated(
     names
-  ))
+  )) {
     stop("Group dimensions must have unique, nonempty names.", call. = FALSE)
+  }
   bad <- names[names %in% reserved_group_names |
     grepl("^(partner|same|female|male|ancestry)_", names) | grepl(
     "_(w|h)$",
     names
   ) |
     !grepl("^[A-Za-z][A-Za-z0-9_.]*$", names)]
-  if (length(bad))
+  if (length(bad)) {
     stop(sprintf(
       "Group dimension name(s) %s are reserved or not valid names.",
       paste0("`", bad, "`", collapse = ", ")
     ), call. = FALSE)
+  }
   invisible(names)
 }
 
 # Accept NULL, a character vector of dimension names (default settings) or a
 # named list of group() objects.
 normalize_group_declaration <- function(groups) {
-  if (is.null(groups) || (is.list(groups) && !length(groups))) return(NULL)
+  if (is.null(groups) || (is.list(groups) && !length(groups))) {
+    return(NULL)
+  }
   if (is.character(groups)) {
     check_group_names(groups)
     return(stats::setNames(lapply(groups, function(name) group()), groups))
   }
-  if (!is.list(groups) || inherits(groups, "hammel_group"))
+  if (!is.list(groups) || inherits(groups, "hammel_group")) {
     stop("`groups` must be dimension names or a named list of group() objects.",
       call. = FALSE
     )
+  }
   check_group_names(names(groups))
   for (name in names(groups)) {
     validate_group(groups[[name]], name)
@@ -187,11 +203,13 @@ apply_group_declaration <- function(population, declaration) {
   # A dimension declared without categories keeps the categories the
   # population already declares (so turning on ancestry, say, keeps their
   # order).
-  for (d in names(declaration))
+  for (d in names(declaration)) {
     if (is.null(declaration[[d]]$categories) && !is.null(population$groups[[
       d
-    ]]$categories))
+    ]]$categories)) {
       declaration[[d]]["categories"] <- list(population$groups[[d]]$categories)
+    }
+  }
   population$groups <- declaration
   # Keep ancestry only for dimensions that track it.
   if (!is.null(population$ancestry)) {
@@ -213,27 +231,35 @@ model_groups <- function(model) {
 # Is a group dimension (any, or the named one) declared for this population?
 declared_group <- function(population, name = NULL) {
   inherits(population, "hammel_population") &&
-    (if (is.null(name)) length(population$groups) > 0L else name %in% names(
-      population$groups
-    ))
+    (if (is.null(name)) {
+      length(population$groups) > 0L
+    } else {
+      name %in% names(
+        population$groups
+      )
+    })
 }
 
 # The name of a population's single declared dimension, for features that use
 # one dimension (transitions, matching, observation by group); NULL otherwise.
 single_dimension <- function(population) {
   if (inherits(population, "hammel_population") && length(population$groups) ==
-    1L)
-    names(population$groups) else NULL
+    1L) {
+    names(population$groups)
+  } else {
+    NULL
+  }
 }
 
 # Check a declaration against a population's persons and transition history.
 validate_group_declaration <- function(declaration, population) {
   persons <- population$persons
   for (name in names(declaration)) {
-    if (!name %in% names(persons))
+    if (!name %in% names(persons)) {
       stop(sprintf("Declared group `%s` is not a persons column.", name),
         call. = FALSE
       )
+    }
     check_groups(tibble::tibble(group = persons[[name]]), paste0(
       "persons$",
       name
@@ -244,7 +270,7 @@ validate_group_declaration <- function(declaration, population) {
       any(c("unknown", "person_id") %in% as.character(c(
         persons[[name]],
         categories
-      ))))
+      )))) {
       stop(sprintf(
         paste0(
           "Group `%s` tracks ancestry, so its categories ",
@@ -252,34 +278,39 @@ validate_group_declaration <- function(declaration, population) {
         ),
         name
       ), call. = FALSE)
+    }
     if (!is.null(categories)) {
       tx <- population$transitions
-      if (!is.null(tx) && "group" %in% names(tx)) tx <- tx[tx$group == name, ,
-        drop = FALSE
-      ]
+      if (!is.null(tx) && "group" %in% names(tx)) {
+        tx <- tx[tx$group == name, ,
+          drop = FALSE
+        ]
+      }
       values <- unique(as.character(c(
         persons[[name]], tx$origin,
         tx$destination
       )))
       missing <- setdiff(values, as.character(categories))
-      if (length(missing))
+      if (length(missing)) {
         stop(sprintf(
           "Group `%s` has values missing from its categories: %s.",
           name,
           paste(missing, collapse = ", ")
         ), call. = FALSE)
+      }
     }
   }
   if (!length(declaration) && !is.null(population$transitions) && nrow(
     population$transitions
-  ))
+  )) {
     stop("Transition histories require a declared group dimension.",
       call. =
         FALSE
     )
+  }
   if (!is.null(population[["ancestry"]])) {
     tracked <- tracked_ancestry(declaration)
-    if (!length(declaration))
+    if (!length(declaration)) {
       stop(
         paste0(
           "Ancestry requires a declared group dimension with ",
@@ -287,14 +318,16 @@ validate_group_declaration <- function(declaration, population) {
         ),
         call. = FALSE
       )
-    if (!length(tracked))
+    }
+    if (!length(tracked)) {
       stop(paste0(
         "An ancestry table requires `ancestry = TRUE` for ",
         "its group dimension."
       ), call. = FALSE)
+    }
     ancestry <- as_ancestry_list(population[["ancestry"]], declaration)
     extra <- setdiff(names(ancestry), tracked)
-    if (length(extra))
+    if (length(extra)) {
       stop(sprintf(
         paste0(
           "Ancestry is supplied for %s, which does not track ",
@@ -302,6 +335,7 @@ validate_group_declaration <- function(declaration, population) {
         ),
         paste0("`", extra, "`", collapse = ", ")
       ), call. = FALSE)
+    }
   }
   invisible(declaration)
 }

@@ -8,43 +8,50 @@
 validate_cohabitation <- function(process) {
   flag <- process$cohabitation_counts_as_previous_union
   if (!is.null(flag) && (!is.logical(flag) || length(flag) != 1L ||
-    !is.null(dim(flag)) || is.na(flag)))
+    !is.null(dim(flag)) || is.na(flag))) {
     stop("`cohabitation_counts_as_previous_union` must be TRUE or FALSE.",
       call. = FALSE
     )
-  if (!is.null(process$cohab_matching))
+  }
+  if (!is.null(process$cohab_matching)) {
     validate_model_argument(
       process$cohab_matching, validate_matching_model,
       "cohab_matching"
     )
+  }
   enabled <- !is.null(process$cohab_prob)
   if (!enabled && (!is.null(process$cohab_matching) || !is.null(
     process$union_convert_rate
-  )))
+  ))) {
     stop("`cohab_matching` and `union_convert_rate` require `cohab_prob`.",
       call. = FALSE
     )
+  }
   if (enabled) {
-    if (!identical(process$initiation, "rate"))
+    if (!identical(process$initiation, "rate")) {
       stop("Cohabitation is available only with rate-based initiation.",
         call. =
           FALSE
       )
+    }
     x <- process$cohab_prob
     check_columns(x, c("age_start", "age_end", "prob"), "cohab_prob")
     check_numeric_column(x$prob, "cohab_prob$prob")
     if (any(x$prob < 0 | x$prob > 1) ||
-      any(c("rate", "dur_start", "dur_end") %in% names(x)))
+      any(c("rate", "dur_start", "dur_end") %in% names(x))) {
       stop(paste0(
         "`cohab_prob` needs age-specific probabilities in ",
         "[0, 1], with `prob`, not `rate`."
       ), call. = FALSE)
+    }
     x$rate <- x$prob
     validate_union_search_rates(x)
   }
-  if (!is.null(process$union_convert_rate)) validate_conversion_rates(
-    process$union_convert_rate
-  )
+  if (!is.null(process$union_convert_rate)) {
+    validate_conversion_rates(
+      process$union_convert_rate
+    )
+  }
   invisible(process)
 }
 
@@ -52,11 +59,12 @@ validate_conversion_rates <- function(rates) {
   check_stratified_columns(rates, character(), "Conversion")
   if (has_calendar_rates(rates)) {
     if (all(c("age_start", "dur_start") %in% names(rates)) &&
-      length(unique(!is.na(rates$dur_start))) != 1L)
+      length(unique(!is.na(rates$dur_start))) != 1L) {
       stop(paste0(
         "Conversion rates must use one age or duration ",
         "clock across calendar periods."
       ), call. = FALSE)
+    }
     validate_calendar_rates(rates, validate_conversion_rates)
     return(invisible(rates))
   }
@@ -64,19 +72,23 @@ validate_conversion_rates <- function(rates) {
   if (any(c(
     "previous_union", "sex", "time_start", "time_end",
     "union_type"
-  ) %in% names(rates)))
+  ) %in% names(rates))) {
     stop(paste0(
       "Conversion rates allow age or duration and ",
       "optional `<group>_w`/`<group>_h` strata, without ",
       "previous_union, sex, type or calendar strata."
     ), call. = FALSE)
+  }
   # Reuse search validation with a synthetic previous category for each row;
   # conversion uses one clock across the entire table, not a previous axis.
   x <- rates
-  for (field in c("age_start", "age_end", "dur_start", "dur_end"))
-    if (!field %in% names(x)) x[[field]] <- NA_real_
+  for (field in c("age_start", "age_end", "dur_start", "dur_end")) {
+    if (!field %in% names(x)) {
+      x[[field]] <- NA_real_
+    }
+  }
   duration <- !is.na(x$dur_start)
-  if (length(unique(duration)) != 1L)
+  if (length(unique(duration)) != 1L) {
     stop(
       paste0(
         "Conversion rates must use one age or duration clock ",
@@ -84,6 +96,7 @@ validate_conversion_rates <- function(rates) {
       ),
       call. = FALSE
     )
+  }
   x$previous_union <- "separated"
   # Fill unused synthetic categories with copies to exercise existing coverage.
   x <- do.call(rbind, lapply(c("none", "separated", "widowed"), function(
@@ -108,11 +121,12 @@ prepare_cohabitation <- function(process, strata) {
     rate = numeric()
   )
   none <- strata(data.frame(rate = numeric()), "cohabitation")$spec
-  if (is.null(process$cohab_prob))
+  if (is.null(process$cohab_prob)) {
     return(list(
       enabled = FALSE, prob = empty, conversion = empty,
       prob_spec = none, conversion_spec = none
     ))
+  }
   prob <- strata(
     expand_previous_union_rates(process$cohab_prob),
     "cohabitation probability"
@@ -130,10 +144,14 @@ prepare_cohabitation <- function(process, strata) {
       union_level =
         TRUE
     )
-    if (!"age_start" %in% names(conversion$rates)) conversion$rates$age_start <-
-      NA_real_
-    if (!"age_end" %in% names(conversion$rates)) conversion$rates$age_end <-
-      NA_real_
+    if (!"age_start" %in% names(conversion$rates)) {
+      conversion$rates$age_start <-
+        NA_real_
+    }
+    if (!"age_end" %in% names(conversion$rates)) {
+      conversion$rates$age_end <-
+        NA_real_
+    }
   }
   list(
     enabled = TRUE, prob = prob$rates, conversion = conversion$rates,

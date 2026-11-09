@@ -87,15 +87,22 @@ create_baseline_population <- function(
     mother_id = rep(NA_integer_, size),
     father_id = rep(NA_integer_, size)
   )
-  if (!is.null(draw)) for (column in names(drawn <- draw(size))) persons[[
-    column
-  ]] <- drawn[[column]]
+  if (!is.null(draw)) {
+    for (column in names(drawn <- draw(size))) {
+      persons[[
+        column
+      ]] <- drawn[[column]]
+    }
+  }
   hammel_population(persons,
     end_time = end_time,
-    groups = if (is.null(draw)) NULL else
+    groups = if (is.null(draw)) {
+      NULL
+    } else {
       lapply(attr(draw, "categories"), function(x) group(
         categories = x
       ))
+    }
   )
 }
 
@@ -103,30 +110,36 @@ create_baseline_population <- function(
 
 # Validate baseline group weights and return a function drawing `size` people.
 baseline_group_sampler <- function(groups) {
-  if (is.null(groups)) return(NULL)
+  if (is.null(groups)) {
+    return(NULL)
+  }
   check_weights <- function(w, what) {
     if (!is.numeric(w) || !is.null(dim(w)) || !length(w) || anyNA(w) ||
-      any(!is.finite(w)) || any(w < 0) || !any(w > 0))
+      any(!is.finite(w)) || any(w < 0) || !any(w > 0)) {
       stop(sprintf(
         "%s must be finite and nonnegative, with a positive value.",
         what
       ), call. = FALSE)
+    }
     # Scale before summation to avoid overflow for large finite weights.
     p <- w / max(w)
     p / sum(p)
   }
   if (is.data.frame(groups)) {
     dimensions <- setdiff(names(groups), "weight")
-    if (!"weight" %in% names(groups) || !length(dimensions) || !nrow(groups))
+    if (!"weight" %in% names(groups) || !length(dimensions) || !nrow(groups)) {
       stop(paste0(
         "A `groups` data frame needs one column per ",
         "dimension and a `weight` column."
       ), call. = FALSE)
+    }
     check_group_names(dimensions)
-    for (d in dimensions) check_groups(
-      data.frame(group = groups[[d]]),
-      "groups"
-    )
+    for (d in dimensions) {
+      check_groups(
+        data.frame(group = groups[[d]]),
+        "groups"
+      )
+    }
     p <- check_weights(groups$weight, "`groups$weight`")
     draw <- function(size) {
       rows <- sample.int(nrow(groups), size, replace = TRUE, prob = p)
@@ -139,22 +152,24 @@ baseline_group_sampler <- function(groups) {
       function(d) unique(groups[[d]])
     )
   } else {
-    if (!is.list(groups) || !length(groups))
+    if (!is.list(groups) || !length(groups)) {
       stop("`groups` must be a named list of weight vectors or a data frame.",
         call. = FALSE
       )
+    }
     dimensions <- names(groups)
     check_group_names(dimensions)
     probabilities <- lapply(dimensions, function(d) {
       labels <- names(groups[[d]])
       if (is.null(labels) || anyNA(labels) || any(!nzchar(trimws(labels))) ||
-        anyDuplicated(labels))
+        anyDuplicated(labels)) {
         stop(
           sprintf(
             "`groups$%s` must be named by unique, nonempty categories.", d
           ),
           call. = FALSE
         )
+      }
       check_weights(groups[[d]], sprintf("`groups$%s`", d))
     })
     draw <- function(size) stats::setNames(lapply(

@@ -50,7 +50,9 @@ get_detailed_unions <- function(population) {
   population <- normalize_population_transitions(population)
   tx <- population$transitions
   for (d in dims) {
-    if (is.null(tx) || !any(tx$group == d)) next
+    if (is.null(tx) || !any(tx$group == d)) {
+      next
+    }
     view <- dimension_view(population, d)
     indexed <- prepare_group_observations(view$persons, view, TRUE)
     groups <- observation_groups(indexed, TRUE)
@@ -59,9 +61,11 @@ get_detailed_unions <- function(population) {
     ) - 1L)
     labels <- groups
     # Histories hold labels as text; keep the persons column's type.
-    if (is.numeric(persons[[d]])) storage.mode(labels) <- storage.mode(persons[[
-      d
-    ]])
+    if (is.numeric(persons[[d]])) {
+      storage.mode(labels) <- storage.mode(persons[[
+        d
+      ]])
+    }
     formation[[d]] <- list(w = labels[codes[, 1L] + 1L], h = labels[codes[
       ,
       2L
@@ -73,8 +77,11 @@ get_detailed_unions <- function(population) {
     for (column in columns) {
       result[[paste0(column, "_", suffix)]] <- if (!is.null(formation[[
         column
-      ]]))
-        formation[[column]][[suffix]] else persons[[column]][rows]
+      ]])) {
+        formation[[column]][[suffix]]
+      } else {
+        persons[[column]][rows]
+      }
     }
   }
   result
@@ -125,11 +132,12 @@ get_parent_info <- function(population) {
       rows
     ]
   }
-  for (d in dims)
+  for (d in dims) {
     for (parent in c("mother", "father")) {
       rows <- match(persons[[paste0(parent, "_id")]], persons$person_id)
       result[[paste0(d, "_", parent)]] <- persons[[d]][rows]
     }
+  }
   result
 }
 

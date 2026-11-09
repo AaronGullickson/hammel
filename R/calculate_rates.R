@@ -432,18 +432,25 @@ calculate_fertility_rates <- function(
   pool_dissolved = FALSE
 ) {
   validate_rate_conf_level(conf_level)
-  if (!is.logical(unrealized) || length(unrealized) != 1L || is.na(unrealized))
+  if (!is.logical(unrealized) ||
+    length(unrealized) != 1L || is.na(unrealized)) {
     stop("`unrealized` must be TRUE or FALSE.", call. = FALSE)
+  }
   if (unrealized) {
     record <- if (inherits(
       population,
       "hammel_population"
-    )) population$simulation else NULL
-    if (is.null(record$unrealized_births))
+    )) {
+      population$simulation
+    } else {
+      NULL
+    }
+    if (is.null(record$unrealized_births)) {
       stop(paste(
         "`unrealized = TRUE` requires a population returned by simulate()",
         "with an unrealized-births record."
       ), call. = FALSE)
+    }
   }
   alias <- observation_alias(population, by)
   population <- alias$population
@@ -457,15 +464,18 @@ calculate_fertility_rates <- function(
   if (!is.null(parity_breaks)) {
     check_demographic_breaks(parity_breaks, "parity_breaks", ages = TRUE)
     finite <- parity_breaks[is.finite(parity_breaks)]
-    if (parity_breaks[1] != 0 || any(finite != floor(finite)))
+    if (parity_breaks[1] != 0 || any(finite != floor(finite))) {
       stop(paste0(
         "`parity_breaks` must start at zero and contain ",
         "integer boundaries or Inf."
       ), call. = FALSE)
-    if (is.finite(tail(parity_breaks, 1))) parity_breaks <- c(
-      parity_breaks,
-      Inf
-    )
+    }
+    if (is.finite(tail(parity_breaks, 1))) {
+      parity_breaks <- c(
+        parity_breaks,
+        Inf
+      )
+    }
   }
   obs <- person_observation(population, by, tail(time_breaks, 1))
   counts <- run_person_lexis(obs, by, time_breaks, age_breaks,
@@ -483,10 +493,12 @@ calculate_fertility_rates <- function(
     out$births / out$person_years, NA_real_
   ))
   attr(out, "index") <- NULL
-  if (unrealized) out <- add_unrealized_births(
-    out, population$simulation,
-    alias
-  )
+  if (unrealized) {
+    out <- add_unrealized_births(
+      out, population$simulation,
+      alias
+    )
+  }
   attr(out, "unassigned_births") <- tibble::tibble(
     time_start = head(
       time_breaks, -1
@@ -519,35 +531,45 @@ calculate_cohab_convert_rate <- function(
     by, c("group_w", "group_h"), "calculate_cohab_convert_rate",
     alias$dims
   )
-  if (!inherits(population, "hammel_population"))
+  if (!inherits(population, "hammel_population")) {
     stop("`population` must be a hammel_population with typed union histories.",
       call. = FALSE
     )
-  if (is.null(dur_breaks) == is.null(age_breaks))
+  }
+  if (is.null(dur_breaks) == is.null(age_breaks)) {
     stop("Supply exactly one of `dur_breaks` and `age_breaks`.", call. = FALSE)
+  }
   validate_population(population)
-  if (!"union_type" %in% names(population$unions))
+  if (!"union_type" %in% names(population$unions)) {
     stop(paste0(
       "Conversion observation requires typed union ",
       "histories with `union_type`."
     ), call. = FALSE)
+  }
   check_demographic_breaks(time_breaks, "time_breaks")
   duration <- !is.null(dur_breaks)
   breaks <- if (duration) dur_breaks else age_breaks
   check_demographic_breaks(breaks, if (duration) "dur_breaks" else "age_breaks",
     ages = TRUE
   )
-  if (is.finite(tail(breaks, 1))) breaks <- c(breaks, Inf)
+  if (is.finite(tail(breaks, 1))) {
+    breaks <- c(breaks, Inf)
+  }
   if (is.null(population$end_time) || tail(time_breaks, 1) >
-    population$end_time)
+    population$end_time) {
     stop("Observation requires a known endpoint and cannot extend beyond it.",
       call. = FALSE
     )
+  }
   unions <- population$unions[population$unions$union_type == "cohab", ]
   wives <- match(unions$wife_id, population$persons$person_id)
-  origins <- if (duration) unions$start_time else population$persons$birth_time[
-    wives
-  ]
+  origins <- if (duration) {
+    unions$start_time
+  } else {
+    population$persons$birth_time[
+      wives
+    ]
+  }
   nt <- length(time_breaks) - 1L
   na <- length(breaks) - 1L
   strata <- union_strata(population, unions, by,
@@ -601,14 +623,17 @@ calculate_dissolution_rates <- function(
   )
   check_demographic_breaks(time_breaks, "time_breaks")
   check_demographic_breaks(dur_breaks, "dur_breaks", ages = TRUE)
-  if (is.finite(tail(dur_breaks, 1))) dur_breaks <- c(dur_breaks, Inf)
+  if (is.finite(tail(dur_breaks, 1))) {
+    dur_breaks <- c(dur_breaks, Inf)
+  }
   if (inherits(population, "hammel_population")) {
     validate_population(population)
     if (is.null(population$end_time) || tail(time_breaks, 1) >
-      population$end_time)
+      population$end_time) {
       stop("Observation requires a known endpoint and cannot extend beyond it.",
         call. = FALSE
       )
+    }
     unions <- population$unions
   } else {
     unions <- population
@@ -617,25 +642,28 @@ calculate_dissolution_rates <- function(
       "unions"
     )
     check_numeric_column(unions$union_id, "unions$union_id", id = TRUE)
-    if (anyDuplicated(unions$union_id))
+    if (anyDuplicated(unions$union_id)) {
       stop("`unions$union_id` must be unique; analyze replications separately.",
         call. = FALSE
       )
+    }
     check_numeric_column(unions$start_time, "unions$start_time")
     check_numeric_column(unions$end_time, "unions$end_time", missing = TRUE)
-    if (any(unions$end_time < unions$start_time, na.rm = TRUE))
+    if (any(unions$end_time < unions$start_time, na.rm = TRUE)) {
       stop("Union end times must not precede start times.", call. = FALSE)
+    }
     reason <- unions$end_reason
     if (!is.character(reason) || !is.null(dim(reason)) ||
       any(!is.na(reason) & !reason %in% c(
         "dissolution", "death_husband",
         "death_wife", "conversion"
       )) ||
-      any(is.na(reason) != is.na(unions$end_time)))
+      any(is.na(reason) != is.na(unions$end_time))) {
       stop(paste0(
         "Ended unions require a valid end reason; ongoing ",
         "unions require NA end and reason."
       ), call. = FALSE)
+    }
   }
   nt <- length(time_breaks) - 1L
   nd <- length(dur_breaks) - 1L
@@ -706,16 +734,18 @@ calculate_transition_rates <- function(
   group = NULL
 ) {
   validate_rate_conf_level(conf_level)
-  if (!inherits(population, "hammel_population"))
+  if (!inherits(population, "hammel_population")) {
     stop("`population` must be a grouped hammel_population.", call. = FALSE)
+  }
   validate_population(population)
-  if (!declared_group(population))
+  if (!declared_group(population)) {
     stop("`calculate_transition_rates()` requires a declared group dimension.",
       call. = FALSE
     )
+  }
   dims <- names(population$groups)
   if (is.null(group)) {
-    if (length(dims) != 1L)
+    if (length(dims) != 1L) {
       stop(sprintf(
         paste0(
           "Name the dimension whose transitions are counted ",
@@ -723,11 +753,13 @@ calculate_transition_rates <- function(
         ),
         paste0("\"", dims, "\"", collapse = ", ")
       ), call. = FALSE)
+    }
     group <- dims
   }
-  if (!is.character(group) || length(group) != 1L || !group %in% dims)
+  if (!is.character(group) || length(group) != 1L || !group %in% dims) {
     stop("`group` must name one declared group dimension.", call. = FALSE)
-  if (group %in% by)
+  }
+  if (group %in% by) {
     stop(sprintf(
       paste0(
         "Transitions in `%s` are split by origin and ",
@@ -735,6 +767,7 @@ calculate_transition_rates <- function(
       ),
       group, group
     ), call. = FALSE)
+  }
   # Other dimensions in `by` combine with this one: the internal group is
   # the combination, and only moves in this dimension count.
   external <- check_by(
@@ -749,21 +782,26 @@ calculate_transition_rates <- function(
     alias <- observation_alias(population, by, extra = group)
     population <- alias$population
     by <- setdiff(alias$by, "group")
-  } else population <- dimension_view(population, group)
+  } else {
+    population <- dimension_view(population, group)
+  }
   by <- check_by(
     by, c("sex", "union_type", "previous_union"),
     "calculate_transition_rates", alias$dims
   )
   check_pool_dissolved(pool_dissolved, by)
-  if (is.null(age_breaks) == is.null(dur_breaks))
+  if (is.null(age_breaks) == is.null(dur_breaks)) {
     stop("Supply exactly one of `age_breaks` and `dur_breaks`.", call. = FALSE)
+  }
   check_demographic_breaks(time_breaks, "time_breaks")
   duration <- !is.null(dur_breaks)
   breaks <- if (duration) dur_breaks else age_breaks
   check_demographic_breaks(breaks, if (duration) "dur_breaks" else "age_breaks",
     ages = TRUE
   )
-  if (is.finite(tail(breaks, 1))) breaks <- c(breaks, Inf)
+  if (is.finite(tail(breaks, 1))) {
+    breaks <- c(breaks, Inf)
+  }
   obs <- person_observation(population, by, tail(time_breaks, 1),
     grouped =
       TRUE,
@@ -796,7 +834,9 @@ calculate_transition_rates <- function(
       drop =
         FALSE
     ]
-  } else rows <- rows[rows$origin != rows$destination, , drop = FALSE]
+  } else {
+    rows <- rows[rows$origin != rows$destination, , drop = FALSE]
+  }
   dest <- rows$.key3 - 1L
   axis <- if (duration) "dur" else "age"
   out <- tibble::as_tibble(rows[c(
@@ -813,7 +853,9 @@ calculate_transition_rates <- function(
   if (size) {
     decode <- alias$combined$decode
     code <- out$origin
-    for (d in others) out[[d]] <- decode[[d]][code + 1L]
+    for (d in others) {
+      out[[d]] <- decode[[d]][code + 1L]
+    }
     out$origin <- decode[[group]][code + 1L]
     out$destination <- decode[[group]][out$destination + 1L]
     out <- out[c(
@@ -824,9 +866,13 @@ calculate_transition_rates <- function(
     # The first `by` variable varies fastest; ties keep the calculator's order.
     keys <- lapply(rev(external), function(b) {
       x <- as.character(out[[b]])
-      match(x, if (b %in% others) as.character(alias$combined$categories[[
-        b
-      ]]) else unique(x))
+      match(x, if (b %in% others) {
+        as.character(alias$combined$categories[[
+          b
+        ]])
+      } else {
+        unique(x)
+      })
     })
     out <- out[do.call(order, c(keys, list(seq_len(nrow(out))))), ,
       drop =
@@ -871,7 +917,9 @@ calculate_union_rates <- function(
 person_breaks <- function(time_breaks, age_breaks) {
   check_demographic_breaks(time_breaks, "time_breaks")
   check_demographic_breaks(age_breaks, "age_breaks", ages = TRUE)
-  if (is.finite(tail(age_breaks, 1))) age_breaks <- c(age_breaks, Inf)
+  if (is.finite(tail(age_breaks, 1))) {
+    age_breaks <- c(age_breaks, Inf)
+  }
   age_breaks
 }
 
@@ -896,9 +944,11 @@ person_rate_rows <- function(
       age_breaks, "age",
       s[["a"]]
     ), sex_dim),
-    if (!is.null(parity_breaks)) list(band_dim(parity_breaks, "parity", s[[
-      "parity"
-    ]])),
+    if (!is.null(parity_breaks)) {
+      list(band_dim(parity_breaks, "parity", s[[
+        "parity"
+      ]]))
+    },
     person_by_dims(by, obs, counts, pool_dissolved)
   )
   rows <- build_rows(dims)
@@ -922,10 +972,15 @@ add_unrealized_births <- function(out, simulation, alias = list()) {
   u <- simulation$unrealized_births
   # Records name each group dimension; the table uses the internal `group`
   # (a combined code when several dimensions are requested).
-  if (!is.null(alias$combined)) u$group <- encode_combined(alias, u)
-  else for (from in names(alias$rename)) names(u)[names(u) == alias$rename[[
-    from
-  ]]] <- from
+  if (!is.null(alias$combined)) {
+    u$group <- encode_combined(alias, u)
+  } else {
+    for (from in names(alias$rename)) {
+      names(u)[names(u) == alias$rename[[
+        from
+      ]]] <- from
+    }
+  }
   n <- nrow(out)
   value <- numeric(n)
   covered <- out$time_start >= simulation$start_time
@@ -958,21 +1013,27 @@ add_unrealized_births <- function(out, simulation, alias = list()) {
           out$parity_start
         ))
         ok <- ok & p$ok
-      } else ok[] <- FALSE # pooled-parity schedule cannot be split by parity
+      } else {
+        ok[] <- FALSE
+      } # pooled-parity schedule cannot be split by parity
     }
     if ("group" %in% names(out)) {
       keys <- c(keys, list(as.character(u$group)))
       row_keys <- c(row_keys, list(as.character(out$group)))
     }
     # The fertility schedule never splits by previous union.
-    if ("previous_union" %in% names(out)) ok[] <- FALSE
+    if ("previous_union" %in% names(out)) {
+      ok[] <- FALSE
+    }
     if ("union_type" %in% names(out)) {
       if ("union_type" %in% names(u)) {
         ok <- ok & u$union_type %in% out$union_type
         keys <- c(keys, list(u$union_type)); row_keys <- c(row_keys, list(
           out$union_type
         ))
-      } else ok[] <- FALSE # overall schedule cannot be split by union type
+      } else {
+        ok[] <- FALSE
+      } # overall schedule cannot be split by union type
     }
     key <- do.call(paste, c(keys, sep = "\r"))
     row_key <- do.call(paste, c(row_keys, sep = "\r"))
@@ -986,14 +1047,18 @@ add_unrealized_births <- function(out, simulation, alias = list()) {
         r
       ] &
         out$age_start < u$age_end[r] & out$age_end > u$age_start[r]
-      if ("parity_start" %in% names(out) && "parity_start" %in% names(u))
+      if ("parity_start" %in% names(out) && "parity_start" %in% names(u)) {
         hit <- hit & out$parity_start < u$parity_end[r] & out$parity_end >
           u$parity_start[r]
-      if ("group" %in% names(out)) hit <- hit & as.character(out$group) ==
-        as.character(u$group[r])
+      }
+      if ("group" %in% names(out)) {
+        hit <- hit & as.character(out$group) ==
+          as.character(u$group[r])
+      }
       if ("union_type" %in% names(out) && "union_type" %in% names(u) &&
-        u$union_type[r] %in% out$union_type)
+        u$union_type[r] %in% out$union_type) {
         hit <- hit & out$union_type == u$union_type[r]
+      }
       unknown <- unknown | hit
     }
   }
@@ -1013,9 +1078,14 @@ check_demographic_breaks <- function(breaks, name, ages = FALSE) {
     stop(sprintf(
       "`%s` must be strictly increasing %sboundaries.", name,
       if (ages) {
-        if (name == "dur_breaks") "nonnegative duration " else
+        if (name == "dur_breaks") {
+          "nonnegative duration "
+        } else {
           "nonnegative age "
-      } else "finite time "
+        }
+      } else {
+        "finite time "
+      }
     ), call. = FALSE)
   }
 }
@@ -1032,14 +1102,19 @@ calculate_entry_rates <- function(
   conf_level = NULL,
   pool_dissolved = FALSE
 ) {
-  if (!inherits(population, "hammel_population"))
+  if (!inherits(population, "hammel_population")) {
     stop("`population` must be a hammel_population with union histories.",
       call. = FALSE
     )
+  }
   if (!is.null(dur_breaks)) {
     check_demographic_breaks(dur_breaks, "dur_breaks", ages = TRUE)
-    if (is.finite(tail(dur_breaks, 1))) dur_breaks <- c(dur_breaks, Inf)
-    if (!"previous_union" %in% by) by <- c(by, "previous_union")
+    if (is.finite(tail(dur_breaks, 1))) {
+      dur_breaks <- c(dur_breaks, Inf)
+    }
+    if (!"previous_union" %in% by) {
+      by <- c(by, "previous_union")
+    }
   }
   check_pool_dissolved(pool_dissolved, by)
   age_breaks <- person_breaks(time_breaks, age_breaks)
@@ -1056,10 +1131,16 @@ calculate_entry_rates <- function(
     axis = axis, sex = TRUE, utype_filter = if (marriage_measure) 2L else 1L,
     previous_mask = mask, pool_dissolved = pool_dissolved, exclusive = TRUE
   )
-  kinds <- if (marriage_measure) list(c(1L, 2L)) else if (entry_type) list(
-    0L,
-    1L
-  ) else list(c(0L, 1L))
+  kinds <- if (marriage_measure) {
+    list(c(1L, 2L))
+  } else if (entry_type) {
+    list(
+      0L,
+      1L
+    )
+  } else {
+    list(c(0L, 1L))
+  }
   block <- function(counts, breaks, axis_name, previous_codes, source) {
     s <- counts$strides
     dims <- c(
@@ -1070,9 +1151,13 @@ calculate_entry_rates <- function(
         ),
         label_dim("sex", c("m", "f"), s[["sex"]])
       ),
-      lapply(by, function(name) if (name == "union_type")
-        label_dim("union_type", c("cohab", "marriage"), counts$cells) else
-        person_by_dims(name, obs, counts, pool_dissolved, previous_codes)[[1]])
+      lapply(by, function(name) {
+        if (name == "union_type") {
+          label_dim("union_type", c("cohab", "marriage"), counts$cells)
+        } else {
+          person_by_dims(name, obs, counts, pool_dissolved, previous_codes)[[1]]
+        }
+      })
     )
     rows <- build_rows(dims)
     rows$.source <- rep(source, nrow(rows))
@@ -1101,16 +1186,21 @@ calculate_entry_rates <- function(
     cells <- x$cells
     # Formation kind offsets: the union_type dimension codes cohab 0, marriage
     # 1.
-    type <- if (entry_type) (rows$.index[here] - 1) %/% cells else rep(0, sum(
-      here
-    ))
+    type <- if (entry_type) {
+      (rows$.index[here] - 1) %/% cells
+    } else {
+      rep(0, sum(
+        here
+      ))
+    }
     base <- rows$.index[here] - type * cells
     exposure[here] <- x$person_years[base]
     for (j in seq_along(kinds)) {
       use <- if (entry_type) type == j - 1L else rep(TRUE, length(type))
-      for (kind in kinds[[j]])
+      for (kind in kinds[[j]]) {
         events[here][use] <- events[here][use] + x$formations[base[use] +
           cells * kind]
+      }
     }
   }
   columns <- c(
@@ -1146,7 +1236,9 @@ prepare_union_group_observations <- function(
   tx <- population$transitions
   combined <- population[[".hammel_combined"]]
   moves <- if (is.null(combined)) nrow(tx) else nrow(combined$history)
-  if (!length(moves) || !moves || !nrow(unions)) return(unions)
+  if (!length(moves) || !moves || !nrow(unions)) {
+    return(unions)
+  }
   persons <- prepare_group_observations(population$persons, population, TRUE)
   identities <- observation_groups(persons, TRUE)
   indices <- match(persons$group, identities) - 1L
@@ -1154,7 +1246,9 @@ prepare_union_group_observations <- function(
     persons, unions, indices, as.integer(mode),
     typed, as.integer(identity_count), as.integer(group_count)
   )
-  if (length(history$row)) attr(unions, ".hammel_group_history") <- history
+  if (length(history$row)) {
+    attr(unions, ".hammel_group_history") <- history
+  }
   unions
 }
 
@@ -1177,8 +1271,10 @@ run_person_lexis <- function(
 ) {
   utype <- "union_type" %in% by
   previous <- "previous_union" %in% by
-  if (is.null(exclusive)) exclusive <- obs$typed || previous || utype_filter >
-    0L
+  if (is.null(exclusive)) {
+    exclusive <- obs$typed || previous || utype_filter >
+      0L
+  }
   map <- if (pool_dissolved) c(0L, 1L, 1L) else 0:2
   options <- list(
     typed = obs$typed, exclusive = exclusive,
@@ -1187,21 +1283,30 @@ run_person_lexis <- function(
     previous_mask = previous_mask, sex = sex, group = group, union_type = utype,
     previous_union = previous, previous_map = map
   )
-  if (!is.null(group_target)) options$group_target <- as.integer(group_target)
+  if (!is.null(group_target)) {
+    options$group_target <- as.integer(group_target)
+  }
   ng <- if (is.null(obs$groups)) 1L else length(obs$groups)
   counts <- person_lexis_cpp(
     obs$persons, obs$unions, obs$group_indices, ng,
-    time_breaks, axis_breaks, if (length(parity_breaks)) parity_breaks else
-      numeric(1), options
+    time_breaks, axis_breaks, if (length(parity_breaks)) {
+      parity_breaks
+    } else {
+      numeric(1)
+    }, options
   )
   nt <- length(time_breaks) - 1L
   na <- length(axis_breaks) - 1L
   sizes <- c(
     t = nt, a = na, sex = if (sex) 2L else 1L,
     parity = if (length(parity_breaks) > 1L) length(parity_breaks) - 1L else 1L,
-    group = if (group) ng else 1L, union_type = if (utype) length(
-      union_type_labels(obs$typed)
-    ) else 1L,
+    group = if (group) ng else 1L, union_type = if (utype) {
+      length(
+        union_type_labels(obs$typed)
+      )
+    } else {
+      1L
+    },
     previous_union = if (previous) length(unique(map)) else 1L
   )
   strides <- cumprod(c(1, head(sizes, -1)))
@@ -1242,11 +1347,12 @@ union_strata <- function(
   w <- h <- rep(0L, nrow(unions))
   if (wives || husbands) {
     if (inherits(population, "hammel_population")) {
-      if (!declared_group(population))
+      if (!declared_group(population)) {
         stop(paste0(
           "Splitting by \"group_w\" or \"group_h\" requires a ",
           "declared group dimension."
         ), call. = FALSE)
+      }
       persons <- prepare_group_observations(
         population$persons, population,
         TRUE
@@ -1263,22 +1369,30 @@ union_strata <- function(
     } else {
       needed <- c(if (wives) "group_w", if (husbands) "group_h")
       missing <- setdiff(needed, names(unions))
-      if (length(missing))
+      if (length(missing)) {
         stop(sprintf(
           "Splitting a union table by %s requires union column(s) %s.",
           paste0("\"", needed, "\"", collapse = " and "),
           paste0("`", missing, "`", collapse = ", ")
         ), call. = FALSE)
+      }
       values <- c(if (wives) as.character(unions$group_w), if (
-        husbands) as.character(unions$group_h))
-      if (anyNA(values) || any(!nzchar(trimws(values))))
+        husbands) {
+        as.character(unions$group_h)
+      })
+      if (anyNA(values) || any(!nzchar(trimws(values)))) {
         stop(paste0(
           "Union `group_w` and `group_h` must contain ",
           "nonmissing, nonempty labels."
         ), call. = FALSE)
+      }
       identities <- sort(unique(values), method = "radix")
-      if (wives) w <- match(as.character(unions$group_w), identities) - 1L
-      if (husbands) h <- match(as.character(unions$group_h), identities) - 1L
+      if (wives) {
+        w <- match(as.character(unions$group_w), identities) - 1L
+      }
+      if (husbands) {
+        h <- match(as.character(unions$group_h), identities) - 1L
+      }
     }
   }
   ng <- if (is.null(identities)) 1L else length(identities)
@@ -1286,27 +1400,33 @@ union_strata <- function(
   index <- if (mode == 2L) w + ng * h else if (husbands) h else w
   types <- c("cohab", "marriage")
   if (typed_split) {
-    if (!"union_type" %in% names(unions))
+    if (!"union_type" %in% names(unions)) {
       stop("Splitting by \"union_type\" requires a union `union_type` column.",
         call. = FALSE
       )
+    }
     if (!is.character(unions$union_type) || !is.null(dim(unions$union_type)) ||
-      anyNA(unions$union_type) || any(!unions$union_type %in% types))
+      anyNA(unions$union_type) || any(!unions$union_type %in% types)) {
       stop(paste0(
         "`union_type` must contain only cohab or marriage ",
         "without missing values."
       ), call. = FALSE)
+    }
     index <- index + combos * (match(unions$union_type, types) - 1L)
   }
-  if ((wives || husbands) && inherits(population, "hammel_population"))
+  if ((wives || husbands) && inherits(population, "hammel_population")) {
     unions <- prepare_union_group_observations(
       unions, population, mode,
       typed_split, ng, combos
     )
+  }
   dims <- lapply(by, function(name) switch(name,
     group_w = label_dim("group_w", identities, stride),
-    group_h = label_dim("group_h", identities, stride * if (mode == 2L) ng else
-      1L),
+    group_h = label_dim("group_h", identities, stride * if (mode == 2L) {
+      ng
+    } else {
+      1L
+    }),
     union_type = label_dim("union_type", types, stride * combos)
   ))
   list(
@@ -1323,7 +1443,9 @@ encode_combined <- function(alias, data, suffix = "") {
   code <- 0
   for (k in seq_along(combined$dims)) {
     column <- paste0(combined$dims[k], suffix)
-    if (!column %in% names(data)) return(rep(NA_integer_, nrow(data)))
+    if (!column %in% names(data)) {
+      return(rep(NA_integer_, nrow(data)))
+    }
     code <- code + (match(as.character(data[[column]]), as.character(
       combined$categories[[k]]
     )) - 1L) *
@@ -1336,7 +1458,7 @@ encode_combined <- function(alias, data, suffix = "") {
 validate_rate_conf_level <- function(conf_level) {
   if (!is.null(conf_level) && (!is.numeric(conf_level) ||
     length(conf_level) != 1L || !is.null(dim(conf_level)) ||
-    !is.finite(conf_level) || conf_level <= 0 || conf_level >= 1))
+    !is.finite(conf_level) || conf_level <= 0 || conf_level >= 1)) {
     stop(
       paste0(
         "`conf_level` must be NULL or a finite numeric ",
@@ -1344,12 +1466,15 @@ validate_rate_conf_level <- function(conf_level) {
       ),
       call. = FALSE
     )
+  }
   invisible(NULL)
 }
 
 add_rate_confidence <- function(table, events, exposure, conf_level) {
   validate_rate_conf_level(conf_level)
-  if (is.null(conf_level)) return(table)
+  if (is.null(conf_level)) {
+    return(table)
+  }
   table$conf_low <- rep(NA_real_, nrow(table))
   table$conf_high <- rep(NA_real_, nrow(table))
   for (i in which(table[[exposure]] > 0)) {

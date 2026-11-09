@@ -24,6 +24,8 @@ Agreed by the user and implemented November 9, 2026 (D143). This guide defines w
 
 10. Keep every line in hand-maintained `R/` files at most 80 characters, including purpose comments, explanatory comments, and roxygen text. Apply the same convention to new or edited R code elsewhere. Use a two-space indent and one argument per line for a function signature that does not fit on one line. Wrap calls at argument or expression boundaries; split long diagnostic strings with literal `paste0()` pieces so messages remain unchanged. Keep generated wrappers untouched (D149). This R-source rule does not require hard-wrapping Markdown prose, which is kept renderer-friendly.
 
+11. Use braces for every loop body and for statement-style or multiline `if`/`else` branches. Keep `else` on the line containing the preceding closing brace, including `} else if (...) {` chains. A compact, single-line conditional used only to choose a value may remain unbraced when it has no side effects, assignments, or control-flow modifiers. Put `return()`, `stop()`, `break`, and `next` on their own lines inside the relevant block. Brace multiline callback bodies that contain control flow and error-handler bodies that raise errors. Apply the same convention to documentation examples (D150).
+
 For a new function, first identify its responsibility and closest existing consumer. Extend that file if the responsibility fits. If no existing file is a logical home, explain the proposed responsibility and filename and ask the user before creating a new R script. Do not create one automatically. The user’s authorization of this reorganization covers the files listed below; future additions follow this rule.
 
 ## Responsibility boundaries
@@ -268,7 +270,7 @@ Use snake_case for package-owned function names and arguments, including `conf_l
 
 The reference is the [tidyverse naming and syntax guide](https://style.tidyverse.org/syntax.html), [function-writing guide](https://style.tidyverse.org/functions.html), and [API design principles](https://design.tidyverse.org/). Apply those conventions with the user's explicit exceptions: noun-based specification constructors, the retained `create_baseline_population()` action name, uppercase section headings, and a purpose comment at the top of every hand-maintained file. Adopting a coding convention does not require adding tidyverse dependencies or changing demographic behavior.
 
-Review on November 9, 2026, updated after the confidence-argument rename and 80-column formatting (D149):
+Review on November 9, 2026, updated after the confidence-argument rename and 80-column formatting and control-flow bracing (D149/D150):
 
 | Area | Finding |
 | --- | --- |
@@ -277,13 +279,13 @@ Review on November 9, 2026, updated after the confidence-argument rename and 80-
 | Argument order | Data/model-facing functions generally put their primary input first: `population`, `rates`, `persons`, or `model`. Specification constructors instead start with their defining settings, such as a formula or inheritance method. No additional argument-order change is proposed. |
 | Return conventions | No hand-maintained top-level function ends in an unnecessary explicit `return()`. Public table outputs follow the existing tibble contract; model/specification objects remain inspectable lists. `validate_population()` returns its input invisibly. |
 | Long lines | All lines in the 33 hand-maintained `R/` files, including comments and roxygen, are at most 80 characters after D149. Generated wrappers are excluded. |
-| Control-flow braces | Of 127 loop expressions, 46 have unbraced bodies, contrary to the guide's loop convention. Inline early returns and some multiline `if` branches also need formatting review. The scan found 665 nonbraced `if` branches, but this includes legitimate value-producing expressions, so that number is not a violation count. |
+| Control-flow braces | All 127 loop bodies are braced. Statement-style and multiline conditional branches are braced, as are early-return/error branches and control-flow callbacks. The 109 remaining unbraced conditionals are compact, single-line value expressions; else-if chains retain their normal chained syntax. Documentation examples follow the same rule (D150). |
 | Multiline definitions | Top-level function signatures that exceed one line now use one argument per line with a two-space indent. Indentation and wrapped calls were normalized as part of D149; short definitions remain on one line. |
 | Diagnostic formatting | Existing validation uses base R errors, typically with `call. = FALSE`. This review did not introduce a new error/condition framework or a dependency merely to obtain tidyverse-style diagnostics. |
 
 The review examined all 33 hand-maintained R files (211 top-level functions); generated `RcppExports.R` was excluded. Naming and control-flow counts came from parsed R expressions; long-line counts came from source text. Argument roles, returns, and representative signature formatting were also inspected. `lintr` was not installed. D149 used styler 1.11.0 and its formatting-only dependencies from a temporary `/tmp` library and cache; no package dependency was added. This is a targeted source/API audit and width check, not certification against a complete lint rule set or an exhaustive check of every local variable and function call.
 
-The argument rename and 80-column formatting are implemented. Remaining control-flow style cleanup, further public API renames (including abbreviations or the singular `calculate_cohab_convert_rate()`), and changes to defaults or return contracts remain separate work. Keep historical verification records and user-maintained articles intact; old calls there may need `conf_level` when run with the current API.
+The argument rename, 80-column formatting, and control-flow bracing are implemented. Further public API renames (including abbreviations or the singular `calculate_cohab_convert_rate()`), and changes to defaults or return contracts remain separate work. Keep historical verification records and user-maintained articles intact; old calls there may need `conf_level` when run with the current API.
 
 ## Verification
 

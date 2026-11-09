@@ -64,8 +64,11 @@ group_inheritance("mother")
 group_inheritance("hierarchy", order = c("A", "B"), passing = 0.05)
 group_inheritance("custom",
   fun = function(mother_group, father_group, ...) {
-    if (is.na(father_group) ||
-      mother_group == father_group) mother_group else "mixed"
+    if (is.na(father_group) || mother_group == father_group) {
+      mother_group
+    } else {
+      "mixed"
+    }
   }
 )
 }

@@ -166,7 +166,9 @@ unreachable_parity_cells <- function(rates, interval) {
     age_end = numeric(), earliest_eligible = numeric()
   )
   if (!all(c("parity_start", "parity_end") %in% names(rates)) || !(interval >
-    0)) return(empty)
+    0)) {
+    return(empty)
+  }
   out <- list()
   # Earliest next birth from eligibility age `e` given positive rows `r`.
   next_birth <- function(r, e) {
@@ -176,9 +178,14 @@ unreachable_parity_cells <- function(rates, interval) {
   for (rows in split_rate_groups(rates)) {
     r <- rates[rows, , drop = FALSE]
     r <- r[r$rate > 0, , drop = FALSE]
-    if (!nrow(r)) next
-    group <- if ("group" %in% names(r)) as.character(r$group[1]) else
+    if (!nrow(r)) {
+      next
+    }
+    group <- if ("group" %in% names(r)) {
+      as.character(r$group[1])
+    } else {
       NA_character_
+    }
     starts <- sort(unique(rates$parity_start[rows]))
     ends <- vapply(starts, function(k) rates$parity_end[rows][match(
       k,
@@ -203,14 +210,20 @@ unreachable_parity_cells <- function(rates, interval) {
           }
           # Cells split at whole ages; report the run of cells ending no later
           # than the earliest eligible age as one range.
-          end <- if (at_k$age_end[i] <= eligible) at_k$age_end[i] else floor(
-            eligible
-          )
-          if (end > lo) out[[length(out) + 1L]] <- data.frame(
-            group = group,
-            parity = k, age_start = lo, age_end = end,
-            earliest_eligible = eligible
-          )
+          end <- if (at_k$age_end[i] <= eligible) {
+            at_k$age_end[i]
+          } else {
+            floor(
+              eligible
+            )
+          }
+          if (end > lo) {
+            out[[length(out) + 1L]] <- data.frame(
+              group = group,
+              parity = k, age_start = lo, age_end = end,
+              earliest_eligible = eligible
+            )
+          }
         }
       }
       # Carry eligibility through every parity of this band to the next band.
@@ -219,7 +232,8 @@ unreachable_parity_cells <- function(rates, interval) {
         while (steps > 0 && is.finite(eligible)) {
           birth <- next_birth(at_k, eligible)
           if (!is.finite(birth)) {
-            eligible <- Inf; break
+            eligible <- Inf
+            break
           }
           inside <- at_k$age_start <= birth & birth < at_k$age_end
           # Within an upper-open positive row every later step adds the
@@ -241,9 +255,13 @@ warn_unreachable_parity_cells <- function(rates, interval) {
   # The static reachability heuristic assumes the same schedules throughout a
   # life. Applying it to calendar slices could falsely reject reachable
   # histories.
-  if (has_calendar_rates(rates)) return(invisible(NULL))
+  if (has_calendar_rates(rates)) {
+    return(invisible(NULL))
+  }
   cells <- unreachable_parity_cells(rates, interval)
-  if (!nrow(cells)) return(invisible(cells))
+  if (!nrow(cells)) {
+    return(invisible(cells))
+  }
   keys <- unique(cells[c("group", "parity")])
   parts <- vapply(seq_len(nrow(keys)), function(i) {
     d <- cells[(is.na(cells$group) & is.na(keys$group[i]) | cells$group %in%
@@ -251,20 +269,28 @@ warn_unreachable_parity_cells <- function(rates, interval) {
       cells$parity == keys$parity[i], ]
     sprintf(
       "%sparity %g at ages [%g, %g)%s",
-      if (is.na(keys$group[i])) "" else paste0(
-        "group ", keys$group[i],
-        ", "
-      ),
+      if (is.na(keys$group[i])) {
+        ""
+      } else {
+        paste0(
+          "group ", keys$group[i],
+          ", "
+        )
+      },
       keys$parity[i], min(d$age_start), max(d$age_end),
-      if (is.finite(d$earliest_eligible[1]))
+      if (is.finite(d$earliest_eligible[1])) {
         sprintf(" (earliest eligible age %g)", d$earliest_eligible[1])
-      else " (unreachable at any age)"
+      } else {
+        " (unreachable at any age)"
+      }
     )
   }, character(1))
   shown <- head(parts, 5)
-  if (length(parts) > 5) shown <- c(shown, sprintf("and %d more", length(
-    parts
-  ) - 5))
+  if (length(parts) > 5) {
+    shown <- c(shown, sprintf("and %d more", length(
+      parts
+    ) - 5))
+  }
   warning(
     sprintf(paste0(
       "With `birth_interval` = %g, some positive parity-specific ",

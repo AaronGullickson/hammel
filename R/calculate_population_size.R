@@ -34,11 +34,12 @@ calculate_population_size <- function(
   by = NULL,
   pool_dissolved = FALSE
 ) {
-  if (!is.numeric(times) || !is.null(dim(times)) || any(!is.finite(times)))
+  if (!is.numeric(times) || !is.null(dim(times)) || any(!is.finite(times))) {
     stop("`times` must be a numeric vector of finite times in years.",
       call. =
         FALSE
     )
+  }
   alias <- observation_alias(population, by)
   population <- alias$population
   by <- alias$by
@@ -47,8 +48,12 @@ calculate_population_size <- function(
     "calculate_population_size", alias$dims
   )
   check_pool_dissolved(pool_dissolved, by)
-  obs <- person_observation(population, by, if (length(times)) max(times) else -
-    Inf)
+  obs <- person_observation(population, by, if (length(times)) {
+    max(times)
+  } else {
+    -
+      Inf
+  })
   previous <- "previous_union" %in% by
   utype <- "union_type" %in% by
   map <- if (pool_dissolved) c(0L, 1L, 1L) else 0:2

@@ -50,11 +50,15 @@ extract_kin <- function(
   generations = 2,
   relative_ids = NULL
 ) {
-  if (is.data.frame(population)) population <- hammel_population(population)
+  if (is.data.frame(population)) {
+    population <- hammel_population(population)
+  }
   validate_population(population)
   validate_kinship_generations(generations, "generations")
   ids <- population$persons$person_id
-  if (is.null(relative_ids)) relative_ids <- ids
+  if (is.null(relative_ids)) {
+    relative_ids <- ids
+  }
   for (name in c("ego_ids", "relative_ids")) {
     values <- get(name)
     check_numeric_column(values, name, id = TRUE)

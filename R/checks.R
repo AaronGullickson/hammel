@@ -38,8 +38,11 @@ check_numeric_column <- function(x, name, missing = FALSE, id = FALSE) {
     stop(
       sprintf(
         "`%s` must contain %s%s.", name,
-        if (id) "positive whole-number IDs" else
-          "finite numeric values",
+        if (id) {
+          "positive whole-number IDs"
+        } else {
+          "finite numeric values"
+        },
         if (missing) " or NA" else " without missing values"
       ),
       call. = FALSE

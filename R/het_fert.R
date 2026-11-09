@@ -40,18 +40,23 @@ het_fert <- function(cv, alpha) {
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 validate_het_fert <- function(model) {
-  if (is.null(model)) return(invisible(NULL))
-  if (!inherits(model, "hammel_het_fert") || !is.list(model))
+  if (is.null(model)) {
+    return(invisible(NULL))
+  }
+  if (!inherits(model, "hammel_het_fert") || !is.list(model)) {
     stop("`hetfert` must be NULL or a het_fert(cv, alpha) object.",
       call. =
         FALSE
     )
+  }
   scalar <- function(x) is.numeric(x) && is.null(dim(x)) && length(x) == 1L &&
     is.finite(x)
-  if (!scalar(model$cv) || model$cv < 0)
+  if (!scalar(model$cv) || model$cv < 0) {
     stop("`cv` must be a finite nonnegative numeric scalar.", call. = FALSE)
-  if (!scalar(model$alpha) || model$alpha < 0 || model$alpha > 1)
+  }
+  if (!scalar(model$alpha) || model$alpha < 0 || model$alpha > 1) {
     stop("`alpha` must be a finite numeric scalar in [0, 1].", call. = FALSE)
+  }
   invisible(model)
 }
 
@@ -60,8 +65,10 @@ fertility_log_variance <- function(cv) {
 }
 
 validate_fertility_weights <- function(persons) {
-  if (!"hetfert" %in% names(persons)) return(invisible(NULL))
-  if (!"sex" %in% names(persons) || anyNA(persons$sex))
+  if (!"hetfert" %in% names(persons)) {
+    return(invisible(NULL))
+  }
+  if (!"sex" %in% names(persons) || anyNA(persons$sex)) {
     stop(
       paste0(
         "Fertility weight validation requires nonmissing ",
@@ -69,15 +76,18 @@ validate_fertility_weights <- function(persons) {
       ),
       call. = FALSE
     )
+  }
   w <- persons$hetfert
   # Base R commonly represents an all-NA column as logical. It is a valid
   # unused placeholder in male-only/empty histories, but not for women.
-  if (!is.null(dim(w)) || !(is.numeric(w) || (is.logical(w) && all(is.na(w)))))
+  if (!is.null(dim(w)) ||
+    !(is.numeric(w) || (is.logical(w) && all(is.na(w))))) {
     stop("`persons$hetfert` must be a numeric column; male entries may be NA.",
       call. = FALSE
     )
+  }
   female <- which(persons$sex == "f")
-  if (any(!is.finite(w[female]) | w[female] <= 0))
+  if (any(!is.finite(w[female]) | w[female] <= 0)) {
     stop(
       paste(
         paste0(
@@ -88,6 +98,7 @@ validate_fertility_weights <- function(persons) {
       ),
       call. = FALSE
     )
+  }
   invisible(NULL)
 }
 
@@ -100,10 +111,13 @@ initialize_fertility_weights <- function(persons, model) {
     female <- which(persons$sex == "f")
     persons$hetfert <- rep(NA_real_, nrow(persons))
     variance <- fertility_log_variance(model$cv)
-    persons$hetfert[female] <- if (model$cv == 0) rep(1, length(female)) else
+    persons$hetfert[female] <- if (model$cv == 0) {
+      rep(1, length(female))
+    } else {
       stats::rlnorm(length(female), meanlog = -variance / 2, sdlog = sqrt(
         variance
       ))
+    }
   }
   validate_fertility_weights(persons)
   persons$hetfert <- as.numeric(persons$hetfert)

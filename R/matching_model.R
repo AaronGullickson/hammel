@@ -132,11 +132,12 @@ age_gap_matching_model <- function(
       stop("`", name, "` must be a finite numeric scalar.", call. = FALSE)
     }
   }
-  if (half_weight_distance <= 0)
+  if (half_weight_distance <= 0) {
     stop("`half_weight_distance` must be positive.", call. = FALSE)
+  }
   quadratic <- -(sqrt(log(2)) / half_weight_distance)^2
   linear <- -2 * (preferred_age_gap * quadratic)
-  if (!is.finite(quadratic) || quadratic >= 0 || !is.finite(linear))
+  if (!is.finite(quadratic) || quadratic >= 0 || !is.finite(linear)) {
     stop(
       paste0(
         "Inputs must yield finite coefficients with a negative ",
@@ -144,6 +145,7 @@ age_gap_matching_model <- function(
       ),
       call. = FALSE
     )
+  }
   matching_model(~ age_difference + I(age_difference^2),
     c(age_difference = unname(linear), "I(age_difference^2)" = unname(
       quadratic
@@ -157,7 +159,9 @@ age_gap_matching_model <- function(
 # Male-group formula effects can be absorbed by calibrated target weights.
 warn_absorbed_group_formula <- function(model) {
   male <- grep("^male_.+", all.vars(model$formula), value = TRUE)
-  if (!length(male)) return(invisible(FALSE))
+  if (!length(male)) {
+    return(invisible(FALSE))
+  }
   warning(sprintf(paste(
     "Formula terms using %s are absorbed by calibrated group weights:",
     paste0(
@@ -172,16 +176,19 @@ warn_absorbed_group_formula <- function(model) {
 }
 
 validate_delta <- function(x) {
-  if (is.null(x)) return(invisible(x))
+  if (is.null(x)) {
+    return(invisible(x))
+  }
   if (!is.numeric(x) || is.complex(x) || !is.null(dim(x)) || any(!is.finite(
     x
   )) ||
     (length(x) && (is.null(names(x)) || anyNA(names(x)) ||
-      any(!nzchar(trimws(names(x)))) || anyDuplicated(names(x)))))
+      any(!nzchar(trimws(names(x)))) || anyDuplicated(names(x))))) {
     stop(paste0(
       "`delta` must be a finite numeric vector with ",
       "unique nonempty group names."
     ), call. = FALSE)
+  }
   invisible(x)
 }
 
@@ -195,7 +202,7 @@ validate_matching_model <- function(model) {
   formula <- model$formula
   vars <- if (inherits(formula, "formula")) all.vars(formula) else character()
   if (!inherits(formula, "formula") || length(formula) != 2L ||
-    any(vars != "age_difference" & !grepl("^(female|male|same)_.+", vars)))
+    any(vars != "age_difference" & !grepl("^(female|male|same)_.+", vars))) {
     stop(
       paste(
         paste0(
@@ -207,8 +214,10 @@ validate_matching_model <- function(model) {
       call. =
         FALSE
     )
-  if (length(attr(stats::terms(formula), "offset")))
+  }
+  if (length(attr(stats::terms(formula), "offset"))) {
     stop("Matching formula offsets are not supported.", call. = FALSE)
+  }
   beta <- model$coefficients
   if (!is.numeric(beta) || is.complex(beta) || !is.null(dim(beta)) || any(
     !is.finite(beta)
@@ -216,28 +225,36 @@ validate_matching_model <- function(model) {
     (length(beta) && is.null(names(beta))) || anyNA(names(beta)) || any(
     !nzchar(names(beta))
   ) ||
-    anyDuplicated(names(beta)))
+    anyDuplicated(names(beta))) {
     stop(paste0(
       "`coefficients` must be a finite numeric vector ",
       "with unique nonempty names."
     ), call. = FALSE)
-  if (is.data.frame(model$group_exogamy)) validate_exogamy_table(
-    model$group_exogamy
-  )
+  }
+  if (is.data.frame(model$group_exogamy)) {
+    validate_exogamy_table(
+      model$group_exogamy
+    )
+  }
   for (field in c("group_exogamy", "delta")) {
     x <- model[[field]]
-    if (field == "group_exogamy" && is.data.frame(x)) next
+    if (field == "group_exogamy" && is.data.frame(x)) {
+      next
+    }
     values <- if (is_dimension_list(x)) {
       if (is.null(names(x)) || anyNA(names(x)) || any(!nzchar(names(x))) ||
-        anyDuplicated(names(x)))
+        anyDuplicated(names(x))) {
         stop(sprintf(
           "A list `%s` must be named by group dimension, once each.",
           field
         ), call. = FALSE)
+      }
       x
-    } else list(x)
+    } else {
+      list(x)
+    }
     for (v in values) {
-      if (is.data.frame(v))
+      if (is.data.frame(v)) {
         stop(paste(
           paste0(
             "A dimension's `group_exogamy` entry is a named ",
@@ -248,6 +265,7 @@ validate_matching_model <- function(model) {
             "`<group>_x`/`<group>_y` columns)."
           )
         ), call. = FALSE)
+      }
       switch(field,
         group_exogamy = split_group_exogamy(v),
         delta =
@@ -259,7 +277,7 @@ validate_matching_model <- function(model) {
   if (!any(grepl("^(female|male|same)_.+", vars))) {
     design <- matching_design_matrix(formula, data.frame(age_difference = seq(-
       50, 50, length.out = 101)))
-    if (!setequal(colnames(design), names(beta)))
+    if (!setequal(colnames(design), names(beta))) {
       stop(
         paste0(
           "Coefficient names must match all non-intercept ",
@@ -267,6 +285,7 @@ validate_matching_model <- function(model) {
         ),
         call. = FALSE
       )
+    }
   }
   invisible(model)
 }
@@ -311,18 +330,20 @@ validate_internal_matching <- function(model) {
   levels <- model$group_levels
   if (!is.null(levels)) {
     labels <- matching_group_labels(levels, "group_levels")
-    if (!length(labels) || anyDuplicated(labels))
+    if (!length(labels) || anyDuplicated(labels)) {
       stop("`group_levels` must be unique nonempty group labels.",
         call. =
           FALSE
       )
+    }
   }
   categorical <- any(all.vars(formula) %in% c("female_group", "male_group"))
-  if (categorical && length(levels) < 2L)
+  if (categorical && length(levels) < 2L) {
     stop(paste0(
       "Categorical matching predictors require a group ",
       "dimension with at least two categories."
     ), call. = FALSE)
+  }
   # A fixed validation grid covers both sexes' group levels, equality, and gaps.
   data <- data.frame(age_difference = seq(-50, 50, length.out = 101))
   if (matching_has_group_formula(model)) {
@@ -354,14 +375,20 @@ matching_design_matrix <- function(formula, data) {
         drop.unused.levels = FALSE
       )
       factors <- frame[vapply(frame, is.factor, logical(1))]
-      contrasts <- if (length(factors)) lapply(factors, function(x)
-        stats::contr.treatment(levels(x))) else NULL
+      contrasts <- if (length(factors)) {
+        lapply(factors, function(x)
+          stats::contr.treatment(levels(x)))
+      } else {
+        NULL
+      }
       stats::model.matrix(formula, data = frame, contrasts.arg = contrasts)
     },
-    warning = function(w) stop("Matching formula evaluation: ",
-      conditionMessage(w),
-      call. = FALSE
-    )
+    warning = function(w) {
+      stop("Matching formula evaluation: ",
+        conditionMessage(w),
+        call. = FALSE
+      )
+    }
   )
   design <- design[, colnames(design) != "(Intercept)", drop = FALSE]
   if (nrow(design) != nrow(data) || any(!is.finite(design))) {
@@ -381,7 +408,9 @@ calculate_matching_utilities <- function(
   add_group_exogamy = TRUE
 ) {
   check_numeric_column(age_difference, "age_difference")
-  if (!length(age_difference)) return(numeric())
+  if (!length(age_difference)) {
+    return(numeric())
+  }
   data <- matching_predictor_data(
     matching, age_difference, female_group,
     male_group
@@ -394,8 +423,9 @@ calculate_matching_utilities <- function(
   }
   utility <- drop(design %*% matching$coefficients[colnames(design)])
   if (add_group_exogamy && nrow(expand_group_exogamy(matching$group_exogamy))) {
-    if (is.null(female_group) || is.null(male_group))
+    if (is.null(female_group) || is.null(male_group)) {
       stop("Pair effects require female and male group data.", call. = FALSE)
+    }
     utility <- utility + matching_pair_offsets(
       matching, female_group,
       male_group
@@ -417,15 +447,18 @@ calculate_matching_probabilities <- function(
     matching, age_difference,
     female_group, male_group
   )
-  if (!length(utility)) return(numeric())
+  if (!length(utility)) {
+    return(numeric())
+  }
   restrictions <- expand_prevent_exogamy(matching$prevent_exogamy)
   allowed <- rep(TRUE, length(utility))
   if (restrictions$all || nrow(restrictions$pairs)) {
-    if (is.null(female_group) || is.null(male_group))
+    if (is.null(female_group) || is.null(male_group)) {
       stop("Group restrictions require female and male group data.",
         call. =
           FALSE
       )
+    }
     allowed <- matching_group_allowed(matching, female_group, male_group)
   }
   weights <- numeric(length(utility))
@@ -463,8 +496,10 @@ prepare_matching_model <- function(matching, population_groups = NULL) {
     for (i in seq_len(nrow(pairs))) {
       female <- match(pairs$female_group[i], labels)
       male <- match(pairs$male_group[i], labels)
-      if (!is.na(female) && !is.na(male)) offsets[female, male] <-
-        pairs$log_odds[i]
+      if (!is.na(female) && !is.na(male)) {
+        offsets[female, male] <-
+          pairs$log_odds[i]
+      }
     }
   }
   restrictions <- expand_prevent_exogamy(matching$prevent_exogamy)
@@ -474,7 +509,9 @@ prepare_matching_model <- function(matching, population_groups = NULL) {
     for (i in seq_len(nrow(restrictions$pairs))) {
       female <- match(restrictions$pairs$female_group[i], labels)
       male <- match(restrictions$pairs$male_group[i], labels)
-      if (!is.na(female) && !is.na(male)) blocked[female, male] <- TRUE
+      if (!is.na(female) && !is.na(male)) {
+        blocked[female, male] <- TRUE
+      }
     }
   }
   group_formula <- matching_has_group_formula(matching)
@@ -488,8 +525,10 @@ prepare_matching_model <- function(matching, population_groups = NULL) {
       pairs
     ) > 0,
     pair_offsets = offsets,
-    evaluate = function(age_difference, female_group = NULL,
-    male_group = NULL) {
+    evaluate = function(
+      age_difference, female_group = NULL,
+      male_group = NULL
+    ) {
       calculate_matching_utilities(matching, age_difference,
         if (is.null(female_group)) NULL else labels[female_group + 1L],
         if (is.null(male_group)) NULL else labels[male_group + 1L],

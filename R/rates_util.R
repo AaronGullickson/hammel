@@ -14,13 +14,14 @@ has_calendar_rates <- function(rates) {
 }
 
 calendar_rate_segments <- function(rates, start = -Inf, end = Inf) {
-  if (!has_calendar_rates(rates))
+  if (!has_calendar_rates(rates)) {
     return(list(list(start = -Inf, end = Inf, rates = rates)))
+  }
   check_columns(rates, c("time_start", "time_end"), "rates")
   check_numeric_column(rates$time_start, "rates$time_start")
   ends <- rates$time_end
   if (!nrow(rates) || !is.numeric(ends) || !is.null(dim(ends)) ||
-    anyNA(ends) || any(ends <= rates$time_start))
+    anyNA(ends) || any(ends <= rates$time_start)) {
     stop(
       paste0(
         "Calendar intervals need finite starts and greater ",
@@ -28,20 +29,24 @@ calendar_rate_segments <- function(rates, start = -Inf, end = Inf) {
       ),
       call. = FALSE
     )
+  }
   times <- sort(unique(c(rates$time_start, ends)))
   indices <- seq_len(length(times) - 1L)
-  keep <- if (start == end) times[indices] <= start & times[indices + 1L] >
-    start else
+  keep <- if (start == end) {
+    times[indices] <= start & times[indices + 1L] >
+      start
+  } else {
     times[indices] < end & times[indices + 1L] > start
+  }
   lapply(indices[keep], function(i) {
     time <- times[i]
     rows <- rates$time_start <= time & time < rates$time_end
     list(
       start = time, end = times[i + 1L],
       rates = rates[rows, setdiff(names(rates), c("time_start", "time_end")),
-          drop =
-            FALSE
-        ]
+        drop =
+          FALSE
+      ]
     )
   })
 }
@@ -51,13 +56,20 @@ calendar_rate_slices <- function(rates, start = -Inf, end = Inf) {
 }
 
 validate_calendar_rates <- function(rates, validate, with_interval = FALSE) {
-  if (!has_calendar_rates(rates)) return(FALSE)
-  for (segment in calendar_rate_segments(rates)) if (nrow(segment$rates)) {
-    if (with_interval) validate(segment$rates, c(
-      segment$start,
-      segment$end
-    )) else
-      validate(segment$rates)
+  if (!has_calendar_rates(rates)) {
+    return(FALSE)
+  }
+  for (segment in calendar_rate_segments(rates)) {
+    if (nrow(segment$rates)) {
+      if (with_interval) {
+        validate(segment$rates, c(
+          segment$start,
+          segment$end
+        ))
+      } else {
+        validate(segment$rates)
+      }
+    }
   }
   TRUE
 }
@@ -65,13 +77,18 @@ validate_calendar_rates <- function(rates, validate, with_interval = FALSE) {
 check_time_coverage <- function(starts, ends, start, end, description) {
   times <- sort(unique(c(start, starts, ends)))
   times <- times[times >= start & (times < end | times == start)]
-  for (time in times) if (!any(starts <= time & time < ends))
-    stop(sprintf("%s at time %g.", description, time), call. = FALSE)
+  for (time in times) {
+    if (!any(starts <= time & time < ends)) {
+      stop(sprintf("%s at time %g.", description, time), call. = FALSE)
+    }
+  }
   invisible(NULL)
 }
 
 check_calendar_coverage <- function(rates, start, end, name) {
-  if (is.null(rates) || !has_calendar_rates(rates)) return(invisible(NULL))
+  if (is.null(rates) || !has_calendar_rates(rates)) {
+    return(invisible(NULL))
+  }
   calendar_rate_slices(rates) # validate bounds, including edited inputs
   check_time_coverage(
     rates$time_start, rates$time_end, start, end,
@@ -97,11 +114,15 @@ group_registries <- function(population, transition_rates = list()) {
   persons <- population$persons
   registries <- stats::setNames(lapply(names(declaration), function(name) {
     categories <- declaration[[name]]$categories
-    if (!is.null(categories)) return(categories)
+    if (!is.null(categories)) {
+      return(categories)
+    }
     values <- unique(persons[[name]])
     # Transition histories and this dimension's transition rates.
     tx <- population$transitions
-    if (!is.null(tx)) tx <- tx[as.character(tx$group) == name, , drop = FALSE]
+    if (!is.null(tx)) {
+      tx <- tx[as.character(tx$group) == name, , drop = FALSE]
+    }
     rates <- transition_rates[[name]]
     values <- extend_identity_groups(values, c(
       as.character(tx$origin),
@@ -132,17 +153,21 @@ rate_strata_columns <- function(rates, registries, union_level = FALSE) {
   for (d in seq_along(registries)) {
     name <- names(registries)[d]
     if (!union_level) {
-      if (name %in% names(rates)) out[[length(out) + 1L]] <- list(
-        column = name,
-        dim = d, role = 0L
-      )
+      if (name %in% names(rates)) {
+        out[[length(out) + 1L]] <- list(
+          column = name,
+          dim = d, role = 0L
+        )
+      }
     } else {
       for (role in 0:1) {
         column <- paste0(name, if (role) "_h" else "_w")
-        if (column %in% names(rates)) out[[length(out) + 1L]] <- list(
-          column =
-            column, dim = d, role = role
-        )
+        if (column %in% names(rates)) {
+          out[[length(out) + 1L]] <- list(
+            column =
+              column, dim = d, role = role
+          )
+        }
       }
     }
   }
@@ -166,24 +191,30 @@ prepare_strata_rates <- function(
   # Person-level tables use the dimension's name; union-level tables the
   # wife's and husband's columns.
   dims <- names(registries)
-  wrong <- if (union_level) c(intersect(c(dims, "group_pair"), names(
-    rates
-  ))) else
+  wrong <- if (union_level) {
+    c(intersect(c(dims, "group_pair"), names(
+      rates
+    )))
+  } else {
     intersect(c(paste0(dims, "_w"), paste0(dims, "_h")), names(rates))
-  if (length(wrong))
+  }
+  if (length(wrong)) {
     stop(sprintf(
-      if (union_level)
+      if (union_level) {
         paste0(
           "%s rates use %s; union rates are stratified by ",
           "the wife's and husband's groups, `<group>_w` and ",
           "`<group>_h`."
-        ) else
+        )
+      } else {
         paste0(
           "%s rates use %s; these rates are stratified by a ",
           "group dimension's own name."
-        ), process,
+        )
+      }, process,
       paste0("`", wrong, "`", collapse = ", ")
     ), call. = FALSE)
+  }
   columns <- rate_strata_columns(rates, registries, union_level)
   spec <- list(
     dims = integer(), roles = integer(), strides = integer(),
@@ -205,7 +236,7 @@ prepare_strata_rates <- function(
     ]])) - 1L
     # Rows for categories absent from an inferred registry are unused; with
     # declared categories they are errors.
-    if (anyNA(code) && isTRUE(declared[[x$dim]]))
+    if (anyNA(code) && isTRUE(declared[[x$dim]])) {
       stop(
         sprintf(
           paste0(
@@ -220,6 +251,7 @@ prepare_strata_rates <- function(
         ),
         call. = FALSE
       )
+    }
     keep <- keep & !is.na(code)
     index <- index + code * strides[k]
   }
@@ -227,10 +259,14 @@ prepare_strata_rates <- function(
   label <- function(k) paste(vapply(seq_along(columns), function(j) {
     value <- as.character(registries[[columns[[j]]$dim]])[(k %/% strides[j]) %%
       counts[j] + 1L]
-    if (length(columns) == 1L) value else paste0(
-      columns[[j]]$column, "=",
+    if (length(columns) == 1L) {
       value
-    )
+    } else {
+      paste0(
+        columns[[j]]$column, "=",
+        value
+      )
+    }
   }, ""), collapse = ", ")
   # Coverage is checked before rows for absent categories are dropped, so a
   # slice whose rows all name absent categories still reports every stratum
@@ -238,13 +274,18 @@ prepare_strata_rates <- function(
   rates$.hammel_group <- index
   missing <- unique(unlist(lapply(
     calendar_rate_slices(rates, start, end),
-    function(x)
-      if (nrow(x)) setdiff(seq_len(count) - 1L, x$.hammel_group[!is.na(
-        x$.hammel_group
-      )]) else integer()
+    function(x) {
+      if (nrow(x)) {
+        setdiff(seq_len(count) - 1L, x$.hammel_group[!is.na(
+          x$.hammel_group
+        )])
+      } else {
+        integer()
+      }
+    }
   )))
   rates <- rates[keep, , drop = FALSE]
-  if (coverage && length(missing))
+  if (coverage && length(missing)) {
     stop(
       sprintf(
         "%s rates are missing schedules for group(s): %s.", process,
@@ -252,6 +293,7 @@ prepare_strata_rates <- function(
       ),
       call. = FALSE
     )
+  }
   check_strata_overlap(rates, process)
   spec <- list(
     dims = vapply(columns, `[[`, integer(1), "dim") - 1L,
@@ -269,11 +311,12 @@ prepare_strata_rates <- function(
 group_engine_input <- function(persons, registries, match_dims, specs) {
   n <- length(registries)
   categories <- matrix(0L, nrow(persons), n)
-  for (d in seq_len(n))
+  for (d in seq_len(n)) {
     categories[, d] <- match(
       as.character(persons[[names(registries)[d]]]),
       as.character(registries[[d]])
     ) - 1L
+  }
   counts <- vapply(registries, length, integer(1))
   report <- list(
     dims = seq_len(n) - 1L, roles = integer(n),
@@ -320,7 +363,9 @@ decode_report_strata <- function(index, registries) {
 # dimensions do not stratify rates, so a table split only by such a column
 # (validated as separate strata at construction) is rejected here.
 check_strata_overlap <- function(rates, process) {
-  if (!nrow(rates)) return(invisible(rates))
+  if (!nrow(rates)) {
+    return(invisible(rates))
+  }
   keys <- intersect(c(
     ".hammel_group", "sex", "union_type", "previous_union",
     "parity_start",
@@ -328,18 +373,23 @@ check_strata_overlap <- function(rates, process) {
   ), names(rates))
   for (axis in c("age", "dur")) {
     lo <- paste0(axis, "_start"); hi <- paste0(axis, "_end")
-    if (!lo %in% names(rates)) next
+    if (!lo %in% names(rates)) {
+      next
+    }
     rows <- which(!is.na(rates[[lo]]))
-    key <- if (length(keys)) do.call(paste, c(lapply(rates[rows, keys,
-      drop =
-        FALSE
-    ], as.character), sep = "\r")) else
+    key <- if (length(keys)) {
+      do.call(paste, c(lapply(rates[rows, keys,
+        drop =
+          FALSE
+      ], as.character), sep = "\r"))
+    } else {
       rep("", length(rows))
+    }
     for (r in split(rows, key)) {
       r <- r[order(rates[[lo]][r])]
       if (length(r) > 1L && any(rates[[lo]][r[-1L]] < utils::head(cummax(rates[[
         hi
-      ]][r]), -1L)))
+      ]][r]), -1L))) {
         stop(sprintf(
           paste0(
             "%s rates have overlapping bands within a stratum; ",
@@ -347,6 +397,7 @@ check_strata_overlap <- function(rates, process) {
           ),
           process
         ), call. = FALSE)
+      }
     }
   }
   invisible(rates)
@@ -357,7 +408,9 @@ check_strata_overlap <- function(rates, process) {
 # Shared group validation and execution-only schedule indexing. Public labels
 # and their types are preserved; the engine uses compact integer indices.
 check_groups <- function(table, name) {
-  if (!"group" %in% names(table)) return(invisible(table))
+  if (!"group" %in% names(table)) {
+    return(invisible(table))
+  }
   x <- table$group
   if (!(is.character(x) || is.numeric(x)) ||
     !is.null(dim(x)) || anyNA(x) ||
@@ -377,11 +430,15 @@ check_groups <- function(table, name) {
 # Row sets of each stratum of a rate table, by the given group columns.
 split_rate_groups <- function(rates, columns = "group") {
   columns <- intersect(columns, names(rates))
-  for (column in columns) check_groups(
-    tibble::tibble(group = rates[[column]]),
-    paste0("rates$", column)
-  )
-  if (!length(columns)) return(list(seq_len(nrow(rates))))
+  for (column in columns) {
+    check_groups(
+      tibble::tibble(group = rates[[column]]),
+      paste0("rates$", column)
+    )
+  }
+  if (!length(columns)) {
+    return(list(seq_len(nrow(rates))))
+  }
   key <- do.call(paste, c(lapply(rates[columns], as.character), sep = "\r"))
   split(seq_len(nrow(rates)), key, drop = TRUE)
 }
@@ -393,10 +450,14 @@ validate_rates <- function(rates, mortality) {
     rates, if (mortality) "sex" else "union_type",
     if (mortality) "Mortality" else "Fertility"
   )
-  if (validate_calendar_rates(rates, function(x) validate_rates(x, mortality)))
+  if (validate_calendar_rates(rates,
+    function(x) validate_rates(x, mortality))) {
     return(invisible(rates))
+  }
   columns <- c("age_start", "age_end", "rate")
-  if (mortality) columns <- c("sex", columns)
+  if (mortality) {
+    columns <- c("sex", columns)
+  }
   check_columns(rates, columns, "rates")
   # Possible group columns: each stratum is validated as its own schedule.
   strata <- candidate_strata(rates)
@@ -405,9 +466,11 @@ validate_rates <- function(rates, mortality) {
       schedule <- rates[rows, setdiff(names(rates), strata), drop = FALSE]
       validate_rates(schedule, mortality)
     }
-    if (!nrow(rates)) stop("`rates` must contain at least one age interval.",
-      call. = FALSE
-    )
+    if (!nrow(rates)) {
+      stop("`rates` must contain at least one age interval.",
+        call. = FALSE
+      )
+    }
     return(invisible(rates))
   }
   if (nrow(rates) == 0L) {
@@ -448,10 +511,11 @@ validate_rates <- function(rates, mortality) {
         call. = FALSE
       )
     }
-    if ("union_status" %in% names(rates))
+    if ("union_status" %in% names(rates)) {
       stop("Fertility input `union_status` has been replaced by `union_type`.",
         call. = FALSE
       )
+    }
     if ("union_type" %in% names(rates)) {
       status <- rates$union_type
       if (!is.character(status) || !is.null(dim(status)) || anyNA(status) ||
@@ -482,11 +546,12 @@ validate_rates <- function(rates, mortality) {
       any(upper <= rates$parity_start) || any(is.finite(upper) & upper !=
       floor(upper)) ||
       any(rates$parity_start > .Machine$integer.max) ||
-      any(is.finite(upper) & upper > .Machine$integer.max))
+      any(is.finite(upper) & upper > .Machine$integer.max)) {
       stop(paste0(
         "Parity bands need nonnegative integer starts and ",
         "greater integer ends or Inf within engine count capacity."
       ), call. = FALSE)
+    }
     schedules <- unlist(lapply(schedules, function(rows) {
       bands <- unique(rates[rows, c("parity_start", "parity_end"),
         drop =
@@ -496,11 +561,12 @@ validate_rates <- function(rates, mortality) {
       if (bands$parity_start[1] != 0 || tail(bands$parity_end, 1) != Inf ||
         (nrow(bands) > 1L && any(head(bands$parity_end, -1) != tail(
           bands$parity_start, -1
-        ))))
+        )))) {
         stop(paste0(
           "Parity bands must cover [0, Inf) without gaps or ",
           "overlaps in every group/union-type schedule."
         ), call. = FALSE)
+      }
       lapply(seq_len(nrow(bands)), function(i) rows[
         rates$parity_start[rows] == bands$parity_start[i] &
           rates$parity_end[rows] == bands$parity_end[i]

@@ -159,10 +159,12 @@ simulate <- function(model, years, seed = NULL) {
     population$persons$group <- NULL
   }
   start <- population$end_time
-  if (is.null(start)) stop("The population needs a finite `end_time`.",
-    call. =
-      FALSE
-  )
+  if (is.null(start)) {
+    stop("The population needs a finite `end_time`.",
+      call. =
+        FALSE
+    )
+  }
   if (!is.numeric(years) || length(years) != 1L || !is.finite(years) || years <
     0) {
     stop("`years` must be finite and nonnegative.", call. = FALSE)
@@ -178,9 +180,13 @@ simulate <- function(model, years, seed = NULL) {
   birth_interval <- model$processes$fertility$birth_interval
   ffab <- model$processes$fertility$ffab
   hetfert <- model$processes$fertility$hetfert
-  if (!is.null(hetfert)) validate_fertility_weights(population$persons)
+  if (!is.null(hetfert)) {
+    validate_fertility_weights(population$persons)
+  }
   for (death_slice in calendar_rate_slices(death_rates, start, start + years)) {
-    if (!nrow(death_slice)) next
+    if (!nrow(death_slice)) {
+      next
+    }
     for (rows in split_rate_groups(death_slice, c(
       dimensions, "group",
       undeclared
@@ -221,7 +227,9 @@ simulate <- function(model, years, seed = NULL) {
     validate_process_weights(x$weights, "transition")
   }
   dissolution_process <- model$processes$union_dissolution
-  if (!is.null(dissolution_process)) attach_process(model, dissolution_process)
+  if (!is.null(dissolution_process)) {
+    attach_process(model, dissolution_process)
+  }
   union_process <- model$processes$union_formation
   attach_process(model, union_process)
   calendar_inputs <- list(
@@ -230,19 +238,21 @@ simulate <- function(model, years, seed = NULL) {
     conversion = union_process$union_convert_rate,
     cohabitation_probability = union_process$cohab_prob
   )
-  for (d in names(transition_list))
+  for (d in names(transition_list)) {
     calendar_inputs[[paste0("`", d, "` transition")]] <- transition_list[[
       d
     ]]$rates
+  }
   # A rate table stratified by a persons column that is not a declared group.
   for (name in names(calendar_inputs)) {
     columns <- names(calendar_inputs[[name]])
     bad <- c(intersect(undeclared, columns), if (!grouped && any(c(
       "group",
       "group_pair"
-    ) %in% columns))
-      intersect(c("group", "group_pair"), columns))
-    if (length(bad))
+    ) %in% columns)) {
+      intersect(c("group", "group_pair"), columns)
+    })
+    if (length(bad)) {
       stop(
         sprintf(
           paste0(
@@ -253,27 +263,31 @@ simulate <- function(model, years, seed = NULL) {
         ),
         call. = FALSE
       )
+    }
   }
-  for (name in names(calendar_inputs))
+  for (name in names(calendar_inputs)) {
     check_calendar_coverage(calendar_inputs[[name]], start, start + years, name)
+  }
   cohab_enabled <- !is.null(union_process$cohab_prob)
   counts_cohab <- isTRUE(union_process$cohabitation_counts_as_previous_union)
   if (!cohab_enabled && "union_type" %in% names(population$unions) &&
-    any(population$unions$union_type == "cohab"))
+    any(population$unions$union_type == "cohab")) {
     stop(paste0(
       "A cohabitation history requires cohab_prob to ",
       "continue with union types enabled."
     ), call. = FALSE)
+  }
   if (!cohab_enabled && (("union_type" %in% names(birth_rates) && any(
     birth_rates$union_type %in% c("cohab", "marriage")
   )) ||
     (!is.null(dissolution_process) && "union_type" %in% names(
       dissolution_process$rates
-    ))))
+    )))) {
     stop("Type-specific fertility/dissolution requires cohab_prob.",
       call. =
         FALSE
     )
+  }
   status_fertility <- "union_type" %in% names(birth_rates)
   if (union_process$initiation == "on_demand" && status_fertility) {
     stop(
@@ -311,61 +325,80 @@ simulate <- function(model, years, seed = NULL) {
   ))
   resolved <- resolve_matching_models(union_process, declaration, registries)
   union_process <- resolved$process
-  match_dims <- if (length(resolved$dims)) resolved$dims else if (length(
+  match_dims <- if (length(resolved$dims)) {
+    resolved$dims
+  } else if (length(
     dimensions
-  ) == 1L) dimensions
+  ) == 1L) {
+    dimensions
+  }
   group_values <- if (length(resolved$dims)) {
     resolved$values
   } else if (length(match_dims)) {
     registries[[match_dims]]
   }
   tracked <- tracked_ancestry(declaration)
-  components <- lapply(dimensions, function(d)
-    if (d %in% tracked) setdiff(
-      names(population$ancestry[[d]]),
-      "person_id"
-    ) else character())
+  components <- lapply(dimensions, function(d) {
+    if (d %in% tracked) {
+      setdiff(
+        names(population$ancestry[[d]]),
+        "person_id"
+      )
+    } else {
+      character()
+    }
+  })
   sizes <- vapply(components, length, integer(1))
   offsets <- cumsum(c(0L, utils::head(sizes, -1)))
-  for (d in dimensions)
+  for (d in dimensions) {
     if (!d %in% tracked && any(vapply(model_entries(declaration[[
       d
     ]]$inheritance), function(m)
-      identical(m$method, "ancestry"), logical(1))))
+      identical(m$method, "ancestry"), logical(1)))) {
       stop(paste0(
         "The \"ancestry\" inheritance method requires ",
         "`ancestry = TRUE` in group()."
       ), call. = FALSE)
+    }
+  }
   model_arguments <- list(
     matching = union_process$matching,
     father_matching = union_process$father_matching,
     cohab_matching = union_process$cohab_matching
   )
   inheritance_arguments <- lapply(declaration, `[[`, "inheritance")
-  for (name in names(model_arguments))
+  for (name in names(model_arguments)) {
     check_model_coverage(model_arguments[[name]], start, start + years, name)
-  for (d in dimensions)
+  }
+  for (d in dimensions) {
     check_model_coverage(
       inheritance_arguments[[d]], start, start + years,
       sprintf("`%s` inheritance", d)
     )
+  }
   scheduled_models <- any(vapply(
     c(model_arguments, inheritance_arguments),
     is_model_schedule, logical(1)
   ))
-  model_context <- if (scheduled_models)
+  model_context <- if (scheduled_models) {
     prepare_model_schedules(
       model_arguments, group_values, unname(
         inheritance_arguments
       ),
       registries, components, start, start + years
-    ) else NULL
+    )
+  } else {
+    NULL
+  }
   inheritance <- lapply(seq_along(dimensions), function(d) {
-    rule <- if (scheduled_models) model_context$inheritance[[d]] else
+    rule <- if (scheduled_models) {
+      model_context$inheritance[[d]]
+    } else {
       prepare_group_inheritance(
         declaration[[d]]$inheritance, registries[[d]],
         components[[d]]
       )
+    }
     c(rule, list(
       ancestry_offset = as.integer(offsets[d]),
       ancestry_size = sizes[[d]]
@@ -380,50 +413,62 @@ simulate <- function(model, years, seed = NULL) {
   death_rates <- death$rates
   birth <- strata(birth_rates, "fertility")
   birth_rates <- birth$rates
-  search <- if (is.null(union_process$rates))
+  search <- if (is.null(union_process$rates)) {
     list(
       rates = data.frame(
         age_start = numeric(), age_end = numeric(),
         rate = numeric()
       ),
       spec = strata(data.frame(rate = numeric()), "search")$spec
-    ) else
+    )
+  } else {
     strata(expand_previous_union_rates(union_process$rates), "union formation")
+  }
   union_rates <- search$rates
   validate_matching_groups(union_process$matching, group_values)
-  if (!is.null(union_process$father_matching))
+  if (!is.null(union_process$father_matching)) {
     validate_matching_groups(union_process$father_matching, group_values)
-  dissolution <- if (is.null(dissolution_process))
+  }
+  dissolution <- if (is.null(dissolution_process)) {
     list(
       rates = data.frame(
         age_start = numeric(), age_end = numeric(),
         rate = numeric()
       ),
       spec = strata(data.frame(rate = numeric()), "dissolution")$spec
-    ) else
+    )
+  } else {
     strata(dissolution_process$rates, "Union dissolution", union_level = TRUE)
+  }
   dissolution_rates <- dissolution$rates
   dissolution_rates$age_start <- dissolution_rates$dur_start
   dissolution_rates$age_end <- dissolution_rates$dur_end
   cohab <- prepare_cohabitation(union_process, strata)
-  if (!is.null(union_process$cohab_matching))
+  if (!is.null(union_process$cohab_matching)) {
     validate_matching_groups(union_process$cohab_matching, group_values)
-  if (cohab_enabled && !"union_type" %in% names(population$unions))
+  }
+  if (cohab_enabled && !"union_type" %in% names(population$unions)) {
     population$unions$union_type <- rep("marriage", nrow(population$unions))
-  if (cohab_enabled && !"previous_cohab_id" %in% names(population$unions))
+  }
+  if (cohab_enabled && !"previous_cohab_id" %in% names(population$unions)) {
     population$unions$previous_cohab_id <- rep(NA_real_, nrow(
       population$unions
     ))
+  }
   engine_persons <- population$persons
-  group_input <- if (!grouped) NULL else group_engine_input(
-    population$persons,
-    registries, match_dims,
-    list(
-      mortality = death$spec, fertility = birth$spec, search = search$spec,
-      probability = cohab$prob_spec, conversion = cohab$conversion_spec,
-      dissolution = dissolution$spec
+  group_input <- if (!grouped) {
+    NULL
+  } else {
+    group_engine_input(
+      population$persons,
+      registries, match_dims,
+      list(
+        mortality = death$spec, fertility = birth$spec, search = search$spec,
+        probability = cohab$prob_spec, conversion = cohab$conversion_spec,
+        dissolution = dissolution$spec
+      )
     )
-  )
+  }
   # Each transition process: strata over its own dimension (the origin) and
   # any other dimensions its table uses; destinations; and each person's
   # entry time into their current category of that dimension.
@@ -463,22 +508,27 @@ simulate <- function(model, years, seed = NULL) {
     conversion = union_process$weights_conversion,
     search = union_process$weights
   )
-  for (k in seq_along(transition_list))
+  for (k in seq_along(transition_list)) {
     weight_models[[paste0("transition_", k)]] <- transition_list[[k]]$weights
+  }
   weight_models <- Filter(Negate(is.null), weight_models)
-  for (name in names(weight_models))
+  for (name in names(weight_models)) {
     check_model_coverage(weight_models[[name]], start, start + years, paste(
       name, "weights"
     ))
+  }
   # Weight variables resolve against the declaration (D134): each dimension's
   # categories, and ancestry variables `ancestry_<dim>_<category>` in engine
   # column order.
-  ancestry_names <- unlist(lapply(seq_along(dimensions), function(k)
-    if (sizes[k]) paste0("ancestry_", dimensions[k], "_", components[[k]])))
+  ancestry_names <- unlist(lapply(seq_along(dimensions), function(k) {
+    if (sizes[k]) paste0("ancestry_", dimensions[k], "_", components[[k]])
+  }))
   weight_context <- list(categories = registries, ancestry = as.character(
     ancestry_names
   ))
-  weight_input <- if (!length(weight_models)) NULL else {
+  weight_input <- if (!length(weight_models)) {
+    NULL
+  } else {
     types <- c(
       mortality = "person", fertility = "person",
       dissolution = "union",
@@ -487,12 +537,18 @@ simulate <- function(model, years, seed = NULL) {
     prepared <- lapply(names(weight_models), function(name) {
       transition <- startsWith(name, "transition_")
       context <- weight_context
-      if (transition) context$transition_dim <- names(transition_list)[
-        as.integer(sub("transition_", "", name))
-      ]
+      if (transition) {
+        context$transition_dim <- names(transition_list)[
+          as.integer(sub("transition_", "", name))
+        ]
+      }
       prepare_weight_model(
         weight_models[[name]], if (
-          transition) "transition" else types[[name]],
+          transition) {
+          "transition"
+        } else {
+          types[[name]]
+        },
         if (transition) "transition" else name, context
       )
     })
@@ -518,12 +574,17 @@ simulate <- function(model, years, seed = NULL) {
       )
     }
     had_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
-    if (had_seed) old_seed <- get(".Random.seed", envir = .GlobalEnv)
+    if (had_seed) {
+      old_seed <- get(".Random.seed", envir = .GlobalEnv)
+    }
     on.exit(
       {
-        if (had_seed) assign(".Random.seed", old_seed, envir = .GlobalEnv)
-        else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
+        if (had_seed) {
+          assign(".Random.seed", old_seed, envir = .GlobalEnv)
+        } else if (exists(".Random.seed",
+          envir = .GlobalEnv, inherits = FALSE)) {
           rm(list = ".Random.seed", envir = .GlobalEnv)
+        }
       },
       add = TRUE
     )
@@ -537,8 +598,11 @@ simulate <- function(model, years, seed = NULL) {
   result <- population
   births <- deaths <- 0
   if (years > 0) {
-    matching <- if (scheduled_models) model_context$matching else
+    matching <- if (scheduled_models) {
+      model_context$matching
+    } else {
       prepare_matching_model(union_process$matching, group_values)
+    }
     father_matching <- if (scheduled_models) {
       model_context$father_matching
     } else if (is.null(union_process$father_matching)) {
@@ -573,11 +637,12 @@ simulate <- function(model, years, seed = NULL) {
       if (scheduled_models) model_context$config else NULL,
       weight_input, group_input
     )
-    if (!isTRUE(native$cells_consistent))
+    if (!isTRUE(native$cells_consistent)) {
       stop("Internal error: fertility cell counts are inconsistent.",
         call. =
           FALSE
       )
+    }
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
     if (added > 0L) {
@@ -586,12 +651,17 @@ simulate <- function(model, years, seed = NULL) {
           FALSE
       ])
     }
-    for (column in names(native$persons)) persons[[column]] <- native$persons[[
-      column
-    ]]
-    if (!is.null(hetfert)) persons$hetfert <- native$hetfert
-    for (d in seq_along(dimensions))
+    for (column in names(native$persons)) {
+      persons[[column]] <- native$persons[[
+        column
+      ]]
+    }
+    if (!is.null(hetfert)) {
+      persons$hetfert <- native$hetfert
+    }
+    for (d in seq_along(dimensions)) {
       persons[[dimensions[d]]] <- registries[[d]][native$categories[, d] + 1L]
+    }
     result$persons <- tibble::as_tibble(persons)
     if (grouped) {
       tx <- native$transitions
@@ -620,10 +690,14 @@ simulate <- function(model, years, seed = NULL) {
     if (length(tracked)) {
       result$ancestry <- list()
       for (k in seq_along(dimensions)) {
-        if (!sizes[k]) next
+        if (!sizes[k]) {
+          next
+        }
         table <- tibble::tibble(person_id = persons$person_id)
-        for (j in seq_len(sizes[k])) table[[components[[k]][j]]] <-
-          native$ancestry[, offsets[k] + j]
+        for (j in seq_len(sizes[k])) {
+          table[[components[[k]][j]]] <-
+            native$ancestry[, offsets[k] + j]
+        }
         result$ancestry[[dimensions[k]]] <- table
       }
     }
@@ -635,9 +709,11 @@ simulate <- function(model, years, seed = NULL) {
           FALSE
       ])
     }
-    for (column in names(native$unions)) unions[[column]] <- native$unions[[
-      column
-    ]]
+    for (column in names(native$unions)) {
+      unions[[column]] <- native$unions[[
+        column
+      ]]
+    }
     result$unions <- tibble::as_tibble(unions)
     births <- native$births
     deaths <- native$deaths
@@ -694,8 +770,9 @@ simulate <- function(model, years, seed = NULL) {
       new_rows <- seq_len(nrow(added)) + nrow(population$unions)
       for (g in seq_along(group_values)) {
         column <- paste0(".log_weight_", as.character(group_values)[g])
-        if (!column %in% names(result$unions))
+        if (!column %in% names(result$unions)) {
           result$unions[[column]] <- rep(NA_real_, nrow(result$unions))
+        }
         result$unions[[column]][new_rows] <- added[, g]
       }
     }
@@ -706,7 +783,9 @@ simulate <- function(model, years, seed = NULL) {
     birth_interval = birth_interval, ffab = ffab,
     births = births, deaths = deaths
   )
-  if (!is.null(hetfert)) result$simulation$hetfert <- hetfert
+  if (!is.null(hetfert)) {
+    result$simulation$hetfert <- hetfert
+  }
   result$simulation$unrealized_births <- format_unrealized_births(
     if (years > 0) native$unrealized else NULL, birth_rates, registries
   )
@@ -714,16 +793,23 @@ simulate <- function(model, years, seed = NULL) {
     result$simulation$cohabitation_counts_as_previous_union <- counts_cohab
     result$simulation$conversions <- if (years > 0) native$conversions else 0
   }
-  if (length(transition_list))
-    result$simulation$transitions <- if (years > 0) nrow(
-      native$transitions
-    ) else 0L
-  if (!is.null(dissolution_process))
+  if (length(transition_list)) {
+    result$simulation$transitions <- if (years > 0) {
+      nrow(
+        native$transitions
+      )
+    } else {
+      0L
+    }
+  }
+  if (!is.null(dissolution_process)) {
     result$simulation$dissolutions <- if (years > 0) native$dissolutions else 0
-  if (!is.null(hidden_group))
+  }
+  if (!is.null(hidden_group)) {
     result$persons$group <- c(hidden_group, hidden_group[rep(NA_integer_, nrow(
       result$persons
     ) - length(hidden_group))])
+  }
   result$persons <- tibble::as_tibble(result$persons)
   result$unions <- tibble::as_tibble(result$unions)
   validate_population(result)
@@ -750,15 +836,19 @@ format_unrealized_births <- function(native, rates, registries) {
     period_end = native$period_end
   )
   # The reporting index combines every group dimension's category.
-  if (length(registries))
+  if (length(registries)) {
     for (column in names(decoded <- decode_report_strata(
       native$group,
       registries
-    )))
+    ))) {
       out[[column]] <- decoded[[column]]
-  if ("union_type" %in% names(rates)) out$union_type <- as.character(
-    native$union_type
-  )
+    }
+  }
+  if ("union_type" %in% names(rates)) {
+    out$union_type <- as.character(
+      native$union_type
+    )
+  }
   if ("parity_start" %in% names(rates)) {
     out$parity_start <- native$parity_start
     out$parity_end <- native$parity_end

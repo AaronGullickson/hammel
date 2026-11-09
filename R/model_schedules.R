@@ -6,39 +6,46 @@
 is_model_schedule <- function(x) is.data.frame(x)
 
 validate_model_argument <- function(x, validate, name) {
-  if (!is_model_schedule(x)) return(validate(x))
+  if (!is_model_schedule(x)) {
+    return(validate(x))
+  }
   check_columns(x, c("time_start", "time_end", "model"), name)
   check_numeric_column(x$time_start, paste0(name, "$time_start"))
   ends <- x$time_end
   if (!nrow(x) || !is.numeric(ends) || !is.null(dim(ends)) || anyNA(ends) ||
-    any(ends <= x$time_start))
+    any(ends <= x$time_start)) {
     stop(
       sprintf(
         "%s schedule needs finite starts and greater ends (possibly Inf).", name
       ),
       call. = FALSE
     )
+  }
   rows <- order(x$time_start)
   if (length(rows) > 1L && any(tail(x$time_start[rows], -1L) < head(cummax(ends[
     rows
-  ]), -1L)))
+  ]), -1L))) {
     stop(sprintf("%s model intervals must not overlap.", name), call. = FALSE)
-  if (!is.list(x$model) || !is.null(dim(x$model)))
+  }
+  if (!is.list(x$model) || !is.null(dim(x$model))) {
     stop(sprintf("%s$model must be a list column of complete models.", name),
       call. = FALSE
     )
+  }
   for (i in seq_len(nrow(x))) {
     model <- x$model[[i]]
-    if (is.null(model) || is_model_schedule(model) || is.character(model))
+    if (is.null(model) || is_model_schedule(model) || is.character(model)) {
       stop(sprintf(
         "%s$model[[%d]] must contain a complete model object.", name,
         i
       ), call. = FALSE)
-    tryCatch(validate(model), error = function(e)
+    }
+    tryCatch(validate(model), error = function(e) {
       stop(sprintf("%s$model[[%d]]: %s", name, i, conditionMessage(e)),
         call. =
           FALSE
-      ))
+      )
+    })
   }
   invisible(x)
 }
@@ -52,17 +59,23 @@ model_entries <- function(x) {
 }
 
 model_at <- function(x, time) {
-  if (!is_model_schedule(x)) return(x)
+  if (!is_model_schedule(x)) {
+    return(x)
+  }
   i <- which(x$time_start <= time & time < x$time_end)
-  if (length(i) != 1L) stop("No unique active model in schedule.",
-    call. =
-      FALSE
-  )
+  if (length(i) != 1L) {
+    stop("No unique active model in schedule.",
+      call. =
+        FALSE
+    )
+  }
   x$model[[i]]
 }
 
 check_model_coverage <- function(x, start, end, name) {
-  if (!is_model_schedule(x)) return(invisible(NULL))
+  if (!is_model_schedule(x)) {
+    return(invisible(NULL))
+  }
   check_time_coverage(
     x$time_start, x$time_end, start, end,
     sprintf("%s model schedule has a coverage gap", name)
@@ -71,9 +84,12 @@ check_model_coverage <- function(x, start, end, name) {
 
 collect_model_bank <- function(arguments) {
   bank <- list()
-  for (argument in arguments) for (model in model_entries(argument)) {
-    if (!any(vapply(bank, identical, logical(1), y = model)))
-      bank[[length(bank) + 1L]] <- model
+  for (argument in arguments) {
+    for (model in model_entries(argument)) {
+      if (!any(vapply(bank, identical, logical(1), y = model))) {
+        bank[[length(bank) + 1L]] <- model
+      }
+    }
   }
   bank
 }
@@ -98,9 +114,13 @@ prepare_model_schedules <- function(
     population_groups = values
   )
   times <- start
-  for (x in c(arguments, inheritance)) if (is_model_schedule(x)) times <- c(
-    times, x$time_start, x$time_end
-  )
+  for (x in c(arguments, inheritance)) {
+    if (is_model_schedule(x)) {
+      times <- c(
+        times, x$time_start, x$time_end
+      )
+    }
+  }
   times <- sort(unique(times[times >= start & (times < end | times == start)]))
   id <- function(model, bank) which(vapply(bank, identical, logical(1),
     y =
@@ -111,11 +131,14 @@ prepare_model_schedules <- function(
     matching_bank
   ), integer(1))
   role_ids <- function(role) {
-    if (is.null(arguments[[role]])) matching_ids else
+    if (is.null(arguments[[role]])) {
+      matching_ids
+    } else {
       vapply(times, function(t) id(
         model_at(arguments[[role]], t),
         matching_bank
       ), integer(1))
+    }
   }
   prepared_inheritance <- list()
   routes <- list()

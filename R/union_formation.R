@@ -200,14 +200,16 @@ union_formation <- function(
   validate_union_formation(process)
   validate_process_weights(weights_conversion, "union")
   validate_process_weights(weights, "person")
-  if (!is.null(weights) && !identical(initiation, "rate"))
+  if (!is.null(weights) && !identical(initiation, "rate")) {
     stop("Search `weights` require rate-based union formation.", call. = FALSE)
-  if (!is.null(weights) && !is.null(rates))
+  }
+  if (!is.null(weights) && !is.null(rates)) {
     warn_cancelled_weight_terms(
       weights, weight_strata("search", rates),
       "search"
     )
-  if (!is.null(weights_conversion) && !is.null(union_convert_rate))
+  }
+  if (!is.null(weights_conversion) && !is.null(union_convert_rate)) {
     warn_cancelled_weight_terms(
       weights_conversion, weight_strata(
         "conversion",
@@ -215,15 +217,22 @@ union_formation <- function(
       ),
       "conversion"
     )
-  for (field in c("matching", "father_matching", "cohab_matching"))
+  }
+  for (field in c("matching", "father_matching", "cohab_matching")) {
     process[field] <- list(normalize_model_argument(process[[field]]))
-  for (field in c("cohab_prob", "union_convert_rate"))
-    if (!is.null(process[[field]])) process[[field]] <- tibble::as_tibble(
-      process[[field]]
-    )
+  }
+  for (field in c("cohab_prob", "union_convert_rate")) {
+    if (!is.null(process[[field]])) {
+      process[[field]] <- tibble::as_tibble(
+        process[[field]]
+      )
+    }
+  }
   if (!is.null(rates)) {
     process$rates <- tibble::as_tibble(rates)
-    if (!is.null(attr(rates, "source"))) process$source <- attr(rates, "source")
+    if (!is.null(attr(rates, "source"))) {
+      process$source <- attr(rates, "source")
+    }
   }
   process
 }
@@ -295,11 +304,12 @@ validate_union_formation <- function(process) {
   }
   validate_kinship_generations(process$kinship_generations)
   validate_model_argument(process$matching, validate_matching_model, "matching")
-  if (!is.null(process$father_matching))
+  if (!is.null(process$father_matching)) {
     validate_model_argument(
       process$father_matching, validate_matching_model,
       "father_matching"
     )
+  }
   if (process$initiation == "on_demand") {
     if (!is.null(process$rates)) {
       stop("On-demand union formation does not take rates.", call. = FALSE)
@@ -311,12 +321,16 @@ validate_union_formation <- function(process) {
 }
 
 expand_previous_union_rates <- function(rates) {
-  if (!"previous_union" %in% names(rates)) return(rates)
+  if (!"previous_union" %in% names(rates)) {
+    return(rates)
+  }
   changed <- FALSE
   expand_slice <- function(x) {
     copies <- lapply(split_rate_groups(x), function(rows) {
       copy <- x[rows[x$previous_union[rows] == "dissolved"], , drop = FALSE]
-      if (nrow(copy)) changed <<- TRUE
+      if (nrow(copy)) {
+        changed <<- TRUE
+      }
       do.call(rbind, lapply(c("separated", "widowed"), function(label) {
         out <- copy
         out$previous_union <- rep(label, nrow(copy))
@@ -328,10 +342,14 @@ expand_previous_union_rates <- function(rates) {
       copies
     ))
   }
-  if (!has_calendar_rates(rates)) return(expand_slice(rates))
+  if (!has_calendar_rates(rates)) {
+    return(expand_slice(rates))
+  }
   pieces <- lapply(calendar_rate_segments(rates), function(segment) {
     x <- segment$rates
-    if (!nrow(x)) return(NULL)
+    if (!nrow(x)) {
+      return(NULL)
+    }
     x$time_start <- segment$start
     x$time_end <- segment$end
     x <- x[, names(rates), drop = FALSE]
@@ -352,17 +370,18 @@ validate_union_search_rates <- function(rates) {
           effective$previous_union
         ),
         function(x) length(unique(x)) != 1L, logical(1)
-      )))
+      ))) {
       stop(paste0(
         "Each previous_union category must use the same ",
         "age or duration clock across calendar periods."
       ), call. = FALSE)
+    }
     return(invisible(rates))
   }
   check_columns(rates, c("age_start", "age_end", "rate"), "rates")
   check_numeric_column(rates$rate, "rates$rate")
   if (!nrow(rates) || any(rates$rate < 0) ||
-    any(c("sex", "time_start", "time_end") %in% names(rates)))
+    any(c("sex", "time_start", "time_end") %in% names(rates))) {
     stop(
       paste0(
         "Use nonnegative female search rates in valid age ",
@@ -370,17 +389,21 @@ validate_union_search_rates <- function(rates) {
       ),
       call. = FALSE
     )
+  }
   duration_columns <- c("dur_start", "dur_end") %in% names(rates)
-  if (any(duration_columns) && !all(duration_columns))
+  if (any(duration_columns) && !all(duration_columns)) {
     stop("Supply both `dur_start` and `dur_end`, or neither.", call. = FALSE)
-  boundaries <- c("age_start", "age_end", if (all(duration_columns)) c(
-    "dur_start", "dur_end"
-  ))
+  }
+  boundaries <- c("age_start", "age_end", if (all(duration_columns)) {
+    c(
+      "dur_start", "dur_end"
+    )
+  })
   for (column in boundaries) {
     x <- rates[[column]]
     # Bare NA is logical in R; permit all-NA placeholders for an unused axis.
     if (!(is.numeric(x) || (is.logical(x) && all(is.na(x)))) ||
-      !is.null(dim(x)) || any(is.nan(x)))
+      !is.null(dim(x)) || any(is.nan(x))) {
       stop(
         sprintf(paste0(
           "`rates$%s` must contain numeric boundaries or NA ",
@@ -388,16 +411,23 @@ validate_union_search_rates <- function(rates) {
         ), column),
         call. = FALSE
       )
+    }
   }
   age <- !is.na(rates$age_start) & !is.na(rates$age_end)
-  duration <- if (all(duration_columns))
-    !is.na(rates$dur_start) & !is.na(rates$dur_end) else rep(FALSE, nrow(
-    rates
-  ))
+  duration <- if (all(duration_columns)) {
+    !is.na(rates$dur_start) & !is.na(rates$dur_end)
+  } else {
+    rep(FALSE, nrow(
+      rates
+    ))
+  }
   age_empty <- is.na(rates$age_start) & is.na(rates$age_end)
-  duration_empty <- if (all(duration_columns))
-    is.na(rates$dur_start) & is.na(rates$dur_end) else rep(TRUE, nrow(rates))
-  if (any(!((age & duration_empty) | (duration & age_empty))))
+  duration_empty <- if (all(duration_columns)) {
+    is.na(rates$dur_start) & is.na(rates$dur_end)
+  } else {
+    rep(TRUE, nrow(rates))
+  }
+  if (any(!((age & duration_empty) | (duration & age_empty)))) {
     stop(
       paste0(
         "Each row requires exactly one complete age or ",
@@ -405,18 +435,20 @@ validate_union_search_rates <- function(rates) {
       ),
       call. = FALSE
     )
+  }
   starts <- rates$age_start
   ends <- rates$age_end
   if (any(duration)) {
-    if (!"previous_union" %in% names(rates))
+    if (!"previous_union" %in% names(rates)) {
       stop(paste0(
         "Duration search bands require `previous_union` ",
         "('dissolved', 'separated', or 'widowed')."
       ), call. = FALSE)
+    }
     starts[duration] <- rates$dur_start[duration]
     ends[duration] <- rates$dur_end[duration]
   }
-  if (any(!is.finite(starts)) || any(starts < 0) || any(ends <= starts))
+  if (any(!is.finite(starts)) || any(starts < 0) || any(ends <= starts)) {
     stop(
       paste0(
         "Use valid nonnegative age or duration bands with ",
@@ -424,6 +456,7 @@ validate_union_search_rates <- function(rates) {
       ),
       call. = FALSE
     )
+  }
   strata <- split_rate_groups(rates, candidate_strata(rates))
   if ("previous_union" %in% names(rates)) {
     previous <- rates$previous_union
@@ -431,17 +464,18 @@ validate_union_search_rates <- function(rates) {
     if (!is.character(previous) || !is.null(dim(previous)) || anyNA(
       previous
     ) ||
-      any(!previous %in% categories))
+      any(!previous %in% categories)) {
       stop(paste0(
         "`previous_union` must contain 'none', ",
         "'separated', 'widowed', or pooled 'dissolved'."
       ), call. = FALSE)
+    }
     if (any(vapply(
       strata, function(rows)
         !(setequal(previous[rows], c("none", "dissolved")) ||
           setequal(previous[rows], c("none", "separated", "widowed"))),
       logical(1)
-    )))
+    ))) {
       stop(
         paste0(
           "Supply either 'none' and 'dissolved', or all ",
@@ -452,20 +486,25 @@ validate_union_search_rates <- function(rates) {
         ),
         call. = FALSE
       )
-    if (any(duration & previous == "none"))
+    }
+    if (any(duration & previous == "none")) {
       stop("`previous_union = 'none'` requires age-specific bands.",
         call. =
           FALSE
       )
+    }
     effective <- expand_previous_union_rates(rates)
-    effective_duration <- if (all(duration_columns)) !is.na(
-      effective$dur_start
-    ) else
+    effective_duration <- if (all(duration_columns)) {
+      !is.na(
+        effective$dur_start
+      )
+    } else {
       rep(FALSE, nrow(effective))
+    }
     if (any(vapply(
       split(effective_duration, effective$previous_union),
       function(x) length(unique(x)) != 1L, logical(1)
-    )))
+    ))) {
       stop(
         paste0(
           "Each `previous_union` category must use the same ",
@@ -473,6 +512,7 @@ validate_union_search_rates <- function(rates) {
         ),
         call. = FALSE
       )
+    }
     strata <- unlist(lapply(strata, function(rows) split(rows, previous[
       rows
     ])), recursive = FALSE)
@@ -480,11 +520,12 @@ validate_union_search_rates <- function(rates) {
   for (rows in strata) {
     rows <- rows[order(starts[rows])]
     if (length(rows) > 1L &&
-      any(tail(starts[rows], -1) < head(cummax(ends[rows]), -1)))
+      any(tail(starts[rows], -1) < head(cummax(ends[rows]), -1))) {
       stop("Union-search age or duration bands must not overlap.",
         call. =
           FALSE
       )
+    }
   }
   invisible(rates)
 }

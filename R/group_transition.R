@@ -62,8 +62,9 @@ group_transition <- function(
 ) {
   process <- new_rate_process("group_transition", rates)
   process$group <- check_transition_group(group)
-  if (!is.null(household) && !inherits(household, "hammel_household"))
+  if (!is.null(household) && !inherits(household, "hammel_household")) {
     stop("`household` must be NULL or created with household().", call. = FALSE)
+  }
   process["household"] <- list(household)
   validate_group_transition(process)
   validate_process_weights(weights, "transition")
@@ -114,10 +115,11 @@ set_group_transition <- function(
 household <- function(age_independence = 18) {
   if (!is.numeric(age_independence) || length(age_independence) != 1L ||
     !is.finite(age_independence) ||
-    age_independence < 0)
+    age_independence < 0) {
     stop("`age_independence` must be a finite nonnegative number of years.",
       call. = FALSE
     )
+  }
   structure(list(age_independence = as.numeric(age_independence)),
     class =
       "hammel_household"
@@ -127,13 +129,16 @@ household <- function(age_independence = 18) {
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 check_transition_group <- function(group) {
-  if (is.null(group)) return(NULL)
+  if (is.null(group)) {
+    return(NULL)
+  }
   if (!is.character(group) || length(group) != 1L || is.na(group) || !nzchar(
     group
-  ))
+  )) {
     stop("`group` must be NULL or the name of one declared group dimension.",
       call. = FALSE
     )
+  }
   group
 }
 
@@ -148,9 +153,11 @@ transition_processes <- function(model) {
 # same dimension. A process without `group` takes the only declared dimension.
 store_transition_process <- function(model, process) {
   declaration <- model_groups(model)
-  if (is.null(process$group) && length(declaration) == 1L) process$group <-
-    names(declaration)
-  if (is.null(process$group) && length(declaration) > 1L)
+  if (is.null(process$group) && length(declaration) == 1L) {
+    process$group <-
+      names(declaration)
+  }
+  if (is.null(process$group) && length(declaration) > 1L) {
     stop(
       sprintf(
         "Name the dimension whose categories change with `group`: one of %s.",
@@ -158,6 +165,7 @@ store_transition_process <- function(model, process) {
       ),
       call. = FALSE
     )
+  }
   processes <- transition_processes(model)
   processes[[if (is.null(process$group)) ".default" else process$group]] <-
     process
@@ -167,26 +175,30 @@ store_transition_process <- function(model, process) {
 
 # Resolve each transition process to a declared dimension, in declaration order.
 resolve_transition_processes <- function(processes, declaration) {
-  if (!length(processes)) return(list())
-  if (!length(declaration))
+  if (!length(processes)) {
+    return(list())
+  }
+  if (!length(declaration)) {
     stop(paste0(
       "Group transitions require a declared group ",
       "dimension; use set_groups()."
     ), call. = FALSE)
+  }
   dims <- names(declaration)
   resolved <- list()
   for (key in names(processes)) {
     x <- processes[[key]]
     group <- x$group
     if (is.null(group)) {
-      if (length(dims) != 1L)
+      if (length(dims) != 1L) {
         stop(paste0(
           "A group transition without `group` needs exactly ",
           "one declared group dimension."
         ), call. = FALSE)
+      }
       group <- dims
     }
-    if (!group %in% dims)
+    if (!group %in% dims) {
       stop(sprintf(
         paste0(
           "Group transitions use `%s`, which is not a declared ",
@@ -194,12 +206,14 @@ resolve_transition_processes <- function(processes, declaration) {
         ),
         group
       ), call. = FALSE)
-    if (!is.null(resolved[[group]]))
+    }
+    if (!is.null(resolved[[group]])) {
       stop(sprintf("Group `%s` has more than one transition process.", group),
         call. = FALSE
       )
+    }
     x$group <- group
-    if (group %in% names(x$rates))
+    if (group %in% names(x$rates)) {
       stop(sprintf(
         paste0(
           "Transition rates for `%s` cannot be stratified by ",
@@ -207,6 +221,7 @@ resolve_transition_processes <- function(processes, declaration) {
         ),
         group, group
       ), call. = FALSE)
+    }
     resolved[[group]] <- x
   }
   resolved[intersect(dims, names(resolved))]
@@ -214,11 +229,12 @@ resolve_transition_processes <- function(processes, declaration) {
 
 validate_group_transition <- function(process) {
   if (!identical(process$name, "group_transition") ||
-    !identical(process$rate_unit, "person_year"))
+    !identical(process$rate_unit, "person_year")) {
     stop("Invalid group-transition specification or units.", call. = FALSE)
+  }
   r <- process$rates
   old <- intersect(c("group_origin", "group_dest"), names(r))
-  if (length(old))
+  if (length(old)) {
     stop(
       paste0(
         "Transition rates name categories with `origin` and ",
@@ -227,50 +243,58 @@ validate_group_transition <- function(process) {
       paste0("`", old, "`", collapse = " and "), ".",
       call. = FALSE
     )
+  }
   check_stratified_columns(
     r, c("origin", "destination", "sex", "union_type"),
     "Group-transition"
   )
   if (validate_calendar_rates(r, function(x) {
     copy <- process; copy$rates <- x; validate_group_transition(copy)
-  })) return(invisible(process))
+  })) {
+    return(invisible(process))
+  }
   check_columns(r, c("origin", "destination", "rate"), "rates")
   age <- all(c("age_start", "age_end") %in% names(r))
   dur <- all(c("dur_start", "dur_end") %in% names(r))
-  if (!is.null(process$household) && dur)
+  if (!is.null(process$household) && dur) {
     stop(paste0(
       "Household moves need age bands: dependents reach ",
       "their own clock at a set age."
     ), call. = FALSE)
+  }
   if (!nrow(r) || age == dur ||
     any(c("time_start", "time_end", "union_status", "marital_status") %in%
       names(r)) ||
     (age && any(c("dur_start", "dur_end") %in% names(r))) ||
-    (dur && any(c("age_start", "age_end") %in% names(r))))
+    (dur && any(c("age_start", "age_end") %in% names(r)))) {
     stop("Use one common age or duration band type for all group transitions.",
       call. = FALSE
     )
+  }
   for (column in c("origin", "destination")) {
     check_groups(data.frame(group = r[[column]]), column)
   }
-  if (any(as.character(r$origin) == as.character(r$destination)))
+  if (any(as.character(r$origin) == as.character(r$destination))) {
     stop("Group transitions cannot have the same origin and destination.",
       call. = FALSE
     )
+  }
   start <- r[[if (age) "age_start" else "dur_start"]]
   end <- r[[if (age) "age_end" else "dur_end"]]
   check_numeric_column(start, "band start")
   check_numeric_column(r$rate, "rate")
   if (any(start < 0) || any(r$rate < 0) || !is.numeric(end) ||
-    !is.null(dim(end)) || anyNA(end) || any(end <= start))
+    !is.null(dim(end)) || anyNA(end) || any(end <= start)) {
     stop(paste0(
       "Transition rates and band starts must be ",
       "nonnegative with valid band ends."
     ), call. = FALSE)
+  }
   if ("sex" %in% names(r) && (!is.character(r$sex) || anyNA(r$sex) || any(
     !r$sex %in% c("m", "f")
-  )))
+  ))) {
     stop("Transition sex must be m or f.", call. = FALSE)
+  }
   if ("union_type" %in% names(r) && (!is.character(r$union_type) || anyNA(
     r$union_type
   ) ||
@@ -281,11 +305,12 @@ validate_group_transition <- function(process) {
     ("partnered" %in% r$union_type && any(r$union_type %in% c(
       "cohab",
       "marriage"
-    )))))
+    ))))) {
     stop(paste0(
       "Transition union_type must use ",
       "unpartnered/partnered or unpartnered/cohab/marriage."
     ), call. = FALSE)
+  }
   keys <- c(intersect(c("origin", "destination", "sex", "union_type"), names(
     r
   )), candidate_strata(r))
@@ -296,11 +321,12 @@ validate_group_transition <- function(process) {
   for (rows in split(seq_len(nrow(r)), strata)) {
     rows <- rows[order(start[rows])]
     if (length(rows) > 1L && any(start[rows[-1L]] < head(cummax(end[rows]), -
-      1L)))
+      1L))) {
       stop("Group-transition bands must not overlap within a stratum.",
         call. =
           FALSE
       )
+    }
   }
   invisible(process)
 }

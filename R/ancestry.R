@@ -18,9 +18,11 @@ tracked_ancestry <- function(declaration) {
 
 # Accept one bare table when exactly one dimension tracks ancestry.
 as_ancestry_list <- function(ancestry, declaration) {
-  if (is.null(ancestry) || !is.data.frame(ancestry)) return(ancestry)
+  if (is.null(ancestry) || !is.data.frame(ancestry)) {
+    return(ancestry)
+  }
   tracked <- tracked_ancestry(declaration)
-  if (length(tracked) != 1L)
+  if (length(tracked) != 1L) {
     stop(
       paste0(
         "`ancestry` must be a named list of tables, one ",
@@ -28,17 +30,20 @@ as_ancestry_list <- function(ancestry, declaration) {
       ),
       call. = FALSE
     )
+  }
   stats::setNames(list(ancestry), tracked)
 }
 
 validate_ancestry <- function(ancestry, persons, declaration = NULL) {
-  if (is.null(ancestry)) return(invisible(ancestry))
+  if (is.null(ancestry)) {
+    return(invisible(ancestry))
+  }
   ancestry <- as_ancestry_list(ancestry, declaration)
   if (!is.list(ancestry) || is.null(names(ancestry)) || anyNA(names(
     ancestry
   )) ||
     any(!nzchar(names(ancestry))) || anyDuplicated(names(ancestry)) ||
-    !all(vapply(ancestry, is.data.frame, logical(1))))
+    !all(vapply(ancestry, is.data.frame, logical(1)))) {
     stop(
       paste0(
         "`ancestry` must be a named list of tables, one ",
@@ -46,10 +51,13 @@ validate_ancestry <- function(ancestry, persons, declaration = NULL) {
       ),
       call. = FALSE
     )
-  for (name in names(ancestry)) validate_ancestry_table(
-    ancestry[[name]],
-    persons
-  )
+  }
+  for (name in names(ancestry)) {
+    validate_ancestry_table(
+      ancestry[[name]],
+      persons
+    )
+  }
   invisible(ancestry)
 }
 
@@ -108,8 +116,10 @@ normalize_population_ancestry <- function(population) {
       # Without shares, people start with all their ancestry in their category.
       labels <- as.character(persons[[name]])
       x <- tibble::tibble(person_id = persons$person_id)
-      for (category in unique(labels)) x[[category]] <- as.numeric(labels ==
-        category)
+      for (category in unique(labels)) {
+        x[[category]] <- as.numeric(labels ==
+          category)
+      }
       x$unknown <- rep(0, nrow(persons))
     } else {
       columns <- setdiff(names(x), c("person_id", "unknown"))
@@ -128,7 +138,9 @@ normalize_population_ancestry <- function(population) {
 # category shares and unknown, in declaration order.
 ancestry_matrix <- function(population, tracked) {
   n <- nrow(population$persons)
-  if (!length(tracked)) return(matrix(numeric(), nrow = n, ncol = 0L))
+  if (!length(tracked)) {
+    return(matrix(numeric(), nrow = n, ncol = 0L))
+  }
   do.call(cbind, lapply(tracked, function(d) {
     x <- population$ancestry[[d]]
     as.matrix(x[setdiff(names(x), "person_id")])

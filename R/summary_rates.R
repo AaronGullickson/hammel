@@ -20,7 +20,9 @@ summary_strata <- function(table, by_sex = FALSE, by_union_status = FALSE) {
   status <- c("union_status", "union_type", "previous_union")
   keep <- c(
     "time_start", "time_end", if (by_sex) "sex", if (
-      by_union_status) status,
+      by_union_status) {
+      status
+    },
     setdiff(names(table), c(
       summary_measures, "time_start", "time_end",
       "sex", status
@@ -31,7 +33,9 @@ summary_strata <- function(table, by_sex = FALSE, by_union_status = FALSE) {
 
 summary_rows <- function(table, by_sex = FALSE, by_union_status = FALSE) {
   columns <- summary_strata(table, by_sex, by_union_status)
-  if (!length(columns)) return(list(seq_len(nrow(table))))
+  if (!length(columns)) {
+    return(list(seq_len(nrow(table))))
+  }
   codes <- lapply(table[columns], function(column) match(column, unique(
     column
   )))
@@ -40,21 +44,25 @@ summary_rows <- function(table, by_sex = FALSE, by_union_status = FALSE) {
 }
 
 check_summary_intervals <- function(rates, open) {
-  if (!nrow(rates)) stop("A rate table needs at least one age band.",
-    call. =
-      FALSE
-  )
+  if (!nrow(rates)) {
+    stop("A rate table needs at least one age band.",
+      call. =
+        FALSE
+    )
+  }
   check_numeric_column(rates$age_start, "rates$age_start")
   ends <- rates$age_end
   if (!is.numeric(ends) || anyNA(ends) || any(rates$age_start < 0) ||
-    any(ends <= rates$age_start)) stop("Invalid age intervals.",
-    call. =
-      FALSE
-  )
+    any(ends <= rates$age_start)) {
+    stop("Invalid age intervals.",
+      call. =
+        FALSE
+    )
+  }
   ordered <- rates[order(rates$age_start), , drop = FALSE]
   if (nrow(ordered) > 1L && any(head(ordered$age_end, -1) != tail(
     ordered$age_start, -1
-  )))
+  ))) {
     stop(
       paste0(
         "Age intervals must be contiguous and nonoverlapping ",
@@ -62,7 +70,8 @@ check_summary_intervals <- function(rates, open) {
       ),
       call. = FALSE
     )
-  if (open && (ordered$age_start[1] != 0 || tail(ordered$age_end, 1) != Inf))
+  }
+  if (open && (ordered$age_start[1] != 0 || tail(ordered$age_end, 1) != Inf)) {
     stop(
       paste0(
         "Life tables require ages from zero through an ",
@@ -70,6 +79,8 @@ check_summary_intervals <- function(rates, open) {
       ),
       call. = FALSE
     )
-  if (!open && any(!is.finite(ends)))
+  }
+  if (!open && any(!is.finite(ends))) {
     stop("TFR requires finite age intervals.", call. = FALSE)
+  }
 }

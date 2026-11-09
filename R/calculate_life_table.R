@@ -30,34 +30,43 @@
 calculate_life_table <- function(rates, radix = 1) {
   if (inherits(rates, "hammel_process")) {
     if (!identical(rates$name, "mortality") ||
-      !identical(rates$rate_unit, "person_year"))
+      !identical(rates$rate_unit, "person_year")) {
       stop("Life tables require a mortality process with person-year rates.",
         call. = FALSE
       )
+    }
     rates <- rates$rates
   }
   check_columns(rates, c("age_start", "age_end"), "rates")
   if (!"mx" %in% names(rates)) {
-    if ("rate_mortality" %in% names(rates)) rates$mx <- rates$rate_mortality
-    else if ("rate" %in% names(rates)) rates$mx <- rates$rate
-    else stop("Supply `rate_mortality`, `mx`, or `rate`.", call. = FALSE)
+    if ("rate_mortality" %in% names(rates)) {
+      rates$mx <- rates$rate_mortality
+    } else if ("rate" %in% names(rates)) {
+      rates$mx <- rates$rate
+    } else {
+      stop("Supply `rate_mortality`, `mx`, or `rate`.", call. = FALSE)
+    }
   }
   check_groups(rates, "rates")
   check_numeric_column(rates$mx, "rates$mx", missing = TRUE)
-  if (any(rates$mx < 0, na.rm = TRUE)) stop(
-    "Mortality rates must be nonnegative.",
-    call. = FALSE
-  )
+  if (any(rates$mx < 0, na.rm = TRUE)) {
+    stop(
+      "Mortality rates must be nonnegative.",
+      call. = FALSE
+    )
+  }
   if (!is.numeric(radix) || length(radix) != 1L || !is.finite(radix) || radix <=
-    0)
+    0) {
     stop("`radix` must be positive and finite.", call. = FALSE)
+  }
   rates <- rates[c(
     summary_strata(rates, by_sex = TRUE, by_union_status = TRUE),
     "age_start", "age_end", "mx"
   )]
   if (!nrow(rates)) {
-    for (column in c("n", "ax", "qx", "lx", "lx_end", "dx", "Lx", "Tx", "ex"))
+    for (column in c("n", "ax", "qx", "lx", "lx_end", "dx", "Lx", "Tx", "ex")) {
       rates[[column]] <- numeric()
+    }
     return(tibble::as_tibble(rates))
   }
   tables <- lapply(
@@ -74,22 +83,31 @@ calculate_life_table <- function(rates, radix = 1) {
       for (i in seq_len(size)) {
         lx[i] <- survivors
         if (is.na(m[i])) {
-          survivors <- NA_real_; next
+          survivors <- NA_real_
+          next
         }
         if (is.infinite(n[i])) {
           q[i] <- if (m[i] > 0) 1 else 0
           survival <- if (m[i] > 0) 0 else 1
           ax[i] <- if (m[i] > 0) 1 / m[i] else Inf
-          L[i] <- if (is.na(survivors)) NA_real_ else if (survivors == 0) 0 else
+          L[i] <- if (is.na(survivors)) {
+            NA_real_
+          } else if (survivors == 0) {
+            0
+          } else {
             survivors * ax[i]
+          }
         } else {
           z <- m[i] * n[i]
           q[i] <- -expm1(-z)
           survival <- exp(-z)
           L[i] <- survivors * if (m[i] == 0) n[i] else q[i] / m[i]
           # Stable mean time lived by deaths within an exponential age interval.
-          ax[i] <- if (z < 1e-5) n[i] * (0.5 - z / 12 + z^3 / 720) else
+          ax[i] <- if (z < 1e-5) {
+            n[i] * (0.5 - z / 12 + z^3 / 720)
+          } else {
             1 / m[i] - n[i] / expm1(z)
+          }
         }
         lend[i] <- survivors * survival
         survivors <- lend[i]

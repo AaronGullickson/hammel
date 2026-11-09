@@ -79,15 +79,18 @@ set_union_dissolution <- function(model, rates, weights = NULL) {
 
 validate_union_dissolution <- function(process, calendar_interval = NULL) {
   if (!identical(process$name, "union_dissolution") ||
-    !identical(process$rate_unit, "person_year"))
+    !identical(process$rate_unit, "person_year")) {
     stop("Invalid union-dissolution specification or units.", call. = FALSE)
+  }
   rates <- process$rates
   check_stratified_columns(rates, "union_type", "Union-dissolution")
   if (validate_calendar_rates(rates, function(slice, interval) {
     copy <- process
     copy$rates <- slice
     validate_union_dissolution(copy, interval)
-  }, with_interval = TRUE)) return(invisible(process))
+  }, with_interval = TRUE)) {
+    return(invisible(process))
+  }
   check_columns(rates, c("dur_start", "dur_end", "rate"), "rates")
   check_numeric_column(rates$dur_start, "rates$dur_start")
   check_numeric_column(rates$rate, "rates$rate")
@@ -98,7 +101,7 @@ validate_union_dissolution <- function(process, calendar_interval = NULL) {
     any(c(
       "sex", "age_start", "age_end", "union_status", "time_start",
       "time_end"
-    ) %in% names(rates)))
+    ) %in% names(rates))) {
     stop(
       paste0(
         "Use nonnegative dissolution rates in valid ",
@@ -108,36 +111,53 @@ validate_union_dissolution <- function(process, calendar_interval = NULL) {
       ),
       call. = FALSE
     )
+  }
   # Possible group columns (`<group>_w`, `<group>_h`) define strata.
   strata <- candidate_strata(rates)
-  pair_labels <- if (length(strata)) do.call(paste, c(lapply(
-    rates[strata],
-    as.character
-  ), sep = ":")) else
+  pair_labels <- if (length(strata)) {
+    do.call(paste, c(lapply(
+      rates[strata],
+      as.character
+    ), sep = ":"))
+  } else {
     rep("shared", nrow(rates))
-  types <- if ("union_type" %in% names(rates)) rates$union_type else rep(
-    "shared", nrow(rates)
-  )
+  }
+  types <- if ("union_type" %in% names(rates)) {
+    rates$union_type
+  } else {
+    rep(
+      "shared", nrow(rates)
+    )
+  }
   if ("union_type" %in% names(rates)) {
     if (!is.character(types) || anyNA(types) || any(!types %in% c(
       "cohab",
       "marriage"
-    )))
+    ))) {
       stop(paste0(
         "Dissolution `union_type` must use cohab and ",
         "marriage labels without missing values."
       ), call. = FALSE)
+    }
     for (pair in unique(pair_labels)) {
       missing <- setdiff(c("cohab", "marriage"), types[pair_labels == pair])
-      if (!length(missing)) next
-      context <- if (is.null(calendar_interval)) "" else sprintf(
-        " during calendar interval [%s, %s)",
-        format(calendar_interval[1], trim = TRUE, scientific = FALSE),
-        format(calendar_interval[2], trim = TRUE, scientific = FALSE)
-      )
-      if (length(strata)) context <- paste0(context, sprintf(
-        " for group stratum '%s'", pair
-      ))
+      if (!length(missing)) {
+        next
+      }
+      context <- if (is.null(calendar_interval)) {
+        ""
+      } else {
+        sprintf(
+          " during calendar interval [%s, %s)",
+          format(calendar_interval[1], trim = TRUE, scientific = FALSE),
+          format(calendar_interval[2], trim = TRUE, scientific = FALSE)
+        )
+      }
+      if (length(strata)) {
+        context <- paste0(context, sprintf(
+          " for group stratum '%s'", pair
+        ))
+      }
       stop(sprintf(
         paste0(
           "Dissolution rates are missing a '%s' schedule%s. ",
@@ -157,8 +177,9 @@ validate_union_dissolution <- function(process, calendar_interval = NULL) {
     ordered <- rates[rows, , drop = FALSE]
     ordered <- ordered[order(ordered$dur_start), , drop = FALSE]
     if (nrow(ordered) > 1L &&
-      any(tail(ordered$dur_start, -1) < head(cummax(ordered$dur_end), -1)))
+      any(tail(ordered$dur_start, -1) < head(cummax(ordered$dur_end), -1))) {
       stop("Union-dissolution duration bands must not overlap.", call. = FALSE)
+    }
   }
   invisible(process)
 }

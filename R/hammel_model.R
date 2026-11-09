@@ -60,10 +60,12 @@ set_population <- function(model, population) {
   check_model(model)
   validate_population(population)
   # A declaration made with set_groups() replaces the population's own.
-  if (!is.null(model$groups)) population <- apply_group_declaration(
-    population,
-    model$groups
-  )
+  if (!is.null(model$groups)) {
+    population <- apply_group_declaration(
+      population,
+      model$groups
+    )
+  }
   population <- normalize_population_transitions(population)
   population <- normalize_population_ancestry(population)
   population$persons <- tibble::as_tibble(population$persons)

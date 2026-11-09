@@ -3228,3 +3228,12 @@ Keep `create_baseline_population()` unchanged. Verbs remain appropriate for pipe
 **Decision:** Wrap hand-maintained `R/` source to at most 80 characters per line, including comments and roxygen documentation, and follow this convention in future R code. For long function signatures use one argument per line with a two-space indent. Wrap long calls and expressions at syntax boundaries; preserve explanatory comments, public-first sectioning, documentation content, names, defaults, and demographic behavior. Generated wrappers and user-owned articles/README/historical validation evidence remain untouched. Markdown prose need not be hard-wrapped.
 
 Long diagnostic literals may use `paste0()` of literal pieces so their complete text is unchanged. Small braced branches are permitted where needed to lay out long conditional expressions. Verify the parsed expressions modulo constant string concatenation and single-expression conditional braces, compare generated help content and example expressions, and run the offline suite. The tooling may use a temporary formatting library/cache without adding a package dependency. Other control-flow style findings from D148 remain separate work.
+
+
+## D150 — Control-flow braces (November 9, 2026)
+
+**Status:** User instruction and implementation authorization, November 9, 2026.
+
+**Decision:** Apply the general tidyverse brace rules to hand-maintained R source: brace every loop body and all statement-style or multiline conditional branches, including early returns, errors, and loop exits. Keep `else` beside the preceding closing brace. Preserve compact, single-line conditional value expressions when they contain no assignments, side effects, or control-flow modifiers. Brace multiline control-flow callbacks and error-handler bodies. Put `return()`, `stop()`, `break`, and `next` on their own lines within the relevant block. Apply the convention to documentation examples and retain the D149 80-column limit.
+
+**Scope and verification:** This is control-flow grouping and formatting, not a change to conditions, event order, random draws, values, or demographic semantics. Preserve comments, exports, defaults, documentation content, and generated wrappers. Verify parsed expressions after normalizing added single-expression branch/loop/function braces, compare before/after simulation outputs and RNG states, and run the offline suite. Broader changes to condition coercion, error APIs, or model behavior are not authorized by this formatting task.

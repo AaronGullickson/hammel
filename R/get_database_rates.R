@@ -122,7 +122,9 @@ get_mortality_hmd <- function(
   attr(rates, "source") <- database_source("HMD", country, sort(year), item)
   attr(rates, "source")$shape <- shape
   attr(rates, "source")$periods <- periods
-  if (!is.null(coverage_years)) attr(rates, "source")$coverage_item <- "Mx_1x1"
+  if (!is.null(coverage_years)) {
+    attr(rates, "source")$coverage_item <- "Mx_1x1"
+  }
   if (!is.null(open_age)) {
     attr(rates, "source")$open_age <- open_age
     attr(rates, "source")$open_age_method <- "pooled_deaths_exposure"
@@ -194,8 +196,9 @@ get_fertility_hfd <- function(
   by_parity = FALSE
 ) {
   if (!is.logical(by_parity) || length(by_parity) != 1L ||
-    !is.null(dim(by_parity)) || is.na(by_parity))
+    !is.null(dim(by_parity)) || is.na(by_parity)) {
     stop("`by_parity` must be TRUE or FALSE.", call. = FALSE)
+  }
   check_database_request(country, year, username, password)
   if (!is.null(update) &&
     (!is.character(update) || length(update) != 1L || is.na(update) ||
@@ -208,8 +211,11 @@ get_fertility_hfd <- function(
     username = username, password = password,
     fixup = FALSE, Update = update
   )
-  rates <- if (by_parity) fertility_by_parity_from_hfd(data, year) else
+  rates <- if (by_parity) {
+    fertility_by_parity_from_hfd(data, year)
+  } else {
     fertility_from_hfd(data, year)$rates
+  }
   attr(rates, "source") <- database_source(
     "HFD", country, sort(year), item,
     update
@@ -244,11 +250,12 @@ select_database_year <- function(data, year, columns) {
   check_columns(data, c("Year", "Age", columns), "database data")
   check_numeric_column(data$Year, "database data$Year")
   missing <- setdiff(year, data$Year)
-  if (length(missing))
+  if (length(missing)) {
     stop(sprintf(
       "The requested year(s) are not present in the downloaded data: %s.",
       paste(missing, collapse = ", ")
     ), call. = FALSE)
+  }
   selected <- data[data$Year %in% year, , drop = FALSE]
   selected
 }
@@ -287,11 +294,12 @@ check_database_request <- function(country, year, username, password) {
 check_database_years <- function(year) {
   if (!is.numeric(year) || !is.null(dim(year)) || !length(year) ||
     anyNA(year) || any(!is.finite(year)) || any(year != trunc(year)) ||
-    anyDuplicated(year))
+    anyDuplicated(year)) {
     stop("`year` must contain distinct whole-number calendar years.",
       call. =
         FALSE
     )
+  }
   invisible(year)
 }
 
@@ -325,11 +333,12 @@ mortality_from_hmd <- function(
   check_columns(data, c("Year", "Age", "Male", "Female"), "HMD data")
   periods <- hmd_period_intervals(data, shape, coverage_years)
   missing <- setdiff(year, periods$time_start)
-  if (length(missing))
+  if (length(missing)) {
     stop(sprintf(
       "The requested year(s) are not present as source period starts: %s.",
       paste(missing, collapse = ", ")
     ), call. = FALSE)
+  }
   if (!is.null(open_age)) {
     deaths <- index_hmd_pool_source(
       deaths, year, shape, coverage_years,
@@ -345,10 +354,17 @@ mortality_from_hmd <- function(
     selected <- data[rows, , drop = FALSE]
     ages <- hmd_age_intervals(selected, shape)
     period_end <- unique(periods$time_end[rows])
-    keep <- if (is.null(open_age)) rep(TRUE, nrow(ages)) else ages$age_start <
-      open_age
-    totals <- if (is.null(open_age)) NULL else
+    keep <- if (is.null(open_age)) {
+      rep(TRUE, nrow(ages))
+    } else {
+      ages$age_start <
+        open_age
+    }
+    totals <- if (is.null(open_age)) {
+      NULL
+    } else {
       pool_hmd_open_age(ages, y, period_end, open_age, deaths, exposures)
+    }
     out <- lapply(c(m = "Male", f = "Female"), function(column) {
       sex <- if (column == "Male") "m" else "f"
       check_hmd_retained_rates(selected[[column]][keep], ages[keep, ], y, sex)
@@ -375,19 +391,22 @@ mortality_from_hmd <- function(
     list(rates = out, pooled_tail = totals)
   })
   process <- mortality(do.call(rbind, lapply(converted, `[[`, "rates")))
-  if (!is.null(open_age)) process$pooled_tail <- tibble::as_tibble(
-    do.call(rbind, lapply(converted, `[[`, "pooled_tail"))
-  )
+  if (!is.null(open_age)) {
+    process$pooled_tail <- tibble::as_tibble(
+      do.call(rbind, lapply(converted, `[[`, "pooled_tail"))
+    )
+  }
   process
 }
 
 check_hmd_shape <- function(shape) {
   shapes <- c("1x1", "1x5", "1x10", "5x1", "5x5", "5x10")
   if (!is.character(shape) || length(shape) != 1L || is.na(shape) ||
-    !is.null(dim(shape)) || !shape %in% shapes)
+    !is.null(dim(shape)) || !shape %in% shapes) {
     stop(sprintf("`shape` must be one of: %s.", paste(shapes, collapse = ", ")),
       call. = FALSE
     )
+  }
   invisible(shape)
 }
 
@@ -396,22 +415,24 @@ hmd_period_intervals <- function(data, shape = "1x1", coverage_years = NULL) {
   check_columns(data, "Year", "HMD data")
   labels <- trimws(as.character(data$Year))
   if (!length(labels) || anyNA(labels) ||
-    any(!grepl("^[0-9]+(-[0-9]+)?$", labels)))
+    any(!grepl("^[0-9]+(-[0-9]+)?$", labels))) {
     stop("Expected HMD calendar years or inclusive source year ranges.",
       call. =
         FALSE
     )
+  }
   width <- as.numeric(strsplit(shape, "x", fixed = TRUE)[[1L]][2L])
   starts <- as.numeric(sub("-.*$", "", labels))
   ranged <- grepl("-", labels, fixed = TRUE)
   ends <- starts + width
   ends[ranged] <- as.numeric(sub("^.*-", "", labels[ranged])) + 1
   if (width > 1 && any(!ranged)) {
-    if (is.null(coverage_years))
+    if (is.null(coverage_years)) {
       stop(paste0(
         "Parsed grouped HMD periods require annual ",
         "coverage to recover source bounds."
       ), call. = FALSE)
+    }
     check_database_years(coverage_years)
     periods <- sort(unique(starts))
     following <- c(tail(periods, -1L), Inf)[match(starts, periods)]
@@ -420,24 +441,27 @@ hmd_period_intervals <- function(data, shape = "1x1", coverage_years = NULL) {
     ) + 1)
   }
   if (any(!is.finite(starts)) || any(!is.finite(ends)) ||
-    any(ends <= starts | ends - starts > width))
+    any(ends <= starts | ends - starts > width)) {
     stop("HMD source periods are inconsistent with the requested shape.",
       call. = FALSE
     )
+  }
   periods <- unique(tibble::tibble(time_start = starts, time_end = ends))
   periods <- periods[order(periods$time_start), ]
   if (anyDuplicated(periods$time_start) || (nrow(periods) > 1L &&
-    any(tail(periods$time_start, -1L) < head(periods$time_end, -1L))))
+    any(tail(periods$time_start, -1L) < head(periods$time_end, -1L)))) {
     stop("HMD source periods must not overlap or have conflicting bounds.",
       call. = FALSE
     )
+  }
   if (!is.null(coverage_years)) {
     for (i in seq_len(nrow(periods))) {
       years <- seq(periods$time_start[i], periods$time_end[i] - 1)
-      if (any(!years %in% coverage_years))
+      if (any(!years %in% coverage_years)) {
         stop("HMD source periods are inconsistent with annual coverage.",
           call. = FALSE
         )
+      }
     }
   }
   tibble::tibble(time_start = starts, time_end = ends)
@@ -448,33 +472,39 @@ hmd_age_intervals <- function(data, shape = "1x1") {
   ages <- trimws(as.character(data$Age))
   width <- as.numeric(strsplit(shape, "x", fixed = TRUE)[[1L]][1L])
   pattern <- if (width == 1) "^[0-9]+[+]?$" else "^[0-9]+(-[0-9]+|[+])?$"
-  if (anyNA(ages) || any(!grepl(pattern, ages)))
+  if (anyNA(ages) || any(!grepl(pattern, ages))) {
     stop("Expected HMD age labels consistent with the requested shape.",
       call. =
         FALSE
     )
+  }
   starts <- as.numeric(sub("[-+].*$", "", ages))
   open <- grepl("[+]$", ages)
   # readHMDweb() 2.0.8 always parses ages, even with fixup = FALSE.
   if ("OpenInterval" %in% names(data)) {
-    if (!is.logical(data$OpenInterval) || anyNA(data$OpenInterval))
+    if (!is.logical(data$OpenInterval) || anyNA(data$OpenInterval)) {
       stop("HMD OpenInterval must be a nonmissing logical indicator.",
         call. =
           FALSE
       )
+    }
     open <- open | data$OpenInterval
   }
-  ends <- if (width == 1) starts + 1 else
+  ends <- if (width == 1) {
+    starts + 1
+  } else {
     ifelse(starts == 0, 1, ifelse(starts == 1, 5, starts + 5))
+  }
   ranged <- grepl("-", ages, fixed = TRUE)
   if (any(ranged)) {
     upper <- as.numeric(sub("^.*-", "", ages[ranged])) + 1
-    if (any(upper != ends[ranged]))
+    if (any(upper != ends[ranged])) {
       stop("HMD source age ranges are inconsistent with the requested shape.",
         call. = FALSE
       )
+    }
   }
-  if (width == 5 && any(!open & starts > 1 & starts %% 5 != 0))
+  if (width == 5 && any(!open & starts > 1 & starts %% 5 != 0)) {
     stop(
       paste0(
         "HMD five-year ages must use the native ",
@@ -482,22 +512,26 @@ hmd_age_intervals <- function(data, shape = "1x1") {
       ),
       call. = FALSE
     )
+  }
   ends[open] <- Inf
   tibble::tibble(age_start = starts, age_end = ends)
 }
 
 # Explicit source-count pooling for a user-selected open final age category.
 check_hmd_open_age <- function(open_age, shape) {
-  if (is.null(open_age)) return(invisible(open_age))
+  if (is.null(open_age)) {
+    return(invisible(open_age))
+  }
   if (!is.numeric(open_age) || length(open_age) != 1L || !is.null(dim(
     open_age
   )) ||
-    !is.finite(open_age) || open_age < 0 || open_age != trunc(open_age))
+    !is.finite(open_age) || open_age < 0 || open_age != trunc(open_age)) {
     stop("`open_age` must be NULL or a finite nonnegative whole age.",
       call. =
         FALSE
     )
-  if (startsWith(shape, "5x") && !open_age %in% c(0, 1) && open_age %% 5 != 0)
+  }
+  if (startsWith(shape, "5x") && !open_age %in% c(0, 1) && open_age %% 5 != 0) {
     stop(
       paste0(
         "`open_age` must align with a native five-year ",
@@ -505,13 +539,14 @@ check_hmd_open_age <- function(open_age, shape) {
       ),
       call. = FALSE
     )
+  }
   invisible(open_age)
 }
 
 # Diagnose invalid retained Mx with source context, rather than hiding its age
 # behind the generic rate validator. Missing replaced-tail Mx never enter here.
 check_hmd_retained_rates <- function(values, ages, year, sex) {
-  if (!(is.numeric(values) || (is.logical(values) && all(is.na(values)))))
+  if (!(is.numeric(values) || (is.logical(values) && all(is.na(values))))) {
     stop(
       sprintf(
         "HMD mortality rates must be numeric (year %g, sex %s).", year,
@@ -519,6 +554,7 @@ check_hmd_retained_rates <- function(values, ages, year, sex) {
       ),
       call. = FALSE
     )
+  }
   bad <- which(!is.finite(values))
   if (length(bad)) {
     i <- bad[1L]
@@ -539,11 +575,12 @@ check_hmd_retained_rates <- function(values, ages, year, sex) {
 index_hmd_pool_source <- function(data, year, shape, coverage_years, name) {
   check_columns(data, c("Year", "Age", "Male", "Female"), name)
   periods <- hmd_period_intervals(data, shape, coverage_years)
-  if (any(!year %in% periods$time_start))
+  if (any(!year %in% periods$time_start)) {
     stop(sprintf("%s is missing requested source periods.", name),
       call. =
         FALSE
     )
+  }
   rows <- periods$time_start %in% year
   ages <- hmd_age_intervals(data[rows, , drop = FALSE], shape)
   tibble::tibble(
@@ -569,7 +606,7 @@ pool_hmd_open_age <- function(
     (nrow(bands) > 1L && any(head(bands$age_end, -1L) != tail(
       bands$age_start,
       -1L
-    ))))
+    )))) {
     stop(sprintf(
       paste0(
         "HMD rates need a complete source tail from ",
@@ -577,13 +614,14 @@ pool_hmd_open_age <- function(
       ),
       open_age, year
     ), call. = FALSE)
+  }
   expected <- paste(bands$age_start, bands$age_end, sep = ":")
   align <- function(data, name) {
     rows <- data$time_start == year & data$age_start >= open_age
     out <- data[rows, ]
     keys <- paste(out$age_start, out$age_end, sep = ":")
     if (anyDuplicated(keys) || !setequal(keys, expected) || any(out$time_end !=
-      period_end))
+      period_end)) {
       stop(
         sprintf(
           "HMD %s tail age/period bands do not match mortality in year %g.",
@@ -592,6 +630,7 @@ pool_hmd_open_age <- function(
         ),
         call. = FALSE
       )
+    }
     out[match(expected, keys), ]
   }
   d <- align(deaths, "deaths")
@@ -600,8 +639,11 @@ pool_hmd_open_age <- function(
     sex <- if (column == "Male") "m" else "f"
     for (name in c("deaths", "exposure")) {
       values <- if (name == "deaths") d[[column]] else e[[column]]
-      bad <- if (!is.numeric(values)) seq_along(values) else
+      bad <- if (!is.numeric(values)) {
+        seq_along(values)
+      } else {
         which(!is.finite(values) | values < 0)
+      }
       if (length(bad)) {
         i <- bad[1L]
         stop(sprintf(
@@ -615,7 +657,7 @@ pool_hmd_open_age <- function(
     }
     count <- sum(d[[column]])
     exposure <- sum(e[[column]])
-    if (!is.finite(count) || !is.finite(exposure) || exposure <= 0)
+    if (!is.finite(count) || !is.finite(exposure) || exposure <= 0) {
       stop(sprintf(
         paste0(
           "HMD pooled tail needs finite deaths and positive ",
@@ -623,12 +665,14 @@ pool_hmd_open_age <- function(
         ),
         year, sex
       ), call. = FALSE)
+    }
     rate <- count / exposure
-    if (!is.finite(rate))
+    if (!is.finite(rate)) {
       stop(sprintf(
         "HMD pooled-tail rate is not finite: year %g, sex %s.", year,
         sex
       ), call. = FALSE)
+    }
     tibble::tibble(
       time_start = year, time_end = period_end, sex = sex,
       age_start = open_age, age_end = Inf, deaths = count,
@@ -642,16 +686,19 @@ pool_hmd_open_age <- function(
 
 hfd_age_intervals <- function(data) {
   ages <- trimws(as.character(data$Age))
-  if (anyNA(ages) || any(!grepl("^[0-9]+[-+]?$", ages)))
+  if (anyNA(ages) || any(!grepl("^[0-9]+[-+]?$", ages))) {
     stop("Expected single-year HFD ages with optional endpoint signs.",
       call. =
         FALSE
     )
+  }
   starts <- as.numeric(sub("[-+]$", "", ages))
-  if (anyDuplicated(starts)) stop("HFD rates have duplicate age bands.",
-    call. =
-      FALSE
-  )
+  if (anyDuplicated(starts)) {
+    stop("HFD rates have duplicate age bands.",
+      call. =
+        FALSE
+    )
+  }
   tibble::tibble(
     age_start = starts,
     age_end = ifelse(grepl("[+]$", ages), Inf, starts + 1)
@@ -660,9 +707,10 @@ hfd_age_intervals <- function(data) {
 
 fertility_from_hfd <- function(data, year) {
   check_database_years(year)
-  if (length(year) > 1L)
+  if (length(year) > 1L) {
     return(fertility(combine_database_years(year, function(y)
       fertility_from_hfd(data, y)$rates)))
+  }
   data <- select_database_year(data, year, "ASFR")
   ages <- hfd_age_intervals(data)
   fertility(data.frame(
@@ -686,13 +734,16 @@ fertility_by_parity_from_hfd <- function(data, year) {
   starts <- ages$age_start
   for (column in columns) {
     values <- data[[column]]
-    if (is.logical(values) && all(is.na(values))) values <- as.numeric(values)
+    if (is.logical(values) && all(is.na(values))) {
+      values <- as.numeric(values)
+    }
     check_numeric_column(values, paste0("HFD ", column), missing = TRUE)
-    if (any(data[[column]] < 0, na.rm = TRUE))
+    if (any(data[[column]] < 0, na.rm = TRUE)) {
       stop("HFD conditional fertility rates must be nonnegative.",
         call. =
           FALSE
       )
+    }
   }
   rates <- tibble::tibble(
     age_start = rep(starts, times = 5L),
