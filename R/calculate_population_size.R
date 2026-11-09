@@ -6,35 +6,50 @@
 #'
 #' @description
 #'
+#' Calculate population counts from a returned simulation result or a starting
+#' population, at chosen time points. Counts can be disaggregated by stratifying
+#' variables.
 #'
 #' @details
 #'
+#' The `by` argument can take the standard variables of `sex`, `union_type`, or
+#' `previous_union` as well as any group variables defined in the `population`
+#' input.
 #'
-#' Count persons with `birth_time <= time` and missing `death_time` or
-#' `death_time > time`. Counts include births at the requested time and exclude
-#' deaths at that time, representing the population after recorded events there.
-#' States in `by` are also those after all events at each time.
+#' The user can input any numeric value for `times` (including decimal values),
+#' but no value may come after the `end_time` of the simulation.
 #'
 #' @param population A `hammel_population` object either returned from
-#'   [run_simulations()] or built as a baseline starting population.
-#' @param times A numeric vector of finite time points in years. A population
-#'   object cannot be queried beyond its known `end_time`.
-#' @param by `NULL` (default) or a character vector of variables to count
-#'   separately: `"sex"`, declared group dimensions (such as `"race"`),
-#'   `"union_type"` and `"previous_union"`. See [calculate_mortality_rates()]
-#'   for their definitions.
-#' @param use_detailed_previous_union Logical, default `TRUE`, which counts
-#'   `"previous_union"` as `"none"`, `"separated"` and `"widowed"`. With `FALSE`
-#'   and `"previous_union"` in `by`, combine separated and widowed as
-#'   `"dissolved"`.
-#' @return A tibble with `time`, the `by` columns and `population`. Rows follow
-#'   the requested times (repeats kept), with time varying fastest and earlier
-#'   `by` variables varying faster than later ones.
+#'   [run_simulation()] or built as a baseline starting population.
+#' @param times A numeric vector of finite time points in years at which to
+#'   calculate population size.
+#' @param by Character vector of variables to disaggregate population counts by.
+#'   Defaults to `NULL` for no disaggregation. Populations counts can be
+#'   disaggregated by `"sex"`, `"union_type"`, `"previous_union"` and any
+#'   declared group dimensions.
+#' @param use_detailed_previous_union Logical value that indicates whether
+#'   disaggregation by `"previous_union"` will use `"separated"` and `"widowed"`
+#'   or a combined `"dissolved"` category.
+#' @return A tibble with `time`, the `by` columns and `population`.
 #' @export
 #' @examples
-#' population <- generate_uniform_population(100, end_time = 0)
-#' calculate_population_size(population, times = c(-10, -5, 0))
-#' calculate_population_size(population, times = 0, by = "sex")
+#' # calculate population size on a generatd population
+#' pop_start <- generate_uniform_population(1000, end_time = 0)
+#' calculate_population_size(pop_start, times = c(-10, -5, 0))
+#'
+#' # run a simulation
+#' model <- hammel_model() |>
+#'   set_population(pop_start) |>
+#'   set_fertility(usa_2000_fertility) |>
+#'   set_mortality(usa_2000_mortality) |>
+#'   set_union_formation("on_demand")
+#' pop_end <- run_simulation(model, 100)
+#'
+#' # calculate at 20 year intervals
+#' calculate_population_size(pop_end, times = seq(0, 100, 20))
+#'
+#' # caclulate at 20 year intervals by sex
+#' calculate_population_size(pop_end, times = seq(0, 100, 20), by = "sex")
 calculate_population_size <- function(
   population,
   times,
