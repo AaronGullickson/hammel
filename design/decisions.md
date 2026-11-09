@@ -3293,3 +3293,10 @@ Keep `mx` in life-table output, preserving D048's output naming. Mortality proce
 **Decision:** Hand-maintained R code does not use semicolons to separate statements. Each statement goes on its own line; one-line loop, `if` and callback bodies that held several statements become braced blocks. The rule covers `R/`, `tests/testthat/`, `data-raw/` and documentation examples, and new or edited R code elsewhere. Generated wrappers are untouched.
 
 **Implementation:** Semicolons were removed from 13 lines in 9 `R/` files and from 161 lines in 29 test files, located from parsed tokens so strings and comments were excluded. The changes only split statements, so behavior is unchanged; the test suite gives the same results. Historical milestone validation scripts under `validation/` keep their semicolons as accepted evidence and are not rewritten.
+
+
+## D157 — Life expectancy convenience function (November 9, 2026)
+
+**Status:** User request and implementation authorization, November 9, 2026.
+
+**Decision:** Add the exported `calculate_life_expectancy(rates, age = 0)`, which builds a life table with `calculate_life_table()` and returns its `ex` rows at the requested ages, as a tibble of the stratifying columns, `age` and `ex`. Each requested age must be the start of an age band in the rates; other ages, including values inside a band, are an error rather than being interpolated. It accepts the same inputs, strata and errors as `calculate_life_table()` and has no `radix` argument, since life expectancy does not depend on it.

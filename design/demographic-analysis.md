@@ -256,6 +256,11 @@ tables must define it themselves. The function treats mortality as piecewise
 constant hazards, integrates exponential survival/person-years, and calculates
 `ex = Tx/lx`. It does not apply conventional HMD infant adjustments.
 
+`calculate_life_expectancy(rates, age = 0)` builds the same life table and
+returns its `ex` at the requested ages, as a tibble of the stratifying columns,
+`age` and `ex`. Each requested age must be the start of an age band in the
+rates; other ages are an error (D157).
+
 The output includes input identifiers and `mx`, `n`, `ax`, `qx`, `lx`, `lx_end`,
 `dx`, `Lx`, `Tx`, and `ex`. Missing mortality rates propagate into life expectancy.
 A positive-exposure terminal cell with zero deaths has estimated rate zero;

@@ -41,6 +41,7 @@
 #' @param radix Initial number of life-table survivors. Defaults to 1.
 #' @return A tibble containing standard life table parameters as well as `sex`
 #'   and additional stratifying columns (when supplied).
+#' @seealso [calculate_life_expectancy()] for life expectancy at selected ages.
 #' @export
 #' @examples
 #' data(usa_2000_mortality)
@@ -164,5 +165,47 @@ calculate_life_table <- function(rates, radix = 1) {
     }
   )
   result <- do.call(rbind, tables)
-  tibble::as_tibble(result)
+  tibble::as_tibble(result[c(strata, life_table_columns)])
 }
+
+#' Calculate life expectancy at given ages
+#'
+#' @description
+#'
+#' A convenience wrapper around [calculate_life_table()] that returns only
+#' remaining life expectancy (`ex`) at the requested ages, for each stratum of
+#' the input rates.
+#'
+#' @inheritParams calculate_life_table
+#' @param age Ages at which to report life expectancy, in years. Each must be
+#'   the start of an age band in `rates`. Defaults to `0`, life expectancy at
+#'   birth.
+#' @return A tibble with the stratifying columns of the input (when supplied),
+#'   `age`, and `ex`, with one row per stratum and requested age.
+#' @seealso [calculate_life_table()]
+#' @export
+#' @examples
+#' calculate_life_expectancy(usa_2000_mortality)
+#' calculate_life_expectancy(usa_2000_mortality, age = c(0, 30, 65))
+calculate_life_expectancy <- function(rates, age = 0) {
+  table <- calculate_life_table(rates)
+  if (!is.numeric(age) || !length(age) || !all(age %in% table$age_start)) {
+    stop(
+      "`age` must contain ages that start an age band in `rates`.",
+      call. = FALSE
+    )
+  }
+  strata <- setdiff(names(table), life_table_columns)
+  result <- table[table$age_start %in% age, c(strata, "age_start", "ex")]
+  names(result)[names(result) == "age_start"] <- "age"
+  result
+}
+
+# INTERNAL CONSTANTS -------------------------------------------------------
+
+# Age-band and measure columns of a life table; any other column identifies a
+# stratum.
+life_table_columns <- c(
+  "age_start", "age_end", "mx", "n", "ax", "qx", "lx", "lx_end", "dx", "Lx",
+  "Tx", "ex"
+)

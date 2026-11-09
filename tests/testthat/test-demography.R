@@ -118,6 +118,28 @@ test_that("life tables use only rate or rate_mortality as input rates", {
   expect_equal(expected$ex, rep(10, 2))
 })
 
+test_that("life expectancy returns life-table ex at band starts", {
+  lt <- calculate_life_table(usa_2000_mortality)
+  ex <- calculate_life_expectancy(usa_2000_mortality, c(65, 0))
+  expect_s3_class(ex, "tbl_df")
+  expect_named(ex, c("sex", "age", "ex"))
+  expected <- lt[lt$age_start %in% c(0, 65), ]
+  expect_equal(ex$sex, expected$sex)
+  expect_equal(ex$age, expected$age_start)
+  expect_equal(ex$ex, expected$ex)
+  expect_equal(
+    calculate_life_expectancy(usa_2000_mortality)$ex,
+    lt$ex[lt$age_start == 0]
+  )
+  for (bad in list(3, -1, NA_real_, "0", numeric())) {
+    expect_error(
+      calculate_life_expectancy(usa_2000_mortality, bad),
+      "`age` must contain ages that start an age band in `rates`.",
+      fixed = TRUE
+    )
+  }
+})
+
 test_that("life tables reject missing stratum values", {
   rates <- data.frame(
     region = c("a", NA), age_start = c(0, 1), age_end = c(1, Inf), rate = 0.1
