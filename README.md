@@ -1,12 +1,9 @@
-
-# Hammel 
+# Hammel <img src="man/figures/logo.png" align="right" width="120" alt="Hammel hex sticker showing a branching kinship network" />
 
 <!-- badges: start -->
 [![Codecov test coverage](https://codecov.io/gh/AaronGullickson/hammel/graph/badge.svg)](https://app.codecov.io/gh/AaronGullickson/hammel)
 [![R-CMD-check](https://github.com/AaronGullickson/hammel/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/AaronGullickson/hammel/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
-
-<img src="man/figures/logo.png" align="left" width="200" alt="Hammel hex sticker showing a branching kinship network" />
 
 Hammel is a demographic microsimulator written as an R package. Hammel is a spiritual successor to the venerable SOCSIM program but provides a modern interface, enhanced features, greater user customization, and faster computation. Hammel models demographic processes in continuous time and features:
 
