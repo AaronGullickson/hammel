@@ -5,11 +5,7 @@
 \alias{set_groups}
 \title{Describe and declare group dimensions}
 \usage{
-group(
-  categories = NULL,
-  ancestry = FALSE,
-  inheritance = create_group_inheritance()
-)
+group(categories = NULL, ancestry = FALSE, inheritance = group_inheritance())
 
 set_groups(model, ...)
 }
@@ -31,7 +27,7 @@ their parents' shares, and the \code{"ancestry"} inheritance method becomes
 available.}
 
 \item{inheritance}{How newborns are assigned to a category: a
-\code{\link[=create_group_inheritance]{create_group_inheritance()}} object, a method name such as \code{"mother"}, or
+\code{\link[=group_inheritance]{group_inheritance()}} object, a method name such as \code{"mother"}, or
 a calendar schedule tibble with \code{time_start}, \code{time_end} and list-column
 \code{model}. The default selects either parent with equal probability, with
 maternal fallback.}
@@ -67,12 +63,12 @@ carry it, so analysis and restarts need nothing further.
 
 \examples{
 group(categories = c("A", "B", "AB"), ancestry = TRUE,
-      inheritance = create_group_inheritance("mother"))
+      inheritance = group_inheritance("mother"))
 model <- hammel_model() |>
   set_population(create_baseline_population(100, groups = list(group = c(A = .5, B = .5)))) |>
   set_groups(group = group(inheritance = "mother"))
 }
 \seealso{
 \code{\link[=hammel_population]{hammel_population()}}, \code{\link[=create_baseline_population]{create_baseline_population()}},
-\code{\link[=create_group_inheritance]{create_group_inheritance()}}, \code{\link[=group_transition]{group_transition()}}
+\code{\link[=group_inheritance]{group_inheritance()}}, \code{\link[=group_transition]{group_transition()}}
 }

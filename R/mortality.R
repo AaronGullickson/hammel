@@ -37,7 +37,7 @@
 #'   `Inf` for upper-open bands. Rates must be finite and nonnegative, per
 #'   person-year. Use [stratify_rates()] to add proportional group differences.
 #' @param weights NULL (default) for unweighted selection within rate cells, or
-#'   a [create_weight_model()] specification. Weights choose which member of a
+#'   a [weight_model()] specification. Weights choose which member of a
 #'   cell experiences an event without changing the cell's input rate.
 #' @param model A `hammel_model` object, used by `set_mortality()`.
 #' @return `mortality()` returns an inspectable process inheriting from

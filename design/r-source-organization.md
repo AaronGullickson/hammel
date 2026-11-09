@@ -20,11 +20,13 @@ Agreed by the user and implemented November 9, 2026 (D143). This guide defines w
 
 8. Start each hand-maintained R file with a brief comment describing its purpose, above the section headings. Place exported functions first under `# PUBLIC FUNCTIONS ------`, followed by any `# INTERNAL CONSTANTS ------` and `# HELPER FUNCTIONS ------` sections. Omit sections with no contents. Preserve relative order within each group and keep explanatory comments and roxygen blocks with their definitions. Internal-only files need only the applicable internal sections. Keep generated wrappers generated; do not manually reorder or section `RcppExports.R`. Package roxygen metadata uses `# PACKAGE DOCUMENTATION ------`.
 
+9. Use noun-based names for specification constructors: `matching_model()`, `age_gap_matching_model()`, `weight_model()`, and `group_inheritance()`. Use verbs for pipeable actions such as `set_population()`. Retain `create_baseline_population()` as the user-selected exception (D147).
+
 For a new function, first identify its responsibility and closest existing consumer. Extend that file if the responsibility fits. If no existing file is a logical home, explain the proposed responsibility and filename and ask the user before creating a new R script. Do not create one automatically. The user’s authorization of this reorganization covers the files listed below; future additions follow this rule.
 
 ## Responsibility boundaries
 
-- **Matching versus union formation:** matching constructors, formula evaluation, and preparation live in `create_matching_model.R`. Search initiation, eligibility settings, and search-rate validation remain with the process. Group matching retains its own substantial and coherent implementation.
+- **Matching versus union formation:** matching constructors, formula evaluation, and preparation live in `matching_model.R`. Search initiation, eligibility settings, and search-rate validation remain with the process. Group matching retains its own substantial and coherent implementation.
 
 - **Construction versus attachment:** `set_process.R` retains common attachment and dispatch through `attach_process()`. Process-specific constructors and setters live together in their process files. `validate_rates()` remains one shared function, retaining its current name and mortality flag, in `rates_util.R`; splitting its algorithm is separate work.
 
@@ -48,7 +50,7 @@ For a new function, first identify its responsibility and closest existing consu
 
 ## Current file map
 
-Every top-level R function has one home below. **Bold names are exported**, including `validate_population()`; plain names are internal. Package roxygen metadata stays in `hammel-package.R` (it defines no functions). Shared constants stay with the responsibility they support: `summary_measures` in `summary_rates.R`, `reserved_group_names` in `group.R`, `matching_settings` in `matching_groups.R`, `weight_variable_codes` in `create_weight_model.R`, and `builtin_strata`/`rate_schema_columns` in `stratify_rates.R`.
+Every top-level R function has one home below. **Bold names are exported**, including `validate_population()`; plain names are internal. Package roxygen metadata stays in `hammel-package.R` (it defines no functions). Shared constants stay with the responsibility they support: `summary_measures` in `summary_rates.R`, `reserved_group_names` in `group.R`, `matching_settings` in `matching_groups.R`, `weight_variable_codes` in `weight_model.R`, and `builtin_strata`/`rate_schema_columns` in `stratify_rates.R`.
 
 ### `R/RcppExports.R`
 
@@ -110,24 +112,6 @@ Generate baseline persons and sample declared group categories.
 
 - Functions: **`create_baseline_population()`**, `baseline_group_sampler()`.
 
-### `R/create_group_inheritance.R`
-
-Construct, validate, and prepare newborn group inheritance rules.
-
-- Functions: **`create_group_inheritance()`**, `inheritance_methods()`, `normalize_group_inheritance()`, `validate_group_inheritance()`, `extend_identity_groups()`, `prepare_group_inheritance()`.
-
-### `R/create_matching_model.R`
-
-Construct, validate, evaluate, and prepare matching models independently of process settings.
-
-- Functions: **`create_matching_model()`**, `warn_absorbed_group_formula()`, **`create_age_gap_matching_model()`**, `validate_delta()`, `validate_matching_model()`, `validate_internal_matching()`, `matching_design_matrix()`, `calculate_matching_utilities()`, `calculate_matching_probabilities()`, `prepare_matching_model()`.
-
-### `R/create_weight_model.R`
-
-Construct, validate, and prepare within-cell weight models.
-
-- Functions: **`create_weight_model()`**, `weight_builtins()`, `weight_variable()`, `weight_group_name_possible()`, `validate_weight_model()`, `weight_design()`, `validate_process_weights()`, `warn_cancelled_weight_terms()`, `weight_strata()`, `prepare_weight_model()`.
-
 ### `R/extract_kin.R`
 
 Extract kin and validate generation limits shared with matching.
@@ -164,6 +148,12 @@ Normalize, validate, and query recorded group histories and dimension views.
 
 - Functions: `empty_transitions()`, `normalize_population_transitions()`, `validate_transition_history()`, `dimension_view()`, `groups_at()`.
 
+### `R/group_inheritance.R`
+
+Construct, validate, and prepare newborn group inheritance rules.
+
+- Functions: **`group_inheritance()`**, `inheritance_methods()`, `normalize_group_inheritance()`, `validate_group_inheritance()`, `extend_identity_groups()`, `prepare_group_inheritance()`.
+
 ### `R/group_transition.R`
 
 Construct, attach, validate, and resolve transition processes and household rules.
@@ -193,6 +183,12 @@ Specify persistent fertility heterogeneity and initialize/check individual weigh
 Group pair effects, multidimension matching resolution, and engine representation.
 
 - Functions: `matching_group_labels()`, `expand_matching_pairs()`, `expand_group_exogamy()`, `matching_has_group_formula()`, `matching_predictor_data()`, `matching_pair_offsets()`, `validate_matching_groups()`, `expand_prevent_exogamy()`, `matching_group_allowed()`, `is_dimension_list()`, `split_group_exogamy()`, `exogamy_table_dimensions()`, `validate_exogamy_table()`, `matching_dimensions()`, `internal_matching_model()`, `combined_matching_model()`, `combination_labels()`, `resolve_matching_models()`, `%|na|%()`.
+
+### `R/matching_model.R`
+
+Construct, validate, evaluate, and prepare matching models independently of process settings.
+
+- Functions: **`matching_model()`**, `warn_absorbed_group_formula()`, **`age_gap_matching_model()`**, `validate_delta()`, `validate_matching_model()`, `validate_internal_matching()`, `matching_design_matrix()`, `calculate_matching_utilities()`, `calculate_matching_probabilities()`, `prepare_matching_model()`.
 
 ### `R/model_schedules.R`
 
@@ -247,6 +243,12 @@ Construct and validate dissolution processes.
 Construct and validate union formation/search processes.
 
 - Functions: **`union_formation()`**, **`set_union_formation()`**, `validate_union_formation()`, `expand_previous_union_rates()`, `validate_union_search_rates()`.
+
+### `R/weight_model.R`
+
+Construct, validate, and prepare within-cell weight models.
+
+- Functions: **`weight_model()`**, `weight_builtins()`, `weight_variable()`, `weight_group_name_possible()`, `validate_weight_model()`, `weight_design()`, `validate_process_weights()`, `warn_cancelled_weight_terms()`, `weight_strata()`, `prepare_weight_model()`.
 
 ## Maintaining the organization
 

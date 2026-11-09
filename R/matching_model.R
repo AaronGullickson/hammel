@@ -74,11 +74,11 @@
 #' @export
 #' @examples
 #' # Illustrative coefficients, not demographic defaults.
-#' matching <- create_matching_model(
+#' matching <- matching_model(
 #'   ~ age_difference + I(age_difference^2),
 #'   c(age_difference = 0.1, "I(age_difference^2)" = -0.02)
 #' )
-create_matching_model <- function(formula, coefficients, group_exogamy = NULL, delta = NULL) {
+matching_model <- function(formula, coefficients, group_exogamy = NULL, delta = NULL) {
   model <- structure(list(formula = formula, coefficients = coefficients,
                           group_exogamy = group_exogamy, delta = delta),
                      class = "hammel_matching_model")
@@ -90,7 +90,7 @@ create_matching_model <- function(formula, coefficients, group_exogamy = NULL, d
 #' Create a quadratic matching model from interpretable age-gap preferences
 #'
 #' Convert a preferred age gap and a symmetric half-weight distance into a
-#' formula and coefficients for [create_matching_model()]. Age difference is
+#' formula and coefficients for [matching_model()]. Age difference is
 #' male age minus female age. Candidates at the preferred gap plus or minus
 #' `half_weight_distance` receive half the selection weight of a candidate at
 #' the preferred gap. Availability and eligibility also affect realized gaps.
@@ -100,16 +100,16 @@ create_matching_model <- function(formula, coefficients, group_exogamy = NULL, d
 #' selection weights, not a halving of utility or a realized standard deviation.
 #' @param preferred_age_gap Finite numeric scalar in years; negative values allowed.
 #' @param group_exogamy Optional group-pair effects and prohibitions passed
-#'   to [create_matching_model()].
+#'   to [matching_model()].
 #' @param half_weight_distance Finite positive numeric scalar in years from the
 #'   preferred gap at which selection weight halves.
-#' @inheritParams create_matching_model
+#' @inheritParams matching_model
 #' @return A `hammel_matching_model` with linear and quadratic age-difference terms.
 #' @export
 #' @examples
 #' # Illustrative preferences, not demographic defaults.
-#' matching <- create_age_gap_matching_model(3, 5)
-create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL,
+#' matching <- age_gap_matching_model(3, 5)
+age_gap_matching_model <- function(preferred_age_gap, half_weight_distance, group_exogamy = NULL,
                                           delta = NULL) {
   for (name in c("preferred_age_gap", "half_weight_distance")) {
     value <- get(name)
@@ -125,7 +125,7 @@ create_age_gap_matching_model <- function(preferred_age_gap, half_weight_distanc
   if (!is.finite(quadratic) || quadratic >= 0 || !is.finite(linear))
     stop("Inputs must yield finite coefficients with a negative quadratic term.",
          call. = FALSE)
-  create_matching_model(~ age_difference + I(age_difference^2),
+  matching_model(~ age_difference + I(age_difference^2),
     c(age_difference = unname(linear), "I(age_difference^2)" = unname(quadratic)),
     group_exogamy = group_exogamy, delta = delta)
 }
@@ -156,7 +156,7 @@ validate_delta <- function(x) {
 # categories) happen when it is translated at simulation.
 validate_matching_model <- function(model) {
   if (!inherits(model, "hammel_matching_model") || !is.list(model)) {
-    stop("`matching` must be created with create_matching_model().", call. = FALSE)
+    stop("`matching` must be created with matching_model().", call. = FALSE)
   }
   formula <- model$formula
   vars <- if (inherits(formula, "formula")) all.vars(formula) else character()

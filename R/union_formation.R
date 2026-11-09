@@ -58,13 +58,13 @@
 #'
 #' @param initiation Either `"on_demand"` for birth-triggered searches or
 #'   `"rate"` for scheduled searches. No default is selected.
-#' @param matching A specification created by [create_matching_model()], or a
+#' @param matching A specification created by [matching_model()], or a
 #'   tibble with numeric `time_start`, `time_end`, and list-column `model` holding
 #'   complete matching objects. Model intervals are half-open absolute years,
 #'   cannot overlap, and must cover the requested run. The active model is used
 #'   at partner selection, without changing pending search dates or existing
 #'   unions. Base data frames with list columns are also accepted. Defaults
-#'   to `create_age_gap_matching_model(0, 5)`: preferred age gap zero years,
+#'   to `age_gap_matching_model(0, 5)`: preferred age gap zero years,
 #'   with selection weight halving five years on either side.
 #' @param cancel_birth_if_no_match Logical, default `TRUE`. Cancel a birth when
 #'   its on-demand partner search or rate-mode nonmarital father selection fails.
@@ -73,7 +73,7 @@
 #'   attempt is not replaced. Partner scarcity can reduce
 #'   realized fertility below inputs.
 #' @param father_matching Optional matching specification for fathers of
-#'   unpartnered births in rate mode, created by [create_matching_model()], or a
+#'   unpartnered births in rate mode, created by [matching_model()], or a
 #'   `time_start`/`time_end`/`model` schedule as for `matching`.
 #'   Defaults to `NULL`, using the general `matching` model active at that birth. Union
 #'   searches always use `matching`. Not used by on-demand initiation. Process-level
@@ -151,13 +151,13 @@
 #'   Conversion keeps partners, closes cohab with reason `conversion`, and starts
 #'   a linked marriage with a new dissolution-duration origin.
 #' @param weights NULL (default) for unweighted selection of searching women,
-#'   or a [create_weight_model()] using person variables, which chooses which
+#'   or a [weight_model()] using person variables, which chooses which
 #'   unpartnered woman in a cell searches without changing the cell's input
 #'   search rate. Rate mode only. With weighted matching calibration the
 #'   weights are kept current for every searching woman, so calibration uses
 #'   the weighted search intensities.
 #' @param weights_conversion NULL (default) for unweighted selection, or a
-#'   [create_weight_model()] using union variables, which chooses which
+#'   [weight_model()] using union variables, which chooses which
 #'   cohabitation in a cell converts without changing the cell's input rate.
 #' @param cohabitation_counts_as_previous_union Logical, default FALSE. FALSE
 #'   restores previous legal-marriage category after a cohabitation ends; TRUE
@@ -167,7 +167,7 @@
 #' @return `union_formation()` returns a `hammel_union_formation` process;
 #'   `set_union_formation()` returns an updated model. Rate tables are tibbles.
 #' @export
-union_formation <- function(initiation, matching = create_age_gap_matching_model(0, 5),
+union_formation <- function(initiation, matching = age_gap_matching_model(0, 5),
                             rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,
@@ -209,7 +209,7 @@ union_formation <- function(initiation, matching = create_age_gap_matching_model
 
 #' @rdname union_formation
 #' @export
-set_union_formation <- function(model, initiation, matching = create_age_gap_matching_model(0, 5),
+set_union_formation <- function(model, initiation, matching = age_gap_matching_model(0, 5),
                             rates = NULL,
                             min_male_age = 15, kinship_generations = 2,
                             father_matching = NULL, cancel_birth_if_no_match = TRUE,

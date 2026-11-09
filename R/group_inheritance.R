@@ -43,14 +43,14 @@
 #' @return An inspectable `hammel_group_inheritance` object.
 #' @export
 #' @examples
-#' create_group_inheritance("fixed", fixed_value = "none")
-#' create_group_inheritance("mother")
-#' create_group_inheritance("hierarchy", order = c("A", "B"), passing = 0.05)
-#' create_group_inheritance("custom",
+#' group_inheritance("fixed", fixed_value = "none")
+#' group_inheritance("mother")
+#' group_inheritance("hierarchy", order = c("A", "B"), passing = 0.05)
+#' group_inheritance("custom",
 #'   fun = function(mother_group, father_group, ...) {
 #'     if (is.na(father_group) || mother_group == father_group) mother_group else "mixed"
 #'   })
-create_group_inheritance <- function(method = "random_parent", fun = NULL,
+group_inheritance <- function(method = "random_parent", fun = NULL,
                                      order = NULL, passing = 0, fixed_value = NULL) {
   model <- structure(list(method = method, fun = fun,
                           order = order, passing = passing, fixed_value = fixed_value), class = "hammel_group_inheritance")
@@ -69,8 +69,8 @@ normalize_group_inheritance <- function(model) {
     validate_model_argument(model, validate_group_inheritance, "inheritance")
     return(normalize_model_argument(model))
   }
-  if (is.null(model)) model <- create_group_inheritance()
-  if (is.character(model)) model <- create_group_inheritance(method = model)
+  if (is.null(model)) model <- group_inheritance()
+  if (is.character(model)) model <- group_inheritance(method = model)
   validate_group_inheritance(model)
   model
 }
@@ -78,7 +78,7 @@ normalize_group_inheritance <- function(model) {
 validate_group_inheritance <- function(model) {
   if (is.null(model)) return(invisible(model)) # Missing inheritance fields use the current default.
   if (!inherits(model, "hammel_group_inheritance") || !is.list(model))
-    stop("`inheritance` must be created with create_group_inheritance().", call. = FALSE)
+    stop("`inheritance` must be created with group_inheritance().", call. = FALSE)
   if (!is.character(model$method) || length(model$method) != 1L || is.na(model$method) ||
       !model$method %in% inheritance_methods()) stop("Invalid group inheritance method.", call. = FALSE)
   for (field in "order") {

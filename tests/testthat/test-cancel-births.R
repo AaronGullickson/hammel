@@ -1,5 +1,5 @@
 test_that("failed-match cancellation defaults on and validates logical scalars", {
-  matching <- create_matching_model(~ age_difference, c(age_difference = 0))
+  matching <- matching_model(~ age_difference, c(age_difference = 0))
   expect_true(union_formation("on_demand", matching)$cancel_birth_if_no_match)
   expect_false(union_formation("on_demand", matching,
     cancel_birth_if_no_match = FALSE)$cancel_birth_if_no_match)

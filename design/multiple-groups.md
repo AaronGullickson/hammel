@@ -26,8 +26,8 @@ a population's group dimensions are those declared with
 ```r
 set_groups(model,
   race   = group(categories = c("A", "B", "AB"), ancestry = TRUE,
-                 inheritance = create_group_inheritance("custom", fun = mixed_rule)),
-  region = group(inheritance = create_group_inheritance("mother")))
+                 inheritance = group_inheritance("custom", fun = mixed_rule)),
+  region = group(inheritance = group_inheritance("mother")))
 ```
 
 A one-dimension model uses the same mechanism, for example
@@ -70,10 +70,10 @@ is kept.
     destination must be in it; extra categories may start empty. Anything that
     creates a member (custom inheritance, transitions) must use a listed
     category. Group-specific rate tables cover every category. This replaces
-    the `groups` argument of `create_group_inheritance()`.
+    the `groups` argument of `group_inheritance()`.
   - The first category is the reference level for group terms in matching and
     weight formulas (coefficient names such as `raceB`). This replaces
-    `group_levels` in `create_matching_model()` and `create_weight_model()`;
+    `group_levels` in `matching_model()` and `weight_model()`;
     coefficient names are checked when the model meets the declaration.
   - `ancestry`: whether to track ancestry shares for this dimension, default
     `FALSE`. The `"ancestry"` inheritance method and ancestry variables in
@@ -478,7 +478,7 @@ the dimension's own name.
 (named list of weights or a joint data frame) work as specified, with the
 declaration stored on the population (`population$groups`) and on the model
 (`model$groups`, which wins). Inheritance and categories moved into `group()`
-(`set_fertility(inheritance =)` and `create_group_inheritance(groups =)` are
+(`set_fertility(inheritance =)` and `group_inheritance(groups =)` are
 gone); ancestry is tracked only with `ancestry = TRUE`. An undeclared `group`
 column is hidden from the engine during simulation and restored with `NA` for
 newborns; rate tables using an undeclared persons column are errors, which

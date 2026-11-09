@@ -39,7 +39,7 @@
 #'   their parents' shares, and the `"ancestry"` inheritance method becomes
 #'   available.
 #' @param inheritance How newborns are assigned to a category: a
-#'   [create_group_inheritance()] object, a method name such as `"mother"`, or
+#'   [group_inheritance()] object, a method name such as `"mother"`, or
 #'   a calendar schedule tibble with `time_start`, `time_end` and list-column
 #'   `model`. The default selects either parent with equal probability, with
 #'   maternal fallback.
@@ -49,15 +49,15 @@
 #' @return `group()` returns a `hammel_group` object describing one dimension.
 #'   `set_groups()` returns an updated `hammel_model`.
 #' @seealso [hammel_population()], [create_baseline_population()],
-#'   [create_group_inheritance()], [group_transition()]
+#'   [group_inheritance()], [group_transition()]
 #' @rdname group
 #' @order 1
 #' @export
 #' @examples
 #' group(categories = c("A", "B", "AB"), ancestry = TRUE,
-#'       inheritance = create_group_inheritance("mother"))
+#'       inheritance = group_inheritance("mother"))
 group <- function(categories = NULL, ancestry = FALSE,
-                  inheritance = create_group_inheritance()) {
+                  inheritance = group_inheritance()) {
   x <- structure(list(categories = categories, ancestry = ancestry,
                       inheritance = normalize_group_inheritance(inheritance)),
                  class = "hammel_group")

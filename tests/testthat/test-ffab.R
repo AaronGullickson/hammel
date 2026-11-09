@@ -77,7 +77,7 @@ test_that("newborn sex follows a nondefault Bernoulli probability", {
 test_that("configured sex is available to built-in and custom inheritance", {
   for (probability in c(0, 1)) {
     for (method in c("same_sex", "opposite_sex", "custom")) {
-      inheritance <- if (method == "custom") create_group_inheritance("custom",
+      inheritance <- if (method == "custom") group_inheritance("custom",
         fun = function(child_sex, ...) if (child_sex == "f") "A" else "B") else method
       model <- make_model(2, birth_rate = 20, birth_interval = 0)
       model$population$persons$sex <- c("f", "m")

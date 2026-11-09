@@ -26,9 +26,9 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Calendar model schedules and engine preparation | `R/model_schedules.R`; switches in `src/simulate.cpp` |
 | Group transition and household specifications | `R/group_transition.R`; events in `src/simulate.cpp` |
 | Persistent fertility heterogeneity | `R/het_fert.R`; cell weight trees in `src/simulate.cpp` |
-| Weight models | `R/create_weight_model.R`; stored weights and selection in `src/simulate.cpp` |
+| Weight models | `R/weight_model.R`; stored weights and selection in `src/simulate.cpp` |
 | Union formation, dissolution and cohabitation settings | `R/union_formation.R`, `R/union_dissolution.R`, `R/cohabitation.R` |
-| Matching and inheritance models | `R/create_matching_model.R`, `R/matching_groups.R`, `R/create_group_inheritance.R` |
+| Matching and inheritance models | `R/matching_model.R`, `R/matching_groups.R`, `R/group_inheritance.R` |
 | Kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/extract_kin.R` |
 | HMD/HFD downloads, conversion and provenance | `R/get_database_rates.R` |
 | Simulation validation, RNG isolation and result assembly | `R/simulate.R` |
@@ -68,7 +68,7 @@ model <- hammel_model() |>
   set_mortality(mortality_rates) |>
   set_fertility(fertility_rates, birth_interval = 0.75) |>
   set_union_formation("on_demand",
-    create_matching_model(~ age_difference, c(age_difference = 0)))
+    matching_model(~ age_difference, c(age_difference = 0)))
 
 result <- simulate(model, years = 10, seed = 123)
 ```
@@ -165,7 +165,7 @@ See [union dissolution](union-dissolution.md) for examples and deferred scope.
 
 ## Newborn identity configuration
 
-`create_group_inheritance()` attaches per dimension through `group(inheritance = ...)`.
+`group_inheritance()` attaches per dimension through `group(inheritance = ...)`.
 The `"fixed"` method (D142) uses an explicit `fixed_value` category, validated against
 the registry and assigned in C++ with no callback or identity random draw.
 R validates the mode, possible identity registry, grouped schedule coverage,
@@ -352,7 +352,7 @@ model's restrictions. See [group matching](group-matching.md).
 
 ## Milestone 2 construction
 
-`create_matching_model()` accepts a formula with age and group predictors,
+`matching_model()` accepts a formula with age and group predictors,
 named utility coefficients, and optional symmetric additive pair effects (`A:B` in both directions).
 Group predictors are named by dimension (`female_race`, `same_race`) with the
 dimension's categories as levels (D134); see
@@ -413,7 +413,7 @@ model supplies a separately prepared draw model and weights for
 nonmarital father selection. Previous-father
 preference is deferred (D042).
 
-Omitting `matching` uses `create_age_gap_matching_model(0, 5)`. The helper
+Omitting `matching` uses `age_gap_matching_model(0, 5)`. The helper
 converts a preferred age gap and half-weight distance in years to the existing
 quadratic utility model. `diagnostics = TRUE` adds weighted choice's applied
 `.log_weight_<group>` columns to new union records in grouped populations,
@@ -456,8 +456,8 @@ per-generation marginal normalization is imposed. See [the specification](fertil
 
 ## Weight models (D129)
 
-`create_weight_model(formula, coefficients)` or
-`create_weight_model(fun = f)` builds a weight model, validated by
+`weight_model(formula, coefficients)` or
+`weight_model(fun = f)` builds a weight model, validated by
 `validate_weight_model()`; `weights` arguments on `set_mortality()`,
 `set_fertility()`, `set_union_dissolution()`, `set_group_transition()` and
 `set_union_formation()` (with `weights_conversion`) accept one model or a

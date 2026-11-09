@@ -8,7 +8,7 @@ declaration_model <- function(n = 20, rate = 5) {
 test_that("group() validates its settings and normalizes inheritance", {
   g <- group(inheritance = "mother")
   expect_s3_class(g, "hammel_group")
-  expect_identical(g$inheritance, create_group_inheritance("mother"))
+  expect_identical(g$inheritance, group_inheritance("mother"))
   expect_false(g$ancestry)
   expect_identical(group()$inheritance$method, "random_parent")
   expect_error(group(categories = c("A", "A")), "unique")
@@ -87,7 +87,7 @@ test_that("categories fix the complete ordered list", {
   out <- simulate(m, 1, seed = 5)
   expect_identical(out$groups$group$categories, c("B", "A", "C"))
   # A custom rule must return a listed category.
-  rule <- create_group_inheritance("custom", fun = function(...) "D")
+  rule <- group_inheritance("custom", fun = function(...) "D")
   expect_error(simulate(set_groups(model, group = group(inheritance = rule)), 1, seed = 5),
                "undeclared group identity")
 })
@@ -152,7 +152,7 @@ test_that("baselines declare categories in the order given, and set_groups keeps
   model <- model |>
     set_groups(race = group()) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .01),
-                  weights = create_weight_model(~ race, c(raceA = 0, raceAB = 0))) |>
+                  weights = weight_model(~ race, c(raceA = 0, raceAB = 0))) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .1)) |>
     set_union_formation("on_demand")
   expect_s3_class(simulate(model, 1, seed = 4), "hammel_population")

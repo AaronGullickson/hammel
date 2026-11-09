@@ -136,7 +136,7 @@ test_that("grouped duration calibration matches the equivalent age hazards", {
   age$age_start[2:3] <- 21
   age$age_end[2:3] <- Inf
   age$dur_start <- age$dur_end <- NULL
-  matching <- create_matching_model(~ 1, numeric(), group_exogamy = c("A:B" = -2))
+  matching <- matching_model(~ 1, numeric(), group_exogamy = c("A:B" = -2))
   configure <- function(rates) set_union_formation(model, "rate", matching,
     rates = stratify_rates(rates, list(group = c(A = 1, B = 1.3))), diagnostics = TRUE,
     kinship_generations = 0L)
@@ -153,7 +153,7 @@ test_that("grouped duration calibration matches the equivalent age hazards", {
 test_that("duration searches calibrate on their ending origins", {
   rates <- duration_search_rates()
   women <- c(-20, -50)
-  prepared <- prepare_matching_model(create_matching_model(~ 1, numeric(),
+  prepared <- prepare_matching_model(matching_model(~ 1, numeric(),
     group_exogamy = c("A:B" = -1)), c("A", "B"))
   # Durations 1 and 10, both in a constant .2 band: target splits evenly.
   result <- inspect_weighted_calibration_cpp(women, 0:1, c(TRUE, TRUE),

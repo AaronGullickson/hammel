@@ -1,4 +1,4 @@
-inheritance_test_model <- function(rule = create_group_inheritance(), birth_rate = 20,
+inheritance_test_model <- function(rule = group_inheritance(), birth_rate = 20,
                                    categories = NULL) {
   model <- make_model(2, birth_rate = birth_rate, birth_interval = 0)
   model$population$persons$sex <- c("f", "m")
@@ -11,7 +11,7 @@ inheritance_children <- function(result) result$persons[result$persons$birth_tim
 test_that("inheritance method strings are equivalent to constructed models", {
   for (method in c("mother", "father", "random_parent", "same_sex", "opposite_sex", "ancestry")) {
     model <- inheritance_test_model(method)
-    explicit <- inheritance_test_model(create_group_inheritance(method))
+    explicit <- inheritance_test_model(group_inheritance(method))
     expect_identical(model$groups$group$inheritance, explicit$groups$group$inheritance)
     expect_identical(simulate(model, 1, seed = 52), simulate(explicit, 1, seed = 52))
   }
@@ -22,7 +22,7 @@ test_that("inheritance method strings are equivalent to constructed models", {
 })
 
 test_that("custom inheritance receives parents' union status at birth", {
-  rule <- create_group_inheritance("custom",
+  rule <- group_inheritance("custom",
     fun = function(parents_in_union, ...) {
       stopifnot(is.logical(parents_in_union), length(parents_in_union) == 1L,
                 !is.na(parents_in_union))
@@ -53,7 +53,7 @@ test_that("custom inheritance receives parents' union status at birth", {
 
 test_that("built-in inheritance uses parents and newborn sex", {
   for (method in c("mother", "father", "same_sex", "opposite_sex")) {
-    result <- simulate(inheritance_test_model(create_group_inheritance(method)), 1, seed = 52)
+    result <- simulate(inheritance_test_model(group_inheritance(method)), 1, seed = 52)
     children <- inheritance_children(result)
     expect_gt(nrow(children), 5)
     expect_true(all(c("m", "f") %in% children$sex))
@@ -71,7 +71,7 @@ test_that("default, explicit, and missing inheritance specifications use random 
   set.seed(654)
   original <- simulate(model, 1)
   after <- .Random.seed
-  expect_identical(create_group_inheritance()$method, "random_parent")
+  expect_identical(group_inheritance()$method, "random_parent")
   expect_identical(model$groups$group$inheritance$method, "random_parent")
   explicit <- inheritance_test_model("random_parent")
   set.seed(654)
@@ -92,8 +92,8 @@ test_that("missing fathers fall back to maternal identity without extra parent-c
   original$population$persons <- original$population$persons[1, ]
   reference <- simulate(original, 1, seed = 52)
   for (method in c("father", "random_parent", "same_sex", "opposite_sex", "hierarchy")) {
-    rule <- if (method == "hierarchy") create_group_inheritance(method, order = c("B", "A"), passing = 0.5) else
-      create_group_inheritance(method)
+    rule <- if (method == "hierarchy") group_inheritance(method, order = c("B", "A"), passing = 0.5) else
+      group_inheritance(method)
     model <- original
     model <- set_inheritance(model, rule)
     histories <- c("persons", "unions", "ancestry", "transitions")
@@ -102,25 +102,25 @@ test_that("missing fathers fall back to maternal identity without extra parent-c
 })
 
 test_that("random-parent and hierarchy probabilities agree with analytical cases", {
-  model <- inheritance_test_model(create_group_inheritance("random_parent"), birth_rate = 2000)
+  model <- inheritance_test_model(group_inheritance("random_parent"), birth_rate = 2000)
   result <- simulate(model, 1, seed = 52)
   children <- inheritance_children(result)
   expect_gt(nrow(children), 1000)
   expect_lt(abs(mean(children$group == "A") - 0.5), 5 * sqrt(0.25/nrow(children)))
   for (passing in c(0, 1, 0.05)) {
-    model <- set_inheritance(model, create_group_inheritance("hierarchy", order = c("A", "B"), passing = passing))
+    model <- set_inheritance(model, group_inheritance("hierarchy", order = c("A", "B"), passing = passing))
     children <- inheritance_children(simulate(model, 1, seed = 52))
     if (passing %in% c(0, 1)) expect_true(all(children$group == if (passing == 0) "A" else "B")) else
       expect_lt(abs(mean(children$group == "B") - passing), 5 * sqrt(passing*(1-passing)/nrow(children)))
   }
-  model <- inheritance_test_model(create_group_inheritance("hierarchy", order = "B", passing = 1))
+  model <- inheritance_test_model(group_inheritance("hierarchy", order = "B", passing = 1))
   histories <- c("persons", "unions", "ancestry", "transitions")
   expect_identical(simulate(model, 1, seed = 52)[histories],
                    simulate(inheritance_test_model("mother"), 1, seed = 52)[histories])
 })
 
 test_that("ancestry assignment conditions on known shares and handles all-unknown ancestry", {
-  model <- inheritance_test_model(create_group_inheritance("ancestry"), birth_rate = 2000)
+  model <- inheritance_test_model(group_inheritance("ancestry"), birth_rate = 2000)
   # Both parents identify A, but carry a known B reference component.
   p <- model$population$persons
   p$group <- "A"
@@ -135,12 +135,12 @@ test_that("ancestry assignment conditions on known shares and handles all-unknow
   model$population$ancestry$group$B <- 0
   model$population$ancestry$group$unknown <- 1
   model$processes$fertility$rates$rate <- 20
-  maternal <- model; maternal$groups$group$inheritance <- create_group_inheritance()
+  maternal <- model; maternal$groups$group$inheritance <- group_inheritance()
   expect_identical(histories(simulate(model, 1, seed = 52)), histories(simulate(maternal, 1, seed = 52)))
 })
 
 test_that("custom callbacks receive copies of all inputs and use the unified R RNG stream", {
-  custom <- create_group_inheritance("custom", fun = function(mother_group, father_group,
+  custom <- group_inheritance("custom", fun = function(mother_group, father_group,
       mother_ancestry, father_ancestry, child_ancestry, child_sex) {
     stopifnot(mother_group == "A", father_group == "B", child_sex %in% c("m", "f"),
       identical(names(child_ancestry), c("A", "B", "unknown")),
@@ -153,7 +153,7 @@ test_that("custom callbacks receive copies of all inputs and use the unified R R
   set.seed(654); state <- .Random.seed
   actual <- simulate(model, 1, seed = 52)
   expect_identical(.Random.seed, state)
-  native <- inheritance_test_model(create_group_inheritance("random_parent"))
+  native <- inheritance_test_model(group_inheritance("random_parent"))
   expect_identical(histories(actual), histories(simulate(native, 1, seed = 52)))
   set.seed(52)
   actual <- simulate(model, 1)
@@ -162,7 +162,7 @@ test_that("custom callbacks receive copies of all inputs and use the unified R R
   expect_identical(histories(simulate(native, 1)), histories(actual))
   expect_identical(.Random.seed, after)
   # Multinomial-logit-style ancestry probabilities can be implemented in R.
-  rule <- create_group_inheritance("custom", fun = function(child_ancestry, ...) {
+  rule <- group_inheritance("custom", fun = function(child_ancestry, ...) {
     weights <- exp(c(A = child_ancestry[["A"]], B = child_ancestry[["B"]]))
     sample(names(weights), 1, prob = weights)
   })
@@ -170,7 +170,7 @@ test_that("custom callbacks receive copies of all inputs and use the unified R R
 })
 
 test_that("custom mixed identities are declared, use their own schedules, and retain A/B ancestry", {
-  rule <- create_group_inheritance("custom", fun = function(mother_group, father_group, ...) {
+  rule <- group_inheritance("custom", fun = function(mother_group, father_group, ...) {
     if (is.na(father_group) || mother_group == father_group) mother_group else "AB"
   })
   model <- inheritance_test_model(rule, categories = c("A", "B", "AB"))
@@ -192,7 +192,7 @@ test_that("custom mixed identities are declared, use their own schedules, and re
 })
 
 test_that("future identities are checked against rates and categorical matching before execution", {
-  model <- inheritance_test_model(create_group_inheritance("custom", fun = function(...) "AB"),
+  model <- inheritance_test_model(group_inheritance("custom", fun = function(...) "AB"),
                                   categories = c("A", "B", "AB"))
   for (name in c("mortality", "fertility")) {
     edited <- model
@@ -200,7 +200,7 @@ test_that("future identities are checked against rates and categorical matching 
     edited$processes[[name]]$rates <- rbind(transform(rates, group = "A"), transform(rates, group = "B"))
     expect_error(simulate(edited, 0), "missing schedules.*AB")
   }
-  expect_warning(matching <- create_matching_model(~ male_group, c(male_groupB = 0)), "male_group` are absorbed")
+  expect_warning(matching <- matching_model(~ male_group, c(male_groupB = 0)), "male_group` are absorbed")
   model$processes$union_formation$matching <- matching
   # Declared categories include AB, so its coefficient is required.
   expect_error(simulate(model, 0), "coefficient names.*male_groupAB")
@@ -218,12 +218,12 @@ test_that("future identities are checked against rates and categorical matching 
 test_that("custom errors and invalid returns restore explicit RNG state", {
   for (fun in list(function(...) NA_character_, function(...) NULL, function(...) c("A", "B"),
                    function(...) "undeclared", function(...) stop("custom failed"))) {
-    model <- inheritance_test_model(create_group_inheritance("custom", fun = fun))
+    model <- inheritance_test_model(group_inheritance("custom", fun = fun))
     set.seed(654); state <- .Random.seed
     expect_error(simulate(model, 1, seed = 52))
     expect_identical(.Random.seed, state)
   }
-  rule <- create_group_inheritance("custom", fun = function(mother_group, father_group, father_ancestry, ...) {
+  rule <- group_inheritance("custom", fun = function(mother_group, father_group, father_ancestry, ...) {
     stopifnot(is.na(father_group), is.null(father_ancestry)); mother_group
   })
   model <- inheritance_test_model(rule)
@@ -232,13 +232,13 @@ test_that("custom errors and invalid returns restore explicit RNG state", {
 })
 
 test_that("inheritance validates edited specifications and configuration", {
-  expect_error(create_group_inheritance("other"), "method")
-  expect_error(create_group_inheritance("custom"), "fun")
-  expect_error(create_group_inheritance("hierarchy"), "order")
-  expect_error(create_group_inheritance("hierarchy", order = c("A", "A")), "unique")
-  expect_error(create_group_inheritance("mother", passing = 0.1), "hierarchy")
+  expect_error(group_inheritance("other"), "method")
+  expect_error(group_inheritance("custom"), "fun")
+  expect_error(group_inheritance("hierarchy"), "order")
+  expect_error(group_inheritance("hierarchy", order = c("A", "A")), "unique")
+  expect_error(group_inheritance("mother", passing = 0.1), "hierarchy")
   for (passing in list(-1, 2, NA, "0", c(0, 1)))
-    expect_error(create_group_inheritance("hierarchy", order = c("A", "B"), passing = passing), "passing")
+    expect_error(group_inheritance("hierarchy", order = c("A", "B"), passing = passing), "passing")
   expect_error(group(categories = c("A", NA)), "group")
   model <- inheritance_test_model()
   model$groups$group$inheritance$method <- "bad"
@@ -246,7 +246,7 @@ test_that("inheritance validates edited specifications and configuration", {
 })
 
 test_that("numeric identities remain numeric, and empty populations stay typed", {
-  model <- inheritance_test_model(create_group_inheritance("father"))
+  model <- inheritance_test_model(group_inheritance("father"))
   model$population$persons$group <- c(20L, 10L)
   model$population$groups <- list(group = group())
   result <- simulate(model, 0.5, seed = 52)
@@ -260,14 +260,14 @@ test_that("numeric identities remain numeric, and empty populations stay typed",
 })
 
 test_that("new AB identities are available to categorical partner matching during the run", {
-  rule <- create_group_inheritance("custom", fun = function(...) "AB")
+  rule <- group_inheritance("custom", fun = function(...) "AB")
   model <- inheritance_test_model(rule, categories = c("A", "B", "AB"))
   # All newborns are male: until AB women enter the search ages, AB men's
   # mirrored baseline uses the overall female rate rather than a zero rate
   # averaged across newborn girls. The high delta makes their selection clear.
   model <- set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
     age_start = 15, age_end = 50, rate = c(0, 20)), 0, ffab = 0)
-  expect_warning(matching <- create_matching_model(~ male_group,
+  expect_warning(matching <- matching_model(~ male_group,
     c(male_groupB = 0, male_groupAB = .5),
     delta = c(AB = 20)), "male_group` are absorbed")
   model <- set_union_formation(model, "rate", matching, rates = data.frame(
@@ -281,7 +281,7 @@ test_that("new AB identities are available to categorical partner matching durin
 })
 
 test_that("future search schedules, stratified rates, and numeric declarations are supported", {
-  rule <- create_group_inheritance("custom", fun = function(...) "AB")
+  rule <- group_inheritance("custom", fun = function(...) "AB")
   model <- inheritance_test_model(rule, categories = c("A", "B", "AB"))
   model <- set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
     age_start = 15, age_end = 50, rate = c(0, 20)), 0)
@@ -294,10 +294,10 @@ test_that("future search schedules, stratified rates, and numeric declarations a
     list(group = c(A = 0, B = 0, AB = 1)))
   result <- simulate(model, 0.5, seed = 52)
   expect_true(all(!is.na(inheritance_children(result)$death_time)))
-  model <- inheritance_test_model(create_group_inheritance("custom", fun = function(...) 30L))
+  model <- inheritance_test_model(group_inheritance("custom", fun = function(...) 30L))
   model$population$persons$group <- c(20L, 10L)
   model <- set_groups(model, group = group(categories = c(20L, 10L, 30L),
-    inheritance = create_group_inheritance("custom", fun = function(...) 30L)))
+    inheritance = group_inheritance("custom", fun = function(...) 30L)))
   result <- simulate(model, 0.5, seed = 52)
   expect_type(result$persons$group, "integer")
   expect_true(all(inheritance_children(result)$group == 30L))
@@ -306,16 +306,16 @@ test_that("future search schedules, stratified rates, and numeric declarations a
 test_that("fixed inheritance validates a single explicit category", {
   for (value in list(NULL, character(), c("A", "B"), NA_character_, "", " ", Inf,
                      TRUE, matrix("A"), 1 + 1i))
-    expect_error(create_group_inheritance("fixed", fixed_value = value), "value")
-  expect_error(create_group_inheritance("mother", fixed_value = "A"), "only to fixed")
+    expect_error(group_inheritance("fixed", fixed_value = value), "value")
+  expect_error(group_inheritance("mother", fixed_value = "A"), "only to fixed")
   expect_error(inheritance_test_model("fixed"), "value")
-  model <- inheritance_test_model(create_group_inheritance("fixed", fixed_value = "none"))
+  model <- inheritance_test_model(group_inheritance("fixed", fixed_value = "none"))
   expect_error(simulate(model, 0), "undeclared")
 })
 
 test_that("fixed newborn categories preserve founders, ancestry and deterministic RNG", {
-  fixed <- create_group_inheritance("fixed", fixed_value = "none")
-  custom <- create_group_inheritance("custom", fun = function(...) "none")
+  fixed <- group_inheritance("fixed", fixed_value = "none")
+  custom <- group_inheritance("custom", fun = function(...) "none")
   categories <- c("A", "B", "none")
   model <- inheritance_test_model(fixed, categories = categories)
   reference <- inheritance_test_model(custom, categories = categories)
@@ -350,20 +350,20 @@ test_that("fixed inheritance supports numeric categories and calendar switches",
   model <- inheritance_test_model()
   model$population$persons$group <- c(1, 2)
   model <- set_groups(model, group = group(categories = c(0, 1, 2),
-    inheritance = create_group_inheritance("fixed", fixed_value = 0)))
+    inheritance = group_inheritance("fixed", fixed_value = 0)))
   children <- inheritance_children(simulate(model, 1, seed = 726))
   expect_gt(nrow(children), 0)
   expect_identical(children$group, rep(0, nrow(children)))
 
   schedule <- tibble::tibble(time_start = c(0, .5), time_end = c(.5, Inf),
-    model = list(create_group_inheritance("fixed", fixed_value = "none"),
-                 create_group_inheritance("fixed", fixed_value = "primary")))
+    model = list(group_inheritance("fixed", fixed_value = "none"),
+                 group_inheritance("fixed", fixed_value = "primary")))
   model <- inheritance_test_model(schedule, birth_rate = 100,
                                   categories = c("A", "B", "none", "primary"))
   children <- inheritance_children(simulate(model, 1, seed = 726))
   expect_true(any(children$birth_time < .5))
   expect_true(any(children$birth_time >= .5))
   expect_identical(children$group, ifelse(children$birth_time < .5, "none", "primary"))
-  model$groups$group$inheritance$model[[2]] <- create_group_inheritance("fixed", fixed_value = "other")
+  model$groups$group$inheritance$model[[2]] <- group_inheritance("fixed", fixed_value = "other")
   expect_error(simulate(model, .1), "undeclared")
 })

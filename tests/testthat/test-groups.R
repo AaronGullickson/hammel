@@ -58,7 +58,7 @@ test_that("shared and identical grouped schedules agree in distribution", {
   model <- set_inheritance(set_fertility(model, group_status_rates(0.3, 0.2), 0.75), "mother")
   model <- set_union_formation(model, "rate", rates = data.frame(
     age_start = 15, age_end = Inf, rate = 1),
-    matching = create_age_gap_matching_model(0, 5))
+    matching = age_gap_matching_model(0, 5))
   model <- set_mortality(model, data.frame(sex = c("m", "f"),
     age_start = 0, age_end = Inf, rate = 0.01))
   original <- model
@@ -124,7 +124,7 @@ test_that("group search hazards allow intergroup unions", {
   model$population$persons$group <- c("B", "A")
   model$population$groups <- list(group = group())
   model <- set_union_formation(model, "rate",
-    matching = create_age_gap_matching_model(0, 5),
+    matching = age_gap_matching_model(0, 5),
     rates = group_rates(model$processes$union_formation$rates, b = 1e8))
   result <- simulate(model, 0.1, seed = 12)
   expect_equal(nrow(result$unions), 1)
@@ -218,7 +218,7 @@ test_that("on-demand intergroup unions support explicit maternal inheritance", {
   model$population$persons$sex <- c("f", "m")
   model$population$persons$group <- c("B", "A")
   model$population$groups <- list(group = group())
-  model <- set_inheritance(model, create_group_inheritance("mother"))
+  model <- set_inheritance(model, group_inheritance("mother"))
   result <- simulate(model, 0.2, seed = 12)
   expect_equal(nrow(result$unions), 1)
   children <- result$persons[result$persons$birth_time >= 0, ]

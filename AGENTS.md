@@ -41,7 +41,10 @@ be made autonomously; record choices with substantial architectural consequences
   exported functions first and internal
   constants/helpers below, using `# SECTION NAME ------` headings. Preserve
   documentation blocks and leave generated wrappers untouched.
-- Prefer verb-based names for user-facing action functions, such as `create_baseline_population()` and `set_population()`.
+- Use noun-based names for specification constructors, such as `matching_model()`,
+  `age_gap_matching_model()`, `weight_model()`, and `group_inheritance()`.
+  Prefer verbs for pipeable actions such as `set_population()`. Keep
+  `create_baseline_population()` as the explicitly retained exception.
 - Return all public tables as tibbles, including empty tables, population histories,
   process schedules, and demographic summaries. Accept base data frames as inputs.
 - Keep model construction separate from simulation execution. Aim for composable R workflows and R-native, inspectable results at the user-facing boundary. This does not require an R-only implementation: performance-critical computation and internal state may use compiled code, such as C++, with results exposed as ordinary R objects for inspection and analysis.
@@ -160,5 +163,5 @@ the user's agreement.
   articles (`vignettes/`) and makes all edits to the top-level `README.md`
   (D141); do not edit them unless asked. Preserve the user's edits, including
   explanatory source comments and the accepted reports. Fixed newborn assignment
-  is available through `create_group_inheritance("fixed", fixed_value = ...)` (D142); custom inheritance already supports assigning
+  is available through `group_inheritance("fixed", fixed_value = ...)` (D142); custom inheritance already supports assigning
   mixed-parent births to a specified category.

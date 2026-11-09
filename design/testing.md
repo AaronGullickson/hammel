@@ -5,6 +5,14 @@ D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the u
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## Noun-based specification constructors (November 9, 2026)
+
+D147 renames the matching, age-gap matching, weight, and group-inheritance constructors, retaining `create_baseline_population()`. A parsed-expression comparison against the pre-rename working tree confirmed that executable R definitions differ only by those four name replacements, including updated calls and diagnostic messages. Export checks confirmed exactly those replacements, with 43 exports overall and no aliases under the old names.
+
+A before/after simulation using baseline generation, maternal group inheritance, age-gap matching, and mortality weights produced identical population results and random-number states. All four renamed constructor help pages passed Rd validation and their examples executed successfully. A second `devtools::document()` pass completed without the transitional unresolved-name warnings from the initial namespace rename.
+
+The full offline `devtools::test()` run passed 6,496 expectations with zero failures in 108.6 seconds. The live database test was skipped. One existing environment warning concerned HMDHFDplus/lubridate's `timedatectl` access to the system bus in the sandbox. `git diff --check` passed. Native sources, user-maintained README/vignettes, and historical validation sources/artifacts were untouched; old constructor calls in those historical or user-maintained sources require updating before execution against the renamed API.
+
 ## Shared fertility-summary and group-declaration help (November 9, 2026)
 
 D146 combines TFR/PATFR and group construction/declaration into two paired help topics. `devtools::document()` completed successfully, removing the superseded `calculate_patfr.Rd` and `set_groups.Rd` pages. Both shared topics passed Rd validation, alias checks, argument-coverage checks, text rendering, and execution of all examples. The TFR examples exercise both explicit PATFR and automatic parity dispatch; the group examples describe a dimension and declare it on a model.

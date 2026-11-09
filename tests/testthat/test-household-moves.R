@@ -119,7 +119,7 @@ test_that("with households living together, everyone moves at the input rate", {
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .01)) |>
     set_fertility(data.frame(age_start = 15, age_end = 45, rate = .1)) |>
     set_union_formation("on_demand", kinship_generations = 0,
-      matching = create_age_gap_matching_model(2, 5, group_exogamy = list(region = NA))) |>
+      matching = age_gap_matching_model(2, 5, group_exogamy = list(region = NA))) |>
     set_group_transition(rates, group = "region", household = household())
   out <- simulate(model, 20, seed = 12)
   r <- calculate_transition_rates(out, c(5, 20), age_breaks = c(0, 18, 40, Inf), by = "sex")
@@ -147,7 +147,7 @@ test_that("households that start together stay together through a long run", {
     set_fertility(data.frame(union_type = c("unpartnered", "partnered"), age_start = 15, age_end = 45,
                              rate = c(.02, .15))) |>
     set_union_formation("rate", rates = data.frame(age_start = 15, age_end = 60, rate = .2),
-      matching = create_age_gap_matching_model(2, 5, group_exogamy = list(region = NA)),
+      matching = age_gap_matching_model(2, 5, group_exogamy = list(region = NA)),
       kinship_generations = 0) |>
     set_union_dissolution(data.frame(dur_start = 0, dur_end = Inf, rate = .05)) |>
     set_group_transition(moves, group = "region", household = household())

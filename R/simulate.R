@@ -8,7 +8,7 @@
 #' later run. The C++ engine schedules every rate process by cells of at-risk
 #' units with one exponential clock per process: a cell produces events at its
 #' input rate times its members, and the member is chosen uniformly or by weight
-#' models ([create_weight_model()]). It executes at continuous times and
+#' models ([weight_model()]). It executes at continuous times and
 #' prioritizes death over birth on exact ties.
 #' Events execute chronologically. In on-demand mode all living females face the
 #' fertility schedule. Rate mode uses either overall rates for all women (with
@@ -117,7 +117,7 @@
 #'     age_end = Inf, rate = 0.01)) |>
 #'   set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0.1)) |>
 #'   set_union_formation("on_demand",
-#'     create_matching_model(~ age_difference, c(age_difference = 0)))
+#'     matching_model(~ age_difference, c(age_difference = 0)))
 #' result <- simulate(model, years = 2, seed = 42)
 #' result$simulation
 simulate <- function(model, years, seed = NULL) {

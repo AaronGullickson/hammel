@@ -21,7 +21,7 @@ test_that("cell search intensities match explicit scans through every state chan
     set_fertility(data.frame(union_type = c("partnered", "unpartnered"), age_start = 15,
       age_end = 45, rate = c(.15, .03)), birth_interval = .75) |>
     set_union_formation("rate", rates = search,
-      matching = create_matching_model(~ age_difference, c(age_difference = 0),
+      matching = matching_model(~ age_difference, c(age_difference = 0),
         group_exogamy = c("A:B" = -1)),
       cohab_prob = data.frame(age_start = c(0, 25), age_end = c(25, Inf), prob = c(.6, .3)),
       union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .1),
@@ -38,12 +38,12 @@ test_that("cell search intensities match explicit scans through every state chan
   expect_gt(sum(duplicated(wives)), 10)
   # The same model with search weights uses the same calibration path.
   weighted <- set_union_formation(model, "rate", rates = search,
-    matching = create_matching_model(~ age_difference, c(age_difference = 0),
+    matching = matching_model(~ age_difference, c(age_difference = 0),
       group_exogamy = c("A:B" = -1)),
     cohab_prob = data.frame(age_start = c(0, 25), age_end = c(25, Inf), prob = c(.6, .3)),
     union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .1),
     kinship_generations = 0,
     # The baseline declares its categories in the order given (A, B).
-    weights = create_weight_model(~ group, c(groupB = log(2))))
+    weights = weight_model(~ group, c(groupB = log(2))))
   expect_s3_class(simulate(weighted, 3, seed = 33), "hammel_population")
 })

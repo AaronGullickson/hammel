@@ -199,7 +199,7 @@ The former standalone regions/internal-migration milestone is removed; those
 applications may be handled through multiple group columns in milestone 9. Household and geographic rules remain unselected.
 
 Fixed newborn group assignment was selected November 7, 2026 (D142):
-`create_group_inheritance("fixed", fixed_value = ...)` assigns every newborn to a
+`group_inheritance("fixed", fixed_value = ...)` assigns every newborn to a
 specified category, such as the minimum education category. See
 [group inheritance](group-inheritance.md).
 

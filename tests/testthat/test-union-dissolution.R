@@ -210,7 +210,7 @@ test_that("dissolution uses directional group strata with future coverage", {
   model <- dissolution_model()
   model$population$persons$group <- "A"
   model$population$groups <- list(group = group())
-  model <- set_inheritance(model, create_group_inheritance("custom", fun = function(...) "AB"), extra = "AB")
+  model <- set_inheritance(model, group_inheritance("custom", fun = function(...) "AB"), extra = "AB")
   model <- set_union_dissolution(model, data.frame(group_w = "A", group_h = "A",
     dur_start = 0, dur_end = Inf, rate = 0))
   expect_error(simulate(model, 0), "missing schedules.*AB")

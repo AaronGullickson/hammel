@@ -8,7 +8,7 @@ make_kinship_pair_model <- function(ego, relative, generations = 2) {
     set_mortality(data.frame(sex = c("f", "m"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = age, age_end = age + 1, rate = 20), birth_interval = 0) |>
     set_union_formation("on_demand",
-      create_matching_model(~ age_difference, c(age_difference = 0)),
+      matching_model(~ age_difference, c(age_difference = 0)),
       min_male_age = 0, kinship_generations = generations,
       cancel_birth_if_no_match = FALSE)
 }
@@ -67,7 +67,7 @@ test_that("existing unions remain intact and only demonstrated relationships are
 })
 
 test_that("kinship settings default to two and reject invalid or edited depths", {
-  matching <- create_matching_model(~ age_difference, c(age_difference = 0))
+  matching <- matching_model(~ age_difference, c(age_difference = 0))
   expect_equal(union_formation("on_demand", matching)$kinship_generations, 2)
   expect_equal(set_union_formation(hammel_model(), "on_demand", matching,
     kinship_generations = 3)$processes$union_formation$kinship_generations, 3)

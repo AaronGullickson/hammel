@@ -17,7 +17,7 @@ Starts must be finite and nonnegative; ends must exceed starts and may be
 person-year. Use \code{\link[=stratify_rates]{stratify_rates()}} to add proportional group differences.}
 
 \item{weights}{NULL (default) for unweighted selection within rate cells, or
-a \code{\link[=create_weight_model]{create_weight_model()}} specification. Weights choose which member of a
+a \code{\link[=weight_model]{weight_model()}} specification. Weights choose which member of a
 cell experiences an event without changing the cell's input rate.}
 
 \item{model}{A \code{hammel_model} object, used by \code{set_mortality()}.}

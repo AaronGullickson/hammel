@@ -22,7 +22,7 @@ With one matching dimension, each model is translated to the internal
 one-dimension form described here, with `group` standing for that dimension.
 The examples below use a dimension named `group`.
 
-`create_matching_model(..., group_exogamy = NULL)` accepts
+`matching_model(..., group_exogamy = NULL)` accepts
 finite additive log-selection-weight effects as a named numeric vector.
 `"A:B"` supplies the same value for female A/male B and female B/male A.
 For example, `c("A:B" = -1, "A:C" = -0.8)`. Directional pair effects and
@@ -122,7 +122,7 @@ keeps its per-dimension form.
 *Worked example.* With the table above and race {W, B}, region {NE, S}: a
 woman W|S choosing among men W|S 0, B|S -5, W|NE prohibited, B|NE 0
 (unlisted); a woman W|NE: W|S prohibited, B|NE -4, others 0.
-`create_age_gap_matching_model(..., group_exogamy = NULL)` also accepts effects.
+`age_gap_matching_model(..., group_exogamy = NULL)` also accepts effects.
 Pair effects require population group identities; missing group data errors
 at execution, including zero-duration calls. Extra pair labels do not create
 population groups and are harmless when absent from the population.

@@ -22,6 +22,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Person-year inputs and hazard sampling | D005–D007, D013, D024; cell scheduling D128 |
 | Population representation, sex labels, public tibbles | D012, D015, D016, D023 |
 | Process constructors/setters | D017, D026 |
+| Noun names for specification constructors | D147 |
 | Database rate products and reusable downloads | D018, D025 |
 | Demographic extraction and function names | D020–D022, D081 and missing-ASFR clarification |
 | Optional Poisson intervals for observed rates | D124 |
@@ -3191,3 +3192,21 @@ Keep population size, TFR/PATFR, and life tables on separate help topics. This c
 **Decision:** Combine `calculate_tfr()` and `calculate_patfr()` on the `calculate_tfr` help topic, explaining the age-only sum, the conditional age/parity fertility table, automatic dispatch when parity columns are present, and the differing output column names. Preserve the distinct scientific conventions of both calculations.
 
 Combine `group()` and `set_groups()` on the `group` help topic, distinguishing a single dimension's settings from declaring named dimensions on a model. Retain each function's help alias, arguments, and relevant examples. Leave `create_matching_model()` and `create_age_gap_matching_model()` on separate help topics, as explicitly requested. No executable behavior, defaults, or exports change.
+
+
+## D147 — Noun names for specification constructors (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Replace the four `create_*` specification constructors with noun-based names:
+
+| Former name | Current name |
+| --- | --- |
+| `create_matching_model()` | `matching_model()` |
+| `create_age_gap_matching_model()` | `age_gap_matching_model()` |
+| `create_weight_model()` | `weight_model()` |
+| `create_group_inheritance()` | `group_inheritance()` |
+
+Keep `create_baseline_population()` unchanged. Verbs remain appropriate for pipeable actions such as `set_population()`; standalone specification constructors use nouns. Rename the three corresponding source files to match their lead functions. Matching constructors retain separate help topics, as requested under D146.
+
+**Compatibility and scope:** This is a direct pre-release API rename, without aliases under the former names. Defaults, classes, validation rules, stochastic behavior, and model semantics remain unchanged. Update package code, tests, generated help, and current design specifications. Preserve user-maintained README/vignettes, historical validation reports and supporting scripts, and dated verification/handoff records. Those sources can retain historical calls; running them against the renamed API requires updating the calls or using their recorded software version. Earlier decision entries retain their original constructor spellings; this entry governs current names.

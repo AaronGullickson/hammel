@@ -47,7 +47,7 @@ reference_weights <- function(women, men, matching, rates, groups, now = 0,
 group_only <- function(women_share, men_share, effect, delta = NULL) {
   women <- data.frame(born = -30, group = rep(0:1, round(1000 * women_share)), fertile = TRUE)
   men <- data.frame(born = -30, group = rep(0:1, round(1000 * men_share)))
-  matching <- create_matching_model(~ 1, numeric(), group_exogamy = c("A:B" = effect),
+  matching <- matching_model(~ 1, numeric(), group_exogamy = c("A:B" = effect),
                                     delta = delta)
   list(women = women, men = men, matching = matching,
        rates = data.frame(age_start = 15, age_end = 50, rate = 0.1))
@@ -99,7 +99,7 @@ test_that("binned calibration agrees with an exact individual-level reference", 
                       fertile = runif(400) < 0.8)
   men <- data.frame(born = -runif(350, 10, 85), group = sample(0:1, 350, TRUE, c(0.6, 0.4)))
   rates <- data.frame(age_start = c(15, 30), age_end = c(30, 50), rate = c(0.2, 0.05))
-  matching <- create_age_gap_matching_model(2, 5, group_exogamy = c("A:B" = -1.5))
+  matching <- age_gap_matching_model(2, 5, group_exogamy = c("A:B" = -1.5))
   for (fertility in c(FALSE, TRUE)) {
     expected <- reference_weights(women, men, matching, rates, c("A", "B"), fertility = fertility)
     fine <- calibrate(women, men, matching, rates, c("A", "B"), width = 0.001, fertility = fertility)
@@ -111,7 +111,7 @@ test_that("binned calibration agrees with an exact individual-level reference", 
     expect_equal(default$flow, default$target, tolerance = 1e-9)
   }
   # Custom R formulas use the same grid through the formula evaluator.
-  custom <- create_matching_model(~ abs(age_difference - 2),
+  custom <- matching_model(~ abs(age_difference - 2),
     c("abs(age_difference - 2)" = -0.3), group_exogamy = c("A:B" = -1))
   expected <- reference_weights(women, men, custom, rates, c("A", "B"))
   fine <- calibrate(women, men, custom, rates, c("A", "B"), width = 0.001)
@@ -133,7 +133,7 @@ test_that("incremental pool sums match a full rebuild after many pool changes", 
     deltas[i] <- if (present[who[i]]) -1 else 1
     present[who[i]] <- !present[who[i]]
   }
-  matching <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2))
+  matching <- age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2))
   result <- inspect_weighted_incremental_cpp(women$born, women$group, men$born, men$group,
     times, who - 1L, deltas, data.frame(age_start = 15, age_end = 50, rate = 0.1),
     prepare_weighted(matching, c("A", "B")), 2L, 15)
@@ -147,7 +147,7 @@ test_that("three-group calibration meets targets and handles zero and unattainab
                       fertile = TRUE)
   men <- data.frame(born = -runif(600, 15, 50), group = sample(0:2, 600, TRUE, c(4, 4, 1)))
   rates <- data.frame(age_start = 15, age_end = 50, rate = 0.1)
-  matching <- create_age_gap_matching_model(0, 5,
+  matching <- age_gap_matching_model(0, 5,
     group_exogamy = c("A:B" = -3, "B:C" = -.75), delta = c(B = .3, C = -.2))
   result <- calibrate(women, men, matching, rates, c("A", "B", "C"))
   expect_false(result$infeasible)
@@ -164,7 +164,7 @@ test_that("three-group calibration meets targets and handles zero and unattainab
   # Men of a group with no eligible women still receive the population-wide
   # per-capita rate; with all exogamy prevented they cannot be reached.
   women$group <- 0L
-  blocked <- create_matching_model(~ 1, numeric(), group_exogamy = NA)
+  blocked <- matching_model(~ 1, numeric(), group_exogamy = NA)
   result <- calibrate(women, men, blocked, rates, c("A", "B", "C"))
   expect_true(result$infeasible)
   expect_equal(result$log_weights[2:3], c(50, 50))
@@ -173,7 +173,7 @@ test_that("three-group calibration meets targets and handles zero and unattainab
                               age_end = 50, rate = c(.1, 0, 0))
   women_zero <- women
   women_zero$group <- rep(0:2, length.out = nrow(women_zero))
-  zero <- create_matching_model(~ 1, numeric(), group_exogamy = NA,
+  zero <- matching_model(~ 1, numeric(), group_exogamy = NA,
                                  delta = c(B = 10, C = 10))
   result_zero <- calibrate(women_zero, men, zero, grouped_rates, c("A", "B", "C"))
   expect_equal(result_zero$target, c(1, 0, 0))
@@ -190,7 +190,7 @@ weighted_population <- function(n = 600, weights = NULL, seed = 903) {
 }
 
 weighted_model <- function(population, initiation = "on_demand",
-                           matching = create_age_gap_matching_model(0, 5),
+                           matching = age_gap_matching_model(0, 5),
                            father_matching = NULL, ...) {
   model <- hammel_model() |>
     set_population(population) |>
@@ -226,7 +226,7 @@ test_that("one group or no groups use unit weights without changing RNG isolatio
 
 test_that("grouped weighted choice runs in both modes, restarts, and is reproducible", {
   population <- weighted_population(600, c(A = 3, B = 1))
-  matching <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2), delta = c(B = .2))
+  matching <- age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2), delta = c(B = .2))
   for (initiation in c("on_demand", "rate")) {
     model <- weighted_model(population, initiation, matching = matching)
     first <- simulate(model, 20, seed = 905)
@@ -245,7 +245,7 @@ test_that("grouped weighted choice runs in both modes, restarts, and is reproduc
     expect_false(any(c(".n_eligible", ".utility_rank") %in% names(diagnosed$unions)))
   }
   # Rate mode: unpartnered births select fathers through their own calibration.
-  father <- create_age_gap_matching_model(3, 4, group_exogamy = c("A:B" = -1), delta = c(B = -.3))
+  father <- age_gap_matching_model(3, 4, group_exogamy = c("A:B" = -1), delta = c(B = -.3))
   result <- simulate(weighted_model(population, "rate", matching = matching,
                                     father_matching = father), 20, seed = 907)
   persons <- result$persons
@@ -259,7 +259,7 @@ test_that("grouped weighted choice runs in both modes, restarts, and is reproduc
 
 test_that("father models retain separate delta and inherit the general model when absent", {
   population <- weighted_population(600, c(A = 3, B = 1))
-  matching <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2), delta = c(B = .3))
+  matching <- age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2), delta = c(B = .3))
   inherited <- weighted_model(population, "rate", matching = matching)
   explicit <- weighted_model(population, "rate", matching = matching, father_matching = matching)
   expect_identical(simulate(inherited, 20, seed = 910), simulate(explicit, 20, seed = 910))
@@ -277,7 +277,7 @@ test_that("weighted choice warns once when weights must be approximated", {
   persons$group[persons$sex == "m"][1:40] <- "B"
   population <- hammel_population(persons, population$unions, end_time = 0, groups = if ("group" %in% names(persons)) "group")
   # A partial restriction keeps calibration active (full prevention skips it).
-  matching <- create_matching_model(~ age_difference, c(age_difference = 0),
+  matching <- matching_model(~ age_difference, c(age_difference = 0),
                                     group_exogamy = c("A:B" = NA))
   model <- weighted_model(population, matching = matching)
   warnings <- character()
@@ -287,35 +287,35 @@ test_that("weighted choice warns once when weights must be approximated", {
 })
 
 test_that("removed method arguments are rejected and delta inputs validated", {
-  expect_false("matching_method" %in% names(create_matching_model(~ 1, numeric())))
-  expect_error(create_matching_model(~ 1, numeric(), matching_method = "female_choice"), "unused argument")
-  expect_error(create_age_gap_matching_model(0, 5, matching_method = "weighted_choice"), "unused argument")
+  expect_false("matching_method" %in% names(matching_model(~ 1, numeric())))
+  expect_error(matching_model(~ 1, numeric(), matching_method = "female_choice"), "unused argument")
+  expect_error(age_gap_matching_model(0, 5, matching_method = "weighted_choice"), "unused argument")
   expect_error(union_formation("on_demand", matching_method = "female_choice"), "unused argument")
   expect_error(set_union_formation(hammel_model(), "on_demand", matching_method = "female_choice"), "unused argument")
   for (bad in list(1, NA_real_, c(B = Inf), c(B = NA_real_), c(B = "1"),
                    c(B = 1, B = 2), setNames(1, ""), matrix(1)))
-    expect_error(create_age_gap_matching_model(0, 5, delta = bad), "delta")
-  expect_null(create_matching_model(~ 1, numeric())$delta)
-  expect_error(create_matching_model(~ 1, numeric(), imbalance_absorption = 1), "unused argument")
-  edited <- create_age_gap_matching_model(0, 5)
+    expect_error(age_gap_matching_model(0, 5, delta = bad), "delta")
+  expect_null(matching_model(~ 1, numeric())$delta)
+  expect_error(matching_model(~ 1, numeric(), imbalance_absorption = 1), "unused argument")
+  edited <- age_gap_matching_model(0, 5)
   edited$delta <- c(B = Inf)
   expect_error(union_formation("on_demand", edited), "delta")
-  expect_error(prepare_matching_model(create_matching_model(~ 1, numeric(), delta = c(X = 1)),
+  expect_error(prepare_matching_model(matching_model(~ 1, numeric(), delta = c(X = 1)),
                                       c("A", "B")), "delta")
-  expect_error(prepare_matching_model(create_matching_model(~ 1, numeric(), delta = c(A = 1))), "delta")
+  expect_error(prepare_matching_model(matching_model(~ 1, numeric(), delta = c(A = 1))), "delta")
 
 })
 
 test_that("male-group formula terms warn about absorbed utilities", {
-  expect_warning(create_matching_model(~ male_group, c(male_groupB = 1)),
+  expect_warning(matching_model(~ male_group, c(male_groupB = 1)),
                  "male_group` are absorbed")
-  expect_silent(create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -3)))
-  expect_silent(create_matching_model(~ same_group, c(same_group = 1)))
+  expect_silent(age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -3)))
+  expect_silent(matching_model(~ same_group, c(same_group = 1)))
 })
 
 test_that("strict endogamy has zero group log weights even with delta adjustments", {
   population <- weighted_population(600, c(A = 3, B = 1))
-  matching <- create_age_gap_matching_model(0, 5, group_exogamy = NA)
+  matching <- age_gap_matching_model(0, 5, group_exogamy = NA)
   for (initiation in c("on_demand", "rate")) {
     baseline <- simulate(weighted_model(population, initiation, matching = matching,
                                         diagnostics = TRUE), 15, seed = 912)
@@ -334,13 +334,13 @@ test_that("weighted choice handles identities created during the run", {
   # Men of a group with no counted women use the population-wide female rate.
   women <- data.frame(born = rep(-30, 400), group = rep(0:1, c(300, 100)), fertile = TRUE)
   men <- data.frame(born = rep(-30, 450), group = rep(0:2, c(300, 100, 50)))
-  result <- calibrate(women, men, create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1)),
+  result <- calibrate(women, men, age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1)),
                       data.frame(age_start = 15, age_end = 50, rate = 0.1), c("A", "B", "AB"))
   expect_false(result$infeasible)
   expect_equal(result$target[3], 50 / 450, tolerance = 1e-12)
   expect_equal(result$flow, result$target, tolerance = 1e-9)
   # Mixed couples have AB children, who later enter the pools and form unions.
-  rule <- create_group_inheritance("custom", fun = function(mother_group, father_group, ...) {
+  rule <- group_inheritance("custom", fun = function(mother_group, father_group, ...) {
     if (is.na(father_group) || mother_group == father_group) mother_group else "AB"
   })
   population <- weighted_population(800, c(A = 3, B = 1))
@@ -349,7 +349,7 @@ test_that("weighted choice handles identities created during the run", {
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)) |>
     set_fertility(data.frame(age_start = 15, age_end = 45, rate = 0.15)) |> set_inheritance(rule, extra = "AB") |>
     set_union_formation("on_demand",
-      create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1, "A:AB" = -0.5, "B:AB" = -0.5)),
+      age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1, "A:AB" = -0.5, "B:AB" = -0.5)),
       diagnostics = TRUE)
   expect_no_warning(result <- simulate(model, 40, seed = 913))
   expect_identical(result, simulate(model, 40, seed = 913))
@@ -363,7 +363,7 @@ test_that("weighted choice handles identities created during the run", {
 
 test_that("diagnostics record the group log weights applied at each union", {
   population <- weighted_population(600, c(A = 3, B = 1))
-  matching <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2))
+  matching <- age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2))
   model <- weighted_model(population, matching = matching, diagnostics = TRUE)
   first <- simulate(model, 10, seed = 915)
   columns <- c(".log_weight_A", ".log_weight_B")
@@ -395,7 +395,7 @@ test_that("unmet targets hidden by near-zero weights are reported as approximate
                       group = rep(0:2, c(60, 20, 20)), fertile = TRUE)
   men <- data.frame(born = -30, group = rep(0:1, c(60, 20)))
   rates <- data.frame(age_start = 15, age_end = 50, rate = 0.1)
-  matching <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:C" = NA))
+  matching <- age_gap_matching_model(0, 5, group_exogamy = c("A:C" = NA))
   result <- calibrate(women, men, matching, rates, c("A", "B", "C"))
   expect_equal(result$target, c(1, 0, 0))
   expect_true(result$infeasible)
@@ -422,7 +422,7 @@ test_that("calibration uses actual hazards inside narrow age bands", {
                       fertile = runif(500) < 0.8)
   men <- data.frame(born = -runif(450, 12, 70), group = sample(0:1, 450, TRUE, c(0.6, 0.4)))
   yearly <- data.frame(age_start = 15:49, age_end = 16:50, rate = runif(35, 0, 0.3))
-  matching <- create_age_gap_matching_model(1, 5, group_exogamy = c("A:B" = -2))
+  matching <- age_gap_matching_model(1, 5, group_exogamy = c("A:B" = -2))
   for (fertility in c(FALSE, TRUE)) {
     expected <- reference_weights(women, men, matching, yearly, c("A", "B"), fertility = fertility)
     default <- calibrate(women, men, matching, yearly, c("A", "B"), fertility = fertility)

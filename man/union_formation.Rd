@@ -7,7 +7,7 @@
 \usage{
 union_formation(
   initiation,
-  matching = create_age_gap_matching_model(0, 5),
+  matching = age_gap_matching_model(0, 5),
   rates = NULL,
   min_male_age = 15,
   kinship_generations = 2,
@@ -25,7 +25,7 @@ union_formation(
 set_union_formation(
   model,
   initiation,
-  matching = create_age_gap_matching_model(0, 5),
+  matching = age_gap_matching_model(0, 5),
   rates = NULL,
   min_male_age = 15,
   kinship_generations = 2,
@@ -44,13 +44,13 @@ set_union_formation(
 \item{initiation}{Either \code{"on_demand"} for birth-triggered searches or
 \code{"rate"} for scheduled searches. No default is selected.}
 
-\item{matching}{A specification created by \code{\link[=create_matching_model]{create_matching_model()}}, or a
+\item{matching}{A specification created by \code{\link[=matching_model]{matching_model()}}, or a
 tibble with numeric \code{time_start}, \code{time_end}, and list-column \code{model} holding
 complete matching objects. Model intervals are half-open absolute years,
 cannot overlap, and must cover the requested run. The active model is used
 at partner selection, without changing pending search dates or existing
 unions. Base data frames with list columns are also accepted. Defaults
-to \code{create_age_gap_matching_model(0, 5)}: preferred age gap zero years,
+to \code{age_gap_matching_model(0, 5)}: preferred age gap zero years,
 with selection weight halving five years on either side.}
 
 \item{rates}{For \code{"rate"} initiation, an age-specific female search-hazard
@@ -88,7 +88,7 @@ unrelatedness; only demonstrated relationships are screened. Existing unions
 are retained. See \code{\link[=extract_kin]{extract_kin()}} for the shared distance definitions.}
 
 \item{father_matching}{Optional matching specification for fathers of
-unpartnered births in rate mode, created by \code{\link[=create_matching_model]{create_matching_model()}}, or a
+unpartnered births in rate mode, created by \code{\link[=matching_model]{matching_model()}}, or a
 \code{time_start}/\code{time_end}/\code{model} schedule as for \code{matching}.
 Defaults to \code{NULL}, using the general \code{matching} model active at that birth. Union
 searches always use \code{matching}. Not used by on-demand initiation. Process-level
@@ -135,11 +135,11 @@ classifies cohab breakup/death as separated/widowed. Search duration still
 starts at the latest partnership ending. Only applies to typed unions.}
 
 \item{weights_conversion}{NULL (default) for unweighted selection, or a
-\code{\link[=create_weight_model]{create_weight_model()}} using union variables, which chooses which
+\code{\link[=weight_model]{weight_model()}} using union variables, which chooses which
 cohabitation in a cell converts without changing the cell's input rate.}
 
 \item{weights}{NULL (default) for unweighted selection of searching women,
-or a \code{\link[=create_weight_model]{create_weight_model()}} using person variables, which chooses which
+or a \code{\link[=weight_model]{weight_model()}} using person variables, which chooses which
 unpartnered woman in a cell searches without changing the cell's input
 search rate. Rate mode only. With weighted matching calibration the
 weights are kept current for every searching woman, so calibration uses

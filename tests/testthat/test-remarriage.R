@@ -106,7 +106,7 @@ test_that("previous categories contribute the explicit calibrated intensity", {
   previous <- c(rep(0L, 6), rep(1L, 3), rep(2L, 3))
   men <- data.frame(born = -30.125, group = rep(0:1, each = 8))
   rates <- previous_rates(.1, .2, .4)
-  matching <- prepare_matching_model(create_matching_model(~ 1, numeric(),
+  matching <- prepare_matching_model(matching_model(~ 1, numeric(),
     group_exogamy = c("A:B" = -2)), c("A", "B"))
   got <- inspect_weighted_calibration_cpp(women$born, women$group, women$fertile,
     men$born, men$group, rates, matching, 2L, 0, 15, .25, FALSE, previous)
@@ -132,7 +132,7 @@ test_that("grouped and stratified schedules preserve the explicit hazards", {
   model <- set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = .8))
   rates <- rbind(transform(previous_rates(.8, .4, .2), group = "A"),
     transform(previous_rates(.5, .3, .1), group = "B"))
-  matching <- create_matching_model(~ 1, numeric(), group_exogamy = c("A:B" = -1))
+  matching <- matching_model(~ 1, numeric(), group_exogamy = c("A:B" = -1))
   stratified_rates <- rbind(stratify_rates(previous_rates(.8, .4, .2), list(group = c(A = 1))),
     stratify_rates(previous_rates(.5, .3, .1), list(group = c(B = 2))))
   scaled <- set_union_formation(model, "rate", matching, rates = stratified_rates,

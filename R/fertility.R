@@ -85,7 +85,7 @@
 #' @param hetfert NULL (default) for uniform mother selection, or a
 #'   [het_fert()] specification for persistent lognormal selection weights.
 #' @param weights NULL (default) for unweighted selection within rate cells, or
-#'   a [create_weight_model()] specification. Weights choose which member of a
+#'   a [weight_model()] specification. Weights choose which member of a
 #'   cell experiences an event without changing the cell's input rate. They
 #'   combine with `hetfert` on the log scale.
 #' @param ffab Probability that a newborn is female, default `0.4886`.
@@ -96,7 +96,7 @@
 #'   `birth_interval`, `ffab`, `hetfert`, and `weights`.
 #'   `set_fertility()` returns an updated `hammel_model`.
 #' @seealso [set_process()], [mortality()], [union_formation()],
-#'   [het_fert()], [create_group_inheritance()]
+#'   [het_fert()], [group_inheritance()]
 #' @export
 #' @examples
 #' rates <- data.frame(age_start = 15, age_end = 50, rate = 0.1)

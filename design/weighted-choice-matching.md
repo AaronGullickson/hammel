@@ -52,7 +52,7 @@ reproduces explicit female choice exactly, including random-number use.
 Because b depends only on the man's group, it multiplies whole columns of the
 expected pairing table. It changes how often each male group forms unions, not
 the association between partners' characteristics. The age model, including
-`create_age_gap_matching_model()`, keeps its current meaning.
+`age_gap_matching_model()`, keeps its current meaning.
 
 ## Calibrating the weights (continuous time)
 
@@ -348,7 +348,7 @@ so men's ages at union formation remain an outcome, not an input.
 ## User-reported assessment (October 23, 2026)
 
 The user ran these replicated comparisons in the milestone 3 report's uneven
-two-group scenario (on-demand formation, `create_age_gap_matching_model(0, 5)`
+two-group scenario (on-demand formation, `age_gap_matching_model(0, 5)`
 with A:B = -3, 100 years). The 250-man runs of both methods and the
 1,000-man female-choice run used the same 20 seeds; the 1,000-man
 weighted-choice runs used 40 replications. Values are means across replications,

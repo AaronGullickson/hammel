@@ -29,7 +29,7 @@
 #' [set_process()]. Neither function runs a simulation.
 #'
 #' @param weights NULL (default) for unweighted selection, or a
-#'   [create_weight_model()] using union variables, which chooses which union
+#'   [weight_model()] using union variables, which chooses which union
 #'   in a cell dissolves without changing the cell's input rate.
 #' @param rates A nonempty data frame with numeric `dur_start`, `dur_end`, and
 #'   `rate`. Bands are half-open `[dur_start, dur_end)` in years. Starts and

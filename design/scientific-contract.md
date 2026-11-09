@@ -185,7 +185,7 @@ nonnegative intervals are allowed; there is no whole-month restriction.
 
 ### Newborn group identity
 
-Each declared dimension holds a `create_group_inheritance()` object through
+Each declared dimension holds a `group_inheritance()` object through
 `group(inheritance = ...)`, defaulting to `random_parent`.
 The `"fixed"` method (D142) assigns every newborn the explicitly specified
 `fixed_value` category, regardless of parents or sex, with no identity RNG draw.
@@ -303,7 +303,7 @@ duration. Missing processes are rejected rather than given an implicit default.
 The former milestone 1 path without unions is no longer executable.
 
 When matching is omitted, both initiation modes use
-`create_age_gap_matching_model(0, 5)`: preferred male-minus-female gap zero
+`age_gap_matching_model(0, 5)`: preferred male-minus-female gap zero
 years, with relative weight halved five years either side. Explicit models
 override that default; it does not fix the realized age-gap distribution.
 
@@ -846,7 +846,7 @@ w_i / sum(w), where log w_i is a formula's linear predictor x_i * beta or the
 value of a custom function; exp(beta) is the hazard ratio between members of
 the same cell. A model attaches through `weights` on mortality, fertility,
 rate-mode search, dissolution and group transitions, and `weights_conversion`
-for conversion, either as one `create_weight_model()` or a calendar schedule
+for conversion, either as one `weight_model()` or a calendar schedule
 of them (the D123 tibble structure). Weights are normalized within cells, so
 each cell keeps its input rate; population-level effects can be smaller where
 cells are small, homogeneous or changing in composition, and terms that are

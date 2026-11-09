@@ -75,10 +75,10 @@
 #' @export
 #' @examples
 #' # Illustrative coefficients, not demographic defaults.
-#' partnered_mortality <- create_weight_model(~ partnered, c(partnered = log(0.8)))
-#' gap_dissolution <- create_weight_model(~ age_difference,
+#' partnered_mortality <- weight_model(~ partnered, c(partnered = log(0.8)))
+#' gap_dissolution <- weight_model(~ age_difference,
 #'   c(age_difference = log(1.05)))
-create_weight_model <- function(formula = NULL, coefficients = numeric(), fun = NULL) {
+weight_model <- function(formula = NULL, coefficients = numeric(), fun = NULL) {
   if (is.null(formula) == is.null(fun))
     stop("Supply exactly one of `formula` or `fun`.", call. = FALSE)
   model <- structure(list(formula = formula, coefficients = coefficients, fun = fun),
@@ -170,7 +170,7 @@ weight_group_name_possible <- function(name, type) {
 
 validate_weight_model <- function(model) {
   if (!inherits(model, "hammel_weight_model"))
-    stop("`weights` must be created with create_weight_model().", call. = FALSE)
+    stop("`weights` must be created with weight_model().", call. = FALSE)
   if (!is.null(model$fun)) {
     if (!is.function(model$fun)) stop("`fun` must be a function.", call. = FALSE)
     return(invisible(model))

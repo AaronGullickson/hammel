@@ -4,7 +4,7 @@ exogamy_test_model <- function(group_exogamy = NULL) {
   model$population$persons$group <- c("A", "A", "B")
   model$population$groups <- list(group = group())
   identity(set_union_formation(model, "on_demand", diagnostics = TRUE,
-    matching = create_age_gap_matching_model(0, 5, group_exogamy = group_exogamy)))
+    matching = age_gap_matching_model(0, 5, group_exogamy = group_exogamy)))
 }
 
 test_that("NA prohibitions exclude candidates before scoring and diagnostics", {
@@ -20,7 +20,7 @@ test_that("NA prohibitions exclude candidates before scoring and diagnostics", {
     }
     expect_equal(result$unions$husband_id, 2)
   }
-  matching <- as_internal_matching(create_matching_model(~ age_difference, c(age_difference = 0),
+  matching <- as_internal_matching(matching_model(~ age_difference, c(age_difference = 0),
     group_exogamy = NA), c("A", "B"))
   expect_equal(calculate_matching_probabilities(matching, c(0, 0), "A", c("A", "B")), c(1, 0))
   expect_equal(calculate_matching_probabilities(matching, 0, "A", "B"), 0)
@@ -31,19 +31,19 @@ test_that("prohibitions are symmetric and validated with pair effects", {
   model <- exogamy_test_model(c("B:A" = NA))
   result <- suppressWarnings(simulate(model, .3, seed = 52))
   expect_equal(result$unions$husband_id, 2)
-  internal <- as_internal_matching(create_age_gap_matching_model(0, 5, group_exogamy = c("B:A" = NA)),
+  internal <- as_internal_matching(age_gap_matching_model(0, 5, group_exogamy = c("B:A" = NA)),
                                    c("A", "B"))
   expect_false(matching_group_allowed(internal, "A", "B"))
   expect_false(matching_group_allowed(internal, "B", "A"))
   expect_true(matching_group_allowed(internal, "A", "A"))
   for (bad in list(c("A:A" = NA), c("A:B" = NA, "B:A" = -1), c("A:B" = NA, "A:B" = NA),
                    c("A::B" = NA), c("A:B" = -Inf), "A:B", c(TRUE, FALSE), list(NA), c(NA, NA)))
-    expect_error(create_age_gap_matching_model(0, 5, group_exogamy = bad))
-  expect_error(create_age_gap_matching_model(0, 5, group_exogamy = c("A:A" = NA)), "within a category")
-  expect_error(create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = NA, "B:A" = -1)),
+    expect_error(age_gap_matching_model(0, 5, group_exogamy = bad))
+  expect_error(age_gap_matching_model(0, 5, group_exogamy = c("A:A" = NA)), "within a category")
+  expect_error(age_gap_matching_model(0, 5, group_exogamy = c("A:B" = NA, "B:A" = -1)),
                "Conflicting")
   # The argument is gone.
-  expect_error(create_age_gap_matching_model(0, 5, prevent_exogamy = TRUE), "unused argument")
+  expect_error(age_gap_matching_model(0, 5, prevent_exogamy = TRUE), "unused argument")
   model$processes$union_formation$matching$group_exogamy <- "x"
   expect_error(simulate(model, 0), "group_exogamy")
 })
@@ -64,7 +64,7 @@ test_that("empty filtered samples use existing birth cancellation and unknown-fa
   expect_true(all(is.na(result$persons$father_id[children])))
   expect_true(all(result$ancestry$unknown[children] == 0.5))
   # A finite penalty alone still selects a partner from a cross-group-only pool.
-  model$processes$union_formation$matching <- create_age_gap_matching_model(0, 5,
+  model$processes$union_formation$matching <- age_gap_matching_model(0, 5,
     group_exogamy = c("A:B" = -10))
   expect_equal(nrow(simulate(model, 0.3, seed = 52)$unions), 1)
 })
@@ -90,7 +90,7 @@ test_that("rate searches retry and father overrides carry independent restrictio
     cancel_birth_if_no_match = FALSE))
   result <- simulate(model, 0.3, seed = 52)
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 2))
-  model$processes$union_formation$father_matching <- create_age_gap_matching_model(0, 5,
+  model$processes$union_formation$father_matching <- age_gap_matching_model(0, 5,
     group_exogamy = c("A:B" = 1000))
   expect_warning(result <- simulate(model, .3, seed = 52), "could not meet male-group targets")
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 3))
@@ -125,13 +125,13 @@ test_that("existing partners remain and disabled restrictions preserve RNG and h
 })
 
 test_that("restriction tables and missing or empty group populations validate", {
-  matching <- as_internal_matching(create_age_gap_matching_model(0, 5, group_exogamy = data.frame(
+  matching <- as_internal_matching(age_gap_matching_model(0, 5, group_exogamy = data.frame(
     group_x = c("A:B", "A:B"), group_y = c("C::D", "E"), log_odds = c(NA, -1))), c("A:B", "C::D", "E"))
   expect_false(matching_group_allowed(matching, "A:B", "C::D"))
   expect_false(matching_group_allowed(matching, "C::D", "A:B"))
   expect_true(matching_group_allowed(matching, "A:B", "E"))
   model <- make_model(0)
-  model$processes$union_formation$matching <- create_age_gap_matching_model(0, 5, group_exogamy = NA)
+  model$processes$union_formation$matching <- age_gap_matching_model(0, 5, group_exogamy = NA)
   expect_error(simulate(model, 0), "declared group dimension")
   model$population$persons$group <- character()
   model$population$groups <- list(group = group())

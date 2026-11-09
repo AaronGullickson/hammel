@@ -26,7 +26,7 @@ applies to either type. Use \code{\link[=stratify_rates]{stratify_rates()}} to a
 differences, for example by listing both directions of a pair.}
 
 \item{weights}{NULL (default) for unweighted selection, or a
-\code{\link[=create_weight_model]{create_weight_model()}} using union variables, which chooses which union
+\code{\link[=weight_model]{weight_model()}} using union variables, which chooses which union
 in a cell dissolves without changing the cell's input rate.}
 
 \item{model}{A \code{hammel_model} object.}

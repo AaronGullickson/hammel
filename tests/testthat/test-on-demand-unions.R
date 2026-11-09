@@ -2,7 +2,7 @@ make_on_demand_model <- function(n = 2) {
   model <- make_model(n, sex = "m", birth_rate = 20, birth_interval = 0)
   if (n) model$population$persons$sex[1] <- "f"
   set_union_formation(model, "on_demand",
-    create_matching_model(~ age_difference, c(age_difference = 100)),
+    matching_model(~ age_difference, c(age_difference = 100)),
     cancel_birth_if_no_match = FALSE)
 }
 

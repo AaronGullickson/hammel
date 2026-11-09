@@ -28,7 +28,7 @@ test_that("cohabitation validates probability, conversion, type coverage and rat
   bad <- model; bad$processes$union_formation$cohab_prob$rate <- .1
   expect_error(simulate(bad, 0), "not.*rate")
   expect_error(set_union_formation(model, "rate", rates = model$processes$union_formation$rates,
-    cohab_matching = create_age_gap_matching_model(0,5)), "require.*cohab_prob")
+    cohab_matching = age_gap_matching_model(0,5)), "require.*cohab_prob")
   bad <- model; bad$processes$union_formation$union_convert_rate$previous_union <- "none"
   expect_error(simulate(bad, 0), "Conversion rates cannot be stratified by `previous_union`")
   expect_error(fertility(data.frame(age_start=15,age_end=50,rate=.1,union_status="partnered")), "replaced")
@@ -154,8 +154,8 @@ test_that("cohabitation and marriage use distinct matching and diagnostic weight
   model$population$persons$sex[1:300] <- "f"
   model$population$persons$group <- rep(c("A","B"),300)
   model$population$groups <- list(group = group())
-  model$processes$union_formation$matching <- create_matching_model(~1,numeric(),group_exogamy = NA)
-  model$processes$union_formation$cohab_matching <- create_matching_model(~1,numeric(),group_exogamy=c("A:B"=10))
+  model$processes$union_formation$matching <- matching_model(~1,numeric(),group_exogamy = NA)
+  model$processes$union_formation$cohab_matching <- matching_model(~1,numeric(),group_exogamy=c("A:B"=10))
   model$processes$union_formation$diagnostics <- TRUE
   result <- simulate(model,.3,713)
   u <- get_detailed_unions(result)

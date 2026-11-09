@@ -39,7 +39,7 @@ Must be a finite numeric scalar in \verb{[0, 1]}.}
 \code{\link[=het_fert]{het_fert()}} specification for persistent lognormal selection weights.}
 
 \item{weights}{NULL (default) for unweighted selection within rate cells, or
-a \code{\link[=create_weight_model]{create_weight_model()}} specification. Weights choose which member of a
+a \code{\link[=weight_model]{weight_model()}} specification. Weights choose which member of a
 cell experiences an event without changing the cell's input rate. They
 combine with \code{hetfert} on the log scale.}
 
@@ -133,5 +133,5 @@ model <- hammel_model() |> set_fertility(rates)
 }
 \seealso{
 \code{\link[=set_process]{set_process()}}, \code{\link[=mortality]{mortality()}}, \code{\link[=union_formation]{union_formation()}},
-\code{\link[=het_fert]{het_fert()}}, \code{\link[=create_group_inheritance]{create_group_inheritance()}}
+\code{\link[=het_fert]{het_fert()}}, \code{\link[=group_inheritance]{group_inheritance()}}
 }

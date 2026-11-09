@@ -53,7 +53,7 @@ test_that("father searches exclude partnered men, boys and demonstrated kin", {
 test_that("female-choice father selection uses the entered conditional-logit probabilities", {
   model <- make_nonmarital_model(3, birth_rate = 500)
   model$population$persons$birth_time[3] <- -30
-  model$processes$union_formation$matching <- create_matching_model(
+  model$processes$union_formation$matching <- matching_model(
     ~ age_difference, c(age_difference = log(3) / 10))
   result <- simulate(model, 1, seed = 72)
   children <- result$persons[result$persons$birth_time >= 0, ]
@@ -94,7 +94,7 @@ test_that("a father's death removes him from later nonmarital choices", {
 })
 
 test_that("father_matching defaults to the general model and validates edited objects", {
-  general <- create_matching_model(~ age_difference, c(age_difference = 0.1))
+  general <- matching_model(~ age_difference, c(age_difference = 0.1))
   process <- union_formation("on_demand", general)
   expect_null(process$father_matching)
   expect_identical(union_formation("on_demand", general, father_matching = general)$father_matching,
@@ -122,9 +122,9 @@ test_that("father_matching defaults to the general model and validates edited ob
 test_that("father_matching changes nonmarital fathers but not later union choices", {
   model <- make_nonmarital_model(3)
   model$population$persons$birth_time[3] <- -30
-  model$processes$union_formation$matching <- create_matching_model(
+  model$processes$union_formation$matching <- matching_model(
     ~ age_difference, c(age_difference = 100))
-  model$processes$union_formation$father_matching <- create_matching_model(
+  model$processes$union_formation$father_matching <- matching_model(
     ~ age_difference, c(age_difference = -100))
   model$processes$union_formation$rates <- data.frame(
     age_start = 20.5, age_end = Inf, rate = 100)
@@ -141,10 +141,10 @@ test_that("father_matching changes nonmarital fathers but not later union choice
 test_that("father_matching supports the R formula fallback and is unused on demand", {
   model <- make_nonmarital_model(3)
   model$population$persons$birth_time[3] <- -30
-  model$processes$union_formation$father_matching <- create_matching_model(
+  model$processes$union_formation$father_matching <- matching_model(
     ~ age_difference, c(age_difference = -0.1))
   native <- simulate(model, 1, seed = 72)
-  model$processes$union_formation$father_matching <- create_matching_model(
+  model$processes$union_formation$father_matching <- matching_model(
     ~ I(age_difference^3), c("I(age_difference^3)" = -0.001))
   custom <- simulate(model, 1, seed = 72)
   # With available gaps 0 and 10 both specifications give utilities 0 and -1.

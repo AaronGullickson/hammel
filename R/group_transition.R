@@ -39,7 +39,7 @@
 #'   whose categories change. `NULL` (default) means the model's only
 #'   dimension, and is an error when several are declared.
 #' @param weights NULL (default) for unweighted selection, or a
-#'   [create_weight_model()] using person variables and `destination`, which
+#'   [weight_model()] using person variables and `destination`, which
 #'   chooses who in a cell moves without changing the cell's input rate.
 #' @param household `NULL` (default): each person moves individually. A
 #'   [household()]: a move carries the mover's household (D140). One clock

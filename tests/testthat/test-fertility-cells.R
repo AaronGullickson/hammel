@@ -137,7 +137,7 @@ test_that("cell mode runs with groups, union types, cohabitation, matching and r
   model <- hammel_model() |> set_population(base) |> set_mortality(mort) |>
     set_fertility(stratify_rates(sf, list(group = c(A = 1, B = 1.4)))) |>
     set_union_formation("rate",
-      create_matching_model(~ age_difference, c(age_difference = -.1), group_exogamy = c("A:B" = -1)),
+      matching_model(~ age_difference, c(age_difference = -.1), group_exogamy = c("A:B" = -1)),
       rates = data.frame(age_start = 15, age_end = Inf, rate = .15),
       cohab_prob = data.frame(age_start = 0, age_end = Inf, prob = .4),
       union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .2)) |>
@@ -154,7 +154,7 @@ test_that("cell mode runs with groups, union types, cohabitation, matching and r
   od <- hammel_model() |> set_population(base) |> set_mortality(mort) |>
     set_fertility(fert) |>
     set_union_formation("on_demand",
-      create_matching_model(~ age_difference, c(age_difference = -.1), group_exogamy = c("A:B" = -1)))
+      matching_model(~ age_difference, c(age_difference = -.1), group_exogamy = c("A:B" = -1)))
   expect_gt(simulate(od, 5, seed = 53)$simulation$births, 0)
 })
 

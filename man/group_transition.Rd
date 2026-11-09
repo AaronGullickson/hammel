@@ -37,7 +37,7 @@ whose categories change. \code{NULL} (default) means the model's only
 dimension, and is an error when several are declared.}
 
 \item{weights}{NULL (default) for unweighted selection, or a
-\code{\link[=create_weight_model]{create_weight_model()}} using person variables and \code{destination}, which
+\code{\link[=weight_model]{weight_model()}} using person variables and \code{destination}, which
 chooses who in a cell moves without changing the cell's input rate.}
 
 \item{household}{\code{NULL} (default): each person moves individually. A

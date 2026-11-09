@@ -1,5 +1,5 @@
 test_that("diagnostics validate and pass through the setter", {
-  matching <- create_matching_model(~ age_difference, c(age_difference = 0))
+  matching <- matching_model(~ age_difference, c(age_difference = 0))
   expect_false(union_formation("on_demand", matching)$diagnostics)
   expect_true(set_union_formation(hammel_model(), "on_demand", matching,
     diagnostics = TRUE)$processes$union_formation$diagnostics)
