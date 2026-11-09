@@ -196,10 +196,8 @@ test_that("group observations return typed empty outputs", {
     expect_equal(nrow(counts), 0)
     expect_type(counts$group, "character")
     expect_equal(attr(counts, "unassigned_births")$births, 0)
-    expect_s3_class(calculate_tfr(counts), "tbl_df")
-    expect_type(calculate_tfr(counts)$group, "character")
-    expect_s3_class(calculate_life_table(counts), "tbl_df")
-    expect_type(calculate_life_table(counts)$group, "character")
+    expect_error(calculate_tfr(counts), "at least one age band")
+    expect_error(calculate_life_table(counts), "at least one age band")
   }
 })
 

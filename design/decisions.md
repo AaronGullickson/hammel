@@ -3277,3 +3277,10 @@ Long diagnostic literals may use `paste0()` of literal pieces so their complete 
 **Decision:** `calculate_life_table()` accepts mortality input from `rate_mortality` or `rate`, not `mx`. Keep `rate_mortality` precedence when both accepted columns are present, as before in the absence of an `mx` column. An existing `mx` column is not used as input and is replaced by the selected rate in the life-table output. Inputs with only `mx`, including empty tables, fail with a request for an accepted rate column.
 
 Keep `mx` in life-table output, preserving D048's output naming. Mortality process inputs, per-person-year units, radix, strata, missing-rate propagation, open-interval rules, and the exponential-hazard calculation remain unchanged. This removes an input alias, not the demographic notation or original HMD product names. Preserve the user's ongoing documentation edits and historical validation evidence.
+
+
+## D155 — Reject empty life-table and TFR inputs (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** `calculate_life_table()`, `calculate_tfr()` and `calculate_patfr()` stop with "A rate table needs at least one age band." when the input rate table has no rows, instead of returning a typed empty tibble. TFR and PATFR also stop when no female band with a finite end remains after they drop male rows and open age bands. A summary of nothing is treated as an input error rather than a valid empty result. Missing rate columns are still reported first. Nonempty results, warnings for open bands with nonzero fertility, and stratum handling are unchanged. Other summary functions, such as `demographic_counts()` and `calculate_population_size()`, still return typed empty tibbles.

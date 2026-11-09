@@ -32,7 +32,7 @@ the function will treat these additional columns as stratifying dimensions
 and will attempt to stratify the output appropriately. It will also stratify
 output by time when \code{time_start} and \code{time_end} are included.
 
-Constructed life tables make no adjustment for the ax values in the first
+Constructed life tables make no adjustment for the \eqn{{}_1a_0} values in the first
 year of life, which is common in demographic methods. This is to ensure that
 results are consistent with input rates used by the simulation. Users who
 want to model changes in mortality within the first year of life can provide
@@ -41,8 +41,14 @@ fractional year age bands for the first year of life.
 Missing values on rates will result in missing values in the life table.
 }
 \examples{
-calculate_life_table(data.frame(
-  age_start = c(0, 1, 5),
-  age_end = c(1, 5, Inf), rate = 0.1
-))
+data(usa_2000_mortality)
+
+calculate_life_table(usa_2000_mortality)
+
+# stratify by groups to get stratified life tables
+stratify_rates(
+  usa_2000_mortality,
+  by = list(ethnicity = c(A = 1.2, B = 0.9))
+) |>
+ calculate_life_table()
 }

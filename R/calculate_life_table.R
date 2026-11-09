@@ -19,11 +19,11 @@
 #' and will attempt to stratify the output appropriately. It will also stratify
 #' output by time when `time_start` and `time_end` are included.
 #'
-#' Constructed life tables make no adjustment for the ax values in the first
-#' year of life, which is common in demographic methods. This is to ensure that
-#' results are consistent with input rates used by the simulation. Users who
-#' want to model changes in mortality within the first year of life can provide
-#' fractional year age bands for the first year of life.
+#' Constructed life tables make no adjustment for the \eqn{{}_1a_0} value
+#' commonly used in demographic methods. This is to ensure that results are
+#' consistent with input rates used by the simulation. Users who want to model
+#' changes in mortality within the first year of life can provide fractional
+#' year age bands for the first year of life.
 #'
 #' Missing values on rates will result in missing values in the life table.
 #'
@@ -37,10 +37,16 @@
 #'   and additional stratifying columns (when supplied).
 #' @export
 #' @examples
-#' calculate_life_table(data.frame(
-#'   age_start = c(0, 1, 5),
-#'   age_end = c(1, 5, Inf), rate = 0.1
-#' ))
+#' data(usa_2000_mortality)
+#'
+#' calculate_life_table(usa_2000_mortality)
+#'
+#' # stratify by groups to get stratified life tables
+#' stratify_rates(
+#'   usa_2000_mortality,
+#'   by = list(ethnicity = c(A = 1.2, B = 0.9))
+#' ) |>
+#'  calculate_life_table()
 calculate_life_table <- function(rates, radix = 1) {
   if (inherits(rates, "hammel_process")) {
     if (!identical(rates$name, "mortality") ||
@@ -70,8 +76,8 @@ calculate_life_table <- function(rates, radix = 1) {
       call. = FALSE
     )
   }
-  if (!is.numeric(radix) || length(radix) != 1L || !is.finite(radix) || radix <=
-    0) {
+  if (!is.numeric(radix) || length(radix) != 1L || !is.finite(radix) ||
+      radix <= 0) {
     stop("`radix` must be positive and finite.", call. = FALSE)
   }
   rates <- rates[c(
@@ -79,11 +85,9 @@ calculate_life_table <- function(rates, radix = 1) {
     "age_start", "age_end", "mx"
   )]
   if (!nrow(rates)) {
-    for (column in c("n", "ax", "qx", "lx", "lx_end", "dx", "Lx", "Tx", "ex")) {
-      rates[[column]] <- numeric()
-    }
-    return(tibble::as_tibble(rates))
+    stop("A rate table needs at least one age band.", call. = FALSE)
   }
+  # split rates by stratifying variables
   tables <- lapply(
     summary_rows(rates, by_sex = TRUE, by_union_status = TRUE),
     function(rows) {

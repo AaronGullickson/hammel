@@ -90,8 +90,10 @@ test_that("life tables use only rate or rate_mortality as input rates", {
     input <- rates
     names(input)[names(input) == "rate"] <- column
     expect_identical(calculate_life_table(input), expected)
-    expect_identical(
-      calculate_life_table(input[FALSE, ]), expected[FALSE, ]
+    expect_error(
+      calculate_life_table(input[FALSE, ]),
+      "A rate table needs at least one age band.",
+      fixed = TRUE
     )
     input$mx <- "not an input mortality rate"
     expect_identical(calculate_life_table(input), expected)
@@ -273,8 +275,11 @@ test_that("all public demographic tables are tibbles including empty outputs", {
   expect_true(tibble::is_tibble(calculate_tfr(summary)))
   expect_true(tibble::is_tibble(calculate_life_table(summary)))
   expect_true(tibble::is_tibble(calculate_population_size(empty, numeric())))
-  expect_true(tibble::is_tibble(calculate_tfr(summary[FALSE, ])))
-  expect_true(tibble::is_tibble(calculate_life_table(summary[FALSE, ])))
+  expect_error(calculate_tfr(summary[FALSE, ]), "at least one age band")
+  expect_error(
+    calculate_life_table(summary[FALSE, ]),
+    "at least one age band"
+  )
 })
 
 
@@ -296,7 +301,7 @@ test_that("TFR separates union statuses in input tables and fertility processes"
   expect_equal(result$tfr, c(1.5, 3.5, 3, 7))
   expect_equal(result$union_status, rep(c("unpartnered", "partnered"), 2))
   expect_equal(result$time_start, c(2000, 2000, 2005, 2005))
-  expect_identical(calculate_tfr(rates[FALSE, ])$union_status, character())
+  expect_error(calculate_tfr(rates[FALSE, ]), "at least one age band")
   bad <- rates
   bad$age_start[3] <- 21
   expect_error(calculate_tfr(bad), "contiguous")
@@ -315,12 +320,16 @@ test_that("TFR warns only for known nonzero female open-age rates", {
   expect_warning(calculate_tfr(rates),NA)
   rates$rate[3] <- .01
   rates$sex <- "m"
-  expect_warning(calculate_tfr(rates),NA)
+  female <- transform(rates, sex = "f", rate = c(.1, .1, 0))
+  expect_warning(calculate_tfr(rbind(female, rates)), NA)
+  expect_error(calculate_tfr(rates), "female age band")
   rates$sex <- "f"
   rates$union_type <- "partnered"
   expect_warning(calculate_tfr(rbind(rates,transform(rates,union_type="unpartnered"))),
     "TFR.*underestimated")
   only <- rates[3, ]
-  expect_warning(empty <- calculate_tfr(only),"TFR.*underestimated")
-  expect_equal(nrow(empty),0)
+  expect_warning(
+    expect_error(calculate_tfr(only), "finite end"),
+    "TFR.*underestimated"
+  )
 })

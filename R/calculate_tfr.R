@@ -119,6 +119,9 @@ calculate_tfr <- function(rates) {
     rates$rate_fertility <- rates$rate
   }
   check_groups(rates, "rates")
+  if (!nrow(rates)) {
+    stop("A rate table needs at least one age band.", call. = FALSE)
+  }
   unknown <- attr(rates, "unassigned_births")
   if ("sex" %in% names(rates)) {
     rates <- rates[rates$sex == "f", , drop = FALSE]
@@ -153,9 +156,10 @@ calculate_tfr <- function(rates) {
   rates <- rates[is.finite(rates$age_end), , drop = FALSE]
   groups <- summary_strata(rates, by_union_status = TRUE)
   if (!nrow(rates)) {
-    result <- rates[FALSE, c(groups, "age_start", "age_end"), drop = FALSE]
-    result$tfr <- numeric()
-    return(tibble::as_tibble(result))
+    stop(
+      "TFR needs at least one female age band with a finite end.",
+      call. = FALSE
+    )
   }
   tables <- lapply(summary_rows(rates, by_union_status = TRUE), function(rows) {
     r <- rates[rows, , drop = FALSE]
@@ -205,6 +209,9 @@ calculate_patfr <- function(rates) {
     rates$rate_fertility <- rates$rate
   }
   check_groups(rates, "rates")
+  if (!nrow(rates)) {
+    stop("A rate table needs at least one age band.", call. = FALSE)
+  }
   unknown <- attr(rates, "unassigned_births")
   if ("sex" %in% names(rates)) {
     rates <- rates[rates$sex == "f", , drop = FALSE]
@@ -251,12 +258,10 @@ calculate_patfr <- function(rates) {
   rates <- rates[is.finite(rates$age_end), , drop = FALSE]
   groups <- summary_strata(rates, by_union_status = TRUE)
   if (!nrow(rates)) {
-    result <- tibble::as_tibble(rates[FALSE, c(groups, "age_start", "age_end"),
-      drop = FALSE
-    ])
-    result$patfr <- numeric()
-    attr(result, "unassigned_births") <- unknown
-    return(result)
+    stop(
+      "PATFR needs at least one female age band with a finite end.",
+      call. = FALSE
+    )
   }
   tables <- lapply(summary_rows(rates, by_union_status = TRUE), function(rows) {
     r <- rates[rows, , drop = FALSE]

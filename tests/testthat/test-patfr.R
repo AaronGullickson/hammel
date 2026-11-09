@@ -96,9 +96,10 @@ test_that("PATFR omits open ages and warns on known nonzero omitted rates", {
   expect_warning(z <- calculate_patfr(rbind(rates,tail)),NA)
   expect_equal(z,x)
   tail$rate <- .01
-  expect_warning(empty <- calculate_patfr(tail),"PATFR.*underestimated")
-  expect_equal(nrow(empty),0)
-  expect_type(empty$patfr,"double")
+  expect_warning(
+    expect_error(calculate_patfr(tail), "finite end"),
+    "PATFR.*underestimated"
+  )
 })
 
 test_that("PATFR validates age/parity coverage and invalid values", {
@@ -122,16 +123,13 @@ test_that("PATFR validates age/parity coverage and invalid values", {
   expect_error(calculate_tfr(bad),"parity_end")
 })
 
-test_that("PATFR accepts observation rate names and returns typed empty tables", {
+test_that("PATFR accepts observation rate names and rejects empty tables", {
   rates <- patfr_schedule()
   names(rates)[names(rates)=="rate"] <- "rate_fertility"
   expect_equal(calculate_patfr(rates)$patfr,12/55)
   rates$group <- 20L
-  empty <- calculate_patfr(rates[0, ])
-  expect_type(empty$group,"integer")
-  expect_type(empty$patfr,"double")
-  expect_equal(nrow(empty),0)
-  expect_identical(calculate_tfr(rates[0, ]),empty)
+  expect_error(calculate_patfr(rates[0, ]), "at least one age band")
+  expect_error(calculate_tfr(rates[0, ]), "at least one age band")
 })
 
 test_that("fertility processes dispatch to PATFR and mortality is rejected", {
