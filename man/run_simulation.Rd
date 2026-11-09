@@ -118,7 +118,7 @@ is selected at partner/father choice and inheritance at birth. Model- only
 boundaries preserve pending events and earlier histories.
 }
 \examples{
-population <- create_baseline_population(100, max_age = 50)
+population <- generate_uniform_population(100, max_age = 50)
 model <- hammel_model() |>
   set_population(population) |>
   set_mortality(data.frame(

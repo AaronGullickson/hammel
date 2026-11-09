@@ -9,7 +9,7 @@
 #' Describe and declare group dimensions
 #'
 #' `group()` describes one group dimension, for use with `set_groups()`,
-#' [hammel_population()] or [create_baseline_population()]. `set_groups()`
+#' [hammel_population()] or [generate_uniform_population()]. `set_groups()`
 #' declares named dimensions on a model, using one `group()` object per
 #' dimension. Neither function runs a simulation.
 #'
@@ -18,7 +18,7 @@
 #' with [group()]. Groups are always declared: a column that is not declared is
 #' an ordinary custom column, kept but never used by any process or analysis.
 #' The declaration replaces any declaration carried by the population (for
-#' example from [create_baseline_population()]), except that a dimension
+#' example from [generate_uniform_population()]), except that a dimension
 #' declared without `categories` keeps the population's declared categories for
 #' it; it may be given before or after [set_population()]; it is checked against
 #' the population when both are present and at simulation. Simulated populations
@@ -27,7 +27,7 @@
 #' @param categories Optional complete, ordered vector of the dimension's
 #'   categories (character labels or finite numeric codes). `NULL` (the default)
 #'   keeps the categories the population already declares (such as those of
-#'   [create_baseline_population()]); without any, they are inferred from the
+#'   [generate_uniform_population()]); without any, they are inferred from the
 #'   population's values in first-occurrence order, plus transition destinations
 #'   and categories with ancestry shares. When given, every value in the
 #'   population and every transition destination must be listed; extra
@@ -47,7 +47,7 @@
 #'   column. No arguments removes the declaration.
 #' @return `group()` returns a `hammel_group` object describing one dimension.
 #'   `set_groups()` returns an updated `hammel_model`.
-#' @seealso [hammel_population()], [create_baseline_population()],
+#' @seealso [hammel_population()], [generate_uniform_population()],
 #'   [group_inheritance()], [group_transition()]
 #' @rdname group
 #' @order 1
@@ -78,7 +78,7 @@ group <- function(
 #' @export
 #' @examples
 #' model <- hammel_model() |>
-#'   set_population(create_baseline_population(
+#'   set_population(generate_uniform_population(
 #'     100,
 #'     groups = list(group = c(A = .5, B = .5))
 #'   )) |>

@@ -33,6 +33,6 @@ treated as partnered too. No time window is imposed and no endpoint is
 needed.
 }
 \examples{
-population <- create_baseline_population(10)
+population <- generate_uniform_population(10)
 get_unpartnered_births(population)
 }

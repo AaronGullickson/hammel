@@ -16,7 +16,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Responsibility | Implementation |
 | --- | --- |
 | Model construction and population attachment | `R/hammel_model.R` |
-| Population schema and baseline generation | `R/hammel_population.R`, `R/create_baseline_population.R`, `R/checks.R` |
+| Population schema and baseline generation | `R/hammel_population.R`, `R/generate_uniform_population.R`, `R/checks.R` |
 | Group declarations and histories | `R/group.R`, `R/group_history.R` |
 | Ancestry schema and initialization | `R/ancestry.R` |
 | Process attachment | `R/set_process.R` |
@@ -57,7 +57,7 @@ hidden process-wide engine population.
 
 ```r
 set.seed(42)
-population <- create_baseline_population(1000, end_time = 2000)
+population <- generate_uniform_population(1000, end_time = 2000)
 mortality_rates <- data.frame(
   sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01
 )

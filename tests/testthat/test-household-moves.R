@@ -118,7 +118,8 @@ test_that("household rules are validated and histories continue", {
 
 test_that("with households living together, everyone moves at the input rate", {
   set.seed(11)
-  pop <- create_baseline_population(8000, groups = list(region = c(N = .5, S = .5)))
+  pop <- generate_uniform_population(8000, groups = list(region = c(N = .5, S =
+    .5)))
   rates <- data.frame(origin = c("N", "S"), destination = c("S", "N"), age_start = 0, age_end = Inf, rate = .05)
   model <- hammel_model() |> set_population(pop) |>
     set_groups(region = group(inheritance = "mother")) |>
@@ -142,7 +143,8 @@ test_that("households that start together stay together through a long run", {
   # attached to, at the end of a run with births, unions, separations, deaths
   # and many household moves.
   set.seed(21)
-  pop <- create_baseline_population(4000, groups = list(region = c(N = .4, S = .3, W = .3)))
+  pop <- generate_uniform_population(4000, groups = list(region = c(N = .4, S =
+    .3, W = .3)))
   regions <- c("N", "S", "W")
   moves <- expand.grid(origin = regions, destination = regions, stringsAsFactors = FALSE)
   moves <- moves[moves$origin != moves$destination, ]

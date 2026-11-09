@@ -51,7 +51,8 @@ test_that("set_groups works before or after the population and replaces its decl
   expect_identical(restarted$population$groups, out$groups)
   expect_true("group" %in% names(calculate_population_size(out, 1, by = "group")))
   # A later declaration replaces a population's own (here the baseline's).
-  base <- create_baseline_population(10, groups = list(group = c(A = 1, B = 1)))
+  base <- generate_uniform_population(10, groups = list(group = c(A = 1, B =
+    1)))
   expect_false(base$groups$group$ancestry)
   m <- set_groups(set_population(hammel_model(), base), group = group(ancestry = TRUE))
   expect_true(m$population$groups$group$ancestry)
@@ -114,34 +115,39 @@ test_that("ancestry is tracked only when requested", {
 
 test_that("baseline populations sample independent or joint group distributions", {
   set.seed(7)
-  independent <- create_baseline_population(4000, groups = list(group = c(A = 3, B = 1)))
+  independent <- generate_uniform_population(4000, groups = list(group = c(A =
+    3, B = 1)))
   expect_lt(abs(mean(independent$persons$group == "A") - .75), .03)
   expect_named(independent$groups, "group")
   set.seed(7)
-  joint <- create_baseline_population(4000,
+  joint <- generate_uniform_population(4000,
     groups = data.frame(group = c("A", "B"), weight = c(3, 1)))
   expect_lt(abs(mean(joint$persons$group == "A") - .75), .03)
   expect_named(joint$groups, "group")
   for (bad in list(data.frame(group = "A"), data.frame(weight = 1), data.frame(group = "A", weight = -1),
                    data.frame(group = NA, weight = 1), list(), list(group = c(1, 2)),
                    list(sex = c(A = 1)), c(A = 1)))
-    expect_error(create_baseline_population(10, groups = bad))
+    expect_error(generate_uniform_population(10, groups = bad))
   # An empty baseline keeps its typed column and declaration.
-  empty <- create_baseline_population(0, groups = data.frame(group = c("A", "B"), weight = 1))
+  empty <- generate_uniform_population(0, groups = data.frame(group = c("A",
+    "B"), weight = 1))
   expect_identical(empty$persons$group, character())
 })
 
 test_that("baselines declare categories in the order given, and set_groups keeps them", {
   set.seed(3)
   # B may well appear first in the persons table; the declaration still lists A first.
-  pop <- create_baseline_population(200, groups = list(race = c(A = .1, B = .9, AB = 0)))
+  pop <- generate_uniform_population(200, groups = list(race = c(A = .1, B = .9,
+    AB = 0)))
   expect_identical(pop$groups$race$categories, c("A", "B", "AB"))
   expect_false("AB" %in% pop$persons$race)
-  joint <- create_baseline_population(50, groups = data.frame(race = c("W", "B", "W", "B"),
+  joint <- generate_uniform_population(50, groups = data.frame(race = c("W",
+    "B", "W", "B"),
     region = c("S", "S", "N", "N"), weight = c(1, 1, 1, 0)))
   expect_identical(joint$groups$race$categories, c("W", "B"))
   expect_identical(joint$groups$region$categories, c("S", "N"))
-  codes <- create_baseline_population(20, groups = data.frame(code = c(20L, 10L), weight = 1))
+  codes <- generate_uniform_population(20, groups = data.frame(code = c(20L,
+    10L), weight = 1))
   expect_identical(codes$groups$code$categories, c(20L, 10L))
   # Omitted categories are kept, before or after the population is set.
   model <- hammel_model() |> set_population(pop) |> set_groups(race = group(ancestry = TRUE))

@@ -291,5 +291,5 @@ test_that("union wife and husband columns enforce female and male roles", {
   swapped$end_time <- -0.5
   swapped$end_reason <- "dissolution"
   expect_error(hammel_population(persons, swapped, end_time = 0, groups = if ("group" %in% names(persons)) "group"), "wife_id.*female")
-  expect_identical(names(create_baseline_population(0)$unions), names(unions))
+  expect_identical(names(generate_uniform_population(0)$unions), names(unions))
 })

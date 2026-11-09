@@ -178,28 +178,34 @@ test_that("empty grouped populations remain valid and preserve group type", {
 
 test_that("baseline group weights are normalized, sampled and reproducible", {
   set.seed(135)
-  p <- create_baseline_population(10000, groups = list(group = c(A = 2, B = 1, C = 0)))
+  p <- generate_uniform_population(10000, groups = list(group = c(A = 2, B = 1,
+    C = 0)))
   expect_s3_class(p$persons, "tbl_df")
   expect_true(all(p$persons$group %in% c("A", "B")))
   # Five binomial standard deviations; tests sampling rather than exact quotas.
   expect_lt(abs(mean(p$persons$group == "A") - 2/3), 5 * sqrt((2/3) * (1/3) / 10000))
   set.seed(135)
-  expect_identical(p, create_baseline_population(10000, groups = list(group = c(A = 2, B = 1, C = 0))))
+  expect_identical(p, generate_uniform_population(10000, groups = list(group =
+    c(A = 2, B = 1, C = 0))))
   set.seed(135)
-  scaled <- create_baseline_population(10000, groups = list(group = c(A = 20, B = 10, C = 0)))
+  scaled <- generate_uniform_population(10000, groups = list(group = c(A = 20,
+    B = 10, C = 0)))
   expect_identical(scaled, p)
   set.seed(135)
-  ungrouped <- create_baseline_population(10000)
+  ungrouped <- generate_uniform_population(10000)
   p$persons$group <- NULL
   p$groups <- NULL
   p$ancestry <- NULL
   # Grouped populations now also carry an empty transition history.
   p$transitions <- NULL
   expect_identical(p, ungrouped)
-  expect_identical(create_baseline_population(0, groups = list(group = c(A = 1)))$persons$group,
+  expect_identical(generate_uniform_population(0, groups = list(group = c(A =
+    1)))$persons$group,
                    character())
-  expect_true(all(create_baseline_population(10, groups = list(group = c(A = 0, B = 1)))$persons$group == "B"))
-  expect_no_warning(create_baseline_population(10, groups = list(group = c(A = 1e308, B = 1e308))))
+  expect_true(all(generate_uniform_population(10, groups = list(group = c(A = 0,
+    B = 1)))$persons$group == "B"))
+  expect_no_warning(generate_uniform_population(10, groups = list(group = c(A =
+    1e308, B = 1e308))))
 })
 
 test_that("invalid baseline group weights fail without consuming RNG", {
@@ -209,7 +215,8 @@ test_that("invalid baseline group weights fail without consuming RNG", {
                        c(A = NA_real_), c(A = Inf), c(A = 1, A = 2),
                        setNames(1, ""), setNames(1, NA_character_),
                        list(A = 1), c(A = "1"), matrix(1, 1))) {
-    expect_error(create_baseline_population(10, groups = list(group = weights)), "groups")
+    expect_error(generate_uniform_population(10, groups = list(group =
+      weights)), "groups")
     expect_identical(.Random.seed, state)
   }
 })

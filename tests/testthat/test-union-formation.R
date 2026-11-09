@@ -65,7 +65,7 @@ test_that("union process validation and execution boundaries are explicit", {
   expect_error(union_formation("on_demand", matching, rates = rates))
   expect_error(union_formation("rate", matching, rates = rbind(rates, rates)))
   model <- hammel_model() |>
-    set_population(create_baseline_population(0)) |>
+    set_population(generate_uniform_population(0)) |>
     set_mortality(data.frame(sex = c("f", "m"), age_start = 0,
                             age_end = Inf, rate = 0.01)) |>
     set_fertility(data.frame(age_start = 20, age_end = 30, rate = 0.1)) |>

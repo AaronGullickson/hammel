@@ -45,7 +45,7 @@ test_that("empty union histories have the full typed enriched schema", {
   expect_type(result$birth_time_h, "double")
   expect_named(result, c(names(population$unions), "birth_time_w", "death_time_w", "group_w",
                          "birth_time_h", "death_time_h", "group_h"))
-  population <- create_baseline_population(0)
+  population <- generate_uniform_population(0)
   expect_equal(nrow(get_detailed_unions(population)), 0)
   expect_named(get_detailed_unions(population), c(names(population$unions),
     "birth_time_w", "death_time_w", "birth_time_h", "death_time_h"))

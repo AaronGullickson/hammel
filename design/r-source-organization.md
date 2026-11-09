@@ -20,7 +20,7 @@ Agreed by the user and implemented November 9, 2026 (D143). This guide defines w
 
 8. Start each hand-maintained R file with a brief comment describing its purpose, above the section headings. Place exported functions first under `# PUBLIC FUNCTIONS ------`, followed by any `# INTERNAL CONSTANTS ------` and `# HELPER FUNCTIONS ------` sections. Omit sections with no contents. Preserve relative order within each group and keep explanatory comments and roxygen blocks with their definitions. Internal-only files need only the applicable internal sections. Keep generated wrappers generated; do not manually reorder or section `RcppExports.R`. Package roxygen metadata uses `# PACKAGE DOCUMENTATION ------`.
 
-9. Use noun-based names for specification constructors: `matching_model()`, `age_gap_matching_model()`, `weight_model()`, and `group_inheritance()`. Use verbs for pipeable actions such as `set_population()`. Retain `create_baseline_population()` as the user-selected exception (D147).
+9. Use noun-based names for specification constructors: `matching_model()`, `age_gap_matching_model()`, `weight_model()`, and `group_inheritance()`. Use verbs for actions such as `set_population()`, `run_simulation()`, and `generate_uniform_population()` (D147/D152/D153). Population generation creates actual populations rather than specification objects.
 
 10. Keep every line in hand-maintained `R/` files at most 80 characters, including purpose comments, explanatory comments, and roxygen text. Apply the same convention to new or edited R code elsewhere. Use a two-space indent and one argument per line for a function signature that does not fit on one line. Wrap calls at argument or expression boundaries; split long diagnostic strings with literal `paste0()` pieces so messages remain unchanged. Keep generated wrappers untouched (D149). This R-source rule does not require hard-wrapping Markdown prose, which is kept renderer-friendly.
 
@@ -112,12 +112,6 @@ Cohabitation and conversion settings within union formation, including preparati
 
 - Functions: `validate_cohabitation()`, `validate_conversion_rates()`, `prepare_cohabitation()`.
 
-### `R/create_baseline_population.R`
-
-Generate baseline persons and sample declared group categories.
-
-- Functions: **`create_baseline_population()`**, `baseline_group_sampler()`.
-
 ### `R/extract_kin.R`
 
 Extract kin and validate generation limits shared with matching.
@@ -135,6 +129,12 @@ Extract parent, union, and unpartnered-birth relationship tables.
 Construct and attach fertility processes; validate fertility settings and feasibility.
 
 - Functions: **`set_fertility()`**, **`fertility()`**, `unreachable_parity_cells()`, `warn_unreachable_parity_cells()`, `validate_ffab()`, `validate_birth_interval()`.
+
+### `R/generate_uniform_population.R`
+
+Generate baseline persons and sample declared group categories.
+
+- Functions: **`generate_uniform_population()`**, `baseline_group_sampler()`.
 
 ### `R/get_database_rates.R`
 
@@ -270,7 +270,7 @@ Pkgdown reference grouping remains a separate follow-up choice. The source reorg
 
 Use snake_case for package-owned function names and arguments, including `conf_level` on rate calculators. D148 replaces `conf.level` in Hammel's interface; `stats::poisson.test()` retains its own `conf.level` argument and `conf.int` output. Do not rename external functions' arguments to match Hammel's convention.
 
-The reference is the [tidyverse naming and syntax guide](https://style.tidyverse.org/syntax.html), [function-writing guide](https://style.tidyverse.org/functions.html), and [API design principles](https://design.tidyverse.org/). Apply those conventions with the user's explicit exceptions: noun-based specification constructors, the retained `create_baseline_population()` action name, uppercase section headings, and a purpose comment at the top of every hand-maintained file. Adopting a coding convention does not require adding tidyverse dependencies or changing demographic behavior.
+The reference is the [tidyverse naming and syntax guide](https://style.tidyverse.org/syntax.html), [function-writing guide](https://style.tidyverse.org/functions.html), and [API design principles](https://design.tidyverse.org/). Follow these guides subject to the user's explicit choices: noun-based specification constructors, verb-based actions including `generate_uniform_population()`, uppercase section headings, and a purpose comment at the top of every hand-maintained file. Adopting a coding convention does not require adding tidyverse dependencies or changing demographic behavior.
 
 Review on November 9, 2026, updated after the confidence-argument rename and 80-column formatting and control-flow bracing (D149/D150):
 

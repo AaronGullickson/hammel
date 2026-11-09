@@ -23,6 +23,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Population representation, sex labels, public tibbles | D012, D015, D016, D023 |
 | Process constructors/setters | D017, D026 |
 | Noun names for specification constructors | D147 |
+| Uniform-age population generator naming | D153 |
 | Database rate products and reusable downloads | D018, D025 |
 | Demographic extraction and function names | D020–D022, D081 and missing-ASFR clarification |
 | Optional Poisson intervals for observed rates | D124; argument name D148 |
@@ -3255,3 +3256,14 @@ Long diagnostic literals may use `paste0()` of literal pieces so their complete 
 **Decision:** Rename Hammel's standalone `simulate(model, years, seed = NULL)` action to `run_simulation(model, years, seed = NULL)`, with source file `R/run_simulation.R` and help topic `run_simulation`. Remove the former export and help alias. Do not implement `simulate.hammel_model()` or reinterpret the `stats::simulate()` generic's `nsim` argument: the user judged that generic unrelated to Hammel's execution interface. The existing stats generic remains available without being masked by Hammel.
 
 **Scope:** Direct pre-release API rename without a compatibility alias. Preserve arguments, defaults, population/result classes, RNG behavior, event timing, and native engine entry points and filenames. Update package calls, tests, generated help, and current design specifications; preserve historical decision/verification records, validation evidence, and user-maintained README/articles. Calls using the old name in those sources need updating before execution against the current API. No new demographic or replication mechanism is selected.
+
+
+## D153 — Name the uniform-age population generator (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Rename `create_baseline_population()` to `generate_uniform_population()`, with source file `R/generate_uniform_population.R` and help topic `generate_uniform_population`. The name identifies the generation method rather than the population's role as a baseline. "Uniform" refers to the initial age distribution on zero through `max_age`; sex and group categories continue to follow the supplied probabilities/weights and need not be uniform. This is an action that generates an actual population, so it retains a verb-based name.
+
+**Scope:** Direct pre-release API rename without an alias under the former name. Preserve all arguments, defaults, validation, group sampling, returned classes/tables, and RNG draws. Update package code, tests, generated help, and current specifications; preserve user-maintained README/articles and historical validation evidence. This supersedes the retained population-generator spelling in D147. Internal baseline-group sampling remains unchanged.
+
+**Future work:** The user anticipates more advanced starting-population methods, potentially based on fertility/mortality schedules. This rename does not select an algorithm, demographic assumptions, API, or implementation for those methods; they require their own scientific specification and authorization.

@@ -25,7 +25,7 @@
 #'   `by` variables varying faster than later ones.
 #' @export
 #' @examples
-#' population <- create_baseline_population(100, end_time = 0)
+#' population <- generate_uniform_population(100, end_time = 0)
 #' calculate_population_size(population, times = c(-10, -5, 0))
 #' calculate_population_size(population, times = 0, by = "sex")
 calculate_population_size <- function(

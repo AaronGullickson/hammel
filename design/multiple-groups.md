@@ -121,7 +121,7 @@ is kept.
   dimensions working, with group effects in matching limited to one
   dimension, calibrated as now. Step 2 adds joint calibration across
   dimensions.
-- **Baseline populations.** `create_baseline_population()` renames
+- **Baseline populations.** `generate_uniform_population()` renames
   `group_weights` to `groups`, which takes either a named list of
   per-dimension weights (drawn independently), such as
   `list(race = c(A = .6, B = .4), region = c(N = .5, S = .5))`, or a data frame
@@ -229,7 +229,7 @@ calibration cost as the number of combinations grows.
 
 ### Declared categories from baselines (user decision, November 6, 2026)
 
-`create_baseline_population()` declares each dimension's `categories` from
+`generate_uniform_population()` declares each dimension's `categories` from
 its input, in the order given (weights' names, including zero-weight
 categories, or first appearance in a joint table), so the reference category
 no longer depends on the random order of persons. A dimension that

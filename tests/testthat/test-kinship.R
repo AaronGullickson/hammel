@@ -75,7 +75,7 @@ test_that("kinship extraction preserves IDs, query order, deaths, and empty sche
   expect_equal(nrow(empty), 0)
   expect_identical(vapply(empty, typeof, character(1)), vapply(expected, typeof, character(1)))
   expect_equal(nrow(extract_kin(population, 80, relative_ids = numeric())), 0)
-  expect_equal(nrow(extract_kin(create_baseline_population(0), numeric())), 0)
+  expect_equal(nrow(extract_kin(generate_uniform_population(0), numeric())), 0)
   expect_equal(nrow(extract_kin(population, 80, relative_ids = 80)), 0)
   expect_error(extract_kin(population, 999), "present")
   expect_error(extract_kin(population, c(80, 80)), "unique")

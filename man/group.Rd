@@ -13,7 +13,7 @@ set_groups(model, ...)
 \item{categories}{Optional complete, ordered vector of the dimension's
 categories (character labels or finite numeric codes). \code{NULL} (the default)
 keeps the categories the population already declares (such as those of
-\code{\link[=create_baseline_population]{create_baseline_population()}}); without any, they are inferred from the
+\code{\link[=generate_uniform_population]{generate_uniform_population()}}); without any, they are inferred from the
 population's values in first-occurrence order, plus transition destinations
 and categories with ancestry shares. When given, every value in the
 population and every transition destination must be listed; extra
@@ -42,7 +42,7 @@ column. No arguments removes the declaration.}
 }
 \description{
 \code{group()} describes one group dimension, for use with \code{set_groups()},
-\code{\link[=hammel_population]{hammel_population()}} or \code{\link[=create_baseline_population]{create_baseline_population()}}. \code{set_groups()}
+\code{\link[=hammel_population]{hammel_population()}} or \code{\link[=generate_uniform_population]{generate_uniform_population()}}. \code{set_groups()}
 declares named dimensions on a model, using one \code{group()} object per
 dimension. Neither function runs a simulation.
 }
@@ -52,7 +52,7 @@ Name the persons columns that are group dimensions and give each its settings
 with \code{\link[=group]{group()}}. Groups are always declared: a column that is not declared is
 an ordinary custom column, kept but never used by any process or analysis.
 The declaration replaces any declaration carried by the population (for
-example from \code{\link[=create_baseline_population]{create_baseline_population()}}), except that a dimension
+example from \code{\link[=generate_uniform_population]{generate_uniform_population()}}), except that a dimension
 declared without \code{categories} keeps the population's declared categories for
 it; it may be given before or after \code{\link[=set_population]{set_population()}}; it is checked against
 the population when both are present and at simulation. Simulated populations
@@ -65,13 +65,13 @@ group(
   inheritance = group_inheritance("mother")
 )
 model <- hammel_model() |>
-  set_population(create_baseline_population(
+  set_population(generate_uniform_population(
     100,
     groups = list(group = c(A = .5, B = .5))
   )) |>
   set_groups(group = group(inheritance = "mother"))
 }
 \seealso{
-\code{\link[=hammel_population]{hammel_population()}}, \code{\link[=create_baseline_population]{create_baseline_population()}},
+\code{\link[=hammel_population]{hammel_population()}}, \code{\link[=generate_uniform_population]{generate_uniform_population()}},
 \code{\link[=group_inheritance]{group_inheritance()}}, \code{\link[=group_transition]{group_transition()}}
 }

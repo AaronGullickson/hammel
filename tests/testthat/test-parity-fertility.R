@@ -96,7 +96,7 @@ test_that("absent parity and zero-spacing equal-parity rates give the same ferti
 
 test_that("parity composes with grouped typed fertility, conversion and stratified rates", {
   set.seed(33)
-  pop <- create_baseline_population(500,50,0,groups = list(group = c(A=1,B=1)))
+  pop <- generate_uniform_population(500,50,0,groups = list(group = c(A=1,B=1)))
   base <- parity_rates(c(.3,.2,.1))
   rates <- rbind(transform(base,union_type="unpartnered"),
     transform(base,union_type="cohab",rate=rate*.8),
@@ -125,7 +125,7 @@ test_that("parity composes with grouped typed fertility, conversion and stratifi
 
 test_that("grouped zero-spacing parity schedules match shared rates in distribution", {
   set.seed(123)
-  pop <- create_baseline_population(400,50,0,groups = list(group = c(A=1,B=1)))
+  pop <- generate_uniform_population(400,50,0,groups = list(group = c(A=1,B=1)))
   base <- data.frame(age_start=15,age_end=50,union_type=c("unpartnered","partnered"),rate=.2)
   model <- hammel_model() |> set_population(pop) |>
     set_mortality(data.frame(sex=c("m","f"),age_start=0,age_end=Inf,rate=.01)) |>

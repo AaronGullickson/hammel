@@ -31,6 +31,6 @@ reconstructions of historical group transitions. Existing columns that
 conflict with the added fields cause an error.
 }
 \examples{
-population <- create_baseline_population(10)
+population <- generate_uniform_population(10)
 get_parent_info(population)
 }

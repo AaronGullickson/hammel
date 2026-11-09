@@ -36,6 +36,6 @@ Existing columns whose names conflict with added partner fields cause an
 error.
 }
 \examples{
-population <- create_baseline_population(10)
+population <- generate_uniform_population(10)
 get_detailed_unions(population)
 }

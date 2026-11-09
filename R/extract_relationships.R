@@ -29,7 +29,7 @@
 #'   column types.
 #' @export
 #' @examples
-#' population <- create_baseline_population(10)
+#' population <- generate_uniform_population(10)
 #' get_detailed_unions(population)
 get_detailed_unions <- function(population) {
   validate_population(population)
@@ -109,7 +109,7 @@ get_detailed_unions <- function(population) {
 #'   Empty populations retain the enriched column types.
 #' @export
 #' @examples
-#' population <- create_baseline_population(10)
+#' population <- generate_uniform_population(10)
 #' get_parent_info(population)
 get_parent_info <- function(population) {
   validate_population(population)
@@ -165,7 +165,7 @@ get_parent_info <- function(population) {
 #'   Empty results retain the enriched schema. The population is not modified.
 #' @export
 #' @examples
-#' population <- create_baseline_population(10)
+#' population <- generate_uniform_population(10)
 #' get_unpartnered_births(population)
 get_unpartnered_births <- function(population) {
   parents <- get_parent_info(population)

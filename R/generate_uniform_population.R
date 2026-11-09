@@ -1,12 +1,14 @@
-# Generate baseline populations and sample their declared group categories.
+# Generate populations with uniform ages and sampled group categories.
 
 # PUBLIC FUNCTIONS ---------------------------------------------------------
 
-#' Generate a simple baseline population
+#' Generate a population with uniformly distributed ages
 #'
 #' Create a starter population with independent uniformly distributed ages,
 #' randomly assigned sex, unknown parents, and no unions. Everyone is alive at
 #' the reference time. This is not a stable or stationary population.
+#' Uniform refers to ages sampled between zero and `max_age`; sex and group
+#' categories follow their supplied probabilities and need not be uniform.
 #'
 #' Ages are sampled in continuous years without rounding to simulation steps.
 #' Generation uses and advances R's current random-number state; use
@@ -36,10 +38,10 @@
 #' @export
 #' @examples
 #' set.seed(42)
-#' population <- create_baseline_population(size = 50000, max_age = 70)
+#' population <- generate_uniform_population(size = 50000, max_age = 70)
 #' model <- hammel_model() |>
 #'   set_population(population)
-create_baseline_population <- function(
+generate_uniform_population <- function(
   size,
   max_age = 70,
   end_time = 0,

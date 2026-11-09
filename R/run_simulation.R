@@ -110,7 +110,7 @@
 #'   `dissolutions` when a dissolution process is configured.
 #' @export
 #' @examples
-#' population <- create_baseline_population(100, max_age = 50)
+#' population <- generate_uniform_population(100, max_age = 50)
 #' model <- hammel_model() |>
 #'   set_population(population) |>
 #'   set_mortality(data.frame(

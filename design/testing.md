@@ -5,6 +5,14 @@ D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the u
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## Uniform-age population generator rename (November 9, 2026)
+
+D153 renames the population generator to `generate_uniform_population`, with matching source and help filenames. The help explicitly identifies the age distribution as uniform and retains weighted sex/group sampling. A clean second `devtools::document()` pass completed successfully, and the renamed help page passed Rd validation and example execution. Export checks confirmed exactly the name replacement, with no alias under the former name.
+
+Parsed executable expressions and test expressions differ only by the intended name substitution; long renamed test-call lines were wrapped without changing their expressions. Seven before/after cases produced identical populations and RNG states: empty and ordinary populations, zero maximum age, female probabilities zero/one, fractional reference time, zero-weight categories, independent multiple dimensions, and joint group weights. All arguments, defaults, returned classes, and validation behavior are unchanged.
+
+The full offline `devtools::test()` run passed 6,498 expectations with zero failures in 108.4 seconds. The live database test was skipped; one existing environment warning concerned HMDHFDplus/lubridate's `timedatectl` system-bus access. Hand-maintained R source and added/edited test lines meet the 80-column convention; `git diff --check` passed. Native code, user-maintained README/vignettes, and historical validation evidence remain untouched. No advanced or stable-population generation method was implemented.
+
 ## Execution renamed to run_simulation (November 9, 2026)
 
 D152 renames the standalone execution function and source/help file to `run_simulation`, removing Hammel's `simulate` export and alias. A clean second `devtools::document()` pass completed successfully; the renamed help topic passed Rd validation and its example executed successfully. Current API references and test calls were updated, with renamed long test-call lines wrapped to 80 columns. Native entry points and source filenames are unchanged.

@@ -43,9 +43,8 @@ be made autonomously; record choices with substantial architectural consequences
   documentation blocks and leave generated wrappers untouched.
 - Use noun-based names for specification constructors, such as `matching_model()`,
   `age_gap_matching_model()`, `weight_model()`, and `group_inheritance()`.
-  Prefer verbs for pipeable actions such as `set_population()` and
-  `run_simulation()`. Keep
-  `create_baseline_population()` as the explicitly retained exception.
+  Use verbs for actions such as `set_population()`, `run_simulation()`, and
+  `generate_uniform_population()`.
 - Keep hand-maintained `R/` source lines at most 80 characters, including
   comments and roxygen documentation. Follow the same limit for new or edited
   R code elsewhere. Wrap long calls and use one argument per line with a

@@ -128,7 +128,7 @@ test_that("cell mode runs with groups, union types, cohabitation, matching and r
   old <- options(hammel.check_cells = TRUE)
   on.exit(options(old), add = TRUE)
   set.seed(5)
-  base <- create_baseline_population(1500, max_age = 60)
+  base <- generate_uniform_population(1500, max_age = 60)
   base$persons$group <- sample(c("A", "B"), 1500, TRUE)
   base$groups <- list(group = group())
   fert <- data.frame(age_start = c(15, 25, 35), age_end = c(25, 35, 50), rate = c(.1, .12, .04))

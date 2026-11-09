@@ -69,7 +69,7 @@ test_that("existing partners are retained and women have no additional age restr
   expect_identical(result$unions, model$population$unions)
   expect_true(all(result$persons$father_id[result$persons$mother_id %in% 1] == 2))
   # Without a supplied union, the same young woman can search for an adult man.
-  model$population$unions <- create_baseline_population(0)$unions
+  model$population$unions <- generate_uniform_population(0)$unions
   model$population$persons$birth_time[2] <- -20
   result <- run_simulation(model, 0.1, seed = 52)
   expect_equal(result$unions$wife_id, 1)

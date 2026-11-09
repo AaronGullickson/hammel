@@ -97,7 +97,7 @@ structural validation. `end_time` is the population reference time and supplies
 the next simulation start. Persons born by that time with missing `death_time`
 are alive; deceased persons remain in the history and never re-enter risk.
 
-`create_baseline_population(size, max_age = 70, end_time = 0,
+`generate_uniform_population(size, max_age = 70, end_time = 0,
 female_probability = 0.5)` generates independent uniform ages in continuous
 years and independent sex assignments. Everyone is alive, parents are unknown,
 and unions are empty. IDs are `1:size`; size zero is permitted. Size must be a

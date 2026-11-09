@@ -141,7 +141,7 @@ test_that("weights survive restarts and spacing removes/reintroduces weighted me
 test_that("weighted hazards integrate with grouped partner/father matching and union types", {
   old <- options(hammel.check_cells = TRUE); on.exit(options(old), add = TRUE)
   set.seed(81)
-  pop <- create_baseline_population(1000, max_age = 45)
+  pop <- generate_uniform_population(1000, max_age = 45)
   pop$persons$group <- rep(c("A", "B"), 500)
   pop$groups <- list(group = group())
   rates <- expand.grid(union_type = c("unpartnered", "cohab", "marriage"),

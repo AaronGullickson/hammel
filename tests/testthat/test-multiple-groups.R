@@ -230,7 +230,7 @@ test_that("detailed unions add each dimension's partner categories", {
   expect_true(all(c("race_w", "race_h", "region_w", "region_h") %in% names(u)))
   expect_identical(u$race_h, out$persons$race[match(u$husband_id, out$persons$person_id)])
   # One dimension of any name, replayed through transitions to formation.
-  p <- create_baseline_population(200, groups = list(race = c(A = .5, B = .5)))
+  p <- generate_uniform_population(200, groups = list(race = c(A = .5, B = .5)))
   m <- hammel_model() |> set_population(p) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .2)) |>
@@ -967,7 +967,7 @@ test_that("review regressions: absent-category schedules, dimensions named group
   # Rows naming only categories the population lacks still leave its
   # categories without schedules (with inferred categories).
   set.seed(1)
-  pop <- create_baseline_population(200, groups = list(race = c(A = 1)))
+  pop <- generate_uniform_population(200, groups = list(race = c(A = 1)))
   pop$groups$race["categories"] <- list(NULL)
   model <- set_mortality(base(pop), data.frame(sex = c("m", "f"), race = "B", age_start = 0, age_end = Inf,
                                                rate = 1e8))
@@ -979,7 +979,8 @@ test_that("review regressions: absent-category schedules, dimensions named group
     "missing schedules.*A")
   # A dimension named `group` alongside another.
   set.seed(1)
-  pop <- create_baseline_population(200, groups = list(group = c(A = .5, B = .5), region = c(N = .5, S = .5)))
+  pop <- generate_uniform_population(200, groups = list(group = c(A = .5, B =
+    .5), region = c(N = .5, S = .5)))
   sizes <- calculate_population_size(pop, 0, by = c("group", "region"))
   expect_named(sizes, c("time", "group", "region", "population"))
   expect_equal(sum(sizes$population), 200)
@@ -987,7 +988,8 @@ test_that("review regressions: absent-category schedules, dimensions named group
                c("time", "region", "sex", "group", "population"))
   # Parent information for every declared dimension, ignoring undeclared columns.
   set.seed(1)
-  pop <- create_baseline_population(300, groups = list(race = c(A = .5, B = .5), region = c(N = .5, S = .5)))
+  pop <- generate_uniform_population(300, groups = list(race = c(A = .5, B =
+    .5), region = c(N = .5, S = .5)))
   pop$persons$group <- "undeclared"
   out <- run_simulation(set_mortality(base(pop), data.frame(sex = c("m", "f"),
     age_start = 0, age_end = Inf, rate = .01)),

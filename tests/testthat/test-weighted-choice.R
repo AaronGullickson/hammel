@@ -185,7 +185,7 @@ test_that("three-group calibration meets targets and handles zero and unattainab
 
 weighted_population <- function(n = 600, weights = NULL, seed = 903) {
   set.seed(seed)
-  create_baseline_population(n, max_age = 60, end_time = 0,
+  generate_uniform_population(n, max_age = 60, end_time = 0,
     groups = if (!is.null(weights)) list(group = weights))
 }
 
