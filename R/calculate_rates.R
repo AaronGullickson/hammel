@@ -2,11 +2,87 @@
 
 # PUBLIC FUNCTIONS ---------------------------------------------------------
 
-#' Calculate age-specific mortality rates
+#' Calculate observed demographic event rates
 #'
-#' Report deaths per person-year, with exact half-open period and age splitting.
+#' Calculate mortality, fertility, union formation, marriage, dissolution,
+#' cohabitation conversion, and group-transition rates from recorded population
+#' histories. Each function counts its events and divides by its own risk
+#' exposure; the denominators are not interchangeable. These functions analyze
+#' histories without running a simulation or changing the population.
 #'
-#' @section Stratification with `by`:
+#' @param population One independent history. All functions accept a
+#'   `hammel_population` with the required histories and a known endpoint;
+#'   observation cannot extend beyond it. Mortality and fertility also accept
+#'   bare persons data frames when union stratification is not requested.
+#'   Dissolution also accepts a bare union table. For bare tables, the caller
+#'   must ensure complete follow-up. See each calculator's section for its
+#'   required histories and table columns.
+#' @param time_breaks Strictly increasing finite calendar boundaries in years.
+#'   Cells are half-open: events at internal boundaries enter the cell starting
+#'   there; the final calendar boundary is excluded.
+#' @param age_breaks Strictly increasing nonnegative age boundaries in years.
+#'   A finite final boundary gains Inf, creating an open final band starting
+#'   there. Required for mortality, fertility, union formation, and marriage.
+#'   Conversion and group transitions require exactly one of `age_breaks` and
+#'   `dur_breaks`; conversion uses the woman's attained age.
+#' @param dur_breaks Strictly increasing nonnegative duration boundaries in years.
+#'   A finite final boundary gains Inf. Required for dissolution; optional for
+#'   union formation; an alternative to age for conversion and group transitions.
+#'   The duration origin and union-formation mixed age/duration output are
+#'   described in the corresponding sections below.
+#' @param by `NULL` (default) or a character vector of variables to split results
+#'   over. Accepted variables and their event-time interpretation differ by
+#'   calculator; see the sections below. Declared group dimensions must be named
+#'   explicitly, for example `"race"`, `"race_w"`, or `"race_h"`.
+#' @param conf.level NULL (default) to omit confidence intervals, or a finite
+#'   numeric scalar strictly between 0 and 1. Adds `conf_low` and `conf_high`
+#'   from two-sided exact [stats::poisson.test()] intervals for observed event
+#'   counts over exposure. Bounds are NA at zero exposure. For fertility, these
+#'   describe the observed rate, not the unrealized-adjusted rate.
+#' @param pool_dissolved Logical, default `FALSE`. For calculators accepting this
+#'   argument, `TRUE` with `"previous_union"` in `by` combines separated and
+#'   widowed as `"dissolved"`, pooling counts and exposure before calculating
+#'   rates and confidence intervals. Union formation adds `"previous_union"`
+#'   automatically when `dur_breaks` is supplied.
+#' @param parity_breaks For fertility only: NULL to pool parities, or strictly
+#'   increasing nonnegative
+#'   integer boundaries starting at zero. Bands are half-open. A finite final
+#'   boundary receives Inf, as for age breaks.
+#' @param unrealized For fertility only: logical, default `FALSE`. With `TRUE`,
+#'   the population must
+#'   come from `simulate()`; add
+#'   `unrealized_births` (counted births that could not occur because their
+#'   fertility cell had members but no eligible woman, from
+#'   `simulation$unrealized_births`) and
+#'   `rate_fertility_adjusted = (births + unrealized_births) / person_years`.
+#'   Values are `NA` where they cannot be attributed exactly: periods before the
+#'   most recent simulation's start (restarts keep only the latest run's
+#'   record), breaks that cut through a recorded one-year period or fertility
+#'   cell, and `by` or parity strata the fertility schedule did not use
+#'   (`"previous_union"` always).
+#' @param group The declared group dimension whose transitions are counted.
+#'   `NULL` (default) means the only declared dimension.
+#' @return A tibble containing calendar bands, age or duration bands where
+#'   applicable, requested strata, event counts, exposure, and the observed rate.
+#'   Rates are NA at zero exposure; zero events with positive exposure give zero.
+#'   Confidence limits are included only when requested. Person-based exposure
+#'   uses `person_years` (woman-years for fertility); union-based exposure uses
+#'   `union_years`. Each calculator's section specifies its count/rate columns,
+#'   row ordering, and additional output.
+#'
+#' @section Choosing a calculator:
+#' \tabular{lll}{
+#' Calculator \tab Events \tab Exposure\cr
+#' Mortality \tab Deaths \tab Person-years alive\cr
+#' Fertility \tab Maternal births \tab Woman-years alive\cr
+#' Union formation \tab Partnership starts \tab Unpartnered person-years\cr
+#' Marriage \tab Marriage starts and conversions \tab Nonmarried person-years\cr
+#' Dissolution \tab Dissolutions \tab Union-years\cr
+#' Cohabitation conversion \tab Conversions \tab Cohabitation union-years\cr
+#' Group transitions \tab Directed group moves \tab Person-years in origin category
+#' }
+#'
+#' @section Person-state stratification:
 #' `by` lists categorical variables to split exposure and events over. Each is
 #' the person's state at the time, changing only at recorded events:
 #' * A declared group dimension's name (such as `"race"`; see
@@ -30,29 +106,265 @@
 #' one ending by the partner's death, and use the mother's group before any
 #' same-time transition.
 #'
-#' Rows vary by time fastest, then age, then sex, then the `by` variables in
-#' the order given, earlier ones varying faster. Strata sum to pooled counts and
+#' For mortality and fertility, rows vary by time fastest, then age (and
+#' parity when requested), then sex, then the `by` variables in the order
+#' given, earlier ones varying faster. Strata sum to pooled counts and
 #' exposure; recompute rates after pooling.
 #'
-#' @param population A hammel_population or persons data frame.
-#' @param time_breaks Strictly increasing finite period boundaries in years.
-#' @param age_breaks Strictly increasing nonnegative age boundaries in years.
-#'   If the final boundary is finite, Inf is appended to create an open-ended
-#'   final age band starting at that boundary.
-#' @param by `NULL` (default) or a character vector of variables to split
-#'   results over: declared group dimensions, `"union_type"` and
-#'   `"previous_union"`. See below.
-#' @param conf.level NULL (default) to omit confidence intervals, or a finite
-#'   numeric scalar strictly between 0 and 1. Adds `conf_low` and `conf_high`
-#'   from two-sided exact [stats::poisson.test()] intervals for observed event
-#'   counts over exposure. Bounds are NA at zero exposure. For fertility, these
-#'   describe the observed rate, not the unrealized-adjusted rate.
-#' @param pool_dissolved Logical, default `FALSE`. With `TRUE` and
-#'   `"previous_union"` in `by`, combine separated and widowed as
-#'   `"dissolved"`, pooling counts and exposure before calculating rates.
-#' @return A tibble containing period, sex, age, the `by` columns,
+#' For mortality and fertility, `by` selects declared group dimensions,
+#' `"union_type"`, and `"previous_union"`. Group transitions additionally allow
+#' `"sex"`. Union entry and union-level rates have the distinct interpretations
+#' described in their own sections. Do not sum shared exposure across union-entry
+#' types or group-transition destinations.
+#'
+#' @section Mortality:
+#' `calculate_mortality_rates()`:
+#' Report deaths per person-year, with exact half-open period and age splitting.
+#'
+#' \strong{Output:} A tibble containing period, sex, age, the `by` columns,
 #'   person_years, deaths and rate_mortality.
+#'
+#' @section Fertility:
+#' `calculate_fertility_rates()`:
+#' Report maternal births per woman-year, including time excluded by minimum
+#' birth spacing. Only female rows are returned. Current parity is reconstructed
+#' from all recorded maternal births, including pre-window births and deceased
+#' children; custom person parity columns are ignored. Each birth counts at the
+#' parity immediately before it and advances subsequent exposure. Simultaneous
+#' births progress successively in recorded person-row order.
+#'
+#' `by` works as in [calculate_mortality_rates()]: births count under the
+#' mother's state just before them.
+#'
+#' \strong{Output:} A tibble with period, sex (female), age, optional parity_start and
+#'   parity_end, the `by` columns, person_years, births and rate_fertility, and
+#'   with `unrealized = TRUE`, unrealized_births and rate_fertility_adjusted.
+#'   Unknown-mother births are in the period-level unassigned_births attribute.
+#'
+#' @section Union formation:
+#' `calculate_union_rates()`:
+#' Count union starts and unpartnered person-years by age, period, sex, and
+#' optionally `previous_union`: `"none"`, `"separated"`, or `"widowed"`. The most recent
+#' episode's ending determines the category; each start counts in the category
+#' immediately before formation. Partnered time contributes no exposure.
+#' Men describe realized matching outcomes, not a male search-rate input.
+#' Typed entries pool cohabitation and direct marriage; conversion is excluded
+#' because partners remain partnered. Previous-category classification follows
+#' the population's recorded cohabitation policy, default FALSE without metadata.
+#' With `dur_breaks`, only none rows use age; separated/widowed rows use
+#' duration since the most recent ending; `pool_dissolved` can combine them.
+#'
+#' Histories must be complete for the intended interpretation. `"none"` means
+#' no recorded earlier union; omitted history cannot establish never-partnered
+#' status. Overlapping episodes are rejected. Touching episodes are allowed;
+#' tied starts follow union ID order. Time and age cells are half-open, with
+#' events on internal boundaries assigned to the cell beginning there. Every
+#' episode counts, including zero-duration episodes. Rates are formations per
+#' unpartnered person-year, NA at zero exposure. Search attempts that fail to
+#' form unions are not counted, so these rates can differ from search hazards.
+#'
+#' \strong{\code{population}:} A `hammel_population` with person and union histories and
+#'   a known endpoint. Observation cannot extend beyond that endpoint.
+#'
+#' \strong{\code{by}:} `NULL` (default) or a character vector of variables to split
+#'   results over: declared group dimensions (each person's own categories
+#'   before formation),
+#'   `"previous_union"` (`"none"`, `"separated"` or `"widowed"`, the category
+#'   immediately before formation) and `"union_type"` (the type of union
+#'   entered, `"cohab"` or `"marriage"`; requires typed histories). Both
+#'   `union_type` rows share the full unpartnered exposure, which must not be
+#'   summed across them. Rows vary by time fastest, then age (or duration),
+#'   then sex, then the `by` variables in the order given.
+#'
+#' \strong{\code{dur_breaks}:} Optional nonnegative duration boundaries in years. When
+#'   supplied, separated/widowed rows use years since the latest union ending;
+#'   none rows still use `age_breaks`. Adds `"previous_union"` to `by` (last,
+#'   unless listed). A finite final boundary gains Inf.
+#'   Adds `dur_start`/`dur_end`, with NA in the unused age/duration pair.
+#'   Duration rows include all ages; this is not an age-by-duration surface.
+#'
+#' \strong{Output:} A tibble with `time_start`, `time_end`, `sex`, `age_start`, `age_end`,
+#'   duration columns when `dur_breaks` is supplied, the `by` columns,
+#'   `person_years`, `unions`, and `rate_union`. Empty cells are retained.
+#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#'
+#' @section Marriage:
+#' `calculate_marriage_rates()`:
+#' Count direct marriages and conversions to marriage over nonmarried
+#' person-years: unpartnered and cohabiting time both contribute exposure.
+#' Married time contributes none. Each marriage episode counts once per spouse,
+#' including a marriage beginning at conversion. Untyped unions are interpreted
+#' as marriages. Men describe realized outcomes, not male search-rate inputs.
+#'
+#' Complete, nonoverlapping histories are required. Cells are half-open; starts
+#' on boundaries enter the cell beginning there. Exposure is censored at death
+#' and the observation endpoint. Rates are NA when exposure is zero. This
+#' age-specific measure does not provide duration strata. With
+#' `by = "previous_union"`, cohabiting exposure and conversion retain the
+#' category held immediately before that cohabitation began. Ending categories
+#' follow the recorded cohabitation policy, as in [calculate_union_rates()].
+#' For entry into any partnership over unpartnered exposure, use
+#' [calculate_union_rates()].
+#'
+#' \strong{\code{by}:} `NULL` (default) or a character vector of variables to split
+#'   results over: declared group dimensions and `"previous_union"`, as in
+#'   [calculate_union_rates()].
+#'
+#' \strong{Output:} A tibble with `time_start`, `time_end`, `sex`, `age_start`, `age_end`,
+#'   the `by` columns, `person_years`, `marriages`, and `rate_marriage`.
+#'   Empty cells are retained. Person-years include cohabiting time.
+#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#'
+#' @section Dissolution:
+#' `calculate_dissolution_rates()`:
+#' Split each union episode across calendar periods and elapsed-duration bands,
+#' counting union-years once per episode, not once per spouse. Death and
+#' dissolution both stop exposure, but only `end_reason = "dissolution"` counts
+#' toward dissolutions. Missing ends are censored at the observation endpoint.
+#' Repeated episodes are separate observations; distinct overlapping records
+#' are not merged. Analyze one independent history per call, then combine counts.
+#'
+#' Exposure and event cells are half-open. Dissolutions at internal boundaries
+#' belong to the cell beginning there, and events at the last time boundary are
+#' excluded. Zero-duration episodes may contribute events with no exposure.
+#' Rates are dissolutions per union-year: zero with positive exposure and no
+#' events, and NA when exposure is zero. This is a cause-specific rate, not the
+#' probability of dissolution in the presence of competing partner deaths.
+#'
+#' \strong{\code{population}:} A `hammel_population`, or a union data frame containing
+#'   unique positive whole-number `union_id`, `start_time`, `end_time`, and
+#'   `end_reason`. Ends and reasons are NA for ongoing episodes; ended reasons
+#'   are `"dissolution"`, `"death_husband"`, `"death_wife"`, or `"conversion"`. Population objects
+#'   need a known endpoint; observation cannot extend beyond it. For bare tables,
+#'   ensure complete follow-up through the requested endpoint.
+#'
+#' \strong{\code{dur_breaks}:} Strictly increasing nonnegative duration boundaries in years.
+#'   If the last boundary is finite, append Inf for an open final band.
+#'
+#' \strong{\code{by}:} `NULL` (default) or a character vector of variables to split
+#'   results over: `"<group>_w"` and `"<group>_h"` for declared group
+#'   dimensions, such as `"race_w"` and `"region_h"` (the wife's and
+#'   husband's current categories, following transition histories;
+#'   directional, so sum A-wife/B-husband and B-wife/A-husband rows for an
+#'   unordered pair; any combination of dimensions and partners) and
+#'   `"union_type"` (cohab or marriage, each with its own exposure;
+#'   conversion stops cohabitation exposure without counting as dissolution,
+#'   and duration resets at the start of the linked marriage). Population
+#'   inputs require declared groups for the group variables; bare union tables
+#'   require `group_w`, `group_h` or `union_type` columns. A dissolution counts
+#'   under the groups before any same-time transition.
+#'
+#' \strong{Output:} A tibble with `time_start`, `time_end`, `dur_start`, `dur_end`,
+#'   the `by` columns, `union_years`, `dissolutions`, and `rate_dissolution`.
+#'   Rows vary by time fastest, then duration, then the `by` variables in the
+#'   order given.
+#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#'
+#' @section Cohabitation conversion:
+#' `calculate_cohab_convert_rate()`:
+#' Count conversions over cohabitation union-years, once per episode. Marriage
+#' episodes contribute neither exposure nor events. Conversion, dissolution and
+#' partner death end cohabitation exposure; only `end_reason = "conversion"`
+#' counts as an event. Ongoing episodes are censored at the observation endpoint.
+#' Cells are half-open; boundary events enter the cell beginning there, and
+#' events at the final time boundary are excluded. Zero-duration episodes can
+#' contribute events without exposure. Rates are NA when exposure is zero.
+#'
+#' \strong{\code{population}:} A `hammel_population` with typed union histories and a known
+#'   endpoint. Observation cannot extend beyond it.
+#'
+#' \strong{\code{dur_breaks}:} Optional strictly increasing nonnegative duration boundaries,
+#'   in years since cohabitation began. Supply exactly one of `dur_breaks` and
+#'   `age_breaks`. A finite final boundary gains an open-ended band through Inf.
+#'
+#' \strong{\code{by}:} `NULL` (default) or a character vector of `"<group>_w"` (the
+#'   woman's current category in a declared group dimension, such as
+#'   `"race_w"`, matching conversion input schedules) and `"<group>_h"` (the
+#'   man's), in any combination of dimensions. Rows vary by time fastest, then the axis
+#'   band, then the `by` variables in the order given.
+#'
+#' \strong{Output:} A tibble with `time_start`, `time_end`, `dur_start`, `dur_end` (or
+#'   `age_start`, `age_end`), the `by` columns, `union_years`, `conversions`
+#'   and `rate_cohab_convert`. Empty cells are retained. Rates are conversions per
+#'   cohabitation union-year, not conversion probabilities with competing risks.
+#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#'
+#' @section Group transitions:
+#' `calculate_transition_rates()`:
+#' Count individual moves and person-years in their origin category of one
+#' group dimension in half-open
+#' Lexis cells. Each outgoing destination shares its origin's exposure: do not
+#' sum denominators across destinations. Duration is years since the latest
+#' entry into a category of this dimension, or age before its first recorded
+#' transition; return moves reset
+#' duration and union changes do not. Events use the exiting group's duration.
+#' Death and competing moves end exposure. Rates are cause-specific hazards,
+#' not transition probabilities. Internal-boundary events enter the cell
+#' starting there; the final calendar boundary is excluded.
+#'
+#' \strong{\code{population}:} A grouped `hammel_population` with a known endpoint and
+#'   complete person, transition and (when requested) union histories.
+#'
+#' \strong{\code{dur_breaks}:} Optional strictly increasing nonnegative group-duration
+#'   boundaries. Supply exactly one of age_breaks and dur_breaks. A finite final
+#'   axis boundary gains Inf.
+#'
+#' \strong{\code{by}:} `NULL` (default) or a character vector of variables to split
+#'   results over: `"sex"`, `"union_type"` (current union state; typed
+#'   histories use unpartnered/cohab/marriage, untyped unpartnered/partnered)
+#'   and `"previous_union"`, as in [calculate_mortality_rates()], and other
+#'   declared group dimensions (the person's category there at the time; only
+#'   moves in `group` count, and duration is unaffected by moves in other
+#'   dimensions). Union variables require exclusive histories. A transition counts under the union
+#'   state after same-time union changes, which precede transitions.
+#'
+#' \strong{Output:} A tibble with `time_start`, `time_end`, age or duration bounds,
+#'   `origin`, `destination`, the `by` columns, `person_years`,
+#'   `transitions`, and `rate_transition` (NA at zero exposure). All distinct
+#'   directed pairs among current and historical identities are retained,
+#'   including zero-event cells. Fewer than two known groups returns a typed
+#'   empty tibble. Rows vary by time fastest, then the axis band, then
+#'   destination, then origin, then the `by` variables in the order given.
+#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#'
+#' @seealso [calculate_population_size()], [calculate_tfr()],
+#'   [calculate_patfr()], [calculate_life_table()]
+#' @name calculate_rates
+#' @rdname calculate_rates
+#' @order 1
 #' @export
+#' @examples
+#'
+#' # Dissolution
+#' unions <- data.frame(union_id = 1:3, start_time = c(0, 1, 2),
+#'   end_time = c(3, 4, NA),
+#'   end_reason = c("dissolution", "death_husband", NA))
+#' calculate_dissolution_rates(unions, c(0, 2, 5), c(0, 2, Inf))
+#'
+#' # Group transitions
+#' persons <- data.frame(person_id = 1, sex = "f", birth_time = 0,
+#'   death_time = NA_real_, mother_id = NA_real_, father_id = NA_real_, group = "B")
+#' population <- hammel_population(persons, end_time = 5,
+#'   transitions = data.frame(person_id = 1, time = 2,
+#'     origin = "A", destination = "B"), groups = "group")
+#' calculate_transition_rates(population, c(0, 5), age_breaks = c(0, Inf))
+#'
+#' # Person and partnership rates from a supplied history:
+#' persons <- data.frame(person_id = 1:3, sex = c("f", "m", "f"),
+#'   birth_time = c(-25, -27, 2), death_time = c(NA_real_, 4, NA_real_),
+#'   mother_id = c(NA_real_, NA_real_, 1),
+#'   father_id = c(NA_real_, NA_real_, 2))
+#' unions <- data.frame(union_id = 1:2, wife_id = 1, husband_id = 2,
+#'   start_time = c(1, 3), end_time = c(3, 4),
+#'   end_reason = c("conversion", "death_husband"),
+#'   union_type = c("cohab", "marriage"), previous_cohab_id = c(NA_real_, 1))
+#' population <- hammel_population(persons, unions, end_time = 5)
+#' calculate_mortality_rates(population, c(0, 5), c(0, Inf))
+#' calculate_fertility_rates(population, c(0, 5), c(0, Inf))
+#' calculate_union_rates(population, c(0, 5), c(0, Inf))
+#' calculate_marriage_rates(population, c(0, 5), c(0, Inf))
+#' calculate_dissolution_rates(population, c(0, 5), c(0, Inf))
+#' calculate_cohab_convert_rate(population, c(0, 5), dur_breaks = c(0, Inf))
 calculate_mortality_rates <- function(population, time_breaks, age_breaks, by = NULL,
                                       conf.level = NULL, pool_dissolved = FALSE) {
   validate_rate_conf_level(conf.level)
@@ -73,36 +385,8 @@ calculate_mortality_rates <- function(population, time_breaks, age_breaks, by = 
   finish_strata(add_rate_confidence(out, "deaths", "person_years", conf.level), alias)
 }
 
-#' Calculate age-specific fertility rates, optionally by current parity
-#'
-#' Report maternal births per woman-year, including time excluded by minimum
-#' birth spacing. Only female rows are returned. Current parity is reconstructed
-#' from all recorded maternal births, including pre-window births and deceased
-#' children; custom person parity columns are ignored. Each birth counts at the
-#' parity immediately before it and advances subsequent exposure. Simultaneous
-#' births progress successively in recorded person-row order.
-#'
-#' `by` works as in [calculate_mortality_rates()]: births count under the
-#' mother's state just before them.
-#' @inheritParams calculate_mortality_rates
-#' @param parity_breaks NULL to pool parities, or strictly increasing nonnegative
-#'   integer boundaries starting at zero. Bands are half-open. A finite final
-#'   boundary receives Inf, as for age breaks.
-#' @param unrealized Logical, default `FALSE`. With `TRUE`, the population must
-#'   come from `simulate()`; add
-#'   `unrealized_births` (counted births that could not occur because their
-#'   fertility cell had members but no eligible woman, from
-#'   `simulation$unrealized_births`) and
-#'   `rate_fertility_adjusted = (births + unrealized_births) / person_years`.
-#'   Values are `NA` where they cannot be attributed exactly: periods before the
-#'   most recent simulation's start (restarts keep only the latest run's
-#'   record), breaks that cut through a recorded one-year period or fertility
-#'   cell, and `by` or parity strata the fertility schedule did not use
-#'   (`"previous_union"` always).
-#' @return A tibble with period, sex (female), age, optional parity_start and
-#'   parity_end, the `by` columns, person_years, births and rate_fertility, and
-#'   with `unrealized = TRUE`, unrealized_births and rate_fertility_adjusted.
-#'   Unknown-mother births are in the period-level unassigned_births attribute.
+#' @rdname calculate_rates
+#' @order 2
 #' @export
 calculate_fertility_rates <- function(population, time_breaks, age_breaks, by = NULL,
                                       parity_breaks = NULL, unrealized = FALSE,
@@ -146,35 +430,8 @@ calculate_fertility_rates <- function(population, time_breaks, age_breaks, by = 
   out
 }
 
-#' Calculate cohabitation-to-marriage conversion rates
-#'
-#' Count conversions over cohabitation union-years, once per episode. Marriage
-#' episodes contribute neither exposure nor events. Conversion, dissolution and
-#' partner death end cohabitation exposure; only `end_reason = "conversion"`
-#' counts as an event. Ongoing episodes are censored at the observation endpoint.
-#' Cells are half-open; boundary events enter the cell beginning there, and
-#' events at the final time boundary are excluded. Zero-duration episodes can
-#' contribute events without exposure. Rates are NA when exposure is zero.
-#'
-#' @param population A `hammel_population` with typed union histories and a known
-#'   endpoint. Observation cannot extend beyond it.
-#' @param time_breaks Strictly increasing finite calendar boundaries in years.
-#' @param dur_breaks Optional strictly increasing nonnegative duration boundaries,
-#'   in years since cohabitation began. Supply exactly one of `dur_breaks` and
-#'   `age_breaks`. A finite final boundary gains an open-ended band through Inf.
-#' @param age_breaks Optional strictly increasing nonnegative boundaries for the
-#'   woman's attained age, matching the conversion schedule's age convention.
-#' @param by `NULL` (default) or a character vector of `"<group>_w"` (the
-#'   woman's current category in a declared group dimension, such as
-#'   `"race_w"`, matching conversion input schedules) and `"<group>_h"` (the
-#'   man's), in any combination of dimensions. Rows vary by time fastest, then the axis
-#'   band, then the `by` variables in the order given.
-#' @inheritParams calculate_mortality_rates
-#' @return A tibble with `time_start`, `time_end`, `dur_start`, `dur_end` (or
-#'   `age_start`, `age_end`), the `by` columns, `union_years`, `conversions`
-#'   and `rate_cohab_convert`. Empty cells are retained. Rates are conversions per
-#'   cohabitation union-year, not conversion probabilities with competing risks.
-#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#' @rdname calculate_rates
+#' @order 6
 #' @export
 calculate_cohab_convert_rate <- function(population, time_breaks,
                                          dur_breaks = NULL, age_breaks = NULL,
@@ -218,55 +475,9 @@ calculate_cohab_convert_rate <- function(population, time_breaks,
   add_rate_confidence(result, "conversions", "union_years", conf.level)
 }
 
-#' Calculate union-years, dissolutions and duration-specific rates
-#'
-#' Split each union episode across calendar periods and elapsed-duration bands,
-#' counting union-years once per episode, not once per spouse. Death and
-#' dissolution both stop exposure, but only `end_reason = "dissolution"` counts
-#' toward dissolutions. Missing ends are censored at the observation endpoint.
-#' Repeated episodes are separate observations; distinct overlapping records
-#' are not merged. Analyze one independent history per call, then combine counts.
-#'
-#' Exposure and event cells are half-open. Dissolutions at internal boundaries
-#' belong to the cell beginning there, and events at the last time boundary are
-#' excluded. Zero-duration episodes may contribute events with no exposure.
-#' Rates are dissolutions per union-year: zero with positive exposure and no
-#' events, and NA when exposure is zero. This is a cause-specific rate, not the
-#' probability of dissolution in the presence of competing partner deaths.
-#'
-#' @param population A `hammel_population`, or a union data frame containing
-#'   unique positive whole-number `union_id`, `start_time`, `end_time`, and
-#'   `end_reason`. Ends and reasons are NA for ongoing episodes; ended reasons
-#'   are `"dissolution"`, `"death_husband"`, `"death_wife"`, or `"conversion"`. Population objects
-#'   need a known endpoint; observation cannot extend beyond it. For bare tables,
-#'   ensure complete follow-up through the requested endpoint.
-#' @param time_breaks Strictly increasing finite calendar boundaries in years.
-#' @param dur_breaks Strictly increasing nonnegative duration boundaries in years.
-#'   If the last boundary is finite, append Inf for an open final band.
-#' @param by `NULL` (default) or a character vector of variables to split
-#'   results over: `"<group>_w"` and `"<group>_h"` for declared group
-#'   dimensions, such as `"race_w"` and `"region_h"` (the wife's and
-#'   husband's current categories, following transition histories;
-#'   directional, so sum A-wife/B-husband and B-wife/A-husband rows for an
-#'   unordered pair; any combination of dimensions and partners) and
-#'   `"union_type"` (cohab or marriage, each with its own exposure;
-#'   conversion stops cohabitation exposure without counting as dissolution,
-#'   and duration resets at the start of the linked marriage). Population
-#'   inputs require declared groups for the group variables; bare union tables
-#'   require `group_w`, `group_h` or `union_type` columns. A dissolution counts
-#'   under the groups before any same-time transition.
-#' @inheritParams calculate_mortality_rates
-#' @return A tibble with `time_start`, `time_end`, `dur_start`, `dur_end`,
-#'   the `by` columns, `union_years`, `dissolutions`, and `rate_dissolution`.
-#'   Rows vary by time fastest, then duration, then the `by` variables in the
-#'   order given.
-#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#' @rdname calculate_rates
+#' @order 5
 #' @export
-#' @examples
-#' unions <- data.frame(union_id = 1:3, start_time = c(0, 1, 2),
-#'   end_time = c(3, 4, NA),
-#'   end_reason = c("dissolution", "death_husband", NA))
-#' calculate_dissolution_rates(unions, c(0, 2, 5), c(0, 2, Inf))
 calculate_dissolution_rates <- function(population, time_breaks, dur_breaks, by = NULL,
                                         conf.level = NULL) {
   validate_rate_conf_level(conf.level)
@@ -314,32 +525,8 @@ calculate_dissolution_rates <- function(population, time_breaks, dur_breaks, by 
   add_rate_confidence(result, "dissolutions", "union_years", conf.level)
 }
 
-#' Calculate marriage entry rates including cohabitation conversions
-#'
-#' Count direct marriages and conversions to marriage over nonmarried
-#' person-years: unpartnered and cohabiting time both contribute exposure.
-#' Married time contributes none. Each marriage episode counts once per spouse,
-#' including a marriage beginning at conversion. Untyped unions are interpreted
-#' as marriages. Men describe realized outcomes, not male search-rate inputs.
-#'
-#' Complete, nonoverlapping histories are required. Cells are half-open; starts
-#' on boundaries enter the cell beginning there. Exposure is censored at death
-#' and the observation endpoint. Rates are NA when exposure is zero. This
-#' age-specific measure does not provide duration strata. With
-#' `by = "previous_union"`, cohabiting exposure and conversion retain the
-#' category held immediately before that cohabitation began. Ending categories
-#' follow the recorded cohabitation policy, as in [calculate_union_rates()].
-#' For entry into any partnership over unpartnered exposure, use
-#' [calculate_union_rates()].
-#'
-#' @inheritParams calculate_union_rates
-#' @param by `NULL` (default) or a character vector of variables to split
-#'   results over: declared group dimensions and `"previous_union"`, as in
-#'   [calculate_union_rates()].
-#' @return A tibble with `time_start`, `time_end`, `sex`, `age_start`, `age_end`,
-#'   the `by` columns, `person_years`, `marriages`, and `rate_marriage`.
-#'   Empty cells are retained. Person-years include cohabiting time.
-#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#' @rdname calculate_rates
+#' @order 4
 #' @export
 calculate_marriage_rates <- function(population, time_breaks, age_breaks, by = NULL,
                                      conf.level = NULL, pool_dissolved = FALSE) {
@@ -352,55 +539,9 @@ calculate_marriage_rates <- function(population, time_breaks, age_breaks, by = N
     marriage_measure = TRUE, conf.level = conf.level, pool_dissolved = pool_dissolved), alias)
 }
 
-#' Calculate age- or duration-specific group-transition rates
-#'
-#' Count individual moves and person-years in their origin category of one
-#' group dimension in half-open
-#' Lexis cells. Each outgoing destination shares its origin's exposure: do not
-#' sum denominators across destinations. Duration is years since the latest
-#' entry into a category of this dimension, or age before its first recorded
-#' transition; return moves reset
-#' duration and union changes do not. Events use the exiting group's duration.
-#' Death and competing moves end exposure. Rates are cause-specific hazards,
-#' not transition probabilities. Internal-boundary events enter the cell
-#' starting there; the final calendar boundary is excluded.
-#'
-#' @param population A grouped `hammel_population` with a known endpoint and
-#'   complete person, transition and (when requested) union histories.
-#' @param time_breaks Strictly increasing finite calendar boundaries in years.
-#' @param age_breaks Optional strictly increasing nonnegative age boundaries.
-#' @param dur_breaks Optional strictly increasing nonnegative group-duration
-#'   boundaries. Supply exactly one of age_breaks and dur_breaks. A finite final
-#'   axis boundary gains Inf.
-#' @param by `NULL` (default) or a character vector of variables to split
-#'   results over: `"sex"`, `"union_type"` (current union state; typed
-#'   histories use unpartnered/cohab/marriage, untyped unpartnered/partnered)
-#'   and `"previous_union"`, as in [calculate_mortality_rates()], and other
-#'   declared group dimensions (the person's category there at the time; only
-#'   moves in `group` count, and duration is unaffected by moves in other
-#'   dimensions). Union variables require exclusive histories. A transition counts under the union
-#'   state after same-time union changes, which precede transitions.
-#' @param group The declared group dimension whose transitions are counted.
-#'   `NULL` (default) means the only declared dimension.
-#' @param pool_dissolved Logical, default `FALSE`. With `TRUE` and
-#'   `"previous_union"` in `by`, combine separated and widowed as `"dissolved"`.
-#' @inheritParams calculate_mortality_rates
-#' @return A tibble with `time_start`, `time_end`, age or duration bounds,
-#'   `origin`, `destination`, the `by` columns, `person_years`,
-#'   `transitions`, and `rate_transition` (NA at zero exposure). All distinct
-#'   directed pairs among current and historical identities are retained,
-#'   including zero-event cells. Fewer than two known groups returns a typed
-#'   empty tibble. Rows vary by time fastest, then the axis band, then
-#'   destination, then origin, then the `by` variables in the order given.
-#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#' @rdname calculate_rates
+#' @order 7
 #' @export
-#' @examples
-#' persons <- data.frame(person_id = 1, sex = "f", birth_time = 0,
-#'   death_time = NA_real_, mother_id = NA_real_, father_id = NA_real_, group = "B")
-#' population <- hammel_population(persons, end_time = 5,
-#'   transitions = data.frame(person_id = 1, time = 2,
-#'     origin = "A", destination = "B"), groups = "group")
-#' calculate_transition_rates(population, c(0, 5), age_breaks = c(0, Inf))
 calculate_transition_rates <- function(population, time_breaks, age_breaks = NULL,
                                        dur_breaks = NULL, by = NULL, conf.level = NULL,
                                        pool_dissolved = FALSE, group = NULL) {
@@ -489,57 +630,8 @@ calculate_transition_rates <- function(population, time_breaks, age_breaks = NUL
   add_rate_confidence(out, "transitions", "person_years", conf.level)
 }
 
-#' Calculate union exposure and formation rates
-#'
-#' Count union starts and unpartnered person-years by age, period, sex, and
-#' optionally `previous_union`: `"none"`, `"separated"`, or `"widowed"`. The most recent
-#' episode's ending determines the category; each start counts in the category
-#' immediately before formation. Partnered time contributes no exposure.
-#' Men describe realized matching outcomes, not a male search-rate input.
-#' Typed entries pool cohabitation and direct marriage; conversion is excluded
-#' because partners remain partnered. Previous-category classification follows
-#' the population's recorded cohabitation policy, default FALSE without metadata.
-#' With `dur_breaks`, only none rows use age; separated/widowed rows use
-#' duration since the most recent ending; `pool_dissolved` can combine them.
-#'
-#' Histories must be complete for the intended interpretation. `"none"` means
-#' no recorded earlier union; omitted history cannot establish never-partnered
-#' status. Overlapping episodes are rejected. Touching episodes are allowed;
-#' tied starts follow union ID order. Time and age cells are half-open, with
-#' events on internal boundaries assigned to the cell beginning there. Every
-#' episode counts, including zero-duration episodes. Rates are formations per
-#' unpartnered person-year, NA at zero exposure. Search attempts that fail to
-#' form unions are not counted, so these rates can differ from search hazards.
-#'
-#' @param population A `hammel_population` with person and union histories and
-#'   a known endpoint. Observation cannot extend beyond that endpoint.
-#' @param time_breaks Strictly increasing finite calendar boundaries in years.
-#' @param age_breaks Strictly increasing nonnegative age boundaries in years.
-#'   A finite final boundary gains an open-ended band through Inf.
-#' @param by `NULL` (default) or a character vector of variables to split
-#'   results over: declared group dimensions (each person's own categories
-#'   before formation),
-#'   `"previous_union"` (`"none"`, `"separated"` or `"widowed"`, the category
-#'   immediately before formation) and `"union_type"` (the type of union
-#'   entered, `"cohab"` or `"marriage"`; requires typed histories). Both
-#'   `union_type` rows share the full unpartnered exposure, which must not be
-#'   summed across them. Rows vary by time fastest, then age (or duration),
-#'   then sex, then the `by` variables in the order given.
-#' @param pool_dissolved Logical, default FALSE. With TRUE, return `"none"`
-#'   and `"dissolved"`, pooling separated and widowed events and exposure before
-#'   calculating rates and confidence intervals. Requires `"previous_union"` in
-#'   `by` (added automatically with `dur_breaks`).
-#' @param dur_breaks Optional nonnegative duration boundaries in years. When
-#'   supplied, separated/widowed rows use years since the latest union ending;
-#'   none rows still use `age_breaks`. Adds `"previous_union"` to `by` (last,
-#'   unless listed). A finite final boundary gains Inf.
-#'   Adds `dur_start`/`dur_end`, with NA in the unused age/duration pair.
-#'   Duration rows include all ages; this is not an age-by-duration surface.
-#' @inheritParams calculate_mortality_rates
-#' @return A tibble with `time_start`, `time_end`, `sex`, `age_start`, `age_end`,
-#'   duration columns when `dur_breaks` is supplied, the `by` columns,
-#'   `person_years`, `unions`, and `rate_union`. Empty cells are retained.
-#'   With non-NULL `conf.level`, also includes `conf_low` and `conf_high`.
+#' @rdname calculate_rates
+#' @order 3
 #' @export
 calculate_union_rates <- function(population, time_breaks, age_breaks, by = NULL,
                                   dur_breaks = NULL, conf.level = NULL, pool_dissolved = FALSE) {

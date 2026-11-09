@@ -2,13 +2,16 @@
 % Please edit documentation in R/group.R
 \name{group}
 \alias{group}
-\title{Describe one group dimension}
+\alias{set_groups}
+\title{Describe and declare group dimensions}
 \usage{
 group(
   categories = NULL,
   ancestry = FALSE,
   inheritance = create_group_inheritance()
 )
+
+set_groups(model, ...)
 }
 \arguments{
 \item{categories}{Optional complete, ordered vector of the dimension's
@@ -32,18 +35,44 @@ available.}
 a calendar schedule tibble with \code{time_start}, \code{time_end} and list-column
 \code{model}. The default selects either parent with equal probability, with
 maternal fallback.}
+
+\item{model}{A \code{hammel_model}, used by \code{set_groups()}.}
+
+\item{...}{Named \code{group()} objects, one per dimension, named by the persons
+column. No arguments removes the declaration.}
 }
 \value{
-A \code{hammel_group} object.
+\code{group()} returns a \code{hammel_group} object describing one dimension.
+\code{set_groups()} returns an updated \code{hammel_model}.
 }
 \description{
-Settings for one declared group dimension, used with \code{\link[=set_groups]{set_groups()}},
-\code{\link[=hammel_population]{hammel_population()}} or \code{\link[=create_baseline_population]{create_baseline_population()}}.
+\code{group()} describes one group dimension, for use with \code{set_groups()},
+\code{\link[=hammel_population]{hammel_population()}} or \code{\link[=create_baseline_population]{create_baseline_population()}}. \code{set_groups()}
+declares named dimensions on a model, using one \code{group()} object per
+dimension. Neither function runs a simulation.
 }
+\section{Declaring model dimensions}{
+
+Name the persons columns that are group dimensions and give each its
+settings with \code{\link[=group]{group()}}. Groups are always declared: a column that is not
+declared is an ordinary custom column, kept but never used by any process
+or analysis. The declaration replaces any declaration carried by the
+population (for example from \code{\link[=create_baseline_population]{create_baseline_population()}}), except that a
+dimension declared without \code{categories} keeps the population's declared
+categories for it; it may be
+given before or after \code{\link[=set_population]{set_population()}}; it is checked against the
+population when both are present and at simulation. Simulated populations
+carry it, so analysis and restarts need nothing further.
+}
+
 \examples{
 group(categories = c("A", "B", "AB"), ancestry = TRUE,
       inheritance = create_group_inheritance("mother"))
+model <- hammel_model() |>
+  set_population(create_baseline_population(100, groups = list(group = c(A = .5, B = .5)))) |>
+  set_groups(group = group(inheritance = "mother"))
 }
 \seealso{
-\code{\link[=set_groups]{set_groups()}}
+\code{\link[=hammel_population]{hammel_population()}}, \code{\link[=create_baseline_population]{create_baseline_population()}},
+\code{\link[=create_group_inheritance]{create_group_inheritance()}}, \code{\link[=group_transition]{group_transition()}}
 }

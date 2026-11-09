@@ -3173,3 +3173,21 @@ Observed event-rate calculators and rate-specific helpers share `calculate_rates
 **Decision:** Each demographic process constructor shares a help topic with its corresponding convenience setter. The five pairs are mortality, fertility, union formation, union dissolution, and group transitions. Each page explains the specification once, shows both interfaces, and distinguishes the returned process specification from the updated model. Neither interface executes a simulation.
 
 Keep generic `set_process()` on its own topic for attaching an existing specification, with links to the process-specific topics. Separate the formerly combined mortality/fertility constructor page and remove their setters from the generic attachment page. The other three process pairs already shared topics; clarify their constructor/setter relationship. This is documentation organization, with no function, argument, default, or demographic behavior changes.
+
+
+## D145 — Shared help for observed event-rate calculators (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Combine the seven observed event-rate calculators into the `calculate_rates` help topic: mortality, fertility, union formation, marriage, dissolution, cohabitation conversion, and group transitions. Preserve each function's own help alias. Document common arguments once, provide an event/exposure comparison, and retain separate sections describing each function's event definitions, eligibility, timing, strata, exposure denominator, and output. Include examples covering all seven calculators without running a simulation or downloading rates.
+
+Keep population size, TFR/PATFR, and life tables on separate help topics. This changes documentation organization only; function names, arguments, defaults, exports, and executable behavior remain unchanged.
+
+
+## D146 — Shared fertility-summary and group-declaration help (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Combine `calculate_tfr()` and `calculate_patfr()` on the `calculate_tfr` help topic, explaining the age-only sum, the conditional age/parity fertility table, automatic dispatch when parity columns are present, and the differing output column names. Preserve the distinct scientific conventions of both calculations.
+
+Combine `group()` and `set_groups()` on the `group` help topic, distinguishing a single dimension's settings from declaring named dimensions on a model. Retain each function's help alias, arguments, and relevant examples. Leave `create_matching_model()` and `create_age_gap_matching_model()` on separate help topics, as explicitly requested. No executable behavior, defaults, or exports change.

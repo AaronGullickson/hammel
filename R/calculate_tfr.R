@@ -2,8 +2,32 @@
 
 # PUBLIC FUNCTIONS ---------------------------------------------------------
 
-#' Calculate total fertility rates
+#' Calculate total fertility and parity-adjusted total fertility rates
 #'
+#' Calculate a fertility summary from an age-specific rate schedule, with
+#' `calculate_patfr()` integrating conditional age/parity rates through a
+#' synthetic fertility table. `calculate_tfr()` sums rates over age when parity
+#' columns are absent and delegates to `calculate_patfr()` when they are present.
+#' These functions summarize rate schedules; they do not run a simulation.
+#'
+#' @param rates A table returned by [calculate_fertility_rates()], a fertility
+#'   process object, or a data frame with `age_start`, `age_end`, and
+#'   `rate_fertility` or `rate` in births per woman-year. Bare `rate` tables are
+#'   interpreted as fertility rates; mortality processes are not valid inputs.
+#'   PATFR additionally requires `parity_start` and `parity_end`, with rates per
+#'   woman-year at the current parity. Optional period columns, `union_type`,
+#'   `previous_union`, legacy `union_status`, and other non-measure columns
+#'   (such as group dimensions) define separate strata. If `sex` is present,
+#'   only female rows are used.
+#' @return A tibble with the supplied period and other stratification columns,
+#'   finite `age_start` and `age_end`, and either `tfr` or `patfr`.
+#'   `calculate_tfr()` returns `tfr` without parity columns and the result of
+#'   `calculate_patfr()` with `patfr` when parity columns are supplied.
+#'   `calculate_patfr()` always returns `patfr`. Empty results retain their
+#'   column types. PATFR results and nonempty TFR results preserve a supplied
+#'   `unassigned_births` attribute.
+#'
+#' @section Total fertility rate:
 #' Sum age-specific fertility rates times their actual interval widths.
 #' If parity-bound columns are present, delegate to [calculate_patfr()] instead
 #' and return its `patfr` column rather than `tfr`, with the same other strata.
@@ -19,17 +43,50 @@
 #' dimension (`race`, `region`), adds separate strata, with its type and labels
 #' preserved; strata are not pooled. Age bands are checked independently within
 #' each stratum.
-#' @param rates A table returned by [calculate_fertility_rates()], a fertility
-#'   process object, or a data frame with `age_start`, `age_end`, and `rate_fertility`
-#'   or `rate` in births per woman-year. Bare `rate` tables are interpreted as
-#'   fertility rates; mortality processes are not valid inputs.
-#' @return With parity columns, the result of [calculate_patfr()] with `patfr`.
-#'   Otherwise, a tibble with period columns, `union_type`, `previous_union` or
-#'   legacy `union_status` when supplied,
-#'   other stratum columns (such as group dimensions) when supplied,
-#'   `age_start`, `age_end`, and `tfr`.
-#'   If `sex` is present, only female rows are used.
+#'
+#' @section Parity- and age-adjusted total fertility rate:
+#' Progress a synthetic cohort from parity zero through conditional age/parity
+#' fertility schedules using the HFD period fertility-table midpoint convention.
+#' Women in the final open parity band remain there and can have repeated births.
+#' This is a deterministic fertility table without mortality or explicit birth
+#' spacing, not a microsimulation or an exact continuous-time hazard solution.
+#'
+#' Separate the same period, group and union-type strata as [calculate_tfr()];
+#' select female rows when sex is present. Parity itself is integrated over.
+#' Each stratum has its own cohort: a union-type-specific index assumes that
+#' type throughout, without partnership or group transitions.
+#' Every age must have complete, nonoverlapping parity coverage from zero to
+#' one open final category. Finite parity bounds must be nonnegative integers.
+#' Each parity must cover the same contiguous finite age range. Missing included
+#' rates yield NA for that stratum. No missing-rate zero fill is performed here.
+#'
+#' Upper-open age rows are omitted, warning on known nonzero omitted female
+#' rates. The returned finite age range defines the calculation: all women
+#' start at parity zero at its lower bound. Split at integer ages and input
+#' boundaries into steps of at most one year. On each step of length d, use
+#' progression probability `d*m / (1 + d*m/2)` and midpoint entry/exit exposure,
+#' following HFD Methods Protocol (2015), sections 8.3-8.4. Probabilities above
+#' one are rejected. Fractional steps generalize the annual convention.
+#' HFD endpoint mapping and missing-cell choices can change agreement with its
+#' published indices. See \url{https://www.humanfertility.org/File/GetDocumentFree/Docs/methods.pdf}.
+#'
+#' @seealso [calculate_fertility_rates()], [fertility()]
+#' @rdname calculate_tfr
+#' @order 1
 #' @export
+#' @examples
+#' # TFR from age-specific rates:
+#' rates <- data.frame(age_start = c(15, 16), age_end = c(16, 17),
+#'   rate = c(0.1, 0.2))
+#' calculate_tfr(rates)
+#'
+#' # Conditional rates at parity zero and in an open parity band:
+#' conditional <- data.frame(age_start = c(15, 16, 15, 16),
+#'   age_end = c(16, 17, 16, 17), parity_start = c(0, 0, 1, 1),
+#'   parity_end = c(1, 1, Inf, Inf), rate = c(0.1, 0.2, 0.05, 0.1))
+#' calculate_patfr(conditional)
+#' # Parity columns make calculate_tfr() select the same PATFR calculation:
+#' calculate_tfr(conditional)
 calculate_tfr <- function(rates) {
   if (inherits(rates, "hammel_process")) {
     if (!identical(rates$name, "fertility") ||
@@ -74,41 +131,8 @@ calculate_tfr <- function(rates) {
   result
 }
 
-#' Calculate parity- and age-adjusted total fertility rates
-#'
-#' Progress a synthetic cohort from parity zero through conditional age/parity
-#' fertility schedules using the HFD period fertility-table midpoint convention.
-#' Women in the final open parity band remain there and can have repeated births.
-#' This is a deterministic fertility table without mortality or explicit birth
-#' spacing, not a microsimulation or an exact continuous-time hazard solution.
-#'
-#' Separate the same period, group and union-type strata as [calculate_tfr()];
-#' select female rows when sex is present. Parity itself is integrated over.
-#' Each stratum has its own cohort: a union-type-specific index assumes that
-#' type throughout, without partnership or group transitions.
-#' Every age must have complete, nonoverlapping parity coverage from zero to
-#' one open final category. Finite parity bounds must be nonnegative integers.
-#' Each parity must cover the same contiguous finite age range. Missing included
-#' rates yield NA for that stratum. No missing-rate zero fill is performed here.
-#'
-#' Upper-open age rows are omitted, warning on known nonzero omitted female
-#' rates. The returned finite age range defines the calculation: all women
-#' start at parity zero at its lower bound. Split at integer ages and input
-#' boundaries into steps of at most one year. On each step of length d, use
-#' progression probability `d*m / (1 + d*m/2)` and midpoint entry/exit exposure,
-#' following HFD Methods Protocol (2015), sections 8.3-8.4. Probabilities above
-#' one are rejected. Fractional steps generalize the annual convention.
-#' HFD endpoint mapping and missing-cell choices can change agreement with its
-#' published indices. See \url{https://www.humanfertility.org/File/GetDocumentFree/Docs/methods.pdf}.
-#'
-#' @param rates A fertility process or a table with `age_start`, `age_end`,
-#'   `parity_start`, `parity_end` and `rate` or `rate_fertility` in births per
-#'   woman-year at that current parity. Optional `time_start`, `time_end`,
-#'   `union_type`, legacy `union_status` and any other non-measure column (such
-#'   as a group dimension) define separate strata.
-#' @return A tibble with the supplied stratification columns, finite `age_start`,
-#'   `age_end`, and `patfr`. Empty results retain their column types. A supplied
-#'   `unassigned_births` attribute is preserved.
+#' @rdname calculate_tfr
+#' @order 2
 #' @export
 calculate_patfr <- function(rates) {
   if (inherits(rates, "hammel_process")) {

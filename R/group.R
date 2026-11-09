@@ -5,10 +5,24 @@
 # Group dimensions are always declared (D134). A declaration is a named list
 # of `hammel_group` objects, one per dimension, keyed by the persons column.
 
-#' Describe one group dimension
+#' Describe and declare group dimensions
 #'
-#' Settings for one declared group dimension, used with [set_groups()],
-#' [hammel_population()] or [create_baseline_population()].
+#' `group()` describes one group dimension, for use with `set_groups()`,
+#' [hammel_population()] or [create_baseline_population()]. `set_groups()`
+#' declares named dimensions on a model, using one `group()` object per
+#' dimension. Neither function runs a simulation.
+#'
+#' @section Declaring model dimensions:
+#' Name the persons columns that are group dimensions and give each its
+#' settings with [group()]. Groups are always declared: a column that is not
+#' declared is an ordinary custom column, kept but never used by any process
+#' or analysis. The declaration replaces any declaration carried by the
+#' population (for example from [create_baseline_population()]), except that a
+#' dimension declared without `categories` keeps the population's declared
+#' categories for it; it may be
+#' given before or after [set_population()]; it is checked against the
+#' population when both are present and at simulation. Simulated populations
+#' carry it, so analysis and restarts need nothing further.
 #'
 #' @param categories Optional complete, ordered vector of the dimension's
 #'   categories (character labels or finite numeric codes). `NULL` (the
@@ -29,8 +43,15 @@
 #'   a calendar schedule tibble with `time_start`, `time_end` and list-column
 #'   `model`. The default selects either parent with equal probability, with
 #'   maternal fallback.
-#' @return A `hammel_group` object.
-#' @seealso [set_groups()]
+#' @param model A `hammel_model`, used by `set_groups()`.
+#' @param ... Named `group()` objects, one per dimension, named by the persons
+#'   column. No arguments removes the declaration.
+#' @return `group()` returns a `hammel_group` object describing one dimension.
+#'   `set_groups()` returns an updated `hammel_model`.
+#' @seealso [hammel_population()], [create_baseline_population()],
+#'   [create_group_inheritance()], [group_transition()]
+#' @rdname group
+#' @order 1
 #' @export
 #' @examples
 #' group(categories = c("A", "B", "AB"), ancestry = TRUE,
@@ -44,23 +65,8 @@ group <- function(categories = NULL, ancestry = FALSE,
   x
 }
 
-#' Declare a model's group dimensions
-#'
-#' Name the persons columns that are group dimensions and give each its
-#' settings with [group()]. Groups are always declared: a column that is not
-#' declared is an ordinary custom column, kept but never used by any process
-#' or analysis. The declaration replaces any declaration carried by the
-#' population (for example from [create_baseline_population()]), except that a
-#' dimension declared without `categories` keeps the population's declared
-#' categories for it; it may be
-#' given before or after [set_population()]; it is checked against the
-#' population when both are present and at simulation. Simulated populations
-#' carry it, so analysis and restarts need nothing further.
-#'
-#' @param model A `hammel_model`.
-#' @param ... Named [group()] objects, one per dimension, named by the persons
-#'   column. No arguments removes the declaration.
-#' @return The updated `hammel_model`.
+#' @rdname group
+#' @order 2
 #' @export
 #' @examples
 #' model <- hammel_model() |>

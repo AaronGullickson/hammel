@@ -5,6 +5,18 @@ D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the u
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## Shared fertility-summary and group-declaration help (November 9, 2026)
+
+D146 combines TFR/PATFR and group construction/declaration into two paired help topics. `devtools::document()` completed successfully, removing the superseded `calculate_patfr.Rd` and `set_groups.Rd` pages. Both shared topics passed Rd validation, alias checks, argument-coverage checks, text rendering, and execution of all examples. The TFR examples exercise both explicit PATFR and automatic parity dispatch; the group examples describe a dimension and declare it on a model.
+
+Parsed executable R expressions and exports are unchanged from the preceding commit. Both matching-model help pages remain unchanged. `git diff --check` passed; no simulation, download, or full-suite rerun was needed for this documentation-only change.
+
+## Shared observed-rate help topic (November 9, 2026)
+
+D145 combines the seven observed-rate help pages into `calculate_rates`. `devtools::document()` completed successfully and removed the seven superseded generated pages. The shared topic passed `tools::checkRd()`, has aliases for all seven public functions, and documents the union of their arguments exactly once. Examples cover all seven functions and executed successfully after `pkgload::load_all()`, using supplied person/union/transition histories with no simulation or data download. Text help rendered successfully through `tools::Rd2txt()`.
+
+Comparing parsed R expressions against the preceding commit confirmed that all executable definitions are unchanged, and `NAMESPACE` is unchanged. `git diff --check` passed. The simulation suite was not rerun for this documentation-only change.
+
 ## Shared process help topics (November 9, 2026)
 
 D144 pairs each demographic process constructor with its convenience setter on one help topic, with separate mortality and fertility pages and a standalone generic `set_process()` page. `devtools::document()` completed successfully. All six affected topics passed Rd validation and alias checks; every available example on those topics executed successfully after `pkgload::load_all()`. Union formation and group transitions have no examples in these topics. Comparing parsed R expressions against the preceding commit confirmed that all executable definitions are unchanged, and `NAMESPACE` is unchanged. `git diff --check` passed. The simulation suite was not rerun for this documentation-only change.
