@@ -43,7 +43,10 @@ summary_rows <- function(table, by_sex = FALSE, by_union_status = FALSE) {
   split(seq_len(nrow(table)), factor(keys, levels = unique(keys)))
 }
 
-check_summary_intervals <- function(rates, open) {
+# Validate one stratum's age bands. `strata` names the stratum columns so that
+# errors identify the failing stratum.
+check_summary_intervals <- function(rates, open, strata = character()) {
+  where <- stratum_label(rates, strata)
   if (!nrow(rates)) {
     stop("A rate table needs at least one age band.",
       call. =
@@ -54,10 +57,7 @@ check_summary_intervals <- function(rates, open) {
   ends <- rates$age_end
   if (!is.numeric(ends) || anyNA(ends) || any(rates$age_start < 0) ||
     any(ends <= rates$age_start)) {
-    stop("Invalid age intervals.",
-      call. =
-        FALSE
-    )
+    stop(paste0("Invalid age intervals", where, "."), call. = FALSE)
   }
   ordered <- rates[order(rates$age_start), , drop = FALSE]
   if (nrow(ordered) > 1L && any(head(ordered$age_end, -1) != tail(
@@ -65,8 +65,8 @@ check_summary_intervals <- function(rates, open) {
   ))) {
     stop(
       paste0(
-        "Age intervals must be contiguous and nonoverlapping ",
-        "within each group."
+        "Age intervals must be contiguous and nonoverlapping",
+        where, "."
       ),
       call. = FALSE
     )
@@ -75,12 +75,33 @@ check_summary_intervals <- function(rates, open) {
     stop(
       paste0(
         "Life tables require ages from zero through an ",
-        "explicit open interval."
+        "explicit open interval", where, "."
       ),
       call. = FALSE
     )
   }
   if (!open && any(!is.finite(ends))) {
-    stop("TFR requires finite age intervals.", call. = FALSE)
+    stop(paste0("TFR requires finite age intervals", where, "."),
+      call. = FALSE
+    )
   }
+}
+
+# Describe a stratum for error messages, as " in stratum sex = f, region = a
+# (columns other than age bands, rates and counts define strata)", or "" when
+# the table has no stratum columns.
+stratum_label <- function(rates, strata) {
+  strata <- intersect(strata, names(rates))
+  if (!length(strata) || !nrow(rates)) {
+    return("")
+  }
+  values <- vapply(
+    strata,
+    function(column) as.character(rates[[column]][1]),
+    character(1)
+  )
+  paste0(
+    " in stratum ", paste0(strata, " = ", values, collapse = ", "),
+    " (columns other than age bands, rates and counts define strata)"
+  )
 }

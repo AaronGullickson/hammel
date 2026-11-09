@@ -4,6 +4,27 @@
 
 #' Construct period life tables from age-specific mortality rates
 #'
+#' @description
+#'
+#' Constructs a period life table from input tables that provide age-specific
+#' motality rates. Input data can come from user-provided input rate schedules,
+#' mortality process objects, or estimated rates from a simulation via
+#' [calculate_mortality_rates()].
+#'
+#' @details
+#'
+#' When the supplied `rates` table contains character or factor columns other
+#' than `age_start`, `age_end`, `sex`, and either `rate_mortality` or `rate`,
+#' the function will treat these additional columns as stratifying dimensions
+#' and will attempt to stratify the output appropriately. It will also
+#' stratify output by time when `time_start` and `time_end` are included.
+#'
+#' Constructed life tables make no adjustment for the ax values in the first
+#' year of life, which is common in demographic methods. This is to ensure that
+#' results here are consistent with input rates used by the simulation. Users
+#' who want to model changes in mortality within the first year of life can
+#' provide fractional year age bands for the first year of life.
+#'
 #' Treat mortality rates as piecewise constant hazards. Closed-interval survival
 #' is exponential, and person-years are integrated under that same assumption.
 #' This does not apply conventional HMD infant adjustments. Missing rates remain
@@ -14,15 +35,13 @@
 #' transitions between statuses.
 #'
 #' @param rates A table returned by [calculate_mortality_rates()], a mortality
-#'   process object, or a data frame with `age_start`, `age_end`, and
-#'   `rate_mortality` or `rate` per person-year. If both are supplied,
-#'   `rate_mortality` takes precedence. `mx` is an output column, not an input
-#'   rate option; an existing `mx` column is replaced in the output.
-#' @param radix Initial life-table survivors, a positive finite number.
-#' @return A tibble with period, sex, group, and union-status identifiers (when
-#'   supplied), `age_start`, `age_end`, `mx`, `n`, `ax`, `qx`, `lx`, `lx_end`,
-#'   `dx`, `Lx`, `Tx`, and `ex`. Summary counts and exposure columns are
-#'   omitted. Life expectancy is `Tx / lx` in years.
+#'   process object from [mortality()], or a data frame with at least
+#'   `age_start`, `age_end`, `sex`, and `rate_mortality` or `rate` columns.
+#'   Tables may be further stratified by other variables.
+#' @param radix Initial number of life-table survivors. Defaults to 1.
+#' @return A tibble with sex and additional stratifying column (when supplied)
+#'   identifiers, `age_start`, `age_end`, `mx`, `n`, `ax`, `qx`, `lx`, `lx_end`,
+#'   `dx`, `Lx`, `Tx`, and `ex`.
 #' @export
 #' @examples
 #' calculate_life_table(data.frame(
@@ -76,7 +95,11 @@ calculate_life_table <- function(rates, radix = 1) {
     summary_rows(rates, by_sex = TRUE, by_union_status = TRUE),
     function(rows) {
       r <- rates[rows, , drop = FALSE]
-      check_summary_intervals(r, open = TRUE)
+      check_summary_intervals(
+        r,
+        open = TRUE,
+        strata = summary_strata(r, by_sex = TRUE, by_union_status = TRUE)
+      )
       r <- r[order(r$age_start), , drop = FALSE]
       n <- r$age_end - r$age_start
       m <- r$mx

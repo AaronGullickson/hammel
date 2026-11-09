@@ -22,6 +22,12 @@ supplied), \code{age_start}, \code{age_end}, \code{mx}, \code{n}, \code{ax}, \co
 omitted. Life expectancy is \code{Tx / lx} in years.
 }
 \description{
+Constructs a period life table from input tables that provide age-specific
+motality rates. Input data can come from user-provided input rate schedules,
+mortality process objects, or estimated rates from a simulation via
+\code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}.
+}
+\details{
 Treat mortality rates as piecewise constant hazards. Closed-interval survival
 is exponential, and person-years are integrated under that same assumption.
 This does not apply conventional HMD infant adjustments. Missing rates remain

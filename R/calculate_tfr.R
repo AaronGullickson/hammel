@@ -159,7 +159,7 @@ calculate_tfr <- function(rates) {
   }
   tables <- lapply(summary_rows(rates, by_union_status = TRUE), function(rows) {
     r <- rates[rows, , drop = FALSE]
-    check_summary_intervals(r, open = FALSE)
+    check_summary_intervals(r, open = FALSE, strata = groups)
     key <- r[1, groups, drop = FALSE]
     cbind(key, data.frame(
       age_start = min(r$age_start), age_end = max(

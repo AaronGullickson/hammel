@@ -116,6 +116,28 @@ test_that("life tables use only rate or rate_mortality as input rates", {
   expect_equal(expected$ex, rep(10, 2))
 })
 
+test_that("interval errors name the failing stratum", {
+  labelled <- data.frame(
+    sex = "f", age_start = c(0, 1), age_end = c(1, Inf),
+    rate = 0.01, note = c("a", "b")
+  )
+  expect_error(
+    calculate_life_table(labelled),
+    "explicit open interval in stratum sex = f, note = a \\(columns other"
+  )
+  expect_error(
+    calculate_life_table(labelled[2, c("age_start", "age_end", "rate")]),
+    "explicit open interval\\.$"
+  )
+  overlap <- data.frame(
+    age_start = c(15, 20), age_end = c(25, 30), rate = 0.1, region = "x"
+  )
+  expect_error(
+    calculate_tfr(overlap),
+    "nonoverlapping in stratum region = x \\("
+  )
+})
+
 test_that("life tables follow piecewise constant hazards and handle limiting cases", {
   rates <- data.frame(
     age_start = c(0, 1, 5), age_end = c(1, 5, Inf), rate = 0.1
