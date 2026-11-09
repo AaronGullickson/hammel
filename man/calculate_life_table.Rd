@@ -8,34 +8,37 @@ calculate_life_table(rates, radix = 1)
 }
 \arguments{
 \item{rates}{A table returned by \code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}, a mortality
-process object, or a data frame with \code{age_start}, \code{age_end}, and
-\code{rate_mortality} or \code{rate} per person-year. If both are supplied,
-\code{rate_mortality} takes precedence. \code{mx} is an output column, not an input
-rate option; an existing \code{mx} column is replaced in the output.}
+process object from \code{\link[=mortality]{mortality()}}, or a data frame with at least
+\code{age_start}, \code{age_end}, \code{sex}, and \code{rate_mortality} or \code{rate} columns. Must
+contain an open-ended age group specified by an \code{Inf} value for \code{age_end}.
+Input may be further stratified by other variables.}
 
-\item{radix}{Initial life-table survivors, a positive finite number.}
+\item{radix}{Initial number of life-table survivors. Defaults to 1.}
 }
 \value{
-A tibble with period, sex, group, and union-status identifiers (when
-supplied), \code{age_start}, \code{age_end}, \code{mx}, \code{n}, \code{ax}, \code{qx}, \code{lx}, \code{lx_end},
-\code{dx}, \code{Lx}, \code{Tx}, and \code{ex}. Summary counts and exposure columns are
-omitted. Life expectancy is \code{Tx / lx} in years.
+A tibble containing standard life table parameters as well as \code{sex}
+and additional stratifying columns (when supplied).
 }
 \description{
 Constructs a period life table from input tables that provide age-specific
-motality rates. Input data can come from user-provided input rate schedules,
+mortality rates. Input data can come from user-provided input rate schedules,
 mortality process objects, or estimated rates from a simulation via
-\code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}.
+\code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}, and may be stratified by additional variables.
 }
 \details{
-Treat mortality rates as piecewise constant hazards. Closed-interval survival
-is exponential, and person-years are integrated under that same assumption.
-This does not apply conventional HMD infant adjustments. Missing rates remain
-unknown. A zero terminal rate gives infinite remaining lifetime when terminal
-survivorship is positive. Require a final explicit open age interval. Tables
-are constructed separately for each period, sex, group, and union status
-present. Status-specific tables hold that status fixed; they do not model
-transitions between statuses.
+When the supplied \code{rates} table contains character or factor columns other
+than \code{age_start}, \code{age_end}, \code{sex}, and either \code{rate_mortality} or \code{rate},
+the function will treat these additional columns as stratifying dimensions
+and will attempt to stratify the output appropriately. It will also stratify
+output by time when \code{time_start} and \code{time_end} are included.
+
+Constructed life tables make no adjustment for the ax values in the first
+year of life, which is common in demographic methods. This is to ensure that
+results are consistent with input rates used by the simulation. Users who
+want to model changes in mortality within the first year of life can provide
+fractional year age bands for the first year of life.
+
+Missing values on rates will result in missing values in the life table.
 }
 \examples{
 calculate_life_table(data.frame(

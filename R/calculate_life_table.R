@@ -7,41 +7,34 @@
 #' @description
 #'
 #' Constructs a period life table from input tables that provide age-specific
-#' motality rates. Input data can come from user-provided input rate schedules,
+#' mortality rates. Input data can come from user-provided input rate schedules,
 #' mortality process objects, or estimated rates from a simulation via
-#' [calculate_mortality_rates()].
+#' [calculate_mortality_rates()], and may be stratified by additional variables.
 #'
 #' @details
 #'
 #' When the supplied `rates` table contains character or factor columns other
 #' than `age_start`, `age_end`, `sex`, and either `rate_mortality` or `rate`,
 #' the function will treat these additional columns as stratifying dimensions
-#' and will attempt to stratify the output appropriately. It will also
-#' stratify output by time when `time_start` and `time_end` are included.
+#' and will attempt to stratify the output appropriately. It will also stratify
+#' output by time when `time_start` and `time_end` are included.
 #'
 #' Constructed life tables make no adjustment for the ax values in the first
 #' year of life, which is common in demographic methods. This is to ensure that
-#' results here are consistent with input rates used by the simulation. Users
-#' who want to model changes in mortality within the first year of life can
-#' provide fractional year age bands for the first year of life.
+#' results are consistent with input rates used by the simulation. Users who
+#' want to model changes in mortality within the first year of life can provide
+#' fractional year age bands for the first year of life.
 #'
-#' Treat mortality rates as piecewise constant hazards. Closed-interval survival
-#' is exponential, and person-years are integrated under that same assumption.
-#' This does not apply conventional HMD infant adjustments. Missing rates remain
-#' unknown. A zero terminal rate gives infinite remaining lifetime when terminal
-#' survivorship is positive. Require a final explicit open age interval. Tables
-#' are constructed separately for each period, sex, group, and union status
-#' present. Status-specific tables hold that status fixed; they do not model
-#' transitions between statuses.
+#' Missing values on rates will result in missing values in the life table.
 #'
 #' @param rates A table returned by [calculate_mortality_rates()], a mortality
 #'   process object from [mortality()], or a data frame with at least
-#'   `age_start`, `age_end`, `sex`, and `rate_mortality` or `rate` columns.
-#'   Tables may be further stratified by other variables.
+#'   `age_start`, `age_end`, `sex`, and `rate_mortality` or `rate` columns. Must
+#'   contain an open-ended age group specified by an `Inf` value for `age_end`.
+#'   Input may be further stratified by other variables.
 #' @param radix Initial number of life-table survivors. Defaults to 1.
-#' @return A tibble with sex and additional stratifying column (when supplied)
-#'   identifiers, `age_start`, `age_end`, `mx`, `n`, `ax`, `qx`, `lx`, `lx_end`,
-#'   `dx`, `Lx`, `Tx`, and `ex`.
+#' @return A tibble containing standard life table parameters as well as `sex`
+#'   and additional stratifying columns (when supplied).
 #' @export
 #' @examples
 #' calculate_life_table(data.frame(
