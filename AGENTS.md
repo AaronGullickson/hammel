@@ -48,7 +48,9 @@ be made autonomously; record choices with substantial architectural consequences
 - Keep hand-maintained `R/` source lines at most 80 characters, including
   comments and roxygen documentation. Follow the same limit for new or edited
   R code elsewhere. Wrap long calls and use one argument per line with a
-  two-space indent for long function signatures. Split long diagnostic strings
+  two-space indent for long function signatures. Indent continuation lines,
+  including wrapped `if` conditions, by two spaces rather than aligning them
+  with an opening parenthesis. Split long diagnostic strings
   without changing their text. Leave generated wrappers untouched.
 - Use braces for all loop bodies and statement-style or multiline `if`/`else`
   branches. Keep `else` on the same line as the preceding closing brace.

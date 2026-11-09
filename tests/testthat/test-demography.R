@@ -118,6 +118,17 @@ test_that("life tables use only rate or rate_mortality as input rates", {
   expect_equal(expected$ex, rep(10, 2))
 })
 
+test_that("life tables reject missing stratum values", {
+  rates <- data.frame(
+    region = c("a", NA), age_start = c(0, 1), age_end = c(1, Inf), rate = 0.1
+  )
+  expect_error(
+    calculate_life_table(rates),
+    "`rates$region` must not contain missing values.",
+    fixed = TRUE
+  )
+})
+
 test_that("interval errors name the failing stratum", {
   labelled <- data.frame(
     sex = "f", age_start = c(0, 1), age_end = c(1, Inf),

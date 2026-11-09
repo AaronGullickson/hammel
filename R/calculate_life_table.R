@@ -13,23 +13,29 @@
 #'
 #' @details
 #'
-#' When the supplied `rates` table contains character or factor columns other
-#' than `age_start`, `age_end`, `sex`, and either `rate_mortality` or `rate`,
-#' the function will treat these additional columns as stratifying dimensions
-#' and will attempt to stratify the output appropriately. It will also stratify
-#' output by time when `time_start` and `time_end` are included.
+#' When the supplied `rates` table contains columns other than `age_start`,
+#' `age_end`, and either `rate_mortality` or `rate`, the function will treat
+#' these additional columns as stratifying dimensions and will stratify the
+#' output appropriately. It will also stratify output by time when `time_start`
+#' and `time_end` are included. The function also ignores additional calculated
+#' columns from the output of [calculate_mortality_rates()], so the results of
+#' that function can be directly piped into this function. Stratification
+#' produces separate life tables by strata, not multistate life tables.
 #'
-#' Constructed life tables make no adjustment for the \eqn{{}_1a_0} value
-#' commonly used in demographic methods. This is to ensure that results are
-#' consistent with input rates used by the simulation. Users who want to model
-#' changes in mortality within the first year of life can provide fractional
-#' year age bands for the first year of life.
+#' Constructed life tables do not make any adjustment to the \eqn{a_x} or
+#' \eqn{q_x} values for the 0 to 1 age group. commonly used in demographic
+#' methods. This is to ensure that results are consistent with input rates used
+#' by the simulation. Users who want to model changes in mortality within the
+#' first year of life can provide fractional year age bands for the first year
+#' of life.
 #'
-#' Missing values on rates will result in missing values in the life table.
+#' Missing values on rates will result in missing values for lx, Lx, Tx, and ex
+#' for any later age bands. A zero mortality rate in the open age band will
+#' result in infinite life expectancy.
 #'
 #' @param rates A table returned by [calculate_mortality_rates()], a mortality
 #'   process object from [mortality()], or a data frame with at least
-#'   `age_start`, `age_end`, `sex`, and `rate_mortality` or `rate` columns. Must
+#'   `age_start`, `age_end`, and `rate_mortality` or `rate` columns. Must
 #'   contain an open-ended age group specified by an `Inf` value for `age_end`.
 #'   Input may be further stratified by other variables.
 #' @param radix Initial number of life-table survivors. Defaults to 1.
@@ -46,7 +52,7 @@
 #'   usa_2000_mortality,
 #'   by = list(ethnicity = c(A = 1.2, B = 0.9))
 #' ) |>
-#'  calculate_life_table()
+#'   calculate_life_table()
 calculate_life_table <- function(rates, radix = 1) {
   if (inherits(rates, "hammel_process")) {
     if (!identical(rates$name, "mortality") ||
@@ -74,19 +80,27 @@ calculate_life_table <- function(rates, radix = 1) {
     stop("Mortality rates must be nonnegative.", call. = FALSE)
   }
   if (!is.numeric(radix) || length(radix) != 1L || !is.finite(radix) ||
-      radix <= 0) {
+    radix <= 0) {
     stop("`radix` must be positive and finite.", call. = FALSE)
   }
-  rates <- rates[c(summary_strata(rates), "age_start", "age_end", "mx")]
+  strata <- summary_strata(rates)
+  rates <- rates[c(strata, "age_start", "age_end", "mx")]
   if (!nrow(rates)) {
     stop("A rate table needs at least one age band.", call. = FALSE)
+  }
+  for (column in strata) {
+    if (anyNA(rates[[column]])) {
+      stop(
+        sprintf("`rates$%s` must not contain missing values.", column),
+        call. = FALSE
+      )
+    }
   }
   # split rates by stratifying variables and calculate life tables for each
   tables <- lapply(
     summary_rows(rates),
     function(rows) {
       r <- rates[rows, , drop = FALSE]
-      strata <- summary_strata(r)
       check_summary_intervals(r, strata = strata)
       r <- r[order(r$age_start), , drop = FALSE]
       if (r$age_start[1] != 0 || tail(r$age_end, 1) != Inf) {
@@ -136,7 +150,7 @@ calculate_life_table <- function(rates, radix = 1) {
         lend[i] <- survivors * survival
         survivors <- lend[i]
       }
-      # put it altogether in a table and calculate summary measures of Tx and ex
+      # put it all together in a table and calculate summary measures
       r$n <- n
       r$ax <- ax
       r$qx <- q
