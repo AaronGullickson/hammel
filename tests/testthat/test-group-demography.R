@@ -132,7 +132,7 @@ test_that("group life tables follow analytical constant-hazard survival", {
     sex = c("m", "f"), time_start = c(0, 1),
     union_type = c("overall", "partnered", "unpartnered"), stringsAsFactors = FALSE)
   grid$age_end <- ifelse(grid$age_start == 0, 5, Inf)
-  grid$mx <- ifelse(grid$group == "A", 0.1, 0.2) *
+  grid$rate <- ifelse(grid$group == "A", 0.1, 0.2) *
     (grid$time_start + 1) * ifelse(grid$sex == "m", 2, 1) *
     match(grid$union_type, c("overall", "partnered", "unpartnered"))
   result <- calculate_life_table(grid, radix = 1000)
@@ -142,8 +142,9 @@ test_that("group life tables follow analytical constant-hazard survival", {
   expect_equal(result$lx[result$age_start == 5],
                1000 * exp(-5 * result$mx[result$age_start == 5]))
   process_rates <- subset(grid, time_start == 0 & union_type == "overall")
-  process_rates <- process_rates[c("age_start", "age_end", "group", "sex", "mx")]
-  names(process_rates)[names(process_rates) == "mx"] <- "rate"
+  process_rates <- process_rates[c(
+    "age_start", "age_end", "group", "sex", "rate"
+  )]
   expect_equal(nrow(calculate_life_table(mortality(process_rates))), 8)
   grid$group <- ifelse(grid$group == "A", 20L, 10L)
   expect_type(calculate_life_table(grid)$group, "integer")

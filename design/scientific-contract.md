@@ -596,7 +596,10 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   Any missing ASFR in the included finite bands makes the corresponding
   period/group/status TFR `NA`, including an all-missing set. Known zero rates
   contribute zero; missing rates in excluded open bands do not affect TFR. There is no `age_range` argument.
-- `calculate_life_table()` requires contiguous bands from zero through an
+- `calculate_life_table()` accepts `rate_mortality` or `rate` as its input
+  rate column, preferring `rate_mortality` when both are present. `mx` is
+  output only and cannot substitute for or override an input rate column.
+  It requires contiguous bands from zero through an
   explicit open interval and separates periods/sexes and union status when
   present. Conditional tables do not model status transitions. For finite width `n`
   and hazard `m`, `q = 1-exp(-m*n)`, survival propagates exponentially, and

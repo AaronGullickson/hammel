@@ -2,7 +2,7 @@
 
 # PUBLIC FUNCTIONS ---------------------------------------------------------
 
-#' Construct period life tables from mortality rates
+#' Construct period life tables from age-specific mortality rates
 #'
 #' Treat mortality rates as piecewise constant hazards. Closed-interval survival
 #' is exponential, and person-years are integrated under that same assumption.
@@ -15,7 +15,9 @@
 #'
 #' @param rates A table returned by [calculate_mortality_rates()], a mortality
 #'   process object, or a data frame with `age_start`, `age_end`, and
-#'   `rate_mortality`, `mx`, or `rate` per person-year.
+#'   `rate_mortality` or `rate` per person-year. If both are supplied,
+#'   `rate_mortality` takes precedence. `mx` is an output column, not an input
+#'   rate option; an existing `mx` column is replaced in the output.
 #' @param radix Initial life-table survivors, a positive finite number.
 #' @return A tibble with period, sex, group, and union-status identifiers (when
 #'   supplied), `age_start`, `age_end`, `mx`, `n`, `ax`, `qx`, `lx`, `lx_end`,
@@ -25,7 +27,7 @@
 #' @examples
 #' calculate_life_table(data.frame(
 #'   age_start = c(0, 1, 5),
-#'   age_end = c(1, 5, Inf), mx = 0.1
+#'   age_end = c(1, 5, Inf), rate = 0.1
 #' ))
 calculate_life_table <- function(rates, radix = 1) {
   if (inherits(rates, "hammel_process")) {
@@ -38,17 +40,18 @@ calculate_life_table <- function(rates, radix = 1) {
     rates <- rates$rates
   }
   check_columns(rates, c("age_start", "age_end"), "rates")
-  if (!"mx" %in% names(rates)) {
-    if ("rate_mortality" %in% names(rates)) {
-      rates$mx <- rates$rate_mortality
-    } else if ("rate" %in% names(rates)) {
-      rates$mx <- rates$rate
-    } else {
-      stop("Supply `rate_mortality`, `mx`, or `rate`.", call. = FALSE)
-    }
+  if ("rate_mortality" %in% names(rates)) {
+    rate_column <- "rate_mortality"
+  } else if ("rate" %in% names(rates)) {
+    rate_column <- "rate"
+  } else {
+    stop("Supply `rate_mortality` or `rate`.", call. = FALSE)
   }
   check_groups(rates, "rates")
-  check_numeric_column(rates$mx, "rates$mx", missing = TRUE)
+  check_numeric_column(
+    rates[[rate_column]], paste0("rates$", rate_column), missing = TRUE
+  )
+  rates$mx <- rates[[rate_column]]
   if (any(rates$mx < 0, na.rm = TRUE)) {
     stop(
       "Mortality rates must be nonnegative.",

@@ -5,6 +5,14 @@ D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the u
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## Life-table input rate columns (November 9, 2026)
+
+D154 removes `mx` as an input-rate alias for `calculate_life_table()`. The function now requires `rate_mortality` or `rate`, preserving the former precedence of `rate_mortality` over `rate`. Existing `mx` columns cannot override an accepted rate column; output still contains `mx`. Numeric-column diagnostics identify the selected input column. The user's updated help title was preserved.
+
+`devtools::test(filter = "^(demography|group-demography)$")` passed 210 expectations with no failures, warnings, or skips. Cases cover both accepted names, typed mortality processes, rejection of populated/empty `mx`-only tables, conflicting/invalid extra `mx` values, two-column precedence, valid empty tibbles, and existing analytical survival, life expectancy, missing/zero/extreme rates, strata, and radix behavior. Old input fixtures were converted to `rate`; output-column assertions retain `mx`.
+
+`devtools::document()` completed successfully, and the life-table help page passed Rd validation and example execution. Final test-line wrapping was checked by parsing and `git diff --check`; edited code meets the 80-column limit. The full simulation suite was not rerun for this narrow analysis-input change. No simulation mechanism, mortality interpretation, or historical validation artifact changed.
+
 ## Uniform-age population generator rename (November 9, 2026)
 
 D153 renames the population generator to `generate_uniform_population`, with matching source and help filenames. The help explicitly identifies the age distribution as uniform and retains weighted sex/group sampling. A clean second `devtools::document()` pass completed successfully, and the renamed help page passed Rd validation and example execution. Export checks confirmed exactly the name replacement, with no alias under the former name.

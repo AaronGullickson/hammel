@@ -271,9 +271,14 @@ the terminal treatment is aligned. A pooled target ASMR requires exposure
 weights within the pooled band, not an unweighted average of input rates.
 
 TFR and life-table functions also accept their corresponding `$rates` tables.
-TFR uses `rate_fertility` or fertility `rate`; life tables use `mx`, `rate_mortality`, or mortality
-`rate`. Typed processes prevent passing mortality to TFR or fertility to a life
-table. A bare `rate` column has no such type protection.
+TFR uses `rate_fertility` or fertility `rate`; life tables require
+`rate_mortality` or mortality `rate`, preferring `rate_mortality` when both
+are supplied. `mx` is retained in life-table output but is not an accepted
+input rate column; an existing `mx` column cannot override the selected input.
+Typed processes prevent passing mortality to TFR or fertility to a life table.
+A bare `rate` column has no such type protection. For a constant accepted
+input rate of 0.1 over ages zero through an open terminal interval, life
+expectancy remains 10 years and the output `mx` is 0.1.
 
 Input-rate summaries, including those passed a process object, summarize its
 stored rate table, including strata added by `stratify_rates()` (D132). They do

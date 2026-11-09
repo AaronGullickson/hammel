@@ -26,6 +26,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Uniform-age population generator naming | D153 |
 | Database rate products and reusable downloads | D018, D025 |
 | Demographic extraction and function names | D020–D022, D081 and missing-ASFR clarification |
+| Life-table input rate columns | D154 |
 | Optional Poisson intervals for observed rates | D124; argument name D148 |
 | Continuous execution | D024; execution function name D152 |
 | Fertility spacing (cell accounting) | D026, D101 (superseding D027/D028/D099 compensation) |
@@ -3267,3 +3268,12 @@ Long diagnostic literals may use `paste0()` of literal pieces so their complete 
 **Scope:** Direct pre-release API rename without an alias under the former name. Preserve all arguments, defaults, validation, group sampling, returned classes/tables, and RNG draws. Update package code, tests, generated help, and current specifications; preserve user-maintained README/articles and historical validation evidence. This supersedes the retained population-generator spelling in D147. Internal baseline-group sampling remains unchanged.
 
 **Future work:** The user anticipates more advanced starting-population methods, potentially based on fertility/mortality schedules. This rename does not select an algorithm, demographic assumptions, API, or implementation for those methods; they require their own scientific specification and authorization.
+
+
+## D154 — Restrict life-table input rate columns (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** `calculate_life_table()` accepts mortality input from `rate_mortality` or `rate`, not `mx`. Keep `rate_mortality` precedence when both accepted columns are present, as before in the absence of an `mx` column. An existing `mx` column is not used as input and is replaced by the selected rate in the life-table output. Inputs with only `mx`, including empty tables, fail with a request for an accepted rate column.
+
+Keep `mx` in life-table output, preserving D048's output naming. Mortality process inputs, per-person-year units, radix, strata, missing-rate propagation, open-interval rules, and the exponential-hazard calculation remain unchanged. This removes an input alias, not the demographic notation or original HMD product names. Preserve the user's ongoing documentation edits and historical validation evidence.

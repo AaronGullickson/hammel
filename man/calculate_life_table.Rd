@@ -2,14 +2,16 @@
 % Please edit documentation in R/calculate_life_table.R
 \name{calculate_life_table}
 \alias{calculate_life_table}
-\title{Construct period life tables from mortality rates}
+\title{Construct period life tables from age-specific mortality rates}
 \usage{
 calculate_life_table(rates, radix = 1)
 }
 \arguments{
 \item{rates}{A table returned by \code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}, a mortality
 process object, or a data frame with \code{age_start}, \code{age_end}, and
-\code{rate_mortality}, \code{mx}, or \code{rate} per person-year.}
+\code{rate_mortality} or \code{rate} per person-year. If both are supplied,
+\code{rate_mortality} takes precedence. \code{mx} is an output column, not an input
+rate option; an existing \code{mx} column is replaced in the output.}
 
 \item{radix}{Initial life-table survivors, a positive finite number.}
 }
@@ -32,6 +34,6 @@ transitions between statuses.
 \examples{
 calculate_life_table(data.frame(
   age_start = c(0, 1, 5),
-  age_end = c(1, 5, Inf), mx = 0.1
+  age_end = c(1, 5, Inf), rate = 0.1
 ))
 }

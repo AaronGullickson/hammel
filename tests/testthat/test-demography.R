@@ -83,8 +83,43 @@ test_that("TFR uses band widths, propagates missing rates and groups periods", {
   expect_identical(calculate_tfr(rbind(rates, later))$tfr, c(3.5, 7))
 })
 
+test_that("life tables use only rate or rate_mortality as input rates", {
+  rates <- data.frame(age_start = c(0, 5), age_end = c(5, Inf), rate = 0.1)
+  expected <- calculate_life_table(rates)
+  for (column in c("rate", "rate_mortality")) {
+    input <- rates
+    names(input)[names(input) == "rate"] <- column
+    expect_identical(calculate_life_table(input), expected)
+    expect_identical(
+      calculate_life_table(input[FALSE, ]), expected[FALSE, ]
+    )
+    input$mx <- "not an input mortality rate"
+    expect_identical(calculate_life_table(input), expected)
+    input[[column]] <- "invalid"
+    expect_error(calculate_life_table(input), paste0("rates\\$", column))
+  }
+  mx_only <- rates
+  names(mx_only)[names(mx_only) == "rate"] <- "mx"
+  expect_error(
+    calculate_life_table(mx_only), "Supply `rate_mortality` or `rate`.",
+    fixed = TRUE
+  )
+  expect_error(calculate_life_table(mx_only[FALSE, ]),
+    "Supply `rate_mortality` or `rate`.", fixed = TRUE
+  )
+  both <- rates
+  both$rate_mortality <- both$rate
+  both$rate <- 0.2
+  both$mx <- 0.5
+  expect_identical(calculate_life_table(both), expected)
+  expect_identical(expected$mx, rep(0.1, 2))
+  expect_equal(expected$ex, rep(10, 2))
+})
+
 test_that("life tables follow piecewise constant hazards and handle limiting cases", {
-  rates <- data.frame(age_start = c(0, 1, 5), age_end = c(1, 5, Inf), mx = 0.1)
+  rates <- data.frame(
+    age_start = c(0, 1, 5), age_end = c(1, 5, Inf), rate = 0.1
+  )
   lt <- calculate_life_table(rates)
   expect_true(all(abs(lt$ex - 10) < 1e-12))
   expect_true(abs(lt$lx[3] - exp(-0.5)) < 1e-12)
@@ -94,19 +129,19 @@ test_that("life tables follow piecewise constant hazards and handle limiting cas
   expect_equal(scaled$ex, lt$ex)
   expect_equal(scaled$lx, lt$lx * 1e+05)
   tiny <- rates
-  tiny$mx <- 1e-12
+  tiny$rate <- 1e-12
   lt <- calculate_life_table(tiny)
   expect_true(all(abs(lt$ex/1e+12 - 1) < 1e-12))
   expect_true(abs(lt$ax[1] - 0.5) < 1e-10)
   zero <- rates
-  zero$mx <- 0
+  zero$rate <- 0
   lt <- calculate_life_table(zero)
   expect_true(all(is.infinite(lt$ex)))
   expect_true(all(lt$qx == 0))
   expect_true(all(lt$lx == 1))
   expect_identical(lt$Lx[1:2], c(1, 4))
   missing <- rates
-  missing$mx[2] <- NA_real_
+  missing$rate[2] <- NA_real_
   expect_true(all(is.na(calculate_life_table(missing)$ex)))
   closed <- rates
   closed$age_end[3] <- 100
@@ -117,11 +152,11 @@ test_that("life tables follow piecewise constant hazards and handle limiting cas
   female$sex <- "f"
   male <- rates
   male$sex <- "m"
-  male$mx <- 0.2
+  male$rate <- 0.2
   tables <- calculate_life_table(rbind(female, male))
   expect_true(all(abs(tables$ex[tables$sex == "f"] - 10) < 1e-12))
   expect_true(all(abs(tables$ex[tables$sex == "m"] - 5) < 1e-12))
-  high <- data.frame(age_start = c(0, 1), age_end = c(1, Inf), mx = 40)
+  high <- data.frame(age_start = c(0, 1), age_end = c(1, Inf), rate = 40)
   expect_true(calculate_life_table(high)$lx[2] > 0)
   expect_true(all(abs(calculate_life_table(high)$ex - 1/40) < 1e-12))
 })
