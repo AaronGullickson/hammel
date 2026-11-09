@@ -19,7 +19,8 @@ test_that("dissolution type strata partition episode exposure and events", {
   expect_equal(x$dissolutions,c(0,0,0,1))
   expect_equal(x$rate_dissolution,c(0,0,0,.25))
   expect_error(calculate_dissolution_rates(unions,c(0,5),c(0,Inf), by = NA),"`by` must")
-  bare <- unions; bare$union_type <- NULL
+  bare <- unions
+  bare$union_type <- NULL
   expect_error(calculate_dissolution_rates(bare,c(0,5),c(0,Inf),by = "union_type"),"union_type")
   for (bad in list(c(NA,"marriage","cohab","marriage"),rep("partnered",4))) {
     bare$union_type <- bad

@@ -57,7 +57,8 @@ test_that("all scheduled models and interval bounds validate before execution", 
   s <- model_calendar(mm)
   bad_entries <- list(NULL, "mother", group_inheritance("mother"), s, list())
   for (entry in bad_entries) {
-    bad <- s; bad$model[2] <- list(entry)
+    bad <- s
+    bad$model[2] <- list(entry)
     expect_error(model_choice_fixture("matching", bad), "model")
   }
   bad_intervals <- list(s[setdiff(names(s), "model")], s[setdiff(names(s), "time_end")],
@@ -65,9 +66,11 @@ test_that("all scheduled models and interval bounds validate before execution", 
     transform(s, time_end = time_start), transform(s, time_end = NA_real_),
     transform(s, time_start = as.character(time_start)), s[FALSE, ], rbind(s, s[1, ]))
   for (bad in bad_intervals) expect_error(model_choice_fixture("matching", bad))
-  bad <- s; bad$model[[2]]$coefficients[1] <- NA_real_
+  bad <- s
+  bad$model[[2]]$coefficients[1] <- NA_real_
   expect_error(model_choice_fixture("matching", bad), "matching\\$model\\[\\[2\\]\\]")
-  bad <- model_calendar(group_inheritance("mother")); bad$model[2] <- list(mm)
+  bad <- model_calendar(group_inheritance("mother"))
+  bad$model[2] <- list(mm)
   expect_error(model_inheritance_fixture(bad), "inheritance\\$model")
   bad$model[2] <- list("father")
   expect_error(model_inheritance_fixture(bad), "complete model")
@@ -99,7 +102,9 @@ test_that("general and cohabitation matching use the new model at a tied pending
   second <- age_gap_matching_model(20, .1)
   # The first draw is the search clock's (zero death and fertility rates draw
   # none); one searching woman at rate 1 makes it her search time.
-  seed <- 783; set.seed(seed); boundary <- rexp(1)
+  seed <- 783
+  set.seed(seed)
+  boundary <- rexp(1)
   for (role in c("matching", "cohab_matching")) {
     m <- model_choice_fixture(role, model_calendar(first, second, boundary))
     out <- run_simulation(m, boundary + .01, seed = seed)
@@ -113,7 +118,9 @@ test_that("general and cohabitation matching use the new model at a tied pending
 test_that("father and on-demand matching select preferences at birth execution", {
   first <- age_gap_matching_model(0, .1)
   second <- age_gap_matching_model(20, .1)
-  seed <- 183; set.seed(seed); boundary <- rexp(1) / 20
+  seed <- 183
+  set.seed(seed)
+  boundary <- rexp(1) / 20
   for (on_demand in c(FALSE, TRUE)) {
     role <- if (on_demand) "matching" else "father_matching"
     m <- model_choice_fixture(role, model_calendar(first, second, boundary),
@@ -132,7 +139,9 @@ test_that("NULL father and cohabitation matching follow general calendars dynami
   for (role in c("father_matching", "cohab_matching")) {
     birth <- role == "father_matching"
     # The first draw is the fertility clock's (rate 20) or the search clock's (rate 1).
-    seed <- 183; set.seed(seed); boundary <- if (birth) rexp(1) / 20 else rexp(1)
+    seed <- 183
+    set.seed(seed)
+    boundary <- if (birth) rexp(1) / 20 else rexp(1)
     general <- model_calendar(first, second, boundary)
     fallback <- model_choice_fixture(role, NULL, general, birth = birth)
     fixed <- model_choice_fixture(role, first, general, birth = birth)
@@ -164,7 +173,9 @@ test_that("inheritance switches newborn identity without relabeling older people
 })
 
 test_that("inheritance applies the new model at an exact tied birth", {
-  seed <- 981; set.seed(seed); boundary <- rexp(1) / 100
+  seed <- 981
+  set.seed(seed)
+  boundary <- rexp(1) / 100
   s <- model_calendar(group_inheritance("mother"), group_inheritance("father"), boundary)
   out <- run_simulation(model_inheritance_fixture(s), boundary + 1e-7, seed =
     seed)
@@ -210,7 +221,8 @@ test_that("weighted calibration switches from hard within-group matching and bac
     m$population$groups <- list(group = group())
     m$processes$union_formation$diagnostics <- TRUE
     m$processes$union_formation$matching <- model_calendar(before, after, 1e-6)
-    reference <- m; reference$processes$union_formation$matching <- after
+    reference <- m
+    reference$processes$union_formation$matching <- after
     expected <- run_simulation(reference, .5, seed = 921)
     expect_true(all(expected$unions$start_time > 1e-6))
     expect_gt(nrow(expected$unions), 10)
@@ -224,7 +236,9 @@ test_that("matching formulas can switch between native and R formula paths", {
   second <- matching_model(~ abs(age_difference), c("abs(age_difference)" = 100))
   # The first draw is the search clock's (zero death and fertility rates draw
   # none); one searching woman at rate 1 makes it her search time.
-  seed <- 783; set.seed(seed); boundary <- rexp(1)
+  seed <- 783
+  set.seed(seed)
+  boundary <- rexp(1)
   out <- run_simulation(model_choice_fixture("matching", model_calendar(first,
     second, boundary)),
     boundary + .01, seed = seed)
@@ -234,7 +248,8 @@ test_that("matching formulas can switch between native and R formula paths", {
 test_that("scheduled models preserve RNG isolation and handle zero and empty runs", {
   mm <- age_gap_matching_model(0, 5)
   m <- model_choice_fixture("matching", model_calendar(mm))
-  set.seed(72); old <- .Random.seed
+  set.seed(72)
+  old <- .Random.seed
   out <- run_simulation(m, 1, seed = 83)
   expect_identical(.Random.seed, old)
   expect_identical(run_simulation(m, 1, seed = 83), out)
@@ -258,10 +273,14 @@ test_that("inheritance schedules update hierarchy ranks and passing parameters",
 
 test_that("different custom inheritance intervals share identity indices and callback RNG", {
   for (labels in list(c("A", "B", "C", "D"), c(10L, 20L, 30L, 40L))) {
-    first <- group_inheritance("custom",
-      fun = local({value <- labels[3]; function(...) value}))
-    second <- group_inheritance("custom",
-      fun = local({value <- labels[4]; function(...) value}))
+    first <- group_inheritance("custom", fun = local({
+      value <- labels[3]
+      function(...) value
+    }))
+    second <- group_inheritance("custom", fun = local({
+      value <- labels[4]
+      function(...) value
+    }))
     m <- model_inheritance_fixture(model_calendar(first, second, .25))
     m$population$persons$group <- labels[1:2]
     m <- set_groups(m, group = group(categories = labels, inheritance = model_calendar(first, second, .25)))
@@ -273,7 +292,8 @@ test_that("different custom inheritance intervals share identity indices and cal
   late <- group_inheritance("custom",
     fun = function(...) sample(c("A", "C"), 1))
   m <- model_inheritance_fixture(model_calendar(group_inheritance("mother"), late, .1), extra = "C")
-  set.seed(12); before <- .Random.seed
+  set.seed(12)
+  before <- .Random.seed
   a <- run_simulation(m, .5, seed = 51)
   expect_identical(.Random.seed, before)
   expect_identical(run_simulation(m, .5, seed = 51), a)

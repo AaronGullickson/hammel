@@ -74,7 +74,8 @@ test_that("calibration reproduces the analytical group-only examples", {
   x <- group_only(c(.75, .25), c(.75, .25), -3, c(B = .12274682836))
   result <- calibrate(x$women, x$men, x$matching, x$rates, c("A", "B"))
   expect_equal(result$target[2], .27371293659, tolerance = 1e-10)
-  w <- exp(result$log_weights[2]); t <- exp(-3)
+  w <- exp(result$log_weights[2])
+  t <- exp(-3)
   AB <- .75 * .25 * w * t / (.75 + .25 * w * t)
   BA <- .25 * .75 * t / (.75 * t + .25 * w)
   expect_equal(AB / BA, 3, tolerance = 1e-7)
@@ -216,7 +217,8 @@ test_that("one group or no groups use unit weights without changing RNG isolatio
       ordinary <- run_simulation(model, 15, seed = 904)
       # A common target adjustment cannot change choices in a one-group model.
       if (!is.null(weights)) model$processes$union_formation$matching$delta <- c(A = 2)
-      set.seed(1); before <- .Random.seed
+      set.seed(1)
+      before <- .Random.seed
       result <- run_simulation(model, 15, seed = 904)
       expect_identical(.Random.seed, before)
       expect_identical(result, ordinary)
@@ -285,7 +287,10 @@ test_that("weighted choice warns once when weights must be approximated", {
   model <- weighted_model(population, matching = matching)
   warnings <- character()
   withCallingHandlers(run_simulation(model, 10, seed = 908),
-    warning = function(w) { warnings <<- c(warnings, conditionMessage(w)); invokeRestart("muffleWarning") })
+    warning = function(w) {
+      warnings <<- c(warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    })
   expect_length(grep("could not meet male-group targets", warnings), 1)
 })
 

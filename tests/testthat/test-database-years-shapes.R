@@ -28,7 +28,8 @@ test_that("HMD annual years have calendar columns only for vector requests", {
   expect_equal(unique(out$time_end), c(2001, 2003))
   expect_equal(out$rate, c(raw$Male[1:3], raw$Female[1:3], raw$Male[7:9], raw$Female[7:9]))
   expect_error(mortality_from_hmd(raw, c(2000, 2004)), "requested year.*2004")
-  bad <- raw; bad$Male[7] <- NA_real_
+  bad <- raw
+  bad$Male[7] <- NA_real_
   expect_error(mortality_from_hmd(bad, c(2000, 2002)))
   expect_s3_class(mortality_from_hmd(bad, 2000)$rates, "tbl_df")
 })
@@ -56,7 +57,8 @@ test_that("all native HMD shapes retain source age and period widths", {
   }
   expect_error(mortality_from_hmd(hmd_group_fixture(), 2001, "5x5"), "period starts")
   expect_error(mortality_from_hmd(hmd_group_fixture(), 2000, "1x5"), "age labels")
-  bad <- hmd_group_fixture(); bad$Age[2] <- "1-5"
+  bad <- hmd_group_fixture()
+  bad$Age[2] <- "1-5"
   expect_error(mortality_from_hmd(bad, 2000, "5x5"), "inconsistent")
 })
 
@@ -72,14 +74,16 @@ test_that("raw HMD periods preserve shortened endpoints and reject conflicts", {
 
 test_that("parsed HMD bounds use annual coverage and preserve open ages", {
   raw <- hmd_group_fixture(c("1998-1999", "2000-2003"))
-  parsed <- raw; parsed$Year <- rep(c(1998, 2000), each = 4)
+  parsed <- raw
+  parsed$Year <- rep(c(1998, 2000), each = 4)
   parsed$Age <- rep(c(0, 1, 5, 110), 2)
   parsed$OpenInterval <- rep(c(FALSE, FALSE, FALSE, TRUE), 2)
   expect_identical(mortality_from_hmd(parsed, c(1998, 2000), "5x5", 1998:2003),
     mortality_from_hmd(raw, c(1998, 2000), "5x5"))
   expect_error(mortality_from_hmd(parsed, 2000, "5x5"), "annual coverage")
   expect_error(mortality_from_hmd(parsed, 2000, "5x5", c(1998, 2000:2003)), "annual coverage")
-  bad <- parsed; bad$OpenInterval[4] <- NA
+  bad <- parsed
+  bad$OpenInterval[4] <- NA
   expect_error(mortality_from_hmd(bad, 1998, "5x5", 1998:2003), "OpenInterval")
 })
 
@@ -88,7 +92,8 @@ test_that("HMD web getters download each required product once and keep provenan
   calls <- character()
   with_database_reader("readHMDweb", function(CNTRY, item, username, password, fixup) {
     calls <<- c(calls, item)
-    expect_equal(CNTRY, "SWE"); expect_false(fixup)
+    expect_equal(CNTRY, "SWE")
+    expect_false(fixup)
     hmd_year_fixture()
   }, {
     out <- get_mortality_hmd("SWE", c(2002, 2000), "test", "test")
@@ -102,7 +107,8 @@ test_that("HMD web getters download each required product once and keep provenan
   })
   calls <- character()
   raw <- hmd_group_fixture(c("1998-1999", "2000-2003"))
-  parsed <- raw; parsed$Year <- rep(c(1998, 2000), each = 4)
+  parsed <- raw
+  parsed$Year <- rep(c(1998, 2000), each = 4)
   parsed$Age <- rep(c(0, 1, 5, 110), 2)
   parsed$OpenInterval <- rep(c(FALSE, FALSE, FALSE, TRUE), 2)
   with_database_reader("readHMDweb", function(CNTRY, item, ...) {
@@ -117,7 +123,8 @@ test_that("HMD web getters download each required product once and keep provenan
   })
   calls <- character()
   with_database_reader("readHMDweb", function(CNTRY, item, ...) {
-    calls <<- c(calls, item); raw
+    calls <<- c(calls, item)
+    raw
   }, {
     out <- get_mortality_hmd("SWE", 1998, "test", "test", shape = "5x5")
     expect_identical(calls, "Mx_5x5")
@@ -128,7 +135,8 @@ test_that("HMD web getters download each required product once and keep provenan
 
 test_that("local grouped HMD parsing produces the same intervals as raw labels", {
   skip_if_not_installed("HMDHFDplus")
-  path <- tempfile(fileext = ".txt"); on.exit(unlink(path), add = TRUE)
+  path <- tempfile(fileext = ".txt")
+  on.exit(unlink(path), add = TRUE)
   writeLines(c("Synthetic HMD fixture", "", "Year Age Female Male Total",
     "2000-2003 0 .01 .02 .015", "2000-2003 1-4 .01 .02 .015",
     "2000-2003 5-9 .01 .02 .015", "2000-2003 110+ .01 .02 .015"), path)
@@ -148,7 +156,8 @@ test_that("HFD annual and conditional products select multiple years locally", {
   expect_equal(out$age_end, rep(c(13, 21, Inf), 2))
   expect_error(fertility_from_hfd(raw, c(2000, 1990)), "requested year.*1990")
   for (column in c(paste0("m", 1:4, "x"), "m5px")) raw[[column]] <- raw$ASFR
-  raw$m2x[1] <- NA_real_; raw$m3x[7] <- NA_real_
+  raw$m2x[1] <- NA_real_
+  raw$m3x[7] <- NA_real_
   conditional <- fertility_by_parity_from_hfd(raw, c(2002, 2000))
   expect_equal(unique(conditional$time_start), c(2000, 2002))
   expect_equal(conditional$parity_start, rep(rep(0:4, each = 3), 2))
@@ -159,7 +168,9 @@ test_that("HFD annual and conditional products select multiple years locally", {
   calls <- 0
   with_database_reader("readHFDweb", function(CNTRY, item, username, password, fixup, Update) {
     calls <<- calls + 1
-    expect_equal(item, "mi"); expect_equal(Update, "20260702"); expect_false(fixup)
+    expect_equal(item, "mi")
+    expect_equal(Update, "20260702")
+    expect_false(fixup)
     raw
   }, {
     rates <- get_fertility_hfd("SWE", c(2002, 2000), "test", "test",
@@ -171,7 +182,10 @@ test_that("HFD annual and conditional products select multiple years locally", {
     expect_equal(attr(rates, "source")$periods$time_end, c(2001, 2003))
   })
   calls <- 0
-  with_database_reader("readHFDweb", function(...) {calls <<- calls + 1; raw}, {
+  with_database_reader("readHFDweb", function(...) {
+    calls <<- calls + 1
+    raw
+  }, {
     rates <- get_fertility_hfd("SWE", 2000:2002, "test", "test")
     expect_equal(calls, 1)
     expect_equal(unique(rates$time_start), 2000:2002)

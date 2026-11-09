@@ -108,26 +108,33 @@ test_that("supplied ancestry needs complete IDs and bounded unit-sum shares", {
   a <- p$ancestry$group
   bad <- a[-1, ]
   expect_error(hammel_population(p$persons, end_time = 0, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "one row")
-  bad <- a; bad$person_id[2] <- bad$person_id[1]
+  bad <- a
+  bad$person_id[2] <- bad$person_id[1]
   expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "one row")
-  bad <- a; bad$person_id[2] <- 99
+  bad <- a
+  bad$person_id[2] <- 99
   expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "one row")
   for (value in c(NA_real_, Inf, -0.1, 1.1)) {
-    bad <- a; bad$A[1] <- value
+    bad <- a
+    bad$A[1] <- value
     expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "proportions")
   }
-  bad <- a; bad$A[1] <- 0.9
+  bad <- a
+  bad$A[1] <- 0.9
   expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "sum to 1")
-  bad <- a; bad$unknown <- NULL
+  bad <- a
+  bad$unknown <- NULL
   expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "unknown")
-  bad <- a; names(bad)[2] <- " "
+  bad <- a
+  names(bad)[2] <- " "
   expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "nonempty")
   # One table per dimension; a bare table is accepted when one dimension tracks ancestry.
   expect_error(hammel_population(p$persons, ancestry = list(a, a), groups = list(group = group(ancestry = TRUE))),
                "named list")
   expect_error(hammel_population(p$persons, ancestry = list(other = a), groups = list(group = group(ancestry = TRUE))),
                "does not track ancestry")
-  bad <- a; bad$A <- as.character(bad$A)
+  bad <- a
+  bad$A <- as.character(bad$A)
   expect_error(hammel_population(p$persons, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "proportions")
   p$ancestry$group$unknown[1] <- NA_real_
   expect_error(set_population(hammel_model(), p), "proportions")

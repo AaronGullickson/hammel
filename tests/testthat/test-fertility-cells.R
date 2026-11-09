@@ -85,7 +85,8 @@ test_that("cells split ages at whole years and pooled parity bands by actual par
 })
 
 test_that("zero spacing generates births at the input rate", {
-  n <- 3000; years <- 2
+  n <- 3000
+  years <- 2
   pop <- run_simulation(cell_model(n, rate = .1, spacing = 0), years, seed = 21)
   births <- sum(pop$persons$mother_id %in% seq_len(n))
   expected <- .1 * n * years

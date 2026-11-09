@@ -51,13 +51,17 @@ test_that("PATFR separates all TFR strata and preserves metadata and group types
   rows <- lapply(seq_len(nrow(grid)),function(i) {
     x <- base
     x$rate <- i*.01
-    x$time_start <- grid$time_start[i]; x$time_end <- grid$time_start[i]+5
-    x$group <- grid$group[i]; x$union_type <- grid$union_type[i]
+    x$time_start <- grid$time_start[i]
+    x$time_end <- grid$time_start[i]+5
+    x$group <- grid$group[i]
+    x$union_type <- grid$union_type[i]
     x
   })
   rates <- do.call(rbind,rows)
   rates$sex <- "f"
-  male <- rates; male$sex <- "m"; male$rate <- 1
+  male <- rates
+  male$sex <- "m"
+  male$rate <- 1
   rates <- rbind(rates,male)
   unknown <- tibble::tibble(time_start=2000,time_end=2010,births=2)
   attr(rates,"unassigned_births") <- unknown
@@ -74,7 +78,9 @@ test_that("PATFR separates all TFR strata and preserves metadata and group types
 
 test_that("missing PATFR rates invalidate only their included stratum", {
   rates <- patfr_schedule()
-  other <- rates; rates$group <- "A"; other$group <- "B"
+  other <- rates
+  rates$group <- "A"
+  other$group <- "B"
   rates$rate[2] <- NA_real_
   x <- calculate_patfr(rbind(rates,other))
   expect_true(is.na(x$patfr[1]))
@@ -107,19 +113,27 @@ test_that("PATFR validates age/parity coverage and invalid values", {
   expect_error(calculate_patfr(rates[-1, ]),"start at zero")
   expect_error(calculate_patfr(rates[-3, ]),"open final")
   expect_error(calculate_patfr(rbind(rates,rates[1, ])),"exactly once")
-  bad <- rates; bad$parity_start[2] <- 1.5
+  bad <- rates
+  bad$parity_start[2] <- 1.5
   expect_error(calculate_patfr(bad),"integer")
-  bad <- rates; bad$parity_start[2] <- 2; bad$parity_end[2] <- 3
+  bad <- rates
+  bad$parity_start[2] <- 2
+  bad$parity_end[2] <- 3
   expect_error(calculate_patfr(bad),"exactly once")
-  bad <- rates; bad$age_end[2] <- 20.5
+  bad <- rates
+  bad$age_end[2] <- 20.5
   expect_error(calculate_patfr(bad),"exactly once")
-  bad <- rates; bad$rate[2] <- -1
+  bad <- rates
+  bad$rate[2] <- -1
   expect_error(calculate_patfr(bad),"nonnegative")
-  bad <- rates; bad$rate[2] <- Inf
+  bad <- rates
+  bad$rate[2] <- Inf
   expect_error(calculate_patfr(bad),"finite")
-  bad <- rates; bad$rate[1] <- 3
+  bad <- rates
+  bad$rate[1] <- 3
   expect_error(calculate_patfr(bad),"probabilities")
-  bad <- rates; bad$parity_end <- NULL
+  bad <- rates
+  bad$parity_end <- NULL
   expect_error(calculate_tfr(bad),"parity_end")
 })
 

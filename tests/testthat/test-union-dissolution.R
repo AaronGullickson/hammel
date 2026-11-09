@@ -19,19 +19,23 @@ test_that("dissolution constructors validate duration schedules and retain prove
   expect_identical(p$source, attr(rates, "source"))
   expect_identical(set_process(hammel_model(), p), set_union_dissolution(hammel_model(), rates))
   for (column in c("sex", "age_start", "age_end", "union_status")) {
-    bad <- rates; bad[[column]] <- 0
+    bad <- rates
+    bad[[column]] <- 0
     expect_error(union_dissolution(bad), "duration bands|cannot be stratified")
   }
   for (column in c("time_start", "time_end")) {
-    bad <- rates; bad[[column]] <- 0
+    bad <- rates
+    bad[[column]] <- 0
     expect_error(union_dissolution(bad), "missing columns")
   }
   for (value in list(-1, NA_real_, Inf, "0", matrix(0, 2, 1))) {
-    bad <- rates; bad$dur_start <- value
+    bad <- rates
+    bad$dur_start <- value
     expect_error(union_dissolution(bad))
   }
   for (value in list(-1, NA_real_, Inf, "0")) {
-    bad <- rates; bad$rate <- value
+    bad <- rates
+    bad$rate <- value
     expect_error(union_dissolution(bad))
   }
   expect_error(union_dissolution(rates[FALSE, ]))
@@ -52,7 +56,8 @@ test_that("dissolution constructors validate duration schedules and retain prove
 test_that("one annual dissolution hazard per couple matches analytical survival", {
   n <- 8000L
   model <- dissolution_model(n, duration = 8, rate = .2)
-  set.seed(123); original_rng <- .Random.seed
+  set.seed(123)
+  original_rng <- .Random.seed
   result <- run_simulation(model, 2, seed = 52)
   expected <- exp(-.4)
   survived <- is.na(result$unions$end_time)
@@ -87,7 +92,8 @@ test_that("birth ties retain the pending dissolution and death wins same-person 
   # when positive), then dissolution. With one unit per process each due time is
   # its threshold over the rate. Ties sit at .5, away from integer-age cells.
   seed <- 71
-  set.seed(seed); draws <- rexp(3)
+  set.seed(seed)
+  draws <- rexp(3)
   model <- dissolution_model(rate = draws[2] / .5)
   model <- set_fertility(model, data.frame(age_start = 15, age_end = 50,
     union_type = c("partnered", "unpartnered"), rate = c(draws[1] / .5, 0)), birth_interval = 0)
@@ -120,7 +126,8 @@ test_that("birth ties retain the pending dissolution and death wins same-person 
 test_that("widowhood invalidates pending dissolution in both initiation modes", {
   # Zero rates draw no thresholds: the dissolution clock draws first (due at
   # 1), then the mortality clock when his positive-rate cell fills (due at .5).
-  set.seed(71); draws <- rexp(2)
+  set.seed(71)
+  draws <- rexp(2)
   for (mode in c("rate", "on_demand")) {
     model <- dissolution_model(rate = draws[1])
     if (mode == "on_demand") {
@@ -268,7 +275,8 @@ test_that("directional group columns are validated", {
   model$population$groups <- list(group = group())
   shared <- data.frame(dur_start = 0, dur_end = Inf, rate = .1)
   for (column in c("group_pair", "group")) {
-    bad <- shared; bad[[column]] <- "A"
+    bad <- shared
+    bad[[column]] <- "A"
     expect_error(run_simulation(set_union_dissolution(model, bad), 0), "_w`")
   }
   expect_error(run_simulation(set_mortality(model, transform(

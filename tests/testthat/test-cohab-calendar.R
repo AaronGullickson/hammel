@@ -41,7 +41,8 @@ test_that("probability coverage follows rate calendar and group/category rules",
   m$population$end_time <- .1
   expect_s3_class(run_simulation(m, .9, seed = 3), "hammel_population")
   expect_error(run_simulation(m, 1, seed = 3), "calendar coverage")
-  p <- cohab_calendar(); p$time_start[2] <- .7
+  p <- cohab_calendar()
+  p$time_start[2] <- .7
   expect_error(run_simulation(cohab_calendar_model(p), 1), "calendar coverage")
   expect_s3_class(run_simulation(cohab_calendar_model(p), .4, seed = 3),
     "hammel_population")
@@ -158,7 +159,8 @@ test_that("active age and previous-union strata apply after a calendar change", 
 
 test_that("probability calendars handle zero/empty runs, restarts and RNG isolation", {
   m <- cohab_calendar_model(n = 100)
-  set.seed(731); before <- .Random.seed
+  set.seed(731)
+  before <- .Random.seed
   out <- run_simulation(m, 1.2, seed = 92)
   expect_identical(.Random.seed, before)
   expect_identical(run_simulation(m, 1.2, seed = 92), out)

@@ -271,7 +271,8 @@ calculate_patfr <- function(rates) {
   }
   tables <- lapply(summary_rows(rates), function(rows) {
     r <- rates[rows, , drop = FALSE]
-    lower <- min(r$age_start); upper <- max(r$age_end)
+    lower <- min(r$age_start)
+    upper <- max(r$age_end)
     parity <- sort(unique(c(r$parity_start, r$parity_end[is.finite(
       r$parity_end
     )])))
@@ -320,7 +321,8 @@ patfr_midpoint <- function(hazard, widths) {
     d <- widths[a]
     exposure <- state * d
     if (n > 1L) {
-      outgoing <- seq_len(n - 1L); incoming <- outgoing + 1L
+      outgoing <- seq_len(n - 1L)
+      incoming <- outgoing + 1L
       q <- d * hazard[a, outgoing] / (1 + d * hazard[a, outgoing] / 2)
       if (any(!is.finite(q)) || any(q > 1)) {
         stop(paste0(

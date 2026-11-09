@@ -291,7 +291,8 @@ validate_union_types <- function(unions) {
   }
   links <- unions$previous_cohab_id
   check_numeric_column(links, "previous_cohab_id", missing = TRUE, id = TRUE)
-  rows <- which(!is.na(links)); parent <- match(links[rows], unions$union_id)
+  rows <- which(!is.na(links))
+  parent <- match(links[rows], unions$union_id)
   if (anyNA(parent) || anyDuplicated(parent) || any(unions$union_type[rows] !=
     "marriage") ||
     any(unions$union_type[parent] != "cohab") ||

@@ -372,7 +372,8 @@ check_strata_overlap <- function(rates, process) {
     "destination", "time_start"
   ), names(rates))
   for (axis in c("age", "dur")) {
-    lo <- paste0(axis, "_start"); hi <- paste0(axis, "_end")
+    lo <- paste0(axis, "_start")
+    hi <- paste0(axis, "_end")
     if (!lo %in% names(rates)) {
       next
     }

@@ -20,14 +20,16 @@ test_that("het_fert validates parameters and edited process specifications", {
   m <- het_model()
   m$processes$fertility$hetfert$alpha <- 2
   expect_error(run_simulation(m, 1, 1), "alpha")
-  set.seed(1); before <- .Random.seed
+  set.seed(1)
+  before <- .Random.seed
   het_fert(.5, .5)
   expect_identical(.Random.seed, before)
 })
 
 test_that("founder draws have the specified moments, obey seed policy and include zero runs", {
   m <- het_model(20000L)
-  set.seed(15); before <- .Random.seed
+  set.seed(15)
+  before <- .Random.seed
   p <- run_simulation(m, 0, 42)
   expect_identical(.Random.seed, before)
   expect_identical(p, run_simulation(m, 0, 42))
@@ -37,7 +39,8 @@ test_that("founder draws have the specified moments, obey seed policy and includ
   expect_true(all(is.finite(p$persons$hetfert) & p$persons$hetfert > 0))
   expect_identical(p$simulation$hetfert, het_fert(.5, .4))
   expect_s3_class(p$persons, "tbl_df")
-  set.seed(15); run_simulation(m, 0)
+  set.seed(15)
+  run_simulation(m, 0)
   expect_false(identical(.Random.seed, before))
   empty <- run_simulation(het_model(0), 0, 42)
   expect_type(empty$persons$hetfert, "double")
@@ -112,7 +115,8 @@ test_that("newborn innovation has the specified normal-scale distribution", {
     p <- run_simulation(m, 1, 62)
     children <- !is.na(p$persons$mother_id)
     mothers <- match(p$persons$mother_id[children], p$persons$person_id)
-    variance <- log1p(.5^2); mu <- -variance / 2
+    variance <- log1p(.5^2)
+    mu <- -variance / 2
     innovation <- (log(p$persons$hetfert[children]) - mu -
       alpha * (log(p$persons$hetfert[mothers]) - mu)) / sqrt(variance * (1 - alpha^2))
     expect_lt(abs(mean(innovation)), 4 / sqrt(length(innovation)))
@@ -123,7 +127,8 @@ test_that("newborn innovation has the specified normal-scale distribution", {
 })
 
 test_that("weights survive restarts and spacing removes/reintroduces weighted members", {
-  old <- options(hammel.check_cells = TRUE); on.exit(options(old), add = TRUE)
+  old <- options(hammel.check_cells = TRUE)
+  on.exit(options(old), add = TRUE)
   m <- het_model(100, het_fert(1, .8), rate = .8, interval = .75)
   first <- run_simulation(m, 3, 71)
   again <- run_simulation(set_population(m, first), 2, 72)
@@ -139,7 +144,8 @@ test_that("weights survive restarts and spacing removes/reintroduces weighted me
 })
 
 test_that("weighted hazards integrate with grouped partner/father matching and union types", {
-  old <- options(hammel.check_cells = TRUE); on.exit(options(old), add = TRUE)
+  old <- options(hammel.check_cells = TRUE)
+  on.exit(options(old), add = TRUE)
   set.seed(81)
   pop <- generate_uniform_population(1000, max_age = 45)
   pop$persons$group <- rep(c("A", "B"), 500)
@@ -147,7 +153,8 @@ test_that("weighted hazards integrate with grouped partner/father matching and u
   rates <- expand.grid(union_type = c("unpartnered", "cohab", "marriage"),
     parity_start = 0:1, stringsAsFactors = FALSE)
   rates$parity_end <- ifelse(rates$parity_start == 0, 1, Inf)
-  rates$age_start <- 15; rates$age_end <- 45
+  rates$age_start <- 15
+  rates$age_end <- 45
   rates$rate <- .15
   model <- hammel_model() |> set_population(pop) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .01)) |>
@@ -173,7 +180,8 @@ test_that("weighted hazards integrate with grouped partner/father matching and u
 })
 
 test_that("removing a dominant eligible weight preserves tiny remaining weights", {
-  old <- options(hammel.check_cells = TRUE); on.exit(options(old), add = TRUE)
+  old <- options(hammel.check_cells = TRUE)
+  on.exit(options(old), add = TRUE)
   m <- het_model(2, het_fert(.5, .5), rate = 10, interval = .75)
   m$population$persons$hetfert <- c(1e100, 1e-100)
   p <- run_simulation(m, 3, 91)
@@ -188,7 +196,8 @@ test_that("removing a dominant eligible weight preserves tiny remaining weights"
 
 test_that("failed generated-weight initialization restores a supplied seed", {
   m <- het_model(100, het_fert(1e308, .5))
-  set.seed(10); before <- .Random.seed
+  set.seed(10)
+  before <- .Random.seed
   expect_error(run_simulation(m, 0, 42), "strictly positive")
   expect_identical(.Random.seed, before)
 })
@@ -219,9 +228,11 @@ test_that("disabled runs remove weights and re-enabling redraws all women", {
 
 test_that("weight validation handles missing sex and logical NA placeholders clearly", {
   p <- het_model(2)$population$persons
-  p$hetfert <- c(1, 2); p$sex[1] <- NA_character_
+  p$hetfert <- c(1, 2)
+  p$sex[1] <- NA_character_
   expect_error(validate_fertility_weights(p), "nonmissing.*sex")
-  p$sex[] <- "m"; p$hetfert <- c(NA, NA)
+  p$sex[] <- "m"
+  p$hetfert <- c(NA, NA)
   expect_no_error(validate_fertility_weights(p))
   m <- set_population(het_model(2), hammel_population(p, end_time = 0, groups = if ("group" %in% names(p)) "group"))
   out <- run_simulation(m, 0, 1)

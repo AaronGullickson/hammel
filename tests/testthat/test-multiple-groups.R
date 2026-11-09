@@ -127,13 +127,15 @@ test_that("matching group effects use one named dimension among several", {
   out <- run_simulation(matching_pair_model(age_gap_matching_model(0, 5,
     group_exogamy = list(region = NA))), 2, seed = 41)
   expect_gt(nrow(out$unions), 100)
-  region <- pair_categories(out, "region"); race <- pair_categories(out, "race")
+  region <- pair_categories(out, "region")
+  race <- pair_categories(out, "race")
   expect_true(all(region$w == region$h))
   expect_gt(mean(race$w != race$h), .2)
   # A strong race pair effect, given by name, separates races instead.
   out <- run_simulation(matching_pair_model(age_gap_matching_model(0, 5,
     group_exogamy = list(race = c("A:B" = -30)))), 2, seed = 41)
-  race <- pair_categories(out, "race"); region <- pair_categories(out, "region")
+  race <- pair_categories(out, "race")
+  region <- pair_categories(out, "region")
   expect_true(all(race$w == race$h))
   expect_gt(mean(region$w != region$h), .2)
   # Formula predictors name the dimension; the first category is the reference.
@@ -464,7 +466,8 @@ combined_reference <- function(out) {
   # Same-instant moves merge into one move in the single combined column.
   if (!is.null(merged)) {
     key <- paste(merged$person_id, merged$time)
-    first <- !duplicated(key); last <- !duplicated(key, fromLast = TRUE)
+    first <- !duplicated(key)
+    last <- !duplicated(key, fromLast = TRUE)
     merged <- data.frame(person_id = merged$person_id[first], time = merged$time[first], group = "rr",
       origin = merged$origin[first], destination = merged$destination[last])
   }
@@ -475,7 +478,8 @@ combined_reference <- function(out) {
 split_rr <- function(x, suffix = "") {
   column <- paste0("rr", suffix)
   parts <- do.call(rbind, strsplit(x[[column]], ".", fixed = TRUE))
-  x[[paste0("race", suffix)]] <- parts[, 1]; x[[paste0("region", suffix)]] <- parts[, 2]
+  x[[paste0("race", suffix)]] <- parts[, 1]
+  x[[paste0("region", suffix)]] <- parts[, 2]
   x[[column]] <- NULL
   x
 }
@@ -489,7 +493,8 @@ sum_by <- function(x, keys, values) {
 }
 
 compare_split <- function(ours, reference, keys, values) {
-  ours <- as.data.frame(ours); reference <- as.data.frame(reference)
+  ours <- as.data.frame(ours)
+  reference <- as.data.frame(reference)
   k1 <- do.call(paste, c(lapply(ours[keys], as.character), sep = "|"))
   k2 <- do.call(paste, c(lapply(reference[keys], as.character), sep = "|"))
   # Our grid is the full cross of categories; the reference has observed
@@ -813,7 +818,8 @@ test_that("one matching model can combine a race effect with a region prohibitio
   out <- run_simulation(step2_model(age_gap_matching_model(0, 5,
     group_exogamy = list(race = c("A:B" = -30), region = NA))), 2, seed = 71)
   expect_gt(nrow(out$unions), 100)
-  race <- pair_categories(out, "race"); region <- pair_categories(out, "region")
+  race <- pair_categories(out, "race")
+  region <- pair_categories(out, "region")
   expect_true(all(region$w == region$h))
   expect_true(all(race$w == race$h))
   # Diagnostics name combinations.
@@ -853,8 +859,10 @@ test_that("models naming different dimensions share the combination", {
   expect_no_warning(out <- run_simulation(matching_pair_model(schedule), 2,
     seed = 74))
   u <- get_detailed_unions(out)
-  early <- u$start_time < 1; late <- !early
-  expect_gt(sum(early), 30); expect_gt(sum(late), 30)
+  early <- u$start_time < 1
+  late <- !early
+  expect_gt(sum(early), 30)
+  expect_gt(sum(late), 30)
   expect_true(all(u$race_w[early] == u$race_h[early]))
   expect_true(all(u$region_w[late] == u$region_h[late]))
   # A person's combination follows moves in either dimension.
@@ -934,7 +942,8 @@ test_that("tables give cross-dimension effects, such as race exogamy that differ
   u <- get_detailed_unions(out)
   expect_gt(nrow(u), 100)
   expect_true(all(u$region_w == u$region_h))
-  south <- u$region_w == "S"; north <- !south
+  south <- u$region_w == "S"
+  north <- !south
   expect_true(all(u$race_w[south] == u$race_h[south]))
   expect_gt(sum(u$race_w[north] != u$race_h[north]), 10)
 })

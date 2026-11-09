@@ -3284,3 +3284,12 @@ Keep `mx` in life-table output, preserving D048's output naming. Mortality proce
 **Status:** User decision and implementation authorization, November 9, 2026.
 
 **Decision:** `calculate_life_table()`, `calculate_tfr()` and `calculate_patfr()` stop with "A rate table needs at least one age band." when the input rate table has no rows, instead of returning a typed empty tibble. TFR and PATFR also stop when no female band with a finite end remains after they drop male rows and open age bands. A summary of nothing is treated as an input error rather than a valid empty result. Missing rate columns are still reported first. Nonempty results, warnings for open bands with nonzero fertility, and stratum handling are unchanged. Other summary functions, such as `demographic_counts()` and `calculate_population_size()`, still return typed empty tibbles.
+
+
+## D156 — No semicolon statement separators in R code (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Hand-maintained R code does not use semicolons to separate statements. Each statement goes on its own line; one-line loop, `if` and callback bodies that held several statements become braced blocks. The rule covers `R/`, `tests/testthat/`, `data-raw/` and documentation examples, and new or edited R code elsewhere. Generated wrappers are untouched.
+
+**Implementation:** Semicolons were removed from 13 lines in 9 `R/` files and from 161 lines in 29 test files, located from parsed tokens so strings and comments were excluded. The changes only split statements, so behavior is unchanged; the test suite gives the same results. Historical milestone validation scripts under `validation/` keep their semicolons as accepted evidence and are not rewritten.

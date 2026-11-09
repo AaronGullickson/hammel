@@ -1,8 +1,11 @@
 # Synthetic calendar schedules: independent of database preparation.
 calendar_epochs <- function(rates, values, times = c(0, .5, Inf)) {
   do.call(rbind, lapply(seq_along(values), function(i) {
-    x <- rates; x$rate <- values[i]
-    x$time_start <- times[i]; x$time_end <- times[i + 1L]; x
+    x <- rates
+    x$rate <- values[i]
+    x$time_start <- times[i]
+    x$time_end <- times[i + 1L]
+    x
   }))
 }
 
@@ -34,7 +37,8 @@ test_that("calendar bounds validate and retain source tables", {
       transform(r, time_end = time_start), transform(r, time_end = NA_real_),
       transform(r, time_start = as.character(time_start)), rbind(r, r[1, ])))
     expect_error(mortality(bad))
-  future <- r; future$rate[nrow(future)] <- -1
+  future <- r
+  future$rate[nrow(future)] <- -1
   expect_error(mortality(future), "nonnegative")
   expect_s3_class(mortality(transform(r, time_start = time_start - 2000,
     time_end = time_end - 2000)), "hammel_process")
@@ -60,7 +64,8 @@ test_that("run coverage, zero years and endpoint exclusion use fractional times"
   expect_equal(run_simulation(m, 4.31, seed = 9)$simulation$deaths, 3)
   expect_equal(run_simulation(m, 0, seed = 9)$end_time, 2015.5)
   expect_error(run_simulation(m, 6), "calendar coverage gap")
-  gap <- r; gap$time_start[3:4] <- 2020
+  gap <- r
+  gap$time_start[3:4] <- 2020
   expect_error(run_simulation(set_mortality(m, gap), 5),
     "calendar coverage gap")
   # A gap outside this run is allowed.
@@ -80,7 +85,8 @@ test_that("mortality integrates fractional calendar and age boundaries", {
   expect_lt(abs(mean(is.na(out$persons$death_time)) - expected),
     5 * sqrt(expected * (1 - expected) / n))
   expect_identical(run_simulation(m, 1.3, seed = 912), out)
-  set.seed(45); before <- .Random.seed
+  set.seed(45)
+  before <- .Random.seed
   run_simulation(m, .6, seed = 21)
   expect_identical(.Random.seed, before)
   # Sampling a candidate beyond the boundary must not execute an old hazard.
@@ -141,7 +147,9 @@ test_that("duration search clocks retain their origin across rate boundaries", {
   expect_equal(nrow(out$unions), 2)
   expect_gte(out$unions$start_time[2], .8)
   expect_lt(out$unions$start_time[2], .81)
-  bad <- r; bad$age_start[5] <- 0; bad$age_end[5] <- Inf
+  bad <- r
+  bad$age_start[5] <- 0
+  bad$age_end[5] <- Inf
   bad$dur_start[5] <- bad$dur_end[5] <- NA_real_
   expect_error(set_union_formation(m, "rate", rates = bad), "same age or duration clock")
 })
@@ -271,7 +279,9 @@ test_that("asynchronous changes retain parity/type/group accounting and calibrat
   f <- expand.grid(group = c("A", "B"), union_type = c("unpartnered", "partnered"),
     parity_start = c(0, 1), stringsAsFactors = FALSE)
   f$parity_end <- ifelse(f$parity_start == 0, 1, Inf)
-  f$age_start <- 15; f$age_end <- 50; f$rate <- 0
+  f$age_start <- 15
+  f$age_end <- 50
+  f$rate <- 0
   m <- set_fertility(m, calendar_epochs(f, c(.3, .6), c(0, .4, Inf)),
     birth_interval = .3, hetfert = het_fert(.5, .5))
   m <- set_union_formation(m, "rate", rates = calendar_epochs(
@@ -303,9 +313,11 @@ test_that("fertility can change parity partitions and pooled/typed union rates",
   after <- expand.grid(parity_start = c(0, 1),
     union_type = c("unpartnered", "cohab", "marriage"), stringsAsFactors = FALSE)
   after$parity_end <- ifelse(after$parity_start == 0, 1, Inf)
-  after$age_start <- 15; after$age_end <- 50
+  after$age_start <- 15
+  after$age_end <- 50
   after$rate <- ifelse(after$union_type == "cohab" & after$parity_start == 0, 1e5, 0)
-  after$time_start <- .5; after$time_end <- Inf
+  after$time_start <- .5
+  after$time_end <- Inf
   m <- set_fertility(m, rbind(before, after), birth_interval = .1)
   withr::local_options(hammel.check_cells = TRUE)
   out <- run_simulation(m, .7, seed = 124)

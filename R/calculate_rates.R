@@ -830,7 +830,8 @@ calculate_transition_rates <- function(
   if (size) {
     # Combined codes: keep moves in this dimension only (other dimensions
     # unchanged), then label each part.
-    o <- rows$origin; d <- rows$destination
+    o <- rows$origin
+    d <- rows$destination
     rows <- rows[o %% size != d %% size & o %/% size == d %/% size, ,
       drop =
         FALSE
@@ -1010,9 +1011,8 @@ add_unrealized_births <- function(out, simulation, alias = list()) {
           u$parity_start, u$parity_end, out$parity_start,
           out$parity_end
         )
-        keys <- c(keys, list(p$lo)); row_keys <- c(row_keys, list(
-          out$parity_start
-        ))
+        keys <- c(keys, list(p$lo))
+        row_keys <- c(row_keys, list(out$parity_start))
         ok <- ok & p$ok
       } else {
         ok[] <- FALSE
@@ -1029,9 +1029,8 @@ add_unrealized_births <- function(out, simulation, alias = list()) {
     if ("union_type" %in% names(out)) {
       if ("union_type" %in% names(u)) {
         ok <- ok & u$union_type %in% out$union_type
-        keys <- c(keys, list(u$union_type)); row_keys <- c(row_keys, list(
-          out$union_type
-        ))
+        keys <- c(keys, list(u$union_type))
+        row_keys <- c(row_keys, list(out$union_type))
       } else {
         ok[] <- FALSE
       } # overall schedule cannot be split by union type

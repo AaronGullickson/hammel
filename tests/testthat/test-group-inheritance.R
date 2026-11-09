@@ -139,7 +139,8 @@ test_that("ancestry assignment conditions on known shares and handles all-unknow
   model$population$ancestry$group$B <- 0
   model$population$ancestry$group$unknown <- 1
   model$processes$fertility$rates$rate <- 20
-  maternal <- model; maternal$groups$group$inheritance <- group_inheritance()
+  maternal <- model
+  maternal$groups$group$inheritance <- group_inheritance()
   expect_identical(histories(run_simulation(model, 1, seed = 52)), histories(
     run_simulation(maternal, 1, seed = 52)))
 })
@@ -155,7 +156,8 @@ test_that("custom callbacks receive copies of all inputs and use the unified R R
     if (runif(1) < 0.5) mother_group else father_group
   })
   model <- inheritance_test_model(custom)
-  set.seed(654); state <- .Random.seed
+  set.seed(654)
+  state <- .Random.seed
   actual <- run_simulation(model, 1, seed = 52)
   expect_identical(.Random.seed, state)
   native <- inheritance_test_model(group_inheritance("random_parent"))
@@ -225,12 +227,14 @@ test_that("custom errors and invalid returns restore explicit RNG state", {
   for (fun in list(function(...) NA_character_, function(...) NULL, function(...) c("A", "B"),
                    function(...) "undeclared", function(...) stop("custom failed"))) {
     model <- inheritance_test_model(group_inheritance("custom", fun = fun))
-    set.seed(654); state <- .Random.seed
+    set.seed(654)
+    state <- .Random.seed
     expect_error(run_simulation(model, 1, seed = 52))
     expect_identical(.Random.seed, state)
   }
   rule <- group_inheritance("custom", fun = function(mother_group, father_group, father_ancestry, ...) {
-    stopifnot(is.na(father_group), is.null(father_ancestry)); mother_group
+    stopifnot(is.na(father_group), is.null(father_ancestry))
+    mother_group
   })
   model <- inheritance_test_model(rule)
   model$population$persons <- model$population$persons[1, ]

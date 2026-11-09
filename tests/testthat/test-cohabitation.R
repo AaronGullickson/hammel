@@ -22,14 +22,17 @@ test_that("cohabitation validates probability, conversion, type coverage and rat
   expect_s3_class(model$processes$union_formation$cohab_prob, "tbl_df")
   expect_error(set_union_formation(model, "on_demand", cohab_prob = data.frame(age_start=0,age_end=Inf,prob=.5)), "rate-based")
   for (prob in c(-1, 1.1, NA, Inf)) {
-    bad <- model; bad$processes$union_formation$cohab_prob$prob <- prob
+    bad <- model
+    bad$processes$union_formation$cohab_prob$prob <- prob
     expect_error(run_simulation(bad, 0), "prob")
   }
-  bad <- model; bad$processes$union_formation$cohab_prob$rate <- .1
+  bad <- model
+  bad$processes$union_formation$cohab_prob$rate <- .1
   expect_error(run_simulation(bad, 0), "not.*rate")
   expect_error(set_union_formation(model, "rate", rates = model$processes$union_formation$rates,
     cohab_matching = age_gap_matching_model(0,5)), "require.*cohab_prob")
-  bad <- model; bad$processes$union_formation$union_convert_rate$previous_union <- "none"
+  bad <- model
+  bad$processes$union_formation$union_convert_rate$previous_union <- "none"
   expect_error(run_simulation(bad, 0),
     "Conversion rates cannot be stratified by `previous_union`")
   expect_error(fertility(data.frame(age_start=15,age_end=50,rate=.1,union_status="partnered")), "replaced")
@@ -178,14 +181,16 @@ test_that("cohab probabilities select group and previous category and require co
   model$population$persons$group <- rep(c("A","B"),100)
   model$population$groups <- list(group = group())
   p <- expand.grid(group=c("A","B"),previous_union=c("none","separated","widowed"),stringsAsFactors=FALSE)
-  p$age_start <- 15; p$age_end <- Inf
+  p$age_start <- 15
+  p$age_end <- Inf
   p$prob <- as.numeric(p$group=="B" & p$previous_union=="none")
   model$processes$union_formation$cohab_prob <- p
   result <- run_simulation(model,.5,813)
   u <- get_detailed_unions(result)
   expect_true(all(u$union_type[u$group_w=="B"]=="cohab"))
   expect_true(all(u$union_type[u$group_w=="A"]=="marriage"))
-  bad <- model; bad$processes$union_formation$cohab_prob <- p[-1,]
+  bad <- model
+  bad$processes$union_formation$cohab_prob <- p[-1,]
   expect_error(run_simulation(bad,0),"all three")
 })
 
@@ -199,7 +204,8 @@ test_that("conversion age clocks and pending birth ties retain the conversion", 
   # none. With one unit per process each due time is its threshold over the
   # rate. Ties are placed at .5, away from her integer-age fertility cells.
   seed <- 71L
-  set.seed(seed); draws <- rexp(3)
+  set.seed(seed)
+  draws <- rexp(3)
   model <- initial_cohabs(conversion=draws[2]/.5,breakup=0)
   model <- set_fertility(model,data.frame(age_start=15,age_end=50,
     union_type=c("unpartnered","cohab","marriage"),rate=c(0,draws[1]/.5,0)),birth_interval=0)
@@ -244,7 +250,8 @@ test_that("typed dissolution retains symmetric pair hazards", {
   model$population$persons$group <- c("A","B","A","A","B","B")
   model$population$groups <- list(group = group())
   rates <- expand.grid(group_w=c("A","B"),group_h=c("A","B"),union_type=c("cohab","marriage"),stringsAsFactors=FALSE)
-  rates$dur_start <- 0; rates$dur_end <- Inf
+  rates$dur_start <- 0
+  rates$dur_end <- Inf
   rates$rate <- ifelse(rates$union_type=="cohab" & rates$group_w!=rates$group_h,1e5,0)
   model <- set_union_dissolution(model,rates)
   result <- run_simulation(model,.1,42)

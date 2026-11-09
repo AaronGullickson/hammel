@@ -65,7 +65,8 @@ test_that("categorical group predictors have stable treatment contrasts and inte
   result <- inspect_group_matching_cpp(gaps, prepare_matching_model(matching, c("A", "B")), 1L, c(0L, 0L))
   expect_equal(result, unname(expected))
   # Session contrast settings must not change these specified coefficients.
-  old <- options(contrasts = c("contr.sum", "contr.poly")); on.exit(options(old))
+  old <- options(contrasts = c("contr.sum", "contr.poly"))
+  on.exit(options(old))
   expect_equal(calculate_matching_utilities(matching, gaps, "B", c("A", "A")), unname(expected))
   # Categories come from the declaration and are checked when the model meets it.
   expect_error(internal_matching_model(public, "group", c("A", "B", "C")), "coefficient names")

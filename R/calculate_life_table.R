@@ -87,7 +87,7 @@ calculate_life_table <- function(rates, radix = 1) {
   if (!nrow(rates)) {
     stop("A rate table needs at least one age band.", call. = FALSE)
   }
-  # split rates by stratifying variables
+  # split rates by stratifying variables and calculate life tables for each
   tables <- lapply(
     summary_rows(rates),
     function(rows) {
@@ -109,6 +109,7 @@ calculate_life_table <- function(rates, radix = 1) {
       size <- nrow(r)
       q <- ax <- L <- lx <- lend <- rep(NA_real_, size)
       survivors <- radix
+      # step through each age and calculate life table measures
       for (i in seq_len(size)) {
         lx[i] <- survivors
         if (is.na(m[i])) {
@@ -141,8 +142,14 @@ calculate_life_table <- function(rates, radix = 1) {
         lend[i] <- survivors * survival
         survivors <- lend[i]
       }
-      r$n <- n; r$ax <- ax; r$qx <- q; r$lx <- lx; r$lx_end <- lend
-      r$dx <- lx - lend; r$Lx <- L
+      # put it altogether in a table and calculate summary measures of Tx and ex
+      r$n <- n
+      r$ax <- ax
+      r$qx <- q
+      r$lx <- lx
+      r$lx_end <- lend
+      r$dx <- lx - lend
+      r$Lx <- L
       r$Tx <- rev(cumsum(rev(L)))
       r$ex <- ifelse(lx > 0, r$Tx / lx, NA_real_)
       r

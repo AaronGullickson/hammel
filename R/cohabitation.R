@@ -102,9 +102,11 @@ validate_conversion_rates <- function(rates) {
   x <- do.call(rbind, lapply(c("none", "separated", "widowed"), function(
     label
   ) {
-    copy <- x; copy$previous_union <- label
+    copy <- x
+    copy$previous_union <- label
     if (label == "none" && all(duration)) {
-      copy$age_start <- copy$dur_start; copy$age_end <- copy$dur_end
+      copy$age_start <- copy$dur_start
+      copy$age_end <- copy$dur_end
       copy$dur_start <- copy$dur_end <- NA_real_
     }
     copy

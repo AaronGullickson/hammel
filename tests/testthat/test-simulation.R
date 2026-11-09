@@ -53,7 +53,10 @@ test_that("mortality times follow the process clock's exponential draws", {
   set.seed(42)
   thresholds <- numeric(100)
   thresholds[1] <- rexp(1)
-  for (k in 2:100) { runif(2); thresholds[k] <- rexp(1) }
+  for (k in 2:100) {
+    runif(2)
+    thresholds[k] <- rexp(1)
+  }
   expected <- cumsum(thresholds / (1e+08 * (100:1)))
   exact <- run_simulation(make_model(100, death_rate = 1e+08), 1/12, seed = 42)
   expect_equal(sort(exact$persons$death_time), expected, tolerance = 1e-14)

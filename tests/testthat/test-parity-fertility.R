@@ -15,14 +15,17 @@ test_that("parity schedules require complete partitions in every stratum", {
   expect_error(fertility(rates[-2, ]),"cover")
   expect_error(fertility(rates[-3, ]),"cover")
   for (column in c("parity_start","parity_end")) {
-    bad <- rates; bad[[column]] <- NULL
+    bad <- rates
+    bad[[column]] <- NULL
     expect_error(fertility(bad),column)
   }
   for (bad_value in c(-1,.5,Inf,NA_real_)) {
-    bad <- rates; bad$parity_start[1] <- bad_value
+    bad <- rates
+    bad$parity_start[1] <- bad_value
     expect_error(fertility(bad))
   }
-  bad <- rates; bad$parity_end[1] <- 2
+  bad <- rates
+  bad$parity_end[1] <- 2
   expect_error(fertility(bad),"cover")
   expect_error(fertility(rbind(rates,rates[1, ])),"Age intervals")
   grouped <- rbind(transform(rates,group="A"),transform(rates,group="B"))
@@ -38,8 +41,11 @@ test_that("birth history initializes parity without custom column overrides", {
   model <- parity_model(c(0,20,0),interval=0,n=2)
   people <- model$population$persons
   # Woman 1 has one recorded child, already deceased. Founder 2 has none.
-  child <- people[1, ]; child$person_id <- 3L; child$birth_time <- -1
-  child$death_time <- -.5; child$mother_id <- 1L
+  child <- people[1, ]
+  child$person_id <- 3L
+  child$birth_time <- -1
+  child$death_time <- -.5
+  child$mother_id <- 1L
   people <- rbind(people,child)
   people$parity <- 99L
   model <- set_population(model,hammel_population(people,end_time=0, groups = if ("group" %in% names(people)) "group"))
@@ -88,7 +94,8 @@ test_that("absent parity and zero-spacing equal-parity rates give the same ferti
   plain <- make_model(n,sex="f",birth_rate=.2,birth_interval=0)
   strat <- set_fertility(plain,parity_rates(rep(.2,3)),birth_interval=0)
   founders <- function(x) sum(x$persons$mother_id %in% seq_len(n))
-  a <- founders(run_simulation(plain,4,42)); b <- founders(run_simulation(strat,
+  a <- founders(run_simulation(plain,4,42))
+  b <- founders(run_simulation(strat,
     4,43))
   expect_lt(abs(a - b), 4 * sqrt(2 * .2 * 4 * n))
   expect_false("parity" %in% names(run_simulation(strat,1,42)$persons))

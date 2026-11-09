@@ -91,7 +91,8 @@ demographic_counts <- function(population, time_breaks, age_breaks, by = NULL) {
 
 # An unordered pair label for two group labels, such as "A:B" for B and A.
 unordered_pair <- function(a, b) {
-  a <- as.character(a); b <- as.character(b)
+  a <- as.character(a)
+  b <- as.character(b)
   ifelse(a <= b, paste(a, b, sep = ":"), paste(b, a, sep = ":"))
 }
 

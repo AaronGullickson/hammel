@@ -9,7 +9,8 @@ test_that("previous-union schedules require complete valid strata within groups"
   expect_error(union_formation("rate", rates = rates[-1, ]), "all three")
   for (value in list(c("none", "separated", NA), c("none", "divorced", "widowed"),
                      factor(rates$previous_union), matrix(rates$previous_union))) {
-    bad <- rates; bad$previous_union <- value
+    bad <- rates
+    bad$previous_union <- value
     expect_error(union_formation("rate", rates = bad), "previous_union")
   }
   grouped <- rbind(transform(rates, group = "A"), transform(rates, group = "B"))

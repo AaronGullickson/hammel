@@ -11,7 +11,10 @@ family <- function(h_region = "N", union_end = NA_real_, w_death = NA_real_, d_a
   unions <- data.frame(union_id = 1:2, wife_id = c(1, 6), husband_id = c(2, 2),
     start_time = c(-11, -14), end_time = c(union_end, -13),
     end_reason = c(if (is.na(union_end)) NA else "dissolution", "dissolution"))
-  if (!is.na(w_death)) { unions$end_time[1] <- w_death; unions$end_reason[1] <- "death_wife" }
+  if (!is.na(w_death)) {
+    unions$end_time[1] <- w_death
+    unions$end_reason[1] <- "death_wife"
+  }
   hammel_population(persons, unions = unions, end_time = 0, groups = "region")
 }
 
@@ -77,7 +80,8 @@ test_that("children follow the father when the mother has died, and orphans are 
   # own clocks (rates for children here).
   pop <- family(w_death = -1)
   pop$persons$death_time[2] <- -1
-  pop$unions$end_time[1] <- -1; pop$unions$end_reason[1] <- "death_wife"
+  pop$unions$end_time[1] <- -1
+  pop$unions$end_reason[1] <- "death_wife"
   pop <- hammel_population(pop$persons, unions = pop$unions, end_time = 0, groups = "region")
   child_moves <- data.frame(origin = "N", destination = "S", age_start = 0, age_end = 15, rate = 1e8)
   tx <- moves(run_simulation(household_model(pop, child_moves), .5, seed = 5))
@@ -148,7 +152,9 @@ test_that("households that start together stay together through a long run", {
   regions <- c("N", "S", "W")
   moves <- expand.grid(origin = regions, destination = regions, stringsAsFactors = FALSE)
   moves <- moves[moves$origin != moves$destination, ]
-  moves$age_start <- 0; moves$age_end <- Inf; moves$rate <- .1
+  moves$age_start <- 0
+  moves$age_end <- Inf
+  moves$rate <- .1
   model <- hammel_model() |> set_population(pop) |>
     set_groups(region = group(inheritance = "mother")) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .02)) |>

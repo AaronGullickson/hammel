@@ -105,7 +105,8 @@ test_that("empty histories, empty populations and group label types are retained
   expect_equal(out$person_years, c(6, 4))
   expect_equal(out$transitions, c(0, 0))
   expect_equal(out$rate_transition, c(0, 0))
-  pop$persons <- pop$persons[0, ]; pop$unions <- pop$unions[0, ]
+  pop$persons <- pop$persons[0, ]
+  pop$unions <- pop$unions[0, ]
   pop$ancestry <- pop$ancestry[0, ]
   empty <- calculate_transition_rates(pop, c(0, 6), dur_breaks = c(0, Inf), by = c("sex", "union_type"))
   expect_s3_class(empty, "tbl_df")
@@ -129,7 +130,8 @@ test_that("transition counter rejects invalid axes, endpoints and flags", {
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "group"),
                "not by `group` in `by`")
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "region"), "cannot split")
-  pop$persons$group <- NULL; pop$transitions <- NULL
+  pop$persons$group <- NULL
+  pop$transitions <- NULL
   pop$groups <- list(group = group())
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf)), "group")
 })

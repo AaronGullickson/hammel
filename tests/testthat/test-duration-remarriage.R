@@ -18,34 +18,46 @@ test_that("single search tables permit one clock per previous category", {
   expect_s3_class(union_formation("rate", rates = rates)$rates, "tbl_df")
   mixed <- rates
   mixed$dur_start[3] <- mixed$dur_end[3] <- NA
-  mixed$age_start[3] <- 30; mixed$age_end[3] <- Inf
+  mixed$age_start[3] <- 30
+  mixed$age_end[3] <- Inf
   expect_silent(union_formation("rate", rates = mixed))
   expect_error(union_formation("rate", rates = rates[, setdiff(names(rates), "dur_end")]), "both")
   for (column in c("age_start", "age_end")) {
-    bad <- rates; bad[[column]][2] <- 20
+    bad <- rates
+    bad[[column]][2] <- 20
     expect_error(union_formation("rate", rates = bad), "exactly one")
   }
-  bad <- rates; bad$age_start[2] <- 20; bad$age_end[2] <- 50
+  bad <- rates
+  bad$age_start[2] <- 20
+  bad$age_end[2] <- 50
   expect_error(union_formation("rate", rates = bad), "exactly one")
-  bad <- rates; bad$dur_start[2] <- bad$dur_end[2] <- NA
+  bad <- rates
+  bad$dur_start[2] <- bad$dur_end[2] <- NA
   expect_error(union_formation("rate", rates = bad), "exactly one")
-  bad <- rates; bad$age_start[1] <- bad$age_end[1] <- NA
-  bad$dur_start[1] <- 0; bad$dur_end[1] <- Inf
+  bad <- rates
+  bad$age_start[1] <- bad$age_end[1] <- NA
+  bad$dur_start[1] <- 0
+  bad$dur_end[1] <- Inf
   expect_error(union_formation("rate", rates = bad), "none.*age")
   # A category cannot switch clocks across either bands or groups.
-  extra <- mixed[2, ]; extra$dur_start <- extra$dur_end <- NA
-  extra$age_start <- 50; extra$age_end <- Inf
+  extra <- mixed[2, ]
+  extra$dur_start <- extra$dur_end <- NA
+  extra$age_start <- 50
+  extra$age_end <- Inf
   expect_error(union_formation("rate", rates = rbind(mixed, extra)), "same.*clock")
   group_a <- transform(rates, group = "A")
   group_b <- transform(mixed, group = "B")
   expect_error(union_formation("rate", rates = rbind(group_a, group_b)), "same.*clock")
-  bad <- rates; bad$previous_union <- NULL
+  bad <- rates
+  bad$previous_union <- NULL
   expect_error(union_formation("rate", rates = bad), "require.*previous_union")
   for (value in c(-1, Inf, NaN)) {
-    bad <- rates; bad$dur_start[2] <- value
+    bad <- rates
+    bad$dur_start[2] <- value
     expect_error(union_formation("rate", rates = bad))
   }
-  bad <- rates; bad$dur_end[2] <- 0
+  bad <- rates
+  bad$dur_end[2] <- 0
   expect_error(union_formation("rate", rates = bad), "greater")
   expect_error(union_formation("rate", rates = rbind(rates, rates[2, ])), "overlap")
   all_age <- data.frame(age_start = 15, age_end = Inf, rate = .1)
@@ -68,7 +80,8 @@ test_that("duration search clocks resume attained duration rather than age", {
   expect_gte(late$unions$start_time[2], 3)
   expect_lt(late$unions$start_time[2], 4)
   # Changing age leaves a duration-specific waiting time unchanged.
-  older <- model; older$population$persons$birth_time <- -80
+  older <- model
+  older$population$persons$birth_time <- -80
   expect_identical(run_simulation(model, 4, 43)$unions, run_simulation(older, 4,
     43)$unions)
   # Input history order does not change either the previous category or origin.
@@ -88,7 +101,8 @@ test_that("duration hazards agree with analytical cumulative hazard across gaps"
   rates <- duration_search_rates()
   dissolved <- rates[2, ]
   dissolved <- dissolved[rep(1L, 3), ]
-  dissolved$dur_start <- c(0, 2, 4); dissolved$dur_end <- c(1, 3, Inf)
+  dissolved$dur_start <- c(0, 2, 4)
+  dissolved$dur_end <- c(1, 3, Inf)
   dissolved$rate <- c(.1, .2, .4)
   model <- set_union_formation(model, "rate", rates = rbind(rates[c(1, 3), ], dissolved),
     kinship_generations = 0L)
@@ -142,7 +156,8 @@ test_that("grouped duration calibration matches the equivalent age hazards", {
   configure <- function(rates) set_union_formation(model, "rate", matching,
     rates = stratify_rates(rates, list(group = c(A = 1, B = 1.3))), diagnostics = TRUE,
     kinship_generations = 0L)
-  set.seed(87); rng <- .Random.seed
+  set.seed(87)
+  rng <- .Random.seed
   a <- run_simulation(configure(duration), 4, 71)
   b <- run_simulation(configure(age), 4, 71)
   expect_identical(a, b)

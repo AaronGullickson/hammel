@@ -50,7 +50,9 @@ test_that("events respect internal boundaries, censoring and zero-duration histo
   expect_true(is.na(late_long$rate_dissolution))
   # A missing end and a known future end both censor at the requested end.
   ongoing <- union_count_history()[3, ]
-  future <- ongoing; future$end_time <- 10; future$end_reason <- "dissolution"
+  future <- ongoing
+  future$end_time <- 10
+  future$end_reason <- "dissolution"
   expect_identical(calculate_dissolution_rates(ongoing, c(0, 5), c(0, Inf)),
                    calculate_dissolution_rates(future, c(0, 5), c(0, Inf)))
   # Beginning the window late uses attained duration, not zero duration.
@@ -132,10 +134,14 @@ test_that("union counts validate endpoints, breakpoints, histories and grouping"
   expect_error(calculate_dissolution_rates(unions, c(0, 5), c(0, Inf), by = c("group_w", "group_h")), "group")
   expect_error(calculate_dissolution_rates(rbind(unions, unions), c(0, 5), c(0, Inf)), "unique")
   expect_error(calculate_dissolution_rates(unions[-1], c(0, 5), c(0, Inf)), "missing columns")
-  bad <- unions; bad$end_time[1] <- -1
+  bad <- unions
+  bad$end_time[1] <- -1
   expect_error(calculate_dissolution_rates(bad, c(0, 5), c(0, Inf)), "precede")
-  bad <- unions; bad$end_reason[1] <- NA_character_
+  bad <- unions
+  bad$end_reason[1] <- NA_character_
   expect_error(calculate_dissolution_rates(bad, c(0, 5), c(0, Inf)), "end reason")
-  bad <- unions; bad$group_w <- c("A", NA, "B"); bad$group_h <- "A"
+  bad <- unions
+  bad$group_w <- c("A", NA, "B")
+  bad$group_h <- "A"
   expect_error(calculate_dissolution_rates(bad, c(0, 5), c(0, Inf), by = c("group_w", "group_h")), "group")
 })

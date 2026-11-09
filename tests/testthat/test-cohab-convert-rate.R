@@ -53,9 +53,11 @@ test_that("conversion observation censors and assigns boundary events", {
   expect_equal(at$union_years,c(0,0))
   expect_equal(at$conversions,c(0,1))
   expect_true(all(is.na(at$rate_cohab_convert)))
-  pop$unions$end_time[3] <- NA_real_; pop$unions$end_reason[3] <- NA_character_
+  pop$unions$end_time[3] <- NA_real_
+  pop$unions$end_reason[3] <- NA_character_
   expect_equal(calculate_cohab_convert_rate(pop,c(0,8),dur_breaks=c(0,Inf))$union_years,7)
-  pop$unions$end_time[3] <- 5; pop$unions$end_reason[3] <- "death_husband"
+  pop$unions$end_time[3] <- 5
+  pop$unions$end_reason[3] <- "death_husband"
   pop$persons$death_time[2] <- 5
   expect_equal(calculate_cohab_convert_rate(pop,c(0,8),dur_breaks=c(0,Inf))$union_years,4)
 })
@@ -77,7 +79,8 @@ test_that("conversion observation validates axes, histories, flags and empty dat
   pop$unions$union_type <- NULL
   expect_error(calculate_cohab_convert_rate(pop,c(0,8), dur_breaks = c(0,Inf)),"typed")
   pop$unions$union_type <- character()
-  pop$persons <- pop$persons[0, ]; pop$ancestry <- pop$ancestry[0, ]
+  pop$persons <- pop$persons[0, ]
+  pop$ancestry <- pop$ancestry[0, ]
   x <- calculate_cohab_convert_rate(pop,c(0,8), dur_breaks = c(0,Inf), by = "group_w")
   expect_s3_class(x,"tbl_df")
   expect_equal(nrow(x),0)

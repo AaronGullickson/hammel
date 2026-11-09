@@ -35,7 +35,8 @@ test_that("missing parents, overlapping histories and untyped histories are hand
   pop$persons$mother_id[7] <- NA_integer_
   expect_equal(get_unpartnered_births(pop)$birth_time,c(4,4.5,7.5,8))
   pop <- unpartnered_birth_history()
-  duplicate <- pop$unions[1, ]; duplicate$union_id <- 5L
+  duplicate <- pop$unions[1, ]
+  duplicate$union_id <- 5L
   pop$unions <- rbind(pop$unions,duplicate)
   expect_equal(nrow(get_unpartnered_births(pop)),6)
   pop$unions$union_type <- NULL
@@ -57,7 +58,8 @@ test_that("birth extractor preserves empty schema and validates histories", {
   x <- get_unpartnered_births(pop)
   expect_equal(nrow(x),0)
   expect_named(x,names(get_parent_info(pop)))
-  pop$persons <- pop$persons[0, ]; pop$ancestry <- pop$ancestry[0, ]
+  pop$persons <- pop$persons[0, ]
+  pop$ancestry <- pop$ancestry[0, ]
   expect_s3_class(get_unpartnered_births(pop),"tbl_df")
   expect_type(get_unpartnered_births(pop)$person_id,"integer")
   expect_error(get_unpartnered_births(list()),"hammel_population")

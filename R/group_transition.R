@@ -249,7 +249,9 @@ validate_group_transition <- function(process) {
     "Group-transition"
   )
   if (validate_calendar_rates(r, function(x) {
-    copy <- process; copy$rates <- x; validate_group_transition(copy)
+    copy <- process
+    copy$rates <- x
+    validate_group_transition(copy)
   })) {
     return(invisible(process))
   }

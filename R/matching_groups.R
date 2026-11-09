@@ -447,7 +447,8 @@ validate_exogamy_table <- function(x) {
   side <- function(s) do.call(paste, c(lapply(dims, function(d) as.character(x[[
     paste0(d, "_", s)
   ]])), sep = "\r"))
-  a <- side("x"); b <- side("y")
+  a <- side("x")
+  b <- side("y")
   key <- ifelse(a <= b, paste(a, b, sep = "\n"), paste(b, a, sep = "\n"))
   if (anyDuplicated(key)) {
     stop(
