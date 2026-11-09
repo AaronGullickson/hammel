@@ -56,7 +56,10 @@ test_that("all calculators reject invalid confidence levels", {
 test_that("zero events have positive upper limits and zero exposure has NA bounds", {
   persons <- tibble::tibble(person_id = 1, sex = "f", birth_time = 0,
     death_time = NA_real_, mother_id = NA_real_, father_id = NA_real_)
-  x <- calculate_mortality_rates(persons, c(0, 100), c(0, Inf), conf_level = .95)
+  population <- hammel_population(persons, end_time = 100)
+  x <- calculate_mortality_rates(
+    population, c(0, 100), c(0, Inf), conf_level = .95
+  )
   expect_equal(x$conf_low[x$sex == "f"], 0)
   expect_equal(x$conf_high[x$sex == "f"], -log(.025) / 100)
   expect_true(all(is.na(x$conf_high[x$person_years == 0])))

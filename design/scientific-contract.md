@@ -639,8 +639,8 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   requested instant. It preserves requested order and repeated times.
 
 Population objects require known endpoints for observation; do not observe
-beyond them. Bare persons tables require the caller to ensure complete
-follow-up. Missing death means censored at the observation endpoint. Zero-duration lives
+beyond them. Person-level summaries require a population object, so the
+endpoint is always known (D159). Missing death means censored at the observation endpoint. Zero-duration lives
 contribute zero exposure, while recorded events still count in their applicable
 age/period cells.
 

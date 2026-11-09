@@ -38,6 +38,7 @@ test_that("Lexis event boundaries are half open", {
   p <- persons[1, ]
   p$birth_time <- 0
   p$death_time <- 1
+  p <- hammel_population(p, end_time = 2)
   boundary <- demographic_counts(p, c(0, 1, 2), c(0, 1, Inf))
   expect_equal(sum(boundary$deaths), 1, tolerance = 0)
   expect_equal(boundary$deaths[boundary$sex == "f" & boundary$time_start == 1 & boundary$age_start ==
@@ -284,8 +285,10 @@ test_that("population counts include births and exclude deaths at each instant",
   expect_identical(calculate_population_size(population, c(1, 0, 1))$population, c(2L,
     1L, 2L))
   expect_equal(calculate_population_size(population, -1)$population, 0L, tolerance = 0)
-  expect_identical(calculate_population_size(persons, c(0, 1)), calculate_population_size(population,
-    c(0, 1)))
+  expect_error(
+    calculate_population_size(persons, c(0, 1)),
+    "must be a hammel_population"
+  )
   expect_equal(calculate_population_size(empty, 1)$population, 0L, tolerance = 0)
   expect_equal(nrow(calculate_population_size(population, numeric())), 0L, tolerance = 0)
   expect_error(calculate_population_size(population, 2))

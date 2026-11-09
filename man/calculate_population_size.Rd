@@ -12,9 +12,8 @@ calculate_population_size(
 )
 }
 \arguments{
-\item{population}{A \code{hammel_population} or persons data frame representing
-one independent history. For bare tables, ensure follow-up is complete
-through every requested time. Union variables require a population.}
+\item{population}{A \code{hammel_population} object either returned from
+\code{\link[=run_simulations]{run_simulations()}} or built as a baseline starting population.}
 
 \item{times}{A numeric vector of finite time points in years. A population
 object cannot be queried beyond its known \code{end_time}.}
@@ -25,8 +24,8 @@ separately: \code{"sex"}, declared group dimensions (such as \code{"race"}),
 for their definitions.}
 
 \item{use_detailed_previous_union}{Logical, default \code{TRUE}, which counts
-\code{"previous_union"} as \code{"none"}, \code{"separated"} and \code{"widowed"}. With
-\code{FALSE} and \code{"previous_union"} in \code{by}, combine separated and widowed as
+\code{"previous_union"} as \code{"none"}, \code{"separated"} and \code{"widowed"}. With \code{FALSE}
+and \code{"previous_union"} in \code{by}, combine separated and widowed as
 \code{"dissolved"}.}
 }
 \value{
@@ -35,6 +34,9 @@ the requested times (repeats kept), with time varying fastest and earlier
 \code{by} variables varying faster than later ones.
 }
 \description{
+Calculate the living population at time points
+}
+\details{
 Count persons with \code{birth_time <= time} and missing \code{death_time} or
 \code{death_time > time}. Counts include births at the requested time and exclude
 deaths at that time, representing the population after recorded events there.

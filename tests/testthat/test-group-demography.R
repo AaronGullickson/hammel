@@ -76,8 +76,11 @@ test_that("population sizes preserve time order and count each person's group", 
   expect_equal(subset(sizes, group == "B")$population, c(1, 3, 3, 2, 3))
   pooled <- calculate_population_size(p, times)
   expect_equal(rowSums(matrix(sizes$population, ncol = 2)), pooled$population)
-  # A bare persons table has no declaration, so it cannot be split by group.
-  expect_error(calculate_population_size(p$persons, times, by = "group"), "declared group")
+  # A bare persons table is not accepted; it must be a hammel_population.
+  expect_error(
+    calculate_population_size(p$persons, times, by = "group"),
+    "must be a hammel_population"
+  )
   expect_identical(calculate_population_size(p, times), pooled)
 })
 

@@ -13,11 +13,10 @@
 #'
 #' @param population One independent history. All functions accept a
 #'   `hammel_population` with the required histories and a known endpoint;
-#'   observation cannot extend beyond it. Mortality and fertility also accept
-#'   bare persons data frames when union stratification is not requested.
-#'   Dissolution also accepts a bare union table. For bare tables, the caller
-#'   must ensure complete follow-up. See each calculator's section for its
-#'   required histories and table columns.
+#'   observation cannot extend beyond it. Wrap a persons table with
+#'   [hammel_population()] and its `end_time`. Dissolution also accepts a bare
+#'   union table, for which the caller must ensure complete follow-up. See
+#'   each calculator's section for its required histories and table columns.
 #' @param time_breaks Strictly increasing finite calendar boundaries in years.
 #'   Cells are half-open: events at internal boundaries enter the cell starting
 #'   there; the final calendar boundary is excluded.
@@ -1122,8 +1121,6 @@ calculate_entry_rates <- function(
   age_breaks <- person_breaks(time_breaks, age_breaks)
   entry_type <- "union_type" %in% by
   obs <- person_observation(population, by, tail(time_breaks, 1),
-    needs_unions =
-      TRUE,
     requires_typed = entry_type
   )
   # union_type here splits formations only; exposure is not split by it.

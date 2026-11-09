@@ -309,8 +309,9 @@ return zero-row tibbles with the appropriate column types.
 
 Lexis exposure splits `[birth_time, death_time)` directly at period/age
 boundaries; fractional years and unequal bands are supported. Population
-objects must have a known endpoint and cannot be queried beyond it. With bare
-persons tables, the caller must ensure follow-up through the requested endpoint.
+objects must have a known endpoint and cannot be queried beyond it. Population
+size and mortality and fertility rates require a `hammel_population`; wrap a
+persons table with `hammel_population(persons, end_time = ...)` (D159).
 Missing death times are censored there.
 
 ## Replications and interpretation

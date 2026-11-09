@@ -28,11 +28,7 @@ prepare_group_observations <- function(persons, population, by_group) {
     return(persons)
   }
   # A combined view of several dimensions carries indexed codes directly.
-  combined <- if (inherits(population, "hammel_population")) {
-    population[[
-      ".hammel_combined"
-    ]]
-  }
+  combined <- population[[".hammel_combined"]]
   if (!is.null(combined)) {
     attr(persons, ".hammel_group_values") <- combined$values
     h <- combined$history
@@ -136,43 +132,29 @@ person_observation <- function(
   population,
   by,
   end,
-  needs_unions = FALSE,
   requires_typed = FALSE,
   grouped = "group" %in% by,
   validate = TRUE
 ) {
-  union_vars <- intersect(by, c("union_type", "previous_union"))
-  if (inherits(population, "hammel_population")) {
-    if (validate) {
-      validate_population(population)
-    }
-    if (is.null(population$end_time) || end > population$end_time) {
-      stop("Observation requires a known endpoint and cannot extend beyond it.",
-        call. = FALSE
-      )
-    }
-    persons <- population$persons
-    unions <- population$unions
-  } else {
-    if (needs_unions || length(union_vars)) {
-      stop(
-        sprintf(
-          "Splitting by %s requires a hammel_population with union histories.",
-          paste0("\"", union_vars, "\"", collapse = ", ")
-        ),
-        call. =
-          FALSE
-      )
-    }
-    if (!is.data.frame(population)) {
-      stop("`population` must be a hammel_population or persons data frame.",
-        call. = FALSE
-      )
-    }
-    persons <- population
-    hammel_population(persons)
-    unions <- NULL
+  if (!inherits(population, "hammel_population")) {
+    stop(
+      paste0(
+        "`population` must be a hammel_population; wrap a persons table ",
+        "with hammel_population(persons, end_time = ...)."
+      ),
+      call. = FALSE
+    )
   }
+  if (validate) {
+    validate_population(population)
+  }
+  if (is.null(population$end_time) || end > population$end_time) {
+    stop("Observation requires a known endpoint and cannot extend beyond it.",
+      call. = FALSE
+    )
+  }
+  persons <- population$persons
+  unions <- population$unions
   if (grouped && !declared_group(population)) {
     stop(
       paste0(
@@ -209,8 +191,9 @@ person_observation <- function(
         0L, nrow(persons)
       )
     },
-    counts_cohab = inherits(population, "hammel_population") &&
-      isTRUE(population$simulation$cohabitation_counts_as_previous_union)
+    counts_cohab = isTRUE(
+      population$simulation$cohabitation_counts_as_previous_union
+    )
   )
 }
 

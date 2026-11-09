@@ -4,14 +4,19 @@
 
 #' Calculate the living population at time points
 #'
+#' @description
+#'
+#'
+#' @details
+#'
+#'
 #' Count persons with `birth_time <= time` and missing `death_time` or
 #' `death_time > time`. Counts include births at the requested time and exclude
 #' deaths at that time, representing the population after recorded events there.
 #' States in `by` are also those after all events at each time.
 #'
-#' @param population A `hammel_population` or persons data frame representing
-#'   one independent history. For bare tables, ensure follow-up is complete
-#'   through every requested time. Union variables require a population.
+#' @param population A `hammel_population` object either returned from
+#'   [run_simulations()] or built as a baseline starting population.
 #' @param times A numeric vector of finite time points in years. A population
 #'   object cannot be queried beyond its known `end_time`.
 #' @param by `NULL` (default) or a character vector of variables to count
@@ -19,8 +24,8 @@
 #'   `"union_type"` and `"previous_union"`. See [calculate_mortality_rates()]
 #'   for their definitions.
 #' @param use_detailed_previous_union Logical, default `TRUE`, which counts
-#'   `"previous_union"` as `"none"`, `"separated"` and `"widowed"`. With
-#'   `FALSE` and `"previous_union"` in `by`, combine separated and widowed as
+#'   `"previous_union"` as `"none"`, `"separated"` and `"widowed"`. With `FALSE`
+#'   and `"previous_union"` in `by`, combine separated and widowed as
 #'   `"dissolved"`.
 #' @return A tibble with `time`, the `by` columns and `population`. Rows follow
 #'   the requested times (repeats kept), with time varying fastest and earlier

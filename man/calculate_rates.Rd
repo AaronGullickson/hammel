@@ -81,11 +81,10 @@ calculate_transition_rates(
 \arguments{
 \item{population}{One independent history. All functions accept a
 \code{hammel_population} with the required histories and a known endpoint;
-observation cannot extend beyond it. Mortality and fertility also accept
-bare persons data frames when union stratification is not requested.
-Dissolution also accepts a bare union table. For bare tables, the caller
-must ensure complete follow-up. See each calculator's section for its
-required histories and table columns.}
+observation cannot extend beyond it. Wrap a persons table with
+\code{\link[=hammel_population]{hammel_population()}} and its \code{end_time}. Dissolution also accepts a bare
+union table, for which the caller must ensure complete follow-up. See
+each calculator's section for its required histories and table columns.}
 
 \item{time_breaks}{Strictly increasing finite calendar boundaries in years.
 Cells are half-open: events at internal boundaries enter the cell starting
