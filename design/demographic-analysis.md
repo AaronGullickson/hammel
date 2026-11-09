@@ -125,8 +125,9 @@ only at recorded events:
   `separated` or `widowed`. Conversion is not an ending, and cohabitation
   endings follow the population's recorded `cohabitation_counts_as_previous_union`
   policy (D085). It applies to partnered time too: a woman in her first union
-  is `none`. `pool_dissolved = TRUE` merges `separated` and `widowed` into
-  `dissolved` in any calculator when `previous_union` is in `by`.
+  is `none`. `use_detailed_previous_union = FALSE` merges `separated` and
+  `widowed` into `dissolved` in any calculator when `previous_union` is in
+  `by`; the default `TRUE` keeps all three categories (D158).
 - `<dim>_w`, `<dim>_h` (such as `race_w`): the wife's and husband's current
   categories, for union-level rates. Directional: A-wife/B-husband and B-wife/A-husband are
   separate rows; sum them for an unordered pair.
@@ -710,7 +711,7 @@ unrealized outputs, invalid confidence levels and unchanged default outputs.
 ## Detailed and pooled previous unions (D126)
 
 Union and marriage rate calculators use `none`, `separated`, and `widowed`
-when `by = "previous_union"`. Set `pool_dissolved = TRUE` to return
+when `by = "previous_union"`. Set `use_detailed_previous_union = FALSE` to return
 `none` and `dissolved` instead, together with `by = "previous_union"`.
 Duration breaks also enable previous-union stratification.
 Dissolved pools separation and widowhood. Events and exposure are summed

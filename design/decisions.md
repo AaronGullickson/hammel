@@ -3300,3 +3300,12 @@ Keep `mx` in life-table output, preserving D048's output naming. Mortality proce
 **Status:** User request and implementation authorization, November 9, 2026.
 
 **Decision:** Add the exported `calculate_life_expectancy(rates, age = 0)`, which builds a life table with `calculate_life_table()` and returns its `ex` rows at the requested ages, as a tibble of the stratifying columns, `age` and `ex`. Each requested age must be the start of an age band in the rates; other ages, including values inside a band, are an error rather than being interpolated. It accepts the same inputs, strata and errors as `calculate_life_table()` and has no `radix` argument, since life expectancy does not depend on it.
+
+
+## D158 — Rename `pool_dissolved` to `use_detailed_previous_union` (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Replace the `pool_dissolved = FALSE` argument of `calculate_population_size()` and the rate calculators with `use_detailed_previous_union = TRUE`, reversing the logical. The default `TRUE` reports `previous_union` as `none`, `separated` and `widowed`; `FALSE` combines separated and widowed as `dissolved`, pooling counts and exposure before rates and confidence intervals, exactly as `pool_dissolved = TRUE` did. `FALSE` still requires `"previous_union"` in `by` (explicitly or, for union formation, implied by `dur_breaks`). The old name names what is pooled but not the variable it changes; the new name ties the option to `previous_union`.
+
+**Scope:** Direct pre-release rename with no alias for the old name. Package code, internal helpers (`check_detailed_previous_union()`), tests, generated help and current specifications are updated. Decision-log entries, session handoffs, testing records and accepted validation reports keep the old name as historical evidence. The user-maintained article `vignettes/articles/second_demog_transition.qmd` still calls `pool_dissolved = TRUE` and needs `use_detailed_previous_union = FALSE`.

@@ -68,7 +68,7 @@ Generated native wrappers; continue to generate rather than hand-edit.
 
 Shared history preparation, stratification, and output construction for demographic analysis. Used by rate calculators, population counts, and relationship extraction.
 
-- Functions: `observation_groups()`, `prepare_group_observations()`, `check_by()`, `check_pool_dissolved()`, `previous_labels()`, `person_observation()`, `union_type_labels()`, `build_rows()`, `dim_of()`, `label_dim()`, `person_by_dims()`, `finish_rows()`, `observation_alias()`, `combine_dimensions()`, `finish_strata()`, `rename_group_columns()`.
+- Functions: `observation_groups()`, `prepare_group_observations()`, `check_by()`, `check_detailed_previous_union()`, `previous_labels()`, `person_observation()`, `union_type_labels()`, `build_rows()`, `dim_of()`, `label_dim()`, `person_by_dims()`, `finish_rows()`, `observation_alias()`, `combine_dimensions()`, `finish_strata()`, `rename_group_columns()`.
 
 ### `R/ancestry.R`
 

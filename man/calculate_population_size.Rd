@@ -4,7 +4,12 @@
 \alias{calculate_population_size}
 \title{Calculate the living population at time points}
 \usage{
-calculate_population_size(population, times, by = NULL, pool_dissolved = FALSE)
+calculate_population_size(
+  population,
+  times,
+  by = NULL,
+  use_detailed_previous_union = TRUE
+)
 }
 \arguments{
 \item{population}{A \code{hammel_population} or persons data frame representing
@@ -19,8 +24,10 @@ separately: \code{"sex"}, declared group dimensions (such as \code{"race"}),
 \code{"union_type"} and \code{"previous_union"}. See \code{\link[=calculate_mortality_rates]{calculate_mortality_rates()}}
 for their definitions.}
 
-\item{pool_dissolved}{Logical, default \code{FALSE}. With \code{TRUE} and
-\code{"previous_union"} in \code{by}, combine separated and widowed as \code{"dissolved"}.}
+\item{use_detailed_previous_union}{Logical, default \code{TRUE}, which counts
+\code{"previous_union"} as \code{"none"}, \code{"separated"} and \code{"widowed"}. With
+\code{FALSE} and \code{"previous_union"} in \code{by}, combine separated and widowed as
+\code{"dissolved"}.}
 }
 \value{
 A tibble with \code{time}, the \code{by} columns and \code{population}. Rows follow

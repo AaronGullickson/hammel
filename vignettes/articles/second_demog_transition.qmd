@@ -602,7 +602,7 @@ mar_rates_observed <- calculate_union_rates(
   c(16, seq(20, 60, 5), 70, 80),
   by = "previous_union",
   conf.level = 0.95,
-  pool_dissolved = TRUE
+  use_detailed_previous_union = FALSE
 ) |>
   filter(sex == "f")
 

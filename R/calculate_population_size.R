@@ -18,8 +18,10 @@
 #'   separately: `"sex"`, declared group dimensions (such as `"race"`),
 #'   `"union_type"` and `"previous_union"`. See [calculate_mortality_rates()]
 #'   for their definitions.
-#' @param pool_dissolved Logical, default `FALSE`. With `TRUE` and
-#'   `"previous_union"` in `by`, combine separated and widowed as `"dissolved"`.
+#' @param use_detailed_previous_union Logical, default `TRUE`, which counts
+#'   `"previous_union"` as `"none"`, `"separated"` and `"widowed"`. With
+#'   `FALSE` and `"previous_union"` in `by`, combine separated and widowed as
+#'   `"dissolved"`.
 #' @return A tibble with `time`, the `by` columns and `population`. Rows follow
 #'   the requested times (repeats kept), with time varying fastest and earlier
 #'   `by` variables varying faster than later ones.
@@ -32,7 +34,7 @@ calculate_population_size <- function(
   population,
   times,
   by = NULL,
-  pool_dissolved = FALSE
+  use_detailed_previous_union = TRUE
 ) {
   if (!is.numeric(times) || !is.null(dim(times)) || any(!is.finite(times))) {
     stop("`times` must be a numeric vector of finite times in years.",
@@ -47,7 +49,7 @@ calculate_population_size <- function(
     by, c("sex", "group", "union_type", "previous_union"),
     "calculate_population_size", alias$dims
   )
-  check_pool_dissolved(pool_dissolved, by)
+  check_detailed_previous_union(use_detailed_previous_union, by)
   obs <- person_observation(population, by, if (length(times)) {
     max(times)
   } else {
@@ -56,7 +58,7 @@ calculate_population_size <- function(
   })
   previous <- "previous_union" %in% by
   utype <- "union_type" %in% by
-  map <- if (pool_dissolved) c(0L, 1L, 1L) else 0:2
+  map <- if (use_detailed_previous_union) 0:2 else c(0L, 1L, 1L)
   ng <- if (is.null(obs$groups)) 1L else length(obs$groups)
   options <- list(
     typed = obs$typed, exclusive = obs$typed || previous,
@@ -79,7 +81,9 @@ calculate_population_size <- function(
   names(strides) <- names(sizes)
   dims <- c(
     list(dim_of(data.frame(time = times), stride = 1)),
-    person_by_dims(by, obs, list(strides = strides), pool_dissolved)
+    person_by_dims(
+      by, obs, list(strides = strides), use_detailed_previous_union
+    )
   )
   rows <- build_rows(dims)
   out <- finish_rows(rows[!grepl("^\\.key", names(rows))])

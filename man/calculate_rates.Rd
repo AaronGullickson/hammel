@@ -17,7 +17,7 @@ calculate_mortality_rates(
   age_breaks,
   by = NULL,
   conf_level = NULL,
-  pool_dissolved = FALSE
+  use_detailed_previous_union = TRUE
 )
 
 calculate_fertility_rates(
@@ -28,7 +28,7 @@ calculate_fertility_rates(
   parity_breaks = NULL,
   unrealized = FALSE,
   conf_level = NULL,
-  pool_dissolved = FALSE
+  use_detailed_previous_union = TRUE
 )
 
 calculate_union_rates(
@@ -38,7 +38,7 @@ calculate_union_rates(
   by = NULL,
   dur_breaks = NULL,
   conf_level = NULL,
-  pool_dissolved = FALSE
+  use_detailed_previous_union = TRUE
 )
 
 calculate_marriage_rates(
@@ -47,7 +47,7 @@ calculate_marriage_rates(
   age_breaks,
   by = NULL,
   conf_level = NULL,
-  pool_dissolved = FALSE
+  use_detailed_previous_union = TRUE
 )
 
 calculate_dissolution_rates(
@@ -74,7 +74,7 @@ calculate_transition_rates(
   dur_breaks = NULL,
   by = NULL,
   conf_level = NULL,
-  pool_dissolved = FALSE,
+  use_detailed_previous_union = TRUE,
   group = NULL
 )
 }
@@ -108,10 +108,11 @@ from two-sided exact \code{\link[stats:poisson.test]{stats::poisson.test()}} int
 counts over exposure. Bounds are NA at zero exposure. For fertility, these
 describe the observed rate, not the unrealized-adjusted rate.}
 
-\item{pool_dissolved}{Logical, default \code{FALSE}. For calculators accepting
-this argument, \code{TRUE} with \code{"previous_union"} in \code{by} combines separated
-and widowed as \code{"dissolved"}, pooling counts and exposure before
-calculating rates and confidence intervals. Union formation adds
+\item{use_detailed_previous_union}{Logical, default \code{TRUE}, which reports
+\code{"previous_union"} as \code{"none"}, \code{"separated"} and \code{"widowed"}. With
+\code{FALSE} and \code{"previous_union"} in \code{by}, separated and widowed are combined
+as \code{"dissolved"}, pooling counts and exposure before calculating rates and
+confidence intervals. Union formation adds
 \code{"previous_union"} automatically when \code{dur_breaks} is supplied.}
 
 \item{parity_breaks}{For fertility only: NULL to pool parities, or strictly
@@ -249,7 +250,7 @@ conversion is excluded because partners remain partnered. Previous-category
 classification follows the population's recorded cohabitation policy, default
 FALSE without metadata. With \code{dur_breaks}, only none rows use age;
 separated/widowed rows use duration since the most recent ending;
-\code{pool_dissolved} can combine them.
+\code{use_detailed_previous_union = FALSE} combines them.
 
 Histories must be complete for the intended interpretation. \code{"none"} means no
 recorded earlier union; omitted history cannot establish never-partnered

@@ -128,7 +128,7 @@ returns `person_years`, `unions`, and `rate_union`, split by period, age and sex
 counts and exposure are pooled before calculating rates and that column is omitted. All exposure is unpartnered; no additional `union_status`
 column is needed. Optional `group` follows each individual's identity, including
 men. Detailed output retains all three categories and empty cells.
-Set `pool_dissolved = TRUE` to retain `none` and pool separated/widowed
+Set `use_detailed_previous_union = FALSE` to retain `none` and pool separated/widowed
 as `dissolved`; this requires previous-union stratification and sums events/exposure before
 rates and exact Poisson intervals. The same option is available on
 `calculate_marriage_rates()`. Rates with zero exposure

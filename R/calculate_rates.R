@@ -40,10 +40,11 @@
 #'   from two-sided exact [stats::poisson.test()] intervals for observed event
 #'   counts over exposure. Bounds are NA at zero exposure. For fertility, these
 #'   describe the observed rate, not the unrealized-adjusted rate.
-#' @param pool_dissolved Logical, default `FALSE`. For calculators accepting
-#'   this argument, `TRUE` with `"previous_union"` in `by` combines separated
-#'   and widowed as `"dissolved"`, pooling counts and exposure before
-#'   calculating rates and confidence intervals. Union formation adds
+#' @param use_detailed_previous_union Logical, default `TRUE`, which reports
+#'   `"previous_union"` as `"none"`, `"separated"` and `"widowed"`. With
+#'   `FALSE` and `"previous_union"` in `by`, separated and widowed are combined
+#'   as `"dissolved"`, pooling counts and exposure before calculating rates and
+#'   confidence intervals. Union formation adds
 #'   `"previous_union"` automatically when `dur_breaks` is supplied.
 #' @param parity_breaks For fertility only: NULL to pool parities, or strictly
 #'   increasing nonnegative integer boundaries starting at zero. Bands are
@@ -152,7 +153,7 @@
 #' classification follows the population's recorded cohabitation policy, default
 #' FALSE without metadata. With `dur_breaks`, only none rows use age;
 #' separated/widowed rows use duration since the most recent ending;
-#' `pool_dissolved` can combine them.
+#' `use_detailed_previous_union = FALSE` combines them.
 #'
 #' Histories must be complete for the intended interpretation. `"none"` means no
 #' recorded earlier union; omitted history cannot establish never-partnered
@@ -386,7 +387,7 @@ calculate_mortality_rates <- function(
   age_breaks,
   by = NULL,
   conf_level = NULL,
-  pool_dissolved = FALSE
+  use_detailed_previous_union = TRUE
 ) {
   validate_rate_conf_level(conf_level)
   alias <- observation_alias(population, by)
@@ -396,16 +397,16 @@ calculate_mortality_rates <- function(
     by, c("group", "union_type", "previous_union"),
     "calculate_mortality_rates", alias$dims
   )
-  check_pool_dissolved(pool_dissolved, by)
+  check_detailed_previous_union(use_detailed_previous_union, by)
   age_breaks <- person_breaks(time_breaks, age_breaks)
   obs <- person_observation(population, by, tail(time_breaks, 1))
   counts <- run_person_lexis(obs, by, time_breaks, age_breaks,
     sex = TRUE,
-    pool_dissolved = pool_dissolved
+    use_detailed_previous_union = use_detailed_previous_union
   )
   out <- person_rate_rows(
     obs, by, counts, time_breaks, age_breaks, c("m", "f"),
-    pool_dissolved
+    use_detailed_previous_union
   )
   out$deaths <- counts$deaths[attr(out, "index")]
   out$rate_mortality <- as.numeric(ifelse(out$person_years > 0,
@@ -429,7 +430,7 @@ calculate_fertility_rates <- function(
   parity_breaks = NULL,
   unrealized = FALSE,
   conf_level = NULL,
-  pool_dissolved = FALSE
+  use_detailed_previous_union = TRUE
 ) {
   validate_rate_conf_level(conf_level)
   if (!is.logical(unrealized) ||
@@ -460,7 +461,7 @@ calculate_fertility_rates <- function(
     by, c("group", "union_type", "previous_union"),
     "calculate_fertility_rates", alias$dims
   )
-  check_pool_dissolved(pool_dissolved, by)
+  check_detailed_previous_union(use_detailed_previous_union, by)
   age_breaks <- person_breaks(time_breaks, age_breaks)
   if (!is.null(parity_breaks)) {
     check_demographic_breaks(parity_breaks, "parity_breaks", ages = TRUE)
@@ -482,11 +483,11 @@ calculate_fertility_rates <- function(
   counts <- run_person_lexis(obs, by, time_breaks, age_breaks,
     sex = TRUE,
     parity_breaks = if (is.null(parity_breaks)) numeric() else parity_breaks,
-    pool_dissolved = pool_dissolved
+    use_detailed_previous_union = use_detailed_previous_union
   )
   out <- person_rate_rows(
     obs, by, counts, time_breaks, age_breaks, "f",
-    pool_dissolved,
+    use_detailed_previous_union,
     parity_breaks
   )
   out$births <- counts$births[attr(out, "index")]
@@ -704,7 +705,7 @@ calculate_marriage_rates <- function(
   age_breaks,
   by = NULL,
   conf_level = NULL,
-  pool_dissolved = FALSE
+  use_detailed_previous_union = TRUE
 ) {
   validate_rate_conf_level(conf_level)
   alias <- observation_alias(population, by)
@@ -717,7 +718,7 @@ calculate_marriage_rates <- function(
   finish_strata(calculate_entry_rates(population, time_breaks, age_breaks, by,
     dur_breaks = NULL,
     marriage_measure = TRUE, conf_level = conf_level,
-    pool_dissolved = pool_dissolved
+    use_detailed_previous_union = use_detailed_previous_union
   ), alias)
 }
 
@@ -731,7 +732,7 @@ calculate_transition_rates <- function(
   dur_breaks = NULL,
   by = NULL,
   conf_level = NULL,
-  pool_dissolved = FALSE,
+  use_detailed_previous_union = TRUE,
   group = NULL
 ) {
   validate_rate_conf_level(conf_level)
@@ -790,7 +791,7 @@ calculate_transition_rates <- function(
     by, c("sex", "union_type", "previous_union"),
     "calculate_transition_rates", alias$dims
   )
-  check_pool_dissolved(pool_dissolved, by)
+  check_detailed_previous_union(use_detailed_previous_union, by)
   if (is.null(age_breaks) == is.null(dur_breaks)) {
     stop("Supply exactly one of `age_breaks` and `dur_breaks`.", call. = FALSE)
   }
@@ -812,7 +813,8 @@ calculate_transition_rates <- function(
   size <- if (is.null(alias)) 0L else length(alias$combined$categories[[1]])
   counts <- run_person_lexis(obs, setdiff(by, "sex"), time_breaks, breaks,
     axis = if (duration) 1L else 0L, sex = "sex" %in% by, group = TRUE,
-    pool_dissolved = pool_dissolved, exclusive = union_vars,
+    use_detailed_previous_union = use_detailed_previous_union,
+    exclusive = union_vars,
     group_target = if (size) obs$groups %% size
   )
   s <- counts$strides
@@ -824,7 +826,7 @@ calculate_transition_rates <- function(
       label_dim("destination", groups, counts$cells),
       label_dim("origin", groups, s[["group"]])
     ),
-    person_by_dims(by, obs, counts, pool_dissolved)
+    person_by_dims(by, obs, counts, use_detailed_previous_union)
   )
   rows <- build_rows(dims)
   if (size) {
@@ -894,7 +896,7 @@ calculate_union_rates <- function(
   by = NULL,
   dur_breaks = NULL,
   conf_level = NULL,
-  pool_dissolved = FALSE
+  use_detailed_previous_union = TRUE
 ) {
   validate_rate_conf_level(conf_level)
   alias <- observation_alias(population, by)
@@ -907,7 +909,7 @@ calculate_union_rates <- function(
   finish_strata(calculate_entry_rates(population, time_breaks, age_breaks, by,
     dur_breaks,
     marriage_measure = FALSE, conf_level = conf_level,
-    pool_dissolved = pool_dissolved
+    use_detailed_previous_union = use_detailed_previous_union
   ), alias)
 }
 
@@ -933,7 +935,7 @@ person_rate_rows <- function(
   time_breaks,
   age_breaks,
   sexes,
-  pool_dissolved,
+  use_detailed_previous_union,
   parity_breaks = NULL
 ) {
   s <- counts$strides
@@ -951,7 +953,7 @@ person_rate_rows <- function(
         "parity"
       ]]))
     },
-    person_by_dims(by, obs, counts, pool_dissolved)
+    person_by_dims(by, obs, counts, use_detailed_previous_union)
   )
   rows <- build_rows(dims)
   columns <- c(
@@ -1100,7 +1102,7 @@ calculate_entry_rates <- function(
   dur_breaks,
   marriage_measure,
   conf_level = NULL,
-  pool_dissolved = FALSE
+  use_detailed_previous_union = TRUE
 ) {
   if (!inherits(population, "hammel_population")) {
     stop("`population` must be a hammel_population with union histories.",
@@ -1116,7 +1118,7 @@ calculate_entry_rates <- function(
       by <- c(by, "previous_union")
     }
   }
-  check_pool_dissolved(pool_dissolved, by)
+  check_detailed_previous_union(use_detailed_previous_union, by)
   age_breaks <- person_breaks(time_breaks, age_breaks)
   entry_type <- "union_type" %in% by
   obs <- person_observation(population, by, tail(time_breaks, 1),
@@ -1129,7 +1131,9 @@ calculate_entry_rates <- function(
   run <- function(axis, breaks, mask) run_person_lexis(obs, state_by,
     time_breaks, breaks,
     axis = axis, sex = TRUE, utype_filter = if (marriage_measure) 2L else 1L,
-    previous_mask = mask, pool_dissolved = pool_dissolved, exclusive = TRUE
+    previous_mask = mask,
+    use_detailed_previous_union = use_detailed_previous_union,
+    exclusive = TRUE
   )
   kinds <- if (marriage_measure) {
     list(c(1L, 2L))
@@ -1155,7 +1159,9 @@ calculate_entry_rates <- function(
         if (name == "union_type") {
           label_dim("union_type", c("cohab", "marriage"), counts$cells)
         } else {
-          person_by_dims(name, obs, counts, pool_dissolved, previous_codes)[[1]]
+          person_by_dims(
+            name, obs, counts, use_detailed_previous_union, previous_codes
+          )[[1]]
         }
       })
     )
@@ -1171,7 +1177,7 @@ calculate_entry_rates <- function(
       run(0L, age_breaks, c(TRUE, FALSE, FALSE)),
       run(2L, dur_breaks, c(FALSE, TRUE, TRUE))
     )
-    later <- if (pool_dissolved) 1L else 1:2
+    later <- if (use_detailed_previous_union) 1:2 else 1L
     a <- block(counts[[1]], age_breaks, "age", 0L, 1L)
     b <- block(counts[[2]], dur_breaks, "dur", later, 2L)
     a$dur_start <- a$dur_end <- rep(NA_real_, nrow(a))
@@ -1265,7 +1271,7 @@ run_person_lexis <- function(
   group = "group" %in% by,
   utype_filter = 0L,
   previous_mask = c(TRUE, TRUE, TRUE),
-  pool_dissolved = FALSE,
+  use_detailed_previous_union = TRUE,
   exclusive = NULL,
   group_target = NULL
 ) {
@@ -1275,7 +1281,7 @@ run_person_lexis <- function(
     exclusive <- obs$typed || previous || utype_filter >
       0L
   }
-  map <- if (pool_dissolved) c(0L, 1L, 1L) else 0:2
+  map <- if (use_detailed_previous_union) 0:2 else c(0L, 1L, 1L)
   options <- list(
     typed = obs$typed, exclusive = exclusive,
     counts_cohab = obs$counts_cohab,

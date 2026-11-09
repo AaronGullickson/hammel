@@ -36,7 +36,7 @@ test_that("previous union follows the recorded cohabitation policy", {
   # Now the cohabitation ended by death at 38 makes her widowed.
   expect_equal(x$person_years, c(40, 8, 2))
   pooled <- woman(calculate_mortality_rates(pop, c(0, 40), c(0, Inf), by = "previous_union",
-                                            pool_dissolved = TRUE))
+                                            use_detailed_previous_union = FALSE))
   expect_identical(pooled$previous_union, c("none", "dissolved"))
   expect_equal(pooled$person_years, c(40, 10))
 })
@@ -84,7 +84,7 @@ test_that("by is validated and rows follow the documented order", {
   expect_error(calculate_mortality_rates(pop, c(0, 40), c(0, Inf), by = c("group", "group")), "distinct")
   expect_error(calculate_mortality_rates(pop$persons, c(0, 40), c(0, Inf), by = "union_type"),
                "union histories")
-  expect_error(calculate_mortality_rates(pop, c(0, 40), c(0, Inf), pool_dissolved = TRUE), "previous_union")
+  expect_error(calculate_mortality_rates(pop, c(0, 40), c(0, Inf), use_detailed_previous_union = FALSE), "previous_union")
   x <- calculate_mortality_rates(pop, c(0, 20, 40), c(0, 30, Inf), by = c("union_type", "group"))
   n <- 2 * 2 * 2
   expect_identical(x$time_start[1:2], c(0, 20))

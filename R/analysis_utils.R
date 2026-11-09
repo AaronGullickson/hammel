@@ -100,28 +100,33 @@ check_by <- function(by, allowed, fun, dims = NULL) {
   by
 }
 
-check_pool_dissolved <- function(pool_dissolved, by) {
-  if (!is.logical(pool_dissolved) || length(pool_dissolved) != 1L ||
-    !is.null(dim(pool_dissolved)) || is.na(pool_dissolved)) {
-    stop("`pool_dissolved` must be TRUE or FALSE.", call. = FALSE)
-  }
-  if (pool_dissolved && !"previous_union" %in% by) {
-    stop("`pool_dissolved = TRUE` requires \"previous_union\" in `by`.",
-      call. =
-        FALSE
+# Validate the previous-union detail flag. Pooled categories (FALSE) only
+# apply when `previous_union` is in `by`.
+check_detailed_previous_union <- function(detailed, by) {
+  if (!is.logical(detailed) || length(detailed) != 1L ||
+    !is.null(dim(detailed)) || is.na(detailed)) {
+    stop(
+      "`use_detailed_previous_union` must be TRUE or FALSE.",
+      call. = FALSE
     )
   }
-  invisible(pool_dissolved)
+  if (!detailed && !"previous_union" %in% by) {
+    stop(
+      paste0(
+        "`use_detailed_previous_union = FALSE` requires ",
+        "\"previous_union\" in `by`."
+      ),
+      call. = FALSE
+    )
+  }
+  invisible(detailed)
 }
 
-previous_labels <- function(pool_dissolved) {
-  if (pool_dissolved) {
-    c("none", "dissolved")
+previous_labels <- function(use_detailed_previous_union) {
+  if (use_detailed_previous_union) {
+    c("none", "separated", "widowed")
   } else {
-    c(
-      "none", "separated",
-      "widowed"
-    )
+    c("none", "dissolved")
   }
 }
 
@@ -285,7 +290,7 @@ person_by_dims <- function(
   by,
   obs,
   counts,
-  pool_dissolved,
+  use_detailed_previous_union,
   previous_codes = NULL
 ) {
   lapply(by, function(name) switch(name,
@@ -296,7 +301,7 @@ person_by_dims <- function(
       counts$strides[["union_type"]]
     ),
     previous_union = {
-      labels <- previous_labels(pool_dissolved)
+      labels <- previous_labels(use_detailed_previous_union)
       codes <- if (is.null(previous_codes)) {
         seq_along(labels) - 1L
       } else {

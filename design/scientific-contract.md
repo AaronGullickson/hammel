@@ -620,8 +620,8 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   Optional `dur_breaks` switches separated/widowed rows to duration since the
   latest ending and automatically separates previous categories (D084). None
   rows retain age bands; unused boundary pairs are NA. Duration rows include
-  all ages, and age/duration axes are not crossed. `pool_dissolved = TRUE`
-  combines separated/widowed counts and exposure before rates and confidence
+  all ages, and age/duration axes are not crossed.
+  `use_detailed_previous_union = FALSE` combines separated/widowed counts and exposure before rates and confidence
   intervals when previous-union stratification is enabled (D126). NULL duration
   breaks preserve age-only output.
   See [remarriage](remarriage.md) for input, restart and boundary conventions.

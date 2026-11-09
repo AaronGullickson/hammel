@@ -20,7 +20,7 @@ test_that("pooled previous-union summaries sum exposure and events before exact 
           by = c("previous_union", if (grouped) "group", if (typed) "union_type"),conf_level=.95)
         if(!marriage) args <- c(args,list(dur_breaks=duration))
         detailed <- do.call(fun,args)
-        pooled <- do.call(fun,c(args,list(pool_dissolved=TRUE)))
+        pooled <- do.call(fun,c(args,list(use_detailed_previous_union = FALSE)))
         expect_setequal(unique(detailed$previous_union),c("none","separated","widowed"))
         expect_setequal(unique(pooled$previous_union),c("none","dissolved"))
         events <- if(marriage) "marriages" else "unions"
@@ -52,19 +52,19 @@ test_that("pooling requires previous strata and validates its option", {
   pop <- previous_pool_history()
   for(fun in list(calculate_union_rates,calculate_marriage_rates)) {
     for(bad in list(NA,1,"yes",c(TRUE,FALSE)))
-      expect_error(fun(pop,c(0,3),c(0,Inf),pool_dissolved=bad),"pool_dissolved")
-    expect_error(fun(pop,c(0,3),c(0,Inf),pool_dissolved=TRUE),"requires.*previous_union")
-    x <- fun(pop,c(0,3),c(0,Inf),by = "previous_union",pool_dissolved=TRUE)
+      expect_error(fun(pop,c(0,3),c(0,Inf),use_detailed_previous_union = bad),"use_detailed_previous_union")
+    expect_error(fun(pop,c(0,3),c(0,Inf),use_detailed_previous_union = FALSE),"requires.*previous_union")
+    x <- fun(pop,c(0,3),c(0,Inf),by = "previous_union",use_detailed_previous_union = FALSE)
     expect_setequal(x$previous_union,c("none","dissolved"))
     expect_false("conf_low" %in% names(x))
     empty <- hammel_population(pop$persons[FALSE,],end_time=3, groups = if ("group" %in% names(pop$persons)) "group")
-    x <- fun(empty,c(0,3),c(0,Inf),by = "previous_union",pool_dissolved=TRUE,conf_level=.95)
+    x <- fun(empty,c(0,3),c(0,Inf),by = "previous_union",use_detailed_previous_union = FALSE,conf_level=.95)
     expect_true(all(x$person_years==0 & is.na(x$conf_low) & is.na(x$conf_high)))
   }
 })
 
  test_that("duration stratification permits pooling without a redundant previous flag", {
   x <- calculate_union_rates(previous_pool_history(),c(0,3),c(0,Inf),
-    dur_breaks=c(0,1,Inf),pool_dissolved=TRUE)
+    dur_breaks=c(0,1,Inf),use_detailed_previous_union = FALSE)
   expect_setequal(x$previous_union,c("none","dissolved"))
  })
