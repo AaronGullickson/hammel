@@ -26,6 +26,25 @@ One row per person, including deceased persons.
 Omit marital status and latest-union pointers. Derive relationship state from `unions`; the engine may cache derived state for performance without requiring another user-facing column. Unknown earlier histories must not be silently interpreted as known lifetime singlehood. Optional persistent fertility selection weights use `hetfert` under D102;
 sibling and last-born-child pointers are omitted. Group labels must be nonempty; their input type is preserved. See [groups](groups.md) for schedule lookup and inheritance rules.
 
+## Uniform-age population generation
+
+`generate_uniform_population()` draws independent continuous ages uniformly
+between `min_age` (default zero) and `max_age` (default 70), in years (D168).
+Both bounds must be finite nonnegative numeric scalars, with
+`min_age <= max_age`. Birth time is `end_time - age`; everyone is alive at the
+reference time, with unknown parents and no unions. Sex and groups retain
+their independently specified sampling distributions. This is an initial
+population, without any claim that its age distribution is stable.
+
+For example, `min_age = 18, max_age = 65, end_time = 2000` produces ages in
+18–65 years, with birth times in 1935–1982. Equal bounds of 25 produce birth
+times exactly 1975. Empty populations retain the typed empty schema and still
+validate the bounds. Invalid or reversed bounds fail before drawing random
+numbers. With `min_age = 0`, existing calls retain their output and RNG state
+for the same seed when other arguments are unchanged. The new argument follows
+`end_time`, before `female_probability` and `groups`; positional calls using
+those later arguments must account for the new order.
+
 ## Ancestry
 
 An optional `ancestry` component is a named list with one tibble per dimension

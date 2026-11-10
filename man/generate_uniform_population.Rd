@@ -8,6 +8,7 @@ generate_uniform_population(
   size,
   max_age = 70,
   end_time = 0,
+  min_age = 0,
   female_probability = 0.5,
   groups = NULL
 )
@@ -19,6 +20,9 @@ generate_uniform_population(
 
 \item{end_time}{Reference time in years, finite. Birth times are this value
 minus the sampled ages. Defaults to a relative time origin of zero.}
+
+\item{min_age}{Minimum initial age in years, finite and nonnegative, and no
+greater than \code{max_age}. Defaults to zero.}
 
 \item{female_probability}{Probability of assigning sex "f" (female). The
 other sex value is "m" (male). This does not enforce exact proportions.}
@@ -42,12 +46,15 @@ A validated \code{hammel_population} object.
 }
 \description{
 Create a starter population with independent uniformly distributed ages,
-randomly assigned sex, unknown parents, and no unions. Everyone is alive at
-the reference time. This is not a stable or stationary population.
-Uniform refers to ages sampled between zero and \code{max_age}; sex and group
-categories follow their supplied probabilities and need not be uniform.
+randomly assigned sex, unknown parents, and no unions.
 }
 \details{
+Everyone is alive at
+the reference time. This is not a stable or stationary population.
+Uniform refers to ages sampled between \code{min_age} and \code{max_age}; sex and
+group categories follow their supplied probabilities and need not be uniform.
+Equal age bounds generate everyone at that age.
+
 Ages are sampled in continuous years without rounding to simulation steps.
 Generation uses and advances R's current random-number state; use
 \code{\link[=set.seed]{set.seed()}} for reproducibility.

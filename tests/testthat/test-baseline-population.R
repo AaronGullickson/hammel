@@ -54,3 +54,87 @@ test_that("baseline generator rejects invalid arguments", {
   }
 })
 
+
+test_that("uniform ages respect positive fractional bounds", {
+  set.seed(42)
+  population <- generate_uniform_population(
+    50000, min_age = 18.25, max_age = 65.75, end_time = 2000
+  )
+  ages <- population$end_time - population$persons$birth_time
+  width <- 65.75 - 18.25
+  expect_true(all(ages >= 18.25 & ages <= 65.75))
+  expect_lt(abs(mean(ages) - 42), 6 * width / sqrt(12 * length(ages)))
+  expect_lt(
+    abs(var(ages) - width^2 / 12),
+    6 * width^2 / sqrt(180 * length(ages))
+  )
+  expect_true(all(is.na(population$persons$death_time)))
+  expect_equal(nrow(population$unions), 0L)
+  expect_invisible(validate_population(population))
+})
+
+test_that("equal age bounds and empty populations are supported", {
+  fixed <- generate_uniform_population(
+    3, min_age = 25.5, max_age = 25.5, end_time = 2000
+  )
+  expect_identical(fixed$persons$birth_time, rep(1974.5, 3))
+  empty <- generate_uniform_population(0, min_age = 18, max_age = 65)
+  expect_equal(nrow(empty$persons), 0L)
+  expect_s3_class(empty$persons, "tbl_df")
+  expect_invisible(validate_population(empty))
+})
+
+test_that("zero minimum age preserves output and RNG state", {
+  weights <- list(region = c(A = 1, B = 2))
+  set.seed(42)
+  positional <- generate_uniform_population(
+    100, 50, 2000, female_probability = 0.6, groups = weights
+  )
+  rng <- .Random.seed
+  set.seed(42)
+  explicit <- generate_uniform_population(
+    size = 100,
+    max_age = 50,
+    end_time = 2000,
+    female_probability = 0.6,
+    groups = weights,
+    min_age = 0
+  )
+  expect_identical(explicit, positional)
+  expect_identical(.Random.seed, rng)
+})
+
+test_that("invalid age bounds fail before consuming random numbers", {
+  invalid <- list(
+    NULL, numeric(), -1, NA_real_, NaN, Inf, -Inf, "18", TRUE,
+    c(1, 2), 0 + 0i, matrix(0), array(0)
+  )
+  for (age in invalid) {
+    set.seed(42)
+    rng <- .Random.seed
+    expect_error(generate_uniform_population(2, min_age = age), "min_age")
+    expect_identical(.Random.seed, rng)
+    expect_error(generate_uniform_population(2, max_age = age), "max_age")
+    expect_identical(.Random.seed, rng)
+  }
+  expect_error(
+    generate_uniform_population(0, min_age = 20, max_age = 19),
+    "min_age.*must not exceed.*max_age"
+  )
+})
+
+
+test_that("minimum age immediately follows the reference time", {
+  expect_identical(
+    names(formals(generate_uniform_population)),
+    c("size", "max_age", "end_time", "min_age", "female_probability", "groups")
+  )
+  set.seed(42)
+  positional <- generate_uniform_population(10, 50, 2000, 18, 1)
+  set.seed(42)
+  named <- generate_uniform_population(
+    10, max_age = 50, end_time = 2000, min_age = 18, female_probability = 1
+  )
+  expect_identical(positional, named)
+  expect_true(all(positional$persons$sex == "f"))
+})

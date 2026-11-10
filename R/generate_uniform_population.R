@@ -4,11 +4,18 @@
 
 #' Generate a population with uniformly distributed ages
 #'
+#' @description
+#'
 #' Create a starter population with independent uniformly distributed ages,
-#' randomly assigned sex, unknown parents, and no unions. Everyone is alive at
+#' randomly assigned sex, unknown parents, and no unions.
+#'
+#' @details
+#'
+#' Everyone is alive at
 #' the reference time. This is not a stable or stationary population.
-#' Uniform refers to ages sampled between zero and `max_age`; sex and group
-#' categories follow their supplied probabilities and need not be uniform.
+#' Uniform refers to ages sampled between `min_age` and `max_age`; sex and
+#' group categories follow their supplied probabilities and need not be uniform.
+#' Equal age bounds generate everyone at that age.
 #'
 #' Ages are sampled in continuous years without rounding to simulation steps.
 #' Generation uses and advances R's current random-number state; use
@@ -18,6 +25,8 @@
 #' @param max_age Maximum initial age in years, finite and nonnegative.
 #' @param end_time Reference time in years, finite. Birth times are this value
 #'   minus the sampled ages. Defaults to a relative time origin of zero.
+#' @param min_age Minimum initial age in years, finite and nonnegative, and no
+#'   greater than `max_age`. Defaults to zero.
 #' @param female_probability Probability of assigning sex "f" (female). The
 #'   other sex value is "m" (male). This does not enforce exact proportions.
 #' @param groups Optional group dimensions to sample, independently of age and
@@ -45,6 +54,7 @@ generate_uniform_population <- function(
   size,
   max_age = 70,
   end_time = 0,
+  min_age = 0,
   female_probability = 0.5,
   groups = NULL
 ) {
@@ -59,9 +69,20 @@ generate_uniform_population <- function(
       call. = FALSE
     )
   }
-  if (!is.numeric(max_age) || length(max_age) != 1L || !is.finite(max_age) ||
+  if (!is.numeric(max_age) || is.complex(max_age) || !is.null(dim(max_age)) ||
+        length(max_age) != 1L ||
+        !is.finite(max_age) ||
         max_age < 0) {
     stop("`max_age` must be finite and nonnegative, in years.", call. = FALSE)
+  }
+  if (!is.numeric(min_age) || is.complex(min_age) || !is.null(dim(min_age)) ||
+        length(min_age) != 1L ||
+        !is.finite(min_age) ||
+        min_age < 0) {
+    stop("`min_age` must be finite and nonnegative, in years.", call. = FALSE)
+  }
+  if (min_age > max_age) {
+    stop("`min_age` must not exceed `max_age`.", call. = FALSE)
   }
   check_time(end_time, "end_time")
   if (!is.numeric(female_probability) || length(female_probability) != 1L ||
@@ -83,7 +104,7 @@ generate_uniform_population <- function(
         "f", "m"
       )
     ),
-    birth_time = end_time - stats::runif(size, min = 0, max = max_age),
+    birth_time = end_time - stats::runif(size, min = min_age, max = max_age),
     death_time = rep(NA_real_, size),
     mother_id = rep(NA_integer_, size),
     father_id = rep(NA_integer_, size)
