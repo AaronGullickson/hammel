@@ -7,35 +7,50 @@
 het_fert(cv, alpha)
 }
 \arguments{
-\item{cv}{Finite nonnegative scalar coefficient of variation. Zero means
-fresh weights are one, with no random draw.}
+\item{cv}{Finite nonnegative scalar coefficient of variation that defines
+amount of variation in fertility. Zero indicates no variance.}
 
-\item{alpha}{Finite scalar in \verb{[0,1]}. Zero gives independent daughters; one
-copies maternal weights exactly. At zero CV the log-space formula gives W_d
-= W_m^alpha for supplied nonunit weights, without random innovation.}
+\item{alpha}{Finite scalar in \verb{[0,1]} that defines degree of inheritability.
+Zero gives independent daughters; one copies maternal weights exactly.}
 }
 \value{
 A \code{hammel_het_fert} specification for \code{\link[=set_fertility]{set_fertility()}} or
-\code{\link[=fertility]{fertility()}}. Construction consumes no random draws.
+\code{\link[=fertility]{fertility()}}.
 }
 \description{
-Weights redistribute births among eligible women within a fertility cell;
-they do not multiply the cell's target rate. Fresh weights are lognormal with
-mean one and coefficient of variation \code{cv}. Daughters inherit on the normal
-scale: Z_d = alpha * Z_m + sqrt(1 - alpha^2) * epsilon. Here alpha describes
-log-weight association, not raw-weight correlation. This preserves the
-lognormal distribution when reproducing mothers have the specified latent
-normal distribution; reproductive selection can change it across generations.
+Use fertility weights that allow for greater inheritable variance in
+fertility behavior across women.
 }
 \details{
-Simulation draws weights for all recorded women when persons has no \code{hetfert}
-column, or retains supplied finite strictly positive female values. An
-incomplete supplied column is an error. Male weights are unused; newly
-created male entries are NA. Draws follow the simulation seed. The output
-persons table always contains \code{hetfert} when this model is enabled, including
-zero-year runs. Enabled restarts retain weights. With \code{hetfert = NULL},
-output omits the column even if supplied, so later re-enabling draws fresh
-weights for all women.
+With het_fert in use, a \code{hetfert} column is added to the persons table with a
+value for every woman. This value \eqn{Z} is drawn from a standard normal
+distribution. That value is converted into a weight \eqn{W}:
+
+\deqn{
+  W = e^{-\sigma^2 / 2 + \sigma Z},\qquad\sigma^2 = log(1 + c^2)
+}
+
+where \eqn{c} is the coefficient of variation. \eqn{W} will have a lognormal
+distribution with \eqn{E(W)=1} and \eqn{SD(W)=c}. The weight \eqn{W} is
+applied to the selection of eligible woman for a birth event within a
+fertility rate cell.
+
+Daughters may partially inherit their score \eqn{Z_d}. The daughter's latent
+normal score \eqn{Z_d} is determined by her own draw from the standard normal
+distribution \eqn{Z_a} and the mother's score as follows:
+
+\deqn{
+  Z_d = \alpha Z_m + \sqrt{1-\alpha^2}Z_a
+}
+
+where \eqn{\alpha} determines the degree of inheritance. A value of zero
+means no heritability while a value of 1 means perfect heritability.
+
+The correlation coefficient between mother's and daughter's weights is given by:
+
+\deqn{
+ r(W_m, W_d)=\frac{(1+c^2)^\alpha-1}{c^2}
+}
 }
 \examples{
 het_fert(cv = 0.5, alpha = 0.4)
