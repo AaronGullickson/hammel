@@ -94,8 +94,10 @@ test_that("mortality integrates fractional calendar and age boundaries", {
     c("sex", "age_start", "age_end", "rate")], c(.4, 0))
   out <- run_simulation(set_mortality(m, zero_after), 2.5, seed = 92)
   expect_true(all(out$persons$death_time[!is.na(out$persons$death_time)] < .5))
-  expect_equal(count_run_events(run_simulation(make_model(2), .75, seed = 2), "deaths"),
-    0)
+  expect_equal(
+    count_run_events(run_simulation(make_model(2), .75, seed = 2), "deaths"),
+    0
+  )
 })
 
 test_that("fertility changes retain spacing, weights and count unrealized births", {
@@ -208,7 +210,11 @@ test_that("dissolution and conversion recover integrated calendar hazards", {
     if (conversion) m$processes$union_formation$union_convert_rate <- r
     else m <- set_union_dissolution(m, r)
     out <- run_simulation(m, 1.25, seed = 719)
-    count <- if (conversion) count_run_events(out, "conversions") else count_run_events(out, "dissolutions")
+    count <- if (conversion) {
+      count_run_events(out, "conversions")
+    } else {
+      count_run_events(out, "dissolutions")
+    }
     p <- 1 - exp(-.2 * .5 - .6 * .75)
     expect_lt(abs(count / n - p), 5 * sqrt(p * (1 - p) / n))
   }

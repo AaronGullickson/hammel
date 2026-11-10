@@ -105,7 +105,9 @@ test_that("fertility compensation and different age bands remain separate by sta
   rates$age_start <- c(30, 15)
   rates$age_end <- c(40, 19)
   model <- set_fertility(model, rates, 0)
-  expect_equal(count_run_events(run_simulation(model, 1, seed = 52), "births"), 0)
+  expect_equal(
+    count_run_events(run_simulation(model, 1, seed = 52), "births"), 0
+  )
 })
 
 test_that("constant status-specific fertility gives the corresponding birth counts", {

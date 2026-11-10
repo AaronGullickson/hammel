@@ -9,116 +9,35 @@ run_simulation(model, years, seed = NULL)
 \arguments{
 \item{model}{A \code{hammel_model} containing a population, mortality, fertility,
 and union-formation processes, optionally union dissolution and group
-transitions. The population must have a finite \code{end_time}.}
+transition processes. The population must have a finite \code{end_time}.}
 
-\item{years}{Nonnegative simulation duration in years; fractional years are
-supported, as are fractional population endpoints and calendar-rate bands.}
+\item{years}{Simulation duration in years; fractional years are
+supported.}
 
-\item{seed}{Optional integer seed. With a seed, the caller's RNG state is
-restored afterward. With \code{NULL}, the simulation advances the current RNG.}
+\item{seed}{Optional integer seed for random number generation. If not
+specified, simulation will use current RNG.}
 }
 \value{
 A \code{hammel_population} with updated histories and endpoint, plus a
-\code{simulation} component recording the latest run's settings and
-birth/death counts, plus \code{dissolutions} when a dissolution process is
-configured. \code{unrealized_births} records births that could not occur, by
-period and fertility cell, accumulated across runs since
-\code{unrealized_since}, the start of the first simulated run.
+\code{simulation} component recording selected settings.
 }
 \description{
-Advance a configured model and return a population that can initialize a
-later run. The C++ engine schedules every rate process by cells of at-risk
-units with one exponential clock per process: a cell produces events at its
-input rate times its members, and the member is chosen uniformly or by weight
-models (\code{\link[=weight_model]{weight_model()}}). It executes at continuous times and prioritizes
-death over birth on exact ties. Events execute chronologically. In on-demand
-mode all living females face the fertility schedule. Rate mode uses either
-overall rates for all women (with a warning), or separate \code{union_type}
-schedules. A union-formation process is required. With on-demand union
-formation, use the woman's current partner, or draw one from all eligible men
-using conditional-logit probabilities from the matching formula to form a
-union at the birth. Men must meet the configured minimum age (default 15
-years). Known kin are excluded within the configured generation bound on each
-side of a common ancestor (default two). Hard group exclusions also apply. If
-no eligible man exists, cancel the birth by default. Explicitly set
-\code{cancel_birth_if_no_match = FALSE} to preserve it with unknown father. Rate
-initiation adds age- or duration-specific search events for unpartnered women
-only. Duration schedules for separated/widowed categories measure time since
-the most recent union ended; \code{none} remains age-specific. Failed attempts
-leave the woman searching. Widowhood switches her to unpartnered fertility; a
-new union switches to partnered fertility, preserving birth spacing.
-Unpartnered births do not trigger searches in rate mode. Instead, select a
-father using the same available male pool, screening and \code{father_matching}
-model (falling back to \code{matching}), without forming a union or reserving the
-man. A failed match cancels the birth unless explicitly allowed by the union
-process. Cancellation starts no new birth-spacing interval. On-demand mode
-rejects status schedules. Optional \code{\link[=union_dissolution]{union_dissolution()}} adds one
-duration-dependent annual hazard per union, unaffected by births. It ends the
-episode with \code{end_reason = "dissolution"}, and restores unpartnered
-availability and fertility/search eligibility. Exact ties select death,
-birth, dissolution, conversion, search, then group transition. Dissolution
-and conversion rates may use the wife's and husband's categories
-(\verb{<group>_w}, \verb{<group>_h}). Rate-based formation optionally selects
-age/duration schedules using \code{previous_union}: none, separated, or widowed
-(or pooled none/dissolved). Duration origins and categories are recovered
-from recorded histories. Matching uses male-group weights recalibrated at
-each search; simulation warns once if any search needed approximate weights.
-A separate father model has its own preferences and delta target adjustments.
-Event initiation is unchanged. Optional cohabitation uses rate mode only:
-type is selected from \code{cohab_prob} before marriage/cohabitation-specific
-matching. Conversion retains partners and creates linked episodes, with
-same-person ties ordered death, birth, dissolution, conversion, search.
-Fertility input strata use \code{union_type}.
+Run a demographic simulation with the provided \code{hammel_model} for a given
+time length.
 }
 \details{
-Optional \code{\link[=group_transition]{group_transition()}} adds directed competing age- or duration-based
-moves, with optional sex and union-type strata. A move updates current group
-and affected event/pool/cell state, retaining ancestry. Grouped output always
-includes a transitions tibble; restarts preserve the full transition history.
+A bare minimum model for simulation will contain a population and fertility,
+mortality, and union formation processes, but may contain additional
+processes.
 
-Optional fertility \code{hetfert = het_fert(cv, alpha)} weights eligible mother
-selection within fixed-intensity cells. Supplied positive female weights are
-retained; absent weights are drawn under the simulation seed, and daughters
-inherit on the log scale. Output persons includes \code{hetfert} whenever enabled,
-and omits it whenever disabled, even if the input supplied weights.
+The output of the function is a \code{hammel_population} which can be set as
+the new starting population of the model via \code{\link[=set_population]{set_population()}} to chain
+simulations together. However, users should note that frequent restarts are
+slower than a single simulation with changing rates and models.
 
-Minimum birth spacing is configured in \code{\link[=fertility]{fertility()}} or \code{\link[=set_fertility]{set_fertility()}} and
-uses recorded maternal births, including on restart. Births are generated by
-cell-accounted fertility (D101; see \code{\link[=fertility]{fertility()}}): each one-year
-age/parity/union-type/group cell produces births at its input rate times all
-its members, assigned to an eligible member uniformly or proportionally to
-\code{hetfert} weights when enabled. Births that cannot occur because a cell has
-no eligible member are counted in \code{unrealized_births}. Fertility
-outside supplied bands is zero. Mortality must cover all ages for both sexes,
-ending at \code{Inf}.
-
-Events are recorded at their sampled times in \verb{[start, start + years)}. Rates
-and all times remain in person-year and year units. Newborns get a category
-in each declared group dimension from its \code{\link[=group]{group()}} inheritance rule (random
-parent by default, with maternal fallback); other newborn custom columns are
-missing. Rate tables stratify by the dimensions they have columns for (the
-woman's categories for union searches). Ungrouped tables apply to everyone.
-Missing population groups in a grouped rate table are errors. Groups must be
-declared (\code{\link[=set_groups]{set_groups()}}); a grouped table without a declared group dimension
-is an error. Matching can use group predictors and pair effects. Existing
-custom columns and histories are preserved. Restarting samples new pending
-events and does not reproduce an uninterrupted run exactly. When ancestry is
-tracked, each newborn receives half of each parent's shares, with a missing
-parent contributing its half to unknown ancestry. Initial shares are
-retained, including on restart; grouped populations without shares initialize
-from recorded identities. No additional random draws are made.
-
-Calendar-banded rates change within the same run at \code{time_start}/\code{time_end}
-boundaries, before same-time demographic events. Histories, birth spacing and
-duration origins persist. Rates change in place when a process keeps its
-cells; otherwise its cells are rebuilt with new draws, so adding rate
-boundaries need not preserve a fixed-seed trajectory. Calendar-banded
-\code{cohab_prob} is evaluated at the search instant; probability- only boundaries
-refresh role calibration while retaining pending event dates. Matching and
-inheritance arguments may be direct models or calendar schedules with
-\code{time_start}, \code{time_end} and list-column \code{model}. The current matching model
-is selected at partner/father choice and inheritance at birth. Model- only
-boundaries preserve pending events and earlier histories.
+If no seed is provided, the simulation will use the current RNG. Setting the
+seed will ensure reproducibility of results and simulation will not affect
+existing RNG state.
 }
 \examples{
 population <- generate_uniform_population(100, max_age = 50)

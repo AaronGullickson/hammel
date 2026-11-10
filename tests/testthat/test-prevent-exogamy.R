@@ -76,8 +76,9 @@ test_that("a compatible man anywhere in the pool is always found under restricti
     unions <- run_simulation(model, 0.1, seed = seed)$unions
     if (nrow(unions)) unions$husband_id[1] else NA_real_
   }, numeric(1))
-  births <- vapply(1:30, function(seed) count_run_events(run_simulation(model, 0.1, seed =
-    seed), "births"), numeric(1))
+  births <- vapply(1:30, function(seed) {
+    count_run_events(run_simulation(model, 0.1, seed = seed), "births")
+  }, numeric(1))
   expect_true(all(husbands[births > 0] == 2))
 })
 

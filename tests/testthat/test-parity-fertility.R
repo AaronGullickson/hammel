@@ -140,8 +140,10 @@ test_that("grouped zero-spacing parity schedules match shared rates in distribut
     set_union_formation("rate",rates=data.frame(age_start=15,age_end=Inf,rate=.3),kinship_generations=0L)
   rates <- do.call(rbind,lapply(0:2,function(k) transform(base,parity_start=k,parity_end=if(k==2) Inf else k+1)))
   # Different cell structure, same intensity: compare birth counts statistically.
-  a <- count_run_events(run_simulation(set_fertility(model,rates,birth_interval=0),8,
-    44), "births")
+  a <- count_run_events(
+    run_simulation(set_fertility(model, rates, birth_interval = 0), 8, 44),
+    "births"
+  )
   b <- count_run_events(run_simulation(model,8,45), "births")
   expect_lt(abs(a - b), 4 * sqrt(a + b))
 })
