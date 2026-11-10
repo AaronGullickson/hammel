@@ -114,9 +114,10 @@ Cohabitation and conversion settings within union formation, including preparati
 
 ### `R/extract_kin.R`
 
-Extract kin and validate generation limits shared with matching.
+Extract kin, count living kin over time, and validate generation limits
+shared with matching.
 
-- Functions: **`extract_kin()`**, `validate_kinship_generations()`.
+- Functions: **`extract_kin()`**, **`count_kin()`**, `validate_kinship_generations()`, `kin_relationship()`, `kin_relationship_types()`, `living_kin_categories()`.
 
 ### `R/extract_relationships.R`
 

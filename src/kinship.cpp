@@ -187,8 +187,8 @@ DataFrame extract_kin_cpp(DataFrame persons, NumericVector ego_ids,
     for (const auto& ancestor : kinship.ancestors(relative))
       relatives_of_ancestor[ancestor.person].push_back(r);
   }
-  std::vector<double> out_ego, out_relative, out_ancestor;
-  std::vector<int> out_ego_distance, out_relative_distance;
+  std::vector<double> out_ego, out_relative;
+  std::vector<int> out_ego_distance, out_relative_distance, out_ancestors;
   std::vector<std::string> out_ego_lineage, out_relative_lineage;
   std::vector<int> out_ego_complete, out_relative_complete;
   std::vector<int> seen(relative_ids.size(), -1);
@@ -207,29 +207,43 @@ DataFrame extract_kin_cpp(DataFrame persons, NumericVector ego_ids,
     std::sort(candidates.begin(), candidates.end());
     for (int r : candidates) {
       const int relative = index.at(relative_ids[r]);
-      auto evidence = kinship.shared_ancestors(ego, relative);
-      long long nearest = std::numeric_limits<long long>::max();
-      for (const auto& shared : evidence)
-        nearest = std::min(nearest, static_cast<long long>(shared.ego_distance) + shared.relative_distance);
-      std::sort(evidence.begin(), evidence.end(), [&](const hammel::KinEvidence& a, const hammel::KinEvidence& b) {
-        return ids[a.ancestor] < ids[b.ancestor];
-      });
+      const auto evidence = kinship.shared_ancestors(ego, relative);
+      // Closest ancestors minimize the distance sum; among them, keep the
+      // pair with the smaller ego distance (differs only in collapsed
+      // pedigrees). One row per pair counts and combines those ancestors.
+      int best_sum = std::numeric_limits<int>::max();
+      int best_ego = std::numeric_limits<int>::max();
       for (const auto& shared : evidence) {
-        if (static_cast<long long>(shared.ego_distance) + shared.relative_distance != nearest) continue;
-        out_ego.push_back(ego_ids[e]); out_relative.push_back(relative_ids[r]);
-        out_ancestor.push_back(ids[shared.ancestor]);
-        out_ego_distance.push_back(shared.ego_distance);
-        out_relative_distance.push_back(shared.relative_distance);
-        out_ego_lineage.push_back(kin_lineage(shared.ego_lineage));
-        out_relative_lineage.push_back(kin_lineage(shared.relative_lineage));
-        out_ego_complete.push_back(kinship.ancestry_complete(ego));
-        out_relative_complete.push_back(kinship.ancestry_complete(relative));
+        const int sum = shared.ego_distance + shared.relative_distance;
+        if (sum < best_sum || (sum == best_sum && shared.ego_distance < best_ego)) {
+          best_sum = sum;
+          best_ego = shared.ego_distance;
+        }
       }
+      int count = 0;
+      unsigned char ego_lineage = 0, relative_lineage = 0;
+      for (const auto& shared : evidence) {
+        if (shared.ego_distance != best_ego ||
+            shared.ego_distance + shared.relative_distance != best_sum) continue;
+        ++count;
+        ego_lineage |= shared.ego_lineage;
+        relative_lineage |= shared.relative_lineage;
+      }
+      if (!count) continue;
+      out_ego.push_back(ego_ids[e]); out_relative.push_back(relative_ids[r]);
+      out_ego_distance.push_back(best_ego);
+      out_relative_distance.push_back(best_sum - best_ego);
+      out_ancestors.push_back(count);
+      out_ego_lineage.push_back(kin_lineage(ego_lineage));
+      out_relative_lineage.push_back(kin_lineage(relative_lineage));
+      out_ego_complete.push_back(kinship.ancestry_complete(ego));
+      out_relative_complete.push_back(kinship.ancestry_complete(relative));
     }
   }
   return DataFrame::create(_["ego_id"] = out_ego, _["relative_id"] = out_relative,
-    _["common_ancestor_id"] = out_ancestor, _["ego_distance"] = out_ego_distance,
-    _["relative_distance"] = out_relative_distance, _["ego_lineage"] = out_ego_lineage,
+    _["ego_distance"] = out_ego_distance,
+    _["relative_distance"] = out_relative_distance,
+    _["n_common_ancestors"] = out_ancestors, _["ego_lineage"] = out_ego_lineage,
     _["relative_lineage"] = out_relative_lineage,
     _["ego_ancestry_complete"] = LogicalVector(out_ego_complete.begin(), out_ego_complete.end()),
     _["relative_ancestry_complete"] = LogicalVector(out_relative_complete.begin(), out_relative_complete.end()));

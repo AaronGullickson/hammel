@@ -19,14 +19,15 @@ side, default \code{2}. Zero returns no kin between distinct people.}
 all recorded persons. Unknown IDs are errors; empty vectors return no rows.}
 }
 \value{
-A tibble with \code{ego_id}, \code{relative_id}, \code{common_ancestor_id},
-\code{ego_distance}, \code{relative_distance}, \code{ego_lineage}, \code{relative_lineage},
+A tibble with one row per ego and relative: \code{ego_id},
+\code{relative_id}, \code{relationship}, \code{ego_distance}, \code{relative_distance},
+\code{n_common_ancestors}, \code{ego_lineage}, \code{relative_lineage},
 \code{ego_ancestry_complete}, and \code{relative_ancestry_complete}. Lineage is
-\code{"self"}, \code{"maternal"}, \code{"paternal"}, or \code{"both"} for shortest routes.
-Completeness refers only to required parent links within the chosen depth.
-Empty results retain the same column types; no rows does not prove
-unrelatedness or complete ancestry. Input ego/relative order is retained;
-tied ancestor IDs are sorted.
+\code{"self"}, \code{"maternal"}, \code{"paternal"}, or \code{"both"} for shortest routes to
+the closest common ancestors. Completeness refers only to required parent
+links within the chosen depth. Empty results retain the same column
+types; no rows does not prove unrelatedness or complete ancestry. Input
+ego/relative order is retained.
 }
 \description{
 Find recorded common ancestors within \code{generations} parent steps of both an
@@ -38,13 +39,15 @@ nieces/nephews, and first cousins are included, including half relationships.
 Great-grandparents and first cousins once removed require depth three.
 }
 \details{
-Returns the closest common ancestors by minimum sum of the two distances
-within the requested bounds. Equally close ancestors have separate rows;
-count distinct relative IDs when counting people. Does not assign
-relationship categories or infer full versus half kin from missing links. The
-ego itself is excluded. Includes deceased and living people in recorded
-history, without automatic filtering to a census date or living kin. Ancestry
-cycles are errors.
+Returns one row per relative, describing their closest common ancestors:
+those with the smallest sum of the two distances within the requested
+bounds. \code{n_common_ancestors} counts them, ordinarily 2 for full kin and 1
+for half kin; a count of 1 is only recorded evidence when a parent is
+unknown. \code{relationship} names the distance pair, such as \code{"sibling"},
+\code{"aunt_uncle"} or \code{"first_cousin"}, with full and half kin together. The ego
+itself is excluded. Includes deceased and living people in recorded history;
+use \code{\link[=count_kin]{count_kin()}} for living kin at given times. Ancestry cycles
+are errors.
 }
 \examples{
 persons <- data.frame(
@@ -54,4 +57,7 @@ persons <- data.frame(
 )
 population <- hammel_population(persons, end_time = 0)
 extract_kin(population, ego_ids = 30)
+}
+\seealso{
+\code{\link[=count_kin]{count_kin()}}
 }
