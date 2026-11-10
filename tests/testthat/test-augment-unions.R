@@ -11,7 +11,7 @@ detailed_union_population <- function() {
 test_that("detailed unions attach spouses by ID and preserve episodes and input", {
   population <- detailed_union_population()
   original <- population
-  result <- get_detailed_unions(population)
+  result <- augment_unions(population)
   expect_s3_class(result, "tbl_df")
   expect_identical(result[names(population$unions)], population$unions)
   expect_equal(result$birth_time_w, c(-20, -20))
@@ -22,23 +22,23 @@ test_that("detailed unions attach spouses by ID and preserve episodes and input"
   expect_identical(result$group_h, c(30L, 20L))
   expect_identical(population, original)
   population["end_time"] <- list(NULL)
-  expect_error(get_detailed_unions(population), "end_time")
+  expect_error(augment_unions(population), "end_time")
 })
 
 test_that("groups are optional and their labels retain their input types", {
   population <- detailed_union_population()
   population$persons$group <- c("B", "A", "C")
   population$groups <- list(group = group())
-  expect_identical(get_detailed_unions(population)$group_h, c("C", "B"))
+  expect_identical(augment_unions(population)$group_h, c("C", "B"))
   population$persons$group <- NULL
   population$groups <- NULL
-  expect_false(any(c("group_w", "group_h") %in% names(get_detailed_unions(population))))
+  expect_false(any(c("group_w", "group_h") %in% names(augment_unions(population))))
 })
 
 test_that("empty union histories have the full typed enriched schema", {
   population <- detailed_union_population()
   population$unions <- population$unions[FALSE, ]
-  result <- get_detailed_unions(population)
+  result <- augment_unions(population)
   expect_s3_class(result, "tbl_df")
   expect_equal(nrow(result), 0)
   expect_type(result$group_w, "integer")
@@ -46,19 +46,19 @@ test_that("empty union histories have the full typed enriched schema", {
   expect_named(result, c(names(population$unions), "birth_time_w", "death_time_w", "group_w",
                          "birth_time_h", "death_time_h", "group_h"))
   population <- generate_uniform_population(0)
-  expect_equal(nrow(get_detailed_unions(population)), 0)
-  expect_named(get_detailed_unions(population), c(names(population$unions),
+  expect_equal(nrow(augment_unions(population)), 0)
+  expect_named(augment_unions(population), c(names(population$unions),
     "birth_time_w", "death_time_w", "birth_time_h", "death_time_h"))
 })
 
 test_that("detailed unions reject invalid histories and conflicting columns", {
   population <- detailed_union_population()
-  expect_error(get_detailed_unions(population$persons), "hammel_population")
+  expect_error(augment_unions(population$persons), "hammel_population")
   population$unions$birth_time_w <- 100
-  expect_error(get_detailed_unions(population), "conflict.*birth_time_w")
+  expect_error(augment_unions(population), "conflict.*birth_time_w")
   population <- detailed_union_population()
   population$unions$husband_id[1] <- 99
-  expect_error(get_detailed_unions(population), "refer to two distinct persons")
+  expect_error(augment_unions(population), "refer to two distinct persons")
 })
 
 test_that("partner groups describe formation rather than identity after later moves", {
@@ -69,7 +69,7 @@ test_that("partner groups describe formation rather than identity after later mo
     time = c(1.75, 1.5, .5, .75), origin = c(40L, 50L, 10L, 60L),
     destination = c(10L, 30L, 40L, 20L))
   original <- population
-  out <- get_detailed_unions(population)
+  out <- augment_unions(population)
   expect_identical(out$group_w, c(40L, 10L))
   expect_identical(out$group_h, c(50L, 60L))
   expect_identical(out[names(population$unions)], population$unions)
@@ -78,9 +78,9 @@ test_that("partner groups describe formation rather than identity after later mo
   population$persons$group[population$persons$person_id == 10] <- 80L
   population$transitions <- rbind(population$transitions,
     tibble::tibble(person_id = 10, time = 1.9, origin = 10L, destination = 80L))
-  expect_identical(get_detailed_unions(population)$group_w, out$group_w)
+  expect_identical(augment_unions(population)$group_w, out$group_w)
   population$unions <- population$unions[0, ]
-  empty <- get_detailed_unions(population)
+  empty <- augment_unions(population)
   expect_identical(empty$group_w, integer())
   expect_identical(empty$group_h, integer())
 })
@@ -91,7 +91,7 @@ test_that("formation reconstruction preserves character labels", {
   population$groups <- list(group = group())
   population$transitions <- tibble::tibble(person_id = c(10, 70), time = c(1, 1.75),
     origin = c("X", "Y"), destination = c("A", "C"))
-  out <- get_detailed_unions(population)
+  out <- augment_unions(population)
   expect_identical(out$group_w, c("A", "X"))
   expect_identical(out$group_h, c("Y", "B"))
 })

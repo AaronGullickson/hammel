@@ -155,7 +155,7 @@ calculate_population_size(pop_final, seq(0, 300, 5), by = "race") |>
 #| fig-cap: Log-odds ratio over time (5 year intervals) between three groups. 95% confidence bands shown. Dotted lines show expected plateaus for the A:B group and A:AB and B:AB groups. 
 
 crosstabs <- pop_final |>
-  get_detailed_unions() |>
+  augment_unions() |>
   #mutate(time_period = cut(start_time, breaks = seq(0, 300, 5))) |>
   mutate(time_mid = floor(start_time / 5) * 5 + 2.5) |>
   count(time_mid, race_w, race_h) |>
@@ -199,7 +199,7 @@ crosstabs |>
 #| fig-cap: Gender ratio over time (5 year intervals) within A:B marriages. 95% confidence bands shown. Dotted lines show the expected ratio of 1. 
 
 ratio <- pop_final |>
-  get_detailed_unions() |>
+  augment_unions() |>
   #mutate(time_period = cut(start_time, breaks = seq(0, 300, 5))) |>
   mutate(time_mid = floor(start_time / 5) * 5 + 2.5) |>
   count(time_mid, race_w, race_h) |>

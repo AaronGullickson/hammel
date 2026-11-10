@@ -86,7 +86,7 @@ Births/deaths and union events preceding a same-time transition use the origin;
 population snapshots at that time use the destination. No missing prehistory
 is imputed.
 
-`get_detailed_unions()` reconstructs `<group>_w` and `<group>_h` for every
+`augment_unions()` reconstructs `<group>_w` and `<group>_h` for every
 dimension at each union's start, before a same-time transition, rather than joining final identities.
 Later moves therefore do not relabel the pairings used to assess formation.
 

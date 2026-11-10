@@ -42,9 +42,9 @@ For a new function, first identify its responsibility and closest existing consu
 
 - **Observed rates versus demographic summaries:** all seven observed event-rate calculators belong together, including the singularly named `calculate_cohab_convert_rate()`. Keep `calculate_entry_rates()`, `person_rate_rows()`, and `add_unrealized_births()` there as closely related calculation helpers. TFR/PATFR share `calculate_tfr.R`; life tables and population snapshots have distinct files. Shared rate-summary checks live in `summary_rates.R`.
 
-- **Shared analysis helpers:** `analysis_utils.R` contains history preparation, stratification, and output construction shared by rate calculators, `calculate_population_size()`, and `get_detailed_unions()`. Its scope is demographic analysis of recorded histories, including supplied populations. Helpers specific to event-rate calculation, including confidence intervals and exposure-counting wrappers, stay in `calculate_rates.R`.
+- **Shared analysis helpers:** `analysis_utils.R` contains history preparation, stratification, and output construction shared by rate calculators, `calculate_population_size()`, and `augment_unions()`. Its scope is demographic analysis of recorded histories, including supplied populations. Helpers specific to event-rate calculation, including confidence intervals and exposure-counting wrappers, stay in `calculate_rates.R`.
 
-- **Relationship extraction:** the three small `get_*` relationship functions share `extract_relationships.R`. Kinship remains separate because it has its own traversal contract and shared generation checks. Public names do not change.
+- **History augmentation:** `augment_persons()` and `augment_unions()` add relationship-derived columns to person and union histories; `extract_unpartnered_births()` selects births from augmented person histories. They share `augment_histories.R` (D169). Kinship remains separate because it has its own traversal contract and shared generation checks.
 
 - **Cohabitation:** keep its settings/conversion helpers together even though cohabitation is configured through the union-formation process, rather than introducing a new process or public constructor.
 
@@ -77,6 +77,12 @@ Shared history preparation, stratification, and output construction for demograp
 Ancestry schema, normalization, and initialization.
 
 - Functions: `tracked_ancestry()`, `as_ancestry_list()`, `validate_ancestry()`, `validate_ancestry_table()`, `normalize_population_ancestry()`, `ancestry_matrix()`.
+
+### `R/augment_histories.R`
+
+Augment person and union histories with relationship information and extract unpartnered births.
+
+- Functions: **`augment_unions()`**, **`augment_persons()`**, **`extract_unpartnered_births()`**.
 
 ### `R/calculate_life_table.R`
 
@@ -120,12 +126,6 @@ Extract kin, count living kin over time, and validate generation limits
 shared with matching.
 
 - Functions: **`extract_kin()`**, **`count_kin()`**, `validate_kinship_generations()`, `kin_relationship()`, `kin_relationship_types()`, `living_kin_categories()`.
-
-### `R/extract_relationships.R`
-
-Extract parent, union, and unpartnered-birth relationship tables.
-
-- Functions: **`get_detailed_unions()`**, **`get_parent_info()`**, **`get_unpartnered_births()`**.
 
 ### `R/fertility.R`
 

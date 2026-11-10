@@ -134,7 +134,7 @@ rate table (D083); see [remarriage](remarriage.md). Optional rate-mode cohabitat
 type-specific rates and same-partner conversion (D085/D086); see
 [cohabitation](cohabitation.md). Separate demographic, partnership-entry,
 marriage-entry, dissolution and conversion observations use their documented
-risk denominators. `get_unpartnered_births()` supports father-matching assessment.
+risk denominators. `extract_unpartnered_births()` supports father-matching assessment.
 Acceptance retains the documented fertility-transition, sparse-pool,
 initialization, and calibration limitations; it does not authorize later work.
 

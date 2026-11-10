@@ -349,7 +349,7 @@ behavior; default Lexis summaries use all female exposure, while
 
 ## Parent information
 
-`get_parent_info(population)` enriches the full persons table with
+`augment_persons(population)` enriches the full persons table with
 `age_mother` and `age_father` at each person's birth, in years, and
 `<group>_mother` and `<group>_father` for each declared dimension (such as
 `race_mother`; `group_mother` for a dimension named `group`).
@@ -358,7 +358,7 @@ missing values; founder rows remain present. For example, birth in 2000.5
 and maternal birth in 1975.25 give `age_mother = 25.25`.
 
 ```r
-parent_info <- get_parent_info(result)
+parent_info <- augment_persons(result)
 cross_group_births <- parent_info |>
   dplyr::filter(!is.na(group_mother), !is.na(group_father),
                 group_mother != group_father)
@@ -373,7 +373,7 @@ Parent groups are recorded identities, not reconstructed past transitions.
 
 ### Detailed union records
 
-`get_detailed_unions(population)` accepts a `hammel_population` and returns a
+`augment_unions(population)` accepts a `hammel_population` and returns a
 separate tibble containing all union rows and columns, in their original order,
 with partner attributes matched through `wife_id` and `husband_id`. It adds
 `birth_time_w`, `death_time_w`, `birth_time_h`, and `death_time_h`, plus
@@ -395,7 +395,7 @@ dates from those IDs regardless of their row positions in persons; repeated
 unions reuse those attributes while retaining distinct episode records.
 
 ```r
-detailed_unions <- get_detailed_unions(result)
+detailed_unions <- augment_unions(result)
 ```
 
 ### Current union type exposure and events
@@ -554,11 +554,11 @@ Finite last axis breaks gain Inf, as with the other rate helpers.
 
 ## Births with fathers selected outside partnerships
 
-`get_unpartnered_births(population)` returns parent-enriched person rows for
+`extract_unpartnered_births(population)` returns parent-enriched person rows for
 births with known mother and father where the mother had no active partnership.
 It excludes both marriage and cohabitation coverage, without deduplicating
 parental pairs: each birth is a father-selection event. All input person columns
-and the parent ages/groups from `get_parent_info()` are retained in person-row
+and the parent ages/groups from `augment_persons()` are retained in person-row
 order. Founders and births missing either parent are omitted. Complete histories
 are needed; no recorded partnership is interpreted as unpartnered, not proof of
 never partnering. Formation coverage is half-open; exact dissolution/conversion
@@ -569,7 +569,7 @@ is imposed; users can filter birth_time afterward. The input is not modified.
 
 ```r
 father_crosstabs <- results |>
-  purrr::map(get_unpartnered_births) |>
+  purrr::map(extract_unpartnered_births) |>
   dplyr::bind_rows(.id = "replication") |>
   dplyr::count(replication, group_mother, group_father)
 ```

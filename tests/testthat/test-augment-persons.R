@@ -10,7 +10,7 @@ parent_info_population <- function() {
 test_that("parent information matches IDs and preserves person histories", {
   population <- parent_info_population()
   original <- population
-  result <- get_parent_info(population)
+  result <- augment_persons(population)
   expect_s3_class(result, "tbl_df")
   expect_identical(result[names(population$persons)], population$persons)
   expect_identical(result$age_mother, c(25.25, NA_real_, NA_real_, 26.75))
@@ -19,22 +19,22 @@ test_that("parent information matches IDs and preserves person histories", {
   expect_identical(result$group_father, c(10L, NA_integer_, NA_integer_, NA_integer_))
   expect_identical(population, original)
   population["end_time"] <- list(NULL)
-  expect_error(get_parent_info(population), "end_time")
+  expect_error(augment_persons(population), "end_time")
   population$end_time <- original$end_time
   population$persons <- as.data.frame(population$persons)
-  expect_identical(get_parent_info(population), result)
+  expect_identical(augment_persons(population), result)
 })
 
 test_that("parent groups are optional and retain their types", {
   population <- parent_info_population()
   population$persons$group <- c("AB", "A", "B", "B")
   population$groups <- list(group = group())
-  result <- get_parent_info(population)
+  result <- augment_persons(population)
   expect_identical(result$group_mother, c("B", NA_character_, NA_character_, "B"))
   expect_identical(result$group_father, c("A", NA_character_, NA_character_, NA_character_))
   population$persons$group <- NULL
   population$groups <- NULL
-  result <- get_parent_info(population)
+  result <- augment_persons(population)
   expect_named(result, c(names(population$persons), "age_mother", "age_father"))
   expect_identical(result$age_mother, c(25.25, NA_real_, NA_real_, 26.75))
 })
@@ -43,7 +43,7 @@ test_that("empty populations and unknown parents keep an enriched typed schema",
   population <- parent_info_population()
   population$persons <- population$persons[FALSE, ]
   population$ancestry <- population$ancestry[FALSE, ]
-  result <- get_parent_info(population)
+  result <- augment_persons(population)
   expect_s3_class(result, "tbl_df")
   expect_equal(nrow(result), 0)
   expect_named(result, c(names(population$persons), "age_mother", "age_father",
@@ -51,20 +51,20 @@ test_that("empty populations and unknown parents keep an enriched typed schema",
   expect_type(result$age_mother, "double")
   expect_type(result$group_father, "integer")
   empty <- generate_uniform_population(0)
-  expect_named(get_parent_info(empty), c(names(empty$persons), "age_mother", "age_father"))
-  founders <- get_parent_info(generate_uniform_population(10))
+  expect_named(augment_persons(empty), c(names(empty$persons), "age_mother", "age_father"))
+  founders <- augment_persons(generate_uniform_population(10))
   expect_true(all(is.na(founders$age_mother)))
   expect_true(all(is.na(founders$age_father)))
 })
 
 test_that("parent information rejects invalid input and conflicting columns", {
   population <- parent_info_population()
-  expect_error(get_parent_info(population$persons), "hammel_population")
+  expect_error(augment_persons(population$persons), "hammel_population")
   for (column in c("age_mother", "age_father", "group_mother", "group_father")) {
     bad <- population
     bad$persons[[column]] <- 1
-    expect_error(get_parent_info(bad), paste0("conflict.*", column))
+    expect_error(augment_persons(bad), paste0("conflict.*", column))
   }
   population$persons$mother_id[1] <- 99
-  expect_error(get_parent_info(population), "mother_id")
+  expect_error(augment_persons(population), "mother_id")
 })

@@ -1,4 +1,4 @@
-# Extract parent, partner, and unpartnered-birth information from histories.
+# Augment person and union histories and extract unpartnered births.
 
 # PUBLIC FUNCTIONS ---------------------------------------------------------
 
@@ -29,8 +29,8 @@
 #' @export
 #' @examples
 #' population <- generate_uniform_population(10)
-#' get_detailed_unions(population)
-get_detailed_unions <- function(population) {
+#' augment_unions(population)
+augment_unions <- function(population) {
   validate_population(population)
   persons <- population$persons
   result <- tibble::as_tibble(population$unions)
@@ -110,8 +110,8 @@ get_detailed_unions <- function(population) {
 #' @export
 #' @examples
 #' population <- generate_uniform_population(10)
-#' get_parent_info(population)
-get_parent_info <- function(population) {
+#' augment_persons(population)
+augment_persons <- function(population) {
   validate_population(population)
   persons <- population$persons
   result <- tibble::as_tibble(persons)
@@ -149,7 +149,7 @@ get_parent_info <- function(population) {
 #' Extract births with known parents to unpartnered mothers
 #'
 #' Return births where the mother was outside both cohabitation and marriage,
-#' with parent ages and optional groups supplied by [get_parent_info()]. Known
+#' with parent ages and optional groups supplied by [augment_persons()]. Known
 #' mother and father IDs are required. Each birth is retained separately,
 #' including repeated parental pairs; missing-parent records and founders are
 #' omitted. These rows can be used to examine nonpartnership father matching.
@@ -171,9 +171,9 @@ get_parent_info <- function(population) {
 #' @export
 #' @examples
 #' population <- generate_uniform_population(10)
-#' get_unpartnered_births(population)
-get_unpartnered_births <- function(population) {
-  parents <- get_parent_info(population)
+#' extract_unpartnered_births(population)
+extract_unpartnered_births <- function(population) {
+  parents <- augment_persons(population)
   rows <- unpartnered_birth_rows_cpp(population$persons, population$unions)
   parents[rows, , drop = FALSE]
 }

@@ -431,7 +431,7 @@ inferring them again; explicit `categories` still replace them.
   still require one dimension (stage 5).
 - Inheritance calendar schedules work for every dimension.
 - `calculate_transition_rates(..., group = NULL)` counts one dimension's
-  transitions, returning `origin`/`destination`. `get_detailed_unions()`
+  transitions, returning `origin`/`destination`. `augment_unions()`
   replays each dimension's transitions to union start. Analysis code works on a
   one-dimension view of the population.
 - With one dimension, results are bit-identical to stage 2 when both builds

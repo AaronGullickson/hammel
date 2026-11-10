@@ -164,7 +164,7 @@ test_that("cohabitation and marriage use distinct matching and diagnostic weight
   model$processes$union_formation$cohab_matching <- matching_model(~1,numeric(),group_exogamy=c("A:B"=10))
   model$processes$union_formation$diagnostics <- TRUE
   result <- run_simulation(model,.3,713)
-  u <- get_detailed_unions(result)
+  u <- augment_unions(result)
   marriage <- subset(u,union_type=="marriage")
   cohab <- subset(u,union_type=="cohab")
   expect_gt(nrow(marriage),50)
@@ -186,7 +186,7 @@ test_that("cohab probabilities select group and previous category and require co
   p$prob <- as.numeric(p$group=="B" & p$previous_union=="none")
   model$processes$union_formation$cohab_prob <- p
   result <- run_simulation(model,.5,813)
-  u <- get_detailed_unions(result)
+  u <- augment_unions(result)
   expect_true(all(u$union_type[u$group_w=="B"]=="cohab"))
   expect_true(all(u$union_type[u$group_w=="A"]=="marriage"))
   bad <- model

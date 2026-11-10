@@ -188,7 +188,7 @@ test_that("a single dimension may have any name, including in analysis", {
   tracked <- run_simulation(set_groups(model, region = group(ancestry = TRUE)),
     1, seed = 7)
   expect_named(calculate_population_size(tracked, 1, by = "region"), c("time", "region", "population"))
-  expect_true(all(c("region_w", "region_h") %in% names(get_detailed_unions(tracked))))
+  expect_true(all(c("region_w", "region_h") %in% names(augment_unions(tracked))))
 })
 
 test_that("remaining single-dimension features and ancestry inputs are checked", {
@@ -228,7 +228,7 @@ test_that("unrealized births follow a woman's current group after a transition",
 
 test_that("detailed unions add each dimension's partner categories", {
   out <- run_simulation(two_dimension_model(union = TRUE), .5, seed = 10)
-  u <- get_detailed_unions(out)
+  u <- augment_unions(out)
   expect_true(all(c("race_w", "race_h", "region_w", "region_h") %in% names(u)))
   expect_identical(u$race_h, out$persons$race[match(u$husband_id, out$persons$person_id)])
   # One dimension of any name, replayed through transitions to formation.
@@ -240,7 +240,7 @@ test_that("detailed unions add each dimension's partner categories", {
     set_group_transition(data.frame(origin = "A", destination = "B", age_start = 0,
                                     age_end = Inf, rate = .5))
   out <- run_simulation(m, 3, seed = 11)
-  u <- get_detailed_unions(out)
+  u <- augment_unions(out)
   expect_false(any(c("group_w", "group_h") %in% names(u)))
   moved <- out$transitions$person_id[out$transitions$time > 0]
   late <- u[u$wife_id %in% moved & u$start_time > 0, ]
@@ -392,7 +392,7 @@ test_that("detailed unions replay transitions in every dimension", {
     data.frame(origin = "A", destination = "B", age_start = 0, age_end = Inf, rate = 1), group = "race")
   model <- set_union_formation(model, "rate", rates = data.frame(age_start = 15, age_end = 50, rate = .5))
   out <- suppressWarnings(run_simulation(model, 2, seed = 26))
-  u <- get_detailed_unions(out)
+  u <- augment_unions(out)
   expect_gt(nrow(u), 20)
   tx <- out$transitions
   # A wife's category at formation: her latest move before it, or her
@@ -739,7 +739,7 @@ test_that("cohabitation probabilities and conversion use declared dimensions", {
   model <- set_fertility(model, data.frame(union_type = c("unpartnered", "cohab", "marriage"),
     age_start = 15, age_end = 50, rate = 0))
   out <- run_simulation(model, 1, seed = 62)
-  u <- get_detailed_unions(out)
+  u <- augment_unions(out)
   first <- u[is.na(u$previous_cohab_id), ]
   expect_gt(nrow(first), 50)
   # Women of race A cohabit, women of race B marry.
@@ -849,7 +849,7 @@ test_that("models naming different dimensions share the combination", {
   expect_gt(nrow(race_pairs), 30)
   expect_true(all(race_pairs$w == race_pairs$h))
   # Cohabitations use the cohabitation model's region prohibition.
-  u <- get_detailed_unions(out)
+  u <- augment_unions(out)
   cohab <- u[u$union_type == "cohab", ]
   expect_gt(nrow(cohab), 10)
   expect_true(all(cohab$region_w == cohab$region_h))
@@ -858,7 +858,7 @@ test_that("models naming different dimensions share the combination", {
   # Each region is calibrated as its own market (D138), so targets are met.
   expect_no_warning(out <- run_simulation(matching_pair_model(schedule), 2,
     seed = 74))
-  u <- get_detailed_unions(out)
+  u <- augment_unions(out)
   early <- u$start_time < 1
   late <- !early
   expect_gt(sum(early), 30)
@@ -872,7 +872,7 @@ test_that("models naming different dimensions share the combination", {
     group = "region")
   withr::local_options(hammel.check_cells = TRUE)
   expect_no_warning(out <- run_simulation(moving, 1, seed = 75))
-  u <- get_detailed_unions(out)
+  u <- augment_unions(out)
   expect_gt(sum(out$transitions$group == "region"), 50)
   expect_true(all(u$region_w == u$region_h))
 })
@@ -939,7 +939,7 @@ test_that("tables give cross-dimension effects, such as race exogamy that differ
                             log_odds = NA))
   out <- run_simulation(matching_pair_model(age_gap_matching_model(0, 5,
     group_exogamy = table)), 2, seed = 82)
-  u <- get_detailed_unions(out)
+  u <- augment_unions(out)
   expect_gt(nrow(u), 100)
   expect_true(all(u$region_w == u$region_h))
   south <- u$region_w == "S"
@@ -1003,7 +1003,7 @@ test_that("review regressions: absent-category schedules, dimensions named group
   out <- run_simulation(set_mortality(base(pop), data.frame(sex = c("m", "f"),
     age_start = 0, age_end = Inf, rate = .01)),
                   3, seed = 3)
-  expect_no_warning(info <- get_parent_info(out))
+  expect_no_warning(info <- augment_persons(out))
   expect_true(all(c("race_mother", "race_father", "region_mother", "region_father") %in% names(info)))
   expect_false(any(c("group_mother", "group_father") %in% names(info)))
   kids <- !is.na(info$mother_id)

@@ -335,7 +335,7 @@ test_that("strict endogamy has zero group log weights even with delta adjustment
       matching = adjusted, diagnostics = TRUE), 15, seed = 912))
     expect_identical(result, baseline)
     expect_true(all(as.matrix(result$unions[c(".log_weight_A", ".log_weight_B")]) == 0))
-    unions <- get_detailed_unions(result)
+    unions <- augment_unions(result)
     expect_true(all(unions$group_w == unions$group_h))
   }
 })
@@ -364,7 +364,7 @@ test_that("weighted choice handles identities created during the run", {
   expect_no_warning(result <- run_simulation(model, 40, seed = 913))
   expect_identical(result, run_simulation(model, 40, seed = 913))
   expect_true(any(result$persons$group == "AB"))
-  unions <- get_detailed_unions(result)
+  unions <- augment_unions(result)
   expect_true(any(unions$group_w == "AB" | unions$group_h == "AB"))
   expect_true(all(c(".log_weight_A", ".log_weight_B", ".log_weight_AB") %in% names(result$unions)))
   restart <- run_simulation(set_population(model, result), 5, seed = 914)

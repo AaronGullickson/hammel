@@ -36,7 +36,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Shared history preparation and analysis strata | `R/analysis_utils.R`; native observation in `src/observation.cpp` |
 | Observed event-rate calculations | `R/calculate_rates.R`; native counts in `src/observation.cpp` and `src/demography.cpp` |
 | Population counts and rate summaries | `R/calculate_population_size.R`, `R/calculate_tfr.R`, `R/calculate_life_table.R`, `R/summary_rates.R` |
-| Relationship extraction | `R/extract_relationships.R` |
+| History augmentation and unpartnered-birth extraction | `R/augment_histories.R` |
 | Software and analytical validation | `tests/testthat/` |
 | Replication assessment | `validation/milestone1.qmd` through `validation/milestone9.qmd` |
 
@@ -264,17 +264,17 @@ type. `calculate_cohab_convert_rate()` reports conversion per cohabitation
 year by duration or woman's age, optionally by woman's group. These risk
 sets differ and must not be treated as interchangeable search-rate estimates.
 
-`get_unpartnered_births()` extracts known-parent births outside either union
+`extract_unpartnered_births()` extracts known-parent births outside either union
 type, adding parent ages/groups for father-matching assessment. Each birth is
 retained, including repeated parental pairs. Birth-first dissolution/conversion
 boundaries and half-open ordinary coverage match demographic observations.
 
-`get_detailed_unions(population)` returns a separate tibble preserving union
+`augment_unions(population)` returns a separate tibble preserving union
 records and appending each partner's birth/death time and optional group at
 union formation, reconstructed from transition histories, with `_w` and `_h` suffixes. It joins by partner IDs, preserves types and row order,
 and leaves the population unchanged. See [demographic analysis](demographic-analysis.md).
 
-`get_parent_info(population)` returns a separate tibble preserving all persons
+`augment_persons(population)` returns a separate tibble preserving all persons
 and their columns, adding `age_mother` and `age_father` in years at each
 person's birth, plus `<group>_mother` and `<group>_father` for each declared
 group dimension (such as `race_mother`).
