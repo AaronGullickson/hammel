@@ -5,64 +5,63 @@
 
 # HMD MORTALITY IMPORT -----------------------------------
 
-#' Download prepared mortality rates from the Human Mortality Database
+#' Download prepared mortality rates from the HMD
 #'
-#' Download a native HMD mortality product through HMDHFDplus. Male and female
-#' central death rates retain their person-year units and Hammel's piecewise
-#' constant hazard interpretation. Rates are not rescaled by age/period width.
-#' Missing retained rates are rejected. Optional `open_age` pools source deaths
-#' and exposure into a final open age band, permitting missing Mx in that tail.
+#' @description
+#'
+#' Download mortality rate schedules from the Human Mortality Database in the
+#' format that [mortality()] expects. Requires user name and password and the
+#' HMDHFDplus package.
+#'
+#' @details
+#'
+#' To use this function, users will need to install the HMDHFDplus package with:
+#'
+#' ```r
+#' install.packages("HMDHFDplus")
+#' ```
+#'
+#' Users will also need to either pass a user name and password to the function
+#' arguments or set the these values in the `.Renviron` as follows:
+#'
+#' ```bash
+#' HMD_USERNAME="username here"
+#' HMD_PASSWORD="password here"
+#' ```
 #'
 #' A single requested year returns a static schedule without calendar columns.
 #' Multiple years return `time_start`/`time_end` for the selected source
-#' periods, in chronological order. For grouped-time shapes, `year` selects
-#' period starts: for example, 2000 selects the source interval 2000-2004 in a
-#' five-year product. Nonconsecutive requests retain calendar gaps; no rates are
-#' carried forward.
+#' periods, in chronological order.
 #'
-#' Native five-year ages are 0, 1-4, 5-9, etc.; returned bands are [0,1), [1,5),
-#' [5,10), etc. Upper-open ages end at Inf. Source period ends are inclusive and
-#' map to exclusive next-year endpoints. Shortened source periods are retained.
-#' Each required product is downloaded once per call. For grouped-time products,
-#' readers that discard period end labels also require one `Mx_1x1` request to
-#' establish annual coverage; this is recorded in source metadata. Credentials
-#' are passed to the reader and never stored in the returned table.
+#' HMD rate schedules include an open-ended category at age 110+, but with many
+#' historical sources this will lead to missing values at some earlier ages.
+#' Users can avoid this by using the optional `open_age` argument to specify an
+#' open-ended age. The function will pool source death and exposure at this open
+#' age band from HMD to construct the open-age death rate.
 #'
 #' @param country A single HMD population code, such as `"USA"`.
 #' @param year One whole-number calendar year or a nonempty vector of distinct
 #'   years. For grouped HMD periods, supply their starting years. All requested
-#'   years must exist in the product; duplicates are rejected.
+#'   years must exist in the product.
 #' @param username Database username. Defaults to the `HMD_USERNAME` environment
 #'   variable.
 #' @param password Database password. Defaults to the `HMD_PASSWORD` environment
 #'   variable.
 #' @param shape Native HMD age-by-period shape: `"1x1"` (default), `"1x5"`,
-#'   `"1x10"`, `"5x1"`, `"5x5"`, or `"5x10"`. This selects `Mx_<shape>`;
-#'   `open_age` can separately pool the final age band.
+#'   `"1x10"`, `"5x1"`, `"5x5"`, or `"5x10"`.
 #' @param open_age Optional nonnegative whole age at a native age-band start.
 #'   Default NULL keeps the source age layout. Otherwise retain rates below this
 #'   age and pool `Deaths_<shape>` and `Exposures_<shape>` into one `[open_age,
-#'   Inf)` rate for each sex and source period: total deaths divided by total
-#'   person-years. This requires two additional product downloads.
-#'   Counts/exposures must be finite and nonnegative with positive pooled
-#'   exposure; individual zero-exposure cells may contribute zero. No missing
-#'   counts/exposures are imputed. Cutoffs must align with source bands (0, 1,
-#'   5, 10, etc. for five-year ages). The cutoff is not a maximum lifespan.
+#'   Inf)` rate for each sex and source period.
 #' @return A validated mortality rate tibble with a `source` attribute recording
 #'   years, shape and represented source periods. Multiple-year requests include
-#'   `time_start`/`time_end`; length-one requests omit them. With `open_age`,
-#'   source metadata also records the pooling method, products and tail totals.
+#'   `time_start`/`time_end`. With `open_age`, source metadata also records the
+#'   pooling method, products and tail totals.
 #' @export
 #' @examples
 #' \dontrun{
-#' rates <- get_mortality_hmd("USA", year = 2000)
-#' saveRDS(rates, "rates.rds")
-#' model <- hammel_model() |> set_mortality(readRDS("rates.rds"))
-#' history <- get_mortality_hmd("SWE", year = 1891:2000, open_age = 95)
-#' grouped <- get_mortality_hmd("SWE",
-#'   year = seq(1900, 1995, 5),
-#'   shape = "5x5", open_age = 95
-#' )
+#' mort_rates_usa <- get_mortality_hmd("USA", year = 2000)
+#' mort_rates_swe <- get_mortality_hmd("SWE", year = 1891:2000, open_age = 95)
 #' }
 get_mortality_hmd <- function(
   country,
@@ -118,8 +117,7 @@ get_mortality_hmd <- function(
     )
   }
   process <- mortality_from_hmd(
-    data, year, shape, coverage_years,
-    open_age, deaths, exposures
+    data, year, shape, coverage_years, open_age, deaths, exposures
   )
   rates <- process$rates
   periods <- unique(hmd_period_intervals(data, shape, coverage_years))
@@ -145,53 +143,59 @@ get_mortality_hmd <- function(
 
 # HFD FERTILITY IMPORT -----------------------------------
 
-#' Download prepared fertility rates from the Human Fertility Database
+#' Download prepared fertility rates from the HFD
 #'
-#' Download total period age-specific fertility rates (`asfrRR`) through
-#' HMDHFDplus and select one year or a vector of years from one download. Rates
-#' remain births per woman-year. One year gives a static schedule without
-#' calendar columns; multiple years give chronological `time_start`/`time_end`
-#' bands [year, year + 1). Nonconsecutive years retain gaps.
-#' Birth-order-specific columns are not used by default. Missing total rates are
-#' rejected. These HFD products use their native annual, single-age layout;
-#' HMD-style `shape` options are not available. With `by_parity = TRUE`, request
-#' conditional age/parity rates (`mi`) instead: first births map to parity
-#' [0,1), through fifth-or-higher births at [4,Inf). Missing conditional cells
-#' are replaced with zero; source metadata records that policy and the number of
-#' replacements across the selected years. Parity tables can be supplied to
-#' fertility constructors for parity-dependent execution. Parity initializes
-#' from recorded maternal birth histories.
+#' @description
 #'
-#' HFD endpoint rows are retained: `12-` is represented as `[12,13)` using its
-#' supplied rate, and `55+` as `[55,Inf)`. TFR omits the upper-open band and
-#' warns if its rate is nonzero. No rates are supplied outside the represented
-#' schedule. Credentials are never retained in the table.
+#' Download fertility rate schedules from the Human Fertility Database in the
+#' format that [fertility()] expects. Requires user name and password and the
+#' HMDHFDplus package.
 #'
-#' @param country A single HFD population code.
+#' @details
+#'
+#' To use this function, users will need to install the HMDHFDplus package with:
+#'
+#' ```r
+#' install.packages("HMDHFDplus")
+#' ```
+#'
+#' Users will also need to either pass a user name and password to the function
+#' arguments or set the these values in the `.Renviron` as follows:
+#'
+#' ```bash
+#' HFD_USERNAME="username here"
+#' HFD_PASSWORD="password here"
+#' ```
+#'
+#' A single requested year returns a static schedule without calendar columns.
+#' Multiple years return `time_start`/`time_end` for the selected source
+#' periods, in chronological order.
+#'
+#' HFD endpoint rows retained: `12-` is represented as `[12,13)` using its
+#' supplied rate, and `55+` as `[55,Inf)`.
+#'
+#' @param country A single HFD population code, such as `"USA"`.
 #' @param year One whole-number calendar year or a nonempty vector of distinct
-#'   years. All requested years must exist; duplicates are rejected.
-#' @param username HFD username, defaulting to `HFD_USERNAME`.
-#' @param password HFD password, defaulting to `HFD_PASSWORD`.
+#'   years. All requested years must exist.
+#' @param username HFD username, defaulting to `HFD_USERNAME` environmental
+#'   variable.
+#' @param password HFD password, defaulting to `HFD_PASSWORD` environmental
+#'   variable.
 #' @param update Optional HFD revision date as `"YYYYMMDD"`, passed as `Update`
 #'   to HMDHFDplus. `NULL` requests its current revision.
 #' @param by_parity Logical, default FALSE. TRUE returns conditional rates with
 #'   `parity_start`/`parity_end` in addition to the age bounds and `rate`.
-#'   Requires the HFD conditional-rate product; unavailable products/years error
-#'   rather than falling back to unconditional rates.
+#'   Requires the HFD conditional-rate product.
 #' @return A fertility rate tibble with a `source` attribute recording selected
 #'   years and source periods. Multiple years include `time_start`/`time_end`;
-#'   length-one requests omit them. Total-rate tables are validated for
-#'   execution. Parity tables use half-open age/parity bounds; unavailable
-#'   conditional rates are zero-filled.
+#'   length-one requests omit them.
 #' @export
 #' @examples
 #' \dontrun{
-#' rates <- get_fertility_hfd("USA", 2000)
-#' saveRDS(rates, "rates.rds")
-#' model <- hammel_model() |> set_fertility(readRDS("rates.rds"))
-#' history <- get_fertility_hfd("SWE", 1891:2000)
-#' # Conditional age/parity rates for simulation:
-#' parity_rates <- get_fertility_hfd("USA", 2000, by_parity = TRUE)
+#' fert_rates_usa <- get_fertility_hfd("USA", 2000)
+#' fert_rates_swe <- get_fertility_hfd("SWE", 1891:2000)
+#' # Conditional age/parity rates
+#' fert_rates_usa_parity <- get_fertility_hfd("USA", 2000, by_parity = TRUE)
 #' }
 get_fertility_hfd <- function(
   country,
@@ -227,8 +231,7 @@ get_fertility_hfd <- function(
     fertility_from_hfd(data, year)$rates
   }
   attr(rates, "source") <- database_source(
-    "HFD", country, sort(year), item,
-    update
+    "HFD", country, sort(year), item, update
   )
   attr(rates, "source")$periods <- tibble::tibble(
     time_start = sort(year),
@@ -363,12 +366,10 @@ mortality_from_hmd <- function(
   }
   if (!is.null(open_age)) {
     deaths <- index_hmd_pool_source(
-      deaths, year, shape, coverage_years,
-      "HMD deaths"
+      deaths, year, shape, coverage_years, "HMD deaths"
     )
     exposures <- index_hmd_pool_source(
-      exposures, year, shape, coverage_years,
-      "HMD exposure"
+      exposures, year, shape, coverage_years, "HMD exposure"
     )
   }
   converted <- lapply(
@@ -401,8 +402,7 @@ mortality_from_hmd <- function(
           )
           if (!is.null(totals)) {
             final <- totals[totals$sex == sex, c(
-              "sex", "age_start", "age_end",
-              "rate"
+              "sex", "age_start", "age_end", "rate"
             )]
             below <- rbind(below, as.data.frame(final))
           }
