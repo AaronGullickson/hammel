@@ -15,30 +15,23 @@ hammel_population(
 }
 \arguments{
 \item{persons}{A data frame with one row per person, including deceased
-persons. Columns are preserved and the table is returned as a tibble.}
+persons. Must include a unique \code{person_id}, nonmissing \code{birth_time},
+\code{death_time}, \code{mother_id}, and \code{father_id}.}
 
 \item{unions}{A data frame with one row per union episode, or \code{NULL} for no
 unions. \code{wife_id} references the female partner and \code{husband_id} the male
-partner; these roles do not imply legal marriage. An empty data frame is
-normalized to the union schema. Optional \code{union_type} is cohab or marriage.
-A conversion closes cohab with \code{end_reason = "conversion"} and links the
-same-time marriage through \code{previous_cohab_id}.}
+partner. Optional \code{union_type} is cohab or marriage.}
 
 \item{end_time}{Required finite numeric reference time in years. Its calendar
 origin is supplied by the user. This supplies the next simulation's
 starting time. Recorded events must not occur after this time.}
 
 \item{ancestry}{Optional ancestry shares for dimensions declared with
-\code{group(ancestry = TRUE)}: a named list with one data frame per such
+\code{group(ancestry = TRUE)}: a named list with one data frame per such group
 dimension (a bare data frame when only one dimension tracks ancestry), each
 with exactly one row per person, keyed by \code{person_id}, one column of shares
 per category (named by the category) and an \code{unknown} share. Shares must be
-finite, between zero and one, and sum to one per row (tolerance \code{1e-8}).
-Supplied shares are preserved, with rows aligned to persons. Without them,
-people start with all their ancestry in their recorded category. Newborns
-average parental shares; a missing parent contributes its half to
-\code{unknown}. Identity remains separate. Categories of a tracked dimension
-cannot be named \code{unknown} or \code{person_id}.}
+finite, between zero and one, and sum to one per row (tolerance \code{1e-8}).}
 
 \item{transitions}{Optional data frame of individual category changes with
 \code{person_id}, \code{time}, \code{group} (the dimension; may be omitted when one is
@@ -50,14 +43,12 @@ even when empty, with character \code{group}, \code{origin} and \code{destinatio
 \item{groups}{Optional group declaration: a character vector of dimension
 names (each with \code{\link[=group]{group()}} defaults) or a named list of \code{\link[=group]{group()}} objects.
 Persons columns that are not declared are ordinary custom columns. Models
-usually declare groups with \code{\link[=set_groups]{set_groups()}}; declare them here to analyze a
-population directly, without a model.}
+usually declare groups with \code{\link[=set_groups]{set_groups()}}.}
 }
 \value{
 A named list of class \code{hammel_population} with components \code{persons},
 \code{unions}, and \code{end_time}, plus an \code{ancestry} tibble when supplied or when
 persons has groups, and a \code{transitions} tibble when groups are present.
-Ancestry is retained across restarts and deaths.
 }
 \description{
 Create a \code{hammel_population} object to serve as the starting population for a
@@ -68,26 +59,17 @@ In most cases, it will be more common to create a \code{hammel_population} objec
 by using \code{\link[=generate_uniform_population]{generate_uniform_population()}} or to recieve a \code{hammel_population}
 object as the output of \code{\link[=run_simulation]{run_simulation()}}.
 
-The \code{hammel_population} object
-The \code{hammel_population} object must always contain a \code{persons} data frame
-and
-Collect person and union histories in an inspectable population object. This
-constructor does not run a simulation. It validates consistent tables against
-the population schema. Custom columns are retained. A declared group
-dimension (see \code{groups} and \code{\link[=set_groups]{set_groups()}}) is a persons column of nonmissing
-character labels or finite numeric codes (character labels must be nonempty).
-Newborns are assigned by its \code{\link[=group]{group()}} inheritance rule. Undeclared columns,
-including one named \code{group}, are ordinary custom columns.
+The \code{hammel_population} object must always contain a \code{persons} data frame and
+an \code{end_time} value. The \code{end_time} value defines the starting point for the
+simulation and no dates in the \code{hammel_population} may exceed the \code{end_time}
+value.
 }
 \examples{
-sim <- hammel_population(
+population <- hammel_population(
   persons = data.frame(
-    person_id = 1:2, sex = c("m", "f"),
-    birth_time = c(-25, -23), death_time = NA_real_,
-    mother_id = NA_integer_, father_id = NA_integer_
+    person_id = 1:2, sex = c("m", "f"), birth_time = c(-25, -23),
+    death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_
   ),
   end_time = 0
 )
-sim$persons
-sim$unions
 }

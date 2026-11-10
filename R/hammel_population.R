@@ -15,33 +15,24 @@
 #' by using [generate_uniform_population()] or to recieve a `hammel_population`
 #' object as the output of [run_simulation()].
 #'
-#' The `hammel_population` object
-#' The `hammel_population` object must always contain a `persons` data frame
-#' and
-#' Collect person and union histories in an inspectable population object. This
-#' constructor does not run a simulation. It validates consistent tables against
-#' the population schema. Custom columns are retained. A declared group
-#' dimension (see `groups` and [set_groups()]) is a persons column of nonmissing
-#' character labels or finite numeric codes (character labels must be nonempty).
-#' Newborns are assigned by its [group()] inheritance rule. Undeclared columns,
-#' including one named `group`, are ordinary custom columns.
+#' The `hammel_population` object must always contain a `persons` data frame and
+#' an `end_time` value. The `end_time` value defines the starting point for the
+#' simulation and no dates in the `hammel_population` may exceed the `end_time`
+#' value.
 #'
 #' @param persons A data frame with one row per person, including deceased
-#'   persons. Columns are preserved and the table is returned as a tibble.
+#'   persons. Must include a unique `person_id`, nonmissing `birth_time`,
+#'   `death_time`, `mother_id`, and `father_id`.
 #' @param unions A data frame with one row per union episode, or `NULL` for no
 #'   unions. `wife_id` references the female partner and `husband_id` the male
-#'   partner; these roles do not imply legal marriage. An empty data frame is
-#'   normalized to the union schema. Optional `union_type` is cohab or marriage.
-#'   A conversion closes cohab with `end_reason = "conversion"` and links the
-#'   same-time marriage through `previous_cohab_id`.
+#'   partner. Optional `union_type` is cohab or marriage.
 #' @param end_time Required finite numeric reference time in years. Its calendar
 #'   origin is supplied by the user. This supplies the next simulation's
 #'   starting time. Recorded events must not occur after this time.
 #' @param groups Optional group declaration: a character vector of dimension
 #'   names (each with [group()] defaults) or a named list of [group()] objects.
 #'   Persons columns that are not declared are ordinary custom columns. Models
-#'   usually declare groups with [set_groups()]; declare them here to analyze a
-#'   population directly, without a model.
+#'   usually declare groups with [set_groups()].
 #' @param transitions Optional data frame of individual category changes with
 #'   `person_id`, `time`, `group` (the dimension; may be omitted when one is
 #'   declared), `origin`, and `destination`. Each person's history in each
@@ -49,34 +40,24 @@
 #'   and the known endpoint. Grouped populations always include this tibble,
 #'   even when empty, with character `group`, `origin` and `destination`.
 #' @param ancestry Optional ancestry shares for dimensions declared with
-#'   `group(ancestry = TRUE)`: a named list with one data frame per such
+#'   `group(ancestry = TRUE)`: a named list with one data frame per such group
 #'   dimension (a bare data frame when only one dimension tracks ancestry), each
 #'   with exactly one row per person, keyed by `person_id`, one column of shares
 #'   per category (named by the category) and an `unknown` share. Shares must be
 #'   finite, between zero and one, and sum to one per row (tolerance `1e-8`).
-#'   Supplied shares are preserved, with rows aligned to persons. Without them,
-#'   people start with all their ancestry in their recorded category. Newborns
-#'   average parental shares; a missing parent contributes its half to
-#'   `unknown`. Identity remains separate. Categories of a tracked dimension
-#'   cannot be named `unknown` or `person_id`.
 #'
 #' @return A named list of class `hammel_population` with components `persons`,
 #'   `unions`, and `end_time`, plus an `ancestry` tibble when supplied or when
 #'   persons has groups, and a `transitions` tibble when groups are present.
-#'   Ancestry is retained across restarts and deaths.
 #' @export
-#'
 #' @examples
-#' sim <- hammel_population(
+#' population <- hammel_population(
 #'   persons = data.frame(
-#'     person_id = 1:2, sex = c("m", "f"),
-#'     birth_time = c(-25, -23), death_time = NA_real_,
-#'     mother_id = NA_integer_, father_id = NA_integer_
+#'     person_id = 1:2, sex = c("m", "f"), birth_time = c(-25, -23),
+#'     death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_
 #'   ),
 #'   end_time = 0
 #' )
-#' sim$persons
-#' sim$unions
 hammel_population <- function(
   persons,
   unions = NULL,
@@ -118,25 +99,27 @@ hammel_population <- function(
 
 #' Set the starting population of a Hammel model
 #'
-#' Supply a validated population containing person and union histories and their
-#' reference time. Tables are normalized to tibbles; column contents and
-#' additional components are retained. Existing process configuration is
-#' retained. The input model is not modified. Grouped populations without
-#' ancestry proportions initialize each starting person at 100% ancestry in
-#' their recorded group. Supplied ancestry is retained and normalized to a
-#' tibble in person order; see [hammel_population()].
+#' @description
+#'
+#' Set the starting population for a `hammel_model` with a `hammel_population`
+#' object.
+#'
+#' @details
+#'
+#' While a `hammel_population` object can be built from scratch with
+#' [hammel_population()], this object will more commonly be created by
+#' [generate_uniform_population()] or returned from [run_simulation()].
+#'
 #'
 #' @param model A `hammel_model` object.
-#' @param population A `hammel_population` object. Construct it from tables with
-#'   [hammel_population()]. Its `end_time` supplies the model's starting time.
-#'
+#' @param population A `hammel_population` object. Its `end_time` supplies the
+#'   model's starting time.
 #' @return An updated `hammel_model`.
 #' @export
 #' @examples
 #' persons <- data.frame(
-#'   person_id = 1:2, sex = c("m", "f"),
-#'   birth_time = c(-25, -23), death_time = NA_real_,
-#'   mother_id = NA_integer_, father_id = NA_integer_
+#'   person_id = 1:2, sex = c("m", "f"), birth_time = c(-25, -23),
+#'   death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_
 #' )
 #' population <- hammel_population(persons, end_time = 0)
 #' model <- hammel_model() |>
@@ -158,6 +141,8 @@ set_population <- function(model, population) {
 
 #' Validate a Hammel population
 #'
+#' @description
+#'
 #' Check the population structure, population schemas, IDs, relationship
 #' references, and date consistency. This function does not normalize or change
 #' the object. Invalid objects raise an error; valid objects are returned
@@ -166,13 +151,6 @@ set_population <- function(model, population) {
 #' @param results A `hammel_population` object.
 #' @return The supplied object, invisibly and unchanged.
 #' @export
-#' @examples
-#' persons <- data.frame(
-#'   person_id = 1L, sex = "f", birth_time = -20,
-#'   death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_
-#' )
-#' results <- hammel_population(persons, end_time = 0)
-#' validate_population(results)
 validate_population <- function(results) {
   if (!inherits(results, "hammel_population") || !is.list(results) ||
         anyDuplicated(names(results)) ||
