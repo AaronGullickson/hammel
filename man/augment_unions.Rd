@@ -2,12 +2,12 @@
 % Please edit documentation in R/augment_histories.R
 \name{augment_unions}
 \alias{augment_unions}
-\title{Add recorded partner information to union histories}
+\title{Extract union data from simulation results with additional detail}
 \usage{
 augment_unions(population)
 }
 \arguments{
-\item{population}{A validated \code{hammel_population} containing person and union
+\item{population}{A \code{hammel_population} object containing person and union
 histories, such as the result of \code{\link[=run_simulation]{run_simulation()}}.}
 }
 \value{
@@ -18,23 +18,25 @@ identify wives and husbands. Empty union histories retain the enriched
 column types.
 }
 \description{
-Match wives and husbands to the population's person table by ID and return
-their recorded birth times, death times, and optional groups at formation
-alongside every union record. Union row order and all existing columns are
-retained. The population and its union table are not modified.
+Extract the unions data frame from a \code{hammel_population} object, augmented
+with additional information.
 }
 \details{
-Dates remain in years. Missing death times denote people alive at the
-recorded endpoint. Each declared group dimension adds its wife's and
-husband's categories (\verb{<group>_w}, \verb{<group>_h}); undeclared columns are not
-added; otherwise their types are preserved. Groups are reconstructed at each
-union's start from retained transitions; later moves do not relabel earlier
-unions. A transition at the exact formation time follows formation, so its
-origin group applies. Without transition history, use recorded person groups.
-Existing columns whose names conflict with added partner fields cause an
-error.
+The unions record will match wives and husbands to the population's person
+table by ID and return their recorded birth times, death times, and group
+membership at formation time alongside every union record.
 }
 \examples{
-population <- generate_uniform_population(10)
-augment_unions(population)
+population <- generate_uniform_population(1000)
+model <- hammel_model() |>
+  set_population(population) |>
+  set_mortality(usa_2000_mortality) |>
+  set_fertility(usa_2000_fertility) |>
+  set_union_formation(
+    "on_demand",
+    matching = age_gap_matching_model(3, 5)
+  )
+result <- run_simulation(model, years = 50, seed = 42)
+result |>
+  augment_unions()
 }

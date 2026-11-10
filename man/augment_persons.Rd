@@ -2,12 +2,12 @@
 % Please edit documentation in R/augment_histories.R
 \name{augment_persons}
 \alias{augment_persons}
-\title{Add recorded parent information to person histories}
+\title{Extract persons data from simulation results with additional detail}
 \usage{
 augment_persons(population)
 }
 \arguments{
-\item{population}{A validated \code{hammel_population}, such as the result of
+\item{population}{A \code{hammel_population}, such as the result of
 \code{\link[=run_simulation]{run_simulation()}}.}
 }
 \value{
@@ -17,20 +17,25 @@ dimension \verb{<group>_mother} and \verb{<group>_father} (such as \code{race_mo
 Empty populations retain the enriched column types.
 }
 \description{
-Match mothers and fathers by person ID and append their ages at each child's
-birth and their optional recorded groups. All persons, including founders and
-deceased persons, retain their original row order and columns. The input
-population is not modified.
+Extract the persons data frame from a \code{hammel_population} object, augmented
+with additional information.
 }
 \details{
-Ages are in continuous years: the child's birth time minus the parent's birth
-time. Unknown parents yield missing ages and groups. Each declared group
-dimension adds the parents' recorded categories, with their type preserved;
-undeclared columns are not added. These are recorded identities, not
-reconstructions of historical group transitions. Existing columns that
-conflict with the added fields cause an error.
+Mothers and fathers will be matched with children by person ID and their
+age at the person's birth will be appended along with group membership.
 }
 \examples{
-population <- generate_uniform_population(10)
-augment_persons(population)
+population <- generate_uniform_population(1000)
+model <- hammel_model() |>
+  set_population(population) |>
+  set_mortality(usa_2000_mortality) |>
+  set_fertility(usa_2000_fertility) |>
+  set_union_formation(
+    "on_demand",
+    matching = age_gap_matching_model(3, 5)
+  )
+result <- run_simulation(model, years = 50, seed = 42)
+result |>
+  augment_persons() |>
+  tail()
 }

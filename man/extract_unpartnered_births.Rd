@@ -7,7 +7,7 @@
 extract_unpartnered_births(population)
 }
 \arguments{
-\item{population}{A validated \code{hammel_population} with person and union
+\item{population}{A \code{hammel_population} with person and union
 histories, such as the result of \code{\link[=run_simulation]{run_simulation()}}.}
 }
 \value{
@@ -18,21 +18,19 @@ Empty results retain the enriched schema. The population is not modified.
 }
 \description{
 Return births where the mother was outside both cohabitation and marriage,
-with parent ages and optional groups supplied by \code{\link[=augment_persons]{augment_persons()}}. Known
-mother and father IDs are required. Each birth is retained separately,
-including repeated parental pairs; missing-parent records and founders are
-omitted. These rows can be used to examine nonpartnership father matching.
-}
-\details{
-Histories must be complete for the intended interpretation. Partnership
-coverage is half-open: births at formation are partnered. Births exactly at
-dissolution or conversion retain the ending partnership (birth-first ties).
-Births at death endings are unpartnered unless another episode covers that
-time. Overlapping episodes do not duplicate births. Untyped partnerships are
-treated as partnered too. No time window is imposed and no endpoint is
-needed.
+with parent ages and optional groups supplied by \code{\link[=augment_persons]{augment_persons()}}.
 }
 \examples{
-population <- generate_uniform_population(10)
-extract_unpartnered_births(population)
+population <- generate_uniform_population(1000)
+model <- hammel_model() |>
+  set_population(population) |>
+  set_mortality(usa_2000_mortality) |>
+  set_fertility(usa_2000_fertility_union) |>
+  set_union_formation(
+    "rate",
+    rates = usa_2000_marriage,
+    matching = age_gap_matching_model(3, 5)
+  )
+result <- run_simulation(model, years = 50, seed = 42)
+extract_unpartnered_births(result)
 }

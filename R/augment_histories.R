@@ -2,24 +2,20 @@
 
 # PUBLIC FUNCTIONS ---------------------------------------------------------
 
-#' Add recorded partner information to union histories
+#' Extract union data from simulation results with additional detail
 #'
-#' Match wives and husbands to the population's person table by ID and return
-#' their recorded birth times, death times, and optional groups at formation
-#' alongside every union record. Union row order and all existing columns are
-#' retained. The population and its union table are not modified.
+#' @description
 #'
-#' Dates remain in years. Missing death times denote people alive at the
-#' recorded endpoint. Each declared group dimension adds its wife's and
-#' husband's categories (`<group>_w`, `<group>_h`); undeclared columns are not
-#' added; otherwise their types are preserved. Groups are reconstructed at each
-#' union's start from retained transitions; later moves do not relabel earlier
-#' unions. A transition at the exact formation time follows formation, so its
-#' origin group applies. Without transition history, use recorded person groups.
-#' Existing columns whose names conflict with added partner fields cause an
-#' error.
+#' Extract the unions data frame from a `hammel_population` object, augmented
+#' with additional information.
 #'
-#' @param population A validated `hammel_population` containing person and union
+#' @details
+#'
+#' The unions record will match wives and husbands to the population's person
+#' table by ID and return their recorded birth times, death times, and group
+#' membership at formation time alongside every union record.
+#'
+#' @param population A `hammel_population` object containing person and union
 #'   histories, such as the result of [run_simulation()].
 #' @return A separate tibble with all union columns plus `birth_time_w`,
 #'   `death_time_w`, `birth_time_h`, and `death_time_h`, plus `<group>_w` and
@@ -28,8 +24,18 @@
 #'   column types.
 #' @export
 #' @examples
-#' population <- generate_uniform_population(10)
-#' augment_unions(population)
+#' population <- generate_uniform_population(1000)
+#' model <- hammel_model() |>
+#'   set_population(population) |>
+#'   set_mortality(usa_2000_mortality) |>
+#'   set_fertility(usa_2000_fertility) |>
+#'   set_union_formation(
+#'     "on_demand",
+#'     matching = age_gap_matching_model(3, 5)
+#'   )
+#' result <- run_simulation(model, years = 50, seed = 42)
+#' result |>
+#'   augment_unions()
 augment_unions <- function(population) {
   validate_population(population)
   persons <- population$persons
@@ -87,21 +93,19 @@ augment_unions <- function(population) {
   result
 }
 
-#' Add recorded parent information to person histories
+#' Extract persons data from simulation results with additional detail
 #'
-#' Match mothers and fathers by person ID and append their ages at each child's
-#' birth and their optional recorded groups. All persons, including founders and
-#' deceased persons, retain their original row order and columns. The input
-#' population is not modified.
+#' @description
 #'
-#' Ages are in continuous years: the child's birth time minus the parent's birth
-#' time. Unknown parents yield missing ages and groups. Each declared group
-#' dimension adds the parents' recorded categories, with their type preserved;
-#' undeclared columns are not added. These are recorded identities, not
-#' reconstructions of historical group transitions. Existing columns that
-#' conflict with the added fields cause an error.
+#' Extract the persons data frame from a `hammel_population` object, augmented
+#' with additional information.
 #'
-#' @param population A validated `hammel_population`, such as the result of
+#' @details
+#'
+#' Mothers and fathers will be matched with children by person ID and their
+#' age at the person's birth will be appended along with group membership.
+#'
+#' @param population A `hammel_population`, such as the result of
 #'   [run_simulation()].
 #' @return A separate tibble containing all person columns plus `age_mother` and
 #'   `age_father`, measured at that person's birth, and for each declared group
@@ -109,8 +113,19 @@ augment_unions <- function(population) {
 #'   Empty populations retain the enriched column types.
 #' @export
 #' @examples
-#' population <- generate_uniform_population(10)
-#' augment_persons(population)
+#' population <- generate_uniform_population(1000)
+#' model <- hammel_model() |>
+#'   set_population(population) |>
+#'   set_mortality(usa_2000_mortality) |>
+#'   set_fertility(usa_2000_fertility) |>
+#'   set_union_formation(
+#'     "on_demand",
+#'     matching = age_gap_matching_model(3, 5)
+#'   )
+#' result <- run_simulation(model, years = 50, seed = 42)
+#' result |>
+#'   augment_persons() |>
+#'   tail()
 augment_persons <- function(population) {
   validate_population(population)
   persons <- population$persons
@@ -148,21 +163,12 @@ augment_persons <- function(population) {
 
 #' Extract births with known parents to unpartnered mothers
 #'
+#' @description
+#'
 #' Return births where the mother was outside both cohabitation and marriage,
-#' with parent ages and optional groups supplied by [augment_persons()]. Known
-#' mother and father IDs are required. Each birth is retained separately,
-#' including repeated parental pairs; missing-parent records and founders are
-#' omitted. These rows can be used to examine nonpartnership father matching.
+#' with parent ages and optional groups supplied by [augment_persons()].
 #'
-#' Histories must be complete for the intended interpretation. Partnership
-#' coverage is half-open: births at formation are partnered. Births exactly at
-#' dissolution or conversion retain the ending partnership (birth-first ties).
-#' Births at death endings are unpartnered unless another episode covers that
-#' time. Overlapping episodes do not duplicate births. Untyped partnerships are
-#' treated as partnered too. No time window is imposed and no endpoint is
-#' needed.
-#'
-#' @param population A validated `hammel_population` with person and union
+#' @param population A `hammel_population` with person and union
 #'   histories, such as the result of [run_simulation()].
 #' @return A separate tibble containing selected person rows and `age_mother`,
 #'   `age_father`, plus `group_mother` and `group_father` when groups are
@@ -170,8 +176,18 @@ augment_persons <- function(population) {
 #'   Empty results retain the enriched schema. The population is not modified.
 #' @export
 #' @examples
-#' population <- generate_uniform_population(10)
-#' extract_unpartnered_births(population)
+#' population <- generate_uniform_population(1000)
+#' model <- hammel_model() |>
+#'   set_population(population) |>
+#'   set_mortality(usa_2000_mortality) |>
+#'   set_fertility(usa_2000_fertility_union) |>
+#'   set_union_formation(
+#'     "rate",
+#'     rates = usa_2000_marriage,
+#'     matching = age_gap_matching_model(3, 5)
+#'   )
+#' result <- run_simulation(model, years = 50, seed = 42)
+#' extract_unpartnered_births(result)
 extract_unpartnered_births <- function(population) {
   parents <- augment_persons(population)
   rows <- unpartnered_birth_rows_cpp(population$persons, population$unions)
