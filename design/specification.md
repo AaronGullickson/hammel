@@ -29,7 +29,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Weight models | `R/weight_model.R`; stored weights and selection in `src/simulate.cpp` |
 | Union formation, dissolution and cohabitation settings | `R/union_formation.R`, `R/union_dissolution.R`, `R/cohabitation.R` |
 | Matching and inheritance models | `R/matching_model.R`, `R/matching_groups.R`, `R/group_inheritance.R` |
-| Kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/extract_kin.R` |
+| Kinship traversal, extraction and selective living-kin counting | `src/kinship.h`, `src/kinship.cpp`, `R/extract_kin.R` |
 | HMD/HFD downloads, conversion and provenance | `R/get_database_rates.R` |
 | Simulation validation, RNG isolation and result assembly | `R/run_simulation.R` |
 | Continuous scheduling and events | `src/simulate.cpp` |

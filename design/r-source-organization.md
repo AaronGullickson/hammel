@@ -64,7 +64,7 @@ Every top-level R function has one home below. **Bold names are exported**, incl
 
 Generated native wrappers; continue to generate rather than hand-edit.
 
-- Functions: `dissolution_counts_cpp()`, `previous_union_info_cpp()`, `previous_union_state_cpp()`, `unpartnered_birth_rows_cpp()`, `union_start_groups_cpp()`, `union_group_history_cpp()`, `extract_kin_cpp()`, `person_lexis_cpp()`, `person_snapshot_cpp()`, `inspect_matching_cpp()`, `inspect_group_matching_cpp()`, `inspect_weighted_calibration_cpp()`, `inspect_exact_draw_cpp()`, `inspect_weighted_incremental_cpp()`, `simulate_cpp()`.
+- Functions: `dissolution_counts_cpp()`, `previous_union_info_cpp()`, `previous_union_state_cpp()`, `unpartnered_birth_rows_cpp()`, `union_start_groups_cpp()`, `union_group_history_cpp()`, `extract_kin_cpp()`, `count_kin_cpp()`, `person_lexis_cpp()`, `person_snapshot_cpp()`, `inspect_matching_cpp()`, `inspect_group_matching_cpp()`, `inspect_weighted_calibration_cpp()`, `inspect_exact_draw_cpp()`, `inspect_weighted_incremental_cpp()`, `simulate_cpp()`.
 
 ### `R/analysis_utils.R`
 

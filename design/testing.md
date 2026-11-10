@@ -1290,3 +1290,116 @@ this review; their domain-specific cross-period clock checks remain necessary.
 The stale model-schedule status in AGENTS and the detailed dissolution category
 in the dissolution specification were corrected. No demographic defaults or
 calendar-gap rules were changed.
+
+
+## Selective living-kin counting (D170, November 10, 2026)
+
+`count_kin(relationships = ...)` uses native accumulation rather than the full
+extracted-pair table. Default and selected results matched the previous R
+implementation at commit `6b1cc9d` exactly in every benchmark below. The fixture
+has 12,000 people in 12 cohorts of 1,000, born 25 years apart, with alternating
+sexes, parents sampled independently from the preceding cohort, and deaths at
+age 80. It is a synthetic performance fixture, not a demographic assessment.
+
+The table reports median elapsed seconds over three calls per method after
+checking exact equality, with garbage collection before each timed call.
+Measurements were repeated after the full test suite finished. These timings
+are specific to this machine and pedigree; dense pedigrees, more observation
+times and larger generation bounds have different costs. The old selected
+method computes everything and filters the returned rows.
+
+| Generations | Observation times | Relationships | Previous (s) | New (s) | Ratio |
+| --- | --- | --- | ---: | ---: | ---: |
+| 2 | 0 | all | 0.574 | 0.053 | 10.8 |
+| 2 | 0 | first cousin | 0.543 | 0.039 | 13.9 |
+| 3 | -80, -40, 0 | all | 2.754 | 0.655 | 4.2 |
+| 3 | -80, -40, 0 | first cousin | 2.781 | 0.105 | 26.5 |
+
+Kinship-focused tests passed 1,017 expectations. The full offline suite passed
+7,519 expectations with zero failures in 112.2 seconds, one existing
+`timedatectl` warning during HMDHFDplus/lubridate loading, and the opt-in live
+database test skipped. Coverage includes an independent extraction-based
+reference, selected/full identity, pedigree-collapse tie classification, full
+versus half kin, group moves and birth/death ties, empty strata, duplicate and
+reordered times, invalid selectors, RNG preservation and whole-graph cycle
+checks even when nobody is alive or the generation bound is zero.
+
+To reproduce the benchmark from the repository root with the updated package:
+
+```r
+pkgload::load_all(quiet = TRUE)
+old <- new.env(parent = asNamespace("hammel"))
+baseline <- system2(
+  "git", c("show", "6b1cc9d:R/extract_kin.R"),
+  stdout = TRUE
+)
+eval(parse(text = baseline), envir = old)
+set.seed(170)
+size <- 1000L
+cohorts <- 12L
+persons <- data.frame(
+  person_id = seq_len(size * cohorts),
+  sex = rep(c("f", "m"), size * cohorts / 2),
+  birth_time = rep(seq(-300, -25, by = 25), each = size),
+  mother_id = NA_integer_,
+  father_id = NA_integer_
+)
+persons$death_time <- ifelse(
+  persons$birth_time + 80 <= 0,
+  persons$birth_time + 80, NA_real_
+)
+for (cohort in 2:cohorts) {
+  rows <- seq_len(size) + size * (cohort - 1L)
+  parents <- rows - size
+  persons$mother_id[rows] <- sample(
+    parents[persons$sex[parents] == "f"], size,
+    replace = TRUE
+  )
+  persons$father_id[rows] <- sample(
+    parents[persons$sex[parents] == "m"], size,
+    replace = TRUE
+  )
+}
+population <- hammel_population(persons, end_time = 0)
+run_case <- function(depth, times, selected) {
+  previous <- function() {
+    out <- old$count_kin(population, times, generations = depth, by = "sex")
+    if (!is.null(selected)) {
+      out <- out[out$relationship %in% selected, ]
+    }
+    out
+  }
+  current <- function() count_kin(
+    population, times,
+    generations = depth,
+    by = "sex",
+    relationships = selected
+  )
+  stopifnot(identical(previous(), current()))
+  timing <- function(f) {
+    median(
+      replicate(3, {
+        gc()
+        unname(system.time(f())["elapsed"])
+      })
+    )
+  }
+  a <- timing(previous)
+  b <- timing(current)
+  data.frame(
+    depth = depth,
+    times = length(times),
+    relationships = if (is.null(selected)) "all" else selected,
+    previous_seconds = a,
+    current_seconds = b,
+    speedup = a / b
+  )
+}
+results <- rbind(
+  run_case(2, 0, NULL),
+  run_case(2, 0, "first_cousin"),
+  run_case(3, c(-80, -40, 0), NULL),
+  run_case(3, c(-80, -40, 0), "first_cousin")
+)
+print(results, row.names = FALSE)
+```

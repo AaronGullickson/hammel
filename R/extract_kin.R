@@ -121,12 +121,15 @@ extract_kin <- function(
 #' @param by `NULL` (default) or a character vector of the ego's
 #'   characteristics at each time to count separately: `"sex"` and declared
 #'   group dimensions, such as `"race"`.
+#' @param relationships `NULL` (default) for all relationships, or a nonempty
+#'   character vector of unique relationship names within `generations`, such
+#'   as `"first_cousin"`. Retains the usual row order and ego denominators.
 #' @return A tibble with `time`, the `by` columns, `relationship`, `persons`
 #'   (living egos), `kin` (their living kin of that type), `mean_kin`
 #'   (`kin / persons`) and `share_with_kin` (share of egos with at least one).
 #'   `mean_kin` and `share_with_kin` are `NA` with no egos. Every time,
-#'   stratum and relationship within `generations` has a row. Rows vary by
-#'   time fastest, then the `by` variables in order, then relationship.
+#'   stratum and selected relationship within `generations` has a row. Rows vary
+#'   by time fastest, then the `by` variables in order, then relationship.
 #' @seealso [extract_kin()]
 #' @export
 #' @examples
@@ -141,7 +144,8 @@ count_kin <- function(
   population,
   times,
   generations = 2,
-  by = NULL
+  by = NULL,
+  relationships = NULL
 ) {
   if (!is.numeric(times) || !is.null(dim(times)) || !length(times) ||
         any(!is.finite(times))) {
@@ -154,7 +158,7 @@ count_kin <- function(
     stop("`population` must be a hammel_population.", call. = FALSE)
   }
   validate_population(population)
-  if (is.null(population$end_time) || max(times) > population$end_time) {
+  if (max(times) > population$end_time) {
     stop(
       "Observation requires a known endpoint and cannot extend beyond it.",
       call. = FALSE
@@ -163,18 +167,34 @@ count_kin <- function(
   validate_kinship_generations(generations, "generations")
   dims <- names(population$groups)
   by <- check_by(by, c("sex", dims), "count_kin")
-  persons <- population$persons
-  ids <- persons$person_id
-  n <- length(ids)
-  kin <- extract_kin_cpp(persons, ids, ids, as.integer(generations))
-  ego <- match(kin$ego_id, ids)
-  relative <- match(kin$relative_id, ids)
-  # Labels pool distance pairs that share a name, such as (2,3) and (3,2).
-  types <- unique(kin_relationship_types(generations)$relationship)
-  type <- match(
-    kin_relationship(kin$ego_distance, kin$relative_distance), types
-  )
+  distances <- kin_relationship_types(generations)
+  types <- unique(distances$relationship)
+  if (!is.null(relationships)) {
+    if (!is.character(relationships) || !is.null(dim(relationships)) ||
+          !length(relationships) ||
+          anyNA(relationships) ||
+          anyDuplicated(relationships) ||
+          any(!relationships %in% types)) {
+      stop(
+        paste0(
+          "`relationships` must contain unique relationship names ",
+          "available within `generations`."
+        ),
+        call. = FALSE
+      )
+    }
+    types <- types[types %in% relationships]
+  }
+  lookup <- matrix(-1L, nrow = generations + 1L, ncol = generations + 1L)
+  type <- match(distances$relationship, types)
+  selected <- !is.na(type)
+  lookup[cbind(
+    distances$ego_distance[selected] + 1L,
+    distances$relative_distance[selected] + 1L
+  )] <- type[selected] - 1L
   n_types <- length(types)
+  persons <- population$persons
+  n <- nrow(persons)
   levels <- lapply(
     by, function(name) {
       if (name == "sex") {
@@ -188,57 +208,40 @@ count_kin <- function(
   n_strata <- prod(lengths(levels))
   birth <- persons$birth_time
   death <- persons$death_time
-  results <- lapply(
-    times, function(time) {
-      alive <- birth <= time & (is.na(death) | death > time)
-      stratum <- rep(1L, n)
-      stride <- 1L
-      for (name in by) {
-        values <- if (name == "sex") {
-          persons$sex
-        } else {
-          groups_at(dimension_view(population, name), seq_len(n), rep(time, n))
-        }
-        stratum <- stratum + stride * (match(values, levels[[name]]) - 1L)
-        stride <- stride * length(levels[[name]])
+  strata <- matrix(0L, nrow = n, ncol = length(times))
+  for (i in seq_along(times)) {
+    time <- times[i]
+    alive <- birth <= time & (is.na(death) | death > time)
+    stratum <- rep(1L, n)
+    stride <- 1L
+    for (name in by) {
+      values <- if (name == "sex") {
+        persons$sex
+      } else {
+        groups_at(dimension_view(population, name), seq_len(n), rep(time, n))
       }
-      keep <- alive[ego] & alive[relative]
-      cell <- (type[keep] - 1L) * n_strata + stratum[ego[keep]]
-      # Egos with at least one living relative of each type.
-      pairs <- unique((ego[keep] - 1L) * n_types + type[keep])
-      pair_ego <- (pairs - 1L) %/% n_types + 1L
-      pair_type <- (pairs - 1L) %% n_types + 1L
-      list(
-        persons = tabulate(stratum[alive], n_strata),
-        kin = tabulate(cell, n_strata * n_types),
-        with = tabulate(
-          (pair_type - 1L) * n_strata + stratum[pair_ego],
-          n_strata * n_types
-        )
-      )
+      stratum <- stratum + stride * (match(values, levels[[name]]) - 1L)
+      stride <- stride * length(levels[[name]])
     }
+    stratum[!alive] <- 0L
+    strata[, i] <- as.integer(stratum)
+  }
+  counts <- count_kin_cpp(
+    persons, as.integer(generations), lookup, strata, n_strata, n_types
   )
   grid <- expand.grid(
     time = seq_along(times),
     stratum = seq_len(n_strata),
     type = seq_len(n_types)
   )
-  cell <- (grid$type - 1L) * n_strata + grid$stratum
-  persons_n <- vapply(
-    seq_len(nrow(grid)), function(i) {
-      results[[grid$time[i]]]$persons[grid$stratum[i]]
-    }, integer(1)
+  cell <- grid$time + length(times) * (
+    grid$stratum - 1L + n_strata * (grid$type - 1L)
   )
-  kin_n <- vapply(
-    seq_len(nrow(grid)), function(i) {
-      results[[grid$time[i]]]$kin[cell[i]]
-    }, integer(1)
-  )
-  with_n <- vapply(
-    seq_len(nrow(grid)), function(i) {
-      results[[grid$time[i]]]$with[cell[i]]
-    }, integer(1)
-  )
+  persons_n <- counts$persons[
+    grid$time + length(times) * (grid$stratum - 1L)
+  ]
+  kin_n <- counts$kin[cell]
+  with_n <- counts$with[cell]
   out <- tibble::tibble(time = times[grid$time])
   stride <- 1L
   for (name in by) {

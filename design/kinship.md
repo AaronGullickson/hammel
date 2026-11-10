@@ -135,7 +135,8 @@ search sets are retained.
 
 ## Living kin counts
 
-`count_kin(population, times, generations = 2, by = NULL)` averages
+`count_kin(population, times, generations = 2, by = NULL,
+relationships = NULL)` averages
 living kin per living person at each requested time (D161). Inputs follow
 `calculate_population_size()`: a `hammel_population` whose known `end_time` is
 no earlier than the requested finite times. A person is living at time t when
@@ -154,11 +155,39 @@ with `time`, the `by` columns, `relationship`, `persons` (living egos in the
 stratum), `kin` (their living kin of that type, summed), `mean_kin`
 (`kin / persons`, NA when there are no egos) and `share_with_kin` (share of
 egos with at least one, NA when there are no egos). Every time, stratum and
-relationship possible within `generations` has a row, including zero counts.
+selected relationship possible within `generations` has a row, including zero
+counts. `relationships = NULL` selects all relationships as before; otherwise
+supply unique relationship labels available at that generation depth, for
+example `"first_cousin"` or `c("parent", "sibling")`. Empty, missing, duplicate
+or unknown labels are errors. Selection retains the existing canonical row
+order rather than the order supplied by the caller.
 Distance pairs that share a label, such as (2,3) and (3,2) for
 `first_cousin_once_removed`, form one relationship. Rows vary by time fastest,
 then the `by` variables in order, then relationship in increasing distance sum (parent, child, grandparent,
 sibling, grandchild, aunt_uncle, niece_nephew, first_cousin at depth two).
+
+Relationship selection (D170) does not change the ego population or how kin
+are classified. For example, selecting `"first_cousin"` at depth two retains
+all living people in the denominator and returns the same cousin rows as
+filtering the full result. People who are siblings and also share grandparents
+are classified by the closest relationship, so are not counted as cousins.
+`"second_cousin"` requires `generations >= 3`; selecting it at depth two is an
+error. Selecting absent but valid relationships returns zero kin counts, with
+NA averages and shares only in strata with no living people. Birth/death and
+group-transition ties retain the observation rules above.
+
+The counting path accumulates selected kin counts and counts of egos with kin
+directly in C++, without producing the extraction table. Candidate generation
+uses selected ancestor-distance pairs, but final classification examines the
+full generation bound. Ancestors need not be alive. People never alive at any
+requested time are not counting candidates, while their ancestry links remain
+available for traversal and all parent links remain subject to cycle checks.
+No lineage or ancestry-completeness reporting is needed for counting. The
+shared ancestry cache retains its existing reporting behavior for extraction
+and matching; the counter disables reporting-only metadata. Counts remain
+deterministic and do not consume random numbers. The implementation stores a
+person-by-time stratum matrix, so memory for observation state grows with both
+population size and the number of requested times.
 
 No standard errors are reported: relatives share kin, so egos are not
 independent, and replicate simulations are the appropriate source of

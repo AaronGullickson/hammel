@@ -229,3 +229,159 @@ test_that("living kin validate inputs", {
   expect_equal(sum(three$relationship == "first_cousin_once_removed"), 1)
   expect_equal(nrow(count_kin(population, 0, generations = 0)), 0)
 })
+
+test_that("relationship selection retains full-result rows and denominators", {
+  population <- living_kin_population()
+  times <- c(0, -20, 0)
+  all <- count_kin(population, times)
+  for (selected in list("first_cousin", c("first_cousin", "parent"))) {
+    actual <- count_kin(population, times, relationships = selected)
+    expected <- all[all$relationship %in% selected, ]
+    expect_identical(actual, expected)
+  }
+  cousins <- count_kin(population, 0, relationships = "first_cousin")
+  # Half-siblings 7 and 9 share grandparents, but remain siblings, not cousins.
+  expect_identical(cousins$kin, 4L)
+  expect_identical(cousins$persons, 8L)
+  expect_equal(cousins$share_with_kin, 3 / 8)
+  set.seed(42)
+  rng <- .Random.seed
+  count_kin(population, times, relationships = "first_cousin")
+  expect_identical(.Random.seed, rng)
+})
+
+test_that("selective counts observe group changes and empty strata", {
+  population <- living_kin_population(
+    groups = c("A", "B", "A", "B", "A", "B", "B", "B", "A")
+  )
+  population <- hammel_population(
+    population$persons,
+    end_time = 0,
+    groups = "race",
+    transitions = data.frame(
+      person_id = 7, time = -2, origin = "A", destination = "B"
+    )
+  )
+  all <- count_kin(population, c(-3, -2, 0), by = c("sex", "race"))
+  selected <- count_kin(
+    population, c(-3, -2, 0),
+    by = c("sex", "race"),
+    relationships = "first_cousin"
+  )
+  expect_identical(selected, all[all$relationship == "first_cousin", ])
+  women_b <- selected[
+    selected$time == -2 & selected$sex == "f" & selected$race == "B",
+  ]
+  expect_identical(women_b$persons, 2L)
+  expect_identical(women_b$kin, 3L)
+  expect_identical(women_b$share_with_kin, 1)
+  empty <- generate_uniform_population(0, groups = list(race = c(A = 1, B = 1)))
+  out <- count_kin(
+    empty, 0,
+    by = c("sex", "race"),
+    relationships = "first_cousin"
+  )
+  expect_equal(nrow(out), 4L)
+  expect_true(all(out$persons == 0L & out$kin == 0L))
+  expect_true(all(is.na(out$mean_kin) & is.na(out$share_with_kin)))
+  founders <- count_kin(
+    generate_uniform_population(10), 0, relationships = "first_cousin"
+  )
+  expect_identical(founders$kin, 0L)
+  expect_identical(founders$share_with_kin, 0)
+})
+
+test_that("closest-relationship ties retain the full ancestry bound", {
+  persons <- data.frame(
+    person_id = 1:4, sex = c("f", "f", "m", "f"),
+    birth_time = c(-90, -60, -40, -20), death_time = NA_real_,
+    mother_id = c(NA, 1, 2, 1), father_id = c(NA, NA, NA, 3)
+  )
+  population <- hammel_population(persons, end_time = 0)
+  # Person 4 is both sibling and grandchild of 2. At depth two, the (0,2)
+  # evidence wins over (1,1) from ego 2; (1,1) wins over (2,0) from ego 4.
+  expect_identical(
+    count_kin(population, 0, relationships = "sibling")$kin, 1L
+  )
+  expect_identical(
+    count_kin(population, 0, generations = 1, relationships = "sibling")$kin,
+    2L
+  )
+})
+
+test_that("counts agree with extracted histories on a synthetic pedigree", {
+  set.seed(17)
+  size <- 20L
+  cohorts <- 6L
+  persons <- data.frame(
+    person_id = seq_len(size * cohorts),
+    sex = rep(c("f", "m"), size * cohorts / 2),
+    birth_time = rep(seq(-60, -10, by = 10), each = size),
+    death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_
+  )
+  for (cohort in 2:cohorts) {
+    rows <- seq_len(size) + size * (cohort - 1L)
+    parents <- rows - size
+    persons$mother_id[rows] <- sample(parents[persons$sex[parents] == "f"],
+      size, replace = TRUE
+    )
+    persons$father_id[rows] <- sample(parents[persons$sex[parents] == "m"],
+      size, replace = TRUE
+    )
+  }
+  persons$death_time[c(1, 4, 25, 52)] <- -5
+  population <- hammel_population(persons, end_time = 0)
+  for (depth in 1:3) {
+    kin <- extract_kin(population, persons$person_id, generations = depth)
+    counts <- count_kin(population, c(0, -20, -5, -20),
+      generations = depth, by = "sex"
+    )
+    for (i in seq_len(nrow(counts))) {
+      row <- counts[i, ]
+      alive <- persons$birth_time <= row$time &
+        (is.na(persons$death_time) | persons$death_time > row$time)
+      egos <- persons$person_id[alive & persons$sex == row$sex]
+      relatives <- persons$person_id[alive]
+      pairs <- kin[
+        kin$ego_id %in% egos & kin$relative_id %in% relatives &
+          kin$relationship == row$relationship,
+      ]
+      expect_equal(row$persons, length(egos))
+      expect_equal(row$kin, nrow(pairs))
+      expect_equal(row$mean_kin, nrow(pairs) / length(egos))
+      expect_equal(
+        row$share_with_kin, length(unique(pairs$ego_id)) / length(egos)
+      )
+    }
+    chosen <- unique(kin$relationship[grepl("cousin", kin$relationship)])
+    if (length(chosen)) {
+      selected <- count_kin(population, c(0, -20, -5, -20),
+        generations = depth, by = "sex", relationships = chosen
+      )
+      expect_identical(selected, counts[counts$relationship %in% chosen, ])
+    }
+  }
+})
+
+test_that("relationship selection validates labels and retains cycle checks", {
+  population <- living_kin_population()
+  bad <- list(
+    character(), NA_character_, "", "cousin", "second_cousin", 1, TRUE,
+    c("parent", "parent"), matrix("parent")
+  )
+  for (selected in bad) {
+    expect_error(count_kin(population, 0, relationships = selected),
+      "relationships"
+    )
+  }
+  expect_error(
+    count_kin(population, 0, generations = 0, relationships = "parent"),
+    "relationships"
+  )
+  expect_identical(nrow(count_kin(population, 0, generations = 0)), 0L)
+  dead <- make_model(2)$population
+  dead$persons$mother_id <- c(2, 1)
+  dead$persons$death_time <- -10
+  expect_error(count_kin(dead, 0, relationships = "first_cousin"), "cycle")
+  expect_error(count_kin(dead, 0, generations = 0), "cycle")
+})

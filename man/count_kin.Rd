@@ -4,7 +4,7 @@
 \alias{count_kin}
 \title{Calculate the average number of living kin over time}
 \usage{
-count_kin(population, times, generations = 2, by = NULL)
+count_kin(population, times, generations = 2, by = NULL, relationships = NULL)
 }
 \arguments{
 \item{population}{A \code{hammel_population} with a known \code{end_time} no earlier
@@ -20,14 +20,18 @@ cousins.}
 \item{by}{\code{NULL} (default) or a character vector of the ego's
 characteristics at each time to count separately: \code{"sex"} and declared
 group dimensions, such as \code{"race"}.}
+
+\item{relationships}{\code{NULL} (default) for all relationships, or a nonempty
+character vector of unique relationship names within \code{generations}, such
+as \code{"first_cousin"}. Retains the usual row order and ego denominators.}
 }
 \value{
 A tibble with \code{time}, the \code{by} columns, \code{relationship}, \code{persons}
 (living egos), \code{kin} (their living kin of that type), \code{mean_kin}
 (\code{kin / persons}) and \code{share_with_kin} (share of egos with at least one).
 \code{mean_kin} and \code{share_with_kin} are \code{NA} with no egos. Every time,
-stratum and relationship within \code{generations} has a row. Rows vary by
-time fastest, then the \code{by} variables in order, then relationship.
+stratum and selected relationship within \code{generations} has a row. Rows vary
+by time fastest, then the \code{by} variables in order, then relationship.
 }
 \description{
 Count, for each person living at each requested time, the living relatives
