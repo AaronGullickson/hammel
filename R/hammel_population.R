@@ -72,7 +72,8 @@ hammel_population <- function(
 ) {
   results <- structure(
     list(
-      persons = persons, unions = normalize_unions(unions),
+      persons = persons,
+      unions = normalize_unions(unions),
       end_time = end_time
     ),
     class = "hammel_population"
@@ -115,8 +116,8 @@ hammel_population <- function(
 #' validate_population(results)
 validate_population <- function(results) {
   if (!inherits(results, "hammel_population") || !is.list(results) ||
-    anyDuplicated(names(results)) ||
-    !all(c("persons", "unions", "end_time") %in% names(results))) {
+        anyDuplicated(names(results)) ||
+        !all(c("persons", "unions", "end_time") %in% names(results))) {
     stop(
       paste0(
         "`results` must be a hammel_population object with ",
@@ -129,10 +130,12 @@ validate_population <- function(results) {
   unions <- results$unions
   time <- results$end_time
   check_time(time, "end_time")
-  check_columns(persons, c(
-    "person_id", "sex", "birth_time", "death_time",
-    "mother_id", "father_id"
-  ), "persons")
+  check_columns(
+    persons, c(
+      "person_id", "sex", "birth_time", "death_time",
+      "mother_id", "father_id"
+    ), "persons"
+  )
   validate_group_declaration(results$groups, results)
   validate_transition_history(results)
   check_columns(unions, names(empty_unions()), "unions")
@@ -141,14 +144,16 @@ validate_population <- function(results) {
     stop("`persons$person_id` must be unique.", call. = FALSE)
   }
   if (!is.character(persons$sex) || !is.null(dim(persons$sex)) ||
-    anyNA(persons$sex) || any(!persons$sex %in% c("m", "f"))) {
-    stop('`persons$sex` must contain "m" (male) or "f" (female).',
-      call. =
-        FALSE
+        anyNA(persons$sex) ||
+        any(!persons$sex %in% c("m", "f"))) {
+    stop(
+      '`persons$sex` must contain "m" (male) or "f" (female).',
+      call. = FALSE
     )
   }
   for (field in c("birth_time", "death_time")) {
-    check_numeric_column(persons[[field]], paste0("persons$", field),
+    check_numeric_column(
+      persons[[field]], paste0("persons$", field),
       missing = field == "death_time"
     )
   }
@@ -157,16 +162,14 @@ validate_population <- function(results) {
   }
   for (field in c("mother_id", "father_id")) {
     x <- persons[[field]]
-    check_numeric_column(x, paste0("persons$", field),
+    check_numeric_column(
+      x, paste0("persons$", field),
       missing = TRUE,
       id = TRUE
     )
     if (any(!is.na(x) & (!x %in% persons$person_id | x == persons$person_id))) {
       stop(
-        sprintf(
-          "`persons$%s` must refer to another person or be NA.",
-          field
-        ),
+        sprintf("`persons$%s` must refer to another person or be NA.", field),
         call. = FALSE
       )
     }
@@ -177,9 +180,11 @@ validate_population <- function(results) {
   if (anyDuplicated(unions$union_id)) {
     stop("`unions$union_id` must be unique.", call. = FALSE)
   }
-  if (any(!unions$wife_id %in% persons$person_id |
-    !unions$husband_id %in% persons$person_id |
-    unions$wife_id == unions$husband_id)) {
+  if (any(
+        !unions$wife_id %in% persons$person_id |
+          !unions$husband_id %in% persons$person_id |
+          unions$wife_id == unions$husband_id
+      )) {
     stop("Union partners must refer to two distinct persons.", call. = FALSE)
   }
   wife_sex <- persons$sex[match(unions$wife_id, persons$person_id)]
@@ -200,11 +205,12 @@ validate_population <- function(results) {
   }
   reason <- unions$end_reason
   if (!is.character(reason) || !is.null(dim(reason)) ||
-    any(!is.na(reason) & !reason %in% c(
-      "death_husband", "death_wife",
-      "dissolution", "conversion"
-    )) ||
-    any(is.na(reason) != is.na(unions$end_time))) {
+        any(
+          !is.na(reason) &
+            !reason %in%
+               c("death_husband", "death_wife", "dissolution", "conversion")
+        ) ||
+        any(is.na(reason) != is.na(unions$end_time))) {
     stop(
       paste0(
         "`unions$end_reason` must be death_husband, ",
@@ -215,28 +221,33 @@ validate_population <- function(results) {
     )
   }
   validate_union_types(unions)
-  if (any(reason == "conversion", na.rm = TRUE) && !"union_type" %in% names(
-    unions
-  )) {
-    stop("Conversion records require union_type and conversion links.",
-      call. =
-        FALSE
+  if (any(reason == "conversion", na.rm = TRUE) &&
+        !"union_type" %in% names(unions)) {
+    stop(
+      "Conversion records require union_type and conversion links.",
+      call. = FALSE
     )
   }
   for (partner in c("wife_id", "husband_id")) {
     born <- persons$birth_time[match(unions[[partner]], persons$person_id)]
     if (any(unions$start_time < born)) {
-      stop("Unions must not start before either partner's birth.",
-        call. =
-          FALSE
+      stop(
+        "Unions must not start before either partner's birth.",
+        call. = FALSE
       )
     }
   }
   if (!is.null(time) &&
-    any(c(
-      persons$birth_time, persons$death_time, unions$start_time,
-      unions$end_time
-    ) > time, na.rm = TRUE)) {
+        any(
+          c(
+            persons$birth_time,
+            persons$death_time,
+            unions$start_time,
+            unions$end_time
+          ) >
+            time,
+          na.rm = TRUE
+        )) {
     stop(
       paste0(
         "Recorded events must not occur after the population's ",
@@ -253,7 +264,7 @@ validate_population <- function(results) {
 
 normalize_unions <- function(unions) {
   if (is.null(unions) ||
-    (is.data.frame(unions) && nrow(unions) == 0L && ncol(unions) == 0L)) {
+        (is.data.frame(unions) && nrow(unions) == 0L && ncol(unions) == 0L)) {
     return(empty_unions())
   }
   unions
@@ -261,8 +272,12 @@ normalize_unions <- function(unions) {
 
 empty_unions <- function() {
   tibble::tibble(
-    union_id = integer(), wife_id = integer(), husband_id = integer(),
-    start_time = numeric(), end_time = numeric(), end_reason = character()
+    union_id = integer(),
+    wife_id = integer(),
+    husband_id = integer(),
+    start_time = numeric(),
+    end_time = numeric(),
+    end_reason = character()
   )
 }
 
@@ -271,20 +286,18 @@ validate_union_types <- function(unions) {
     return(invisible(unions))
   }
   x <- unions$union_type
-  if (!is.character(x) || !is.null(dim(x)) || anyNA(x) || any(!x %in% c(
-    "cohab",
-    "marriage"
-  ))) {
-    stop("`unions$union_type` must contain 'cohab' or 'marriage'.",
-      call. =
-        FALSE
+  if (!is.character(x) || !is.null(dim(x)) || anyNA(x) ||
+        any(!x %in% c("cohab", "marriage"))) {
+    stop(
+      "`unions$union_type` must contain 'cohab' or 'marriage'.",
+      call. = FALSE
     )
   }
   if (!"previous_cohab_id" %in% names(unions)) {
     if (any(unions$end_reason == "conversion", na.rm = TRUE)) {
-      stop("Conversion histories require `previous_cohab_id` links.",
-        call. =
-          FALSE
+      stop(
+        "Conversion histories require `previous_cohab_id` links.",
+        call. = FALSE
       )
     }
     return(invisible(unions))
@@ -293,21 +306,29 @@ validate_union_types <- function(unions) {
   check_numeric_column(links, "previous_cohab_id", missing = TRUE, id = TRUE)
   rows <- which(!is.na(links))
   parent <- match(links[rows], unions$union_id)
-  if (anyNA(parent) || anyDuplicated(parent) || any(unions$union_type[rows] !=
-    "marriage") ||
-    any(unions$union_type[parent] != "cohab") ||
-    any(is.na(unions$end_reason[parent]) | unions$end_reason[parent] !=
-      "conversion") ||
-    any(is.na(unions$end_time[parent]) | unions$end_time[parent] !=
-      unions$start_time[rows]) ||
-    any(unions$wife_id[parent] != unions$wife_id[rows] | unions$husband_id[
-      parent
-    ] != unions$husband_id[rows]) ||
-    any(!which(unions$end_reason == "conversion") %in% parent)) {
-    stop(paste0(
-      "Conversions require unique same-partner ",
-      "cohab-to-marriage links at the same time."
-    ), call. = FALSE)
+  if (anyNA(parent) || anyDuplicated(parent) ||
+        any(unions$union_type[rows] != "marriage") ||
+        any(unions$union_type[parent] != "cohab") ||
+        any(
+          is.na(unions$end_reason[parent]) |
+            unions$end_reason[parent] != "conversion"
+        ) ||
+        any(
+          is.na(unions$end_time[parent]) |
+            unions$end_time[parent] != unions$start_time[rows]
+        ) ||
+        any(
+          unions$wife_id[parent] != unions$wife_id[rows] |
+            unions$husband_id[parent] != unions$husband_id[rows]
+        ) ||
+        any(!which(unions$end_reason == "conversion") %in% parent)) {
+    stop(
+      paste0(
+        "Conversions require unique same-partner ",
+        "cohab-to-marriage links at the same time."
+      ),
+      call. = FALSE
+    )
   }
   invisible(unions)
 }

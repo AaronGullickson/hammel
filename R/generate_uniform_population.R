@@ -48,8 +48,9 @@ generate_uniform_population <- function(
   female_probability = 0.5,
   groups = NULL
 ) {
-  if (!is.numeric(size) || length(size) != 1L || !is.finite(size) ||
-    size < 0 || size != trunc(size) || size > .Machine$integer.max) {
+  if (!is.numeric(size) || length(size) != 1L || !is.finite(size) || size < 0 ||
+        size != trunc(size) ||
+        size > .Machine$integer.max) {
     stop(
       paste0(
         "`size` must be a nonnegative whole number no ",
@@ -58,8 +59,8 @@ generate_uniform_population <- function(
       call. = FALSE
     )
   }
-  if (!is.numeric(max_age) || length(max_age) != 1L ||
-    !is.finite(max_age) || max_age < 0) {
+  if (!is.numeric(max_age) || length(max_age) != 1L || !is.finite(max_age) ||
+        max_age < 0) {
     stop("`max_age` must be finite and nonnegative, in years.", call. = FALSE)
   }
   check_time(end_time, "end_time")
@@ -67,23 +68,24 @@ generate_uniform_population <- function(
     stop("`end_time` must be a finite time in years.", call. = FALSE)
   }
   if (!is.numeric(female_probability) || length(female_probability) != 1L ||
-    !is.finite(female_probability) || female_probability < 0 ||
-    female_probability > 1) {
-    stop("`female_probability` must be a number between 0 and 1.",
-      call. =
-        FALSE
+        !is.finite(female_probability) ||
+        female_probability < 0 ||
+        female_probability > 1) {
+    stop(
+      "`female_probability` must be a number between 0 and 1.",
+      call. = FALSE
     )
   }
 
   draw <- baseline_group_sampler(groups)
   persons <- data.frame(
     person_id = seq_len(size),
-    sex = as.character(ifelse(stats::rbinom(size,
-      size = 1,
-      prob = female_probability
-    ) == 1,
-    "f", "m"
-    )),
+    sex = as.character(
+      ifelse(
+        stats::rbinom(size, size = 1, prob = female_probability) == 1,
+        "f", "m"
+      )
+    ),
     birth_time = end_time - stats::runif(size, min = 0, max = max_age),
     death_time = rep(NA_real_, size),
     mother_id = rep(NA_integer_, size),
@@ -91,19 +93,16 @@ generate_uniform_population <- function(
   )
   if (!is.null(draw)) {
     for (column in names(drawn <- draw(size))) {
-      persons[[
-        column
-      ]] <- drawn[[column]]
+      persons[[column]] <- drawn[[column]]
     }
   }
-  hammel_population(persons,
+  hammel_population(
+    persons,
     end_time = end_time,
     groups = if (is.null(draw)) {
       NULL
     } else {
-      lapply(attr(draw, "categories"), function(x) group(
-        categories = x
-      ))
+      lapply(attr(draw, "categories"), function(x) group(categories = x))
     }
   )
 }
@@ -117,11 +116,16 @@ baseline_group_sampler <- function(groups) {
   }
   check_weights <- function(w, what) {
     if (!is.numeric(w) || !is.null(dim(w)) || !length(w) || anyNA(w) ||
-      any(!is.finite(w)) || any(w < 0) || !any(w > 0)) {
-      stop(sprintf(
-        "%s must be finite and nonnegative, with a positive value.",
-        what
-      ), call. = FALSE)
+          any(!is.finite(w)) ||
+          any(w < 0) ||
+          !any(w > 0)) {
+      stop(
+        sprintf(
+          "%s must be finite and nonnegative, with a positive value.",
+          what
+        ),
+        call. = FALSE
+      )
     }
     # Scale before summation to avoid overflow for large finite weights.
     p <- w / max(w)
@@ -130,24 +134,24 @@ baseline_group_sampler <- function(groups) {
   if (is.data.frame(groups)) {
     dimensions <- setdiff(names(groups), "weight")
     if (!"weight" %in% names(groups) || !length(dimensions) || !nrow(groups)) {
-      stop(paste0(
-        "A `groups` data frame needs one column per ",
-        "dimension and a `weight` column."
-      ), call. = FALSE)
+      stop(
+        paste0(
+          "A `groups` data frame needs one column per ",
+          "dimension and a `weight` column."
+        ),
+        call. = FALSE
+      )
     }
     check_group_names(dimensions)
     for (d in dimensions) {
-      check_groups(
-        data.frame(group = groups[[d]]),
-        "groups"
-      )
+      check_groups(data.frame(group = groups[[d]]), "groups")
     }
     p <- check_weights(groups$weight, "`groups$weight`")
     draw <- function(size) {
       rows <- sample.int(nrow(groups), size, replace = TRUE, prob = p)
-      lapply(stats::setNames(dimensions, dimensions), function(d) groups[[d]][
-        rows
-      ])
+      lapply(
+        stats::setNames(dimensions, dimensions), function(d) groups[[d]][rows]
+      )
     }
     categories <- lapply(
       stats::setNames(dimensions, dimensions),
@@ -155,33 +159,39 @@ baseline_group_sampler <- function(groups) {
     )
   } else {
     if (!is.list(groups) || !length(groups)) {
-      stop("`groups` must be a named list of weight vectors or a data frame.",
+      stop(
+        "`groups` must be a named list of weight vectors or a data frame.",
         call. = FALSE
       )
     }
     dimensions <- names(groups)
     check_group_names(dimensions)
-    probabilities <- lapply(dimensions, function(d) {
-      labels <- names(groups[[d]])
-      if (is.null(labels) || anyNA(labels) || any(!nzchar(trimws(labels))) ||
-        anyDuplicated(labels)) {
-        stop(
-          sprintf(
-            "`groups$%s` must be named by unique, nonempty categories.", d
-          ),
-          call. = FALSE
-        )
+    probabilities <- lapply(
+      dimensions, function(d) {
+        labels <- names(groups[[d]])
+        if (is.null(labels) || anyNA(labels) || any(!nzchar(trimws(labels))) ||
+              anyDuplicated(labels)) {
+          stop(
+            sprintf(
+              "`groups$%s` must be named by unique, nonempty categories.", d
+            ),
+            call. = FALSE
+          )
+        }
+        check_weights(groups[[d]], sprintf("`groups$%s`", d))
       }
-      check_weights(groups[[d]], sprintf("`groups$%s`", d))
-    })
-    draw <- function(size) stats::setNames(lapply(
-      seq_along(dimensions),
-      function(k)
-        names(groups[[k]])[sample.int(length(groups[[k]]), size,
-          replace = TRUE,
-          prob = probabilities[[k]]
-        )]
-    ), dimensions)
+    )
+    draw <- function(size) stats::setNames(
+      lapply(
+        seq_along(dimensions),
+        function(k)
+          names(groups[[k]])[sample.int(
+            length(groups[[k]]), size,
+            replace = TRUE,
+            prob = probabilities[[k]]
+          )]
+      ), dimensions
+    )
     categories <- lapply(
       stats::setNames(dimensions, dimensions),
       function(d) names(groups[[d]])

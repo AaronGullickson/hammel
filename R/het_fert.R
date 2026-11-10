@@ -44,9 +44,9 @@ validate_het_fert <- function(model) {
     return(invisible(NULL))
   }
   if (!inherits(model, "hammel_het_fert") || !is.list(model)) {
-    stop("`hetfert` must be NULL or a het_fert(cv, alpha) object.",
-      call. =
-        FALSE
+    stop(
+      "`hetfert` must be NULL or a het_fert(cv, alpha) object.",
+      call. = FALSE
     )
   }
   scalar <- function(x) is.numeric(x) && is.null(dim(x)) && length(x) == 1L &&
@@ -81,8 +81,9 @@ validate_fertility_weights <- function(persons) {
   # Base R commonly represents an all-NA column as logical. It is a valid
   # unused placeholder in male-only/empty histories, but not for women.
   if (!is.null(dim(w)) ||
-    !(is.numeric(w) || (is.logical(w) && all(is.na(w))))) {
-    stop("`persons$hetfert` must be a numeric column; male entries may be NA.",
+        !(is.numeric(w) || (is.logical(w) && all(is.na(w))))) {
+    stop(
+      "`persons$hetfert` must be a numeric column; male entries may be NA.",
       call. = FALSE
     )
   }
@@ -114,9 +115,11 @@ initialize_fertility_weights <- function(persons, model) {
     persons$hetfert[female] <- if (model$cv == 0) {
       rep(1, length(female))
     } else {
-      stats::rlnorm(length(female), meanlog = -variance / 2, sdlog = sqrt(
-        variance
-      ))
+      stats::rlnorm(
+        length(female),
+        meanlog = -variance / 2,
+        sdlog = sqrt(variance)
+      )
     }
   }
   validate_fertility_weights(persons)

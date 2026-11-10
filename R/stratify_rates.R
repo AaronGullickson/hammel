@@ -56,33 +56,38 @@
 #'   list(race_w = c(A = 1, B = 1), race_h = c(A = 2, B = 1))
 #' )
 stratify_rates <- function(rates, by) {
-  if (!is.data.frame(rates) || !"rate" %in% names(rates) || !is.numeric(
-    rates$rate
-  )) {
-    stop("`rates` must be a data frame with a numeric `rate` column.",
-      call. =
-        FALSE
+  if (!is.data.frame(rates) || !"rate" %in% names(rates) ||
+        !is.numeric(rates$rate)) {
+    stop(
+      "`rates` must be a data frame with a numeric `rate` column.",
+      call. = FALSE
     )
   }
   validate_strata_factors(by)
   existing <- intersect(names(by), names(rates))
   if (length(existing)) {
-    stop(sprintf(
-      paste0(
-        "`rates` already has column(s) %s; stratify a ",
-        "table without them, or stratify subsets and bind them."
+    stop(
+      sprintf(
+        paste0(
+          "`rates` already has column(s) %s; stratify a ",
+          "table without them, or stratify subsets and bind them."
+        ),
+        paste0("`", existing, "`", collapse = ", ")
       ),
-      paste0("`", existing, "`", collapse = ", ")
-    ), call. = FALSE)
+      call. = FALSE
+    )
   }
   # One row per combination of categories, the first column varying slowest.
-  grid <- expand.grid(lapply(rev(by), names),
+  grid <- expand.grid(
+    lapply(rev(by), names),
     KEEP.OUT.ATTRS = FALSE,
     stringsAsFactors = FALSE
   )[rev(names(by))]
-  factor <- Reduce(`*`, lapply(names(by), function(col) unname(by[[col]][grid[[
-    col
-  ]]])))
+  factor <- Reduce(
+    `*`, lapply(
+      names(by), function(col) unname(by[[col]][grid[[col]]])
+    )
+  )
   n <- nrow(rates)
   rows <- rep(seq_len(n), times = nrow(grid))
   out <- as.data.frame(rates)[rows, , drop = FALSE]
@@ -124,30 +129,37 @@ rate_schema_columns <- c(
 # Columns of a rate table that may be group strata: everything else. Group
 # dimensions are known only once the table meets the population's declaration.
 candidate_strata <- function(rates) {
-  setdiff(names(rates), c(
-    rate_schema_columns, builtin_strata, "union_status",
-    "marital_status", ".hammel_group"
-  ))
+  setdiff(
+    names(rates), c(
+      rate_schema_columns, builtin_strata, "union_status",
+      "marital_status", ".hammel_group"
+    )
+  )
 }
 
 validate_strata_factors <- function(by) {
   columns <- names(by)
   if (!is.list(by) || is.data.frame(by) || !length(by) || is.null(columns) ||
-    anyNA(columns) || any(!nzchar(trimws(columns))) || anyDuplicated(columns)) {
-    stop("`by` must be a nonempty named list with unique column names.",
-      call. =
-        FALSE
+        anyNA(columns) ||
+        any(!nzchar(trimws(columns))) ||
+        anyDuplicated(columns)) {
+    stop(
+      "`by` must be a nonempty named list with unique column names.",
+      call. = FALSE
     )
   }
   schema <- intersect(columns, rate_schema_columns)
   if (length(schema)) {
-    stop(sprintf(
-      paste0(
-        "`by` cannot stratify by %s, which are band, rate or ",
-        "calendar columns."
+    stop(
+      sprintf(
+        paste0(
+          "`by` cannot stratify by %s, which are band, rate or ",
+          "calendar columns."
+        ),
+        paste0("`", schema, "`", collapse = ", ")
       ),
-      paste0("`", schema, "`", collapse = ", ")
-    ), call. = FALSE)
+      call. = FALSE
+    )
   }
   if (any(!grepl("^[A-Za-z][A-Za-z0-9_.]*$", columns))) {
     stop("`by` names must be valid column names.", call. = FALSE)
@@ -156,15 +168,22 @@ validate_strata_factors <- function(by) {
     x <- by[[col]]
     labels <- names(x)
     if (!is.numeric(x) || !is.null(dim(x)) || !length(x) || anyNA(x) ||
-      any(!is.finite(x)) || any(x < 0) || is.null(labels) || anyNA(labels) ||
-      any(!nzchar(trimws(labels))) || anyDuplicated(labels)) {
-      stop(sprintf(
-        paste0(
-          "`by$%s` must be a named numeric vector of finite ",
-          "nonnegative factors with unique nonempty category names."
+          any(!is.finite(x)) ||
+          any(x < 0) ||
+          is.null(labels) ||
+          anyNA(labels) ||
+          any(!nzchar(trimws(labels))) ||
+          anyDuplicated(labels)) {
+      stop(
+        sprintf(
+          paste0(
+            "`by$%s` must be a named numeric vector of finite ",
+            "nonnegative factors with unique nonempty category names."
+          ),
+          col
         ),
-        col
-      ), call. = FALSE)
+        call. = FALSE
+      )
     }
   }
   invisible(by)
@@ -175,12 +194,15 @@ validate_strata_factors <- function(by) {
 check_stratified_columns <- function(rates, allowed, process) {
   bad <- intersect(setdiff(builtin_strata, allowed), names(rates))
   if (length(bad)) {
-    stop(sprintf(
-      "%s rates cannot be stratified by %s; supported columns: %s.",
-      process,
-      paste0("`", bad, "`", collapse = ", "),
-      paste0("`", allowed, "`", collapse = ", ")
-    ), call. = FALSE)
+    stop(
+      sprintf(
+        "%s rates cannot be stratified by %s; supported columns: %s.",
+        process,
+        paste0("`", bad, "`", collapse = ", "),
+        paste0("`", allowed, "`", collapse = ", ")
+      ),
+      call. = FALSE
+    )
   }
   invisible(rates)
 }

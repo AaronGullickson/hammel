@@ -59,7 +59,7 @@ calculate_population_size <- function(
   if (!is.numeric(times) || !is.null(dim(times)) || any(!is.finite(times))) {
     stop(
       "`times` must be a numeric vector of finite times in years.",
-      call. =FALSE
+      call. = FALSE
     )
   }
   alias <- observation_alias(population, by)
@@ -72,17 +72,20 @@ calculate_population_size <- function(
     alias$dims
   )
   check_detailed_previous_union(use_detailed_previous_union, by)
-  obs <- person_observation(population, by, if (length(times)) {
-    max(times)
-  } else {
-    -Inf
-  })
+  obs <- person_observation(
+    population, by, if (length(times)) {
+      max(times)
+    } else {
+      -Inf
+    }
+  )
   previous <- "previous_union" %in% by
   utype <- "union_type" %in% by
   map <- if (use_detailed_previous_union) 0:2 else c(0L, 1L, 1L)
   ng <- if (is.null(obs$groups)) 1L else length(obs$groups)
   options <- list(
-    typed = obs$typed, exclusive = obs$typed || previous,
+    typed = obs$typed,
+    exclusive = obs$typed || previous,
     counts_cohab = obs$counts_cohab,
     sex = "sex" %in% by,
     group = "group" %in% by,
@@ -94,7 +97,9 @@ calculate_population_size <- function(
     obs$persons, obs$unions, obs$group_indices, ng, as.numeric(times), options
   )
   sizes <- c(
-    t = length(times), a = 1L, sex = if ("sex" %in% by) 2L else 1L,
+    t = length(times),
+    a = 1L,
+    sex = if ("sex" %in% by) 2L else 1L,
     parity = 1L,
     group = if ("group" %in% by) ng else 1L,
     union_type = if (utype) length(union_type_labels(obs$typed)) else 1L,

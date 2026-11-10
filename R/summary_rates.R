@@ -25,9 +25,9 @@ summary_rows <- function(table) {
   if (!length(columns)) {
     return(list(seq_len(nrow(table))))
   }
-  codes <- lapply(table[columns], function(column) match(column, unique(
-    column
-  )))
+  codes <- lapply(
+    table[columns], function(column) match(column, unique(column))
+  )
   keys <- do.call(paste, c(codes, sep = ":"))
   split(seq_len(nrow(table)), factor(keys, levels = unique(keys)))
 }
@@ -38,26 +38,19 @@ summary_rows <- function(table) {
 check_summary_intervals <- function(rates, strata = character()) {
   where <- stratum_label(rates, strata)
   if (!nrow(rates)) {
-    stop("A rate table needs at least one age band.",
-      call. =
-        FALSE
-    )
+    stop("A rate table needs at least one age band.", call. = FALSE)
   }
   check_numeric_column(rates$age_start, "rates$age_start")
   ends <- rates$age_end
   if (!is.numeric(ends) || anyNA(ends) || any(rates$age_start < 0) ||
-    any(ends <= rates$age_start)) {
+        any(ends <= rates$age_start)) {
     stop(paste0("Invalid age intervals", where, "."), call. = FALSE)
   }
   ordered <- rates[order(rates$age_start), , drop = FALSE]
-  if (nrow(ordered) > 1L && any(head(ordered$age_end, -1) != tail(
-    ordered$age_start, -1
-  ))) {
+  if (nrow(ordered) > 1L &&
+        any(head(ordered$age_end, -1) != tail(ordered$age_start, -1))) {
     stop(
-      paste0(
-        "Age intervals must be contiguous and nonoverlapping",
-        where, "."
-      ),
+      paste0("Age intervals must be contiguous and nonoverlapping", where, "."),
       call. = FALSE
     )
   }

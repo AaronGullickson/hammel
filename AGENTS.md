@@ -47,10 +47,16 @@ be made autonomously; record choices with substantial architectural consequences
   `generate_uniform_population()`.
 - Keep hand-maintained `R/` source lines at most 80 characters, including
   comments and roxygen documentation. Follow the same limit for new or edited
-  R code elsewhere. Wrap long calls and use one argument per line with a
-  two-space indent for long function signatures. Indent continuation lines,
-  including wrapped `if` conditions, by two spaces rather than aligning them
-  with an opening parenthesis. Split long diagnostic strings
+  R code elsewhere. Keep calls on one line when they fit and remain readable.
+  In multiline calls, put each named argument on its own line; short unnamed
+  arguments may share a line. Keep nested calls and expressions together when
+  they fit, remove unnecessary breaks, and put the closing parenthesis on its
+  own line. Use one argument per line with a two-space indent for long
+  function definitions. See D163. For wrapped `if` conditions, prefer breaks
+  at logical operators and keep short nested calls intact. Indent continuation
+  lines two spaces beyond the first boolean expression after `if (` (D164).
+  Other continuation lines use two spaces beyond the line they continue.
+  Split long diagnostic strings
   without changing their text. Leave generated wrappers untouched.
 - Use braces for all loop bodies and statement-style or multiline `if`/`else`
   branches. Keep `else` on the same line as the preceding closing brace.

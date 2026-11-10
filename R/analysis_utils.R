@@ -9,7 +9,8 @@
 # Population validation already checks label types and missing values.
 observation_groups <- function(persons, by_group) {
   if (!is.logical(by_group) || length(by_group) != 1L ||
-    !is.null(dim(by_group)) || is.na(by_group)) {
+        !is.null(dim(by_group)) ||
+        is.na(by_group)) {
     stop("`by_group` must be TRUE or FALSE.", call. = FALSE)
   }
   if (!by_group) {
@@ -34,16 +35,15 @@ prepare_group_observations <- function(persons, population, by_group) {
     h <- combined$history
     if (nrow(h)) {
       attr(persons, ".hammel_group_history") <- list(
-        row = match(h$person_id, persons$person_id) - 1L, time = h$time,
-        from = h$from, to = h$to
+        row = match(h$person_id, persons$person_id) - 1L,
+        time = h$time,
+        from = h$from,
+        to = h$to
       )
     }
     return(persons)
   }
-  tx <- if (inherits(
-    population,
-    "hammel_population"
-  )) {
+  tx <- if (inherits(population, "hammel_population")) {
     population$transitions
   } else {
     NULL
@@ -51,12 +51,15 @@ prepare_group_observations <- function(persons, population, by_group) {
   if (is.null(tx) || !nrow(tx)) {
     return(persons)
   }
-  groups <- extend_identity_groups(unique(persons$group), c(as.character(
-    tx$origin
-  ), as.character(tx$destination)))
+  groups <- extend_identity_groups(
+    unique(persons$group), c(
+      as.character(tx$origin), as.character(tx$destination)
+    )
+  )
   attr(persons, ".hammel_group_values") <- groups
   attr(persons, ".hammel_group_history") <- list(
-    row = match(tx$person_id, persons$person_id) - 1L, time = tx$time,
+    row = match(tx$person_id, persons$person_id) - 1L,
+    time = tx$time,
     from = match(as.character(tx$origin), as.character(groups)) - 1L,
     to = match(as.character(tx$destination), as.character(groups)) - 1L
   )
@@ -72,26 +75,38 @@ check_by <- function(by, allowed, fun, dims = NULL) {
   if (is.null(by)) {
     return(character())
   }
-  if (!is.character(by) ||
-    !is.null(dim(by)) || anyNA(by) || anyDuplicated(by)) {
-    stop("`by` must be NULL or a character vector of distinct variable names.",
+  if (!is.character(by) || !is.null(dim(by)) || anyNA(by) ||
+        anyDuplicated(by)) {
+    stop(
+      "`by` must be NULL or a character vector of distinct variable names.",
       call. = FALSE
     )
   }
   unknown <- setdiff(by, allowed)
   if (length(unknown) && length(dims)) {
-    shown <- unlist(lapply(allowed, function(a) {
-      suffix <- sub("^group", "", a)
-      if (a %in% c("group", "group_w", "group_h")) paste0(dims, suffix) else a
-    }))
+    shown <- unlist(
+      lapply(
+        allowed, function(a) {
+          suffix <- sub("^group", "", a)
+          if (a %in% c("group", "group_w", "group_h")) {
+            paste0(dims, suffix)
+          } else {
+            a
+          }
+        }
+      )
+    )
     allowed <- shown
   }
   if (length(unknown)) {
-    stop(sprintf(
-      "`%s()` cannot split by %s; `by` accepts %s.", fun,
-      paste0("\"", unknown, "\"", collapse = ", "),
-      paste0("\"", allowed, "\"", collapse = ", ")
-    ), call. = FALSE)
+    stop(
+      sprintf(
+        "`%s()` cannot split by %s; `by` accepts %s.", fun,
+        paste0("\"", unknown, "\"", collapse = ", "),
+        paste0("\"", allowed, "\"", collapse = ", ")
+      ),
+      call. = FALSE
+    )
   }
   by
 }
@@ -100,11 +115,9 @@ check_by <- function(by, allowed, fun, dims = NULL) {
 # apply when `previous_union` is in `by`.
 check_detailed_previous_union <- function(detailed, by) {
   if (!is.logical(detailed) || length(detailed) != 1L ||
-    !is.null(dim(detailed)) || is.na(detailed)) {
-    stop(
-      "`use_detailed_previous_union` must be TRUE or FALSE.",
-      call. = FALSE
-    )
+        !is.null(dim(detailed)) ||
+        is.na(detailed)) {
+    stop("`use_detailed_previous_union` must be TRUE or FALSE.", call. = FALSE)
   }
   if (!detailed && !"previous_union" %in% by) {
     stop(
@@ -149,7 +162,8 @@ person_observation <- function(
     validate_population(population)
   }
   if (is.null(population$end_time) || end > population$end_time) {
-    stop("Observation requires a known endpoint and cannot extend beyond it.",
+    stop(
+      "Observation requires a known endpoint and cannot extend beyond it.",
       call. = FALSE
     )
   }
@@ -169,27 +183,30 @@ person_observation <- function(
   groups <- if (grouped) observation_groups(persons, TRUE) else NULL
   typed <- !is.null(unions) && "union_type" %in% names(unions)
   if (requires_typed && !typed) {
-    stop("Splitting by \"union_type\" requires typed union histories.",
-      call. =
-        FALSE
+    stop(
+      "Splitting by \"union_type\" requires typed union histories.",
+      call. = FALSE
     )
   }
   if (is.null(unions)) {
     unions <- data.frame(
       union_id = numeric(),
       wife_id = numeric(),
-      husband_id = numeric(), start_time = numeric(), end_time = numeric(),
+      husband_id = numeric(),
+      start_time = numeric(),
+      end_time = numeric(),
       end_reason = character()
     )
   }
   list(
-    persons = persons, unions = unions, typed = typed, groups = groups,
+    persons = persons,
+    unions = unions,
+    typed = typed,
+    groups = groups,
     group_indices = if (grouped) {
       match(persons$group, groups) - 1L
     } else {
-      rep(
-        0L, nrow(persons)
-      )
+      rep(0L, nrow(persons))
     },
     counts_cohab = isTRUE(
       population$simulation$cohabitation_counts_as_previous_union
@@ -201,10 +218,7 @@ union_type_labels <- function(typed) {
   if (typed) {
     c("unpartnered", "cohab", "marriage")
   } else {
-    c(
-      "unpartnered",
-      "partnered"
-    )
+    c("unpartnered", "partnered")
   }
 }
 
@@ -216,19 +230,18 @@ union_type_labels <- function(typed) {
 build_rows <- function(dims) {
   sizes <- vapply(dims, function(d) length(d$code), integer(1))
   grid <- expand.grid(lapply(sizes, seq_len), KEEP.OUT.ATTRS = FALSE)
-  parts <- lapply(seq_along(dims), function(k) {
-    d <- dims[[k]]
-    x <- d$columns[grid[[k]], , drop = FALSE]
-    rownames(x) <- NULL
-    x
-  })
+  parts <- lapply(
+    seq_along(dims), function(k) {
+      d <- dims[[k]]
+      x <- d$columns[grid[[k]], , drop = FALSE]
+      rownames(x) <- NULL
+      x
+    }
+  )
   out <- if (length(parts)) {
     do.call(cbind, parts)
   } else {
-    data.frame(
-      row.names =
-        seq_len(nrow(grid))
-    )
+    data.frame(row.names = seq_len(nrow(grid)))
   }
   index <- numeric(nrow(grid))
   for (k in seq_along(dims)) {
@@ -236,8 +249,8 @@ build_rows <- function(dims) {
     index <- index + d$code[grid[[k]]] * d$stride
     out[[paste0(".key", k)]] <- (if (is.null(d$key)) {
       seq_along(d$code)
-    } else {
-      d$key
+      } else {
+        d$key
     })[grid[[k]]]
   }
   out$.index <- index + 1
@@ -251,8 +264,10 @@ dim_of <- function(
   key = NULL
 ) {
   list(
-    columns = as.data.frame(columns, stringsAsFactors = FALSE), code = code,
-    stride = stride, key = key
+    columns = as.data.frame(columns, stringsAsFactors = FALSE),
+    code = code,
+    stride = stride,
+    key = key
   )
 }
 
@@ -276,27 +291,32 @@ person_by_dims <- function(
   use_detailed_previous_union,
   previous_codes = NULL
 ) {
-  lapply(by, function(name) switch(name,
-    sex = label_dim("sex", c("m", "f"), counts$strides[["sex"]]),
-    group = label_dim("group", obs$groups, counts$strides[["group"]]),
-    union_type = label_dim(
-      "union_type", union_type_labels(obs$typed),
-      counts$strides[["union_type"]]
-    ),
-    previous_union = {
-      labels <- previous_labels(use_detailed_previous_union)
-      codes <- if (is.null(previous_codes)) {
-        seq_along(labels) - 1L
-      } else {
-        previous_codes
+  lapply(
+    by, function(name) switch(
+      name,
+      sex = label_dim("sex", c("m", "f"), counts$strides[["sex"]]),
+      group = label_dim("group", obs$groups, counts$strides[["group"]]),
+      union_type = label_dim(
+        "union_type", union_type_labels(obs$typed),
+        counts$strides[["union_type"]]
+      ),
+      previous_union = {
+        labels <- previous_labels(use_detailed_previous_union)
+        codes <- if (is.null(previous_codes)) {
+          seq_along(labels) - 1L
+        } else {
+          previous_codes
+        }
+        label_dim(
+          "previous_union", labels[codes + 1L], counts$strides[[
+            "previous_union"
+          ]],
+          code = codes,
+          key = codes + 1L
+        )
       }
-      label_dim("previous_union", labels[codes + 1L], counts$strides[[
-        "previous_union"
-      ]],
-      code = codes, key = codes + 1L
-      )
-    }
-  ))
+    )
+  )
 }
 
 finish_rows <- function(rows) {
@@ -319,9 +339,8 @@ observation_alias <- function(
   extra = character()
 ) {
   none <- list(population = population, by = by, rename = character())
-  if (!inherits(population, "hammel_population") || !length(
-    population$groups
-  )) {
+  if (!inherits(population, "hammel_population") ||
+        !length(population$groups)) {
     return(none)
   }
   dims <- names(population$groups)
@@ -330,31 +349,40 @@ observation_alias <- function(
   if (length(dims) == 1L && !length(extra)) {
     dim <- dims
     if (dim != "group" && any(paste0("group", suffixes) %in% by)) {
-      stop(sprintf(
-        "Split by the declared group dimension `%s`, not `group`.",
-        dim
-      ), call. = FALSE)
+      stop(
+        sprintf(
+          "Split by the declared group dimension `%s`, not `group`.",
+          dim
+        ),
+        call. = FALSE
+      )
     }
     population <- dimension_view(population, dim)
     hit <- by %in% external
     if (any(hit)) {
-      by[hit] <- paste0("group", suffixes)[match(by[hit], paste0(
-        dim, suffixes
-      ))]
+      by[hit] <- paste0("group", suffixes)[match(
+        by[hit], paste0(dim, suffixes)
+      )]
     }
-    return(list(
-      population = population, by = by, dims = dims,
-      rename = stats::setNames(paste0(dim, suffixes), paste0(
-        "group",
-        suffixes
-      ))
-    ))
+    return(
+      list(
+        population = population,
+        by = by,
+        dims = dims,
+        rename = stats::setNames(
+          paste0(dim, suffixes), paste0("group", suffixes)
+        )
+      )
+    )
   }
   if (!"group" %in% dims && any(paste0("group", suffixes) %in% by)) {
-    stop(sprintf(
-      "Split by declared group dimensions (%s), not `group`.",
-      paste0("`", dims, "`", collapse = ", ")
-    ), call. = FALSE)
+    stop(
+      sprintf(
+        "Split by declared group dimensions (%s), not `group`.",
+        paste0("`", dims, "`", collapse = ", ")
+      ),
+      call. = FALSE
+    )
   }
   requests <- lapply(suffixes, function(x) dims[paste0(dims, x) %in% by])
   used <- unique(c(extra, dims[dims %in% unlist(requests)]))
@@ -386,10 +414,15 @@ observation_alias <- function(
   }
   internal <- internal[!drop]
   list(
-    population = view, by = internal, rename = character(), external = by,
+    population = view,
+    by = internal,
+    rename = character(),
+    external = by,
     dims = dims,
-    suffixes = suffixes, requests = requests,
-    combined = combined, extra = extra
+    suffixes = suffixes,
+    requests = requests,
+    combined = combined,
+    extra = extra
   )
 }
 
@@ -402,33 +435,41 @@ combine_dimensions <- function(population, dims) {
   tx <- if (is.null(tx)) {
     empty_transitions()
   } else {
-    tx[tx$group %in% dims, ,
-      drop = FALSE
-    ]
+    tx[tx$group %in% dims, , drop = FALSE]
   }
-  categories <- lapply(stats::setNames(dims, dims), function(d) {
-    x <- tx[tx$group == d, , drop = FALSE]
-    extend_identity_groups(unique(persons[[d]]), c(
-      as.character(x$origin),
-      as.character(x$destination)
-    ))
-  })
+  categories <- lapply(
+    stats::setNames(dims, dims), function(d) {
+      x <- tx[tx$group == d, , drop = FALSE]
+      extend_identity_groups(
+        unique(persons[[d]]), c(
+          as.character(x$origin),
+          as.character(x$destination)
+        )
+      )
+    }
+  )
   sizes <- vapply(categories, length, integer(1))
   strides <- as.integer(cumprod(c(1, utils::head(sizes, -1))))
-  code <- function(d, values) match(as.character(values), as.character(
-    categories[[d]]
-  )) - 1L
-  current <- Reduce(`+`, lapply(seq_along(dims), function(k) code(
-    dims[k],
-    persons[[dims[k]]]
-  ) * strides[k]))
+  code <- function(d, values) match(
+    as.character(values), as.character(categories[[d]])
+  ) - 1L
+  current <- Reduce(
+    `+`, lapply(
+      seq_along(dims), function(k) code(
+        dims[k],
+        persons[[dims[k]]]
+      ) * strides[k]
+    )
+  )
   history <- data.frame(
-    person_id = numeric(), time = numeric(), from = integer(), to = integer()
+    person_id = numeric(),
+    time = numeric(),
+    from = integer(),
+    to = integer()
   )
   if (nrow(tx)) {
     tx <- tx[order(tx$person_id, tx$time, match(tx$group, dims)), ,
-      drop =
-        FALSE
+      drop = FALSE
     ]
     n <- nrow(tx)
     first_row <- !duplicated(tx$person_id)
@@ -451,31 +492,39 @@ combine_dimensions <- function(population, dims) {
       initial[!is.na(known)] <- as.integer(first_origin[known[!is.na(known)]])
       # Category after each row: the latest destination in d so far.
       last <- cummax(ifelse(mine, seq_len(n), 0L))
-      value_after <- ifelse(last >= start & last > 0L, code(d, tx$destination)[
-        pmax(last, 1L)
-      ], initial)
+      value_after <- ifelse(
+        last >= start & last > 0L, code(d, tx$destination)[
+          pmax(last, 1L)
+        ], initial
+      )
       previous <- c(NA, value_after[-n])
       value_before <- ifelse(first_row, initial, previous)
       after <- after + value_after * strides[k]
       before <- before + value_before * strides[k]
     }
     history <- data.frame(
-      person_id = tx$person_id, time = tx$time,
+      person_id = tx$person_id,
+      time = tx$time,
       from = as.integer(before),
       to = as.integer(after)
     )
   }
   decode <- as.data.frame(
-    lapply(seq_along(dims), function(k)
-      categories[[k]][(seq_len(prod(sizes)) - 1L) %/% strides[k] %% sizes[k] +
-        1L]),
-    stringsAsFactors = FALSE, col.names = dims
+    lapply(
+      seq_along(dims), function(k)
+        categories[[k]][(seq_len(prod(sizes)) - 1L) %/% strides[k] %% sizes[k] +
+          1L]
+    ),
+    stringsAsFactors = FALSE,
+    col.names = dims
   )
   list(
-    current = as.integer(current), history = history, count = as.integer(
-      prod(sizes)
-    ),
-    categories = categories, decode = decode, dims = dims
+    current = as.integer(current),
+    history = history,
+    count = as.integer(prod(sizes)),
+    categories = categories,
+    decode = decode,
+    dims = dims
   )
 }
 
@@ -505,15 +554,18 @@ finish_strata <- function(
     }
     rows <- match(out[[column]], seq_len(nrow(decode)) - 1L)
     for (d in alias$requests[[k]]) {
-      out[[paste0(d, alias$suffixes[k])]] <-
-        decode[[d]][rows]
+      out[[paste0(d, alias$suffixes[k])]] <- decode[[d]][rows]
     }
   }
   keys <- c(before, alias$external)
   out <- out[c(keys, after)]
-  dropped <- any(vapply(seq_along(alias$suffixes), function(k)
-    paste0("group", alias$suffixes[k]) %in% internal &&
-      !setequal(alias$requests[[k]], alias$combined$dims), logical(1)))
+  dropped <- any(
+    vapply(
+      seq_along(alias$suffixes), function(k)
+        paste0("group", alias$suffixes[k]) %in% internal &&
+        !setequal(alias$requests[[k]], alias$combined$dims), logical(1)
+    )
+  )
   if (dropped) {
     key <- do.call(paste, c(lapply(out[keys], as.character), sep = "\r"))
     first <- !duplicated(key)
@@ -521,27 +573,28 @@ finish_strata <- function(
     summed <- out[first, , drop = FALSE]
     summed[[events]] <- as.vector(tapply(out[[events]], group, sum))
     summed[[exposure]] <- as.vector(tapply(out[[exposure]], group, sum))
-    summed[[rate]] <- as.numeric(ifelse(summed[[exposure]] > 0, summed[[
-      events
-    ]] / summed[[exposure]], NA_real_))
+    summed[[rate]] <- as.numeric(
+      ifelse(
+        summed[[exposure]] > 0, summed[[events]] / summed[[exposure]], NA_real_
+      )
+    )
     out <- summed
   }
   # The first `by` variable varies fastest; ties keep the calculator's order.
-  order_keys <- lapply(rev(alias$external), function(b) {
-    x <- as.character(out[[b]])
-    dim <- sub("_[wh]$", "", b)
-    levels <- if (dim %in% names(alias$combined$categories)) {
-      as.character(
-        alias$combined$categories[[dim]]
-      )
-    } else {
-      unique(x)
+  order_keys <- lapply(
+    rev(alias$external), function(b) {
+      x <- as.character(out[[b]])
+      dim <- sub("_[wh]$", "", b)
+      levels <- if (dim %in% names(alias$combined$categories)) {
+        as.character(alias$combined$categories[[dim]])
+      } else {
+        unique(x)
+      }
+      match(x, levels)
     }
-    match(x, levels)
-  })
+  )
   out <- out[do.call(order, c(order_keys, list(seq_len(nrow(out))))), ,
-    drop =
-      FALSE
+    drop = FALSE
   ]
   tibble::as_tibble(out)
 }

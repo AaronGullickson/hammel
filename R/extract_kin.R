@@ -68,10 +68,13 @@ extract_kin <- function(
     values <- get(name)
     check_numeric_column(values, name, id = TRUE)
     if (anyDuplicated(values) || any(!values %in% ids)) {
-      stop(sprintf(
-        "`%s` must contain unique IDs present in the population.",
-        name
-      ), call. = FALSE)
+      stop(
+        sprintf(
+          "`%s` must contain unique IDs present in the population.",
+          name
+        ),
+        call. = FALSE
+      )
     }
   }
   kin <- extract_kin_cpp(
@@ -79,11 +82,13 @@ extract_kin <- function(
     as.integer(generations)
   )
   kin$relationship <- kin_relationship(kin$ego_distance, kin$relative_distance)
-  tibble::as_tibble(kin[c(
-    "ego_id", "relative_id", "relationship", "ego_distance",
-    "relative_distance", "n_common_ancestors", "ego_lineage",
-    "relative_lineage", "ego_ancestry_complete", "relative_ancestry_complete"
-  )])
+  tibble::as_tibble(
+    kin[c(
+      "ego_id", "relative_id", "relationship", "ego_distance",
+      "relative_distance", "n_common_ancestors", "ego_lineage",
+      "relative_lineage", "ego_ancestry_complete", "relative_ancestry_complete"
+    )]
+  )
 }
 
 #' Calculate the average number of living kin over time
@@ -142,7 +147,7 @@ count_kin <- function(
   by = NULL
 ) {
   if (!is.numeric(times) || !is.null(dim(times)) || !length(times) ||
-    any(!is.finite(times))) {
+        any(!is.finite(times))) {
     stop(
       "`times` must be a nonempty numeric vector of finite times in years.",
       call. = FALSE
@@ -153,7 +158,8 @@ count_kin <- function(
   }
   validate_population(population)
   if (is.null(population$end_time) || max(times) > population$end_time) {
-    stop("Observation requires a known endpoint and cannot extend beyond it.",
+    stop(
+      "Observation requires a known endpoint and cannot extend beyond it.",
       call. = FALSE
     )
   }
@@ -172,59 +178,70 @@ count_kin <- function(
     kin_relationship(kin$ego_distance, kin$relative_distance), types
   )
   n_types <- length(types)
-  levels <- lapply(by, function(name) {
-    if (name == "sex") {
-      c("m", "f")
-    } else {
-      living_kin_categories(population, name)
+  levels <- lapply(
+    by, function(name) {
+      if (name == "sex") {
+        c("m", "f")
+      } else {
+        living_kin_categories(population, name)
+      }
     }
-  })
+  )
   names(levels) <- by
   n_strata <- prod(lengths(levels))
   birth <- persons$birth_time
   death <- persons$death_time
-  results <- lapply(times, function(time) {
-    alive <- birth <= time & (is.na(death) | death > time)
-    stratum <- rep(1L, n)
-    stride <- 1L
-    for (name in by) {
-      values <- if (name == "sex") {
-        persons$sex
-      } else {
-        groups_at(dimension_view(population, name), seq_len(n), rep(time, n))
+  results <- lapply(
+    times, function(time) {
+      alive <- birth <= time & (is.na(death) | death > time)
+      stratum <- rep(1L, n)
+      stride <- 1L
+      for (name in by) {
+        values <- if (name == "sex") {
+          persons$sex
+        } else {
+          groups_at(dimension_view(population, name), seq_len(n), rep(time, n))
+        }
+        stratum <- stratum + stride * (match(values, levels[[name]]) - 1L)
+        stride <- stride * length(levels[[name]])
       }
-      stratum <- stratum + stride * (match(values, levels[[name]]) - 1L)
-      stride <- stride * length(levels[[name]])
-    }
-    keep <- alive[ego] & alive[relative]
-    cell <- (type[keep] - 1L) * n_strata + stratum[ego[keep]]
-    # Egos with at least one living relative of each type.
-    pairs <- unique((ego[keep] - 1L) * n_types + type[keep])
-    pair_ego <- (pairs - 1L) %/% n_types + 1L
-    pair_type <- (pairs - 1L) %% n_types + 1L
-    list(
-      persons = tabulate(stratum[alive], n_strata),
-      kin = tabulate(cell, n_strata * n_types),
-      with = tabulate(
-        (pair_type - 1L) * n_strata + stratum[pair_ego],
-        n_strata * n_types
+      keep <- alive[ego] & alive[relative]
+      cell <- (type[keep] - 1L) * n_strata + stratum[ego[keep]]
+      # Egos with at least one living relative of each type.
+      pairs <- unique((ego[keep] - 1L) * n_types + type[keep])
+      pair_ego <- (pairs - 1L) %/% n_types + 1L
+      pair_type <- (pairs - 1L) %% n_types + 1L
+      list(
+        persons = tabulate(stratum[alive], n_strata),
+        kin = tabulate(cell, n_strata * n_types),
+        with = tabulate(
+          (pair_type - 1L) * n_strata + stratum[pair_ego],
+          n_strata * n_types
+        )
       )
-    )
-  })
+    }
+  )
   grid <- expand.grid(
-    time = seq_along(times), stratum = seq_len(n_strata),
+    time = seq_along(times),
+    stratum = seq_len(n_strata),
     type = seq_len(n_types)
   )
   cell <- (grid$type - 1L) * n_strata + grid$stratum
-  persons_n <- vapply(seq_len(nrow(grid)), function(i) {
-    results[[grid$time[i]]]$persons[grid$stratum[i]]
-  }, integer(1))
-  kin_n <- vapply(seq_len(nrow(grid)), function(i) {
-    results[[grid$time[i]]]$kin[cell[i]]
-  }, integer(1))
-  with_n <- vapply(seq_len(nrow(grid)), function(i) {
-    results[[grid$time[i]]]$with[cell[i]]
-  }, integer(1))
+  persons_n <- vapply(
+    seq_len(nrow(grid)), function(i) {
+      results[[grid$time[i]]]$persons[grid$stratum[i]]
+    }, integer(1)
+  )
+  kin_n <- vapply(
+    seq_len(nrow(grid)), function(i) {
+      results[[grid$time[i]]]$kin[cell[i]]
+    }, integer(1)
+  )
+  with_n <- vapply(
+    seq_len(nrow(grid)), function(i) {
+      results[[grid$time[i]]]$with[cell[i]]
+    }, integer(1)
+  )
   out <- tibble::tibble(time = times[grid$time])
   stride <- 1L
   for (name in by) {
@@ -261,20 +278,25 @@ kin_relationship <- function(ego_distance, relative_distance) {
     words <- c("once", "twice", "thrice")
     ifelse(
       k == 0L, "",
-      paste0("_", ifelse(k <= 3L, words[pmax(pmin(k, 3L), 1L)],
-        paste0(k, "_times")
-      ), "_removed")
+      paste0(
+        "_", ifelse(
+          k <= 3L, words[pmax(pmin(k, 3L), 1L)],
+          paste0(k, "_times")
+        ), "_removed"
+      )
     )
   }
   a <- as.integer(ego_distance)
   b <- as.integer(relative_distance)
   out <- character(length(a))
   up <- b == 0L
-  out[up] <- ifelse(a[up] == 1L, "parent",
+  out[up] <- ifelse(
+    a[up] == 1L, "parent",
     paste0(greats(a[up] - 2L), "grandparent")
   )
   down <- a == 0L
-  out[down] <- ifelse(b[down] == 1L, "child",
+  out[down] <- ifelse(
+    b[down] == 1L, "child",
     paste0(greats(b[down] - 2L), "grandchild")
   )
   side <- a >= 1L & b >= 1L
@@ -300,7 +322,7 @@ kin_relationship_types <- function(generations) {
   pairs <- pairs[pairs$ego_distance + pairs$relative_distance > 0L, ]
   pairs <- pairs[order(
     pairs$ego_distance + pairs$relative_distance, -pairs$ego_distance
-  ), ]
+    ), ]
   pairs$relationship <- kin_relationship(
     pairs$ego_distance, pairs$relative_distance
   )
@@ -329,9 +351,11 @@ validate_kinship_generations <- function(
   name = "kinship_generations"
 ) {
   if (!is.numeric(generations) || length(generations) != 1L ||
-    !is.null(dim(generations)) || !is.finite(generations) || generations <
-    0 ||
-    generations != floor(generations) || generations > .Machine$integer.max) {
+        !is.null(dim(generations)) ||
+        !is.finite(generations) ||
+        generations < 0 ||
+        generations != floor(generations) ||
+        generations > .Machine$integer.max) {
     stop(
       sprintf(
         "`%s` must be a nonnegative whole number within integer range.", name

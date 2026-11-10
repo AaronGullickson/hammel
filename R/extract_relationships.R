@@ -40,10 +40,13 @@ get_detailed_unions <- function(population) {
   added <- c(paste0(columns, "_w"), paste0(columns, "_h"))
   conflicts <- intersect(names(result), added)
   if (length(conflicts)) {
-    stop(sprintf(
-      "Union columns conflict with partner fields: %s.",
-      paste(conflicts, collapse = ", ")
-    ), call. = FALSE)
+    stop(
+      sprintf(
+        "Union columns conflict with partner fields: %s.",
+        paste(conflicts, collapse = ", ")
+      ),
+      call. = FALSE
+    )
   }
   # Categories at each union's start, replaying each dimension's transitions.
   formation <- list()
@@ -56,28 +59,26 @@ get_detailed_unions <- function(population) {
     view <- dimension_view(population, d)
     indexed <- prepare_group_observations(view$persons, view, TRUE)
     groups <- observation_groups(indexed, TRUE)
-    codes <- union_start_groups_cpp(indexed, population$unions, match(
-      view$persons$group, groups
-    ) - 1L)
+    codes <- union_start_groups_cpp(
+      indexed, population$unions, match(view$persons$group, groups) - 1L
+    )
     labels <- groups
     # Histories hold labels as text; keep the persons column's type.
     if (is.numeric(persons[[d]])) {
-      storage.mode(labels) <- storage.mode(persons[[
-        d
-      ]])
+      storage.mode(labels) <- storage.mode(persons[[d]])
     }
-    formation[[d]] <- list(w = labels[codes[, 1L] + 1L], h = labels[codes[
-      ,
-      2L
-    ] + 1L])
+    formation[[d]] <- list(
+      w = labels[codes[, 1L] + 1L],
+      h = labels[codes[, 2L] + 1L]
+    )
   }
   for (suffix in c("w", "h")) {
     id_column <- if (suffix == "w") "wife_id" else "husband_id"
     rows <- match(result[[id_column]], persons$person_id)
     for (column in columns) {
-      result[[paste0(column, "_", suffix)]] <- if (!is.null(formation[[
-        column
-      ]])) {
+      result[[paste0(column, "_", suffix)]] <- if (!is.null(
+                                                      formation[[column]]
+                                                    )) {
         formation[[column]][[suffix]]
       } else {
         persons[[column]][rows]
@@ -116,15 +117,20 @@ get_parent_info <- function(population) {
   persons <- population$persons
   result <- tibble::as_tibble(persons)
   dims <- names(population$groups)
-  added <- c("age_mother", "age_father", paste0(rep(dims, each = 2), c(
-    "_mother", "_father"
-  )))
+  added <- c(
+    "age_mother", "age_father", paste0(
+      rep(dims, each = 2), c("_mother", "_father")
+    )
+  )
   conflicts <- intersect(names(result), added)
   if (length(conflicts)) {
-    stop(sprintf(
-      "Person columns conflict with parent fields: %s.",
-      paste(conflicts, collapse = ", ")
-    ), call. = FALSE)
+    stop(
+      sprintf(
+        "Person columns conflict with parent fields: %s.",
+        paste(conflicts, collapse = ", ")
+      ),
+      call. = FALSE
+    )
   }
   for (parent in c("mother", "father")) {
     rows <- match(persons[[paste0(parent, "_id")]], persons$person_id)

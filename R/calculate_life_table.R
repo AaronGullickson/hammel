@@ -71,14 +71,15 @@ calculate_life_table <- function(rates, radix = 1) {
   }
   check_groups(rates, "rates")
   check_numeric_column(
-    rates[[rate_column]], paste0("rates$", rate_column), missing = TRUE
+    rates[[rate_column]], paste0("rates$", rate_column),
+    missing = TRUE
   )
   rates$mx <- rates[[rate_column]]
   if (any(rates$mx < 0, na.rm = TRUE)) {
     stop("Mortality rates must be nonnegative.", call. = FALSE)
   }
   if (!is.numeric(radix) || length(radix) != 1L || !is.finite(radix) ||
-    radix <= 0) {
+        radix <= 0) {
     stop("`radix` must be positive and finite.", call. = FALSE)
   }
   strata <- summary_strata(rates)

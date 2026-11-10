@@ -216,7 +216,8 @@ calculate_mortality_rates <- function(
   check_detailed_previous_union(use_detailed_previous_union, by)
   age_breaks <- person_breaks(time_breaks, age_breaks)
   obs <- person_observation(population, by, tail(time_breaks, 1))
-  counts <- run_person_lexis(obs, by, time_breaks, age_breaks,
+  counts <- run_person_lexis(
+    obs, by, time_breaks, age_breaks,
     sex = TRUE,
     use_detailed_previous_union = use_detailed_previous_union
   )
@@ -225,9 +226,9 @@ calculate_mortality_rates <- function(
     use_detailed_previous_union
   )
   out$deaths <- counts$deaths[attr(out, "index")]
-  out$rate_mortality <- as.numeric(ifelse(out$person_years > 0,
-    out$deaths / out$person_years, NA_real_
-  ))
+  out$rate_mortality <- as.numeric(
+    ifelse(out$person_years > 0, out$deaths / out$person_years, NA_real_)
+  )
   attr(out, "index") <- NULL
   finish_strata(
     add_rate_confidence(out, "deaths", "person_years", conf_level),
@@ -249,15 +250,18 @@ calculate_fertility_rates <- function(
   use_detailed_previous_union = TRUE
 ) {
   validate_rate_conf_level(conf_level)
-  if (!is.logical(unrealized) ||
-    length(unrealized) != 1L || is.na(unrealized)) {
+  if (!is.logical(unrealized) || length(unrealized) != 1L ||
+        is.na(unrealized)) {
     stop("`unrealized` must be TRUE or FALSE.", call. = FALSE)
   }
   if (unrealized && is.null(population$unrealized_births)) {
-    stop(paste(
-      "`unrealized = TRUE` requires a population returned by",
-      "run_simulation(), which records unrealized births."
-    ), call. = FALSE)
+    stop(
+      paste(
+        "`unrealized = TRUE` requires a population returned by",
+        "run_simulation(), which records unrealized births."
+      ),
+      call. = FALSE
+    )
   }
   alias <- observation_alias(population, by)
   population <- alias$population
@@ -272,47 +276,45 @@ calculate_fertility_rates <- function(
     check_demographic_breaks(parity_breaks, "parity_breaks", ages = TRUE)
     finite <- parity_breaks[is.finite(parity_breaks)]
     if (parity_breaks[1] != 0 || any(finite != floor(finite))) {
-      stop(paste0(
-        "`parity_breaks` must start at zero and contain ",
-        "integer boundaries or Inf."
-      ), call. = FALSE)
+      stop(
+        paste0(
+          "`parity_breaks` must start at zero and contain ",
+          "integer boundaries or Inf."
+        ),
+        call. = FALSE
+      )
     }
     if (is.finite(tail(parity_breaks, 1))) {
-      parity_breaks <- c(
-        parity_breaks,
-        Inf
-      )
+      parity_breaks <- c(parity_breaks, Inf)
     }
   }
   obs <- person_observation(population, by, tail(time_breaks, 1))
-  counts <- run_person_lexis(obs, by, time_breaks, age_breaks,
+  counts <- run_person_lexis(
+    obs, by, time_breaks, age_breaks,
     sex = TRUE,
     parity_breaks = if (is.null(parity_breaks)) numeric() else parity_breaks,
     use_detailed_previous_union = use_detailed_previous_union
   )
   out <- person_rate_rows(
     obs, by, counts, time_breaks, age_breaks, "f",
-    use_detailed_previous_union,
-    parity_breaks
+    use_detailed_previous_union, parity_breaks
   )
   out$births <- counts$births[attr(out, "index")]
-  out$rate_fertility <- as.numeric(ifelse(out$person_years > 0,
-    out$births / out$person_years, NA_real_
-  ))
+  out$rate_fertility <- as.numeric(
+    ifelse(out$person_years > 0, out$births / out$person_years, NA_real_)
+  )
   attr(out, "index") <- NULL
   if (unrealized) {
     out <- add_unrealized_births(out, population, alias)
   }
   attr(out, "unassigned_births") <- tibble::tibble(
-    time_start = head(
-      time_breaks, -1
-    ),
-    time_end = tail(time_breaks, -1), births = counts$unassigned_births
+    time_start = head(time_breaks, -1),
+    time_end = tail(time_breaks, -1),
+    births = counts$unassigned_births
   )
-  out <- finish_strata(add_rate_confidence(
-    out, "births", "person_years",
-    conf_level
-  ), alias)
+  out <- finish_strata(
+    add_rate_confidence(out, "births", "person_years", conf_level), alias
+  )
   out
 }
 
@@ -336,7 +338,8 @@ calculate_cohab_convert_rate <- function(
     alias$dims
   )
   if (!inherits(population, "hammel_population")) {
-    stop("`population` must be a hammel_population with typed union histories.",
+    stop(
+      "`population` must be a hammel_population with typed union histories.",
       call. = FALSE
     )
   }
@@ -345,23 +348,28 @@ calculate_cohab_convert_rate <- function(
   }
   validate_population(population)
   if (!"union_type" %in% names(population$unions)) {
-    stop(paste0(
-      "Conversion observation requires typed union ",
-      "histories with `union_type`."
-    ), call. = FALSE)
+    stop(
+      paste0(
+        "Conversion observation requires typed union ",
+        "histories with `union_type`."
+      ),
+      call. = FALSE
+    )
   }
   check_demographic_breaks(time_breaks, "time_breaks")
   duration <- !is.null(dur_breaks)
   breaks <- if (duration) dur_breaks else age_breaks
-  check_demographic_breaks(breaks, if (duration) "dur_breaks" else "age_breaks",
+  check_demographic_breaks(
+    breaks, if (duration) "dur_breaks" else "age_breaks",
     ages = TRUE
   )
   if (is.finite(tail(breaks, 1))) {
     breaks <- c(breaks, Inf)
   }
-  if (is.null(population$end_time) || tail(time_breaks, 1) >
-    population$end_time) {
-    stop("Observation requires a known endpoint and cannot extend beyond it.",
+  if (is.null(population$end_time) ||
+        tail(time_breaks, 1) > population$end_time) {
+    stop(
+      "Observation requires a known endpoint and cannot extend beyond it.",
       call. = FALSE
     )
   }
@@ -370,36 +378,39 @@ calculate_cohab_convert_rate <- function(
   origins <- if (duration) {
     unions$start_time
   } else {
-    population$persons$birth_time[
-      wives
-    ]
+    population$persons$birth_time[wives]
   }
   nt <- length(time_breaks) - 1L
   na <- length(breaks) - 1L
-  strata <- union_strata(population, unions, by,
+  strata <- union_strata(
+    population, unions, by,
     stride = nt * na,
     typed_split = FALSE
   )
   axis <- if (duration) "dur" else "age"
-  rows <- build_rows(c(
-    list(band_dim(time_breaks, "time", 1), band_dim(
-      breaks,
-      axis, nt
-    )),
-    strata$dims
-  ))
-  counts <- dissolution_counts_cpp(strata$unions, time_breaks, breaks,
-    strata$index, strata$count,
-    origins = origins, event_reason = "conversion"
+  rows <- build_rows(
+    c(
+      list(band_dim(time_breaks, "time", 1), band_dim(breaks, axis, nt)),
+      strata$dims
+    )
   )
-  result <- tibble::as_tibble(rows[c("time_start", "time_end", paste0(axis, c(
-    "_start", "_end"
-  )), by)])
+  counts <- dissolution_counts_cpp(
+    strata$unions, time_breaks, breaks,
+    strata$index, strata$count,
+    origins = origins,
+    event_reason = "conversion"
+  )
+  result <- tibble::as_tibble(
+    rows[c("time_start", "time_end", paste0(axis, c("_start", "_end")), by)]
+  )
   result$union_years <- counts$union_years[rows$.index]
   result$conversions <- counts$dissolutions[rows$.index]
-  result$rate_cohab_convert <- as.numeric(ifelse(result$union_years > 0,
-    result$conversions / result$union_years, NA_real_
-  ))
+  result$rate_cohab_convert <- as.numeric(
+    ifelse(
+      result$union_years > 0,
+      result$conversions / result$union_years, NA_real_
+    )
+  )
   result <- finish_strata(
     result, alias, "conversions", "union_years",
     "rate_cohab_convert"
@@ -434,9 +445,10 @@ calculate_dissolution_rates <- function(
     stop("`population` must be a hammel_population.", call. = FALSE)
   }
   validate_population(population)
-  if (is.null(population$end_time) || tail(time_breaks, 1) >
-    population$end_time) {
-    stop("Observation requires a known endpoint and cannot extend beyond it.",
+  if (is.null(population$end_time) ||
+        tail(time_breaks, 1) > population$end_time) {
+    stop(
+      "Observation requires a known endpoint and cannot extend beyond it.",
       call. = FALSE
     )
   }
@@ -444,25 +456,27 @@ calculate_dissolution_rates <- function(
   nt <- length(time_breaks) - 1L
   nd <- length(dur_breaks) - 1L
   strata <- union_strata(population, unions, by, stride = nt * nd)
-  rows <- build_rows(c(
-    list(band_dim(time_breaks, "time", 1), band_dim(
-      dur_breaks, "dur", nt
-    )),
-    strata$dims
-  ))
+  rows <- build_rows(
+    c(
+      list(band_dim(time_breaks, "time", 1), band_dim(dur_breaks, "dur", nt)),
+      strata$dims
+    )
+  )
   counts <- dissolution_counts_cpp(
     strata$unions, time_breaks, dur_breaks,
     strata$index, strata$count
   )
-  result <- tibble::as_tibble(rows[c(
-    "time_start", "time_end", "dur_start",
-    "dur_end", by
-  )])
+  result <- tibble::as_tibble(
+    rows[c("time_start", "time_end", "dur_start", "dur_end", by)]
+  )
   result$union_years <- counts$union_years[rows$.index]
   result$dissolutions <- counts$dissolutions[rows$.index]
-  result$rate_dissolution <- as.numeric(ifelse(result$union_years > 0,
-    result$dissolutions / result$union_years, NA_real_
-  ))
+  result$rate_dissolution <- as.numeric(
+    ifelse(
+      result$union_years > 0,
+      result$dissolutions / result$union_years, NA_real_
+    )
+  )
   result <- finish_strata(
     result, alias, "dissolutions", "union_years",
     "rate_dissolution"
@@ -489,11 +503,15 @@ calculate_marriage_rates <- function(
     by, c("group", "previous_union"), "calculate_marriage_rates",
     alias$dims
   )
-  finish_strata(calculate_entry_rates(population, time_breaks, age_breaks, by,
-    dur_breaks = NULL,
-    marriage_measure = TRUE, conf_level = conf_level,
-    use_detailed_previous_union = use_detailed_previous_union
-  ), alias)
+  finish_strata(
+    calculate_entry_rates(
+      population, time_breaks, age_breaks, by,
+      dur_breaks = NULL,
+      marriage_measure = TRUE,
+      conf_level = conf_level,
+      use_detailed_previous_union = use_detailed_previous_union
+    ), alias
+  )
 }
 
 #' @rdname calculate_rates
@@ -515,20 +533,24 @@ calculate_transition_rates <- function(
   }
   validate_population(population)
   if (!declared_group(population)) {
-    stop("`calculate_transition_rates()` requires a declared group dimension.",
+    stop(
+      "`calculate_transition_rates()` requires a declared group dimension.",
       call. = FALSE
     )
   }
   dims <- names(population$groups)
   if (is.null(group)) {
     if (length(dims) != 1L) {
-      stop(sprintf(
-        paste0(
-          "Name the dimension whose transitions are counted ",
-          "with `group`: one of %s."
+      stop(
+        sprintf(
+          paste0(
+            "Name the dimension whose transitions are counted ",
+            "with `group`: one of %s."
+          ),
+          paste0("\"", dims, "\"", collapse = ", ")
         ),
-        paste0("\"", dims, "\"", collapse = ", ")
-      ), call. = FALSE)
+        call. = FALSE
+      )
     }
     group <- dims
   }
@@ -536,20 +558,21 @@ calculate_transition_rates <- function(
     stop("`group` must name one declared group dimension.", call. = FALSE)
   }
   if (group %in% by) {
-    stop(sprintf(
-      paste0(
-        "Transitions in `%s` are split by origin and ",
-        "destination, not by `%s` in `by`."
+    stop(
+      sprintf(
+        paste0(
+          "Transitions in `%s` are split by origin and ",
+          "destination, not by `%s` in `by`."
+        ),
+        group, group
       ),
-      group, group
-    ), call. = FALSE)
+      call. = FALSE
+    )
   }
   # Other dimensions in `by` combine with this one: the internal group is
   # the combination, and only moves in this dimension count.
   external <- check_by(
-    by, c("sex", "union_type", "previous_union", setdiff(
-      dims, group
-    )),
+    by, c("sex", "union_type", "previous_union", setdiff(dims, group)),
     "calculate_transition_rates"
   )
   others <- intersect(external, dims)
@@ -572,21 +595,25 @@ calculate_transition_rates <- function(
   check_demographic_breaks(time_breaks, "time_breaks")
   duration <- !is.null(dur_breaks)
   breaks <- if (duration) dur_breaks else age_breaks
-  check_demographic_breaks(breaks, if (duration) "dur_breaks" else "age_breaks",
+  check_demographic_breaks(
+    breaks, if (duration) "dur_breaks" else "age_breaks",
     ages = TRUE
   )
   if (is.finite(tail(breaks, 1))) {
     breaks <- c(breaks, Inf)
   }
-  obs <- person_observation(population, by, tail(time_breaks, 1),
-    grouped =
-      TRUE,
+  obs <- person_observation(
+    population, by, tail(time_breaks, 1),
+    grouped = TRUE,
     validate = FALSE
   )
   union_vars <- any(c("union_type", "previous_union") %in% by)
   size <- if (is.null(alias)) 0L else length(alias$combined$categories[[1]])
-  counts <- run_person_lexis(obs, setdiff(by, "sex"), time_breaks, breaks,
-    axis = if (duration) 1L else 0L, sex = "sex" %in% by, group = TRUE,
+  counts <- run_person_lexis(
+    obs, setdiff(by, "sex"), time_breaks, breaks,
+    axis = if (duration) 1L else 0L,
+    sex = "sex" %in% by,
+    group = TRUE,
     use_detailed_previous_union = use_detailed_previous_union,
     exclusive = union_vars,
     group_target = if (size) obs$groups %% size
@@ -609,25 +636,24 @@ calculate_transition_rates <- function(
     o <- rows$origin
     d <- rows$destination
     rows <- rows[o %% size != d %% size & o %/% size == d %/% size, ,
-      drop =
-        FALSE
+      drop = FALSE
     ]
   } else {
     rows <- rows[rows$origin != rows$destination, , drop = FALSE]
   }
   dest <- rows$.key3 - 1L
   axis <- if (duration) "dur" else "age"
-  out <- tibble::as_tibble(rows[c(
-    "time_start", "time_end", paste0(axis, c(
-      "_start", "_end"
-    )),
-    "origin", "destination", by
-  )])
+  out <- tibble::as_tibble(
+    rows[c(
+      "time_start", "time_end", paste0(axis, c("_start", "_end")),
+      "origin", "destination", by
+    )]
+  )
   out$person_years <- counts$person_years[rows$.index - dest * counts$cells]
   out$transitions <- counts$transitions[rows$.index]
-  out$rate_transition <- as.numeric(ifelse(out$person_years > 0,
-    out$transitions / out$person_years, NA_real_
-  ))
+  out$rate_transition <- as.numeric(
+    ifelse(out$person_years > 0, out$transitions / out$person_years, NA_real_)
+  )
   if (size) {
     decode <- alias$combined$decode
     code <- out$origin
@@ -642,19 +668,20 @@ calculate_transition_rates <- function(
       external, "person_years", "transitions", "rate_transition"
     )]
     # The first `by` variable varies fastest; ties keep the calculator's order.
-    keys <- lapply(rev(external), function(b) {
-      x <- as.character(out[[b]])
-      match(x, if (b %in% others) {
-        as.character(alias$combined$categories[[
-          b
-        ]])
-      } else {
-        unique(x)
-      })
-    })
+    keys <- lapply(
+      rev(external), function(b) {
+        x <- as.character(out[[b]])
+        match(
+          x, if (b %in% others) {
+            as.character(alias$combined$categories[[b]])
+          } else {
+            unique(x)
+          }
+        )
+      }
+    )
     out <- out[do.call(order, c(keys, list(seq_len(nrow(out))))), ,
-      drop =
-        FALSE
+      drop = FALSE
     ]
   }
   add_rate_confidence(out, "transitions", "person_years", conf_level)
@@ -680,11 +707,15 @@ calculate_union_rates <- function(
     by, c("group", "previous_union", "union_type"),
     "calculate_union_rates", alias$dims
   )
-  finish_strata(calculate_entry_rates(population, time_breaks, age_breaks, by,
-    dur_breaks,
-    marriage_measure = FALSE, conf_level = conf_level,
-    use_detailed_previous_union = use_detailed_previous_union
-  ), alias)
+  finish_strata(
+    calculate_entry_rates(
+      population, time_breaks, age_breaks, by,
+      dur_breaks,
+      marriage_measure = FALSE,
+      conf_level = conf_level,
+      use_detailed_previous_union = use_detailed_previous_union
+    ), alias
+  )
 }
 
 # HELPER FUNCTIONS ---------------------------------------------------------
@@ -713,19 +744,19 @@ person_rate_rows <- function(
   parity_breaks = NULL
 ) {
   s <- counts$strides
-  sex_dim <- label_dim("sex", sexes, s[["sex"]], code = match(sexes, c(
-    "m",
-    "f"
-  )) - 1L)
+  sex_dim <- label_dim(
+    "sex", sexes, s[["sex"]],
+    code = match(sexes, c("m", "f")) - 1L
+  )
   dims <- c(
-    list(band_dim(time_breaks, "time", 1), band_dim(
-      age_breaks, "age",
-      s[["a"]]
-    ), sex_dim),
+    list(
+      band_dim(time_breaks, "time", 1), band_dim(
+        age_breaks, "age",
+        s[["a"]]
+      ), sex_dim
+    ),
     if (!is.null(parity_breaks)) {
-      list(band_dim(parity_breaks, "parity", s[[
-        "parity"
-      ]]))
+      list(band_dim(parity_breaks, "parity", s[["parity"]]))
     },
     person_by_dims(by, obs, counts, use_detailed_previous_union)
   )
@@ -755,9 +786,7 @@ add_unrealized_births <- function(out, population, alias = list()) {
     u$group <- encode_combined(alias, u)
   } else {
     for (from in names(alias$rename)) {
-      names(u)[names(u) == alias$rename[[
-        from
-      ]]] <- from
+      names(u)[names(u) == alias$rename[[from]]] <- from
     }
   }
   n <- nrow(out)
@@ -825,16 +854,15 @@ add_unrealized_births <- function(out, population, alias = list()) {
       ] &
         out$age_start < u$age_end[r] & out$age_end > u$age_start[r]
       if ("parity_start" %in% names(out) && "parity_start" %in% names(u) &&
-        !is.na(u$parity_start[r])) {
+            !is.na(u$parity_start[r])) {
         hit <- hit & out$parity_start < u$parity_end[r] & out$parity_end >
           u$parity_start[r]
       }
       if ("group" %in% names(out)) {
-        hit <- hit & as.character(out$group) ==
-          as.character(u$group[r])
+        hit <- hit & as.character(out$group) == as.character(u$group[r])
       }
       if ("union_type" %in% names(out) && "union_type" %in% names(u) &&
-        u$union_type[r] %in% out$union_type) {
+            u$union_type[r] %in% out$union_type) {
         hit <- hit & out$union_type == u$union_type[r]
       }
       unknown <- unknown | hit
@@ -842,29 +870,37 @@ add_unrealized_births <- function(out, population, alias = list()) {
   }
   value[unknown] <- NA_real_
   out$unrealized_births <- value
-  out$rate_fertility_adjusted <- as.numeric(ifelse(out$person_years > 0,
-    (out$births + out$unrealized_births) / out$person_years, NA_real_
-  ))
+  out$rate_fertility_adjusted <- as.numeric(
+    ifelse(
+      out$person_years > 0,
+      (out$births + out$unrealized_births) / out$person_years, NA_real_
+    )
+  )
   out
 }
 
 check_demographic_breaks <- function(breaks, name, ages = FALSE) {
   if (!is.numeric(breaks) || !is.null(dim(breaks)) || length(breaks) < 2L ||
-    anyNA(breaks) ||
-    any(!is.finite(head(breaks, -1))) || any(diff(breaks) <= 0) ||
-    (!ages && !is.finite(tail(breaks, 1))) || (ages && breaks[1] < 0)) {
-    stop(sprintf(
-      "`%s` must be strictly increasing %sboundaries.", name,
-      if (ages) {
-        if (name == "dur_breaks") {
-          "nonnegative duration "
+        anyNA(breaks) ||
+        any(!is.finite(head(breaks, -1))) ||
+        any(diff(breaks) <= 0) ||
+        (!ages && !is.finite(tail(breaks, 1))) ||
+        (ages && breaks[1] < 0)) {
+    stop(
+      sprintf(
+        "`%s` must be strictly increasing %sboundaries.", name,
+        if (ages) {
+          if (name == "dur_breaks") {
+            "nonnegative duration "
+          } else {
+            "nonnegative age "
+          }
         } else {
-          "nonnegative age "
+          "finite time "
         }
-      } else {
-        "finite time "
-      }
-    ), call. = FALSE)
+      ),
+      call. = FALSE
+    )
   }
 }
 
@@ -881,7 +917,8 @@ calculate_entry_rates <- function(
   use_detailed_previous_union = TRUE
 ) {
   if (!inherits(population, "hammel_population")) {
-    stop("`population` must be a hammel_population with union histories.",
+    stop(
+      "`population` must be a hammel_population with union histories.",
       call. = FALSE
     )
   }
@@ -897,14 +934,18 @@ calculate_entry_rates <- function(
   check_detailed_previous_union(use_detailed_previous_union, by)
   age_breaks <- person_breaks(time_breaks, age_breaks)
   entry_type <- "union_type" %in% by
-  obs <- person_observation(population, by, tail(time_breaks, 1),
+  obs <- person_observation(
+    population, by, tail(time_breaks, 1),
     requires_typed = entry_type
   )
   # union_type here splits formations only; exposure is not split by it.
   state_by <- setdiff(by, "union_type")
-  run <- function(axis, breaks, mask) run_person_lexis(obs, state_by,
+  run <- function(axis, breaks, mask) run_person_lexis(
+    obs, state_by,
     time_breaks, breaks,
-    axis = axis, sex = TRUE, utype_filter = if (marriage_measure) 2L else 1L,
+    axis = axis,
+    sex = TRUE,
+    utype_filter = if (marriage_measure) 2L else 1L,
     previous_mask = mask,
     use_detailed_previous_union = use_detailed_previous_union,
     exclusive = TRUE
@@ -912,10 +953,7 @@ calculate_entry_rates <- function(
   kinds <- if (marriage_measure) {
     list(c(1L, 2L))
   } else if (entry_type) {
-    list(
-      0L,
-      1L
-    )
+    list(0L, 1L)
   } else {
     list(c(0L, 1L))
   }
@@ -923,21 +961,20 @@ calculate_entry_rates <- function(
     s <- counts$strides
     dims <- c(
       list(
-        band_dim(time_breaks, "time", 1), band_dim(
-          breaks, axis_name,
-          s[["a"]]
-        ),
+        band_dim(time_breaks, "time", 1), band_dim(breaks, axis_name, s[["a"]]),
         label_dim("sex", c("m", "f"), s[["sex"]])
       ),
-      lapply(by, function(name) {
-        if (name == "union_type") {
-          label_dim("union_type", c("cohab", "marriage"), counts$cells)
-        } else {
-          person_by_dims(
-            name, obs, counts, use_detailed_previous_union, previous_codes
-          )[[1]]
+      lapply(
+        by, function(name) {
+          if (name == "union_type") {
+            label_dim("union_type", c("cohab", "marriage"), counts$cells)
+          } else {
+            person_by_dims(
+              name, obs, counts, use_detailed_previous_union, previous_codes
+            )[[1]]
+          }
         }
-      })
+      )
     )
     rows <- build_rows(dims)
     rows$.source <- rep(source, nrow(rows))
@@ -969,9 +1006,7 @@ calculate_entry_rates <- function(
     type <- if (entry_type) {
       (rows$.index[here] - 1) %/% cells
     } else {
-      rep(0, sum(
-        here
-      ))
+      rep(0, sum(here))
     }
     base <- rows$.index[here] - type * cells
     exposure[here] <- x$person_years[base]
@@ -990,9 +1025,12 @@ calculate_entry_rates <- function(
   result <- tibble::as_tibble(rows[columns])
   result$person_years <- exposure
   result$unions <- events
-  result$rate_union <- as.numeric(ifelse(result$person_years > 0,
-    result$unions / result$person_years, NA_real_
-  ))
+  result$rate_union <- as.numeric(
+    ifelse(
+      result$person_years > 0,
+      result$unions / result$person_years, NA_real_
+    )
+  )
   if (marriage_measure) {
     names(result)[names(result) == "unions"] <- "marriages"
     names(result)[names(result) == "rate_union"] <- "rate_marriage"
@@ -1052,16 +1090,21 @@ run_person_lexis <- function(
   utype <- "union_type" %in% by
   previous <- "previous_union" %in% by
   if (is.null(exclusive)) {
-    exclusive <- obs$typed || previous || utype_filter >
-      0L
+    exclusive <- obs$typed || previous || utype_filter > 0L
   }
   map <- if (use_detailed_previous_union) 0:2 else c(0L, 1L, 1L)
   options <- list(
-    typed = obs$typed, exclusive = exclusive,
+    typed = obs$typed,
+    exclusive = exclusive,
     counts_cohab = obs$counts_cohab,
-    axis = as.integer(axis), utype_filter = as.integer(utype_filter),
-    previous_mask = previous_mask, sex = sex, group = group, union_type = utype,
-    previous_union = previous, previous_map = map
+    axis = as.integer(axis),
+    utype_filter = as.integer(utype_filter),
+    previous_mask = previous_mask,
+    sex = sex,
+    group = group,
+    union_type = utype,
+    previous_union = previous,
+    previous_map = map
   )
   if (!is.null(group_target)) {
     options$group_target <- as.integer(group_target)
@@ -1078,12 +1121,13 @@ run_person_lexis <- function(
   nt <- length(time_breaks) - 1L
   na <- length(axis_breaks) - 1L
   sizes <- c(
-    t = nt, a = na, sex = if (sex) 2L else 1L,
+    t = nt,
+    a = na,
+    sex = if (sex) 2L else 1L,
     parity = if (length(parity_breaks) > 1L) length(parity_breaks) - 1L else 1L,
-    group = if (group) ng else 1L, union_type = if (utype) {
-      length(
-        union_type_labels(obs$typed)
-      )
+    group = if (group) ng else 1L,
+    union_type = if (utype) {
+      length(union_type_labels(obs$typed))
     } else {
       1L
     },
@@ -1127,15 +1171,15 @@ union_strata <- function(
   w <- h <- rep(0L, nrow(unions))
   if (wives || husbands) {
     if (!declared_group(population)) {
-      stop(paste0(
-        "Splitting by \"group_w\" or \"group_h\" requires a ",
-        "declared group dimension."
-      ), call. = FALSE)
+      stop(
+        paste0(
+          "Splitting by \"group_w\" or \"group_h\" requires a ",
+          "declared group dimension."
+        ),
+        call. = FALSE
+      )
     }
-    persons <- prepare_group_observations(
-      population$persons, population,
-      TRUE
-    )
+    persons <- prepare_group_observations(population$persons, population, TRUE)
     identities <- observation_groups(persons, TRUE)
     w <- match(
       persons$group[match(unions$wife_id, persons$person_id)],
@@ -1152,16 +1196,21 @@ union_strata <- function(
   types <- c("cohab", "marriage")
   if (typed_split) {
     if (!"union_type" %in% names(unions)) {
-      stop("Splitting by \"union_type\" requires a union `union_type` column.",
+      stop(
+        "Splitting by \"union_type\" requires a union `union_type` column.",
         call. = FALSE
       )
     }
     if (!is.character(unions$union_type) || !is.null(dim(unions$union_type)) ||
-      anyNA(unions$union_type) || any(!unions$union_type %in% types)) {
-      stop(paste0(
-        "`union_type` must contain only cohab or marriage ",
-        "without missing values."
-      ), call. = FALSE)
+          anyNA(unions$union_type) ||
+          any(!unions$union_type %in% types)) {
+      stop(
+        paste0(
+          "`union_type` must contain only cohab or marriage ",
+          "without missing values."
+        ),
+        call. = FALSE
+      )
     }
     index <- index + combos * (match(unions$union_type, types) - 1L)
   }
@@ -1171,18 +1220,25 @@ union_strata <- function(
       typed_split, ng, combos
     )
   }
-  dims <- lapply(by, function(name) switch(name,
-    group_w = label_dim("group_w", identities, stride),
-    group_h = label_dim("group_h", identities, stride * if (mode == 2L) {
-      ng
-    } else {
-      1L
-    }),
-    union_type = label_dim("union_type", types, stride * combos)
-  ))
+  dims <- lapply(
+    by, function(name) switch(
+      name,
+      group_w = label_dim("group_w", identities, stride),
+      group_h = label_dim(
+        "group_h", identities, stride * if (mode == 2L) {
+          ng
+        } else {
+          1L
+        }
+      ),
+      union_type = label_dim("union_type", types, stride * combos)
+    )
+  )
   list(
-    unions = unions, index = as.integer(index),
-    count = combos * if (typed_split) 2L else 1L, dims = dims
+    unions = unions,
+    index = as.integer(index),
+    count = combos * if (typed_split) 2L else 1L,
+    dims = dims
   )
 }
 
@@ -1197,9 +1253,9 @@ encode_combined <- function(alias, data, suffix = "") {
     if (!column %in% names(data)) {
       return(rep(NA_integer_, nrow(data)))
     }
-    code <- code + (match(as.character(data[[column]]), as.character(
-      combined$categories[[k]]
-    )) - 1L) *
+    code <- code + (match(
+      as.character(data[[column]]), as.character(combined$categories[[k]])
+      ) - 1L) *
       strides[k]
   }
   as.integer(code)
@@ -1207,9 +1263,12 @@ encode_combined <- function(alias, data, suffix = "") {
 
 # Shared by public event-rate summaries, after their final aggregation.
 validate_rate_conf_level <- function(conf_level) {
-  if (!is.null(conf_level) && (!is.numeric(conf_level) ||
-    length(conf_level) != 1L || !is.null(dim(conf_level)) ||
-    !is.finite(conf_level) || conf_level <= 0 || conf_level >= 1)) {
+  if (!is.null(conf_level) &&
+        (!is.numeric(conf_level) || length(conf_level) != 1L ||
+           !is.null(dim(conf_level)) ||
+           !is.finite(conf_level) ||
+           conf_level <= 0 ||
+           conf_level >= 1)) {
     stop(
       paste0(
         "`conf_level` must be NULL or a finite numeric ",
@@ -1230,9 +1289,8 @@ add_rate_confidence <- function(table, events, exposure, conf_level) {
   table$conf_high <- rep(NA_real_, nrow(table))
   for (i in which(table[[exposure]] > 0)) {
     limits <- stats::poisson.test(
-      x = table[[events]][i], T = table[[exposure]][
-        i
-      ],
+      x = table[[events]][i],
+      T = table[[exposure]][i],
       conf.level = conf_level
     )$conf.int
     table$conf_low[i] <- limits[1L]

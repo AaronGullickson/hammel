@@ -3347,3 +3347,33 @@ New `count_kin(population, times, generations = 2, by = NULL)` reports, at each 
 **Status:** User decision and implementation authorization, November 9, 2026.
 
 **Decision:** Rate processes no longer carry `rate_unit = "person_year"`. The field was a constant set by every rate constructor and could not be changed through the API; since the engine became continuous-time with per-person-year rates only (D024), its checks guarded only against hand-edited objects. The constructors, the seven checks (`set_process()`, union formation, dissolution and transition validation, `calculate_life_table()`, `calculate_tfr()` and `calculate_patfr()`) and the tests that set or expected it are removed or simplified; validation now checks the process name only, with messages such as "Life tables require a mortality process." Rates remain per person-year, as documented in each constructor and the scientific contract. Historical records keep the field.
+
+
+## D163 — Readable function-call wrapping (November 10, 2026)
+
+**Status:** User decision and implementation authorization, November 10, 2026.
+
+**Decision:** Keep function calls on one line when they fit within 80 characters and remain readable. For multiline calls, put each named argument on its own line; short, unnamed arguments may share a line. Keep nested calls and expressions together when they fit within the limit. Put the closing parenthesis on its own line and remove unnecessary line breaks. Function definitions retain the separate rule: if the signature needs wrapping, put every argument on its own line. This clarifies D149; the width limit alone does not justify splitting a short nested call or combining named arguments on one line.
+
+**Scope:** Apply the layout to hand-maintained `R/` source, preserving comments and behavior. Generated wrappers, user-owned README/articles and historical validation evidence remain untouched.
+
+**Implementation and checks:** Reformatted 31 hand-maintained `R/` files from the existing working tree. Parsed expressions remain equivalent after normalizing single-expression branch braces and constant `paste0()` concatenation: three conditional values gained braces to wrap them, and one diagnostic literal was split inside its existing `paste0()`. Comments are identical, all hand-maintained R source lines fit within 80 columns, and generated wrappers are unchanged. `devtools::test()` passed 6,568 expectations with zero failures, one `timedatectl` system-bus warning while loading HMDHFDplus/lubridate, and the opt-in live database test skipped. `git diff --check` passed.
+
+
+## D164 — Wrapped if-condition indentation (November 10, 2026)
+
+**Status:** User decision and implementation authorization, November 10, 2026.
+
+**Decision:** Wrap long `if` conditions at logical operators where possible, preserving short nested calls on one line. Indent continuation lines two spaces beyond the first boolean expression after `if (`. For an `if` statement with two leading spaces, the first boolean begins at column 7 and continuation booleans begin at column 9, with eight leading spaces. The body retains its ordinary two-space indent relative to `if`. This supersedes D149's two-space continuation indent for wrapped `if` conditions; other continuations retain their existing rule.
+
+```r
+  if (!is.numeric(rates$age_end) || !is.null(dim(rates$age_end)) ||
+        anyNA(rates$age_end) ||
+        any(rates$age_start < 0 | rates$age_end <= rates$age_start)) {
+    stop("Invalid age bands.", call. = FALSE)
+  }
+```
+
+**Implementation:** Applied the rule across hand-maintained `R/` source, changing 29 files from the pre-pass working tree while preserving the user's corrected TFR condition. Long conditions wrap at logical operators, with nested calls kept intact where they fit; longer individual comparisons wrap within their calls as needed to retain the 80-column limit. Generated wrappers, README, vignettes and historical validation evidence are unchanged. Parsed expressions and all terminal tokens (including comments and string literals) are identical before and after this pass, and every hand-maintained R source line remains within 80 columns.
+
+**Validation:** A parsed-token audit verified the prescribed indentation for 238 continued outer logical-chain terms. `devtools::test()` passed 6,568 expectations with zero failures in 86.2 seconds; one `timedatectl` warning occurred while loading HMDHFDplus/lubridate, and the opt-in live database test was skipped. `git diff --check` passed.

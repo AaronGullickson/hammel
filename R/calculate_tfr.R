@@ -67,10 +67,7 @@ calculate_tfr <- function(rates) {
   check_columns(rates, c("age_start", "age_end"), "rates")
   if (!"rate_fertility" %in% names(rates)) {
     if (!"rate" %in% names(rates)) {
-      stop(
-        "Supply `rate_fertility` or fertility `rate`.",
-        call. = FALSE
-      )
+      stop("Supply `rate_fertility` or fertility `rate`.", call. = FALSE)
     }
     rates$rate_fertility <- rates$rate
   }
@@ -81,8 +78,7 @@ calculate_tfr <- function(rates) {
   unknown <- attr(rates, "unassigned_births")
   if ("sex" %in% names(rates)) {
     # TFR describes women only, so sex is never a stratum or output column.
-    rates <- rates[rates$sex == "f", setdiff(names(rates), "sex"),
-                   drop = FALSE]
+    rates <- rates[rates$sex == "f", setdiff(names(rates), "sex"), drop = FALSE]
   }
   check_numeric_column(rates$age_start, "rates$age_start")
   if (!is.numeric(rates$age_end) || anyNA(rates$age_end)) {
@@ -94,21 +90,24 @@ calculate_tfr <- function(rates) {
       call. = FALSE
     )
   }
-  check_numeric_column(rates$rate_fertility, "rates$rate_fertility",
+  check_numeric_column(
+    rates$rate_fertility, "rates$rate_fertility",
     missing = TRUE
   )
   if (any(rates$rate_fertility < 0, na.rm = TRUE)) {
-    stop(
-      "ASFRs must be nonnegative.",
+    stop("ASFRs must be nonnegative.", call. = FALSE)
+  }
+  if (any(
+        !is.finite(rates$age_end) & rates$rate_fertility != 0,
+        na.rm = TRUE
+      )) {
+    warning(
+      paste0(
+        "TFR omits an open age band with non-zero ",
+        "fertility; TFR is underestimated over the full age range."
+      ),
       call. = FALSE
     )
-  }
-  if (any(!is.finite(rates$age_end) & rates$rate_fertility != 0,
-    na.rm = TRUE)) {
-    warning(paste0(
-      "TFR omits an open age band with non-zero ",
-      "fertility; TFR is underestimated over the full age range."
-    ), call. = FALSE)
   }
   rates <- rates[is.finite(rates$age_end), , drop = FALSE]
   groups <- summary_strata(rates)
@@ -118,16 +117,20 @@ calculate_tfr <- function(rates) {
       call. = FALSE
     )
   }
-  tables <- lapply(summary_rows(rates), function(rows) {
-    r <- rates[rows, , drop = FALSE]
-    check_summary_intervals(r, strata = groups)
-    key <- r[1, groups, drop = FALSE]
-    cbind(key, data.frame(
-      age_start = min(r$age_start),
-      age_end = max(r$age_end),
-      tfr = sum(r$rate_fertility * (r$age_end - r$age_start))
-    ))
-  })
+  tables <- lapply(
+    summary_rows(rates), function(rows) {
+      r <- rates[rows, , drop = FALSE]
+      check_summary_intervals(r, strata = groups)
+      key <- r[1, groups, drop = FALSE]
+      cbind(
+        key, data.frame(
+          age_start = min(r$age_start),
+          age_end = max(r$age_end),
+          tfr = sum(r$rate_fertility * (r$age_end - r$age_start))
+        )
+      )
+    }
+  )
   result <- do.call(rbind, tables)
   result <- tibble::as_tibble(result)
   attr(result, "unassigned_births") <- unknown
@@ -140,23 +143,16 @@ calculate_tfr <- function(rates) {
 calculate_patfr <- function(rates) {
   if (inherits(rates, "hammel_process")) {
     if (!identical(rates$name, "fertility")) {
-      stop("PATFR requires a fertility process.",
-        call. =
-          FALSE
-      )
+      stop("PATFR requires a fertility process.", call. = FALSE)
     }
     rates <- rates$rates
   }
   check_columns(
-    rates, c("age_start", "age_end", "parity_start", "parity_end"),
-    "rates"
+    rates, c("age_start", "age_end", "parity_start", "parity_end"), "rates"
   )
   if (!"rate_fertility" %in% names(rates)) {
     if (!"rate" %in% names(rates)) {
-      stop(
-        "Supply `rate_fertility` or fertility `rate`.",
-        call. = FALSE
-      )
+      stop("Supply `rate_fertility` or fertility `rate`.", call. = FALSE)
     }
     rates$rate_fertility <- rates$rate
   }
@@ -167,43 +163,53 @@ calculate_patfr <- function(rates) {
   unknown <- attr(rates, "unassigned_births")
   if ("sex" %in% names(rates)) {
     # TFR describes women only, so sex is never a stratum or output column.
-    rates <- rates[rates$sex == "f", setdiff(names(rates), "sex"),
-      drop = FALSE
-    ]
+    rates <- rates[rates$sex == "f", setdiff(names(rates), "sex"), drop = FALSE]
   }
   check_numeric_column(rates$age_start, "rates$age_start")
-  if (!is.numeric(rates$age_end) || !is.null(dim(rates$age_end)) || anyNA(
-    rates$age_end
-  ) ||
-    any(rates$age_start < 0 | rates$age_end <= rates$age_start)) {
-    stop("Age bands need nonnegative starts and greater ends, possibly Inf.",
+  if (!is.numeric(rates$age_end) || !is.null(dim(rates$age_end)) ||
+        anyNA(rates$age_end) ||
+        any(rates$age_start < 0 | rates$age_end <= rates$age_start)) {
+    stop(
+      "Age bands need nonnegative starts and greater ends, possibly Inf.",
       call. = FALSE
     )
   }
   check_numeric_column(rates$parity_start, "rates$parity_start")
   end <- rates$parity_end
   if (!is.numeric(end) || !is.null(dim(end)) || anyNA(end) ||
-    any(rates$parity_start < 0 | rates$parity_start != floor(
-      rates$parity_start
-    )) ||
-    any(end <= rates$parity_start) || any(is.finite(end) & end != floor(end))) {
-    stop(paste0(
-      "Parity bands need nonnegative integer starts and ",
-      "greater integer ends or Inf."
-    ), call. = FALSE)
+        any(
+          rates$parity_start < 0 |
+            rates$parity_start != floor(rates$parity_start)
+        ) ||
+        any(end <= rates$parity_start) ||
+        any(is.finite(end) & end != floor(end))) {
+    stop(
+      paste0(
+        "Parity bands need nonnegative integer starts and ",
+        "greater integer ends or Inf."
+      ),
+      call. = FALSE
+    )
   }
-  check_numeric_column(rates$rate_fertility, "rates$rate_fertility",
-                       missing = TRUE)
+  check_numeric_column(
+    rates$rate_fertility, "rates$rate_fertility",
+    missing = TRUE
+  )
   if (any(rates$rate_fertility < 0, na.rm = TRUE)) {
     stop("Fertility rates must be nonnegative.", call. = FALSE)
   }
-  if (any(!is.finite(rates$age_end) & rates$rate_fertility != 0,
-    na.rm = TRUE)) {
-    warning(paste0(
-      "PATFR omits an open age band with non-zero ",
-      "fertility; PATFR is underestimated over the full ",
-      "age range."
-    ), call. = FALSE)
+  if (any(
+        !is.finite(rates$age_end) & rates$rate_fertility != 0,
+        na.rm = TRUE
+      )) {
+    warning(
+      paste0(
+        "PATFR omits an open age band with non-zero ",
+        "fertility; PATFR is underestimated over the full ",
+        "age range."
+      ),
+      call. = FALSE
+    )
   }
   rates <- rates[is.finite(rates$age_end), , drop = FALSE]
   groups <- summary_strata(rates)
@@ -213,43 +219,61 @@ calculate_patfr <- function(rates) {
       call. = FALSE
     )
   }
-  tables <- lapply(summary_rows(rates), function(rows) {
-    r <- rates[rows, , drop = FALSE]
-    lower <- min(r$age_start)
-    upper <- max(r$age_end)
-    parity <- sort(
-      unique(c(r$parity_start, r$parity_end[is.finite(r$parity_end)]))
-    )
-    if (!any(is.infinite(r$parity_end)) || min(parity) != 0) {
-      stop(paste0(
-        "Parity coverage must start at zero and include an ",
-        "open final category."
-      ), call. = FALSE)
-    }
-    top <- max(parity)
-    states <- 0:top
-    ages <- sort(unique(c(r$age_start, r$age_end, seq(ceiling(lower), floor(
-      upper
-    )))))
-    ages <- ages[ages >= lower & ages <= upper]
-    hazard <- matrix(NA_real_, nrow = length(ages) - 1L, ncol = length(states))
-    for (a in seq_len(nrow(hazard))) {
-      for (k in seq_along(states)) {
-        cell <- which(r$age_start <= ages[a] & r$age_end >= ages[a + 1L] &
-          r$parity_start <= states[k] & r$parity_end > states[k])
-        if (length(cell) != 1L) {
-          stop(paste0(
-            "Each age/parity cell must be covered exactly ",
-            "once, without gaps or overlaps."
-          ), call. = FALSE)
-        }
-        hazard[a, k] <- r$rate_fertility[cell]
+  tables <- lapply(
+    summary_rows(rates), function(rows) {
+      r <- rates[rows, , drop = FALSE]
+      lower <- min(r$age_start)
+      upper <- max(r$age_end)
+      parity <- sort(
+        unique(c(r$parity_start, r$parity_end[is.finite(r$parity_end)]))
+      )
+      if (!any(is.infinite(r$parity_end)) || min(parity) != 0) {
+        stop(
+          paste0(
+            "Parity coverage must start at zero and include an ",
+            "open final category."
+          ),
+          call. = FALSE
+        )
       }
+      top <- max(parity)
+      states <- 0:top
+      ages <- sort(
+        unique(c(r$age_start, r$age_end, seq(ceiling(lower), floor(upper))))
+      )
+      ages <- ages[ages >= lower & ages <= upper]
+      hazard <- matrix(
+        NA_real_,
+        nrow = length(ages) - 1L,
+        ncol = length(states)
+      )
+      for (a in seq_len(nrow(hazard))) {
+        for (k in seq_along(states)) {
+          cell <- which(
+            r$age_start <= ages[a] & r$age_end >= ages[a + 1L] &
+              r$parity_start <= states[k] & r$parity_end > states[k]
+          )
+          if (length(cell) != 1L) {
+            stop(
+              paste0(
+                "Each age/parity cell must be covered exactly ",
+                "once, without gaps or overlaps."
+              ),
+              call. = FALSE
+            )
+          }
+          hazard[a, k] <- r$rate_fertility[cell]
+        }
+      }
+      value <- if (anyNA(hazard)) {
+        NA_real_
+      } else {
+        patfr_midpoint(hazard, diff(ages))
+      }
+      key <- r[1, groups, drop = FALSE]
+      cbind(key, data.frame(age_start = lower, age_end = upper, patfr = value))
     }
-    value <- if (anyNA(hazard)) NA_real_ else patfr_midpoint(hazard, diff(ages))
-    key <- r[1, groups, drop = FALSE]
-    cbind(key, data.frame(age_start = lower, age_end = upper, patfr = value))
-  })
+  )
   result <- tibble::as_tibble(do.call(rbind, tables))
   attr(result, "unassigned_births") <- unknown
   result
@@ -269,10 +293,13 @@ patfr_midpoint <- function(hazard, widths) {
       incoming <- outgoing + 1L
       q <- d * hazard[a, outgoing] / (1 + d * hazard[a, outgoing] / 2)
       if (any(!is.finite(q)) || any(q > 1)) {
-        stop(paste0(
-          "Rates are too large for valid HFD midpoint ",
-          "progression probabilities."
-        ), call. = FALSE)
+        stop(
+          paste0(
+            "Rates are too large for valid HFD midpoint ",
+            "progression probabilities."
+          ),
+          call. = FALSE
+        )
       }
       exposure[outgoing] <- state[outgoing] * d * (1 - q / 2)
       exposure[incoming] <- exposure[incoming] + state[outgoing] * q * d / 2

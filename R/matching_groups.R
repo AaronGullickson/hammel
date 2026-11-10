@@ -13,7 +13,8 @@ matching_group_labels <- function(x, name) {
 
 expand_matching_pairs <- function(effects, symmetric = FALSE) {
   empty <- tibble::tibble(
-    female_group = character(), male_group = character(),
+    female_group = character(),
+    male_group = character(),
     log_odds = numeric()
   )
   if (is.null(effects)) {
@@ -38,56 +39,66 @@ expand_matching_pairs <- function(effects, symmetric = FALSE) {
   } else {
     labels <- names(effects)
     if (!is.numeric(effects) || is.complex(effects) || !is.null(dim(effects)) ||
-      any(!is.finite(effects)) || (length(effects) &&
-      (is.null(labels) || anyNA(labels) || any(!nzchar(labels))))) {
-      stop(paste0(
-        "`group_exogamy` must be a finite named numeric ",
-        "vector or a pair table."
-      ), call. = FALSE)
-    }
-    tables <- lapply(seq_along(effects), function(i) {
-      key <- labels[i]
-      pattern <- if (symmetric) "^[^:]+:[^:]+$" else "^[^:]+:{1,2}[^:]+$"
-      if (!grepl(pattern, key)) {
-        stop(if (symmetric) {
-          paste0(
-            "Use single ':' unordered pair names in ",
-            "`group_exogamy`."
-          )
-        } else {
-          paste0(
-            "Use 'female:male' or symmetric 'group::group' ",
-            "names in `prevent_exogamy`."
-          )
-        }, call. = FALSE)
-      }
-      pair <- strsplit(key, ":{1,2}")[[1]]
-      if (any(!nzchar(trimws(pair)))) {
-        stop(
-          "Pair group labels must be nonempty.",
-          call. = FALSE
-        )
-      }
-      table <- tibble::tibble(
-        female_group = pair[1], male_group = pair[2],
-        log_odds = unname(effects[i])
+          any(!is.finite(effects)) ||
+          (length(effects) &&
+             (is.null(labels) || anyNA(labels) || any(!nzchar(labels))))) {
+      stop(
+        paste0(
+          "`group_exogamy` must be a finite named numeric ",
+          "vector or a pair table."
+        ),
+        call. = FALSE
       )
-      if (!symmetric && grepl("::", key, fixed = TRUE) && pair[1] != pair[2]) {
-        table <- rbind(table, tibble::tibble(
-          female_group = pair[2],
-          male_group = pair[1],
+    }
+    tables <- lapply(
+      seq_along(effects), function(i) {
+        key <- labels[i]
+        pattern <- if (symmetric) "^[^:]+:[^:]+$" else "^[^:]+:{1,2}[^:]+$"
+        if (!grepl(pattern, key)) {
+          stop(
+            if (symmetric) {
+              paste0(
+                "Use single ':' unordered pair names in ", "`group_exogamy`."
+              )
+            } else {
+              paste0(
+                "Use 'female:male' or symmetric 'group::group' ",
+                "names in `prevent_exogamy`."
+              )
+            },
+            call. = FALSE
+          )
+        }
+        pair <- strsplit(key, ":{1,2}")[[1]]
+        if (any(!nzchar(trimws(pair)))) {
+          stop("Pair group labels must be nonempty.", call. = FALSE)
+        }
+        table <- tibble::tibble(
+          female_group = pair[1],
+          male_group = pair[2],
           log_odds = unname(effects[i])
-        ))
+        )
+        if (!symmetric && grepl("::", key, fixed = TRUE) &&
+              pair[1] != pair[2]) {
+          table <- rbind(
+            table, tibble::tibble(
+              female_group = pair[2],
+              male_group = pair[1],
+              log_odds = unname(effects[i])
+            )
+          )
+        }
+        table
       }
-      table
-    })
+    )
     table <- if (length(tables)) do.call(rbind, tables) else empty
   }
   if (!is.numeric(table$log_odds) || is.complex(table$log_odds) ||
-    !is.null(dim(table$log_odds)) || any(!is.finite(table$log_odds))) {
-    stop("`group_exogamy` log odds must be finite numeric values.",
-      call. =
-        FALSE
+        !is.null(dim(table$log_odds)) ||
+        any(!is.finite(table$log_odds))) {
+    stop(
+      "`group_exogamy` log odds must be finite numeric values.",
+      call. = FALSE
     )
   }
   if (symmetric && nrow(table)) {
@@ -108,14 +119,14 @@ expand_matching_pairs <- function(effects, symmetric = FALSE) {
       } else {
         "Conflicting or overlapping directed pairs in `prevent_exogamy`."
       },
-      call. =
-        FALSE
+      call. = FALSE
     )
   }
   table
 }
 
-expand_group_exogamy <- function(effects) expand_matching_pairs(effects,
+expand_group_exogamy <- function(effects) expand_matching_pairs(
+  effects,
   symmetric = TRUE
 )
 
@@ -134,7 +145,8 @@ matching_predictor_data <- function(
     return(data)
   }
   if (is.null(female_group) || is.null(male_group)) {
-    stop("Matching group predictors require female and male group data.",
+    stop(
+      "Matching group predictors require female and male group data.",
       call. = FALSE
     )
   }
@@ -144,11 +156,14 @@ matching_predictor_data <- function(
     return(data)
   }
   if (!length(female) %in% c(1L, length(gaps)) ||
-    length(male) != length(gaps)) {
-    stop(paste0(
-      "Supply one female group per search (or candidate) ",
-      "and one male group per candidate."
-    ), call. = FALSE)
+        length(male) != length(gaps)) {
+    stop(
+      paste0(
+        "Supply one female group per search (or candidate) ",
+        "and one male group per candidate."
+      ),
+      call. = FALSE
+    )
   }
   female <- rep(female, length.out = length(gaps))
   # A combined matching category (several dimensions): decode each
@@ -157,23 +172,21 @@ matching_predictor_data <- function(
     f <- match(female, matching$group_levels)
     m <- match(male, matching$group_levels)
     if (anyNA(f) || anyNA(m)) {
-      stop(
-        "Matching group data contain unknown combinations.",
-        call. = FALSE
-      )
+      stop("Matching group data contain unknown combinations.", call. = FALSE)
     }
     for (d in names(matching$categories)) {
       levels <- as.character(matching$categories[[d]])
-      data[[paste0("female_", d)]] <- factor(matching$decode[[d]][f],
-        levels =
-          levels
+      data[[paste0("female_", d)]] <- factor(
+        matching$decode[[d]][f],
+        levels = levels
       )
-      data[[paste0("male_", d)]] <- factor(matching$decode[[d]][m],
-        levels =
-          levels
+      data[[paste0("male_", d)]] <- factor(
+        matching$decode[[d]][m],
+        levels = levels
       )
-      data[[paste0("same_", d)]] <- as.numeric(matching$decode[[d]][f] ==
-        matching$decode[[d]][m])
+      data[[paste0("same_", d)]] <- as.numeric(
+        matching$decode[[d]][f] == matching$decode[[d]][m]
+      )
     }
     return(data)
   }
@@ -214,34 +227,36 @@ matching_pair_offsets <- function(matching, female_group, male_group) {
 validate_matching_groups <- function(matching, population_groups) {
   if (is_model_schedule(matching)) {
     for (m in model_entries(matching)) {
-      validate_matching_groups(
-        m,
-        population_groups
-      )
+      validate_matching_groups(m, population_groups)
     }
     return(invisible(matching))
   }
-  if (length(matching$delta) && (is.null(population_groups) ||
-    any(!names(matching$delta) %in% as.character(population_groups)))) {
-    stop("`delta` names must belong to the population group identity registry.",
+  if (length(matching$delta) &&
+        (is.null(population_groups) ||
+           any(!names(matching$delta) %in% as.character(population_groups)))) {
+    stop(
+      "`delta` names must belong to the population group identity registry.",
       call. = FALSE
     )
   }
   pairs <- expand_group_exogamy(matching$group_exogamy)
   restrictions <- expand_prevent_exogamy(matching$prevent_exogamy)
   if ((nrow(pairs) || matching_has_group_formula(matching) ||
-    restrictions$all ||
-    nrow(restrictions$pairs)) && is.null(population_groups)) {
-    stop("Group matching effects require population group identities.",
-      call. =
-        FALSE
+         restrictions$all ||
+         nrow(restrictions$pairs)) &&
+        is.null(population_groups)) {
+    stop(
+      "Group matching effects require population group identities.",
+      call. = FALSE
     )
   }
   if (any(all.vars(matching$formula) %in% c("female_group", "male_group")) &&
-    any(!as.character(population_groups) %in% as.character(
-      matching$group_levels
-    ))) {
-    stop("Population groups must be covered by matching `group_levels`.",
+        any(
+          !as.character(population_groups) %in%
+             as.character(matching$group_levels)
+        )) {
+    stop(
+      "Population groups must be covered by matching `group_levels`.",
       call. = FALSE
     )
   }
@@ -267,15 +282,11 @@ expand_prevent_exogamy <- function(x) {
         x$log_odds <- rep(0, nrow(x))
         expand_matching_pairs(x)
       } else {
-        stop(
-          "Use FALSE, TRUE, a character vector of pairs, or a pair table."
-        )
+        stop("Use FALSE, TRUE, a character vector of pairs, or a pair table.")
       }
     },
     error = function(e) {
-      stop("Invalid `prevent_exogamy`: ", conditionMessage(
-        e
-      ), call. = FALSE)
+      stop("Invalid `prevent_exogamy`: ", conditionMessage(e), call. = FALSE)
     }
   )
   if (any(pairs$female_group == pairs$male_group)) {
@@ -315,18 +326,21 @@ split_group_exogamy <- function(x) {
   if (is.null(x)) {
     return(out)
   }
-  if (!is.data.frame(x) && length(x) == 1L && is.null(names(x)) && is.atomic(
-    x
-  ) && is.na(x)) {
+  if (!is.data.frame(x) && length(x) == 1L && is.null(names(x)) &&
+        is.atomic(x) &&
+        is.na(x)) {
     out$prevent <- TRUE
     return(out)
   }
   if (is.data.frame(x)) {
     if (!all(c("female_group", "male_group", "log_odds") %in% names(x))) {
-      stop(paste0(
-        "Internal error: pair tables reach ",
-        "split_group_exogamy() only from tables."
-      ), call. = FALSE)
+      stop(
+        paste0(
+          "Internal error: pair tables reach ",
+          "split_group_exogamy() only from tables."
+        ),
+        call. = FALSE
+      )
     }
     blocked <- is.na(x$log_odds)
     effects <- x[!blocked, , drop = FALSE]
@@ -336,52 +350,53 @@ split_group_exogamy <- function(x) {
       effects <- NULL
     }
   } else {
-    if (!(is.numeric(x) || is.logical(x)) || is.complex(x) || !is.null(dim(
-      x
-    )) ||
-      (length(x) && (is.null(names(x)) || anyNA(names(x)) || any(!nzchar(
-        names(x)
-      ))))) {
-      stop(paste(
-        paste0(
-          "`group_exogamy` must be a named vector of finite ",
-          "effects and NA prohibitions,"
+    if (!(is.numeric(x) || is.logical(x)) || is.complex(x) ||
+          !is.null(dim(x)) ||
+          (length(x) &&
+             (is.null(names(x)) || anyNA(names(x)) ||
+                any(!nzchar(names(x)))))) {
+      stop(
+        paste(
+          paste0(
+            "`group_exogamy` must be a named vector of finite ",
+            "effects and NA prohibitions,"
+          ),
+          "NA, or a pair table."
         ),
-        "NA, or a pair table."
-      ), call. = FALSE)
+        call. = FALSE
+      )
     }
     blocked <- is.na(x)
     effects <- if (any(!blocked)) {
-      stats::setNames(
-        as.numeric(x[!blocked]),
-        names(x)[!blocked]
-      )
+      stats::setNames(as.numeric(x[!blocked]), names(x)[!blocked])
     }
     banned <- stats::setNames(rep(0, sum(blocked)), names(x)[blocked])
   }
   pairs <- expand_group_exogamy(effects)
-  prohibited <- expand_group_exogamy(if (length(banned) || is.data.frame(
-    banned
-  )) {
-    banned
-  })
+  prohibited <- expand_group_exogamy(
+    if (length(banned) || is.data.frame(banned)) {
+      banned
+    }
+  )
   if (any(prohibited$female_group == prohibited$male_group)) {
-    stop(paste0(
-      "`group_exogamy` cannot prohibit unions within a ",
-      "category (such as `\"A:A\" = NA`)."
-    ), call. = FALSE)
+    stop(
+      paste0(
+        "`group_exogamy` cannot prohibit unions within a ",
+        "category (such as `\"A:A\" = NA`)."
+      ),
+      call. = FALSE
+    )
   }
   key <- function(t) paste(t$female_group, t$male_group, sep = "\r")
   if (any(key(prohibited) %in% key(pairs))) {
-    stop("Conflicting or overlapping unordered pairs in `group_exogamy`.",
+    stop(
+      "Conflicting or overlapping unordered pairs in `group_exogamy`.",
       call. = FALSE
     )
   }
   out$effects <- effects
   if (nrow(prohibited)) {
-    out$prevent <- as.data.frame(prohibited[c(
-      "female_group", "male_group"
-    )])
+    out$prevent <- as.data.frame(prohibited[c("female_group", "male_group")])
   }
   out
 }
@@ -392,21 +407,22 @@ split_group_exogamy <- function(x) {
 exogamy_table_dimensions <- function(x) {
   columns <- setdiff(names(x), "log_odds")
   if (any(c("female_group", "male_group") %in% names(x))) {
-    stop(paste(
-      paste0(
-        "A `group_exogamy` table uses `<group>_x` and ",
-        "`<group>_y` columns and `log_odds`,"
+    stop(
+      paste(
+        paste0(
+          "A `group_exogamy` table uses `<group>_x` and ",
+          "`<group>_y` columns and `log_odds`,"
+        ),
+        paste0(
+          "such as `race_x`, `race_y`; the ",
+          "female_group/male_group form is removed."
+        )
       ),
-      paste0(
-        "such as `race_x`, `race_y`; the ",
-        "female_group/male_group form is removed."
-      )
-    ), call. = FALSE)
+      call. = FALSE
+    )
   }
-  if (!"log_odds" %in% names(x) || !length(columns) || any(!grepl(
-    "_[xy]$",
-    columns
-  ))) {
+  if (!"log_odds" %in% names(x) || !length(columns) ||
+        any(!grepl("_[xy]$", columns))) {
     stop(
       paste0(
         "A `group_exogamy` table needs `<group>_x` and ",
@@ -432,21 +448,26 @@ exogamy_table_dimensions <- function(x) {
 validate_exogamy_table <- function(x) {
   dims <- exogamy_table_dimensions(x)
   for (column in setdiff(names(x), "log_odds")) {
-    check_groups(tibble::tibble(group = x[[column]]), paste0(
-      "group_exogamy$",
-      column
-    ))
+    check_groups(
+      tibble::tibble(group = x[[column]]), paste0("group_exogamy$", column)
+    )
   }
   v <- x$log_odds
   if (!(is.numeric(v) || is.logical(v)) || is.complex(v) || !is.null(dim(v)) ||
-    any(is.infinite(v))) {
-    stop("`group_exogamy$log_odds` must be finite effects or NA prohibitions.",
+        any(is.infinite(v))) {
+    stop(
+      "`group_exogamy$log_odds` must be finite effects or NA prohibitions.",
       call. = FALSE
     )
   }
-  side <- function(s) do.call(paste, c(lapply(dims, function(d) as.character(x[[
-    paste0(d, "_", s)
-  ]])), sep = "\r"))
+  side <- function(s) do.call(
+    paste, c(
+      lapply(
+        dims, function(d) as.character(x[[paste0(d, "_", s)]])
+      ),
+      sep = "\r"
+    )
+  )
   a <- side("x")
   b <- side("y")
   key <- ifelse(a <= b, paste(a, b, sep = "\n"), paste(b, a, sep = "\n"))
@@ -460,10 +481,13 @@ validate_exogamy_table <- function(x) {
     )
   }
   if (any(is.na(v) & a == b)) {
-    stop(paste0(
-      "A `group_exogamy` table cannot prohibit unions ",
-      "within a combination of categories."
-    ), call. = FALSE)
+    stop(
+      paste0(
+        "A `group_exogamy` table cannot prohibit unions ",
+        "within a combination of categories."
+      ),
+      call. = FALSE
+    )
   }
   invisible(dims)
 }
@@ -476,10 +500,7 @@ matching_dimensions <- function(model, dims) {
   for (field in matching_settings) {
     x <- model[[field]]
     if (field == "group_exogamy" && is.data.frame(x)) {
-      used <- c(
-        used,
-        exogamy_table_dimensions(x)
-      )
+      used <- c(used, exogamy_table_dimensions(x))
     } else if (is_dimension_list(x)) {
       used <- c(used, names(x))
     } else if (!is.null(x) && !identical(x, FALSE) && length(x)) {
@@ -509,25 +530,30 @@ matching_dimensions <- function(model, dims) {
             dims[1], paste0("`", dims, "`", collapse = ", ")
           )
         },
-        call. =
-          FALSE
+        call. = FALSE
       )
     }
     used <- c(used, dims)
   }
   used <- unique(used)
   if (length(used) && !length(dims)) {
-    stop(paste0(
-      "Group effects in matching require a declared ",
-      "group dimension; use set_groups()."
-    ), call. = FALSE)
+    stop(
+      paste0(
+        "Group effects in matching require a declared ",
+        "group dimension; use set_groups()."
+      ),
+      call. = FALSE
+    )
   }
   unknown <- setdiff(used, dims)
   if (length(unknown)) {
-    stop(sprintf(
-      "Matching uses %s, which is not a declared group dimension.",
-      paste0("`", unknown, "`", collapse = ", ")
-    ), call. = FALSE)
+    stop(
+      sprintf(
+        "Matching uses %s, which is not a declared group dimension.",
+        paste0("`", unknown, "`", collapse = ", ")
+      ),
+      call. = FALSE
+    )
   }
   used
 }
@@ -541,7 +567,9 @@ internal_matching_model <- function(model, dim, categories) {
       list(
         formula = model$formula,
         coefficients = model$coefficients,
-        group_exogamy = NULL, group_levels = NULL, prevent_exogamy = FALSE,
+        group_exogamy = NULL,
+        group_levels = NULL,
+        prevent_exogamy = FALSE,
         delta = NULL
       ),
       class = "hammel_matching_model"
@@ -552,19 +580,27 @@ internal_matching_model <- function(model, dim, categories) {
   public <- paste0(c("female_", "male_", "same_"), dim)
   private <- c("female_group", "male_group", "same_group")
   formula <- model$formula
-  renamed <- stats::as.formula(call("~", do.call(substitute, list(
-    formula[[2L]],
-    stats::setNames(lapply(private, as.name), public)
-  ))), env = environment(
-    formula
-  ))
+  renamed <- stats::as.formula(
+    call(
+      "~", do.call(
+        substitute, list(
+          formula[[2L]],
+          stats::setNames(lapply(private, as.name), public)
+        )
+      )
+    ),
+    env = environment(formula)
+  )
   coefficients <- model$coefficients
   vars <- intersect(public, all.vars(formula))
   if (any(public[1:2] %in% vars) && length(categories) < 2L) {
-    stop(paste0(
-      "Categorical matching predictors require a group ",
-      "dimension with at least two categories."
-    ), call. = FALSE)
+    stop(
+      paste0(
+        "Categorical matching predictors require a group ",
+        "dimension with at least two categories."
+      ),
+      call. = FALSE
+    )
   }
   if (length(vars)) {
     # Map coefficient names through the two model matrices' columns.
@@ -572,49 +608,57 @@ internal_matching_model <- function(model, dim, categories) {
     n <- max(2L, length(labels))
     data <- data.frame(age_difference = seq_len(n))
     data[[public[1]]] <- factor(rep(labels, length.out = n), levels = labels)
-    data[[public[2]]] <- factor(rep(rev(labels), length.out = n),
-      levels =
-        labels
+    data[[public[2]]] <- factor(
+      rep(rev(labels), length.out = n),
+      levels = labels
     )
     data[[public[3]]] <- rep(c(0, 1), length.out = n)
     original <- colnames(matching_design_matrix(formula, data))
     names(data)[match(public, names(data))] <- private
     translated <- colnames(matching_design_matrix(renamed, data))
     if (!setequal(original, names(coefficients))) {
-      stop(sprintf(
-        paste0(
-          "Matching coefficient names must match the ",
-          "model-matrix columns: %s."
+      stop(
+        sprintf(
+          paste0(
+            "Matching coefficient names must match the ",
+            "model-matrix columns: %s."
+          ),
+          paste(original, collapse = ", ")
         ),
-        paste(original, collapse = ", ")
-      ), call. = FALSE)
+        call. = FALSE
+      )
     }
     names(coefficients) <- translated[match(names(coefficients), original)]
   }
   exogamy <- if (is.data.frame(model$group_exogamy)) {
     table <- model$group_exogamy
-    split_group_exogamy(data.frame(
-      female_group = as.character(table[[paste0(
-        dim, "_x"
-      )]]),
-      male_group = as.character(table[[paste0(dim, "_y")]]),
-      log_odds = as.numeric(table$log_odds),
-      stringsAsFactors = FALSE
-    ))
+    split_group_exogamy(
+      data.frame(
+        female_group = as.character(table[[paste0(dim, "_x")]]),
+        male_group = as.character(table[[paste0(dim, "_y")]]),
+        log_odds = as.numeric(table$log_odds),
+        stringsAsFactors = FALSE
+      )
+    )
   } else {
     split_group_exogamy(pick(model$group_exogamy))
   }
-  internal <- structure(list(
-    formula = renamed, coefficients = coefficients,
-    group_exogamy = exogamy$effects,
-    group_levels = if (any(c("female_group", "male_group") %in% all.vars(
-      renamed
-    ))) {
-      categories
-    },
-    prevent_exogamy = exogamy$prevent,
-    delta = pick(model$delta)
-  ), class = "hammel_matching_model")
+  internal <- structure(
+    list(
+      formula = renamed,
+      coefficients = coefficients,
+      group_exogamy = exogamy$effects,
+      group_levels = if (any(
+                           c("female_group", "male_group") %in%
+                             all.vars(renamed)
+                         )) {
+        categories
+      },
+      prevent_exogamy = exogamy$prevent,
+      delta = pick(model$delta)
+    ),
+    class = "hammel_matching_model"
+  )
   validate_internal_matching(internal)
   internal
 }
@@ -630,9 +674,14 @@ combined_matching_model <- function(model, categories, labels) {
   sizes <- vapply(categories, length, integer(1))
   strides <- cumprod(c(1, utils::head(sizes, -1)))
   k <- length(labels)
-  decode <- stats::setNames(lapply(seq_along(dims), function(j)
-    as.character(categories[[j]])[(seq_len(k) - 1L) %/% strides[j] %% sizes[j] +
-      1L]), dims)
+  decode <- stats::setNames(
+    lapply(
+      seq_along(dims), function(j)
+        as.character(categories[[j]])[
+          (seq_len(k) - 1L) %/% strides[j] %% sizes[j] + 1L
+        ]
+    ), dims
+  )
   own <- matching_dimensions(model, dims)
   pick <- function(x, d) if (is_dimension_list(x)) x[[d]] else NULL
   effects <- matrix(0, k, k)
@@ -671,14 +720,9 @@ combined_matching_model <- function(model, categories, labels) {
       effects[f, m] <- effects[f, m] + pairs$log_odds[r]
     }
     if (isTRUE(exogamy$prevent)) {
-      blocked <- blocked | outer(
-        decode[[d]],
-        decode[[d]], `!=`
-      )
+      blocked <- blocked | outer(decode[[d]], decode[[d]], `!=`)
     } else if (is.data.frame(exogamy$prevent)) {
-      for (r in seq_len(nrow(
-        exogamy$prevent
-      ))) {
+      for (r in seq_len(nrow(exogamy$prevent))) {
         f <- decode[[d]] == as.character(exogamy$prevent$female_group[r])
         m <- decode[[d]] == as.character(exogamy$prevent$male_group[r])
         blocked[f, m] <- TRUE
@@ -700,10 +744,11 @@ combined_matching_model <- function(model, categories, labels) {
     TRUE
   } else if (any(blocked)) {
     pairs <- which(blocked, arr.ind = TRUE)
-    data.frame(female_group = labels[pairs[, 1]], male_group = labels[pairs[
-      ,
-      2
-    ]], stringsAsFactors = FALSE)
+    data.frame(
+      female_group = labels[pairs[, 1]],
+      male_group = labels[pairs[, 2]],
+      stringsAsFactors = FALSE
+    )
   } else {
     FALSE
   }
@@ -715,29 +760,41 @@ combined_matching_model <- function(model, categories, labels) {
     }
     unknown <- setdiff(names(x), as.character(categories[[d]]))
     if (length(unknown)) {
-      stop(sprintf(
-        "`delta` names must be categories of `%s`; unknown: %s.", d,
-        paste(unknown, collapse = ", ")
-      ), call. = FALSE)
+      stop(
+        sprintf(
+          "`delta` names must be categories of `%s`; unknown: %s.", d,
+          paste(unknown, collapse = ", ")
+        ),
+        call. = FALSE
+      )
     }
     delta <- delta + unname(x[decode[[d]]] %|na|% 0)
   }
-  internal <- structure(list(
-    formula = model$formula,
-    coefficients = model$coefficients,
-    group_exogamy = table, group_levels = labels, prevent_exogamy = prevent,
-    delta = if (any(delta != 0)) stats::setNames(delta, labels),
-    decode = decode, categories = categories
-  ), class = "hammel_matching_model")
+  internal <- structure(
+    list(
+      formula = model$formula,
+      coefficients = model$coefficients,
+      group_exogamy = table,
+      group_levels = labels,
+      prevent_exogamy = prevent,
+      delta = if (any(delta != 0)) stats::setNames(delta, labels),
+      decode = decode,
+      categories = categories
+    ),
+    class = "hammel_matching_model"
+  )
   vars <- grep("^(female|male|same)_.+", all.vars(model$formula), value = TRUE)
   if (length(vars)) {
     categorical <- vars[grepl("^(female|male)_", vars)]
     small <- sub("^(female|male)_", "", categorical)
     if (any(sizes[small] < 2L)) {
-      stop(paste0(
-        "Categorical matching predictors require a group ",
-        "dimension with at least two categories."
-      ), call. = FALSE)
+      stop(
+        paste0(
+          "Categorical matching predictors require a group ",
+          "dimension with at least two categories."
+        ),
+        call. = FALSE
+      )
     }
     n <- max(2L, k)
     female <- labels[(seq_len(n) - 1L) %% k + 1L]
@@ -746,13 +803,16 @@ combined_matching_model <- function(model, categories, labels) {
     data <- matching_predictor_data(internal, seq_len(n), female, male)
     columns <- colnames(matching_design_matrix(model$formula, data))
     if (!setequal(columns, names(model$coefficients))) {
-      stop(sprintf(
-        paste0(
-          "Matching coefficient names must match the ",
-          "model-matrix columns: %s."
+      stop(
+        sprintf(
+          paste0(
+            "Matching coefficient names must match the ",
+            "model-matrix columns: %s."
+          ),
+          paste(columns, collapse = ", ")
         ),
-        paste(columns, collapse = ", ")
-      ), call. = FALSE)
+        call. = FALSE
+      )
     }
   }
   internal
@@ -765,9 +825,12 @@ combination_labels <- function(categories) {
   sizes <- vapply(categories, length, integer(1))
   strides <- cumprod(c(1, utils::head(sizes, -1)))
   k <- prod(sizes)
-  parts <- lapply(seq_along(categories), function(j)
-    as.character(categories[[j]])[(seq_len(k) - 1L) %/% strides[j] %% sizes[j] +
-      1L])
+  parts <- lapply(
+    seq_along(categories), function(j)
+      as.character(categories[[j]])[
+        (seq_len(k) - 1L) %/% strides[j] %% sizes[j] + 1L
+      ]
+  )
   labels <- do.call(paste, c(parts, sep = "|"))
   if (anyDuplicated(labels)) {
     labels <- paste0("combination_", seq_len(k))
@@ -783,13 +846,19 @@ combination_labels <- function(categories) {
 resolve_matching_models <- function(process, declaration, registries) {
   dims <- names(declaration)
   fields <- c("matching", "father_matching", "cohab_matching")
-  used <- unique(unlist(lapply(fields, function(f)
-    lapply(model_entries(process[[f]]), matching_dimensions, dims = dims))))
+  used <- unique(
+    unlist(
+      lapply(
+        fields, function(f)
+          lapply(model_entries(process[[f]]), matching_dimensions, dims = dims)
+      )
+    )
+  )
   used <- dims[dims %in% used]
   if (length(used) > 1L) {
-    categories <- lapply(stats::setNames(used, used), function(d) registries[[
-      d
-    ]])
+    categories <- lapply(
+      stats::setNames(used, used), function(d) registries[[d]]
+    )
     labels <- combination_labels(categories)
     convert <- function(model) combined_matching_model(
       model, categories,
@@ -812,8 +881,7 @@ resolve_matching_models <- function(process, declaration, registries) {
     if (is_model_schedule(x)) {
       x$model <- lapply(x$model, convert)
     } else {
-      x <-
-        convert(x)
+      x <- convert(x)
     }
     process[f] <- list(x)
   }

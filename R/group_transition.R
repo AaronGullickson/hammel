@@ -1,4 +1,4 @@
- # Construct and validate group-transition processes and household move rules.
+# Construct and validate group-transition processes and household move rules.
 
 # PUBLIC FUNCTIONS ---------------------------------------------------------
 
@@ -163,8 +163,10 @@ set_group_transition <- function(
 #' household(age_independence = 18)
 household <- function(age_independence = 18) {
   if (!is.numeric(age_independence) || length(age_independence) != 1L ||
-    !is.finite(age_independence) || age_independence < 0) {
-    stop("`age_independence` must be a finite nonnegative number of years.",
+        !is.finite(age_independence) ||
+        age_independence < 0) {
+    stop(
+      "`age_independence` must be a finite nonnegative number of years.",
       call. = FALSE
     )
   }
@@ -181,8 +183,9 @@ check_transition_group <- function(group) {
     return(NULL)
   }
   if (!is.character(group) || length(group) != 1L || is.na(group) ||
-      !nzchar(group)) {
-    stop("`group` must be NULL or the name of one declared group dimension.",
+        !nzchar(group)) {
+    stop(
+      "`group` must be NULL or the name of one declared group dimension.",
       call. = FALSE
     )
   }
@@ -201,8 +204,7 @@ transition_processes <- function(model) {
 store_transition_process <- function(model, process) {
   declaration <- model_groups(model)
   if (is.null(process$group) && length(declaration) == 1L) {
-    process$group <-
-      names(declaration)
+    process$group <- names(declaration)
   }
   if (is.null(process$group) && length(declaration) > 1L) {
     stop(
@@ -226,10 +228,13 @@ resolve_transition_processes <- function(processes, declaration) {
     return(list())
   }
   if (!length(declaration)) {
-    stop(paste0(
-      "Group transitions require a declared group ",
-      "dimension; use set_groups()."
-    ), call. = FALSE)
+    stop(
+      paste0(
+        "Group transitions require a declared group ",
+        "dimension; use set_groups()."
+      ),
+      call. = FALSE
+    )
   }
   dims <- names(declaration)
   resolved <- list()
@@ -238,36 +243,46 @@ resolve_transition_processes <- function(processes, declaration) {
     group <- x$group
     if (is.null(group)) {
       if (length(dims) != 1L) {
-        stop(paste0(
-          "A group transition without `group` needs exactly ",
-          "one declared group dimension."
-        ), call. = FALSE)
+        stop(
+          paste0(
+            "A group transition without `group` needs exactly ",
+            "one declared group dimension."
+          ),
+          call. = FALSE
+        )
       }
       group <- dims
     }
     if (!group %in% dims) {
-      stop(sprintf(
-        paste0(
-          "Group transitions use `%s`, which is not a declared ",
-          "group dimension."
+      stop(
+        sprintf(
+          paste0(
+            "Group transitions use `%s`, which is not a declared ",
+            "group dimension."
+          ),
+          group
         ),
-        group
-      ), call. = FALSE)
+        call. = FALSE
+      )
     }
     if (!is.null(resolved[[group]])) {
-      stop(sprintf("Group `%s` has more than one transition process.", group),
+      stop(
+        sprintf("Group `%s` has more than one transition process.", group),
         call. = FALSE
       )
     }
     x$group <- group
     if (group %in% names(x$rates)) {
-      stop(sprintf(
-        paste0(
-          "Transition rates for `%s` cannot be stratified by ",
-          "`%s` itself; use `origin`."
+      stop(
+        sprintf(
+          paste0(
+            "Transition rates for `%s` cannot be stratified by ",
+            "`%s` itself; use `origin`."
+          ),
+          group, group
         ),
-        group, group
-      ), call. = FALSE)
+        call. = FALSE
+      )
     }
     resolved[[group]] <- x
   }
@@ -295,28 +310,37 @@ validate_group_transition <- function(process) {
     c("origin", "destination", "sex", "union_type"),
     "Group-transition"
   )
-  if (validate_calendar_rates(r, function(x) {
-    copy <- process
-    copy$rates <- x
-    validate_group_transition(copy)
-  })) {
+  if (validate_calendar_rates(
+        r,
+        function(x) {
+       copy <- process
+       copy$rates <- x
+       validate_group_transition(copy)
+     }
+      )) {
     return(invisible(process))
   }
   check_columns(r, c("origin", "destination", "rate"), "rates")
   age <- all(c("age_start", "age_end") %in% names(r))
   dur <- all(c("dur_start", "dur_end") %in% names(r))
   if (!is.null(process$household) && dur) {
-    stop(paste0(
-      "Household moves need age bands: dependents reach ",
-      "their own clock at a set age."
-    ), call. = FALSE)
+    stop(
+      paste0(
+        "Household moves need age bands: dependents reach ",
+        "their own clock at a set age."
+      ),
+      call. = FALSE
+    )
   }
   if (!nrow(r) || age == dur ||
-    any(c("time_start", "time_end", "union_status", "marital_status") %in%
-      names(r)) ||
-    (age && any(c("dur_start", "dur_end") %in% names(r))) ||
-    (dur && any(c("age_start", "age_end") %in% names(r)))) {
-    stop("Use one common age or duration band type for all group transitions.",
+        any(
+          c("time_start", "time_end", "union_status", "marital_status") %in%
+            names(r)
+        ) ||
+        (age && any(c("dur_start", "dur_end") %in% names(r))) ||
+        (dur && any(c("age_start", "age_end") %in% names(r)))) {
+    stop(
+      "Use one common age or duration band type for all group transitions.",
       call. = FALSE
     )
   }
@@ -324,7 +348,8 @@ validate_group_transition <- function(process) {
     check_groups(data.frame(group = r[[column]]), column)
   }
   if (any(as.character(r$origin) == as.character(r$destination))) {
-    stop("Group transitions cannot have the same origin and destination.",
+    stop(
+      "Group transitions cannot have the same origin and destination.",
       call. = FALSE
     )
   }
@@ -333,42 +358,54 @@ validate_group_transition <- function(process) {
   check_numeric_column(start, "band start")
   check_numeric_column(r$rate, "rate")
   if (any(start < 0) || any(r$rate < 0) || !is.numeric(end) ||
-    !is.null(dim(end)) || anyNA(end) || any(end <= start)) {
-    stop(paste0(
-      "Transition rates and band starts must be ",
-      "nonnegative with valid band ends."
-    ), call. = FALSE)
+        !is.null(dim(end)) ||
+        anyNA(end) ||
+        any(end <= start)) {
+    stop(
+      paste0(
+        "Transition rates and band starts must be ",
+        "nonnegative with valid band ends."
+      ),
+      call. = FALSE
+    )
   }
-  if ("sex" %in% names(r) && (!is.character(r$sex) || anyNA(r$sex) || any(
-    !r$sex %in% c("m", "f")
-  ))) {
+  if ("sex" %in% names(r) &&
+        (!is.character(r$sex) || anyNA(r$sex) ||
+           any(!r$sex %in% c("m", "f")))) {
     stop("Transition sex must be m or f.", call. = FALSE)
   }
-  if ("union_type" %in% names(r) && (!is.character(r$union_type) ||
-    anyNA(r$union_type) ||
-    any(!r$union_type %in% c("unpartnered", "partnered", "cohab","marriage")) ||
-    ("partnered" %in% r$union_type && any(r$union_type %in%
-                                          c("cohab","marriage"))))) {
-    stop(paste0(
-      "Transition union_type must use ",
-      "unpartnered/partnered or unpartnered/cohab/marriage."
-    ), call. = FALSE)
+  if ("union_type" %in% names(r) &&
+        (!is.character(r$union_type) || anyNA(r$union_type) ||
+           any(
+             !r$union_type %in%
+                c("unpartnered", "partnered", "cohab","marriage")
+           ) ||
+           ("partnered" %in% r$union_type &&
+              any(r$union_type %in% c("cohab","marriage"))))) {
+    stop(
+      paste0(
+        "Transition union_type must use ",
+        "unpartnered/partnered or unpartnered/cohab/marriage."
+      ),
+      call. = FALSE
+    )
   }
   keys <- c(
     intersect(c("origin", "destination", "sex", "union_type"), names(r)),
     candidate_strata(r)
   )
-  strata <- do.call(interaction, c(lapply(r[keys], as.factor), list(
-    drop = TRUE,
-    lex.order = TRUE
-  )))
+  strata <- do.call(
+    interaction, c(
+      lapply(r[keys], as.factor), list(drop = TRUE, lex.order = TRUE)
+    )
+  )
   for (rows in split(seq_len(nrow(r)), strata)) {
     rows <- rows[order(start[rows])]
-    if (length(rows) > 1L && any(start[rows[-1L]] < head(cummax(end[rows]),
-      -1L))) {
-      stop("Group-transition bands must not overlap within a stratum.",
-        call. =
-          FALSE
+    if (length(rows) > 1L &&
+          any(start[rows[-1L]] < head(cummax(end[rows]), -1L))) {
+      stop(
+        "Group-transition bands must not overlap within a stratum.",
+        call. = FALSE
       )
     }
   }

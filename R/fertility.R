@@ -118,13 +118,15 @@ set_fertility <- function(
   weights = NULL,
   hetfert = NULL
 ) {
-  set_process(model, fertility(
-    rates = rates,
-    birth_interval = birth_interval,
-    ffab = ffab,
-    weights = weights,
-    hetfert = hetfert
-  ))
+  set_process(
+    model, fertility(
+      rates = rates,
+      birth_interval = birth_interval,
+      ffab = ffab,
+      weights = weights,
+      hetfert = hetfert
+    )
+  )
 }
 
 # HELPER FUNCTIONS ---------------------------------------------------------
@@ -139,12 +141,14 @@ set_fertility <- function(
 # the year are not reported. Returns one row per unreachable age range.
 unreachable_parity_cells <- function(rates, interval) {
   empty <- data.frame(
-    group = character(), parity = numeric(),
+    group = character(),
+    parity = numeric(),
     age_start = numeric(),
-    age_end = numeric(), earliest_eligible = numeric()
+    age_end = numeric(),
+    earliest_eligible = numeric()
   )
-  if (!all(c("parity_start", "parity_end") %in% names(rates)) || !(interval >
-    0)) {
+  if (!all(c("parity_start", "parity_end") %in% names(rates)) ||
+        !(interval > 0)) {
     return(empty)
   }
   out <- list()
@@ -165,10 +169,12 @@ unreachable_parity_cells <- function(rates, interval) {
       NA_character_
     }
     starts <- sort(unique(rates$parity_start[rows]))
-    ends <- vapply(starts, function(k) rates$parity_end[rows][match(
-      k,
-      rates$parity_start[rows]
-    )], 0)
+    ends <- vapply(
+      starts, function(k) rates$parity_end[rows][match(
+        k,
+        rates$parity_start[rows]
+      )], 0
+    )
     # earliest age at which a woman at the current parity is eligible
     eligible <- 0
     for (b in seq_along(starts)) {
@@ -180,8 +186,10 @@ unreachable_parity_cells <- function(rates, interval) {
           lo <- at_k$age_start[i]
           if (!is.finite(eligible)) {
             out[[length(out) + 1L]] <- data.frame(
-              group = group, parity = k,
-              age_start = lo, age_end = at_k$age_end[i],
+              group = group,
+              parity = k,
+              age_start = lo,
+              age_end = at_k$age_end[i],
               earliest_eligible = Inf
             )
             next
@@ -191,14 +199,14 @@ unreachable_parity_cells <- function(rates, interval) {
           end <- if (at_k$age_end[i] <= eligible) {
             at_k$age_end[i]
           } else {
-            floor(
-              eligible
-            )
+            floor(eligible)
           }
           if (end > lo) {
             out[[length(out) + 1L]] <- data.frame(
               group = group,
-              parity = k, age_start = lo, age_end = end,
+              parity = k,
+              age_start = lo,
+              age_end = end,
               earliest_eligible = eligible
             )
           }
@@ -241,43 +249,42 @@ warn_unreachable_parity_cells <- function(rates, interval) {
     return(invisible(cells))
   }
   keys <- unique(cells[c("group", "parity")])
-  parts <- vapply(seq_len(nrow(keys)), function(i) {
-    d <- cells[(is.na(cells$group) & is.na(keys$group[i]) | cells$group %in%
-      keys$group[i]) &
-      cells$parity == keys$parity[i], ]
-    sprintf(
-      "%sparity %g at ages [%g, %g)%s",
-      if (is.na(keys$group[i])) {
-        ""
-      } else {
-        paste0(
-          "group ", keys$group[i],
-          ", "
-        )
-      },
-      keys$parity[i], min(d$age_start), max(d$age_end),
-      if (is.finite(d$earliest_eligible[1])) {
-        sprintf(" (earliest eligible age %g)", d$earliest_eligible[1])
-      } else {
-        " (unreachable at any age)"
-      }
-    )
-  }, character(1))
+  parts <- vapply(
+    seq_len(nrow(keys)), function(i) {
+      d <- cells[(is.na(cells$group) & is.na(keys$group[i]) | cells$group %in%
+        keys$group[i]) &
+        cells$parity == keys$parity[i], ]
+      sprintf(
+        "%sparity %g at ages [%g, %g)%s",
+        if (is.na(keys$group[i])) {
+          ""
+        } else {
+          paste0("group ", keys$group[i], ", ")
+        },
+        keys$parity[i], min(d$age_start), max(d$age_end),
+        if (is.finite(d$earliest_eligible[1])) {
+          sprintf(" (earliest eligible age %g)", d$earliest_eligible[1])
+        } else {
+          " (unreachable at any age)"
+        }
+      )
+    }, character(1)
+  )
   shown <- head(parts, 5)
   if (length(parts) > 5) {
-    shown <- c(shown, sprintf("and %d more", length(
-      parts
-    ) - 5))
+    shown <- c(shown, sprintf("and %d more", length(parts) - 5))
   }
   warning(
-    sprintf(paste0(
-      "With `birth_interval` = %g, some positive parity-specific ",
+    sprintf(
       paste0(
-        "fertility rates fall in one-year age cells where ",
-        "no woman can be eligible, so "
-      ),
-      "those births cannot occur: %s."
-    ), interval, paste(shown, collapse = "; ")),
+        "With `birth_interval` = %g, some positive parity-specific ",
+        paste0(
+          "fertility rates fall in one-year age cells where ",
+          "no woman can be eligible, so "
+        ),
+        "those births cannot occur: %s."
+      ), interval, paste(shown, collapse = "; ")
+    ),
     call. = FALSE
   )
   invisible(cells)
@@ -285,9 +292,12 @@ warn_unreachable_parity_cells <- function(rates, interval) {
 
 validate_ffab <- function(probability) {
   if (!is.numeric(probability) || !is.null(dim(probability)) ||
-    length(probability) != 1L || !is.finite(probability) ||
-    probability < 0 || probability > 1) {
-    stop("`ffab` must be a finite numeric probability in [0, 1].",
+        length(probability) != 1L ||
+        !is.finite(probability) ||
+        probability < 0 ||
+        probability > 1) {
+    stop(
+      "`ffab` must be a finite numeric probability in [0, 1].",
       call. = FALSE
     )
   }
@@ -295,10 +305,12 @@ validate_ffab <- function(probability) {
 }
 
 validate_birth_interval <- function(duration) {
-  if (!is.numeric(duration) || !is.null(dim(duration)) || length(duration) !=
-    1L ||
-    !is.finite(duration) || duration < 0) {
-    stop("`birth_interval` must be a finite nonnegative number of years.",
+  if (!is.numeric(duration) || !is.null(dim(duration)) ||
+        length(duration) != 1L ||
+        !is.finite(duration) ||
+        duration < 0) {
+    stop(
+      "`birth_interval` must be a finite nonnegative number of years.",
       call. = FALSE
     )
   }

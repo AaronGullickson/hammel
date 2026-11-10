@@ -25,10 +25,7 @@
 #'     age_end = Inf, rate = c(0.01, 0.008)
 #'   ))
 hammel_model <- function() {
-  structure(
-    list(population = NULL, processes = list()),
-    class = "hammel_model"
-  )
+  structure(list(population = NULL, processes = list()), class = "hammel_model")
 }
 
 #' Set the starting population of a Hammel model
@@ -61,10 +58,7 @@ set_population <- function(model, population) {
   validate_population(population)
   # A declaration made with set_groups() replaces the population's own.
   if (!is.null(model$groups)) {
-    population <- apply_group_declaration(
-      population,
-      model$groups
-    )
+    population <- apply_group_declaration(population, model$groups)
   }
   population <- normalize_population_transitions(population)
   population <- normalize_population_ancestry(population)
