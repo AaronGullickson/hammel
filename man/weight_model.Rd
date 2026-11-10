@@ -11,83 +11,102 @@ weight_model(formula = NULL, coefficients = numeric(), fun = NULL)
 
 \item{coefficients}{A finite named numeric vector of log hazard ratios.}
 
-\item{fun}{A custom function returning log weights, instead of \code{formula}.
-
-\strong{Calendar schedules.} A process's \code{weights} may instead be a tibble with
-numeric \code{time_start}, \code{time_end} and a list column \code{model} of weight models,
-as for matching and inheritance model schedules. Half-open intervals must not
-overlap and must cover the run; all models in a schedule must be formulas or
-all custom functions. The model active at an instant applies; switching
-models changes only who is chosen within cells, not event clocks or cell
-intensities. A formula with zero coefficients turns weighting off for an
-interval.}
+\item{fun}{A custom function returning log weights, instead of \code{formula}.}
 }
 \value{
 A \code{hammel_weight_model}. This specifies a model; it does not estimate
 one.
 }
 \description{
-A weight model decides which member of a rate cell experiences an event,
-without changing the cell's input intensity. The cell produces events at its
-input rate times its members; each event goes to member \code{i} with probability
-\code{w_i / sum(w)}, where \code{w_i = exp(eta_i)}. With a formula, \code{eta_i} is the
-linear predictor \code{x_i \%*\% beta}, so \code{exp(beta)} is the hazard ratio between
-two members of the same cell that differ by one unit in a term. Population
-level effects can be smaller where cells are small or homogeneous.
+Create a \code{weight_model} that will be used to generate weights for determining
+which individuals/units experience an event.
 }
 \details{
+A weight model decides which member of a rate cell experiences an event,
+without changing the cell's input intensity and thus the input rates. The
+cell produces events at its input rate times its members; each event goes to
+member \code{i} with probability \code{w_i / sum(w)}, where \code{w_i = exp(eta_i)}.
+
+With a formula, \code{eta_i} is the linear predictor \code{x_i \%*\% beta}, so
+\code{exp(beta)} is the hazard ratio between two members of the same cell that
+differ by one unit in a term. Users can therefore create proportional hazards
+models, without affecting overall input rates. Population level effects can
+be smaller where cells are small or homogeneous.
+
 Attach a weight model with the \code{weights} argument of \code{\link[=set_mortality]{set_mortality()}},
 \code{\link[=set_fertility]{set_fertility()}}, \code{\link[=set_union_dissolution]{set_union_dissolution()}}, \code{\link[=set_group_transition]{set_group_transition()}} and
-\code{\link[=set_union_formation]{set_union_formation()}} (searches), or \code{weights_conversion} of
-\code{\link[=set_union_formation]{set_union_formation()}}.
+\code{\link[=set_union_formation]{set_union_formation()}}, or \code{weights_conversion} of \code{\link[=set_union_formation]{set_union_formation()}}.
+}
+\section{Variables}{
+ Group variables are named by the declared group
+dimensions (see \code{\link[=set_groups]{set_groups()}}); for a dimension \code{race} with categories A
+and B.
 
-\strong{Variables.} Group variables are named by the declared group dimensions
-(see \code{\link[=set_groups]{set_groups()}}); for a dimension \code{race} with categories A and B:
 Mortality, fertility and group transitions are person processes and may use
 \code{sex} (\code{"f"}, \code{"m"}), \code{race}, \code{union_type} (\code{"unpartnered"}, \code{"cohab"},
 \code{"marriage"}), \code{partnered} (0/1), \code{parity} (births; 0 for men),
 \code{previous_union} (\code{"none"}, \code{"separated"}, \code{"widowed"}), \code{partner_race} (NA
 when unpartnered) and, when the dimension tracks ancestry, shares
-\code{ancestry_race_A} and \code{ancestry_race_unknown}. Group transitions may also use
-\code{destination}, the destination of the risk in the transition's dimension.
+\code{ancestry_race_A} and \code{ancestry_race_unknown}. Group transitions may also
+use \code{destination}, the destination of the risk in the transition's
+dimension.
+
 Dissolution and conversion are union processes and may use \code{race_w},
 \code{race_h}, \code{parity_w}, \code{previous_union_w}, \code{previous_union_h},
-\code{ancestry_race_A_w}, \code{ancestry_race_A_h}, \code{same_race} (0/1), \code{age_difference}
-(husband's age minus wife's age) and \code{union_type} (\code{"cohab"}, \code{"marriage"}).
-All variables change only at events. The first listed level of each
-categorical variable is its reference; for a group dimension it is its first
-category (declared, or first in the population).
+\code{ancestry_race_A_w}, \code{ancestry_race_A_h}, \code{same_race} (0/1),
+\code{age_difference} (husband's age minus wife's age) and \code{union_type}
+(\code{"cohab"}, \code{"marriage"}).
 
-\strong{Formulas.} Terms are main effects of these variables and interactions (\code{:}
-or \code{*}); transformations such as \code{I()} are not supported (use \code{fun}).
-Categorical variables use treatment coding, and \code{coefficients} must be named
-exactly as the corresponding model-matrix columns, for example \code{raceB} or
-\code{union_typecohab}. A group-valued variable's levels are its dimension's
-categories. Group variable names and their coefficients are checked when the
-model meets the group declaration at simulation; other names are checked when
-the model is set. The intercept has no effect. A term whose variable is
-missing (such as \code{partner_race} for an unpartnered person) contributes zero,
-with a warning.
-
-\strong{Custom functions.} \code{fun(members, bin)} receives a tibble with one row per
-eligible member of the chosen cell, holding the variables above for every
-declared dimension (with labels for categorical variables) and identifiers
-(\code{person_id}, or \code{union_id}, \code{wife_id} and \code{husband_id}), and a list \code{bin}
-describing the cell: its \code{process}, strata (each dimension's category, or
-\verb{<dim>_w}/\verb{<dim>_h} for union processes, NA when the rates do not stratify by
-it; \code{origin} and \code{destination} for transitions), band (\code{age_start}/\code{age_end}
-or \code{dur_start}/\code{dur_end}) and the active rate period \code{time_start}/\code{time_end}
-(NA for static rates). Exact ages and times are not passed. It must return
-one finite log weight per row; NA gives zero, with a warning. It shares the
-simulation's random-number stream and cannot change simulation state. In
-fertility with weighted matching calibration, the function is evaluated at
-every refresh of every woman, which can be slow.
+The first listed level of each categorical variable is its reference; for a
+group dimension it is its first category (declared, or first in the
+population).
 }
+
+\section{Formulas}{
+ Terms are main effects of these variables and interactions
+(\code{:} or \code{*}); transformations such as \code{I()} are not supported (use \code{fun}).
+Categorical variables use treatment coding, and \code{coefficients} must be
+named exactly as the corresponding model-matrix columns, for example
+\code{raceB} or \code{union_typecohab}.
+}
+
+\section{Custom functions}{
+ Instead of using a formula, users can create a
+custom function with \code{fun}. \code{fun(members, bin)} receives a tibble with one
+row per eligible member of the chosen cell, holding the variables above for
+every declared dimension (with labels for categorical variables) and
+identifiers (\code{person_id}, or \code{union_id}, \code{wife_id} and \code{husband_id}), and a
+list \code{bin} describing the cell: its \code{process}, strata (each dimension's
+category, or \verb{<dim>_w}/\verb{<dim>_h} for union processes, NA when the rates do
+not stratify by it; \code{origin} and \code{destination} for transitions), band
+(\code{age_start}/\code{age_end} or \code{dur_start}/\code{dur_end}) and the active rate period
+\code{time_start}/\code{time_end} (NA for static rates). Exact ages and times are not
+passed. In fertility with weighted matching calibration, the function is
+evaluated at every refresh of every woman, which can be slow.
+}
+
+\section{Time-varying weights}{
+ A process's \code{weights} may instead be a tibble
+with numeric \code{time_start}, \code{time_end} and a list column \code{model} of weight
+models, as for matching and inheritance model schedules.
+}
+
 \examples{
-# Illustrative coefficients, not demographic defaults.
-partnered_mortality <- weight_model(~partnered, c(partnered = log(0.8)))
+# allow mortality to be 10\% lower for individuals with partners
+partnered_mortality <- weight_model(~partnered, c(partnered = log(0.9)))
+
+# allow dissolution rates to change by 5\% per year increase in partner
+# age differences - not in absolute terms which would require the custom
+# function
 gap_dissolution <- weight_model(
   ~age_difference,
   c(age_difference = log(1.05))
+)
+# like previous example but use custom function to get absolute age
+# difference
+gap_dissolution <- weight_model(
+  fun = function(members, bin) {
+    log(1.05) * abs(members$age_difference)
+  }
 )
 }
