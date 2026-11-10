@@ -63,5 +63,5 @@ diss_rates <- data.frame(
   dur_start = c(0, 5), dur_end = c(5, Inf),
   rate = c(0.04, 0.02)
 )
-model <- hammel_model() |> set_union_dissolution(rates)
+model <- hammel_model() |> set_union_dissolution(diss_rates)
 }
