@@ -28,28 +28,21 @@ Specifically, we will reproduce the simulation with an uneven starting group siz
 
 We will use static fertility and mortality rates from the USA in 2000. Union formation will use the "on  demand" model, so we do not need to specify rates of marriage.
 
-```{r}
-#| label: get-vital-rates
-
-mortality_rates <- get_mortality_hmd("USA", 2000)
-fertility_rates <- get_fertility_hfd("USA", 2000)
-```
-
 We also need to set up models of inheritance and group exogamy that can change over time. We can do this by setting up "list tibbles" with `time_start` and `time_end` columns to handle change over time.
 
 For this simulation, we will include the burn-in period as part of the same simulation. So, for the first 100 years of the simulation, we will disallow group exogamy. We will then start with a very low group exogamy value of -5. The group exogamy value should produce a log-odds ratio of intermarriage double that size. So, a starting value of -5 corresponds to a log odds ratio of intermarriage of -10, which is similar to that observed historically between White and Black populations in the USA. 
 
 We then allow the absolute value of the group exogamy parameter to decline by 0.25 every five years until it stops declining after 50 years at a value of -2.5. It then holds constant at -2.5 for the remainder of the simulation.
 
-We can set up a specific matching model for a given time period with the needed parameters by using `create_age_gap_matching_model` where we also apply a preferred two-year age gap between husbands and wives. To create time variation, we put all of our models into a list and then add it as a column of a tibble that contains the `time_start` and `time_end` columns. 
+We can set up a specific matching model for a given time period with the needed parameters by using `age_gap_matching_model` where we also apply a preferred two-year age gap between husbands and wives. To create time variation, we put all of our models into a list and then add it as a column of a tibble that contains the `time_start` and `time_end` columns. 
 
 ```{r}
 #| label: setup-matching-models
 
-m <- list(create_age_gap_matching_model(2, 5, group_exogamy = NA))
+m <- list(age_gap_matching_model(2, 5, group_exogamy = NA))
 lodds <- -5
 for (i in 1:11) {
-  m[[length(m) + 1L]] <- create_age_gap_matching_model(
+  m[[length(m) + 1L]] <- age_gap_matching_model(
     2, 5,
     group_exogamy = c("A:B" = lodds, "A:AB" = lodds / 2, "B:AB" = lodds / 2)
   )
@@ -74,8 +67,8 @@ inheritance_models <- tibble(
   time_start = c(0, 100),
   time_end   = c(100, Inf),
   model      = list(
-    create_group_inheritance("random_parent"),
-    create_group_inheritance(
+    group_inheritance("random_parent"),
+    group_inheritance(
       "custom",
       fun = function(child_ancestry, mother_group, father_group, ...) {
         # Same identity or missing father: follow mother
@@ -110,8 +103,11 @@ We will use uneven starting groups of A (85%) and B (15%).
 
 ```{r}
 #| label: set-base-pop
-pop <- create_baseline_population(200000, end_time = 0,
-                                  groups = list(race = c("A" = 0.85, "B" = 0.15)))
+pop <- generate_uniform_population(
+  200000, 
+  end_time = 0,
+  groups = list(race = c("A" = 0.85, "B" = 0.15))
+)
 ```
 
 In this case, the 100 year run-in to produce a stable population is included already in the input objects. So, we just need to run the simulation for 300 years to produce the desired result. Note that because I set `end_time = 0` in the baseline population, all of our time increments count up from zero.
@@ -121,13 +117,13 @@ In this case, the 100 year run-in to produce a stable population is included alr
 
 model <- hammel_model() |>
   set_population(pop) |>
-  set_mortality(mortality_rates) |>
-  set_fertility(fertility_rates) |>
+  set_mortality(usa_2000_mortality) |>
+  set_fertility(usa_2000_fertility) |>
   set_groups(race = group(categories = c("A", "B", "AB"), ancestry = TRUE,
                           inheritance = inheritance_models)) |>
   set_union_formation("on_demand", matching = matching_models)
 
-runtime <- system.time(pop_final <- simulate(model, 300, 42))
+runtime <- system.time(pop_final <- run_simulation(model, 300, 42))
 ```
 
 The simulation takes `r runtime[["elapsed"]]` seconds to run.
@@ -309,14 +305,14 @@ trans_rates <- tribble(
 
 model <- hammel_model() |>
   set_population(pop) |>
-  set_mortality(mortality_rates) |>
-  set_fertility(fertility_rates) |>
+  set_mortality(usa_2000_mortality) |>
+  set_fertility(usa_2000_fertility) |>
   set_groups(race = group(categories = c("A", "B", "AB"), ancestry = TRUE,
                           inheritance = inheritance_models)) |>
   set_union_formation("on_demand", matching = matching_models) |>
   set_group_transition(trans_rates)
 
-runtime <- system.time(pop_final <- simulate(model, 300, 42))
+runtime <- system.time(pop_final <- run_simulation(model, 300, 42))
 ```
 
 ```{r}
@@ -343,7 +339,7 @@ temp <- calculate_transition_rates(
   pop_final,
   time_breaks = c(0, 100, 200, 300),
   age_breaks = c(15, 20),
-  conf.level = 0.95
+  conf_level = 0.95
 ) |>
   filter(origin == "AB", age_start == 15) |>
   select(time_start, time_end, age_start, age_end, origin, destination, 
