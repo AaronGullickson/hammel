@@ -46,7 +46,7 @@ test_that("union processes construct and replace without modifying other process
   expect_null(model$processes$union_formation)
   expect_identical(updated$processes$fertility, model$processes$fertility)
   expect_identical(updated, set_union_formation(model, "rate", matching, rates = rates))
-  replaced <- set_union_formation(updated, "on_demand", matching)
+  replaced <- set_union_formation(updated, "on_demand", matching = matching)
   expect_null(replaced$processes$union_formation$rates)
   expect_identical(replaced$processes$fertility, model$processes$fertility)
   edited <- process
@@ -60,8 +60,8 @@ test_that("union processes construct and replace without modifying other process
 test_that("union process validation and execution boundaries are explicit", {
   matching <- matching_model(~ age_difference, c(age_difference = 0))
   rates <- data.frame(age_start = 18, age_end = Inf, rate = 0.1)
-  expect_error(union_formation("other", matching))
-  expect_error(union_formation("rate", matching))
+  expect_error(union_formation("other", matching = matching))
+  expect_error(union_formation("rate", matching = matching))
   expect_error(union_formation("on_demand", matching, rates = rates))
   expect_error(union_formation("rate", matching, rates = rbind(rates, rates)))
   model <- hammel_model() |>
@@ -77,12 +77,12 @@ test_that("union process validation and execution boundaries are explicit", {
 
 test_that("minimum male age defaults to 15 and is configurable and revalidated", {
   matching <- matching_model(~ age_difference, c(age_difference = 0))
-  expect_equal(union_formation("on_demand", matching)$min_male_age, 15)
-  model <- set_union_formation(hammel_model(), "on_demand", matching, min_male_age = 16.5)
+  expect_equal(union_formation("on_demand", matching = matching)$min_male_age, 15)
+  model <- set_union_formation(hammel_model(), "on_demand", matching = matching, min_male_age = 16.5)
   expect_equal(model$processes$union_formation$min_male_age, 16.5)
-  expect_equal(union_formation("on_demand", matching, min_male_age = 0)$min_male_age, 0)
+  expect_equal(union_formation("on_demand", matching = matching, min_male_age = 0)$min_male_age, 0)
   for (age in list(NULL, NA_real_, Inf, -1, "15", c(15, 16), matrix(15))) {
-    expect_error(union_formation("on_demand", matching, min_male_age = age), "min_male_age")
+    expect_error(union_formation("on_demand", matching = matching, min_male_age = age), "min_male_age")
     edited <- model$processes$union_formation
     edited$min_male_age <- age
     expect_error(set_process(hammel_model(), edited), "min_male_age")

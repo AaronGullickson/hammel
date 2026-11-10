@@ -199,13 +199,13 @@ weighted_model <- function(population, initiation = "on_demand",
   identity(if (initiation == "on_demand") {
     model |>
       set_fertility(data.frame(age_start = 15, age_end = 45, rate = 0.12)) |>
-      set_union_formation("on_demand", matching, father_matching = father_matching, ...)
+      set_union_formation("on_demand", matching = matching, father_matching = father_matching, rates = ...)
   } else {
     model |>
       set_fertility(data.frame(age_start = 15, age_end = 45, rate = c(0.15, 0.05),
                                union_type = c("partnered", "unpartnered"))) |>
       set_union_formation("rate", matching, rates = data.frame(age_start = 15, age_end = 50, rate = 0.15),
-                          father_matching = father_matching, ...)
+                          father_matching = father_matching, min_male_age = ...)
   })
 }
 
@@ -307,7 +307,7 @@ test_that("removed method arguments are rejected and delta inputs validated", {
   expect_error(matching_model(~ 1, numeric(), imbalance_absorption = 1), "unused argument")
   edited <- age_gap_matching_model(0, 5)
   edited$delta <- c(B = Inf)
-  expect_error(union_formation("on_demand", edited), "delta")
+  expect_error(union_formation("on_demand", matching = edited), "delta")
   expect_error(prepare_matching_model(matching_model(~ 1, numeric(), delta = c(X = 1)),
                                       c("A", "B")), "delta")
   expect_error(prepare_matching_model(matching_model(~ 1, numeric(), delta = c(A = 1))), "delta")
@@ -359,7 +359,7 @@ test_that("weighted choice handles identities created during the run", {
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)) |>
     set_fertility(data.frame(age_start = 15, age_end = 45, rate = 0.15)) |> set_inheritance(rule, extra = "AB") |>
     set_union_formation("on_demand",
-      age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1, "A:AB" = -0.5, "B:AB" = -0.5)),
+      matching = age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1, "A:AB" = -0.5, "B:AB" = -0.5)),
       diagnostics = TRUE)
   expect_no_warning(result <- run_simulation(model, 40, seed = 913))
   expect_identical(result, run_simulation(model, 40, seed = 913))

@@ -96,11 +96,11 @@ test_that("a father's death removes him from later nonmarital choices", {
 
 test_that("father_matching defaults to the general model and validates edited objects", {
   general <- matching_model(~ age_difference, c(age_difference = 0.1))
-  process <- union_formation("on_demand", general)
+  process <- union_formation("on_demand", matching = general)
   expect_null(process$father_matching)
-  expect_identical(union_formation("on_demand", general, father_matching = general)$father_matching,
+  expect_identical(union_formation("on_demand", matching = general, father_matching = general)$father_matching,
                    general)
-  expect_error(union_formation("on_demand", general, father_matching = "invalid"), "matching")
+  expect_error(union_formation("on_demand", matching = general, father_matching = "invalid"), "matching")
   model <- make_nonmarital_model(3)
   model$population$persons$birth_time[3] <- -30
   model$processes$union_formation$matching <- general

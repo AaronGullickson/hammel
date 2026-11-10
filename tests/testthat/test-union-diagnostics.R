@@ -1,10 +1,10 @@
 test_that("diagnostics validate and pass through the setter", {
   matching <- matching_model(~ age_difference, c(age_difference = 0))
-  expect_false(union_formation("on_demand", matching)$diagnostics)
-  expect_true(set_union_formation(hammel_model(), "on_demand", matching,
+  expect_false(union_formation("on_demand", matching = matching)$diagnostics)
+  expect_true(set_union_formation(hammel_model(), "on_demand", matching = matching,
     diagnostics = TRUE)$processes$union_formation$diagnostics)
   for (bad in list(NULL, NA, 1, c(TRUE, FALSE), "yes")) {
-    expect_error(union_formation("on_demand", matching, diagnostics = bad), "diagnostics")
+    expect_error(union_formation("on_demand", matching = matching, diagnostics = bad), "diagnostics")
     model <- make_model(0)
     model$processes$union_formation$diagnostics <- bad
     expect_error(run_simulation(model, 0), "diagnostics")

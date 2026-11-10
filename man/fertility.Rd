@@ -9,8 +9,8 @@ fertility(
   rates,
   birth_interval = 0.75,
   ffab = 0.4886,
-  hetfert = NULL,
-  weights = NULL
+  weights = NULL,
+  hetfert = NULL
 )
 
 set_fertility(
@@ -18,8 +18,8 @@ set_fertility(
   rates,
   birth_interval = 0.75,
   ffab = 0.4886,
-  hetfert = NULL,
-  weights = NULL
+  weights = NULL,
+  hetfert = NULL
 )
 }
 \arguments{
@@ -36,13 +36,13 @@ fertility above.}
 \item{ffab}{Probability that a newborn is female, default \code{0.4886}. Must be a
 finite numeric scalar in \verb{[0, 1]}.}
 
-\item{hetfert}{NULL (default) for uniform mother selection, or a \code{\link[=het_fert]{het_fert()}}
-specification for persistent lognormal selection weights.}
-
 \item{weights}{NULL (default) for unweighted selection within rate cells, or
 a \code{\link[=weight_model]{weight_model()}} specification. Weights choose which member of a cell
 experiences an event without changing the cell's input rate. They combine
 with \code{hetfert} on the log scale.}
+
+\item{hetfert}{NULL (default) for uniform mother selection, or a \code{\link[=het_fert]{het_fert()}}
+specification for persistent lognormal selection weights.}
 
 \item{model}{A \code{hammel_model} object, used by \code{set_fertility()}.}
 }

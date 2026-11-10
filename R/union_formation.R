@@ -168,19 +168,19 @@
 #' @export
 union_formation <- function(
   initiation,
-  matching = age_gap_matching_model(0, 5),
   rates = NULL,
+  matching = age_gap_matching_model(0, 5),
+  father_matching = NULL,
+  cohab_matching = NULL,
+  cohab_prob = NULL,
+  union_convert_rate = NULL,
+  weights = NULL,
+  weights_conversion = NULL,
   min_male_age = 15,
   kinship_generations = 2,
-  father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
-  diagnostics = FALSE,
-  cohab_prob = NULL,
-  cohab_matching = NULL,
-  union_convert_rate = NULL,
   cohabitation_counts_as_previous_union = FALSE,
-  weights_conversion = NULL,
-  weights = NULL
+  diagnostics = FALSE
 ) {
   process <- structure(list(
     name = "union_formation", initiation = initiation, matching = matching,
@@ -242,30 +242,36 @@ union_formation <- function(
 set_union_formation <- function(
   model,
   initiation,
-  matching = age_gap_matching_model(0, 5),
   rates = NULL,
+  matching = age_gap_matching_model(0, 5),
+  father_matching = NULL,
+  cohab_matching = NULL,
+  cohab_prob = NULL,
+  union_convert_rate = NULL,
+  weights = NULL,
+  weights_conversion = NULL,
   min_male_age = 15,
   kinship_generations = 2,
-  father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
-  diagnostics = FALSE,
-  cohab_prob = NULL,
-  cohab_matching = NULL,
-  union_convert_rate = NULL,
   cohabitation_counts_as_previous_union = FALSE,
-  weights_conversion = NULL,
-  weights = NULL
+  diagnostics = FALSE
 ) {
   set_process(model, union_formation(
-    initiation, matching, rates,
-    min_male_age, kinship_generations,
-    father_matching,
-    cancel_birth_if_no_match, diagnostics,
-    cohab_prob, cohab_matching,
-    union_convert_rate,
-    cohabitation_counts_as_previous_union,
-    weights_conversion,
-    weights
+    initiation = initiation,
+    rates = rates,
+    matching = matching,
+    father_matching = father_matching,
+    cohab_matching = cohab_matching,
+    cohab_prob = cohab_prob,
+    union_convert_rate = union_convert_rate,
+    weights = weights,
+    weights_conversion = weights_conversion,
+    min_male_age = min_male_age,
+    kinship_generations = kinship_generations,
+    cancel_birth_if_no_match = cancel_birth_if_no_match,
+    cohabitation_counts_as_previous_union =
+      cohabitation_counts_as_previous_union,
+    diagnostics = diagnostics
   ))
 }
 

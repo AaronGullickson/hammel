@@ -110,8 +110,8 @@ fertility <- function(
   rates,
   birth_interval = 0.75,
   ffab = 0.4886,
-  hetfert = NULL,
-  weights = NULL
+  weights = NULL,
+  hetfert = NULL
 ) {
   validate_rates(rates, mortality = FALSE)
   validate_process_weights(weights, "person")
@@ -139,13 +139,15 @@ set_fertility <- function(
   rates,
   birth_interval = 0.75,
   ffab = 0.4886,
-  hetfert = NULL,
-  weights = NULL
+  weights = NULL,
+  hetfert = NULL
 ) {
-  set_process(model, fertility(rates,
+  set_process(model, fertility(
+    rates = rates,
     birth_interval = birth_interval,
-    ffab = ffab, hetfert = hetfert,
-    weights = weights
+    ffab = ffab,
+    weights = weights,
+    hetfert = hetfert
   ))
 }
 

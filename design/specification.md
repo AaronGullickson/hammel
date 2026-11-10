@@ -68,7 +68,7 @@ model <- hammel_model() |>
   set_mortality(mortality_rates) |>
   set_fertility(fertility_rates, birth_interval = 0.75) |>
   set_union_formation("on_demand",
-    matching_model(~ age_difference, c(age_difference = 0)))
+    matching = matching_model(~ age_difference, c(age_difference = 0)))
 
 result <- run_simulation(model, years = 10, seed = 123)
 ```

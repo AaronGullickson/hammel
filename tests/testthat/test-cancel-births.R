@@ -1,10 +1,10 @@
 test_that("failed-match cancellation defaults on and validates logical scalars", {
   matching <- matching_model(~ age_difference, c(age_difference = 0))
-  expect_true(union_formation("on_demand", matching)$cancel_birth_if_no_match)
-  expect_false(union_formation("on_demand", matching,
+  expect_true(union_formation("on_demand", matching = matching)$cancel_birth_if_no_match)
+  expect_false(union_formation("on_demand", matching = matching,
     cancel_birth_if_no_match = FALSE)$cancel_birth_if_no_match)
   for (bad in list(NULL, NA, 0, 1, "TRUE", c(TRUE, FALSE), matrix(TRUE))) {
-    expect_error(union_formation("on_demand", matching, cancel_birth_if_no_match = bad),
+    expect_error(union_formation("on_demand", matching = matching, cancel_birth_if_no_match = bad),
                  "cancel_birth_if_no_match")
     model <- make_model(0)
     process <- model$processes$union_formation
@@ -90,7 +90,7 @@ test_that("default cancellation covers samples rejected by eligibility in both m
           rates = data.frame(age_start = 0, age_end = Inf, rate = 0))
         model <- set_fertility(model, data.frame(union_type = c("partnered", "unpartnered"),
           age_start = 15, age_end = 50, rate = 20), 0)
-      } else model <- set_union_formation(model, "on_demand", matching)
+      } else model <- set_union_formation(model, "on_demand", matching = matching)
       expect_true(model$processes$union_formation$cancel_birth_if_no_match)
       result <- run_simulation(model, 0.5, seed = 52)
       expect_equal(result$simulation$births, 0)

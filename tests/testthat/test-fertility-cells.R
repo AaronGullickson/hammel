@@ -162,7 +162,7 @@ test_that("cell mode runs with groups, union types, cohabitation, matching and r
   od <- hammel_model() |> set_population(base) |> set_mortality(mort) |>
     set_fertility(fert) |>
     set_union_formation("on_demand",
-      matching_model(~ age_difference, c(age_difference = -.1), group_exogamy = c("A:B" = -1)))
+      matching = matching_model(~ age_difference, c(age_difference = -.1), group_exogamy = c("A:B" = -1)))
   expect_gt(run_simulation(od, 5, seed = 53)$simulation$births, 0)
 })
 

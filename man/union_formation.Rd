@@ -7,51 +7,42 @@
 \usage{
 union_formation(
   initiation,
-  matching = age_gap_matching_model(0, 5),
   rates = NULL,
+  matching = age_gap_matching_model(0, 5),
+  father_matching = NULL,
+  cohab_matching = NULL,
+  cohab_prob = NULL,
+  union_convert_rate = NULL,
+  weights = NULL,
+  weights_conversion = NULL,
   min_male_age = 15,
   kinship_generations = 2,
-  father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
-  diagnostics = FALSE,
-  cohab_prob = NULL,
-  cohab_matching = NULL,
-  union_convert_rate = NULL,
   cohabitation_counts_as_previous_union = FALSE,
-  weights_conversion = NULL,
-  weights = NULL
+  diagnostics = FALSE
 )
 
 set_union_formation(
   model,
   initiation,
-  matching = age_gap_matching_model(0, 5),
   rates = NULL,
+  matching = age_gap_matching_model(0, 5),
+  father_matching = NULL,
+  cohab_matching = NULL,
+  cohab_prob = NULL,
+  union_convert_rate = NULL,
+  weights = NULL,
+  weights_conversion = NULL,
   min_male_age = 15,
   kinship_generations = 2,
-  father_matching = NULL,
   cancel_birth_if_no_match = TRUE,
-  diagnostics = FALSE,
-  cohab_prob = NULL,
-  cohab_matching = NULL,
-  union_convert_rate = NULL,
   cohabitation_counts_as_previous_union = FALSE,
-  weights_conversion = NULL,
-  weights = NULL
+  diagnostics = FALSE
 )
 }
 \arguments{
 \item{initiation}{Either \code{"on_demand"} for birth-triggered searches or
 \code{"rate"} for scheduled searches. No default is selected.}
-
-\item{matching}{A specification created by \code{\link[=matching_model]{matching_model()}}, or a tibble
-with numeric \code{time_start}, \code{time_end}, and list-column \code{model} holding
-complete matching objects. Model intervals are half-open absolute years,
-cannot overlap, and must cover the requested run. The active model is used
-at partner selection, without changing pending search dates or existing
-unions. Base data frames with list columns are also accepted. Defaults to
-\code{age_gap_matching_model(0, 5)}: preferred age gap zero years, with
-selection weight halving five years on either side.}
 
 \item{rates}{For \code{"rate"} initiation, an age-specific female search-hazard
 table with \code{age_start}, \code{age_end}, and \code{rate}, in years and per
@@ -73,6 +64,56 @@ other category uses one clock consistently across all its bands and groups.
 Age and duration cannot apply together. All-age inputs may omit duration
 columns. Must be NULL for \code{"on_demand"}.}
 
+\item{matching}{A specification created by \code{\link[=matching_model]{matching_model()}}, or a tibble
+with numeric \code{time_start}, \code{time_end}, and list-column \code{model} holding
+complete matching objects. Model intervals are half-open absolute years,
+cannot overlap, and must cover the requested run. The active model is used
+at partner selection, without changing pending search dates or existing
+unions. Base data frames with list columns are also accepted. Defaults to
+\code{age_gap_matching_model(0, 5)}: preferred age gap zero years, with
+selection weight halving five years on either side.}
+
+\item{father_matching}{Optional matching specification for fathers of
+unpartnered births in rate mode, created by \code{\link[=matching_model]{matching_model()}}, or a
+\code{time_start}/\code{time_end}/\code{model} schedule as for \code{matching}. Defaults to
+\code{NULL}, using the general \code{matching} model active at that birth. Union
+searches always use \code{matching}. Not used by on-demand initiation.
+Process-level age and kinship screening settings are shared; NULL inherits
+the general model's settings.}
+
+\item{cohab_matching}{Optional cohabitation matching model or whole-model
+schedule; NULL shares the general \code{matching} model active at that search.
+Marriage, cohabitation and unpartnered father searches calibrate weights
+using their own intensities and share the available male pool.}
+
+\item{cohab_prob}{Optional age-specific probability table with \code{age_start},
+\code{age_end}, \code{prob}, optionally \code{group} and \code{previous_union}. Enables typed
+unions only in rate mode. Age gaps mean zero. Optional \code{time_start} and
+\code{time_end} supply half-open calendar intervals; each active slice must
+satisfy the same age/group/previous-category rules and cover the run. Type
+uses the active probability at the search instant, before matching.
+Existing unions keep their types. NULL retains untyped partnerships and
+their RNG path.}
+
+\item{union_convert_rate}{Optional age- or duration-specific conversion
+table, optionally by the partners' categories (\verb{<group>_w}, \verb{<group>_h} for
+a declared dimension). Duration uses the current cohabitation start. Uses
+\code{rate} and either age or duration boundaries, not both clocks, with no
+previous-union axis. NULL gives no conversions and warns at simulation.
+Conversion keeps partners, closes cohab with reason \code{conversion}, and
+starts a linked marriage with a new dissolution-duration origin.}
+
+\item{weights}{NULL (default) for unweighted selection of searching women, or
+a \code{\link[=weight_model]{weight_model()}} using person variables, which chooses which unpartnered
+woman in a cell searches without changing the cell's input search rate.
+Rate mode only. With weighted matching calibration the weights are kept
+current for every searching woman, so calibration uses the weighted search
+intensities.}
+
+\item{weights_conversion}{NULL (default) for unweighted selection, or a
+\code{\link[=weight_model]{weight_model()}} using union variables, which chooses which cohabitation in
+a cell converts without changing the cell's input rate.}
+
 \item{min_male_age}{Minimum male age in continuous years at a new partner
 search, default \code{15}. Finite nonnegative scalar; zero disables this age
 exclusion. Existing unions are retained. No minimum is added for actual
@@ -87,14 +128,6 @@ Missing ancestry is not proof of unrelatedness; only demonstrated
 relationships are screened. Existing unions are retained. See
 \code{\link[=extract_kin]{extract_kin()}} for the shared distance definitions.}
 
-\item{father_matching}{Optional matching specification for fathers of
-unpartnered births in rate mode, created by \code{\link[=matching_model]{matching_model()}}, or a
-\code{time_start}/\code{time_end}/\code{model} schedule as for \code{matching}. Defaults to
-\code{NULL}, using the general \code{matching} model active at that birth. Union
-searches always use \code{matching}. Not used by on-demand initiation.
-Process-level age and kinship screening settings are shared; NULL inherits
-the general model's settings.}
-
 \item{cancel_birth_if_no_match}{Logical, default \code{TRUE}. Cancel a birth when
 its on-demand partner search or rate-mode nonmarital father selection
 fails. Set \code{FALSE} to allow births with unknown fathers. Historical missing
@@ -102,50 +135,17 @@ father IDs are retained. A cancellation starts no new spacing interval, and
 the attempt is not replaced. Partner scarcity can reduce realized fertility
 below inputs.}
 
+\item{cohabitation_counts_as_previous_union}{Logical, default FALSE. FALSE
+restores previous legal-marriage category after a cohabitation ends; TRUE
+classifies cohab breakup/death as separated/widowed. Search duration still
+starts at the latest partnership ending. Only applies to typed unions.}
+
 \item{diagnostics}{Logical, default \code{FALSE}. When the general matching model
 uses weighted choice in a grouped population, record \verb{.log_weight_<group>}
 columns on newly formed unions: the log group weights applied at the search
 that formed each union (0 for the reference group and when calibration
 cannot affect choices). Use the column for each alternative's group as a
 conditional-logit offset in wife-side choice sets.}
-
-\item{cohab_prob}{Optional age-specific probability table with \code{age_start},
-\code{age_end}, \code{prob}, optionally \code{group} and \code{previous_union}. Enables typed
-unions only in rate mode. Age gaps mean zero. Optional \code{time_start} and
-\code{time_end} supply half-open calendar intervals; each active slice must
-satisfy the same age/group/previous-category rules and cover the run. Type
-uses the active probability at the search instant, before matching.
-Existing unions keep their types. NULL retains untyped partnerships and
-their RNG path.}
-
-\item{cohab_matching}{Optional cohabitation matching model or whole-model
-schedule; NULL shares the general \code{matching} model active at that search.
-Marriage, cohabitation and unpartnered father searches calibrate weights
-using their own intensities and share the available male pool.}
-
-\item{union_convert_rate}{Optional age- or duration-specific conversion
-table, optionally by the partners' categories (\verb{<group>_w}, \verb{<group>_h} for
-a declared dimension). Duration uses the current cohabitation start. Uses
-\code{rate} and either age or duration boundaries, not both clocks, with no
-previous-union axis. NULL gives no conversions and warns at simulation.
-Conversion keeps partners, closes cohab with reason \code{conversion}, and
-starts a linked marriage with a new dissolution-duration origin.}
-
-\item{cohabitation_counts_as_previous_union}{Logical, default FALSE. FALSE
-restores previous legal-marriage category after a cohabitation ends; TRUE
-classifies cohab breakup/death as separated/widowed. Search duration still
-starts at the latest partnership ending. Only applies to typed unions.}
-
-\item{weights_conversion}{NULL (default) for unweighted selection, or a
-\code{\link[=weight_model]{weight_model()}} using union variables, which chooses which cohabitation in
-a cell converts without changing the cell's input rate.}
-
-\item{weights}{NULL (default) for unweighted selection of searching women, or
-a \code{\link[=weight_model]{weight_model()}} using person variables, which chooses which unpartnered
-woman in a cell searches without changing the cell's input search rate.
-Rate mode only. With weighted matching calibration the weights are kept
-current for every searching woman, so calibration uses the weighted search
-intensities.}
 
 \item{model}{A \code{hammel_model} object.}
 }

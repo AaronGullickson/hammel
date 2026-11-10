@@ -12,7 +12,7 @@ make_model <- function(n = 1000, sex = "m", age = 20, death_rate = 0,
   set_fertility(data.frame(age_start = 15, age_end = 50, rate = birth_rate),
          birth_interval = birth_interval) |>
   set_union_formation("on_demand",
-    matching_model(~ age_difference, c(age_difference = 0)),
+    matching = matching_model(~ age_difference, c(age_difference = 0)),
     cancel_birth_if_no_match = FALSE)
 }
 

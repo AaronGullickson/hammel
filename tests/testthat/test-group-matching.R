@@ -120,7 +120,7 @@ test_that("group matching validates edited models and missing identities even at
   expect_no_error(run_simulation(model, 1))
   matching <- matching_model(~ age_difference, c(age_difference = 0), group_exogamy = c("A:B" = 0))
   matching$group_exogamy <- c("A:B" = 0, "B:A" = 0)
-  expect_error(set_union_formation(make_model(0), "on_demand", matching), "overlapping")
+  expect_error(set_union_formation(make_model(0), "on_demand", matching = matching), "overlapping")
   model$processes$union_formation$matching <- matching
   expect_error(run_simulation(model, 0), "overlapping")
 })
