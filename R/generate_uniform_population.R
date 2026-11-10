@@ -11,45 +11,75 @@
 #'
 #' @details
 #'
-#' Everyone is alive at
-#' the reference time. This is not a stable or stationary population.
-#' Uniform refers to ages sampled between `min_age` and `max_age`; sex and
-#' group categories follow their supplied probabilities and need not be uniform.
-#' Equal age bounds generate everyone at that age.
+#' Ages are sample from the uniform distribution between `min_age` and `max_age`
+#' and only the living population is generated. This population will have no
+#' father or mother ids. Sex and group categories follow their supplied
+#' probabilities.
 #'
-#' Ages are sampled in continuous years without rounding to simulation steps.
-#' Generation uses and advances R's current random-number state; use
-#' [set.seed()] for reproducibility.
+#' The generated population will not have a realistic age distribution.
+#' Typically, users will run a "burn in" simulation to produce a more realistic
+#' population distribution and kinship history for the desired simulation.
 #'
-#' @param size Number of persons, a nonnegative whole number.
+#' The `end_time` for the population will define the starting point for the
+#' simulation. By default, this value is set to zero so that time is measured
+#' since the beginning of the simulation. This means that birth times for the
+#' existing population will be negative. Users who are drawing from input data
+#' with time increments from real calendar time, should reset this starting
+#' value as appropriate.
+#'
+#' If the `groups` argument is used, the population declares each dimension with
+#' [group()] defaults, except that its `categories` are those given, in order:
+#'
+#' - the weights' names
+#' - each dimension's values in order of first appearance in the table's rows.
+#'
+#' The first is the reference category, and zero-weight categories are declared,
+#' allowing for groups that may emerge later. [set_groups()] can replace that
+#' declaration; categories it omits are kept.
+#'
+#' @param size Number of living persons, a nonnegative whole number.
 #' @param max_age Maximum initial age in years, finite and nonnegative.
 #' @param end_time Reference time in years, finite. Birth times are this value
 #'   minus the sampled ages. Defaults to a relative time origin of zero.
 #' @param min_age Minimum initial age in years, finite and nonnegative, and no
 #'   greater than `max_age`. Defaults to zero.
 #' @param female_probability Probability of assigning sex "f" (female). The
-#'   other sex value is "m" (male). This does not enforce exact proportions.
+#'   other sex value is "m" (male).
 #' @param groups Optional group dimensions to sample, independently of age and
 #'   sex. Either a named list with one named numeric vector of weights per
 #'   dimension (categories as names; dimensions are drawn independently), or a
 #'   data frame with one column per dimension and a numeric `weight` column,
 #'   giving the joint distribution of category combinations. Weights are finite
 #'   and nonnegative with at least one positive value, and are normalized.
-#'   Realized counts are random. The population declares each dimension with
-#'   [group()] defaults, except that its `categories` are those given, in order:
-#'   the weights' names, or each dimension's values in order of first appearance
-#'   in the table's rows. The first is the reference category, and zero-weight
-#'   categories are declared (they start empty). [set_groups()] can replace that
-#'   declaration; categories it omits are kept. `NULL` (the default) adds no
-#'   groups and consumes no extra random draws.
+#'   `NULL` (the default) adds no groups.
 #'
 #' @return A validated `hammel_population` object.
 #' @export
 #' @examples
 #' set.seed(42)
-#' population <- generate_uniform_population(size = 50000, max_age = 70)
-#' model <- hammel_model() |>
-#'   set_population(population)
+#'
+#' # generate 50000 people with a maximum age of 50
+#' population <- generate_uniform_population(size = 50000, max_age = 50)
+#'
+#' # generate a population divided by race and region, with unequal division
+#' # of race by region
+#' region_race_dist <- tibble::tribble(
+#'   ~race, ~region, ~weight,
+#'  "W",   "NE",    0.145,
+#'  "W",   "MW",    0.190,
+#'  "W",   "S",     0.257,
+#'  "W",   "W",     0.152,
+#'  "B",   "NE",    0.022,
+#'  "B",   "MW",    0.023,
+#'  "B",   "S",     0.067,
+#'  "B",   "W",     0.019,
+#'  "O",   "NE",    0.021,
+#'  "O",   "MW",    0.014,
+#'  "O",   "S",     0.030,
+#'  "O",   "W",     0.060,
+#' )
+#' population <- generate_uniform_population(50000, groups = region_race_dist)
+#' prop.table(table(population$persons$race, population$persons$region))
 generate_uniform_population <- function(
   size,
   max_age = 70,
