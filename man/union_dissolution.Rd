@@ -10,20 +10,9 @@ union_dissolution(rates, weights = NULL)
 set_union_dissolution(model, rates, weights = NULL)
 }
 \arguments{
-\item{rates}{A nonempty data frame with numeric \code{dur_start}, \code{dur_end}, and
-\code{rate}. Bands are half-open \verb{[dur_start, dur_end)} in years. Starts and
-rates must be finite and nonnegative; ends must exceed starts and may be
-\code{Inf}. Bands cannot overlap within a stratum. Gaps and durations outside
-support have zero hazard. Sex, age and union-status columns are not
-supported. Input order, custom columns and provenance are retained.
-Optional \verb{<group>_w} and \verb{<group>_h} columns (for a declared group
-dimension such as \code{race}: \code{race_w}, \code{race_h}) select the wife's and
-husband's categories; strata are directional, so A-wife/B-husband and
-B-wife/A-husband are separate. Stratified tables must cover every
-combination of the dimension's categories. Optional \code{union_type} supplies
-both \code{cohab} and \code{marriage} schedules within each stratum; without it the
-same duration risk applies to either type. Use \code{\link[=stratify_rates]{stratify_rates()}} to add
-proportional differences, for example by listing both directions of a pair.}
+\item{rates}{A nonempty data frame with at least numeric \code{dur_start},
+\code{dur_end}, and \code{rate}. See details for format and description of
+stratification variables that can be applied.}
 
 \item{weights}{NULL (default) for unweighted selection, or a \code{\link[=weight_model]{weight_model()}}
 using union variables, which chooses which union in a cell dissolves
@@ -37,36 +26,40 @@ without changing the cell's input rate.}
 \code{set_union_dissolution()} returns an updated model.
 }
 \description{
-Construct or attach an optional dissolution process. One continuous hazard
-applies per union, using years since the union began, independently of either
-partner's age. Rates are per partnered woman-year (equivalently union-year),
-not annual probabilities. Omitting this process retains death-only union
-endings.
+Constructs a union dissolution process specification for a simulation model.
+The convenience function \code{set_union_dissolution} is equivalent to
+\code{set_process(model, union_dissolution(...))} and allows for direct piping
+from a model.
 }
 \details{
-Births do not affect a union's dissolution risk. Exact ties select death,
-then birth, then dissolution; a tied birth occurs while partnered.
-Dissolution ends the episode, restores both partners' availability, and moves
-the woman to her unpartnered fertility and search risks, retaining birth
-spacing. Optional age-specific search schedules by previous union are
-specified through \code{\link[=union_formation]{union_formation()}}. Restarts resume at attained union
-duration rather than reset duration.
+The primary and only required input to the function is a union dissolution
+rate schedule for the \code{rates} argument. This data frame must contain
+\code{dur_start} and \code{dur_end} columns to define the half-open age intervals
+(inclusive at the start and exclusive at the end) and a \code{rate} column for the
+duration-specific dissolution rates.
+
+Rates are always specified as union dissolutions over union-years lived. Gaps
+in the duration band are treated as cases with zero rates.
+
+Columns named by declared group dimensions (see \code{\link[=set_groups]{set_groups()}}), such as
+\code{race} or \code{region}, supply separate schedules for each combination of their
+categories, but they must be suffixed by \verb{_h} or \verb{_w} to indicate the group
+of the husband or wife, respectively (e.g. \code{race_h} and \code{race_w}).
+
+Optional \code{time_start}/\code{time_end} columns select half-open calendar intervals
+in absolute years, including fractional years. Both columns are required
+together; starts are finite and ends exceed starts (possibly Inf). Active
+slices must satisfy the strata and coverage rules and cover the requested
+simulation run.
+
+If cohabitations are in use in the simulation, the rates can be stratified by
+\code{union_type} to supply both \code{cohab} and \code{marriage} schedules; without it the
+same duration risk applies to either type. The \code{\link[=stratify_rates]{stratify_rates()}} function
+provides a quick means to add stratification to an existing rate schedule.
 }
-\section{Calendar rates}{
-
-Optional \code{time_start}/\code{time_end} select half-open absolute calendar-year
-bands, including fractional years. Active slices retain the existing strata
-rules and must cover the requested run. Changes precede same-time events
-without resetting the union-duration origin. Other arguments remain static.
-
-\code{union_dissolution()} creates the process specification;
-\code{set_union_dissolution()} creates it and attaches it to a model through
-\code{\link[=set_process]{set_process()}}. Neither function runs a simulation.
-}
-
 \examples{
-# Illustrative rates, not demographic defaults.
-rates <- data.frame(
+# Illustrative rates
+diss_rates <- data.frame(
   dur_start = c(0, 5), dur_end = c(5, Inf),
   rate = c(0.04, 0.02)
 )
