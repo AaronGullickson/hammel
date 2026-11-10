@@ -41,6 +41,14 @@ be made autonomously; record choices with substantial architectural consequences
   exported functions first and internal
   constants/helpers below, using `# SECTION NAME ------` headings. Preserve
   documentation blocks and leave generated wrappers untouched.
+- The user prefers to write the final roxygen2 documentation. For new
+  functions, agents should write first drafts and identify them as needing
+  user editing and review. When changing existing functions with roxygen2
+  documentation, make only the minimal documentation edits needed to reflect
+  the changes; preserve the user's wording and organization elsewhere. In
+  the completion report, identify the affected documentation and notify the
+  user that it should be reviewed. Do not treat an agent-written draft as
+  final user-approved documentation.
 - Use noun-based names for specification constructors, such as `matching_model()`,
   `age_gap_matching_model()`, `weight_model()`, and `group_inheritance()`.
   Use verbs for actions such as `set_population()`, `run_simulation()`, and
