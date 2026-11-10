@@ -23,18 +23,15 @@ set_fertility(
 )
 }
 \arguments{
-\item{rates}{A nonempty data frame containing numeric \code{age_start}, \code{age_end},
-and \code{rate}. Starts must be finite and nonnegative; ends must exceed starts
-and may be \code{Inf} for upper-open bands. Rates must be finite and
-nonnegative, per woman-year. Use \code{\link[=stratify_rates]{stratify_rates()}} to add proportional
-group differences.}
+\item{rates}{A nonempty data frame defining the fertility rate schedules.
+Must contain at least numeric \code{age_start}, \code{age_end}, and \code{rate}. See
+details for description of stratification variables that can be applied.}
 
 \item{birth_interval}{Minimum maternal birth-to-birth interval in years,
-defaulting to \code{0.75}. Must be finite and nonnegative; see cell-accounted
-fertility above.}
+defaulting to \code{0.75}. Must be finite and nonnegative.}
 
 \item{ffab}{Probability that a newborn is female, default \code{0.4886}. Must be a
-finite numeric scalar in \verb{[0, 1]}.}
+finite numeric scalar between 0 and 1.}
 
 \item{weights}{NULL (default) for unweighted selection within rate cells, or
 a \code{\link[=weight_model]{weight_model()}} specification. Weights choose which member of a cell
@@ -53,84 +50,66 @@ specification for persistent lognormal selection weights.}
 returns an updated \code{hammel_model}.
 }
 \description{
-\code{fertility()} constructs a process specification without running a
-simulation. \code{set_fertility()} constructs the same specification and attaches
-it to a model, equivalent to \code{set_process(model, fertility(...))} with the
-same fertility arguments. The input model is not modified and neither
-function runs a simulation.
+Constructs a fertility process specification for a simulation model. The
+convenience function \code{set_fertility} is equivalent to \code{set_process(model, fertility(...))} and allows for direct piping from a model.
 }
 \details{
-Rates are piecewise constant over half-open age intervals, in years, and
-expressed per woman-year. Overlapping intervals are rejected; adjacent
-intervals are allowed. Input order and custom columns are preserved; rate
-schedules become tibbles. A \code{source} attribute on the input table is copied
-into the process.
+The primary and only required input to the function is a fertility rate
+schedule for the \code{rates} argument. This data frame must contain \code{age_start}
+and \code{age_end} columns to define the half-open age intervals (inclusive at the
+start and exclusive at the end) and a \code{rate} column for the age-specific
+fertility rates. The example below shows the basic format:
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{#> # A tibble: 6 x 3
+#>   age_start age_end   rate
+#>       <int>   <int>  <dbl>
+#> 1        15      20 0.0477
+#> 2        20      25 0.110 
+#> 3        25      30 0.114 
+#> 4        30      35 0.0912
+#> 5        35      40 0.0397
+#> 6        40      45 0.008
+}\if{html}{\out{</div>}}
+
+Rates are always specified as births over person-years lived for women. An
+open-ended age group specified with \code{age_end} of \code{Inf} can be included but is
+not required. Any age groups without a specified rate will be assumed to have
+a zero rate.
 
 Columns named by declared group dimensions (see \code{\link[=set_groups]{set_groups()}}), such as
 \code{race} or \code{region}, supply separate schedules for each combination of their
-categories; dimensions without a column share the schedule. Each conditional
-fertility stratum needs both statuses (or all three typed statuses). Overlap
-is checked within strata. Simulation requires schedules for every combination
-of categories of the dimensions a table uses; a table using an undeclared
-persons column is an error.
+categories; dimensions without a column share the schedule. Every combination
+of categories of the dimensions must be included in the rates if the
+dimension is used.
 
 Optional \code{time_start}/\code{time_end} columns select half-open calendar intervals
 in absolute years, including fractional years. Both columns are required
 together; starts are finite and ends exceed starts (possibly Inf). Active
 slices must satisfy the strata and coverage rules and cover the requested
-run. Rates are constant within intervals, with no interpolation. Calendar
-changes precede same-time events, preserving histories, birth spacing, parity
-and duration origins. Inheritance also accepts whole-model calendar
-schedules; other fertility arguments remain static.
+simulation run.
 
 Fertility optionally accepts \code{union_type} containing both \code{"partnered"} and
-\code{"unpartnered"}, or all three \code{"unpartnered"}, \code{"cohab"}, \code{"marriage"}.
+\code{"unpartnered"}, or all three of \code{"unpartnered"}, \code{"cohab"}, \code{"marriage"}.
 Shared partnered rates cover either partnership type. Rates use woman-years
 in the indicated type; the old fertility input \code{union_status} is rejected.
-Without that column, one overall schedule applies to all women. A partial
-status table or any other label is rejected; use explicit zero rates to
-suppress births in a status. Overlap is checked separately within each
-status. On-demand union formation requires overall rates; rate-based
-formation accepts either form and warns when an overall schedule is used.
+Without that column, one overall schedule applies to all women. On-demand
+union formation requires overall rates; rate-based formation accepts either
+form, but using overall fertility rates with specified union formation rates
+will lead to independence between marriage and fertility, which is likely
+undesirable in most applications. A warning is printed if this is the case.
 
 Optional \code{parity_start}/\code{parity_end} use half-open current maternal parity
 bands, covering zero through Inf without gaps or overlap in every group/type
-stratum. Parity is counted from recorded maternal births (including deceased
-children) and incremented only on successful births; no custom parity column
-overrides history. A pooled parity band applies its rate to each contained
-actual parity.
+stratum.
 
-Birth spacing uses cell-accounted fertility (D101). Women are grouped into
-cells: one-year (or shorter) age sub-bands of each group/union-type schedule
-after group multipliers, split at whole ages and band edges, and one actual
-parity when rates are parity-specific. Each cell produces births at its input
-rate times all its living members, including those inside the birth interval,
-and each birth goes to an eligible member, uniformly by default or
-proportional to persistent weights when \code{hetfert} is enabled. Observed rates
-then equal inputs in expectation for any population composition, including
-after restarts and union-type changes, while a cell has an eligible member. A
-cell with members but none eligible keeps its intensity; when it would
-produce a birth, no child is born and the event is counted in
-the population's \code{unrealized_births}. An individual woman's hazard depends on
-recent births by others in her cell; this is a calibration device. Upper-open
-age bands stay one cell when \code{birth_interval * rate} is below 0.001 and are
-otherwise split yearly. Zero-rate bands form no cells.
-
-For parity-specific schedules with a positive \code{birth_interval}, \code{fertility()}
-warns when positive rates fall in one-year age cells where no woman can be
-eligible: births are singletons at least \code{birth_interval} apart, starting
-from the schedule's first positive rate, so parity k is first eligible at the
-age found by following each parity's first positive rate. Union types are
-pooled and groups checked separately. Partly reachable cells and higher
-actual parities within an open parity band (always unreachable at the
-youngest ages) are not reported.
+The \code{\link[=stratify_rates]{stratify_rates()}} function provides a quick means to add stratification
+to an existing rate schedule.
 }
 \examples{
-rates <- data.frame(age_start = 15, age_end = 50, rate = 0.1)
-process <- fertility(rates)
-model <- hammel_model() |> set_process(process)
+fert_process <- fertility(usa_2000_fertility)
+model <- hammel_model() |> set_process(fert_process)
 # Equivalent convenience setter:
-model <- hammel_model() |> set_fertility(rates)
+model <- hammel_model() |> set_fertility(usa_2000_fertility)
 }
 \seealso{
 \code{\link[=set_process]{set_process()}}, \code{\link[=mortality]{mortality()}}, \code{\link[=union_formation]{union_formation()}}, \code{\link[=het_fert]{het_fert()}},
