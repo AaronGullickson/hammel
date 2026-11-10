@@ -7,31 +7,35 @@
 set_process(model, process)
 }
 \arguments{
-\item{model}{A \code{hammel_model} object.}
+\item{model}{A \link{hammel_model} object.}
 
 \item{process}{A \code{hammel_process} specification.}
 }
 \value{
-An updated \code{hammel_model}. The input model is not modified.
+An updated \link{hammel_model}. The input model is not modified.
 }
 \description{
-Store a process specification under its name, replacing an existing process
-with the same name. Other processes are retained. Built-in rate schedules are
-validated again when attached. No simulation is executed.
+Store a process specification under its name, replacing any existing process
+with the same name.
 }
 \details{
+The available processes are:
+\itemize{
+\item \code{\link[=fertility]{fertility()}}
+\item \code{\link[=mortality]{mortality()}}
+\item \code{\link[=union_formation]{union_formation()}}
+\item \code{\link[=union_dissolution]{union_dissolution()}}
+\item \code{\link[=group_transition]{group_transition()}}
+}
+
 Use this function to attach an already-created process. The convenience
 setters \code{\link[=set_mortality]{set_mortality()}}, \code{\link[=set_fertility]{set_fertility()}}, \code{\link[=set_union_formation]{set_union_formation()}},
 \code{\link[=set_union_dissolution]{set_union_dissolution()}}, and \code{\link[=set_group_transition]{set_group_transition()}} construct and attach
 the corresponding process in one call.
 }
 \examples{
-mortality_rates <- data.frame(
-  sex = c("m", "f"), age_start = 0,
-  age_end = Inf, rate = c(0.01, 0.008)
-)
-process <- mortality(mortality_rates)
-model <- hammel_model() |> set_process(process)
+mortality_process <- mortality(usa_2000_mortality)
+model <- hammel_model() |> set_process(mortality_process)
 model$processes
 }
 \seealso{

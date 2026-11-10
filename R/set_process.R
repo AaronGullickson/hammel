@@ -4,28 +4,35 @@
 
 #' Set a demographic process specification
 #'
-#' Store a process specification under its name, replacing an existing process
-#' with the same name. Other processes are retained. Built-in rate schedules are
-#' validated again when attached. No simulation is executed.
+#' @description
+#'
+#' Store a process specification under its name, replacing any existing process
+#' with the same name.
+#'
+#' @details
+#'
+#' The available processes are:
+#'
+#' - [fertility()]
+#' - [mortality()]
+#' - [union_formation()]
+#' - [union_dissolution()]
+#' - [group_transition()]
 #'
 #' Use this function to attach an already-created process. The convenience
 #' setters [set_mortality()], [set_fertility()], [set_union_formation()],
 #' [set_union_dissolution()], and [set_group_transition()] construct and attach
 #' the corresponding process in one call.
 #'
-#' @param model A `hammel_model` object.
+#' @param model A [hammel_model] object.
 #' @param process A `hammel_process` specification.
-#' @return An updated `hammel_model`. The input model is not modified.
+#' @return An updated [hammel_model]. The input model is not modified.
 #' @seealso [mortality()], [fertility()], [union_formation()],
 #'   [union_dissolution()], [group_transition()]
 #' @export
 #' @examples
-#' mortality_rates <- data.frame(
-#'   sex = c("m", "f"), age_start = 0,
-#'   age_end = Inf, rate = c(0.01, 0.008)
-#' )
-#' process <- mortality(mortality_rates)
-#' model <- hammel_model() |> set_process(process)
+#' mortality_process <- mortality(usa_2000_mortality)
+#' model <- hammel_model() |> set_process(mortality_process)
 #' model$processes
 #' @order 0
 set_process <- function(model, process) {
