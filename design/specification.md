@@ -40,7 +40,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Software and analytical validation | `tests/testthat/` |
 | Replication assessment | `validation/milestone1.qmd` through `validation/milestone9.qmd` |
 
-See [R source organization](r-source-organization.md) for the complete function map and placement rules (D143).
+See [R source organization](r-source-organization.md) for the complete function map and placement rules (D143). Every multiline R function definition must have a braced body, including anonymous callbacks and single-expression bodies (D171).
 
 The engine is C++17 with Rcpp. R exposes ordinary list objects and tibbles.
 Grouped dissolution and conversion observations build union-level group

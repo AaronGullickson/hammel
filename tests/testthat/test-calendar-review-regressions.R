@@ -34,10 +34,12 @@ test_that("execution population coverage checks ignore unreachable historical an
   m$population$groups <- list(group = group())
   m$population$end_time <- 2000
   m$population$persons$birth_time <- m$population$persons$birth_time+2000
-  extend <- function(x) rbind(transform(x,group="A",time_start=1900,time_end=1950),
-    transform(x,group="A",time_start=1950,time_end=2010),
-    transform(x,group="B",time_start=1950,time_end=2010),
-    transform(x,group="B",time_start=2010,time_end=2100))
+  extend <- function(x) {
+    rbind(transform(x,group="A",time_start=1900,time_end=1950),
+      transform(x,group="A",time_start=1950,time_end=2010),
+      transform(x,group="B",time_start=1950,time_end=2010),
+      transform(x,group="B",time_start=2010,time_end=2100))
+  }
   mortality <- extend(m$processes$mortality$rates)
   mortality$age_start[mortality$time_start==1900] <- 1
   mortality$age_end[mortality$time_start==2010] <- 50

@@ -767,8 +767,9 @@ fertility_from_hfd <- function(data, year) {
     return(
       fertility(
         combine_database_years(
-          year, function(y)
+          year, function(y) {
             fertility_from_hfd(data, y)$rates
+          }
         )
       )
     )

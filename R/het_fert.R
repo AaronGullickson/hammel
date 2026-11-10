@@ -68,8 +68,10 @@ validate_het_fert <- function(model) {
       call. = FALSE
     )
   }
-  scalar <- function(x) is.numeric(x) && is.null(dim(x)) && length(x) == 1L &&
-    is.finite(x)
+  scalar <- function(x) {
+    is.numeric(x) && is.null(dim(x)) && length(x) == 1L &&
+      is.finite(x)
+  }
   if (!scalar(model$cv) || model$cv < 0) {
     stop("`cv` must be a finite nonnegative numeric scalar.", call. = FALSE)
   }

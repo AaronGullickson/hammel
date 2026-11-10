@@ -31,9 +31,11 @@ reference_weights <- function(women, men, matching, rates, groups, now = 0,
   d <- vapply(groups, function(g) if (g %in% names(matching$delta)) matching$delta[[g]] else 0, numeric(1))
   target <- mirror * exp(d - max(d))
   target <- target / sum(target)
-  U <- vapply(seq_len(nrow(men)), function(j) calculate_matching_utilities(matching,
-    women$born - men$born[j], groups[women$group + 1L],
-    rep(groups[men$group[j] + 1L], nrow(women))), numeric(nrow(women)))
+  U <- vapply(seq_len(nrow(men)), function(j) {
+    calculate_matching_utilities(matching,
+      women$born - men$born[j], groups[women$group + 1L],
+      rep(groups[men$group[j] + 1L], nrow(women)))
+  }, numeric(nrow(women)))
   W <- exp(U - max(U))
   S <- cbind(rowSums(W[, men$group == 0, drop = FALSE]), rowSums(W[, men$group == 1, drop = FALSE]))
   flow_b <- function(log_b) {
@@ -253,8 +255,12 @@ test_that("grouped weighted choice runs in both modes, restarts, and is reproduc
                                     father_matching = father), 20, seed = 907)
   persons <- result$persons
   born <- persons[persons$birth_time >= 0, ]
-  in_union <- mapply(function(mother, time) any(result$unions$wife_id == mother &
-    result$unions$start_time <= time & (is.na(result$unions$end_time) | result$unions$end_time > time)),
+  in_union <- mapply(function(mother, time) {
+    any(
+      result$unions$wife_id == mother & result$unions$start_time <= time &
+        (is.na(result$unions$end_time) | result$unions$end_time > time)
+    )
+  },
     born$mother_id, born$birth_time)
   expect_true(any(!in_union))
   expect_true(all(!is.na(born$father_id)))

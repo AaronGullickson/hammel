@@ -59,11 +59,24 @@ test_that("union rates stratify by either partner's categories in any dimension"
 
 test_that("newborns get a category in every dimension from its own rule", {
   model <- two_dimension_model(400, birth_rate = 2)
-  model <- set_groups(model,
-    race = group(categories = c("A", "B", "AB"), ancestry = TRUE,
-                 inheritance = group_inheritance("custom", fun = function(mother_group, father_group, ...)
-                   if (is.na(father_group) || mother_group == father_group) mother_group else "AB")),
-    region = group(inheritance = "father"))
+  model <- set_groups(
+    model,
+    race = group(
+      categories = c("A", "B", "AB"),
+      ancestry = TRUE,
+      inheritance = group_inheritance(
+        "custom",
+        fun = function(mother_group, father_group, ...) {
+          if (is.na(father_group) || mother_group == father_group) {
+            mother_group
+          } else {
+            "AB"
+          }
+        }
+      )
+    ),
+    region = group(inheritance = "father")
+  )
   out <- run_simulation(model, 1, seed = 3)
   kids <- out$persons[out$persons$birth_time >= 0, ]
   expect_gt(nrow(kids), 50)
@@ -681,9 +694,13 @@ test_that("weight models use any dimension's variables", {
 test_that("custom weight functions see every dimension in members and cells", {
   model <- two_dimension_model(200, union = TRUE)
   seen <- new.env()
-  record <- function(name) function(members, bin) {
-    if (is.null(seen[[name]])) assign(name, list(members = members, bin = bin), envir = seen)
-    rep(0, nrow(members))
+  record <- function(name) {
+    function(members, bin) {
+      if (is.null(seen[[name]])) {
+        assign(name, list(members = members, bin = bin), envir = seen)
+      }
+      rep(0, nrow(members))
+    }
   }
   model <- set_mortality(model, stratify_rates(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf,
     rate = .2), list(region = c(N = 1, S = 2))), weights = weight_model(fun = record("mortality")))
@@ -970,9 +987,11 @@ test_that("group_exogamy tables are validated", {
 })
 
 test_that("review regressions: absent-category schedules, dimensions named group, parent info", {
-  base <- function(pop) hammel_model() |> set_population(pop) |>
-    set_fertility(data.frame(age_start = 15, age_end = 45, rate = .1)) |>
-    set_union_formation("on_demand", kinship_generations = 0)
+  base <- function(pop) {
+    hammel_model() |> set_population(pop) |>
+      set_fertility(data.frame(age_start = 15, age_end = 45, rate = .1)) |>
+      set_union_formation("on_demand", kinship_generations = 0)
+  }
   # Rows naming only categories the population lacks still leave its
   # categories without schedules (with inferred categories).
   set.seed(1)

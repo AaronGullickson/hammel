@@ -460,9 +460,10 @@ validate_union_search_rates <- function(rates) {
     if (any(
       vapply(
         strata,
-        function(rows)
+        function(rows) {
           !(setequal(previous[rows], c("none", "dissolved")) ||
-            setequal(previous[rows], c("none", "separated", "widowed"))),
+            setequal(previous[rows], c("none", "separated", "widowed")))
+        },
         logical(1)
       )
     )) {

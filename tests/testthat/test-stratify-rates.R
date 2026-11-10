@@ -13,8 +13,9 @@ strata_model <- function() {
 
 # Build the same table by hand, row block by category.
 explicit_strata <- function(rates, factors) {
-  out <- do.call(rbind, lapply(names(factors), function(g)
-    transform(as.data.frame(rates), rate = rate * factors[[g]], group = g)))
+  out <- do.call(rbind, lapply(names(factors), function(g) {
+    transform(as.data.frame(rates), rate = rate * factors[[g]], group = g)
+  }))
   rownames(out) <- NULL
   out
 }

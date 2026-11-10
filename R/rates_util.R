@@ -257,21 +257,23 @@ prepare_strata_rates <- function(
     index <- index + code * strides[k]
   }
   count <- as.integer(prod(counts))
-  label <- function(k) paste(
-    vapply(
-      seq_along(columns), function(j) {
-        value <- as.character(registries[[columns[[j]]$dim]])[
-          (k %/% strides[j]) %% counts[j] + 1L
-        ]
-        if (length(columns) == 1L) {
-          value
-        } else {
-          paste0(columns[[j]]$column, "=", value)
-        }
-      }, ""
-    ),
-    collapse = ", "
-  )
+  label <- function(k) {
+    paste(
+      vapply(
+        seq_along(columns), function(j) {
+          value <- as.character(registries[[columns[[j]]$dim]])[
+            (k %/% strides[j]) %% counts[j] + 1L
+          ]
+          if (length(columns) == 1L) {
+            value
+          } else {
+            paste0(columns[[j]]$column, "=", value)
+          }
+        }, ""
+      ),
+      collapse = ", "
+    )
+  }
   # Coverage is checked before rows for absent categories are dropped, so a
   # slice whose rows all name absent categories still reports every stratum
   # as missing (rather than looking empty).
@@ -369,8 +371,9 @@ decode_report_strata <- function(index, registries) {
   strides <- cumprod(c(1, utils::head(counts, -1)))
   stats::setNames(
     lapply(
-      seq_along(registries), function(d)
+      seq_along(registries), function(d) {
         registries[[d]][(index %/% strides[d]) %% counts[d] + 1L]
+      }
     ), names(registries)
   )
 }
@@ -605,10 +608,12 @@ validate_rates <- function(rates, mortality) {
             )
           }
           lapply(
-            seq_len(nrow(bands)), function(i) rows[
-              rates$parity_start[rows] == bands$parity_start[i] &
-                rates$parity_end[rows] == bands$parity_end[i]
-            ]
+            seq_len(nrow(bands)), function(i) {
+              rows[
+                rates$parity_start[rows] == bands$parity_start[i] &
+                  rates$parity_end[rows] == bands$parity_end[i]
+              ]
+            }
           )
         }
       ),

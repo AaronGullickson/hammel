@@ -191,11 +191,13 @@ weight_variable <- function(name, type, context = NULL) {
     return(NULL)
   }
   dims <- names(context$categories)
-  group_info <- function(code, d) list(
-    code = code,
-    component = match(d, dims) - 1L,
-    levels = as.character(context$categories[[d]])
-  )
+  group_info <- function(code, d) {
+    list(
+      code = code,
+      component = match(d, dims) - 1L,
+      levels = as.character(context$categories[[d]])
+    )
+  }
   if (type != "union") {
     if (name %in% dims) {
       return(group_info(1L, name))
@@ -235,12 +237,12 @@ weight_variable <- function(name, type, context = NULL) {
 # Could `name` be a group variable for this process type, for some declared
 # dimension? Dimension names follow check_group_names().
 weight_group_name_possible <- function(name, type) {
-  dim_ok <- function(x) !x %in% reserved_group_names &&
-    !grepl("^(partner|same|female|male|ancestry)_", x) && !grepl(
-    "_(w|h)$",
-    x
-  ) &&
-    grepl("^[A-Za-z][A-Za-z0-9_.]*$", x)
+  dim_ok <- function(x) {
+    !x %in% reserved_group_names &&
+      !grepl("^(partner|same|female|male|ancestry)_", x) &&
+      !grepl("_(w|h)$", x) &&
+      grepl("^[A-Za-z][A-Za-z0-9_.]*$", x)
+  }
   if (type == "union") {
     base <- sub("_[wh]$", "", name)
     return(

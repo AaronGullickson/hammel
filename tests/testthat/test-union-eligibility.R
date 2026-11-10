@@ -43,8 +43,10 @@ test_that("an under-age man never blocks an eligible adult elsewhere in the pool
   model <- make_model(3, birth_rate = 20, birth_interval = 0)
   model$population$persons$sex[1] <- "f"
   model$population$persons$birth_time <- c(-20, -1, -25)
-  results <- lapply(1:50, function(seed) run_simulation(model, 0.1, seed =
-    seed))
+  results <- lapply(1:50, function(seed) {
+    run_simulation(model, 0.1, seed =
+      seed)
+  })
   first_fathers <- vapply(results, function(result) {
     children <- result$persons[result$persons$mother_id %in% 1, ]
     if (!nrow(children)) return(-1)

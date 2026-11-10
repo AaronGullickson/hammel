@@ -143,8 +143,9 @@ test_that("type-specific group strata built by binding stratified subsets", {
   model$population$groups <- list(group = group())
   typed <- data.frame(age_start=15,age_end=50,union_type=c("unpartnered","cohab","marriage"),rate=c(.03,.15,.1))
   factors <- list(unpartnered=c(A=1,B=.8),cohab=c(A=1.2,B=.9),marriage=c(A=1,B=1.1))
-  stratified <- do.call(rbind, lapply(names(factors), function(type)
-    stratify_rates(typed[typed$union_type==type,],list(group=factors[[type]]))))
+  stratified <- do.call(rbind, lapply(names(factors), function(type) {
+    stratify_rates(typed[typed$union_type==type,],list(group=factors[[type]]))
+  }))
   implicit <- set_fertility(model,stratified,birth_interval=.1)
   explicit <- stratified
   explicit$rate <- typed$rate[match(explicit$union_type,typed$union_type)] *
@@ -262,13 +263,29 @@ test_that("typed dissolution retains symmetric pair hazards", {
 })
 
 test_that("union entry types share exposure and exclude conversion", {
-  history <- function() hammel_population(
-    data.frame(person_id = 1:4, sex = c("f", "m", "m", "m"),
-      birth_time = -20, death_time = c(NA, NA, 4, NA),
-      mother_id = NA_integer_, father_id = NA_integer_, group = c("A", "B", "A", "B")),
-    data.frame(union_id = 1:3, wife_id = 1, husband_id = 2:4,
-      start_time = c(1, 3, 5), end_time = c(2, 4, NA),
-      end_reason = c("dissolution", "death_husband", NA)), end_time = 6, groups = "group")
+  history <- function() {
+    hammel_population(
+      data.frame(
+        person_id = 1:4,
+        sex = c("f", "m", "m", "m"),
+        birth_time = -20,
+        death_time = c(NA, NA, 4, NA),
+        mother_id = NA_integer_,
+        father_id = NA_integer_,
+        group = c("A", "B", "A", "B")
+      ),
+      data.frame(
+        union_id = 1:3,
+        wife_id = 1,
+        husband_id = 2:4,
+        start_time = c(1, 3, 5),
+        end_time = c(2, 4, NA),
+        end_reason = c("dissolution", "death_husband", NA)
+      ),
+      end_time = 6,
+      groups = "group"
+    )
+  }
   pop <- history()
   pop$unions$union_type <- c("cohab", "marriage", "cohab")
   for (previous in c(FALSE, TRUE)) {

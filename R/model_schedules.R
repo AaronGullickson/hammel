@@ -23,7 +23,7 @@ validate_model_argument <- function(x, validate, name) {
   }
   rows <- order(x$time_start)
   if (length(rows) > 1L &&
-        any(tail(x$time_start[rows], -1L) < head(cummax(ends[ rows ]), -1L))) {
+        any(tail(x$time_start[rows], -1L) < head(cummax(ends[rows]), -1L))) {
     stop(sprintf("%s model intervals must not overlap.", name), call. = FALSE)
   }
   if (!is.list(x$model) || !is.null(dim(x$model))) {
@@ -123,24 +123,22 @@ prepare_model_schedules <- function(
     }
   }
   times <- sort(unique(times[times >= start & (times < end | times == start)]))
-  id <- function(model, bank) which(
-    vapply(bank, identical, logical(1), y = model)
-  )[1L] - 1L
+  id <- function(model, bank) {
+    which(vapply(bank, identical, logical(1), y = model))[1L] - 1L
+  }
   matching_ids <- vapply(
-    times, function(t) id(
-      model_at(arguments$matching, t),
-      matching_bank
-    ), integer(1)
+    times, function(t) {
+      id(model_at(arguments$matching, t), matching_bank)
+    }, integer(1)
   )
   role_ids <- function(role) {
     if (is.null(arguments[[role]])) {
       matching_ids
     } else {
       vapply(
-        times, function(t) id(
-          model_at(arguments[[role]], t),
-          matching_bank
-        ), integer(1)
+        times, function(t) {
+          id(model_at(arguments[[role]], t), matching_bank)
+        }, integer(1)
       )
     }
   }

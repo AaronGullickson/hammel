@@ -127,10 +127,14 @@ normalize_population_ancestry <- function(population) {
       x$unknown <- rep(0, nrow(persons))
     } else {
       columns <- setdiff(names(x), c("person_id", "unknown"))
-      x <- x[match(persons$person_id, x$person_id), c(
-        "person_id", columns,
-        "unknown"
-        ), drop = FALSE]
+      x <- x[
+        match(persons$person_id, x$person_id),
+        c(
+          "person_id", columns,
+          "unknown"
+        ),
+        drop = FALSE
+      ]
     }
     out[[name]] <- tibble::as_tibble(x)
   }

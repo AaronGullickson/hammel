@@ -118,11 +118,15 @@ test_that("custom functions receive members and the cell, without exact times", 
     mean(dead$person_id %in% c(seq_len(200), 400 + seq_len(200)))   # partnered share
   }
   runs <- 1:15
-  custom_share <- vapply(runs, function(s) share(run_simulation(set_mortality(
-    model, mortality_rates,
-    weights = weight_model(fun = f)), 1, seed = s)), 0)
-  formula_share <- vapply(runs, function(s) share(run_simulation(formula, 1,
-    seed = s)), 0)
+  custom_share <- vapply(runs, function(s) {
+    share(run_simulation(set_mortality(
+      model, mortality_rates,
+      weights = weight_model(fun = f)), 1, seed = s))
+  }, 0)
+  formula_share <- vapply(runs, function(s) {
+    share(run_simulation(formula, 1,
+      seed = s))
+  }, 0)
   expect_lt(abs(mean(custom_share) - mean(formula_share)),
             4 * sqrt(var(custom_share) / 15 + var(formula_share) / 15) + 1e-9)
   bad_length <- weight_model(fun = function(members, bin) 0)
@@ -544,9 +548,13 @@ test_that("person formulas use parity, previous unions and ancestry", {
 
 test_that("custom functions receive members and cells for every process", {
   seen <- new.env()
-  record <- function(name) function(members, bin) {
-    if (is.null(seen[[name]])) seen[[name]] <- list(members = members, bin = bin)
-    rep(0, nrow(members))
+  record <- function(name) {
+    function(members, bin) {
+      if (is.null(seen[[name]])) {
+        seen[[name]] <- list(members = members, bin = bin)
+      }
+      rep(0, nrow(members))
+    }
   }
   # Dissolution and conversion: union members and their cells.
   model <- grouped_union_model(200, type = "cohab")

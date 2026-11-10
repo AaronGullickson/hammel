@@ -469,8 +469,9 @@ matching_design_matrix <- function(formula, data) {
       factors <- frame[vapply(frame, is.factor, logical(1))]
       contrasts <- if (length(factors)) {
         lapply(
-          factors, function(x)
+          factors, function(x) {
             stats::contr.treatment(levels(x))
+          }
         )
       } else {
         NULL

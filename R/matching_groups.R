@@ -125,10 +125,9 @@ expand_matching_pairs <- function(effects, symmetric = FALSE) {
   table
 }
 
-expand_group_exogamy <- function(effects) expand_matching_pairs(
-  effects,
-  symmetric = TRUE
-)
+expand_group_exogamy <- function(effects) {
+  expand_matching_pairs(effects, symmetric = TRUE)
+}
 
 matching_has_group_formula <- function(matching) {
   any(grepl("^(female|male|same)_.+", all.vars(matching$formula)))
@@ -251,9 +250,8 @@ validate_matching_groups <- function(matching, population_groups) {
     )
   }
   if (any(all.vars(matching$formula) %in% c("female_group", "male_group")) &&
-        any(
-          !as.character(population_groups) %in%
-             as.character(matching$group_levels)
+        any(!as.character(population_groups) %in%
+            as.character(matching$group_levels)
         )) {
     stop(
       "Population groups must be covered by matching `group_levels`.",
@@ -460,14 +458,16 @@ validate_exogamy_table <- function(x) {
       call. = FALSE
     )
   }
-  side <- function(s) do.call(
-    paste, c(
-      lapply(
-        dims, function(d) as.character(x[[paste0(d, "_", s)]])
-      ),
-      sep = "\r"
+  side <- function(s) {
+    do.call(
+      paste, c(
+        lapply(
+          dims, function(d) as.character(x[[paste0(d, "_", s)]])
+        ),
+        sep = "\r"
+      )
     )
-  )
+  }
   a <- side("x")
   b <- side("y")
   key <- ifelse(a <= b, paste(a, b, sep = "\n"), paste(b, a, sep = "\n"))
@@ -676,10 +676,11 @@ combined_matching_model <- function(model, categories, labels) {
   k <- length(labels)
   decode <- stats::setNames(
     lapply(
-      seq_along(dims), function(j)
+      seq_along(dims), function(j) {
         as.character(categories[[j]])[
           (seq_len(k) - 1L) %/% strides[j] %% sizes[j] + 1L
         ]
+      }
     ), dims
   )
   own <- matching_dimensions(model, dims)
@@ -768,7 +769,8 @@ combined_matching_model <- function(model, categories, labels) {
         call. = FALSE
       )
     }
-    delta <- delta + unname(x[decode[[d]]] %|na|% 0)
+    adjustment <- unname(x[decode[[d]]])
+    delta <- delta + ifelse(is.na(adjustment), 0, adjustment)
   }
   internal <- structure(
     list(
@@ -818,18 +820,17 @@ combined_matching_model <- function(model, categories, labels) {
   internal
 }
 
-`%|na|%` <- function(x, y) ifelse(is.na(x), y, x)
-
 # Labels of combinations: categories joined with `|` (first dimension first).
 combination_labels <- function(categories) {
   sizes <- vapply(categories, length, integer(1))
   strides <- cumprod(c(1, utils::head(sizes, -1)))
   k <- prod(sizes)
   parts <- lapply(
-    seq_along(categories), function(j)
+    seq_along(categories), function(j) {
       as.character(categories[[j]])[
         (seq_len(k) - 1L) %/% strides[j] %% sizes[j] + 1L
       ]
+    }
   )
   labels <- do.call(paste, c(parts, sep = "|"))
   if (anyDuplicated(labels)) {
@@ -849,8 +850,9 @@ resolve_matching_models <- function(process, declaration, registries) {
   used <- unique(
     unlist(
       lapply(
-        fields, function(f)
+        fields, function(f) {
           lapply(model_entries(process[[f]]), matching_dimensions, dims = dims)
+        }
       )
     )
   )
@@ -860,18 +862,19 @@ resolve_matching_models <- function(process, declaration, registries) {
       stats::setNames(used, used), function(d) registries[[d]]
     )
     labels <- combination_labels(categories)
-    convert <- function(model) combined_matching_model(
-      model, categories,
-      labels
-    )
+    convert <- function(model) {
+      combined_matching_model(model, categories, labels)
+    }
   } else {
     dim <- if (length(used)) used else NULL
     categories <- if (is.null(dim)) NULL else registries[[dim]]
     labels <- categories
-    convert <- function(model) internal_matching_model(
-      model,
-      if (length(matching_dimensions(model, dims))) dim, categories
-    )
+    convert <- function(model) {
+      internal_matching_model(
+        model,
+        if (length(matching_dimensions(model, dims))) dim, categories
+      )
+    }
   }
   for (f in fields) {
     x <- process[[f]]

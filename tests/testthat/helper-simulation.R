@@ -42,10 +42,12 @@ quiet_unreachable <- function(expr) {
 # cells, so their histories differ draw by draw while agreeing in distribution.
 # Compare union and dissolution counts over replications.
 expect_equivalent_unions <- function(a, b, years, seeds = 1:20) {
-  counts <- function(model) vapply(seeds, function(seed) {
-    unions <- run_simulation(model, years, seed)$unions
-    c(nrow(unions), sum(unions$end_reason %in% "dissolution"))
-  }, numeric(2))
+  counts <- function(model) {
+    vapply(seeds, function(seed) {
+      unions <- run_simulation(model, years, seed)$unions
+      c(nrow(unions), sum(unions$end_reason %in% "dissolution"))
+    }, numeric(2))
+  }
   x <- counts(a)
   y <- counts(b)
   for (k in 1:2) {

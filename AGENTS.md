@@ -72,6 +72,11 @@ be made autonomously; record choices with substantial architectural consequences
   they have no side effects or control-flow modifiers. Put `return()`, `stop()`,
   `break`, and `next` on their own lines inside the relevant block; brace
   control-flow/error-handler callback bodies as well.
+- Every function definition spanning multiple lines must have a braced body,
+  including named functions, local helpers and anonymous callbacks. This also
+  applies when the body is a single expression or wrapped function call.
+  Compact one-line functions may remain unbraced, subject to the control-flow
+  rules above. See D171.
 - Do not use semicolons to separate R statements; put each statement on its
   own line (D156).
 - Use snake_case for package-owned function and argument names (for example,

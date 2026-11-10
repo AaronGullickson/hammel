@@ -247,11 +247,13 @@ build_rows <- function(dims) {
   for (k in seq_along(dims)) {
     d <- dims[[k]]
     index <- index + d$code[grid[[k]]] * d$stride
-    out[[paste0(".key", k)]] <- (if (is.null(d$key)) {
-      seq_along(d$code)
+    out[[paste0(".key", k)]] <- (
+      if (is.null(d$key)) {
+        seq_along(d$code)
       } else {
         d$key
-    })[grid[[k]]]
+      }
+    )[grid[[k]]]
   }
   out$.index <- index + 1
   out
@@ -292,30 +294,32 @@ person_by_dims <- function(
   previous_codes = NULL
 ) {
   lapply(
-    by, function(name) switch(
-      name,
-      sex = label_dim("sex", c("m", "f"), counts$strides[["sex"]]),
-      group = label_dim("group", obs$groups, counts$strides[["group"]]),
-      union_type = label_dim(
-        "union_type", union_type_labels(obs$typed),
-        counts$strides[["union_type"]]
-      ),
-      previous_union = {
-        labels <- previous_labels(use_detailed_previous_union)
-        codes <- if (is.null(previous_codes)) {
-          seq_along(labels) - 1L
-        } else {
-          previous_codes
+    by, function(name) {
+      switch(
+        name,
+        sex = label_dim("sex", c("m", "f"), counts$strides[["sex"]]),
+        group = label_dim("group", obs$groups, counts$strides[["group"]]),
+        union_type = label_dim(
+          "union_type", union_type_labels(obs$typed),
+          counts$strides[["union_type"]]
+        ),
+        previous_union = {
+          labels <- previous_labels(use_detailed_previous_union)
+          codes <- if (is.null(previous_codes)) {
+            seq_along(labels) - 1L
+          } else {
+            previous_codes
+          }
+          label_dim(
+            "previous_union", labels[codes + 1L], counts$strides[[
+              "previous_union"
+            ]],
+            code = codes,
+            key = codes + 1L
+          )
         }
-        label_dim(
-          "previous_union", labels[codes + 1L], counts$strides[[
-            "previous_union"
-          ]],
-          code = codes,
-          key = codes + 1L
-        )
-      }
-    )
+      )
+    }
   )
 }
 
@@ -450,15 +454,14 @@ combine_dimensions <- function(population, dims) {
   )
   sizes <- vapply(categories, length, integer(1))
   strides <- as.integer(cumprod(c(1, utils::head(sizes, -1))))
-  code <- function(d, values) match(
-    as.character(values), as.character(categories[[d]])
-  ) - 1L
+  code <- function(d, values) {
+    match(as.character(values), as.character(categories[[d]])) - 1L
+  }
   current <- Reduce(
     `+`, lapply(
-      seq_along(dims), function(k) code(
-        dims[k],
-        persons[[dims[k]]]
-      ) * strides[k]
+      seq_along(dims), function(k) {
+        code(dims[k], persons[[dims[k]]]) * strides[k]
+      }
     )
   )
   history <- data.frame(
@@ -511,9 +514,11 @@ combine_dimensions <- function(population, dims) {
   }
   decode <- as.data.frame(
     lapply(
-      seq_along(dims), function(k)
-        categories[[k]][(seq_len(prod(sizes)) - 1L) %/% strides[k] %% sizes[k] +
-          1L]
+      seq_along(dims), function(k) {
+        categories[[k]][
+          (seq_len(prod(sizes)) - 1L) %/% strides[k] %% sizes[k] + 1L
+        ]
+      }
     ),
     stringsAsFactors = FALSE,
     col.names = dims
@@ -561,9 +566,10 @@ finish_strata <- function(
   out <- out[c(keys, after)]
   dropped <- any(
     vapply(
-      seq_along(alias$suffixes), function(k)
+      seq_along(alias$suffixes), function(k) {
         paste0("group", alias$suffixes[k]) %in% internal &&
-        !setequal(alias$requests[[k]], alias$combined$dims), logical(1)
+          !setequal(alias$requests[[k]], alias$combined$dims)
+      }, logical(1)
     )
   )
   if (dropped) {

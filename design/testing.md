@@ -1369,12 +1369,14 @@ run_case <- function(depth, times, selected) {
     }
     out
   }
-  current <- function() count_kin(
-    population, times,
-    generations = depth,
-    by = "sex",
-    relationships = selected
-  )
+  current <- function() {
+    count_kin(
+      population, times,
+      generations = depth,
+      by = "sex",
+      relationships = selected
+    )
+  }
   stopifnot(identical(previous(), current()))
   timing <- function(f) {
     median(

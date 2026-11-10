@@ -940,16 +940,18 @@ calculate_entry_rates <- function(
   )
   # union_type here splits formations only; exposure is not split by it.
   state_by <- setdiff(by, "union_type")
-  run <- function(axis, breaks, mask) run_person_lexis(
-    obs, state_by,
-    time_breaks, breaks,
-    axis = axis,
-    sex = TRUE,
-    utype_filter = if (marriage_measure) 2L else 1L,
-    previous_mask = mask,
-    use_detailed_previous_union = use_detailed_previous_union,
-    exclusive = TRUE
-  )
+  run <- function(axis, breaks, mask) {
+    run_person_lexis(
+      obs, state_by,
+      time_breaks, breaks,
+      axis = axis,
+      sex = TRUE,
+      utype_filter = if (marriage_measure) 2L else 1L,
+      previous_mask = mask,
+      use_detailed_previous_union = use_detailed_previous_union,
+      exclusive = TRUE
+    )
+  }
   kinds <- if (marriage_measure) {
     list(c(1L, 2L))
   } else if (entry_type) {
@@ -1221,18 +1223,20 @@ union_strata <- function(
     )
   }
   dims <- lapply(
-    by, function(name) switch(
-      name,
-      group_w = label_dim("group_w", identities, stride),
-      group_h = label_dim(
-        "group_h", identities, stride * if (mode == 2L) {
-          ng
-        } else {
-          1L
-        }
-      ),
-      union_type = label_dim("union_type", types, stride * combos)
-    )
+    by, function(name) {
+      switch(
+        name,
+        group_w = label_dim("group_w", identities, stride),
+        group_h = label_dim(
+          "group_h", identities, stride * if (mode == 2L) {
+            ng
+          } else {
+            1L
+          }
+        ),
+        union_type = label_dim("union_type", types, stride * combos)
+      )
+    }
   )
   list(
     unions = unions,

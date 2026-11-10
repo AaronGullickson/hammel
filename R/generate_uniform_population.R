@@ -229,17 +229,20 @@ baseline_group_sampler <- function(groups) {
         check_weights(groups[[d]], sprintf("`groups$%s`", d))
       }
     )
-    draw <- function(size) stats::setNames(
-      lapply(
-        seq_along(dimensions),
-        function(k)
-          names(groups[[k]])[sample.int(
-            length(groups[[k]]), size,
-            replace = TRUE,
-            prob = probabilities[[k]]
-          )]
-      ), dimensions
-    )
+    draw <- function(size) {
+      stats::setNames(
+        lapply(
+          seq_along(dimensions),
+          function(k) {
+            names(groups[[k]])[sample.int(
+              length(groups[[k]]), size,
+              replace = TRUE,
+              prob = probabilities[[k]]
+            )]
+          }
+        ), dimensions
+      )
+    }
     categories <- lapply(
       stats::setNames(dimensions, dimensions),
       function(d) names(groups[[d]])

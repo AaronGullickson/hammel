@@ -77,9 +77,9 @@ validate_conversion_rates <- function(rates) {
   }
   check_columns(rates, "rate", "union_convert_rate")
   if (any(
-        c("previous_union", "sex", "time_start", "time_end", "union_type") %in%
-          names(rates)
-      )) {
+    c("previous_union", "sex", "time_start", "time_end", "union_type") %in%
+      names(rates)
+  )) {
     stop(
       paste0(
         "Conversion rates allow age or duration and ",

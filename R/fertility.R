@@ -170,10 +170,9 @@ unreachable_parity_cells <- function(rates, interval) {
     }
     starts <- sort(unique(rates$parity_start[rows]))
     ends <- vapply(
-      starts, function(k) rates$parity_end[rows][match(
-        k,
-        rates$parity_start[rows]
-      )], 0
+      starts, function(k) {
+        rates$parity_end[rows][match(k, rates$parity_start[rows])]
+      }, 0
     )
     # earliest age at which a woman at the current parity is eligible
     eligible <- 0

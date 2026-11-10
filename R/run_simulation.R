@@ -341,11 +341,12 @@ run_simulation <- function(model, years, seed = NULL) {
       )
     }
   )
-  strata <- function(rates, process, union_level = FALSE)
+  strata <- function(rates, process, union_level = FALSE) {
     prepare_strata_rates(
       rates, process, registries, start, start + years,
       union_level
     )
+  }
   death <- strata(death_rates, "mortality")
   death_rates <- death$rates
   birth <- strata(birth_rates, "fertility")

@@ -61,9 +61,15 @@ test_that("search rates and cohabitation probabilities accept the same complete 
   m$population$unions <- tibble::tibble(union_id=1,wife_id=1,husband_id=2,
     start_time=-5,end_time=-1,end_reason="death_husband")
   m$population$persons$death_time[2] <- -1
-  attach <- function(rates,prob) set_union_formation(m,"rate",rates=rates,
-    cohab_prob=prob,union_convert_rate=data.frame(dur_start=0,dur_end=Inf,rate=0),
-    kinship_generations=0)
+  attach <- function(rates,prob) {
+    set_union_formation(
+      m, "rate",
+      rates = rates,
+      cohab_prob = prob,
+      union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = 0),
+      kinship_generations = 0
+    )
+  }
   actual <- run_simulation(attach(calendar,p),2,seed=42)
   expected <- run_simulation(attach(duplicate_pooled(calendar),duplicate_pooled(
     p)),2,seed=42)

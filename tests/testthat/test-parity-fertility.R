@@ -109,8 +109,12 @@ test_that("parity composes with grouped typed fertility, conversion and stratifi
     transform(base,union_type="cohab",rate=rate*.8),
     transform(base,union_type="marriage",rate=rate*1.1))
   b_factor <- c(unpartnered=1.1,cohab=.9,marriage=1.2)
-  stratified <- do.call(rbind,lapply(names(b_factor),function(type)
-    stratify_rates(rates[rates$union_type==type,],list(group=c(A=1,B=b_factor[[type]])))))
+  stratified <- do.call(rbind,lapply(names(b_factor),function(type) {
+    stratify_rates(
+      rates[rates$union_type == type, ],
+      list(group = c(A = 1, B = b_factor[[type]]))
+    )
+  }))
   model <- hammel_model() |> set_population(pop) |>
     set_mortality(data.frame(sex=c("m","f"),age_start=0,age_end=Inf,rate=.01)) |>
     (\(m) quiet_unreachable(set_fertility(m,stratified)))() |>
