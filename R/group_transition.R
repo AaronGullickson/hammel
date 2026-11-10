@@ -381,7 +381,7 @@ validate_group_transition <- function(process) {
                 c("unpartnered", "partnered", "cohab","marriage")
            ) ||
            ("partnered" %in% r$union_type &&
-              any(r$union_type %in% c("cohab","marriage"))))) {
+              any(r$union_type %in% c("cohab", "marriage"))))) {
     stop(
       paste0(
         "Transition union_type must use ",

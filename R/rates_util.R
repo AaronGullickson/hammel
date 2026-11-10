@@ -402,7 +402,7 @@ check_strata_overlap <- function(rates, process) {
     key <- if (length(keys)) {
       do.call(
         paste, c(
-          lapply(rates[rows, keys, drop = FALSE ], as.character),
+          lapply(rates[rows, keys, drop = FALSE], as.character),
           sep = "\r"
         )
       )
@@ -571,14 +571,13 @@ validate_rates <- function(rates, mortality) {
     check_numeric_column(rates$parity_start, "rates$parity_start")
     upper <- rates$parity_end
     if (!is.numeric(upper) || !is.null(dim(upper)) || anyNA(upper) ||
-          any(
-            rates$parity_start < 0 |
-              rates$parity_start != floor(rates$parity_start)
-          ) ||
-          any(upper <= rates$parity_start) ||
-          any(is.finite(upper) & upper != floor(upper)) ||
-          any(rates$parity_start > .Machine$integer.max) ||
-          any(is.finite(upper) & upper > .Machine$integer.max)) {
+        any(rates$parity_start < 0 |
+            rates$parity_start != floor(rates$parity_start)
+        ) ||
+        any(upper <= rates$parity_start) ||
+        any(is.finite(upper) & upper != floor(upper)) ||
+        any(rates$parity_start > .Machine$integer.max) ||
+        any(is.finite(upper) & upper > .Machine$integer.max)) {
       stop(
         paste0(
           "Parity bands need nonnegative integer starts and ",
@@ -595,10 +594,10 @@ validate_rates <- function(rates, mortality) {
           )
           bands <- bands[order(bands$parity_start), , drop = FALSE]
           if (bands$parity_start[1] != 0 || tail(bands$parity_end, 1) != Inf ||
-                (nrow(bands) > 1L &&
-                   any(
-                     head(bands$parity_end, -1) != tail(bands$parity_start, -1)
-                   ))) {
+              (nrow(bands) > 1L &&
+               any(
+                 head(bands$parity_end, -1) != tail(bands$parity_start, -1)
+               ))) {
             stop(
               paste0(
                 "Parity bands must cover [0, Inf) without gaps or ",
@@ -623,10 +622,10 @@ validate_rates <- function(rates, mortality) {
   for (rows in schedules) {
     rows <- rows[order(rates$age_start[rows])]
     if (length(rows) > 1L &&
-          any(
-            rates$age_start[rows[-1L]] <
-              cummax(rates$age_end[rows])[-length(rows)]
-          )) {
+        any(
+          rates$age_start[rows[-1L]] <
+          cummax(rates$age_end[rows])[-length(rows)]
+        )) {
       stop(
         "Age intervals must not overlap within a rate schedule.",
         call. = FALSE

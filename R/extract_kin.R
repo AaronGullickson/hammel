@@ -320,9 +320,9 @@ kin_relationship_types <- function(generations) {
   g <- seq.int(0L, as.integer(generations))
   pairs <- expand.grid(ego_distance = g, relative_distance = g)
   pairs <- pairs[pairs$ego_distance + pairs$relative_distance > 0L, ]
-  pairs <- pairs[order(
-    pairs$ego_distance + pairs$relative_distance, -pairs$ego_distance
-    ), ]
+  pairs <- pairs[
+    order(pairs$ego_distance + pairs$relative_distance, -pairs$ego_distance),
+  ]
   pairs$relationship <- kin_relationship(
     pairs$ego_distance, pairs$relative_distance
   )

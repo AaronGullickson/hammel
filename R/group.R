@@ -235,8 +235,8 @@ declared_group <- function(population, name = NULL) {
   inherits(population, "hammel_population") &&
     (if (is.null(name)) {
       length(population$groups) > 0L
-      } else {
-        name %in% names(population$groups)
+    } else {
+      name %in% names(population$groups)
     })
 }
 

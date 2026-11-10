@@ -256,8 +256,8 @@ weight_group_name_possible <- function(name, type) {
   dim_ok(name) || (startsWith(name, "partner_") && dim_ok(
     sub("^partner_", "", name)
   )) ||
-    (grepl("^ancestry_.+_.+", name)) || (type == "transition" && name ==
-    "destination")
+    (grepl("^ancestry_.+_.+", name)) || 
+      (type == "transition" && name == "destination")
 }
 
 validate_weight_model <- function(model) {

@@ -244,7 +244,7 @@ get_fertility_hfd <- function(
     attr(rates, "source")$missing_rates <- "zero"
     columns <- c(paste0("m", 1:4, "x"), "m5px")
     attr(rates, "source")$missing_rates_replaced <- sum(
-      is.na(data[ data$Year %in% year, columns, drop = FALSE ])
+      is.na(data[data$Year %in% year, columns, drop = FALSE])
     )
   }
   attr(rates, "source")$open_ages <- "lower_as_single_year_upper_open"

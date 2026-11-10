@@ -82,8 +82,8 @@ augment_unions <- function(population) {
     rows <- match(result[[id_column]], persons$person_id)
     for (column in columns) {
       result[[paste0(column, "_", suffix)]] <- if (!is.null(
-                                                      formation[[column]]
-                                                    )) {
+        formation[[column]]
+      )) {
         formation[[column]][[suffix]]
       } else {
         persons[[column]][rows]

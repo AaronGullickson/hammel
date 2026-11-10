@@ -648,10 +648,12 @@ internal_matching_model <- function(model, dim, categories) {
       formula = renamed,
       coefficients = coefficients,
       group_exogamy = exogamy$effects,
-      group_levels = if (any(
-                           c("female_group", "male_group") %in%
-                             all.vars(renamed)
-                         )) {
+      group_levels = if (
+        any(
+          c("female_group", "male_group") %in%
+          all.vars(renamed)
+        )
+      ) {
         categories
       },
       prevent_exogamy = exogamy$prevent,

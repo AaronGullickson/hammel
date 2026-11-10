@@ -1257,10 +1257,12 @@ encode_combined <- function(alias, data, suffix = "") {
     if (!column %in% names(data)) {
       return(rep(NA_integer_, nrow(data)))
     }
-    code <- code + (match(
-      as.character(data[[column]]), as.character(combined$categories[[k]])
-      ) - 1L) *
-      strides[k]
+    code <- code + (
+      match(
+        as.character(data[[column]]),
+        as.character(combined$categories[[k]])
+      ) - 1L
+    ) * strides[k]
   }
   as.integer(code)
 }
@@ -1268,11 +1270,11 @@ encode_combined <- function(alias, data, suffix = "") {
 # Shared by public event-rate summaries, after their final aggregation.
 validate_rate_conf_level <- function(conf_level) {
   if (!is.null(conf_level) &&
-        (!is.numeric(conf_level) || length(conf_level) != 1L ||
-           !is.null(dim(conf_level)) ||
-           !is.finite(conf_level) ||
-           conf_level <= 0 ||
-           conf_level >= 1)) {
+      (!is.numeric(conf_level) || length(conf_level) != 1L ||
+       !is.null(dim(conf_level)) ||
+       !is.finite(conf_level) ||
+       conf_level <= 0 ||
+       conf_level >= 1)) {
     stop(
       paste0(
         "`conf_level` must be NULL or a finite numeric ",
