@@ -49,9 +49,6 @@ attach_process <- function(model, process) {
     stop("`name` must be a single nonempty string.", call. = FALSE)
   }
   if (name %in% c("mortality", "fertility")) {
-    if (!identical(process$rate_unit, "person_year")) {
-      stop("Built-in process rates must use person-year units.", call. = FALSE)
-    }
     validate_rates(process$rates, mortality = name == "mortality")
     validate_process_weights(process$weights, "person")
     if (name == "fertility") {
@@ -103,8 +100,7 @@ attach_process <- function(model, process) {
 
 new_rate_process <- function(name, rates) {
   fields <- list(
-    name = name, rates = tibble::as_tibble(rates),
-    rate_unit = "person_year"
+    name = name, rates = tibble::as_tibble(rates)
   )
   if (!is.null(attr(rates, "source"))) {
     fields$source <- attr(rates, "source")

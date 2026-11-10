@@ -78,9 +78,8 @@ set_union_dissolution <- function(model, rates, weights = NULL) {
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 validate_union_dissolution <- function(process, calendar_interval = NULL) {
-  if (!identical(process$name, "union_dissolution") ||
-    !identical(process$rate_unit, "person_year")) {
-    stop("Invalid union-dissolution specification or units.", call. = FALSE)
+  if (!identical(process$name, "union_dissolution")) {
+    stop("Invalid union-dissolution specification.", call. = FALSE)
   }
   rates <- process$rates
   check_stratified_columns(rates, "union_type", "Union-dissolution")

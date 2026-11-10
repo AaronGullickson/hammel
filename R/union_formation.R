@@ -189,7 +189,7 @@ union_formation <- function(
     father_matching = father_matching,
     cancel_birth_if_no_match = cancel_birth_if_no_match,
     diagnostics = diagnostics,
-    rates = rates, rate_unit = "person_year",
+    rates = rates,
     cohab_prob = cohab_prob, cohab_matching = cohab_matching,
     union_convert_rate = union_convert_rate,
     cohabitation_counts_as_previous_union =
@@ -279,9 +279,8 @@ set_union_formation <- function(
 
 validate_union_formation <- function(process) {
   validate_cohabitation(process)
-  if (!identical(process$name, "union_formation") ||
-    !identical(process$rate_unit, "person_year")) {
-    stop("Invalid union-formation specification or units.", call. = FALSE)
+  if (!identical(process$name, "union_formation")) {
+    stop("Invalid union-formation specification.", call. = FALSE)
   }
   if (!is.character(process$initiation) || length(process$initiation) != 1L ||
     is.na(process$initiation) || !process$initiation %in% c(

@@ -56,11 +56,8 @@
 #'   calculate_life_table()
 calculate_life_table <- function(rates, radix = 1) {
   if (inherits(rates, "hammel_process")) {
-    if (!identical(rates$name, "mortality") ||
-      !identical(rates$rate_unit, "person_year")) {
-      stop("Life tables require a mortality process with person-year rates.",
-        call. = FALSE
-      )
+    if (!identical(rates$name, "mortality")) {
+      stop("Life tables require a mortality process.", call. = FALSE)
     }
     rates <- rates$rates
   }

@@ -1,4 +1,4 @@
-# Construct and validate group-transition processes and household move rules.
+ # Construct and validate group-transition processes and household move rules.
 
 # PUBLIC FUNCTIONS ---------------------------------------------------------
 
@@ -228,9 +228,8 @@ resolve_transition_processes <- function(processes, declaration) {
 }
 
 validate_group_transition <- function(process) {
-  if (!identical(process$name, "group_transition") ||
-    !identical(process$rate_unit, "person_year")) {
-    stop("Invalid group-transition specification or units.", call. = FALSE)
+  if (!identical(process$name, "group_transition")) {
+    stop("Invalid group-transition specification.", call. = FALSE)
   }
   r <- process$rates
   old <- intersect(c("group_origin", "group_dest"), names(r))

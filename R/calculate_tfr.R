@@ -56,10 +56,8 @@
 #' calculate_tfr(usa_2000_fertility_union)
 calculate_tfr <- function(rates) {
   if (inherits(rates, "hammel_process")) {
-    if (!identical(rates$name, "fertility") ||
-      !identical(rates$rate_unit, "person_year")) {
-      stop("TFR requires a fertility process with person-year rates.",
-           call. = FALSE)
+    if (!identical(rates$name, "fertility")) {
+      stop("TFR requires a fertility process.", call. = FALSE)
     }
     rates <- rates$rates
   }
@@ -141,11 +139,8 @@ calculate_tfr <- function(rates) {
 #' @export
 calculate_patfr <- function(rates) {
   if (inherits(rates, "hammel_process")) {
-    if (!identical(rates$name, "fertility") || !identical(
-      rates$rate_unit,
-      "person_year"
-    )) {
-      stop("PATFR requires a fertility process with person-year rates.",
+    if (!identical(rates$name, "fertility")) {
+      stop("PATFR requires a fertility process.",
         call. =
           FALSE
       )

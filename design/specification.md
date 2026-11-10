@@ -82,7 +82,7 @@ its core tables to tibbles, and preserves extra components. The population's
 model. An unknown endpoint is allowed for construction, but not execution.
 
 `mortality(rates)` and `fertility(rates, birth_interval = 0.75)` return typed
-`hammel_process` objects with `name`, `rates`, and `rate_unit = "person_year"`.
+`hammel_process` objects with `name` and `rates`; rates are always per person-year.
 Fertility also stores `birth_interval` and the female-birth probability `ffab`
 (default 0.4886); source attributes are copied into the
 process when present. `set_process(model, process)` stores a process under its

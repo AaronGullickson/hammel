@@ -272,10 +272,7 @@ test_that("snapshot event accounting handles repeated moves, deaths and arbitrar
   expect_equal(nrow(calculate_population_size(pop, numeric(), by = "group")), 0)
 })
 
-test_that("edited transition specifications reject incompatible units and unsupported processes", {
-  model <- set_group_transition(transition_model(), transition_rates())
-  model$processes$group_transition$group$rate_unit <- "annual_probability"
-  expect_error(run_simulation(model, 0), "specification or units")
+test_that("edited transition specifications reject unsupported processes", {
   model <- make_model(1)
   model$processes$unimplemented <- structure(list(name = "unimplemented"), class = "hammel_process")
   expect_error(run_simulation(model, 0), "Unsupported demographic process")
