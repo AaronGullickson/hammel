@@ -78,6 +78,17 @@ explicitly; no demographic coefficients are defaulted. Formula functions must
 be deterministic and must not mutate simulation state. Data-dependent
 transformations can change with the candidate pool; use fixed transformations
 when coefficients should have a fixed interpretation.
+
+Partners are drawn exactly from the full conditional-logit distribution over
+all eligible men, without a candidate sample. Living, unpartnered men are
+grouped by group and quarter-year birth bin; a bin is chosen in proportion to
+its size times the largest weight any member could have, a member is accepted
+with the ratio of his weight to that maximum, and only he is screened for age
+and kinship. For the built-in linear/quadratic age model this is exact.
+Custom R formulas are bounded on a 1/32-year grid; if a drawn man's utility
+exceeds the bound, simulation warns that draws were approximate. Existing
+unions are retained even if a new-search restriction would exclude the
+partner.
 }
 \examples{
 # Illustrative coefficients, not demographic defaults.

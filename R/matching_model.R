@@ -30,6 +30,17 @@
 #' transformations can change with the candidate pool; use fixed transformations
 #' when coefficients should have a fixed interpretation.
 #'
+#' Partners are drawn exactly from the full conditional-logit distribution over
+#' all eligible men, without a candidate sample. Living, unpartnered men are
+#' grouped by group and quarter-year birth bin; a bin is chosen in proportion to
+#' its size times the largest weight any member could have, a member is accepted
+#' with the ratio of his weight to that maximum, and only he is screened for age
+#' and kinship. For the built-in linear/quadratic age model this is exact.
+#' Custom R formulas are bounded on a 1/32-year grid; if a drawn man's utility
+#' exceeds the bound, simulation warns that draws were approximate. Existing
+#' unions are retained even if a new-search restriction would exclude the
+#' partner.
+#'
 #' @param formula A one-sided R formula using `age_difference` and group
 #'   predictors `female_<group>`, `male_<group>` and `same_<group>`. Use `~ 1`
 #'   and `numeric()` coefficients for pair-effects-only matching.
