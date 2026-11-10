@@ -3,7 +3,7 @@
 \name{group}
 \alias{group}
 \alias{set_groups}
-\title{Describe and declare group dimensions}
+\title{Describe and declare a group dimension}
 \usage{
 group(categories = NULL, ancestry = FALSE, inheritance = group_inheritance())
 
@@ -12,24 +12,24 @@ set_groups(model, ...)
 \arguments{
 \item{categories}{Optional complete, ordered vector of the dimension's
 categories (character labels or finite numeric codes). \code{NULL} (the default)
-keeps the categories the population already declares (such as those of
-\code{\link[=generate_uniform_population]{generate_uniform_population()}}); without any, they are inferred from the
-population's values in first-occurrence order, plus transition destinations
-and categories with ancestry shares. When given, every value in the
-population and every transition destination must be listed; extra
-categories may start empty, for example the output of a custom inheritance
-rule. Group-specific rate tables must cover every category.}
+either keeps the categories the population already declares, if any, or
+they are inferred from the population's values in first-occurrence order,
+plus transition destinations and categories with ancestry shares. When
+given, every value in the population and every transition destination must
+be listed; categories can be declared even if starting population contains
+no members of that category.}
 
 \item{ancestry}{Logical, default \code{FALSE}. Track ancestry shares for this
-dimension: the population then has an \code{ancestry} table, newborns average
-their parents' shares, and the \code{"ancestry"} inheritance method becomes
-available.}
+dimension in the simulation output. The returned population then has an
+\code{ancestry} table indicating the share of ancestry from each category of the
+group. Required for use of the \code{ancestry} inheritance method.}
 
-\item{inheritance}{How newborns are assigned to a category: a
-\code{\link[=group_inheritance]{group_inheritance()}} object, a method name such as \code{"mother"}, or a
-calendar schedule tibble with \code{time_start}, \code{time_end} and list-column
-\code{model}. The default selects either parent with equal probability, with
-maternal fallback.}
+\item{inheritance}{Either a single character string, a \code{\link[=group_inheritance]{group_inheritance()}}
+object, or a calendar schedule tibble with \code{time_start}, \code{time_end} and a
+list-column \code{model} providing the group inheritance model for a time
+period. Determines how group membership is assigned to newborns. Defaults
+to \code{random_parent}. Character sting entries will use built-in methods
+provided gy the \code{group_inheritance} model.}
 
 \item{model}{A \code{hammel_model}, used by \code{set_groups()}.}
 
@@ -41,35 +41,29 @@ column. No arguments removes the declaration.}
 \code{set_groups()} returns an updated \code{hammel_model}.
 }
 \description{
-\code{group()} describes one group dimension, for use with \code{set_groups()},
-\code{\link[=hammel_population]{hammel_population()}} or \code{\link[=generate_uniform_population]{generate_uniform_population()}}. \code{set_groups()}
-declares named dimensions on a model, using one \code{group()} object per
-dimension. Neither function runs a simulation.
-}
-\section{Declaring model dimensions}{
+The \code{group()} function describes a single group dimension, including valid
+categories, whether to track ancestry, and inheritance rules. The
+\code{set_groups()} function declares all group dimensions for a \code{hammel_model}.
 
-Name the persons columns that are group dimensions and give each its settings
-with \code{\link[=group]{group()}}. Groups are always declared: a column that is not declared is
-an ordinary custom column, kept but never used by any process or analysis.
-The declaration replaces any declaration carried by the population (for
-example from \code{\link[=generate_uniform_population]{generate_uniform_population()}}), except that a dimension
-declared without \code{categories} keeps the population's declared categories for
-it; it may be given before or after \code{\link[=set_population]{set_population()}}; it is checked against
-the population when both are present and at simulation. Simulated populations
-carry it, so analysis and restarts need nothing further.
+For the \code{set_groups} function, each named argument should identify a group
+name and provide the returned value from a \code{group()} function. See examples
+for syntax.
 }
-
 \examples{
-group(
-  categories = c("A", "B", "AB"), ancestry = TRUE,
-  inheritance = group_inheritance("mother")
-)
+# create two groups - ethnicity and education
 model <- hammel_model() |>
-  set_population(generate_uniform_population(
-    100,
-    groups = list(group = c(A = .5, B = .5))
-  )) |>
-  set_groups(group = group(inheritance = "mother"))
+  set_groups(
+    ethnicity = group(
+      categories = c("W", "B", "O"),
+      ancestry = TRUE,
+      inheritance = group_inheritance("ancestry")
+    ),
+    education = group(
+      categories = c("LHS", "HS", "SC", "C"),
+      ancestry = FALSE,
+      inheritance = group_inheritance("fixed", fixed_value = "LHS")
+    )
+  )
 }
 \seealso{
 \code{\link[=hammel_population]{hammel_population()}}, \code{\link[=generate_uniform_population]{generate_uniform_population()}},

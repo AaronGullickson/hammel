@@ -6,42 +6,36 @@
 # Group dimensions are always declared (D134). A declaration is a named list
 # of `hammel_group` objects, one per dimension, keyed by the persons column.
 
-#' Describe and declare group dimensions
+#' Describe and declare a group dimension
 #'
-#' `group()` describes one group dimension, for use with `set_groups()`,
-#' [hammel_population()] or [generate_uniform_population()]. `set_groups()`
-#' declares named dimensions on a model, using one `group()` object per
-#' dimension. Neither function runs a simulation.
+#' @description
 #'
-#' @section Declaring model dimensions:
-#' Name the persons columns that are group dimensions and give each its settings
-#' with [group()]. Groups are always declared: a column that is not declared is
-#' an ordinary custom column, kept but never used by any process or analysis.
-#' The declaration replaces any declaration carried by the population (for
-#' example from [generate_uniform_population()]), except that a dimension
-#' declared without `categories` keeps the population's declared categories for
-#' it; it may be given before or after [set_population()]; it is checked against
-#' the population when both are present and at simulation. Simulated populations
-#' carry it, so analysis and restarts need nothing further.
+#' The `group()` function describes a single group dimension, including valid
+#' categories, whether to track ancestry, and inheritance rules. The
+#' `set_groups()` function declares all group dimensions for a `hammel_model`.
+#'
+#' For the `set_groups` function, each named argument should identify a group
+#' name and provide the returned value from a `group()` function. See examples
+#' for syntax.
 #'
 #' @param categories Optional complete, ordered vector of the dimension's
 #'   categories (character labels or finite numeric codes). `NULL` (the default)
-#'   keeps the categories the population already declares (such as those of
-#'   [generate_uniform_population()]); without any, they are inferred from the
-#'   population's values in first-occurrence order, plus transition destinations
-#'   and categories with ancestry shares. When given, every value in the
-#'   population and every transition destination must be listed; extra
-#'   categories may start empty, for example the output of a custom inheritance
-#'   rule. Group-specific rate tables must cover every category.
+#'   either keeps the categories the population already declares, if any, or
+#'   they are inferred from the population's values in first-occurrence order,
+#'   plus transition destinations and categories with ancestry shares. When
+#'   given, every value in the population and every transition destination must
+#'   be listed; categories can be declared even if starting population contains
+#'   no members of that category.
 #' @param ancestry Logical, default `FALSE`. Track ancestry shares for this
-#'   dimension: the population then has an `ancestry` table, newborns average
-#'   their parents' shares, and the `"ancestry"` inheritance method becomes
-#'   available.
-#' @param inheritance How newborns are assigned to a category: a
-#'   [group_inheritance()] object, a method name such as `"mother"`, or a
-#'   calendar schedule tibble with `time_start`, `time_end` and list-column
-#'   `model`. The default selects either parent with equal probability, with
-#'   maternal fallback.
+#'   dimension in the simulation output. The returned population then has an
+#'   `ancestry` table indicating the share of ancestry from each category of the
+#'   group. Required for use of the `ancestry` inheritance method.
+#' @param inheritance Either a single character string, a [group_inheritance()]
+#'   object, or a calendar schedule tibble with `time_start`, `time_end` and a
+#'   list-column `model` providing the group inheritance model for a time
+#'   period. Determines how group membership is assigned to newborns. Defaults
+#'   to `random_parent`. Character sting entries will use built-in methods
+#'   provided gy the `group_inheritance` model.
 #' @param model A `hammel_model`, used by `set_groups()`.
 #' @param ... Named `group()` objects, one per dimension, named by the persons
 #'   column. No arguments removes the declaration.
@@ -53,10 +47,20 @@
 #' @order 1
 #' @export
 #' @examples
-#' group(
-#'   categories = c("A", "B", "AB"), ancestry = TRUE,
-#'   inheritance = group_inheritance("mother")
-#' )
+#' # create two groups - ethnicity and education
+#' model <- hammel_model() |>
+#'   set_groups(
+#'     ethnicity = group(
+#'       categories = c("W", "B", "O"),
+#'       ancestry = TRUE,
+#'       inheritance = group_inheritance("ancestry")
+#'     ),
+#'     education = group(
+#'       categories = c("LHS", "HS", "SC", "C"),
+#'       ancestry = FALSE,
+#'       inheritance = group_inheritance("fixed", fixed_value = "LHS")
+#'     )
+#'   )
 group <- function(
   categories = NULL,
   ancestry = FALSE,
@@ -77,13 +81,6 @@ group <- function(
 #' @rdname group
 #' @order 2
 #' @export
-#' @examples
-#' model <- hammel_model() |>
-#'   set_population(generate_uniform_population(
-#'     100,
-#'     groups = list(group = c(A = .5, B = .5))
-#'   )) |>
-#'   set_groups(group = group(inheritance = "mother"))
 set_groups <- function(model, ...) {
   check_model(model)
   groups <- list(...)
@@ -106,8 +103,8 @@ set_groups <- function(model, ...) {
 # make derived names ambiguous.
 reserved_group_names <- c(
   "person_id", "sex", "birth_time", "death_time",
-  "mother_id",
-  "father_id", "union_type", "previous_union", "parity", "partnered",
+  "mother_id", "father_id",
+  "union_type", "previous_union", "parity", "partnered",
   "age_difference",
   "origin", "destination", "hetfert", "unknown", "time", "rate"
 )
