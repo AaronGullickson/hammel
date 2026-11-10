@@ -10,12 +10,10 @@ mortality(rates, weights = NULL)
 set_mortality(model, rates, weights = NULL)
 }
 \arguments{
-\item{rates}{A nonempty data frame containing numeric \code{age_start}, \code{age_end},
-and \code{rate}, and character \code{sex} values \code{"m"} and \code{"f"}, with both
-represented. Starts must be finite and nonnegative; ends must exceed starts
-and may be \code{Inf} for upper-open bands. Rates must be finite and
-nonnegative, per person-year. Use \code{\link[=stratify_rates]{stratify_rates()}} to add proportional
-group differences.}
+\item{rates}{A nonempty data frame defining the mortality rate schedules.
+Must contain at least numeric \code{age_start}, \code{age_end}, and \code{rate}, as well
+as character \code{sex} columns. See details for format and description of
+stratification variables that can be applied.}
 
 \item{weights}{NULL (default) for unweighted selection within rate cells, or
 a \code{\link[=weight_model]{weight_model()}} specification. Weights choose which member of a cell
@@ -25,49 +23,61 @@ experiences an event without changing the cell's input rate.}
 }
 \value{
 \code{mortality()} returns an inspectable process inheriting from
-\code{hammel_mortality} and \code{hammel_process}, with \code{name}, \code{rates}, \code{rate_unit},
+\code{hammel_mortality} and \code{hammel_process}, with \code{name}, \code{rates},
 and \code{weights}. \code{set_mortality()} returns an updated \code{hammel_model}.
 }
 \description{
-\code{mortality()} constructs a process specification without running a
-simulation. \code{set_mortality()} constructs the same specification and attaches
-it to a model, equivalent to \code{set_process(model, mortality(rates, weights))}.
-The input model is not modified and neither function runs a simulation.
+Constructs a mortality process specification for a simulation model. The
+convenience function \code{set_mortality} is equivalent to \code{set_process(model, mortality(...))} and allows for direct piping from a model.
 }
 \details{
-Rates are piecewise constant annual hazards over half-open age intervals.
-Supply separate schedules for both sexes. Overlapping intervals are rejected;
-adjacent intervals are allowed. Gaps and uncovered ages are not filled or
-interpreted as zero rates. Simulation requires coverage of [0, Inf). Input
-order and custom columns are preserved, rate tables become tibbles, and a
-\code{source} attribute on the input is copied into the process.
+The primary and only required input to the function is a fertility rate
+schedule for the \code{rates} argument. This data frame must contain \code{age_start}
+and \code{age_end} columns to define the half-open age intervals (inclusive at the
+start and exclusive at the end), a \code{sex} column ("f" for female and "m" for
+male) and a \code{rate} column for the age-specific fertility rates. The example
+below shows the basic format:
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{#> # A tibble: 44 x 4
+#>    sex   age_start age_end     rate
+#>    <chr>     <int>   <dbl>    <dbl>
+#>  1 f             0       1 0.00628 
+#>  2 f             1       5 0.000288
+#>  3 f             5      10 0.000142
+#>  4 f            10      15 0.000159
+#>  5 f            15      20 0.000396
+#>  6 f            20      25 0.000471
+#>  7 f            25      30 0.000536
+#>  8 f            30      35 0.000745
+#>  9 f            35      40 0.00114 
+#> 10 f            40      45 0.00174 
+#> # i 34 more rows
+}\if{html}{\out{</div>}}
+
+Rates are always specified as deaths over person-years lived. An open-ended
+age group specified with \code{age_end} of \code{Inf} must be included. No gap in the
+age band is allowed.
 
 Columns named by declared group dimensions (see \code{\link[=set_groups]{set_groups()}}), such as
 \code{race} or \code{region}, supply separate schedules for each combination of their
-categories. Dimensions without a column share the schedule. Each stratum
-needs both sexes; overlap is checked within strata. Simulation requires
-schedules for every combination of categories of the dimensions a table uses.
-A table using an undeclared persons column is an error.
-}
-\section{Calendar rates}{
+categories; dimensions without a column share the schedule. Every combination
+of categories of the dimensions must be included in the rates if the
+dimension is used.
 
 Optional \code{time_start}/\code{time_end} columns select half-open calendar intervals
 in absolute years, including fractional years. Both columns are required
 together; starts are finite and ends exceed starts (possibly Inf). Active
 slices must satisfy the strata and coverage rules and cover the requested
-run. Rates are constant within intervals, with no interpolation. Calendar
-changes precede same-time events and preserve recorded histories.
-}
+simulation run.
 
+The \code{\link[=stratify_rates]{stratify_rates()}} function provides a quick means to add stratification
+to an existing rate schedule.
+}
 \examples{
-rates <- data.frame(
-  sex = c("m", "f"), age_start = 0,
-  age_end = Inf, rate = c(0.01, 0.008)
-)
-process <- mortality(rates)
-model <- hammel_model() |> set_process(process)
+mort_process <- mortality(usa_2000_mortality)
+model <- hammel_model() |> set_process(mort_process)
 # Equivalent convenience setter:
-model <- hammel_model() |> set_mortality(rates)
+model <- hammel_model() |> set_mortality(usa_2000_mortality)
 }
 \seealso{
 \code{\link[=set_process]{set_process()}}, \code{\link[=fertility]{fertility()}}, \code{\link[=union_formation]{union_formation()}},
