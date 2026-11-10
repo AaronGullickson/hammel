@@ -71,7 +71,7 @@
 #'   with `hetfert` on the log scale.
 #' @param model A `hammel_model` object, used by `set_fertility()`.
 #' @return `fertility()` returns an inspectable process inheriting from
-#'   `hammel_fertility` and `hammel_process`, with `name`, `rates`, `rate_unit`,
+#'   `hammel_fertility` and `hammel_process`, with `name`, `rates`,
 #'   `birth_interval`, `ffab`, `hetfert`, and `weights`. `set_fertility()`
 #'   returns an updated `hammel_model`.
 #' @seealso [set_process()], [mortality()], [union_formation()], [het_fert()],

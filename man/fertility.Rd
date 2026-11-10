@@ -45,7 +45,7 @@ specification for persistent lognormal selection weights.}
 }
 \value{
 \code{fertility()} returns an inspectable process inheriting from
-\code{hammel_fertility} and \code{hammel_process}, with \code{name}, \code{rates}, \code{rate_unit},
+\code{hammel_fertility} and \code{hammel_process}, with \code{name}, \code{rates},
 \code{birth_interval}, \code{ffab}, \code{hetfert}, and \code{weights}. \code{set_fertility()}
 returns an updated \code{hammel_model}.
 }
