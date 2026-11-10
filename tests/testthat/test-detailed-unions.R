@@ -22,7 +22,7 @@ test_that("detailed unions attach spouses by ID and preserve episodes and input"
   expect_identical(result$group_h, c(30L, 20L))
   expect_identical(population, original)
   population["end_time"] <- list(NULL)
-  expect_identical(get_detailed_unions(population), result)
+  expect_error(get_detailed_unions(population), "end_time")
 })
 
 test_that("groups are optional and their labels retain their input types", {
@@ -85,13 +85,12 @@ test_that("partner groups describe formation rather than identity after later mo
   expect_identical(empty$group_h, integer())
 })
 
-test_that("formation reconstruction preserves character labels and works without an endpoint", {
+test_that("formation reconstruction preserves character labels", {
   population <- detailed_union_population()
   population$persons$group <- c("B", "A", "C")
   population$groups <- list(group = group())
   population$transitions <- tibble::tibble(person_id = c(10, 70), time = c(1, 1.75),
     origin = c("X", "Y"), destination = c("A", "C"))
-  population["end_time"] <- list(NULL)
   out <- get_detailed_unions(population)
   expect_identical(out$group_w, c("A", "X"))
   expect_identical(out$group_h, c("Y", "B"))

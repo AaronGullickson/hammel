@@ -23,8 +23,8 @@
 #' use [count_kin()] for living kin at given times. Ancestry cycles
 #' are errors.
 #'
-#' @param population A `hammel_population` or a persons data frame, including
-#'   deceased persons and recorded parent IDs. No known endpoint is required.
+#' @param population A `hammel_population` with a finite `end_time`, including
+#'   deceased persons and recorded parent IDs.
 #' @param ego_ids Unique person IDs whose known kin should be extracted.
 #' @param generations Nonnegative whole number of parent generations on EACH
 #'   side, default `2`. Zero returns no kin between distinct people.
@@ -55,9 +55,6 @@ extract_kin <- function(
   generations = 2,
   relative_ids = NULL
 ) {
-  if (is.data.frame(population)) {
-    population <- hammel_population(population)
-  }
   validate_population(population)
   validate_kinship_generations(generations, "generations")
   ids <- population$persons$person_id

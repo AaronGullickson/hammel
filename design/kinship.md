@@ -83,8 +83,9 @@ path enumeration and genetic coefficients are outside this increment.
 `extract_kin(population, ego_ids, generations = 2, relative_ids = NULL)` returns
 an ordinary tibble of known relatives within the SAME two-sided bounds. Egos
 are explicitly selected; relative IDs default to all people in recorded history.
-Accept a population object or a base persons data frame. No known endpoint
-is required. Both deceased and living relatives are eligible for extraction. This is a
+Accept a `hammel_population` object with a finite reference time (D166).
+Bare persons tables must first be constructed into a population with an explicit
+`end_time`. Both deceased and living relatives are eligible for extraction. This is a
 history query, not a living-kin census at a selected date (see
 `count_kin()` below). Inputs must be validated populations with
 valid, unique query IDs.

@@ -7,7 +7,7 @@
 hammel_population(
   persons,
   unions = NULL,
-  end_time = NULL,
+  end_time,
   ancestry = NULL,
   transitions = NULL,
   groups = NULL
@@ -24,8 +24,9 @@ normalized to the union schema. Optional \code{union_type} is cohab or marriage.
 A conversion closes cohab with \code{end_reason = "conversion"} and links the
 same-time marriage through \code{previous_cohab_id}.}
 
-\item{end_time}{Optional finite simulation endpoint in years. Its calendar
-origin is supplied by the user. \code{NULL} means that the endpoint is unknown.}
+\item{end_time}{Required finite numeric reference time in years. Its calendar
+origin is supplied by the user. This supplies the next simulation's
+starting time. Recorded events must not occur after this time.}
 
 \item{ancestry}{Optional ancestry shares for dimensions declared with
 \code{group(ancestry = TRUE)}: a named list with one data frame per such
@@ -59,6 +60,17 @@ persons has groups, and a \code{transitions} tibble when groups are present.
 Ancestry is retained across restarts and deaths.
 }
 \description{
+Create a \code{hammel_population} object to serve as the starting population for a
+simulation.
+}
+\details{
+In most cases, it will be more common to create a \code{hammel_population} object
+by using \code{\link[=generate_uniform_population]{generate_uniform_population()}} or to recieve a \code{hammel_population}
+object as the output of \code{\link[=run_simulation]{run_simulation()}}.
+
+The \code{hammel_population} object
+The \code{hammel_population} object must always contain a \code{persons} data frame
+and
 Collect person and union histories in an inspectable population object. This
 constructor does not run a simulation. It validates consistent tables against
 the population schema. Custom columns are retained. A declared group

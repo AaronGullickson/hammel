@@ -15,8 +15,8 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 
 | Responsibility | Implementation |
 | --- | --- |
-| Model construction and population attachment | `R/hammel_model.R` |
-| Population schema and baseline generation | `R/hammel_population.R`, `R/generate_uniform_population.R`, `R/checks.R` |
+| Model construction and validation | `R/hammel_model.R` |
+| Population schema, model attachment and baseline generation | `R/hammel_population.R`, `R/generate_uniform_population.R`, `R/checks.R` |
 | Group declarations and histories | `R/group.R`, `R/group_history.R` |
 | Ancestry schema and initialization | `R/ancestry.R` |
 | Process attachment | `R/set_process.R` |
@@ -74,12 +74,13 @@ result <- run_simulation(model, years = 10, seed = 123)
 ```
 
 `hammel_model()` stores `population` and a named `processes` list.
-`hammel_population(persons, unions = NULL, end_time = NULL)` constructs the
+`hammel_population(persons, unions = NULL, end_time)` constructs the
 population; its schema is specified in [population tables](population-schema.md).
 `set_population(model, population)` accepts that class, validates it, normalizes
 its core tables to tibbles, and preserves extra components. The population's
 `end_time` is the next run's start; no duplicate starting time is stored in the
-model. An unknown endpoint is allowed for construction, but not execution.
+model. The endpoint is required and must be a single finite numeric year at
+construction, validation and attachment (D166).
 
 `mortality(rates)` and `fertility(rates, birth_interval = 0.75)` return typed
 `hammel_process` objects with `name` and `rates`; rates are always per person-year.

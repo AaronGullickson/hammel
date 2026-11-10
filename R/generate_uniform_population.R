@@ -64,9 +64,6 @@ generate_uniform_population <- function(
     stop("`max_age` must be finite and nonnegative, in years.", call. = FALSE)
   }
   check_time(end_time, "end_time")
-  if (is.null(end_time)) {
-    stop("`end_time` must be a finite time in years.", call. = FALSE)
-  }
   if (!is.numeric(female_probability) || length(female_probability) != 1L ||
         !is.finite(female_probability) ||
         female_probability < 0 ||

@@ -126,7 +126,10 @@ test_that("union counts validate endpoints, breakpoints, histories and grouping"
   population <- union_count_population()
   expect_error(calculate_dissolution_rates(population, c(0, 6), c(0, Inf)), "endpoint")
   population["end_time"] <- list(NULL)
-  expect_error(calculate_dissolution_rates(population, c(0, 5), c(0, Inf)), "endpoint")
+  expect_error(
+    calculate_dissolution_rates(population, c(0, 5), c(0, Inf)),
+    "end_time"
+  )
   expect_error(
     calculate_dissolution_rates(union_count_history(), c(0, 5), c(0, Inf)),
     "must be a hammel_population"

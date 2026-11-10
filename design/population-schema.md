@@ -73,9 +73,17 @@ valid; dates before the origin may be negative. Do not round dates to integer
 months or birthdays. Execution is continuous under D024, and midpoint fertility
 compensation under D028 has no monthly grid.
 
-`end_time` is a finite reference time or `NULL` when unknown. Simulation and
-observation require a known endpoint; the next simulation starts there. Tables
-must not contain recorded events later than a supplied reference time.
+`end_time` is required and must be a single finite numeric reference time in
+years (D166). Omission, `NULL`, missing/nonfinite values, complex numbers,
+vectors and arrays are invalid. The next simulation starts there; after a run,
+it records the new endpoint. Tables must not contain recorded events later
+than this reference time. Negative and fractional reference times are valid
+when consistent with the histories.
+
+For example, a population with births at -25 and -23 and `end_time = 0` can
+start a simulation at zero. With `end_time = 2000`, a 50-year run ends at 2050.
+Supplying `NULL` or omitting `end_time` fails at construction. Direct validation
+and model attachment reject a population whose endpoint was edited to `NULL`.
 
 Recorded lifetimes and analysis periods are half-open. Exposure is exact overlap
 in person-years, split by age and period boundaries. Population counts include
@@ -97,7 +105,7 @@ consistency is not provided by the structural validator. Ancestry cycles are rej
 Normalization and validation are separate operations. `hammel_population()` normalizes absent unions before checking the constructed object. `validate_population()` verifies a `hammel_population` without mutation and returns it invisibly. `set_population()` accepts only a population object, validates it, normalizes
 its person/union tables to tibbles, and stores it as `model$population` while
 preserving extra components. Population construction/validation lives in
-`R/hammel_population.R`; the model setter lives in `R/hammel_model.R`.
+`R/hammel_population.R`, alongside the population setter (D165).
 
 
 ## Typed union episodes (D086)

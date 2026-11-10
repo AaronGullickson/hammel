@@ -19,7 +19,8 @@ test_that("parent information matches IDs and preserves person histories", {
   expect_identical(result$group_father, c(10L, NA_integer_, NA_integer_, NA_integer_))
   expect_identical(population, original)
   population["end_time"] <- list(NULL)
-  expect_identical(get_parent_info(population), result)
+  expect_error(get_parent_info(population), "end_time")
+  population$end_time <- original$end_time
   population$persons <- as.data.frame(population$persons)
   expect_identical(get_parent_info(population), result)
 })

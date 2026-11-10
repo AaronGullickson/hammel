@@ -26,7 +26,7 @@ test_that("unpartnered births exclude all partnership types with exact birth tie
   expect_type(x$group_mother,"integer")
   expect_identical(pop,before)
   pop["end_time"] <- list(NULL)
-  expect_equal(get_unpartnered_births(pop)$person_id,x$person_id)
+  expect_error(get_unpartnered_births(pop), "end_time")
 })
 
 test_that("missing parents, overlapping histories and untyped histories are handled", {

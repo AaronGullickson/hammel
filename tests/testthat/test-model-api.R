@@ -1,7 +1,11 @@
 test_that("model construction retains population and rate specifications", {
   persons <- tibble::tibble(person_id = c(1L, 2L), sex = c("m", "f"), birth_time = c(-25,
     -23), death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
-  unions <- hammel_population(persons, groups = if ("group" %in% names(persons)) "group")$unions
+  unions <- hammel_population(
+    persons,
+    end_time = 0,
+    groups = if ("group" %in% names(persons)) "group"
+  )$unions
   mortality <- tibble::tibble(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
   fertility <- tibble::tibble(age_start = 15, age_end = 50, rate = 0.1)
   empty <- hammel_model()
@@ -22,7 +26,11 @@ test_that("model construction retains population and rate specifications", {
 test_that("replacing a process preserves the original model and other processes", {
   persons <- tibble::tibble(person_id = c(1L, 2L), sex = c("m", "f"), birth_time = c(-25,
     -23), death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
-  unions <- hammel_population(persons, groups = if ("group" %in% names(persons)) "group")$unions
+  unions <- hammel_population(
+    persons,
+    end_time = 0,
+    groups = if ("group" %in% names(persons)) "group"
+  )$unions
   mortality <- tibble::tibble(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
   fertility <- tibble::tibble(age_start = 15, age_end = 50, rate = 0.1)
   empty <- hammel_model()
@@ -40,7 +48,11 @@ test_that("replacing a process preserves the original model and other processes"
 test_that("population restarts preserve histories, endpoints and processes", {
   persons <- tibble::tibble(person_id = c(1L, 2L), sex = c("m", "f"), birth_time = c(-25,
     -23), death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
-  unions <- hammel_population(persons, groups = if ("group" %in% names(persons)) "group")$unions
+  unions <- hammel_population(
+    persons,
+    end_time = 0,
+    groups = if ("group" %in% names(persons)) "group"
+  )$unions
   mortality <- tibble::tibble(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
   fertility <- tibble::tibble(age_start = 15, age_end = 50, rate = 0.1)
   empty <- hammel_model()
@@ -54,37 +66,58 @@ test_that("population restarts preserve histories, endpoints and processes", {
   expect_identical(restarted$population$end_time, 120)
   expect_identical(restarted$processes, configured$processes)
   expect_identical(configured$population$end_time, 0)
-  unknown <- set_population(restarted, hammel_population(persons, unions, groups = if ("group" %in% names(persons)) "group"))
-  expect_true("end_time" %in% names(unknown$population))
-  expect_true(is.null(unknown$population$end_time))
+
 })
 
 test_that("population constructors normalize input subclasses to tibbles", {
   persons <- tibble::tibble(person_id = c(1L, 2L), sex = c("m", "f"), birth_time = c(-25,
     -23), death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
-  unions <- hammel_population(persons, groups = if ("group" %in% names(persons)) "group")$unions
+  unions <- hammel_population(
+    persons,
+    end_time = 0,
+    groups = if ("group" %in% names(persons)) "group"
+  )$unions
   mortality <- tibble::tibble(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
   fertility <- tibble::tibble(age_start = 15, age_end = 50, rate = 0.1)
   empty <- hammel_model()
   configured <- set_fertility(set_mortality(set_population(empty, hammel_population(persons,
     unions, end_time = 0, groups = if ("group" %in% names(persons)) "group")), mortality), fertility)
   custom_persons <- structure(persons, class = c("custom_persons", "data.frame"))
-  expect_identical(set_population(empty, hammel_population(custom_persons, unions, groups = if ("group" %in% names(custom_persons)) "group"))$population$persons,
+  expect_identical(set_population(empty, hammel_population(
+    custom_persons,
+    end_time = 0,
+    unions,
+    groups = if ("group" %in% names(custom_persons)) "group"
+  ))$population$persons,
     tibble::as_tibble(custom_persons))
 })
 
 test_that("configuration rejects invalid objects and reference times", {
   persons <- tibble::tibble(person_id = c(1L, 2L), sex = c("m", "f"), birth_time = c(-25,
     -23), death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
-  unions <- hammel_population(persons, groups = if ("group" %in% names(persons)) "group")$unions
+  unions <- hammel_population(
+    persons,
+    end_time = 0,
+    groups = if ("group" %in% names(persons)) "group"
+  )$unions
   mortality <- tibble::tibble(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
   fertility <- tibble::tibble(age_start = 15, age_end = 50, rate = 0.1)
   empty <- hammel_model()
   configured <- set_fertility(set_mortality(set_population(empty, hammel_population(persons,
     unions, end_time = 0, groups = if ("group" %in% names(persons)) "group")), mortality), fertility)
   results <- hammel_population(persons, unions, end_time = 120, groups = if ("group" %in% names(persons)) "group")
-  expect_error(hammel_population(NULL, unions, groups = if ("group" %in% names(NULL)) "group"))
-  expect_error(hammel_population(persons, list(), groups = if ("group" %in% names(persons)) "group"))
+  expect_error(hammel_population(
+    NULL,
+    end_time = 0,
+    unions,
+    groups = if ("group" %in% names(NULL)) "group"
+  ))
+  expect_error(hammel_population(
+    persons,
+    end_time = 0,
+    list(),
+    groups = if ("group" %in% names(persons)) "group"
+  ))
   expect_error(set_population(empty, persons, list()))
   expect_error(set_population(empty, results, unions))
   expect_error(set_population(empty, results, start_time = 0))
@@ -100,14 +133,27 @@ test_that("configuration rejects invalid objects and reference times", {
 test_that("omitted unions produce an empty union history", {
   persons <- tibble::tibble(person_id = c(1L, 2L), sex = c("m", "f"), birth_time = c(-25,
     -23), death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
-  unions <- hammel_population(persons, groups = if ("group" %in% names(persons)) "group")$unions
+  unions <- hammel_population(
+    persons,
+    end_time = 0,
+    groups = if ("group" %in% names(persons)) "group"
+  )$unions
   mortality <- tibble::tibble(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
   fertility <- tibble::tibble(age_start = 15, age_end = 50, rate = 0.1)
   empty <- hammel_model()
   configured <- set_fertility(set_mortality(set_population(empty, hammel_population(persons,
     unions, end_time = 0, groups = if ("group" %in% names(persons)) "group")), mortality), fertility)
-  unmarried <- set_population(configured, hammel_population(persons, groups = if ("group" %in% names(persons)) "group"))
-  expect_identical(unmarried, set_population(configured, hammel_population(persons, unions = NULL, groups = if ("group" %in% names(persons)) "group")))
+  unmarried <- set_population(configured, hammel_population(
+    persons,
+    end_time = 0,
+    groups = if ("group" %in% names(persons)) "group"
+  ))
+  expect_identical(unmarried, set_population(configured, hammel_population(
+    persons,
+    end_time = 0,
+    unions = NULL,
+    groups = if ("group" %in% names(persons)) "group"
+  )))
   expect_identical(unmarried$population$persons, persons)
   expect_true(is.data.frame(unmarried$population$unions))
   expect_equal(nrow(unmarried$population$unions), 0L, tolerance = 0)
@@ -118,7 +164,11 @@ test_that("omitted unions produce an empty union history", {
 test_that("fractional year endpoints are retained", {
   persons <- tibble::tibble(person_id = c(1L, 2L), sex = c("m", "f"), birth_time = c(-25,
     -23), death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
-  unions <- hammel_population(persons, groups = if ("group" %in% names(persons)) "group")$unions
+  unions <- hammel_population(
+    persons,
+    end_time = 0,
+    groups = if ("group" %in% names(persons)) "group"
+  )$unions
   mortality <- tibble::tibble(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
   fertility <- tibble::tibble(age_start = 15, age_end = 50, rate = 0.1)
   empty <- hammel_model()
@@ -131,15 +181,27 @@ test_that("fractional year endpoints are retained", {
 test_that("population construction and attachment reject inconsistent histories", {
   persons <- tibble::tibble(person_id = c(1L, 2L), sex = c("m", "f"), birth_time = c(-25,
     -23), death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
-  unions <- hammel_population(persons, groups = if ("group" %in% names(persons)) "group")$unions
+  unions <- hammel_population(
+    persons,
+    end_time = 0,
+    groups = if ("group" %in% names(persons)) "group"
+  )$unions
   mortality <- tibble::tibble(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
   fertility <- tibble::tibble(age_start = 15, age_end = 50, rate = 0.1)
   empty <- hammel_model()
   configured <- set_fertility(set_mortality(set_population(empty, hammel_population(persons,
     unions, end_time = 0, groups = if ("group" %in% names(persons)) "group")), mortality), fertility)
   check_rejected <- function(p = persons, u = unions) {
-    expect_error(hammel_population(p, u, groups = if ("group" %in% names(p)) "group"))
-    invalid <- structure(list(persons = p, unions = u, end_time = NULL), class = "hammel_population")
+    expect_error(hammel_population(
+      p,
+      end_time = 0,
+      u,
+      groups = if ("group" %in% names(p)) "group"
+    ))
+    invalid <- structure(
+      list(persons = p, unions = u, end_time = 0),
+      class = "hammel_population"
+    )
     expect_error(set_population(empty, invalid))
   }
   check_rejected(persons[setdiff(names(persons), "sex")])
@@ -191,7 +253,11 @@ test_that("population construction and attachment reject inconsistent histories"
 test_that("custom columns and empty populations retain their structure", {
   persons <- tibble::tibble(person_id = c(1L, 2L), sex = c("m", "f"), birth_time = c(-25,
     -23), death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
-  unions <- hammel_population(persons, groups = if ("group" %in% names(persons)) "group")$unions
+  unions <- hammel_population(
+    persons,
+    end_time = 0,
+    groups = if ("group" %in% names(persons)) "group"
+  )$unions
   mortality <- tibble::tibble(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
   fertility <- tibble::tibble(age_start = 15, age_end = 50, rate = 0.1)
   empty <- hammel_model()
@@ -199,14 +265,26 @@ test_that("custom columns and empty populations retain their structure", {
     unions, end_time = 0, groups = if ("group" %in% names(persons)) "group")), mortality), fertility)
   p <- persons
   p$custom_attribute <- c("a", "b")
-  expect_identical(hammel_population(p, groups = if ("group" %in% names(p)) "group")$persons, p)
-  expect_equal(nrow(hammel_population(persons[FALSE, ], groups = if ("group" %in% names(persons[FALSE, ])) "group")$persons), 0L, tolerance = 0)
+  expect_identical(hammel_population(
+    p,
+    end_time = 0,
+    groups = if ("group" %in% names(p)) "group"
+  )$persons, p)
+  expect_equal(nrow(hammel_population(
+    persons[FALSE, ],
+    end_time = 0,
+    groups = if ("group" %in% names(persons[FALSE, ])) "group"
+  )$persons), 0L, tolerance = 0)
 })
 
 test_that("population validation is read only and rejects malformed objects", {
   persons <- tibble::tibble(person_id = c(1L, 2L), sex = c("m", "f"), birth_time = c(-25,
     -23), death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
-  unions <- hammel_population(persons, groups = if ("group" %in% names(persons)) "group")$unions
+  unions <- hammel_population(
+    persons,
+    end_time = 0,
+    groups = if ("group" %in% names(persons)) "group"
+  )$unions
   mortality <- tibble::tibble(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
   fertility <- tibble::tibble(age_start = 15, age_end = 50, rate = 0.1)
   empty <- hammel_model()
@@ -227,13 +305,22 @@ test_that("population validation is read only and rejects malformed objects", {
   invalid$persons$person_id[2] <- 1L
   expect_error(validate_population(invalid))
   expect_error(validate_population(persons))
-  expect_identical(hammel_population(persons, data.frame(), groups = if ("group" %in% names(persons)) "group")$unions, unions)
+  expect_identical(hammel_population(
+    persons,
+    end_time = 0,
+    data.frame(),
+    groups = if ("group" %in% names(persons)) "group"
+  )$unions, unions)
 })
 
 test_that("population attachment preserves optional metadata", {
   persons <- tibble::tibble(person_id = c(1L, 2L), sex = c("m", "f"), birth_time = c(-25,
     -23), death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
-  unions <- hammel_population(persons, groups = if ("group" %in% names(persons)) "group")$unions
+  unions <- hammel_population(
+    persons,
+    end_time = 0,
+    groups = if ("group" %in% names(persons)) "group"
+  )$unions
   mortality <- tibble::tibble(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
   fertility <- tibble::tibble(age_start = 15, age_end = 50, rate = 0.1)
   empty <- hammel_model()
@@ -253,7 +340,11 @@ test_that("population attachment preserves optional metadata", {
 test_that("sex labels are explicit and public population tables are tibbles", {
   persons <- tibble::tibble(person_id = c(1L, 2L), sex = c("m", "f"), birth_time = c(-25,
     -23), death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
-  unions <- hammel_population(persons, groups = if ("group" %in% names(persons)) "group")$unions
+  unions <- hammel_population(
+    persons,
+    end_time = 0,
+    groups = if ("group" %in% names(persons)) "group"
+  )$unions
   mortality <- tibble::tibble(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)
   fertility <- tibble::tibble(age_start = 15, age_end = 50, rate = 0.1)
   empty <- hammel_model()
@@ -261,8 +352,16 @@ test_that("sex labels are explicit and public population tables are tibbles", {
     unions, end_time = 0, groups = if ("group" %in% names(persons)) "group")), mortality), fertility)
   results <- hammel_population(persons, unions, end_time = 120, groups = if ("group" %in% names(persons)) "group")
   check_rejected <- function(p = persons, u = unions) {
-    expect_error(hammel_population(p, u, groups = if ("group" %in% names(p)) "group"))
-    invalid <- structure(list(persons = p, unions = u, end_time = NULL), class = "hammel_population")
+    expect_error(hammel_population(
+      p,
+      end_time = 0,
+      u,
+      groups = if ("group" %in% names(p)) "group"
+    ))
+    invalid <- structure(
+      list(persons = p, unions = u, end_time = 0),
+      class = "hammel_population"
+    )
     expect_error(set_population(empty, invalid))
   }
   for (sex in list(c(0L, 1L), c("m", NA_character_), c("male", "female"))) {
@@ -272,8 +371,15 @@ test_that("sex labels are explicit and public population tables are tibbles", {
   }
   expect_true(tibble::is_tibble(results$persons))
   expect_true(tibble::is_tibble(results$unions))
-  expect_true(tibble::is_tibble(hammel_population(as.data.frame(persons))$persons))
-  expect_true(tibble::is_tibble(hammel_population(persons[FALSE, ], groups = if ("group" %in% names(persons[FALSE, ])) "group")$persons))
+  expect_true(tibble::is_tibble(hammel_population(
+    as.data.frame(persons),
+    end_time = 0
+  )$persons))
+  expect_true(tibble::is_tibble(hammel_population(
+    persons[FALSE, ],
+    end_time = 0,
+    groups = if ("group" %in% names(persons[FALSE, ])) "group"
+  )$persons))
 })
 
 
@@ -292,4 +398,35 @@ test_that("union wife and husband columns enforce female and male roles", {
   swapped$end_reason <- "dissolution"
   expect_error(hammel_population(persons, swapped, end_time = 0, groups = if ("group" %in% names(persons)) "group"), "wife_id.*female")
   expect_identical(names(generate_uniform_population(0)$unions), names(unions))
+})
+
+
+test_that("population reference times are required and validated everywhere", {
+  population <- generate_uniform_population(2, end_time = 0)
+  persons <- population$persons
+  expect_error(hammel_population(persons), "end_time.*required")
+  bad_times <- list(
+    NULL, NA_real_, NaN, Inf, -Inf, numeric(), c(0, 1), "0", TRUE,
+    0 + 0i, matrix(0), array(0)
+  )
+  for (time in bad_times) {
+    expect_error(
+      hammel_population(persons, end_time = time),
+      "end_time.*single finite numeric"
+    )
+    invalid <- population
+    invalid["end_time"] <- list(time)
+    expect_error(validate_population(invalid), "end_time")
+    expect_error(set_population(hammel_model(), invalid), "end_time")
+  }
+  for (time in c(-0.5, 0, 0.5, 2000)) {
+    persons$birth_time <- rep(time - 25, nrow(persons))
+    valid <- hammel_population(persons, end_time = time)
+    expect_identical(valid$end_time, time)
+    expect_invisible(validate_population(valid))
+  }
+  expect_error(
+    hammel_population(persons, end_time = 1900),
+    "Recorded events.*reference time"
+  )
 })

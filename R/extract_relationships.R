@@ -7,8 +7,7 @@
 #' Match wives and husbands to the population's person table by ID and return
 #' their recorded birth times, death times, and optional groups at formation
 #' alongside every union record. Union row order and all existing columns are
-#' retained. The population and its union table are not modified. No known
-#' endpoint is needed.
+#' retained. The population and its union table are not modified.
 #'
 #' Dates remain in years. Missing death times denote people alive at the
 #' recorded endpoint. Each declared group dimension adds its wife's and
@@ -93,7 +92,7 @@ get_detailed_unions <- function(population) {
 #' Match mothers and fathers by person ID and append their ages at each child's
 #' birth and their optional recorded groups. All persons, including founders and
 #' deceased persons, retain their original row order and columns. The input
-#' population is not modified and no known endpoint is required.
+#' population is not modified.
 #'
 #' Ages are in continuous years: the child's birth time minus the parent's birth
 #' time. Unknown parents yield missing ages and groups. Each declared group

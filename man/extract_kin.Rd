@@ -7,8 +7,8 @@
 extract_kin(population, ego_ids, generations = 2, relative_ids = NULL)
 }
 \arguments{
-\item{population}{A \code{hammel_population} or a persons data frame, including
-deceased persons and recorded parent IDs. No known endpoint is required.}
+\item{population}{A \code{hammel_population} with a finite \code{end_time}, including
+deceased persons and recorded parent IDs.}
 
 \item{ego_ids}{Unique person IDs whose known kin should be extracted.}
 

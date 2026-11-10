@@ -6,10 +6,11 @@
 # Domain-specific checks stay with the API they validate.
 
 check_time <- function(time, argument) {
-  if (!is.null(time) &&
-        (!is.numeric(time) || length(time) != 1L || !is.finite(time))) {
+  if (!is.numeric(time) || is.complex(time) || !is.null(dim(time)) ||
+        length(time) != 1L ||
+        !is.finite(time)) {
     stop(
-      sprintf("`%s` must be NULL or a finite time in years.", argument),
+      sprintf("`%s` must be a single finite numeric time in years.", argument),
       call. = FALSE
     )
   }

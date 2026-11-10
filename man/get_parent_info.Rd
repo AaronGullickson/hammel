@@ -20,7 +20,7 @@ Empty populations retain the enriched column types.
 Match mothers and fathers by person ID and append their ages at each child's
 birth and their optional recorded groups. All persons, including founders and
 deceased persons, retain their original row order and columns. The input
-population is not modified and no known endpoint is required.
+population is not modified.
 }
 \details{
 Ages are in continuous years: the child's birth time minus the parent's birth

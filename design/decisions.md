@@ -3377,3 +3377,27 @@ New `count_kin(population, times, generations = 2, by = NULL)` reports, at each 
 **Implementation:** Applied the rule across hand-maintained `R/` source, changing 29 files from the pre-pass working tree while preserving the user's corrected TFR condition. Long conditions wrap at logical operators, with nested calls kept intact where they fit; longer individual comparisons wrap within their calls as needed to retain the 80-column limit. Generated wrappers, README, vignettes and historical validation evidence are unchanged. Parsed expressions and all terminal tokens (including comments and string literals) are identical before and after this pass, and every hand-maintained R source line remains within 80 columns.
 
 **Validation:** A parsed-token audit verified the prescribed indentation for 238 continued outer logical-chain terms. `devtools::test()` passed 6,568 expectations with zero failures in 86.2 seconds; one `timedatectl` warning occurred while loading HMDHFDplus/lubridate, and the opt-in live database test was skipped. `git diff --check` passed.
+
+
+## D165 — Population setter source location (November 10, 2026)
+
+**Status:** User decision and implementation authorization, November 10, 2026.
+
+**Decision:** Move `set_population()` and its unchanged roxygen documentation from `R/hammel_model.R` to `R/hammel_population.R`, beside the population constructor and validation. This follows the constructor/setter grouping used for demographic processes. `hammel_model.R` retains the model constructor and `check_model()`. This supersedes D143's explicit retention of the population setter in `hammel_model.R`. Function behavior and help-topic boundaries are unchanged.
+
+**Validation:** Parsed definitions confirm the setter moved unchanged and all other definitions in both source files are unchanged. The setter's roxygen block moved verbatim; its regenerated help file changes only the source-file reference. Targeted `devtools::test(filter = "model-api|group-declaration|ancestry")` passed 298 expectations with zero failures, warnings or skips. Source-width checks and `git diff --check` passed.
+
+
+## D166 — Required population reference time (November 10, 2026)
+
+**Status:** User decision and implementation authorization, November 10, 2026.
+
+**Decision:** Require `end_time` in `hammel_population()` and validate it as a single finite numeric year, rejecting `NULL`, missing/nonfinite values, vectors, arrays and complex numbers. The population's endpoint supplies the next simulation's starting time. Constructor, direct validation and attachment enforce the same endpoint contract; negative and fractional years remain valid when consistent with recorded histories. Existing checks against events after the endpoint remain in force. This supersedes D015's optional unknown endpoint.
+
+The user also chose to require a `hammel_population` object for `extract_kin()`. Remove its bare-persons-table conversion rather than infer or invent an endpoint. Both living and deceased recorded relatives remain eligible; kinship algorithms and demographic event behavior are unchanged.
+
+**Validation plan:** Test omitted and invalid endpoints at construction, invalid endpoints in hand-edited populations at validation and attachment, valid negative/fractional/calendar years, retained date-consistency checks, and rejection of bare tables by `extract_kin()`. Update existing fixtures to supply their actual reference time and run the offline suite.
+
+**Implementation and checks:** The constructor now has no `end_time` default and reports omission explicitly. Shared time validation enforces a finite numeric scalar for construction and population validation; the generator uses the same check and retains its existing zero-year default. Removed the obsolete nullable-endpoint guard from population date-consistency checking and the bare-table conversion from `extract_kin()`. Updated fixtures to supply reference times and changed unknown-endpoint expectations to validation errors; other schema-error tests retain valid endpoints so they continue to check their intended failures. Help and current specifications reflect the new requirement.
+
+Targeted model/population, ancestry, kinship and detailed-union tests passed 530 expectations without failures or warnings. The final offline `devtools::test()` run passed 6,612 expectations with zero failures in 85.6 seconds, one existing `timedatectl` warning while loading HMDHFDplus/lubridate, and the opt-in live database test skipped. Updated help files parse, hand-maintained R source and edited test lines satisfy the 80-column rule, and `git diff --check` passed.

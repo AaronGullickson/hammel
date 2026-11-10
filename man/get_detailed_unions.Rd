@@ -21,8 +21,7 @@ column types.
 Match wives and husbands to the population's person table by ID and return
 their recorded birth times, death times, and optional groups at formation
 alongside every union record. Union row order and all existing columns are
-retained. The population and its union table are not modified. No known
-endpoint is needed.
+retained. The population and its union table are not modified.
 }
 \details{
 Dates remain in years. Missing death times denote people alive at the

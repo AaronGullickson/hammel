@@ -24,6 +24,8 @@ of a model assumption is distinct from evidence of demographic accuracy.
 
 Public dates, ages, and durations are numeric years; rates are events per
 person-year and exposure is person-years. The user supplies the time origin.
+Every population requires one finite numeric `end_time`, which supplies the
+next simulation's starting time (D166).
 Execution is continuous: there is no month index, configurable execution step,
 time truncation, or rounding to birthdays.
 

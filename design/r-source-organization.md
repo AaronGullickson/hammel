@@ -34,6 +34,8 @@ For a new function, first identify its responsibility and closest existing consu
 
 - **Matching versus union formation:** matching constructors, formula evaluation, and preparation live in `matching_model.R`. Search initiation, eligibility settings, and search-rate validation remain with the process. Group matching retains its own substantial and coherent implementation.
 
+- **Population construction and attachment:** `hammel_population.R` keeps `hammel_population()`, `set_population()` and population validation together. The setter attaches a population to a model, following the constructor/setter grouping used by process files. `hammel_model.R` owns the model container and its validation (D165).
+
 - **Construction versus attachment:** `set_process.R` retains common attachment and dispatch through `attach_process()`. Process-specific constructors and setters live together in their process files. `validate_rates()` remains one shared function, retaining its current name and mortality flag, in `rates_util.R`; splitting its algorithm is separate work.
 
 - **Transition processes versus histories:** process construction, household rules, storage, and resolution stay together. History schema and queries live in `group_history.R`; shared analysis preparation lives in `analysis_utils.R`; union-rate-specific preparation stays with the rate calculators.
@@ -169,15 +171,15 @@ Construct, attach, validate, and resolve transition processes and household rule
 
 ### `R/hammel_model.R`
 
-Construct models and attach populations.
+Construct and validate model specifications.
 
-- Functions: **`hammel_model()`**, **`set_population()`**, `check_model()`.
+- Functions: **`hammel_model()`**, `check_model()`.
 
 ### `R/hammel_population.R`
 
-Construct and validate population objects and normalize union tables.
+Construct, validate, and attach population objects; normalize union tables.
 
-- Functions: `validate_union_types()`, **`hammel_population()`**, **`validate_population()`**, `normalize_unions()`, `empty_unions()`.
+- Functions: `validate_union_types()`, **`hammel_population()`**, **`set_population()`**, **`validate_population()`**, `normalize_unions()`, `empty_unions()`.
 
 ### `R/het_fert.R`
 

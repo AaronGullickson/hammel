@@ -1,9 +1,23 @@
-# Construct and validate population objects and their union histories.
+# Construct, validate, and attach populations to model specifications.
 
 # PUBLIC FUNCTIONS ---------------------------------------------------------
 
 #' Create a Hammel population
 #'
+#' @description
+#'
+#' Create a `hammel_population` object to serve as the starting population for a
+#' simulation.
+#'
+#' @details
+#'
+#' In most cases, it will be more common to create a `hammel_population` object
+#' by using [generate_uniform_population()] or to recieve a `hammel_population`
+#' object as the output of [run_simulation()].
+#'
+#' The `hammel_population` object
+#' The `hammel_population` object must always contain a `persons` data frame
+#' and
 #' Collect person and union histories in an inspectable population object. This
 #' constructor does not run a simulation. It validates consistent tables against
 #' the population schema. Custom columns are retained. A declared group
@@ -20,8 +34,9 @@
 #'   normalized to the union schema. Optional `union_type` is cohab or marriage.
 #'   A conversion closes cohab with `end_reason = "conversion"` and links the
 #'   same-time marriage through `previous_cohab_id`.
-#' @param end_time Optional finite simulation endpoint in years. Its calendar
-#'   origin is supplied by the user. `NULL` means that the endpoint is unknown.
+#' @param end_time Required finite numeric reference time in years. Its calendar
+#'   origin is supplied by the user. This supplies the next simulation's
+#'   starting time. Recorded events must not occur after this time.
 #' @param groups Optional group declaration: a character vector of dimension
 #'   names (each with [group()] defaults) or a named list of [group()] objects.
 #'   Persons columns that are not declared are ordinary custom columns. Models
@@ -65,11 +80,15 @@
 hammel_population <- function(
   persons,
   unions = NULL,
-  end_time = NULL,
+  end_time,
   ancestry = NULL,
   transitions = NULL,
   groups = NULL
 ) {
+  if (missing(end_time)) {
+    stop("`end_time` is required, in years.", call. = FALSE)
+  }
+  check_time(end_time, "end_time")
   results <- structure(
     list(
       persons = persons,
@@ -95,6 +114,46 @@ hammel_population <- function(
   results$persons <- tibble::as_tibble(results$persons)
   results$unions <- tibble::as_tibble(results$unions)
   results
+}
+
+#' Set the starting population of a Hammel model
+#'
+#' Supply a validated population containing person and union histories and their
+#' reference time. Tables are normalized to tibbles; column contents and
+#' additional components are retained. Existing process configuration is
+#' retained. The input model is not modified. Grouped populations without
+#' ancestry proportions initialize each starting person at 100% ancestry in
+#' their recorded group. Supplied ancestry is retained and normalized to a
+#' tibble in person order; see [hammel_population()].
+#'
+#' @param model A `hammel_model` object.
+#' @param population A `hammel_population` object. Construct it from tables with
+#'   [hammel_population()]. Its `end_time` supplies the model's starting time.
+#'
+#' @return An updated `hammel_model`.
+#' @export
+#' @examples
+#' persons <- data.frame(
+#'   person_id = 1:2, sex = c("m", "f"),
+#'   birth_time = c(-25, -23), death_time = NA_real_,
+#'   mother_id = NA_integer_, father_id = NA_integer_
+#' )
+#' population <- hammel_population(persons, end_time = 0)
+#' model <- hammel_model() |>
+#'   set_population(population)
+set_population <- function(model, population) {
+  check_model(model)
+  validate_population(population)
+  # A declaration made with set_groups() replaces the population's own.
+  if (!is.null(model$groups)) {
+    population <- apply_group_declaration(population, model$groups)
+  }
+  population <- normalize_population_transitions(population)
+  population <- normalize_population_ancestry(population)
+  population$persons <- tibble::as_tibble(population$persons)
+  population$unions <- tibble::as_tibble(population$unions)
+  model$population <- population
+  model
 }
 
 #' Validate a Hammel population
@@ -237,17 +296,15 @@ validate_population <- function(results) {
       )
     }
   }
-  if (!is.null(time) &&
-        any(
-          c(
-            persons$birth_time,
-            persons$death_time,
-            unions$start_time,
-            unions$end_time
-          ) >
-            time,
-          na.rm = TRUE
-        )) {
+  if (any(
+        c(
+          persons$birth_time,
+          persons$death_time,
+          unions$start_time,
+          unions$end_time
+        ) > time,
+        na.rm = TRUE
+      )) {
     stop(
       paste0(
         "Recorded events must not occur after the population's ",

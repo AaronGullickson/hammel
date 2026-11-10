@@ -73,8 +73,10 @@ test_that("kinship extraction preserves IDs, query order, deaths, and empty sche
   expect_false(anyDuplicated(expected[c("ego_id", "relative_id")]) > 0)
   expect_true(any(expected$relative_id == 20))
   expect_s3_class(expected, "tbl_df")
-  expect_identical(extract_kin(as.data.frame(population$persons), c(80, 90),
-    relative_ids = c(95, 85, 20)), expected)
+  expect_error(
+    extract_kin(as.data.frame(population$persons), c(80, 90)),
+    "hammel_population"
+  )
   empty <- extract_kin(population, integer())
   expect_s3_class(empty, "tbl_df")
   expect_equal(nrow(empty), 0)
