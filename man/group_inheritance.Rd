@@ -14,54 +14,80 @@ group_inheritance(
 }
 \arguments{
 \item{method}{One of \code{"mother"}, \code{"father"}, \code{"random_parent"}, \code{"same_sex"},
-\code{"opposite_sex"}, \code{"ancestry"}, \code{"hierarchy"}, \code{"custom"}, or \code{"fixed"}.
-Random parent chooses each with probability 0.5. Same/opposite sex chooses
-the parent whose sex matches/differs from the child's. Ancestry samples
-known child shares, conditioning out unknown ancestry. Missing information
-required by a built-in rule falls back to the mother, including missing
-fathers, entirely unknown ancestry, and missing hierarchy ranks.}
+\code{"opposite_sex"}, \code{"ancestry"}, \code{"fixed"}, \code{"hierarchy"}, or \code{"custom"}.
+See details for further information.}
 
-\item{fun}{For \code{"custom"}, an R function receiving named arguments
-\code{mother_group}, \code{father_group}, \code{mother_ancestry}, \code{father_ancestry},
-\code{child_ancestry}, \code{child_sex} (\code{"f"}/\code{"m"}), and \code{parents_in_union}
-(logical union status at birth, including on-demand formation). Nonmarital
-births and unknown fathers give FALSE. Older callbacks without this new
-argument or \code{...} remain supported. Use \code{...} for unused inputs. Ancestry
-vectors (the dimension's own shares, when it tracks ancestry) are named by
-category and \code{unknown}. A missing father has NA group and NULL ancestry.
-Return exactly one nonmissing identity in the possible group set. Ordinary
-R random draws are supported; functions must not mutate simulation/global
-state. Invalid returns and errors fail.}
+\item{fun}{For \code{"custom"}, an R function defined by the user. See details for
+variables exposed for this function.}
 
 \item{order}{For \code{"hierarchy"}, unique group labels, highest-ranked first.
-Choose between parental identities, not ancestry. Complex orders use \code{fun}.}
+Chooses between parental group membership, not ancestry.}
 
 \item{passing}{For \code{"hierarchy"}, probability in \verb{[0,1]} of reversing the
-order for a birth. Defaults to zero. Equal parental identities and missing
-ranks/parents retain maternal assignment without a passing draw.}
+order for a birth. Defaults to zero.}
 
 \item{fixed_value}{For \code{"fixed"}, one category label or finite numeric code
-in the dimension's categories. Every newborn receives this category,
-regardless of parents or sex, without an identity random draw or R
-callback.}
+in the dimension's categories. Every newborn receives this category.}
 }
 \value{
 An inspectable \code{hammel_group_inheritance} object.
 }
 \description{
-Assign one group independently of genealogical ancestry shares. Attach this
-object to a dimension with \code{\link[=group]{group()}}. The default selects either parent with
-equal probability, with maternal fallback. Existing people are not
-reassigned, and ancestry is unchanged by assignment. \code{\link[=group]{group()}} also accepts a
-schedule tibble with \code{time_start}, \code{time_end}, and a \code{model} list column
-containing complete inheritance objects. Half-open absolute-year intervals
-select the model at birth. A custom rule must return one of the dimension's
-categories; declare categories that may only appear later in \code{\link[=group]{group()}}.
+A model specification indicating how the group category of newborns should be
+assigned for a particular group dimension. Used in \code{\link[=group]{group()}}.
+}
+\details{
+Whenever groups are in use, an inheritance rule is required to determine how
+the group membership of newborns is determined. The function provides several
+out of the box methods, as well as the ability for users to define a custom
+method:
+\itemize{
+\item \code{random_parent}: The default method. The newborn is assigned the group
+membership of a randomly selected parent with equal probability.
+\item \code{mother} - The newborn is assigned the group membership of the mother.
+\item \code{father} - The newborn is assigned the group membership of the father.
+\item \code{same_sex} - The newborn is assigned the group membership of their same-sex
+parent.
+\item \code{different_sex} - The newborn is assigned the group membership of their
+opposite-sex parent.
+\item \code{ancestry} - The newborn is assigned a group membership randomly, weighted
+by their ancestry share from each group. \code{ancestry = TRUE} must be set for
+the group to use this method.
+\item \code{fixed} - All newborns are assigned a fixed group membership given by the
+\code{fixed_value} argument.
+\item \code{hierarchy} - The newborn is assigned the group membership from the parent
+whose membership is higher on the \code{order} argument. If the \code{passing} argument
+is provided, it defines the probability that this ordering is inverted.
+\item \code{custom} - The newborn is assigned a group membership based on a custom
+R function provided by the user with the \code{fun} argument. Simulations with
+custom R functions are slower to process.
+}
+
+For methods that require no additional arguments (\code{random_parent}, \code{mother},
+\code{father}, \code{same_sex}, \code{different_sex}, \code{ancestry}), the name of the method
+may be passed to arguments requiring an inheritance model like \code{\link[=group]{group()}}
+instead of the model itself.
+
+For the custom function, the following variables are exposed and can be
+called from the function declaration:
+\itemize{
+\item \code{mother_group}: The mother's group membership.
+\item \code{father_group}: The father's group membership. NA if unknown.
+\item \code{mother_ancestry}: Numeric vector of ancestry share from each group for
+mother, as well as an "unknown" value for unknown ancestry.
+\item \code{father_ancestry}: Numeric vector of ancestry share from each group for
+father, as well as an "unknown" value for unknown ancestry.
+\item \code{child_ancestry}: Numeric vector of ancestry share from each group for
+child, as well as an "unknown" value for unknown ancestry.
+\item \code{child_sex}: Either "f" or "m".
+\item \code{parents_in_union}: Logical indicating whether the parents were in a union,
+including on-demand union formation.
+}
 }
 \examples{
 group_inheritance("fixed", fixed_value = "none")
 group_inheritance("mother")
-group_inheritance("hierarchy", order = c("A", "B"), passing = 0.05)
+group_inheritance("hierarchy", order = c("B", "W"), passing = 0.05)
 group_inheritance("custom",
   fun = function(mother_group, father_group, ...) {
     if (is.na(father_group) || mother_group == father_group) {
