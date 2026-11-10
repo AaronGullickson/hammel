@@ -40,18 +40,14 @@ seed will ensure reproducibility of results and simulation will not affect
 existing RNG state.
 }
 \examples{
-population <- generate_uniform_population(100, max_age = 50)
+population <- generate_uniform_population(1000)
 model <- hammel_model() |>
   set_population(population) |>
-  set_mortality(data.frame(
-    sex = c("m", "f"), age_start = 0,
-    age_end = Inf, rate = 0.01
-  )) |>
-  set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0.1)) |>
+  set_mortality(usa_2000_mortality) |>
+  set_fertility(usa_2000_fertility) |>
   set_union_formation(
     "on_demand",
-    matching = matching_model(~age_difference, c(age_difference = 0))
+    matching = age_gap_matching_model(3, 5)
   )
-result <- run_simulation(model, years = 2, seed = 42)
-result$simulation
+result <- run_simulation(model, years = 50, seed = 42)
 }

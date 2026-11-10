@@ -281,7 +281,7 @@ run_simulation <- function(model, years, seed = NULL) {
               model_entries(declaration[[d]]$inheritance),
               function(m) {
                 identical(m$method, "ancestry")
-                },
+              },
               logical(1)
             )
           )) {
