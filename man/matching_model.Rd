@@ -13,87 +13,100 @@ and \code{numeric()} coefficients for pair-effects-only matching.}
 
 \item{coefficients}{A finite named numeric vector of utility coefficients.}
 
-\item{group_exogamy}{Optional symmetric pair effects and prohibitions, in one
-of two forms. \strong{List form} (D135): a named list keyed by dimension, such
-as \code{list(race = c("A:B" = -2, "B:C" = NA), region = NA)}; a bare value
-applies to the only declared dimension. Each value is a named vector over
-unordered pairs (\code{"A:B"} applies to female A/male B and female B/male A
-alike): a finite value is an additive log-weight effect and NA prohibits
-the pair; \code{NA} alone prohibits every union between different categories of
-the dimension. Effects from different dimensions add. Specify each
-unordered pair once; reverse duplicates and \code{::} syntax are errors. Omitted
-pairs have no effect. Finite within-category entries (\code{"A:A"}) are allowed;
-within-category prohibitions are errors. \strong{Table form} (D139), for
-cross-dimension effects: a data frame with \verb{<group>_x} and \verb{<group>_y}
-columns for each dimension it uses and \code{log_odds}, such as
-\code{data.frame(race_x = "W", region_x = "S", race_y = "B", region_y = "S", log_odds = -5)}. Each row is one unordered pair of category combinations,
-applied in both directions; NA prohibits it; unlisted pairs have no effect;
-a pair may be listed once; every row names a category in each of the
-table's dimensions. The table fully specifies the effects: it is not
-combined with the list form. Rows naming absent categories are unused.
-Prohibited men are ineligible, alongside age and kinship exclusions. A
-search fails only when no eligible man exists in the whole pool, following
-existing failed-search and birth cancellation rules. Prohibitions override
-finite preferences and do not end existing unions. Both forms are applied
-natively during partner draws, unlike formula group terms, which are
-evaluated in R.}
+\item{group_exogamy}{Either a list or data.frame indicating the log odds of
+group exogamous pairings. See details for syntax.}
 
 \item{delta}{Optional male-target adjustments, as a named list keyed by
 dimension or a bare value for the only declared dimension: a finite numeric
-vector with unique category names. Multiply mirrored male targets by
-\code{exp(delta)} and normalize. Omitted groups have zero adjustment. Positive
-values raise the male target relative to baseline and other groups;
-negative values lower it. Only differences matter. Does not set
-pair-specific ratios or change female search rates. Names must be
-categories of the dimension (including declared future categories).}
+vector with unique category names.}
 }
 \value{
 An inspectable \code{hammel_matching_model} list containing \code{formula} and
-\code{coefficients}. This specifies a model; it does not estimate one.
+\code{coefficients}.
 }
 \description{
-Define relative partner utilities with an R formula and named coefficients.
-Predictors include \code{age_difference}: male age minus female age, in continuous
-years at the search time. Formula transformations such as
-\code{I(age_difference^2)} and \code{abs(age_difference)} are supported through
-\code{\link[stats:model.matrix]{stats::model.matrix()}}. An intercept is ignored because it cancels from
-partner-only conditional-logit probabilities. No wait alternative is
-included. Group predictors are named by a declared group dimension (see
-\code{\link[=set_groups]{set_groups()}}): for a dimension \code{race}, \code{female_race} and \code{male_race} are
-factors over its categories with treatment contrasts (the first category is
-the reference), and \code{same_race} is 1 for partners in the same category, 0
-otherwise. Pair effects are added after the formula, including custom
-formulas. Predictors and settings may name several dimensions: the engine's
-matching category is the combination of every dimension any matching model of
-the run names, pair effects from different dimensions add, a pair prohibited
-in any dimension is prohibited, \code{delta} values add, and calibration balances
-male selection within each combination. These modify relative candidate
-weights, not search hazards or eligibility.
+Specify conditional-logit model parameters for matching partners.
 }
 \details{
+The \code{formula} argument can be used to define a formula for the utility
+\eqn{U_{ij}} of the match between woman i and man j. This utility is defined
+as the log of the unnormalized choice weight, such that the probability of
+woman i choosing man j is given by:
+
+\deqn{
+  P(j \mid i) = \frac{\exp(U_{ij})}{\sum_k \exp(U_{ik})}
+}
+
+where the denominator sums across all eligible male partners. This equation is
+equivalent to a conditional-logit model specification.
+
+In practice, when groups are in use, this formula needs to be modified to
+adjust for expected male group shares, because the model uses women only to
+make the choice:
+
+\deqn{
+ P(j\mid i)= \frac{\omega_{g(j)}\exp(U_{ij})}{\sum_k\omega_{g(k)}\exp(U_{ik})}
+}
+
+where \eqn{\omega_g} is a group-specific weight to adjust for male group
+shares. More details are provided on the package website.
+
+When \code{delta = 0}, the \eqn{\omega} weights will adjust male group shares to
+produce symmetry by gender in group exogamous unions. To allow for gender
+asymmetry, users can adjust \code{delta} values. The \code{delta} value will typically
+need to be tuned.
+
+Users can define formulas based on:
+\itemize{
+\item \code{age_difference}: male age minus female age
+\item \verb{female_<group>}: group membership for \verb{<group>} dimension of the woman.
+\item \verb{male_<group>}: group membership for \verb{<group>} dimension of the man.
+\item \verb{same_<group>}: 0/1 numeric indicating same \if{html}{\out{<group>}} membership for man and
+woman.
+}
+
+Formula transformations such as  \code{I(age_difference^2)} and
+\code{abs(age_difference)} are supported through \code{\link[stats:model.matrix]{stats::model.matrix()}}. If users
+limit the formula to \code{age_difference} and \code{I(age_difference^2)}, utilities
+will be estimated in C++ leading to faster simulation runs.
+
 Coefficient names must match the non-intercept model-matrix columns exactly,
 for example \code{female_raceB}. Names involving group predictors are checked when
 the model meets the group declaration at simulation. Supply all coefficients
-explicitly; no demographic coefficients are defaulted. Formula functions must
-be deterministic and must not mutate simulation state. Data-dependent
-transformations can change with the candidate pool; use fixed transformations
-when coefficients should have a fixed interpretation.
+explicitly; no demographic coefficients are defaulted.
 
-Partners are drawn exactly from the full conditional-logit distribution over
-all eligible men, without a candidate sample. Living, unpartnered men are
-grouped by group and quarter-year birth bin; a bin is chosen in proportion to
-its size times the largest weight any member could have, a member is accepted
-with the ratio of his weight to that maximum, and only he is screened for age
-and kinship. For the built-in linear/quadratic age model this is exact.
-Custom R formulas are bounded on a 1/32-year grid; if a drawn man's utility
-exceeds the bound, simulation warns that draws were approximate. Existing
-unions are retained even if a new-search restriction would exclude the
-partner.
+Users may find it easier to define group exogamy by the use of the
+\code{group_exogamy} argument than the use of a formula. This argument indicates
+the likelihood of group exogamy across multiple group dimensions. It can take
+one of two forms
+\itemize{
+\item \strong{List form}: a named list keyed by dimension, such as
+\code{list(race = c("A:B" = -2, "B:C" = NA), region = NA)}. Each value is a named
+vector over unordered pairs (\code{"A:B"} applies to female A/male B and female
+B/male A alike): a finite value is an additive log-weight effect and NA
+prohibits the pair; \code{NA} alone prohibits every union between different
+categories of the dimension. Effects from different dimensions add. Omitted
+pairs are treated as implicitly zero. Cross-dimension effects are not possible
+in this format.
+\item \strong{Table form}, for cross-dimension effects: a data frame with \verb{<group>_x}
+and \verb{<group>_y} columns for each dimension it uses and \code{log_odds}, such as
+\code{data.frame(race_x = "W", region_x = "S", race_y = "B", region_y = "S", log_odds = -5)}. Each row is one unordered pair of category combinations,
+applied in both directions; NA prohibits it; unlisted pairs have an implicit
+log odds of zero.
+}
+
+Users may find \code{\link[=age_gap_matching_model]{age_gap_matching_model()}} more intuitive than specifying
+a direct formula.
 }
 \examples{
-# Illustrative coefficients, not demographic defaults.
+# maximize age difference utility when husband is 5 years older. Double
+# utility for same race unions
 matching <- matching_model(
-  ~ age_difference + I(age_difference^2),
-  c(age_difference = 0.1, "I(age_difference^2)" = -0.02)
+  ~ age_difference + I(age_difference^2) + same_race,
+  c(
+    age_difference = 0.1,
+    "I(age_difference^2)" = -0.02,
+    same_race = 0.69
+  )
 )
 }

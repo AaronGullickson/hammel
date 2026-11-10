@@ -12,42 +12,71 @@ age_gap_matching_model(
 )
 }
 \arguments{
-\item{preferred_age_gap}{Finite numeric scalar in years; negative values
-allowed.}
+\item{preferred_age_gap}{Finite numeric scalar in years providing the
+preferred age gap where the age gap is defined by husband's age minus
+wife's age. Negative values allowed.}
 
 \item{half_weight_distance}{Finite positive numeric scalar in years from the
-preferred gap at which selection weight halves.}
+preferred age gap at which utility is halved.}
 
-\item{group_exogamy}{Optional group-pair effects and prohibitions passed to
+\item{group_exogamy}{Optional group exogamy parameters passed to
 \code{\link[=matching_model]{matching_model()}}.}
 
 \item{delta}{Optional male-target adjustments, as a named list keyed by
 dimension or a bare value for the only declared dimension: a finite numeric
-vector with unique category names. Multiply mirrored male targets by
-\code{exp(delta)} and normalize. Omitted groups have zero adjustment. Positive
-values raise the male target relative to baseline and other groups;
-negative values lower it. Only differences matter. Does not set
-pair-specific ratios or change female search rates. Names must be
-categories of the dimension (including declared future categories).}
+vector with unique category names.}
 }
 \value{
 A \code{hammel_matching_model} with linear and quadratic age-difference
 terms.
 }
 \description{
-Convert a preferred age gap and a symmetric half-weight distance into a
-formula and coefficients for \code{\link[=matching_model]{matching_model()}}. Age difference is male age
-minus female age. Candidates at the preferred gap plus or minus
-\code{half_weight_distance} receive half the selection weight of a candidate at
-the preferred gap. Availability and eligibility also affect realized gaps.
+Construct a matching model using age gap preferences rather than a formula.
+Provides an intuitive front-end for \code{\link[=matching_model]{matching_model()}}.
 }
 \details{
-The quadratic coefficient is \code{-log(2) / half_weight_distance^2} and the
-linear coefficient is \code{-2 * preferred_age_gap * quadratic}. This specifies
-relative selection weights, not a halving of utility or a realized standard
-deviation.
+For a matching model that uses a quadratic formulation of age difference and
+its square, the formula can be re-specified by the maximum value of the
+parabola which gives the "preferred" age gap, and how quickly the utility
+declines from that peak. If \eqn{x} is the age difference and \eqn{U} is the
+utility defined as:
+
+\deqn{
+ U = \beta_l x + \beta_q x^2
+}
+
+then the value \eqn{x} where \eqn{U} is maximized is given by:
+
+\deqn{
+ x_{max} = \frac{\beta_l}{-2\beta_q}
+}
+
+Solving for \eqn{\beta_l} gives:
+
+\deqn{
+ \beta_l = -2 * \beta_q x_{max}
+}
+
+The degree of decline from the peak can be defined by how many years of age
+difference \eqn{d} are necessary to reduce \eqn{U} by half. The formula for
+\eqn{\beta_q} is given by:
+
+\deqn{
+ \beta_q = \frac{-\log(2)}{d^2}
+}
+
+Thus, the values of the linear and quadratic terms can be determined by the
+desired values of \eqn{x_{max}} and \eqn{d}.
 }
 \examples{
-# Illustrative preferences, not demographic defaults.
-matching <- age_gap_matching_model(3, 5)
+# preferred age gap of 3 years with a halving at 5 years, plus group
+# exogamy terms. Exogamy allowed by race but not region.
+matching <- age_gap_matching_model(
+  preferred_age_gap = 3,
+  half_weight_distance = 5,
+  group_exogamy = list(
+    race = c("W:B" = -3, "W:O" = -1, "B:O" = -2),
+    region = NA
+  )
+)
 }

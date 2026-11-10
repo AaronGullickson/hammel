@@ -2,90 +2,106 @@
 
 # PUBLIC FUNCTIONS ---------------------------------------------------------
 
-#' Specify a conditional-logit matching model
+#'Specify a conditional-logit matching model
 #'
-#' Define relative partner utilities with an R formula and named coefficients.
-#' Predictors include `age_difference`: male age minus female age, in continuous
-#' years at the search time. Formula transformations such as
-#' `I(age_difference^2)` and `abs(age_difference)` are supported through
-#' [stats::model.matrix()]. An intercept is ignored because it cancels from
-#' partner-only conditional-logit probabilities. No wait alternative is
-#' included. Group predictors are named by a declared group dimension (see
-#' [set_groups()]): for a dimension `race`, `female_race` and `male_race` are
-#' factors over its categories with treatment contrasts (the first category is
-#' the reference), and `same_race` is 1 for partners in the same category, 0
-#' otherwise. Pair effects are added after the formula, including custom
-#' formulas. Predictors and settings may name several dimensions: the engine's
-#' matching category is the combination of every dimension any matching model of
-#' the run names, pair effects from different dimensions add, a pair prohibited
-#' in any dimension is prohibited, `delta` values add, and calibration balances
-#' male selection within each combination. These modify relative candidate
-#' weights, not search hazards or eligibility.
+#'@description
 #'
-#' Coefficient names must match the non-intercept model-matrix columns exactly,
-#' for example `female_raceB`. Names involving group predictors are checked when
-#' the model meets the group declaration at simulation. Supply all coefficients
-#' explicitly; no demographic coefficients are defaulted. Formula functions must
-#' be deterministic and must not mutate simulation state. Data-dependent
-#' transformations can change with the candidate pool; use fixed transformations
-#' when coefficients should have a fixed interpretation.
+#'Specify conditional-logit model parameters for matching partners.
 #'
-#' Partners are drawn exactly from the full conditional-logit distribution over
-#' all eligible men, without a candidate sample. Living, unpartnered men are
-#' grouped by group and quarter-year birth bin; a bin is chosen in proportion to
-#' its size times the largest weight any member could have, a member is accepted
-#' with the ratio of his weight to that maximum, and only he is screened for age
-#' and kinship. For the built-in linear/quadratic age model this is exact.
-#' Custom R formulas are bounded on a 1/32-year grid; if a drawn man's utility
-#' exceeds the bound, simulation warns that draws were approximate. Existing
-#' unions are retained even if a new-search restriction would exclude the
-#' partner.
 #'
-#' @param formula A one-sided R formula using `age_difference` and group
-#'   predictors `female_<group>`, `male_<group>` and `same_<group>`. Use `~ 1`
-#'   and `numeric()` coefficients for pair-effects-only matching.
-#' @param coefficients A finite named numeric vector of utility coefficients.
-#' @param group_exogamy Optional symmetric pair effects and prohibitions, in one
-#'   of two forms. **List form** (D135): a named list keyed by dimension, such
-#'   as `list(race = c("A:B" = -2, "B:C" = NA), region = NA)`; a bare value
-#'   applies to the only declared dimension. Each value is a named vector over
-#'   unordered pairs (`"A:B"` applies to female A/male B and female B/male A
-#'   alike): a finite value is an additive log-weight effect and NA prohibits
-#'   the pair; `NA` alone prohibits every union between different categories of
-#'   the dimension. Effects from different dimensions add. Specify each
-#'   unordered pair once; reverse duplicates and `::` syntax are errors. Omitted
-#'   pairs have no effect. Finite within-category entries (`"A:A"`) are allowed;
-#'   within-category prohibitions are errors. **Table form** (D139), for
-#'   cross-dimension effects: a data frame with `<group>_x` and `<group>_y`
-#'   columns for each dimension it uses and `log_odds`, such as
-#'   `data.frame(race_x = "W", region_x = "S", race_y = "B", region_y = "S",
-#'   log_odds = -5)`. Each row is one unordered pair of category combinations,
-#'   applied in both directions; NA prohibits it; unlisted pairs have no effect;
-#'   a pair may be listed once; every row names a category in each of the
-#'   table's dimensions. The table fully specifies the effects: it is not
-#'   combined with the list form. Rows naming absent categories are unused.
-#'   Prohibited men are ineligible, alongside age and kinship exclusions. A
-#'   search fails only when no eligible man exists in the whole pool, following
-#'   existing failed-search and birth cancellation rules. Prohibitions override
-#'   finite preferences and do not end existing unions. Both forms are applied
-#'   natively during partner draws, unlike formula group terms, which are
-#'   evaluated in R.
-#' @param delta Optional male-target adjustments, as a named list keyed by
-#'   dimension or a bare value for the only declared dimension: a finite numeric
-#'   vector with unique category names. Multiply mirrored male targets by
-#'   `exp(delta)` and normalize. Omitted groups have zero adjustment. Positive
-#'   values raise the male target relative to baseline and other groups;
-#'   negative values lower it. Only differences matter. Does not set
-#'   pair-specific ratios or change female search rates. Names must be
-#'   categories of the dimension (including declared future categories).
-#' @return An inspectable `hammel_matching_model` list containing `formula` and
-#'   `coefficients`. This specifies a model; it does not estimate one.
-#' @export
-#' @examples
-#' # Illustrative coefficients, not demographic defaults.
+#'@details
+#'
+#'The `formula` argument can be used to define a formula for the utility
+#'\eqn{U_{ij}} of the match between woman i and man j. This utility is defined
+#'as the log of the unnormalized choice weight, such that the probability of
+#'woman i choosing man j is given by:
+#'
+#' \deqn{
+#'   P(j \mid i) = \frac{\exp(U_{ij})}{\sum_k \exp(U_{ik})}
+#' }
+#'
+#'where the denominator sums across all eligible male partners. This equation is
+#'equivalent to a conditional-logit model specification.
+#'
+#'In practice, when groups are in use, this formula needs to be modified to
+#'adjust for expected male group shares, because the model uses women only to
+#'make the choice:
+#'
+#' \deqn{
+#'  P(j\mid i)= \frac{\omega_{g(j)}\exp(U_{ij})}{\sum_k\omega_{g(k)}\exp(U_{ik})}
+#' }
+#'
+#'where \eqn{\omega_g} is a group-specific weight to adjust for male group
+#'shares. More details are provided on the package website.
+#'
+#'When `delta = 0`, the \eqn{\omega} weights will adjust male group shares to
+#'produce symmetry by gender in group exogamous unions. To allow for gender
+#'asymmetry, users can adjust `delta` values. The `delta` value will typically
+#'need to be tuned.
+#'
+#'Users can define formulas based on:
+#'
+#' - `age_difference`: male age minus female age
+#' - `female_<group>`: group membership for `<group>` dimension of the woman.
+#' - `male_<group>`: group membership for `<group>` dimension of the man.
+#' - `same_<group>`: 0/1 numeric indicating same <group> membership for man and
+#'woman.
+#'
+#'Formula transformations such as  `I(age_difference^2)` and
+#'`abs(age_difference)` are supported through [stats::model.matrix()]. If users
+#'limit the formula to `age_difference` and `I(age_difference^2)`, utilities
+#'will be estimated in C++ leading to faster simulation runs.
+#'
+#'Coefficient names must match the non-intercept model-matrix columns exactly,
+#'for example `female_raceB`. Names involving group predictors are checked when
+#'the model meets the group declaration at simulation. Supply all coefficients
+#'explicitly; no demographic coefficients are defaulted.
+#'
+#'Users may find it easier to define group exogamy by the use of the
+#'`group_exogamy` argument than the use of a formula. This argument indicates
+#'the likelihood of group exogamy across multiple group dimensions. It can take
+#'one of two forms
+#'
+#' - **List form**: a named list keyed by dimension, such as
+#'`list(race = c("A:B" = -2, "B:C" = NA), region = NA)`. Each value is a named
+#'vector over unordered pairs (`"A:B"` applies to female A/male B and female
+#'B/male A alike): a finite value is an additive log-weight effect and NA
+#'prohibits the pair; `NA` alone prohibits every union between different
+#'categories of the dimension. Effects from different dimensions add. Omitted
+#'pairs are treated as implicitly zero. Cross-dimension effects are not possible
+#'in this format.
+#' - **Table form**, for cross-dimension effects: a data frame with `<group>_x`
+#'and `<group>_y` columns for each dimension it uses and `log_odds`, such as
+#'`data.frame(race_x = "W", region_x = "S", race_y = "B", region_y = "S",
+#'log_odds = -5)`. Each row is one unordered pair of category combinations,
+#'applied in both directions; NA prohibits it; unlisted pairs have an implicit
+#'log odds of zero.
+#'
+#'Users may find [age_gap_matching_model()] more intuitive than specifying
+#'a direct formula.
+#'
+#'@param formula A one-sided R formula using `age_difference` and group
+#'  predictors `female_<group>`, `male_<group>` and `same_<group>`. Use `~ 1`
+#'  and `numeric()` coefficients for pair-effects-only matching.
+#'@param coefficients A finite named numeric vector of utility coefficients.
+#'@param group_exogamy Either a list or data.frame indicating the log odds of
+#'  group exogamous pairings. See details for syntax.
+#'@param delta Optional male-target adjustments, as a named list keyed by
+#'  dimension or a bare value for the only declared dimension: a finite numeric
+#'  vector with unique category names.
+#'@return An inspectable `hammel_matching_model` list containing `formula` and
+#'  `coefficients`.
+#'@export
+#'@examples
+#' # maximize age difference utility when husband is 5 years older. Double
+#' # utility for same race unions
 #' matching <- matching_model(
-#'   ~ age_difference + I(age_difference^2),
-#'   c(age_difference = 0.1, "I(age_difference^2)" = -0.02)
+#'   ~ age_difference + I(age_difference^2) + same_race,
+#'   c(
+#'     age_difference = 0.1,
+#'     "I(age_difference^2)" = -0.02,
+#'     same_race = 0.69
+#'   )
 #' )
 matching_model <- function(
   formula,
@@ -109,29 +125,68 @@ matching_model <- function(
 
 #' Create a quadratic matching model from interpretable age-gap preferences
 #'
-#' Convert a preferred age gap and a symmetric half-weight distance into a
-#' formula and coefficients for [matching_model()]. Age difference is male age
-#' minus female age. Candidates at the preferred gap plus or minus
-#' `half_weight_distance` receive half the selection weight of a candidate at
-#' the preferred gap. Availability and eligibility also affect realized gaps.
+#' @description
 #'
-#' The quadratic coefficient is `-log(2) / half_weight_distance^2` and the
-#' linear coefficient is `-2 * preferred_age_gap * quadratic`. This specifies
-#' relative selection weights, not a halving of utility or a realized standard
-#' deviation.
-#' @param preferred_age_gap Finite numeric scalar in years; negative values
-#'   allowed.
-#' @param group_exogamy Optional group-pair effects and prohibitions passed to
+#' Construct a matching model using age gap preferences rather than a formula.
+#' Provides an intuitive front-end for [matching_model()].
+#'
+#' @details
+#'
+#' For a matching model that uses a quadratic formulation of age difference and
+#' its square, the formula can be re-specified by the maximum value of the
+#' parabola which gives the "preferred" age gap, and how quickly the utility
+#' declines from that peak. If \eqn{x} is the age difference and \eqn{U} is the
+#' utility defined as:
+#'
+#' \deqn{
+#'  U = \beta_l x + \beta_q x^2
+#' }
+#'
+#' then the value \eqn{x} where \eqn{U} is maximized is given by:
+#'
+#' \deqn{
+#'  x_{max} = \frac{\beta_l}{-2\beta_q}
+#' }
+#'
+#' Solving for \eqn{\beta_l} gives:
+#'
+#' \deqn{
+#'  \beta_l = -2 * \beta_q x_{max}
+#' }
+#'
+#' The degree of decline from the peak can be defined by how many years of age
+#' difference \eqn{d} are necessary to reduce \eqn{U} by half. The formula for
+#' \eqn{\beta_q} is given by:
+#'
+#' \deqn{
+#'  \beta_q = \frac{-\log(2)}{d^2}
+#' }
+#'
+#' Thus, the values of the linear and quadratic terms can be determined by the
+#' desired values of \eqn{x_{max}} and \eqn{d}.
+#'
+#' @param preferred_age_gap Finite numeric scalar in years providing the
+#'   preferred age gap where the age gap is defined by husband's age minus
+#'   wife's age. Negative values allowed.
+#' @param group_exogamy Optional group exogamy parameters passed to
 #'   [matching_model()].
 #' @param half_weight_distance Finite positive numeric scalar in years from the
-#'   preferred gap at which selection weight halves.
+#'   preferred age gap at which utility is halved.
 #' @inheritParams matching_model
 #' @return A `hammel_matching_model` with linear and quadratic age-difference
 #'   terms.
 #' @export
 #' @examples
-#' # Illustrative preferences, not demographic defaults.
-#' matching <- age_gap_matching_model(3, 5)
+#' # preferred age gap of 3 years with a halving at 5 years, plus group
+#' # exogamy terms. Exogamy allowed by race but not region.
+#' matching <- age_gap_matching_model(
+#'   preferred_age_gap = 3,
+#'   half_weight_distance = 5,
+#'   group_exogamy = list(
+#'     race = c("W:B" = -3, "W:O" = -1, "B:O" = -2),
+#'     region = NA
+#'   )
+#' )
 age_gap_matching_model <- function(
   preferred_age_gap,
   half_weight_distance,
