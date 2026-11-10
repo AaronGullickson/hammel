@@ -72,7 +72,7 @@ test_that("conversion preserves partners, resets dissolution duration and links 
   expect_equal(late$unions$previous_cohab_id[2], late$unions$union_id[1])
   expect_equal(late$unions$wife_id, c(1,1))
   expect_equal(late$unions$husband_id, c(2,2))
-  expect_equal(late$simulation$conversions, 1)
+  expect_equal(count_run_events(late, "conversions"), 1)
   # Current partnership is continuous and conversion is not a second entry.
   rates <- calculate_union_rates(late, c(0,3), c(0,Inf))
   expect_equal(sum(rates$unions), 2)
@@ -91,8 +91,8 @@ test_that("conversion and cohab breakup follow competing annual hazards", {
   reasons <- result$unions$end_reason[seq_len(n)]
   observed <- c(sum(reasons=="conversion",na.rm=TRUE),sum(reasons=="dissolution",na.rm=TRUE))
   expect_true(all(abs(observed-n*expected)<6*sqrt(n*expected*(1-expected))))
-  expect_equal(result$simulation$conversions, observed[1])
-  expect_equal(result$simulation$dissolutions, observed[2])
+  expect_equal(count_run_events(result, "conversions"), observed[1])
+  expect_equal(count_run_events(result, "dissolutions"), observed[2])
 })
 
 test_that("fertility follows type and conversion retains actual-birth spacing", {
@@ -220,7 +220,7 @@ test_that("conversion age clocks and pending birth ties retain the conversion", 
   model$processes$union_formation$union_convert_rate$rate <- draws[3]/.5
   ended <- run_simulation(model,1.5,seed)
   expect_equal(ended$unions$end_reason[1],"dissolution")
-  expect_equal(ended$simulation$conversions,0)
+  expect_equal(count_run_events(ended, "conversions"),0)
 })
 
 test_that("earlier legal history governs subsequent searches after cohabitant death", {
@@ -255,10 +255,10 @@ test_that("typed dissolution retains symmetric pair hazards", {
   rates$rate <- ifelse(rates$union_type=="cohab" & rates$group_w!=rates$group_h,1e5,0)
   model <- set_union_dissolution(model,rates)
   result <- run_simulation(model,.1,42)
-  expect_equal(result$simulation$dissolutions,1)
+  expect_equal(count_run_events(result, "dissolutions"),1)
   expect_equal(result$unions$end_reason[1],"dissolution")
   model <- set_union_dissolution(model,transform(rates,rate=ifelse(group_w!=group_h,0,rate)))
-  expect_equal(run_simulation(model,.1,42)$simulation$dissolutions,0)
+  expect_equal(count_run_events(run_simulation(model,.1,42), "dissolutions"),0)
 })
 
 test_that("union entry types share exposure and exclude conversion", {
@@ -295,4 +295,14 @@ test_that("union entry types share exposure and exclude conversion", {
   typed <- calculate_union_rates(converted, c(0,1), c(0,Inf), by = "union_type")
   expect_equal(sum(typed$unions), 2) # Existing cohab starts at the window boundary.
   expect_equal(sum(typed$unions[typed$union_type == "marriage"]), 0)
+})
+
+
+test_that("cohabitation interpretation remains without run event counts", {
+  model <- cohab_fixture()
+  model$processes$union_formation$cohabitation_counts_as_previous_union <- TRUE
+  result <- run_simulation(model, 0)
+  expect_true(result$simulation$cohabitation_counts_as_previous_union)
+  counts <- c("births", "deaths", "dissolutions", "conversions", "transitions")
+  expect_false(any(counts %in% names(result$simulation)))
 })

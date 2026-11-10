@@ -166,9 +166,9 @@ test_that("weighted hazards integrate with grouped partner/father matching and u
       union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .3)) |>
     set_union_dissolution(data.frame(dur_start = 0, dur_end = Inf, rate = .2))
   p <- run_simulation(model, 8, 82)
-  expect_gt(p$simulation$births, 0)
-  expect_gt(p$simulation$conversions, 0)
-  expect_gt(p$simulation$dissolutions, 0)
+  expect_gt(count_run_events(p, "births"), 0)
+  expect_gt(count_run_events(p, "conversions"), 0)
+  expect_gt(count_run_events(p, "dissolutions"), 0)
   expect_true(all(is.finite(p$persons$hetfert[p$persons$sex == "f"])))
   # The fertility-driven on-demand channel uses the same weighted hazard sums.
   overall <- rates[rates$union_type == "unpartnered", ]
@@ -176,7 +176,7 @@ test_that("weighted hazards integrate with grouped partner/father matching and u
   model <- model |> set_fertility(overall, hetfert = het_fert(.7, .4)) |>
     set_union_formation("on_demand", matching = age_gap_matching_model(0, 5,
       group_exogamy = c("A:B" = -1)))
-  expect_gt(run_simulation(model, 5, 83)$simulation$births, 0)
+  expect_gt(count_run_events(run_simulation(model, 5, 83), "births"), 0)
 })
 
 test_that("removing a dominant eligible weight preserves tiny remaining weights", {

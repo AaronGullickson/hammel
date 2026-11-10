@@ -148,3 +148,25 @@ as_internal_matching <- function(model, labels) {
   dim <- if (length(matching_dimensions(model, "group"))) "group"
   internal_matching_model(model, dim, labels)
 }
+
+# Count recorded events strictly inside the latest run's interval. Input
+# history at its starting instant is excluded; run-end events are not executed.
+count_run_events <- function(population, event) {
+  time <- switch(
+    event,
+    births = population$persons$birth_time,
+    deaths = population$persons$death_time,
+    dissolutions = population$unions$end_time[
+      population$unions$end_reason %in% "dissolution"
+    ],
+    conversions = population$unions$end_time[
+      population$unions$end_reason %in% "conversion"
+    ],
+    transitions = population$transitions$time
+  )
+  as.numeric(sum(
+    time > population$simulation$start_time &
+      time < population$simulation$end_time,
+    na.rm = TRUE
+  ))
+}

@@ -3,7 +3,7 @@ test_that("minimum male age excludes boys while preserving births and unknown fa
   model$population$persons$sex[1] <- "f"
   model$population$persons$birth_time[2] <- -14
   result <- run_simulation(model, 0.5, seed = 52)
-  expect_gt(result$simulation$births, 0)
+  expect_gt(count_run_events(result, "births"), 0)
   expect_equal(nrow(result$unions), 0)
   expect_true(all(is.na(result$persons$father_id)))
   expect_identical(result, run_simulation(model, 0.5, seed = 52))
@@ -65,7 +65,7 @@ test_that("existing partners are retained and women have no additional age restr
   model$population$unions <- tibble::tibble(union_id = 1, wife_id = 1,
     husband_id = 2, start_time = -0.1, end_time = NA_real_, end_reason = NA_character_)
   result <- run_simulation(model, 0.1, seed = 52)
-  expect_gt(result$simulation$births, 0)
+  expect_gt(count_run_events(result, "births"), 0)
   expect_identical(result$unions, model$population$unions)
   expect_true(all(result$persons$father_id[result$persons$mother_id %in% 1] == 2))
   # Without a supplied union, the same young woman can search for an adult man.

@@ -3401,3 +3401,12 @@ The user also chose to require a `hammel_population` object for `extract_kin()`.
 **Implementation and checks:** The constructor now has no `end_time` default and reports omission explicitly. Shared time validation enforces a finite numeric scalar for construction and population validation; the generator uses the same check and retains its existing zero-year default. Removed the obsolete nullable-endpoint guard from population date-consistency checking and the bare-table conversion from `extract_kin()`. Updated fixtures to supply reference times and changed unknown-endpoint expectations to validation errors; other schema-error tests retain valid endpoints so they continue to check their intended failures. Help and current specifications reflect the new requirement.
 
 Targeted model/population, ancestry, kinship and detailed-union tests passed 530 expectations without failures or warnings. The final offline `devtools::test()` run passed 6,612 expectations with zero failures in 85.6 seconds, one existing `timedatectl` warning while loading HMDHFDplus/lubridate, and the opt-in live database test skipped. Updated help files parse, hand-maintained R source and edited test lines satisfy the 80-column rule, and `git diff --check` passed.
+
+
+## D167 — Remove duplicated run event counts (November 10, 2026)
+
+**Status:** User decision and implementation authorization, November 10, 2026.
+
+**Decision:** Remove births, deaths, dissolutions, conversions and transitions counts from the returned population's `simulation` component. Keep all existing run dates and settings, including the cohabitation interpretation setting needed by population analysis. Keep `unrealized_births` and `unrealized_since` as accumulated population records. Demographic events remain in person, union and transition histories; execution, random-number consumption and event timing are unchanged. This supersedes D160's retention of per-run event counters.
+
+**Validation plan:** Replace tests' consumption of duplicated counters with counts from the latest run's history interval. Verify settings remain available and event count fields are absent, including when restarting from an output containing older counters. Run the offline suite. Preserve historical milestone evidence and user-owned README/articles.

@@ -72,7 +72,7 @@ test_that("type probabilities change at fractional dates while searches recover 
   expect_true(all(u$union_type[u$start_time >= .5] == "cohab"))
   expected <- 1 - exp(-.7 * 1.3)
   expect_lt(abs(nrow(u) / n - expected), 5 * sqrt(expected * (1 - expected) / n))
-  expect_equal(out$simulation$conversions, 0)
+  expect_equal(count_run_events(out, "conversions"), 0)
   # Existing marriages remain marriage after the probability change.
   expect_true(all(is.na(u$end_time)))
 })

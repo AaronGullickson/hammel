@@ -54,11 +54,11 @@ test_that("empty filtered samples use existing birth cancellation and unknown-fa
   model$population$groups <- list(group = group())
   model$processes$union_formation$cancel_birth_if_no_match <- TRUE
   result <- run_simulation(model, 0.3, seed = 52)
-  expect_equal(result$simulation$births, 0)
+  expect_equal(count_run_events(result, "births"), 0)
   expect_equal(nrow(result$unions), 0)
   model$processes$union_formation$cancel_birth_if_no_match <- FALSE
   result <- run_simulation(model, 0.3, seed = 52)
-  expect_gt(result$simulation$births, 0)
+  expect_gt(count_run_events(result, "births"), 0)
   expect_equal(nrow(result$unions), 0)
   children <- result$persons$birth_time >= 0
   expect_true(all(is.na(result$persons$father_id[children])))
@@ -76,8 +76,8 @@ test_that("a compatible man anywhere in the pool is always found under restricti
     unions <- run_simulation(model, 0.1, seed = seed)$unions
     if (nrow(unions)) unions$husband_id[1] else NA_real_
   }, numeric(1))
-  births <- vapply(1:30, function(seed) run_simulation(model, 0.1, seed =
-    seed)$simulation$births, numeric(1))
+  births <- vapply(1:30, function(seed) count_run_events(run_simulation(model, 0.1, seed =
+    seed), "births"), numeric(1))
   expect_true(all(husbands[births > 0] == 2))
 })
 

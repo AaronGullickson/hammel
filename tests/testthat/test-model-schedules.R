@@ -179,7 +179,7 @@ test_that("inheritance applies the new model at an exact tied birth", {
   s <- model_calendar(group_inheritance("mother"), group_inheritance("father"), boundary)
   out <- run_simulation(model_inheritance_fixture(s), boundary + 1e-7, seed =
     seed)
-  expect_equal(out$simulation$births, 1)
+  expect_equal(count_run_events(out, "births"), 1)
   expect_equal(tail(out$persons$birth_time, 1), boundary, tolerance = 0)
   expect_equal(tail(out$persons$group, 1), "B")
 })
@@ -352,5 +352,5 @@ test_that("inheritance-only boundaries preserve matching execution without birth
   expected <- run_simulation(m,2,seed=812)
   expect_equal(actual$persons,expected$persons)
   expect_equal(actual$unions,expected$unions)
-  expect_equal(actual$simulation$births,0)
+  expect_equal(count_run_events(actual, "births"),0)
 })

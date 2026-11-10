@@ -43,7 +43,7 @@ test_that("on-demand rejects status schedules, rate overall warns exactly once",
   })
   expect_length(warnings, 1)
   expect_match(warnings, "overall fertility schedule.*union_type")
-  expect_gt(result$simulation$births, 0)
+  expect_gt(count_run_events(result, "births"), 0)
   expect_true(all(is.na(result$persons$father_id)))
   expect_equal(nrow(result$unions), 0)
   expect_warning(run_simulation(model, 0), "overall fertility schedule")
@@ -52,7 +52,7 @@ test_that("on-demand rejects status schedules, rate overall warns exactly once",
 test_that("unpartnered births select fathers without triggering unions", {
   model <- set_fertility(make_rate_model(search_rate = 0), status_rates(0, 20), 0)
   expect_no_warning(result <- run_simulation(model, 1, seed = 52))
-  expect_gt(result$simulation$births, 0)
+  expect_gt(count_run_events(result, "births"), 0)
   expect_equal(nrow(result$unions), 0)
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 2))
   expect_identical(result, run_simulation(model, 1, seed = 52))
@@ -92,7 +92,7 @@ test_that("formation and widowhood switch fertility schedules without bypassing 
   expect_true(all(is.na(children$father_id)))
   continued <- run_simulation(set_population(model, result), 0.2, seed = 53)
   expect_identical(continued$unions, result$unions)
-  expect_gt(continued$simulation$births, 0)
+  expect_gt(count_run_events(continued, "births"), 0)
 })
 
 test_that("fertility compensation and different age bands remain separate by status", {
@@ -105,7 +105,7 @@ test_that("fertility compensation and different age bands remain separate by sta
   rates$age_start <- c(30, 15)
   rates$age_end <- c(40, 19)
   model <- set_fertility(model, rates, 0)
-  expect_equal(run_simulation(model, 1, seed = 52)$simulation$births, 0)
+  expect_equal(count_run_events(run_simulation(model, 1, seed = 52), "births"), 0)
 })
 
 test_that("constant status-specific fertility gives the corresponding birth counts", {

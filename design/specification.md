@@ -120,10 +120,12 @@ R validates inputs and assembles the returned `hammel_population`, retaining
 histories and existing extra person columns. Newborn group identity follows
 the dimension's inheritance model (random parent by default, with maternal fallback); other custom attributes are
 missing. Group-specific schedules and baseline group sampling are documented in
-[groups](groups.md). The `simulation` component records `start_time`, `end_time`,
-`birth_interval`, `ffab`, `births`, and `deaths` for the latest run, plus
-`dissolutions` when that optional process is configured, and
-`unrealized_births`, a tibble of counted unrealized births.
+[groups](groups.md). The `simulation` component records the latest run's
+`start_time`, `end_time`, `birth_interval` and `ffab`, plus `hetfert` when enabled
+and `cohabitation_counts_as_previous_union` when cohabitation is enabled.
+Event counts are not duplicated there (D167); events remain in person, union
+and transition histories. `unrealized_births` and `unrealized_since` are
+population components accumulated across chained runs (D160).
 
 Grouped populations also have an `ancestry` tibble, or may supply it explicitly
 to `hammel_population(ancestry = ...)`. Initialization uses recorded identities

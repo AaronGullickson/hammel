@@ -53,7 +53,7 @@ test_that("existing unions preserve sex-specific partner identity and custom his
 test_that("no men preserves the first birth with unknown father and no union", {
   model <- make_on_demand_model(1)
   result <- run_simulation(model, 0.1, seed = 3)
-  expect_gt(result$simulation$births, 0)
+  expect_gt(count_run_events(result, "births"), 0)
   first <- which(!is.na(result$persons$mother_id))[1]
   expect_true(is.na(result$persons$father_id[first]))
   expect_true(all(result$unions$start_time > result$persons$birth_time[first]))

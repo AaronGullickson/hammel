@@ -13,8 +13,8 @@ test_that("simulation handles empty populations and zero risks", {
     0.1)$simulation$birth_interval, 0.1)
   model <- make_model()
   zero <- run_simulation(model, 1, seed = 42)
-  expect_equal(zero$simulation$births, 0, tolerance = 0)
-  expect_equal(zero$simulation$deaths, 0, tolerance = 0)
+  expect_equal(count_run_events(zero, "births"), 0, tolerance = 0)
+  expect_equal(count_run_events(zero, "deaths"), 0, tolerance = 0)
   expect_true(all(is.na(zero$persons$death_time)))
   expect_equal(zero$end_time, 1, tolerance = 0)
   expect_identical(model$population$end_time, 0)
@@ -78,7 +78,7 @@ test_that("birth precedes a later death within a former monthly bin", {
   ordered <- run_simulation(make_model(1, sex = "f", death_rate = draws[2]/0.06,
     birth_rate = draws[1]/0.02,
     birth_interval = 0.05), 0.03, seed = 42) # spacing leaves room for one birth
-  expect_equal(ordered$simulation$births, 1, tolerance = 0)
+  expect_equal(count_run_events(ordered, "births"), 1, tolerance = 0)
   expect_true(abs(ordered$persons$birth_time[2] - 0.02) < 1e-14)
 })
 
@@ -107,8 +107,6 @@ test_that("birth accounting, father availability and spacing survive restarts", 
   model$population$persons$sex[seq_len(1000)] <- "f"
   result <- run_simulation(model, 5, seed = 42)
   new <- result$persons$person_id > 2000
-  expect_equal(sum(new), result$simulation$births, tolerance = 0)
-  expect_equal(nrow(result$persons), 2000 + result$simulation$births, tolerance = 0)
   expect_true(!anyDuplicated(result$persons$person_id))
   expect_true(all(result$persons$father_id[new] %in% result$persons$person_id[result$persons$sex ==
     "m"]))
@@ -155,8 +153,10 @@ test_that("death closes existing unions without forming new unions", {
 test_that("fractional run durations and tibble outputs are supported", {
   result <- run_simulation(make_model(), 0.123, seed = 42)
   expect_equal(result$end_time, 0.123, tolerance = 0)
-  expect_identical(names(result$simulation), c("start_time", "end_time", "birth_interval",
-    "ffab", "births", "deaths"))
+  expect_identical(
+    names(result$simulation),
+    c("start_time", "end_time", "birth_interval", "ffab")
+  )
   expect_s3_class(result$unrealized_births, "tbl_df")
   expect_equal(result$unrealized_since, 0)
   expect_error(run_simulation(make_model(), -1))
@@ -172,7 +172,7 @@ test_that("nondefault process spacing is enforced and revalidated on restart", {
   continued <- run_simulation(set_population(model, result), 3, seed = 43)
   expect_equal(result$simulation$birth_interval, 1.13, tolerance = 0)
   expect_equal(continued$simulation$birth_interval, 1.13, tolerance = 0)
-  expect_true(continued$simulation$births > 0)
+  expect_true(count_run_events(continued, "births") > 0)
   children <- continued$persons[!is.na(continued$persons$mother_id), ]
   intervals <- unlist(lapply(split(children$birth_time, children$mother_id), function(times) diff(sort(times))))
   expect_true(length(intervals) > 0)
@@ -184,3 +184,21 @@ test_that("nondefault process spacing is enforced and revalidated on restart", {
   expect_error(run_simulation(edited, 1))
 })
 
+
+
+test_that("restarts keep settings but discard legacy run counts", {
+  model <- make_model(2)
+  result <- run_simulation(model, 1, seed = 42)
+  counts <- c("births", "deaths", "dissolutions", "conversions", "transitions")
+  for (name in counts) {
+    result$simulation[[name]] <- 10
+  }
+  continued <- run_simulation(set_population(model, result), 0)
+  expect_false(any(counts %in% names(continued$simulation)))
+  expect_identical(continued$simulation$birth_interval, 0.75)
+  expect_identical(continued$simulation$ffab, result$simulation$ffab)
+  expect_identical(continued$persons, result$persons)
+  expect_identical(continued$unions, result$unions)
+  expect_identical(continued$unrealized_births, result$unrealized_births)
+  expect_identical(continued$unrealized_since, result$unrealized_since)
+})

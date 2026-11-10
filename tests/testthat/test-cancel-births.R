@@ -30,12 +30,12 @@ test_that("both initiation modes cancel unmatched births unless explicitly allow
     result <- run_simulation(model, 1, seed = 52)
     expect_identical(.Random.seed, rng)
     expect_equal(result$persons, tibble::as_tibble(model$population$persons))
-    expect_equal(result$simulation$births, 0)
+    expect_equal(count_run_events(result, "births"), 0)
     expect_equal(nrow(result$unions), 0)
     expect_identical(result, run_simulation(model, 1, seed = 52))
     model$processes$union_formation$cancel_birth_if_no_match <- FALSE
     allowed <- run_simulation(model, 1, seed = 52)
-    expect_gt(allowed$simulation$births, 0)
+    expect_gt(count_run_events(allowed, "births"), 0)
     expect_true(all(is.na(allowed$persons$father_id)))
   }
 })
@@ -65,7 +65,7 @@ test_that("cancelled attempts do not create spacing, IDs or kinship and can late
     kin <- extract_kin(result, 2, relative_ids = 3)
     expect_equal(kin$relative_distance, 1)
     continued <- run_simulation(set_population(model, result), 0.2, seed = 53)
-    expect_equal(continued$simulation$births, 0)
+    expect_equal(count_run_events(continued, "births"), 0)
   }
 })
 
@@ -93,11 +93,11 @@ test_that("default cancellation covers samples rejected by eligibility in both m
       } else model <- set_union_formation(model, "on_demand", matching = matching)
       expect_true(model$processes$union_formation$cancel_birth_if_no_match)
       result <- run_simulation(model, 0.5, seed = 52)
-      expect_equal(result$simulation$births, 0)
+      expect_equal(count_run_events(result, "births"), 0)
       expect_equal(nrow(result$unions), nrow(model$population$unions))
       model$processes$union_formation$cancel_birth_if_no_match <- FALSE
       result <- run_simulation(model, 0.5, seed = 52)
-      expect_gt(result$simulation$births, 0)
+      expect_gt(count_run_events(result, "births"), 0)
     }
   }
 })

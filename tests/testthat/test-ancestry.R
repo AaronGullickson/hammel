@@ -254,7 +254,7 @@ test_that("integer shares and cancelled births retain valid ancestry rows", {
   p$ancestry$group <- p$ancestry$group[1, ]
   model <- set_union_formation(ancestry_birth_model(p), "on_demand")
   result <- run_simulation(model, 0.3, seed = 654)
-  expect_equal(result$simulation$births, 0)
+  expect_equal(count_run_events(result, "births"), 0)
   expect_identical(result$ancestry$group, p$ancestry$group)
 })
 

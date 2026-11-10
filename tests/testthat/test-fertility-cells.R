@@ -148,7 +148,7 @@ test_that("cell mode runs with groups, union types, cohabitation, matching and r
                                      union_type = c("cohab", "marriage")))
   first <- run_simulation(model, 5, seed = 51)
   expect_identical(first, run_simulation(model, 5, seed = 51))
-  expect_gt(first$simulation$births, 0)
+  expect_gt(count_run_events(first, "births"), 0)
   expect_true(all(c("group", "union_type") %in% names(first$unrealized_births)))
   restarted <- run_simulation(set_population(model, first), 3, seed = 52)
   expect_equal(restarted$simulation$start_time, 5)
@@ -163,14 +163,14 @@ test_that("cell mode runs with groups, union types, cohabitation, matching and r
     set_fertility(fert) |>
     set_union_formation("on_demand",
       matching = matching_model(~ age_difference, c(age_difference = -.1), group_exogamy = c("A:B" = -1)))
-  expect_gt(run_simulation(od, 5, seed = 53)$simulation$births, 0)
+  expect_gt(count_run_events(run_simulation(od, 5, seed = 53), "births"), 0)
 })
 
 test_that("cancelled attempts keep eligibility and do not create births", {
   pop <- run_simulation(set_union_formation(cell_model(50, rate = .5),
     "on_demand",
                                       cancel_birth_if_no_match = TRUE), 2, seed = 61)
-  expect_identical(pop$simulation$births, 0)
+  expect_identical(count_run_events(pop, "births"), 0)
   expect_identical(nrow(pop$unrealized_births), 0L)
 })
 

@@ -10,7 +10,7 @@ test_that("explicit zero fertility tails preserve histories and positive tails e
   positive <- make_model(100,sex="f",age=60,birth_rate=0)
   positive <- set_fertility(positive,data.frame(age_start=55,age_end=Inf,rate=.2))
   result <- run_simulation(positive,2,42)
-  expect_gt(result$simulation$births,0)
+  expect_gt(count_run_events(result, "births"),0)
 })
 
 test_that("independent mortality preserves constant fertility after burn-in", {

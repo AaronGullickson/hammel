@@ -40,7 +40,7 @@ test_that("competing outgoing hazards recover analytical destinations and surviv
   expected <- c(exp(-1), .4 * (1 - exp(-1)), .6 * (1 - exp(-1)))
   expect_lt(max(abs(as.numeric(counts) - expected) / sqrt(expected * (1 - expected) / 12000)), 5)
   expect_equal(nrow(out$transitions), sum(out$persons$group != "A"))
-  expect_identical(out$simulation$transitions, nrow(out$transitions))
+  expect_equal(count_run_events(out, "transitions"), nrow(out$transitions))
   expect_equal(out$ancestry$group$A, rep(1, 12000))
   expect_identical(run_simulation(model, 2, seed = 124), out)
 })
@@ -193,13 +193,13 @@ test_that("moves refresh available male pools and active fertility/calibration c
   model <- set_inheritance(set_fertility(model, rates, birth_interval = 0), "mother")
   out <- run_simulation(set_group_transition(model, transform(transition_rates(
     1e5), age_end = 21)), .3, seed = 51)
-  expect_gt(out$simulation$births, 0)
+  expect_gt(count_run_events(out, "births"), 0)
   expect_equal(nrow(out$transitions), 2)
   expect_true(all(out$persons$group == "B"))
   expect_true(all(out$persons$birth_time[out$persons$birth_time > 0] > min(out$transitions$time)))
   f <- calculate_fertility_rates(out, c(0, .3), c(0, Inf), by = "group")
   expect_equal(f$births[f$group == "A"], 0)
-  expect_equal(sum(f$births), out$simulation$births)
+  expect_equal(sum(f$births), count_run_events(out, "births"))
 })
 
 test_that("cohabitation conversion refreshes both partners' transition strata", {

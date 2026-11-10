@@ -436,7 +436,7 @@ test_that("rejection sampling recovers after an extreme-weight member leaves", {
     set_union_formation("on_demand")
   withr::local_options(hammel.check_cells = TRUE)
   out <- run_simulation(model, 20, seed = 1)
-  expect_equal(out$simulation$deaths, 4)
+  expect_equal(count_run_events(out, "deaths"), 4)
   # The extreme-weight member is chosen first.
   expect_equal(which.min(out$persons$death_time), 1L)
 })
@@ -532,7 +532,7 @@ test_that("person formulas use parity, previous unions and ancestry", {
   withr::local_options(hammel.check_cells = TRUE)
   out <- suppressWarnings(run_simulation(set_mortality(model, mortality_rates,
     weights = w), 2, seed = 63))
-  expect_gt(out$simulation$deaths, 0)
+  expect_gt(count_run_events(out, "deaths"), 0)
   # Group B has no group-A ancestry: a strong ancestry effect shifts deaths to A.
   strong <- weight_model(~ ancestry_group_A, c(ancestry_group_A = log(4)))
   big <- weighted_mortality_model(5000, groups = c("A", "B"))
@@ -597,7 +597,7 @@ test_that("custom functions receive members and cells for every process", {
       if (is.null(seen$fertility)) seen$fertility <- list(members = members, bin = bin)
       log(seq_len(nrow(members)))
     }))
-  expect_gt(run_simulation(fert, 1, seed = 68)$simulation$births, 0)
+  expect_gt(count_run_events(run_simulation(fert, 1, seed = 68), "births"), 0)
   expect_identical(seen$fertility$bin$process, "fertility")
   expect_true(all(c("parity_start", "parity_end", "age_start", "age_end") %in% names(seen$fertility$bin)))
 })

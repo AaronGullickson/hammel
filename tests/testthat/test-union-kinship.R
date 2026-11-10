@@ -22,7 +22,7 @@ test_that("R extraction and native eligibility agree on known relatives", {
     known <- nrow(extract_kin(model$population, cases$ego[j],
       generations = cases$generations[j], relative_ids = cases$relative[j])) > 0
     result <- run_simulation(model, 0.2, seed = 52)
-    expect_gt(result$simulation$births, 0)
+    expect_gt(count_run_events(result, "births"), 0)
     if (known) {
       expect_equal(nrow(result$unions), 0)
       newborn <- result$persons$birth_time >= 0
@@ -38,7 +38,7 @@ test_that("newborn parent links enter screening and survive restart reconstructi
   model$processes$union_formation$min_male_age <- 0
   result <- run_simulation(model, 0.5, seed = 52)
   expect_true(any(result$persons$sex[-1] == "m"))
-  expect_gt(result$simulation$births, 0)
+  expect_gt(count_run_events(result, "births"), 0)
   expect_equal(nrow(result$unions), 0)
   expect_true(all(is.na(result$persons$father_id)))
   continued <- run_simulation(set_population(model, result), 0.5, seed = 53)

@@ -64,7 +64,7 @@ test_that("one annual dissolution hazard per couple matches analytical survival"
   expect_lt(abs(mean(survived) - expected), 6 * sqrt(expected * (1 - expected) / n))
   expect_identical(.Random.seed, original_rng)
   expect_identical(result, run_simulation(model, 2, seed = 52))
-  expect_equal(result$simulation$dissolutions, sum(!survived))
+  expect_equal(count_run_events(result, "dissolutions"), sum(!survived))
   expect_true(all(result$unions$end_reason[!survived] == "dissolution"))
   expect_true(all(result$unions$end_time[!survived] >= 0 & result$unions$end_time[!survived] < 2))
   expect_true(all(is.na(result$persons$death_time)))
@@ -78,7 +78,7 @@ test_that("duration bands use union duration, gaps and attained restart duration
   expect_true(all(is.na(early$unions$end_time)))
   later <- run_simulation(set_population(model, early), 2, seed = 53)
   expect_true(all(later$unions$end_time >= 5 & later$unions$end_time < 6))
-  expect_equal(later$simulation$dissolutions, 100)
+  expect_equal(count_run_events(later, "dissolutions"), 100)
   # Old input unions use duration six immediately, independently of age.
   model$population$unions$start_time <- -6
   old <- run_simulation(model, 1, seed = 52)
@@ -111,15 +111,15 @@ test_that("birth ties retain the pending dissolution and death wins same-person 
   expect_equal(maternal$person_years[maternal$union_type == "partnered"], 0)
   # Observation endpoint is exclusive even for an exact tied event.
   endpoint <- run_simulation(model, .5, seed = seed)
-  expect_equal(endpoint$simulation$births, 0)
-  expect_equal(endpoint$simulation$dissolutions, 0)
+  expect_equal(count_run_events(endpoint, "births"), 0)
+  expect_equal(count_run_events(endpoint, "dissolutions"), 0)
   # Her positive death rate now draws second, so dissolution draws third.
   model <- set_mortality(model, data.frame(sex = c("f", "m"),
     age_start = 0, age_end = Inf, rate = c(draws[2] / .5, 0)))
   model$processes$union_dissolution$rates$rate <- draws[3] / .5
   dead <- run_simulation(model, 1.5, seed = seed)
-  expect_equal(dead$simulation$births, 0)
-  expect_equal(dead$simulation$dissolutions, 0)
+  expect_equal(count_run_events(dead, "births"), 0)
+  expect_equal(count_run_events(dead, "dissolutions"), 0)
   expect_identical(dead$unions$end_reason, "death_wife")
 })
 
@@ -139,7 +139,7 @@ test_that("widowhood invalidates pending dissolution in both initiation modes", 
     result <- run_simulation(model, 1.5, seed = 71)
     expect_equal(result$persons$death_time[2], .5, tolerance = 0)
     expect_identical(result$unions$end_reason, "death_husband")
-    expect_equal(result$simulation$dissolutions, 0)
+    expect_equal(count_run_events(result, "dissolutions"), 0)
   }
 })
 
@@ -152,7 +152,7 @@ test_that("births do not reset the union dissolution clock", {
     union_type = c("partnered", "unpartnered"), rate = c(20, 0)), birth_interval = 0)
   quiet <- run_simulation(model, 10, seed = 52)
   result <- run_simulation(busy, 10, seed = 52)
-  expect_gt(result$simulation$births, 0)
+  expect_gt(count_run_events(result, "births"), 0)
   expect_identical(result$unions, quiet$unions)
   births <- result$persons$birth_time[result$persons$birth_time >= 0]
   expect_true(all(births <= result$unions$end_time))
@@ -169,7 +169,7 @@ test_that("dissolution restores matching availability and repeat episodes start 
     expect_true(all(result$unions$wife_id == 1 & result$unions$husband_id == 2))
     ended <- !is.na(result$unions$end_time)
     expect_true(all(result$unions$end_time[ended] - result$unions$start_time[ended] >= .1))
-    expect_equal(result$simulation$dissolutions, sum(ended))
+    expect_equal(count_run_events(result, "dissolutions"), sum(ended))
     expect_no_error(validate_population(result))
     births <- result$persons$birth_time[result$persons$mother_id %in% 1]
     expect_true(all(diff(births) >= .1 - 1e-12))
@@ -227,15 +227,15 @@ test_that("dissolution uses directional group strata with future coverage", {
 
 test_that("optional process, zero-duration runs, empty populations and fallbacks work", {
   model <- dissolution_model()
-  expect_equal(run_simulation(model, 0)$simulation$dissolutions, 0)
+  expect_equal(count_run_events(run_simulation(model, 0), "dissolutions"), 0)
   model$processes$union_dissolution <- NULL
   absent <- run_simulation(model, 2, seed = 52)
-  expect_null(absent$simulation$dissolutions)
+  expect_false("dissolutions" %in% names(absent$simulation))
   expect_true(all(is.na(absent$unions$end_time)))
   empty <- make_model(0)
   empty <- set_union_dissolution(empty, data.frame(dur_start = 0, dur_end = Inf, rate = .1))
   out <- run_simulation(empty, 2, seed = 52)
-  expect_equal(out$simulation$dissolutions, 0)
+  expect_equal(count_run_events(out, "dissolutions"), 0)
   expect_s3_class(out$unions, "tbl_df")
   fallback <- set_union_dissolution(model, data.frame(group_pair = c("B:B", "A:A"), dur_start = 0,
     dur_end = Inf, rate = c(1e4, 0)))

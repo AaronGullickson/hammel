@@ -60,8 +60,8 @@ test_that("run coverage, zero years and endpoint exclusion use fractional times"
   m <- make_model(3)
   m$population$end_time <- 2015.5
   m <- set_mortality(m, r)
-  expect_equal(run_simulation(m, 4.3, seed = 9)$simulation$deaths, 0)
-  expect_equal(run_simulation(m, 4.31, seed = 9)$simulation$deaths, 3)
+  expect_equal(count_run_events(run_simulation(m, 4.3, seed = 9), "deaths"), 0)
+  expect_equal(count_run_events(run_simulation(m, 4.31, seed = 9), "deaths"), 3)
   expect_equal(run_simulation(m, 0, seed = 9)$end_time, 2015.5)
   expect_error(run_simulation(m, 6), "calendar coverage gap")
   gap <- r
@@ -69,8 +69,8 @@ test_that("run coverage, zero years and endpoint exclusion use fractional times"
   expect_error(run_simulation(set_mortality(m, gap), 5),
     "calendar coverage gap")
   # A gap outside this run is allowed.
-  expect_equal(run_simulation(set_mortality(m, gap), 1, seed =
-    1)$simulation$deaths, 0)
+  expect_equal(count_run_events(run_simulation(set_mortality(m, gap), 1, seed =
+    1), "deaths"), 0)
   m$population$end_time <- 2021
   expect_error(run_simulation(m, 0), "calendar coverage gap")
 })
@@ -94,7 +94,7 @@ test_that("mortality integrates fractional calendar and age boundaries", {
     c("sex", "age_start", "age_end", "rate")], c(.4, 0))
   out <- run_simulation(set_mortality(m, zero_after), 2.5, seed = 92)
   expect_true(all(out$persons$death_time[!is.na(out$persons$death_time)] < .5))
-  expect_equal(run_simulation(make_model(2), .75, seed = 2)$simulation$deaths,
+  expect_equal(count_run_events(run_simulation(make_model(2), .75, seed = 2), "deaths"),
     0)
 })
 
@@ -113,7 +113,7 @@ test_that("fertility changes retain spacing, weights and count unrealized births
   expect_equal(u$period_start, 0)
   expect_equal(u$period_end, 1)
   expect_equal(out$persons$hetfert[1], 2)
-  expect_equal(out$simulation$births, 0)
+  expect_equal(count_run_events(out, "births"), 0)
   expect_equal(out$persons$mother_id, m$population$persons$mother_id)
   restarted <- run_simulation(set_population(m, out), .5, seed = 82)
   # The restart keeps the first run's records and appends its own.
@@ -208,7 +208,7 @@ test_that("dissolution and conversion recover integrated calendar hazards", {
     if (conversion) m$processes$union_formation$union_convert_rate <- r
     else m <- set_union_dissolution(m, r)
     out <- run_simulation(m, 1.25, seed = 719)
-    count <- if (conversion) out$simulation$conversions else out$simulation$dissolutions
+    count <- if (conversion) count_run_events(out, "conversions") else count_run_events(out, "dissolutions")
     p <- 1 - exp(-.2 * .5 - .6 * .75)
     expect_lt(abs(count / n - p), 5 * sqrt(p * (1 - p) / n))
   }
@@ -267,8 +267,8 @@ test_that("calendar changes precede exact person and cell clock ties", {
     else m <- set_mortality(m, calendar_epochs(m$processes$mortality$rates,
       c(10, 0), c(0, boundary, Inf)))
     out <- run_simulation(m, boundary + .1, seed = 682)
-    expect_equal(out$simulation$births, 0)
-    expect_equal(out$simulation$deaths, 0)
+    expect_equal(count_run_events(out, "births"), 0)
+    expect_equal(count_run_events(out, "deaths"), 0)
   }
 })
 
@@ -310,9 +310,9 @@ test_that("asynchronous changes retain parity/type/group accounting and calibrat
     c(.2, .6), c(0, .2, Inf)))
   withr::local_options(hammel.check_cells = TRUE)
   out <- run_simulation(m, 1.5, seed = 13)
-  expect_gt(out$simulation$births, 0)
-  expect_gt(out$simulation$transitions, 0)
-  expect_gt(out$simulation$dissolutions, 0)
+  expect_gt(count_run_events(out, "births"), 0)
+  expect_gt(count_run_events(out, "transitions"), 0)
+  expect_gt(count_run_events(out, "dissolutions"), 0)
   expect_true(all(is.finite(out$persons$hetfert[out$persons$sex == "f"])))
   expect_true(all(c(".log_weight_A", ".log_weight_B") %in% names(out$unions)))
   expect_identical(run_simulation(m, 1.5, seed = 13), out)
@@ -335,7 +335,7 @@ test_that("fertility can change parity partitions and pooled/typed union rates",
   m <- set_fertility(m, rbind(before, after), birth_interval = .1)
   withr::local_options(hammel.check_cells = TRUE)
   out <- run_simulation(m, .7, seed = 124)
-  expect_equal(out$simulation$births, 1)
+  expect_equal(count_run_events(out, "births"), 1)
   expect_gte(tail(out$persons$birth_time, 1), .5)
   expect_equal(tail(out$persons$mother_id, 1), 1)
 })

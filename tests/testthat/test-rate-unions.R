@@ -4,7 +4,7 @@ test_that("rate searches form unions independently of births and never originate
   expect_equal(nrow(result$unions), 1)
   expect_equal(result$unions$wife_id, 1)
   expect_equal(result$unions$husband_id, 2)
-  expect_equal(result$simulation$births, 0)
+  expect_equal(count_run_events(result, "births"), 0)
   expect_identical(result, run_simulation(model, 1, seed = 52))
   model$population$persons$sex[] <- "m"
   expect_equal(nrow(run_simulation(model, 1, seed = 52)$unions), 0)
@@ -14,7 +14,7 @@ test_that("explicit zero unpartnered fertility suppresses births in rate mode", 
   for (n in c(1, 2)) {
     model <- make_rate_model(n, search_rate = 0, birth_rate = 20)
     result <- run_simulation(model, 1, seed = 52)
-    expect_equal(result$simulation$births, 0)
+    expect_equal(count_run_events(result, "births"), 0)
     expect_equal(nrow(result$unions), 0)
   }
   model <- make_rate_model(search_rate = 20, birth_rate = 20, birth_interval = 0.02)
