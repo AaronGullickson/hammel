@@ -52,7 +52,7 @@ test_that("England/Wales example data have the documented table schemas", {
     "time_start", "time_end", "age_start", "age_end", "previous_union", "rate"
   ))
   expect_named(inputs$premarital_cohabitation, c(
-    "year", "source_age_label", "proportion_cohabiting_before_marriage"
+    "year", "age_groups", "prop_cohabit"
   ))
   expect_named(inputs$cohabitation_outcomes, c(
     "cohort_start", "cohort_end", "marriage_5", "separation_5", "continuing_5",
@@ -101,9 +101,9 @@ test_that("observation tables preserve source rounding and missing values", {
   expect_true(all(is.na(outcomes[3, c(
     "marriage_10", "separation_10", "continuing_10"
   )])))
-  expect_true("All ages" %in% inputs$premarital_cohabitation$source_age_label)
+  expect_true("All ages" %in% inputs$premarital_cohabitation$age_groups)
   expect_true("Age not stated" %in%
-    inputs$premarital_cohabitation$source_age_label)
+    inputs$premarital_cohabitation$age_groups)
   first <- inputs$marital_divorce_death_2005
   expect_identical(tail(first$anniversary, 2), c(55L, 60L))
   expect_equal(first$cumulative_divorce[1], 0.00022)

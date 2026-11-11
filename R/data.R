@@ -109,8 +109,8 @@
 #'
 #' A named list of six tibbles used by the second demographic transition
 #' article. Fertility and marriage tables have Hammel's schedule column names;
-#' cohabitation and marital divorce/death observations retain their source
-#' columns for the article's transformation examples. Cohabitation cohort
+#' cohabitation and marital divorce/death observations retain source values
+#' for the article's transformation examples. Cohabitation cohort
 #' outcomes cover Great Britain; the other tables cover England and Wales.
 #'
 #' @details
@@ -148,8 +148,8 @@
 #'   \item{fertility}{18 rows: `union_type`, `age_start`, `age_end`, `rate`.}
 #'   \item{marriage}{672 rows: `time_start`, `time_end`, `age_start`,
 #'     `age_end`, `previous_union`, `rate`.}
-#'   \item{premarital_cohabitation}{373 rows: `year`, `source_age_label`,
-#'     `proportion_cohabiting_before_marriage`.}
+#'   \item{premarital_cohabitation}{373 rows: `year`, `age_groups`,
+#'     `prop_cohabit`.}
 #'   \item{cohabitation_outcomes}{3 rows: `cohort_start`, `cohort_end`,
 #'     `marriage_5`, `separation_5`, `continuing_5`, `marriage_10`,
 #'     `separation_10`, `continuing_10`.}

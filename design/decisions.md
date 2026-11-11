@@ -3482,3 +3482,12 @@ Keep `premarital_cohabitation`, `cohabitation_outcomes`, `marital_divorce_death_
 `devtools::test(filter = "^data$")` passed 54 expectations without failures, warnings or skips. A source package was built and installed into a temporary library; `data()` loading, namespace access and dataset indexing worked, and the same 54 tests passed against the installed package without repository CSV access. Generated help parses, new R source/test lines satisfy the 80-column limit and `git diff --check` passed. No HMD retrieval or credentials were used; no package dependency was added. The full simulation suite was not rerun because no execution behavior changed.
 
 Reuse provenance: the ONS material reuse statement at <https://www.ons.gov.uk/methodology/geography/licences> and the government's Population Trends catalogue at <https://www.data.gov.uk/dataset/b26340c6-9db3-4a26-93cd-46256c0bc2f7/population_trends> were checked. Dataset help supplies ONS/OGL attribution plus the original paper authors and table references. Original publication PDFs are not redistributed in the bundle.
+
+
+## D174 — Shorten premarital-cohabitation column names (November 10, 2026)
+
+**Status:** User instruction and implementation authorization, November 10, 2026.
+
+**Decision:** In `england_wales_1992_onward$premarital_cohabitation`, rename `source_age_label` to `age_groups` and `proportion_cohabiting_before_marriage` to `prop_cohabit`. Retain `year` and all source values and row order. Update the offline preparation script, bundled object, help and tests. Original CSVs remain unchanged; the user-owned article is left for user editing. This revises D173's retention of source column names for this table only.
+
+**Validation:** Rebuilt the bundled object offline. The entire six-table bundle is identical to its previous version after applying only the two column renames. All 54 data checks passed without failures, warnings or skips; regenerated help parses and `git diff --check` passed. Existing roxygen edits were limited to the column names and source-value wording, for user review.

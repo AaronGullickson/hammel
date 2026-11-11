@@ -62,7 +62,7 @@ demographic-transition example (D173):
 | --- | --- | --- |
 | `fertility` | 18 union-type-specific 1992 fertility rates | Standard age columns; no source-label or duplicate-rate columns |
 | `marriage` | 672 first-marriage/remarriage rows, 1992–2019 | Standard calendar, age and previous-union columns; 48 missing rates retained |
-| `premarital_cohabitation` | 373 female shared-address proportions at marriage | Source columns and values retained |
+| `premarital_cohabitation` | 373 female shared-address proportions at marriage | `year`, `age_groups`, `prop_cohabit`; source values retained |
 | `cohabitation_outcomes` | 3 Great Britain cohabitation-cohort outcome rows | Source columns, rounding and missingness retained |
 | `marital_divorce_death_2005` | 52 cumulative marital divorce/death observations | Source columns and values retained |
 | `marital_divorce_death_2010` | 60 cumulative marital divorce/death observations | Source columns and values retained |

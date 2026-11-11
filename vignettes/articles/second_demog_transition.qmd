@@ -37,7 +37,7 @@ We can then compare the overall fertility rates from this simulation to a simula
 
 This simulation has a high demand on the required inputs. Given that, we will not focus on an exact replication of real values for a single country, but will construct a "stylized" scenario from available data sources. For this simulation, I have chosen to use values based on England and Wales because the [Office for National Statistics](https://www.ons.gov.uk/) (ONS) produces detailed reports that can get us most of what we need. We will run the simulation from 1992 to 2019, because we can find data sources for several inputs that roughly align with this time period.
 
-All of the data sources have been converted to CSV files that live in [validation/data/england_wales_1992_onward](https://github.com/AaronGullickson/hammel/tree/master/validation/data/england_wales_1992_onward).
+All of the data are available in the package under the object named `england_wales_1992_onward`.
 
 ### Fertility and Mortality
 
@@ -46,19 +46,7 @@ First, we need to get age-specific fertility rates disaggregated by union status
 ```{r}
 #| label: get-fertility-rates
 
-fertility_rates1992 <- read_csv(
-  here(
-    "validation",
-    "data", 
-    "england_wales_1992_onward",
-    "fertility_by_union_type_1992.csv"
-  )
-) |>
-  rename(
-    age_start = denominator_age_start,
-    age_end = denominator_age_end
-  ) |>
-  select(union_type, age_start, age_end, rate)
+fertility_rates1992 <- england_wales_1992_onward$fertility
 
 fertility_rates1992
 ```
@@ -95,22 +83,16 @@ The report does provide this by age group, but to keep things simple we will ass
 ```{r}
 #| label: get-cohab-prob
 
-prob_cohab <- read_csv(
-  here(
-    "validation",
-    "data",
-    "england_wales_1992_onward", 
-    "female_premarital_cohabitation_1994_2019.csv"
-  )
-) |>
-  filter(source_age_label == "All ages") |>
+prob_cohab <- england_wales_1992_onward$premarital_cohabitation |>
+  filter(age_groups == "All ages") |>
   arrange(year) |>
-  rename(prob = proportion_cohabiting_before_marriage) |>
+  rename(prob = prop_cohabit) |>
   mutate(time_start = year, time_end = year + 1, 
     age_start = 0, age_end = Inf) |>
   select(starts_with("time_"), starts_with("age_"), prob) |>
   # extend 1994 back to 1992
-  mutate(time_start = if_else(time_start == 1994, 1992, time_start))
+  mutate(time_start = if_else(time_start == 1994, 1992, time_start)) |>
+  select(-age_groups)
 
 prob_cohab
 ```
@@ -129,12 +111,7 @@ $$h_{d} = h_e \frac{p_d}{p_m + p_d}$$
 ```{r}
 #| label: get-cohab-hazards
 
-cohab_hazards <- read_csv(here(
-  "validation",
-  "data", 
-  "england_wales_1992_onward", 
-  "great_britain_cohabitation_cohort_outcomes.csv"
-)) |>
+cohab_hazards <- england_wales_1992_onward$cohabitation_outcomes |>
   # extrapolate missing values for 10 year estimates in last cohort
   mutate(
     across(
@@ -212,18 +189,9 @@ Beaujouan and Bhrolcháin (2011) provide duration-based cumulative divorce and d
 #| label: get-dissolution-rates
 
 dissolution_rates <- bind_rows(
-  read_csv(here(
-    "validation",
-    "data",
-    "england_wales_1992_onward",
-    "marital_divorce_death_cumulative_2005.csv"
-  )),
-  read_csv(here(
-    "validation",
-    "data",
-    "england_wales_1992_onward",
-    "marital_divorce_death_cumulative_2010.csv"
-  ))) |>
+  england_wales_1992_onward$marital_divorce_death_2005,
+  england_wales_1992_onward$marital_divorce_death_2010,
+) |>
   # lets do it five year intervals
   filter((anniversary %% 5) == 0) |>
   arrange(year, anniversary) |>

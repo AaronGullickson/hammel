@@ -47,12 +47,15 @@ marriage <- marriage[c(
   "time_start", "time_end", "age_start", "age_end", "previous_union", "rate"
 )]
 
+premarital_cohabitation <- read_source(
+  "female_premarital_cohabitation_1994_2019.csv"
+)
+names(premarital_cohabitation) <- c("year", "age_groups", "prop_cohabit")
+
 england_wales_1992_onward <- list(
   fertility = fertility,
   marriage = marriage,
-  premarital_cohabitation = read_source(
-    "female_premarital_cohabitation_1994_2019.csv"
-  ),
+  premarital_cohabitation = premarital_cohabitation,
   cohabitation_outcomes = read_source(
     "great_britain_cohabitation_cohort_outcomes.csv"
   ),

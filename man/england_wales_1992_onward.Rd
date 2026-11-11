@@ -10,8 +10,8 @@ A named list containing:
 \item{fertility}{18 rows: \code{union_type}, \code{age_start}, \code{age_end}, \code{rate}.}
 \item{marriage}{672 rows: \code{time_start}, \code{time_end}, \code{age_start},
 \code{age_end}, \code{previous_union}, \code{rate}.}
-\item{premarital_cohabitation}{373 rows: \code{year}, \code{source_age_label},
-\code{proportion_cohabiting_before_marriage}.}
+\item{premarital_cohabitation}{373 rows: \code{year}, \code{age_groups},
+\code{prop_cohabit}.}
 \item{cohabitation_outcomes}{3 rows: \code{cohort_start}, \code{cohort_end},
 \code{marriage_5}, \code{separation_5}, \code{continuing_5}, \code{marriage_10},
 \code{separation_10}, \code{continuing_10}.}
@@ -53,8 +53,8 @@ england_wales_1992_onward
 \description{
 A named list of six tibbles used by the second demographic transition
 article. Fertility and marriage tables have Hammel's schedule column names;
-cohabitation and marital divorce/death observations retain their source
-columns for the article's transformation examples. Cohabitation cohort
+cohabitation and marital divorce/death observations retain source values
+for the article's transformation examples. Cohabitation cohort
 outcomes cover Great Britain; the other tables cover England and Wales.
 }
 \details{
