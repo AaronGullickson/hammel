@@ -7,8 +7,7 @@
 extract_kin(population, ego_ids, generations = 2, relative_ids = NULL)
 }
 \arguments{
-\item{population}{A \code{hammel_population} with a finite \code{end_time}, including
-deceased persons and recorded parent IDs.}
+\item{population}{A \code{hammel_population} with a finite \code{end_time}.}
 
 \item{ego_ids}{Unique person IDs whose known kin should be extracted.}
 
@@ -19,44 +18,47 @@ side, default \code{2}. Zero returns no kin between distinct people.}
 all recorded persons. Unknown IDs are errors; empty vectors return no rows.}
 }
 \value{
-A tibble with one row per ego and relative: \code{ego_id},
-\code{relative_id}, \code{relationship}, \code{ego_distance}, \code{relative_distance},
-\code{n_common_ancestors}, \code{ego_lineage}, \code{relative_lineage},
-\code{ego_ancestry_complete}, and \code{relative_ancestry_complete}. Lineage is
-\code{"self"}, \code{"maternal"}, \code{"paternal"}, or \code{"both"} for shortest routes to
-the closest common ancestors. Completeness refers only to required parent
-links within the chosen depth. Empty results retain the same column
-types; no rows does not prove unrelatedness or complete ancestry. Input
-ego/relative order is retained.
+A tibble with one row per ego and relative: \code{ego_id}, \code{relative_id},
+\code{relationship}, \code{ego_distance}, \code{relative_distance}, \code{n_common_ancestors},
+\code{ego_lineage}, \code{relative_lineage}, \code{ego_ancestry_complete}, and
+\code{relative_ancestry_complete}. Lineage is \code{"self"}, \code{"maternal"},
+\code{"paternal"}, or \code{"both"} for shortest routes to the closest common
+ancestors.
 }
 \description{
-Find recorded common ancestors within \code{generations} parent steps of both an
-ego and a relative, including each person at distance zero. Uses the same
-native kinship module as union eligibility. Unknown parents terminate their
-branches; missing evidence does not establish unrelatedness. At depth two,
-known parents/children, grandparents/grandchildren, siblings, aunts/uncles,
-nieces/nephews, and first cousins are included, including half relationships.
-Great-grandparents and first cousins once removed require depth three.
+Extract kin of a set of ego individuals from simulated data. Kin relations
+are governed by generational distance.
 }
 \details{
+Find recorded common ancestors within \code{generations} parent steps of both an
+ego and a relative, including each person at distance zero. This function
+uses the same native kinship module as union eligibility. Unknown parents
+terminate their branches;. At depth two, known parents/children,
+grandparents/grandchildren, siblings, aunts/uncles, nieces/nephews, and first
+cousins are included, including half relationships. Great-grandparents and
+first cousins once removed require depth three.
+
 Returns one row per relative, describing their closest common ancestors:
-those with the smallest sum of the two distances within the requested
-bounds. \code{n_common_ancestors} counts them, ordinarily 2 for full kin and 1
-for half kin; a count of 1 is only recorded evidence when a parent is
-unknown. \code{relationship} names the distance pair, such as \code{"sibling"},
-\code{"aunt_uncle"} or \code{"first_cousin"}, with full and half kin together. The ego
-itself is excluded. Includes deceased and living people in recorded history;
-use \code{\link[=count_kin]{count_kin()}} for living kin at given times. Ancestry cycles
-are errors.
+those with the smallest sum of the two distances within the requested bounds.
+\code{n_common_ancestors} counts them, ordinarily 2 for full kin and 1 for half
+kin; a count of 1 is only recorded evidence when a parent is unknown.
+\code{relationship} names the distance pair, such as \code{"sibling"}, \code{"aunt_uncle"}
+or \code{"first_cousin"}, with full and half kin together. The ego itself is
+excluded. Includes deceased and living people in recorded history; use
+\code{\link[=count_kin]{count_kin()}} for mean counts of living kin at given times.
 }
 \examples{
-persons <- data.frame(
-  person_id = c(10, 20, 30), sex = c("f", "m", "f"),
-  birth_time = c(-50, -50, -20), death_time = NA_real_,
-  mother_id = c(NA, NA, 10), father_id = c(NA, NA, 20)
-)
-population <- hammel_population(persons, end_time = 0)
-extract_kin(population, ego_ids = 30)
+population <- generate_uniform_population(1000)
+model <- hammel_model() |>
+  set_population(population) |>
+  set_mortality(usa_2000_mortality) |>
+  set_fertility(usa_2000_fertility) |>
+  set_union_formation(
+    "on_demand",
+    matching = age_gap_matching_model(3, 5)
+  )
+result <- run_simulation(model, years = 50, seed = 42)
+extract_kin(result, max(result$person$person_id))
 }
 \seealso{
 \code{\link[=count_kin]{count_kin()}}

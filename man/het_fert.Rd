@@ -46,7 +46,8 @@ distribution \eqn{Z_a} and the mother's score as follows:
 where \eqn{\alpha} determines the degree of inheritance. A value of zero
 means no heritability while a value of 1 means perfect heritability.
 
-The correlation coefficient between mother's and daughter's weights is given by:
+The correlation coefficient between mother's and daughter's weights is given
+by:
 
 \deqn{
  r(W_m, W_d)=\frac{(1+c^2)^\alpha-1}{c^2}
