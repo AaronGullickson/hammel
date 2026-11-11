@@ -1405,3 +1405,41 @@ results <- rbind(
 )
 print(results, row.names = FALSE)
 ```
+
+## Native source style, file split and engine class (D175, November 11, 2026)
+
+All hand-maintained C++ in `src/` is formatted by the new root `.clang-format`
+(excluded from the package build); every line is at most 80 characters, and
+the generated `RcppExports` files come from `Rcpp::compileAttributes()`. The
+former 4,107-line `simulate.cpp` is split into the files listed in
+[C++ sources](r-source-organization.md#c-sources), and its engine function
+is an internal `Simulation` class. Unused native members and functions were
+removed; duplicated sum-tree, band-lookup, member-pick, ID-index,
+interval-bin and parent-link code was merged; hot paths gained an
+allocation-free native candidate utility, cached weight-model and delta
+lookups, and integer union-status matching for transitions.
+
+Before/after equivalence was checked by hashing the result or error message of
+every native `*_cpp` call made by the full offline test suite (1,790 calls,
+including 25 expected errors) and comparing in call order. Two baseline runs
+of `master` (515ae53) agreed exactly. With `-ffp-contract=off` supplied through
+`R_MAKEVARS_USER`, every intermediate step and the final code matched the
+baseline on all 1,790 calls. With default flags the final code also matched on
+all 1,790 calls; an intermediate state of the split differed in 165 simulation
+results only because GCC on ARM fused multiply-adds differently after code
+motion (D175). The final default-flag offline testthat suite passed 7,555
+expectations with no failures and one existing skip (the live database test).
+
+An end-to-end benchmark with seeded 100,000-person on-demand runs (ungrouped,
+and grouped with ancestry and weighted matching) and 20,000-person rate-mode
+runs with dissolution and transitions (100 years each, three seeds, three
+interleaved rounds per build) produced identical result hashes for `master` and
+the final build at default flags. Median times changed by -4.0%, -0.4% and
+-0.5% respectively, within run-to-run variation except possibly the first.
+
+At equal formatting the native code grew from 6,908 to 7,252 non-comment,
+nonblank lines: the class declaration and header declarations outweigh the
+removed duplication. A `-Wall -Wextra` compile reports no warnings in
+hand-maintained sources. No exported entry point, argument or default changed; `R/RcppExports.R` was
+only regenerated (reordered), and no hand-maintained R file or user-owned
+document changed.

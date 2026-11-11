@@ -1,0 +1,32 @@
+# C++ style for src/: mirrors the R source conventions (80 columns, braces on
+# every control-flow body, one statement per line). See
+# design/r-source-organization.md.
+BasedOnStyle: Google
+ColumnLimit: 80
+IndentWidth: 2
+ContinuationIndentWidth: 2
+AccessModifierOffset: -1
+AlignAfterOpenBracket: true
+BreakAfterOpenBracketFunction: true
+BreakBeforeCloseBracketFunction: true
+BreakAfterOpenBracketIf: false
+BreakBeforeCloseBracketIf: false
+BreakAfterOpenBracketLoop: false
+BreakBeforeCloseBracketLoop: false
+BreakAfterOpenBracketBracedList: false
+BreakBeforeCloseBracketBracedList: false
+BinPackParameters: OnePerLine
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackArguments: true
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortLambdasOnASingleLine: All
+InsertBraces: true
+DerivePointerAlignment: false
+PointerAlignment: Left
+SortIncludes: Never
+IncludeBlocks: Preserve
+SpacesBeforeTrailingComments: 2

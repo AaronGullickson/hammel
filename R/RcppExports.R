@@ -33,14 +33,6 @@ count_kin_cpp <- function(persons, generations, relationship_types, strata, n_st
     .Call(`_hammel_count_kin_cpp`, persons, generations, relationship_types, strata, n_strata, n_types)
 }
 
-person_lexis_cpp <- function(persons, unions, groups, group_count, time_breaks, axis_breaks, parity_breaks, options) {
-    .Call(`_hammel_person_lexis_cpp`, persons, unions, groups, group_count, time_breaks, axis_breaks, parity_breaks, options)
-}
-
-person_snapshot_cpp <- function(persons, unions, groups, group_count, times, options) {
-    .Call(`_hammel_person_snapshot_cpp`, persons, unions, groups, group_count, times, options)
-}
-
 inspect_matching_cpp <- function(age_difference, matching) {
     .Call(`_hammel_inspect_matching_cpp`, age_difference, matching)
 }
@@ -49,19 +41,27 @@ inspect_group_matching_cpp <- function(age_difference, matching, female_group, m
     .Call(`_hammel_inspect_group_matching_cpp`, age_difference, matching, female_group, male_groups)
 }
 
-inspect_weighted_calibration_cpp <- function(female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility, female_previous = NULL, female_previous_ends = NULL) {
-    .Call(`_hammel_inspect_weighted_calibration_cpp`, female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility, female_previous, female_previous_ends)
-}
-
 inspect_exact_draw_cpp <- function(male_born, male_group, male_excluded, female_born, female_group, log_weights, matching, groups, now, cutoff, draws) {
     .Call(`_hammel_inspect_exact_draw_cpp`, male_born, male_group, male_excluded, female_born, female_group, log_weights, matching, groups, now, cutoff, draws)
 }
 
-inspect_weighted_incremental_cpp <- function(female_born, female_groups, male_born, male_groups, op_times, op_men, op_deltas, rates, matching, group_count, cutoff) {
-    .Call(`_hammel_inspect_weighted_incremental_cpp`, female_born, female_groups, male_born, male_groups, op_times, op_men, op_deltas, rates, matching, group_count, cutoff)
+person_lexis_cpp <- function(persons, unions, groups, group_count, time_breaks, axis_breaks, parity_breaks, options) {
+    .Call(`_hammel_person_lexis_cpp`, persons, unions, groups, group_count, time_breaks, axis_breaks, parity_breaks, options)
+}
+
+person_snapshot_cpp <- function(persons, unions, groups, group_count, times, options) {
+    .Call(`_hammel_person_snapshot_cpp`, persons, unions, groups, group_count, times, options)
 }
 
 simulate_cpp <- function(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab, dissolution_rates, cohab_prob, conversion_rates, cohab_matching, counts_cohab, check_cells = FALSE, hetfert = NULL, transition_input = NULL, model_schedule_input = NULL, weight_input = NULL, group_input = NULL) {
     .Call(`_hammel_simulate_cpp`, persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, diagnostics, initial_ancestry, inheritance, ffab, dissolution_rates, cohab_prob, conversion_rates, cohab_matching, counts_cohab, check_cells, hetfert, transition_input, model_schedule_input, weight_input, group_input)
+}
+
+inspect_weighted_calibration_cpp <- function(female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility, female_previous = NULL, female_previous_ends = NULL) {
+    .Call(`_hammel_inspect_weighted_calibration_cpp`, female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility, female_previous, female_previous_ends)
+}
+
+inspect_weighted_incremental_cpp <- function(female_born, female_groups, male_born, male_groups, op_times, op_men, op_deltas, rates, matching, group_count, cutoff) {
+    .Call(`_hammel_inspect_weighted_incremental_cpp`, female_born, female_groups, male_born, male_groups, op_times, op_men, op_deltas, rates, matching, group_count, cutoff)
 }
 

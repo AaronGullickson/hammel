@@ -108,7 +108,7 @@ the engine minimizes
     L(log b) = (1/Lambda) sum over w of lambda[w] log sum over h of b[h] S[w,h]
                - sum over g of tau[g] log b[g]
 
-(`WeightCalibrator::solve` in `src/simulate.cpp`). Its gradient with respect
+(`WeightCalibrator::solve` in `src/weight_calibration.cpp`). Its gradient with respect
 to log b[g] is phi[g] - tau[g], so the stationary point is exactly the target
 condition phi(b) = tau. The first term is an intensity-weighted sum of
 log-sum-exp functions of log b, which is convex, and the second is linear, so

@@ -25,14 +25,15 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Proportional input-rate stratification | `R/stratify_rates.R` |
 | Calendar model schedules and engine preparation | `R/model_schedules.R`; switches in `src/simulate.cpp` |
 | Group transition and household specifications | `R/group_transition.R`; events in `src/simulate.cpp` |
-| Persistent fertility heterogeneity | `R/het_fert.R`; cell weight trees in `src/simulate.cpp` |
-| Weight models | `R/weight_model.R`; stored weights and selection in `src/simulate.cpp` |
+| Persistent fertility heterogeneity | `R/het_fert.R`; cell weight trees in `src/fertility_cells.h` |
+| Weight models | `R/weight_model.R`; stored weights and selection in `src/simulate.cpp`, `src/rate_cells.h` and `src/fertility_cells.h` |
 | Union formation, dissolution and cohabitation settings | `R/union_formation.R`, `R/union_dissolution.R`, `R/cohabitation.R` |
 | Matching and inheritance models | `R/matching_model.R`, `R/matching_groups.R`, `R/group_inheritance.R` |
 | Kinship traversal, extraction and selective living-kin counting | `src/kinship.h`, `src/kinship.cpp`, `R/extract_kin.R` |
 | HMD/HFD downloads, conversion and provenance | `R/get_database_rates.R` |
 | Simulation validation, RNG isolation and result assembly | `R/run_simulation.R` |
-| Continuous scheduling and events | `src/simulate.cpp` |
+| Continuous scheduling and events | `src/simulate.cpp` (the `Simulation` engine); rate processes in `src/rate_cells.h` and `src/fertility_cells.h`; shared queues, sum trees and clocks in `src/event_queues.h`; rate bands in `src/rate_bands.h` |
+| Partner matching, exact draws and weighted-choice calibration | `src/matching.h`, `src/matching.cpp`, `src/weight_calibration.h`, `src/weight_calibration.cpp` |
 | Shared history preparation and analysis strata | `R/analysis_utils.R`; native observation in `src/observation.cpp` |
 | Observed event-rate calculations | `R/calculate_rates.R`; native counts in `src/observation.cpp` and `src/demography.cpp` |
 | Population counts and rate summaries | `R/calculate_population_size.R`, `R/calculate_tfr.R`, `R/calculate_life_table.R`, `R/summary_rates.R` |
@@ -334,7 +335,7 @@ callbacks that can bypass consistency checks.
 
 ## Exact full-pool partner draws
 
-There is no candidate sample (D072). `MalePool` in `src/simulate.cpp` keeps
+There is no candidate sample (D072). `MalePool` in `src/matching.h` keeps
 living, unpartnered men in cells by group and quarter-year birth bin, with
 constant-time swap removal. Each matching model is prepared once as a
 `DrawModel`: the native linear/raw-quadratic age model has a closed-form
@@ -351,7 +352,7 @@ no method argument. Separate father models have their own preferences,
 restrictions and delta. Grouped searches build the calibrator unless strict
 endogamy makes weighting irrelevant. Each man's group log weight is added to
 his selection score in the exact draw.
-`WeightCalibrator` in `src/simulate.cpp` keeps unpartnered counts by group and
+`WeightCalibrator` in `src/weight_calibration.h` keeps unpartnered counts by group and
 birth-time bin and incrementally maintained pool sums for each matching model's
 table of utilities over bin-centre lags, updated at events, and solves the
 weights at each search from those sums. Female contributions come from the

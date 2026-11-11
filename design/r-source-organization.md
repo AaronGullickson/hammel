@@ -269,6 +269,30 @@ Do not combine file moves with function renaming, algorithm changes, defaults, o
 
 Pkgdown reference grouping remains a separate follow-up choice. The source reorganization preserved help topics; D144 subsequently grouped process constructors with their setters, and D145 combined the observed event-rate help pages as described above. The site’s reference groups are unchanged.
 
+## C++ sources
+
+Agreed by the user November 11, 2026 (D175). Native code in `src/` is C++17 with Rcpp (D019).
+
+**Style.** The `.clang-format` file at the package root enforces these conventions; run `clang-format -i` on hand-maintained sources and headers, never on generated `src/RcppExports.cpp`. The style mirrors the R rules: Google base style, at most 80 characters per line including comments, a two-space indent and two-space continuation, braces on every `if`, `else` and loop body, and one statement per line. Wrapped function signatures put one parameter per line with the closing parenthesis on its own line; wrapped calls break after the opening parenthesis and close on their own line. Wrapped `if` conditions break at logical operators, with continuation lines aligned under the first condition (clang-format cannot reproduce the extra two spaces of D164). Compact one-line member functions defined inside a class may stay on one line. Long string literals are split into adjacent literals, which compile to the same text.
+
+Start each file with a purpose comment. Give each class, struct and nontrivial function a comment saying what it represents, with its units (years, person-years) and invariants, and cite the governing decision where one exists. Larger files use `// SECTION NAME ------` headings. Group includes as `<Rcpp.h>`, standard headers, then project headers. Internal code belongs to `namespace hammel` in headers and to an anonymous namespace when file-local; `[[Rcpp::export]]` functions stay at global scope, with their default arguments on the exported definition. Keep classes used on hot paths in headers so their members can inline. Ask the user before creating a C++ file when no existing file fits, as for R scripts.
+
+| File | Responsibility |
+| --- | --- |
+| `simulate.cpp` | `simulate_cpp()` and the `Simulation` class holding one run's state: setup from validated inputs, event handlers, calendar boundaries, weight models, newborn inheritance and result tables. |
+| `rate_bands.h`, `rate_bands.cpp` | `Band` schedules read from rate tables, calendar slices, current hazards and band lookup. |
+| `event_queues.h` | `BoundaryQueue`, the `SumTree` family (`IntensityTree`, `FertilityWeightTree`), `ProcessClock`, and uniform and log-weight member selection. |
+| `rate_cells.h` | `RateCells`: cell-scheduled mortality, search, dissolution, conversion and transition processes (D128). |
+| `fertility_cells.h`, `fertility_cells.cpp` | `FertilityCells`: cell-accounted fertility (D101) with hetfert and weight models. |
+| `matching.h`, `matching.cpp` | Candidate utilities, lag tables, `MalePool`, `DrawModel`, exact partner draws (D072) and matching inspection entry points. |
+| `weight_calibration.h`, `weight_calibration.cpp` | `WeightCalibrator`, `ProbabilityTracker` and `SearchCalibration` (D066, D138), with calibration inspection entry points. |
+| `kinship.h`, `kinship.cpp` | Bounded ancestry (`Kinship`), kin extraction and living-kin counting. |
+| `group_history.h` | Public-ID lookup, interval bins and indexed group histories for observation. |
+| `observation.cpp` | Person-level Lexis observation and population snapshots (D133). |
+| `demography.cpp` | Union-level counts and union/birth history helpers for analysis. |
+
+**Verifying native refactors.** A behavior-preserving change must leave fixed-seed results identical. Record a hash of every native (`*_cpp`) call's result or error while running the test suite, before and after the change, with multiply-add contraction disabled (`-ffp-contract=off` in a user Makevars file named by `R_MAKEVARS_USER`, leaving the package build unchanged), and compare them; all tests must also pass with default flags. GCC on ARM fuses multiply-adds across inlined calls by default, so moving code between functions or files can change last-digit rounding, and with it a seeded trajectory, without any change in logic (D175).
+
 ## Function-writing conventions and review
 
 Use snake_case for package-owned function names and arguments, including `conf_level` on rate calculators. D148 replaces `conf.level` in Hammel's interface; `stats::poisson.test()` retains its own `conf.level` argument and `conf.int` output. Do not rename external functions' arguments to match Hammel's convention.
