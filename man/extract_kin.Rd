@@ -33,7 +33,7 @@ are governed by generational distance.
 Find recorded common ancestors within \code{generations} parent steps of both an
 ego and a relative, including each person at distance zero. This function
 uses the same native kinship module as union eligibility. Unknown parents
-terminate their branches;. At depth two, known parents/children,
+terminate their branches. At depth two, known parents/children,
 grandparents/grandchildren, siblings, aunts/uncles, nieces/nephews, and first
 cousins are included, including half relationships. Great-grandparents and
 first cousins once removed require depth three.
@@ -58,7 +58,7 @@ model <- hammel_model() |>
     matching = age_gap_matching_model(3, 5)
   )
 result <- run_simulation(model, years = 50, seed = 42)
-extract_kin(result, max(result$person$person_id))
+extract_kin(result, max(result$persons$person_id))
 }
 \seealso{
 \code{\link[=count_kin]{count_kin()}}

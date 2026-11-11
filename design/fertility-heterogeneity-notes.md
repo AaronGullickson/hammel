@@ -1,5 +1,12 @@
 # Fertility weights: distribution and inheritance design notes
 
+**Status (D176, November 11, 2026):** Hetfert is not available to users.
+`het_fert()` is no longer exported and `fertility()`/`set_fertility()` no
+longer accept `hetfert`. The engine path below is retained and tested through
+the internal `enable_het_fert(model, het_fert(cv, alpha))`, pending a general
+quantitative-characteristics feature. The rules below describe that internal
+path.
+
 October 29, 2026. The user selected mean-one lognormal fertility weights and
 maternal inheritance on the normal/log-weight scale, exposed as
 `set_fertility(..., hetfert = het_fert(cv, alpha))`. This specifies the accepted
@@ -11,7 +18,7 @@ qualification remains part of the contract: no per-generation distribution corre
 ## Execution, inputs and observations
 
 `het_fert(cv, alpha)` requires finite scalar cv >= 0 and alpha in [0,1]. Neither
-parameter has an implicit default. `hetfert = NULL` disables heterogeneity and
+parameter has an implicit default. No `hetfert` (the default) disables heterogeneity and
 retains uniform mother selection. Model construction consumes no random draws.
 When enabled, simulation uses the following rules:
 

@@ -378,7 +378,7 @@ the seed.
   kept in the cell's existing weight tree and calibration sums, as `hetfert`
   is now. A custom function is then called at every refresh of every woman;
   simulation warns that this can be slow.
-- **`hetfert`:** combines additively on the log scale,
+- **`hetfert`** (internal only, D176): combines additively on the log scale,
   eta_i = log(hetfert_i) + x_i * beta, so accepted milestone 5 behavior is
   unchanged when no fertility weight model is given. Replacing `hetfert` by a
   formula term may follow once persistent, inherited characteristics exist.

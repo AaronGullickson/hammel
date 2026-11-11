@@ -198,9 +198,11 @@ test_that("fertility weights select mothers at selection and at refresh under ca
     matching = matching_model(~ age_difference, c(age_difference = 0), group_exogamy = NA))
   check(set_fertility(restricted, rates, birth_interval = 0, weights = w), n)
   # A fertility weight model combines with hetfert, and zero coefficients keep it.
-  model <- set_fertility(weighted_fertility_model(300, c("A", "B")), rates, hetfert = het_fert(.5, 1))
-  zero <- set_fertility(model, rates, hetfert = het_fert(.5, 1),
-    weights = weight_model(~ group, c(groupB = 0)))
+  model <- set_fertility(weighted_fertility_model(300, c("A", "B")), rates) |>
+    enable_het_fert(het_fert(.5, 1))
+  zero <- set_fertility(model, rates,
+    weights = weight_model(~ group, c(groupB = 0))) |>
+    enable_het_fert(het_fert(.5, 1))
   expect_identical(run_simulation(zero, 1, seed = 4), run_simulation(model, 1,
     seed = 4))
   expect_warning(run_simulation(set_fertility(model, rates, weights =

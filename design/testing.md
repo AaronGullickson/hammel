@@ -1443,3 +1443,15 @@ removed duplication. A `-Wall -Wextra` compile reports no warnings in
 hand-maintained sources. No exported entry point, argument or default changed; `R/RcppExports.R` was
 only regenerated (reordered), and no hand-maintained R file or user-owned
 document changed.
+
+## Internal hetfert (D176, November 11, 2026)
+
+`het_fert()` was removed from the exports and `hetfert` from `fertility()` and
+`set_fertility()`; tests enable the retained path with the internal
+`enable_het_fert()`. A new test checks that `het_fert` is not exported, that
+neither constructor has a `hetfert` argument, that `fertility(hetfert = ...)`
+fails as an unused argument, and that `enable_het_fert()` requires a fertility
+process. All existing hetfert, weight-model and calendar-rate tests were kept,
+with only the enabling call changed. `devtools::test()` passed 7,562
+expectations with 0 failures, 0 warnings and 1 skip (the opt-in live database
+test). No engine code changed.

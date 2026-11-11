@@ -6,9 +6,21 @@ het_model <- function(n = 100L, specification = het_fert(.5, .4), rate = .2,
   hammel_model() |> set_population(hammel_population(p, end_time = 0, groups = if ("group" %in% names(p)) "group")) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = rate),
-      hetfert = specification, birth_interval = interval, ffab = ffab) |>
+      birth_interval = interval, ffab = ffab) |>
+    enable_het_fert(specification) |>
     set_union_formation("on_demand", cancel_birth_if_no_match = FALSE)
 }
+
+test_that("hetfert is internal and not accepted by fertility()", {
+  expect_false("het_fert" %in% getNamespaceExports("hammel"))
+  expect_false("hetfert" %in% names(formals(fertility)))
+  expect_false("hetfert" %in% names(formals(set_fertility)))
+  rates <- data.frame(age_start = 15, age_end = 50, rate = .1)
+  expect_error(fertility(rates, hetfert = het_fert(.5, .4)), "unused argument")
+  expect_null(fertility(rates)$hetfert)
+  expect_error(enable_het_fert(hammel_model(), het_fert(.5, .4)),
+    "fertility process")
+})
 
 test_that("het_fert validates parameters and edited process specifications", {
   expect_s3_class(het_fert(.5, .4), "hammel_het_fert")
@@ -158,7 +170,8 @@ test_that("weighted hazards integrate with grouped partner/father matching and u
   rates$rate <- .15
   model <- hammel_model() |> set_population(pop) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .01)) |>
-    set_fertility(stratify_rates(rates, list(group = c(A = 1, B = 1.4))), hetfert = het_fert(1, .5)) |>
+    set_fertility(stratify_rates(rates, list(group = c(A = 1, B = 1.4)))) |>
+    enable_het_fert(het_fert(1, .5)) |>
     set_union_formation("rate", matching = age_gap_matching_model(0, 5,
       group_exogamy = c("A:B" = -1)),
       rates = data.frame(age_start = 15, age_end = Inf, rate = .3),
@@ -173,7 +186,8 @@ test_that("weighted hazards integrate with grouped partner/father matching and u
   # The fertility-driven on-demand channel uses the same weighted hazard sums.
   overall <- rates[rates$union_type == "unpartnered", ]
   overall$union_type <- NULL
-  model <- model |> set_fertility(overall, hetfert = het_fert(.7, .4)) |>
+  model <- model |> set_fertility(overall) |>
+    enable_het_fert(het_fert(.7, .4)) |>
     set_union_formation("on_demand", matching = age_gap_matching_model(0, 5,
       group_exogamy = c("A:B" = -1)))
   expect_gt(count_run_events(run_simulation(model, 5, 83), "births"), 0)

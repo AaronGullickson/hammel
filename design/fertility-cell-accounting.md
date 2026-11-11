@@ -13,7 +13,7 @@ Milestone 8 (D128, accepted under D130) moved births to the fertility process's
 single clock shared by all its cells, pooled groups when fertility schedules
 are not group-specific, and changed unrealized births from expected values to
 counts; this document describes that current behavior. Formula and custom
-fertility weights (D129) combine with `hetfert` on the log scale.
+fertility weights (D129) combine with internal `hetfert` (D176) on the log scale.
 
 ## Purpose
 
@@ -291,7 +291,7 @@ members. Until November 4, 2026 the run recorded expected values
 
 ## Individual weights (D102)
 
-Weights are one by default. `hetfert = het_fert(cv, alpha)` enables the
+Weights are one by default. The internal `enable_het_fert(model, het_fert(cv, alpha))` (not available to users, D176) enables the
 [user-selected persistent lognormal weights](fertility-heterogeneity-notes.md). The user selected option A (decision 4):
 weights set the probability of being chosen within a cell, not a direct rate
 multiplier. Option B is retained here as the rejected alternative.

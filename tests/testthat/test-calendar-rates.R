@@ -106,7 +106,8 @@ test_that("fertility changes retain spacing, weights and count unrealized births
   m <- make_model(2, sex = "f", age = 30, birth_interval = 2) |>
     set_population(spacing_population(n))
   r <- calendar_epochs(data.frame(age_start = 15, age_end = 50, rate = 0), c(.2, .4))
-  m <- set_fertility(m, r, birth_interval = 2, hetfert = het_fert(cv = 0, alpha = 1))
+  m <- set_fertility(m, r, birth_interval = 2) |>
+    enable_het_fert(het_fert(cv = 0, alpha = 1))
   m$population$persons$hetfert <- c(rep(2, n), rep(NA, n))
   out <- run_simulation(m, 1, seed = 81)
   u <- out$unrealized_births
@@ -303,7 +304,8 @@ test_that("asynchronous changes retain parity/type/group accounting and calibrat
   f$age_end <- 50
   f$rate <- 0
   m <- set_fertility(m, calendar_epochs(f, c(.3, .6), c(0, .4, Inf)),
-    birth_interval = .3, hetfert = het_fert(.5, .5))
+    birth_interval = .3) |>
+    enable_het_fert(het_fert(.5, .5))
   m <- set_union_formation(m, "rate", rates = calendar_epochs(
     data.frame(age_start = 15, age_end = Inf, rate = 0), c(.5, .9), c(0, .7, Inf)),
     diagnostics = TRUE, cancel_birth_if_no_match = FALSE)
