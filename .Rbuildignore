@@ -8,6 +8,7 @@
 ^LICENSE\.md$
 ^src/.*\.gcda$
 ^src/.*\.gcno$
+^\.clang-format$
 ^vignettes/\.quarto$
 ^vignettes/.*_files$
 ^vignettes/.*\.html$

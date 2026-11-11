@@ -121,8 +121,9 @@ dissolution, conversion, search) apply to the chosen mother as they do now.
 
 ## Implementation and validation
 
-Implemented October 29, 2026 in `src/simulate.cpp` (`BoundaryQueue`,
-`FertilityCells`, `fertility_strata`) and `R/set_process.R`/`R/run_simulation.R`.
+Implemented October 29, 2026 in the engine (now `BoundaryQueue` in
+`src/event_queues.h`, `FertilityCells` and `fertility_strata` in
+`src/fertility_cells.h`) and `R/set_process.R`/`R/run_simulation.R`.
 
 **Current structure (D128).** Fertility cells are one `FertilityCells`
 process: an `IntensityTree` over cells, one `ProcessClock` and a

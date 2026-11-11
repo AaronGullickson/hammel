@@ -3491,3 +3491,15 @@ Reuse provenance: the ONS material reuse statement at <https://www.ons.gov.uk/me
 **Decision:** In `england_wales_1992_onward$premarital_cohabitation`, rename `source_age_label` to `age_groups` and `proportion_cohabiting_before_marriage` to `prop_cohabit`. Retain `year` and all source values and row order. Update the offline preparation script, bundled object, help and tests. Original CSVs remain unchanged; the user-owned article is left for user editing. This revises D173's retention of source column names for this table only.
 
 **Validation:** Rebuilt the bundled object offline. The entire six-table bundle is identical to its previous version after applying only the two column renames. All 54 data checks passed without failures, warnings or skips; regenerated help parses and `git diff --check` passed. Existing roxygen edits were limited to the column names and source-value wording, for user review.
+
+## D175 — C++ source style, file layout and engine class (November 11, 2026)
+
+**Status:** User decisions November 11, 2026: the style mirrors the R rules, the proposed file split, a `Simulation` class for the engine, and verification with multiply-add contraction disabled.
+
+**Decision:** Format native code with a checked-in `.clang-format` that mirrors the R conventions (80 columns, braces on every control-flow body, one statement per line, one parameter per line in wrapped signatures); see [C++ sources](r-source-organization.md#c-sources). Split the former single engine file by responsibility into `rate_bands`, `event_queues`, `rate_cells`, `fertility_cells`, `matching`, `weight_calibration` and `simulate`, with internals in `namespace hammel`. Hold one run's state in an internal `Simulation` class whose named methods replace the engine's local lambdas; `simulate_cpp()` constructs it and runs it. Remove unused native code, merge duplicated helpers, and make allocation-free or cached versions of hot-path lookups, all without changing results. Exported entry points, their arguments and R behavior are unchanged.
+
+**Rationale:** The engine had grown into one 1,900-line function sharing state through about 60 lambdas, with lines up to 139 characters. Named methods, cohesive files and documented classes make the event logic reviewable. The refactor preserves random-number use, event order and arithmetic.
+
+**Verification policy:** A behavior-preserving native change must produce identical hashes of every native call's result or error over the test suite with `-ffp-contract=off`, and all tests must pass with default flags. GCC on ARM fuses multiply-adds across inlined calls by default, so code motion alone can change last-digit rounding and the seeded trajectory there; the flag is set only in the verification build, because R CMD check reports `-f` flags in package Makevars as non-portable.
+
+**Validation:** See [testing](testing.md#native-source-style-file-split-and-engine-class-d175-november-11-2026).

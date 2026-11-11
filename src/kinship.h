@@ -1,3 +1,5 @@
+// Bounded ancestry and kin relationships over a parent graph, shared by the
+// engine (kin exclusion in partner draws) and the kinship extractors.
 #ifndef HAMMEL_KINSHIP_H
 #define HAMMEL_KINSHIP_H
 
@@ -7,13 +9,17 @@
 
 namespace hammel {
 
-// Positions in the caller's persons vector, not public person IDs. -1 is unknown.
+// Positions in the caller's persons vector, not public person IDs. -1 is
+// unknown.
 struct KinAncestor {
   int person;
   int distance;
-  unsigned char lineage; // 0 self, 1 maternal, 2 paternal, 3 both shortest sides
+  unsigned char
+    lineage;  // 0 self, 1 maternal, 2 paternal, 3 both shortest sides
 };
 
+// One ancestor shared by an ego and a relative, with each side's distance and
+// lineage.
 struct KinEvidence {
   int ancestor;
   int ego_distance;
@@ -22,11 +28,17 @@ struct KinEvidence {
   unsigned char relative_lineage;
 };
 
+// Ancestor sets up to `generations` back, computed on first use and cached
+// (sorted by person). Parent links must be acyclic; people may be appended
+// (newborns) but never removed.
 class Kinship {
-public:
+ public:
   // Counting needs minimum distances but not reporting-only kin metadata.
-  Kinship(std::vector<std::array<int, 2>> parents, int generations,
-          bool track_details = true);
+  Kinship(
+    std::vector<std::array<int, 2>> parents,
+    int generations,
+    bool track_details = true
+  );
   void append(int mother, int father);
   int generations() const { return generations_; }
   const std::vector<KinAncestor>& ancestors(int person);
@@ -34,7 +46,7 @@ public:
   std::vector<KinEvidence> shared_ancestors(int ego, int relative);
   bool ancestry_complete(int person);
 
-private:
+ private:
   int generations_;
   bool track_details_;
   std::vector<std::array<int, 2>> parents_;
@@ -51,5 +63,5 @@ private:
   void check_person(int person) const;
 };
 
-} // namespace hammel
+}  // namespace hammel
 #endif

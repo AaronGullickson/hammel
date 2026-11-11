@@ -79,6 +79,10 @@ be made autonomously; record choices with substantial architectural consequences
   rules above. See D171.
 - Do not use semicolons to separate R statements; put each statement on its
   own line (D156).
+- Format hand-maintained C++ in `src/` with the root `.clang-format` and
+  follow the C++ section of the source organization guide (D175). Verify
+  behavior-preserving native refactors by comparing hashed native results
+  with `-ffp-contract=off`, and run the tests with default flags.
 - Use snake_case for package-owned function and argument names (for example,
   `conf_level`). Preserve external APIs when calling them, such as
   `stats::poisson.test(conf.level = conf_level)`. Follow tidyverse function-writing

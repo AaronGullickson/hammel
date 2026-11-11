@@ -1,7 +1,7 @@
 # How event timing works
 
-Updated November 5, 2026. This explains how the engine in `src/simulate.cpp`
-times events since milestone 8 (D128): one clock per rate process, spent at the
+Updated November 5, 2026. This explains how the engine (`src/simulate.cpp` and
+the process classes it uses) times events since milestone 8 (D128): one clock per rate process, spent at the
 process's total intensity, with cells choosing who experiences the event. The
 [cell scheduling specification](binned-group-hazards.md#cell-scheduling-d128)
 gives the data structures; this note gives the reasoning.
