@@ -123,7 +123,7 @@ only at recorded events:
   the same unpartnered exposure.
 - `previous_union`: how the most recent ended union ended, `none`,
   `separated` or `widowed`. Conversion is not an ending, and cohabitation
-  endings follow the population's recorded `cohabitation_counts_as_previous_union`
+  endings follow the population's recorded `cohab_as_previous_union`
   policy (D085). It applies to partnered time too: a woman in her first union
   is `none`. `use_detailed_previous_union = FALSE` merges `separated` and
   `widowed` into `dissolved` in any calculator when `previous_union` is in

@@ -209,7 +209,7 @@ person_observation <- function(
       rep(0L, nrow(persons))
     },
     counts_cohab = isTRUE(
-      population$simulation$cohabitation_counts_as_previous_union
+      population$simulation$cohab_as_previous_union
     )
   )
 }

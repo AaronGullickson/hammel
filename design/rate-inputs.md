@@ -81,7 +81,7 @@ age/duration boundaries `NA`. The age columns remain part of the table schema
 even when some categories use duration. Gaps have zero hazard.
 
 Search duration runs from the most recent partnership ending, not simulation
-start or first union ending. The `cohabitation_counts_as_previous_union`
+start or first union ending. The `cohab_as_previous_union`
 setting controls whether ended cohabitations determine the previous category;
 every actual partnership ending resets the duration origin even when a prior
 legal-marriage category is restored. There is no input `union_type` split of

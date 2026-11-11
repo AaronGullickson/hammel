@@ -115,12 +115,12 @@ test_that("fertility follows type and conversion retains actual-birth spacing", 
 test_that("cohabitation endings restore legal status by default and support the toggle", {
   for (counts in c(FALSE, TRUE)) {
     model <- initial_cohabs(conversion=0,breakup=1e5)
-    model$processes$union_formation$cohabitation_counts_as_previous_union <- counts
+    model$processes$union_formation$cohab_as_previous_union <- counts
     result <- run_simulation(model,.1,42)
     info <- previous_union_info_cpp(result$persons,result$unions,counts)
     expect_equal(info$previous_union,c(if(counts)1L else 0L,if(counts)1L else 0L))
     model <- initial_cohabs(conversion=0,breakup=0)
-    model$processes$union_formation$cohabitation_counts_as_previous_union <- counts
+    model$processes$union_formation$cohab_as_previous_union <- counts
     model <- set_mortality(model,data.frame(sex=c("f","m"),age_start=0,age_end=Inf,rate=c(1e5,0)))
     result <- run_simulation(model,.1,42)
     info <- previous_union_info_cpp(result$persons,result$unions,counts)
@@ -231,7 +231,7 @@ test_that("earlier legal history governs subsequent searches after cohabitant de
     model$population$unions <- tibble::tibble(union_id=1:2,wife_id=1,husband_id=2:3,
       start_time=c(-10,-2),end_time=c(-5,NA),end_reason=c("dissolution",NA),union_type=c("marriage","cohab"))
     model$processes$union_formation$rates$rate <- 0
-    model$processes$union_formation$cohabitation_counts_as_previous_union <- counts
+    model$processes$union_formation$cohab_as_previous_union <- counts
     model <- set_mortality(model,data.frame(sex=c("f","m","m"),age_start=c(0,0,80),
       age_end=c(Inf,80,Inf),rate=c(0,0,1e5)))
     result <- run_simulation(model,.1,42)
@@ -317,9 +317,9 @@ test_that("union entry types share exposure and exclude conversion", {
 
 test_that("cohabitation interpretation remains without run event counts", {
   model <- cohab_fixture()
-  model$processes$union_formation$cohabitation_counts_as_previous_union <- TRUE
+  model$processes$union_formation$cohab_as_previous_union <- TRUE
   result <- run_simulation(model, 0)
-  expect_true(result$simulation$cohabitation_counts_as_previous_union)
+  expect_true(result$simulation$cohab_as_previous_union)
   counts <- c("births", "deaths", "dissolutions", "conversions", "transitions")
   expect_false(any(counts %in% names(result$simulation)))
 })

@@ -122,7 +122,7 @@ the dimension's inheritance model (random parent by default, with maternal fallb
 missing. Group-specific schedules and baseline group sampling are documented in
 [groups](groups.md). The `simulation` component records the latest run's
 `start_time`, `end_time`, `birth_interval` and `ffab`, plus `hetfert` when enabled
-and `cohabitation_counts_as_previous_union` when cohabitation is enabled.
+and `cohab_as_previous_union` when cohabitation is enabled.
 Event counts are not duplicated there (D167); events remain in person, union
 and transition histories. `unrealized_births` and `unrealized_since` are
 population components accumulated across chained runs (D160).

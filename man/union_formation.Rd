@@ -18,7 +18,7 @@ union_formation(
   min_male_age = 15,
   kinship_generations = 2,
   cancel_birth_if_no_match = TRUE,
-  cohabitation_counts_as_previous_union = FALSE,
+  cohab_as_previous_union = FALSE,
   diagnostics = FALSE
 )
 
@@ -36,7 +36,7 @@ set_union_formation(
   min_male_age = 15,
   kinship_generations = 2,
   cancel_birth_if_no_match = TRUE,
-  cohabitation_counts_as_previous_union = FALSE,
+  cohab_as_previous_union = FALSE,
   diagnostics = FALSE
 )
 }
@@ -95,7 +95,7 @@ fails. Set \code{FALSE} to allow births with unknown fathers. Historical missing
 father IDs are retained. Partner scarcity can reduce realized fertility
 below inputs.}
 
-\item{cohabitation_counts_as_previous_union}{Logical, default FALSE. FALSE
+\item{cohab_as_previous_union}{Logical, default FALSE. FALSE
 only marriage defines the \code{previous_union} value; TRUE cohabitation or
 marriage define the \code{previous_union} value.}
 

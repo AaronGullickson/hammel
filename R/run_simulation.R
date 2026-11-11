@@ -196,7 +196,7 @@ run_simulation <- function(model, years, seed = NULL) {
     check_calendar_coverage(calendar_inputs[[name]], start, start + years, name)
   }
   cohab_enabled <- !is.null(union_process$cohab_prob)
-  counts_cohab <- isTRUE(union_process$cohabitation_counts_as_previous_union)
+  counts_cohab <- isTRUE(union_process$cohab_as_previous_union)
   if (!cohab_enabled && "union_type" %in% names(population$unions) &&
         any(population$unions$union_type == "cohab")) {
     stop(
@@ -750,7 +750,7 @@ run_simulation <- function(model, years, seed = NULL) {
     )
   }
   if (cohab_enabled) {
-    result$simulation$cohabitation_counts_as_previous_union <- counts_cohab
+    result$simulation$cohab_as_previous_union <- counts_cohab
   }
   if (!is.null(hidden_group)) {
     result$persons$group <- c(

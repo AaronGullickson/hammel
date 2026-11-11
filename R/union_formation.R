@@ -112,7 +112,7 @@
 #' @param weights_conversion NULL (default) for unweighted selection, or a
 #'   [weight_model()] using union variables, which chooses which cohabitation in
 #'   a cell converts to marriage without changing the cell's input rate.
-#' @param cohabitation_counts_as_previous_union Logical, default FALSE. FALSE
+#' @param cohab_as_previous_union Logical, default FALSE. FALSE
 #'   only marriage defines the `previous_union` value; TRUE cohabitation or
 #'   marriage define the `previous_union` value.
 #' @param model A `hammel_model` object.
@@ -143,7 +143,7 @@ union_formation <- function(
   min_male_age = 15,
   kinship_generations = 2,
   cancel_birth_if_no_match = TRUE,
-  cohabitation_counts_as_previous_union = FALSE,
+  cohab_as_previous_union = FALSE,
   diagnostics = FALSE
 ) {
   process <- structure(
@@ -160,8 +160,7 @@ union_formation <- function(
       cohab_prob = cohab_prob,
       cohab_matching = cohab_matching,
       union_convert_rate = union_convert_rate,
-      cohabitation_counts_as_previous_union =
-      cohabitation_counts_as_previous_union,
+      cohab_as_previous_union = cohab_as_previous_union,
       weights_conversion = normalize_model_argument(weights_conversion),
       weights = normalize_model_argument(weights)
     ),
@@ -218,7 +217,7 @@ set_union_formation <- function(
   min_male_age = 15,
   kinship_generations = 2,
   cancel_birth_if_no_match = TRUE,
-  cohabitation_counts_as_previous_union = FALSE,
+  cohab_as_previous_union = FALSE,
   diagnostics = FALSE
 ) {
   set_process(
@@ -235,8 +234,7 @@ set_union_formation <- function(
       min_male_age = min_male_age,
       kinship_generations = kinship_generations,
       cancel_birth_if_no_match = cancel_birth_if_no_match,
-      cohabitation_counts_as_previous_union =
-      cohabitation_counts_as_previous_union,
+      cohab_as_previous_union = cohab_as_previous_union,
       diagnostics = diagnostics
     )
   )

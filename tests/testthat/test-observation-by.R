@@ -31,7 +31,7 @@ test_that("mortality exposure splits by union type and previous union", {
 
 test_that("previous union follows the recorded cohabitation policy", {
   pop <- by_history()
-  pop$simulation$cohabitation_counts_as_previous_union <- TRUE
+  pop$simulation$cohab_as_previous_union <- TRUE
   x <- woman(calculate_mortality_rates(pop, c(0, 40), c(0, Inf), by = "previous_union"))
   # Now the cohabitation ended by death at 38 makes her widowed.
   expect_equal(x$person_years, c(40, 8, 2))

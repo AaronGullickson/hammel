@@ -6,12 +6,12 @@
 # zero probability in gaps and shared matching/rates when explicitly
 # unstratified.
 validate_cohabitation <- function(process) {
-  flag <- process$cohabitation_counts_as_previous_union
+  flag <- process$cohab_as_previous_union
   if (!is.null(flag) &&
         (!is.logical(flag) || length(flag) != 1L || !is.null(dim(flag)) ||
            is.na(flag))) {
     stop(
-      "`cohabitation_counts_as_previous_union` must be TRUE or FALSE.",
+      "`cohab_as_previous_union` must be TRUE or FALSE.",
       call. = FALSE
     )
   }

@@ -6,7 +6,7 @@ October 29, 2026 (D093); see the [validation report](../validation/milestone4.qm
 ## Inputs and entry
 
 `union_formation()` and its setter accept `cohab_prob`, `cohab_matching`,
-`union_convert_rate`, and `cohabitation_counts_as_previous_union = FALSE`.
+`union_convert_rate`, and `cohab_as_previous_union = FALSE`.
 `cohab_prob = NULL` retains untyped partnerships, without type draws or new
 clocks. When enabled, probability tables use `age_start`, `age_end`, `prob`,
 optionally `group` and `previous_union`; probabilities are finite in [0,1].
