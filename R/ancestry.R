@@ -129,10 +129,7 @@ normalize_population_ancestry <- function(population) {
       columns <- setdiff(names(x), c("person_id", "unknown"))
       x <- x[
         match(persons$person_id, x$person_id),
-        c(
-          "person_id", columns,
-          "unknown"
-        ),
+        c("person_id", columns, "unknown"),
         drop = FALSE
       ]
     }

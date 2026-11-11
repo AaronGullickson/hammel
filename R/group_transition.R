@@ -378,7 +378,7 @@ validate_group_transition <- function(process) {
         (!is.character(r$union_type) || anyNA(r$union_type) ||
            any(
              !r$union_type %in%
-                c("unpartnered", "partnered", "cohab","marriage")
+               c("unpartnered", "partnered", "cohab", "marriage")
            ) ||
            ("partnered" %in% r$union_type &&
               any(r$union_type %in% c("cohab", "marriage"))))) {

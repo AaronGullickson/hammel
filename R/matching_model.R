@@ -505,8 +505,7 @@ calculate_matching_utilities <- function(
     return(numeric())
   }
   data <- matching_predictor_data(
-    matching, age_difference, female_group,
-    male_group
+    matching, age_difference, female_group, male_group
   )
   design <- matching_design_matrix(matching$formula, data)
   if (!setequal(colnames(design), names(matching$coefficients))) {
@@ -521,8 +520,7 @@ calculate_matching_utilities <- function(
       stop("Pair effects require female and male group data.", call. = FALSE)
     }
     utility <- utility + matching_pair_offsets(
-      matching, female_group,
-      male_group
+      matching, female_group, male_group
     )
   }
   if (any(!is.finite(utility))) {

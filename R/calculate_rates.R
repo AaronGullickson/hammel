@@ -334,8 +334,7 @@ calculate_cohab_convert_rate <- function(
   population <- alias$population
   by <- alias$by
   by <- check_by(
-    by, c("group_w", "group_h"), "calculate_cohab_convert_rate",
-    alias$dims
+    by, c("group_w", "group_h"), "calculate_cohab_convert_rate", alias$dims
   )
   if (!inherits(population, "hammel_population")) {
     stop(
@@ -500,8 +499,7 @@ calculate_marriage_rates <- function(
   population <- alias$population
   by <- alias$by
   by <- check_by(
-    by, c("group", "previous_union"), "calculate_marriage_rates",
-    alias$dims
+    by, c("group", "previous_union"), "calculate_marriage_rates", alias$dims
   )
   finish_strata(
     calculate_entry_rates(
@@ -807,10 +805,10 @@ add_unrealized_births <- function(out, population, alias = list()) {
     row_keys <- list(out$time_start, out$age_start)
     ok <- t$ok & a$ok
     # Records outside every observation row contribute nothing anywhere.
-    inside <- u$period_start < max(out$time_end) & u$period_end > min(
-      out$time_start
-    ) &
-      u$age_start < max(out$age_end) & u$age_end > min(out$age_start)
+    inside <- u$period_start < max(out$time_end) &
+      u$period_end > min(out$time_start) &
+      u$age_start < max(out$age_end) &
+      u$age_end > min(out$age_start)
     if ("parity_start" %in% names(out)) {
       if ("parity_start" %in% names(u)) {
         p <- within(
@@ -821,8 +819,9 @@ add_unrealized_births <- function(out, population, alias = list()) {
         row_keys <- c(row_keys, list(out$parity_start))
         ok <- ok & !is.na(u$parity_start) & p$ok %in% TRUE
       } else {
+        # A pooled-parity schedule cannot be split by parity.
         ok[] <- FALSE
-      } # pooled-parity schedule cannot be split by parity
+      }
     }
     if ("group" %in% names(out)) {
       keys <- c(keys, list(as.character(u$group)))
@@ -838,8 +837,9 @@ add_unrealized_births <- function(out, population, alias = list()) {
         keys <- c(keys, list(u$union_type))
         row_keys <- c(row_keys, list(out$union_type))
       } else {
+        # An overall schedule cannot be split by union type.
         ok[] <- FALSE
-      } # overall schedule cannot be split by union type
+      }
     }
     key <- do.call(paste, c(keys, sep = "\r"))
     row_key <- do.call(paste, c(row_keys, sep = "\r"))
@@ -849,10 +849,10 @@ add_unrealized_births <- function(out, population, alias = list()) {
     value[as.integer(names(sums))] <- as.numeric(sums)
     # Records that overlap rows without fitting one row make those rows unknown.
     for (r in which(inside & !exact)) {
-      hit <- out$time_start < u$period_end[r] & out$time_end > u$period_start[
-        r
-      ] &
-        out$age_start < u$age_end[r] & out$age_end > u$age_start[r]
+      hit <- out$time_start < u$period_end[r] &
+        out$time_end > u$period_start[r] &
+        out$age_start < u$age_end[r] &
+        out$age_end > u$age_start[r]
       if ("parity_start" %in% names(out) && "parity_start" %in% names(u) &&
             !is.na(u$parity_start[r])) {
         hit <- hit & out$parity_start < u$parity_end[r] & out$parity_end >
@@ -1270,11 +1270,11 @@ encode_combined <- function(alias, data, suffix = "") {
 # Shared by public event-rate summaries, after their final aggregation.
 validate_rate_conf_level <- function(conf_level) {
   if (!is.null(conf_level) &&
-      (!is.numeric(conf_level) || length(conf_level) != 1L ||
-       !is.null(dim(conf_level)) ||
-       !is.finite(conf_level) ||
-       conf_level <= 0 ||
-       conf_level >= 1)) {
+        (!is.numeric(conf_level) || length(conf_level) != 1L ||
+           !is.null(dim(conf_level)) ||
+           !is.finite(conf_level) ||
+           conf_level <= 0 ||
+           conf_level >= 1)) {
     stop(
       paste0(
         "`conf_level` must be NULL or a finite numeric ",

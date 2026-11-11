@@ -155,12 +155,12 @@ check_group_names <- function(names) {
         anyDuplicated(names)) {
     stop("Group dimensions must have unique, nonempty names.", call. = FALSE)
   }
-  bad <- names[names %in% reserved_group_names |
-    grepl("^(partner|same|female|male|ancestry)_", names) | grepl(
-      "_(w|h)$",
-      names
-    ) |
-    !grepl("^[A-Za-z][A-Za-z0-9_.]*$", names)]
+  bad <- names[
+    names %in% reserved_group_names |
+      grepl("^(partner|same|female|male|ancestry)_", names) |
+      grepl("_(w|h)$", names) |
+      !grepl("^[A-Za-z][A-Za-z0-9_.]*$", names)
+  ]
   if (length(bad)) {
     stop(
       sprintf(

@@ -252,23 +252,7 @@ We have annual marriage rates by whether the woman was never married or previous
 ```{r}
 #| label: get-marriage-rates
 
-marriage_rates_pretuned <- read_csv(
-  here(
-    "validation",
-    "data",
-    "england_wales_1992_onward",
-    "female_marriage_rates_1992_2019.csv"
-  )
-) |>
-  filter(marriage_order != "all_marriages") |>
-  mutate(
-    time_start = year, 
-    time_end = year + 1,
-    #rate = rate * 3,
-    previous_union = if_else(marriage_order == "first_marriage",
-                             "none", "dissolved")
-  ) |>
-  select(time_start, time_end, age_start, age_end, previous_union, rate)
+marriage_rates_pretuned <- england_wales_1992_onward$marriage
 
 # some marriage rates for young age groups and dissolved are missing. For those 
 # cases, carry forward the previous years
@@ -311,7 +295,7 @@ dissolution_rates1992 <- dissolution_rates |>
   select(-starts_with("time_"))
   
 # because this is a negative growth rate population start big
-pop <- create_baseline_population(150000, 70, 1942)
+pop <- generate_uniform_population(150000, 70, 1942)
 
 model <- hammel_model() |>  
   set_population(pop) |>
@@ -319,14 +303,14 @@ model <- hammel_model() |>
   set_fertility(fertility_rates1992) |>
   set_union_formation(
     "rate", 
-    matching = create_age_gap_matching_model(2, 5),
+    matching = age_gap_matching_model(2, 5),
     rates = marriage_rates1992, 
     cohab_prob = prob_cohab1992,
     union_convert_rate = conversion_rates1992
   ) |>
   set_union_dissolution(dissolution_rates1992)
 
-pop_start <- simulate(model, 1992-1942, 42)
+pop_start <- run_simulation(model, 1992 - 1942, 42)
 ```
 
 Lets take a look at the observed first-time marriage rates in our simulation and compare them to the pre-tuned marriage rate data. We are looking for a good fit to confirm our tuning.
@@ -368,7 +352,10 @@ We now run two simulations. In the first simulation, we hold all rates constant 
 
 # two simulations - holding everything constant and allowing it to vary
 time_constant <- system.time(
-  pop_constant <- simulate(model |> set_population(pop_start), 2019-1992, 42)
+  pop_constant <- run_simulation(
+    model |> 
+      set_population(pop_start), 2019 - 1992, 42
+  )
 )
 
 model <- hammel_model() |>  
@@ -377,7 +364,7 @@ model <- hammel_model() |>
   set_fertility(fertility_rates1992) |>
   set_union_formation(
     "rate", 
-    matching = create_age_gap_matching_model(2, 5),
+    matching = age_gap_matching_model(2, 5),
     rates = marriage_rates,
     cohab_prob = prob_cohab,
     union_convert_rate = conversion_rates
@@ -385,7 +372,7 @@ model <- hammel_model() |>
   set_union_dissolution(dissolution_rates)
 
 time_changing <- system.time(
-  pop_change <- simulate(model, 2019-1992, 42)
+  pop_change <- run_simulation(model, 2019 - 1992, 42)
 )
 ```
 
@@ -517,7 +504,7 @@ calculate_dissolution_rates(
   1992:2019,
   dur_breaks = seq(0, 45, 5),
   by = "union_type",
-  conf.level = 0.95
+  conf_level = 0.95
 ) |>
   filter(union_type == "marriage", time_start %in% c(1992, 2000, 2010, 2018)) |>
   ggplot(aes(x = dur_start + 2.5, y = rate_dissolution))+
@@ -543,7 +530,7 @@ calculate_dissolution_rates(
   c(1992, 1998, 2005, 2019),
   dur_breaks = c(0, 5),
   by = "union_type",
-  conf.level = 0.95
+  conf_level = 0.95
 ) |>
   filter(union_type == "cohab") |>
   mutate(time_mid = (time_start + time_end) / 2) |>
@@ -569,7 +556,7 @@ mar_rates_observed <- calculate_union_rates(
   1992:2019,
   c(16, seq(20, 60, 5), 70, 80),
   by = "previous_union",
-  conf.level = 0.95,
+  conf_level = 0.95,
   use_detailed_previous_union = FALSE
 ) |>
   filter(sex == "f")
@@ -600,7 +587,7 @@ calculate_union_rates(
   c(1992, 1995:2019),
   c(0, Inf),
   by = "union_type",
-  conf.level = 0.95
+  conf_level = 0.95
 ) |>
   filter(sex == "f") |>
   select(time_start, time_end, union_type, unions) |>

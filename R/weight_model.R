@@ -246,10 +246,8 @@ weight_group_name_possible <- function(name, type) {
   if (type == "union") {
     base <- sub("_[wh]$", "", name)
     return(
-      (grepl("_[wh]$", name) && (dim_ok(base) || grepl(
-        "^ancestry_.+_.+",
-        base
-      ))) ||
+      (grepl("_[wh]$", name) &&
+         (dim_ok(base) || grepl("^ancestry_.+_.+", base))) ||
         (startsWith(name, "same_") && dim_ok(sub("^same_", "", name)))
     )
   }
@@ -508,12 +506,8 @@ weight_strata <- function(process, rates, group = NULL) {
   wives <- sub("_w$", "", grep("_w$", strata, value = TRUE))
   husbands <- sub("_h$", "", grep("_h$", strata, value = TRUE))
   union <- c(
-    paste0(wives, if (length(wives)) "_w"), paste0(
-      husbands, if (
-        length(husbands)) {
-        "_h"
-      }
-    ),
+    paste0(wives, if (length(wives)) "_w"),
+    paste0(husbands, if (length(husbands)) "_h"),
     paste0("same_", intersect(wives, husbands))
   )
   switch(

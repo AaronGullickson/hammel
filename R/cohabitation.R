@@ -10,10 +10,7 @@ validate_cohabitation <- function(process) {
   if (!is.null(flag) &&
         (!is.logical(flag) || length(flag) != 1L || !is.null(dim(flag)) ||
            is.na(flag))) {
-    stop(
-      "`cohab_as_previous_union` must be TRUE or FALSE.",
-      call. = FALSE
-    )
+    stop("`cohab_as_previous_union` must be TRUE or FALSE.", call. = FALSE)
   }
   if (!is.null(process$cohab_matching)) {
     validate_model_argument(

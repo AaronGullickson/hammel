@@ -461,9 +461,7 @@ validate_exogamy_table <- function(x) {
   side <- function(s) {
     do.call(
       paste, c(
-        lapply(
-          dims, function(d) as.character(x[[paste0(d, "_", s)]])
-        ),
+        lapply(dims, function(d) as.character(x[[paste0(d, "_", s)]])),
         sep = "\r"
       )
     )
@@ -649,10 +647,7 @@ internal_matching_model <- function(model, dim, categories) {
       coefficients = coefficients,
       group_exogamy = exogamy$effects,
       group_levels = if (
-        any(
-          c("female_group", "male_group") %in%
-          all.vars(renamed)
-        )
+        any(c("female_group", "male_group") %in% all.vars(renamed))
       ) {
         categories
       },

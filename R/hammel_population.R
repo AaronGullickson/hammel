@@ -12,7 +12,7 @@
 #' @details
 #'
 #' In most cases, it will be more common to create a `hammel_population` object
-#' by using [generate_uniform_population()] or to recieve a `hammel_population`
+#' by using [generate_uniform_population()] or to receive a `hammel_population`
 #' object as the output of [run_simulation()].
 #'
 #' The `hammel_population` object must always contain a `persons` data frame and
@@ -21,8 +21,8 @@
 #' value.
 #'
 #' @param persons A data frame with one row per person, including deceased
-#'   persons. Must include a unique `person_id`, nonmissing `birth_time`,
-#'   `death_time`, `mother_id`, and `father_id`.
+#'   persons. Must include a unique `person_id`, nonmissing `sex`, nonmissing
+#'   `birth_time`, `death_time`, `mother_id`, and `father_id`.
 #' @param unions A data frame with one row per union episode, or `NULL` for no
 #'   unions. `wife_id` references the female partner and `husband_id` the male
 #'   partner. Optional `union_type` is cohab or marriage.
@@ -245,7 +245,7 @@ validate_population <- function(results) {
         any(
           !is.na(reason) &
             !reason %in%
-               c("death_husband", "death_wife", "dissolution", "conversion")
+              c("death_husband", "death_wife", "dissolution", "conversion")
         ) ||
         any(is.na(reason) != is.na(unions$end_time))) {
     stop(

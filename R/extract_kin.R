@@ -15,7 +15,7 @@
 #' Find recorded common ancestors within `generations` parent steps of both an
 #' ego and a relative, including each person at distance zero. This function
 #' uses the same native kinship module as union eligibility. Unknown parents
-#' terminate their branches;. At depth two, known parents/children,
+#' terminate their branches. At depth two, known parents/children,
 #' grandparents/grandchildren, siblings, aunts/uncles, nieces/nephews, and first
 #' cousins are included, including half relationships. Great-grandparents and
 #' first cousins once removed require depth three.
@@ -54,7 +54,7 @@
 #'     matching = age_gap_matching_model(3, 5)
 #'   )
 #' result <- run_simulation(model, years = 50, seed = 42)
-#' extract_kin(result, max(result$person$person_id))
+#' extract_kin(result, max(result$persons$person_id))
 extract_kin <- function(
   population,
   ego_ids,
@@ -115,7 +115,7 @@ extract_kin <- function(
 #' - "child"
 #' - "grandparent"
 #' - "grandchild"
-#'- "sibling"
+#' - "sibling"
 #' - "aunt_uncle"
 #' - "niece_nephew"
 #' - "first_cousin"
@@ -256,9 +256,7 @@ count_kin <- function(
   cell <- grid$time + length(times) * (
     grid$stratum - 1L + n_strata * (grid$type - 1L)
   )
-  persons_n <- counts$persons[
-    grid$time + length(times) * (grid$stratum - 1L)
-  ]
+  persons_n <- counts$persons[grid$time + length(times) * (grid$stratum - 1L)]
   kin_n <- counts$kin[cell]
   with_n <- counts$with[cell]
   out <- tibble::tibble(time = times[grid$time])

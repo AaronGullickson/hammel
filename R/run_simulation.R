@@ -166,9 +166,8 @@ run_simulation <- function(model, years, seed = NULL) {
     cohabitation_probability = union_process$cohab_prob
   )
   for (d in names(transition_list)) {
-    calendar_inputs[[paste0("`", d, "` transition")]] <- transition_list[[
-      d
-    ]]$rates
+    calendar_inputs[[paste0("`", d, "` transition")]] <-
+      transition_list[[d]]$rates
   }
   # A rate table stratified by a persons column that is not a declared group.
   for (name in names(calendar_inputs)) {
@@ -343,8 +342,7 @@ run_simulation <- function(model, years, seed = NULL) {
   )
   strata <- function(rates, process, union_level = FALSE) {
     prepare_strata_rates(
-      rates, process, registries, start, start + years,
-      union_level
+      rates, process, registries, start, start + years, union_level
     )
   }
   death <- strata(death_rates, "mortality")
@@ -499,13 +497,10 @@ run_simulation <- function(model, years, seed = NULL) {
           ]
         }
         prepare_weight_model(
-          weight_models[[name]], if (
-            transition) {
-            "transition"
-          } else {
-            types[[name]]
-          },
-          if (transition) "transition" else name, context
+          weight_models[[name]],
+          if (transition) "transition" else types[[name]],
+          if (transition) "transition" else name,
+          context
         )
       }
     )
@@ -767,10 +762,6 @@ run_simulation <- function(model, years, seed = NULL) {
 
 # HELPER FUNCTIONS ---------------------------------------------------------
 
-# Counts of unrealized births from cells with members but no eligible woman
-# (D101), by one-year period from the run start and cell. Columns mirror the
-# fertility table's strata: group, union_type and parity bounds appear only
-# when the schedules use them. Always a tibble, possibly with zero rows.
 # Append unrealized-birth records whose stratum columns differ between runs;
 # a column a run did not use is NA (pooled) in that run's rows.
 bind_unrealized_births <- function(old, new) {
@@ -785,6 +776,10 @@ bind_unrealized_births <- function(old, new) {
   tibble::as_tibble(rbind(old[columns], new[columns]))
 }
 
+# Counts of unrealized births from cells with members but no eligible woman
+# (D101), by one-year period from the run start and cell. Columns mirror the
+# fertility table's strata: group, union_type and parity bounds appear only
+# when the schedules use them. Always a tibble, possibly with zero rows.
 format_unrealized_births <- function(native, rates, registries) {
   if (is.null(native) || !length(native$period_start)) {
     native <- data.frame(

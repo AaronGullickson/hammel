@@ -208,9 +208,7 @@ person_observation <- function(
     } else {
       rep(0L, nrow(persons))
     },
-    counts_cohab = isTRUE(
-      population$simulation$cohab_as_previous_union
-    )
+    counts_cohab = isTRUE(population$simulation$cohab_as_previous_union)
   )
 }
 
@@ -311,9 +309,9 @@ person_by_dims <- function(
             previous_codes
           }
           label_dim(
-            "previous_union", labels[codes + 1L], counts$strides[[
-              "previous_union"
-            ]],
+            "previous_union",
+            labels[codes + 1L],
+            counts$strides[["previous_union"]],
             code = codes,
             key = codes + 1L
           )
@@ -496,9 +494,9 @@ combine_dimensions <- function(population, dims) {
       # Category after each row: the latest destination in d so far.
       last <- cummax(ifelse(mine, seq_len(n), 0L))
       value_after <- ifelse(
-        last >= start & last > 0L, code(d, tx$destination)[
-          pmax(last, 1L)
-        ], initial
+        last >= start & last > 0L,
+        code(d, tx$destination)[pmax(last, 1L)],
+        initial
       )
       previous <- c(NA, value_after[-n])
       value_before <- ifelse(first_row, initial, previous)

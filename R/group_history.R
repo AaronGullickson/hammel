@@ -126,15 +126,12 @@ validate_transition_history <- function(population) {
   )) {
     rows <- rows[order(tx$time[rows])]
     current <- as.character(p[[tx$group[rows[1]]]][i[rows[1]]])
-    if (
-      anyDuplicated(tx$time[rows]) ||
-        (length(rows) > 1L &&
-          any(
-            as.character(tx$destination[head(rows, - 1L)]) !=
-              as.character(tx$origin[tail(rows, -1L)])
-          )) ||
-        as.character(tail(tx$destination[rows], 1)) != current
-    ) {
+    chained <- length(rows) < 2L || all(
+      as.character(tx$destination[head(rows, -1L)]) ==
+        as.character(tx$origin[tail(rows, -1L)])
+    )
+    if (anyDuplicated(tx$time[rows]) || !chained ||
+          as.character(tail(tx$destination[rows], 1)) != current) {
       stop(
         paste0(
           "Transition history must chain chronologically to ",

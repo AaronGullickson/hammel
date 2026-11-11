@@ -72,13 +72,8 @@ calculate_population_size <- function(
     alias$dims
   )
   check_detailed_previous_union(use_detailed_previous_union, by)
-  obs <- person_observation(
-    population, by, if (length(times)) {
-      max(times)
-    } else {
-      -Inf
-    }
-  )
+  last_time <- if (length(times)) max(times) else -Inf
+  obs <- person_observation(population, by, last_time)
   previous <- "previous_union" %in% by
   utype <- "union_type" %in% by
   map <- if (use_detailed_previous_union) 0:2 else c(0L, 1L, 1L)

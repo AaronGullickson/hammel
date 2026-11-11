@@ -148,9 +148,8 @@ augment_persons <- function(population) {
   }
   for (parent in c("mother", "father")) {
     rows <- match(persons[[paste0(parent, "_id")]], persons$person_id)
-    result[[paste0("age_", parent)]] <- persons$birth_time - persons$birth_time[
-      rows
-    ]
+    result[[paste0("age_", parent)]] <-
+      persons$birth_time - persons$birth_time[rows]
   }
   for (d in dims) {
     for (parent in c("mother", "father")) {

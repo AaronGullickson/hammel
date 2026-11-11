@@ -89,9 +89,8 @@ stratify_rates <- function(rates, by) {
     stringsAsFactors = FALSE
   )[rev(names(by))]
   factor <- Reduce(
-    `*`, lapply(
-      names(by), function(col) unname(by[[col]][grid[[col]]])
-    )
+    `*`,
+    lapply(names(by), function(col) unname(by[[col]][grid[[col]]]))
   )
   n <- nrow(rates)
   rows <- rep(seq_len(n), times = nrow(grid))

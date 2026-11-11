@@ -587,8 +587,7 @@ check_hmd_retained_rates <- function(values, ages, year, sex) {
   if (!(is.numeric(values) || (is.logical(values) && all(is.na(values))))) {
     stop(
       sprintf(
-        "HMD mortality rates must be numeric (year %g, sex %s).", year,
-        sex
+        "HMD mortality rates must be numeric (year %g, sex %s).", year, sex
       ),
       call. = FALSE
     )
@@ -667,8 +666,7 @@ pool_hmd_open_age <- function(
       stop(
         sprintf(
           "HMD %s tail age/period bands do not match mortality in year %g.",
-          name,
-          year
+          name, year
         ),
         call. = FALSE
       )
@@ -720,8 +718,7 @@ pool_hmd_open_age <- function(
       if (!is.finite(rate)) {
         stop(
           sprintf(
-            "HMD pooled-tail rate is not finite: year %g, sex %s.", year,
-            sex
+            "HMD pooled-tail rate is not finite: year %g, sex %s.", year, sex
           ),
           call. = FALSE
         )

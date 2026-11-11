@@ -37,8 +37,7 @@ validate_model_argument <- function(x, validate, name) {
     if (is.null(model) || is_model_schedule(model) || is.character(model)) {
       stop(
         sprintf(
-          "%s$model[[%d]] must contain a complete model object.", name,
-          i
+          "%s$model[[%d]] must contain a complete model object.", name, i
         ),
         call. = FALSE
       )
