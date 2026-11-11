@@ -1,6 +1,7 @@
 url: https://aarongullickson.github.io/hammel/
 template:
   bootstrap: 5
+  math-rendering: mathjax
 authors:
   Aaron Gullickson:
     href: https://aarongullickson.github.io
