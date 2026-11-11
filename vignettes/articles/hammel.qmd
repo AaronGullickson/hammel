@@ -484,7 +484,7 @@ The idea behind the age gap matching model is to fit $U$ by a quadratic equation
 
 $$U = \beta_l x + \beta_q x^2$$
 
-This defines a parabola that will be maximized at $\beta_l/(-2 \beta_q)$. This maximum is the preferred age gap between partners. Instead of inputing these $\beta$ values directly, the `age_gap_matching_model` has users input two more intuitive derived values:
+This defines a parabola that will be maximized at $\beta_l/(-2 \beta_q)$. This maximum is the preferred age gap between partners. Instead of entering these $\beta$ values directly, the `age_gap_matching_model` has users input two more intuitive derived values:
 
 - `preferred_age_gap`: The preferred age gap where $U$ is maximized.
 - `half_weight_distance`: The number of years of age difference for the value of $U$ to be halved from the peak. This defines how quickly the parabola declines from its peak. 
@@ -551,7 +551,10 @@ Groups are defined by additional variables in the `persons` tibble of your start
 ```{r}
 #| label: create-population-by-race
 
-pop_race <- generate_uniform_population(50000, groups = list(race = c(W = 1, B = 1)))
+pop_race <- generate_uniform_population(
+  50000,
+  groups = list(race = c(W = 1, B = 1))
+)
 table(pop_race$persons$race)
 ```
 
@@ -695,8 +698,7 @@ model <- hammel_model() |>
   )
 ```
 
-One final thing to note about this model is that for the group transition, I am defining households, so that migration transitions happen to households rather than individuals. A person's household is their current partner (married or
-cohabiting) and the dependents attached to either of them. Children under the `age_independence` follow the mother, if alive, and otherwise the father.
+One final thing to note about this model is that for the group transition, I am defining households, so that migration transitions happen to households rather than individuals. A person's household is their current partner (married or cohabiting) and the dependents attached to either of them. Children under the `age_independence` follow the mother, if alive, and otherwise the father.
 
 ```{r}
 #| label: run-group-sim
@@ -803,4 +805,10 @@ calculate_transition_rates(
 
 ## Going Further
 
+Other vignettes provided here go into more detail on other features of Hammel.
 
+- The [Demographic Transition](demographic_transition.html) vignette shows how to vary rates by time within the same simulation and how to extract kinship information from the simulation output.
+- The [Second Demographic Transition](second_demog_transition.html) vignette shows how to add union dissolution, remarriage, and cohabitation into the simulation model.
+- The [Multigroup Intermarriage](multigroup_intemar.html) vignette shows how to vary inheritance and matching models by time within the same simulation and how to develop custom inheritance models.
+
+Hammel is in active development so if you have questions or would like to see a new feature implemented, feel free to open an [issue](https://github.com/AaronGullickson/hammel/issues). 
