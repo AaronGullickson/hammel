@@ -132,7 +132,7 @@ Here is an example of a rate schedule for US fertility in 2000, provided with th
 usa_2000_fertility
 ```
 
-Importantly, rates may be stratified by additional variables as described in @tbl-irate-schedules. This stratification allows for much more detailed and complex microsimulation. We will return to this feature below, but first a simple example will establish the basic workflow for simulating populations with hammel.
+Importantly, rates may be stratified by additional variables as described in @tbl-rate-schedules. This stratification allows for much more detailed and complex microsimulation. We will return to this feature below, but first a simple example will establish the basic workflow for simulating populations with hammel.
 
 
 ## A Simple Example
@@ -306,8 +306,234 @@ calculate_mortality_rates(
 
 @fig-mort-rates-basic-compare shows the same tight fit for mortality rates. Note that `calculate_mortality_rates` automatically added stratification by sex. Both of these functions also take a `by` argument to stratify by other variables, but at present we haven't stratified the input rates by anything else.
 
-## More realistic union formation
+## Modeling Union Formation
+
+The previous example used an "on demand" union formation method for convenience. To better model union formation, I can use a proper marriage rate schedule. Luckily, the package provides a dataset of US marriage rates circa 2000.
+
+```{r}
+#| label: show-marriage-rate-schedule
+
+usa_2000_marriage
+```
+
+These are female marriage rates. Union formation is female-centric. Women decide when to search for partners and whom to choose. Future versions of the package may incorporate a proper two-sex model.
+
+We can specify the rates by choosing "rate" as our method in `set_union_formation` and specifying the marriage rates in the `rates` argument. However, before we jump straight ahead to that, we need to also think a little about fertility. Right now fertility rates are not stratified by `union_type` which means there is no connection between a women's hazard of giving birth and her union status. That was fine for the on demand method because fertility drove union formation. If we leave it as is now, union formation and fertility will be completely independent.
+
+To correct for this, I want to stratify the fertility rates by `union_type`. Luckily (again), the package comes with US fertility rates in 2000 stratified by union type.
+
+```{r}
+#| label: show-fertility-by-union-type-schedule
+
+usa_2000_fertility_union
+
+calculate_tfr(usa_2000_fertility_union)
+```
+
+Fertility is much higher among partnered women, as we would expect. Note, I am using a dichotomy between partnered/unpartnered that the program expects. When cohabitation is also being used, union type can also be divided into unpartnered/cohab/marriage. 
+
+Now I can set up my full model.
+
+```{r}
+#| label: setup-model-marriage
+
+model <- hammel_model() |>
+  set_fertility(usa_2000_fertility_union) |>
+  set_mortality(usa_2000_mortality) |>
+  set_union_formation("rate", rates = usa_2000_marriage) |>
+  set_population(pop_initial)
+```
+
+The model is set, so lets run it.
+
+```{r}
+#| label: run-marriage-simulation
+
+tic()
+pop_end <- run_simulation(model, 100, seed = 42)
+toc()
+```
+
+Lets look at population size again.
+
+```{r}
+#| label: fig-pop-size-marriage
+#| fig-cap: Population size over time in the simulation
+
+pop_end |>
+  calculate_population_size(0:100) |>
+  ggplot(aes(x = time, y = population)) +
+  geom_line()
+```
+
+In this simulation, the population grew even faster than before and then declines a bit before leveling off to our slower growth rate. This is a consequence of starting with an entirely unmarried population. This exposure to marriage leads to a high initial overall marriage rate followed by a decline as younger cohorts age into marriage. Those marriage rates affect the level of exposure to higher partnered fertility.
+
+To confirm this, we can look at the "crude" marriage rate in five-year increments by pooling all ages together.
+
+```{r}
+#| label: fig-crude-mar-rates
+#| fig-cap: Crude female marriage rates in five year increments across the simulation 
+
+calculate_marriage_rates(
+  pop_end,
+  time_breaks = seq(0, 100, 5),
+  age_breaks = c(0, Inf)
+) |>
+  filter(sex == "f") |>
+  ggplot(aes(x = time_start + 2.5, y  = rate_marriage)) +
+  geom_line()+
+  labs(x = "time", y = "crude female marriage rate")
+```
+
+As expected, @fig-crude-mar-rates shows the high initial marriage rate followed by a decline before stabilizing at a somewhat higher level. We can also do the same with crude birth rates.
+
+
+```{r}
+#| label: fig-crude-birth-rates
+#| fig-cap: Crude birth rates in five year increments across the simulation 
+
+calculate_fertility_rates(
+  pop_end,
+  time_breaks = seq(0, 100, 5),
+  age_breaks = c(0, Inf)
+) |>
+  ggplot(aes(x = time_start + 2.5, y  = rate_fertility)) +
+  geom_line()+
+  labs(x = "time", y = "crude birth rate")
+```
+
+@fig-crude-birth-rates shows a similar pattern to the previous figure. We see the initial spike in birth rates as many women enter into unions followed by a decline that corresponds to the decline in marriage rates. This kind of dynamic is why we often use a "burn in" period to weed out the effects of the starting population before running the desired simulation.
+
+When properly stratified by union type, the age-specific fertility rates should be consistent across the time period regardless of these issues, except for random noise. @fig-tfr-compare shows that this is true when reporting the period TFR by five year time periods, stratified by union type.
+
+```{r}
+#| label: fig-tfr-compare
+#| fig-cap: Total fertility rate estimated from period age-specific fertility rates in five year increments, separated by union type of the mother. Dotted lines show comparable values for the input rates.
+
+calculate_fertility_rates(
+  pop_end,
+  time_breaks = seq(0, 100, 5),
+  age_breaks = seq(15, 45, 5),
+  by = "union_type"
+) |>
+  calculate_tfr() |>
+  ggplot(aes(x = time_start + 2.5, y = tfr, color = union_type)) +
+  geom_hline(
+    data = usa_2000_fertility_union |> calculate_tfr(),
+    aes(yintercept = tfr),
+    linetype = 2
+  )+
+  geom_line() +
+  scale_y_continuous(limits = c(0, NA)) +
+  labs(x = "time", y = "total fertility rate", color = "union type")
+```
+
+@fig-age-specific-marriage-rates show that the age-specific female marriage rates estimated from the simulation also follow closely to the input rates.
+
+```{r}
+#| label: fig-age-specific-marriage-rates
+#| fig-cap: Age-specific female fertility rates estimated from simulation. 95% confidence band shown. Dotted red line shows the input rates.
+
+calculate_marriage_rates(
+  pop_end,
+  time_breaks = c(0, 100),
+  age_breaks = seq(15, 70, 5),
+  conf_level = 0.95
+) |>
+  filter(sex == "f") |>
+  ggplot(aes(x = age_start + 2.5, y = rate_marriage)) +
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high),
+              color = NA, fill = "grey70") +
+  geom_point(size = 0.5) +
+  geom_line(
+    data = usa_2000_marriage,
+    aes(y = rate),
+    linetype = 2,
+    color = "red"
+  )
+```
+
+### Modifying matching characteristics
+
+To this point, I have specified when women will seek out partners, but I have not specified what kind of partners they will seek out. Are partners just chosen randomly? To examine this further, lets look at the distribution of observed age differences between partners from our simulation. To help with this, we can use the `augment_unions` helper function to add husband and wife characteristics to the unions data.
+
+```{r}
+#| label: fig-age-diff-marriage
+#| fig-cap: Distribution of age difference between partners from simulated data
+
+pop_end |>
+  augment_unions() |>
+  # subtracting birth time of husband from wife gives
+  # age husband - age wife
+  mutate(age_diff = birth_time_w - birth_time_h) |>
+  ggplot(aes(x = age_diff, y = after_stat(density))) +
+  geom_histogram(color = NA, fill = "grey70") +
+  geom_density(color = "red") +
+  geom_vline(xintercept = 0, linetype = 2) +
+  labs(x = "husband's age - wife's age")
+```
+
+@fig-age-diff-marriage reveals that individuals are clearly not been chosen randomly. There is a strong tendency to marry someone of a similar age. The overall distribution itself looks (suspiciously) like a normal distribution centered on zero. This is because we have been using a default `matching_model` that sets the preferred age difference at 0.
+
+The decision of how potential partners are matched on the marriage market is determined by the `matching_model`. The matching model implicitly uses a conditional logit model in which potential partners are sampled with weights equal to $e^{U_{ij}}$, where $U_{ij}$ is the utility of a match between woman $i$ and man $j$. All eligible men are considered by a woman when she searches for a partner. Eligibility is determined by a minimum age characteristics and degree of relatedness, both of which can be controlled within the model. The default is to exclude men under 15 and men who are first cousins or closer in terms of relatedness. 
+
+The full `matching_model()` function allows users full control over $U$ through an R style formula interface with variables for partner age differences and group membership. However, for most users, the convenience function `age_gap_matching_model()` will be easier to use. 
+
+The idea behind the age gap matching model is to fit $U$ by a quadratic equation where $x$ is the age difference defined by husband's age minus the wife's age.
+
+$$U = \beta_l x + \beta_q x^2$$
+
+This defines a parabola that will be maximized at $\beta_l/(-2 \beta_q)$. This maximum is the preferred age gap between partners. Instead of inputing these $\beta$ values directly, the `age_gap_matching_model` has users input two more intuitive derived values:
+
+- `preferred_age_gap`: The preferred age gap where $U$ is maximized.
+- `half_weight_distance`: The number of years of age difference for the value of $U$ to be halved from the peak. This defines how quickly the parabola declines from its peak. 
+
+So, I could define a preferred age gap of 3 with a half weight of 10 years as follows:
+
+```{r}
+#| label: create-matching-model
+
+match_model <- age_gap_matching_model(3, 5)
+```
+
+I can then apply this matching model in my `set_union_formation` function and re-run the simulation.
+
+```{r}
+#| label: run-maching-sim
+
+model <- model |>
+  set_union_formation(
+    "rate",
+    rates = usa_2000_marriage,
+    matching = match_model,
+    min_male_age = 18
+  )
+
+pop_end <- run_simulation(model, 100, 42)
+```
+
+@fig-age-diff-match shows the resulting distribution of spousal age differences in the new simulation. The peak is now shifted upward and is close to the three year preferred age gap. The simulated data are not guaranteed to produce a peak exactly at this preferred age gap because the decision of who to marry is also conditioned by the supply of available men by age.
+
+```{r}
+#| label: fig-age-diff-match
+#| fig-cap: Distribution of age difference between partners from simulated data. Dotted line shows an age gap of three years, favoring the husband.
+
+pop_end |>
+  augment_unions() |>
+  # subtracting birth time of husband from wife gives
+  # age husband - age wife
+  mutate(age_diff = birth_time_w - birth_time_h) |>
+  ggplot(aes(x = age_diff, y = after_stat(density))) +
+  geom_histogram(color = NA, fill = "grey70") +
+  geom_density(color = "red") +
+  geom_vline(xintercept = 3, linetype = 2)+
+  labs(x = "husband's age - wife's age")
+```
+
+These matching models can also account for preferences that differ by the specified groups of the partners, but at the moment we have no groups to include.
+
+## Adding Groups
 
 
 
-
+## Going Further
