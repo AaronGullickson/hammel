@@ -101,8 +101,8 @@ rate_processes |>
   ) |>
   tab_footnote(
     footnote = paste(
-      "Parity bands use half-open [parity_start, parity_end) intervals and describe",
-      "current maternal parity."
+      "Parity bands use half-open [parity_start, parity_end) intervals and",
+      "describe current maternal parity."
     ),
     locations = cells_body(
       columns = optional,
@@ -275,7 +275,7 @@ calculate_fertility_rates(
   geom_ribbon(aes(ymin = conf_low, ymax = conf_high),
               color = NA, fill = "grey70") +
   geom_point(size = 0.5) +
-  geom_line(data = usa_2000_fertility, aes(y = rate), 
+  geom_line(data = usa_2000_fertility, aes(y = rate),
             linetype = 2, color = "red") +
   labs(x = "age", y = "age-specific fertility rate")
 ```
@@ -298,7 +298,7 @@ calculate_mortality_rates(
   geom_ribbon(aes(ymin = conf_low, ymax = conf_high),
               color = NA, fill = "grey70") +
   geom_point(size = 0.5) +
-  geom_line(data = usa_2000_mortality, aes(y = rate), 
+  geom_line(data = usa_2000_mortality, aes(y = rate),
             linetype = 2, color = "red") +
   facet_wrap(~sex) +
   scale_y_log10() +
@@ -382,7 +382,7 @@ calculate_marriage_rates(
 ) |>
   filter(sex == "f") |>
   ggplot(aes(x = time_start + 2.5, y  = rate_marriage)) +
-  geom_line()+
+  geom_line() +
   labs(x = "time", y = "crude female marriage rate")
 ```
 
@@ -391,7 +391,7 @@ As expected, @fig-crude-mar-rates shows the high initial marriage rate followed 
 
 ```{r}
 #| label: fig-crude-birth-rates
-#| fig-cap: Crude birth rates in five year increments across the simulation 
+#| fig-cap: Crude birth rates in five year increments across the simulation
 
 calculate_fertility_rates(
   pop_end,
@@ -399,7 +399,7 @@ calculate_fertility_rates(
   age_breaks = c(0, Inf)
 ) |>
   ggplot(aes(x = time_start + 2.5, y  = rate_fertility)) +
-  geom_line()+
+  geom_line() +
   labs(x = "time", y = "crude birth rate")
 ```
 
@@ -423,7 +423,7 @@ calculate_fertility_rates(
     data = usa_2000_fertility_union |> calculate_tfr(),
     aes(yintercept = tfr),
     linetype = 2
-  )+
+  ) +
   geom_line() +
   scale_y_continuous(limits = c(0, NA)) +
   labs(x = "time", y = "total fertility rate", color = "union type")
@@ -527,7 +527,7 @@ pop_end |>
   ggplot(aes(x = age_diff, y = after_stat(density))) +
   geom_histogram(color = NA, fill = "grey70") +
   geom_density(color = "red") +
-  geom_vline(xintercept = 3, linetype = 2)+
+  geom_vline(xintercept = 3, linetype = 2) +
   labs(x = "husband's age - wife's age")
 ```
 
@@ -590,13 +590,13 @@ When I define my simulation, I can now add a `set_groups` function that allows m
 ```{r}
 #| label: setup-groups
 
-grp_region = group(
+grp_region <- group(
   categories = c("NE", "MW", "S", "W"),
   ancestry = FALSE,
   inheritance = "mother"
 )
 
-grp_race = group(
+grp_race <- group(
   categories = c("W", "B", "O"),
   ancestry = TRUE,
   inheritance = group_inheritance(
@@ -629,7 +629,7 @@ I am almost ready to run my simulation, but I want to make a couple of other cha
 #| label: match-model-w-exogamy
 
 match_model_grp <- age_gap_matching_model(
-  preferred_age_gap = 3, 
+  preferred_age_gap = 3,
   half_weight_distance = 5,
   group_exogamy = list(
     race = c("W:B" = -4, "W:O" = -2, "B:O" = -3),
@@ -692,8 +692,8 @@ model <- hammel_model() |>
   ) |>
   set_groups(race = grp_race, region = grp_region) |>
   set_group_transition(
-    usa_2000_migration, 
-    group = "region", 
+    usa_2000_migration,
+    group = "region",
     household = household(age_independence = 18)
   )
 ```
@@ -719,9 +719,9 @@ Lets look at how race and region changed over time. The `by` argument will allow
 calculate_population_size(pop_end, seq(0, 100, 5), by = c("race", "region")) |>
   group_by(time, region) |>
   mutate(prop = population / sum(population)) |>
-  ggplot(aes(x = time, y = prop, group = race, color = race))+
-  geom_line()+
-  facet_wrap(~region)+
+  ggplot(aes(x = time, y = prop, group = race, color = race)) +
+  geom_line() +
+  facet_wrap(~region) +
   labs(x = "year", y = "share of population")
 ```
 
@@ -758,11 +758,16 @@ pop_end |>
   ) |>
   mutate(pair = str_replace(pair, "_", ":")) |>
   left_join(expected, by = "pair") |>
-  ggplot(aes(x = pair, y = log_odds))+
-  geom_point()+
-  geom_linerange(aes(ymin = log_odds - 1.96 * se, ymax = log_odds + 1.96 * se))+
-  geom_point(aes(y = expected), color = "red", alpha = 0.7)+
-  coord_flip()+
+  ggplot(aes(x = pair, y = log_odds)) +
+  geom_point() +
+  geom_linerange(
+    aes(
+      ymin = log_odds - 1.96 * se,
+      ymax = log_odds + 1.96 * se
+    )
+  ) +
+  geom_point(aes(y = expected), color = "red", alpha = 0.7) +
+  coord_flip() +
   labs(x = "interracial pairing", y = "log-odds")
 ```
 
@@ -791,11 +796,13 @@ calculate_transition_rates(
   age_breaks = c(seq(0, 35, 5), seq(45, 85, 10)),
   conf_level = 0.95
 ) |>
-  ggplot(aes(x = age_start, y = rate_transition))+
-  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey60") +
+  ggplot(aes(x = age_start, y = rate_transition)) +
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high),
+              color = NA, fill = "grey60") +
   geom_point(size = 0.5) +
-  geom_line(data = usa_2000_migration, aes(y = rate), linetype = 2, color = "red") +
-  geom_vline(xintercept = 18, linetype = 2)+
+  geom_line(data = usa_2000_migration, aes(y = rate),
+            linetype = 2, color = "red") +
+  geom_vline(xintercept = 18, linetype = 2) +
   facet_grid(origin ~ destination) +
   labs(x = "age", y = "migration rate")
 ```
