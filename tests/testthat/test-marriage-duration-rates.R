@@ -116,7 +116,7 @@ test_that("observed duration rates recover known female search hazards", {
     dur_start = c(NA, 0, 1, 2, 0), dur_end = c(NA, 1, 2, Inf, Inf),
     rate = c(0, .1, .3, .2, 0))
   model <- set_union_formation(model, "rate", rates = rates, kinship_generations = 0L)
-  result <- simulate(model, 4, 771)
+  result <- run_simulation(model, 4, 771)
   observed <- calculate_union_rates(result, c(0, 4), c(0, Inf), dur_breaks = c(0, 1, 2, Inf))
   women <- subset(observed, sex == "f" & previous_union == "separated")
   target <- c(.1, .3, .2)

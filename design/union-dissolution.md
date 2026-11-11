@@ -149,10 +149,8 @@ Zero exposure gives `NA` for the rate; positive exposure and zero dissolutions
 give zero. Duration boundaries use years and append `Inf` when the last supplied
 boundary is finite, as `calculate_fertility_rates() and calculate_mortality_rates()` does for age.
 
-Input may be a population object with a known endpoint or a union data frame
-with unique `union_id`, finite `start_time`, numeric `end_time` (NA if ongoing),
-and a valid `end_reason`. Population observation must not exceed its endpoint;
-for bare tables the caller ensures complete follow-up to the requested end.
+Input must be a population object with a known endpoint; observation must not
+exceed it. Bare union tables are not accepted (D159).
 Do not stack independent replications with repeated union IDs before extraction.
 Use one history per call, then combine the summaries. All grid cells are retained,
 including typed zero-exposure cells for empty ungrouped histories.
@@ -162,8 +160,7 @@ variables are the wife's and husband's current groups, following transition
 histories, with a full period/duration grid for every combination of
 population groups (including combinations without observed episodes). Rows are
 directional; sum both directions for the unordered pairs that dissolution
-inputs use. Bare union tables require `group_w`/`group_h` columns. Empty
-grouped inputs return a typed zero-row tibble.
+inputs use.
 
 Worked accounting: U1 starts at 0 and dissolves at 3; U2 starts at 1 and ends
 at 4 through death; U3 starts at 2 and remains ongoing at endpoint 5. Over

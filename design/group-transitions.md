@@ -86,7 +86,7 @@ Births/deaths and union events preceding a same-time transition use the origin;
 population snapshots at that time use the destination. No missing prehistory
 is imputed.
 
-`get_detailed_unions()` reconstructs `<group>_w` and `<group>_h` for every
+`augment_unions()` reconstructs `<group>_w` and `<group>_h` for every
 dimension at each union's start, before a same-time transition, rather than joining final identities.
 Later moves therefore do not relabel the pairings used to assess formation.
 
@@ -113,7 +113,7 @@ rates <- data.frame(
   age_start = 0, age_end = Inf, rate = c(0.2, 0.3, 0.1)
 )
 model <- model |> set_group_transition(rates, group = "race")
-result <- simulate(model, years = 5, seed = 42)
+result <- run_simulation(model, years = 5, seed = 42)
 result$transitions
 ```
 
@@ -232,7 +232,7 @@ together through births, unions, separations, deaths and moves (tested).
 ## Observed transition rates
 
 `calculate_transition_rates(population, time_breaks, age_breaks = NULL,
-dur_breaks = NULL, by = NULL, conf.level = NULL, pool_dissolved = FALSE,
+dur_breaks = NULL, by = NULL, conf_level = NULL, use_detailed_previous_union = TRUE,
 group = NULL)` counts one dimension's transitions (`group`, required when
 several are declared) and returns a tibble
 with directed `origin`/`destination`, calendar bounds, the selected age or

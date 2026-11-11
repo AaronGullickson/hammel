@@ -54,7 +54,7 @@ availability and renewed female rate searches after widowhood are implemented. T
 
 ## Implemented construction interface
 
-`create_matching_model(formula, coefficients, group_exogamy = NULL,
+`matching_model(formula, coefficients, group_exogamy = NULL,
 delta = NULL)` stores a
 one-sided R formula and finite named coefficients
 matching its non-intercept model-matrix columns. Predictors include
@@ -73,7 +73,7 @@ estimation interface yet.
 
 ```r
 union_formation(
-  initiation, matching = create_age_gap_matching_model(0, 5),
+  initiation, matching = age_gap_matching_model(0, 5),
   rates = NULL, min_male_age = 15,
   kinship_generations = 2, father_matching = NULL,
   cancel_birth_if_no_match = TRUE, diagnostics = FALSE
@@ -83,7 +83,7 @@ union_formation(
 This constructs
 a process; `set_union_formation(model, ...)` attaches it. Initiation is explicitly
 `"on_demand"` or `"rate"`; initiation has no default. Omitting `matching` uses
-`create_age_gap_matching_model(0, 5)`: a preferred male-minus-female age gap of
+`age_gap_matching_model(0, 5)`: a preferred male-minus-female age gap of
 zero years and a symmetric half-weight distance of five years. Explicit matching
 models override this default in both the constructor and setter. With
 `father_matching = NULL`, nonmarital father selection uses this same model.
@@ -384,7 +384,7 @@ woman-year in the indicated status; an overall schedule applies to all women.
 
 On-demand initiation requires an overall schedule and rejects conditional
 schedules at simulation validation, including zero-duration runs. Rate initiation
-accepts either form. With overall rates it emits one warning per simulate call
+accepts either form. With overall rates it emits one warning per `run_simulation()` call
 that the same schedule applies to both statuses. This replaces D038's temporary
 suppression of all unpartnered births in rate mode.
 
@@ -436,7 +436,7 @@ siblings share the recorded father in kinship extraction/screening.
 ## Separate nonmarital father matching (D041)
 
 `union_formation()` and `set_union_formation()` accept `father_matching = NULL`.
-A non-NULL value must be a `create_matching_model()` specification with the same
+A non-NULL value must be a `matching_model()` specification with the same
 formula contract as general `matching`. Only rate-mode births to unpartnered
 women use this model. NULL resolves to the current general model at execution,
 not a copy frozen at process construction. Existing objects without the field
@@ -494,7 +494,7 @@ random draws, and do not change matching or event timing.
 
 ## Age-gap matching helper
 
-`create_age_gap_matching_model(preferred_age_gap, half_weight_distance)` converts
+`age_gap_matching_model(preferred_age_gap, half_weight_distance)` converts
 two explicit inputs in years into the existing formula-based matching model.
 Age gap is male age minus female age; the preferred gap may be negative or zero.
 The half-weight distance must be strictly positive. There are no defaults.

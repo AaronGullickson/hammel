@@ -10,51 +10,57 @@ stratify_rates(rates, by)
 \item{rates}{A data frame with a numeric \code{rate} column, such as a mortality,
 fertility, search, conversion, dissolution or transition rate table.}
 
-\item{by}{A named list. Each name is a column to add; each element is a
-named numeric vector of finite, nonnegative factors, one per category.
-Factors are not normalized, and zero suppresses that stratum's risk.}
+\item{by}{A named list. Each name is a column to add; each element is a named
+numeric vector of finite, nonnegative factors, one per category. The final
+rate will be determined by taking the original rate times the factor
+provided.}
 }
 \value{
-A tibble with the new columns (character labels) and multiplied
-rates. Other attributes of \code{rates}, such as provenance, are kept.
+A tibble with the new columns (character labels) and modified
+rates.
 }
 \description{
-Copy each row of a rate table once per category of one or more new columns,
-multiplying its \code{rate} by that category's factor. The result is an ordinary
-stratified rate table for any rate process, such as group-specific mortality
-that is 20\% higher in one group than in a reference group.
+Stratify a rate schedule by additional columns, applying proportional changes
+to rates by stratum.
 }
 \details{
-Several columns in \code{by} are crossed: every combination of categories gets
-the product of its factors. All other columns, including calendar bands
-(\code{time_start}, \code{time_end}), are copied unchanged. Every category a process
-needs must be listed; a population group omitted from \code{by} is a coverage
-error at simulation, as for any group-specific table. Factors of one still
-create separate strata.
-
-A column that already exists in \code{rates} is an error. To give different
-effects within existing strata, for example different group effects for
-partnered and unpartnered fertility, stratify each subset and bind the
-results with \code{\link[=rbind]{rbind()}}.
+Any of the input rate processes such as fertility, mortality, marriage,
+transition, dissolution, and conversion can be stratified by this function.
+Stratified rates can also be further stratified by this function.
 
 Columns in \code{by} are either built-in strata (\code{sex}, \code{union_type},
-\code{previous_union}, \code{origin}, \code{destination}) or group dimensions
-declared with \code{\link[=set_groups]{set_groups()}}: a dimension's name (such as \code{race}) for
-person-level rates, or \verb{<name>_w} and \verb{<name>_h} (the wife's and husband's
-categories) for dissolution and conversion rates. Band, rate and calendar
-columns cannot be added. Process setters reject built-in strata their
-process does not support: mortality accepts \code{sex}; fertility \code{union_type};
-union searches \code{previous_union}; dissolution \code{union_type}; group
-transitions \code{origin}, \code{destination}, \code{sex} and \code{union_type}. Group
-columns are checked against the declaration at simulation.
+\code{previous_union}, \code{origin}, \code{destination}) or group dimensions declared with
+\code{\link[=set_groups]{set_groups()}}: a dimension's name (such as \code{race}) for person-level rates,
+or \verb{<name>_w} and \verb{<name>_h} (the wife's and husband's categories) for
+dissolution and conversion rates. Band, rate and calendar columns cannot be
+added. Process setters reject built-in strata their process does not support.
+
+If \code{by} includes multiple columns, every combination of categories gets the
+product of its factors.
 }
 \examples{
-mortality_rates <- data.frame(sex = c("m", "f"), age_start = 0,
-  age_end = Inf, rate = c(0.01, 0.008))
-# Race A has 20\% higher mortality than reference race B.
-stratify_rates(mortality_rates, list(race = c(A = 1.2, B = 1)))
+# stratify fertility rates by group and partnership status
+usa_2000_fertility |> calculate_tfr()
+fertility_rates <- stratify_rates(
+  usa_2000_fertility,
+  by = list(
+    group = c(A = 1.1, B = 1),
+    # this is not really a great idea for union type as within union
+    # type fertility rates have a totally different age profile, but
+    # ok for testing purposes
+    union_type = c("unpartnered" = 0.3, "partnered" = 1.3)
+  )
+)
+fertility_rates |> calculate_tfr()
 
-# Unions of an A wife and a B husband dissolve twice as often.
-dissolution <- data.frame(dur_start = 0, dur_end = Inf, rate = 0.02)
-stratify_rates(dissolution, list(race_w = c(A = 1, B = 1), race_h = c(A = 2, B = 1)))
+# although this works, a proportional hazards assumption by union type
+# is unrealistic because the within union type age profile of fertility is
+# very different from the overall age profile. So for this case, its better
+# to use already stratified rates by union type and then further stratify
+# by group
+fertility_rates <- stratify_rates(
+  usa_2000_fertility_union,
+  by = list(group = c(A = 1.1, B = 1))
+)
+fertility_rates |> calculate_tfr()
 }

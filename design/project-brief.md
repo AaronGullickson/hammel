@@ -91,7 +91,7 @@ USA circa 2000–2001 demographic comparisons, matching-parameter recovery, and
 R formula-fallback performance comparisons (D042). The user accepted milestone 2
 as complete on October 19, 2026 (D050), retaining the documented limitations.
 Matching defaults to
-`create_age_gap_matching_model(0, 5)`, and optional union diagnostics record
+`age_gap_matching_model(0, 5)`, and optional union diagnostics record
 the applied log male-group weights on new union records (D070/D072).
 
 ## Milestone 3 completion and future scope
@@ -134,7 +134,7 @@ rate table (D083); see [remarriage](remarriage.md). Optional rate-mode cohabitat
 type-specific rates and same-partner conversion (D085/D086); see
 [cohabitation](cohabitation.md). Separate demographic, partnership-entry,
 marriage-entry, dissolution and conversion observations use their documented
-risk denominators. `get_unpartnered_births()` supports father-matching assessment.
+risk denominators. `extract_unpartnered_births()` supports father-matching assessment.
 Acceptance retains the documented fertility-transition, sparse-pool,
 initialization, and calibration limitations; it does not authorize later work.
 

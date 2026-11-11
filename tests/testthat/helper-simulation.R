@@ -12,7 +12,7 @@ make_model <- function(n = 1000, sex = "m", age = 20, death_rate = 0,
   set_fertility(data.frame(age_start = 15, age_end = 50, rate = birth_rate),
          birth_interval = birth_interval) |>
   set_union_formation("on_demand",
-    create_matching_model(~ age_difference, c(age_difference = 0)),
+    matching = matching_model(~ age_difference, c(age_difference = 0)),
     cancel_birth_if_no_match = FALSE)
 }
 
@@ -24,7 +24,7 @@ make_rate_model <- function(n = 2, search_rate = 1, birth_rate = 0, birth_interv
     transform(rates, union_type = "partnered"),
     transform(rates, union_type = "unpartnered", rate = 0)), birth_interval)
   set_union_formation(model, "rate",
-    create_matching_model(~ age_difference, c(age_difference = 0)),
+    matching_model(~ age_difference, c(age_difference = 0)),
     rates = data.frame(age_start = 15, age_end = Inf, rate = search_rate),
     cancel_birth_if_no_match = FALSE)
 }
@@ -42,10 +42,12 @@ quiet_unreachable <- function(expr) {
 # cells, so their histories differ draw by draw while agreeing in distribution.
 # Compare union and dissolution counts over replications.
 expect_equivalent_unions <- function(a, b, years, seeds = 1:20) {
-  counts <- function(model) vapply(seeds, function(seed) {
-    unions <- simulate(model, years, seed)$unions
-    c(nrow(unions), sum(unions$end_reason %in% "dissolution"))
-  }, numeric(2))
+  counts <- function(model) {
+    vapply(seeds, function(seed) {
+      unions <- run_simulation(model, years, seed)$unions
+      c(nrow(unions), sum(unions$end_reason %in% "dissolution"))
+    }, numeric(2))
+  }
   x <- counts(a)
   y <- counts(b)
   for (k in 1:2) {
@@ -91,7 +93,8 @@ demographic_counts <- function(population, time_breaks, age_breaks, by = NULL) {
 
 # An unordered pair label for two group labels, such as "A:B" for B and A.
 unordered_pair <- function(a, b) {
-  a <- as.character(a); b <- as.character(b)
+  a <- as.character(a)
+  b <- as.character(b)
   ifelse(a <= b, paste(a, b, sep = ":"), paste(b, a, sep = ":"))
 }
 
@@ -141,9 +144,31 @@ directional_pairs <- function(rates) {
 }
 
 # Translate a public matching model for a single dimension named `group` with
-# categories `labels`, as simulate() does, for tests of internal helpers.
+# categories `labels`, as run_simulation() does, for tests of internal helpers.
 as_internal_matching <- function(model, labels) {
   if (is.null(labels)) return(internal_matching_model(model, NULL, NULL))
   dim <- if (length(matching_dimensions(model, "group"))) "group"
   internal_matching_model(model, dim, labels)
+}
+
+# Count recorded events strictly inside the latest run's interval. Input
+# history at its starting instant is excluded; run-end events are not executed.
+count_run_events <- function(population, event) {
+  time <- switch(
+    event,
+    births = population$persons$birth_time,
+    deaths = population$persons$death_time,
+    dissolutions = population$unions$end_time[
+      population$unions$end_reason %in% "dissolution"
+    ],
+    conversions = population$unions$end_time[
+      population$unions$end_reason %in% "conversion"
+    ],
+    transitions = population$transitions$time
+  )
+  as.numeric(sum(
+    time > population$simulation$start_time &
+      time < population$simulation$end_time,
+    na.rm = TRUE
+  ))
 }

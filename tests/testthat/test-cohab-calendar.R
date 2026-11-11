@@ -26,7 +26,7 @@ test_that("cohabitation calendars validate every active probability slice", {
     expect_error(cohab_calendar_model(bad))
   edited <- m
   edited$processes$union_formation$cohab_prob$prob[2] <- -1
-  expect_error(simulate(edited, 0), "prob")
+  expect_error(run_simulation(edited, 0), "prob")
   # Nonoverlap applies to simultaneous age/stratum risks, not calendar alone.
   p <- rbind(transform(p, age_end = 20), transform(p, age_start = 20))
   expect_s3_class(cohab_calendar_model(p), "hammel_model")
@@ -36,20 +36,24 @@ test_that("cohabitation calendars validate every active probability slice", {
 
 test_that("probability coverage follows rate calendar and group/category rules", {
   m <- cohab_calendar_model(cohab_calendar(times = c(.1, .5, 1)))
-  expect_error(simulate(m, 0), "cohabitation_probability.*calendar coverage")
+  expect_error(run_simulation(m, 0),
+    "cohabitation_probability.*calendar coverage")
   m$population$end_time <- .1
-  expect_s3_class(simulate(m, .9, seed = 3), "hammel_population")
-  expect_error(simulate(m, 1, seed = 3), "calendar coverage")
-  p <- cohab_calendar(); p$time_start[2] <- .7
-  expect_error(simulate(cohab_calendar_model(p), 1), "calendar coverage")
-  expect_s3_class(simulate(cohab_calendar_model(p), .4, seed = 3), "hammel_population")
+  expect_s3_class(run_simulation(m, .9, seed = 3), "hammel_population")
+  expect_error(run_simulation(m, 1, seed = 3), "calendar coverage")
+  p <- cohab_calendar()
+  p$time_start[2] <- .7
+  expect_error(run_simulation(cohab_calendar_model(p), 1), "calendar coverage")
+  expect_s3_class(run_simulation(cohab_calendar_model(p), .4, seed = 3),
+    "hammel_population")
   m <- cohab_calendar_model(rbind(transform(cohab_calendar(), group = "A"),
     transform(cohab_calendar(), group = "B")))
   m$population$persons$group <- c("A", "B")
   m$population$groups <- list(group = group())
   p <- m$processes$union_formation$cohab_prob
   m$processes$union_formation$cohab_prob <- p[!(p$group == "B" & p$time_start == .5), ]
-  expect_error(simulate(m, 1), "cohabitation probability.*missing schedules.*B")
+  expect_error(run_simulation(m, 1),
+    "cohabitation probability.*missing schedules.*B")
   p <- rbind(transform(cohab_calendar(), previous_union = "none"),
     transform(cohab_calendar(), previous_union = "separated"),
     transform(cohab_calendar(), previous_union = "widowed"))
@@ -60,7 +64,7 @@ test_that("probability coverage follows rate calendar and group/category rules",
 test_that("type probabilities change at fractional dates while searches recover their hazard", {
   n <- 8000
   m <- cohab_calendar_model(n = 2 * n, search = .7)
-  out <- simulate(m, 1.3, seed = 911)
+  out <- run_simulation(m, 1.3, seed = 911)
   u <- out$unions
   expect_gt(sum(u$start_time < .5), 0)
   expect_gt(sum(u$start_time >= .5), 0)
@@ -68,14 +72,14 @@ test_that("type probabilities change at fractional dates while searches recover 
   expect_true(all(u$union_type[u$start_time >= .5] == "cohab"))
   expected <- 1 - exp(-.7 * 1.3)
   expect_lt(abs(nrow(u) / n - expected), 5 * sqrt(expected * (1 - expected) / n))
-  expect_equal(out$simulation$conversions, 0)
+  expect_equal(count_run_events(out, "conversions"), 0)
   # Existing marriages remain marriage after the probability change.
   expect_true(all(is.na(u$end_time)))
 })
 
 test_that("non-extreme calendar probabilities recover type shares in each period", {
   m <- cohab_calendar_model(cohab_calendar(c(.2, .8)), n = 16000, search = .7)
-  out <- simulate(m, 1.3, seed = 554)
+  out <- run_simulation(m, 1.3, seed = 554)
   for (late in c(FALSE, TRUE)) {
     u <- out$unions[(out$unions$start_time >= .5) == late, ]
     p <- if (late) .8 else .2
@@ -91,9 +95,9 @@ test_that("probability changes precede an exact tied search without rescheduling
   # search clock's, and with one searching woman at rate 1 it is her search time.
   boundary <- rexp(1)
   m <- cohab_calendar_model(cohab_calendar(times = c(0, boundary, Inf)))
-  early <- simulate(m, boundary, seed = seed)
+  early <- run_simulation(m, boundary, seed = seed)
   expect_equal(nrow(early$unions), 0)
-  out <- simulate(m, boundary + .01, seed = seed)
+  out <- run_simulation(m, boundary + .01, seed = seed)
   expect_equal(nrow(out$unions), 1)
   expect_equal(out$unions$start_time, boundary, tolerance = 0)
   expect_equal(out$unions$union_type, "cohab")
@@ -107,9 +111,9 @@ test_that("probability-only changes preserve existing union clocks and histories
     end_time = NA_real_, end_reason = NA_character_, union_type = "cohab")
   m$processes$union_formation$union_convert_rate$rate <- .2
   m <- set_union_dissolution(m, data.frame(dur_start = 0, dur_end = Inf, rate = .3))
-  reference <- simulate(m, 2, seed = 839)
+  reference <- run_simulation(m, 2, seed = 839)
   m$processes$union_formation$cohab_prob <- cohab_calendar(c(0, 1))
-  out <- simulate(m, 2, seed = 839)
+  out <- run_simulation(m, 2, seed = 839)
   expect_identical(out, reference)
 })
 
@@ -125,11 +129,11 @@ test_that("probability changes refresh weighted matching contributions immediate
   reference <- m
   reference$processes$union_formation$cohab_prob <- data.frame(
     age_start = 0, age_end = Inf, group = c("A", "B"), prob = c(.2, .8))
-  expected <- simulate(reference, .5, seed = 921)
+  expected <- run_simulation(reference, .5, seed = 921)
   expect_true(all(expected$unions$start_time > 1e-6))
   expect_gt(nrow(expected$unions), 10)
   withr::local_options(hammel.check_cells = TRUE)
-  actual <- simulate(m, .5, seed = 921)
+  actual <- run_simulation(m, .5, seed = 921)
   expect_equal(actual$unions, expected$unions, tolerance = 1e-10)
   expect_equal(actual$persons, expected$persons)
   expect_true(all(c(".log_weight_A", ".log_weight_B") %in% names(actual$unions)))
@@ -144,25 +148,27 @@ test_that("active age and previous-union strata apply after a calendar change", 
     start_time = -2, end_time = -1, end_reason = "dissolution")
   # Both searches start after .5, when the women reach age 20.5.
   m$processes$union_formation$rates$age_start <- 20.5
-  out <- simulate(m, .6, seed = 45)
+  out <- run_simulation(m, .6, seed = 45)
   u <- out$unions[out$unions$start_time >= 0, ]
   expect_equal(nrow(u), 2)
   expect_equal(u$union_type[match(c(1, 3), u$wife_id)], c("marriage", "cohab"))
   # An uncovered age selects probability zero even in the active calendar slice.
   m <- cohab_calendar_model(transform(cohab_calendar(c(1, 1)), age_start = 50), search = 1e5)
-  expect_equal(simulate(m, .6, seed = 1)$unions$union_type, "marriage")
+  expect_equal(run_simulation(m, .6, seed = 1)$unions$union_type, "marriage")
 })
 
 test_that("probability calendars handle zero/empty runs, restarts and RNG isolation", {
   m <- cohab_calendar_model(n = 100)
-  set.seed(731); before <- .Random.seed
-  out <- simulate(m, 1.2, seed = 92)
+  set.seed(731)
+  before <- .Random.seed
+  out <- run_simulation(m, 1.2, seed = 92)
   expect_identical(.Random.seed, before)
-  expect_identical(simulate(m, 1.2, seed = 92), out)
-  expect_equal(nrow(simulate(m, 0, seed = 92)$unions), 0)
-  expect_equal(nrow(simulate(cohab_calendar_model(n = 0), 1.2, seed = 92)$persons), 0)
-  early <- simulate(m, .5, seed = 33)
-  restarted <- simulate(set_population(m, early), .5, seed = 34)
+  expect_identical(run_simulation(m, 1.2, seed = 92), out)
+  expect_equal(nrow(run_simulation(m, 0, seed = 92)$unions), 0)
+  expect_equal(nrow(run_simulation(cohab_calendar_model(n = 0), 1.2, seed =
+    92)$persons), 0)
+  early <- run_simulation(m, .5, seed = 33)
+  restarted <- run_simulation(set_population(m, early), .5, seed = 34)
   old <- nrow(early$unions)
   expect_equal(restarted$unions[seq_len(old), names(early$unions)], early$unions)
   added <- restarted$unions[restarted$unions$start_time >= .5, ]
@@ -176,7 +182,7 @@ test_that("shared and asynchronous rate/probability boundaries apply the current
     n = 2 * n, search = 0)
   m$processes$union_formation$rates <- data.frame(age_start = 0, age_end = Inf,
     rate = c(0, .8), time_start = c(0, .3), time_end = c(.3, Inf))
-  out <- simulate(m, 1.2, seed = 593)
+  out <- run_simulation(m, 1.2, seed = 593)
   u <- out$unions
   expect_true(all(u$start_time >= .3))
   expect_gt(sum(u$start_time < .7), 100)

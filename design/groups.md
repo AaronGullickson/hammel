@@ -159,7 +159,7 @@ assignment of mixed categories such as AB.
 
 ## Baseline initialization
 
-`create_baseline_population(groups = NULL)` optionally samples group
+`generate_uniform_population(groups = NULL)` optionally samples group
 dimensions, independently of age and sex. `groups` is either a named list of
 named weight vectors, one per dimension, drawn independently, such as
 `list(race = c(A = 2, B = 1), region = c(N = 1, S = 1))`, or a data frame with

@@ -6,7 +6,7 @@ October 29, 2026 (D093); see the [validation report](../validation/milestone4.qm
 ## Inputs and entry
 
 `union_formation()` and its setter accept `cohab_prob`, `cohab_matching`,
-`union_convert_rate`, and `cohabitation_counts_as_previous_union = FALSE`.
+`union_convert_rate`, and `cohab_as_previous_union = FALSE`.
 `cohab_prob = NULL` retains untyped partnerships, without type draws or new
 clocks. When enabled, probability tables use `age_start`, `age_end`, `prob`,
 optionally `group` and `previous_union`; probabilities are finite in [0,1].
@@ -220,7 +220,7 @@ its own type's union-years and dissolution events. Conversion ends cohabitation
 exposure without counting as dissolution, and the linked marriage starts at
 duration zero. Both types and empty cells are retained; zero exposure gives NA.
 Without `union_type` in `by`, counts and exposure are pooled before calculating rates. Splitting
-requires a valid `union_type` column, including for bare union tables.
+requires a valid `union_type` column in the population's union histories.
 
 
 ## Demographic rates by current union type

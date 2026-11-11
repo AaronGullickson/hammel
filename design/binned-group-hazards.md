@@ -225,10 +225,10 @@ In fertility only eligible women are weighted and chosen, as now.
 
 ### API
 
-    create_weight_model(formula, coefficients)
-    create_weight_model(fun = f)
+    weight_model(formula, coefficients)
+    weight_model(fun = f)
 
-The formula form mirrors `create_matching_model()`: a one-sided formula, a
+The formula form mirrors `matching_model()`: a one-sided formula, a
 finite named numeric vector of coefficients.
 Categorical variables use treatment coding with fixed levels, and coefficient
 names follow the model-matrix column names (for example `raceB`,

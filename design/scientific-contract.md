@@ -24,6 +24,8 @@ of a model assumption is distinct from evidence of demographic accuracy.
 
 Public dates, ages, and durations are numeric years; rates are events per
 person-year and exposure is person-years. The user supplies the time origin.
+Every population requires one finite numeric `end_time`, which supplies the
+next simulation's starting time (D166).
 Execution is continuous: there is no month index, configurable execution step,
 time truncation, or rounding to birthdays.
 
@@ -51,7 +53,7 @@ input order and extra columns; native scheduling sorts its own copy.
 | Additional setting | None | `birth_interval`, finite nonnegative scalar years; default 0.75 |
 
 Mortality constructors validate structure without requiring full coverage;
-`simulate()` checks complete schedules. Specifying and attaching processes does
+`run_simulation()` checks complete schedules. Specifying and attaching processes does
 not execute a simulation. Edited built-in specifications are revalidated at
 attachment and execution. Fertility schedules need no feasibility check under
 cell accounting; parity schedules with unreachable cells receive a warning.
@@ -97,7 +99,7 @@ structural validation. `end_time` is the population reference time and supplies
 the next simulation start. Persons born by that time with missing `death_time`
 are alive; deceased persons remain in the history and never re-enter risk.
 
-`create_baseline_population(size, max_age = 70, end_time = 0,
+`generate_uniform_population(size, max_age = 70, end_time = 0,
 female_probability = 0.5)` generates independent uniform ages in continuous
 years and independent sex assignments. Everyone is alive, parents are unknown,
 and unions are empty. IDs are `1:size`; size zero is permitted. Size must be a
@@ -185,7 +187,7 @@ nonnegative intervals are allowed; there is no whole-month restriction.
 
 ### Newborn group identity
 
-Each declared dimension holds a `create_group_inheritance()` object through
+Each declared dimension holds a `group_inheritance()` object through
 `group(inheritance = ...)`, defaulting to `random_parent`.
 The `"fixed"` method (D142) assigns every newborn the explicitly specified
 `fixed_value` category, regardless of parents or sex, with no identity RNG draw.
@@ -230,9 +232,10 @@ schedules or intervals, union-type transitions), at cell resolution, while a
 cell has an eligible member. Within a one-year cell, selection does not vary
 with exact age. A cell with members but none eligible keeps its intensity; when
 the birth clock draws it, no child is born and one unrealized birth is counted
-in `simulation$unrealized_births` (a tibble of counts by one-year period from
-the run start, group, union type, parity band and age band; D128 revises D101's
-expected-value reporting). In a cell shared by groups, the draw that would pick
+in the population's `unrealized_births` (a tibble of counts by one-year period
+from the run start, group, union type, parity band and age band; D128 revises
+D101's expected-value reporting). The record accumulates across restarts from
+`unrealized_since` (D160). In a cell shared by groups, the draw that would pick
 a mother picks the group in proportion to its members.
 `calculate_fertility_rates(unrealized = TRUE)` attributes the counts to
 observation rows. Cancelled attempts keep their spent intensity. Union changes move a woman between cells; restarts rebuild cells
@@ -303,7 +306,7 @@ duration. Missing processes are rejected rather than given an implicit default.
 The former milestone 1 path without unions is no longer executable.
 
 When matching is omitted, both initiation modes use
-`create_age_gap_matching_model(0, 5)`: preferred male-minus-female gap zero
+`age_gap_matching_model(0, 5)`: preferred male-minus-female gap zero
 years, with relative weight halved five years either side. Explicit models
 override that default; it does not fix the realized age-gap distribution.
 
@@ -525,7 +528,7 @@ and the distinction between evidence and proof of unrelatedness.
 
 ## Execution, competition, and random numbers
 
-`simulate(model, years, seed = NULL)` processes `[start, start + years)`.
+`run_simulation(model, years, seed = NULL)` processes `[start, start + years)`.
 Duration is finite and nonnegative; zero duration returns the population with
 updated run metadata. Times that cannot be represented at the chosen numeric
 scale are rejected. Candidates exactly at the run endpoint are excluded.
@@ -596,7 +599,10 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   Any missing ASFR in the included finite bands makes the corresponding
   period/group/status TFR `NA`, including an all-missing set. Known zero rates
   contribute zero; missing rates in excluded open bands do not affect TFR. There is no `age_range` argument.
-- `calculate_life_table()` requires contiguous bands from zero through an
+- `calculate_life_table()` accepts `rate_mortality` or `rate` as its input
+  rate column, preferring `rate_mortality` when both are present. `mx` is
+  output only and cannot substitute for or override an input rate column.
+  It requires contiguous bands from zero through an
   explicit open interval and separates periods/sexes and union status when
   present. Conditional tables do not model status transitions. For finite width `n`
   and hazard `m`, `q = 1-exp(-m*n)`, survival propagates exponentially, and
@@ -617,8 +623,8 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   Optional `dur_breaks` switches separated/widowed rows to duration since the
   latest ending and automatically separates previous categories (D084). None
   rows retain age bands; unused boundary pairs are NA. Duration rows include
-  all ages, and age/duration axes are not crossed. `pool_dissolved = TRUE`
-  combines separated/widowed counts and exposure before rates and confidence
+  all ages, and age/duration axes are not crossed.
+  `use_detailed_previous_union = FALSE` combines separated/widowed counts and exposure before rates and confidence
   intervals when previous-union stratification is enabled (D126). NULL duration
   breaks preserve age-only output.
   See [remarriage](remarriage.md) for input, restart and boundary conventions.
@@ -629,15 +635,15 @@ See [groups](groups.md) for output ordering, empty cases, and worked examples.
   uses each episode's start; boundaries are half-open and finite final duration
   breaks gain `Inf`. Return `rate_dissolution = dissolutions / union_years`,
   with NA at zero exposure. `by` can split by the wife's and husband's groups
-  (`group_w`, `group_h`, directional) and by union type. Bare
-  union tables require complete caller-verified follow-up. This cause-specific
+  (`group_w`, `group_h`, directional) and by union type. Input must be a
+  population object with a known endpoint (D159). This cause-specific
   rate is not a cumulative probability with competing deaths.
 - `calculate_population_size()` includes births and excludes deaths at each
   requested instant. It preserves requested order and repeated times.
 
 Population objects require known endpoints for observation; do not observe
-beyond them. Bare persons tables require the caller to ensure complete
-follow-up. Missing death means censored at the observation endpoint. Zero-duration lives
+beyond them. Person-level summaries require a population object, so the
+endpoint is always known (D159). Missing death means censored at the observation endpoint. Zero-duration lives
 contribute zero exposure, while recorded events still count in their applicable
 age/period cells.
 
@@ -846,7 +852,7 @@ w_i / sum(w), where log w_i is a formula's linear predictor x_i * beta or the
 value of a custom function; exp(beta) is the hazard ratio between members of
 the same cell. A model attaches through `weights` on mortality, fertility,
 rate-mode search, dissolution and group transitions, and `weights_conversion`
-for conversion, either as one `create_weight_model()` or a calendar schedule
+for conversion, either as one `weight_model()` or a calendar schedule
 of them (the D123 tibble structure). Weights are normalized within cells, so
 each cell keeps its input rate; population-level effects can be smaller where
 cells are small, homogeneous or changing in composition, and terms that are
@@ -881,7 +887,7 @@ examples, calibration updates, callback constraints and validation.
 
 ## Optional uncertainty for observed rates (D124)
 
-All event-rate calculators accept `conf.level = NULL` (unchanged default output)
+All event-rate calculators accept `conf_level = NULL` (unchanged default output)
 or a confidence level strictly between zero and one. Non-NULL values append
 `conf_low` and `conf_high`, using the row's observed count and its existing
 exposure in `stats::poisson.test()`. Zero exposure yields NA bounds. Fertility

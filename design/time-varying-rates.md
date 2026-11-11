@@ -95,7 +95,7 @@ events and exposure; rate changes do not create demographic events.
 
 For a runnable fractional-year workflow, see
 [the milestone 7 rate example](../inst/examples/milestone7-rates.R).
-`simulate(model, years = 4.3)` starting at population `end_time = 2015.5`
+`run_simulation(model, years = 4.3)` starting at population `end_time = 2015.5`
 ends at 2019.8. Calendar bounds may also be fractional, such as
 `[2015.5, 2019.8)`, with no rounding to an annual or monthly grid.
 

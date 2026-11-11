@@ -32,7 +32,58 @@ be made autonomously; record choices with substantial architectural consequences
 
 ## Engineering expectations
 
-- Prefer verb-based names for user-facing action functions, such as `create_baseline_population()` and `set_population()`.
+- Organize R functions by cohesive responsibility using
+  [the source organization guide](design/r-source-organization.md). Place new
+  functions in an existing file when its responsibility fits. If no existing
+  file is a logical home, explain the proposed responsibility and filename and
+  ask the user before creating a new R script; do not create one automatically.
+- Start each hand-maintained R file with a brief purpose comment. Place
+  exported functions first and internal
+  constants/helpers below, using `# SECTION NAME ------` headings. Preserve
+  documentation blocks and leave generated wrappers untouched.
+- The user prefers to write the final roxygen2 documentation. For new
+  functions, agents should write first drafts and identify them as needing
+  user editing and review. When changing existing functions with roxygen2
+  documentation, make only the minimal documentation edits needed to reflect
+  the changes; preserve the user's wording and organization elsewhere. In
+  the completion report, identify the affected documentation and notify the
+  user that it should be reviewed. Do not treat an agent-written draft as
+  final user-approved documentation.
+- Use noun-based names for specification constructors, such as `matching_model()`,
+  `age_gap_matching_model()`, `weight_model()`, and `group_inheritance()`.
+  Use verbs for actions such as `set_population()`, `run_simulation()`, and
+  `generate_uniform_population()`.
+- Keep hand-maintained `R/` source lines at most 80 characters, including
+  comments and roxygen documentation. Follow the same limit for new or edited
+  R code elsewhere. Keep calls on one line when they fit and remain readable.
+  In multiline calls, put each named argument on its own line; short unnamed
+  arguments may share a line. Keep nested calls and expressions together when
+  they fit, remove unnecessary breaks, and put the closing parenthesis on its
+  own line. Use one argument per line with a two-space indent for long
+  function definitions. See D163. For wrapped `if` conditions, prefer breaks
+  at logical operators and keep short nested calls intact. Indent continuation
+  lines two spaces beyond the first boolean expression after `if (` (D164).
+  Other continuation lines use two spaces beyond the line they continue.
+  Split long diagnostic strings
+  without changing their text. Leave generated wrappers untouched.
+- Use braces for all loop bodies and statement-style or multiline `if`/`else`
+  branches. Keep `else` on the same line as the preceding closing brace.
+  Compact, single-line conditional value expressions may remain unbraced when
+  they have no side effects or control-flow modifiers. Put `return()`, `stop()`,
+  `break`, and `next` on their own lines inside the relevant block; brace
+  control-flow/error-handler callback bodies as well.
+- Every function definition spanning multiple lines must have a braced body,
+  including named functions, local helpers and anonymous callbacks. This also
+  applies when the body is a single expression or wrapped function call.
+  Compact one-line functions may remain unbraced, subject to the control-flow
+  rules above. See D171.
+- Do not use semicolons to separate R statements; put each statement on its
+  own line (D156).
+- Use snake_case for package-owned function and argument names (for example,
+  `conf_level`). Preserve external APIs when calling them, such as
+  `stats::poisson.test(conf.level = conf_level)`. Follow tidyverse function-writing
+  conventions subject to the explicit project naming and section-heading rules;
+  see the source organization guide for the current style review.
 - Return all public tables as tibbles, including empty tables, population histories,
   process schedules, and demographic summaries. Accept base data frames as inputs.
 - Keep model construction separate from simulation execution. Aim for composable R workflows and R-native, inspectable results at the user-facing boundary. This does not require an R-only implementation: performance-critical computation and internal state may use compiled code, such as C++, with results exposed as ordinary R objects for inspection and analysis.
@@ -151,5 +202,5 @@ the user's agreement.
   articles (`vignettes/`) and makes all edits to the top-level `README.md`
   (D141); do not edit them unless asked. Preserve the user's edits, including
   explanatory source comments and the accepted reports. Fixed newborn assignment
-  is available through `create_group_inheritance("fixed", fixed_value = ...)` (D142); custom inheritance already supports assigning
+  is available through `group_inheritance("fixed", fixed_value = ...)` (D142); custom inheritance already supports assigning
   mixed-parent births to a specified category.

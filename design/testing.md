@@ -5,6 +5,105 @@ D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the u
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## Life-table input rate columns (November 9, 2026)
+
+D154 removes `mx` as an input-rate alias for `calculate_life_table()`. The function now requires `rate_mortality` or `rate`, preserving the former precedence of `rate_mortality` over `rate`. Existing `mx` columns cannot override an accepted rate column; output still contains `mx`. Numeric-column diagnostics identify the selected input column. The user's updated help title was preserved.
+
+`devtools::test(filter = "^(demography|group-demography)$")` passed 210 expectations with no failures, warnings, or skips. Cases cover both accepted names, typed mortality processes, rejection of populated/empty `mx`-only tables, conflicting/invalid extra `mx` values, two-column precedence, valid empty tibbles, and existing analytical survival, life expectancy, missing/zero/extreme rates, strata, and radix behavior. Old input fixtures were converted to `rate`; output-column assertions retain `mx`.
+
+`devtools::document()` completed successfully, and the life-table help page passed Rd validation and example execution. Final test-line wrapping was checked by parsing and `git diff --check`; edited code meets the 80-column limit. The full simulation suite was not rerun for this narrow analysis-input change. No simulation mechanism, mortality interpretation, or historical validation artifact changed.
+
+## Uniform-age population generator rename (November 9, 2026)
+
+D153 renames the population generator to `generate_uniform_population`, with matching source and help filenames. The help explicitly identifies the age distribution as uniform and retains weighted sex/group sampling. A clean second `devtools::document()` pass completed successfully, and the renamed help page passed Rd validation and example execution. Export checks confirmed exactly the name replacement, with no alias under the former name.
+
+Parsed executable expressions and test expressions differ only by the intended name substitution; long renamed test-call lines were wrapped without changing their expressions. Seven before/after cases produced identical populations and RNG states: empty and ordinary populations, zero maximum age, female probabilities zero/one, fractional reference time, zero-weight categories, independent multiple dimensions, and joint group weights. All arguments, defaults, returned classes, and validation behavior are unchanged.
+
+The full offline `devtools::test()` run passed 6,498 expectations with zero failures in 108.4 seconds. The live database test was skipped; one existing environment warning concerned HMDHFDplus/lubridate's `timedatectl` system-bus access. Hand-maintained R source and added/edited test lines meet the 80-column convention; `git diff --check` passed. Native code, user-maintained README/vignettes, and historical validation evidence remain untouched. No advanced or stable-population generation method was implemented.
+
+## Execution renamed to run_simulation (November 9, 2026)
+
+D152 renames the standalone execution function and source/help file to `run_simulation`, removing Hammel's `simulate` export and alias. A clean second `devtools::document()` pass completed successfully; the renamed help topic passed Rd validation and its example executed successfully. Current API references and test calls were updated, with renamed long test-call lines wrapped to 80 columns. Native entry points and source filenames are unchanged.
+
+Before/after parsed expressions confirmed only the intended name/diagnostic substitution, allowing equivalent concatenation of literal message fragments. Existing test expressions are unchanged apart from the function rename and formatting. Zero- and three-year execution outputs and RNG states matched exactly. Export checks confirmed the single name replacement, and an added regression checks that unqualified `simulate` still resolves to `stats::simulate()` and runs an ordinary linear-model simulation.
+
+The full offline `devtools::test()` run passed 6,498 expectations with zero failures in 108.6 seconds. The live database test was skipped; one existing environment warning concerned HMDHFDplus/lubridate's `timedatectl` system-bus access. All hand-maintained `R/` files and newly added/edited test lines remain within 80 columns, and `git diff --check` passed. User-owned README/vignettes and historical validation evidence remain untouched; their old execution calls require updating for the current API.
+
+## Control-flow braces (November 9, 2026)
+
+D150 braces all loop bodies and statement-style or multiline conditional branches in hand-maintained R source, including early returns, error paths, loop exits, and control-flow/error-handler callbacks. All 127 loops are braced. A parser-based review retains 109 compact, single-line conditional value expressions and finds no remaining unbraced loop or statement/multiline conditional requiring expansion. The group-inheritance callback example follows the same rule. Control-flow modifiers formerly sharing a semicolon-separated line are on their own lines.
+
+Before/after parsed expressions are identical after normalizing added single-expression branch, loop, and function-body braces. Zero- and three-year simulation outputs and RNG states matched exactly. Explanatory comments, exported names, defaults, and diagnostic strings were preserved. Generated help retains its non-example content, all pages pass Rd validation, and example expressions are equivalent after the same brace normalization. Every hand-maintained `R/` source line remains within 80 columns. Generated wrappers, native code, package dependencies, and user-owned README/vignettes/historical validation evidence were untouched.
+
+The full offline `devtools::test()` run passed 6,496 expectations with zero failures in 107.7 seconds. The live database test was skipped. One existing environment warning concerned HMDHFDplus/lubridate's `timedatectl` system-bus access. Final whitespace-only refinements were rechecked by parsing. `git diff --check` passed. The project guidance records the brace convention for future code.
+
+## Eighty-column R source formatting (November 9, 2026)
+
+D149 wraps all 33 hand-maintained `R/` files to at most 80 characters per line, including comments and roxygen text. Generated `RcppExports.R` is byte-identical to the preceding version. Long top-level function signatures use one argument per line with a two-space indent; long messages use literal-only `paste0()` pieces without changing the resulting message. Styler 1.11.0 and its formatting dependencies were installed only into a temporary `/tmp` library/cache; package dependencies are unchanged.
+
+Before/after parsing confirmed equivalent expressions after folding literal-only `paste0()` calls and normalizing single-expression conditional braces. Explanatory non-roxygen comments were preserved, allowing whitespace reflow. All regenerated help pages passed Rd validation and retained identical non-whitespace content, while examples parsed identically. Zero- and three-year before/after simulations produced identical complete outputs and RNG states. Exports are unchanged.
+
+The full offline `devtools::test()` run passed 6,496 expectations with zero failures in 109.6 seconds. The live database test was skipped; one existing environment warning concerned HMDHFDplus/lubridate's `timedatectl` access to the system bus. Final whitespace refinements were rechecked by parsing and by the complete source-width scan. `git diff --check` passed. User-owned README/vignettes, historical validation evidence, and native sources were untouched.
+
+To check the width convention without an additional package:
+
+```r
+files <- setdiff(
+  list.files("R", pattern = "[.]R$", full.names = TRUE),
+  "R/RcppExports.R"
+)
+for (file in files) {
+  lines <- readLines(file)
+  stopifnot(all(nchar(lines, type = "width") <= 80L))
+}
+```
+
+## Snake-case confidence argument and style review (November 9, 2026)
+
+D148 changes the seven rate calculators and three internal confidence/entry helpers to `conf_level`. The external `stats::poisson.test()` call and the independent test reference keep the required `conf.level` spelling. Regenerated help passed Rd validation and documents `conf_level` rather than the former public argument. Exports are unchanged.
+
+A parsed-expression comparison against the pre-change working tree confirmed only the intended argument/diagnostic rename. Before/after outputs for all seven calculators were identical at `NULL`, 0.8, and 0.95 confidence settings, including attributes and empty cells supplied by the shared confidence fixture. The full offline `devtools::test()` run passed 6,496 expectations with zero failures in 108.0 seconds; the live database test was skipped. One existing warning concerned `timedatectl` system-bus access during HMDHFDplus/lubridate loading. `git diff --check` passed.
+
+The accompanying [function-style review](r-source-organization.md#function-writing-conventions-and-review) used parsed definitions and source inspection across all 33 hand-maintained R files. Public naming now follows snake_case. Formatting findings and explicit project exceptions are recorded there; no package-wide formatting or additional dependency was introduced. User-maintained README/vignettes and historical validation evidence were not edited.
+
+## Noun-based specification constructors (November 9, 2026)
+
+D147 renames the matching, age-gap matching, weight, and group-inheritance constructors, retaining `create_baseline_population()`. A parsed-expression comparison against the pre-rename working tree confirmed that executable R definitions differ only by those four name replacements, including updated calls and diagnostic messages. Export checks confirmed exactly those replacements, with 43 exports overall and no aliases under the old names.
+
+A before/after simulation using baseline generation, maternal group inheritance, age-gap matching, and mortality weights produced identical population results and random-number states. All four renamed constructor help pages passed Rd validation and their examples executed successfully. A second `devtools::document()` pass completed without the transitional unresolved-name warnings from the initial namespace rename.
+
+The full offline `devtools::test()` run passed 6,496 expectations with zero failures in 108.6 seconds. The live database test was skipped. One existing environment warning concerned HMDHFDplus/lubridate's `timedatectl` access to the system bus in the sandbox. `git diff --check` passed. Native sources, user-maintained README/vignettes, and historical validation sources/artifacts were untouched; old constructor calls in those historical or user-maintained sources require updating before execution against the renamed API.
+
+## Shared fertility-summary and group-declaration help (November 9, 2026)
+
+D146 combines TFR/PATFR and group construction/declaration into two paired help topics. `devtools::document()` completed successfully, removing the superseded `calculate_patfr.Rd` and `set_groups.Rd` pages. Both shared topics passed Rd validation, alias checks, argument-coverage checks, text rendering, and execution of all examples. The TFR examples exercise both explicit PATFR and automatic parity dispatch; the group examples describe a dimension and declare it on a model.
+
+Parsed executable R expressions and exports are unchanged from the preceding commit. Both matching-model help pages remain unchanged. `git diff --check` passed; no simulation, download, or full-suite rerun was needed for this documentation-only change.
+
+## Shared observed-rate help topic (November 9, 2026)
+
+D145 combines the seven observed-rate help pages into `calculate_rates`. `devtools::document()` completed successfully and removed the seven superseded generated pages. The shared topic passed `tools::checkRd()`, has aliases for all seven public functions, and documents the union of their arguments exactly once. Examples cover all seven functions and executed successfully after `pkgload::load_all()`, using supplied person/union/transition histories with no simulation or data download. Text help rendered successfully through `tools::Rd2txt()`.
+
+Comparing parsed R expressions against the preceding commit confirmed that all executable definitions are unchanged, and `NAMESPACE` is unchanged. `git diff --check` passed. The simulation suite was not rerun for this documentation-only change.
+
+## Shared process help topics (November 9, 2026)
+
+D144 pairs each demographic process constructor with its convenience setter on one help topic, with separate mortality and fertility pages and a standalone generic `set_process()` page. `devtools::document()` completed successfully. All six affected topics passed Rd validation and alias checks; every available example on those topics executed successfully after `pkgload::load_all()`. Union formation and group transitions have no examples in these topics. Comparing parsed R expressions against the preceding commit confirmed that all executable definitions are unchanged, and `NAMESPACE` is unchanged. `git diff --check` passed. The simulation suite was not rerun for this documentation-only change.
+
+## Within-file ordering and section headings (November 9, 2026)
+
+Following the user's instruction under D143, each hand-maintained R file now starts with a purpose comment, followed by exported functions and then internal constants/helpers under `# SECTION NAME ------` headings. Generated wrappers remain untouched. Before/after parsing confirmed that every function and constant is unchanged and remains in its original file; all exported functions precede helpers. Explanatory comments and roxygen blocks were retained, and section headings were updated where necessary.
+
+`devtools::document()` produced no help-page or export changes. The full offline `devtools::test()` run passed 6,496 expectations with zero failures in 108.8 seconds, with the live database test skipped. The same environment warning about `timedatectl` system-bus access occurred while loading HMDHFDplus/lubridate. The final purpose comments and heading adjustments were checked by parsing again and `git diff --check`; they do not change executable R expressions.
+
+## R source organization (November 9, 2026)
+
+D143 reorganizes the R files according to the user-agreed [source organization guide](r-source-organization.md). Before/after parsing confirmed that all 226 function definitions, six shared constants, and package metadata are identical as R expressions. Every original source comment was retained. The resulting 34 R files match the agreed map; `simulate()` is unchanged, and `model_schedules.R`, `hammel_model.R`, generated wrappers, and native sources are unchanged.
+
+`devtools::document()` completed successfully. All 43 exports are unchanged, and every generated help page is identical except for its source-file pointer. Explicit roxygen `@order` tags preserve the original order of functions and parameters in the shared mortality/fertility and process-setter topics.
+
+The full offline `devtools::test()` run passed 6,496 expectations with zero failures in 108 seconds. The opt-in live database test was skipped. One environment warning occurred while loading HMDHFDplus/lubridate: `timedatectl` could not access the system bus in the sandbox, as in the preceding recorded run. No rates were downloaded and no credentials were exposed. `git diff --check` passed. This mechanical reorganization does not change demographic behavior or rerun the user-owned milestone reports.
+
 ## Fixed newborn assignment (November 7, 2026)
 
 D142 adds native fixed-category inheritance. `devtools::test(filter =
@@ -329,7 +428,7 @@ software behavior, not demographic parameter recovery.
 | Test file | Main evidence |
 | --- | --- |
 | `test-groups.R` | Group rate lookup, analytical survival, coverage errors, fallback warnings, maternal inheritance, cross-group unions, restarts, RNG equivalence, and weighted initialization |
-| `test-group-demography.R` | Exact group exposure/counts, cross-group parent and spouse attribution, conservation, analytical group TFR/life tables, population sizes, validation, and typed empty tables |
+| `test-group-demography.R` | Exact group exposure/counts, cross-group parent and spouse attribution, conservation, analytical group TFR/life tables, population sizes, validation, typed empty counts, and errors for empty TFR/life-table input |
 | `test-group-prop-hazard.R` | Multiplier validation, explicit-schedule equivalence, compensation order, omitted/unit/zero factors, warnings, RNG preservation, restarts, numeric codes, empty populations, and overflow |
 | `test-group-inheritance.R` | All assignment rules/fallbacks, passing and ancestry probabilities, custom RNG, mixed identity rates, future-group coverage, restarts, and random-parent defaults and explicit maternal inheritance |
 | `test-ancestry.R` | Starting identities, supplied proportions and IDs, parental averaging across generations, unknown shares, restarts/deaths, numeric labels, empty tables, and RNG independence |
@@ -1191,3 +1290,118 @@ this review; their domain-specific cross-period clock checks remain necessary.
 The stale model-schedule status in AGENTS and the detailed dissolution category
 in the dissolution specification were corrected. No demographic defaults or
 calendar-gap rules were changed.
+
+
+## Selective living-kin counting (D170, November 10, 2026)
+
+`count_kin(relationships = ...)` uses native accumulation rather than the full
+extracted-pair table. Default and selected results matched the previous R
+implementation at commit `6b1cc9d` exactly in every benchmark below. The fixture
+has 12,000 people in 12 cohorts of 1,000, born 25 years apart, with alternating
+sexes, parents sampled independently from the preceding cohort, and deaths at
+age 80. It is a synthetic performance fixture, not a demographic assessment.
+
+The table reports median elapsed seconds over three calls per method after
+checking exact equality, with garbage collection before each timed call.
+Measurements were repeated after the full test suite finished. These timings
+are specific to this machine and pedigree; dense pedigrees, more observation
+times and larger generation bounds have different costs. The old selected
+method computes everything and filters the returned rows.
+
+| Generations | Observation times | Relationships | Previous (s) | New (s) | Ratio |
+| --- | --- | --- | ---: | ---: | ---: |
+| 2 | 0 | all | 0.574 | 0.053 | 10.8 |
+| 2 | 0 | first cousin | 0.543 | 0.039 | 13.9 |
+| 3 | -80, -40, 0 | all | 2.754 | 0.655 | 4.2 |
+| 3 | -80, -40, 0 | first cousin | 2.781 | 0.105 | 26.5 |
+
+Kinship-focused tests passed 1,017 expectations. The full offline suite passed
+7,519 expectations with zero failures in 112.2 seconds, one existing
+`timedatectl` warning during HMDHFDplus/lubridate loading, and the opt-in live
+database test skipped. Coverage includes an independent extraction-based
+reference, selected/full identity, pedigree-collapse tie classification, full
+versus half kin, group moves and birth/death ties, empty strata, duplicate and
+reordered times, invalid selectors, RNG preservation and whole-graph cycle
+checks even when nobody is alive or the generation bound is zero.
+
+To reproduce the benchmark from the repository root with the updated package:
+
+```r
+pkgload::load_all(quiet = TRUE)
+old <- new.env(parent = asNamespace("hammel"))
+baseline <- system2(
+  "git", c("show", "6b1cc9d:R/extract_kin.R"),
+  stdout = TRUE
+)
+eval(parse(text = baseline), envir = old)
+set.seed(170)
+size <- 1000L
+cohorts <- 12L
+persons <- data.frame(
+  person_id = seq_len(size * cohorts),
+  sex = rep(c("f", "m"), size * cohorts / 2),
+  birth_time = rep(seq(-300, -25, by = 25), each = size),
+  mother_id = NA_integer_,
+  father_id = NA_integer_
+)
+persons$death_time <- ifelse(
+  persons$birth_time + 80 <= 0,
+  persons$birth_time + 80, NA_real_
+)
+for (cohort in 2:cohorts) {
+  rows <- seq_len(size) + size * (cohort - 1L)
+  parents <- rows - size
+  persons$mother_id[rows] <- sample(
+    parents[persons$sex[parents] == "f"], size,
+    replace = TRUE
+  )
+  persons$father_id[rows] <- sample(
+    parents[persons$sex[parents] == "m"], size,
+    replace = TRUE
+  )
+}
+population <- hammel_population(persons, end_time = 0)
+run_case <- function(depth, times, selected) {
+  previous <- function() {
+    out <- old$count_kin(population, times, generations = depth, by = "sex")
+    if (!is.null(selected)) {
+      out <- out[out$relationship %in% selected, ]
+    }
+    out
+  }
+  current <- function() {
+    count_kin(
+      population, times,
+      generations = depth,
+      by = "sex",
+      relationships = selected
+    )
+  }
+  stopifnot(identical(previous(), current()))
+  timing <- function(f) {
+    median(
+      replicate(3, {
+        gc()
+        unname(system.time(f())["elapsed"])
+      })
+    )
+  }
+  a <- timing(previous)
+  b <- timing(current)
+  data.frame(
+    depth = depth,
+    times = length(times),
+    relationships = if (is.null(selected)) "all" else selected,
+    previous_seconds = a,
+    current_seconds = b,
+    speedup = a / b
+  )
+}
+results <- rbind(
+  run_case(2, 0, NULL),
+  run_case(2, 0, "first_cousin"),
+  run_case(3, c(-80, -40, 0), NULL),
+  run_case(3, c(-80, -40, 0), "first_cousin")
+)
+print(results, row.names = FALSE)
+```

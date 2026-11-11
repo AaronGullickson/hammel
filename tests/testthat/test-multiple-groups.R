@@ -20,23 +20,26 @@ test_that("rates stratify by any combination of declared dimensions", {
   # Only race A in region S dies.
   rates <- stratify_rates(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 1e8),
     list(race = c(A = 1, B = 0), region = c(N = 0, S = 1)))
-  out <- simulate(set_mortality(model, rates), .1, seed = 1)
+  out <- run_simulation(set_mortality(model, rates), .1, seed = 1)
   died <- !is.na(out$persons$death_time)
   expect_identical(died, persons$race == "A" & persons$region == "S")
   # Rates by one dimension pool the other.
   by_region <- stratify_rates(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 1e8),
     list(region = c(N = 1, S = 0)))
-  out <- simulate(set_mortality(model, by_region), .1, seed = 1)
+  out <- run_simulation(set_mortality(model, by_region), .1, seed = 1)
   expect_identical(!is.na(out$persons$death_time), persons$region == "N")
   # Every combination must be covered, and categories must be known.
   partial <- rates[!(rates$race == "B" & rates$region == "N"), ]
-  expect_error(simulate(set_mortality(model, partial), 0), "missing schedules.*race=B, region=N")
+  expect_error(run_simulation(set_mortality(model, partial), 0),
+    "missing schedules.*race=B, region=N")
   declared <- set_groups(model, race = group(categories = c("A", "B")), region = group())
-  expect_error(simulate(set_mortality(declared, rbind(rates, transform(rates[1:2, ], race = "C"))), 0),
+  expect_error(run_simulation(set_mortality(declared, rbind(rates, transform(
+    rates[1:2, ], race = "C"))), 0),
                "not categories of group `race`: C")
   # A rate table may use a dimension's column only once declared.
   undeclared <- set_groups(model, race = group())
-  expect_error(simulate(set_mortality(undeclared, rates), 0), "`region`.*not a declared group")
+  expect_error(run_simulation(set_mortality(undeclared, rates), 0),
+    "`region`.*not a declared group")
 })
 
 test_that("union rates stratify by either partner's categories in any dimension", {
@@ -47,20 +50,34 @@ test_that("union rates stratify by either partner's categories in any dimension"
   husbands <- persons[seq(2, nrow(persons), 2), ]
   rates <- stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = 1e8),
     list(race_w = c(A = 1, B = 0), region_h = c(N = 0, S = 1)))
-  out <- simulate(set_union_dissolution(model, rates), .1, seed = 2)
+  out <- run_simulation(set_union_dissolution(model, rates), .1, seed = 2)
   expect_identical(out$unions$end_reason %in% "dissolution",
                    wives$race == "A" & husbands$region == "S")
-  expect_error(simulate(set_union_dissolution(model, transform(rates, race = "A")), 0), "_w`")
+  expect_error(run_simulation(set_union_dissolution(model, transform(rates,
+    race = "A")), 0), "_w`")
 })
 
 test_that("newborns get a category in every dimension from its own rule", {
   model <- two_dimension_model(400, birth_rate = 2)
-  model <- set_groups(model,
-    race = group(categories = c("A", "B", "AB"), ancestry = TRUE,
-                 inheritance = create_group_inheritance("custom", fun = function(mother_group, father_group, ...)
-                   if (is.na(father_group) || mother_group == father_group) mother_group else "AB")),
-    region = group(inheritance = "father"))
-  out <- simulate(model, 1, seed = 3)
+  model <- set_groups(
+    model,
+    race = group(
+      categories = c("A", "B", "AB"),
+      ancestry = TRUE,
+      inheritance = group_inheritance(
+        "custom",
+        fun = function(mother_group, father_group, ...) {
+          if (is.na(father_group) || mother_group == father_group) {
+            mother_group
+          } else {
+            "AB"
+          }
+        }
+      )
+    ),
+    region = group(inheritance = "father")
+  )
+  out <- run_simulation(model, 1, seed = 3)
   kids <- out$persons[out$persons$birth_time >= 0, ]
   expect_gt(nrow(kids), 50)
   mothers <- match(kids$mother_id, out$persons$person_id)
@@ -75,7 +92,7 @@ test_that("newborns get a category in every dimension from its own rule", {
   kid_rows <- match(kids$person_id, out$ancestry$race$person_id)
   expect_equal(out$ancestry$race$A[kid_rows][mixed], rep(0.5, sum(mixed)))
   # Restarts continue from the carried declaration and ancestry.
-  again <- simulate(set_population(model, out), .5, seed = 4)
+  again <- run_simulation(set_population(model, out), .5, seed = 4)
   expect_identical(again$ancestry$race[seq_len(nrow(out$persons)), ], out$ancestry$race)
 })
 
@@ -83,8 +100,8 @@ test_that("unrealized births report every dimension", {
   # Spacing longer than the run: after one birth each, every cell lacks eligible women.
   model <- two_dimension_model(400, birth_rate = 3)
   model <- set_fertility(model, data.frame(age_start = 15, age_end = 50, rate = 3), birth_interval = 5)
-  out <- simulate(model, 1, seed = 5)
-  u <- out$simulation$unrealized_births
+  out <- run_simulation(model, 1, seed = 5)
+  u <- out$unrealized_births
   expect_true(all(c("race", "region") %in% names(u)))
   expect_gt(sum(u$unrealized_births), 0)
   expect_setequal(unique(u$race), c("A", "B"))
@@ -120,41 +137,46 @@ pair_categories <- function(out, d) {
 
 test_that("matching group effects use one named dimension among several", {
   # Restrict region only: every union joins one region, races mix.
-  out <- simulate(matching_pair_model(create_age_gap_matching_model(0, 5,
+  out <- run_simulation(matching_pair_model(age_gap_matching_model(0, 5,
     group_exogamy = list(region = NA))), 2, seed = 41)
   expect_gt(nrow(out$unions), 100)
-  region <- pair_categories(out, "region"); race <- pair_categories(out, "race")
+  region <- pair_categories(out, "region")
+  race <- pair_categories(out, "race")
   expect_true(all(region$w == region$h))
   expect_gt(mean(race$w != race$h), .2)
   # A strong race pair effect, given by name, separates races instead.
-  out <- simulate(matching_pair_model(create_age_gap_matching_model(0, 5,
+  out <- run_simulation(matching_pair_model(age_gap_matching_model(0, 5,
     group_exogamy = list(race = c("A:B" = -30)))), 2, seed = 41)
-  race <- pair_categories(out, "race"); region <- pair_categories(out, "region")
+  race <- pair_categories(out, "race")
+  region <- pair_categories(out, "region")
   expect_true(all(race$w == race$h))
   expect_gt(mean(region$w != region$h), .2)
   # Formula predictors name the dimension; the first category is the reference.
-  same <- create_matching_model(~ age_difference + same_region, c(age_difference = 0, same_region = 30))
-  out <- simulate(matching_pair_model(same), 2, seed = 41)
+  same <- matching_model(~ age_difference + same_region, c(age_difference = 0, same_region = 30))
+  out <- run_simulation(matching_pair_model(same), 2, seed = 41)
   region <- pair_categories(out, "region")
   expect_true(all(region$w == region$h))
-  female <- create_matching_model(~ female_race:age_difference + same_race,
+  female <- matching_model(~ female_race:age_difference + same_race,
     c("female_raceA:age_difference" = .1, "female_raceB:age_difference" = .2, same_race = 1))
-  expect_s3_class(simulate(matching_pair_model(female), .1, seed = 41), "hammel_population")
-  wrong <- create_matching_model(~ female_race:age_difference, c("female_raceA:age_difference" = 1))
-  expect_error(simulate(matching_pair_model(wrong), 0), "coefficient names.*female_raceB:age_difference")
+  expect_s3_class(run_simulation(matching_pair_model(female), .1, seed = 41),
+    "hammel_population")
+  wrong <- matching_model(~ female_race:age_difference, c("female_raceA:age_difference" = 1))
+  expect_error(run_simulation(matching_pair_model(wrong), 0),
+    "coefficient names.*female_raceB:age_difference")
 })
 
 test_that("matching settings must name declared dimensions", {
-  bare <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1))
-  expect_error(simulate(matching_pair_model(bare), 0),
+  bare <- age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1))
+  expect_error(run_simulation(matching_pair_model(bare), 0),
                "Name the dimension.*group_exogamy = list\\(race")
-  expect_error(simulate(matching_pair_model(create_matching_model(~ same_education,
+  expect_error(run_simulation(matching_pair_model(matching_model(~
+    same_education,
     c(same_education = 1))), 0), "`education`, which is not a declared group dimension")
-  expect_error(create_matching_model(~ age_difference, c(age_difference = 0),
+  expect_error(matching_model(~ age_difference, c(age_difference = 0),
     group_exogamy = list(c("A:B" = 1))), "named by group dimension")
-  expect_error(create_matching_model(~ age_difference, c(age_difference = 0),
+  expect_error(matching_model(~ age_difference, c(age_difference = 0),
     delta = list(race = c(A = NA))), "delta")
-  expect_error(create_matching_model(~ partner_race, c(partner_race = 1)), "one-sided matching formula")
+  expect_error(matching_model(~ partner_race, c(partner_race = 1)), "one-sided matching formula")
 })
 
 test_that("a single dimension may have any name, including in analysis", {
@@ -167,7 +189,7 @@ test_that("a single dimension may have any name, including in analysis", {
                                  list(region = c(N = 1, S = 0)))) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .2)) |>
     set_union_formation("on_demand", kinship_generations = 0)
-  out <- simulate(model, 2, seed = 7)
+  out <- run_simulation(model, 2, seed = 7)
   rates <- calculate_mortality_rates(out, c(0, 2), c(0, Inf), by = "region")
   expect_true("region" %in% names(rates))
   expect_equal(rates$deaths[rates$region == "S"], c(0, 0))
@@ -176,18 +198,21 @@ test_that("a single dimension may have any name, including in analysis", {
   sizes <- calculate_population_size(out, 2, by = "region")
   expect_named(sizes, c("time", "region", "population"))
   # Also when the dimension tracks ancestry.
-  tracked <- simulate(set_groups(model, region = group(ancestry = TRUE)), 1, seed = 7)
+  tracked <- run_simulation(set_groups(model, region = group(ancestry = TRUE)),
+    1, seed = 7)
   expect_named(calculate_population_size(tracked, 1, by = "region"), c("time", "region", "population"))
-  expect_true(all(c("region_w", "region_h") %in% names(get_detailed_unions(tracked))))
+  expect_true(all(c("region_w", "region_h") %in% names(augment_unions(tracked))))
 })
 
 test_that("remaining single-dimension features and ancestry inputs are checked", {
   model <- two_dimension_model()
-  w <- create_weight_model(~ group, c(groupB = 1))
-  expect_error(simulate(set_mortality(model, model$processes$mortality$rates, weights = w), 0),
+  w <- weight_model(~ group, c(groupB = 1))
+  expect_error(run_simulation(set_mortality(model,
+    model$processes$mortality$rates, weights = w), 0),
                "not available for this process: group")
   # Analysis without group splits works with several dimensions.
-  expect_s3_class(calculate_mortality_rates(simulate(model, 1, seed = 8), c(0, 1), c(0, Inf)), "tbl_df")
+  expect_s3_class(calculate_mortality_rates(run_simulation(model, 1, seed = 8),
+    c(0, 1), c(0, Inf)), "tbl_df")
   # A bare ancestry table needs exactly one tracked dimension.
   persons <- model$population$persons
   shares <- data.frame(person_id = persons$person_id, A = 1, unknown = 0)
@@ -208,27 +233,27 @@ test_that("unrealized births follow a woman's current group after a transition",
     set_group_transition(data.frame(origin = "A", destination = "B", age_start = 0, age_end = Inf,
                                     rate = 50))
   withr::local_options(hammel.check_cells = TRUE)
-  out <- simulate(model, .5, seed = 9)
+  out <- run_simulation(model, .5, seed = 9)
   expect_true(all(out$persons$group[1:20] == "B"))
-  u <- out$simulation$unrealized_births
+  u <- out$unrealized_births
   expect_gt(sum(u$unrealized_births[u$group == "B"]), sum(u$unrealized_births[u$group == "A"]))
 })
 
 test_that("detailed unions add each dimension's partner categories", {
-  out <- simulate(two_dimension_model(union = TRUE), .5, seed = 10)
-  u <- get_detailed_unions(out)
+  out <- run_simulation(two_dimension_model(union = TRUE), .5, seed = 10)
+  u <- augment_unions(out)
   expect_true(all(c("race_w", "race_h", "region_w", "region_h") %in% names(u)))
   expect_identical(u$race_h, out$persons$race[match(u$husband_id, out$persons$person_id)])
   # One dimension of any name, replayed through transitions to formation.
-  p <- create_baseline_population(200, groups = list(race = c(A = .5, B = .5)))
+  p <- generate_uniform_population(200, groups = list(race = c(A = .5, B = .5)))
   m <- hammel_model() |> set_population(p) |>
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)) |>
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .2)) |>
     set_union_formation("on_demand", kinship_generations = 0) |>
     set_group_transition(data.frame(origin = "A", destination = "B", age_start = 0,
                                     age_end = Inf, rate = .5))
-  out <- simulate(m, 3, seed = 11)
-  u <- get_detailed_unions(out)
+  out <- run_simulation(m, 3, seed = 11)
+  u <- augment_unions(out)
   expect_false(any(c("group_w", "group_h") %in% names(u)))
   moved <- out$transitions$person_id[out$transitions$time > 0]
   late <- u[u$wife_id %in% moved & u$start_time > 0, ]
@@ -254,7 +279,7 @@ test_that("each dimension has its own transition process, history and duration",
   # Replacing one dimension's process keeps the other's.
   replaced <- set_group_transition(model, transform(race, rate = 0), group = "race")
   expect_identical(replaced$processes$group_transition$region, model$processes$group_transition$region)
-  out <- simulate(model, 4, seed = 21)
+  out <- run_simulation(model, 4, seed = 21)
   tx <- out$transitions
   expect_named(tx, c("person_id", "time", "group", "origin", "destination", "move_id", "initiator_id"))
   # Individual moves: one row per move, initiated by the mover.
@@ -284,7 +309,7 @@ test_that("each dimension has its own transition process, history and duration",
     expect_identical(last$destination, final[[d]][match(last$person_id, final$person_id)])
   }
   # Restarts validate and continue every dimension's history.
-  again <- simulate(set_population(model, out), 1, seed = 22)
+  again <- run_simulation(set_population(model, out), 1, seed = 22)
   expect_identical(again$transitions[seq_len(nrow(tx)), ], tx)
   broken <- out
   broken$transitions$destination[which(tx$group == "region")[1]] <- "A"
@@ -309,7 +334,7 @@ test_that("transition rates can be stratified by another dimension", {
     age_start = 0, age_end = Inf, rate = .5), group = "region")
   model <- set_group_transition(model, data.frame(origin = "A", destination = "B", region = "S",
     age_start = 0, age_end = Inf, rate = 2), group = "race")
-  out <- simulate(model, 3, seed = 23)
+  out <- run_simulation(model, 3, seed = 23)
   tx <- out$transitions
   moves <- tx[tx$group == "race", ]
   expect_gt(nrow(moves), 20)
@@ -318,10 +343,11 @@ test_that("transition rates can be stratified by another dimension", {
   # The transition's own dimension is not a stratum; other names must be declared.
   bad <- set_group_transition(model, data.frame(origin = "A", destination = "B", race = "A",
     age_start = 0, age_end = Inf, rate = 2), group = "race")
-  expect_error(simulate(bad, 0), "cannot be stratified by `race` itself")
+  expect_error(run_simulation(bad, 0), "cannot be stratified by `race` itself")
   undeclared <- set_group_transition(model, data.frame(origin = "A", destination = "B",
     age_start = 0, age_end = Inf, rate = 2), group = "education")
-  expect_error(simulate(undeclared, 0), "`education`, which is not a declared group dimension")
+  expect_error(run_simulation(undeclared, 0),
+    "`education`, which is not a declared group dimension")
   expect_error(group_transition(data.frame(group_origin = "A", group_dest = "B", age_start = 0,
     age_end = Inf, rate = 1)), "`origin` and `destination`")
 })
@@ -336,11 +362,11 @@ test_that("transition weights and custom weight functions are per dimension", {
   }
   model <- set_group_transition(model, data.frame(origin = "N", destination = "S",
     age_start = 0, age_end = Inf, rate = .5), group = "region",
-    weights = create_weight_model(fun = fun))
+    weights = weight_model(fun = fun))
   model <- set_group_transition(model, data.frame(origin = "A", destination = "B",
     age_start = 0, age_end = Inf, rate = .5), group = "race",
-    weights = create_weight_model(~ sex, c(sexm = 3)))
-  out <- simulate(model, 1, seed = 24)
+    weights = weight_model(~ sex, c(sexm = 3)))
+  out <- run_simulation(model, 1, seed = 24)
   expect_identical(unique(seen$bins), "N S")
   expect_identical(unique(seen$dest), "S")
   persons <- out$persons
@@ -354,9 +380,9 @@ test_that("transition weights and custom weight functions are per dimension", {
 test_that("each dimension's inheritance can follow its own calendar schedule", {
   model <- two_dimension_model(400, birth_rate = 2)
   schedule <- tibble::tibble(time_start = c(-100, .5), time_end = c(.5, Inf),
-    model = list(create_group_inheritance("mother"), create_group_inheritance("father")))
+    model = list(group_inheritance("mother"), group_inheritance("father")))
   model <- set_groups(model, race = group(inheritance = "father"), region = group(inheritance = schedule))
-  out <- simulate(model, 1, seed = 25)
+  out <- run_simulation(model, 1, seed = 25)
   kids <- out$persons[out$persons$birth_time >= 0, ]
   mothers <- match(kids$mother_id, out$persons$person_id)
   fathers <- match(kids$father_id, out$persons$person_id)
@@ -366,8 +392,9 @@ test_that("each dimension's inheritance can follow its own calendar schedule", {
   expect_identical(kids$region[early], out$persons$region[mothers][early])
   expect_identical(kids$region[!early], out$persons$region[fathers][!early])
   expect_identical(kids$race, out$persons$race[fathers])
-  gap <- tibble::tibble(time_start = .5, time_end = Inf, model = list(create_group_inheritance("mother")))
-  expect_error(simulate(set_groups(model, race = group(), region = group(inheritance = gap)), 1),
+  gap <- tibble::tibble(time_start = .5, time_end = Inf, model = list(group_inheritance("mother")))
+  expect_error(run_simulation(set_groups(model, race = group(), region = group(
+    inheritance = gap)), 1),
                "`region` inheritance model schedule has a coverage gap")
 })
 
@@ -377,8 +404,8 @@ test_that("detailed unions replay transitions in every dimension", {
   model <- set_group_transition(model,
     data.frame(origin = "A", destination = "B", age_start = 0, age_end = Inf, rate = 1), group = "race")
   model <- set_union_formation(model, "rate", rates = data.frame(age_start = 15, age_end = 50, rate = .5))
-  out <- suppressWarnings(simulate(model, 2, seed = 26))
-  u <- get_detailed_unions(out)
+  out <- suppressWarnings(run_simulation(model, 2, seed = 26))
+  u <- augment_unions(out)
   expect_gt(nrow(u), 20)
   tx <- out$transitions
   # A wife's category at formation: her latest move before it, or her
@@ -403,10 +430,10 @@ test_that("transition settings and histories are checked against the declaration
   early$population <- model$population
   early$processes[c("mortality", "fertility", "union_formation")] <-
     model$processes[c("mortality", "fertility", "union_formation")]
-  expect_error(simulate(early, 0), "without `group` needs exactly one")
+  expect_error(run_simulation(early, 0), "without `group` needs exactly one")
   early$processes$group_transition$race <- group_transition(moves, group = "race")
   early$processes$group_transition$.default$group <- "race"
-  expect_error(simulate(early, 0), "more than one transition process")
+  expect_error(run_simulation(early, 0), "more than one transition process")
   # Histories.
   persons <- model$population$persons
   tx <- data.frame(person_id = 1, time = -1, origin = "B", destination = "A")
@@ -420,7 +447,8 @@ test_that("transition settings and histories are checked against the declaration
     groups = "race"), "`origin` and `destination`")
   expect_error(hammel_population(persons, end_time = 0, transitions = transform(tx, group = "race")),
                "require a declared group")
-  expect_error(calculate_transition_rates(simulate(model, 0), c(0, 1), age_breaks = c(0, Inf),
+  expect_error(calculate_transition_rates(run_simulation(model, 0), c(0, 1),
+    age_breaks = c(0, Inf),
                                           group = "education"), "must name one declared")
 })
 
@@ -451,7 +479,8 @@ combined_reference <- function(out) {
   # Same-instant moves merge into one move in the single combined column.
   if (!is.null(merged)) {
     key <- paste(merged$person_id, merged$time)
-    first <- !duplicated(key); last <- !duplicated(key, fromLast = TRUE)
+    first <- !duplicated(key)
+    last <- !duplicated(key, fromLast = TRUE)
     merged <- data.frame(person_id = merged$person_id[first], time = merged$time[first], group = "rr",
       origin = merged$origin[first], destination = merged$destination[last])
   }
@@ -462,7 +491,8 @@ combined_reference <- function(out) {
 split_rr <- function(x, suffix = "") {
   column <- paste0("rr", suffix)
   parts <- do.call(rbind, strsplit(x[[column]], ".", fixed = TRUE))
-  x[[paste0("race", suffix)]] <- parts[, 1]; x[[paste0("region", suffix)]] <- parts[, 2]
+  x[[paste0("race", suffix)]] <- parts[, 1]
+  x[[paste0("region", suffix)]] <- parts[, 2]
   x[[column]] <- NULL
   x
 }
@@ -476,7 +506,8 @@ sum_by <- function(x, keys, values) {
 }
 
 compare_split <- function(ours, reference, keys, values) {
-  ours <- as.data.frame(ours); reference <- as.data.frame(reference)
+  ours <- as.data.frame(ours)
+  reference <- as.data.frame(reference)
   k1 <- do.call(paste, c(lapply(ours[keys], as.character), sep = "|"))
   k2 <- do.call(paste, c(lapply(reference[keys], as.character), sep = "|"))
   # Our grid is the full cross of categories; the reference has observed
@@ -499,7 +530,7 @@ split_model <- function() {
 }
 
 test_that("person-level rates split by several dimensions match a combined column", {
-  out <- simulate(split_model(), 4, seed = 31)
+  out <- run_simulation(split_model(), 4, seed = 31)
   # A same-instant move in both dimensions.
   p <- out$persons[out$persons$birth_time < 0 & is.na(out$persons$death_time), ][1, ]
   extra <- data.frame(person_id = p$person_id, time = 3.5, group = c("race", "region"),
@@ -540,7 +571,7 @@ test_that("person-level rates split by several dimensions match a combined colum
 test_that("union rates split by each partner's dimensions match a combined column", {
   model <- split_model()
   model <- set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = .2))
-  out <- simulate(model, 4, seed = 32)
+  out <- run_simulation(model, 4, seed = 32)
   ref <- combined_reference(out)
   reference <- split_rr(split_rr(calculate_dissolution_rates(ref, c(0, 2, 4), c(0, Inf),
     by = c("rr_w", "rr_h")), "_w"), "_h")
@@ -552,14 +583,14 @@ test_that("union rates split by each partner's dimensions match a combined colum
                 c("time_start", "race_w", "region_h"), c("union_years", "dissolutions"))
   expect_equal(ours$rate_dissolution, ours$dissolutions / ours$union_years)
   ours <- calculate_dissolution_rates(out, c(0, 4), c(0, Inf), by = c("region_w", "race_w", "race_h"),
-                                      conf.level = .95)
+                                      conf_level = .95)
   compare_split(ours, sum_by(reference, c("region_w", "race_w", "race_h"), c("union_years", "dissolutions")),
                 c("region_w", "race_w", "race_h"), c("union_years", "dissolutions"))
   expect_true(all(ours$conf_low <= ours$rate_dissolution))
 })
 
 test_that("transition rates split by another dimension count only their own moves", {
-  out <- simulate(split_model(), 4, seed = 33)
+  out <- run_simulation(split_model(), 4, seed = 33)
   ref <- combined_reference(out)
   ours <- calculate_transition_rates(out, c(0, 4), age_breaks = c(0, 40, Inf), by = c("region", "sex"),
                                      group = "race")
@@ -598,7 +629,7 @@ test_that("durations by another dimension count from entering this dimension's c
 })
 
 test_that("summaries keep group dimension columns and errors name the dimensions", {
-  out <- simulate(split_model(), 3, seed = 34)
+  out <- run_simulation(split_model(), 3, seed = 34)
   asfr <- calculate_fertility_rates(out, c(0, 3), seq(15, 50, 5), by = c("race", "region"))
   tfr <- calculate_tfr(asfr)
   expect_named(tfr, c("time_start", "time_end", "race", "region", "age_start", "age_end", "tfr"))
@@ -622,8 +653,8 @@ test_that("weight models use any dimension's variables", {
   persons <- model$population$persons
   # Deaths in a pooled cell go almost only to region S.
   rates <- data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .05)
-  weighted <- set_mortality(model, rates, weights = create_weight_model(~ region, c(regionS = 12)))
-  out <- simulate(weighted, 3, seed = 51)
+  weighted <- set_mortality(model, rates, weights = weight_model(~ region, c(regionS = 12)))
+  out <- run_simulation(weighted, 3, seed = 51)
   dead <- out$persons[!is.na(out$persons$death_time), ]
   expect_gt(nrow(dead), 30)
   expect_true(all(dead$region == "S"))
@@ -631,12 +662,13 @@ test_that("weight models use any dimension's variables", {
   tracked <- set_groups(model, race = group(ancestry = TRUE), region = group())
   moves <- set_group_transition(tracked, data.frame(origin = c("A", "B"), destination = c("B", "A"),
     age_start = 0, age_end = Inf, rate = .3), group = "race",
-    weights = create_weight_model(~ region + ancestry_race_A, c(regionS = 12, ancestry_race_A = 0)))
-  out <- simulate(moves, 2, seed = 52)
+    weights = weight_model(~ region + ancestry_race_A, c(regionS = 12, ancestry_race_A = 0)))
+  out <- run_simulation(moves, 2, seed = 52)
   movers <- out$transitions$person_id[out$transitions$group == "race"]
   expect_gt(length(movers), 20)
   expect_true(all(out$persons$region[match(movers, out$persons$person_id)] == "S"))
-  expect_error(simulate(set_mortality(model, rates, weights = create_weight_model(~ ancestry_race_A,
+  expect_error(run_simulation(set_mortality(model, rates, weights =
+    weight_model(~ ancestry_race_A,
     c(ancestry_race_A = 1))), 0), "not available for this process: ancestry_race_A")
   # Union variables by dimension: dissolutions only where regions differ.
   persons <- data.frame(person_id = 1:400, sex = rep(c("f", "m"), 200), birth_time = -30,
@@ -650,30 +682,34 @@ test_that("weight models use any dimension's variables", {
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = 0)) |>
     set_union_formation("on_demand") |>
     set_union_dissolution(data.frame(dur_start = 0, dur_end = Inf, rate = .1),
-      weights = create_weight_model(~ same_region + region_h, c(same_region = -12, region_hS = 0)))
-  out <- simulate(couples, 3, seed = 53)
+      weights = weight_model(~ same_region + region_h, c(same_region = -12, region_hS = 0)))
+  out <- run_simulation(couples, 3, seed = 53)
   ended <- !is.na(out$unions$end_time)
   expect_gt(sum(ended), 20)
   expect_true(all(out$unions$union_id[ended] > 100))
   expect_error(set_union_dissolution(couples, data.frame(dur_start = 0, dur_end = Inf, rate = .1),
-    weights = create_weight_model(~ partnered, c(partnered = 1))), "not available")
+    weights = weight_model(~ partnered, c(partnered = 1))), "not available")
 })
 
 test_that("custom weight functions see every dimension in members and cells", {
   model <- two_dimension_model(200, union = TRUE)
   seen <- new.env()
-  record <- function(name) function(members, bin) {
-    if (is.null(seen[[name]])) assign(name, list(members = members, bin = bin), envir = seen)
-    rep(0, nrow(members))
+  record <- function(name) {
+    function(members, bin) {
+      if (is.null(seen[[name]])) {
+        assign(name, list(members = members, bin = bin), envir = seen)
+      }
+      rep(0, nrow(members))
+    }
   }
   model <- set_mortality(model, stratify_rates(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf,
-    rate = .2), list(region = c(N = 1, S = 2))), weights = create_weight_model(fun = record("mortality")))
+    rate = .2), list(region = c(N = 1, S = 2))), weights = weight_model(fun = record("mortality")))
   model <- set_union_dissolution(model, stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = .3),
-    list(race_w = c(A = 1, B = 2))), weights = create_weight_model(fun = record("dissolution")))
+    list(race_w = c(A = 1, B = 2))), weights = weight_model(fun = record("dissolution")))
   model <- set_group_transition(model, data.frame(origin = "N", destination = "S", race = "B",
     age_start = 0, age_end = Inf, rate = .5), group = "region",
-    weights = create_weight_model(fun = record("transition")))
-  simulate(model, 2, seed = 54)
+    weights = weight_model(fun = record("transition")))
+  run_simulation(model, 2, seed = 54)
   m <- seen$mortality
   expect_true(all(c("race", "region", "partner_race", "partner_region") %in% names(m$members)))
   expect_true(m$bin$region %in% c("N", "S"))
@@ -698,18 +734,19 @@ test_that("calendar bands switch rates stratified by several dimensions", {
     time_start = -100, time_end = 1), list(race = c(A = 1, B = 1), region = c(N = 0, S = 1)))
   late <- stratify_rates(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 1e8,
     time_start = 1, time_end = Inf), list(race = c(A = 0, B = 1), region = c(N = 1, S = 1)))
-  out <- simulate(set_mortality(model, rbind(early, late)), 2, seed = 61)
+  out <- run_simulation(set_mortality(model, rbind(early, late)), 2, seed = 61)
   died <- out$persons$death_time[seq_len(nrow(persons))]
   expect_true(all(died[persons$region == "S"] < 1e-6))
   expect_true(all(abs(died[persons$region == "N" & persons$race == "B"] - 1) < 1e-6))
   expect_true(all(is.na(died[persons$region == "N" & persons$race == "A"])))
   # Every active slice must cover each combination.
   gap <- rbind(early, late[!(late$race == "A" & late$region == "S"), ])
-  expect_error(simulate(set_mortality(model, gap), 2), "missing schedules.*race=A, region=S")
+  expect_error(run_simulation(set_mortality(model, gap), 2),
+    "missing schedules.*race=A, region=S")
 })
 
 test_that("cohabitation probabilities and conversion use declared dimensions", {
-  model <- matching_pair_model(create_age_gap_matching_model(0, 5))
+  model <- matching_pair_model(age_gap_matching_model(0, 5))
   model <- set_union_formation(model, "rate",
     rates = data.frame(age_start = 0, age_end = Inf, rate = 2),
     cohab_prob = data.frame(race = c("A", "B"), age_start = 0, age_end = Inf, prob = c(1, 0)),
@@ -718,8 +755,8 @@ test_that("cohabitation probabilities and conversion use declared dimensions", {
     kinship_generations = 0)
   model <- set_fertility(model, data.frame(union_type = c("unpartnered", "cohab", "marriage"),
     age_start = 15, age_end = 50, rate = 0))
-  out <- simulate(model, 1, seed = 62)
-  u <- get_detailed_unions(out)
+  out <- run_simulation(model, 1, seed = 62)
+  u <- augment_unions(out)
   first <- u[is.na(u$previous_cohab_id), ]
   expect_gt(nrow(first), 50)
   # Women of race A cohabit, women of race B marry.
@@ -751,7 +788,7 @@ step2_tables <- function(model, father = NULL) {
 
 test_that("pair effects, prohibitions and delta combine across dimensions as specified", {
   # Worked example 1: effects add.
-  x <- step2_tables(create_age_gap_matching_model(0, 5,
+  x <- step2_tables(age_gap_matching_model(0, 5,
     group_exogamy = list(race = c("A:B" = -2), region = c("N:S" = -1))))
   expect_identical(x$labels, c("A|N", "B|N", "A|S", "B|S"))
   expect_identical(x$dims, c("race", "region"))
@@ -759,27 +796,27 @@ test_that("pair effects, prohibitions and delta combine across dimensions as spe
   expect_equal(x$prepared$pair_offsets, t(x$prepared$pair_offsets))
   expect_false(x$prepared$prevent_exogamy_all)
   # Example 2: a region prohibition with a race effect.
-  x <- step2_tables(create_age_gap_matching_model(0, 5,
+  x <- step2_tables(age_gap_matching_model(0, 5,
     group_exogamy = list(race = c("A:B" = -2), region = NA)))
   expect_equal(x$prepared$pair_offsets[1, 1:2], c(0, -2))
   expect_identical(x$prepared$blocked_pairs[1, ], c(FALSE, FALSE, TRUE, TRUE))
   expect_identical(x$prepared$blocked_pairs, t(x$prepared$blocked_pairs))
   # Prohibiting every dimension prohibits every different combination.
-  x <- step2_tables(create_age_gap_matching_model(0, 5, group_exogamy = list(race = NA, region = NA)))
+  x <- step2_tables(age_gap_matching_model(0, 5, group_exogamy = list(race = NA, region = NA)))
   expect_true(x$prepared$prevent_exogamy_all)
   # Example 3: formula predictors from both dimensions.
-  x <- step2_tables(create_matching_model(~ same_race + same_region, c(same_race = 1, same_region = .5)))
+  x <- step2_tables(matching_model(~ same_race + same_region, c(same_race = 1, same_region = .5)))
   expect_equal(calculate_matching_utilities(x$internal, rep(0, 4), "A|N", x$labels), c(1.5, .5, 1, 0))
-  x <- step2_tables(create_matching_model(~ female_race:same_region,
+  x <- step2_tables(matching_model(~ female_race:same_region,
     c("female_raceA:same_region" = 1, "female_raceB:same_region" = 2)))
   expect_equal(calculate_matching_utilities(x$internal, rep(0, 4), "B|S", x$labels), c(0, 0, 2, 2))
-  expect_error(step2_tables(create_matching_model(~ female_race + same_region, c(same_region = 1))),
+  expect_error(step2_tables(matching_model(~ female_race + same_region, c(same_region = 1))),
                "coefficient names.*female_raceB")
   # Example 4: delta adds per combination.
-  x <- step2_tables(create_age_gap_matching_model(0, 5,
+  x <- step2_tables(age_gap_matching_model(0, 5,
     delta = list(race = c(B = .5), region = c(S = .2))))
   expect_equal(x$prepared$delta, c(0, .5, .2, .7))
-  expect_error(step2_tables(create_age_gap_matching_model(0, 5,
+  expect_error(step2_tables(age_gap_matching_model(0, 5,
     delta = list(race = c(C = 1), region = c(S = .2)))), "categories of `race`")
 })
 
@@ -789,70 +826,76 @@ step2_model <- function(matching, father_matching = NULL, cohab = FALSE) {
     father_matching = father_matching, rates = data.frame(age_start = 0, age_end = Inf, rate = 1),
     cohab_prob = data.frame(age_start = 0, age_end = Inf, prob = .5),
     union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .1),
-    cohab_matching = create_age_gap_matching_model(0, 5, group_exogamy = list(region = NA)),
+    cohab_matching = age_gap_matching_model(0, 5, group_exogamy = list(region = NA)),
     kinship_generations = 0)
   model
 }
 
 test_that("one matching model can combine a race effect with a region prohibition", {
-  out <- simulate(step2_model(create_age_gap_matching_model(0, 5,
+  out <- run_simulation(step2_model(age_gap_matching_model(0, 5,
     group_exogamy = list(race = c("A:B" = -30), region = NA))), 2, seed = 71)
   expect_gt(nrow(out$unions), 100)
-  race <- pair_categories(out, "race"); region <- pair_categories(out, "region")
+  race <- pair_categories(out, "race")
+  region <- pair_categories(out, "region")
   expect_true(all(region$w == region$h))
   expect_true(all(race$w == race$h))
   # Diagnostics name combinations.
-  diag <- simulate(set_union_formation(step2_model(create_age_gap_matching_model(0, 5,
+  diag <- run_simulation(set_union_formation(step2_model(age_gap_matching_model(
+    0, 5,
     group_exogamy = list(race = c("A:B" = -1), region = c("N:S" = -1)))), "on_demand",
-    matching = create_age_gap_matching_model(0, 5, group_exogamy = list(race = c("A:B" = -1),
+    matching = age_gap_matching_model(0, 5, group_exogamy = list(race = c("A:B" = -1),
       region = c("N:S" = -1))), kinship_generations = 0, diagnostics = TRUE), .5, seed = 72)
   expect_true(all(paste0(".log_weight_", c("A|N", "B|N", "A|S", "B|S")) %in% names(diag$unions)))
 })
 
 test_that("models naming different dimensions share the combination", {
   # Example 5: the general model uses race and the father model region.
-  race <- create_age_gap_matching_model(0, 5, group_exogamy = list(race = c("A:B" = -30)))
-  region <- create_age_gap_matching_model(0, 5, group_exogamy = list(region = NA))
+  race <- age_gap_matching_model(0, 5, group_exogamy = list(race = c("A:B" = -30)))
+  region <- age_gap_matching_model(0, 5, group_exogamy = list(region = NA))
   x <- step2_tables(race, father = region)
   expect_identical(x$labels, c("A|N", "B|N", "A|S", "B|S"))
   expect_equal(x$prepared$pair_offsets[1, ], c(0, -30, 0, -30))
   expect_false(any(x$prepared$blocked_pairs))
   # Near-prohibitive effects can leave some combinations' targets unmet; the
   # engine warns and uses capped weights, as with one dimension.
-  out <- suppressWarnings(simulate(step2_model(race, father_matching = region, cohab = TRUE), 1, seed = 73))
+  out <- suppressWarnings(run_simulation(step2_model(race, father_matching =
+    region, cohab = TRUE), 1, seed = 73))
   # Marriages formed directly (converted cohabitations keep their partners).
   direct <- out$unions$union_type == "marriage" & is.na(out$unions$previous_cohab_id)
   race_pairs <- pair_categories(out, "race")[direct, ]
   expect_gt(nrow(race_pairs), 30)
   expect_true(all(race_pairs$w == race_pairs$h))
   # Cohabitations use the cohabitation model's region prohibition.
-  u <- get_detailed_unions(out)
+  u <- augment_unions(out)
   cohab <- u[u$union_type == "cohab", ]
   expect_gt(nrow(cohab), 10)
   expect_true(all(cohab$region_w == cohab$region_h))
   # Calendar schedule entries may name different dimensions.
   schedule <- tibble::tibble(time_start = c(-100, 1), time_end = c(1, Inf), model = list(race, region))
   # Each region is calibrated as its own market (D138), so targets are met.
-  expect_no_warning(out <- simulate(matching_pair_model(schedule), 2, seed = 74))
-  u <- get_detailed_unions(out)
-  early <- u$start_time < 1; late <- !early
-  expect_gt(sum(early), 30); expect_gt(sum(late), 30)
+  expect_no_warning(out <- run_simulation(matching_pair_model(schedule), 2,
+    seed = 74))
+  u <- augment_unions(out)
+  early <- u$start_time < 1
+  late <- !early
+  expect_gt(sum(early), 30)
+  expect_gt(sum(late), 30)
   expect_true(all(u$race_w[early] == u$race_h[early]))
   expect_true(all(u$region_w[late] == u$region_h[late]))
   # A person's combination follows moves in either dimension.
-  moving <- set_group_transition(step2_model(create_age_gap_matching_model(0, 5,
+  moving <- set_group_transition(step2_model(age_gap_matching_model(0, 5,
     group_exogamy = list(region = NA, race = c("A:B" = -30)))),
     data.frame(origin = c("N", "S"), destination = c("S", "N"), age_start = 0, age_end = Inf, rate = 2),
     group = "region")
   withr::local_options(hammel.check_cells = TRUE)
-  expect_no_warning(out <- simulate(moving, 1, seed = 75))
-  u <- get_detailed_unions(out)
+  expect_no_warning(out <- run_simulation(moving, 1, seed = 75))
+  u <- augment_unions(out)
   expect_gt(sum(out$transitions$group == "region"), 50)
   expect_true(all(u$region_w == u$region_h))
 })
 
 test_that("separate markets are calibrated within themselves (D138)", {
-  x <- step2_tables(create_age_gap_matching_model(0, 5,
+  x <- step2_tables(age_gap_matching_model(0, 5,
     group_exogamy = list(race = c("A:B" = -1), region = NA)))
   # Combinations A|N, B|N, A|S, B|S (codes 0-3). The South has twice as many
   # men as women; women search equally everywhere.
@@ -877,7 +920,7 @@ test_that("a group_exogamy table fully specifies pair effects over combinations"
   table <- data.frame(race_x = c("A", "A", "A"), region_x = c("S", "S", "N"),
                       race_y = c("B", "A", "B"), region_y = c("S", "N", "N"),
                       log_odds = c(-5, NA, -4))
-  x <- step2_tables(create_age_gap_matching_model(0, 5, group_exogamy = table))
+  x <- step2_tables(age_gap_matching_model(0, 5, group_exogamy = table))
   expect_identical(x$dims, c("race", "region"))
   # Woman A|S: A|N prohibited, A|S 0, B|S -5, B|N 0.
   expect_equal(x$prepared$pair_offsets["A|S" == x$labels, ][c(2, 3, 4)], c(0, 0, -5))
@@ -891,13 +934,15 @@ test_that("a group_exogamy table fully specifies pair effects over combinations"
   full <- data.frame(race_x = labels$race[pairs[, 1]], region_x = labels$region[pairs[, 1]],
                      race_y = labels$race[pairs[, 2]], region_y = labels$region[pairs[, 2]])
   full$log_odds <- -2 * (full$race_x != full$race_y) - 1 * (full$region_x != full$region_y)
-  listed <- create_age_gap_matching_model(0, 5, group_exogamy = list(race = c("A:B" = -2), region = c("N:S" = -1)))
-  tabled <- create_age_gap_matching_model(0, 5, group_exogamy = full)
+  listed <- age_gap_matching_model(0, 5, group_exogamy = list(race = c("A:B" = -2), region = c("N:S" = -1)))
+  tabled <- age_gap_matching_model(0, 5, group_exogamy = full)
   expect_equal(step2_tables(tabled)$prepared$pair_offsets, step2_tables(listed)$prepared$pair_offsets)
-  expect_identical(histories(simulate(matching_pair_model(tabled), 1, seed = 81)),
-                   histories(simulate(matching_pair_model(listed), 1, seed = 81)))
+  expect_identical(histories(run_simulation(matching_pair_model(tabled), 1,
+    seed = 81)),
+                   histories(run_simulation(matching_pair_model(listed), 1,
+                     seed = 81)))
   # A one-dimension table in a two-dimension model.
-  x <- step2_tables(create_age_gap_matching_model(0, 5,
+  x <- step2_tables(age_gap_matching_model(0, 5,
     group_exogamy = data.frame(race_x = "A", race_y = "B", log_odds = -3)))
   expect_identical(x$dims, "race")
   expect_equal(x$prepared$pair_offsets[1, ], c(0, -3))
@@ -909,11 +954,13 @@ test_that("tables give cross-dimension effects, such as race exogamy that differ
   table <- rbind(data.frame(race_x = "A", region_x = "S", race_y = "B", region_y = "S", log_odds = NA),
                  data.frame(race_x = cross$race_x, region_x = "N", race_y = cross$race_y, region_y = "S",
                             log_odds = NA))
-  out <- simulate(matching_pair_model(create_age_gap_matching_model(0, 5, group_exogamy = table)), 2, seed = 82)
-  u <- get_detailed_unions(out)
+  out <- run_simulation(matching_pair_model(age_gap_matching_model(0, 5,
+    group_exogamy = table)), 2, seed = 82)
+  u <- augment_unions(out)
   expect_gt(nrow(u), 100)
   expect_true(all(u$region_w == u$region_h))
-  south <- u$region_w == "S"; north <- !south
+  south <- u$region_w == "S"
+  north <- !south
   expect_true(all(u$race_w[south] == u$race_h[south]))
   expect_gt(sum(u$race_w[north] != u$race_h[north]), 10)
 })
@@ -928,35 +975,40 @@ test_that("group_exogamy tables are validated", {
     transform(base, log_odds = -Inf),
     data.frame(race_x = NA, race_y = "B", log_odds = -1),
     base[c("race_x", "race_y")])
-  for (x in bad) expect_error(create_age_gap_matching_model(0, 5, group_exogamy = x))
+  for (x in bad) expect_error(age_gap_matching_model(0, 5, group_exogamy = x))
   # Dimensions are checked against the declaration at simulation.
-  expect_error(simulate(matching_pair_model(create_age_gap_matching_model(0, 5,
+  expect_error(run_simulation(matching_pair_model(age_gap_matching_model(0, 5,
     group_exogamy = data.frame(caste_x = "A", caste_y = "B", log_odds = -1))), 0),
     "`caste`, which is not a declared group dimension")
   # Rows naming absent categories are unused.
-  x <- step2_tables(create_age_gap_matching_model(0, 5,
+  x <- step2_tables(age_gap_matching_model(0, 5,
     group_exogamy = data.frame(race_x = c("A", "Z"), race_y = c("B", "A"), log_odds = c(-1, -9))))
   expect_equal(x$prepared$pair_offsets[1, ], c(0, -1))
 })
 
 test_that("review regressions: absent-category schedules, dimensions named group, parent info", {
-  base <- function(pop) hammel_model() |> set_population(pop) |>
-    set_fertility(data.frame(age_start = 15, age_end = 45, rate = .1)) |>
-    set_union_formation("on_demand", kinship_generations = 0)
+  base <- function(pop) {
+    hammel_model() |> set_population(pop) |>
+      set_fertility(data.frame(age_start = 15, age_end = 45, rate = .1)) |>
+      set_union_formation("on_demand", kinship_generations = 0)
+  }
   # Rows naming only categories the population lacks still leave its
   # categories without schedules (with inferred categories).
   set.seed(1)
-  pop <- create_baseline_population(200, groups = list(race = c(A = 1)))
+  pop <- generate_uniform_population(200, groups = list(race = c(A = 1)))
   pop$groups$race["categories"] <- list(NULL)
   model <- set_mortality(base(pop), data.frame(sex = c("m", "f"), race = "B", age_start = 0, age_end = Inf,
                                                rate = 1e8))
-  expect_error(simulate(model, 1, seed = 2), "missing schedules for group\\(s\\): A")
+  expect_error(run_simulation(model, 1, seed = 2),
+    "missing schedules for group\\(s\\): A")
   calendar <- data.frame(sex = c("m", "f", "m", "f"), race = c("A", "A", "B", "B"), age_start = 0,
     age_end = Inf, rate = .01, time_start = c(-10, -10, 1, 1), time_end = c(1, 1, Inf, Inf))
-  expect_error(simulate(set_mortality(base(pop), calendar), 2, seed = 2), "missing schedules.*A")
+  expect_error(run_simulation(set_mortality(base(pop), calendar), 2, seed = 2),
+    "missing schedules.*A")
   # A dimension named `group` alongside another.
   set.seed(1)
-  pop <- create_baseline_population(200, groups = list(group = c(A = .5, B = .5), region = c(N = .5, S = .5)))
+  pop <- generate_uniform_population(200, groups = list(group = c(A = .5, B =
+    .5), region = c(N = .5, S = .5)))
   sizes <- calculate_population_size(pop, 0, by = c("group", "region"))
   expect_named(sizes, c("time", "group", "region", "population"))
   expect_equal(sum(sizes$population), 200)
@@ -964,11 +1016,13 @@ test_that("review regressions: absent-category schedules, dimensions named group
                c("time", "region", "sex", "group", "population"))
   # Parent information for every declared dimension, ignoring undeclared columns.
   set.seed(1)
-  pop <- create_baseline_population(300, groups = list(race = c(A = .5, B = .5), region = c(N = .5, S = .5)))
+  pop <- generate_uniform_population(300, groups = list(race = c(A = .5, B =
+    .5), region = c(N = .5, S = .5)))
   pop$persons$group <- "undeclared"
-  out <- simulate(set_mortality(base(pop), data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = .01)),
+  out <- run_simulation(set_mortality(base(pop), data.frame(sex = c("m", "f"),
+    age_start = 0, age_end = Inf, rate = .01)),
                   3, seed = 3)
-  expect_no_warning(info <- get_parent_info(out))
+  expect_no_warning(info <- augment_persons(out))
   expect_true(all(c("race_mother", "race_father", "region_mother", "region_father") %in% names(info)))
   expect_false(any(c("group_mother", "group_father") %in% names(info)))
   kids <- !is.na(info$mother_id)

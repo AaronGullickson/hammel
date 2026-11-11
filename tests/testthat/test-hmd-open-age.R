@@ -35,7 +35,8 @@ test_that("HMD open-age pooling uses ratios of sums separately by sex and period
   expect_error(mortality_from_hmd(x$mx, 2000), "year 2000, sex m, age \\[2, 3\\)")
   # Pooling does not change the input or hide missing younger rates.
   expect_true(all(is.na(x$mx$Male[x$mx$Age == "4+"])))
-  bad <- x; bad$mx$Female[1] <- NA_real_
+  bad <- x
+  bad$mx$Female[1] <- NA_real_
   expect_error(pooled_hmd_fixture(bad), "year 2000, sex f, age \\[0, 1\\)")
 })
 
@@ -62,12 +63,15 @@ test_that("cutoffs require valid source age boundaries", {
 
 test_that("pooling requires finite nonnegative counts and positive aggregate exposure", {
   for (source in c("deaths", "exposures")) for (value in c(NA_real_, Inf, -1)) {
-    x <- hmd_open_fixture(); x[[source]]$Male[3] <- value
+    x <- hmd_open_fixture()
+    x[[source]]$Male[3] <- value
     expect_error(pooled_hmd_fixture(x), "year 2000, sex m, age \\[2, 3\\)")
   }
-  x <- hmd_open_fixture(); x$exposures$Female[3:5] <- 0
+  x <- hmd_open_fixture()
+  x$exposures$Female[3:5] <- 0
   expect_error(pooled_hmd_fixture(x), "positive finite exposure.*year 2000, sex f")
-  x <- hmd_open_fixture(); x$deaths$Male[3:5] <- 0
+  x <- hmd_open_fixture()
+  x$deaths$Male[3:5] <- 0
   out <- pooled_hmd_fixture(x)
   expect_equal(out$rates$rate[out$rates$time_start == 2000 & out$rates$sex == "m" &
     out$rates$age_start == 2], 0)
@@ -76,22 +80,28 @@ test_that("pooling requires finite nonnegative counts and positive aggregate exp
   x$deaths$Female[c(1, 8)] <- NA_real_
   x$exposures$Male[c(1, 8)] <- NA_real_
   expect_s3_class(pooled_hmd_fixture(x, years = 2000)$rates, "tbl_df")
-  x <- hmd_open_fixture(); x$deaths$Male <- as.character(x$deaths$Male)
+  x <- hmd_open_fixture()
+  x$deaths$Male <- as.character(x$deaths$Male)
   expect_error(pooled_hmd_fixture(x), "numeric")
 })
 
 test_that("pooling rejects missing, duplicate, mismatched and incomplete tail bands", {
   for (source in c("deaths", "exposures")) {
-    x <- hmd_open_fixture(); x[[source]] <- x[[source]][-3, ]
+    x <- hmd_open_fixture()
+    x[[source]] <- x[[source]][-3, ]
     expect_error(pooled_hmd_fixture(x), "bands do not match")
-    x <- hmd_open_fixture(); x[[source]] <- rbind(x[[source]], x[[source]][3, ])
+    x <- hmd_open_fixture()
+    x[[source]] <- rbind(x[[source]], x[[source]][3, ])
     expect_error(pooled_hmd_fixture(x), "bands do not match")
-    x <- hmd_open_fixture(); x[[source]]$Age[5] <- "5+"
+    x <- hmd_open_fixture()
+    x[[source]]$Age[5] <- "5+"
     expect_error(pooled_hmd_fixture(x), "bands do not match")
-    x <- hmd_open_fixture(); x[[source]] <- x[[source]][x[[source]]$Year != 2001, ]
+    x <- hmd_open_fixture()
+    x[[source]] <- x[[source]][x[[source]]$Year != 2001, ]
     expect_error(pooled_hmd_fixture(x), "missing requested source periods")
   }
-  x <- hmd_open_fixture(); x$mx <- x$mx[-4, ]
+  x <- hmd_open_fixture()
+  x$mx <- x$mx[-4, ]
   expect_error(pooled_hmd_fixture(x), "complete source tail")
 })
 
@@ -108,19 +118,23 @@ test_that("pooling supports native grouped ages and raw or parsed calendar perio
   parsed <- lapply(x, function(d) {
     d$Age <- rep(c(0, 1, 95, 100, 105), 2)
     d$OpenInterval <- rep(c(FALSE, FALSE, FALSE, FALSE, TRUE), 2)
-    d$Year <- rep(c(2000, 2005), each = 5); d
+    d$Year <- rep(c(2000, 2005), each = 5)
+    d
   })
   expect_identical(pooled_hmd_fixture(parsed, c(2000, 2005), 95, "5x5", 2000:2008), out)
-  bad <- x; bad$exposures$Year[6:10] <- "2005-2009"
+  bad <- x
+  bad$exposures$Year[6:10] <- "2005-2009"
   expect_error(pooled_hmd_fixture(bad, c(2000, 2005), 95, "5x5"), "bands do not match")
 })
 
 test_that("getters fetch pooling products only on request and retain safe provenance", {
   skip_if_not_installed("HMDHFDplus")
-  x <- hmd_open_fixture(); calls <- character()
+  x <- hmd_open_fixture()
+  calls <- character()
   with_database_reader("readHMDweb", function(CNTRY, item, username, password, fixup) {
     calls <<- c(calls, item)
-    expect_equal(CNTRY, "SWE"); expect_false(fixup)
+    expect_equal(CNTRY, "SWE")
+    expect_false(fixup)
     switch(item, Mx_1x1 = x$mx, Deaths_1x1 = x$deaths, Exposures_1x1 = x$exposures,
       stop("Unexpected source product"))
   }, {
@@ -133,8 +147,10 @@ test_that("getters fetch pooling products only on request and retain safe proven
     expect_equal(source$pooled_tail$deaths, c(5, 3, 10, 3))
     expect_false(any(c("username", "password") %in% names(source)))
     expect_identical(set_mortality(hammel_model(), r)$processes$mortality$source, source)
-    path <- tempfile(); on.exit(unlink(path), add = TRUE)
-    saveRDS(r, path); expect_identical(readRDS(path), r)
+    path <- tempfile()
+    on.exit(unlink(path), add = TRUE)
+    saveRDS(r, path)
+    expect_identical(readRDS(path), r)
     calls <- character()
     expect_error(get_mortality_hmd("SWE", 2000, "test", "test"), "year 2000")
     expect_identical(calls, "Mx_1x1")
@@ -146,7 +162,7 @@ test_that("pooled complete schedules run directly in the continuous engine", {
   m <- make_model(1000, age = 2, death_rate = 0)
   m$population$persons$birth_time <- 1998
   m$population$end_time <- 2000
-  out <- simulate(set_mortality(m, r), 2, seed = 911)
+  out <- run_simulation(set_mortality(m, r), 2, seed = 911)
   expected <- exp(-5 / 120 - 10 / 60)
   expect_lt(abs(mean(is.na(out$persons$death_time)) - expected),
     5 * sqrt(expected * (1 - expected) / 1000))

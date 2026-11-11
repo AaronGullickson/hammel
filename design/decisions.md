@@ -22,10 +22,13 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | Person-year inputs and hazard sampling | D005–D007, D013, D024; cell scheduling D128 |
 | Population representation, sex labels, public tibbles | D012, D015, D016, D023 |
 | Process constructors/setters | D017, D026 |
+| Noun names for specification constructors | D147 |
+| Uniform-age population generator naming | D153 |
 | Database rate products and reusable downloads | D018, D025 |
 | Demographic extraction and function names | D020–D022, D081 and missing-ASFR clarification |
-| Optional Poisson intervals for observed rates | D124 |
-| Continuous execution | D024 |
+| Life-table input rate columns | D154 |
+| Optional Poisson intervals for observed rates | D124; argument name D148 |
+| Continuous execution | D024; execution function name D152 |
 | Fertility spacing (cell accounting) | D026, D101 (superseding D027/D028/D099 compensation) |
 | Two-sex union models and union API restructuring (deferred) | D073 |
 | Duration-dependent dissolution and symmetric group pairs | D078–D079 |
@@ -3148,3 +3151,343 @@ use the ordinary birth-time selection contract. See [the specification](group-in
 
 **Supersedes:** earlier deferral of fixed newborn assignment; random-parent
 inheritance remains the default for dimensions without an explicit rule.
+
+
+## D143 — R source organization (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Organize R source files by cohesive responsibility, keeping related public functions and their specific helpers together. Use the exact lead function name for a filename when there is a clear lead, preferring the constructor over its convenience setter; otherwise use a descriptive responsibility name. The agreed map is implemented in [R source organization](r-source-organization.md).
+
+Observed event-rate calculators and rate-specific helpers share `calculate_rates.R`. Shared history-analysis preparation lives in `analysis_utils.R`; input-rate validation and engine encoding live in `rates_util.R`. HMD/HFD import functions and all their helpers share `get_database_rates.R`. TFR/PATFR share `calculate_tfr.R`. Matching is separate from union-formation process configuration; transition histories are separate from transition-process configuration. Keep `model_schedules.R` and `set_population()` in `hammel_model.R` as agreed. The `simulate()` body remains intact.
+
+**Future additions:** When a new function has no logical home in an existing R file, explain the proposed responsibility and filename and ask the user before creating a new R script. Do not create one automatically. This requirement is also in `AGENTS.md`.
+
+**Scope:** Mechanical organization, preserving function definitions, constants, source comments, exports, and help topics. Help-topic redesign, pkgdown reference grouping, new demographic behavior, and simulation-body refactoring are separate work. Explicit roxygen ordering preserves the existing shared-help display order after files are split.
+
+
+**Within-file organization (user instruction, November 9, 2026):** Start each hand-maintained R script with a brief purpose comment above the section headings. Put exported functions before internal constants and helper functions, with `# PUBLIC FUNCTIONS ------`, `# INTERNAL CONSTANTS ------`, and `# HELPER FUNCTIONS ------` headings where applicable. Preserve function bodies and documentation blocks. Keep generated wrappers untouched; package documentation uses its own section.
+
+
+## D144 — Shared help for process constructors and setters (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Each demographic process constructor shares a help topic with its corresponding convenience setter. The five pairs are mortality, fertility, union formation, union dissolution, and group transitions. Each page explains the specification once, shows both interfaces, and distinguishes the returned process specification from the updated model. Neither interface executes a simulation.
+
+Keep generic `set_process()` on its own topic for attaching an existing specification, with links to the process-specific topics. Separate the formerly combined mortality/fertility constructor page and remove their setters from the generic attachment page. The other three process pairs already shared topics; clarify their constructor/setter relationship. This is documentation organization, with no function, argument, default, or demographic behavior changes.
+
+
+## D145 — Shared help for observed event-rate calculators (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Combine the seven observed event-rate calculators into the `calculate_rates` help topic: mortality, fertility, union formation, marriage, dissolution, cohabitation conversion, and group transitions. Preserve each function's own help alias. Document common arguments once, provide an event/exposure comparison, and retain separate sections describing each function's event definitions, eligibility, timing, strata, exposure denominator, and output. Include examples covering all seven calculators without running a simulation or downloading rates.
+
+Keep population size, TFR/PATFR, and life tables on separate help topics. This changes documentation organization only; function names, arguments, defaults, exports, and executable behavior remain unchanged.
+
+
+## D146 — Shared fertility-summary and group-declaration help (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Combine `calculate_tfr()` and `calculate_patfr()` on the `calculate_tfr` help topic, explaining the age-only sum, the conditional age/parity fertility table, automatic dispatch when parity columns are present, and the differing output column names. Preserve the distinct scientific conventions of both calculations.
+
+Combine `group()` and `set_groups()` on the `group` help topic, distinguishing a single dimension's settings from declaring named dimensions on a model. Retain each function's help alias, arguments, and relevant examples. Leave `create_matching_model()` and `create_age_gap_matching_model()` on separate help topics, as explicitly requested. No executable behavior, defaults, or exports change.
+
+
+## D147 — Noun names for specification constructors (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Replace the four `create_*` specification constructors with noun-based names:
+
+| Former name | Current name |
+| --- | --- |
+| `create_matching_model()` | `matching_model()` |
+| `create_age_gap_matching_model()` | `age_gap_matching_model()` |
+| `create_weight_model()` | `weight_model()` |
+| `create_group_inheritance()` | `group_inheritance()` |
+
+Keep `create_baseline_population()` unchanged. Verbs remain appropriate for pipeable actions such as `set_population()`; standalone specification constructors use nouns. Rename the three corresponding source files to match their lead functions. Matching constructors retain separate help topics, as requested under D146.
+
+**Compatibility and scope:** This is a direct pre-release API rename, without aliases under the former names. Defaults, classes, validation rules, stochastic behavior, and model semantics remain unchanged. Update package code, tests, generated help, and current design specifications. Preserve user-maintained README/vignettes, historical validation reports and supporting scripts, and dated verification/handoff records. Those sources can retain historical calls; running them against the renamed API requires updating the calls or using their recorded software version. Earlier decision entries retain their original constructor spellings; this entry governs current names.
+
+
+## D148 — Snake-case confidence argument and function-style review (November 9, 2026)
+
+**Status:** User instruction and implementation authorization, November 9, 2026.
+
+**Decision:** Rename Hammel's `conf.level` argument to `conf_level` on all seven observed event-rate calculators and their internal helpers. Update tests, generated help, diagnostics, and current specifications. Keep the external `stats::poisson.test(conf.level = conf_level)` call intact. This is a direct pre-release argument rename without an alias for the former spelling; default output, interval calculation, column names, and exports are unchanged. This supersedes the argument spelling in D124, not its statistical contract.
+
+**Review:** Check the public API and hand-maintained R code against tidyverse naming, function-writing, and syntax conventions, retaining the user's noun constructors, purpose comments, and uppercase section headings. Record the scope, findings, and limits in [R source organization](r-source-organization.md). Broader formatting and unrelated API changes are not part of the confidence-argument rename. User-owned articles and historical validation evidence remain intact.
+
+
+## D149 — Eighty-column R source convention (November 9, 2026)
+
+**Status:** User instruction and implementation authorization, November 9, 2026.
+
+**Decision:** Wrap hand-maintained `R/` source to at most 80 characters per line, including comments and roxygen documentation, and follow this convention in future R code. For long function signatures use one argument per line with a two-space indent. Wrap long calls and expressions at syntax boundaries; preserve explanatory comments, public-first sectioning, documentation content, names, defaults, and demographic behavior. Generated wrappers and user-owned articles/README/historical validation evidence remain untouched. Markdown prose need not be hard-wrapped.
+
+Long diagnostic literals may use `paste0()` of literal pieces so their complete text is unchanged. Small braced branches are permitted where needed to lay out long conditional expressions. Verify the parsed expressions modulo constant string concatenation and single-expression conditional braces, compare generated help content and example expressions, and run the offline suite. The tooling may use a temporary formatting library/cache without adding a package dependency. Other control-flow style findings from D148 remain separate work.
+
+
+## D150 — Control-flow braces (November 9, 2026)
+
+**Status:** User instruction and implementation authorization, November 9, 2026.
+
+**Decision:** Apply the general tidyverse brace rules to hand-maintained R source: brace every loop body and all statement-style or multiline conditional branches, including early returns, errors, and loop exits. Keep `else` beside the preceding closing brace. Preserve compact, single-line conditional value expressions when they contain no assignments, side effects, or control-flow modifiers. Brace multiline control-flow callbacks and error-handler bodies. Put `return()`, `stop()`, `break`, and `next` on their own lines within the relevant block. Apply the convention to documentation examples and retain the D149 80-column limit.
+
+**Scope and verification:** This is control-flow grouping and formatting, not a change to conditions, event order, random draws, values, or demographic semantics. Preserve comments, exports, defaults, documentation content, and generated wrappers. Verify parsed expressions after normalizing added single-expression branch/loop/function braces, compare before/after simulation outputs and RNG states, and run the offline suite. Broader changes to condition coercion, error APIs, or model behavior are not authorized by this formatting task.
+
+
+## D151 — Defer output-presentation work (November 9, 2026)
+
+**Status:** User direction, November 9, 2026.
+
+**Decision:** Leave diagnostic-presentation changes for now and revisit them as part of a project to improve output presentation, likely after the first release milestone. Consider tidyverse-style diagnostic bullets, condition classes, and rich model/result summaries and printing together in that project. These improvements are not first-release requirements.
+
+**Unselected:** Exact timing, summary content and interfaces, condition taxonomy, migration scope, and dependencies such as `cli` or `rlang`. This direction does not authorize implementation, dependency additions, or rewriting the existing diagnostic sites. It does not defer unrelated correctness fixes or determine the scope of other model-checking and post-simulation analysis proposals. Preserve inspectable underlying data and the current simulation return contract when presentation work is designed.
+
+
+## D152 — Rename execution to run_simulation (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Rename Hammel's standalone `simulate(model, years, seed = NULL)` action to `run_simulation(model, years, seed = NULL)`, with source file `R/run_simulation.R` and help topic `run_simulation`. Remove the former export and help alias. Do not implement `simulate.hammel_model()` or reinterpret the `stats::simulate()` generic's `nsim` argument: the user judged that generic unrelated to Hammel's execution interface. The existing stats generic remains available without being masked by Hammel.
+
+**Scope:** Direct pre-release API rename without a compatibility alias. Preserve arguments, defaults, population/result classes, RNG behavior, event timing, and native engine entry points and filenames. Update package calls, tests, generated help, and current design specifications; preserve historical decision/verification records, validation evidence, and user-maintained README/articles. Calls using the old name in those sources need updating before execution against the current API. No new demographic or replication mechanism is selected.
+
+
+## D153 — Name the uniform-age population generator (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Rename `create_baseline_population()` to `generate_uniform_population()`, with source file `R/generate_uniform_population.R` and help topic `generate_uniform_population`. The name identifies the generation method rather than the population's role as a baseline. "Uniform" refers to the initial age distribution on zero through `max_age`; sex and group categories continue to follow the supplied probabilities/weights and need not be uniform. This is an action that generates an actual population, so it retains a verb-based name.
+
+**Scope:** Direct pre-release API rename without an alias under the former name. Preserve all arguments, defaults, validation, group sampling, returned classes/tables, and RNG draws. Update package code, tests, generated help, and current specifications; preserve user-maintained README/articles and historical validation evidence. This supersedes the retained population-generator spelling in D147. Internal baseline-group sampling remains unchanged.
+
+**Future work:** The user anticipates more advanced starting-population methods, potentially based on fertility/mortality schedules. This rename does not select an algorithm, demographic assumptions, API, or implementation for those methods; they require their own scientific specification and authorization.
+
+
+## D154 — Restrict life-table input rate columns (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** `calculate_life_table()` accepts mortality input from `rate_mortality` or `rate`, not `mx`. Keep `rate_mortality` precedence when both accepted columns are present, as before in the absence of an `mx` column. An existing `mx` column is not used as input and is replaced by the selected rate in the life-table output. Inputs with only `mx`, including empty tables, fail with a request for an accepted rate column.
+
+Keep `mx` in life-table output, preserving D048's output naming. Mortality process inputs, per-person-year units, radix, strata, missing-rate propagation, open-interval rules, and the exponential-hazard calculation remain unchanged. This removes an input alias, not the demographic notation or original HMD product names. Preserve the user's ongoing documentation edits and historical validation evidence.
+
+
+## D155 — Reject empty life-table and TFR inputs (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** `calculate_life_table()`, `calculate_tfr()` and `calculate_patfr()` stop with "A rate table needs at least one age band." when the input rate table has no rows, instead of returning a typed empty tibble. TFR and PATFR also stop when no female band with a finite end remains after they drop male rows and open age bands. A summary of nothing is treated as an input error rather than a valid empty result. Missing rate columns are still reported first. Nonempty results, warnings for open bands with nonzero fertility, and stratum handling are unchanged. Other summary functions, such as `demographic_counts()` and `calculate_population_size()`, still return typed empty tibbles.
+
+
+## D156 — No semicolon statement separators in R code (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Hand-maintained R code does not use semicolons to separate statements. Each statement goes on its own line; one-line loop, `if` and callback bodies that held several statements become braced blocks. The rule covers `R/`, `tests/testthat/`, `data-raw/` and documentation examples, and new or edited R code elsewhere. Generated wrappers are untouched.
+
+**Implementation:** Semicolons were removed from 13 lines in 9 `R/` files and from 161 lines in 29 test files, located from parsed tokens so strings and comments were excluded. The changes only split statements, so behavior is unchanged; the test suite gives the same results. Historical milestone validation scripts under `validation/` keep their semicolons as accepted evidence and are not rewritten.
+
+
+## D157 — Life expectancy convenience function (November 9, 2026)
+
+**Status:** User request and implementation authorization, November 9, 2026.
+
+**Decision:** Add the exported `calculate_life_expectancy(rates, age = 0)`, which builds a life table with `calculate_life_table()` and returns its `ex` rows at the requested ages, as a tibble of the stratifying columns, `age` and `ex`. Each requested age must be the start of an age band in the rates; other ages, including values inside a band, are an error rather than being interpolated. It accepts the same inputs, strata and errors as `calculate_life_table()` and has no `radix` argument, since life expectancy does not depend on it.
+
+
+## D158 — Rename `pool_dissolved` to `use_detailed_previous_union` (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Replace the `pool_dissolved = FALSE` argument of `calculate_population_size()` and the rate calculators with `use_detailed_previous_union = TRUE`, reversing the logical. The default `TRUE` reports `previous_union` as `none`, `separated` and `widowed`; `FALSE` combines separated and widowed as `dissolved`, pooling counts and exposure before rates and confidence intervals, exactly as `pool_dissolved = TRUE` did. `FALSE` still requires `"previous_union"` in `by` (explicitly or, for union formation, implied by `dur_breaks`). The old name names what is pooled but not the variable it changes; the new name ties the option to `previous_union`.
+
+**Scope:** Direct pre-release rename with no alias for the old name. Package code, internal helpers (`check_detailed_previous_union()`), tests, generated help and current specifications are updated. Decision-log entries, session handoffs, testing records and accepted validation reports keep the old name as historical evidence. The user-maintained article `vignettes/articles/second_demog_transition.qmd` still calls `pool_dissolved = TRUE` and needs `use_detailed_previous_union = FALSE`.
+
+
+## D159 — Population and rate calculators require a population object (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** `calculate_population_size()`, `calculate_mortality_rates()` and `calculate_fertility_rates()` no longer accept a bare persons data frame. Like the union, marriage, transition and entry calculators, they require a `hammel_population`, and stop with an error suggesting `hammel_population(persons, end_time = ...)` otherwise. A bare table has no recorded endpoint, so these functions could not check that follow-up reached the requested times, and counts past the end of the data were silently too low. Requiring the object makes that check always apply.
+
+**Scope:** The shared observation helper drops its bare-table branch, including its internal `needs_unions` argument and `inherits()` checks that only guarded that branch. Tests that used bare tables for convenience now wrap them in `hammel_population()`; tests of the old bare-table errors now expect the new error.
+
+**Extension (same day):** `calculate_dissolution_rates()` also no longer accepts a bare union table, for the same reason, and requires a `hammel_population`. Its bare-table validation and the union-table branch of the internal `union_strata()` (which read `group_w`/`group_h` columns from the union table) are removed; partner groups always come from the population's declared groups. Dissolution tests build minimal populations around their union records with a test helper, `union_population()`, keeping the same expected values. Checks of bare union-table columns are dropped because `hammel_population()` validates those records.
+
+**Related:** `calculate_union_rates()` now takes `dur_breaks` before `by`, like the other calculators' duration breaks. No existing call passed either argument by position. `calculate_fertility_rates()` still lists `parity_breaks` after `by`.
+
+
+## D160 — Unrealized births are part of the population history (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Move the unrealized-births record from the run metadata, `simulation$unrealized_births`, to the population itself as `unrealized_births`, beside `persons`, `unions` and `transitions`. Each run appends its records to the input population's record instead of replacing it, so restarts keep earlier periods. `unrealized_since` records the start of the first simulated run, the time from which the record is complete. `calculate_fertility_rates(unrealized = TRUE)` reads this record, so adjusted rates for periods before a restart are now known rather than `NA`; periods before `unrealized_since` remain `NA`. `simulation` keeps only the latest run's settings and event counts.
+
+When runs use different fertility schedules, each run's rows keep the stratum columns that run used and have `NA` in the others (for example, `parity_start` is `NA` for a run with a pooled schedule). Attribution treats such rows as pooled over that stratum, so observation rows that split by it are `NA`, as for a single pooled run. This supersedes the "non-checkpoint restarts" limitation for unrealized births recorded at milestone 5 (D105); other per-run counters in `simulation` remain per run, since the histories hold the totals.
+
+
+## D161 — One row per relative, relationship labels and kin counts (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** `extract_kin()` returns one row per ego/relative pair. `common_ancestor_id` is replaced by `n_common_ancestors`, the number of closest recorded shared ancestors (ordinarily 2 for full and 1 for half kin; 1 is only recorded evidence when the other parent is unknown), and lineages combine across those ancestors. A new `relationship` column names the distance pair (`parent`, `sibling`, `aunt_uncle`, `first_cousin`, `second_cousin`, `first_cousin_once_removed`, ...), with full and half kin together. This reverses the earlier convention of reporting each tied ancestor and assigning no category. In rare collapsed pedigrees with tied ancestors at different distance pairs, the row keeps the pair with the smaller ego distance.
+
+New `count_kin(population, times, generations = 2, by = NULL)` reports, at each time, living persons, their living kin of each relationship, the mean and the share with at least one, optionally by the ego's sex and group categories at that time. Only living relatives of living egos count. The user chose no standard errors (egos share kin, so replicate simulations describe uncertainty) and no ancestry-completeness filter: counts reflect recorded links, and users must allow a burn-in, because a starting population without recorded parents undercounts kin for two or three generations. See `design/kinship.md` for the specification, worked example and benchmark.
+
+
+## D162 — Remove the `rate_unit` process field (November 9, 2026)
+
+**Status:** User decision and implementation authorization, November 9, 2026.
+
+**Decision:** Rate processes no longer carry `rate_unit = "person_year"`. The field was a constant set by every rate constructor and could not be changed through the API; since the engine became continuous-time with per-person-year rates only (D024), its checks guarded only against hand-edited objects. The constructors, the seven checks (`set_process()`, union formation, dissolution and transition validation, `calculate_life_table()`, `calculate_tfr()` and `calculate_patfr()`) and the tests that set or expected it are removed or simplified; validation now checks the process name only, with messages such as "Life tables require a mortality process." Rates remain per person-year, as documented in each constructor and the scientific contract. Historical records keep the field.
+
+
+## D163 — Readable function-call wrapping (November 10, 2026)
+
+**Status:** User decision and implementation authorization, November 10, 2026.
+
+**Decision:** Keep function calls on one line when they fit within 80 characters and remain readable. For multiline calls, put each named argument on its own line; short, unnamed arguments may share a line. Keep nested calls and expressions together when they fit within the limit. Put the closing parenthesis on its own line and remove unnecessary line breaks. Function definitions retain the separate rule: if the signature needs wrapping, put every argument on its own line. This clarifies D149; the width limit alone does not justify splitting a short nested call or combining named arguments on one line.
+
+**Scope:** Apply the layout to hand-maintained `R/` source, preserving comments and behavior. Generated wrappers, user-owned README/articles and historical validation evidence remain untouched.
+
+**Implementation and checks:** Reformatted 31 hand-maintained `R/` files from the existing working tree. Parsed expressions remain equivalent after normalizing single-expression branch braces and constant `paste0()` concatenation: three conditional values gained braces to wrap them, and one diagnostic literal was split inside its existing `paste0()`. Comments are identical, all hand-maintained R source lines fit within 80 columns, and generated wrappers are unchanged. `devtools::test()` passed 6,568 expectations with zero failures, one `timedatectl` system-bus warning while loading HMDHFDplus/lubridate, and the opt-in live database test skipped. `git diff --check` passed.
+
+
+## D164 — Wrapped if-condition indentation (November 10, 2026)
+
+**Status:** User decision and implementation authorization, November 10, 2026.
+
+**Decision:** Wrap long `if` conditions at logical operators where possible, preserving short nested calls on one line. Indent continuation lines two spaces beyond the first boolean expression after `if (`. For an `if` statement with two leading spaces, the first boolean begins at column 7 and continuation booleans begin at column 9, with eight leading spaces. The body retains its ordinary two-space indent relative to `if`. This supersedes D149's two-space continuation indent for wrapped `if` conditions; other continuations retain their existing rule.
+
+```r
+  if (!is.numeric(rates$age_end) || !is.null(dim(rates$age_end)) ||
+        anyNA(rates$age_end) ||
+        any(rates$age_start < 0 | rates$age_end <= rates$age_start)) {
+    stop("Invalid age bands.", call. = FALSE)
+  }
+```
+
+**Implementation:** Applied the rule across hand-maintained `R/` source, changing 29 files from the pre-pass working tree while preserving the user's corrected TFR condition. Long conditions wrap at logical operators, with nested calls kept intact where they fit; longer individual comparisons wrap within their calls as needed to retain the 80-column limit. Generated wrappers, README, vignettes and historical validation evidence are unchanged. Parsed expressions and all terminal tokens (including comments and string literals) are identical before and after this pass, and every hand-maintained R source line remains within 80 columns.
+
+**Validation:** A parsed-token audit verified the prescribed indentation for 238 continued outer logical-chain terms. `devtools::test()` passed 6,568 expectations with zero failures in 86.2 seconds; one `timedatectl` warning occurred while loading HMDHFDplus/lubridate, and the opt-in live database test was skipped. `git diff --check` passed.
+
+
+## D165 — Population setter source location (November 10, 2026)
+
+**Status:** User decision and implementation authorization, November 10, 2026.
+
+**Decision:** Move `set_population()` and its unchanged roxygen documentation from `R/hammel_model.R` to `R/hammel_population.R`, beside the population constructor and validation. This follows the constructor/setter grouping used for demographic processes. `hammel_model.R` retains the model constructor and `check_model()`. This supersedes D143's explicit retention of the population setter in `hammel_model.R`. Function behavior and help-topic boundaries are unchanged.
+
+**Validation:** Parsed definitions confirm the setter moved unchanged and all other definitions in both source files are unchanged. The setter's roxygen block moved verbatim; its regenerated help file changes only the source-file reference. Targeted `devtools::test(filter = "model-api|group-declaration|ancestry")` passed 298 expectations with zero failures, warnings or skips. Source-width checks and `git diff --check` passed.
+
+
+## D166 — Required population reference time (November 10, 2026)
+
+**Status:** User decision and implementation authorization, November 10, 2026.
+
+**Decision:** Require `end_time` in `hammel_population()` and validate it as a single finite numeric year, rejecting `NULL`, missing/nonfinite values, vectors, arrays and complex numbers. The population's endpoint supplies the next simulation's starting time. Constructor, direct validation and attachment enforce the same endpoint contract; negative and fractional years remain valid when consistent with recorded histories. Existing checks against events after the endpoint remain in force. This supersedes D015's optional unknown endpoint.
+
+The user also chose to require a `hammel_population` object for `extract_kin()`. Remove its bare-persons-table conversion rather than infer or invent an endpoint. Both living and deceased recorded relatives remain eligible; kinship algorithms and demographic event behavior are unchanged.
+
+**Validation plan:** Test omitted and invalid endpoints at construction, invalid endpoints in hand-edited populations at validation and attachment, valid negative/fractional/calendar years, retained date-consistency checks, and rejection of bare tables by `extract_kin()`. Update existing fixtures to supply their actual reference time and run the offline suite.
+
+**Implementation and checks:** The constructor now has no `end_time` default and reports omission explicitly. Shared time validation enforces a finite numeric scalar for construction and population validation; the generator uses the same check and retains its existing zero-year default. Removed the obsolete nullable-endpoint guard from population date-consistency checking and the bare-table conversion from `extract_kin()`. Updated fixtures to supply reference times and changed unknown-endpoint expectations to validation errors; other schema-error tests retain valid endpoints so they continue to check their intended failures. Help and current specifications reflect the new requirement.
+
+Targeted model/population, ancestry, kinship and detailed-union tests passed 530 expectations without failures or warnings. The final offline `devtools::test()` run passed 6,612 expectations with zero failures in 85.6 seconds, one existing `timedatectl` warning while loading HMDHFDplus/lubridate, and the opt-in live database test skipped. Updated help files parse, hand-maintained R source and edited test lines satisfy the 80-column rule, and `git diff --check` passed.
+
+
+## D167 — Remove duplicated run event counts (November 10, 2026)
+
+**Status:** User decision and implementation authorization, November 10, 2026.
+
+**Decision:** Remove births, deaths, dissolutions, conversions and transitions counts from the returned population's `simulation` component. Keep all existing run dates and settings, including the cohabitation interpretation setting needed by population analysis. Keep `unrealized_births` and `unrealized_since` as accumulated population records. Demographic events remain in person, union and transition histories; execution, random-number consumption and event timing are unchanged. This supersedes D160's retention of per-run event counters.
+
+**Validation plan:** Replace tests' consumption of duplicated counters with counts from the latest run's history interval. Verify settings remain available and event count fields are absent, including when restarting from an output containing older counters. Run the offline suite. Preserve historical milestone evidence and user-owned README/articles.
+
+**Implementation and checks:** Removed all five event counts from the returned `simulation` list and the R-side assignments used only to expose native birth/death counters. Kept run dates, fertility settings, optional heterogeneity and cohabitation interpretation settings, and accumulated unrealized-birth records. Tests now query retained histories via a test-only helper; regression checks cover retained settings, absent counters and overwriting counters from an older restart input. Current output documentation and generated help are consistent with the result.
+
+The offline `devtools::test()` suite passed 6,619 expectations with zero failures in 86.2 seconds; one existing `timedatectl` warning occurred while loading HMDHFDplus/lubridate and the opt-in live database test was skipped. Fixed-seed comparisons against the previous implementation produced identical complete outputs after deleting the previous count fields, for zero- and positive-duration runs with and without cohabitation/dissolution. `git diff --check` passed.
+
+
+## D168 — Minimum age for uniform population generation (November 10, 2026)
+
+**Status:** User request and implementation authorization, November 10, 2026.
+
+**Decision:** Add optional `min_age = 0` to `generate_uniform_population()`, immediately after `end_time` as explicitly requested by the user, before `female_probability` and `groups`. Positional calls using those later arguments must account for the new order. Ages are uniform continuous years between `min_age` and `max_age`; require finite nonnegative numeric scalars with `min_age <= max_age`. Equal bounds generate one fixed age, extending the existing newborn case. Sex, groups, histories and population validation retain their existing contracts. The default zero lower bound preserves existing fixed-seed output and random-number consumption. This extends D153's zero-to-maximum age range.
+
+**Validation plan:** Verify positive and fractional lower bounds, analytical mean and variance of the uniform distribution, equal bounds, empty populations, invalid/reversed bounds rejected without RNG consumption, and unchanged output/RNG state with default bounds and unchanged named settings, plus positional calls in the requested argument order.
+
+**Implementation and checks:** Added the argument in the requested position, documented the age interval and equal-bound behavior, and validated both bounds before sampling. Targeted `devtools::test(filter = "baseline-population|group-declaration")` passed 176 expectations without failures, warnings or skips. Fixed-seed comparisons against the pre-change implementation confirmed identical default, empty, newborn and grouped outputs and RNG state with unchanged named settings. A parsed-call audit found no existing source/test/data-preparation calls requiring migration for an unnamed fourth argument. Generated help parses, source lines fit within 80 columns, and `git diff --check` passed. The full suite was not rerun for this localized generator change.
+
+
+## D169 — Name history augmentation functions (November 10, 2026)
+
+**Status:** User decision and implementation authorization, November 10, 2026.
+
+**Decision:** Rename `get_parent_info()` to `augment_persons()`, `get_detailed_unions()` to `augment_unions()`, and `get_unpartnered_births()` to `extract_unpartnered_births()`. Rename their shared source file from `R/extract_relationships.R` to `R/augment_histories.R`. The first two names describe adding relationship-derived columns; the third describes selecting births outside partnerships. Update exports, help topics, package references, tests and current specifications without changing behavior. No old-name aliases are retained. This revises D143's relationship-file naming and placement description. Historical validation reports and user-owned articles remain untouched.
+
+**Implementation and checks:** Moved the shared source and renamed all three functions, their direct calls, exports, help topics and corresponding test files. Current specifications use the new names. Parsed expressions match the previous source after substituting only the approved function names. Targeted `devtools::test(filter = "augment|extract-unpartnered|weighted-choice|cohabitation|multiple-groups")` passed 562 expectations without failures, warnings or skips. Exports and generated help were verified, and `git diff --check` passed. Roxygen changes were limited to function names, examples and cross-references; the user should review those documentation updates. The user-owned article `vignettes/articles/multigroup_intermar.qmd` retains two old `get_detailed_unions()` calls for the user to update. Historical reports and dated handoff records remain unchanged.
+
+
+## D170 — Selective living-kin counting (November 10, 2026)
+
+**Status:** User implementation authorization, November 10, 2026, following the proposed `relationships` selector and dedicated native counting path.
+
+**Decision:** Add `relationships = NULL` after existing `count_kin()` arguments. NULL retains all relationship rows; a nonempty vector of unique labels selects relationships valid within `generations`, preserving the existing canonical output order. Reject unknown, missing, duplicate and out-of-bound names rather than changing the generation bound. Selection leaves living-person denominators, historical-group observation, full/half pooling and closest-relationship classification unchanged. Accumulate counts directly in C++, without the full extracted-pair table or lineage/completeness reporting; narrow candidate generation to requested distance pairs and people living at some observation time, while classifying candidates using the full bounded ancestry and validating the whole parent graph. No simulation behavior or RNG consumption changes.
+
+**Validation plan:** Compare selected results exactly to filtered all-relationship results and an independent summary of extracted pairs, including pedigree collapse, missing parents, cycles, deaths/births/group moves at observation times, empty strata, multiple and reordered times, and removed cousins. Benchmark default and selected counting against the previous implementation on reproducible synthetic pedigrees; report timings and scope without a universal speed claim.
+
+**Implementation and checks:** Added the native counter, selected-distance candidate indexing, and distance-only ancestry-cache mode; extraction and simulation retain the original reporting mode. Selection keeps canonical output order and complete denominators. Generated Rcpp wrappers and `count_kin` help were regenerated. Existing roxygen text received only the new argument and a minimal output-row clarification, for user review.
+
+Kinship-focused tests passed 1,017 expectations; the full offline suite passed 7,519 expectations with zero failures in 112.2 seconds, one existing `timedatectl` warning and the opt-in database test skipped. A reproducible 12,000-person benchmark against `6b1cc9d` matched every result exactly. At depth three over three times, median full counting fell from 2.754 to 0.655 seconds; first-cousin-only counting fell from 2.781 to 0.105 seconds. These are fixture-specific timings, not universal performance guarantees. See `design/testing.md` for the fixture, all timings and reproduction code. The counter avoids pair-table allocation but uses a person-by-time stratum matrix; observation-state memory still scales with population size and number of times.
+
+
+## D171 — Brace all multiline function definitions (November 10, 2026)
+
+**Status:** User instruction and implementation authorization, November 10, 2026.
+
+**Decision:** Every function definition that spans multiple lines must enclose its body in braces. This covers named functions, local helpers and anonymous callbacks, including bodies consisting of a single expression or a wrapped call. Compact one-line functions may remain unbraced, subject to the existing control-flow rules. This extends D150's narrower rule for multiline control-flow callbacks. Apply to hand-maintained package R source, tests and data-preparation scripts; preserve generated wrappers, historical validation code and user-owned articles.
+
+**Implementation and checks:** Parsed all 109 hand-maintained `.R` files under package source, tests/helpers and data preparation, excluding generated wrappers, historical validation code and user-owned articles. Braced 36 remaining multiline functions (19 in `R/`, 17 in tests/helpers) across 22 files. The final scan finds no unbraced multiline functions. Parsed expressions are identical after normalizing single-expression braces, comments are unchanged, and added/edited R lines fit within 80 columns. Updated the current benchmark example to follow the same rule. The full offline `devtools::test()` suite passed 7,519 expectations with zero failures, one existing `timedatectl` warning and the opt-in live database test skipped. `git diff --check` passed. Existing working-tree edits were preserved.
+
+
+## D172 — Shorten the cohabitation-history setting (November 10, 2026)
+
+**Status:** User decision and implementation authorization, November 10, 2026.
+
+**Decision:** Rename `cohabitation_counts_as_previous_union` to `cohab_as_previous_union` in `union_formation()`, `set_union_formation()`, the stored process and returned `simulation` settings, and population analysis. The meaning and default FALSE remain unchanged: only marriage defines previous-union status when FALSE; cohabitation also counts when TRUE. Update tests, current specifications and generated help; retain historical decision records. The internal native `counts_cohab` argument is unchanged.
+
+**Validation:** Parsed source matches the pre-change working tree after substituting only the requested name. Targeted `devtools::test(filter = "cohab|observation-by|remarriage|union-counts")` passed 376 expectations without failures, warnings or skips. The constructor, setter, FALSE default and generated help were checked directly. Active source, tests and current specifications contain no old-name references. Roxygen edits were limited to the parameter name; the user should review that documentation update. `git diff --check` passed.
+
+
+## D173 — Bundle England/Wales second-transition inputs (November 10, 2026)
+
+**Status:** User implementation authorization, November 10, 2026; the user selected one named list and approved `data-raw/england_wales_1992_onward.R`.
+
+**Decision:** Bundle `england_wales_1992_onward`, a named list of six tibbles drawn only from the local CSVs read by `vignettes/articles/second_demog_transition.qmd`. `fertility` renames denominator-age bounds to `age_start`/`age_end` and retains only `union_type`, bounds and annual `rate`, using the vignette's existing finite 16–45 denominator-age convention. `marriage` drops all-marriage rows, maps first marriage/remarriage to `previous_union = "none"`/`"dissolved"`, maps each year to `[time_start, time_end)`, and retains only schedule columns. Preserve missing marriage rates and do not apply the vignette's filling or twofold tuning.
+
+Keep `premarital_cohabitation`, `cohabitation_outcomes`, `marital_divorce_death_2005` and `marital_divorce_death_2010` unchanged apart from conversion to tibbles, so the article can demonstrate their transformations. Preserve cumulative probabilities, rounding discrepancies, cohort labels and missing ten-year outcomes. HMD mortality remains a separate download; no credentials or database retrieval are part of this task. Preserve original validation sources, reports and the user-owned vignette.
+
+**Provenance and validation plan:** Pin the six local source CSVs by MD5 in the offline preparation script. Keep original source authors, tables, geography and units in the dataset help, credit ONS and its Open Government Licence, and link the source manifest. The government Population Trends catalogue identifies the series as Open Government Licence material; numerical source observations are bundled, not source publications or PDFs. Verify exact raw-table preservation, selected cleaned-column equality with the vignette's input preparation, missingness, row counts and constructor acceptance where complete. Test data availability from an installed package, independent of repository source files.
+
+**Implementation and checks:** Added the six-table data object, the approved offline preparation script, and a first-draft roxygen topic in `R/data.R`. The cleaned fertility and marriage tables match the corresponding preparation chunks of the existing article before its missing-rate filling and tuning, allowing for CSV-reader integer/double attributes. All four retained observation tables match their original CSVs exactly, including rounding and missingness. The original article and validation sources were not edited. Dataset documentation is an agent-written draft for user editing and review.
+
+`devtools::test(filter = "^data$")` passed 54 expectations without failures, warnings or skips. A source package was built and installed into a temporary library; `data()` loading, namespace access and dataset indexing worked, and the same 54 tests passed against the installed package without repository CSV access. Generated help parses, new R source/test lines satisfy the 80-column limit and `git diff --check` passed. No HMD retrieval or credentials were used; no package dependency was added. The full simulation suite was not rerun because no execution behavior changed.
+
+Reuse provenance: the ONS material reuse statement at <https://www.ons.gov.uk/methodology/geography/licences> and the government's Population Trends catalogue at <https://www.data.gov.uk/dataset/b26340c6-9db3-4a26-93cd-46256c0bc2f7/population_trends> were checked. Dataset help supplies ONS/OGL attribution plus the original paper authors and table references. Original publication PDFs are not redistributed in the bundle.
+
+
+## D174 — Shorten premarital-cohabitation column names (November 10, 2026)
+
+**Status:** User instruction and implementation authorization, November 10, 2026.
+
+**Decision:** In `england_wales_1992_onward$premarital_cohabitation`, rename `source_age_label` to `age_groups` and `proportion_cohabiting_before_marriage` to `prop_cohabit`. Retain `year` and all source values and row order. Update the offline preparation script, bundled object, help and tests. Original CSVs remain unchanged; the user-owned article is left for user editing. This revises D173's retention of source column names for this table only.
+
+**Validation:** Rebuilt the bundled object offline. The entire six-table bundle is identical to its previous version after applying only the two column renames. All 54 data checks passed without failures, warnings or skips; regenerated help parses and `git diff --check` passed. Existing roxygen edits were limited to the column names and source-value wording, for user review.

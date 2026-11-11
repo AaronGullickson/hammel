@@ -26,6 +26,25 @@ One row per person, including deceased persons.
 Omit marital status and latest-union pointers. Derive relationship state from `unions`; the engine may cache derived state for performance without requiring another user-facing column. Unknown earlier histories must not be silently interpreted as known lifetime singlehood. Optional persistent fertility selection weights use `hetfert` under D102;
 sibling and last-born-child pointers are omitted. Group labels must be nonempty; their input type is preserved. See [groups](groups.md) for schedule lookup and inheritance rules.
 
+## Uniform-age population generation
+
+`generate_uniform_population()` draws independent continuous ages uniformly
+between `min_age` (default zero) and `max_age` (default 70), in years (D168).
+Both bounds must be finite nonnegative numeric scalars, with
+`min_age <= max_age`. Birth time is `end_time - age`; everyone is alive at the
+reference time, with unknown parents and no unions. Sex and groups retain
+their independently specified sampling distributions. This is an initial
+population, without any claim that its age distribution is stable.
+
+For example, `min_age = 18, max_age = 65, end_time = 2000` produces ages in
+18–65 years, with birth times in 1935–1982. Equal bounds of 25 produce birth
+times exactly 1975. Empty populations retain the typed empty schema and still
+validate the bounds. Invalid or reversed bounds fail before drawing random
+numbers. With `min_age = 0`, existing calls retain their output and RNG state
+for the same seed when other arguments are unchanged. The new argument follows
+`end_time`, before `female_probability` and `groups`; positional calls using
+those later arguments must account for the new order.
+
 ## Ancestry
 
 An optional `ancestry` component is a named list with one tibble per dimension
@@ -73,9 +92,17 @@ valid; dates before the origin may be negative. Do not round dates to integer
 months or birthdays. Execution is continuous under D024, and midpoint fertility
 compensation under D028 has no monthly grid.
 
-`end_time` is a finite reference time or `NULL` when unknown. Simulation and
-observation require a known endpoint; the next simulation starts there. Tables
-must not contain recorded events later than a supplied reference time.
+`end_time` is required and must be a single finite numeric reference time in
+years (D166). Omission, `NULL`, missing/nonfinite values, complex numbers,
+vectors and arrays are invalid. The next simulation starts there; after a run,
+it records the new endpoint. Tables must not contain recorded events later
+than this reference time. Negative and fractional reference times are valid
+when consistent with the histories.
+
+For example, a population with births at -25 and -23 and `end_time = 0` can
+start a simulation at zero. With `end_time = 2000`, a 50-year run ends at 2050.
+Supplying `NULL` or omitting `end_time` fails at construction. Direct validation
+and model attachment reject a population whose endpoint was edited to `NULL`.
 
 Recorded lifetimes and analysis periods are half-open. Exposure is exact overlap
 in person-years, split by age and period boundaries. Population counts include
@@ -97,7 +124,7 @@ consistency is not provided by the structural validator. Ancestry cycles are rej
 Normalization and validation are separate operations. `hammel_population()` normalizes absent unions before checking the constructed object. `validate_population()` verifies a `hammel_population` without mutation and returns it invisibly. `set_population()` accepts only a population object, validates it, normalizes
 its person/union tables to tibbles, and stores it as `model$population` while
 preserving extra components. Population construction/validation lives in
-`R/hammel_population.R`; the model setter lives in `R/hammel_model.R`.
+`R/hammel_population.R`, alongside the population setter (D165).
 
 
 ## Typed union episodes (D086)
