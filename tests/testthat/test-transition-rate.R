@@ -105,7 +105,8 @@ test_that("empty histories, empty populations and group label types are retained
   expect_equal(out$person_years, c(6, 4))
   expect_equal(out$transitions, c(0, 0))
   expect_equal(out$rate_transition, c(0, 0))
-  pop$persons <- pop$persons[0, ]; pop$unions <- pop$unions[0, ]
+  pop$persons <- pop$persons[0, ]
+  pop$unions <- pop$unions[0, ]
   pop$ancestry <- pop$ancestry[0, ]
   empty <- calculate_transition_rates(pop, c(0, 6), dur_breaks = c(0, Inf), by = c("sex", "union_type"))
   expect_s3_class(empty, "tbl_df")
@@ -129,7 +130,8 @@ test_that("transition counter rejects invalid axes, endpoints and flags", {
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "group"),
                "not by `group` in `by`")
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "region"), "cannot split")
-  pop$persons$group <- NULL; pop$transitions <- NULL
+  pop$persons$group <- NULL
+  pop$transitions <- NULL
   pop$groups <- list(group = group())
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf)), "group")
 })
@@ -140,7 +142,7 @@ test_that("simulated competing hazards recover directed rates with shared origin
   model$population$groups <- list(group = group())
   model <- set_group_transition(model, data.frame(origin = "A", destination = c("B", "C"),
     age_start = 0, age_end = Inf, rate = c(.2, .3)))
-  pop <- simulate(model, 2, seed = 317)
+  pop <- run_simulation(model, 2, seed = 317)
   out <- calculate_transition_rates(pop, c(0, 2), age_breaks = c(0, Inf))
   a <- subset(out, origin == "A")
   expect_equal(a$person_years[1], a$person_years[2])

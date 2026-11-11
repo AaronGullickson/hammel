@@ -1,5 +1,5 @@
 test_that("requested quadratic model peaks at 2.57 years and matches analytical probabilities", {
-  matching <- create_matching_model(~ age_difference + I(age_difference^2),
+  matching <- matching_model(~ age_difference + I(age_difference^2),
     c(age_difference = 0.072, "I(age_difference^2)" = -0.014))
   peak <- -0.072 / (2 * -0.014)
   expect_equal(peak, 2.57142857142857)
@@ -11,7 +11,7 @@ test_that("requested quadratic model peaks at 2.57 years and matches analytical 
   expect_equal(native[1], native[3])
   expect_equal(calculate_matching_probabilities(matching, gaps), exp(expected) / sum(exp(expected)))
   # Coefficient order and formula whitespace do not change scoring.
-  reversed <- create_matching_model(~ 0 + age_difference + I(age_difference ^ 2),
+  reversed <- matching_model(~ 0 + age_difference + I(age_difference ^ 2),
     c("I(age_difference^2)" = -0.014, age_difference = 0.072))
   expect_equal(inspect_matching_cpp(gaps, prepare_matching_model(reversed)), native)
 })
@@ -26,7 +26,7 @@ exact_draws <- function(matching, gaps, draws, groups = 1L, male_group = integer
 }
 
 test_that("exact full-pool draws follow conditional-logit probabilities, including rare men", {
-  matching <- create_matching_model(~ age_difference + I(age_difference^2),
+  matching <- matching_model(~ age_difference + I(age_difference^2),
     c(age_difference = 0.072, "I(age_difference^2)" = -0.014))
   set.seed(8)
   n <- 50000
@@ -38,13 +38,13 @@ test_that("exact full-pool draws follow conditional-logit probabilities, includi
   expect_true(all(frequency > 0))
   expect_equal(result$failures, 0L)
   expect_equal(result$approximate, 0)
-  uniform <- create_matching_model(~ age_difference, c(age_difference = 0))
+  uniform <- matching_model(~ age_difference, c(age_difference = 0))
   expect_equal(exact_draws(uniform, c(-4, 2, 30), 0)$probability, rep(1/3, 3))
 })
 
 test_that("exact draws handle pools, age edges, kin, group weights and custom formulas", {
   set.seed(9)
-  matching <- create_age_gap_matching_model(1, 5)
+  matching <- age_gap_matching_model(1, 5)
   # A large pool across many bins, including men near and under the age cutoff.
   gaps <- c(runif(300, -6, 40), -5.05, -4.95, -5.2)   # woman aged 20: men aged 14.8 to 60
   n <- 200000
@@ -65,7 +65,7 @@ test_that("exact draws handle pools, age edges, kin, group weights and custom fo
   expect_equal(exact_draws(matching, gaps, 10, excluded = rep(TRUE, length(gaps)))$failures, 10L)
   expect_equal(exact_draws(matching, numeric(), 3)$failures, 3L)
   # Group weights and hard restrictions enter the exact probabilities.
-  pair <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1, "A:C" = NA))
+  pair <- age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1, "A:C" = NA))
   groups <- rep(0:2, 100)
   result <- exact_draws(pair, gaps[1:300], 150000, groups = 3L, male_group = groups,
                         log_weights = c(0, 0.7, 0.2), labels = c("A", "B", "C"))
@@ -77,7 +77,7 @@ test_that("exact draws handle pools, age edges, kin, group weights and custom fo
   expect_true(all(abs(share - exact_share)[allowed] <
                   6 * sqrt(exact_share * (1 - exact_share) / 150000)[allowed]))
   # A custom formula uses its fine-grid bound; smooth formulas stay exact.
-  custom <- create_matching_model(~ abs(age_difference - 2), c("abs(age_difference - 2)" = -0.3))
+  custom <- matching_model(~ abs(age_difference - 2), c("abs(age_difference - 2)" = -0.3))
   result <- exact_draws(custom, gaps, n)
   expect_equal(result$approximate, 0)
   observed <- tapply(result$counts, cell, sum)
@@ -88,21 +88,21 @@ test_that("exact draws handle pools, age edges, kin, group weights and custom fo
 })
 
 test_that("formula fallback has the same utilities as R model matrices", {
-  matching <- create_matching_model(~ abs(age_difference - 2.5),
+  matching <- matching_model(~ abs(age_difference - 2.5),
     c("abs(age_difference - 2.5)" = -0.2))
   expect_length(prepare_matching_model(matching)$quadratic, 0)
   gaps <- c(-10, -0.5, 2.5, 9.7)
   expect_equal(inspect_matching_cpp(gaps, prepare_matching_model(matching)), -0.2 * abs(gaps - 2.5))
   # A caller-defined deterministic transformation retains its formula semantics.
   transform_gap <- function(x) (x - 3)^2
-  custom <- create_matching_model(~ transform_gap(age_difference),
+  custom <- matching_model(~ transform_gap(age_difference),
     c("transform_gap(age_difference)" = -0.01))
   expect_equal(inspect_matching_cpp(gaps, prepare_matching_model(custom)),
                calculate_matching_utilities(custom, gaps))
 })
 
 test_that("extreme utilities draw the best man and invalid scores are errors", {
-  matching <- create_matching_model(~ age_difference, c(age_difference = 1000))
+  matching <- matching_model(~ age_difference, c(age_difference = 1000))
   prepared <- prepare_matching_model(matching)
   result <- exact_draws(matching, c(0, 1, 2), 50)
   expect_equal(result$probability, c(0, 0, 1))
@@ -122,17 +122,18 @@ test_that("birth-time selection uses formula scores and male-minus-female gap", 
   model <- make_model(3, birth_rate = 20, birth_interval = 0)
   model$population$persons$sex[1] <- "f"
   model$population$persons$birth_time <- c(-20, -20, -30)
-  positive <- create_matching_model(~ age_difference, c(age_difference = 1000))
-  model <- set_union_formation(model, "on_demand", positive)
-  result <- simulate(model, 0.5, seed = 52)
+  positive <- matching_model(~ age_difference, c(age_difference = 1000))
+  model <- set_union_formation(model, "on_demand", matching = positive)
+  result <- run_simulation(model, 0.5, seed = 52)
   expect_equal(result$unions$husband_id, 3)
   expect_true(all(result$persons$father_id[result$persons$mother_id %in% 1] == 3))
-  expect_identical(result, simulate(model, 0.5, seed = 52))
-  negative <- create_matching_model(~ age_difference, c(age_difference = -1000))
-  changed <- simulate(set_union_formation(model, "on_demand", negative), 0.5, seed = 52)
+  expect_identical(result, run_simulation(model, 0.5, seed = 52))
+  negative <- matching_model(~ age_difference, c(age_difference = -1000))
+  changed <- run_simulation(set_union_formation(model, "on_demand", matching = negative),
+    0.5, seed = 52)
   expect_equal(changed$unions$husband_id, 2)
-  fallback <- create_matching_model(~ abs(age_difference - 10),
+  fallback <- matching_model(~ abs(age_difference - 10),
     c("abs(age_difference - 10)" = -1000))
-  expect_equal(simulate(set_union_formation(model, "on_demand", fallback),
+  expect_equal(run_simulation(set_union_formation(model, "on_demand", matching = fallback),
                         0.5, seed = 52)$unions$husband_id, 3)
 })

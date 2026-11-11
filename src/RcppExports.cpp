@@ -108,6 +108,22 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// count_kin_cpp
+List count_kin_cpp(DataFrame persons, int generations, IntegerMatrix relationship_types, IntegerMatrix strata, int n_strata, int n_types);
+RcppExport SEXP _hammel_count_kin_cpp(SEXP personsSEXP, SEXP generationsSEXP, SEXP relationship_typesSEXP, SEXP strataSEXP, SEXP n_strataSEXP, SEXP n_typesSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< DataFrame >::type persons(personsSEXP);
+    Rcpp::traits::input_parameter< int >::type generations(generationsSEXP);
+    Rcpp::traits::input_parameter< IntegerMatrix >::type relationship_types(relationship_typesSEXP);
+    Rcpp::traits::input_parameter< IntegerMatrix >::type strata(strataSEXP);
+    Rcpp::traits::input_parameter< int >::type n_strata(n_strataSEXP);
+    Rcpp::traits::input_parameter< int >::type n_types(n_typesSEXP);
+    rcpp_result_gen = Rcpp::wrap(count_kin_cpp(persons, generations, relationship_types, strata, n_strata, n_types));
+    return rcpp_result_gen;
+END_RCPP
+}
 // person_lexis_cpp
 List person_lexis_cpp(DataFrame persons, DataFrame unions, IntegerVector groups, int group_count, NumericVector time_breaks, NumericVector axis_breaks, NumericVector parity_breaks, List options);
 RcppExport SEXP _hammel_person_lexis_cpp(SEXP personsSEXP, SEXP unionsSEXP, SEXP groupsSEXP, SEXP group_countSEXP, SEXP time_breaksSEXP, SEXP axis_breaksSEXP, SEXP parity_breaksSEXP, SEXP optionsSEXP) {
@@ -282,6 +298,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_union_start_groups_cpp", (DL_FUNC) &_hammel_union_start_groups_cpp, 3},
     {"_hammel_union_group_history_cpp", (DL_FUNC) &_hammel_union_group_history_cpp, 7},
     {"_hammel_extract_kin_cpp", (DL_FUNC) &_hammel_extract_kin_cpp, 4},
+    {"_hammel_count_kin_cpp", (DL_FUNC) &_hammel_count_kin_cpp, 6},
     {"_hammel_person_lexis_cpp", (DL_FUNC) &_hammel_person_lexis_cpp, 8},
     {"_hammel_person_snapshot_cpp", (DL_FUNC) &_hammel_person_snapshot_cpp, 6},
     {"_hammel_inspect_matching_cpp", (DL_FUNC) &_hammel_inspect_matching_cpp, 2},

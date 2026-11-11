@@ -2,7 +2,7 @@
 % Please edit documentation in R/group_transition.R
 \name{household}
 \alias{household}
-\title{Define who moves together in household moves}
+\title{Define who moves together in household transitions}
 \usage{
 household(age_independence = 18)
 }
@@ -16,16 +16,20 @@ A \code{hammel_household}, to pass as \code{household} to
 \code{\link[=set_group_transition]{set_group_transition()}}. Each transition process may use its own rule.
 }
 \description{
-A household rule describes a household for \code{\link[=set_group_transition]{set_group_transition()}} (D140).
-There is no household identifier or residence record: when someone moves,
-the moving party is assembled from current union and parent links. A
-person's household is their current partner (married or cohabiting) and the
+Define a set of rules for determining household membership for transitions.
+}
+\details{
+A household rule describes a household for \code{\link[=set_group_transition]{set_group_transition()}}. The
+simulation does not track households independently, but determines who
+belongs to a household when a household would move and assembles the moving
+party.
+
+A person's household is their current partner (married or cohabiting) and the
 dependents attached to either of them. A dependent is alive, unpartnered,
 younger than \code{age_independence}, and attached to their mother while she is
 alive, otherwise to their father while he is alive. People with neither
-parent alive are independent; grandparents, stepparents and other relatives
-do not take dependents. A person under \code{age_independence} who leaves a union is
-a dependent again if a parent is alive.
+parent alive are independent. A person under \code{age_independence} who leaves a
+union is a dependent again if a parent is alive.
 }
 \examples{
 household(age_independence = 18)

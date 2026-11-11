@@ -13,8 +13,6 @@ test_that("live HMD and HFD downloads satisfy the rate and provenance contracts"
   births <- model$processes$fertility
   expect_true(inherits(deaths, "hammel_mortality"))
   expect_true(inherits(births, "hammel_fertility"))
-  expect_identical(deaths$rate_unit, "person_year")
-  expect_identical(births$rate_unit, "person_year")
   expect_true(setequal(deaths$rates$sex, c("m", "f")))
   expect_true(any(is.infinite(deaths$rates$age_end[deaths$rates$sex == "m"])))
   expect_true(any(is.infinite(deaths$rates$age_end[deaths$rates$sex == "f"])))

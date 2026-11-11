@@ -6,7 +6,8 @@
 
 test_that("cell search intensities match explicit scans through every state change", {
   set.seed(31)
-  pop <- create_baseline_population(3000, max_age = 60, groups = list(group = c(A = .5, B = .5)))
+  pop <- generate_uniform_population(3000, max_age = 60, groups = list(group =
+    c(A = .5, B = .5)))
   mortality <- data.frame(sex = rep(c("m", "f"), 2), age_start = 0, age_end = Inf,
     rate = c(.01, .01, .03, .03), time_start = rep(c(0, 2), each = 2), time_end = rep(c(2, Inf), each = 2))
   # Never-partnered women search by age; separated women by time since their
@@ -21,14 +22,14 @@ test_that("cell search intensities match explicit scans through every state chan
     set_fertility(data.frame(union_type = c("partnered", "unpartnered"), age_start = 15,
       age_end = 45, rate = c(.15, .03)), birth_interval = .75) |>
     set_union_formation("rate", rates = search,
-      matching = create_matching_model(~ age_difference, c(age_difference = 0),
+      matching = matching_model(~ age_difference, c(age_difference = 0),
         group_exogamy = c("A:B" = -1)),
       cohab_prob = data.frame(age_start = c(0, 25), age_end = c(25, Inf), prob = c(.6, .3)),
       union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .1),
       kinship_generations = 0) |>
     set_union_dissolution(data.frame(dur_start = 0, dur_end = Inf, rate = .1))
   withr::local_options(hammel.check_cells = TRUE)
-  out <- simulate(model, 6, seed = 32)
+  out <- run_simulation(model, 6, seed = 32)
   starts <- out$unions$start_time >= 0
   expect_gt(sum(starts), 500)
   expect_gt(sum(out$unions$union_type[starts] == "cohab"), 100)
@@ -38,12 +39,12 @@ test_that("cell search intensities match explicit scans through every state chan
   expect_gt(sum(duplicated(wives)), 10)
   # The same model with search weights uses the same calibration path.
   weighted <- set_union_formation(model, "rate", rates = search,
-    matching = create_matching_model(~ age_difference, c(age_difference = 0),
+    matching = matching_model(~ age_difference, c(age_difference = 0),
       group_exogamy = c("A:B" = -1)),
     cohab_prob = data.frame(age_start = c(0, 25), age_end = c(25, Inf), prob = c(.6, .3)),
     union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = .1),
     kinship_generations = 0,
     # The baseline declares its categories in the order given (A, B).
-    weights = create_weight_model(~ group, c(groupB = log(2))))
-  expect_s3_class(simulate(weighted, 3, seed = 33), "hammel_population")
+    weights = weight_model(~ group, c(groupB = log(2))))
+  expect_s3_class(run_simulation(weighted, 3, seed = 33), "hammel_population")
 })

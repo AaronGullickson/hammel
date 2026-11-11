@@ -16,59 +16,94 @@ set_group_transition(
 )
 }
 \arguments{
-\item{rates}{A nonempty data frame requiring \code{origin}, \code{destination},
-\code{rate}, and either \code{age_start}/\code{age_end} or \code{dur_start}/\code{dur_end} throughout.
-\code{origin} and \code{destination} are categories of the transition's dimension.
-Half-open bands use years; rates are finite nonnegative hazards per
-person-year. Ends may be \code{Inf}. Bands cannot overlap within a stratum.
-Self-transitions are invalid. Optional \code{sex} is m/f. Optional \code{union_type}
-is unpartnered/partnered or unpartnered/cohab/marriage. Columns named by
-other declared group dimensions give separate schedules by those
-categories; the transition's own dimension cannot be such a column.
-Omitted columns apply universally. Destinations may initially be empty;
-other configured group-specific processes must cover all possible
-categories. Optional \code{time_start}/\code{time_end} specify half-open absolute
-calendar-year bands, including fractional years. Every active slice must
-be valid and the table must cover the requested run. Rate changes do not
-reset duration.}
+\item{rates}{A nonempty data frame defining the mortality rate schedules.
+Must contain at least \code{origin}, \code{destination}, \code{rate}, and either
+\code{age_start}/\code{age_end} or \code{dur_start}/\code{dur_end} throughout. See details for
+format and description of stratification variables that can be applied.}
 
 \item{group}{The name of the declared group dimension (see \code{\link[=set_groups]{set_groups()}})
-whose categories change. \code{NULL} (default) means the model's only
-dimension, and is an error when several are declared.}
+whose categories are affected by this transition rate schedule. \code{NULL}
+(default) means the model's only dimension, and is an error when several
+are declared.}
 
-\item{weights}{NULL (default) for unweighted selection, or a
-\code{\link[=create_weight_model]{create_weight_model()}} using person variables and \code{destination}, which
-chooses who in a cell moves without changing the cell's input rate.}
+\item{weights}{NULL (default) for unweighted selection, or a \code{\link[=weight_model]{weight_model()}}
+using person variables and \code{destination}, which chooses who in a cell moves
+without changing the cell's input rate.}
 
 \item{household}{\code{NULL} (default): each person moves individually. A
-\code{\link[=household]{household()}}: a move carries the mover's household (D140). One clock
-per household: a woman in a union carries it, while her partner and
-dependents have none; everyone else has their own. When a carrier moves,
-their partner and the dependents attached to either of them move to the
-same destination, from wherever they are (members already there stay).
-Requires age bands.}
+\code{\link[=household]{household()}}: a move carries the mover's household with them on a
+transition. If the household is set, then the rates apply to the household
+collectively or individuals if they are not in households. Can only be used
+with age bands.}
 
-\item{model}{A \code{hammel_model}.}
+\item{model}{A \code{hammel_model} object, used by \code{set_group_transition()}.}
 }
 \value{
 \code{group_transition()} returns a process with a rates tibble;
-\code{set_group_transition()} returns the updated model. Grouped simulation
-output always includes a \code{transitions} tibble with \code{person_id}, \code{time},
-\code{group} (the dimension), \code{origin}, \code{destination}, \code{move_id} (shared by the
-rows of one move) and \code{initiator_id} (the person whose clock fired),
-including when empty.
+\code{set_group_transition()} returns the updated model.
 }
 \description{
-Construct or attach competing origin-to-destination hazards for one group
-dimension. Only the individual changes category; ancestry, parentage, union
-histories and other dimensions are retained. Duration is years since the
-person's latest recorded transition in this dimension, or age without one.
-Missing directed pairs, strata and gaps have zero risk. Restarts retain
-transition histories and resume durations from them.
+Constructs a group-specific transition process specification for a simulation
+model. The convenience function \code{set_group_tansition} is equivalent to
+\code{set_process(model, group_transition(...))} and allows for direct piping from
+a model.
 }
 \details{
-Each dimension has its own transition process: calling
-\code{set_group_transition()} again for the same dimension replaces it, and other
-dimensions' processes are kept. Transitions at the same instant in
-different dimensions follow the declaration order of \code{\link[=set_groups]{set_groups()}}.
+The primary and only required input to the function is a transition rate
+schedule for the \code{rates} argument. This data frame must contain either
+\code{age_start} and \code{age_end} columns or \code{dur_start} and \code{dur_end} columns to
+define the half-open age/duration intervals (inclusive at the start and
+exclusive at the end), an \code{origin} and \code{destination} column to define the
+origin and destination categories for the transition and a \code{rate} column for
+the transition rates. Transition rate are defined as the number of
+transitions from the origin to destination category per person-year spent
+in the origin category.
+
+For a set of K categories, there will be K(K-1) possible transition rates at
+every age/duration band. Any cases left unspecified will be assumed to have a
+zero rate. The rates are not assumed to be symmetric (e.g.A > B is not the
+same as B < A), but users can provide schedules that make these rates
+
+Each group dimension has its own transition process: and users must call
+\code{set_group_transition()} separately for each group dimension for which they
+desire a process. Columns named by declared group dimensions besides the
+focal group supply separate schedules for each combination of their
+categories; dimensions without a column share the same schedule.
+
+Optional \code{time_start}/\code{time_end} columns select half-open calendar intervals
+in absolute years, including fractional years. Both columns are required
+together; starts are finite and ends exceed starts (possibly Inf). Active
+slices must satisfy the strata and coverage rules and cover the requested
+simulation run.
+
+Transition rates can also be stratified by \code{union_type} containing either
+\code{"partnered"} and \code{"unpartnered"}, or all three of \code{"unpartnered"},
+\code{"cohab"}, \code{"marriage"}, or by \code{sex} ("m" and "f").
+}
+\examples{
+# create grouped population
+pop_start <- generate_uniform_population(
+  1000,
+  groups = list(ethnicity = c(A = 1, B = 1))
+)
+
+# create transition matrix with more A > B than B > A
+ethnic_trans <- tibble::tribble(
+ ~age_start, ~age_end, ~origin, ~destination, ~rate,
+ 0,          Inf,      "A",     "B",          0.05,
+ 0,          Inf,      "B",     "A",          0.02
+)
+
+# create simulation model and run it
+model <- hammel_model() |>
+  set_population(pop_start) |>
+  set_fertility(usa_2000_fertility) |>
+  set_mortality(usa_2000_mortality) |>
+  set_union_formation("on_demand") |>
+  set_groups(ethnicity = group(ancestry = TRUE)) |>
+  set_group_transition(ethnic_trans)
+pop_end <- run_simulation(model, 100)
+
+# check population sizes - group A will grow relative to group B
+calculate_population_size(pop_end, seq(0, 100, 20), by = "ethnicity")
 }

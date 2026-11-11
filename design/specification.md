@@ -1,6 +1,6 @@
 # Design and implemented interface
 
-Updated November 5, 2026. Milestones 1–8 are complete by user acceptance
+Updated November 9, 2026. Milestones 1–8 are complete by user acceptance
 (D029, D050, D077, D093, D105, D116, D127, D130). Individual group transitions are accepted
 under D116; milestone 7 calendar-varying rates are implemented under D118,
 accepted complete November 2, 2026 (D127). D123 implements matching/inheritance model
@@ -15,26 +15,32 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 
 | Responsibility | Implementation |
 | --- | --- |
-| Model construction and population attachment | `R/hammel_model.R` |
-| Group validation and rate lookup | `R/groups.R` |
+| Model construction and validation | `R/hammel_model.R` |
+| Population schema, model attachment and baseline generation | `R/hammel_population.R`, `R/generate_uniform_population.R`, `R/checks.R` |
+| Group declarations and histories | `R/group.R`, `R/group_history.R` |
 | Ancestry schema and initialization | `R/ancestry.R` |
-| Population schema, validation, baseline generation | `R/hammel_population.R`, `R/checks.R` |
-| Mortality/fertility specification and rate validation | `R/set_process.R` |
-| Shared model schedules and registry preparation | `R/model_schedules.R`; model caches and switches in `src/simulate.cpp` |
-| Shared calendar-rate validation | `R/calendar_rates.R`; boundaries and active slices in `src/simulate.cpp` |
-| Individual transition specification and history | `R/group_transition.R`; events in `src/simulate.cpp`; observation splitting in `src/group_history.h` |
-| Persistent fertility weights and specification | `R/het_fert.R`; cell weight trees in `src/simulate.cpp` |
-| Weight models (formulas, custom functions, schedules) | `R/weight_model.R`; stored weights and selection in `src/simulate.cpp` (`RateCells`, `FertilityCells`) |
-| Union formation/matching and dissolution specifications | `R/union_formation.R`, `R/union_dissolution.R` |
-| Shared kinship traversal and extraction | `src/kinship.h`, `src/kinship.cpp`, `R/kinship.R` |
-| HMD/HFD downloads and preparation | `R/construct_demographic_rates.R`, `R/database_intervals.R`, `R/hmd_open_age.R` |
-| Simulation validation, RNG isolation, result assembly | `R/simulate.R` |
+| Process attachment | `R/set_process.R` |
+| Mortality/fertility specifications | `R/mortality.R`, `R/fertility.R` |
+| Input-rate validation, calendar coverage, group strata and engine encoding | `R/rates_util.R` |
+| Proportional input-rate stratification | `R/stratify_rates.R` |
+| Calendar model schedules and engine preparation | `R/model_schedules.R`; switches in `src/simulate.cpp` |
+| Group transition and household specifications | `R/group_transition.R`; events in `src/simulate.cpp` |
+| Persistent fertility heterogeneity | `R/het_fert.R`; cell weight trees in `src/simulate.cpp` |
+| Weight models | `R/weight_model.R`; stored weights and selection in `src/simulate.cpp` |
+| Union formation, dissolution and cohabitation settings | `R/union_formation.R`, `R/union_dissolution.R`, `R/cohabitation.R` |
+| Matching and inheritance models | `R/matching_model.R`, `R/matching_groups.R`, `R/group_inheritance.R` |
+| Kinship traversal, extraction and selective living-kin counting | `src/kinship.h`, `src/kinship.cpp`, `R/extract_kin.R` |
+| HMD/HFD downloads, conversion and provenance | `R/get_database_rates.R` |
+| Simulation validation, RNG isolation and result assembly | `R/run_simulation.R` |
 | Continuous scheduling and events | `src/simulate.cpp` |
-| Demographic extraction and measures | `src/demography.cpp`, `R/calc_demographic_measures.R` |
-| Person-level observation engine (`by`, D133) | `R/observation_strata.R`; `person_lexis_cpp()` and `person_snapshot_cpp()` in `src/observation.cpp` |
-| Union-level dissolution and conversion counts | `dissolution_counts_cpp()` and `union_group_history_cpp()` in `src/demography.cpp` |
+| Shared history preparation and analysis strata | `R/analysis_utils.R`; native observation in `src/observation.cpp` |
+| Observed event-rate calculations | `R/calculate_rates.R`; native counts in `src/observation.cpp` and `src/demography.cpp` |
+| Population counts and rate summaries | `R/calculate_population_size.R`, `R/calculate_tfr.R`, `R/calculate_life_table.R`, `R/summary_rates.R` |
+| History augmentation and unpartnered-birth extraction | `R/augment_histories.R` |
 | Software and analytical validation | `tests/testthat/` |
-| Replication assessment | `validation/milestone1.qmd` through `validation/milestone8.qmd` |
+| Replication assessment | `validation/milestone1.qmd` through `validation/milestone9.qmd` |
+
+See [R source organization](r-source-organization.md) for the complete function map and placement rules (D143). Every multiline R function definition must have a braced body, including anonymous callbacks and single-expression bodies (D171).
 
 The engine is C++17 with Rcpp. R exposes ordinary list objects and tibbles.
 Grouped dissolution and conversion observations build union-level group
@@ -47,11 +53,34 @@ Every rate process uses the same cell machinery (`RateCells`, or
 simulation owns its population, cells, clocks and working state; there is no
 hidden process-wide engine population.
 
+## Bundled England and Wales example data
+
+`england_wales_1992_onward` is a named list of tibbles for the second
+demographic-transition example (D173):
+
+| Member | Contents | Preparation |
+| --- | --- | --- |
+| `fertility` | 18 union-type-specific 1992 fertility rates | Standard age columns; no source-label or duplicate-rate columns |
+| `marriage` | 672 first-marriage/remarriage rows, 1992–2019 | Standard calendar, age and previous-union columns; 48 missing rates retained |
+| `premarital_cohabitation` | 373 female shared-address proportions at marriage | `year`, `age_groups`, `prop_cohabit`; source values retained |
+| `cohabitation_outcomes` | 3 Great Britain cohabitation-cohort outcome rows | Source columns, rounding and missingness retained |
+| `marital_divorce_death_2005` | 52 cumulative marital divorce/death observations | Source columns and values retained |
+| `marital_divorce_death_2010` | 60 cumulative marital divorce/death observations | Source columns and values retained |
+
+The bundle provides the local numerical inputs, not an already calibrated
+simulation scenario. In particular, marriage rates have not been filled or
+tuned, probabilities have not been converted to hazards, cohabitation cohorts
+have not been mapped to calendar periods, and mortality is not included.
+Fertility uses the vignette's denominator-age bounds of 16–45; source birth
+numerators are not strictly restricted to these end-band ages. Source files
+and provenance remain under `validation/data/england_wales_1992_onward/`;
+`data-raw/england_wales_1992_onward.R` builds the bundle offline.
+
 ## Construction is separate from execution
 
 ```r
 set.seed(42)
-population <- create_baseline_population(1000, end_time = 2000)
+population <- generate_uniform_population(1000, end_time = 2000)
 mortality_rates <- data.frame(
   sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01
 )
@@ -62,21 +91,22 @@ model <- hammel_model() |>
   set_mortality(mortality_rates) |>
   set_fertility(fertility_rates, birth_interval = 0.75) |>
   set_union_formation("on_demand",
-    create_matching_model(~ age_difference, c(age_difference = 0)))
+    matching = matching_model(~ age_difference, c(age_difference = 0)))
 
-result <- simulate(model, years = 10, seed = 123)
+result <- run_simulation(model, years = 10, seed = 123)
 ```
 
 `hammel_model()` stores `population` and a named `processes` list.
-`hammel_population(persons, unions = NULL, end_time = NULL)` constructs the
+`hammel_population(persons, unions = NULL, end_time)` constructs the
 population; its schema is specified in [population tables](population-schema.md).
 `set_population(model, population)` accepts that class, validates it, normalizes
 its core tables to tibbles, and preserves extra components. The population's
 `end_time` is the next run's start; no duplicate starting time is stored in the
-model. An unknown endpoint is allowed for construction, but not execution.
+model. The endpoint is required and must be a single finite numeric year at
+construction, validation and attachment (D166).
 
 `mortality(rates)` and `fertility(rates, birth_interval = 0.75)` return typed
-`hammel_process` objects with `name`, `rates`, and `rate_unit = "person_year"`.
+`hammel_process` objects with `name` and `rates`; rates are always per person-year.
 Fertility also stores `birth_interval` and the female-birth probability `ffab`
 (default 0.4886); source attributes are copied into the
 process when present. `set_process(model, process)` stores a process under its
@@ -101,7 +131,7 @@ duration-dependent union dissolution. Optional `group_transition()` is also supp
 
 ## Execution and output
 
-`simulate(model, years, seed = NULL)` requires population, mortality,
+`run_simulation(model, years, seed = NULL)` requires population, mortality,
 fertility, and an explicit union-formation process. It uses continuous years, with no `dt`, execution step, monthly
 compensation grid, or birth-spacing argument on the execution function.
 
@@ -113,10 +143,12 @@ R validates inputs and assembles the returned `hammel_population`, retaining
 histories and existing extra person columns. Newborn group identity follows
 the dimension's inheritance model (random parent by default, with maternal fallback); other custom attributes are
 missing. Group-specific schedules and baseline group sampling are documented in
-[groups](groups.md). The `simulation` component records `start_time`, `end_time`,
-`birth_interval`, `ffab`, `births`, and `deaths` for the latest run, plus
-`dissolutions` when that optional process is configured, and
-`unrealized_births`, a tibble of counted unrealized births.
+[groups](groups.md). The `simulation` component records the latest run's
+`start_time`, `end_time`, `birth_interval` and `ffab`, plus `hetfert` when enabled
+and `cohab_as_previous_union` when cohabitation is enabled.
+Event counts are not duplicated there (D167); events remain in person, union
+and transition histories. `unrealized_births` and `unrealized_since` are
+population components accumulated across chained runs (D160).
 
 Grouped populations also have an `ancestry` tibble, or may supply it explicitly
 to `hammel_population(ancestry = ...)`. Initialization uses recorded identities
@@ -159,7 +191,7 @@ See [union dissolution](union-dissolution.md) for examples and deferred scope.
 
 ## Newborn identity configuration
 
-`create_group_inheritance()` attaches per dimension through `group(inheritance = ...)`.
+`group_inheritance()` attaches per dimension through `group(inheritance = ...)`.
 The `"fixed"` method (D142) uses an explicit `fixed_value` category, validated against
 the registry and assigned in C++ with no callback or identity random draw.
 R validates the mode, possible identity registry, grouped schedule coverage,
@@ -174,7 +206,7 @@ calls. See [group inheritance](group-inheritance.md).
 ```r
 continued <- model |>
   set_population(result) |>
-  simulate(years = 5, seed = 124)
+  run_simulation(years = 5, seed = 124)
 ```
 
 Reusing the original model retains its processes. Building a new model from
@@ -255,17 +287,17 @@ type. `calculate_cohab_convert_rate()` reports conversion per cohabitation
 year by duration or woman's age, optionally by woman's group. These risk
 sets differ and must not be treated as interchangeable search-rate estimates.
 
-`get_unpartnered_births()` extracts known-parent births outside either union
+`extract_unpartnered_births()` extracts known-parent births outside either union
 type, adding parent ages/groups for father-matching assessment. Each birth is
 retained, including repeated parental pairs. Birth-first dissolution/conversion
 boundaries and half-open ordinary coverage match demographic observations.
 
-`get_detailed_unions(population)` returns a separate tibble preserving union
+`augment_unions(population)` returns a separate tibble preserving union
 records and appending each partner's birth/death time and optional group at
 union formation, reconstructed from transition histories, with `_w` and `_h` suffixes. It joins by partner IDs, preserves types and row order,
 and leaves the population unchanged. See [demographic analysis](demographic-analysis.md).
 
-`get_parent_info(population)` returns a separate tibble preserving all persons
+`augment_persons(population)` returns a separate tibble preserving all persons
 and their columns, adding `age_mother` and `age_father` in years at each
 person's birth, plus `<group>_mother` and `<group>_father` for each declared
 group dimension (such as `race_mother`).
@@ -346,7 +378,7 @@ model's restrictions. See [group matching](group-matching.md).
 
 ## Milestone 2 construction
 
-`create_matching_model()` accepts a formula with age and group predictors,
+`matching_model()` accepts a formula with age and group predictors,
 named utility coefficients, and optional symmetric additive pair effects (`A:B` in both directions).
 Group predictors are named by dimension (`female_race`, `same_race`) with the
 dimension's categories as levels (D134); see
@@ -407,7 +439,7 @@ model supplies a separately prepared draw model and weights for
 nonmarital father selection. Previous-father
 preference is deferred (D042).
 
-Omitting `matching` uses `create_age_gap_matching_model(0, 5)`. The helper
+Omitting `matching` uses `age_gap_matching_model(0, 5)`. The helper
 converts a preferred age gap and half-weight distance in years to the existing
 quadratic utility model. `diagnostics = TRUE` adds weighted choice's applied
 `.log_weight_<group>` columns to new union records in grouped populations,
@@ -450,8 +482,8 @@ per-generation marginal normalization is imposed. See [the specification](fertil
 
 ## Weight models (D129)
 
-`create_weight_model(formula, coefficients)` or
-`create_weight_model(fun = f)` builds a weight model, validated by
+`weight_model(formula, coefficients)` or
+`weight_model(fun = f)` builds a weight model, validated by
 `validate_weight_model()`; `weights` arguments on `set_mortality()`,
 `set_fertility()`, `set_union_dissolution()`, `set_group_transition()` and
 `set_union_formation()` (with `weights_conversion`) accept one model or a

@@ -13,8 +13,9 @@ test_that("pooled previous-union inputs equal detailed schedules for both ending
       start_time=-5,end_time=-1,end_reason=reason)
     if(reason=="death_husband") m$population$persons$death_time[2] <- -1
     m <- set_union_formation(m,"rate",rates=rates,kinship_generations=0)
-    actual <- simulate(m,.5,seed=42)
-    expected <- simulate(set_union_formation(m,"rate",rates=detailed,kinship_generations=0),.5,seed=42)
+    actual <- run_simulation(m,.5,seed=42)
+    expected <- run_simulation(set_union_formation(m,"rate",rates=detailed,
+      kinship_generations=0),.5,seed=42)
     expect_equal(actual,expected)
     expect_equal(nrow(actual$unions),2L)
     expect_equal(m$processes$union_formation$rates,tibble::as_tibble(rates))
@@ -32,7 +33,7 @@ test_that("search rates and cohabitation probabilities accept the same complete 
     m <- set_union_formation(make_rate_model(4),"rate",rates=x,cohab_prob=p,
       union_convert_rate=data.frame(dur_start=0,dur_end=Inf,rate=0))
     expect_s3_class(m,"hammel_model")
-    expect_silent(simulate(m,0,seed=1))
+    expect_silent(run_simulation(m,0,seed=1))
   }
   expect_error(union_formation("rate",rates=detailed[-3,]),"complete|all three")
   expect_error(union_formation("rate",rates=rbind(pooled,detailed[3,])),"mix")
@@ -60,11 +61,18 @@ test_that("search rates and cohabitation probabilities accept the same complete 
   m$population$unions <- tibble::tibble(union_id=1,wife_id=1,husband_id=2,
     start_time=-5,end_time=-1,end_reason="death_husband")
   m$population$persons$death_time[2] <- -1
-  attach <- function(rates,prob) set_union_formation(m,"rate",rates=rates,
-    cohab_prob=prob,union_convert_rate=data.frame(dur_start=0,dur_end=Inf,rate=0),
-    kinship_generations=0)
-  actual <- simulate(attach(calendar,p),2,seed=42)
-  expected <- simulate(attach(duplicate_pooled(calendar),duplicate_pooled(p)),2,seed=42)
+  attach <- function(rates,prob) {
+    set_union_formation(
+      m, "rate",
+      rates = rates,
+      cohab_prob = prob,
+      union_convert_rate = data.frame(dur_start = 0, dur_end = Inf, rate = 0),
+      kinship_generations = 0
+    )
+  }
+  actual <- run_simulation(attach(calendar,p),2,seed=42)
+  expected <- run_simulation(attach(duplicate_pooled(calendar),duplicate_pooled(
+    p)),2,seed=42)
   expect_equal(actual,expected)
   expect_equal(actual$unions$union_type[2],"cohab")
 

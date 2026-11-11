@@ -132,7 +132,7 @@ mort_rates <- mortality_rates_sweden |> filter(time_start == 1811) |>
   select(-starts_with("time_"))
 
 # The starting population should have ending times equal to my start date - 100
-pop <- create_baseline_population(100000, 70, 1780 - 100)
+pop <- generate_uniform_population(100000, 70, 1780 - 100)
 
 # set up the model
 model <- hammel_model() |>
@@ -142,10 +142,10 @@ model <- hammel_model() |>
   set_union_formation("on_demand")
 
 # simulate for 100 years to get my starting population
-pop_start <- simulate(model, 100, seed = 1)
+pop_start <- run_simulation(model, 100, seed = 1)
 ```
 
-When I create the baseline population, we need to specify `end_time`. Birth times for the randomly generated population will extend backwards from this value, so this will give the starting year for my simulation. Since we want the real simulation to start in 1780 and we want to project forward this burn in simulation 100 years, this argument needs to be 1680.
+When I create the uniform population, we need to specify `end_time`. Birth times for the randomly generated population will extend backwards from this value, so this will give the starting year for my simulation. Since we want the real simulation to start in 1780 and we want to project forward this burn in simulation 100 years, this argument needs to be 1680.
 
 When setting up the model, the only three required processes are fertility, mortality, and union formation. In this case, we are not interested in a detailed tracking of marriages and so we will use the "on_demand" method. This just generates a union whenever a currently unpartnered woman gives birth.
 
@@ -195,7 +195,7 @@ model <- hammel_model() |>
   # on demand works fine here because our focus is on the fertility and mortility
   set_union_formation("on_demand")
 sim_time <- system.time(
-  pop_final <- simulate(model, 2020 - 1780, seed = 1)
+  pop_final <- run_simulation(model, 2020 - 1780, seed = 1)
 )
 ```
 
@@ -290,6 +290,18 @@ pop_final |>
 
 @fig-life-exp-demog-trans shows the estimated life expectancy at birth for each year of the simulation. The dotted red line shows the life expectancy at birth from the input rates. The estimated life expectancy matches closely to that expected by the input rates.
 
+```{r}
+#| label: fig-cousins
+#| fig-cap: Mean number of living cousins across time in the simulation.
+
+count_kin(pop_final, seq(1780, 2020, 5), relationship = "first_cousin") |>
+  ggplot(aes(x = time, y = mean_kin))+
+  geom_line()+
+  labs(x = "year", y = "mean number of living first cousins")
+```
+
+Finally, @fig-cousins gets at one of the main reasons that SOCSIM was originally developed. The demographic transition led to first a rise in the number of living first cousins per person as mortality declined and then a sharp decline as fertility declined. This is the kind of kinship relation insight that demographic microsimulation is very good at uncovering.
+
 ### Comparing specific age-specific rate schedules
 
 As a final test, I look at age-specific mortality rates and age-specific fertility rates at specific time points and compare them to the input rates at those time points. For this exercise, I can also use the `conf.level = 0.95` argument of the `calculate_fertility_rates` and `calculate_mortality_rates` helper functions to get 95% confidence intervals for each estimate. These confidence intervals are Poisson confidence intervals rather than a normal distribution approximation and should therefore be accurate even for small exposure counts in cells. Because we are looking at age (and sex, for mortality) cells by year, the estimates here are more noisy than for summary measures like TFR or life expectancy. 
@@ -302,7 +314,7 @@ selected_years <- c(1900, 1920, 1940, 1960, 1980, 2000)
 temp <- fertility_rates_sweden |>
   filter(time_start %in% selected_years)
 
-calculate_fertility_rates(pop_final, 1780:2020, 12:55, conf.level = 0.95) |>
+calculate_fertility_rates(pop_final, 1780:2020, 12:55, conf_level = 0.95) |>
   filter(time_start %in% selected_years) |> 
   ggplot(aes(x = age_start + 0.5, y = rate_fertility))+
   geom_ribbon(aes(ymin = conf_low, ymax = conf_high),
@@ -323,7 +335,7 @@ selected_years <- c(1800, 1850, 1900, 1950, 2000)
 temp <- mortality_rates_sweden |>
   filter(time_start %in% selected_years)
 
-calculate_mortality_rates(pop_final, 1780:2020, 0:85, conf.level = 0.95) |>
+calculate_mortality_rates(pop_final, 1780:2020, 0:85, conf_level = 0.95) |>
   filter(time_start %in% selected_years) |> 
   ggplot(aes(x = age_start + 0.5, y = rate_mortality))+
   geom_ribbon(aes(ymin = conf_low, ymax = conf_high),

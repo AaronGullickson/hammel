@@ -57,6 +57,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 
 | Document | Status |
 | --- | --- |
+| [R source organization](r-source-organization.md) | Implemented responsibility map and placement rules for R source files (D143) |
 | [Event timing](waiting-time-sampling.md) | Explanation of the per-process exponential clock and cell choice |
 | [Union-formation models](union-formation-models.md) | Implemented milestone 2 rules, matching defaults, diagnostics, and deferred work |
 | [Cohabitation](cohabitation.md) | Rate-mode type probabilities, type-specific matching/rates, conversion and histories (D085/D086) |

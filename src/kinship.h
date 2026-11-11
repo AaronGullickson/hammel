@@ -24,7 +24,9 @@ struct KinEvidence {
 
 class Kinship {
 public:
-  Kinship(std::vector<std::array<int, 2>> parents, int generations);
+  // Counting needs minimum distances but not reporting-only kin metadata.
+  Kinship(std::vector<std::array<int, 2>> parents, int generations,
+          bool track_details = true);
   void append(int mother, int father);
   int generations() const { return generations_; }
   const std::vector<KinAncestor>& ancestors(int person);
@@ -34,6 +36,7 @@ public:
 
 private:
   int generations_;
+  bool track_details_;
   std::vector<std::array<int, 2>> parents_;
   std::vector<std::vector<KinAncestor>> cache_;
   std::vector<unsigned char> ready_, complete_;

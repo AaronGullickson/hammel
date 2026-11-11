@@ -20,7 +20,7 @@ test_that("pair vectors and tables expand unordered effects symmetrically", {
 })
 
 test_that("native pair offsets match analytical probabilities and R scores", {
-  model <- create_matching_model(~ age_difference, c(age_difference = 0),
+  model <- matching_model(~ age_difference, c(age_difference = 0),
     group_exogamy = c("A:B" = log(2), "A:C" = log(3)))
   labels <- c("A", "B", "C")
   prepared <- prepare_matching_model(model, labels)
@@ -31,14 +31,14 @@ test_that("native pair offsets match analytical probabilities and R scores", {
   expect_equal(result, calculate_matching_utilities(model, c(0, 0, 0), "A", labels))
   expect_equal(softmax(inspect_group_matching_cpp(c(0, 0), prepared, 1L, 0:1)), c(2, 1)/3)
   expect_equal(softmax(inspect_group_matching_cpp(c(0, 0), prepared, 2L, 0:1)), c(3, 1)/4)
-  only <- create_matching_model(~ 1, numeric(), group_exogamy = c("A:B" = log(2)))
+  only <- matching_model(~ 1, numeric(), group_exogamy = c("A:B" = log(2)))
   expect_equal(calculate_matching_probabilities(only, c(0, 0), "A", c("A", "B")), c(1, 2)/3)
-  helper <- create_age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1))
+  helper <- age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1))
   expect_identical(helper$group_exogamy, c("A:B" = -1))
 })
 
 test_that("same_group formula and additive effects combine for custom formulas", {
-  matching <- create_matching_model(~ abs(age_difference) + same_group,
+  matching <- matching_model(~ abs(age_difference) + same_group,
     c("abs(age_difference)" = -0.1, same_group = 0.3), group_exogamy = c("A:B" = 0.7))
   gaps <- c(-2, 1, 0)
   expected <- c(-0.2 + 0.3, -0.1 + 0.7, 0)
@@ -55,7 +55,7 @@ test_that("categorical group predictors have stable treatment contrasts and inte
     female_group = factor(c("A", "B"), levels = c("A", "B")))
   names <- colnames(stats::model.matrix(formula, data))[-1]
   beta <- setNames(seq_along(names)/10, names)
-  expect_warning(public <- create_matching_model(formula, beta), "male_group` are absorbed")
+  expect_warning(public <- matching_model(formula, beta), "male_group` are absorbed")
   matching <- internal_matching_model(public, "group", c("A", "B"))
   gaps <- c(1, 3)
   supplied <- data.frame(age_difference = gaps,
@@ -65,11 +65,12 @@ test_that("categorical group predictors have stable treatment contrasts and inte
   result <- inspect_group_matching_cpp(gaps, prepare_matching_model(matching, c("A", "B")), 1L, c(0L, 0L))
   expect_equal(result, unname(expected))
   # Session contrast settings must not change these specified coefficients.
-  old <- options(contrasts = c("contr.sum", "contr.poly")); on.exit(options(old))
+  old <- options(contrasts = c("contr.sum", "contr.poly"))
+  on.exit(options(old))
   expect_equal(calculate_matching_utilities(matching, gaps, "B", c("A", "A")), unname(expected))
   # Categories come from the declaration and are checked when the model meets it.
   expect_error(internal_matching_model(public, "group", c("A", "B", "C")), "coefficient names")
-  one <- suppressWarnings(create_matching_model(~ male_group, numeric()))
+  one <- suppressWarnings(matching_model(~ male_group, numeric()))
   expect_error(internal_matching_model(one, "group", "A"), "at least two categories")
   expect_error(prepare_matching_model(matching, c("A", "C")), "covered")
   expect_error(calculate_matching_utilities(matching, 1, "A", "C"), "undeclared")
@@ -90,52 +91,54 @@ group_choice_model <- function(initiation = "on_demand", matching, father_matchi
 }
 
 test_that("pair effects drive both union modes and father choice", {
-  matching <- create_matching_model(~ age_difference, c(age_difference = 0), group_exogamy = c("A:B" = 3), delta = c(B = 1000))
-  result <- simulate(group_choice_model(matching = matching), 0.3, seed = 52)
+  matching <- matching_model(~ age_difference, c(age_difference = 0), group_exogamy = c("A:B" = 3), delta = c(B = 1000))
+  result <- run_simulation(group_choice_model(matching = matching), 0.3, seed =
+    52)
   expect_equal(result$unions$husband_id, 3)
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 3))
   model <- group_choice_model("rate", matching)
-  result <- simulate(model, 0.3, seed = 52)
+  result <- run_simulation(model, 0.3, seed = 52)
   expect_equal(nrow(result$unions), 0)
   expect_true(any(result$persons$birth_time >= 0))
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 3))
   model$processes$union_formation$rates$rate <- 1e8
-  result <- simulate(model, 0.3, seed = 52)
+  result <- run_simulation(model, 0.3, seed = 52)
   expect_equal(result$unions$husband_id, 3)
-  opposite <- create_matching_model(~ age_difference, c(age_difference = 0), group_exogamy = c("A:A" = 3), delta = c(B = -1000))
-  result <- simulate(group_choice_model("rate", matching, father_matching = opposite), 0.3, seed = 52)
+  opposite <- matching_model(~ age_difference, c(age_difference = 0), group_exogamy = c("A:A" = 3), delta = c(B = -1000))
+  result <- run_simulation(group_choice_model("rate", matching,
+    father_matching = opposite), 0.3, seed = 52)
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 2))
 })
 
 test_that("group matching validates edited models and missing identities even at zero duration", {
-  matching <- create_matching_model(~ same_group, c(same_group = 1))
+  matching <- matching_model(~ same_group, c(same_group = 1))
   model <- make_model(0)
   model$processes$union_formation$matching <- matching
-  expect_error(simulate(model, 0), "declared group dimension")
+  expect_error(run_simulation(model, 0), "declared group dimension")
   model$population$persons$group <- character()
   model$population$groups <- list(group = group())
-  expect_no_error(simulate(model, 1))
-  matching <- create_matching_model(~ age_difference, c(age_difference = 0), group_exogamy = c("A:B" = 0))
+  expect_no_error(run_simulation(model, 1))
+  matching <- matching_model(~ age_difference, c(age_difference = 0), group_exogamy = c("A:B" = 0))
   matching$group_exogamy <- c("A:B" = 0, "B:A" = 0)
-  expect_error(set_union_formation(make_model(0), "on_demand", matching), "overlapping")
+  expect_error(set_union_formation(make_model(0), "on_demand", matching = matching), "overlapping")
   model$processes$union_formation$matching <- matching
-  expect_error(simulate(model, 0), "overlapping")
+  expect_error(run_simulation(model, 0), "overlapping")
 })
 
 test_that("zero or absent pair effects preserve histories and RNG consumption", {
-  matching <- create_age_gap_matching_model(0, 5)
+  matching <- age_gap_matching_model(0, 5)
   model <- group_choice_model(matching = matching)
   set.seed(654)
-  original <- simulate(model, 1)
+  original <- run_simulation(model, 1)
   state <- .Random.seed
   model$processes$union_formation$matching$group_exogamy <- c("A:B" = 0, "absent:C" = 5)
   set.seed(654)
-  expect_identical(simulate(model, 1), original)
+  expect_identical(run_simulation(model, 1), original)
   expect_identical(.Random.seed, state)
 })
 
 test_that("custom group comparisons work with absent candidate levels", {
-  matching <- internal_matching_model(suppressWarnings(create_matching_model(
+  matching <- internal_matching_model(suppressWarnings(matching_model(
     ~ age_difference + I(male_group == "B"),
     c(age_difference = 0.1, "I(male_group == \"B\")TRUE" = log(2)))), "group", c("A", "B"))
   prepared <- prepare_matching_model(matching, c("A", "B"))
@@ -146,18 +149,18 @@ test_that("custom group comparisons work with absent candidate levels", {
 })
 
 test_that("pair tables support numeric and colon-containing group labels", {
-  matching <- as_internal_matching(create_matching_model(~ same_group, c(same_group = 0.2),
+  matching <- as_internal_matching(matching_model(~ same_group, c(same_group = 0.2),
     group_exogamy = data.frame(group_x = 20, group_y = 10, log_odds = log(2))), c(20, 10))
   prepared <- prepare_matching_model(matching, c(20, 10))
   expect_equal(inspect_group_matching_cpp(c(0, 0), prepared, 0L, 0:1), c(0.2, log(2)))
   expect_equal(calculate_matching_utilities(matching, c(0, 0), 20, c(20, 10)), c(0.2, log(2)))
-  matching <- as_internal_matching(create_matching_model(~ 1, numeric(), group_exogamy = data.frame(
+  matching <- as_internal_matching(matching_model(~ 1, numeric(), group_exogamy = data.frame(
     group_x = "A:B", group_y = "C::D", log_odds = -1)), c("A:B", "C::D"))
   prepared <- prepare_matching_model(matching, c("A:B", "C::D"))
   expect_equal(inspect_group_matching_cpp(c(0, 0), prepared, 0L, 0:1), c(0, -1))
   # The removed female_group/male_group form points to the table form.
-  expect_error(create_matching_model(~ 1, numeric(), group_exogamy = data.frame(
+  expect_error(matching_model(~ 1, numeric(), group_exogamy = data.frame(
     female_group = "A", male_group = "B", log_odds = -1)), "_x` and `<group>_y")
-  expect_error(create_matching_model(~ 1, numeric(), group_exogamy = list(group = data.frame(
+  expect_error(matching_model(~ 1, numeric(), group_exogamy = list(group = data.frame(
     group_x = "A", group_y = "B", log_odds = -1))), "whole `group_exogamy`")
 })

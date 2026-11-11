@@ -29,6 +29,10 @@ extract_kin_cpp <- function(persons, ego_ids, relative_ids, generations) {
     .Call(`_hammel_extract_kin_cpp`, persons, ego_ids, relative_ids, generations)
 }
 
+count_kin_cpp <- function(persons, generations, relationship_types, strata, n_strata, n_types) {
+    .Call(`_hammel_count_kin_cpp`, persons, generations, relationship_types, strata, n_strata, n_types)
+}
+
 person_lexis_cpp <- function(persons, unions, groups, group_count, time_breaks, axis_breaks, parity_breaks, options) {
     .Call(`_hammel_person_lexis_cpp`, persons, unions, groups, group_count, time_breaks, axis_breaks, parity_breaks, options)
 }

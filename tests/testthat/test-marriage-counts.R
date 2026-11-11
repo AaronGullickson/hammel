@@ -27,7 +27,8 @@ test_that("marriage counts assign exact exposure and starts by latest episode", 
     expect_equal(sum(counts$person_years[counts$sex == sex_value]),
       subset(pooled, union_type == "unpartnered" & sex == sex_value)$person_years)
   expect_equal(sum(counts$unions), 2 * nrow(pop$unions))
-  shuffled <- pop; shuffled$unions <- shuffled$unions[3:1, ]
+  shuffled <- pop
+  shuffled$unions <- shuffled$unions[3:1, ]
   expect_identical(calculate_union_rates(shuffled, c(0, 6), c(0, Inf), by = "previous_union"), counts)
 })
 

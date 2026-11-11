@@ -9,7 +9,6 @@ test_that("process constructors and setters preserve rates and replace independe
   expect_true(inherits(death_process, "hammel_mortality"))
   expect_true(inherits(birth_process, "hammel_fertility"))
   expect_identical(death_process$rates, tibble::as_tibble(rates))
-  expect_identical(birth_process$rate_unit, "person_year")
   model <- set_process(set_process(hammel_model(), death_process), birth_process)
   expect_identical(model, set_fertility(set_mortality(hammel_model(), rates), births))
   replacement <- rates
@@ -72,9 +71,6 @@ test_that("invalid rates and edited process specifications are rejected", {
   expect_error(fertility(bad))
   edited <- death_process
   edited$rates$rate[1] <- -1
-  expect_error(set_process(model, edited))
-  edited <- death_process
-  edited$rate_unit <- "month"
   expect_error(set_process(model, edited))
   expect_error(set_process(model, rates))
 })

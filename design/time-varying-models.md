@@ -11,8 +11,8 @@ on November 2, 2026 (D127); see the [validation report](../validation/milestone7
 ## Input contract
 
 A direct model keeps its existing static interpretation. Matching entries are
-complete objects from `create_matching_model()` or its age-gap helper;
-inheritance entries are complete `create_group_inheritance()` objects. Existing
+complete objects from `matching_model()` or its age-gap helper;
+inheritance entries are complete `group_inheritance()` objects. Existing
 static inheritance method-name aliases and top-level NULL defaults remain
 supported. A schedule contains at least one row; base data frames with list
 columns are accepted and normalized to tibbles. Extra columns and source
@@ -94,8 +94,8 @@ matching_schedule <- tibble::tibble(
 inheritance_schedule <- tibble::tibble(
   time_start = c(1811, 1920),
   time_end = c(1920, Inf),
-  model = list(create_group_inheritance("mother"),
-               create_group_inheritance("father"))
+  model = list(group_inheritance("mother"),
+               group_inheritance("father"))
 )
 ```
 

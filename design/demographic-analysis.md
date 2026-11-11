@@ -123,10 +123,11 @@ only at recorded events:
   the same unpartnered exposure.
 - `previous_union`: how the most recent ended union ended, `none`,
   `separated` or `widowed`. Conversion is not an ending, and cohabitation
-  endings follow the population's recorded `cohabitation_counts_as_previous_union`
+  endings follow the population's recorded `cohab_as_previous_union`
   policy (D085). It applies to partnered time too: a woman in her first union
-  is `none`. `pool_dissolved = TRUE` merges `separated` and `widowed` into
-  `dissolved` in any calculator when `previous_union` is in `by`.
+  is `none`. `use_detailed_previous_union = FALSE` merges `separated` and
+  `widowed` into `dissolved` in any calculator when `previous_union` is in
+  `by`; the default `TRUE` keeps all three categories (D158).
 - `<dim>_w`, `<dim>_h` (such as `race_w`): the wife's and husband's current
   categories, for union-level rates. Directional: A-wife/B-husband and B-wife/A-husband are
   separate rows; sum them for an unordered pair.
@@ -134,9 +135,7 @@ only at recorded events:
 Dimension names require declared groups. `union_type` and `previous_union` require
 a `hammel_population` with union histories, and `previous_union` requires
 nonoverlapping histories for each person. Union rates by entry type and
-conversion rates require typed histories. Bare union tables passed to
-`calculate_dissolution_rates()` need `group_w`, `group_h` or `union_type`
-columns for those values.
+conversion rates require typed histories.
 
 **Exposure and events.** Exposure is split at every change in the requested
 variables, and each event counts under the state immediately before it in the
@@ -200,10 +199,8 @@ when death can also end unions.
 groups (D133). Rows are directional: sum A-wife/B-husband and B-wife/A-husband
 rows for the unordered pair that dissolution inputs use (D079). A full
 period/duration grid is retained for every combination of population groups.
-The function also accepts a bare union data frame with `union_id`, `start_time`,
-`end_time`, and `end_reason`; caller-provided follow-up must cover the window.
-Bare tables need `group_w` and `group_h` columns for those variables, with
-labels sorted in radix order. Summarize independent replications separately before binding
+The function requires a `hammel_population` with a known endpoint covering the
+window; bare union tables are not accepted (D159). Summarize independent replications separately before binding
 results, as for person-level Lexis counts. See
 [union dissolution](union-dissolution.md#union-year-counts-and-dissolution-rates)
 for worked accounting and censoring rules.
@@ -256,6 +253,11 @@ tables must define it themselves. The function treats mortality as piecewise
 constant hazards, integrates exponential survival/person-years, and calculates
 `ex = Tx/lx`. It does not apply conventional HMD infant adjustments.
 
+`calculate_life_expectancy(rates, age = 0)` builds the same life table and
+returns its `ex` at the requested ages, as a tibble of the stratifying columns,
+`age` and `ex`. Each requested age must be the start of an age band in the
+rates; other ages are an error (D157).
+
 The output includes input identifiers and `mx`, `n`, `ax`, `qx`, `lx`, `lx_end`,
 `dx`, `Lx`, `Tx`, and `ex`. Missing mortality rates propagate into life expectancy.
 A positive-exposure terminal cell with zero deaths has estimated rate zero;
@@ -271,9 +273,14 @@ the terminal treatment is aligned. A pooled target ASMR requires exposure
 weights within the pooled band, not an unweighted average of input rates.
 
 TFR and life-table functions also accept their corresponding `$rates` tables.
-TFR uses `rate_fertility` or fertility `rate`; life tables use `mx`, `rate_mortality`, or mortality
-`rate`. Typed processes prevent passing mortality to TFR or fertility to a life
-table. A bare `rate` column has no such type protection.
+TFR uses `rate_fertility` or fertility `rate`; life tables require
+`rate_mortality` or mortality `rate`, preferring `rate_mortality` when both
+are supplied. `mx` is retained in life-table output but is not an accepted
+input rate column; an existing `mx` column cannot override the selected input.
+Typed processes prevent passing mortality to TFR or fertility to a life table.
+A bare `rate` column has no such type protection. For a constant accepted
+input rate of 0.1 over ages zero through an open terminal interval, life
+expectancy remains 10 years and the output `mx` is 0.1.
 
 Input-rate summaries, including those passed a process object, summarize its
 stored rate table, including strata added by `stratify_rates()` (D132). They do
@@ -298,8 +305,9 @@ return zero-row tibbles with the appropriate column types.
 
 Lexis exposure splits `[birth_time, death_time)` directly at period/age
 boundaries; fractional years and unequal bands are supported. Population
-objects must have a known endpoint and cannot be queried beyond it. With bare
-persons tables, the caller must ensure follow-up through the requested endpoint.
+objects must have a known endpoint and cannot be queried beyond it. Population
+size and mortality and fertility rates require a `hammel_population`; wrap a
+persons table with `hammel_population(persons, end_time = ...)` (D159).
 Missing death times are censored there.
 
 ## Replications and interpretation
@@ -341,7 +349,7 @@ behavior; default Lexis summaries use all female exposure, while
 
 ## Parent information
 
-`get_parent_info(population)` enriches the full persons table with
+`augment_persons(population)` enriches the full persons table with
 `age_mother` and `age_father` at each person's birth, in years, and
 `<group>_mother` and `<group>_father` for each declared dimension (such as
 `race_mother`; `group_mother` for a dimension named `group`).
@@ -350,7 +358,7 @@ missing values; founder rows remain present. For example, birth in 2000.5
 and maternal birth in 1975.25 give `age_mother = 25.25`.
 
 ```r
-parent_info <- get_parent_info(result)
+parent_info <- augment_persons(result)
 cross_group_births <- parent_info |>
   dplyr::filter(!is.na(group_mother), !is.na(group_father),
                 group_mother != group_father)
@@ -365,7 +373,7 @@ Parent groups are recorded identities, not reconstructed past transitions.
 
 ### Detailed union records
 
-`get_detailed_unions(population)` accepts a `hammel_population` and returns a
+`augment_unions(population)` accepts a `hammel_population` and returns a
 separate tibble containing all union rows and columns, in their original order,
 with partner attributes matched through `wife_id` and `husband_id`. It adds
 `birth_time_w`, `death_time_w`, `birth_time_h`, and `death_time_h`, plus
@@ -387,7 +395,7 @@ dates from those IDs regardless of their row positions in persons; repeated
 unions reuse those attributes while retaining distinct episode records.
 
 ```r
-detailed_unions <- get_detailed_unions(result)
+detailed_unions <- augment_unions(result)
 ```
 
 ### Current union type exposure and events
@@ -546,11 +554,11 @@ Finite last axis breaks gain Inf, as with the other rate helpers.
 
 ## Births with fathers selected outside partnerships
 
-`get_unpartnered_births(population)` returns parent-enriched person rows for
+`extract_unpartnered_births(population)` returns parent-enriched person rows for
 births with known mother and father where the mother had no active partnership.
 It excludes both marriage and cohabitation coverage, without deduplicating
 parental pairs: each birth is a father-selection event. All input person columns
-and the parent ages/groups from `get_parent_info()` are retained in person-row
+and the parent ages/groups from `augment_persons()` are retained in person-row
 order. Founders and births missing either parent are omitted. Complete histories
 are needed; no recorded partnership is interpreted as unpartnered, not proof of
 never partnering. Formation coverage is half-open; exact dissolution/conversion
@@ -561,7 +569,7 @@ is imposed; users can filter birth_time afterward. The input is not modified.
 
 ```r
 father_crosstabs <- results |>
-  purrr::map(get_unpartnered_births) |>
+  purrr::map(extract_unpartnered_births) |>
   dplyr::bind_rows(.id = "replication") |>
   dplyr::count(replication, group_mother, group_father)
 ```
@@ -614,11 +622,12 @@ See [parity fertility](parity-fertility.md#observed-fertility-by-parity).
 
 ## Unrealized births under cell accounting
 
-For populations returned by `simulate()` (D101),
+For populations returned by `run_simulation()` (D101),
 `calculate_fertility_rates(..., unrealized = TRUE)` adds `unrealized_births`
 and `rate_fertility_adjusted = (births + unrealized_births) / person_years`.
 Unrealized births are counts of the times the fertility clock drew a cell that
-had members but no eligible woman (`simulation$unrealized_births`; D128; before
+had members but no eligible woman (the population's `unrealized_births`; D128,
+D160; before
 November 4, 2026 they were expected values), so the adjusted
 rate shows what the input schedule would have produced without that loss. The
 observed `rate_fertility` remains the simulated outcome.
@@ -627,10 +636,13 @@ Each record covers one one-year period from the run start and one fertility
 cell (an age year, actual parity when schedules are parity-specific, group and
 union type). A record is added to the observation row that contains it, so
 actual parities pool into broader parity bands and age years into wider age
-bands. Values are `NA`, rather than approximated, for periods before the most
-recent simulation's start (a restarted population keeps only its latest run's
-record), for time or age breaks that cut through a record, and for union-type or
-parity strata the fertility schedule did not use. Populations without an
+bands. The record accumulates across restarts, like persons, unions and
+transitions, and `unrealized_since` gives the start of the first simulated run
+(D160). Values are `NA`, rather than approximated, for periods before
+`unrealized_since`, for time or age breaks that cut through a record, and for
+union-type or parity strata that the fertility schedule in force at the time
+did not use. When runs use different schedules, a stratum column is `NA` in
+the rows of a run that pooled it. Populations without an
 unrealized-births record (never simulated, or simulated before D101) are
 rejected.
 
@@ -665,7 +677,7 @@ for endpoint, empty-output and history-completeness rules.
 
 All seven event-rate calculators (mortality, fertility, union formation,
 marriage, dissolution, cohabitation conversion and group transitions) accept
-`conf.level = NULL` by default, retaining their existing output. A finite numeric
+`conf_level = NULL` by default, retaining their existing output. A finite numeric
 scalar strictly between zero and one requests two-sided exact Poisson intervals
 at that confidence level, appended as numeric `conf_low` and `conf_high` columns.
 For example:
@@ -673,12 +685,12 @@ For example:
 ```r
 calculate_fertility_rates(
   result, time_breaks = c(2000, 2010), age_breaks = c(15, 20, 25, 30, 35, 40, 45, 50),
-  conf.level = 0.95
+  conf_level = 0.95
 )
 ```
 
 This requests 95% intervals. Each positive-exposure
-row uses `stats::poisson.test(x = events, T = exposure, conf.level = conf.level)`.
+row uses `stats::poisson.test(x = events, T = exposure, conf.level = conf_level)`.
 Exposure is person-years or union-years according to the existing measure.
 Zero exposure produces two NA bounds, even when an endpoint event is recorded;
 empty results retain numeric zero-length confidence columns. Zero events with
@@ -700,7 +712,7 @@ unrealized outputs, invalid confidence levels and unchanged default outputs.
 ## Detailed and pooled previous unions (D126)
 
 Union and marriage rate calculators use `none`, `separated`, and `widowed`
-when `by = "previous_union"`. Set `pool_dissolved = TRUE` to return
+when `by = "previous_union"`. Set `use_detailed_previous_union = FALSE` to return
 `none` and `dissolved` instead, together with `by = "previous_union"`.
 Duration breaks also enable previous-union stratification.
 Dissolved pools separation and widowhood. Events and exposure are summed

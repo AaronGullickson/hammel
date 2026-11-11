@@ -17,3 +17,4 @@
 ^pkgdown$
 ^vignettes/articles/\.quarto$
 ^vignettes/articles/*_files$
+^data-raw$

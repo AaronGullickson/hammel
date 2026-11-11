@@ -38,6 +38,7 @@ test_that("Lexis event boundaries are half open", {
   p <- persons[1, ]
   p$birth_time <- 0
   p$death_time <- 1
+  p <- hammel_population(p, end_time = 2)
   boundary <- demographic_counts(p, c(0, 1, 2), c(0, 1, Inf))
   expect_equal(sum(boundary$deaths), 1, tolerance = 0)
   expect_equal(boundary$deaths[boundary$sex == "f" & boundary$time_start == 1 & boundary$age_start ==
@@ -83,8 +84,100 @@ test_that("TFR uses band widths, propagates missing rates and groups periods", {
   expect_identical(calculate_tfr(rbind(rates, later))$tfr, c(3.5, 7))
 })
 
+test_that("life tables use only rate or rate_mortality as input rates", {
+  rates <- data.frame(age_start = c(0, 5), age_end = c(5, Inf), rate = 0.1)
+  expected <- calculate_life_table(rates)
+  for (column in c("rate", "rate_mortality")) {
+    input <- rates
+    names(input)[names(input) == "rate"] <- column
+    expect_identical(calculate_life_table(input), expected)
+    expect_error(
+      calculate_life_table(input[FALSE, ]),
+      "A rate table needs at least one age band.",
+      fixed = TRUE
+    )
+    input$mx <- "not an input mortality rate"
+    expect_identical(calculate_life_table(input), expected)
+    input[[column]] <- "invalid"
+    expect_error(calculate_life_table(input), paste0("rates\\$", column))
+  }
+  mx_only <- rates
+  names(mx_only)[names(mx_only) == "rate"] <- "mx"
+  expect_error(
+    calculate_life_table(mx_only), "Supply `rate_mortality` or `rate`.",
+    fixed = TRUE
+  )
+  expect_error(calculate_life_table(mx_only[FALSE, ]),
+    "Supply `rate_mortality` or `rate`.", fixed = TRUE
+  )
+  both <- rates
+  both$rate_mortality <- both$rate
+  both$rate <- 0.2
+  both$mx <- 0.5
+  expect_identical(calculate_life_table(both), expected)
+  expect_identical(expected$mx, rep(0.1, 2))
+  expect_equal(expected$ex, rep(10, 2))
+})
+
+test_that("life expectancy returns life-table ex at band starts", {
+  lt <- calculate_life_table(usa_2000_mortality)
+  ex <- calculate_life_expectancy(usa_2000_mortality, c(65, 0))
+  expect_s3_class(ex, "tbl_df")
+  expect_named(ex, c("sex", "age", "ex"))
+  expected <- lt[lt$age_start %in% c(0, 65), ]
+  expect_equal(ex$sex, expected$sex)
+  expect_equal(ex$age, expected$age_start)
+  expect_equal(ex$ex, expected$ex)
+  expect_equal(
+    calculate_life_expectancy(usa_2000_mortality)$ex,
+    lt$ex[lt$age_start == 0]
+  )
+  for (bad in list(3, -1, NA_real_, "0", numeric())) {
+    expect_error(
+      calculate_life_expectancy(usa_2000_mortality, bad),
+      "`age` must contain ages that start an age band in `rates`.",
+      fixed = TRUE
+    )
+  }
+})
+
+test_that("life tables reject missing stratum values", {
+  rates <- data.frame(
+    region = c("a", NA), age_start = c(0, 1), age_end = c(1, Inf), rate = 0.1
+  )
+  expect_error(
+    calculate_life_table(rates),
+    "`rates$region` must not contain missing values.",
+    fixed = TRUE
+  )
+})
+
+test_that("interval errors name the failing stratum", {
+  labelled <- data.frame(
+    sex = "f", age_start = c(0, 1), age_end = c(1, Inf),
+    rate = 0.01, note = c("a", "b")
+  )
+  expect_error(
+    calculate_life_table(labelled),
+    "explicit open interval in stratum sex = f, note = a \\(columns other"
+  )
+  expect_error(
+    calculate_life_table(labelled[2, c("age_start", "age_end", "rate")]),
+    "explicit open interval\\.$"
+  )
+  overlap <- data.frame(
+    age_start = c(15, 20), age_end = c(25, 30), rate = 0.1, region = "x"
+  )
+  expect_error(
+    calculate_tfr(overlap),
+    "nonoverlapping in stratum region = x \\("
+  )
+})
+
 test_that("life tables follow piecewise constant hazards and handle limiting cases", {
-  rates <- data.frame(age_start = c(0, 1, 5), age_end = c(1, 5, Inf), mx = 0.1)
+  rates <- data.frame(
+    age_start = c(0, 1, 5), age_end = c(1, 5, Inf), rate = 0.1
+  )
   lt <- calculate_life_table(rates)
   expect_true(all(abs(lt$ex - 10) < 1e-12))
   expect_true(abs(lt$lx[3] - exp(-0.5)) < 1e-12)
@@ -94,19 +187,19 @@ test_that("life tables follow piecewise constant hazards and handle limiting cas
   expect_equal(scaled$ex, lt$ex)
   expect_equal(scaled$lx, lt$lx * 1e+05)
   tiny <- rates
-  tiny$mx <- 1e-12
+  tiny$rate <- 1e-12
   lt <- calculate_life_table(tiny)
   expect_true(all(abs(lt$ex/1e+12 - 1) < 1e-12))
   expect_true(abs(lt$ax[1] - 0.5) < 1e-10)
   zero <- rates
-  zero$mx <- 0
+  zero$rate <- 0
   lt <- calculate_life_table(zero)
   expect_true(all(is.infinite(lt$ex)))
   expect_true(all(lt$qx == 0))
   expect_true(all(lt$lx == 1))
   expect_identical(lt$Lx[1:2], c(1, 4))
   missing <- rates
-  missing$mx[2] <- NA_real_
+  missing$rate[2] <- NA_real_
   expect_true(all(is.na(calculate_life_table(missing)$ex)))
   closed <- rates
   closed$age_end[3] <- 100
@@ -117,11 +210,11 @@ test_that("life tables follow piecewise constant hazards and handle limiting cas
   female$sex <- "f"
   male <- rates
   male$sex <- "m"
-  male$mx <- 0.2
+  male$rate <- 0.2
   tables <- calculate_life_table(rbind(female, male))
   expect_true(all(abs(tables$ex[tables$sex == "f"] - 10) < 1e-12))
   expect_true(all(abs(tables$ex[tables$sex == "m"] - 5) < 1e-12))
-  high <- data.frame(age_start = c(0, 1), age_end = c(1, Inf), mx = 40)
+  high <- data.frame(age_start = c(0, 1), age_end = c(1, Inf), rate = 40)
   expect_true(calculate_life_table(high)$lx[2] > 0)
   expect_true(all(abs(calculate_life_table(high)$ex - 1/40) < 1e-12))
 })
@@ -192,8 +285,10 @@ test_that("population counts include births and exclude deaths at each instant",
   expect_identical(calculate_population_size(population, c(1, 0, 1))$population, c(2L,
     1L, 2L))
   expect_equal(calculate_population_size(population, -1)$population, 0L, tolerance = 0)
-  expect_identical(calculate_population_size(persons, c(0, 1)), calculate_population_size(population,
-    c(0, 1)))
+  expect_error(
+    calculate_population_size(persons, c(0, 1)),
+    "must be a hammel_population"
+  )
   expect_equal(calculate_population_size(empty, 1)$population, 0L, tolerance = 0)
   expect_equal(nrow(calculate_population_size(population, numeric())), 0L, tolerance = 0)
   expect_error(calculate_population_size(population, 2))
@@ -216,8 +311,11 @@ test_that("all public demographic tables are tibbles including empty outputs", {
   expect_true(tibble::is_tibble(calculate_tfr(summary)))
   expect_true(tibble::is_tibble(calculate_life_table(summary)))
   expect_true(tibble::is_tibble(calculate_population_size(empty, numeric())))
-  expect_true(tibble::is_tibble(calculate_tfr(summary[FALSE, ])))
-  expect_true(tibble::is_tibble(calculate_life_table(summary[FALSE, ])))
+  expect_error(calculate_tfr(summary[FALSE, ]), "at least one age band")
+  expect_error(
+    calculate_life_table(summary[FALSE, ]),
+    "at least one age band"
+  )
 })
 
 
@@ -239,7 +337,7 @@ test_that("TFR separates union statuses in input tables and fertility processes"
   expect_equal(result$tfr, c(1.5, 3.5, 3, 7))
   expect_equal(result$union_status, rep(c("unpartnered", "partnered"), 2))
   expect_equal(result$time_start, c(2000, 2000, 2005, 2005))
-  expect_identical(calculate_tfr(rates[FALSE, ])$union_status, character())
+  expect_error(calculate_tfr(rates[FALSE, ]), "at least one age band")
   bad <- rates
   bad$age_start[3] <- 21
   expect_error(calculate_tfr(bad), "contiguous")
@@ -258,12 +356,16 @@ test_that("TFR warns only for known nonzero female open-age rates", {
   expect_warning(calculate_tfr(rates),NA)
   rates$rate[3] <- .01
   rates$sex <- "m"
-  expect_warning(calculate_tfr(rates),NA)
+  female <- transform(rates, sex = "f", rate = c(.1, .1, 0))
+  expect_warning(calculate_tfr(rbind(female, rates)), NA)
+  expect_error(calculate_tfr(rates), "female age band")
   rates$sex <- "f"
   rates$union_type <- "partnered"
   expect_warning(calculate_tfr(rbind(rates,transform(rates,union_type="unpartnered"))),
     "TFR.*underestimated")
   only <- rates[3, ]
-  expect_warning(empty <- calculate_tfr(only),"TFR.*underestimated")
-  expect_equal(nrow(empty),0)
+  expect_warning(
+    expect_error(calculate_tfr(only), "finite end"),
+    "TFR.*underestimated"
+  )
 })

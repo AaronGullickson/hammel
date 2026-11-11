@@ -10,9 +10,9 @@ acceptance retains the documented limitations.
 
 ## Interface and rules
 
-`create_group_inheritance(method = "random_parent", fun = NULL,
+`group_inheritance(method = "random_parent", fun = NULL,
 order = NULL, passing = 0, fixed_value = NULL)` constructs an inspectable inheritance object.
-`group(inheritance = create_group_inheritance())` attaches it to a declared dimension. Unspecified inheritance, including older specifications without this field,
+`group(inheritance = group_inheritance())` attaches it to a declared dimension. Unspecified inheritance, including older specifications without this field,
 uses random-parent assignment with maternal fallback when the father is unknown.
 Configuration is validated
 at construction, attachment, and execution.
@@ -21,7 +21,7 @@ For rules requiring no additional parameters, `inheritance` also accepts a
 method name: `"mother"`, `"father"`, `"random_parent"`, `"same_sex"`,
 `"opposite_sex"`, or `"ancestry"`. For example,
 `group(inheritance = "father")` is equivalent to using
-`create_group_inheritance("father")`. Stored process specifications contain the
+`group_inheritance("father")`. Stored process specifications contain the
 full model object. Hierarchy, custom and fixed rules require the constructor
 to supply `order`, `fun` or `fixed_value`; their bare names produce the corresponding error.
 
@@ -69,7 +69,7 @@ components or alter ancestry shares.
 
 ## Fixed newborn category (D142)
 
-`create_group_inheritance("fixed", fixed_value = "none")` assigns every newborn
+`group_inheritance("fixed", fixed_value = "none")` assigns every newborn
 `"none"` in this dimension, independently of parental categories, father availability
 and the child's sex. The user specifies the category; there is no automatic
 choice of the first or lowest category. Existing people retain their categories.

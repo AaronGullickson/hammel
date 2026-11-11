@@ -59,7 +59,8 @@ test_that("typed histories always report all three union types", {
   expect_identical(unique(x$union_type),c("unpartnered","cohab","marriage"))
   expect_equal(x$person_years[x$union_type == "unpartnered"],
                demographic_counts(pop,c(0,5),c(0,Inf))$person_years)
-  pop$persons <- pop$persons[0, ]; pop$ancestry <- pop$ancestry[0, ]
+  pop$persons <- pop$persons[0, ]
+  pop$ancestry <- pop$ancestry[0, ]
   x <- demographic_counts(pop,c(0,5),c(0,Inf), by = c("union_type", "group"))
   expect_equal(nrow(x),0)
   expect_type(x$union_type,"character")
