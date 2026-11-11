@@ -53,6 +53,29 @@ Every rate process uses the same cell machinery (`RateCells`, or
 simulation owns its population, cells, clocks and working state; there is no
 hidden process-wide engine population.
 
+## Bundled England and Wales example data
+
+`england_wales_1992_onward` is a named list of tibbles for the second
+demographic-transition example (D173):
+
+| Member | Contents | Preparation |
+| --- | --- | --- |
+| `fertility` | 18 union-type-specific 1992 fertility rates | Standard age columns; no source-label or duplicate-rate columns |
+| `marriage` | 672 first-marriage/remarriage rows, 1992–2019 | Standard calendar, age and previous-union columns; 48 missing rates retained |
+| `premarital_cohabitation` | 373 female shared-address proportions at marriage | Source columns and values retained |
+| `cohabitation_outcomes` | 3 Great Britain cohabitation-cohort outcome rows | Source columns, rounding and missingness retained |
+| `marital_divorce_death_2005` | 52 cumulative marital divorce/death observations | Source columns and values retained |
+| `marital_divorce_death_2010` | 60 cumulative marital divorce/death observations | Source columns and values retained |
+
+The bundle provides the local numerical inputs, not an already calibrated
+simulation scenario. In particular, marriage rates have not been filled or
+tuned, probabilities have not been converted to hazards, cohabitation cohorts
+have not been mapped to calendar periods, and mortality is not included.
+Fertility uses the vignette's denominator-age bounds of 16–45; source birth
+numerators are not strictly restricted to these end-band ages. Source files
+and provenance remain under `validation/data/england_wales_1992_onward/`;
+`data-raw/england_wales_1992_onward.R` builds the bundle offline.
+
 ## Construction is separate from execution
 
 ```r

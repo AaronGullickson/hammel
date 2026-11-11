@@ -39,27 +39,41 @@ recorded within \code{generations} parent steps on each side, by relationship,
 and average them over living persons.
 }
 \details{
-A person is living at time \code{t} when \code{birth_time <= t} and \code{death_time} is
-missing or after \code{t}, as in \code{\link[=calculate_population_size]{calculate_population_size()}}. Every living
-person is an ego, and a relative counts when both are living at \code{t}.
-Relatives are found and labelled as in \code{\link[=extract_kin]{extract_kin()}}: each counts once,
-under the relationship of their closest shared ancestors, with full and half
-kin together.
-
 Counts use recorded parent links only. A starting population without
 recorded parents has no recorded kin, so counts are too low until two or
 three generations have been simulated. Allow a burn-in before interpreting
-them. Relatives share kin, so egos are not independent; use replicate
-simulations to describe uncertainty.
+them. Relatives share kin, so egos are not independent.
+
+The following named relationships are available:
+\itemize{
+\item "parent"
+\item "child"
+\item "grandparent"
+\item "grandchild"
+\item "sibling"
+\item "aunt_uncle"
+\item "niece_nephew"
+\item "first_cousin"
+\item "great_grandparent" (requires \code{generations = 3})
+\item "great_grandchild" (requires \code{generations = 3})
+\item "great_aunt_uncle" (requires \code{generations = 3})
+\item "great_niece_nephew" (requires \code{generations = 3})
+\item "first_cousin_once_removed" (requires \code{generations = 3})
+\item "second_cousin" (requires \code{generations = 3})
+}
 }
 \examples{
-persons <- data.frame(
-  person_id = 1:4, sex = c("f", "m", "f", "m"),
-  birth_time = c(-50, -50, -20, -18), death_time = c(-5, NA, NA, NA),
-  mother_id = c(NA, NA, 1, 1), father_id = c(NA, NA, 2, 2)
-)
-population <- hammel_population(persons, end_time = 0)
-count_kin(population, times = c(-10, 0))
+population <- generate_uniform_population(1000)
+model <- hammel_model() |>
+  set_population(population) |>
+  set_mortality(usa_2000_mortality) |>
+  set_fertility(usa_2000_fertility) |>
+  set_union_formation(
+    "on_demand",
+    matching = age_gap_matching_model(3, 5)
+  )
+result <- run_simulation(model, years = 100, seed = 42)
+count_kin(result, 100, relationships = "first_cousin")
 }
 \seealso{
 \code{\link[=extract_kin]{extract_kin()}}
