@@ -24,21 +24,21 @@ proportions are on the zero-to-one scale. Source cohorts are half-open
 intervals, not calendar periods of a rate schedule.
 }
 \source{
-Office for National Statistics (ONS). Contains public sector information
-licensed under the Open Government Licence v3.0:
+Office for National Statistics (ONS). Contains public sector
+information licensed under the Open Government Licence v3.0:
 \url{https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/}
 
-Fertility: O'Leary L, Natamba E, Jefferies J, Wilson B (2010). Fertility and
-partnership status in the last two decades. Population Trends 140, Table
-B1. \doi{10.1057/pt.2010.10}.
+Fertility: O'Leary L, Natamba E, Jefferies J, Wilson B (2010). Fertility
+and partnership status in the last two decades. Population Trends 140,
+Table B1. \doi{10.1057/pt.2010.10}.
 
 Marriage and premarital cohabitation: ONS Marriages in England and Wales,
 2019 workbook; female marital population estimates, 1971--2001 and
-2002--2019. Exact source URLs, retrieval dates and checksums are recorded in
-the repository's source-folder \code{sources.csv}.
+2002--2019. Exact source URLs, retrieval dates and checksums are recorded
+in the repository's source-folder \code{sources.csv}.
 
-Cohabitation outcomes: Beaujouan E, Ni Bhrolchain M (2011). Cohabitation and
-marriage in Britain since the 1970s. Population Trends 145, Table 3.
+Cohabitation outcomes: Beaujouan E, Ni Bhrolchain M (2011). Cohabitation
+and marriage in Britain since the 1970s. Population Trends 145, Table 3.
 \doi{10.1057/pt.2011.16}.
 
 Marital divorce/death, 2005: Wilson B, Smallwood S (2008). The proportion
@@ -51,37 +51,32 @@ Figure 5. Publication tables and PDFs are not bundled with this dataset.
 england_wales_1992_onward
 }
 \description{
-A named list of six tibbles used by the second demographic transition
-article. Fertility and marriage tables have Hammel's schedule column names;
-cohabitation and marital divorce/death observations retain source values
-for the article's transformation examples. Cohabitation cohort
-outcomes cover Great Britain; the other tables cover England and Wales.
+A named list of six tibbles used by the second demographic transition article
+vignette. Fertility and marriage tables have Hammel's schedule column names;
+cohabitation and marital divorce/death observations retain source values for
+the article's transformation examples. Cohabitation cohort outcomes cover
+Great Britain; the other tables cover England and Wales.
 }
 \details{
 Fertility rates are births per woman-year in 1992 by \code{union_type}:
 \code{"marriage"}, \code{"cohab"} and \code{"unpartnered"}. Age bounds use the source's
-denominator ages, 16--45, as in the article. The youngest and oldest birth
-numerators are not strictly limited to these denominator ages; the final
-band is finite, not open-ended. Source labels and duplicate rate units
-have been removed without changing the rates.
+denominator ages, 16--45.
 
 Marriage rates are annual central rates of first marriages and remarriages
 for 1992--2019. \code{previous_union} maps these to \code{"none"} and \code{"dissolved"};
 this describes legal marital history, not prior cohabitation. Calendar
 intervals are \verb{[time_start, time_end)}. The 48 unavailable rates remain
-\code{NA}; the article's filling and multiplicative tuning are not applied.
-These marriage observations are not direct measurements of union-entry
-hazards including cohabitation. Counts, denominators and source-method
-columns have been removed.
+\code{NA}. These marriage observations are not direct measurements of
+union-entry hazards including cohabitation.
 
-Premarital cohabitation proportions condition on marrying; they are not
-probabilities that a newly formed union is a cohabitation. Cohabitation
+Premarital cohabitation proportions condition on marrying; Cohabitation
 outcomes are cumulative proportions at five and ten years for women under
 45 at cohabitation start. Source rounding and missing ten-year values for
-the latest cohort are retained. Marital divorce/death tables are cumulative
-competing-risk proportions, not annual hazards. No hazard conversion,
-normalization, extrapolation or interpolation is applied to these tables.
-HMD mortality is retrieved separately and is not included in this list.
+the latest cohort are retained.
+
+Marital divorce/death tables are cumulative competing-risk proportions, not
+annual hazards. No hazard conversion, normalization, extrapolation or
+interpolation is applied to these tables.
 
 Original numerical sources and their provenance remain in
 \verb{validation/data/england_wales_1992_onward/} in the repository. The offline
