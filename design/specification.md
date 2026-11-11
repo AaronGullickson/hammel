@@ -25,7 +25,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Proportional input-rate stratification | `R/stratify_rates.R` |
 | Calendar model schedules and engine preparation | `R/model_schedules.R`; switches in `src/simulate.cpp` |
 | Group transition and household specifications | `R/group_transition.R`; events in `src/simulate.cpp` |
-| Persistent fertility heterogeneity | `R/het_fert.R`; cell weight trees in `src/fertility_cells.h` |
+| Persistent fertility heterogeneity (internal, D176) | `R/het_fert.R`; cell weight trees in `src/fertility_cells.h` |
 | Weight models | `R/weight_model.R`; stored weights and selection in `src/simulate.cpp`, `src/rate_cells.h` and `src/fertility_cells.h` |
 | Union formation, dissolution and cohabitation settings | `R/union_formation.R`, `R/union_dissolution.R`, `R/cohabitation.R` |
 | Matching and inheritance models | `R/matching_model.R`, `R/matching_groups.R`, `R/group_inheritance.R` |
@@ -465,9 +465,10 @@ preference tables may be shared, but role weights use each role's intensity.
 
 ## Persistent fertility weights (D102)
 
+Hetfert is internal (D176): users cannot enable it, and fertility always uses
+the uniform path unless the internal `enable_het_fert()` is called.
 `het_fert(cv, alpha)` describes mean-one lognormal founder draws and maternal
-inheritance on the log scale. `set_fertility(..., hetfert = NULL)` keeps the
-uniform path. Enabled simulations initialize missing weight columns after seed
+inheritance on the log scale. Without it, fertility keeps the uniform path. Enabled simulations initialize missing weight columns after seed
 setup, preserve supplied positive female weights, and return weights for all
 women in `persons$hetfert`. Sons receive NA. Zero-year runs initialize weights
 without entering the engine. Existing weights survive enabled restarts. Disabled output omits the weight

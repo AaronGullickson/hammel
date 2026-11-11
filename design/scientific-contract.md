@@ -225,7 +225,7 @@ pool all parities.
 A cell generates births at its input rate times all its living members,
 including women inside the birth interval, and assigns each birth to a
 chosen eligible member, uniformly by default or proportional to persistent
-`hetfert` weights under D102. The equivalent individual hazard is
+`hetfert` weights under D102 (internal only, D176). The equivalent individual hazard is
 `rate * members * individual_weight / eligible_weight_sum`. Observed rates equal inputs in expectation
 for any composition (initialization without histories, restarts with new
 schedules or intervals, union-type transitions), at cell resolution, while a
@@ -259,7 +259,8 @@ reported.
 
 ### Persistent fertility weights (D102)
 
-`set_fertility(..., hetfert = het_fert(cv, alpha))` enables positive persistent
+Hetfert is not available to users (D176); this subsection describes the
+retained internal path. The internal `enable_het_fert(model, het_fert(cv, alpha))` enables positive persistent
 lognormal weights, with fresh mean one and requested CV. If persons lacks
 `hetfert`, simulation draws values for every recorded woman under its seed;
 otherwise supplied female values must be finite and strictly positive and are
@@ -857,7 +858,7 @@ of them (the D123 tibble structure). Weights are normalized within cells, so
 each cell keeps its input rate; population-level effects can be smaller where
 cells are small, homogeneous or changing in composition, and terms that are
 constant within every cell cancel with a warning. In fertility, formula weights
-combine with `hetfert` on the log scale. Variables, the custom-function
+combine with internal `hetfert` (D176) on the log scale. Variables, the custom-function
 contract, missing values, evaluation and matching calibration are specified in
 [binned-group hazards](binned-group-hazards.md#weight-models-d129).
 No eligibility rules beyond fertility spacing exist; unnormalized weights are

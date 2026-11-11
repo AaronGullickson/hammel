@@ -1,6 +1,9 @@
 # Specify persistent fertility heterogeneity and initialize individual weights.
+# Hetfert is internal (D176): it is not exported or accepted by fertility(),
+# and only enable_het_fert() turns it on. The engine path is retained so a
+# general characteristics feature can reuse it.
 
-# PUBLIC FUNCTIONS ---------------------------------------------------------
+# INTERNAL FUNCTIONS -------------------------------------------------------
 
 #' Specify persistent fertility weights and maternal inheritance
 #'
@@ -46,14 +49,23 @@
 #'   amount of variation in fertility. Zero indicates no variance.
 #' @param alpha Finite scalar in `[0,1]` that defines degree of inheritability.
 #'   Zero gives independent daughters; one copies maternal weights exactly.
-#' @return A `hammel_het_fert` specification for [set_fertility()] or
-#'   [fertility()].
-#' @export
-#' @examples
-#' het_fert(cv = 0.5, alpha = 0.4)
+#' @return A `hammel_het_fert` specification for [enable_het_fert()].
+#' @noRd
 het_fert <- function(cv, alpha) {
   model <- structure(list(cv = cv, alpha = alpha), class = "hammel_het_fert")
   validate_het_fert(model)
+  model
+}
+
+# Turn on hetfert for a model's fertility process (NULL turns it off). This is
+# the only route to hetfert while it is internal (D176).
+enable_het_fert <- function(model, hetfert) {
+  check_model(model)
+  if (is.null(model$processes$fertility)) {
+    stop("Hetfert requires a fertility process.", call. = FALSE)
+  }
+  validate_het_fert(hetfert)
+  model$processes$fertility$hetfert <- hetfert
   model
 }
 

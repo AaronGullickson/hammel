@@ -15,8 +15,8 @@ hammel_population(
 }
 \arguments{
 \item{persons}{A data frame with one row per person, including deceased
-persons. Must include a unique \code{person_id}, nonmissing \code{birth_time},
-\code{death_time}, \code{mother_id}, and \code{father_id}.}
+persons. Must include a unique \code{person_id}, nonmissing \code{sex}, nonmissing
+\code{birth_time}, \code{death_time}, \code{mother_id}, and \code{father_id}.}
 
 \item{unions}{A data frame with one row per union episode, or \code{NULL} for no
 unions. \code{wife_id} references the female partner and \code{husband_id} the male
@@ -56,7 +56,7 @@ simulation.
 }
 \details{
 In most cases, it will be more common to create a \code{hammel_population} object
-by using \code{\link[=generate_uniform_population]{generate_uniform_population()}} or to recieve a \code{hammel_population}
+by using \code{\link[=generate_uniform_population]{generate_uniform_population()}} or to receive a \code{hammel_population}
 object as the output of \code{\link[=run_simulation]{run_simulation()}}.
 
 The \code{hammel_population} object must always contain a \code{persons} data frame and

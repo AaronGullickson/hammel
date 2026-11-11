@@ -3503,3 +3503,29 @@ Reuse provenance: the ONS material reuse statement at <https://www.ons.gov.uk/me
 **Verification policy:** A behavior-preserving native change must produce identical hashes of every native call's result or error over the test suite with `-ffp-contract=off`, and all tests must pass with default flags. GCC on ARM fuses multiply-adds across inlined calls by default, so code motion alone can change last-digit rounding and the seeded trajectory there; the flag is set only in the verification build, because R CMD check reports `-f` flags in package Makevars as non-portable.
 
 **Validation:** See [testing](testing.md#native-source-style-file-split-and-engine-class-d175-november-11-2026).
+
+## D176 — Hetfert is internal (November 11, 2026)
+
+**Status:** User instruction, November 11, 2026.
+
+**Decision:** Remove user access to persistent fertility heterogeneity
+(D102, D104) while keeping its implementation. `het_fert()` is no longer
+exported and `fertility()`/`set_fertility()` no longer accept `hetfert`. The R
+validation, weight initialization and engine path are unchanged and reachable
+only through the internal `enable_het_fert(model, het_fert(cv, alpha))`, which
+the tests use. Without it, simulations behave exactly as `hetfert = NULL` did,
+including D104's removal of any supplied `persons$hetfert` column from output.
+
+**Rationale:** Hetfert is a specialized form of a general mechanism: a
+persistent, inherited quantitative person characteristic used in a fertility
+weight model (D129). Removing it from the public API before the first release
+(D136) avoids supporting a specialized interface after a general one exists.
+A general characteristics feature is under discussion; no contract, API or
+scope for it is selected by this decision.
+
+**Consequences:** Model specifications saved with a `hetfert` field still run,
+because the field is internal state, not an argument. The accepted milestone 5
+report (`validation/milestone5.qmd`) calls `het_fert()` and must be reproduced
+at its recorded commit.
+
+**Validation:** See [testing](testing.md#internal-hetfert-d176-november-11-2026).

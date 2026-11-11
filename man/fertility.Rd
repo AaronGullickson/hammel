@@ -5,21 +5,14 @@
 \alias{set_fertility}
 \title{Specify an age-specific fertility process}
 \usage{
-fertility(
-  rates,
-  birth_interval = 0.75,
-  ffab = 0.4886,
-  weights = NULL,
-  hetfert = NULL
-)
+fertility(rates, birth_interval = 0.75, ffab = 0.4886, weights = NULL)
 
 set_fertility(
   model,
   rates,
   birth_interval = 0.75,
   ffab = 0.4886,
-  weights = NULL,
-  hetfert = NULL
+  weights = NULL
 )
 }
 \arguments{
@@ -35,18 +28,14 @@ finite numeric scalar between 0 and 1.}
 
 \item{weights}{NULL (default) for unweighted selection within rate cells, or
 a \code{\link[=weight_model]{weight_model()}} specification. Weights choose which member of a cell
-experiences an event without changing the cell's input rate. They combine
-with \code{hetfert} on the log scale.}
-
-\item{hetfert}{NULL (default) for uniform mother selection, or a \code{\link[=het_fert]{het_fert()}}
-specification for persistent lognormal selection weights.}
+experiences an event without changing the cell's input rate.}
 
 \item{model}{A \code{hammel_model} object, used by \code{set_fertility()}.}
 }
 \value{
 \code{fertility()} returns an inspectable process inheriting from
 \code{hammel_fertility} and \code{hammel_process}, with \code{name}, \code{rates},
-\code{birth_interval}, \code{ffab}, \code{hetfert}, and \code{weights}. \code{set_fertility()}
+\code{birth_interval}, \code{ffab}, and \code{weights}. \code{set_fertility()}
 returns an updated \code{hammel_model}.
 }
 \description{
@@ -112,6 +101,6 @@ model <- hammel_model() |> set_process(fert_process)
 model <- hammel_model() |> set_fertility(usa_2000_fertility)
 }
 \seealso{
-\code{\link[=set_process]{set_process()}}, \code{\link[=mortality]{mortality()}}, \code{\link[=union_formation]{union_formation()}}, \code{\link[=het_fert]{het_fert()}},
+\code{\link[=set_process]{set_process()}}, \code{\link[=mortality]{mortality()}}, \code{\link[=union_formation]{union_formation()}},
 \code{\link[=group_inheritance]{group_inheritance()}}
 }

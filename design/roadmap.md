@@ -163,8 +163,9 @@ start-up, restarts and union-type transitions. Cells without eligible women
 count unrealized births (D128). See [parity fertility](parity-fertility.md) and
 [cell accounting](fertility-cell-accounting.md) for the contract and limitations.
 
-D102 implements persistent positive lognormal selection weights through
-`set_fertility(..., hetfert = het_fert(cv, alpha))`. Dispersion and maternal
+D102 implements persistent positive lognormal selection weights, now internal
+only (D176): users cannot enable them, pending a general quantitative-
+characteristics feature. Dispersion and maternal
 inheritance have separate inputs; supplied person weights persist, otherwise
 simulation draws them. Weights redistribute births within cells without
 changing their target intensities. Reproductive selection can change cohort

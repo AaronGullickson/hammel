@@ -139,7 +139,7 @@ union columns. Enabling cohabitation treats legacy untyped history as marriage.
 
 ## Optional fertility weight column
 
-With `hetfert = het_fert(cv, alpha)` on fertility (D102), `persons$hetfert` stores
+With the internal `enable_het_fert(model, het_fert(cv, alpha))` (D102; not available to users under D176), `persons$hetfert` stores
 persistent dimensionless positive female selection weights. The simulator draws
 values if the entire column is absent; a supplied column requires complete,
 finite, strictly positive female values. Existing values are retained on

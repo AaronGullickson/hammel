@@ -183,9 +183,9 @@ Construct, validate, and attach population objects; normalize union tables.
 
 ### `R/het_fert.R`
 
-Specify persistent fertility heterogeneity and initialize/check individual weights.
+Specify persistent fertility heterogeneity and initialize/check individual weights. Internal only (D176).
 
-- Functions: **`het_fert()`**, `validate_het_fert()`, `fertility_log_variance()`, `validate_fertility_weights()`, `initialize_fertility_weights()`.
+- Functions: `het_fert()`, `enable_het_fert()`, `validate_het_fert()`, `fertility_log_variance()`, `validate_fertility_weights()`, `initialize_fertility_weights()`.
 
 ### `R/matching_groups.R`
 

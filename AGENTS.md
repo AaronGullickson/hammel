@@ -101,7 +101,8 @@ be made autonomously; record choices with substantial architectural consequences
   fertility (D101): each one-year age x actual parity x union type (x group,
   when schedules are group-specific) cell produces births at its input rate
   times all members, assigned to a random eligible member, weighted by
-  persistent hetfert and any weight model when enabled (D102, D129). Draws of
+  any weight model when enabled (D129); persistent hetfert (D102) is internal
+  and not available to users (D176). Draws of
   cells with no eligible woman are counted as unrealized births. See
   design/binned-group-hazards.md and design/fertility-cell-accounting.md. Midpoint compensation
   (D028/D095/D099) was removed. Do not reintroduce superseded monthly timing,

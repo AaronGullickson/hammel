@@ -63,18 +63,15 @@
 #'   defaulting to `0.75`. Must be finite and nonnegative.
 #' @param ffab Probability that a newborn is female, default `0.4886`. Must be a
 #'   finite numeric scalar between 0 and 1.
-#' @param hetfert NULL (default) for uniform mother selection, or a [het_fert()]
-#'   specification for persistent lognormal selection weights.
 #' @param weights NULL (default) for unweighted selection within rate cells, or
 #'   a [weight_model()] specification. Weights choose which member of a cell
-#'   experiences an event without changing the cell's input rate. They combine
-#'   with `hetfert` on the log scale.
+#'   experiences an event without changing the cell's input rate.
 #' @param model A `hammel_model` object, used by `set_fertility()`.
 #' @return `fertility()` returns an inspectable process inheriting from
 #'   `hammel_fertility` and `hammel_process`, with `name`, `rates`,
-#'   `birth_interval`, `ffab`, `hetfert`, and `weights`. `set_fertility()`
+#'   `birth_interval`, `ffab`, and `weights`. `set_fertility()`
 #'   returns an updated `hammel_model`.
-#' @seealso [set_process()], [mortality()], [union_formation()], [het_fert()],
+#' @seealso [set_process()], [mortality()], [union_formation()],
 #'   [group_inheritance()]
 #' @export
 #' @examples
@@ -87,8 +84,7 @@ fertility <- function(
   rates,
   birth_interval = 0.75,
   ffab = 0.4886,
-  weights = NULL,
-  hetfert = NULL
+  weights = NULL
 ) {
   validate_rates(rates, mortality = FALSE)
   validate_process_weights(weights, "person")
@@ -97,11 +93,9 @@ fertility <- function(
   )
   validate_birth_interval(birth_interval)
   validate_ffab(ffab)
-  validate_het_fert(hetfert)
   process <- new_rate_process("fertility", rates)
   process$birth_interval <- birth_interval
   process$ffab <- ffab
-  process$hetfert <- hetfert
   process$weights <- normalize_model_argument(weights)
   warn_unreachable_parity_cells(process$rates, birth_interval)
   process
@@ -115,16 +109,14 @@ set_fertility <- function(
   rates,
   birth_interval = 0.75,
   ffab = 0.4886,
-  weights = NULL,
-  hetfert = NULL
+  weights = NULL
 ) {
   set_process(
     model, fertility(
       rates = rates,
       birth_interval = birth_interval,
       ffab = ffab,
-      weights = weights,
-      hetfert = hetfert
+      weights = weights
     )
   )
 }
