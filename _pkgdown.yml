@@ -13,13 +13,13 @@ reference:
       - set_population
       - set_groups
       - set_process
-      - simulate
+      - run_simulation
 
   - title: Population preparation
     desc: Create and validate starting populations and describe their group dimensions.
     contents:
       - hammel_population
-      - create_baseline_population
+      - generate_uniform_population
       - validate_population
       - group
 
@@ -34,6 +34,7 @@ reference:
     desc: Specify mortality, fertility, unions, and group transitions.
     contents:
       - mortality
+      - fertility
       - het_fert
       - union_formation
       - union_dissolution
@@ -43,10 +44,10 @@ reference:
   - title: Matching, inheritance, and weight models
     desc: Configure partner selection, newborn group inheritance, and selection within rate cells.
     contents:
-      - create_matching_model
-      - create_age_gap_matching_model
-      - create_group_inheritance
-      - create_weight_model
+      - matching_model
+      - age_gap_matching_model
+      - group_inheritance
+      - weight_model
 
   - title: Demographic summaries
     desc: Calculate population sizes, observed event rates, and synthetic demographic measures.
@@ -54,6 +55,7 @@ reference:
       - calculate_population_size
       - calculate_mortality_rates
       - calculate_life_table
+      - calculate_life_expectancy
       - calculate_fertility_rates
       - calculate_tfr
       - calculate_patfr
@@ -67,6 +69,13 @@ reference:
     desc: Extract kin relationships and enrich recorded person, birth, and union histories.
     contents:
       - extract_kin
-      - get_parent_info
-      - get_detailed_unions
-      - get_unpartnered_births
+      - count_kin
+      - augment_persons
+      - augment_unions
+      - extract_unpartnered_births
+
+  - title: Example data
+    desc: Packaged demographic inputs for examples and exploration.
+    contents:
+      - usa_2000
+      - england_wales_1992_onward
