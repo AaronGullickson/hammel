@@ -34,7 +34,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">hammel</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -74,7 +74,7 @@
 
 
 
-      <small class="dont-index">Source: <a href="https://github.com/AaronGullickson/hammel/blob/v0.1.0/vignettes/articles/hammel.qmd" class="external-link"><code>vignettes/articles/hammel.qmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/AaronGullickson/hammel/blob/master/vignettes/articles/hammel.qmd" class="external-link"><code>vignettes/articles/hammel.qmd</code></a></small>
       <div class="d-none name"><code></code></div>
     </div>
 
@@ -717,7 +717,7 @@ Table 1: Rate schedules used by Hammel, along with available age/duration bands
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">tic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">pop_end</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_simulation.html">run_simulation</a></span><span class="op">(</span><span class="va">model</span>, years <span class="op">=</span> <span class="fl">100</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">toc</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; 1.116 sec elapsed</span></span></code></pre></div>
+<span><span class="co">#&gt; 1.059 sec elapsed</span></span></code></pre></div>
 </div>
 <p>Pretty fast! Lets look at its structure.</p>
 <div class="cell">
@@ -947,7 +947,7 @@ Figure 4: Age-specific mortality rates estimated from simulation. 95% confidenc
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">tic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">pop_end</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_simulation.html">run_simulation</a></span><span class="op">(</span><span class="va">model</span>, <span class="fl">100</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">toc</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; 1.434 sec elapsed</span></span></code></pre></div>
+<span><span class="co">#&gt; 1.274 sec elapsed</span></span></code></pre></div>
 </div>
 <p>Lets look at population size again.</p>
 <div class="cell">
@@ -1335,7 +1335,7 @@ Figure 11: Distribution of age difference between partners from simulated data.
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">tic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">pop_end</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_simulation.html">run_simulation</a></span><span class="op">(</span><span class="va">model</span>, <span class="fl">100</span>, <span class="fl">42</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">toc</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; 43.763 sec elapsed</span></span></code></pre></div>
+<span><span class="co">#&gt; 44.66 sec elapsed</span></span></code></pre></div>
 </div>
 <p>This simulation took quite a bit longer to run. The reason for this is the use of a custom R function, because R processing will generally be slower than the underlying C++ used for most of the simulation.</p>
 <p>Lets look at how race and region changed over time. The <code>by</code> argument will allow us to stratify results in all of the <code>calculate</code> helper functions.</p>

@@ -1,10 +1,12 @@
 # Changelog
 
+## hammel (development version)
+
 ## hammel 0.1.0
 
 First public release.
 
-Hammel is a continuous-time demographic microsimulate inspired by
+Hammel is a continuous-time demographic microsimulator inspired by
 SOCSIM. It uses an R interface to allow users to construct, run, and,
 analyze microdemographic simulations. The current release features:
 
