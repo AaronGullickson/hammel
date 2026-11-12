@@ -1,5 +1,7 @@
 # hammel (development version)
 
+- Add optional progress bar to `run_simulation()` with `progress = TRUE`. Defaults to FALSE. (#31)
+
 # hammel 0.1.0
 
 First public release.
