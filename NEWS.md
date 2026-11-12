@@ -2,7 +2,7 @@
 
 First public release.
 
-Hammel is a continuous-time demographic microsimulate inspired by SOCSIM. It uses an R interface to allow users to construct, run, and, analyze microdemographic simulations. The current release features:
+Hammel is a continuous-time demographic microsimulator inspired by SOCSIM. It uses an R interface to allow users to construct, run, and, analyze microdemographic simulations. The current release features:
 
 - Stratification of rate schedules by time, group membership, union type, sex, and parity (for fertility).
 - Union formation processes that including union dissolution, cohabitation and remarriage, and customizable rules for partner matching.
