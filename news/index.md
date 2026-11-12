@@ -2,6 +2,11 @@
 
 ## hammel (development version)
 
+- Add optional progress bar to
+  [`run_simulation()`](https://aarongullickson.github.io/hammel/reference/run_simulation.md)
+  with `progress = TRUE`. Defaults to FALSE.
+  ([\#31](https://github.com/AaronGullickson/hammel/issues/31))
+
 ## hammel 0.1.0
 
 First public release.

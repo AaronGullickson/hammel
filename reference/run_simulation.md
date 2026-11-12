@@ -6,7 +6,7 @@ given time length.
 ## Usage
 
 ``` r
-run_simulation(model, years, seed = NULL)
+run_simulation(model, years, seed = NULL, progress = FALSE)
 ```
 
 ## Arguments
@@ -25,6 +25,11 @@ run_simulation(model, years, seed = NULL)
 
   Optional integer seed for random number generation. If not specified,
   simulation will use current RNG.
+
+- progress:
+
+  Show a console progress bar based on elapsed simulation years.
+  Defaults to `FALSE`.
 
 ## Value
 
