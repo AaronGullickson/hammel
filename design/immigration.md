@@ -1,10 +1,51 @@
-# External immigration: design direction
+# External immigration design
 
 Planning discussion, November 12, 2026. External immigration is not
-implemented. D177–D182 record the accepted direction; the open questions below
-must be resolved before implementation. Illustrative field names do not
-establish a public API. See the [roadmap](roadmap.md#post-release-immigration-from-outside-the-system)
+implemented. This document consolidates the approach selected in D177–D182
+for design review on the `external-migration` branch. Behavior depending on
+the unresolved modeling choices below requires further user decisions before
+implementation. Illustrative field names do not establish a public API.
+See the [roadmap](roadmap.md#post-release-immigration-from-outside-the-system)
 for scope. No emigration mechanism is selected here.
+
+## Purpose and intended workflow
+
+Add people from outside the simulated population during a continuous-time
+run. Users should be able to describe different origin populations and
+migration flows without constructing every migrant record manually or
+restarting the destination simulation for each arrival.
+
+The intended workflow is:
+
+1. Prepare a source `hammel_population`, potentially from a separate burn-in
+   simulation. A template need not be stable or represent the whole origin
+   population; users control the supplied source.
+2. Optionally truncate source histories while preserving living people and
+   their descendants, including deceased descendants needed for reproductive
+   histories.
+3. Define one or more streams, each referencing a template and specifying an
+   absolute arrival intensity. Templates may change through calendar schedules.
+4. Optionally describe selective migration from the template. A predictive
+   selection model is the current proposal; its exact contract is open.
+5. Run the destination model, record actual arrivals and preserve sufficient
+   migration history for rate strata, classifications and later analysis.
+
+Population preparation, stream/model construction and simulation execution
+remain separate responsibilities. No constructor names or signatures are
+selected by this workflow.
+
+## Decision summary
+
+| Topic | Current position | Record |
+| --- | --- | --- |
+| Arrival flow | Absolute stochastic intensity; no controlled/exact-count option | D177 |
+| Origins | Multiple streams with separate intensities | D178 |
+| Source | Sample an existing population with replacement; preserve age, sex and groups; assign fresh IDs | D179 |
+| Template preparation and schedules | Retain living people and descendants when truncating; support calendar-scheduled templates | D180 |
+| Selective migration | Predictive selection proposed instead of distribution-tuning helpers; model semantics open | D180 |
+| Migration histories | Separate personal/family facts from reusable, named classifications | D181 |
+| Rate schedules | Stratify by personal immigration status and stream; generation rules stay outside the required rate-table schema | D182 |
+| Households | Optional household migration under discussion; sampling and intensity units deferred | D179–D180 |
 
 ## Arrival process and streams
 
@@ -55,6 +96,26 @@ ID/link reconstruction and relatives outside the party need specification.
 The user explicitly deferred whether intensity means households per year or
 migrants per year. D177's individual-arrival example does not settle the
 person-count distribution for household arrivals.
+
+## Integration with the destination simulation
+
+Arrivals must compete chronologically with the existing continuous-time
+processes. An immigration event adds new destination members rather than
+selecting an existing resident to experience an event. Whether streams have
+separate clocks or share a clock with stream selection is not decided.
+
+An arriving person must enter all applicable destination process cells and
+matching pools with consistent relationships and demographic state. Source
+event clocks cannot be transplanted: destination rates and models determine
+subsequent events. The initialization of parity, spacing, unions, group
+duration and other history-dependent state still needs a scientific contract.
+Importing supporting histories is distinct from treating every retained source
+relative as an arriving member of the destination population.
+
+Migration records and outputs should remain ordinary, inspectable R objects,
+with public tables following the package's tibble convention. Their schema,
+ID mapping/provenance and restart representation remain open. Each run must
+own its state and must not mutate a reusable source template as it samples.
 
 ## Migration facts, family history and classifications
 
@@ -151,18 +212,79 @@ Immigration separately needs arrival-aware exposure and event accounting so
 imported pre-arrival births and histories are not mistaken for destination
 events or exposure.
 
-## Specification and validation still needed
+## Open decisions
 
-Settle history/attribute copying, group and ancestry compatibility, generation
-rules and representation, selection semantics, schedules, arrival/observation
-timing, event ties, household behavior and public constructors before
-implementation. No implementation milestone or scientific acceptance threshold
-is established here.
+The following choices are open; listing an option does not select it.
 
-Validation should follow those choices. Relevant cases include replicated
-arrival counts and waiting times, independent-stream scenarios, replacement
-with fresh IDs, age preservation, schedule boundaries, mixed-stream pedigrees,
-classification inputs in custom models, and classification/parity preservation
-through truncation and restart. Include unknown histories and distinguish
-actual arrivals from supporting historical relatives. Household checks depend
-on its deferred sampling and intensity decisions.
+| Area | Decisions still needed |
+| --- | --- |
+| Source sampling | Eligible source records; uniform versus modeled selection; weight/probability interpretation; empty templates and zero eligible weight |
+| Imported state | Which histories and attributes accompany a draw; relatives outside a party; parity, spacing, unions and group-duration initialization |
+| Compatibility | Source/destination group declarations, categories and ancestry components; handling future templates' categories |
+| Calendar inputs | Intensity, template and selection-model schedules; interval columns, coverage, gaps, exact boundaries and clock preservation |
+| Households | Party membership, selection probabilities, rate units and reconstruction of internal person/union links |
+| Migration history | Stored facts, source provenance, history depth, starting-population unknowns and restart persistence |
+| Classifications | Rule interface, output types, update timing, custom-model inputs and sufficient retained information after truncation |
+| Rate strata | Declared group versus built-in migration variable, process support and coverage rules |
+| Observation | Entry-aware risk/exposure windows, immigrant versus destination-born events, historical support records and population accounting |
+| Timing and interface | Arrival tie priority, clock organization, stream identifiers and public constructors |
+
+No implementation milestone or scientific acceptance threshold is established
+here. Household implementation can remain deferred while the individual-arrival
+contract is developed; its unresolved rate units must not be silently chosen.
+
+## Worked examples for review
+
+These illustrate accepted meanings and proposed validation cases, not executed
+results or additional demographic defaults.
+
+**Age and replacement.** A source snapshot ends in 2000 and contains a person
+born in 1975. Sampling that person for an arrival in 2050 gives age 25 and
+destination birth time 2025. Sampling the same source person again in 2051
+gives another age-25 person with birth time 2026 and a different destination
+ID. Neither draw removes or ages the source record. If histories accompany
+the person, their date translation still needs to be specified consistently.
+
+**Multiple flows.** A stream with intensity 100 and another with intensity
+40 have expected individual arrival counts of 100 and 40 in a one-year
+interval. Those are expected flows, not quotas or expected final population
+increments: arrivals may subsequently die or have children. These flows do
+not depend on the destination's current population size.
+
+**Truncation and parity.** At a source endpoint, a living woman has two
+recorded children, one alive and one deceased. Retaining living people and
+their descendant closure retains both children, so her recorded parity
+remains two and her latest recorded birth date remains available. Removing
+her deceased ancestors may still require retaining migration-history summaries
+and repairing references under the eventual truncation contract.
+
+**Personal status versus family origin.** An immigrant through stream A and
+a locally born person with immigrant parents from stream B have a child in
+the destination. The child has not personally immigrated and does not inherit
+stream A or B as a personal arrival stream. Their family history supports
+connections to both streams. A named classification can summarize these
+connections for custom inheritance or matching under a user-specified rule;
+no universal numeric generation is assigned here.
+
+## Validation plan
+
+Validation must follow the completed specification. For individual arrivals
+with a valid, nonempty source, the initial analytical and accounting cases are:
+
+| Case | Expected check |
+| --- | --- |
+| Constant intensity lambda for T years | Across replications, arrival counts follow Poisson(lambda * T), and waiting times follow Exp(lambda) |
+| Zero intensity or zero duration | No arrivals |
+| Replacement draws | Repeated source selections get distinct destination IDs; the original template remains unchanged |
+| Destination accounting | Final living population equals initial living population plus actual arrivals plus destination births minus destination deaths |
+| Imported histories | Historical source births/deaths are excluded from destination event counts and pre-entry destination exposure |
+| Truncation | Recorded parity and last-birth dates of retained living women are preserved |
+
+Additional tests should cover multiple streams, age preservation, template
+schedule boundaries, future group categories, mixed-stream pedigrees,
+classification inputs in custom models, unknown histories, and classification
+preservation through truncation and restart. Source and destination should be
+reusable across independent seeded runs under the existing RNG contract.
+Household checks depend on its deferred sampling and intensity decisions.
+Statistical test methods must be justified when implementation begins; no
+acceptance thresholds or successful validation results are claimed here.
