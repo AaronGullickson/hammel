@@ -49,9 +49,11 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/demographic_transition.html">Simulating the Demographic Transition</a></li>
-    <li><a class="dropdown-item" href="../articles/how_it_works.html">How Hammel Works</a></li>
-    <li><a class="dropdown-item" href="../articles/multigroup_intermar.html">Multigroup Simulation with Custom Inheritance</a></li>
     <li><a class="dropdown-item" href="../articles/second_demog_transition.html">Simulating the Second Demographic Transition</a></li>
+    <li><a class="dropdown-item" href="../articles/multigroup_intermar.html">Multigroup Simulation with Custom Inheritance</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Technical</h6></li>
+    <li><a class="dropdown-item" href="../articles/how_it_works.html">How Hammel Works</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -497,7 +499,7 @@ Figure 1: Age-specific first time marriage rates in the observed baseline simul
 <span>  <span class="va">pop_change</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_simulation.html">run_simulation</a></span><span class="op">(</span><span class="va">model</span>, <span class="fl">2019</span> <span class="op">-</span> <span class="fl">1992</span>, <span class="fl">42</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
-<p>The simulation with constant rates takes 2.188 seconds to process. The simulation with varying rates takes 2.154 second to process.</p>
+<p>The simulation with constant rates takes 1.624 seconds to process. The simulation with varying rates takes 1.606 second to process.</p>
 </section><section class="level2"><h2 id="analyze-the-simulation-results">Analyze the Simulation Results<a class="anchor" aria-label="anchor" href="#analyze-the-simulation-results"></a>
 </h2>
 <p>We will analyze the simulation results by comparing summary statistics over time across the two different simulations. We start by analyzing the total fertility rate (TFR) from the annual age-specific fertility rates estimated by the <code>calculate_fertility_rates</code> helper function. Importantly, we do <strong>not</strong> disaggregate these rates by union type because we want to see the effects of compositional change in person years spent in each union type on overall fertility rates.</p>
@@ -633,9 +635,9 @@ Figure 4: Mean age of childbearing over time, across types of simulations.
 <span><span class="co">#&gt; # A tibble: 3 × 6</span></span>
 <span><span class="co">#&gt;   time_start time_end union_type  age_start age_end   tfr</span></span>
 <span><span class="co">#&gt;        &lt;dbl&gt;    &lt;dbl&gt; &lt;chr&gt;           &lt;dbl&gt;   &lt;dbl&gt; &lt;dbl&gt;</span></span>
-<span><span class="co">#&gt; 1       1992     2019 unpartnered        16      45 0.632</span></span>
-<span><span class="co">#&gt; 2       1992     2019 cohab              16      45 2.78 </span></span>
-<span><span class="co">#&gt; 3       1992     2019 marriage           16      45 3.82</span></span></code></pre></div>
+<span><span class="co">#&gt; 1       1992     2019 unpartnered        16      45 0.617</span></span>
+<span><span class="co">#&gt; 2       1992     2019 cohab              16      45 2.92 </span></span>
+<span><span class="co">#&gt; 3       1992     2019 marriage           16      45 3.69</span></span></code></pre></div>
 </div>
 <p>As expected, the empirically estimated fertility rates within union type are very similar to those expected by the input rates.</p>
 <div class="cell">

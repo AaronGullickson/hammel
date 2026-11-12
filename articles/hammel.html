@@ -49,9 +49,11 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/demographic_transition.html">Simulating the Demographic Transition</a></li>
-    <li><a class="dropdown-item" href="../articles/how_it_works.html">How Hammel Works</a></li>
-    <li><a class="dropdown-item" href="../articles/multigroup_intermar.html">Multigroup Simulation with Custom Inheritance</a></li>
     <li><a class="dropdown-item" href="../articles/second_demog_transition.html">Simulating the Second Demographic Transition</a></li>
+    <li><a class="dropdown-item" href="../articles/multigroup_intermar.html">Multigroup Simulation with Custom Inheritance</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Technical</h6></li>
+    <li><a class="dropdown-item" href="../articles/how_it_works.html">How Hammel Works</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -717,7 +719,7 @@ Table 1: Rate schedules used by Hammel, along with available age/duration bands
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">tic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">pop_end</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_simulation.html">run_simulation</a></span><span class="op">(</span><span class="va">model</span>, years <span class="op">=</span> <span class="fl">100</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">toc</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; 1.059 sec elapsed</span></span></code></pre></div>
+<span><span class="co">#&gt; 0.882 sec elapsed</span></span></code></pre></div>
 </div>
 <p>Pretty fast! Lets look at its structure.</p>
 <div class="cell">
@@ -947,7 +949,7 @@ Figure 4: Age-specific mortality rates estimated from simulation. 95% confidenc
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">tic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">pop_end</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_simulation.html">run_simulation</a></span><span class="op">(</span><span class="va">model</span>, <span class="fl">100</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">toc</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; 1.274 sec elapsed</span></span></code></pre></div>
+<span><span class="co">#&gt; 1.151 sec elapsed</span></span></code></pre></div>
 </div>
 <p>Lets look at population size again.</p>
 <div class="cell">
@@ -1335,7 +1337,7 @@ Figure 11: Distribution of age difference between partners from simulated data.
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">tic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">pop_end</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_simulation.html">run_simulation</a></span><span class="op">(</span><span class="va">model</span>, <span class="fl">100</span>, <span class="fl">42</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">toc</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; 44.66 sec elapsed</span></span></code></pre></div>
+<span><span class="co">#&gt; 25.269 sec elapsed</span></span></code></pre></div>
 </div>
 <p>This simulation took quite a bit longer to run. The reason for this is the use of a custom R function, because R processing will generally be slower than the underlying C++ used for most of the simulation.</p>
 <p>Lets look at how race and region changed over time. The <code>by</code> argument will allow us to stratify results in all of the <code>calculate</code> helper functions.</p>
