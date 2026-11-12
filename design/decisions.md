@@ -3529,3 +3529,157 @@ report (`validation/milestone5.qmd`) calls `het_fert()` and must be reproduced
 at its recorded commit.
 
 **Validation:** See [testing](testing.md#internal-hetfert-d176-november-11-2026).
+
+## D177 — Absolute stochastic immigration intensity (November 12, 2026)
+
+**Status:** User modeling decision, November 12, 2026. Planning only;
+external immigration is not implemented by this decision.
+
+**Decision:** Specify external immigration through an absolute arrival
+intensity in migrants per year, with stochastic arrival times. The input is
+an expected flow, not a resident-level hazard or a guaranteed period count.
+Do not offer controlled/exact migrant counts. A population-proportional
+formulation is not selected.
+
+**Interpretation and worked example:** For a constant intensity lambda,
+successive arrival waiting times are exponential with rate lambda. Over T
+years the arrival count is Poisson with mean and variance lambda * T.
+Thus 100 migrants per year implies an expected 100 arrivals over one year,
+with standard deviation 10, rather than exactly 100 arrivals. Resident
+population changes do not themselves change this absolute intensity.
+Calendar-varying intensities can describe changing expected flows; their
+input schema and boundary handling still need specification.
+
+**Rationale:** The user prefers stochastic arrivals and rejects an exact-count
+option. Absolute intensity also avoids treating the receiving population as
+the exposure generating immigration.
+
+**Remaining specification:** Migrant age/sex and group composition, attributes,
+relationships and entry histories, ancestry and generation definitions,
+observation/exposure after entry, event ties, and the public constructor and
+schedule interface remain unresolved. See [the roadmap](roadmap.md#post-release-immigration-from-outside-the-system).
+
+## D178 — Multiple external migrant streams (November 12, 2026)
+
+**Status:** User modeling requirement, November 12, 2026. Planning only.
+
+**Decision:** Allow multiple external migrant streams in one simulation.
+Streams may represent countries or world regions of origin, with separate
+absolute arrival intensities under D177. They provide a way to distinguish
+incoming populations; the specification of stream-specific migrant
+characteristics remains to be designed.
+
+**Remaining specification:** Stream identifiers and input organization,
+calendar variation, migrant characteristic distributions and entry histories,
+and how stream origin is retained or mapped to declared group dimensions
+remain open. This decision does not make stream origin a person's current
+group, ancestry or inherited characteristic automatically, and does not
+select separate clocks versus an aggregated arrival clock.
+
+## D179 — Sample migrant templates from a population (November 12, 2026)
+
+**Status:** User modeling decision, November 12, 2026. Planning only.
+
+**Decision:** Use an existing `hammel_population` as the source template for
+a migrant stream, drawing with replacement. Preserve sampled migrants' age,
+sex and group identifiers, assigning fresh destination person IDs for every
+draw. Age preservation requires translating birth times to the arrival date
+relative to the source population's endpoint. Sampling does not deplete the
+source template.
+
+**Household proposal:** The user raised optional household immigration,
+analogous to household group transitions. The selection unit, use of D140's
+household membership rules, rate units (households versus persons), and
+within-party relationship/union ID remapping still need decisions. Household
+sampling is not specified or implemented by this record.
+
+**Remaining specification:** Source-person eligibility and sampling weights,
+which histories/attributes beyond age, sex and group identifiers to retain,
+relationships to people outside an arriving party, ancestry and source/group
+compatibility, entry observations, and demographic initialization remain
+open. In particular, sampling with replacement does not itself decide how
+parity, birth spacing or previous/current unions initialize.
+
+## D180 — Migrant-template preparation and schedules (November 12, 2026)
+
+**Status:** User requirements and design discussion, November 12, 2026.
+Planning only; no helper API or migration implementation is authorized here.
+
+**Requested capabilities:**
+
+- Revisit population truncation for burn-in outputs and migrant templates.
+  The user clarified that the retained set is living people and their
+  descendants, including deceased descendants. Retain the descendant closure
+  so recorded children are not lost merely because they died; these records
+  support parity and last-birth reconstruction under D098. Do not retain
+  deceased ancestors solely because they are ancestors of living people.
+  Union-state preservation and references to removed people still need a
+  contract; no missing reproductive history is imputed.
+- Allow a stream's template population to change over calendar time using
+  the existing schedule-table pattern: time bounds and a list column of
+  `hammel_population` objects. Column naming, validation, boundary selection
+  and age-reference semantics still need specification.
+- Support selective migration from a template. The user first proposed
+  helpers to tune its distributions, then suggested a predictive model of
+  who migrates as a potentially easier approach instead. This remains a
+  proposal: relative sampling weights versus absolute probabilities/hazards,
+  model inputs and outputs, eligibility and zero-weight behavior are not
+  yet selected. D177's absolute stream intensity remains the accepted flow
+  contract; do not silently replace it with summed individual hazards.
+
+**Deferred:** The user explicitly deferred the household intensity-unit
+decision in D179. Household sampling and its interaction with selection
+models remain unresolved.
+
+## D181 — Migration histories and reusable classifications (November 12, 2026)
+
+**Status:** User-approved design direction, November 12, 2026. Documentation
+only; schemas, classification rules and APIs remain to be specified.
+
+**Decision:** Keep personal migration facts and family migration history
+separate from derived generation/origin classifications. Support mixed-stream
+histories without reducing them to one mandatory generation number or origin
+label. Stream, current group membership and ancestry proportions are distinct;
+their relationships must be explicit.
+
+Users should be able to define a classification once and reuse its named
+outputs in matching, custom group inheritance, custom weight models and
+analysis. Documented custom-function inputs should expose derived values
+concisely, without requiring users to traverse pedigrees. Suggested immigrant,
+arrival-stream and generation fields are illustrative, not an accepted schema
+or default generation rule.
+
+**Requirements for the eventual contract:** Define output names/types,
+initialization and update timing, especially at birth and immigration, and
+distinguish unknown history from a known absence of connection to a stream.
+Preserve sufficient history or summaries through truncation for supported
+classifications; a current label alone may not suffice for future descendants.
+Importing a historical source relative must not itself count as that
+relative's immigration into the destination.
+
+**Open choices and examples:** See [external immigration](immigration.md).
+No particular generation definition, history depth, storage layout, callback
+signature, selection-weight interpretation or household rule is selected.
+
+## D182 — Rate stratification by personal immigration status and stream (November 12, 2026)
+
+**Status:** User-approved design direction, November 12, 2026. Planning only;
+no rate-table schema or implementation is selected.
+
+**Decision:** Support rate stratification by a person's own immigration
+status and arrival stream, rather than requiring generational classifications
+in rate tables. Distinguish people who have not themselves immigrated from
+immigrants arriving through each stream. A destination-born child does not
+inherit a parent's personal immigrant/stream status, while family migration
+history remains available for D181 classifications.
+
+Derived generational/origin variables can be used in custom models, including
+weight models. Under normalized weighting, these influence selection within
+rate cells without independently imposing generation-specific aggregate rates.
+Do not present weights as equivalent to generation-stratified rate schedules.
+
+**Open choices:** Ordinary declared group versus built-in migration
+stratifier, field/category names, starting-population unknowns, supported rate
+processes and validation/coverage rules. Arrival stream remains distinct from
+inherited origin or ancestry. General generation-specific rate stratification
+is not selected by this decision. See [external immigration](immigration.md#rate-stratification).

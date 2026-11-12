@@ -332,10 +332,41 @@ following questions still require a concrete scientific specification.
 Formerly milestone 10 under D131; deferred until after the first public release
 by D136. Add immigrants within a running
 simulation, rather than requiring a restart.
-The user envisages specifying numbers and an age/sex distribution and tracking
-individual immigrant generational status. Timing (batch dates versus arrivals),
-meaning of supplied numbers, attribute/kin/union initialization, ancestry and
-generation definitions, and interactions with group assignment remain open.
+Under D177, the user selected absolute arrival intensity in migrants per year,
+with stochastic arrivals and no controlled/exact-count option. A constant
+intensity gives exponential interarrival times and Poisson period counts;
+resident population changes do not themselves change that intensity.
+Under D178, support multiple streams, potentially representing countries or
+world regions of origin, with separate arrival intensities. Stream-specific
+migrant characteristics and how origin is retained or mapped to groups still
+need specification; no clock organization is selected yet.
+Under D179, draw migrant templates with replacement from an existing
+`hammel_population`, preserving age, sex and group identifiers and assigning
+new person IDs. The source is not depleted. Optional household sampling is
+under discussion; selection, intensity units and relationship/history
+handling are not yet selected.
+D180 requests calendar schedules of population templates using time bounds
+and a list column. Selective migration through a predictive selection model
+is under discussion as an alternative to tuning the source population's
+distributions; no weighting or prediction contract is selected yet.
+Calendar-varying intensity inputs and their boundary handling still need a
+contract. The user also envisages an age/sex distribution and tracking
+individual immigrant generational status. Migrant composition,
+attribute/kin/union initialization, ancestry and generation definitions,
+interactions with group assignment, entry observations and the public API
+remain open. This is a modeling decision, not implementation authorization.
+Under D181, retain personal/family migration history separately from reusable,
+named generation/origin classifications. Custom matching, inheritance and
+weight models should be able to consume concise derived variables without
+traversing pedigrees. Definitions, schemas, update timing and history retention
+through truncation remain to be specified. Stream origin, group membership
+and ancestry are distinct. See [external immigration](immigration.md) for the
+consolidated accepted direction, examples and unresolved contracts.
+Under D182, support rate stratification by personal immigration status and
+arrival stream. Generational classifications remain available to custom
+models; normalized weights do not replace generation-specific aggregate rate
+targets. Group-based versus built-in stratifier representation and rate-table
+contracts remain open.
 No emigration process is implied by the immigration request.
 
 ## Proposed summaries, diagnostics, and helpers
@@ -401,10 +432,18 @@ preserves correct reproductive histories and parent–child relationships, while
 allowing the deeper ancestral kinship history to be discarded. This is a
 milestone 11 proposal; no function name or implementation is selected.
 
-Before implementation, specify how to preserve births to deceased children,
-parity and last-birth dates after removing deceased person records. Simply
-filtering living persons would lose some recorded births and conflict with
-history-derived parity initialization (D098). Also specify handling of removed
+Revisited November 12, 2026 (D180) for both burn-in starters and migrant
+templates. The user selected retention of living people and their descendants,
+including deceased descendants. Retain the descendant closure so recorded
+births to living women, including births of children who died, remain available
+for parity and last-birth reconstruction. Deceased ancestors are not retained
+solely because of their relationship to living people. A related proposal would
+model selection from migrant templates instead of modifying their demographic
+distributions through tuning helpers.
+
+Retention of deceased descendants addresses the loss of recorded births that
+would otherwise conflict with history-derived parity initialization (D098);
+it does not impute unknown births. Before implementation, specify handling of removed
 parent IDs, retained parent–child links, ongoing unions, previous-union histories,
 ancestry, observation endpoints and restart validation. The helper must state
 which kinship information has been discarded; it cannot imply complete pedigree
