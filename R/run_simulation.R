@@ -32,6 +32,8 @@
 #'   supported.
 #' @param seed Optional integer seed for random number generation. If not
 #'   specified, simulation will use current RNG.
+#' @param progress Show a console progress bar based on elapsed simulation
+#'   years. Defaults to `FALSE`.
 #' @return A `hammel_population` with updated histories and endpoint, plus a
 #'   `simulation` component recording selected settings.
 #' @export
@@ -46,8 +48,11 @@
 #'     matching = age_gap_matching_model(3, 5)
 #'   )
 #' result <- run_simulation(model, years = 50, seed = 42)
-run_simulation <- function(model, years, seed = NULL) {
+run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   check_model(model)
+  if (!is.logical(progress) || length(progress) != 1L || is.na(progress)) {
+    stop("`progress` must be TRUE or FALSE.", call. = FALSE)
+  }
   if (is.null(model$population) || is.null(model$processes$mortality) ||
         is.null(model$processes$fertility) ||
         is.null(model$processes$union_formation)) {
@@ -552,6 +557,14 @@ run_simulation <- function(model, years, seed = NULL) {
   )
   engine_persons[["hetfert"]] <- population$persons[["hetfert"]]
   result <- population
+  progress_callback <- NULL
+  if (progress) {
+    progress_bar <- utils::txtProgressBar(min = 0, max = 1, style = 3)
+    on.exit(close(progress_bar), add = TRUE)
+    progress_callback <- function(fraction) {
+      utils::setTxtProgressBar(progress_bar, fraction)
+    }
+  }
   if (years > 0) {
     matching <- if (scheduled_models) {
       model_context$matching
@@ -590,7 +603,8 @@ run_simulation <- function(model, years, seed = NULL) {
       if (is.null(hetfert)) NULL else unclass(hetfert),
       transition_rates,
       if (scheduled_models) model_context$config else NULL,
-      weight_input, group_input
+      weight_input, group_input,
+      progress = progress_callback
     )
     if (!isTRUE(native$cells_consistent)) {
       stop(
@@ -757,6 +771,9 @@ run_simulation <- function(model, years, seed = NULL) {
   result$persons <- tibble::as_tibble(result$persons)
   result$unions <- tibble::as_tibble(result$unions)
   validate_population(result)
+  if (progress) {
+    progress_callback(1)
+  }
   result
 }
 

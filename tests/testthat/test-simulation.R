@@ -1,3 +1,120 @@
+# Simulation execution, RNG isolation, progress and event-time invariants.
+
+test_that("progress preserves complete results and random-number state", {
+  model <- make_model(200, sex = "f", death_rate = 0.02, birth_rate = 0.3)
+  withr::local_seed(831)
+  before <- .Random.seed
+  quiet <- run_simulation(model, 2.5, seed = 42)
+  output <- capture.output(
+    shown <- run_simulation(model, 2.5, seed = 42, progress = TRUE)
+  )
+  expect_identical(shown, quiet)
+  expect_identical(.Random.seed, before)
+  expect_match(paste(output, collapse = ""), "100%", fixed = TRUE)
+  expect_output(run_simulation(model, 2.5, seed = 42), NA)
+
+  quiet <- run_simulation(model, 2.5)
+  after <- .Random.seed
+  assign(".Random.seed", before, envir = .GlobalEnv)
+  capture.output(shown <- run_simulation(model, 2.5, progress = TRUE))
+  expect_identical(shown, quiet)
+  expect_identical(.Random.seed, after)
+
+  for (bad in list(NULL, NA, 1, "TRUE", logical(), c(TRUE, FALSE))) {
+    expect_error(run_simulation(model, 1, progress = bad), "`progress`")
+  }
+})
+
+test_that("progress follows simulation time and closes on success or error", {
+  values <- numeric()
+  closed <- FALSE
+  fail <- FALSE
+  local_mocked_bindings(
+    txtProgressBar = function(...) {
+      values <<- 0
+      closed <<- FALSE
+      structure(
+        list(
+          getVal = function() tail(values, 1),
+          up = function(value) {
+            if (fail && value > 0 && value < 1) {
+              stop("progress callback failed")
+            }
+            values <<- c(values, value)
+          },
+          kill = function() {
+            closed <<- TRUE
+          }
+        ),
+        class = "txtProgressBar"
+      )
+    },
+    .package = "utils"
+  )
+  # With negligible risk, the first age boundary is at 2000.5: 20% of
+  # a 2.5-year run. This establishes time progress independently of counts.
+  model <- make_model(1)
+  model$population$persons$birth_time <- 1980.5
+  model$population$end_time <- 2000
+  model <- set_mortality(
+    model,
+    data.frame(
+      sex = rep(c("m", "f"), 2),
+      age_start = rep(c(0, 20), each = 2),
+      age_end = rep(c(20, Inf), each = 2),
+      rate = 1e-12
+    )
+  )
+  run_simulation(model, 2.5, seed = 42, progress = TRUE)
+  expect_equal(values[1:2], c(0, 0.2))
+  expect_identical(tail(values, 1), 1)
+  expect_true(all(diff(values) > 0))
+  expect_true(closed)
+
+  # Calendar changes also advance progress when all process rates are zero.
+  model <- set_mortality(
+    model,
+    data.frame(
+      sex = rep(c("m", "f"), 2),
+      age_start = 0,
+      age_end = Inf,
+      rate = 0,
+      time_start = rep(c(2000, 2000.5), each = 2),
+      time_end = rep(c(2000.5, 2002.5), each = 2)
+    )
+  )
+  run_simulation(model, 2.5, seed = 42, progress = TRUE)
+  expect_identical(values, c(0, 0.2, 1))
+  expect_true(closed)
+
+  model <- make_model(1000, sex = "f", birth_rate = 0.3, death_rate = 0.02)
+  run_simulation(model, 10, seed = 42, progress = TRUE)
+  expect_true(length(values) > 2L)
+  expect_lte(length(values), 101L)
+  expect_true(all(values >= 0 & values <= 1))
+  expect_true(all(diff(values) > 0))
+  expect_true(closed)
+
+  for (n in c(0, 1)) {
+    for (years in c(0, 0.25)) {
+      run_simulation(make_model(n), years, seed = 42, progress = TRUE)
+      expect_identical(values, c(0, 1))
+      expect_true(closed)
+    }
+  }
+
+  withr::local_seed(831)
+  before <- .Random.seed
+  fail <- TRUE
+  expect_error(
+    run_simulation(model, 10, seed = 42, progress = TRUE),
+    "progress callback failed"
+  )
+  expect_true(closed)
+  expect_lt(tail(values, 1), 1)
+  expect_identical(.Random.seed, before)
+})
+
 test_that("Hammel execution leaves the stats simulate generic available", {
   withr::local_seed(42)
   expect_identical(simulate, stats::simulate)

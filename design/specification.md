@@ -132,9 +132,24 @@ duration-dependent union dissolution. Optional `group_transition()` is also supp
 
 ## Execution and output
 
-`run_simulation(model, years, seed = NULL)` requires population, mortality,
+`run_simulation(model, years, seed = NULL, progress = FALSE)` requires population, mortality,
 fertility, and an explicit union-formation process. It uses continuous years, with no `dt`, execution step, monthly
 compensation grid, or birth-spacing argument on the execution function.
+
+`progress` must be a single nonmissing logical value. When TRUE, a console
+progress bar reports elapsed simulation time divided by the requested duration,
+not the proportion of wall-clock work completed. For example, a run starting
+at 2000 for 20 years reports 25% after processing time 2005. Native progress
+updates occur after chronological events or bookkeeping/calendar boundaries,
+at most once per percentage point; they add no events or random draws. R uses
+`utils::txtProgressBar()` and closes the bar on success, error or interruption.
+The bar reaches 100% only after successful result assembly. Empty populations,
+zero-risk periods and zero-year runs also finish at 100%; initialization and
+result assembly have no separate percentage allocation. FALSE produces no
+progress output. Progress is a display setting, excluded from result metadata.
+Validation compares complete results and RNG states with progress enabled and
+disabled, checks nonzero/fractional starts and durations, monotone bounded
+updates, no-event runs, invalid arguments and cleanup on failure.
 
 C++ builds cells for every rate process from the input schedules (D101,
 D128) and processes the earliest of the next calendar change, the next cell
