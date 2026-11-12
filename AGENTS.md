@@ -50,10 +50,79 @@ substantial architectural consequences.
 
 ## Engineering expectations
 
-- Prefer verb-based names for user-facing action functions, such as
-  [`create_baseline_population()`](https://aarongullickson.github.io/hammel/reference/create_baseline_population.md)
+- Organize R functions by cohesive responsibility using [the source
+  organization
+  guide](https://aarongullickson.github.io/hammel/design/r-source-organization.md).
+  Place new functions in an existing file when its responsibility fits.
+  If no existing file is a logical home, explain the proposed
+  responsibility and filename and ask the user before creating a new R
+  script; do not create one automatically.
+- Start each hand-maintained R file with a brief purpose comment. Place
+  exported functions first and internal constants/helpers below, using
+  `# SECTION NAME ------` headings. Preserve documentation blocks and
+  leave generated wrappers untouched.
+- The user prefers to write the final roxygen2 documentation. For new
+  functions, agents should write first drafts and identify them as
+  needing user editing and review. When changing existing functions with
+  roxygen2 documentation, make only the minimal documentation edits
+  needed to reflect the changes; preserve the user’s wording and
+  organization elsewhere. In the completion report, identify the
+  affected documentation and notify the user that it should be reviewed.
+  Do not treat an agent-written draft as final user-approved
+  documentation.
+- Use noun-based names for specification constructors, such as
+  [`matching_model()`](https://aarongullickson.github.io/hammel/reference/matching_model.md),
+  [`age_gap_matching_model()`](https://aarongullickson.github.io/hammel/reference/age_gap_matching_model.md),
+  [`weight_model()`](https://aarongullickson.github.io/hammel/reference/weight_model.md),
   and
-  [`set_population()`](https://aarongullickson.github.io/hammel/reference/set_population.md).
+  [`group_inheritance()`](https://aarongullickson.github.io/hammel/reference/group_inheritance.md).
+  Use verbs for actions such as
+  [`set_population()`](https://aarongullickson.github.io/hammel/reference/set_population.md),
+  [`run_simulation()`](https://aarongullickson.github.io/hammel/reference/run_simulation.md),
+  and
+  [`generate_uniform_population()`](https://aarongullickson.github.io/hammel/reference/generate_uniform_population.md).
+- Keep hand-maintained `R/` source lines at most 80 characters,
+  including comments and roxygen documentation. Follow the same limit
+  for new or edited R code elsewhere. Keep calls on one line when they
+  fit and remain readable. In multiline calls, put each named argument
+  on its own line; short unnamed arguments may share a line. Keep nested
+  calls and expressions together when they fit, remove unnecessary
+  breaks, and put the closing parenthesis on its own line. Use one
+  argument per line with a two-space indent for long function
+  definitions. See D163. For wrapped `if` conditions, prefer breaks at
+  logical operators and keep short nested calls intact. Indent
+  continuation lines two spaces beyond the first boolean expression
+  after `if (` (D164). Other continuation lines use two spaces beyond
+  the line they continue. Split long diagnostic strings without changing
+  their text. Leave generated wrappers untouched.
+- Use braces for all loop bodies and statement-style or multiline
+  `if`/`else` branches. Keep `else` on the same line as the preceding
+  closing brace. Compact, single-line conditional value expressions may
+  remain unbraced when they have no side effects or control-flow
+  modifiers. Put [`return()`](https://rdrr.io/r/base/function.html),
+  [`stop()`](https://rdrr.io/r/base/stop.html),
+  [`break`](https://rdrr.io/r/base/Control.html), and
+  [`next`](https://rdrr.io/r/base/Control.html) on their own lines
+  inside the relevant block; brace control-flow/error-handler callback
+  bodies as well.
+- Every function definition spanning multiple lines must have a braced
+  body, including named functions, local helpers and anonymous
+  callbacks. This also applies when the body is a single expression or
+  wrapped function call. Compact one-line functions may remain unbraced,
+  subject to the control-flow rules above. See D171.
+- Do not use semicolons to separate R statements; put each statement on
+  its own line (D156).
+- Format hand-maintained C++ in `src/` with the root `.clang-format` and
+  follow the C++ section of the source organization guide (D175). Verify
+  behavior-preserving native refactors by comparing hashed native
+  results with `-ffp-contract=off`, and run the tests with default
+  flags.
+- Use snake_case for package-owned function and argument names (for
+  example, `conf_level`). Preserve external APIs when calling them, such
+  as `stats::poisson.test(conf.level = conf_level)`. Follow tidyverse
+  function-writing conventions subject to the explicit project naming
+  and section-heading rules; see the source organization guide for the
+  current style review.
 - Return all public tables as tibbles, including empty tables,
   population histories, process schedules, and demographic summaries.
   Accept base data frames as inputs.
@@ -69,12 +138,16 @@ substantial architectural consequences.
   semantics explicit. Public times/durations are years, exposure is
   person-years, and input rates are per person-year. The current engine
   executes continuously (D024), with no monthly increment or
-  execution-step parameter. Births use cell-accounted fertility (D101):
-  each one-year age x actual parity x union type x group cell produces
-  births at its input rate times all members, assigned to a random
-  eligible member, weighted by persistent hetfert when enabled (D102).
-  Births in cells with no eligible woman are reported as unrealized. See
-  design/fertility-cell-accounting.md. Midpoint compensation
+  execution-step parameter. Every rate process is scheduled by cells
+  with one exponential clock per process (D128); there are no individual
+  waiting-time clocks. Births use cell-accounted fertility (D101): each
+  one-year age x actual parity x union type (x group, when schedules are
+  group-specific) cell produces births at its input rate times all
+  members, assigned to a random eligible member, weighted by any weight
+  model when enabled (D129); persistent hetfert (D102) is internal and
+  not available to users (D176). Draws of cells with no eligible woman
+  are counted as unrealized births. See design/binned-group-hazards.md
+  and design/fertility-cell-accounting.md. Midpoint compensation
   (D028/D095/D099) was removed. Do not reintroduce superseded monthly
   timing, midpoint compensation or the specialized exact fertility
   sampler without an explicit modeling decision.
@@ -134,14 +207,18 @@ Never mark a scientific decision accepted without the user’s agreement.
   identity registry. D122 adds calendar bands to `cohab_prob`;
   probability-only changes update type selection and matching
   calibration while preserving pending event dates. Other arguments
-  remain static. Milestone 7 is complete with the current engine. D121
-  assigns binned-group hazards and custom formula weights across rate
-  processes to milestone 8; see `design/binned-group-hazards.md`. This
-  direction is not implemented. Summaries/helpers move to 9; multiple
-  group columns are tentative 10; external immigration is 11; the
-  two-sex model is 12. The separate regions milestone is removed, with
-  its unresolved applications retained under 10. Distinguish current
-  specifications from deferred mechanisms and future proposals.
+  remain static. Milestone 7 was completed with the previous engine.
+  Milestone 8, cell scheduling for every rate process (D128) and weight
+  models (D129), was accepted complete on November 5, 2026 (D130), based
+  on `validation/milestone8.qmd`; see `design/binned-group-hazards.md`.
+  Milestone 9, multiple group dimensions (D134; see
+  `design/multiple-groups.md`), including matching across several
+  dimensions, separate-market calibration (D138) and household moves
+  (D140), was accepted complete on November 6, 2026 (D141), based on
+  `validation/milestone9.qmd`. Under D136 the next focus is the first
+  public release; external immigration and the two-sex model are
+  post-release projects. Distinguish current specifications from
+  deferred mechanisms and future proposals.
 - `validation/milestone1.qmd` is the accepted historical assessment;
   reproduce it at its recorded commit because current execution requires
   a union process. `validation/milestone2.qmd` contains the user’s
@@ -153,38 +230,45 @@ Never mark a scientific decision accepted without the user’s agreement.
   `validation/milestone5.qmd` is the accepted
   parity/spacing/heterogeneity assessment. `validation/milestone6.qmd`
   is the accepted individual-transition assessment (D116), with its
-  final render active at acceptance. Preserve all seven reports,
-  rendered artifacts and any active render intermediates; do not
-  fabricate results or set scientific acceptance thresholds. Milestone
-  completion retains documented limitations and does not authorize
-  future features.
+  final render active at acceptance. `validation/milestone7.qmd` and
+  `validation/milestone8.qmd` are the accepted calendar-input and
+  cell-scheduling/weight-model assessments, and
+  `validation/milestone9.qmd` the accepted multiple-dimension
+  assessment. Preserve all nine reports, rendered artifacts and any
+  active render intermediates; do not fabricate results or set
+  scientific acceptance thresholds. Milestone completion retains
+  documented limitations and does not authorize future features.
 - Milestone 4 includes duration-dependent dissolution, age/duration
   searches by previous union, and optional rate-mode cohabitation with
   linked conversion episodes and type-specific matching/rates
-  (D078–D092). One woman carries each union clock; exact ties prioritize
-  death, birth, dissolution, conversion, search, then group transition.
-  See `design/union-dissolution.md`, `design/remarriage.md`, and
-  `design/cohabitation.md`. Supporting benchmarks/recovery evidence
-  lives in `validation/milestone4/`; top-level reports and
-  `validation/data/` remain in place. Preserve active render
-  intermediates until rendering finishes, including milestone 5’s active
-  final render at closeout and milestone 6’s active final render.
-  Parity, fertility heterogeneity and individual group transitions are
-  implemented and accepted. See `design/group-transitions.md`; household
-  moves remain deferred (D114), with regional applications retained
-  under tentative milestone 10’s multiple group columns (D121).
-  Calendar-time rates follow `design/time-varying-rates.md` (D118);
-  matching and inheritance model schedules are implemented under D123.
-  Most categorical characteristics should use groups; multiple group
-  columns are tentative milestone 10 with their schema still unselected.
-- Use
-  [`devtools::test()`](https://devtools.r-lib.org/reference/test.html)
-  for the testthat suite. Live database tests require explicit opt-in;
-  ordinary verification must not download rates or expose credentials.
-  See `design/testing.md` for commands and evidence.
+  (D078–D092). Unions are the units in dissolution and conversion cells
+  (D128); exact ties prioritize death, birth, dissolution, conversion,
+  search, then group transition. See `design/union-dissolution.md`,
+  `design/remarriage.md`, and `design/cohabitation.md`. Supporting
+  benchmarks/recovery evidence lives in `validation/milestone4/`;
+  top-level reports and `validation/data/` remain in place. Preserve
+  active render intermediates until rendering finishes, including
+  milestone 5’s active final render at closeout and milestone 6’s active
+  final render. Parity, fertility heterogeneity and individual group
+  transitions are implemented and accepted. See
+  `design/group-transitions.md`; household moves, deferred by D114, are
+  implemented in milestone 9 as
+  [`household()`](https://aarongullickson.github.io/hammel/reference/household.md)
+  on a transition process (D140), with regional applications under
+  multiple group columns (D121, D131). Calendar-time rates follow
+  `design/time-varying-rates.md` (D118); matching and inheritance model
+  schedules are implemented under D123. Most categorical characteristics
+  should use groups; multiple group dimensions follow D134.
+- Use `devtools::test()` for the testthat suite. Live database tests
+  require explicit opt-in; ordinary verification must not download rates
+  or expose credentials. See `design/testing.md` for commands and
+  evidence.
 - Treat session handoffs as dated status records, not standing pause
-  instructions. The current user request controls work. Preserve the
-  user’s edits, including explanatory source comments and the accepted
-  reports. Fixed newborn assignment remains unselected future work
-  beyond accepted milestone 6; custom inheritance already supports
-  assigning mixed-parent births to a specified category.
+  instructions. The current user request controls work. The user writes
+  all vignettes and articles (`vignettes/`) and makes all edits to the
+  top-level `README.md` (D141); do not edit them unless asked. Preserve
+  the user’s edits, including explanatory source comments and the
+  accepted reports. Fixed newborn assignment is available through
+  `group_inheritance("fixed", fixed_value = ...)` (D142); custom
+  inheritance already supports assigning mixed-parent births to a
+  specified category.

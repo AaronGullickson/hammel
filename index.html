@@ -4,14 +4,27 @@
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>What the Package Does (One Line, Title Case) • hammel</title>
-<script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<title>Hammel • hammel</title>
+<!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+<link rel="icon" type="”image/svg+xml”" href="favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" sizes="any" href="favicon.ico">
+<link rel="manifest" href="site.webmanifest">
+<!-- mathjax math --><script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" crossorigin="anonymous"></script><script>
+  window.MathJax = {
+    chtml: {
+      fontURL: "https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2"
+    }
+  };
+</script><script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="What the Package Does (One Line, Title Case)">
-<meta name="description" content="What the package does (one paragraph).">
-<meta property="og:description" content="What the package does (one paragraph).">
+<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><link href="extra.css" rel="stylesheet">
+<meta property="og:title" content="Hammel">
+<meta name="description" content="Demographic micro-simulation in the spirit of SOCSIM but with modern tools.">
+<meta property="og:description" content="Demographic micro-simulation in the spirit of SOCSIM but with modern tools.">
+<meta property="og:image" content="https://aarongullickson.github.io/hammel/logo.png">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -30,11 +43,15 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
+<li class="nav-item"><a class="nav-link" href="articles/hammel.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="articles/demographic_transition.html">Simulating the Demographic Transition</a></li>
+    <li><a class="dropdown-item" href="articles/how_it_works.html">How Hammel Works</a></li>
+    <li><a class="dropdown-item" href="articles/multigroup_intermar.html">Multigroup Simulation with Custom Inheritance</a></li>
+    <li><a class="dropdown-item" href="articles/second_demog_transition.html">Simulating the Second Demographic Transition</a></li>
   </ul>
 </li>
       </ul>
@@ -51,27 +68,55 @@
 </nav><div class="container template-home">
 <div class="row">
   <main id="main" class="col-md-9"><div class="section level1">
-<div class="page-header"><h1 id="hammel">hammel<a class="anchor" aria-label="anchor" href="#hammel"></a>
-</h1></div>
+<div class="page-header">
+<img src="logo.png" class="logo" alt=""><h1 id="hammel-">Hammel <a class="anchor" aria-label="anchor" href="#hammel-"></a>
+</h1>
+</div>
 <!-- badges: start -->
 
-<p>Hammel is a standalone demographic microsimulator with an R interface and a C++17 engine. It models continuous-time mortality, fertility, and union formation, dissolution, remarriage, and optional cohabitation/conversion, with group-specific rates, individual group transitions, partner matching, ancestry, and newborn identity inheritance. Results expose person, union, and transition histories as tibbles.</p>
-<p>Milestones 1–6 are complete by user acceptance: mortality/fertility, union formation, groups, dissolution/remarriage/cohabitation, parity-specific fertility with persistent fertility heterogeneity, and individual group transitions (D116). Milestone 7, time-varying inputs, is next. See the <a href="design/README.html">documentation index</a>, <a href="design/scientific-contract.html">scientific contract</a>, and <a href="design/testing.html">validation record</a> for implemented behavior and limitations. Future mechanisms are listed in the <a href="design/roadmap.html">roadmap</a>.</p>
+<p>Hammel is an R package for doing demographic microsimulation. Hammel is a spiritual successor to the venerable SOCSIM program but provides a modern interface, enhanced features, greater user customization, and faster computation. Hammel models demographic processes in continuous time and features:</p>
+<ul>
+<li>Stratification of rate schedules by time, group membership, union type, sex, and parity (for fertility).</li>
+<li>Union formation processes that including union dissolution, cohabitation and remarriage, and customizable rules for partner matching.</li>
+<li>Multiple user-defined group identifiers (e.g. race, education, region) complete with age or duration-specific transition rates, customizable partner matching rules across groups, customizable inheritance rules for newborns, and ancestry tracking.</li>
+<li>Helper functions to extract important details from simulations such as age-specific rates, population size, and kinship relations.</li>
+<li>Helper functions to build starting populations and to stratify rate schedules.</li>
+<li>A pipable interface for building and modifying simulation models.</li>
+</ul>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<p>You can install the development version of hammel from <a href="https://github.com/AaronGullickson/hammel" class="external-link">GitHub</a> with:</p>
+<p>Hammel is currently only available through GitHub. You can install the latest development version with <code>pak</code> or <code>devtools</code>:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
-<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"AaronGullickson/hammel"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"AaronGullickson/hammel"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># install.packages("devtools")</span></span>
+<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"AaronGullickson/hammel"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="example">Example<a class="anchor" aria-label="anchor" href="#example"></a>
 </h2>
-<p>The <a href="inst/examples/milestone2.R">union-formation example</a> demonstrates model construction and simulation. The user-authored <a href="validation/milestone3.qmd">milestone 3 report</a> assesses group-specific rates, matching, ancestry, inheritance, and performance. Rendering the report installs the package, retrieves HMD rates, and runs substantial simulations; ordinary package tests use offline inputs unless live database tests are explicitly enabled.</p>
-<p>The <a href="validation/milestone4.qmd">milestone 4 report</a> and its <a href="validation/milestone4.html">rendered assessment</a> cover dissolution, age/duration remarriage, cohabitation, conversion, separate matching roles, and performance. The user accepted milestone 4 on October 29, 2026 (D093). Rendering retrieves HMD mortality, runs 100 independently initialized replications per scenario, and executes the offline test suite. See <a href="validation/README.html">validation contents</a> for retained reports, inputs, and supporting diagnostic evidence.</p>
-<p>The accepted <a href="validation/milestone5.qmd">milestone 5 report</a> and <a href="validation/milestone5.html">rendered assessment</a> cover parity-specific fertility, cell-accounted birth spacing, restart and union-type rate checks, and lognormal fertility weights with maternal inheritance (D105). Completion retains the documented sparse-cell/unrealized-intensity and reproductive-selection limitations. Rendering installs the package, retrieves HFD/HMD inputs, runs replications and the offline tests; it is not an ordinary package check.</p>
-<p>The accepted <a href="validation/milestone6.qmd">milestone 6 report</a> and <a href="validation/milestone6.html">rendered assessment</a> cover age/duration transitions, sex/union-type strata, demographic rate and formation-group recovery, population shares and performance (D116, October 30, 2026). The final render was active at acceptance; preserve its intermediates until it finishes. Household moves are deferred to the regions milestone (D114).</p>
+<p>Several detailed examples of Hammel simulations are available on the <a href="https://hammel.github.io" class="external-link">documentation website</a>. Here I provide a simple toy example.</p>
+<p>To use Hammel, you first set up a simulation model, which can be constructed using a pipable interface. The primary inputs for Hammel are tables of age-specific rate schedules.</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">usa_2000_mortality</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">usa_2000_fertility</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/hammel_model.html">hammel_model</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="reference/fertility.html">set_fertility</a></span><span class="op">(</span><span class="va">usa_2000_fertility</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="reference/mortality.html">set_mortality</a></span><span class="op">(</span><span class="va">usa_2000_mortality</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="reference/union_formation.html">set_union_formation</a></span><span class="op">(</span><span class="st">"on_demand"</span><span class="op">)</span></span></code></pre></div>
+<p>All models must have fertility and mortality rates and some way to deal with union formation. Instead of supplying marriage rates, I am using an “on demand” model for union formation that partners off unpartnered women when they have a birth, but <code>set_union_formation</code> allows customization based on marriages rates, dissolution rates, and cohabitation.</p>
+<p>Once I have the model, I can add a starting population and simulate. In many cases, you would “burn in” a simulation to get a stable population distribution for the starting population, but I won’t do that here.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">pop_start</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/generate_uniform_population.html">generate_uniform_population</a></span><span class="op">(</span><span class="fl">10000</span>, end_time <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="va">model</span> <span class="op">&lt;-</span> <span class="va">model</span> <span class="op">|&gt;</span> </span>
+<span>  <span class="fu"><a href="reference/set_population.html">set_population</a></span><span class="op">(</span><span class="va">pop_start</span><span class="op">)</span></span>
+<span><span class="va">pop_end</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/run_simulation.html">run_simulation</a></span><span class="op">(</span><span class="va">model</span>, <span class="fl">100</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span></code></pre></div>
+<p>Now, I can compute summary statistics.</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/calculate_population_size.html">calculate_population_size</a></span><span class="op">(</span><span class="va">pop_end</span>, <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">100</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
@@ -101,7 +146,8 @@
 <div class="developers">
 <h2 data-toc-skip>Developers</h2>
 <ul class="list-unstyled">
-<li>First Last <br><small class="roles"> Author, maintainer </small>   </li>
+<li>
+<a href="https://aarongullickson.github.io" class="external-link">Aaron Gullickson</a> <br><small class="roles"> Author, maintainer, copyright holder </small> <a href="https://orcid.org/0000-0001-7237-8131" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a>  </li>
 </ul>
 </div>
 
@@ -118,7 +164,7 @@
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by First Last.</p>
+  <p>Developed by <a href="https://aarongullickson.github.io" class="external-link">Aaron Gullickson</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

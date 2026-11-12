@@ -1,75 +1,133 @@
 # Package index
 
-## All functions
+## Model setup and simulation
 
-- [`calculate_cohab_convert_rate()`](https://aarongullickson.github.io/hammel/reference/calculate_cohab_convert_rate.md)
-  : Calculate cohabitation-to-marriage conversion rates
-- [`calculate_dissolution_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_dissolution_rates.md)
-  : Calculate union-years, dissolutions and duration-specific rates
-- [`calculate_fertility_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_fertility_rates.md)
-  : Calculate age-specific fertility rates, optionally by current parity
-- [`calculate_life_table()`](https://aarongullickson.github.io/hammel/reference/calculate_life_table.md)
-  : Construct period life tables from mortality rates
-- [`calculate_marriage_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_marriage_rates.md)
-  : Calculate marriage entry rates including cohabitation conversions
-- [`calculate_mortality_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_mortality_rates.md)
-  : Calculate age-specific mortality rates
-- [`calculate_patfr()`](https://aarongullickson.github.io/hammel/reference/calculate_patfr.md)
-  : Calculate parity- and age-adjusted total fertility rates
-- [`calculate_population_size()`](https://aarongullickson.github.io/hammel/reference/calculate_population_size.md)
-  : Calculate the living population at time points
-- [`calculate_tfr()`](https://aarongullickson.github.io/hammel/reference/calculate_tfr.md)
-  : Calculate total fertility rates
-- [`calculate_transition_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_transition_rates.md)
-  : Calculate age- or duration-specific group-transition rates
-- [`calculate_union_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_union_rates.md)
-  : Calculate union exposure and formation rates
-- [`create_age_gap_matching_model()`](https://aarongullickson.github.io/hammel/reference/create_age_gap_matching_model.md)
-  : Create a quadratic matching model from interpretable age-gap
-  preferences
-- [`create_baseline_population()`](https://aarongullickson.github.io/hammel/reference/create_baseline_population.md)
-  : Generate a simple baseline population
-- [`create_group_inheritance()`](https://aarongullickson.github.io/hammel/reference/create_group_inheritance.md)
-  : Specify newborn group identity inheritance
-- [`create_matching_model()`](https://aarongullickson.github.io/hammel/reference/create_matching_model.md)
-  : Specify a conditional-logit matching model
-- [`extract_kin()`](https://aarongullickson.github.io/hammel/reference/extract_kin.md)
-  : Extract known kin within generation-distance bounds
-- [`get_detailed_unions()`](https://aarongullickson.github.io/hammel/reference/get_detailed_unions.md)
-  : Add recorded partner information to union histories
-- [`get_fertility_hfd()`](https://aarongullickson.github.io/hammel/reference/get_fertility_hfd.md)
-  : Download prepared fertility rates from the Human Fertility Database
-- [`get_mortality_hmd()`](https://aarongullickson.github.io/hammel/reference/get_mortality_hmd.md)
-  : Download prepared mortality rates from the Human Mortality Database
-- [`get_parent_info()`](https://aarongullickson.github.io/hammel/reference/get_parent_info.md)
-  : Add recorded parent information to person histories
-- [`get_unpartnered_births()`](https://aarongullickson.github.io/hammel/reference/get_unpartnered_births.md)
-  : Extract births with known parents to unpartnered mothers
-- [`group_transition()`](https://aarongullickson.github.io/hammel/reference/group_transition.md)
-  [`set_group_transition()`](https://aarongullickson.github.io/hammel/reference/group_transition.md)
-  : Specify individual group transitions
+Construct a model, attach its population and processes, and run a
+simulation.
+
 - [`hammel_model()`](https://aarongullickson.github.io/hammel/reference/hammel_model.md)
   : Create an empty Hammel model specification
-- [`hammel_population()`](https://aarongullickson.github.io/hammel/reference/hammel_population.md)
-  : Create a Hammel population
-- [`het_fert()`](https://aarongullickson.github.io/hammel/reference/het_fert.md)
-  : Specify persistent fertility weights and maternal inheritance
-- [`mortality()`](https://aarongullickson.github.io/hammel/reference/mortality.md)
-  [`fertility()`](https://aarongullickson.github.io/hammel/reference/mortality.md)
-  : Specify age-specific demographic rates
 - [`set_population()`](https://aarongullickson.github.io/hammel/reference/set_population.md)
   : Set the starting population of a Hammel model
+- [`group()`](https://aarongullickson.github.io/hammel/reference/group.md)
+  [`set_groups()`](https://aarongullickson.github.io/hammel/reference/group.md)
+  : Describe and declare a group dimension
 - [`set_process()`](https://aarongullickson.github.io/hammel/reference/set_process.md)
-  [`set_mortality()`](https://aarongullickson.github.io/hammel/reference/set_process.md)
-  [`set_fertility()`](https://aarongullickson.github.io/hammel/reference/set_process.md)
   : Set a demographic process specification
-- [`simulate()`](https://aarongullickson.github.io/hammel/reference/simulate.md)
+- [`run_simulation()`](https://aarongullickson.github.io/hammel/reference/run_simulation.md)
   : Run a demographic simulation
-- [`union_dissolution()`](https://aarongullickson.github.io/hammel/reference/union_dissolution.md)
-  [`set_union_dissolution()`](https://aarongullickson.github.io/hammel/reference/union_dissolution.md)
-  : Specify duration-dependent union dissolution
+
+## Population preparation
+
+Create and validate starting populations and describe their group
+dimensions.
+
+- [`hammel_population()`](https://aarongullickson.github.io/hammel/reference/hammel_population.md)
+  : Create a Hammel population
+- [`generate_uniform_population()`](https://aarongullickson.github.io/hammel/reference/generate_uniform_population.md)
+  : Generate a population with uniformly distributed ages
+- [`validate_population()`](https://aarongullickson.github.io/hammel/reference/validate_population.md)
+  : Validate a Hammel population
+- [`group()`](https://aarongullickson.github.io/hammel/reference/group.md)
+  [`set_groups()`](https://aarongullickson.github.io/hammel/reference/group.md)
+  : Describe and declare a group dimension
+
+## Rate preparation
+
+Import demographic rates and prepare proportional rate strata.
+
+- [`get_mortality_hmd()`](https://aarongullickson.github.io/hammel/reference/get_mortality_hmd.md)
+  : Download prepared mortality rates from the HMD
+- [`get_fertility_hfd()`](https://aarongullickson.github.io/hammel/reference/get_fertility_hfd.md)
+  : Download prepared fertility rates from the HFD
+- [`stratify_rates()`](https://aarongullickson.github.io/hammel/reference/stratify_rates.md)
+  : Add proportional strata to a rate table
+
+## Demographic processes
+
+Specify mortality, fertility, unions, and group transitions.
+
+- [`mortality()`](https://aarongullickson.github.io/hammel/reference/mortality.md)
+  [`set_mortality()`](https://aarongullickson.github.io/hammel/reference/mortality.md)
+  : Specify an age-specific mortality process
+- [`fertility()`](https://aarongullickson.github.io/hammel/reference/fertility.md)
+  [`set_fertility()`](https://aarongullickson.github.io/hammel/reference/fertility.md)
+  : Specify an age-specific fertility process
 - [`union_formation()`](https://aarongullickson.github.io/hammel/reference/union_formation.md)
   [`set_union_formation()`](https://aarongullickson.github.io/hammel/reference/union_formation.md)
   : Specify a union-formation process
-- [`validate_population()`](https://aarongullickson.github.io/hammel/reference/validate_population.md)
-  : Validate a Hammel population
+- [`union_dissolution()`](https://aarongullickson.github.io/hammel/reference/union_dissolution.md)
+  [`set_union_dissolution()`](https://aarongullickson.github.io/hammel/reference/union_dissolution.md)
+  : Specify duration-dependent union dissolution
+- [`group_transition()`](https://aarongullickson.github.io/hammel/reference/group_transition.md)
+  [`set_group_transition()`](https://aarongullickson.github.io/hammel/reference/group_transition.md)
+  : Specify individual group transitions
+- [`household()`](https://aarongullickson.github.io/hammel/reference/household.md)
+  : Define who moves together in household transitions
+
+## Matching, inheritance, and weight models
+
+Configure partner selection, newborn group inheritance, and selection
+within rate cells.
+
+- [`matching_model()`](https://aarongullickson.github.io/hammel/reference/matching_model.md)
+  : Specify a conditional-logit matching model
+- [`age_gap_matching_model()`](https://aarongullickson.github.io/hammel/reference/age_gap_matching_model.md)
+  : Create a quadratic matching model from interpretable age-gap
+  preferences
+- [`group_inheritance()`](https://aarongullickson.github.io/hammel/reference/group_inheritance.md)
+  : Specify newborn group identity inheritance
+- [`weight_model()`](https://aarongullickson.github.io/hammel/reference/weight_model.md)
+  : Create a weight model for selection within rate cells
+
+## Demographic summaries
+
+Calculate population sizes, observed event rates, and synthetic
+demographic measures.
+
+- [`calculate_population_size()`](https://aarongullickson.github.io/hammel/reference/calculate_population_size.md)
+  : Calculate the living population at time points
+- [`calculate_mortality_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_rates.md)
+  [`calculate_fertility_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_rates.md)
+  [`calculate_union_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_rates.md)
+  [`calculate_marriage_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_rates.md)
+  [`calculate_dissolution_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_rates.md)
+  [`calculate_cohab_convert_rate()`](https://aarongullickson.github.io/hammel/reference/calculate_rates.md)
+  [`calculate_transition_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_rates.md)
+  : Calculate observed demographic event rates
+- [`calculate_life_table()`](https://aarongullickson.github.io/hammel/reference/calculate_life_table.md)
+  : Construct period life tables from age-specific mortality rates
+- [`calculate_life_expectancy()`](https://aarongullickson.github.io/hammel/reference/calculate_life_expectancy.md)
+  : Calculate life expectancy at given ages
+- [`calculate_tfr()`](https://aarongullickson.github.io/hammel/reference/calculate_tfr.md)
+  [`calculate_patfr()`](https://aarongullickson.github.io/hammel/reference/calculate_tfr.md)
+  : Calculate total fertility and parity-adjusted total fertility rates
+
+## Family and union histories
+
+Extract kin relationships and enrich recorded person, birth, and union
+histories.
+
+- [`extract_kin()`](https://aarongullickson.github.io/hammel/reference/extract_kin.md)
+  : Extract known kin within generation-distance bounds
+- [`count_kin()`](https://aarongullickson.github.io/hammel/reference/count_kin.md)
+  : Calculate the average number of living kin over time
+- [`augment_persons()`](https://aarongullickson.github.io/hammel/reference/augment_persons.md)
+  : Extract persons data from simulation results with additional detail
+- [`augment_unions()`](https://aarongullickson.github.io/hammel/reference/augment_unions.md)
+  : Extract union data from simulation results with additional detail
+- [`extract_unpartnered_births()`](https://aarongullickson.github.io/hammel/reference/extract_unpartnered_births.md)
+  : Extract births with known parents to unpartnered mothers
+
+## Example data
+
+Packaged demographic inputs for examples and exploration.
+
+- [`usa_2000_mortality`](https://aarongullickson.github.io/hammel/reference/usa_2000.md)
+  [`usa_2000_fertility`](https://aarongullickson.github.io/hammel/reference/usa_2000.md)
+  [`usa_2000_fertility_union`](https://aarongullickson.github.io/hammel/reference/usa_2000.md)
+  [`usa_2000_marriage`](https://aarongullickson.github.io/hammel/reference/usa_2000.md)
+  [`usa_2000_migration`](https://aarongullickson.github.io/hammel/reference/usa_2000.md)
+  : United States example rates, around 2000
+- [`england_wales_1992_onward`](https://aarongullickson.github.io/hammel/reference/england_wales_1992_onward.md)
+  : England and Wales inputs for a second demographic transition example

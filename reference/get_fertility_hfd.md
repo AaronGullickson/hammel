@@ -1,20 +1,9 @@
-# Download prepared fertility rates from the Human Fertility Database
+# Download prepared fertility rates from the HFD
 
-Download total period age-specific fertility rates (`asfrRR`) through
-HMDHFDplus and select one year or a vector of years from one download.
-Rates remain births per woman-year. One year gives a static schedule
-without calendar columns; multiple years give chronological
-`time_start`/`time_end` bands \[year, year + 1). Nonconsecutive years
-retain gaps. Birth-order-specific columns are not used by default.
-Missing total rates are rejected. These HFD products use their native
-annual, single-age layout; HMD-style `shape` options are not available.
-With `by_parity = TRUE`, request conditional age/parity rates (`mi`)
-instead: first births map to parity \[0,1), through fifth-or-higher
-births at \[4,Inf). Missing conditional cells are replaced with zero;
-source metadata records that policy and the number of replacements
-across the selected years. Parity tables can be supplied to fertility
-constructors for parity-dependent execution. Parity initializes from
-recorded maternal birth histories.
+Download fertility rate schedules from the Human Fertility Database in
+the format that
+[`fertility()`](https://aarongullickson.github.io/hammel/reference/fertility.md)
+expects. Requires user name and password and the HMDHFDplus package.
 
 ## Usage
 
@@ -33,20 +22,20 @@ get_fertility_hfd(
 
 - country:
 
-  A single HFD population code.
+  A single HFD population code, such as `"USA"`.
 
 - year:
 
   One whole-number calendar year or a nonempty vector of distinct years.
-  All requested years must exist; duplicates are rejected.
+  All requested years must exist.
 
 - username:
 
-  HFD username, defaulting to `HFD_USERNAME`.
+  HFD username, defaulting to `HFD_USERNAME` environmental variable.
 
 - password:
 
-  HFD password, defaulting to `HFD_PASSWORD`.
+  HFD password, defaulting to `HFD_PASSWORD` environmental variable.
 
 - update:
 
@@ -57,33 +46,42 @@ get_fertility_hfd(
 
   Logical, default FALSE. TRUE returns conditional rates with
   `parity_start`/`parity_end` in addition to the age bounds and `rate`.
-  Requires the HFD conditional-rate product; unavailable products/years
-  error rather than falling back to unconditional rates.
+  Requires the HFD conditional-rate product.
 
 ## Value
 
 A fertility rate tibble with a `source` attribute recording selected
 years and source periods. Multiple years include
-`time_start`/`time_end`; length-one requests omit them. Total-rate
-tables are validated for execution. Parity tables use half-open
-age/parity bounds; unavailable conditional rates are zero-filled.
+`time_start`/`time_end`; length-one requests omit them.
 
 ## Details
 
-HFD endpoint rows are retained: `12-` is represented as `[12,13)` using
-its supplied rate, and `55+` as `[55,Inf)`. TFR omits the upper-open
-band and warns if its rate is nonzero. No rates are supplied outside the
-represented schedule. Credentials are never retained in the table.
+To use this function, users will need to install the HMDHFDplus package
+with:
+
+    install.packages("HMDHFDplus")
+
+Users will also need to either pass a user name and password to the
+function arguments or set the these values in the `.Renviron` as
+follows:
+
+    HFD_USERNAME="username here"
+    HFD_PASSWORD="password here"
+
+A single requested year returns a static schedule without calendar
+columns. Multiple years return `time_start`/`time_end` for the selected
+source periods, in chronological order.
+
+HFD endpoint rows retained: `12-` is represented as `[12,13)` using its
+supplied rate, and `55+` as `[55,Inf)`.
 
 ## Examples
 
 ``` r
 if (FALSE) { # \dontrun{
-rates <- get_fertility_hfd("USA", 2000)
-saveRDS(rates, "rates.rds")
-model <- hammel_model() |> set_fertility(readRDS("rates.rds"))
-history <- get_fertility_hfd("SWE", 1891:2000)
-# Conditional age/parity rates for simulation:
-parity_rates <- get_fertility_hfd("USA", 2000, by_parity = TRUE)
+fert_rates_usa <- get_fertility_hfd("USA", 2000)
+fert_rates_swe <- get_fertility_hfd("SWE", 1891:2000)
+# Conditional age/parity rates
+fert_rates_usa_parity <- get_fertility_hfd("USA", 2000, by_parity = TRUE)
 } # }
 ```

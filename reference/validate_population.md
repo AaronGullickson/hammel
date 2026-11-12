@@ -20,12 +20,3 @@ validate_population(results)
 ## Value
 
 The supplied object, invisibly and unchanged.
-
-## Examples
-
-``` r
-persons <- data.frame(person_id = 1L, sex = "f", birth_time = -20,
-  death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_)
-results <- hammel_population(persons, end_time = 0)
-validate_population(results)
-```

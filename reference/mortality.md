@@ -1,175 +1,103 @@
-# Specify age-specific demographic rates
+# Specify an age-specific mortality process
 
-Construct a process specification without running a simulation. Rates
-are piecewise constant over age intervals `[age_start, age_end)`, in
-years, and expressed per person-year. Overlapping intervals are
-rejected; adjacent intervals are allowed. Input order and custom columns
-are preserved; rate schedules are returned as tibbles. A `source`
-attribute on the input table is copied to the process's `source` field.
+Constructs a mortality process specification for a simulation model. The
+convenience function `set_mortality` is equivalent to
+`set_process(model, mortality(...))` and allows for direct piping from a
+model.
 
 ## Usage
 
 ``` r
-mortality(rates, group_prop_hazard = NULL)
+mortality(rates, weights = NULL)
 
-fertility(
-  rates,
-  birth_interval = 0.75,
-  group_prop_hazard = NULL,
-  inheritance = create_group_inheritance(),
-  ffab = 0.4886,
-  hetfert = NULL
-)
+set_mortality(model, rates, weights = NULL)
 ```
 
 ## Arguments
 
 - rates:
 
-  A nonempty data frame containing numeric `age_start`, `age_end`, and
-  `rate`. Starts must be finite and nonnegative; ends must exceed starts
-  and may be `Inf` for upper-open bands. Rates must be finite and
-  nonnegative. Mortality additionally requires character `sex` values
-  `"m"` and `"f"`, with both represented.
+  A nonempty data frame defining the mortality rate schedules. Must
+  contain at least numeric `age_start`, `age_end`, and `rate`, as well
+  as character `sex` columns. See details for format and description of
+  stratification variables that can be applied.
 
-- group_prop_hazard:
+- weights:
 
-  Optional named numeric vector of finite nonnegative rate multipliers,
-  with unique nonempty group names. Missing groups use 1.0; zero
-  suppresses the risk. Values are not normalized. At execution, multiply
-  the selected input schedule by the person's group factor, including
-  all sex/status strata. Fertility multiplication precedes cell
-  accounting. Without population groups, warn and ignore multipliers.
-  Stored rate tables and their source metadata are unchanged; rate-table
-  summaries use those stored rates, without applying
-  population-dependent multipliers. Fertility with `union_type` rates
-  also accepts a named list such as
-  `list(partnered = c(A = 1.1, B = 0.9), unpartnered = c(A = 1.05))`. An
-  omitted status or group uses 1.0. A single vector applies to all types
-  (or overall fertility). Type lists require `union_type` rates and
-  their names must match the supplied schedule types. Three-type
-  schedules accept lists named unpartnered/cohab/marriage; shared
-  partnered schedules accept unpartnered/partnered. Omitted types and
-  groups have multiplier 1.
+  NULL (default) for unweighted selection within rate cells, or a
+  [`weight_model()`](https://aarongullickson.github.io/hammel/reference/weight_model.md)
+  specification. Weights choose which member of a cell experiences an
+  event without changing the cell's input rate.
 
-- birth_interval:
+- model:
 
-  Minimum maternal birth-to-birth interval in years, defaulting to
-  `0.75`. Must be finite and nonnegative. Applies to fertility only; see
-  cell-accounted fertility below.
-
-- inheritance:
-
-  A group identity model from
-  [`create_group_inheritance()`](https://aarongullickson.github.io/hammel/reference/create_group_inheritance.md),
-  or a tibble with numeric `time_start`, `time_end` and list-column
-  `model` containing complete inheritance models. Intervals are
-  half-open absolute years, must not overlap and must cover the
-  requested run. Select the active model at each birth; older identities
-  and ancestry remain unchanged. Base data frames with list columns are
-  accepted. All declared possible identities across scheduled models
-  join the simulation-wide registry. Static inputs may also be a method
-  name requiring no additional parameters: `"mother"`, `"father"`,
-  `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
-  Fertility defaults to selecting either parent with equal probability,
-  with maternal fallback. Other parental, ancestry, hierarchy, and
-  custom rules assign identity after child sex and ancestry are
-  calculated. Possible identities are checked against grouped schedules
-  and categorical matching levels before execution. Applies to fertility
-  only.
-
-- ffab:
-
-  Probability that a newborn is female, default `0.4886`. Must be a
-  finite numeric scalar in `[0, 1]`. Applies to fertility only.
-
-- hetfert:
-
-  NULL (default) for uniform mother selection, or a
-  [`het_fert()`](https://aarongullickson.github.io/hammel/reference/het_fert.md)
-  specification for persistent lognormal selection weights.
+  A `hammel_model` object, used by `set_mortality()`.
 
 ## Value
 
-A named list containing `name`, `rates`, and `rate_unit`, plus
-`birth_interval` and `ffab` for fertility, inheriting from
-`hammel_mortality` or `hammel_fertility` and `hammel_process`.
+`mortality()` returns an inspectable process inheriting from
+`hammel_mortality` and `hammel_process`, with `name`, `rates`, and
+`weights`. `set_mortality()` returns an updated `hammel_model`.
 
 ## Details
 
-An optional `group` column supplies separate schedules by nonmissing
-character label or finite numeric code. Without it, rates apply to all
-groups. Each mortality group needs both sexes, and each conditional
-fertility group needs both statuses. Overlap is checked within groups.
-Simulation requires schedules for every population group. Without
-population groups, simulation warns and uses the first group
-alphabetically (radix order of character representations, including
-numeric codes).
+The primary and only required input to the function is a fertility rate
+schedule for the `rates` argument. This data frame must contain
+`age_start` and `age_end` columns to define the half-open age intervals
+(inclusive at the start and exclusive at the end), a `sex` column ("f"
+for female and "m" for male) and a `rate` column for the age-specific
+fertility rates. The example below shows the basic format:
 
-Mortality requires separate schedules for both sexes. Gaps and uncovered
-ages are not filled or interpreted as zero rates. Coverage must be
-specified before simulation. Optional `time_start`/`time_end` columns
-select half-open calendar intervals in absolute years, including
-fractional years, on mortality and fertility tables. Both columns are
-required together; starts are finite and ends exceed starts (possibly
-Inf). Active slices must satisfy the existing strata/coverage rules and
-cover the requested run. Rates are constant within intervals, with no
-interpolation. Calendar changes precede same-time events, preserving
-histories, birth spacing, parity and duration origins. Inheritance also
-accepts whole-model calendar schedules; other fertility arguments remain
-static.
+    #> # A tibble: 44 x 4
+    #>    sex   age_start age_end     rate
+    #>    <chr>     <int>   <dbl>    <dbl>
+    #>  1 f             0       1 0.00628
+    #>  2 f             1       5 0.000288
+    #>  3 f             5      10 0.000142
+    #>  4 f            10      15 0.000159
+    #>  5 f            15      20 0.000396
+    #>  6 f            20      25 0.000471
+    #>  7 f            25      30 0.000536
+    #>  8 f            30      35 0.000745
+    #>  9 f            35      40 0.00114
+    #> 10 f            40      45 0.00174
+    #> # i 34 more rows
 
-Fertility optionally accepts `union_type` containing both `"partnered"`
-and `"unpartnered"`, or all three `"unpartnered"`, `"cohab"`,
-`"marriage"`. Shared partnered rates cover either partnership type.
-Rates use woman-years in the indicated type; the old fertility input
-`union_status` is rejected. Without that column, one overall schedule
-applies to all women. A partial status table or any other label is
-rejected; use explicit zero rates to suppress births in a status.
-Overlap is checked separately within each status. On-demand union
-formation requires overall rates; rate-based formation accepts either
-form and warns when an overall schedule is used.
+Rates are always specified as deaths over person-years lived. An
+open-ended age group specified with `age_end` of `Inf` must be included.
+No gap in the age band is allowed.
 
-Optional `parity_start`/`parity_end` use half-open current maternal
-parity bands, covering zero through Inf without gaps or overlap in every
-group/type stratum. Parity is counted from recorded maternal births
-(including deceased children) and incremented only on successful births;
-no custom parity column overrides history. A pooled parity band applies
-its rate to each contained actual parity.
+Columns named by declared group dimensions (see
+[`set_groups()`](https://aarongullickson.github.io/hammel/reference/group.md)),
+such as `race` or `region`, supply separate schedules for each
+combination of their categories; dimensions without a column share the
+schedule. Every combination of categories of the dimensions must be
+included in the rates if the dimension is used.
 
-Birth spacing uses cell-accounted fertility (D101). Women are grouped
-into cells: one-year (or shorter) age sub-bands of each group/union-type
-schedule after group multipliers, split at whole ages and band edges,
-and one actual parity when rates are parity-specific. Each cell produces
-births at its input rate times all its living members, including those
-inside the birth interval, and each birth goes to an eligible member,
-uniformly by default or proportional to persistent weights when
-`hetfert` is enabled. Observed rates then equal inputs in expectation
-for any population composition, including after restarts and union-type
-changes, while a cell has an eligible member. Intensity in cells with
-members but none eligible is dropped and reported in
-`simulation$unrealized_births`. An individual woman's hazard depends on
-recent births by others in her cell; this is a calibration device.
-Upper-open age bands stay one cell when `birth_interval * rate` is below
-0.001 and are otherwise split yearly. Zero-rate bands form no cells.
+Optional `time_start`/`time_end` columns select half-open calendar
+intervals in absolute years, including fractional years. Both columns
+are required together; starts are finite and ends exceed starts
+(possibly Inf). Active slices must satisfy the strata and coverage rules
+and cover the requested simulation run.
 
-For parity-specific schedules with a positive `birth_interval`,
-`fertility()` warns when positive rates fall in one-year age cells where
-no woman can be eligible: births are singletons at least
-`birth_interval` apart, starting from the schedule's first positive
-rate, so parity k is first eligible at the age found by following each
-parity's first positive rate. Union types are pooled and groups checked
-separately. Partly reachable cells and higher actual parities within an
-open parity band (always unreachable at the youngest ages) are not
-reported.
+The
+[`stratify_rates()`](https://aarongullickson.github.io/hammel/reference/stratify_rates.md)
+function provides a quick means to add stratification to an existing
+rate schedule.
+
+## See also
+
+[`set_process()`](https://aarongullickson.github.io/hammel/reference/set_process.md),
+[`fertility()`](https://aarongullickson.github.io/hammel/reference/fertility.md),
+[`union_formation()`](https://aarongullickson.github.io/hammel/reference/union_formation.md),
+[`union_dissolution()`](https://aarongullickson.github.io/hammel/reference/union_dissolution.md),
+[`group_transition()`](https://aarongullickson.github.io/hammel/reference/group_transition.md)
 
 ## Examples
 
 ``` r
-deaths <- mortality(data.frame(sex = c("m", "f"), age_start = 0,
-  age_end = Inf, rate = c(0.01, 0.008)))
-births <- fertility(data.frame(age_start = 15, age_end = 50, rate = 0.1))
-model <- hammel_model() |>
-  set_process(deaths) |>
-  set_process(births)
+mort_process <- mortality(usa_2000_mortality)
+model <- hammel_model() |> set_process(mort_process)
+# Equivalent convenience setter:
+model <- hammel_model() |> set_mortality(usa_2000_mortality)
 ```

@@ -1,163 +1,91 @@
 # Set a demographic process specification
 
-Store a process specification under its name, replacing an existing
-process with the same name. Other processes are retained. Built-in rate
-schedules are validated again when attached. No simulation is executed.
+Store a process specification under its name, replacing any existing
+process with the same name.
 
 ## Usage
 
 ``` r
 set_process(model, process)
-
-set_mortality(model, rates, group_prop_hazard = NULL)
-
-set_fertility(
-  model,
-  rates,
-  birth_interval = 0.75,
-  group_prop_hazard = NULL,
-  inheritance = create_group_inheritance(),
-  ffab = 0.4886,
-  hetfert = NULL
-)
 ```
 
 ## Arguments
 
 - model:
 
-  A `hammel_model` object.
+  A
+  [hammel_model](https://aarongullickson.github.io/hammel/reference/hammel_model.md)
+  object.
 
 - process:
 
   A `hammel_process` specification.
 
-- rates:
-
-  An age-specific rate table passed to
-  [`mortality()`](https://aarongullickson.github.io/hammel/reference/mortality.md)
-  or
-  [`fertility()`](https://aarongullickson.github.io/hammel/reference/mortality.md).
-
-- group_prop_hazard:
-
-  Optional named numeric vector of finite nonnegative rate multipliers
-  by group. Missing groups use 1.0; values are not normalized. Scales
-  shared or group-specific fertility input rates before cell accounting.
-  Without population groups, simulation warns and ignores it. Fertility
-  also accepts a named list of vectors for `partnered` and/or
-  `unpartnered`, or cohab/marriage when rates include those `union_type`
-  strata. List names must occur in the schedules; omitted entries use
-  1.0.
-
-- birth_interval:
-
-  Minimum maternal birth-to-birth interval in years, defaulting to
-  `0.75`. Must be finite and nonnegative.
-
-- inheritance:
-
-  A group identity model from
-  [`create_group_inheritance()`](https://aarongullickson.github.io/hammel/reference/create_group_inheritance.md),
-  or a tibble with numeric `time_start`, `time_end` and list-column
-  `model` containing complete inheritance models. Intervals are
-  half-open absolute years, must not overlap and must cover the
-  requested run. Select the active model at each birth; older identities
-  and ancestry remain unchanged. Base data frames with list columns are
-  accepted. All declared possible identities across scheduled models
-  join the simulation-wide registry. Static inputs may also be a method
-  name requiring no additional parameters: `"mother"`, `"father"`,
-  `"random_parent"`, `"same_sex"`, `"opposite_sex"`, or `"ancestry"`.
-  Applies to fertility and defaults to selecting either parent with
-  equal probability, with maternal fallback. Assignment is independent
-  of recorded ancestry proportions.
-
-- ffab:
-
-  Probability that a newborn is female, default `0.4886`. Must be a
-  finite numeric scalar in `[0, 1]`. Applies to fertility only.
-
-- hetfert:
-
-  NULL (default) for uniform mother selection, or a
-  [`het_fert()`](https://aarongullickson.github.io/hammel/reference/het_fert.md)
-  specification for persistent lognormal selection weights.
-
 ## Value
 
-An updated `hammel_model`. The input model is not modified.
+An updated
+[hammel_model](https://aarongullickson.github.io/hammel/reference/hammel_model.md).
+The input model is not modified.
 
 ## Details
 
-`set_mortality()` and `set_fertility()` construct the corresponding
-process and delegate to `set_process()`.
+The available processes are:
+
+- [`fertility()`](https://aarongullickson.github.io/hammel/reference/fertility.md)
+
+- [`mortality()`](https://aarongullickson.github.io/hammel/reference/mortality.md)
+
+- [`union_formation()`](https://aarongullickson.github.io/hammel/reference/union_formation.md)
+
+- [`union_dissolution()`](https://aarongullickson.github.io/hammel/reference/union_dissolution.md)
+
+- [`group_transition()`](https://aarongullickson.github.io/hammel/reference/group_transition.md)
+
+Use this function to attach an already-created process. The convenience
+setters
+[`set_mortality()`](https://aarongullickson.github.io/hammel/reference/mortality.md),
+[`set_fertility()`](https://aarongullickson.github.io/hammel/reference/fertility.md),
+[`set_union_formation()`](https://aarongullickson.github.io/hammel/reference/union_formation.md),
+[`set_union_dissolution()`](https://aarongullickson.github.io/hammel/reference/union_dissolution.md),
+and
+[`set_group_transition()`](https://aarongullickson.github.io/hammel/reference/group_transition.md)
+construct and attach the corresponding process in one call.
+
+## See also
+
+[`mortality()`](https://aarongullickson.github.io/hammel/reference/mortality.md),
+[`fertility()`](https://aarongullickson.github.io/hammel/reference/fertility.md),
+[`union_formation()`](https://aarongullickson.github.io/hammel/reference/union_formation.md),
+[`union_dissolution()`](https://aarongullickson.github.io/hammel/reference/union_dissolution.md),
+[`group_transition()`](https://aarongullickson.github.io/hammel/reference/group_transition.md)
 
 ## Examples
 
 ``` r
-mortality_rates <- data.frame(sex = c("m", "f"), age_start = 0,
-  age_end = Inf, rate = c(0.01, 0.008))
-fertility_rates <- data.frame(age_start = 15, age_end = 50, rate = 0.1)
-model <- hammel_model() |>
-  set_mortality(mortality_rates) |>
-  set_fertility(fertility_rates)
+mortality_process <- mortality(usa_2000_mortality)
+model <- hammel_model() |> set_process(mortality_process)
 model$processes
 #> $mortality
 #> $name
 #> [1] "mortality"
 #> 
 #> $rates
-#> # A tibble: 2 × 4
-#>   sex   age_start age_end  rate
-#>   <chr>     <dbl>   <dbl> <dbl>
-#> 1 m             0     Inf 0.01 
-#> 2 f             0     Inf 0.008
-#> 
-#> $rate_unit
-#> [1] "person_year"
+#> # A tibble: 44 × 4
+#>    sex   age_start age_end     rate
+#>    <chr>     <int>   <dbl>    <dbl>
+#>  1 f             0       1 0.00628 
+#>  2 f             1       5 0.000288
+#>  3 f             5      10 0.000142
+#>  4 f            10      15 0.000159
+#>  5 f            15      20 0.000396
+#>  6 f            20      25 0.000471
+#>  7 f            25      30 0.000536
+#>  8 f            30      35 0.000745
+#>  9 f            35      40 0.00114 
+#> 10 f            40      45 0.00174 
+#> # ℹ 34 more rows
 #> 
 #> attr(,"class")
 #> [1] "hammel_mortality" "hammel_process"  
-#> 
-#> $fertility
-#> $name
-#> [1] "fertility"
-#> 
-#> $rates
-#> # A tibble: 1 × 3
-#>   age_start age_end  rate
-#>       <dbl>   <dbl> <dbl>
-#> 1        15      50   0.1
-#> 
-#> $rate_unit
-#> [1] "person_year"
-#> 
-#> $inheritance
-#> $method
-#> [1] "random_parent"
-#> 
-#> $fun
-#> NULL
-#> 
-#> $groups
-#> NULL
-#> 
-#> $order
-#> NULL
-#> 
-#> $passing
-#> [1] 0
-#> 
-#> attr(,"class")
-#> [1] "hammel_group_inheritance"
-#> 
-#> $birth_interval
-#> [1] 0.75
-#> 
-#> $ffab
-#> [1] 0.4886
-#> 
-#> attr(,"class")
-#> [1] "hammel_fertility" "hammel_process"  
 #> 
 ```

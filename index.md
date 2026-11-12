@@ -1,77 +1,83 @@
-# hammel
+# Hammel
 
-Hammel is a standalone demographic microsimulator with an R interface
-and a C++17 engine. It models continuous-time mortality, fertility, and
-union formation, dissolution, remarriage, and optional
-cohabitation/conversion, with group-specific rates, individual group
-transitions, partner matching, ancestry, and newborn identity
-inheritance. Results expose person, union, and transition histories as
-tibbles.
+Hammel is an R package for doing demographic microsimulation. Hammel is
+a spiritual successor to the venerable SOCSIM program but provides a
+modern interface, enhanced features, greater user customization, and
+faster computation. Hammel models demographic processes in continuous
+time and features:
 
-Milestones 1–6 are complete by user acceptance: mortality/fertility,
-union formation, groups, dissolution/remarriage/cohabitation,
-parity-specific fertility with persistent fertility heterogeneity, and
-individual group transitions (D116). Milestone 7, time-varying inputs,
-is next. See the [documentation
-index](https://aarongullickson.github.io/hammel/design/README.md),
-[scientific
-contract](https://aarongullickson.github.io/hammel/design/scientific-contract.md),
-and [validation
-record](https://aarongullickson.github.io/hammel/design/testing.md) for
-implemented behavior and limitations. Future mechanisms are listed in
-the
-[roadmap](https://aarongullickson.github.io/hammel/design/roadmap.md).
+- Stratification of rate schedules by time, group membership, union
+  type, sex, and parity (for fertility).
+- Union formation processes that including union dissolution,
+  cohabitation and remarriage, and customizable rules for partner
+  matching.
+- Multiple user-defined group identifiers (e.g. race, education, region)
+  complete with age or duration-specific transition rates, customizable
+  partner matching rules across groups, customizable inheritance rules
+  for newborns, and ancestry tracking.
+- Helper functions to extract important details from simulations such as
+  age-specific rates, population size, and kinship relations.
+- Helper functions to build starting populations and to stratify rate
+  schedules.
+- A pipable interface for building and modifying simulation models.
 
 ## Installation
 
-You can install the development version of hammel from
-[GitHub](https://github.com/AaronGullickson/hammel) with:
+Hammel is currently only available through GitHub. You can install the
+latest development version with `pak` or `devtools`:
 
-\
-`# install.packages("pak")`\
-`pak``::`[`pak`](https://pak.r-lib.org/reference/pak.html)`(``"AaronGullickson/hammel"``)`
+``` r
+
+# install.packages("pak")
+pak::pak("AaronGullickson/hammel")
+
+# install.packages("devtools")
+devtools::install_github("AaronGullickson/hammel")
+```
 
 ## Example
 
-The [union-formation
-example](https://aarongullickson.github.io/hammel/inst/examples/milestone2.R)
-demonstrates model construction and simulation. The user-authored
-[milestone 3
-report](https://aarongullickson.github.io/hammel/validation/milestone3.qmd)
-assesses group-specific rates, matching, ancestry, inheritance, and
-performance. Rendering the report installs the package, retrieves HMD
-rates, and runs substantial simulations; ordinary package tests use
-offline inputs unless live database tests are explicitly enabled.
+Several detailed examples of Hammel simulations are available on the
+[documentation website](https://hammel.github.io). Here I provide a
+simple toy example.
 
-The [milestone 4
-report](https://aarongullickson.github.io/hammel/validation/milestone4.qmd)
-and its [rendered
-assessment](https://aarongullickson.github.io/hammel/validation/milestone4.md)
-cover dissolution, age/duration remarriage, cohabitation, conversion,
-separate matching roles, and performance. The user accepted milestone 4
-on October 29, 2026 (D093). Rendering retrieves HMD mortality, runs 100
-independently initialized replications per scenario, and executes the
-offline test suite. See [validation
-contents](https://aarongullickson.github.io/hammel/validation/README.md)
-for retained reports, inputs, and supporting diagnostic evidence.
+To use Hammel, you first set up a simulation model, which can be
+constructed using a pipable interface. The primary inputs for Hammel are
+tables of age-specific rate schedules.
 
-The accepted [milestone 5
-report](https://aarongullickson.github.io/hammel/validation/milestone5.qmd)
-and [rendered
-assessment](https://aarongullickson.github.io/hammel/validation/milestone5.md)
-cover parity-specific fertility, cell-accounted birth spacing, restart
-and union-type rate checks, and lognormal fertility weights with
-maternal inheritance (D105). Completion retains the documented
-sparse-cell/unrealized-intensity and reproductive-selection limitations.
-Rendering installs the package, retrieves HFD/HMD inputs, runs
-replications and the offline tests; it is not an ordinary package check.
+``` r
 
-The accepted [milestone 6
-report](https://aarongullickson.github.io/hammel/validation/milestone6.qmd)
-and [rendered
-assessment](https://aarongullickson.github.io/hammel/validation/milestone6.md)
-cover age/duration transitions, sex/union-type strata, demographic rate
-and formation-group recovery, population shares and performance (D116,
-October 30, 2026). The final render was active at acceptance; preserve
-its intermediates until it finishes. Household moves are deferred to the
-regions milestone (D114).
+data(usa_2000_mortality)
+data(usa_2000_fertility)
+
+model <- hammel_model() |>
+  set_fertility(usa_2000_fertility) |>
+  set_mortality(usa_2000_mortality) |>
+  set_union_formation("on_demand")
+```
+
+All models must have fertility and mortality rates and some way to deal
+with union formation. Instead of supplying marriage rates, I am using an
+“on demand” model for union formation that partners off unpartnered
+women when they have a birth, but `set_union_formation` allows
+customization based on marriages rates, dissolution rates, and
+cohabitation.
+
+Once I have the model, I can add a starting population and simulate. In
+many cases, you would “burn in” a simulation to get a stable population
+distribution for the starting population, but I won’t do that here.
+
+``` r
+
+pop_start <- generate_uniform_population(10000, end_time = 0)
+model <- model |> 
+  set_population(pop_start)
+pop_end <- run_simulation(model, 100, seed = 42)
+```
+
+Now, I can compute summary statistics.
+
+``` r
+
+calculate_population_size(pop_end, seq(0, 100, 5))
+```

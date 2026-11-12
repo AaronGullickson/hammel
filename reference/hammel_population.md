@@ -1,12 +1,7 @@
 # Create a Hammel population
 
-Collect person and union histories in an inspectable population object.
-This constructor does not run a simulation. It validates consistent
-tables against the population schema. Custom columns are retained. An
-optional `group` column contains nonmissing character labels or finite
-numeric codes (character labels must be nonempty). Newborns inherit
-their group from either parent with equal probability by default, with
-maternal fallback, or use fertility's configured inheritance model.
+Create a `hammel_population` object to serve as the starting population
+for a simulation.
 
 ## Usage
 
@@ -14,9 +9,10 @@ maternal fallback, or use fertility's configured inheritance model.
 hammel_population(
   persons,
   unions = NULL,
-  end_time = NULL,
+  end_time,
   ancestry = NULL,
-  transitions = NULL
+  transitions = NULL,
+  groups = NULL
 )
 ```
 
@@ -24,67 +20,80 @@ hammel_population(
 
 - persons:
 
-  A data frame with one row per person, including deceased persons.
-  Columns are preserved and the table is returned as a tibble.
+  A data frame with one row per person, including deceased persons. Must
+  include a unique `person_id`, nonmissing `sex`, nonmissing
+  `birth_time`, `death_time`, `mother_id`, and `father_id`.
 
 - unions:
 
   A data frame with one row per union episode, or `NULL` for no unions.
   `wife_id` references the female partner and `husband_id` the male
-  partner; these roles do not imply legal marriage. An empty data frame
-  is normalized to the union schema. Optional `union_type` is cohab or
-  marriage. A conversion closes cohab with `end_reason = "conversion"`
-  and links the same-time marriage through `previous_cohab_id`.
+  partner. Optional `union_type` is cohab or marriage.
 
 - end_time:
 
-  Optional finite simulation endpoint in years. Its calendar origin is
-  supplied by the user. `NULL` means that the endpoint is unknown.
+  Required finite numeric reference time in years. Its calendar origin
+  is supplied by the user. This supplies the next simulation's starting
+  time. Recorded events must not occur after this time.
 
 - ancestry:
 
-  Optional data frame with exactly one row per person, keyed by
-  `person_id`, known shares in `group_<label>` columns, and an `unknown`
-  share. Numeric shares must be finite, between zero and one, and sum to
-  one per row (tolerance `1e-8`). Supplied shares are preserved, with
-  rows aligned to persons. Without it, grouped persons start with 100%
-  ancestry in their recorded group, regardless of parent histories.
-  Without groups, no ancestry table is created automatically. Newborns
-  average parental shares; a missing parent contributes its half to
-  `unknown`. Identity remains separate.
+  Optional ancestry shares for dimensions declared with
+  `group(ancestry = TRUE)`: a named list with one data frame per such
+  group dimension (a bare data frame when only one dimension tracks
+  ancestry), each with exactly one row per person, keyed by `person_id`,
+  one column of shares per category (named by the category) and an
+  `unknown` share. Shares must be finite, between zero and one, and sum
+  to one per row (tolerance `1e-8`).
 
 - transitions:
 
-  Optional data frame of individual group changes with `person_id`,
-  `time`, `group_origin`, and `group_dest`. Histories must chain to
-  current person groups and lie within life dates and the known
-  endpoint. Grouped populations always include this tibble, even when
-  empty.
+  Optional data frame of individual category changes with `person_id`,
+  `time`, `group` (the dimension; may be omitted when one is declared),
+  `origin`, and `destination`. Each person's history in each dimension
+  must chain to their current category and lie within life dates and the
+  known endpoint. Grouped populations always include this tibble, even
+  when empty, with character `group`, `origin` and `destination`.
+
+- groups:
+
+  Optional group declaration: a character vector of dimension names
+  (each with
+  [`group()`](https://aarongullickson.github.io/hammel/reference/group.md)
+  defaults) or a named list of
+  [`group()`](https://aarongullickson.github.io/hammel/reference/group.md)
+  objects. Persons columns that are not declared are ordinary custom
+  columns. Models usually declare groups with
+  [`set_groups()`](https://aarongullickson.github.io/hammel/reference/group.md).
 
 ## Value
 
 A named list of class `hammel_population` with components `persons`,
 `unions`, and `end_time`, plus an `ancestry` tibble when supplied or
 when persons has groups, and a `transitions` tibble when groups are
-present. Ancestry is retained across restarts and deaths.
+present.
+
+## Details
+
+In most cases, it will be more common to create a `hammel_population`
+object by using
+[`generate_uniform_population()`](https://aarongullickson.github.io/hammel/reference/generate_uniform_population.md)
+or to receive a `hammel_population` object as the output of
+[`run_simulation()`](https://aarongullickson.github.io/hammel/reference/run_simulation.md).
+
+The `hammel_population` object must always contain a `persons` data
+frame and an `end_time` value. The `end_time` value defines the starting
+point for the simulation and no dates in the `hammel_population` may
+exceed the `end_time` value.
 
 ## Examples
 
 ``` r
-sim <- hammel_population(
-  persons = data.frame(person_id = 1:2, sex = c("m", "f"),
-    birth_time = c(-25, -23), death_time = NA_real_,
-    mother_id = NA_integer_, father_id = NA_integer_),
+population <- hammel_population(
+  persons = data.frame(
+    person_id = 1:2, sex = c("m", "f"), birth_time = c(-25, -23),
+    death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_
+  ),
   end_time = 0
 )
-sim$persons
-#> # A tibble: 2 × 6
-#>   person_id sex   birth_time death_time mother_id father_id
-#>       <int> <chr>      <dbl>      <dbl>     <int>     <int>
-#> 1         1 m            -25         NA        NA        NA
-#> 2         2 f            -23         NA        NA        NA
-sim$unions
-#> # A tibble: 0 × 6
-#> # ℹ 6 variables: union_id <int>, wife_id <int>, husband_id <int>,
-#> #   start_time <dbl>, end_time <dbl>, end_reason <chr>
 ```

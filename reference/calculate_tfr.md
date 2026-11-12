@@ -1,26 +1,18 @@
-# Calculate total fertility rates
+# Calculate total fertility and parity-adjusted total fertility rates
 
-Sum age-specific fertility rates times their actual interval widths. If
-parity-bound columns are present, delegate to
-[`calculate_patfr()`](https://aarongullickson.github.io/hammel/reference/calculate_patfr.md)
-instead and return its `patfr` column rather than `tfr`, with the same
-other strata. Open-ended age bands are omitted, warning if an omitted
-female rate is known and nonzero that TFR underestimates fertility over
-the full age range. Zero or missing omitted rates do not trigger that
-warning. The remaining finite, contiguous age range defines the TFR
-reported. Any missing ASFR in those bands makes the TFR missing. When
-`union_type` (or a legacy `union_status` column) is present, calculate a
-separate sum for each stratum within each period. These conditional sums
-describe fertility under continuous exposure to that status; they are
-not components to add into an overall TFR. A `group` column
-automatically adds separate group strata, with its type and labels
-preserved; groups are not pooled. Age bands are checked independently
-within each period/group/status combination.
+Constructs total fertility rates or parity-adjusted total fertility rats
+from input tables that provide age-specific fertility rates. Input data
+can come from user-provided input rate schedules, fertility process
+objects, or estimated rates from a simulation via
+[calculate_fertility_rates](https://aarongullickson.github.io/hammel/reference/calculate_rates.md),
+and may be stratified by additional variables.
 
 ## Usage
 
 ``` r
 calculate_tfr(rates)
+
+calculate_patfr(rates)
 ```
 
 ## Arguments
@@ -28,16 +20,65 @@ calculate_tfr(rates)
 - rates:
 
   A table returned by
-  [`calculate_fertility_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_fertility_rates.md),
-  a fertility process object, or a data frame with `age_start`,
-  `age_end`, and `rate_fertility` or `rate` in births per woman-year.
-  Bare `rate` tables are interpreted as fertility rates; mortality
-  processes are not valid inputs.
+  [`calculate_fertility_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_rates.md),
+  a fertility process object from
+  [`fertility()`](https://aarongullickson.github.io/hammel/reference/fertility.md),
+  or a data frame with at least `age_start`, `age_end`, and
+  `rate_fertility` or `rate` columns. Input may be further stratified by
+  other variables.
 
 ## Value
 
-With parity columns, the result of
-[`calculate_patfr()`](https://aarongullickson.github.io/hammel/reference/calculate_patfr.md)
-with `patfr`. Otherwise, a tibble with period columns, `union_type` or
-legacy `union_status` when supplied, `group` when supplied, `age_start`,
-`age_end`, and `tfr`. If `sex` is present, only female rows are used.
+A tibble with the supplied period and other stratification columns,
+finite `age_start` and `age_end`, and either `tfr` or `patfr`.
+
+## Details
+
+When the supplied `rates` table contains columns other than `age_start`,
+`age_end`, and either `rate_fertility` or `rate`, the function will
+treat these additional columns as stratifying dimensions and will
+stratify the output appropriately. It will also stratify output by time
+when `time_start` and `time_end` are included. The function also ignores
+additional calculated columns from the output of
+[calculate_fertility_rates](https://aarongullickson.github.io/hammel/reference/calculate_rates.md),
+so the results of that function can be directly piped into this
+function.
+
+When the input `rates` table is stratified by parity with `parity_start`
+and `parity_end` columns, the function `calculate_patfr` will be
+automatically used in place of `calculate_tfr` to calculate
+parity-adjusted total fertility rates. See See
+<https://www.humanfertility.org/File/GetDocumentFree/Docs/methods.pdf>
+for details on the estimation of parity-adjusted total fertility rates.
+
+The function will automatically remove any open-ended age bands because
+TFR cannot be estimated across open-ended age bands. If this band
+contains a non-zero rate, the function will produce a warning that TFR
+may be underestimated.
+
+Missing values on rates will result in missing values for the total
+fertility rate.
+
+## See also
+
+[`calculate_fertility_rates()`](https://aarongullickson.github.io/hammel/reference/calculate_rates.md),
+[`fertility()`](https://aarongullickson.github.io/hammel/reference/fertility.md)
+
+## Examples
+
+``` r
+# TFR from age-specific rates
+calculate_tfr(usa_2000_fertility)
+#> # A tibble: 1 × 3
+#>   age_start age_end   tfr
+#>       <int>   <int> <dbl>
+#> 1        15      45  2.05
+
+# TFR stratified by union type
+calculate_tfr(usa_2000_fertility_union)
+#> # A tibble: 2 × 4
+#>   union_type  age_start age_end   tfr
+#>   <chr>           <int>   <int> <dbl>
+#> 1 partnered          15      45  4.20
+#> 2 unpartnered        15      45  1.17
+```

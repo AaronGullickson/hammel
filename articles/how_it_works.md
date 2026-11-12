@@ -1,0 +1,529 @@
+# How Hammel Works
+
+## Event Scheduling
+
+### SOCSIM Approach
+
+To understand the approach Hammel takes to event scheduling, it is
+useful to understand how SOCSIM worked, as Hammel is built on the same
+principles.
+
+For each living individual in the population, SOCSIM calculates waiting
+time until the next event for each kind of rate process (e.g. death,
+birth, marriage, transition). This is first accomplished by drawing a
+value from `rexp(1)` for each rate process which provides a measure of
+the risk that someone will accumulate before the event happens. SOCSIM
+then advances through a persons’ age or duration specific bands (and
+also possibly joint time bands for time-varying rates) and the hazard
+rate within each band consumes that accumulated risk. If accumulated
+risk remains then SOCSIM moves on to the next band and so on, until the
+accumulated risk is completely consumed. The time to event within the
+final band can be determined by \\R/\lambda\\ where \\R\\ is the
+remaining accumulated risk at the start of this band and \\\lambda\\ is
+the hazard rate in this band.
+
+Notably, this approach provides an exact time to event and does not
+require the discrete month-based approach that SOCSIM instead uses,
+likely for historical reasons. In any case, SOCSIM truncates these event
+times to months of time.
+
+SOCSIM then chooses the nearest event (dealing with some tie issues due
+to month truncation) and adds it to an event queue. Events are processed
+off the queue in monthly batches and new events are then scheduled
+(assuming the processed event wasn’t death in which case you don’t get
+any more events).
+
+### Hammel’s Approach
+
+Initially, Hammel used the exact same approach as SOCSIM with one
+important modification. We dropped the discrete monthly approach and
+moved to a continuous time approach. This actually required no extra
+work because the process itself is better geared toward continuous time
+than a discrete time approach.
+
+However, we eventually switched to a different approach that helped to
+address other engineering issues that had arisen in the course of
+development.
+
+Individuals no longer draw individual waiting times to events. Instead,
+each rate process is given a single clock that determines the time to
+the next event for the population. Individuals/unions are then chosen to
+receive the event based on a multistage design that preserves the
+correct input rates.
+
+For each rate process, we first create bins that distinguish every
+dimension by which the rate is stratified (e.g. age, duration, group
+membership, union type). Within bin \\i\\, we have a \\\lambda_i\\
+individual hazard rate that is directly determined by the input rate
+schedule. We also track \\N_i\\, which is the number of people in the
+simulation who currently occupy that bin. We can then get the total
+hazard rate \\\gamma_i\\ for that bin by:
+
+\\\gamma_i = \lambda_iN_i\\
+
+We can then calculate \\\gamma\\, the collective risk of the next event,
+by taking the sum of the \\\gamma_i\\:
+
+\\\gamma = \sum_i \gamma_i\\
+
+We can then determine the waiting time until the next event in the
+entire population by taking \\E/\gamma\\ where \\E\\ is a draw from
+`rexp(1)`. If \\\gamma\\ changes before the event is executed, whether
+because people move between bins or because rates change at a calendar
+boundary, we recalculate the remaining waiting time \\t\\ by taking:
+
+\\t\_{new} = t\_{old} \frac{\gamma\_{old}}{\gamma\_{new}}\\
+
+If a calendar boundary changes the structure of bins themselves, the
+process is rebuilt and draws a new waiting time, which is equally valid
+because exponential waiting times are memoryless.
+
+When an event occurs, we then choose which bin it occurs within by
+sampling from bins weighted by their \\\gamma_i\\. Within each bin, we
+then draw a random person/union, possibly with weights that are
+discussed below. Then the process produces a new waiting time and the
+cycle continues.
+
+The computationally intensive part of this process is managing the
+\\N_i\\ values. While individuals don’t produce individual waiting
+times, they do move between these bins. In many cases, moving between a
+bin happens when another event occurs to that person/union. For example,
+if a woman marries, in any rate that is stratified by union type, she
+will move from the unpartnered bin to the partnered bin. The other major
+bookkeeping is tracking when a person or union hits a band edge because
+this will move them into a new bin. For example, if the mortality age
+bands are 30-35 and 35-40, a person will hit a band edge on their 35th
+birthday.
+
+We chose this process not because it simplified the code base or
+decreased runtime. In some cases, this approach is faster than our
+previous approach, but in other cases, it is slower. The main reason for
+adopting this approach was to deal with a specific problem with
+fertility and because it opened up the possibility to fully develop
+weights that allow for flexible proportional hazards.
+
+#### Resolving the birth interval issue
+
+The complication with fertility is that birth intervals between births
+mean that fewer person-years of life are actually spent exposed to the
+risk of giving birth than standard fertility rates imply. Our original
+approach to this issue at the individual level was similar to SOCSIM’s
+approach - we used an approximation to boost the fertility rates we
+actually use to compensate for this issue. This approximation works well
+in many cases, but can fail when there is fertility change within a
+single simulation or across restarts. It also fails badly for
+parity-specific fertility.
+
+The binned approach resolves this issue fairly neatly. We distinguish
+\\N_i\\ for fertility which is all women from the actual number of
+eligible women within the bin (those not within the birth interval of a
+previous birth). We sample only among eligible women. With this
+approach, we do not have to make any adjustment to the input rates. We
+also always use fine-grained one year age intervals and one birth parity
+intervals when constructing bins for fertility rates even when the given
+bands are larger, because lack of eligibility will shift risk over to
+other women in the bin. With wide age or parity bins, this could shift
+risk to women of substantially different age or parity.
+
+One potential issue may arise with this approach. It is possible to have
+\\N_i \> 0\\ in a bin but no eligible women. When this bin is sampled,
+there will be no women to produce a birth. In these cases, we record an
+unrealized birth in the final output. Overall fertility will be somewhat
+underestimated. This situation will be rare except for simulations with
+small active populations and very fine bins. We have found it most
+noticeable at high parity-low age bins when using parity-specific births
+because relatively few women will be in these bins and most of them will
+have recently given birth.
+
+#### Weighting individual sampling within bins
+
+To allow for complex variation in the hazard rates of individuals/unions
+in a parsimonious manner, we introduced the concept of a weight model
+that can be applied to any rate process. The weight model creates a
+weight for each individual within a bin. This weight is used to decide
+who to sample from the bin.
+
+The weight model allows users to specify models on the log-weight using
+formulas or a custom function. This approach effectively creates a
+proportional hazard model. For example, here is a simple weight model
+that uses a weight of 1.2 for members of some group B:
+
+``` r
+
+weight_model(~group, coefficients = c("groupB" = log(1.2)))
+```
+
+Because members of group B receive a weight of 1.2 compared to 1 for all
+other groups across all bins, their observed rates will be 20% higher
+than for other groups, within each bin.
+
+Because this model only affects the sampling within bins, the overall
+input rates will be preserved in the output. This approach allows users
+to use a simple overall rate schedule, while allowing for complex
+proportional hazards that may not even be possible using stratified
+rates.
+
+However, users should be aware of one potential limitation of this
+approach. If the distribution of covariates that affect the proportional
+hazards shifts over time, this will come out as changes in the hazard
+across those covariates, **not** in the overall rate. For example, if
+the example above involved two groups A and B and B shrank as a share of
+the population, to maintain the overall hazard, the hazard rate of both
+groups would have to increase. If B increased as a share of the
+population, the hazard rate of both groups would have to decrease. In
+contrast, if stratified rates by group with a 20% fixed difference are
+used instead, then the group-specific hazard rates would stay constant
+but the overall hazard rate would have to change. Depending on the goals
+of a simulation, either one of these approaches can work, but users
+should be aware of how the process works.
+
+Also, because bins are stratified by the rate schedules, weights within
+bin among characteristics that are already used for stratification will
+have no effect. For example, if a user provides rates stratified by
+group, then weighting by group will have no effect because the weights
+will be identical within each bin.
+
+## Weighted choice in union formation
+
+Matching partners uses a conditional logit model in which women pick men
+by weights that derive from, for example, age differences and group
+exogamy. However, because women do the choosing, the results for group
+assignment will be asymmetric by gender. We apply a group-based weight
+to each potential husband to correct for this issue. Below we detail the
+rationale and describe how this weight is constructed in the program.
+
+### A Simplified Scenario
+
+Imagine a population of A and B individuals where A is 75% of the
+population and B is 25% of the population and everyone is married at
+once in a large “marriage jubilee.” Let’s assume that there was no
+group-specific preference for marriage partners. We would then expect
+the distribution of couple types by group to match that shown in
+[Table 1](#tbl-crosstab-simple).
+
+|              | Husband Group A | Husband Group B |
+|--------------|-----------------|-----------------|
+| Wife Group A | (0.75)(0.75)    | (0.75)(0.25)    |
+| Wife Group B | (0.25)(0.75)    | (0.25)(0.25)    |
+
+Table 1: Joint distribution of unions by wife’s group and husband’s
+group when group does not determine choice and where group A is 75% of
+the population and group B is 25%
+
+Now let’s assume a conditional logit process where women choose from
+among available men with a log-odds discount of \\\beta\\ (where
+\\\beta\\ \< 0) such that if she was comparing one man from the same
+group and one man from the other group the probability of an endogamous
+choice would be \\1/(1+e^{\beta})\\ and the probability of an exogamous
+choice would be \\e^{\beta}/(1+e^{\beta})\\. Considering that the woman
+will be presented with different distributions of men by group, the
+overall probabilities need to be adjusted by group size:
+
+\\P(\text{A woman chooses A man}) = \frac{0.75}{0.75 + 0.25e^{\beta}} =
+\frac{0.75}{D_A}\\ \\P(\text{A woman chooses B man}) =
+\frac{0.25e^{\beta}}{0.75 + 0.25e^{\beta}} = \frac{0.25e^{\beta}}{D_A}\\
+\\P(\text{B woman chooses A man}) = \frac{0.75e^{\beta}}{0.25 +
+0.75e^{\beta}} = \frac{0.75e^{\beta}}{D_B}\\ \\P(\text{B woman chooses B
+man}) = \frac{0.25}{0.25 + 0.75e^{\beta}} = \frac{0.25}{D_B}\\
+
+Where, \\D_A = 0.75 + 0.25 e^{\beta}\\ and \\D_B = 0.25 +
+0.75e^{\beta}\\. These denominators represent the sum of all of the
+exponentiated utilities for a given woman (i.e. the overall
+attractiveness of her pool) which is used to normalize the probabilities
+for each type of woman across partner choices.
+
+To get the value of each cell in the table correct we then multiply by
+the row share of A and B women as shown in
+[Table 2](#tbl-crosstab-clogit).
+
+|  | Husband Group A | Husband Group B |
+|----|----|----|
+| Wife Group A | \\(0.75)(0.75) / D_A\\ | \\(0.75)(0.25)e^{\beta} / D_A\\ |
+| Wife Group B | \\(0.25)(0.75)e^{\beta} / D_B\\ | \\(0.25)(0.25) / D_B\\ |
+
+Table 2: Joint distribution of unions by wife’s group and husband’s
+group under a conditional logit model with group endogamy
+
+The inverse cross product of [Table 2](#tbl-crosstab-clogit) gives us
+the association odds ratio often used in assortative mating studies:
+
+\\\frac{(0.25)(0.75)e^{\beta}D_B^{-1}(0.75)(0.25)e^{\beta}D_A^{-1}}{(0.75)(0.75)D_A^{-1}(0.25)(0.25)D_B^{-1}}
+= e^{2\beta}\\
+
+Everything cancels out except for the \\\beta\\ values. The log cross
+product is thus \\2\beta\\ which is consistent with conditional logit
+model estimates typically around half the log-odds ratio in empirical
+data. If we set \\\beta = 0\\ here, then \\D_A = 1\\ and \\D_B = 1\\ and
+[Table 2](#tbl-crosstab-clogit) simplifies to
+[Table 1](#tbl-crosstab-simple).
+
+Although the overall log-odds ratio matches expectation here, the counts
+of A wives and B husbands (\\N_AB\\) and B wives and A husbands
+(\\N_BA\\) are not balanced despite gender balance within each group:
+
+\\\frac{N\_{AB}}{N\_{BA}} =
+\frac{(0.75)(0.25)e^{\beta}D_A^{-1}}{(0.25)(0.75)e^{\beta}D_B^{-1}} =
+\frac{D_B}{D_A} = \frac{0.25 + 0.75e^{\beta}}{0.75 + 0.25 e^{\beta}}\\
+
+This ratio can be substantially different from one. For example, at
+\\\beta = -3\\, the ratio is 0.377 AB unions for every one BA union.
+Given that the model here assumes that the exogamy parameter is
+symmetric with regard to sex, this discrepancy is large.
+
+The row marginals will add up to the overall distribution for women:
+
+\\N\_{A+} = \frac{(0.75)(0.75)+(0.75)(0.25)e^{\beta}}{0.75 + 0.25
+e^{\beta}} = \frac{(0.75)(0.75 + 0.25e^{\beta})}{0.75 + 0.25 e^{\beta}}
+= 0.75\\ \\N\_{B+} = \frac{(0.25)(0.25) + (0.25)(0.75)e^{\beta}}{0.25 +
+0.75e^{\beta}} = \frac{(0.25)(0.25 + 0.75e^{\beta})}{0.25 +
+0.75e^{\beta}} = 0.25\\
+
+However, the column margins will not add up in the same way for men,
+because the two cells on each column do not share a single denominator.
+For example, in the case with \\\beta = -3\\, group B men will only make
+up 0.2298 of husbands as opposed to the 0.25 for women.
+
+The underlying issue is that because women drive the choices we don’t
+observe a symmetric process. If we switched to having men do the
+choosing, we would observe the same issues but in the reverse direction.
+
+#### Applying a weight correction
+
+We can generalize this approach by setting \\F_i\\ and \\M_j\\ as the
+share of women and men respectively belonging to a certain group (0.75
+and 0.25 for groups A and B, respectively, in the example above) and
+setting utility \\U\_{ij}\\ as:
+
+\\ U\_{ij} = \begin{cases} 0 & \text{if } i = j \\ \beta & \text{if } i
+\neq j \end{cases} \\
+
+Then, the value of \\N\_{ij}\\ in cell \\ij\\ is given by:
+
+\\N\_{ij} = F_i \cdot \frac{M_j e^{U\_{ij}}}{D_i}, \qquad D_i = \sum_k
+M_k e^{U\_{ik}}\\
+
+It will be helpful to note how this approach compares to the typical
+log-linear formulation:
+
+|              | Husband Group A     | Husband Group B     |
+|--------------|---------------------|---------------------|
+| Wife Group A | \\r_Ac_A\\          | \\r_Ac_Be^{\beta}\\ |
+| Wife Group B | \\r_Bc_Ae^{\beta}\\ | \\r_Bc_B\\          |
+
+Table 3: Log-linear formulation of the cross-tabulation of wife’s group
+and husband’s group
+
+Where \\r_i\\ and \\c_i\\ are row and column scores estimated to ensure
+the correct marginal distributions. This approach will produce the same
+\\\beta\\ value and when the male and female group distributions are the
+same it will also produce \\N\_{AB} = N\_{BA}\\. We can reproduce this
+approach directly while maintaining the conditional logit model method
+by applying a group-specific weight to each man.
+
+Intuitively, these weights act like a “price adjustment” to modify the
+attractiveness of group B men so their column share matches the desired
+25%. It does not modify the odds ratio but rather just the ratio of
+\\N\_{AB}\\ to \\N\_{BA}\\.
+
+With weights \\\omega_j\\ on men of group \\j\\, we can modify the
+previous formula for the cell counts to:
+
+\\N\_{ij} = F_i \cdot \frac{\omega_j M_j e^{U\_{ij}}}{D_i}, \qquad D_i =
+\sum_k \omega_k M_k e^{U\_{ik}}\\
+
+A slight reformulation here gives us:
+
+\\N\_{ij} = \frac{F_i}{D_i} \cdot \omega_j M_j \cdot e^{U\_{ij}}\\
+
+This is exactly the log-linear form \\r_i c_j e^{U\_{ij}}\\, with
+
+\\r_i = \frac{F_i}{D_i}, \qquad c_j = \omega_j M_j\\
+
+In this simplified two group example, there is a closed form analytical
+solution to solve for \\\omega_j\\. First, we set \\\omega_A = 1\\ as
+the reference weight. Then we define \\f\\ as the share of women in
+group A, \\p\\ as the share of men in group A, and \\q = 1 - p\\ as the
+share of men in group B. [Table 4](#tbl-crosstab-formula) shows the
+equations governing the joint distribution of spouses.
+
+|  | Husband Group A | Husband Group B |
+|----|----|----|
+| Wife Group A | \\\frac{fp}{p+q \omega_B e^{\beta}}\\ | \\\frac{fq \omega_B e^{\beta}}{p+q \omega_B e^{\beta}}\\ |
+| Wife Group B | \\\frac{(1-f)pe^{\beta}}{pe^{\beta}+q\omega_B}\\ | \\\frac{(1-f)q\omega_B}{pe^{\beta}+q\omega_B}\\ |
+
+Table 4: Joint distribution of unions by wife’s group and husband’s
+group as function of input parameters with weights
+
+The constraint is that \\N\_{AB}+N\_{BB} = q\\. Solving for that
+constraint gives a quadratic form:
+
+\\
+qe^{\beta}\omega_B^2+\underbrace{\left\[p-f+(f-q)e^{2\beta}\right\]}\_{C}\omega_B-pe^{\beta}=0
+\\
+
+We can solve for the positive root of the quadratic to get the
+analytical solution for \\\omega_B\\:
+
+\\ \omega_B = \frac{\sqrt{C^2 + 4pq\\e^{2\beta}} - C}{2q\\e^\beta},
+\qquad C = p - f + (f - q)e^{2\beta}. \\
+
+Notably, this solution forces the following equality:
+
+\\N\_{AB} - N\_{BA} = f - p\\
+
+When the groups have the same share within each gender, \\f-p = 0\\ and
+we will have symmetry in \\N\_{AB} = N\_{BA}\\.
+
+[TABLE]
+
+Table 5: Joint distribution, log odds ratio, and ratio of AB/BA under
+different scenarios of input parameters where group size is balanced by
+gender
+
+[Table 5](#tbl-scenario-two-groups-balanced) shows the cell counts, log
+odds ratio and AB/BA ratio under different input scenarios where the
+group share within each gender is the same. All scenarios produce a log
+odds ratio that is exactly double the input \\\beta\\. When A and B are
+equal shares of the population, the weighted and unweighted results are
+identical. When A is 75% of each gender, then the results diverge
+substantially. The unweighted results (i.e. \\\omega_B = 1\\) will
+produce almost a 3:1 ratio of B woman/A man pairings compared to A
+woman/B man pairings. The weighted results produce equal number of AB
+and BA pairings.
+
+One limitation of this approach is that it does not allow for
+directional differences by gender in the ratio - the exogamy parameter
+\\\beta\\ must be symmetric with regard to sex. In many cases, this will
+be appropriate as a single marker of group boundaries, but some
+empirical cases may have a clear difference in intermarriage likelihood
+by gender, suggesting that men and women of that group are viewed
+differently as partners. For example, research has shown about a 3:1
+disparity in black men/white women compared to white men/black women
+pairings in the US.
+
+Another issue is demonstrated in
+[Table 6](#tbl-scenario-two-groups-unbalanced). When group shares are
+not the same by gender, even fairly minor differences can produce even
+larger gender disparity than in the unweighted approach. This is because
+of the equality \\N\_{AB} - N\_{BA} = f - p\\. This gender disparity
+must come out as a difference between the two cells. When intermarriage
+is less likely, the ratio will be even larger.
+
+[TABLE]
+
+Table 6: Joint distribution, log odds ratio, and ratio of AB/BA under
+different scenarios of input parameters where group size is unbalanced
+by gender
+
+One way to help users address both of these issues is to use a tuning
+parameter \\\delta_g\\ for each group. This parameter adjusts the
+general preference for husbands of this group relative to wives, such
+that \\\delta_g \> 0\\ gives a relative preference for husbands and
+\\\delta_g \< 0\\ gives a relative preference for wives.
+
+This parameter will adjust the targeted constraint for \\N\_{AB} +
+N\_{BB}\\ from \\q\\ to:
+
+\\\tau_B = \frac{qe^{\delta_B}}{p+qe^{\delta_B}}\\
+
+Assuming \\\delta_A = 0\\, the closed form solution for \\\omega_B\\
+becomes:
+
+\\ \omega_B = \frac{p}{q} \frac{\sqrt{C^2 +
+4\tau_B(1-\tau_B)e^{2\beta}} - C} {2(1-\tau_B)e^\beta}, \qquad C =
+(f-\tau_B)e^{2\beta} + 1-f-\tau_B \\
+
+[TABLE]
+
+Table 7: Joint distribution, log odds ratio, and ratio of AB/BA under
+different scenarios of input parameters including delta tuning parameter
+
+[Table 7](#tbl-scenario-two-groups-delta) shows scenarios using the
+\\\delta\\ tuning parameter. The first three rows show a case with even
+group share by sex in which the tuning parameter is used to create
+either a roughly 3:1 or 1:3 ratio of AB to BA unions. The last three
+rows show using the tuning parameter to adjust the ratio from a case of
+uneven group share by sex to either 1:1 or 1:3.
+
+### How this approach is implemented
+
+Together, the \\\omega\\ weights and the \\\delta\\ tuning parameters
+give us considerable control over intergroup exogamy while retaining the
+computationally efficient conditional logit approach. Implementing this
+approach in the simulation is, however, more complicated than the static
+two-group case developed above.
+
+In the simulation, women start searches one at a time, at different
+times, so there is no single “jubilee” to balance. Calibration instead
+balances the flow of matches. At the moment of each search, it solves
+for male-group weights that would give the right expected distribution
+of husbands, if every woman currently at risk of searching were to
+search. The focal woman then chooses using those weights. Calibration
+involves no random draws.
+
+Calibration tracks living, unpartnered men and women at or above the
+minimum male age. They are classified by group and by quarter-year birth
+cohort. With several group dimensions, a “group” is a person’s
+combination of categories in the dimensions that matching uses.
+
+Each counted woman contributes her current hazard of starting a partner
+search, \\\lambda_w\\:
+
+- for marriage and cohabitation searches in rate mode, we use her union
+  formation hazard.
+- for searches triggered by a birth (on-demand formation) and for
+  choosing nonmarital fathers, we use her fertility hazard. A woman
+  within her birth interval contributes zero.
+
+These contributions are kept as running totals by group and cohort,
+updated whenever a woman moves between rate cells, crosses a band edge
+or leaves the pool, so they are always current. Each kind of search is
+calibrated separately with its own matching model.
+
+For male targets, let \\r_g\\ be the total search intensity of group
+\\g\\’s women divided by their number. Men are given the same average
+intensity as the women of their own group: if \\M_g\\ is the number of
+counted men in group \\g\\, the target share of husbands from group
+\\g\\ is
+
+\\\tau_g = \frac{M_g, r_g, e^{\delta_g}}{\sum_h M_h, r_h,
+e^{\delta_h}}\\
+
+A group with no counted women uses the population-wide average intensity
+for its men. The targets decide only which male groups the matches go
+to. Women’s search timing still decides how many matches occur.
+
+For each woman, the calibration needs the sum of \\e^{U\_{ij}}\\ over
+the available men of each group, where \\U\_{ij}\\ is the utility
+between woman \\i\\ and a given man \\j\\. These sums are kept up to
+date as men enter and leave the pool. They are evaluated at
+cohort-center ages, and kin are not removed. Given a set of weights
+\\\omega\\, these sums give each woman’s chance of choosing a husband
+from each group. Averaging those chances over all counted women, with
+each woman weighted by her search intensity, gives the expected share of
+husbands from each group. This is the general version of the column
+total \\N\_{AB} + N\_{BB}\\ in the two-group example.
+
+The \\\omega\\ weights are found by Newton’s method so that the expected
+share of husbands from each group equals its target \\\tau_g\\, starting
+from the previous search’s weights. One weight is fixed at 1, since only
+ratios matter. A group’s expected share rises steadily with its own
+weight, so when a solution exists it is unique.
+
+The focal woman then chooses among her eligible men using exact ages,
+the full kinship screen and the calibrated weights:
+
+\\P(j \mid w) = \frac{\omega\_{g(j)}, e^{U\_{wj}}}{\sum\_{k}
+\omega\_{g(k)}, e^{U\_{wk}}}\\
+
+Special cases.
+
+- With one group, or when exogamy is prohibited outright, every weight
+  is 1 and the choice is ordinary female choice.
+- When prohibitions split the groups into blocks that cannot intermarry
+  (for example, region = NA), each block is calibrated as its own
+  marriage market. Its targets are scaled to its own women’s share of
+  searching.
+- If a target can’t be reached, for instance because no compatible women
+  are searching, the search uses the best available weights and is
+  counted as approximate.
