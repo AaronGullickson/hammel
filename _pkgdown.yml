@@ -6,6 +6,19 @@ authors:
   Aaron Gullickson:
     href: https://aarongullickson.github.io
 
+articles:
+  - title: Guides
+    navbar: ~
+    contents:
+      - articles/demographic_transition
+      - articles/second_demog_transition
+      - articles/multigroup_intermar
+
+  - title: Technical
+    navbar: Technical
+    contents:
+      - articles/how_it_works
+
 reference:
   - title: Model setup and simulation
     desc: Construct a model, attach its population and processes, and run a simulation.
