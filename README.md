@@ -28,7 +28,7 @@ devtools::install_github("AaronGullickson/hammel")
 
 ## Example
 
-Several detailed examples of Hammel simulations are available on the [documentation website](https://hammel.github.io). Here I provide a simple toy example.
+Several detailed examples of Hammel simulations are available on the [documentation website](https://aarongullickson.github.io/hammel/). Here I provide a simple toy example.
 
 To use Hammel, you first set up a simulation model, which can be constructed using a pipable interface. The primary inputs for Hammel are tables of age-specific rate schedules.
 
