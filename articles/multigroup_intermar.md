@@ -158,7 +158,7 @@ model <- hammel_model() |>
 runtime <- system.time(pop_final <- run_simulation(model, 300, 42))
 ```
 
-The simulation takes 30.971 seconds to run.
+The simulation takes 51.646 seconds to run.
 
 ## Analyze the Simulation Results
 
