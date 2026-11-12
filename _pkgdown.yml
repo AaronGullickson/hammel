@@ -36,7 +36,6 @@ reference:
     contents:
       - mortality
       - fertility
-      - het_fert
       - union_formation
       - union_dissolution
       - group_transition

@@ -20,3 +20,6 @@ validation/*.knit.md
 inst/doc
 **/.quarto/
 docs
+
+# Quarto intermediates left behind by failed renders
+vignettes/**/*.rmarkdown
