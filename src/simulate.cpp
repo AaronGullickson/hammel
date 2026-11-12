@@ -318,7 +318,7 @@ class Simulation {
   );
   Simulation(const Simulation&) = delete;
   Simulation& operator=(const Simulation&) = delete;
-  List run();
+  List run(SEXP progress);
 
  private:
   // Setup.
@@ -2686,8 +2686,21 @@ void Simulation::rejoin(int c, double now) {
 
 // Process events in chronological order until no scheduled event remains
 // before the horizon.
-List Simulation::run() {
+List Simulation::run(SEXP progress) {
+  int reported_percent = 0;
   while (true) {
+    // Report completed simulation time, with at most 99 native callbacks.
+    // R completes the bar after assembling and validating the result.
+    if (progress != R_NilValue) {
+      const int percent = std::min(
+        99, static_cast<int>(100 * ((weight_now - start) / (end - start)))
+      );
+      if (percent > reported_percent) {
+        Function update(progress);
+        update(percent / 100.0);
+        reported_percent = percent;
+      }
+    }
     if (apply_calendar_boundary()) {
       continue;
     }
@@ -3390,7 +3403,8 @@ List simulate_cpp(
   Nullable<List> transition_input = R_NilValue,
   Nullable<List> model_schedule_input = R_NilValue,
   Nullable<List> weight_input = R_NilValue,
-  Nullable<List> group_input = R_NilValue
+  Nullable<List> group_input = R_NilValue,
+  Nullable<Function> progress = R_NilValue
 ) {
   Simulation simulation(
     persons, mortality_rates, fertility_rates, start, years, birth_interval,
@@ -3400,5 +3414,5 @@ List simulate_cpp(
     conversion_rates, cohab_matching, counts_cohab, check_cells, hetfert,
     transition_input, model_schedule_input, weight_input, group_input
   );
-  return simulation.run();
+  return simulation.run(progress);
 }

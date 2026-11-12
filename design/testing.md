@@ -5,6 +5,19 @@ D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the u
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## Optional simulation progress (November 12, 2026)
+
+`TZ=UTC Rscript -e 'devtools::test(reporter = "summary")'` passed the full
+offline suite with no failures or warnings; the live database test remained
+opt-in/skipped. The simulation file passed 101 expectations. Progress-on/off
+comparisons preserve complete results and RNG state for seeded and unseeded
+runs. Checks cover elapsed-time percentages at an age boundary and a calendar
+change, nonzero starts, fractional durations, bounded monotone updates,
+empty/zero-year runs, invalid logical arguments and bar cleanup plus seed
+restoration after a native callback error. The generated run-simulation help
+passed Rd validation, and native formatting and `git diff --check` passed.
+No demographic mechanism or validation report changed.
+
 ## Life-table input rate columns (November 9, 2026)
 
 D154 removes `mx` as an input-rate alias for `calculate_life_table()`. The function now requires `rate_mortality` or `rate`, preserving the former precedence of `rate_mortality` over `rate`. Existing `mx` columns cannot override an accepted rate column; output still contains `mx`. Numeric-column diagnostics identify the selected input column. The user's updated help title was preserved.
