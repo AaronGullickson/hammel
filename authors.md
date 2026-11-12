@@ -11,13 +11,13 @@
 Source:
 [`DESCRIPTION`](https://github.com/AaronGullickson/hammel/blob/master/DESCRIPTION)
 
-Gullickson A (2026). *hammel: Hammel*. R package version 0.0.0.9000,
+Gullickson A (2026). *hammel: Hammel*. R package version 0.1.0,
 <https://github.com/AaronGullickson/hammel>.
 
     @Manual{,
       title = {hammel: Hammel},
       author = {Aaron Gullickson},
       year = {2026},
-      note = {R package version 0.0.0.9000},
+      note = {R package version 0.1.0},
       url = {https://github.com/AaronGullickson/hammel},
     }
