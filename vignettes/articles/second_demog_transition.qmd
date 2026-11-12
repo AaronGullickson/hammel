@@ -68,12 +68,24 @@ We will hold mortality rates to the 1992 level. These values are pulled from the
 
 ```{r}
 #| label: get-mortality-rates
-
+#| eval: false
 mortality_rates1992 <- get_mortality_hmd("GBRTENW", 1992, shape = "5x1",
                                          open_age = 90)
 
 mortality_rates1992
 ```
+
+```{r}
+#| label: load-mortality-rates
+#| include: false
+
+# really load them locally to avoid GH workflow issues
+mortality_rates1992 <- readRDS(
+  here::here("vignettes", "articles", "data", "england_wales_mortality_1992.rds")
+)
+```
+
+
 
 Mortality rates are stratified by sex, which is mandatory but not by time.
 

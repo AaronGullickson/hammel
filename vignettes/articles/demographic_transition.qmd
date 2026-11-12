@@ -53,10 +53,25 @@ Once the credentials are set up, we can download the data.
 
 ```{r}
 #| label: get-rates
+#| eval: false
 
 fertility_rates_sweden <- get_fertility_hfd("SWE", 1891:2024)
 mortality_rates_sweden <- get_mortality_hmd("SWE", 1751:2024, open_age = 85)
 ```
+
+```{r}
+#| label: load-rates
+#| include: false
+
+# actually load the rates here to allow GH workflow
+fertility_rates_sweden <- readRDS(
+  here::here("vignettes", "articles", "data", "sweden_fertility.rds")
+)
+mortality_rates_sweden <- readRDS(
+  here::here("vignettes", "articles", "data", "sweden_mortality.rds")
+)
+```
+
 
 We are downloading the entire series here for both mortality and fertility. Mortality rates go back to 1751 and fertility rates go back to 1891. Age-specific mortality rates from the HMD use the 110 age category as the default open-ended category. However, in historical data this can sometimes lead to missing values at the oldest ages, so we truncate the open age category to 95 with the `open_age = 85` argument. The function will download death and exposure counts to estimate the mortality rate in this open-ended age category correctly.
 
