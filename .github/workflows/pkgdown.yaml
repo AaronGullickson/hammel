@@ -40,12 +40,12 @@ jobs:
       - name: Build site
         run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE, quiet = FALSE)
         shell: Rscript {0}
-        # Articles download HMD/HFD rates; credentials are repository secrets.
-        env:
-          HMD_USERNAME: ${{ secrets.HMD_USERNAME }}
-          HMD_PASSWORD: ${{ secrets.HMD_PASSWORD }}
-          HFD_USERNAME: ${{ secrets.HFD_USERNAME }}
-          HFD_PASSWORD: ${{ secrets.HFD_PASSWORD }}
+
+      # pkgdown publishes every top-level .md file; AGENTS.md is for agents.
+      - name: Drop agent instructions from the site
+        run: |
+          rm -f docs/AGENTS.html docs/AGENTS.md
+          sed -i '/AGENTS\.html/d' docs/sitemap.xml
 
       - name: Deploy to GitHub pages 🚀
         if: github.event_name != 'pull_request'
