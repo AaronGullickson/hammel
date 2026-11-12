@@ -10,15 +10,18 @@ execute:
 
 ```{r}
 #| label: setup
-#| include: false
 
 library(hammel)
-library(readr)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
-library(here)
-theme_set(theme_bw())
+```
+
+```{r}
+#| label: set-theme
+#| include: false
+
+set_theme(theme_bw())
 ```
 
 The "second demographic transition" is a term used to describe several features of the demographic profiles of advanced industrial countries that have produced complicated family structures and low fertility, such as rising rates of cohabitation, later age at marriage, fertility delay, and increasing marriage dissolution. 
@@ -33,7 +36,7 @@ To show this effect on overall fertility, we will set up a simulation that holds
 
 We can then compare the overall fertility rates from this simulation to a simulation where these are held at their baseline rates. 
 
-## Gathering Inputs
+## Gather Inputs
 
 This simulation has a high demand on the required inputs. Given that, we will not focus on an exact replication of real values for a single country, but will construct a "stylized" scenario from available data sources. For this simulation, I have chosen to use values based on England and Wales because the [Office for National Statistics](https://www.ons.gov.uk/) (ONS) produces detailed reports that can get us most of what we need. We will run the simulation from 1992 to 2019, because we can find data sources for several inputs that roughly align with this time period.
 
@@ -66,7 +69,7 @@ We will hold mortality rates to the 1992 level. These values are pulled from the
 ```{r}
 #| label: get-mortality-rates
 
-mortality_rates1992 <- get_mortality_hmd("GBRTENW", 1992, shape = "5x1", 
+mortality_rates1992 <- get_mortality_hmd("GBRTENW", 1992, shape = "5x1",
                                          open_age = 90)
 
 mortality_rates1992
@@ -87,8 +90,12 @@ prob_cohab <- england_wales_1992_onward$premarital_cohabitation |>
   filter(age_groups == "All ages") |>
   arrange(year) |>
   rename(prob = prop_cohabit) |>
-  mutate(time_start = year, time_end = year + 1, 
-    age_start = 0, age_end = Inf) |>
+  mutate(
+    time_start = year,
+    time_end = year + 1,
+    age_start = 0,
+    age_end = Inf
+  ) |>
   select(starts_with("time_"), starts_with("age_"), prob) |>
   # extend 1994 back to 1992
   mutate(time_start = if_else(time_start == 1994, 1992, time_start)) |>
@@ -197,12 +204,12 @@ dissolution_rates <- bind_rows(
   arrange(year, anniversary) |>
   group_by(year) |>
   mutate(
-    divorce_increment = cumulative_divorce - 
+    divorce_increment = cumulative_divorce -
       lag(cumulative_divorce, default = 0),
-    death_increment = cumulative_death - 
+    death_increment = cumulative_death -
       lag(cumulative_death, default = 0),
-    surviving_start = 1 - 
-      lag(cumulative_divorce, default = 0) - 
+    surviving_start = 1 -
+      lag(cumulative_divorce, default = 0) -
       lag(cumulative_death, default = 0),
     p_divorce = divorce_increment / surviving_start,
     p_death = death_increment / surviving_start,
@@ -229,8 +236,7 @@ dissolution_rates <- dissolution_rates |>
   expand_grid(year = 1992:2019) |>
   mutate(
     rate = rate_2005 +
-      (pmin(year, 2010) - 2005) *
-      (rate_2010 - rate_2005) / 5,
+      (pmin(year, 2010) - 2005) * (rate_2010 - rate_2005) / 5,
     time_start = year,
     time_end = year + 1
   ) |>
@@ -254,17 +260,17 @@ We have annual marriage rates by whether the woman was never married or previous
 
 marriage_rates_pretuned <- england_wales_1992_onward$marriage
 
-# some marriage rates for young age groups and dissolved are missing. For those 
+# some marriage rates for young age groups and dissolved are missing. For those
 # cases, carry forward the previous years
 marriage_rates_pretuned <- marriage_rates_pretuned |>
   arrange(previous_union, age_start, time_start) |>
   group_by(previous_union, age_start, age_end) |>
-    fill(rate, .direction = "down") |>
+  fill(rate, .direction = "down") |>
   ungroup() |>
   arrange(time_start, age_start, previous_union)
 
-# tune marriage rates to account for loss of cohabitation - our primary target is 
-# reproducing the pre-tuned overall marriage rates in the output
+# tune marriage rates to account for loss of cohabitation - our primary target
+# is reproducing the pre-tuned overall marriage rates in the output
 marriage_rates <- marriage_rates_pretuned |>
   mutate(rate = rate * 2)
 
@@ -273,7 +279,7 @@ marriage_rates
 
 The marriage rates are age specific and stratified by time period and previous union status.
 
-## Initializing the Starting Population
+## Initialize the Starting Population
 
 We can now set up the initial population. We will do this by burning in a uniform population over 50 years using the 1992 rates to generate a roughly stable population. Notably, this stable population is unlikely to match the actual England and Wales population distribution precisely because historical rates were changing over time prior to 1992. Most important for our purpose is the share of women in different union types. However, it should give us something reasonable to work with.
 
@@ -281,30 +287,30 @@ We can now set up the initial population. We will do this by burning in a unifor
 #| label: get-pop-start
 
 # apply baseline rates
-marriage_rates1992 <- marriage_rates |> 
+marriage_rates1992 <- marriage_rates |>
   filter(time_start == 1992) |>
   select(-starts_with("time_"))
-prob_cohab1992 <- prob_cohab |> 
+prob_cohab1992 <- prob_cohab |>
   filter(time_start == 1992) |>
   select(-starts_with("time_"))
-conversion_rates1992 <- conversion_rates |> 
+conversion_rates1992 <- conversion_rates |>
   filter(time_start == 1992) |>
   select(-starts_with("time_"))
-dissolution_rates1992 <- dissolution_rates |> 
+dissolution_rates1992 <- dissolution_rates |>
   filter(time_start == 1992) |>
   select(-starts_with("time_"))
-  
+
 # because this is a negative growth rate population start big
 pop <- generate_uniform_population(150000, 70, 1942)
 
-model <- hammel_model() |>  
+model <- hammel_model() |>
   set_population(pop) |>
   set_mortality(mortality_rates1992) |>
   set_fertility(fertility_rates1992) |>
   set_union_formation(
-    "rate", 
+    "rate",
     matching = age_gap_matching_model(2, 5),
-    rates = marriage_rates1992, 
+    rates = marriage_rates1992,
     cohab_prob = prob_cohab1992,
     union_convert_rate = conversion_rates1992
   ) |>
@@ -327,23 +333,23 @@ calculate_marriage_rates(
 ) |>
   filter(sex == "f", previous_union == "none") |>
   left_join(
-    marriage_rates_pretuned |> 
+    marriage_rates_pretuned |>
       filter(previous_union == "none", time_start == 1992),
-    by = join_by(time_end == time_start, 
+    by = join_by(time_end == time_start,
                  age_start == age_start, age_end == age_end)
   ) |>
   select(age_start, age_end, rate_marriage, rate) |>
   rename(rate_observed = rate_marriage, rate_input = rate) |>
   pivot_longer(cols = starts_with("rate"), names_prefix = "rate_") |>
-  ggplot(aes(x = age_start, y = value, group = name, color = name))+
-  geom_point()+
-  geom_line()+
+  ggplot(aes(x = age_start, y = value, group = name, color = name)) +
+  geom_point() +
+  geom_line() +
   labs(x = "age", y = "age-specific first time marriage rate", color = "source")
 ```
 
 @fig-tuning-mar-rates show that our tuning has produced an observed first-time marriage rate that similar to the pre-tuned input data.
 
-## Running the Simulations
+## Run the Simulations
 
 We now run two simulations. In the first simulation, we hold all rates constant to the 1992 values from 1992 to 2019. In the second simulation, we allow them all to vary. We can then compare the two simulations.
 
@@ -353,17 +359,17 @@ We now run two simulations. In the first simulation, we hold all rates constant 
 # two simulations - holding everything constant and allowing it to vary
 time_constant <- system.time(
   pop_constant <- run_simulation(
-    model |> 
+    model |>
       set_population(pop_start), 2019 - 1992, 42
   )
 )
 
-model <- hammel_model() |>  
+model <- hammel_model() |>
   set_population(pop_start) |>
   set_mortality(mortality_rates1992) |>
   set_fertility(fertility_rates1992) |>
   set_union_formation(
-    "rate", 
+    "rate",
     matching = age_gap_matching_model(2, 5),
     rates = marriage_rates,
     cohab_prob = prob_cohab,
@@ -378,7 +384,7 @@ time_changing <- system.time(
 
 The simulation with constant rates takes `r time_constant[["elapsed"]]` seconds to process. The simulation with varying rates takes `r time_changing[["elapsed"]]` second to process.
 
-## Analyzing the Simulation Results
+## Analyze the Simulation Results
 
 We will analyze the simulation results by comparing summary statistics over time across the two different simulations. We start by analyzing the total fertility rate (TFR) from the annual age-specific fertility rates estimated by the `calculate_fertility_rates` helper function. Importantly, we do **not** disaggregate these rates by union type because we want to see the effects of compositional change in person years spent in each union type on overall fertility rates.
 
@@ -389,22 +395,22 @@ We will analyze the simulation results by comparing summary statistics over time
 
 bind_rows(
   calculate_fertility_rates(
-    pop_constant, 
+    pop_constant,
     age_breaks = c(16, 20, 25, 30, 35, 40, 45),
     time_breaks = 1992:2019
   ) |>
     calculate_tfr() |>
     mutate(model = "constant"),
   calculate_fertility_rates(
-    pop_change, 
+    pop_change,
     age_breaks = c(16, 20, 25, 30, 35, 40, 45),
     time_breaks = 1992:2019
   ) |>
     calculate_tfr() |>
     mutate(model = "changing")
 ) |>
-  ggplot(aes(x = time_start + 0.5, y = tfr, color = model))+
-  geom_line()+
+  ggplot(aes(x = time_start + 0.5, y = tfr, color = model)) +
+  geom_line() +
   labs(x = "year", y = "total fertility rate")
 ```
 @fig-tfr illustrates a key feature of the second demographic transition. Rising rates of cohabitation and union dissolution along with later ages at marriage reduce total fertility rates even when fertility rates *within* union type are held constant over time. If we wanted a more detailed look at this, we could hold all rate schedules except one constant to see how much each process contributes to fertility decline.
@@ -431,8 +437,8 @@ bind_rows(
   get_cohab_prop(pop_change) |> mutate(model = "changing")
 ) |>
   filter(year >= 1992) |>
-  ggplot(aes(x = year, y = prop, color = model))+
-  geom_line()+
+  ggplot(aes(x = year, y = prop, color = model)) +
+  geom_line() +
   labs(y = "Share of new unions that are cohabiations")
 ```
 
@@ -446,7 +452,7 @@ Next, we can look at the age of childbearing over time.
 
 get_mean_age_childbearing <- function(result) {
   calculate_fertility_rates(
-    result, 
+    result,
     age_breaks = c(16, 20, 25, 30, 35, 40, 45),
     time_breaks = 1992:2019
   ) |>
@@ -466,14 +472,14 @@ bind_rows(
   get_mean_age_childbearing(pop_change) |> mutate(model = "changing")
 ) |>
   filter(time_start >= 1992) |>
-  ggplot(aes(x = time_start + 0.5, y = mu, color = model))+
-  geom_line()+
+  ggplot(aes(x = time_start + 0.5, y = mu, color = model)) +
+  geom_line() +
   labs(x = "year", y = "mean age of childbearing")
 ```
 
 @fig-mean-age-childbearing shows the mean age of childbearing over time based on the observed age-specific fertility rates. As expected, it increases in the model that allows for changing rate schedule, despite no change in the fertility rates *within* union types.
 
-### Comparing specific age-specific rate schedules
+### Compare specific age-specific rate schedules
 
 I now investigate specific time-varying rate schedules from the simulation to confirm that the empirical estimates conform to the expected input rates. I pick a few specific time points to illustrate.
 
@@ -485,9 +491,9 @@ First, I show that the estimated TFR by union type from the data matches the TFR
 fertility_rates1992 |> calculate_tfr()
 
 calculate_fertility_rates(
-  pop_change, 
+  pop_change,
   age_breaks = c(16, 20, 25, 30, 35, 40, 45),
-  time_breaks = c(1992, 2019), 
+  time_breaks = c(1992, 2019),
   by = "union_type"
 ) |>
   calculate_tfr()
@@ -507,15 +513,18 @@ calculate_dissolution_rates(
   conf_level = 0.95
 ) |>
   filter(union_type == "marriage", time_start %in% c(1992, 2000, 2010, 2018)) |>
-  ggplot(aes(x = dur_start + 2.5, y = rate_dissolution))+
-  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), 
-              color = NA, fill = "grey70")+
-  geom_point(size = 0.5)+
+  ggplot(aes(x = dur_start + 2.5, y = rate_dissolution)) +
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high),
+              color = NA, fill = "grey70") +
+  geom_point(size = 0.5) +
   geom_line(
-    data = dissolution_rates |> 
-      filter(union_type == "marriage", time_start %in% c(1992, 2000, 2010, 2018)), 
-    aes(y = rate), linetype = 2, color = "red")+
-  facet_wrap(~time_start)+
+    data = dissolution_rates |>
+      filter(
+        union_type == "marriage",
+        time_start %in% c(1992, 2000, 2010, 2018)
+      ),
+    aes(y = rate), linetype = 2, color = "red") +
+  facet_wrap(~time_start) +
   labs(x = "union duration", y = "rate of dissolution")
 ```
 
@@ -533,15 +542,17 @@ calculate_dissolution_rates(
   conf_level = 0.95
 ) |>
   filter(union_type == "cohab") |>
-  mutate(time_mid = (time_start + time_end) / 2) |>
-  ggplot(aes(x = dur_start, y = rate_dissolution))+
-  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), 
-              color = NA, fill = "grey70")+
-  geom_point(size = 0.5)+
+  ggplot(aes(x = dur_start, y = rate_dissolution)) +
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high),
+              color = NA, fill = "grey70") +
+  geom_point(size = 0.5) +
   geom_line(
-    data = dissolution_rates |> filter(union_type == "cohab"), 
-    aes(y = rate), linetype = 2, color = "red")+
-  facet_wrap(~time_start)+
+    data = dissolution_rates |> filter(union_type == "cohab"),
+    aes(y = rate),
+    linetype = 2,
+    color = "red"
+  ) +
+  facet_wrap(~time_start) +
   labs(x = "duration", y = "rate of dissolution")
 ```
 
@@ -562,17 +573,20 @@ mar_rates_observed <- calculate_union_rates(
   filter(sex == "f")
 
 mar_rates_observed |>
-  filter(sex == "f", time_start %in% c(1992, 2000, 2010, 2018), 
-    (age_start > 20 & previous_union == "dissolved") | previous_union == "none")  |>
-  ggplot(aes(x = age_start, y = rate_union))+
-  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), 
-                  color = NA, fill = "grey70")+
-  geom_point(size = 0.5)+
+  filter(
+    sex == "f",
+    time_start %in% c(1992, 2000, 2010, 2018),
+    (age_start > 20 & previous_union == "dissolved") | previous_union == "none"
+  ) |>
+  ggplot(aes(x = age_start, y = rate_union)) +
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high),
+              color = NA, fill = "grey70") +
+  geom_point(size = 0.5) +
   geom_line(
     data = marriage_rates |> filter(time_start %in% c(1992, 2000, 2010, 2018)),
     aes(y = rate), linetype = 2, color = "red"
-  )+
-  facet_grid(previous_union~time_start, scales = "free_y")+
+  ) +
+  facet_grid(previous_union ~ time_start, scales = "free_y") +
   labs(x = "age", y = "union rate")
 ```
 
@@ -592,7 +606,7 @@ calculate_union_rates(
   filter(sex == "f") |>
   select(time_start, time_end, union_type, unions) |>
   rename(n = unions) |>
-  pivot_wider(id_cols = starts_with("time_"), 
+  pivot_wider(id_cols = starts_with("time_"),
               names_from = union_type, values_from = n) |>
   mutate(
     prob_cohab = cohab / (cohab + marriage),
@@ -600,11 +614,11 @@ calculate_union_rates(
     conf_low = prob_cohab - 1.96 * se,
     conf_high = prob_cohab + 1.96 * se
   ) |>
-  ggplot(aes(x = time_start, y = prob_cohab))+
-  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), 
-              color = NA, fill = "grey70")+
-  geom_point(size = 0.5)+
-  geom_line(data =prob_cohab, aes(y = prob), linetype = 2, color = "red")+
+  ggplot(aes(x = time_start, y = prob_cohab)) +
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high),
+              color = NA, fill = "grey70") +
+  geom_point(size = 0.5) +
+  geom_line(data = prob_cohab, aes(y = prob), linetype = 2, color = "red") +
   labs(x = "year", y = "probability of cohabitation when union forms")
 ```
 

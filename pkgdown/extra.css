@@ -1,0 +1,27 @@
+/* Home page: show a large logo to the left of the package name. */
+.template-home .page-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.template-home .page-header img.logo {
+  float: none;
+  width: 180px;
+  margin-left: 0;
+}
+
+.template-home .page-header h1 {
+  font-size: 3rem;
+  margin: 0;
+}
+
+@media (max-width: 575.98px) {
+  .template-home .page-header img.logo {
+    width: 110px;
+  }
+
+  .template-home .page-header h1 {
+    font-size: 2.25rem;
+  }
+}
