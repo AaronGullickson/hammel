@@ -33,6 +33,7 @@ reference:
     desc: Create and validate starting populations and describe their group dimensions.
     contents:
       - hammel_population
+      - summary.hammel_population
       - generate_uniform_population
       - validate_population
       - group
