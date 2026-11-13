@@ -500,6 +500,98 @@ male shortage in one group, and splitting a type into meaningless labels.
 This would show squeeze size, redirection and odds-ratio behavior before any
 specification. Not started.
 
+## Cohabitation and nonmarital fathers (November 13, 2026)
+
+Discussion notes for a two-sex market model. The cohabitation and father
+directions are the user's tentative preferences, not accepted decisions.
+
+### Cohabitation: partnership attraction and a couple-based share
+
+Two ways to bring union type into the market:
+
+- **A. Type drawn after the couple.** The market forms partnerships with one
+  alpha; after the couple is chosen, cohabitation is drawn with probability
+  p, as `cohab_prob` does now.
+- **B. Type as a cell dimension.** Separate surfaces, with
+  Y^marr_ij = alpha^marr_ij F_i M_j / D and
+  Y^cohab_ij = alpha^cohab_ij F_i M_j / D.
+
+If p can depend on both partners, the two are equivalent:
+alpha^cohab = alpha p and alpha^marr = alpha (1 - p). **Tentative preferred
+choice (user, November 13, 2026):** partnership alpha plus a couple-based
+cohabitation share p, because it offers the most flexibility. A p that depends
+only on the woman's age, group and previous union reproduces the current
+`cohab_prob` semantics, and a couple-based p replaces `cohab_matching`. The
+odds-ratio relationship above holds separately within each type.
+
+Because p is drawn after a specific couple is chosen, it may use any
+individual characteristic of either partner, such as the man's previous-union
+category, parity or a shared child, without breaking the equal-pair hazard
+within a cell; partnership alpha must use only type-defining characteristics.
+A possible interface is a `cohab_prob`-style table (woman's age, group,
+previous union, optional calendar bands under D122) for the woman-only case,
+and a logistic model over both partners' variables, similar to D129 weight
+formulas, for the couple-based case. Tables with both partners' dimensions
+would grow quickly. Not designed.
+
+**Caveat.** The parameterizations can represent the same models but hold
+different quantities fixed when a user changes one input. Under alpha plus p,
+raising the cohabitation share lowers direct marriage one-for-one and leaves
+the total partnership rate unchanged, consistent with calendar-varying
+`cohab_prob` today (D122). Under separate surfaces, raising cohabitation
+attraction adds unions without reducing marriage. A user who wants
+cohabitation to grow on top of marriage under alpha plus p must also raise
+alpha. This resembles the open question of whether alpha or the odds ratio
+is invariant under composition change, and must be documented clearly.
+
+Conversion and dissolution act within existing couples and do not use the
+market; dissolution returns both partners to it.
+
+### Nonmarital fathers
+
+Currently an unpartnered woman's births occur at her input fertility rate, and
+the father is drawn from unpartnered men by conditional logit
+(`father_matching`), without forming a union. Combining that with market
+alpha for unions would give two inconsistent preference structures. Options:
+
+- **F1. One-sex timing, father from the market row.** The birth occurs at the
+  woman's input rate; the father's type is drawn with probability
+  proportional to Y_ij over her row of the market, then a man uniformly within
+  type j. One preference structure, fertility inputs and cell accounting
+  (D101) preserved, and cheap given row access in the market sum tree. A
+  father-specific difference (for example, younger men as fathers than as
+  husbands) would be an optional multiplier on alpha, replacing
+  `father_matching`. A shortage of men changes who the father is, not whether
+  the birth occurs; births still fail only without eligible men. Squeezed
+  women remain unpartnered longer and have births at unpartnered rates, so a
+  squeeze shifts births between union and nonmarital fertility by the rate
+  difference (an interpretation, not a validated result).
+- **F2. Nonmarital conception as a market event,** at rate
+  beta_ij F_i M_j / D, so nonmarital fertility responds to male availability.
+  It would sit outside the fertility cells and need reconciliation with
+  parity, spacing and cell accounting (D101), and would not preserve
+  unpartnered fertility inputs.
+- **F3. Fathers drawn also from partnered men.** A separate extension, not
+  needed for consistency.
+
+**Tentative preferred choice (user, November 13, 2026):** F1. The goal is to
+keep father selection simple and preserve unpartnered fertility input rates.
+This is not an accepted decision while the two-sex model remains unselected.
+The user also wants an equivalent of `father_matching`: an optional
+father-specific multiplier on alpha, so that the partners chosen as fathers
+can differ from those chosen for unions (for example in age gap). Because
+father selection is a draw conditional on a birth rather than a market
+clock, the multiplier could use individual characteristics of either partner
+beyond the type definition, as the cohabitation share can; drawing within a
+type would then be weighted rather than uniform. Form and interface not
+designed. Behavior with no eligible man (currently cancellation by default,
+or an unknown father) is not yet discussed.
+
+Previous-father continuity (D042, deferred) would raise alpha for specific
+co-parent pairs, breaking the equal-pair hazard within a cell. It would need
+its own process on linked co-parent pairs outside the market, like
+conversion. Deferred.
+
 ## Interface considerations
 
 `union_formation()` mixes timing (`initiation`, `rates`),
@@ -526,6 +618,9 @@ The user identified unresolved connections:
   so father selection, cohabitation and unpartnered partnering must be designed
   together with any two-sex model.
 
+See [cohabitation and nonmarital fathers](#cohabitation-and-nonmarital-fathers-november-13-2026)
+for the November 13 discussion of both connections.
+
 The user deferred API restructuring (D073): the current API is unchanged until
 a single working implementation incorporates all union-formation components.
 
@@ -542,6 +637,9 @@ a single working implementation incorporates all union-formation components.
 - Reference conditions for estimated or calibrated inputs, including
   calibrating alpha to input rates at a reference population.
 - How unions, cohabitation and nonmarital fathers share one model.
+  Tentatively, cohabitation uses partnership alpha with a couple-based share,
+  and nonmarital fathers are drawn from the woman's market row at input
+  fertility rates (F1).
 
 ## References
 

@@ -67,7 +67,7 @@ user's agreement; proposed APIs and research notes do not authorize implementati
 | [Union dissolution](union-dissolution.md) | Milestone 4 duration hazards, female carrier, state changes, and worked examples (D078) |
 | [Kinship infrastructure](kinship.md) | Shared native distance screening and R extraction |
 | [External immigration](immigration.md) | Unimplemented design direction: stochastic streams, population templates, migration histories, classifications and status/stream rate strata (D177–D182) |
-| [Two-sex union models](two-sex-union-models.md) | Proposal notes: directional asymmetry, marriage squeeze, Schoen/Choo–Siow/Dagsvik models, denominators and spillover, API considerations (D073) |
+| [Two-sex union models](two-sex-union-models.md) | Proposal notes: directional asymmetry, marriage squeeze, Schoen/Choo–Siow/Dagsvik models, denominators and spillover, cohabitation and nonmarital fathers, API considerations (D073) |
 | [Future roadmap](roadmap.md) | Accepted milestones and future priorities with unresolved specifications |
 | [Decision log](decisions.md) | Accepted choices and supersession history |
 | [SOCSIM audit plan](socsim-audit.md) | Scope and remaining reference investigation |
