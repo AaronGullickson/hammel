@@ -49,7 +49,7 @@
 #'   amount of variation in fertility. Zero indicates no variance.
 #' @param alpha Finite scalar in `[0,1]` that defines degree of inheritability.
 #'   Zero gives independent daughters; one copies maternal weights exactly.
-#' @return A `hammel_het_fert` specification for [enable_het_fert()].
+#' @return A `hammel_het_fert` specification for `enable_het_fert()`.
 #' @noRd
 het_fert <- function(cv, alpha) {
   model <- structure(list(cv = cv, alpha = alpha), class = "hammel_het_fert")
