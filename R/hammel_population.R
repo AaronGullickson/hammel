@@ -295,6 +295,124 @@ validate_population <- function(results) {
   invisible(results)
 }
 
+# SUMMARY AND PRINT FUNCTIONS -------------------------------------------------
+
+#' Summarize a Hammel population
+#'
+#' @description
+#'
+#' Summary method for class `"hammel_population"`
+#'
+#' @param object an object of class `"hammel_population"`, usually the result
+#'   of a call to [run_simulation].
+#' @param interval_pyramid length of age intervals used for drawing
+#'   population pyramid
+#' @param ... further arguments passed on from other methods.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_population` containing:
+#' \describe{
+#'   \item{end_time}{The population's reference time, in years.}
+#'   \item{persons_total}{The number of recorded persons, including deceased
+#'     persons.}
+#'   \item{persons_alive}{The number of persons alive at the reference time.}
+#'   \item{total_unions}{The number of recorded union episodes, including
+#'     ended unions.}
+#'   \item{age_counts}{A tibble of living male and female counts by five-year
+#'     age group.}
+#' }
+#'
+#' `print()` displays the summary and a text population pyramid, returning
+#' its input invisibly. Pyramid bars share a common scale across both sexes.
+#'
+#' @examples
+#'
+#' # get summary of starting population
+#' population <- generate_uniform_population(1000)
+#' summary(population)
+#'
+#' # get summary of simulatied population
+#' model <- hammel_model() |>
+#'   set_population(population) |>
+#'   set_mortality(usa_2000_mortality) |>
+#'   set_fertility(usa_2000_fertility) |>
+#'   set_union_formation("on_demand")
+#' result <- run_simulation(model, years = 50, seed = 42)
+#' summary(result)
+#' @export
+summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
+
+  # get stats for drawing population pyramid
+  alive <- is.na(object$persons$death_time)
+  ages <- object$end_time - object$persons$birth_time[alive]
+
+  breaks <- seq(0, max(c(5, ages)) + 5, by = 5)
+  age_group <- cut(ages, breaks, right = FALSE)
+
+  age_counts <- table(
+    age_group,
+    factor(object$persons$sex[alive], levels = c("m", "f"))
+  )
+
+  age_counts = tibble::tibble(
+    age = paste0(
+      head(breaks, -1), "–", tail(breaks, -1) - 1
+    ),
+    male = as.integer(age_counts[, "m"]),
+    female = as.integer(age_counts[, "f"])
+  )
+
+  structure(
+    list(
+      first_time = min(object$persons$birth_time),
+      end_time = object$end_time,
+      persons_alive = sum(is.na(object$persons$death_time)),
+      n_births = sum(!is.na(object$persons$birth_time)),
+      n_deaths = sum(!is.na(object$persons$death_time)),
+      n_unions = nrow(object$unions),
+      n_dissolutions = (sum(!is.na(object$unions$end_reason) &
+                              object$unions$end_reason == "dissolution")),
+      age_counts = age_counts
+    ),
+    class = "summary.hammel_population"
+  )
+}
+
+#' @rdname summary.hammel_population
+#' @param x A `summary.hammel_population` object returned by
+#'   `summary.hammel_population()`.
+#' @export
+print.summary.hammel_population <- function(x, ...) {
+
+  cat("Hammel Population Summary\n\n")
+  cat("First date", x$first_time, "\n")
+  cat("End time", x$end_time, "\n")
+  cat("Total persons", x$persons_total, "\n")
+  cat("Persons alive at end", x$persons_alive, "\n")
+  cat("Total births", x$n_births, "\n")
+  cat("Total deaths", x$n_deaths, "\n")
+  cat("Total unions", x$n_unions, "\n")
+  cat("Total dissolutions", x$n_dissolutions, "\n")
+
+  counts <- x$age_counts
+  width <- 25
+  peak <- max(c(counts$male, counts$female, 1))
+  male <- strrep("#", round(width * counts$male / peak))
+  female <- strrep("#", round(width * counts$female / peak))
+
+  cat("\nLiving population by age and sex\n\n")
+  cat(sprintf("%25s   %7s   %s\n", "Male", "Age", "Female"))
+
+  for (i in rev(seq_len(nrow(counts)))) {
+    cat(sprintf(
+      "%25s | %7s | %-25s\n",
+      male[i], counts$age[i], female[i]
+    ))
+  }
+
+  invisible(x)
+}
+
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 normalize_unions <- function(unions) {
@@ -367,3 +485,4 @@ validate_union_types <- function(unions) {
   }
   invisible(unions)
 }
+
