@@ -363,15 +363,17 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
   )
 
   if(!is.null(object$simulation)) {
-    pop_size <- calculate_population_size(
-      object,
-      c(object$simulation$start_time, object$simulation$end_time)
+
+    start <- object$simulation$start_time
+    pop_init <- sum(
+      object$persons$birth_time <= start &
+        (is.na(object$persons$death_time) | object$persons$death_time > start)
     )
     simulation <- list(
-      start = object$simulation$start_time,
+      start = start,
       end = object$simulation$end_time,
-      pop_size_start = as.numeric(pop_size[1, "population"]),
-      pop_size_end = as.numeric(pop_size[2, "population"])
+      pop_size_start = pop_init,
+      pop_size_end = sum(alive)
     )
   } else {
     simulation <- NULL
@@ -382,7 +384,7 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
     list(
       first_time = min(object$persons$birth_time),
       end_time = object$end_time,
-      persons_alive = sum(is.na(object$persons$death_time)),
+      persons_alive = sum(alive),
       n_births = sum(!is.na(object$persons$birth_time)),
       n_births_u = ifelse(
         is.null(object$unrealized_births), NA, nrow(object$unrealized_births)
