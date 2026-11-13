@@ -24,18 +24,35 @@ population pyramid}
 \value{
 \code{summary()} returns an object of class \code{summary.hammel_population} containing:
 \describe{
+\item{first_time}{The earliest recorded birth time, in years.}
 \item{end_time}{The population's reference time, in years.}
-\item{persons_total}{The number of recorded persons, including deceased
-persons.}
 \item{persons_alive}{The number of persons alive at the reference time.}
-\item{total_unions}{The number of recorded union episodes, including
+\item{n_births}{The number of recorded persons with a birth time,
+including persons in the starting population.}
+\item{n_births_u}{The number of retained unrealized birth records, or
+\code{NA} when no unrealized birth table is present.}
+\item{n_deaths}{The number of recorded persons with a death time.}
+\item{n_unions}{The number of recorded union episodes, including
 ended unions.}
+\item{n_dissolutions}{The number of union episodes with end reason
+\code{"dissolution"}.}
 \item{age_counts}{A tibble of living male and female counts by five-year
-age group.}
+age group, with columns \code{age}, \code{male}, and \code{female}.}
+\item{simulation}{A list describing the latest simulation run, with
+\code{start} and \code{end} times in years and living population counts
+\code{pop_size_start} and \code{pop_size_end}, or \code{NULL} when no simulation
+metadata is present.}
+\item{group_counts}{A named list of tibbles, one per declared group
+dimension, or \code{NULL} when no groups are declared. Each tibble contains
+\code{category}, \code{count}, and \code{percent} for the living population at the
+reference time, including declared categories with zero members.
+Percentages are on a 0--100 scale and are \code{NaN} when the dimension's
+total living count is zero.}
 }
 
-\code{print()} displays the summary and a text population pyramid, returning
-its input invisibly. Pyramid bars share a common scale across both sexes.
+\code{print()} displays the summary, group tables when present, and a text
+population pyramid, returning its input invisibly. Pyramid bars share a
+common scale across both sexes.
 }
 \description{
 Summary method for class \code{"hammel_population"}

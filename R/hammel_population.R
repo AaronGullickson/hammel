@@ -312,18 +312,35 @@ validate_population <- function(results) {
 #' @return
 #' `summary()` returns an object of class `summary.hammel_population` containing:
 #' \describe{
+#'   \item{first_time}{The earliest recorded birth time, in years.}
 #'   \item{end_time}{The population's reference time, in years.}
-#'   \item{persons_total}{The number of recorded persons, including deceased
-#'     persons.}
 #'   \item{persons_alive}{The number of persons alive at the reference time.}
-#'   \item{total_unions}{The number of recorded union episodes, including
+#'   \item{n_births}{The number of recorded persons with a birth time,
+#'     including persons in the starting population.}
+#'   \item{n_births_u}{The number of retained unrealized birth records, or
+#'     `NA` when no unrealized birth table is present.}
+#'   \item{n_deaths}{The number of recorded persons with a death time.}
+#'   \item{n_unions}{The number of recorded union episodes, including
 #'     ended unions.}
+#'   \item{n_dissolutions}{The number of union episodes with end reason
+#'     `"dissolution"`.}
 #'   \item{age_counts}{A tibble of living male and female counts by five-year
-#'     age group.}
+#'     age group, with columns `age`, `male`, and `female`.}
+#'   \item{simulation}{A list describing the latest simulation run, with
+#'     `start` and `end` times in years and living population counts
+#'     `pop_size_start` and `pop_size_end`, or `NULL` when no simulation
+#'     metadata is present.}
+#'   \item{group_counts}{A named list of tibbles, one per declared group
+#'     dimension, or `NULL` when no groups are declared. Each tibble contains
+#'     `category`, `count`, and `percent` for the living population at the
+#'     reference time, including declared categories with zero members.
+#'     Percentages are on a 0--100 scale and are `NaN` when the dimension's
+#'     total living count is zero.}
 #' }
 #'
-#' `print()` displays the summary and a text population pyramid, returning
-#' its input invisibly. Pyramid bars share a common scale across both sexes.
+#' `print()` displays the summary, group tables when present, and a text
+#' population pyramid, returning its input invisibly. Pyramid bars share a
+#' common scale across both sexes.
 #'
 #' @examples
 #'
