@@ -121,6 +121,18 @@ set_fertility <- function(
   )
 }
 
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+summary.hammel_fertility <- function(object, ...) {
+
+
+
+}
+
+print.summary.hammel_fertility <- function(x, ...) {
+
+}
+
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 # Positive parity-specific rates in one-year age cells (the fertility cells of
