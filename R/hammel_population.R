@@ -362,17 +362,37 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
     female = as.integer(age_counts[, "f"])
   )
 
+  if(!is.null(object$simulation)) {
+    pop_size <- calculate_population_size(
+      object,
+      c(object$simulation$start_time, object$simulation$end_time)
+    )
+    simulation <- list(
+      start = object$simulation$start_time,
+      end = object$simulation$end_time,
+      pop_size_start = as.numeric(pop_size[1, "population"]),
+      pop_size_end = as.numeric(pop_size[2, "population"])
+    )
+  } else {
+    simulation <- NULL
+  }
+
+
   structure(
     list(
       first_time = min(object$persons$birth_time),
       end_time = object$end_time,
       persons_alive = sum(is.na(object$persons$death_time)),
       n_births = sum(!is.na(object$persons$birth_time)),
+      n_births_u = ifelse(
+        is.null(object$unrealized_births), NA, nrow(object$unrealized_births)
+      ),
       n_deaths = sum(!is.na(object$persons$death_time)),
       n_unions = nrow(object$unions),
       n_dissolutions = (sum(!is.na(object$unions$end_reason) &
                               object$unions$end_reason == "dissolution")),
-      age_counts = age_counts
+      age_counts = age_counts,
+      simulation = simulation
     ),
     class = "summary.hammel_population"
   )
@@ -384,29 +404,47 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
 #' @export
 print.summary.hammel_population <- function(x, ...) {
 
-  cat("Hammel Population Summary\n\n")
-  cat("First date", x$first_time, "\n")
-  cat("End time", x$end_time, "\n")
-  cat("Total persons", x$persons_total, "\n")
-  cat("Persons alive at end", x$persons_alive, "\n")
-  cat("Total births", x$n_births, "\n")
-  cat("Total deaths", x$n_deaths, "\n")
-  cat("Total unions", x$n_unions, "\n")
-  cat("Total dissolutions", x$n_dissolutions, "\n")
+  cat(cli::style_bold("Hammel Population Summary"), "\n\n")
+
+  print_stat("First date:", round(x$first_time, 3))
+  print_stat("End time:", x$end_time)
+  print_stat("Persons alive at end time:", x$persons_alive)
+  print_stat("Total births:", x$n_births)
+  print_stat("Total unrealized births:", x$n_births_u)
+  print_stat("Total deaths", x$n_deaths)
+  print_stat("Total unions", x$n_unions)
+  print_stat("Total dissolutions", x$n_dissolutions)
+
+  if(!is.null(x$simulation)) {
+    cat("\n", cli::style_bold("Latest simulation run"), "\n", sep = "")
+
+    print_stat(
+      "Time period:", paste0(x$simulation$start, "-", x$simulation$end)
+    )
+    print_stat("Starting population size:", x$simulation$pop_size_start)
+    print_stat("Ending population size:", x$simulation$pop_size_end)
+  }
 
   counts <- x$age_counts
   width <- 25
   peak <- max(c(counts$male, counts$female, 1))
   male <- strrep("#", round(width * counts$male / peak))
   female <- strrep("#", round(width * counts$female / peak))
+  age_labels <- format(counts$age, width = 7, justify = "centre")
 
-  cat("\nLiving population by age and sex\n\n")
-  cat(sprintf("%25s   %7s   %s\n", "Male", "Age", "Female"))
-
+  cat(
+    "\n", cli::style_bold("Living population by age and sex"), "\n\n", sep = ""
+  )
+  cat(sprintf(
+    "%25s   %s   %-25s\n",
+    "Male",
+    format("Age", width = 7, justify = "centre"),
+    "Female"
+  ))
   for (i in rev(seq_len(nrow(counts)))) {
     cat(sprintf(
-      "%25s | %7s | %-25s\n",
-      male[i], counts$age[i], female[i]
+      "%25s | %s | %-25s\n",
+      male[i], age_labels[i], female[i]
     ))
   }
 
