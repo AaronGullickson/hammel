@@ -362,8 +362,7 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
     female = as.integer(age_counts[, "f"])
   )
 
-  if(!is.null(object$simulation)) {
-
+  if (!is.null(object$simulation)) {
     start <- object$simulation$start_time
     pop_init <- sum(
       object$persons$birth_time <= start &
@@ -379,6 +378,29 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
     simulation <- NULL
   }
 
+  if (!is.null(object$groups)) {
+    group_counts <- lapply(
+      names(object$groups),
+      function(group_name) {
+        categories <- object$groups[[group_name]]$categories
+        counts <- table(
+          factor(
+            object$persons[[group_name]][alive],
+            levels = categories
+          )
+        ) |>
+          as.numeric()
+        tibble(
+          category = categories,
+          count = counts,
+          percent = 100 * counts / sum(counts)
+        )
+      }
+    )
+    names(group_counts) <- names(object$groups)
+  } else {
+    group_counts <- NULL
+  }
 
   structure(
     list(
@@ -394,7 +416,8 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
       n_dissolutions = (sum(!is.na(object$unions$end_reason) &
                               object$unions$end_reason == "dissolution")),
       age_counts = age_counts,
-      simulation = simulation
+      simulation = simulation,
+      group_counts = group_counts
     ),
     class = "summary.hammel_population"
   )
@@ -412,7 +435,9 @@ print.summary.hammel_population <- function(x, ...) {
   print_stat("End time:", x$end_time)
   print_stat("Persons alive at end time:", x$persons_alive)
   print_stat("Total births:", x$n_births)
-  print_stat("Total unrealized births:", x$n_births_u)
+  if (!is.na(x$n_births_u)) {
+    print_stat("Total unrealized births:", x$n_births_u)
+  }
   print_stat("Total deaths", x$n_deaths)
   print_stat("Total unions", x$n_unions)
   print_stat("Total dissolutions", x$n_dissolutions)
@@ -425,6 +450,33 @@ print.summary.hammel_population <- function(x, ...) {
     )
     print_stat("Starting population size:", x$simulation$pop_size_start)
     print_stat("Ending population size:", x$simulation$pop_size_end)
+  }
+
+  if(!is.null(x$group_counts)) {
+    cat(
+      "\n", cli::style_bold("Living population by group"), "\n", sep = ""
+    )
+
+    for (dimension in names(x$group_counts)) {
+      counts <- x$group_counts[[dimension]]
+      label_width <- max(nchar(c("Category", counts$category)))
+
+      cat("\n", cli::style_bold(dimension), "\n", sep = "")
+      cat(sprintf(
+        "  %-*s %10s %9s\n",
+        label_width, "Category", "Count", "Percent"
+      ))
+
+      for (i in seq_len(nrow(counts))) {
+        cat(sprintf(
+          "  %-*s %10.0f %9.1f\n",
+          label_width,
+          counts$category[i],
+          counts$count[i],
+          counts$percent[i]
+        ))
+      }
+    }
   }
 
   counts <- x$age_counts
