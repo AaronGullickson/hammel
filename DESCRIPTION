@@ -12,6 +12,7 @@ Encoding: UTF-8
 Imports:
     Rcpp,
     tibble,
+    cli,
     utils
 LinkingTo:
     Rcpp
