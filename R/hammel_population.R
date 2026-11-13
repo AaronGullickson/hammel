@@ -356,7 +356,7 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
 
   age_counts = tibble::tibble(
     age = paste0(
-      head(breaks, -1), "–", tail(breaks, -1) - 1
+      head(breaks, -1), "\u002d", tail(breaks, -1) - 1
     ),
     male = as.integer(age_counts[, "m"]),
     female = as.integer(age_counts[, "f"])
@@ -446,7 +446,7 @@ print.summary.hammel_population <- function(x, ...) {
     cat("\n", cli::style_bold("Latest simulation run"), "\n", sep = "")
 
     print_stat(
-      "Time period:", paste0(x$simulation$start, "-", x$simulation$end)
+      "Time period:", paste0(x$simulation$start, "\u002d", x$simulation$end)
     )
     print_stat("Starting population size:", x$simulation$pop_size_start)
     print_stat("Ending population size:", x$simulation$pop_size_end)
