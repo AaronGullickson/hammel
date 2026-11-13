@@ -113,3 +113,29 @@ test_that("fertility spacing is stored and revalidated on attachment", {
   }
 })
 
+
+test_that("fertility summaries warn about positive open-ended age bands", {
+  rates <- tibble::tibble(age_start = 15, age_end = Inf, rate = 0.1)
+  expect_no_warning(process <- fertility(rates))
+  expect_warning(
+    result <- summary(process),
+    "open-ended fertility age band has a positive rate"
+  )
+  expect_s3_class(result, "summary.hammel_fertility")
+  expect_identical(process$rates, rates)
+  rates$rate <- 0
+  expect_no_warning(summary(fertility(rates)))
+  rates$rate <- 0.1
+  rates$age_end <- 50
+  rates$parity_start <- 0
+  rates$parity_end <- Inf
+  rates$time_start <- 2000
+  rates$time_end <- Inf
+  expect_no_warning(summary(fertility(rates)))
+  rates$age_end <- Inf
+  rates$race <- "A"
+  expect_warning(
+    summary(fertility(rates)),
+    "open-ended fertility age band has a positive rate"
+  )
+})

@@ -17,11 +17,11 @@ print_rate_strata <- function(x) {
 
   cat("\n", cli::style_bold("Stratified by"), "\n", sep = "")
   if (length(x$stratified_by)) {
-    width <- max(nchar(x$stratified_by, type = "width"))
+    width <- max(nchar(x$stratified_by, type = "width")) + 1L
     for (column in x$stratified_by) {
       values <- paste(unique(x$strata[[column]]), collapse = ", ")
-      label <- format(column, width = width, justify = "left")
-      cat("  ", label, "  ", values, "\n", sep = "")
+      label <- format(paste0(column, ":"), width = width, justify = "left")
+      cat("  ", label, " ", values, "\n", sep = "")
     }
   } else {
     cat("  None\n")

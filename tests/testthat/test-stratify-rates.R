@@ -223,7 +223,7 @@ test_that("rate metadata printing separates shared and differing bands", {
   metadata <- summarize_rate_strata(rates)
   text <- capture.output(value <- print_rate_strata(metadata))
   expect_identical(value, metadata)
-  expect_true(any(grepl("sex  m, f", text, fixed = TRUE)))
+  expect_true(any(grepl("sex: m, f", text, fixed = TRUE)))
   expect_equal(sum(grepl("[0, Inf)", text, fixed = TRUE)), 1L)
   expect_false(any(grepl("Bands by stratum", text, fixed = TRUE)))
 
