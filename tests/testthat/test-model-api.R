@@ -542,3 +542,78 @@ test_that("model readiness requires declared transition dimensions", {
   expect_true(any(grepl("Unassigned dimension", text, fixed = TRUE)))
   expect_true(any(grepl("set_group_transition()", text, fixed = TRUE)))
 })
+
+test_that("population summaries match the simulated histories", {
+  set.seed(7)
+  population <- generate_uniform_population(300)
+  model <- hammel_model() |>
+    set_population(population) |>
+    set_mortality(usa_2000_mortality) |>
+    set_fertility(usa_2000_fertility) |>
+    set_union_formation("on_demand")
+  result <- run_simulation(model, years = 10, seed = 11)
+  persons <- result$persons
+  alive <- is.na(persons$death_time)
+  out <- summary(result)
+
+  expect_s3_class(out, "summary.hammel_population")
+  expect_identical(out$first_time, min(persons$birth_time))
+  expect_identical(out$end_time, 10)
+  expect_identical(out$persons_alive, sum(alive))
+  expect_identical(out$n_births, nrow(persons))
+  expect_identical(out$n_deaths, sum(!alive))
+  expect_identical(out$n_unions, nrow(result$unions))
+  expect_identical(
+    out$n_dissolutions,
+    sum(result$unions$end_reason %in% "dissolution")
+  )
+  expect_identical(
+    is.na(out$n_births_u),
+    is.null(result$unrealized_births)
+  )
+  expect_s3_class(out$age_counts, "tbl_df")
+  expect_equal(sum(out$age_counts$male), sum(alive & persons$sex == "m"))
+  expect_equal(sum(out$age_counts$female), sum(alive & persons$sex == "f"))
+  expect_identical(out$simulation$start, 0)
+  expect_identical(out$simulation$end, 10)
+  expect_identical(out$simulation$pop_size_start, 300L)
+  expect_identical(out$simulation$pop_size_end, sum(alive))
+  expect_null(out$group_counts)
+
+  text <- cli::cli_fmt(value <- print(out))
+  expect_identical(value, out)
+  expect_true(any(grepl("Latest simulation run", text, fixed = TRUE)))
+  expect_true(any(grepl("Time period: 0-10", text, fixed = TRUE)))
+  expect_true(any(grepl(
+    paste("Persons alive at end time:", sum(alive)), text, fixed = TRUE
+  )))
+  expect_identical(
+    any(grepl("Total unrealized births", text, fixed = TRUE)),
+    !is.na(out$n_births_u)
+  )
+
+  start <- summary(population)
+  expect_null(start$simulation)
+  expect_true(is.na(start$n_births_u))
+  text <- cli::cli_fmt(print(start))
+  expect_false(any(grepl("Latest simulation run", text, fixed = TRUE)))
+  expect_false(any(grepl("unrealized", text, fixed = TRUE)))
+})
+
+test_that("population summaries count declared categories without members", {
+  population <- generate_uniform_population(
+    40,
+    groups = list(region = c(n = 1, s = 1))
+  )
+  model <- hammel_model() |>
+    set_population(population) |>
+    set_groups(region = group(categories = c("n", "s", "w")))
+  counts <- summary(model$population)$group_counts$region
+  expect_s3_class(counts, "tbl_df")
+  expect_identical(counts$category, c("n", "s", "w"))
+  expect_equal(sum(counts$count), 40)
+  expect_equal(counts$count[3], 0)
+  expect_equal(sum(counts$percent), 100)
+  text <- cli::cli_fmt(print(summary(model$population)))
+  expect_true(any(grepl("w 0 (0.0%)", text, fixed = TRUE)))
+})

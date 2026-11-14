@@ -321,3 +321,30 @@ test_that("calendar structure grouping preserves joint parity coverage", {
   expect_true(any(grepl("Bands by calendar period", text, fixed = TRUE)))
   expect_equal(sum(grepl("Parity bands", text, fixed = TRUE)), 2L)
 })
+
+test_that("rate metadata printing handles empty, missing and unused bands", {
+  rates <- tibble::tibble(age_start = 15, age_end = 50, rate = 0.1)
+  text <- cli::cli_fmt(print_rate_strata(summarize_rate_strata(rates[0, ])))
+  expect_true(any(grepl("Bands: none supplied", text, fixed = TRUE)))
+
+  rates <- tibble::tibble(
+    race = c("A", NA),
+    age_start = c(0, 5),
+    age_end = c(Inf, Inf),
+    rate = 0.1
+  )
+  text <- cli::cli_fmt(print_rate_strata(summarize_rate_strata(rates)))
+  expect_true(any(grepl("race = NA", text, fixed = TRUE)))
+  expect_true(any(grepl("[5, Inf)", text, fixed = TRUE)))
+
+  bands <- tibble::tibble(
+    age_start = 0,
+    age_end = Inf,
+    dur_start = NA_real_,
+    dur_end = NA_real_
+  )
+  axes <- format_rate_band_axes(bands)
+  expect_named(axes, "Age bands (years)")
+  text <- cli::cli_fmt(print_rate_band_axes(bands[0, ]))
+  expect_true(any(grepl("Bands: none supplied", text, fixed = TRUE)))
+})

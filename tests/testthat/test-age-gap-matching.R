@@ -88,6 +88,12 @@ test_that("matching summaries recover age-gap parameters and settings", {
     lines[["Group exogamy (race|region)"]],
     "W|S:B|S = prohibited"
   )
+
+  long <- data.frame(
+    race_x = "W", race_y = LETTERS[1:12], log_odds = -seq_len(12)
+  )
+  text <- format_exogamy_table(long, "race")
+  expect_match(text, "W:J = -10, and 2 more", fixed = TRUE)
 })
 
 test_that("union formation summaries nest matching models", {
