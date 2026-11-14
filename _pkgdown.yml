@@ -55,6 +55,7 @@ reference:
       - union_formation
       - summary.union_formation
       - union_dissolution
+      - summary.union_dissolution
       - group_transition
       - household
 
