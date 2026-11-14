@@ -120,6 +120,13 @@ Cohabitation and conversion settings within union formation, including preparati
 
 - Functions: `validate_cohabitation()`, `validate_conversion_rates()`, `prepare_cohabitation()`.
 
+### `R/errors.R`
+
+Raise classified errors and warnings with cli messages (D183); see [error and warning messages](error-messages.md).
+
+- Functions: `abort_hammel()`, `warn_hammel()`, `condition_classes()`.
+- Constants: `error_kinds`, `warning_kinds`.
+
 ### `R/extract_kin.R`
 
 Extract kin, count living kin over time, and validate generation limits

@@ -1,10 +1,9 @@
 # Error and warning messages
 
-Status: style and architecture selected by the user on November 14, 2026
-(D183); migration in progress under issue #25. The condition-class list and
-native message tags below are **proposed** and await user review. Until the
-migration finishes, unconverted call sites still use base `stop()` and
-`warning()` with `call. = FALSE`.
+Status: style, architecture, condition classes and native message tags
+selected by the user on November 14, 2026 (D183); migration in progress under
+issue #25. Until the migration finishes, unconverted call sites still use base
+`stop()` and `warning()` with `call. = FALSE`.
 
 This guide covers every error and warning Hammel raises, in R and from the
 native engine. Most are input validation errors, but the same rules apply to
@@ -100,7 +99,7 @@ failure as fields of the condition object.
 Classes are public API: once released, a class name and the meaning of its
 fields should not change without a decision entry.
 
-**Proposed error classes** (for user review):
+**Error classes:**
 
 | Class | Raised when | Typical fields |
 | --- | --- | --- |
@@ -115,7 +114,7 @@ fields should not change without a decision entry.
 | `hammel_error_runtime` | A user-supplied input fails during a simulation, such as a custom function returning invalid values | `process` |
 | `hammel_error_internal` | An internal consistency check fails; this indicates a bug in Hammel | none |
 
-**Proposed warning classes** (for user review):
+**Warning classes:**
 
 | Class | Raised when |
 | --- | --- |
@@ -130,15 +129,17 @@ two seem to apply, use the one that tells the user what to change.
 
 ## Raising conditions
 
-Shared helpers live in a dedicated R script (proposed name `R/errors.R`,
-authorized by the user on November 14, 2026; see D183):
+Shared helpers live in a dedicated R script, `R/errors.R`, authorized by the
+user on November 14, 2026 (D183):
 
-- `abort_hammel(message, class, call, ...)` wraps `cli::cli_abort()`. It adds
-  the `hammel_error_<class>` and `hammel_error` classes, passes `call`, and
-  stores named data in `...` as condition fields. `message` is a cli character
-  vector: the header followed by named `"x"` and `"i"` bullets.
-- `warn_hammel(message, class, ...)` does the same for warnings with
-  `cli::cli_warn()`.
+- `abort_hammel(message, kind, ..., call)` wraps `cli::cli_abort()`. `kind`
+  is the short class name, such as `"table"`; the helper adds the
+  `hammel_error_<kind>` and `hammel_error` classes, passes `call`, and stores
+  named data in `...` as condition fields. `message` is a cli character
+  vector: the header followed by named `"x"` and `"i"` bullets, interpolated
+  in the caller's environment.
+- `warn_hammel(message, kind, ...)` does the same for warnings with
+  `cli::cli_warn()`. Warnings do not name a calling function.
 - A native-call wrapper translates engine errors and warnings (below).
 
 The general checks in `R/checks.R` (`check_columns()`, `check_numeric_column()`,
@@ -164,8 +165,9 @@ than formatted in C++.
   engine starts, moving it is a behavior change and is listed for the user
   rather than made silently.
 
-**Proposed tags** (for user review; the final list is fixed while converting
-the native sites):
+**Tags.** These cover the user-caused native messages known when D183 was
+made. A native message found during conversion that fits none of them gets a
+new tag only with the user's agreement:
 
 | Tag | Class | Example |
 | --- | --- | --- |

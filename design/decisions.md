@@ -3715,11 +3715,15 @@ without showing the offending value or a fix, and `call. = FALSE` hides which
 function failed. Condition classes make the rewording pass, and later ones,
 cheap: about 430 tests currently match message text.
 
-**Unselected:** The condition-class list and native tags proposed in the
-guide await user review. The wording of individual messages is settled as
-each file is converted. Moving checks from the native engine into R before a
-run starts would change behavior and requires the user's agreement case by
-case.
+**Classes and tags:** The user approved the guide's ten error classes, five
+warning classes and seven native message tags on November 14, 2026, along
+with the helper script name `R/errors.R` and naming setters through internal
+builders shared with their constructors.
+
+**Unselected:** The wording of individual messages is settled as each file is
+converted. A new class or tag requires the user's agreement. Moving checks
+from the native engine into R before a run starts would change behavior and
+requires the user's agreement case by case.
 
 **Consequences:** Condition class names and fields become public API. Tests
 migrate to class checks and snapshot tests as call sites are converted.
