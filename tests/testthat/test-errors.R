@@ -94,3 +94,19 @@ test_that("messages keep their bullet layout", {
   }
   expect_snapshot(user_function(), error = TRUE)
 })
+
+test_that("describe_value names types and sizes", {
+  expect_identical(describe_value(NULL), "`NULL`")
+  expect_identical(describe_value(NA_real_), "`NA`")
+  expect_identical(describe_value("0"), "`\"0\"`")
+  expect_identical(describe_value(Inf), "`Inf`")
+  expect_identical(describe_value(c(1, 2)), "a numeric vector of length 2")
+  expect_identical(describe_value(1:3), "a numeric vector of length 3")
+  expect_identical(describe_value(integer()), "an empty numeric vector")
+  expect_identical(describe_value(list(1)), "a list of length 1")
+  expect_identical(describe_value(list()), "an empty list")
+  expect_identical(describe_value(matrix(1:4, 2)), "a numeric matrix")
+  expect_identical(describe_value(mean), "a function")
+  expect_identical(describe_value(data.frame()), "a data frame")
+  expect_identical(describe_value(0 + 0i), "`0+0i`")
+})

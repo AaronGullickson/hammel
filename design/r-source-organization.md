@@ -124,7 +124,7 @@ Cohabitation and conversion settings within union formation, including preparati
 
 Raise classified errors and warnings with cli messages (D183); see [error and warning messages](error-messages.md).
 
-- Functions: `abort_hammel()`, `warn_hammel()`, `condition_classes()`.
+- Functions: `abort_hammel()`, `warn_hammel()`, `describe_value()`, `condition_classes()`.
 - Constants: `error_kinds`, `warning_kinds`.
 
 ### `R/extract_kin.R`

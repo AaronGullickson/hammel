@@ -26,7 +26,14 @@ test_that("dissolution constructors validate duration schedules and retain prove
   for (column in c("time_start", "time_end")) {
     bad <- rates
     bad[[column]] <- 0
-    expect_error(union_dissolution(bad), "missing columns")
+    error <- expect_error(
+      union_dissolution(bad),
+      class = "hammel_error_table"
+    )
+    expect_identical(
+      error$columns,
+      setdiff(c("time_start", "time_end"), column)
+    )
   }
   for (value in list(-1, NA_real_, Inf, "0", matrix(0, 2, 1))) {
     bad <- rates

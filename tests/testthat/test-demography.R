@@ -99,7 +99,11 @@ test_that("life tables use only rate or rate_mortality as input rates", {
     input$mx <- "not an input mortality rate"
     expect_identical(calculate_life_table(input), expected)
     input[[column]] <- "invalid"
-    expect_error(calculate_life_table(input), paste0("rates\\$", column))
+    error <- expect_error(
+      calculate_life_table(input),
+      class = "hammel_error_table"
+    )
+    expect_identical(error$argument, paste0("rates$", column))
   }
   mx_only <- rates
   names(mx_only)[names(mx_only) == "rate"] <- "mx"

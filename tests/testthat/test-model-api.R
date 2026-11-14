@@ -410,10 +410,11 @@ test_that("population reference times are required and validated everywhere", {
     0 + 0i, matrix(0), array(0)
   )
   for (time in bad_times) {
-    expect_error(
+    error <- expect_error(
       hammel_population(persons, end_time = time),
-      "end_time.*single finite numeric"
+      class = "hammel_error_argument"
     )
+    expect_identical(error$argument, "end_time")
     invalid <- population
     invalid["end_time"] <- list(time)
     expect_error(validate_population(invalid), "end_time")

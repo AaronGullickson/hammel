@@ -43,7 +43,10 @@ test_that("conditional preparation rejects incompatible products and invalid val
   }
   bad <- raw
   bad$m1x <- as.character(bad$m1x)
-  expect_error(hammel:::fertility_by_parity_from_hfd(bad,2000),"numeric")
+  expect_error(
+    hammel:::fertility_by_parity_from_hfd(bad, 2000),
+    class = "hammel_error_table"
+  )
   bad <- raw
   bad$Age[3] <- "20-24"
   expect_error(hammel:::fertility_by_parity_from_hfd(bad,2000),"single-year")

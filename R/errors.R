@@ -49,6 +49,43 @@ warn_hammel <- function(message, kind, ..., .envir = parent.frame()) {
   )
 }
 
+# Describe a value's type and size for an "x" bullet, as in "It is a
+# character vector of length 2." Single atomic values are shown as code.
+describe_value <- function(x) {
+  if (is.null(x)) {
+    return("`NULL`")
+  }
+  if (is.function(x)) {
+    return("a function")
+  }
+  if (is.data.frame(x)) {
+    return("a data frame")
+  }
+  type <- if (is.factor(x)) {
+    "factor"
+  } else if (is.atomic(x)) {
+    typeof(x)
+  } else if (is.list(x)) {
+    "list"
+  } else {
+    class(x)[1]
+  }
+  type <- sub("^(double|integer)$", "numeric", type)
+  if (!is.null(dim(x))) {
+    return(paste("a", type, "matrix"))
+  }
+  if (is.atomic(x) && !is.factor(x) && length(x) == 1L) {
+    value <- if (is.na(x)) "NA" else deparse(unname(x))
+    return(paste0("`", value, "`"))
+  }
+  if (!length(x)) {
+    return(paste0("an empty ", type, if (type == "list") "" else " vector"))
+  }
+  article <- if (grepl("^[aeiou]", type)) "an" else "a"
+  noun <- if (type == "list") "" else " vector"
+  paste0(article, " ", type, noun, " of length ", length(x))
+}
+
 # The class vector of a condition of `type` ("error" or "warning"). An
 # unknown kind is a programming error in Hammel.
 condition_classes <- function(kind, type) {
