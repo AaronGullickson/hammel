@@ -50,6 +50,7 @@ reference:
     contents:
       - mortality
       - fertility
+      - summary.hammel_fertility
       - union_formation
       - union_dissolution
       - group_transition

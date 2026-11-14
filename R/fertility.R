@@ -123,6 +123,47 @@ set_fertility <- function(
 
 # SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
 
+#' Summarize a fertility process
+#'
+#' @description
+#' Summarize fertility settings and the strata and bands in the input rate
+#' schedule. The print method displays compact band lists and an advisory
+#' when an open-ended age band contains a positive fertility rate.
+#'
+#' @param object A `hammel_fertility` object returned by [fertility()].
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_fertility` containing:
+#' \describe{
+#'   \item{birth_interval}{The minimum maternal birth-to-birth interval,
+#'     in years.}
+#'   \item{ffab}{The probability that a newborn is female.}
+#'   \item{rate_strata}{A list describing the input rate schedule, containing
+#'     `stratified_by` (stratum column names), `strata` (a tibble of observed
+#'     stratum combinations), `bands` (a tibble of exact band combinations),
+#'     and `bands_by_stratum` (whether band combinations differ by stratum).
+#'     Shared bands are stored once; otherwise `bands` includes the stratum
+#'     columns. Band endpoints define half-open intervals `[start, end)`.}
+#'   \item{open_band_non_zero}{Whether any age band ends at `Inf` and has a
+#'     positive fertility rate.}
+#' }
+#'
+#' @details
+#' `print()` displays fertility settings, categorical strata, and age,
+#' duration, parity, and calendar bands when present. Long band lists are
+#' abbreviated. Calendar periods with identical non-calendar band structures
+#' are grouped together when structures change over time. Exact band
+#' combinations remain available in `rate_strata$bands`.
+#'
+#' For positive open-ended age bands, the printed advisory notes that the
+#' rate applies to all women in the band and is ignored when calculating
+#' TFR. This is a display message, not an R warning condition.
+#'
+#' @seealso [fertility()], [calculate_tfr()]
+#' @examples
+#' process <- fertility(usa_2000_fertility)
+#' summary(process)
 #' @export
 summary.hammel_fertility <- function(object, ...) {
 
@@ -138,6 +179,9 @@ summary.hammel_fertility <- function(object, ...) {
   )
 }
 
+#' @rdname summary.hammel_fertility
+#' @param x A `summary.hammel_fertility` object returned by
+#'   `summary.hammel_fertility()`.
 #' @export
 print.summary.hammel_fertility <- function(x, ...) {
 
