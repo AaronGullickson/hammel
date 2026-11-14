@@ -2,33 +2,49 @@
 
 # HELPER FUNCTIONS ------------------------------------------------------------
 
-# format the printing of a stat
-print_stat <- function(label, value) {
-  cat(sprintf("%-28s %12s\n", label, value))
+# Open the bullet list used by summary print methods. Wrapped lines are
+# indented under their bullet text. Returns the id of the enclosing div;
+# cli::cli_end(id) closes the list and its theme.
+open_summary_list <- function() {
+  div <- cli::cli_div(
+    theme = list(li = list("text-exdent" = 2)),
+    .auto_close = FALSE
+  )
+  cli::cli_ul(.auto_close = FALSE)
+  div
 }
 
-# Print metadata returned by summarize_rate_strata(), invisibly returning it.
-# Band axes are printed separately; exact combinations remain in the metadata.
-# NULL represents an unconfigured schedule and produces no output.
+# Print one statistic as a cli bullet in the current list. Values are
+# interpolated, not parsed, so braces in category names print literally.
+print_stat <- function(label, value) {
+  cli::cli_li("{label}: {value}", .auto_close = FALSE)
+}
+
+# Open a bullet whose following bullets are nested beneath it. Returns the
+# item id; close it, and everything inside it, with cli::cli_end(id).
+open_nested_stat <- function(label, value = NULL) {
+  item <- if (is.null(value)) {
+    cli::cli_li("{label}", .auto_close = FALSE)
+  } else {
+    cli::cli_li("{label}: {value}", .auto_close = FALSE)
+  }
+  cli::cli_ul(.auto_close = FALSE)
+  item
+}
+
+# Print metadata returned by summarize_rate_strata() as bullets, invisibly
+# returning it. Band axes are printed separately; exact combinations remain
+# in the metadata. NULL represents an unconfigured schedule and prints
+# nothing.
 print_rate_strata <- function(x) {
   if (is.null(x)) {
     return(invisible(x))
   }
 
-  cat("\n", cli::style_bold("Stratified by"), "\n", sep = "")
-  if (length(x$stratified_by)) {
-    width <- max(nchar(x$stratified_by, type = "width")) + 1L
-    for (column in x$stratified_by) {
-      values <- paste(unique(x$strata[[column]]), collapse = ", ")
-      label <- format(paste0(column, ":"), width = width, justify = "left")
-      cat("  ", label, " ", values, "\n", sep = "")
-    }
-  } else {
-    cat("  None\n")
-  }
+  print_stat("Stratified by", format_rate_strata(x))
 
   if (!nrow(x$bands)) {
-    cat("\nNo bands supplied.\n")
+    print_stat("Bands", "none supplied")
     return(invisible(x))
   }
   if (!x$bands_by_stratum) {
@@ -36,7 +52,7 @@ print_rate_strata <- function(x) {
     return(invisible(x))
   }
 
-  cat("\n", cli::style_bold("Bands by stratum"), "\n", sep = "")
+  by_stratum <- open_nested_stat("Bands by stratum")
   for (i in seq_len(nrow(x$strata))) {
     rows <- rep(TRUE, nrow(x$bands))
     labels <- character(length(x$stratified_by))
@@ -51,17 +67,33 @@ print_rate_strata <- function(x) {
       rows <- rows & same
       labels[j] <- paste0(column, " = ", value)
     }
-    cat("\n  ", cli::style_bold(paste(labels, collapse = "; ")),
-      "\n", sep = ""
-    )
-    print_rate_bands(x$bands[rows, ], indent = "    ")
+    stratum <- open_nested_stat(paste(labels, collapse = "; "))
+    print_rate_bands(x$bands[rows, ])
+    cli::cli_end(stratum)
   }
+  cli::cli_end(by_stratum)
   invisible(x)
+}
+
+# Describe stratum columns and their observed values on one line.
+format_rate_strata <- function(x) {
+  if (!length(x$stratified_by)) {
+    return("none")
+  }
+  columns <- vapply(
+    x$stratified_by,
+    function(column) {
+      values <- paste(unique(x$strata[[column]]), collapse = ", ")
+      paste0(column, " (", values, ")")
+    },
+    character(1)
+  )
+  paste(columns, collapse = "; ")
 }
 
 # Group calendar intervals by their exact non-calendar band combinations.
 # Nonadjacent periods can share a structure; their intervals remain separate.
-print_rate_bands <- function(bands, indent = "  ") {
+print_rate_bands <- function(bands) {
   time_columns <- c("time_start", "time_end")
   if (all(time_columns %in% names(bands)) && nrow(bands)) {
     columns <- intersect(
@@ -93,30 +125,44 @@ print_rate_bands <- function(bands, indent = "  ") {
       }
     }
     if (length(structures) > 1L) {
-      cat("\n", indent, cli::style_bold("Bands by calendar period"),
-        "\n", sep = ""
-      )
+      by_period <- open_nested_stat("Bands by calendar period")
       for (i in seq_along(structures)) {
-        print_rate_band_axes(periods[period_groups[[i]], ], indent)
-        print_rate_band_axes(structures[[i]], paste0(indent, "  "))
+        calendar <- format_rate_band_axes(periods[period_groups[[i]], ])
+        period <- open_nested_stat(names(calendar), calendar[[1]])
+        print_rate_band_axes(structures[[i]])
+        cli::cli_end(period)
       }
+      cli::cli_end(by_period)
       return(invisible(bands))
     }
   }
-  print_rate_band_axes(bands, indent)
+  print_rate_band_axes(bands)
   invisible(bands)
 }
 
 # Print marginal band sets, rather than expanding age by calendar time.
 # These lists describe bands present, not every possible joint combination.
-print_rate_band_axes <- function(bands, indent = "  ") {
+print_rate_band_axes <- function(bands) {
+  axes <- format_rate_band_axes(bands)
+  if (!length(axes)) {
+    print_stat("Bands", "none supplied")
+  }
+  for (axis in names(axes)) {
+    print_stat(axis, axes[[axis]])
+  }
+  invisible(bands)
+}
+
+# Named character vector of formatted marginal band sets, one per axis
+# present, named by its display label.
+format_rate_band_axes <- function(bands) {
   axes <- c(
     age = "Age bands (years)",
     dur = "Duration bands (years)",
     parity = "Parity bands",
     time = "Calendar bands (years)"
   )
-  printed <- FALSE
+  out <- character()
   for (axis in names(axes)) {
     columns <- paste0(axis, c("_start", "_end"))
     if (!all(columns %in% names(bands))) {
@@ -128,21 +174,16 @@ print_rate_band_axes <- function(bands, indent = "  ") {
       next
     }
     pairs <- pairs[order(pairs[[1]], pairs[[2]]), ]
-    text <- format_rate_bands(pairs[[1]], pairs[[2]])
-    cat("\n", indent, cli::style_bold(axes[[axis]]), "\n", sep = "")
-    cat(paste0(indent, "  ", text), "\n", sep = "")
-    printed <- TRUE
+    out[[axes[[axis]]]] <- format_rate_bands(pairs[[1]], pairs[[2]])
   }
-  if (!printed) {
-    cat(indent, "No bands supplied.\n", sep = "")
-  }
-  invisible(bands)
+  out
 }
 
 # Abbreviate only contiguous, equal-width finite bands as regular sequences.
 # Other long sets show the first three and last two bands, with a total.
+# A non-breaking space inside each band keeps cli from wrapping within it.
 format_rate_bands <- function(start, end) {
-  labels <- paste0("[", start, ", ", end, ")")
+  labels <- paste0("[", start, ",\u00a0", end, ")")
   n <- length(labels)
   if (n <= 8L) {
     return(paste(labels, collapse = ", "))

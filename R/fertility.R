@@ -173,24 +173,24 @@ summary.hammel_fertility <- function(object, ...) {
 #' @export
 print.summary.hammel_fertility <- function(x, ...) {
 
-  cli::cli_h1("Fertility Process Summary")
+  cli::cli_h2("Fertility process")
 
-  cat("\n")
-  print_stat("Minimum birth interval:", x$birth_interval)
-  print_stat("Fraction female at birth:", x$ffab)
-
+  list <- open_summary_list()
+  print_stat("Minimum birth interval", paste(x$birth_interval, "years"))
+  print_stat("Fraction female at birth", x$ffab)
   print_rate_strata(x$rate_strata)
+  cli::cli_end(list)
 
   if (x$open_band_non_zero) {
-    cat("\n")
-    cli::cli_text(
+    cli::cli_alert_warning(
       paste0(
-        "{.yellow \u26A0} An open-ended age band contains a positive fertility ",
+        "An open-ended age band contains a positive fertility ",
         "rate. This will apply to all women in the band and will be ignored ",
         "when calculating TFR."
-     )
+      )
     )
   }
+  invisible(x)
 }
 
 # HELPER FUNCTIONS ---------------------------------------------------------

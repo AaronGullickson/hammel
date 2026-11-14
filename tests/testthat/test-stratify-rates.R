@@ -221,18 +221,18 @@ test_that("rate metadata printing separates shared and differing bands", {
     rate = c(0.1, 0.2)
   )
   metadata <- summarize_rate_strata(rates)
-  text <- capture.output(value <- print_rate_strata(metadata))
+  text <- cli::cli_fmt(value <- print_rate_strata(metadata))
   expect_identical(value, metadata)
-  expect_true(any(grepl("sex: m, f", text, fixed = TRUE)))
+  expect_true(any(grepl("Stratified by: sex (m, f)", text, fixed = TRUE)))
   expect_equal(sum(grepl("[0, Inf)", text, fixed = TRUE)), 1L)
   expect_false(any(grepl("Bands by stratum", text, fixed = TRUE)))
 
   rates$age_start[2] <- 5
-  text <- capture.output(print_rate_strata(summarize_rate_strata(rates)))
+  text <- cli::cli_fmt(print_rate_strata(summarize_rate_strata(rates)))
   expect_true(any(grepl("sex = m", text, fixed = TRUE)))
   expect_true(any(grepl("sex = f", text, fixed = TRUE)))
   expect_true(any(grepl("[5, Inf)", text, fixed = TRUE)))
-  expect_length(capture.output(print_rate_strata(NULL)), 0L)
+  expect_length(cli::cli_fmt(print_rate_strata(NULL)), 0L)
 })
 
 test_that("printed marginal bands retain parity and calendar intervals", {
@@ -245,8 +245,8 @@ test_that("printed marginal bands retain parity and calendar intervals", {
     time_end = c(2010, Inf),
     rate = 0.1
   )
-  text <- capture.output(print_rate_strata(summarize_rate_strata(rates)))
-  expect_true(any(grepl("None", text, fixed = TRUE)))
+  text <- cli::cli_fmt(print_rate_strata(summarize_rate_strata(rates)))
+  expect_true(any(grepl("Stratified by: none", text, fixed = TRUE)))
   expect_true(any(grepl("Age bands (years)", text, fixed = TRUE)))
   expect_true(any(grepl("Calendar bands (years)", text, fixed = TRUE)))
   expect_true(any(grepl("[1, Inf)", text, fixed = TRUE)))
@@ -263,7 +263,8 @@ test_that("large crossed schedules print compact marginal band sequences", {
     rate = 0.1
   )
   metadata <- summarize_rate_strata(rates)
-  text <- capture.output(value <- print_rate_strata(metadata))
+  withr::local_options(cli.width = 200)
+  text <- cli::cli_fmt(value <- print_rate_strata(metadata))
   expect_identical(value, metadata)
   expect_equal(nrow(metadata$bands), 35L * 51L)
   expect_lt(length(text), 15L)
@@ -277,9 +278,9 @@ test_that("irregular and open-ended band lists are bounded and explicit", {
   end <- c(1:9, Inf)
   text <- format_rate_bands(start, end)
   expect_match(text, "10 bands; showing 5", fixed = TRUE)
-  expect_match(text, "[12, Inf)", fixed = TRUE)
+  expect_match(text, "[12,\u00a0Inf)", fixed = TRUE)
   expect_false(grepl("width", text, fixed = TRUE))
-  expect_identical(format_rate_bands(0, Inf), "[0, Inf)")
+  expect_identical(format_rate_bands(0, Inf), "[0,\u00a0Inf)")
 
   # Equal widths with gaps must not be described as a regular sequence.
   text <- format_rate_bands(seq(0, 18, 2), seq(1, 19, 2))
@@ -295,7 +296,7 @@ test_that("calendar periods sharing band structures print together", {
     rate = seq_len(8) / 100
   )
   metadata <- summarize_rate_strata(rates)
-  text <- capture.output(value <- print_rate_strata(metadata))
+  text <- cli::cli_fmt(value <- print_rate_strata(metadata))
   expect_identical(value, metadata)
   expect_true(any(grepl("Bands by calendar period", text, fixed = TRUE)))
   expect_equal(sum(grepl("Calendar bands (years)", text, fixed = TRUE)), 2L)
@@ -316,7 +317,7 @@ test_that("calendar structure grouping preserves joint parity coverage", {
     parity_end = c(1, Inf, Inf, 1),
     rate = 0.1
   )
-  text <- capture.output(print_rate_strata(summarize_rate_strata(rates)))
+  text <- cli::cli_fmt(print_rate_strata(summarize_rate_strata(rates)))
   expect_true(any(grepl("Bands by calendar period", text, fixed = TRUE)))
   expect_equal(sum(grepl("Parity bands", text, fixed = TRUE)), 2L)
 })

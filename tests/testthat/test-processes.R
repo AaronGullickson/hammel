@@ -114,28 +114,29 @@ test_that("fertility spacing is stored and revalidated on attachment", {
 })
 
 
-test_that("fertility summaries warn about positive open-ended age bands", {
+test_that("fertility summaries flag positive open-ended age bands", {
   rates <- tibble::tibble(age_start = 15, age_end = Inf, rate = 0.1)
   expect_no_warning(process <- fertility(rates))
-  expect_warning(
-    result <- summary(process),
-    "open-ended fertility age band has a positive rate"
-  )
+  expect_no_warning(result <- summary(process))
   expect_s3_class(result, "summary.hammel_fertility")
+  expect_true(result$open_band_non_zero)
   expect_identical(process$rates, rates)
+  text <- cli::cli_fmt(print(result))
+  expect_true(any(grepl("open-ended age band", text, fixed = TRUE)))
+
   rates$rate <- 0
-  expect_no_warning(summary(fertility(rates)))
+  expect_false(summary(fertility(rates))$open_band_non_zero)
   rates$rate <- 0.1
   rates$age_end <- 50
   rates$parity_start <- 0
   rates$parity_end <- Inf
   rates$time_start <- 2000
   rates$time_end <- Inf
-  expect_no_warning(summary(fertility(rates)))
+  result <- summary(fertility(rates))
+  expect_false(result$open_band_non_zero)
+  text <- cli::cli_fmt(print(result))
+  expect_false(any(grepl("open-ended age band", text, fixed = TRUE)))
   rates$age_end <- Inf
   rates$race <- "A"
-  expect_warning(
-    summary(fertility(rates)),
-    "open-ended fertility age band has a positive rate"
-  )
+  expect_true(summary(fertility(rates))$open_band_non_zero)
 })

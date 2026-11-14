@@ -338,7 +338,7 @@ validate_population <- function(results) {
 #'     total living count is zero.}
 #' }
 #'
-#' `print()` displays the summary, group tables when present, and a text
+#' `print()` displays the summary, group counts when present, and a text
 #' population pyramid, returning its input invisibly. Pyramid bars share a
 #' common scale across both sexes.
 #'
@@ -446,55 +446,48 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
 #' @export
 print.summary.hammel_population <- function(x, ...) {
 
-  cat(cli::style_bold("Hammel Population Summary"), "\n\n")
+  cli::cli_h2("Population")
 
-  print_stat("First date:", round(x$first_time, 3))
-  print_stat("End time:", x$end_time)
-  print_stat("Persons alive at end time:", x$persons_alive)
-  print_stat("Total births:", x$n_births)
+  list <- open_summary_list()
+  print_stat("First date", round(x$first_time, 3))
+  print_stat("End time", x$end_time)
+  print_stat("Persons alive at end time", x$persons_alive)
+  print_stat("Total births", x$n_births)
   if (!is.na(x$n_births_u)) {
-    print_stat("Total unrealized births:", x$n_births_u)
+    print_stat("Total unrealized births", x$n_births_u)
   }
   print_stat("Total deaths", x$n_deaths)
   print_stat("Total unions", x$n_unions)
   print_stat("Total dissolutions", x$n_dissolutions)
 
-  if(!is.null(x$simulation)) {
-    cat("\n", cli::style_bold("Latest simulation run"), "\n", sep = "")
-
+  if (!is.null(x$simulation)) {
+    run <- open_nested_stat("Latest simulation run")
     print_stat(
-      "Time period:", paste0(x$simulation$start, "\u002d", x$simulation$end)
+      "Time period",
+      paste0(x$simulation$start, "\u002d", x$simulation$end)
     )
-    print_stat("Starting population size:", x$simulation$pop_size_start)
-    print_stat("Ending population size:", x$simulation$pop_size_end)
+    print_stat("Starting population size", x$simulation$pop_size_start)
+    print_stat("Ending population size", x$simulation$pop_size_end)
+    cli::cli_end(run)
   }
 
-  if(!is.null(x$group_counts)) {
-    cat(
-      "\n", cli::style_bold("Living population by group"), "\n", sep = ""
-    )
-
+  if (!is.null(x$group_counts)) {
+    groups <- open_nested_stat("Living population by group")
     for (dimension in names(x$group_counts)) {
       counts <- x$group_counts[[dimension]]
-      label_width <- max(nchar(c("Category", counts$category)))
-
-      cat("\n", cli::style_bold(dimension), "\n", sep = "")
-      cat(sprintf(
-        "  %-*s %10s %9s\n",
-        label_width, "Category", "Count", "Percent"
-      ))
-
-      for (i in seq_len(nrow(counts))) {
-        cat(sprintf(
-          "  %-*s %10.0f %9.1f\n",
-          label_width,
-          counts$category[i],
-          counts$count[i],
-          counts$percent[i]
-        ))
-      }
+      categories <- sprintf(
+        "%s %.0f (%.1f%%)",
+        counts$category,
+        counts$count,
+        counts$percent
+      )
+      print_stat(dimension, paste(categories, collapse = ", "))
     }
+    cli::cli_end(groups)
   }
+  cli::cli_end(list)
+
+  cli::cli_h3("Living population by age and sex")
 
   counts <- x$age_counts
   width <- 25
@@ -503,21 +496,16 @@ print.summary.hammel_population <- function(x, ...) {
   female <- strrep("#", round(width * counts$female / peak))
   age_labels <- format(counts$age, width = 7, justify = "centre")
 
-  cat(
-    "\n", cli::style_bold("Living population by age and sex"), "\n\n", sep = ""
+  pyramid <- c(
+    sprintf(
+      "%25s   %s   %-25s",
+      "Male",
+      format("Age", width = 7, justify = "centre"),
+      "Female"
+    ),
+    rev(sprintf("%25s | %s | %-25s", male, age_labels, female))
   )
-  cat(sprintf(
-    "%25s   %s   %-25s\n",
-    "Male",
-    format("Age", width = 7, justify = "centre"),
-    "Female"
-  ))
-  for (i in rev(seq_len(nrow(counts)))) {
-    cat(sprintf(
-      "%25s | %s | %-25s\n",
-      male[i], age_labels[i], female[i]
-    ))
-  }
+  cli::cli_verbatim(pyramid)
 
   invisible(x)
 }

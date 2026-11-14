@@ -311,47 +311,41 @@ summary.hammel_union_formation <- function(object, ...) {
 #' @export
 print.summary.hammel_union_formation <- function(x, ...) {
 
-  cli::cli_h1("Union Formation Process Summary")
+  cli::cli_h2("Union formation process")
 
-  cat("\n")
-  print_stat("Search Method:", x$method)
+  list <- open_summary_list()
+  print_stat("Search method", x$method)
+  print_rate_strata(x$rate_strata)
 
-  if(!is.null(x$rate_strata)) {
-    print_rate_strata(x$rate_strata)
-  }
+  eligibility <- open_nested_stat("Male eligibility restrictions")
+  print_stat("Minimum male age", x$min_male_age)
+  print_stat("Generational proximity", x$kinship_generations)
+  cli::cli_end(eligibility)
 
-  cat("\n")
-
-  cli::cli_h2("Male eligibility restrictions")
-  print_stat("Minimum male age:", x$min_male_age)
-  print_stat("Generational proximity:", x$kinship_generations)
- 
-  cat("\n")
-
-  cli::cli_h2("Cohabitation")
-  if(is.null(x$cohabitation)) {
-    cat(cli::col_br_red("Disabled"), "\n")
+  if (is.null(x$cohabitation)) {
+    print_stat("Cohabitation", "disabled")
   } else {
+    cohabitation <- open_nested_stat("Cohabitation", "enabled")
     print_stat(
-      "Probability range:",
+      "Probability range",
       paste(x$cohabitation$cohab_prob_range, collapse = "\u002d")
     )
     print_stat(
       "Counts as previous union",
       ifelse(x$cohab_as_previous_union, "yes", "no")
     )
-    cat("\n")
     print_rate_strata(x$cohabitation$cohab_rate_strata)
-    cat("\n")
-    if(!is.null(x$cohabitation$convert_rate_strata)) {
-      cli::cli_h3("Cohabitation conversion rates")
-      print_rate_strata(x$cohabitation$convert_rate_strata)
+    if (is.null(x$cohabitation$convert_rate_strata)) {
+      print_stat("Conversion to marriage", "not allowed")
     } else {
-      cat(cli::style_italic("No cohabitation conversion to marriage allowed"))
+      conversion <- open_nested_stat("Conversion to marriage rates")
+      print_rate_strata(x$cohabitation$convert_rate_strata)
+      cli::cli_end(conversion)
     }
+    cli::cli_end(cohabitation)
   }
-
-
+  cli::cli_end(list)
+  invisible(x)
 }
 
 # HELPER FUNCTIONS ---------------------------------------------------------
