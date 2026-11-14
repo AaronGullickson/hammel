@@ -73,6 +73,73 @@ set_union_dissolution <- function(model, rates, weights = NULL) {
   set_process(model, union_dissolution(rates, weights))
 }
 
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a union dissolution process
+#'
+#' @description
+#' 
+#' Summary method for class `"hammel_union_dissolution"`
+#'
+#' @param object A `hammel_union_dissolution` object returned by [union_dissolution()].
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_union_dissolution` containing:
+#' \describe{
+#'   \item{rate_strata}{A list describing the input rate schedule, containing
+#'     `stratified_by` (stratum column names), `strata` (a tibble of observed
+#'     stratum combinations), `bands` (a tibble of exact band combinations),
+#'     and `bands_by_stratum` (whether band combinations differ by stratum).
+#'     Shared bands are stored once; otherwise `bands` includes the stratum
+#'     columns. Band endpoints define half-open intervals `[start, end)`.}
+#'   \item{weights}{A summary of the weight model used for selection within
+#'     rate cells: a `summary.hammel_weight_model`, a list of `periods` and
+#'     `models` for a calendar schedule, or `NULL` when selection is
+#'     unweighted.}
+#' }
+#'
+#' @seealso [union_dissolution()]
+#' @examples
+#' diss_rates <- tibble::tribble(
+#'  ~union_type,  ~dur_start, ~dur_end, ~rate,
+#'   "cohab",      0,          5,        0.08,
+#'   "cohab",      5,          10,       0.04,
+#'   "cohab",      10,         Inf,      0.02,
+#'   "marriage",   0,          5,        0.06,
+#'   "marriage",   5,          10,       0.02,
+#'   "marriage",   10,         15,       0.01,
+#'   "marriage",   15,         Inf,      0.015
+#' )
+#' process <- union_dissolution(diss_rates)
+#' summary(process)
+#' @export
+summary.hammel_union_dissolution <- function(object, ...) {
+
+  structure(
+    list(
+      rate_strata = summarize_rate_strata(object$rates),
+      weights = summarize_model_argument(object$weights)
+    ),
+    class = "summary.hammel_union_dissolution"
+  )
+}
+
+#' @rdname summary.hammel_union_dissolution
+#' @param x A `summary.hammel_union_dissolution` object returned by
+#'   `[summary.hammel_union_dissolution()]`.
+#' @export
+print.summary.hammel_union_dissolution <- function(x, ...) {
+
+  cli::cli_h2("Union dissolution process")
+
+  list <- open_summary_list()
+  print_rate_strata(x$rate_strata)
+  print_model_argument("Weight model", x$weights)
+  cli::cli_end(list)
+  invisible(x)
+}
+
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 validate_union_dissolution <- function(process, calendar_interval = NULL) {

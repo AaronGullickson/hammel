@@ -379,3 +379,25 @@ test_that("fixed inheritance supports numeric categories and calendar switches",
   model$groups$group$inheritance$model[[2]] <- group_inheritance("fixed", fixed_value = "other")
   expect_error(run_simulation(model, .1), "undeclared")
 })
+
+test_that("inheritance summaries report method-specific settings", {
+  result <- summary(
+    group_inheritance("hierarchy", order = c("B", "W"), passing = 0.05)
+  )
+  expect_s3_class(result, "summary.hammel_group_inheritance")
+  expect_identical(result$order, c("B", "W"))
+  text <- cli::cli_fmt(value <- print(result))
+  expect_identical(value, result)
+  expect_true(any(grepl("Order: B > W", text, fixed = TRUE)))
+  expect_true(any(grepl("Passing probability: 0.05", text, fixed = TRUE)))
+
+  result <- summary(group_inheritance("fixed", fixed_value = "none"))
+  expect_null(result$order)
+  expect_null(result$passing)
+  text <- cli::cli_fmt(print(result))
+  expect_true(any(grepl("Fixed value: none", text, fixed = TRUE)))
+  expect_identical(
+    inheritance_summary_lines(summary(group_inheritance("mother"))),
+    c(Method = "mother")
+  )
+})

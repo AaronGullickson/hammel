@@ -31,7 +31,7 @@ Constructs a mortality process specification for a simulation model. The
 convenience function \code{set_mortality} is equivalent to \code{set_process(model, mortality(...))} and allows for direct piping from a model.
 }
 \details{
-The primary and only required input to the function is a fertility rate
+The primary and only required input to the function is a mortality rate
 schedule for the \code{rates} argument. This data frame must contain \code{age_start}
 and \code{age_end} columns to define the half-open age intervals (inclusive at the
 start and exclusive at the end), a \code{sex} column ("f" for female and "m" for

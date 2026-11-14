@@ -79,3 +79,61 @@ mortality <- function(rates, weights = NULL) {
 set_mortality <- function(model, rates, weights = NULL) {
   set_process(model, mortality(rates, weights = weights))
 }
+
+
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a mortality process
+#'
+#' @description
+#' 
+#' Summary method for class `"hammel_mortality"`
+#'
+#' @param object A `hammel_mortality` object returned by [mortality()].
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_morality` containing:
+#' \describe{
+#'   \item{rate_strata}{A list describing the input rate schedule, containing
+#'     `stratified_by` (stratum column names), `strata` (a tibble of observed
+#'     stratum combinations), `bands` (a tibble of exact band combinations),
+#'     and `bands_by_stratum` (whether band combinations differ by stratum).
+#'     Shared bands are stored once; otherwise `bands` includes the stratum
+#'     columns. Band endpoints define half-open intervals `[start, end)`.}
+#'   \item{weights}{A summary of the weight model used for selection within
+#'     rate cells: a `summary.hammel_weight_model`, a list of `periods` and
+#'     `models` for a calendar schedule, or `NULL` when selection is
+#'     unweighted.}
+#' }
+#'
+#' @seealso [mortality()], [calculate_life_table()]
+#' @examples
+#' process <- mortality(usa_2000_mortality)
+#' summary(process)
+#' @export
+summary.hammel_mortality <- function(object, ...) {
+
+  structure(
+    list(
+      rate_strata = summarize_rate_strata(object$rates),
+      weights = summarize_model_argument(object$weights)
+    ),
+    class = "summary.hammel_mortality"
+  )
+}
+
+#' @rdname summary.hammel_mortality
+#' @param x A `summary.hammel_mortality` object returned by
+#'   `summary.hammel_mortality()`.
+#' @export
+print.summary.hammel_mortality <- function(x, ...) {
+
+  cli::cli_h2("Mortality process")
+
+  list <- open_summary_list()
+  print_rate_strata(x$rate_strata)
+  print_model_argument("Weight model", x$weights)
+  cli::cli_end(list)
+  invisible(x)
+}

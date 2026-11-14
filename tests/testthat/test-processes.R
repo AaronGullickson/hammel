@@ -113,3 +113,126 @@ test_that("fertility spacing is stored and revalidated on attachment", {
   }
 })
 
+
+test_that("fertility summaries flag positive open-ended age bands", {
+  rates <- tibble::tibble(age_start = 15, age_end = Inf, rate = 0.1)
+  expect_no_warning(process <- fertility(rates))
+  expect_no_warning(result <- summary(process))
+  expect_s3_class(result, "summary.hammel_fertility")
+  expect_true(result$open_band_non_zero)
+  expect_identical(process$rates, rates)
+  text <- cli::cli_fmt(print(result))
+  expect_true(any(grepl("open-ended age band", text, fixed = TRUE)))
+
+  rates$rate <- 0
+  expect_false(summary(fertility(rates))$open_band_non_zero)
+  rates$rate <- 0.1
+  rates$age_end <- 50
+  rates$parity_start <- 0
+  rates$parity_end <- Inf
+  rates$time_start <- 2000
+  rates$time_end <- Inf
+  result <- summary(fertility(rates))
+  expect_false(result$open_band_non_zero)
+  text <- cli::cli_fmt(print(result))
+  expect_false(any(grepl("open-ended age band", text, fixed = TRUE)))
+  rates$age_end <- Inf
+  rates$race <- "A"
+  expect_true(summary(fertility(rates))$open_band_non_zero)
+})
+
+test_that("dissolution summaries show bands by union type", {
+  rates <- tibble::tribble(
+    ~union_type, ~dur_start, ~dur_end, ~rate,
+    "cohab",     0,          5,        0.08,
+    "cohab",     5,          Inf,      0.02,
+    "marriage",  0,          10,       0.02,
+    "marriage",  10,         Inf,      0.01
+  )
+  result <- summary(union_dissolution(rates))
+  expect_s3_class(result, "summary.hammel_union_dissolution")
+  expect_identical(result$rate_strata$stratified_by, "union_type")
+  expect_true(result$rate_strata$bands_by_stratum)
+  expect_null(result$weights)
+  text <- cli::cli_fmt(value <- print(result))
+  expect_identical(value, result)
+  expect_true(any(grepl("Union dissolution process", text, fixed = TRUE)))
+  expect_true(any(grepl(
+    "Stratified by: union_type (cohab, marriage)", text, fixed = TRUE
+  )))
+  expect_true(any(grepl("union_type = marriage", text, fixed = TRUE)))
+  expect_true(any(grepl("[10, Inf)", text, fixed = TRUE)))
+  expect_true(any(grepl("Weight model: none", text, fixed = TRUE)))
+})
+
+test_that("mortality and fertility summaries report their settings", {
+  result <- summary(mortality(usa_2000_mortality))
+  expect_identical(result$rate_strata$stratified_by, "sex")
+  text <- cli::cli_fmt(value <- print(result))
+  expect_identical(value, result)
+  expect_true(any(grepl("Mortality process", text, fixed = TRUE)))
+
+  result <- summary(fertility(usa_2000_fertility, birth_interval = 1.5))
+  expect_identical(result$birth_interval, 1.5)
+  expect_identical(result$ffab, 0.4886)
+  expect_false(result$open_band_non_zero)
+  text <- cli::cli_fmt(print(result))
+  expect_true(any(grepl(
+    "Minimum birth interval: 1.5 years", text, fixed = TRUE
+  )))
+  expect_true(any(grepl(
+    "Fraction female at birth: 0.4886", text, fixed = TRUE
+  )))
+})
+
+test_that("union formation summaries report cohabitation and conversion", {
+  cohab_prob <- tibble::tibble(
+    age_start = c(15, 30),
+    age_end = c(30, Inf),
+    prob = c(0.6, 0.3)
+  )
+  convert <- tibble::tibble(dur_start = 0, dur_end = Inf, rate = 0.1)
+  process <- union_formation(
+    "rate",
+    usa_2000_marriage,
+    cohab_prob = cohab_prob,
+    union_convert_rate = convert,
+    weights_conversion = weight_model(fun = function(members, bin) 0),
+    cohab_as_previous_union = TRUE,
+    min_male_age = 18,
+    kinship_generations = 1
+  )
+  result <- summary(process)
+  expect_identical(result$method, "rate")
+  expect_identical(result$min_male_age, 18)
+  expect_identical(result$kinship_generations, 1)
+  expect_true(result$cohab_as_previous_union)
+  expect_identical(result$cohabitation$cohab_prob_range, c(0.3, 0.6))
+  expect_s3_class(
+    result$cohabitation$conversion_weights,
+    "summary.hammel_weight_model"
+  )
+  text <- cli::cli_fmt(value <- print(result))
+  expect_identical(value, result)
+  expect_true(any(grepl("Cohabitation: enabled", text, fixed = TRUE)))
+  expect_true(any(grepl("Probability range: 0.3-0.6", text, fixed = TRUE)))
+  expect_true(any(grepl("Counts as previous union: yes", text, fixed = TRUE)))
+  expect_true(any(grepl("Conversion to marriage rates", text, fixed = TRUE)))
+  expect_true(any(grepl("Weight model: custom function", text, fixed = TRUE)))
+  expect_true(any(grepl("Minimum male age: 18", text, fixed = TRUE)))
+
+  process <- union_formation(
+    "rate",
+    usa_2000_marriage,
+    cohab_prob = cohab_prob
+  )
+  result <- summary(process)
+  expect_null(result$cohabitation$convert_rate_strata)
+  expect_null(summary(union_formation("on_demand"))$rate_strata)
+  text <- cli::cli_fmt(print(result))
+  expect_true(any(grepl(
+    "Conversion to marriage: not allowed", text, fixed = TRUE
+  )))
+  text <- cli::cli_fmt(print(summary(union_formation("on_demand"))))
+  expect_true(any(grepl("Cohabitation: disabled", text, fixed = TRUE)))
+})

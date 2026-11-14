@@ -108,6 +108,53 @@ weight_model <- function(formula = NULL, coefficients = numeric(), fun = NULL) {
   model
 }
 
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a weight model
+#'
+#' @description
+#'
+#' Summary method for class `"hammel_weight_model"`
+#'
+#' @param object A `hammel_weight_model` object returned by [weight_model()].
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_weight_model`
+#' containing:
+#' \describe{
+#'   \item{custom}{Whether the model uses a custom function rather than a
+#'     formula.}
+#'   \item{formula}{The weight formula, or `NULL` for a custom function.}
+#'   \item{coefficients}{The named log hazard ratios of a formula model.}
+#' }
+#'
+#' `print()` also shows each coefficient's hazard ratio, `exp(coefficient)`.
+#'
+#' @seealso [weight_model()]
+#' @examples
+#' partnered_mortality <- weight_model(~partnered, c(partnered = log(0.9)))
+#' summary(partnered_mortality)
+#' @export
+summary.hammel_weight_model <- function(object, ...) {
+  structure(
+    list(
+      custom = !is.null(object$fun),
+      formula = object$formula,
+      coefficients = object$coefficients
+    ),
+    class = "summary.hammel_weight_model"
+  )
+}
+
+#' @rdname summary.hammel_weight_model
+#' @param x A `summary.hammel_weight_model` object returned by
+#'   `summary.hammel_weight_model()`.
+#' @export
+print.summary.hammel_weight_model <- function(x, ...) {
+  print_model_summary("Weight model", x)
+}
+
 # INTERNAL CONSTANTS -------------------------------------------------------
 
 # Engine codes of weight variables. Group variables (codes 1, 6, 9, 10, 16)
@@ -135,6 +182,18 @@ weight_variable_codes <- c(
 )
 
 # HELPER FUNCTIONS ---------------------------------------------------------
+
+# Lines describing a weight model summary; see model_summary_lines().
+weight_summary_lines <- function(x) {
+  if (x$custom) {
+    return(c(Type = "custom function"))
+  }
+  ratios <- paste("hazard ratio", signif(exp(x$coefficients), 4))
+  c(
+    Formula = deparse1(x$formula),
+    Coefficients = format_named_values(x$coefficients, ratios)
+  )
+}
 
 # Built-in weight variables of a process type, with engine codes and, for
 # categorical variables, their levels (the first is the reference) and the

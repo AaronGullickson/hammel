@@ -344,3 +344,52 @@ test_that("union observations combine simultaneous partner moves and typed numer
   expect_equal(conversion$union_years, c(6, 2))
   expect_equal(sum(conversion$conversions), 0)
 })
+
+test_that("group transition summaries separate pairs from strata", {
+  rates <- tibble::tribble(
+    ~sex, ~age_start, ~age_end, ~origin, ~destination, ~rate,
+    "m",  0,          Inf,      "A",     "B",          0.05,
+    "f",  0,          Inf,      "A",     "B",          0.04,
+    "m",  0,          Inf,      "B",     "A",          0,
+    "f",  0,          Inf,      "B",     "A",          0
+  )
+  result <- summary(group_transition(rates, group = "ethnicity"))
+  expect_s3_class(result, "summary.hammel_group_transition")
+  expect_identical(result$group, "ethnicity")
+  expect_identical(
+    result$transitions,
+    tibble::tibble(origin = "A", destination = "B")
+  )
+  expect_identical(result$categories, c("A", "B"))
+  expect_identical(
+    result$missing_transitions,
+    tibble::tibble(origin = "B", destination = "A")
+  )
+  expect_identical(result$rate_strata$stratified_by, "sex")
+  expect_null(result$age_independence)
+  text <- cli::cli_fmt(value <- print(result))
+  expect_identical(value, result)
+  expect_true(any(grepl("Stratified by: sex (m, f)", text, fixed = TRUE)))
+  expect_true(any(grepl("Household moves: no", text, fixed = TRUE)))
+  expect_true(any(grepl("(1 of 2 possible)", text, fixed = TRUE)))
+  expect_true(any(grepl("Missing transitions: B", text, fixed = TRUE)))
+
+  wider <- summary(
+    group_transition(rates, group = "ethnicity"),
+    categories = c("A", "B", "C")
+  )
+  expect_equal(nrow(wider$missing_transitions), 5L)
+  pairs <- tibble::tibble(
+    origin = rep(letters[1:4], each = 3),
+    destination = rep(letters[1:3], 4)
+  )
+  expect_match(format_transition_pairs(pairs), "and 2 more", fixed = TRUE)
+  expect_identical(format_transition_pairs(pairs[0, ]), "none")
+
+  moved <- summary(group_transition(rates, household = household(16)))
+  expect_null(moved$group)
+  expect_identical(moved$age_independence, 16)
+  text <- cli::cli_fmt(print(moved))
+  expect_true(any(grepl("model's only dimension", text, fixed = TRUE)))
+  expect_true(any(grepl("independence 16 years", text, fixed = TRUE)))
+})

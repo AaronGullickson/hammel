@@ -240,6 +240,165 @@ set_union_formation <- function(
   )
 }
 
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a union formation process
+#'
+#' @description
+#' 
+#' Summary method for class `"hammel_union_formation"`
+#'
+#' @param object A `hammel_union_formation` object returned by [union_formation()].
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_union_formation`
+#' containing:
+#' \describe{
+#'   \item{method}{The union initiation method: `"rate"` or `"on_demand"`.}
+#'   \item{min_male_age}{The minimum eligible male age, in years.}
+#'   \item{kinship_generations}{The configured number of generations used
+#'     for kinship exclusion when selecting partners.}
+#'   \item{cancel_birth_if_no_match}{Whether a birth is cancelled when its
+#'     on-demand partner search or rate-mode nonmarital father selection
+#'     fails, rather than occurring with an unknown father.}
+#'   \item{cohab_as_previous_union}{Whether cohabitations count as previous
+#'     unions when determining previous-union status.}
+#'   \item{rate_strata}{A list describing the union-search rate schedule, or
+#'     `NULL` when no rate schedule is configured. The list contains
+#'     `stratified_by` (stratum column names), `strata` (a tibble of observed
+#'     stratum combinations), `bands` (a tibble of exact band combinations),
+#'     and `bands_by_stratum` (whether band combinations differ by stratum).
+#'     Shared bands are stored once; otherwise `bands` includes the stratum
+#'     columns. Band endpoints define half-open intervals `[start, end)`.}
+#'   \item{cohabitation}{`NULL` when cohabitation is disabled; otherwise a
+#'     list containing `cohab_prob_range` (the minimum and maximum supplied
+#'     cohabitation probabilities), `cohab_rate_strata` (strata and bands of
+#'     the cohabitation probability schedule), `convert_rate_strata`
+#'     (strata and bands of the conversion rate schedule, or `NULL` when no
+#'     conversion schedule is configured), `matching` (a summary of the
+#'     cohabitation matching model, or `NULL` when the general matching
+#'     model is used) and `conversion_weights` (a summary of the conversion
+#'     weight model, or `NULL` when unweighted). Both schedule summaries use the
+#'     same structure as `rate_strata`.}
+#'   \item{matching}{A summary of the matching model: a
+#'     `summary.hammel_matching_model`, or a list of `periods` and `models`
+#'     for a calendar schedule.}
+#'   \item{father_matching}{A summary of the matching model for fathers of
+#'     unpartnered births, as for `matching`, or `NULL` when the general
+#'     matching model is used.}
+#'   \item{search_weights}{A summary of the weight model choosing which
+#'     woman searches: a `summary.hammel_weight_model`, a list of `periods`
+#'     and `models` for a calendar schedule, or `NULL` when searching women
+#'     are selected without weights.}
+#' }
+#'
+#' @seealso [union_formation()]
+#' @examples
+#' process <- union_formation("rate", usa_2000_marriage)
+#' summary(process)
+#' @export
+summary.hammel_union_formation <- function(object, ...) {
+
+  structure(
+    list(
+      method = object$initiation,
+      min_male_age = object$min_male_age,
+      kinship_generations = object$kinship_generations,
+      cancel_birth_if_no_match = object$cancel_birth_if_no_match,
+      cohab_as_previous_union = object$cohab_as_previous_union,
+      rate_strata = summarize_rate_strata(object$rates),
+      search_weights = summarize_model_argument(object$weights),
+      matching = summarize_model_argument(object$matching),
+      father_matching = summarize_model_argument(object$father_matching),
+      cohabitation = if (is.null(object$cohab_prob)) {
+        NULL
+      } else {
+        list(
+          cohab_prob_range = range(object$cohab_prob$prob),
+          cohab_rate_strata = summarize_rate_strata(object$cohab_prob),
+          convert_rate_strata = summarize_rate_strata(
+            object$union_convert_rate
+          ),
+          matching = summarize_model_argument(object$cohab_matching),
+          conversion_weights = summarize_model_argument(
+            object$weights_conversion
+          )
+        )
+      }
+    ),
+    class = "summary.hammel_union_formation"
+  )
+}
+
+#' @rdname summary.hammel_union_formation
+#' @param x A `summary.hammel_union_formation` object returned by
+#'   `summary.hammel_union_formation()`.
+#' @export
+print.summary.hammel_union_formation <- function(x, ...) {
+
+  cli::cli_h2("Union formation process")
+
+  list <- open_summary_list()
+  print_stat("Search method", x$method)
+  print_rate_strata(x$rate_strata)
+  rate_mode <- identical(x$method, "rate")
+  if (rate_mode) {
+    print_model_argument("Search weight model", x$search_weights)
+  }
+  print_model_argument("Matching model", x$matching)
+  if (rate_mode) {
+    print_model_argument(
+      "Father matching model",
+      x$father_matching,
+      none = "same as matching model"
+    )
+  }
+  print_stat(
+    "Births without a matched father",
+    if (x$cancel_birth_if_no_match) "cancelled" else "allowed"
+  )
+
+  eligibility <- open_nested_stat("Male eligibility restrictions")
+  print_stat("Minimum male age", x$min_male_age)
+  print_stat("Generational proximity", x$kinship_generations)
+  cli::cli_end(eligibility)
+
+  if (is.null(x$cohabitation)) {
+    print_stat("Cohabitation", "disabled")
+  } else {
+    cohabitation <- open_nested_stat("Cohabitation", "enabled")
+    print_stat(
+      "Probability range",
+      paste(x$cohabitation$cohab_prob_range, collapse = "\u002d")
+    )
+    print_stat(
+      "Counts as previous union",
+      ifelse(x$cohab_as_previous_union, "yes", "no")
+    )
+    print_rate_strata(x$cohabitation$cohab_rate_strata)
+    print_model_argument(
+      "Matching model",
+      x$cohabitation$matching,
+      none = "same as general matching model"
+    )
+    if (is.null(x$cohabitation$convert_rate_strata)) {
+      print_stat("Conversion to marriage", "not allowed")
+    } else {
+      conversion <- open_nested_stat("Conversion to marriage rates")
+      print_rate_strata(x$cohabitation$convert_rate_strata)
+      print_model_argument(
+        "Weight model",
+        x$cohabitation$conversion_weights
+      )
+      cli::cli_end(conversion)
+    }
+    cli::cli_end(cohabitation)
+  }
+  cli::cli_end(list)
+  invisible(x)
+}
+
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 validate_union_formation <- function(process) {

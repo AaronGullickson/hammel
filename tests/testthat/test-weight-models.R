@@ -611,3 +611,44 @@ test_that("custom functions receive members and cells for every process", {
   expect_identical(seen$fertility$bin$process, "fertility")
   expect_true(all(c("parity_start", "parity_end", "age_start", "age_end") %in% names(seen$fertility$bin)))
 })
+
+test_that("weight model summaries report formulas and hazard ratios", {
+  result <- summary(weight_model(~partnered, c(partnered = log(0.9))))
+  expect_s3_class(result, "summary.hammel_weight_model")
+  expect_false(result$custom)
+  expect_identical(result$coefficients, c(partnered = log(0.9)))
+  text <- cli::cli_fmt(value <- print(result))
+  expect_identical(value, result)
+  expect_true(any(grepl("Formula: ~partnered", text, fixed = TRUE)))
+  expect_true(any(grepl("(hazard ratio 0.9)", text, fixed = TRUE)))
+
+  custom <- summary(weight_model(fun = function(members, bin) 0))
+  expect_true(custom$custom)
+  expect_null(custom$formula)
+  text <- cli::cli_fmt(print(custom))
+  expect_true(any(grepl("Type: custom function", text, fixed = TRUE)))
+})
+
+test_that("process summaries nest weight models and schedules", {
+  weights <- weight_model(~partnered, c(partnered = log(0.9)))
+  result <- summary(mortality(usa_2000_mortality, weights = weights))
+  expect_s3_class(result$weights, "summary.hammel_weight_model")
+  text <- cli::cli_fmt(print(result))
+  expect_true(any(grepl("Weight model: ~partnered", text, fixed = TRUE)))
+  expect_true(any(grepl("^ +\\S+ Coefficients:", text)))
+
+  text <- cli::cli_fmt(print(summary(fertility(usa_2000_fertility))))
+  expect_true(any(grepl("Weight model: none", text, fixed = TRUE)))
+
+  schedule <- tibble::tibble(
+    time_start = c(0, 10),
+    time_end = c(10, Inf),
+    model = list(weights, weight_model(~partnered, c(partnered = 0)))
+  )
+  result <- summary(mortality(usa_2000_mortality, weights = schedule))
+  expect_s3_class(result$weights, "summary.hammel_model_schedule")
+  expect_equal(nrow(result$weights$periods), 2L)
+  text <- cli::cli_fmt(print(result))
+  expect_true(any(grepl("Weight model: calendar schedule", text, fixed = TRUE)))
+  expect_true(any(grepl("Years [10, Inf): ~partnered", text, fixed = TRUE)))
+})

@@ -103,7 +103,70 @@ group_inheritance <- function(
   model
 }
 
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a group inheritance model
+#'
+#' @description
+#'
+#' Summary method for class `"hammel_group_inheritance"`
+#'
+#' @param object A `hammel_group_inheritance` object returned by
+#'   [group_inheritance()].
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_group_inheritance`
+#' containing:
+#' \describe{
+#'   \item{method}{The inheritance method.}
+#'   \item{order}{For `"hierarchy"`, the group labels, highest-ranked first;
+#'     otherwise `NULL`.}
+#'   \item{passing}{For `"hierarchy"`, the probability of reversing the
+#'     order; otherwise `NULL`.}
+#'   \item{fixed_value}{For `"fixed"`, the category every newborn receives;
+#'     otherwise `NULL`.}
+#' }
+#'
+#' @seealso [group_inheritance()], [group()]
+#' @examples
+#' summary(group_inheritance("hierarchy", order = c("B", "W"), passing = 0.05))
+#' @export
+summary.hammel_group_inheritance <- function(object, ...) {
+  hierarchy <- identical(object$method, "hierarchy")
+  structure(
+    list(
+      method = object$method,
+      order = if (hierarchy) object$order else NULL,
+      passing = if (hierarchy) object$passing else NULL,
+      fixed_value = object$fixed_value
+    ),
+    class = "summary.hammel_group_inheritance"
+  )
+}
+
+#' @rdname summary.hammel_group_inheritance
+#' @param x A `summary.hammel_group_inheritance` object returned by
+#'   `summary.hammel_group_inheritance()`.
+#' @export
+print.summary.hammel_group_inheritance <- function(x, ...) {
+  print_model_summary("Group inheritance model", x)
+}
+
 # HELPER FUNCTIONS ---------------------------------------------------------
+
+# Lines describing an inheritance model summary; see model_summary_lines().
+inheritance_summary_lines <- function(x) {
+  lines <- c(Method = x$method)
+  if (!is.null(x$order)) {
+    lines[["Order"]] <- paste(x$order, collapse = " > ")
+    lines[["Passing probability"]] <- format(x$passing)
+  }
+  if (!is.null(x$fixed_value)) {
+    lines[["Fixed value"]] <- format(x$fixed_value)
+  }
+  lines
+}
 
 inheritance_methods <- function() {
   c(

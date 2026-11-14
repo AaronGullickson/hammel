@@ -97,6 +97,65 @@ set_groups <- function(model, ...) {
   model
 }
 
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a group dimension
+#'
+#' @description
+#'
+#' Summary method for class `"hammel_group"`
+#'
+#' @param object A `hammel_group` object returned by [group()].
+#' @param categories Optional categories to report instead of the declared
+#'   ones, such as the categories a population resolves for the dimension.
+#'   `NULL` (default) uses the declared categories.
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_group` containing:
+#' \describe{
+#'   \item{categories}{The dimension's categories, or `NULL` when they are
+#'     inferred from the population.}
+#'   \item{ancestry}{Whether ancestry shares are tracked.}
+#'   \item{inheritance}{A summary of the newborn inheritance model: a
+#'     `summary.hammel_group_inheritance`, or a list of `periods` and
+#'     `models` for a calendar schedule.}
+#' }
+#'
+#' @seealso [group()], [group_inheritance()]
+#' @examples
+#' ethnicity <- group(
+#'   categories = c("W", "B", "O"),
+#'   ancestry = TRUE,
+#'   inheritance = group_inheritance("ancestry")
+#' )
+#' summary(ethnicity)
+#' @export
+summary.hammel_group <- function(object, categories = NULL, ...) {
+  structure(
+    list(
+      categories = if (is.null(categories)) object$categories else categories,
+      ancestry = isTRUE(object$ancestry),
+      inheritance = summarize_model_argument(object$inheritance)
+    ),
+    class = "summary.hammel_group"
+  )
+}
+
+#' @rdname summary.hammel_group
+#' @param x A `summary.hammel_group` object returned by
+#'   `summary.hammel_group()`.
+#' @export
+print.summary.hammel_group <- function(x, ...) {
+
+  cli::cli_h2("Group dimension")
+
+  list <- open_summary_list()
+  print_group_details(x)
+  cli::cli_end(list)
+  invisible(x)
+}
+
 # INTERNAL CONSTANTS -------------------------------------------------------
 
 # Names Hammel uses for its own variables and columns, and patterns that would
@@ -110,6 +169,20 @@ reserved_group_names <- c(
 )
 
 # HELPER FUNCTIONS ---------------------------------------------------------
+
+# Print the bullets of a group summary. Shared by the group and model
+# summaries.
+print_group_details <- function(x) {
+  categories <- if (is.null(x$categories)) {
+    "inferred from the population"
+  } else {
+    paste(x$categories, collapse = ", ")
+  }
+  print_stat("Categories", categories)
+  print_stat("Ancestry tracked", if (x$ancestry) "yes" else "no")
+  print_model_argument("Inheritance", x$inheritance)
+  invisible(x)
+}
 
 validate_group <- function(x, name = "group") {
   if (!inherits(x, "hammel_group") || !is.list(x)) {

@@ -53,9 +53,7 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   if (!is.logical(progress) || length(progress) != 1L || is.na(progress)) {
     stop("`progress` must be TRUE or FALSE.", call. = FALSE)
   }
-  if (is.null(model$population) || is.null(model$processes$mortality) ||
-        is.null(model$processes$fertility) ||
-        is.null(model$processes$union_formation)) {
+  if (length(missing_model_elements(model))) {
     stop(
       paste0(
         "The model needs a population, mortality, ",

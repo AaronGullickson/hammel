@@ -121,6 +121,84 @@ set_fertility <- function(
   )
 }
 
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a fertility process
+#'
+#' @description
+#' 
+#' Summary method for class `"hammel_fertility"`
+#'
+#' @param object A `hammel_fertility` object returned by [fertility()].
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_fertility` containing:
+#' \describe{
+#'   \item{birth_interval}{The minimum maternal birth-to-birth interval,
+#'     in years.}
+#'   \item{ffab}{The probability that a newborn is female.}
+#'   \item{rate_strata}{A list describing the input rate schedule, containing
+#'     `stratified_by` (stratum column names), `strata` (a tibble of observed
+#'     stratum combinations), `bands` (a tibble of exact band combinations),
+#'     and `bands_by_stratum` (whether band combinations differ by stratum).
+#'     Shared bands are stored once; otherwise `bands` includes the stratum
+#'     columns. Band endpoints define half-open intervals `[start, end)`.}
+#'   \item{weights}{A summary of the weight model used for selection within
+#'     rate cells: a `summary.hammel_weight_model`, a list of `periods` and
+#'     `models` for a calendar schedule, or `NULL` when selection is
+#'     unweighted.}
+#'   \item{open_band_non_zero}{Whether any age band ends at `Inf` and has a
+#'     positive fertility rate.}
+#' }
+#'
+#' @seealso [fertility()], [calculate_tfr()]
+#' @examples
+#' process <- fertility(usa_2000_fertility)
+#' summary(process)
+#' @export
+summary.hammel_fertility <- function(object, ...) {
+
+  structure(
+    list(
+      birth_interval = object$birth_interval,
+      ffab = object$ffab,
+      rate_strata = summarize_rate_strata(object$rates),
+      weights = summarize_model_argument(object$weights),
+      open_band_non_zero = any(object$rates$age_end == Inf &
+                                 object$rates$rate > 0)
+    ),
+    class = "summary.hammel_fertility"
+  )
+}
+
+#' @rdname summary.hammel_fertility
+#' @param x A `summary.hammel_fertility` object returned by
+#'   `summary.hammel_fertility()`.
+#' @export
+print.summary.hammel_fertility <- function(x, ...) {
+
+  cli::cli_h2("Fertility process")
+
+  list <- open_summary_list()
+  print_stat("Minimum birth interval", paste(x$birth_interval, "years"))
+  print_stat("Fraction female at birth", x$ffab)
+  print_rate_strata(x$rate_strata)
+  print_model_argument("Weight model", x$weights)
+  cli::cli_end(list)
+
+  if (x$open_band_non_zero) {
+    cli::cli_alert_warning(
+      paste0(
+        "An open-ended age band contains a positive fertility ",
+        "rate. This will apply to all women in the band and will be ignored ",
+        "when calculating TFR."
+      )
+    )
+  }
+  invisible(x)
+}
+
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 # Positive parity-specific rates in one-year age cells (the fertility cells of
