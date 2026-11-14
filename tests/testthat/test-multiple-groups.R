@@ -221,7 +221,7 @@ test_that("remaining single-dimension features and ancestry inputs are checked",
   w <- weight_model(~ group, c(groupB = 1))
   expect_error(run_simulation(set_mortality(model,
     model$processes$mortality$rates, weights = w), 0),
-               "not available for this process: group")
+               "can't use group", class = "hammel_error_specification")
   # Analysis without group splits works with several dimensions.
   expect_s3_class(calculate_mortality_rates(run_simulation(model, 1, seed = 8),
     c(0, 1), c(0, Inf)), "tbl_df")
@@ -284,7 +284,11 @@ test_that("each dimension has its own transition process, history and duration",
                      rate = c(.3, .3))
   region <- data.frame(origin = c("N", "S"), destination = c("S", "N"), dur_start = c(0, 1),
                        dur_end = c(Inf, Inf), rate = c(.4, 1e8))
-  expect_error(set_group_transition(model, race), "Name the dimension.*\"race\", \"region\"")
+  expect_error(
+    set_group_transition(model, race),
+    '"race" and "region"',
+    class = "hammel_error_groups"
+  )
   model <- set_group_transition(model, race, group = "race")
   model <- set_group_transition(model, region, group = "region")
   expect_named(model$processes$group_transition, c("race", "region"))
@@ -355,13 +359,18 @@ test_that("transition rates can be stratified by another dimension", {
   # The transition's own dimension is not a stratum; other names must be declared.
   bad <- set_group_transition(model, data.frame(origin = "A", destination = "B", race = "A",
     age_start = 0, age_end = Inf, rate = 2), group = "race")
-  expect_error(run_simulation(bad, 0), "cannot be stratified by `race` itself")
+  error <- expect_error(run_simulation(bad, 0), class = "hammel_error_groups")
+  expect_identical(error$group, "race")
   undeclared <- set_group_transition(model, data.frame(origin = "A", destination = "B",
     age_start = 0, age_end = Inf, rate = 2), group = "education")
-  expect_error(run_simulation(undeclared, 0),
-    "`education`, which is not a declared group dimension")
+  error <- expect_error(
+    run_simulation(undeclared, 0),
+    "isn't declared",
+    class = "hammel_error_groups"
+  )
+  expect_identical(error$group, "education")
   expect_error(group_transition(data.frame(group_origin = "A", group_dest = "B", age_start = 0,
-    age_end = Inf, rate = 1)), "`origin` and `destination`")
+    age_end = Inf, rate = 1)), "origin and destination", class = "hammel_error_rates")
 })
 
 test_that("transition weights and custom weight functions are per dimension", {
@@ -440,7 +449,10 @@ test_that("detailed unions replay transitions in every dimension", {
 test_that("transition settings and histories are checked against the declaration", {
   model <- transition_pair_model()
   moves <- data.frame(origin = "A", destination = "B", age_start = 0, age_end = Inf, rate = 1)
-  expect_error(group_transition(moves, group = c("race", "region")), "`group` must be NULL")
+  expect_error(
+    group_transition(moves, group = c("race", "region")),
+    class = "hammel_error_argument"
+  )
   # A process stored before the declaration resolves at simulation.
   early <- set_group_transition(hammel_model(), moves)
   expect_named(early$processes$group_transition, ".default")
@@ -686,7 +698,8 @@ test_that("weight models use any dimension's variables", {
   expect_true(all(out$persons$region[match(movers, out$persons$person_id)] == "S"))
   expect_error(run_simulation(set_mortality(model, rates, weights =
     weight_model(~ ancestry_race_A,
-    c(ancestry_race_A = 1))), 0), "not available for this process: ancestry_race_A")
+    c(ancestry_race_A = 1))), 0), "can't use ancestry_race_A",
+    class = "hammel_error_specification")
   # Union variables by dimension: dissolutions only where regions differ.
   persons <- data.frame(person_id = 1:400, sex = rep(c("f", "m"), 200), birth_time = -30,
     death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_,
@@ -705,7 +718,7 @@ test_that("weight models use any dimension's variables", {
   expect_gt(sum(ended), 20)
   expect_true(all(out$unions$union_id[ended] > 100))
   expect_error(set_union_dissolution(couples, data.frame(dur_start = 0, dur_end = Inf, rate = .1),
-    weights = weight_model(~ partnered, c(partnered = 1))), "not available")
+    weights = weight_model(~ partnered, c(partnered = 1))), "can't use", class = "hammel_error_specification")
 })
 
 test_that("custom weight functions see every dimension in members and cells", {

@@ -86,7 +86,8 @@ test_that("setters reject stratified columns their process does not support", {
                                                 list(sex = c(f = 1)))), "Union dissolution",
     class = "hammel_error_rates")
   expect_error(group_transition(stratify_rates(data.frame(origin = "A", destination = "B",
-    age_start = 0, age_end = Inf, rate = 0.1), list(previous_union = c(none = 1)))), "Group-transition")
+    age_start = 0, age_end = Inf, rate = 0.1), list(previous_union = c(none = 1)))), "Group transition",
+    class = "hammel_error_rates")
   # The check uses the table's columns, however they were added.
   expect_error(
     mortality(transform(strata_mortality_rates(), union_type = "cohab")),

@@ -28,3 +28,24 @@
       x Categories: "none" and "separated".
       i Use "none" and "dissolved", or "none", "separated" and "widowed", in every group and period, without mixing the two.
 
+# weight and transition messages keep their layout
+
+    Code
+      mortality(mortality_input(), weights = weights)
+    Condition
+      Error in `mortality()`:
+      ! `coefficients` must be named for each model column.
+      x Missing: "parity".
+      x Unknown: "paritx".
+      i The model columns are "parity".
+
+---
+
+    Code
+      group_transition(rates)
+    Condition
+      Error in `group_transition()`:
+      ! `rates` must use either age bands or duration bands.
+      x Band columns: age_start, age_end, and dur_start.
+      i Give age_start and age_end, or dur_start and dur_end, for every transition.
+

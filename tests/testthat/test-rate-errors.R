@@ -320,3 +320,101 @@ test_that("union formation messages keep their layout", {
   )
   expect_snapshot(union_formation("rate", rates), error = TRUE)
 })
+
+transition_input <- function() {
+  tibble::tibble(
+    origin = c("A", "B"),
+    destination = c("B", "A"),
+    age_start = 0,
+    age_end = Inf,
+    rate = 0.1
+  )
+}
+
+test_that("transition errors name the constructor or setter", {
+  bad <- transition_input()
+  bad$destination[1] <- "A"
+  error <- expect_hammel_error(
+    group_transition(bad),
+    "rates",
+    "group_transition"
+  )
+  expect_identical(error$rows, 1L)
+  expect_hammel_error(
+    set_group_transition(hammel_model(), bad),
+    "rates",
+    "set_group_transition"
+  )
+  expect_hammel_error(
+    group_transition(transition_input(), household = "yes"),
+    "specification",
+    "group_transition"
+  )
+  expect_hammel_error(household(-1), "argument", "household")
+  bad <- transition_input()
+  bad$dur_start <- 0
+  error <- expect_hammel_error(
+    group_transition(bad),
+    "rates",
+    "group_transition"
+  )
+  expect_match(conditionMessage(error), "age bands or duration bands")
+})
+
+test_that("transition schedules report overlapping bands by stratum", {
+  rates <- tibble::tibble(
+    origin = "A",
+    destination = "B",
+    age_start = c(0, 10),
+    age_end = c(20, Inf),
+    rate = 0.1
+  )
+  error <- expect_hammel_error(
+    group_transition(rates),
+    "rates",
+    "group_transition"
+  )
+  expect_match(
+    conditionMessage(error),
+    "overlap for origin = A, destination = B",
+    fixed = TRUE
+  )
+})
+
+test_that("weight model errors name the function that received them", {
+  expect_hammel_error(weight_model(), "argument", "weight_model")
+  expect_hammel_error(
+    weight_model(~ parity - 1, c(parity = 1)),
+    "specification",
+    "weight_model"
+  )
+  weights <- weight_model(~parity, c(paritx = 1))
+  error <- expect_hammel_error(
+    mortality(mortality_input(), weights = weights),
+    "specification",
+    "mortality"
+  )
+  expect_identical(error$argument, "coefficients")
+  weights <- weight_model(~same_group, c(same_group = 1))
+  error <- expect_hammel_error(
+    set_mortality(hammel_model(), mortality_input(), weights = weights),
+    "specification",
+    "set_mortality"
+  )
+  expect_identical(error$variables, "same_group")
+  expect_warning(
+    mortality(mortality_input(), weights = weight_model(~sex, c(sexm = 1))),
+    class = "hammel_warning_no_effect"
+  )
+})
+
+test_that("weight and transition messages keep their layout", {
+  weights <- weight_model(~parity, c(paritx = 1))
+  expect_snapshot(
+    mortality(mortality_input(), weights = weights),
+    error = TRUE
+  )
+  rates <- transition_input()
+  rates$dur_start <- 0
+  expect_snapshot(group_transition(rates), error = TRUE)
+})

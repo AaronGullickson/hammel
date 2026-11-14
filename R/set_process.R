@@ -113,10 +113,10 @@ attach_process <- function(model, process, call = rlang::caller_env()) {
     }
   }
   if (name == "group_transition") {
-    validate_group_transition(process)
-    validate_process_weights(process$weights, "transition")
+    validate_group_transition(process, call = call)
+    validate_process_weights(process$weights, "transition", call = call)
     process$rates <- tibble::as_tibble(process$rates)
-    return(store_transition_process(model, process))
+    return(store_transition_process(model, process, call = call))
   }
   if (name == "union_dissolution") {
     validate_union_dissolution(process, call = call)

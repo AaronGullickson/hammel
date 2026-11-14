@@ -174,7 +174,7 @@ Construct, validate, and prepare newborn group inheritance rules.
 
 Construct, attach, validate, and resolve transition processes and household rules.
 
-- Functions: **`group_transition()`**, **`set_group_transition()`**, **`household()`**, `check_transition_group()`, `transition_processes()`, `store_transition_process()`, `resolve_transition_processes()`, `validate_group_transition()`.
+- Functions: **`group_transition()`**, **`set_group_transition()`**, **`household()`**, `new_group_transition()`, `check_transition_group()`, `transition_processes()`, `store_transition_process()`, `resolve_transition_processes()`, `validate_group_transition()`, `check_transition_rows()`, `validate_transition_schedules()`.
 
 ### `R/hammel_model.R`
 

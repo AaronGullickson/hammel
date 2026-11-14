@@ -475,9 +475,15 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   }
   weight_models <- Filter(Negate(is.null), weight_models)
   for (name in names(weight_models)) {
-    check_model_coverage(
-      weight_models[[name]], start, start + years, paste(name, "weights")
-    )
+    label <- if (startsWith(name, "transition_")) {
+      dimension <- names(transition_list)[
+        as.integer(sub("transition_", "", name))
+      ]
+      paste0("`", dimension, "` transition weights")
+    } else {
+      paste(name, "weights")
+    }
+    check_model_coverage(weight_models[[name]], start, start + years, label)
   }
   # Weight variables resolve against the declaration (D134): each dimension's
   # categories, and ancestry variables `ancestry_<dim>_<category>` in engine
@@ -516,7 +522,8 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
           weight_models[[name]],
           if (transition) "transition" else types[[name]],
           if (transition) "transition" else name,
-          context
+          context,
+          call = run_call
         )
       }
     )
