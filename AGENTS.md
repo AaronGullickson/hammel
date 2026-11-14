@@ -131,6 +131,15 @@ the user's agreement.
 
 ## Documentation and current priorities
 
+- Keep documentation changes focused within each PR to reduce conflicts between
+  concurrent branches. Update the decision log when a decision needs recording
+  and the specific contracts affected by the change. Update `design/roadmap.md`
+  only when priorities, scope, or milestone status actually change; do not use
+  it as a per-PR progress log. Likewise, avoid routine status updates across the
+  documentation index, project brief, and session handoff. Update those files
+  only when their own content needs correction or navigation needs to change.
+  Do not duplicate implementation summaries across documents or reflow unrelated
+  text. Keep current specifications accurate even when an edit may conflict.
 - Current specifications describe implemented behavior. Use Git history for
   superseded specifications and verification records; do not maintain snapshot
   archives in `design/`. Keep rationale and supersession in `design/decisions.md`.
