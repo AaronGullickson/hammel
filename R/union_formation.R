@@ -281,7 +281,16 @@ summary.hammel_union_formation <- function(object, ...) {
       kinship_generations = object$kinship_generations,
       cancel_birth_if_no_match = object$cancel_birth_if_no_match,
       cohab_as_previous_union = object$cohab_as_previous_union,
-      rate_strata = summarize_rate_strata(object$rates)
+      rate_strata = summarize_rate_strata(object$rates),
+      cohabitation = if (is.null(object$cohab_prob)) {
+        NULL
+      } else {
+        list(
+          cohab_prob_range = range(object$cohab_prob$prob),
+          cohab_rate_strata = summarize_rate_strata(object$cohab_prob),
+          convert_rate_strata = summarize_rate_strata(object$union_convert_rate)
+        )
+      }
     ),
     class = "summary.hammel_union_formation"
   )
@@ -295,17 +304,39 @@ print.summary.hammel_union_formation <- function(x, ...) {
 
   cat(cli::style_bold("Union Formation Process Summary", "\n\n"))
 
-  print_stat("Method:", x$method)
+  print_stat("Search Method:", x$method)
+
+  if(!is.null(x$rate_strata)) {
+    print_rate_strata(x$rate_strata)
+  }
 
   cat("\n")
 
   cat(cli::style_bold("Male eligibility restrictions", "\n"))
   print_stat("Minimum male age:", x$min_male_age)
   print_stat("Generational proximity:", x$kinship_generations)
+  
+  cat("\n")
 
-  if(!is.null(x$rate_strata)) {
-    print_rate_strata(x$rate_strata)
+  cat(cli::style_bold("Cohabitation", "\n"))
+  if(is.null(x$cohabitation)) {
+    cat(cli::col_br_red("Disabled"), "\n")
+  } else {
+    print_stat(
+      "Probability range:",
+      paste(x$cohabitation$cohab_prob_range, collapse = "\u002d")
+    )
+    print_rate_strata(x$cohabitation$cohab_rate_strata)
+    cat("\n")
+    if(!is.null(x$cohabitation$convert_rate_strata)) {
+      cat(cli::style_italic("Cohabitation conversion rates"))
+      print_rate_strata(x$cohabitation$convert_rate_strata)
+    } else {
+      cat(cli::style_italic("No cohabitation conversion to marriage allowed"))
+    }
   }
+
+
 }
 
 # HELPER FUNCTIONS ---------------------------------------------------------
