@@ -124,7 +124,7 @@ summary.hammel_mortality <- function(object, ...) {
 #' @export
 print.summary.hammel_mortality <- function(x, ...) {
 
-  cat(cli::style_bold("Mortality Process Summary", "\n\n"))
+  cli::cli_h1("Mortality Process Summary")
 
   print_rate_strata(x$rate_strata)
 }

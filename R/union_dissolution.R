@@ -126,7 +126,7 @@ summary.hammel_union_dissolution <- function(object, ...) {
 #' @export
 print.summary.hammel_union_dissolution <- function(x, ...) {
 
-  cat(cli::cli_h2("Union Dissolution Process Summary", "\n\n"))
+  cli::cli_h1("Union Dissolution Process Summary")
 
   print_rate_strata(x$rate_strata)
 }

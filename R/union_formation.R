@@ -311,8 +311,9 @@ summary.hammel_union_formation <- function(object, ...) {
 #' @export
 print.summary.hammel_union_formation <- function(x, ...) {
 
-  cat(cli::style_bold("Union Formation Process Summary", "\n\n"))
+  cli::cli_h1("Union Formation Process Summary")
 
+  cat("\n")
   print_stat("Search Method:", x$method)
 
   if(!is.null(x$rate_strata)) {
@@ -321,13 +322,13 @@ print.summary.hammel_union_formation <- function(x, ...) {
 
   cat("\n")
 
-  cat(cli::style_bold("Male eligibility restrictions", "\n"))
+  cli::cli_h2("Male eligibility restrictions")
   print_stat("Minimum male age:", x$min_male_age)
   print_stat("Generational proximity:", x$kinship_generations)
-  
+ 
   cat("\n")
 
-  cat(cli::style_bold("Cohabitation", "\n"))
+  cli::cli_h2("Cohabitation")
   if(is.null(x$cohabitation)) {
     cat(cli::col_br_red("Disabled"), "\n")
   } else {
@@ -339,10 +340,11 @@ print.summary.hammel_union_formation <- function(x, ...) {
       "Counts as previous union",
       ifelse(x$cohab_as_previous_union, "yes", "no")
     )
+    cat("\n")
     print_rate_strata(x$cohabitation$cohab_rate_strata)
     cat("\n")
     if(!is.null(x$cohabitation$convert_rate_strata)) {
-      cat(cli::style_italic("Cohabitation conversion rates"))
+      cli::cli_h3("Cohabitation conversion rates")
       print_rate_strata(x$cohabitation$convert_rate_strata)
     } else {
       cat(cli::style_italic("No cohabitation conversion to marriage allowed"))

@@ -173,7 +173,9 @@ summary.hammel_fertility <- function(object, ...) {
 #' @export
 print.summary.hammel_fertility <- function(x, ...) {
 
-  cat(cli::style_bold("Fertility Process Summary", "\n\n"))
+  cli::cli_h1("Fertility Process Summary")
+
+  cat("\n")
   print_stat("Minimum birth interval:", x$birth_interval)
   print_stat("Fraction female at birth:", x$ffab)
 
