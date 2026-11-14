@@ -41,6 +41,10 @@ stratum combinations), \code{bands} (a tibble of exact band combinations),
 and \code{bands_by_stratum} (whether band combinations differ by stratum).
 Shared bands are stored once; otherwise \code{bands} includes the stratum
 columns. Band endpoints define half-open intervals \verb{[start, end)}.}
+\item{weights}{A summary of the weight model used for selection within
+rate cells: a \code{summary.hammel_weight_model}, a list of \code{periods} and
+\code{models} for a calendar schedule, or \code{NULL} when selection is
+unweighted.}
 \item{age_independence}{The household age of independence, in years,
 or \code{NULL} when transitions move individuals rather than households.}
 }

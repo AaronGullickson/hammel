@@ -210,6 +210,10 @@ household <- function(age_independence = 18) {
 #'     and `bands_by_stratum` (whether band combinations differ by stratum).
 #'     Shared bands are stored once; otherwise `bands` includes the stratum
 #'     columns. Band endpoints define half-open intervals `[start, end)`.}
+#'   \item{weights}{A summary of the weight model used for selection within
+#'     rate cells: a `summary.hammel_weight_model`, a list of `periods` and
+#'     `models` for a calendar schedule, or `NULL` when selection is
+#'     unweighted.}
 #'   \item{age_independence}{The household age of independence, in years,
 #'     or `NULL` when transitions move individuals rather than households.}
 #' }
@@ -253,6 +257,7 @@ summary.hammel_group_transition <- function(object, categories = NULL, ...) {
         rates,
         strata = setdiff(strata, c("origin", "destination"))
       ),
+      weights = summarize_model_argument(object$weights),
       age_independence = object$household$age_independence
     ),
     class = "summary.hammel_group_transition"
@@ -301,6 +306,7 @@ print_transition_details <- function(x) {
     paste0("yes, age of independence ", x$age_independence, " years")
   }
   print_stat("Household moves", household)
+  print_model_argument("Weight model", x$weights)
   invisible(x)
 }
 

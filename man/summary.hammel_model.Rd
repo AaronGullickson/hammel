@@ -23,10 +23,10 @@
 \item{population}{The \code{summary.hammel_population} of the starting
 population, or \code{NULL} when no population is set.}
 \item{groups}{A named list with one element per group dimension, or
-\code{NULL} when the model has none. Each element contains \code{declared}
-(whether the dimension is declared), \code{categories} (the population's
-categories, or \code{NULL} when not yet known), \code{ancestry} (whether
-ancestry is tracked), and \code{transition} (the
+\code{NULL} when the model has none. Each element contains \code{group} (the
+\code{summary.hammel_group} of the declared dimension, reporting the
+population's categories when a population is set, or \code{NULL} when the
+dimension is not declared) and \code{transition} (the
 \code{summary.hammel_group_transition} of the dimension's transition
 process, or \code{NULL} when it has none).}
 \item{processes}{A named list of process summaries, in the order

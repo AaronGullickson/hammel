@@ -32,6 +32,106 @@ open_nested_stat <- function(label, value = NULL) {
   item
 }
 
+# Print a component model summary on its own: a level-2 heading and one
+# bullet per line from model_summary_lines().
+print_model_summary <- function(title, x) {
+  cli::cli_h2(title)
+  list <- open_summary_list()
+  lines <- model_summary_lines(x)
+  for (i in seq_along(lines)) {
+    print_stat(names(lines)[i], lines[[i]])
+  }
+  cli::cli_end(list)
+  invisible(x)
+}
+
+# Summarize a process's model argument: NULL, one model, or a calendar
+# schedule (a tibble with time_start, time_end and a list column of models).
+summarize_model_argument <- function(x) {
+  if (is.null(x)) {
+    return(NULL)
+  }
+  if (!is_model_schedule(x)) {
+    return(summary(x))
+  }
+  structure(
+    list(
+      periods = tibble::as_tibble(x[c("time_start", "time_end")]),
+      models = lapply(x$model, summary)
+    ),
+    class = "summary.hammel_model_schedule"
+  )
+}
+
+# Print a summarized model argument as a bullet in a process summary. A model
+# with one line prints on one bullet; otherwise its first line is the
+# bullet's value and the others are nested beneath it. Each period of a
+# schedule is nested in turn. `none` describes a NULL argument.
+print_model_argument <- function(label, x, none = "none") {
+  if (is.null(x)) {
+    print_stat(label, none)
+    return(invisible(x))
+  }
+  if (!inherits(x, "summary.hammel_model_schedule")) {
+    print_model_lines(label, model_summary_lines(x))
+    return(invisible(x))
+  }
+  schedule <- open_nested_stat(label, "calendar schedule")
+  for (i in seq_along(x$models)) {
+    period <- format_rate_bands(
+      x$periods$time_start[i],
+      x$periods$time_end[i]
+    )
+    print_model_lines(
+      paste("Years", period),
+      model_summary_lines(x$models[[i]])
+    )
+  }
+  cli::cli_end(schedule)
+  invisible(x)
+}
+
+# Print one model's lines under `label`; see print_model_argument().
+print_model_lines <- function(label, lines) {
+  if (length(lines) == 1L) {
+    print_stat(label, lines[[1]])
+    return(invisible(lines))
+  }
+  item <- open_nested_stat(label, lines[[1]])
+  for (i in seq_along(lines)[-1]) {
+    print_stat(names(lines)[i], lines[[i]])
+  }
+  cli::cli_end(item)
+  invisible(lines)
+}
+
+# Named character vector describing a component model summary, one element
+# per line, labels as names; the first element is its headline.
+model_summary_lines <- function(x) {
+  if (inherits(x, "summary.hammel_matching_model")) {
+    return(matching_summary_lines(x))
+  }
+  if (inherits(x, "summary.hammel_weight_model")) {
+    return(weight_summary_lines(x))
+  }
+  if (inherits(x, "summary.hammel_group_inheritance")) {
+    return(inheritance_summary_lines(x))
+  }
+  stop("Unsupported model summary.", call. = FALSE)
+}
+
+# Format named numbers as "name = value", with optional parenthetical notes.
+format_named_values <- function(values, notes = NULL) {
+  if (!length(values)) {
+    return("none")
+  }
+  text <- paste0(names(values), " = ", signif(values, 4))
+  if (!is.null(notes)) {
+    text <- paste0(text, " (", notes, ")")
+  }
+  paste(text, collapse = ", ")
+}
+
 # Print metadata returned by summarize_rate_strata() as bullets, invisibly
 # returning it. Band axes are printed separately; exact combinations remain
 # in the metadata. NULL represents an unconfigured schedule and prints

@@ -101,6 +101,10 @@ set_mortality <- function(model, rates, weights = NULL) {
 #'     and `bands_by_stratum` (whether band combinations differ by stratum).
 #'     Shared bands are stored once; otherwise `bands` includes the stratum
 #'     columns. Band endpoints define half-open intervals `[start, end)`.}
+#'   \item{weights}{A summary of the weight model used for selection within
+#'     rate cells: a `summary.hammel_weight_model`, a list of `periods` and
+#'     `models` for a calendar schedule, or `NULL` when selection is
+#'     unweighted.}
 #' }
 #'
 #' @seealso [mortality()], [calculate_life_table()]
@@ -112,7 +116,8 @@ summary.hammel_mortality <- function(object, ...) {
 
   structure(
     list(
-      rate_strata = summarize_rate_strata(object$rates)
+      rate_strata = summarize_rate_strata(object$rates),
+      weights = summarize_model_argument(object$weights)
     ),
     class = "summary.hammel_mortality"
   )
@@ -128,6 +133,7 @@ print.summary.hammel_mortality <- function(x, ...) {
 
   list <- open_summary_list()
   print_rate_strata(x$rate_strata)
+  print_model_argument("Weight model", x$weights)
   cli::cli_end(list)
   invisible(x)
 }

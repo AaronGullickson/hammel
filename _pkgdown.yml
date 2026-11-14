@@ -38,6 +38,7 @@ reference:
       - generate_uniform_population
       - validate_population
       - group
+      - summary.hammel_group
 
   - title: Rate preparation
     desc: Import demographic rates and prepare proportional rate strata.
@@ -66,8 +67,11 @@ reference:
     contents:
       - matching_model
       - age_gap_matching_model
+      - summary.hammel_matching_model
       - group_inheritance
+      - summary.hammel_group_inheritance
       - weight_model
+      - summary.hammel_weight_model
 
   - title: Demographic summaries
     desc: Calculate population sizes, observed event rates, and synthetic demographic measures.

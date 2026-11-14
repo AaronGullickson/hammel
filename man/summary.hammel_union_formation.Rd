@@ -37,10 +37,23 @@ columns. Band endpoints define half-open intervals \verb{[start, end)}.}
 \item{cohabitation}{\code{NULL} when cohabitation is disabled; otherwise a
 list containing \code{cohab_prob_range} (the minimum and maximum supplied
 cohabitation probabilities), \code{cohab_rate_strata} (strata and bands of
-the cohabitation probability schedule), and \code{convert_rate_strata}
+the cohabitation probability schedule), \code{convert_rate_strata}
 (strata and bands of the conversion rate schedule, or \code{NULL} when no
-conversion schedule is configured). Both schedule summaries use the
+conversion schedule is configured), \code{matching} (a summary of the
+cohabitation matching model, or \code{NULL} when the general matching
+model is used) and \code{conversion_weights} (a summary of the conversion
+weight model, or \code{NULL} when unweighted). Both schedule summaries use the
 same structure as \code{rate_strata}.}
+\item{matching}{A summary of the matching model: a
+\code{summary.hammel_matching_model}, or a list of \code{periods} and \code{models}
+for a calendar schedule.}
+\item{father_matching}{A summary of the matching model for fathers of
+unpartnered births, as for \code{matching}, or \code{NULL} when the general
+matching model is used.}
+\item{search_weights}{A summary of the weight model choosing which
+woman searches: a \code{summary.hammel_weight_model}, a list of \code{periods}
+and \code{models} for a calendar schedule, or \code{NULL} when searching women
+are selected without weights.}
 }
 }
 \description{

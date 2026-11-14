@@ -52,10 +52,10 @@ hammel_model <- function() {
 #'   \item{population}{The `summary.hammel_population` of the starting
 #'     population, or `NULL` when no population is set.}
 #'   \item{groups}{A named list with one element per group dimension, or
-#'     `NULL` when the model has none. Each element contains `declared`
-#'     (whether the dimension is declared), `categories` (the population's
-#'     categories, or `NULL` when not yet known), `ancestry` (whether
-#'     ancestry is tracked), and `transition` (the
+#'     `NULL` when the model has none. Each element contains `group` (the
+#'     `summary.hammel_group` of the declared dimension, reporting the
+#'     population's categories when a population is set, or `NULL` when the
+#'     dimension is not declared) and `transition` (the
 #'     `summary.hammel_group_transition` of the dimension's transition
 #'     process, or `NULL` when it has none).}
 #'   \item{processes}{A named list of process summaries, in the order
@@ -203,9 +203,11 @@ summarize_model_groups <- function(model) {
       }
       transition <- transitions[[dimension]]
       list(
-        declared = !is.null(group),
-        categories = categories,
-        ancestry = isTRUE(group$ancestry),
+        group = if (is.null(group)) {
+          NULL
+        } else {
+          summary(group, categories = categories)
+        },
         transition = if (is.null(transition)) {
           NULL
         } else {
@@ -227,16 +229,10 @@ print_model_groups <- function(groups) {
     cli::cli_h3(label)
 
     list <- open_summary_list()
-    if (!group$declared) {
+    if (is.null(group$group)) {
       print_stat("Declared", "no")
     } else {
-      categories <- if (is.null(group$categories)) {
-        "not yet known; set a population"
-      } else {
-        paste(group$categories, collapse = ", ")
-      }
-      print_stat("Categories", categories)
-      print_stat("Ancestry tracked", if (group$ancestry) "yes" else "no")
+      print_group_details(group$group)
     }
     if (is.null(group$transition)) {
       print_stat("Transition process", "none")

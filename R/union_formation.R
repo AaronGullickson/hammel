@@ -271,10 +271,23 @@ set_union_formation <- function(
 #'   \item{cohabitation}{`NULL` when cohabitation is disabled; otherwise a
 #'     list containing `cohab_prob_range` (the minimum and maximum supplied
 #'     cohabitation probabilities), `cohab_rate_strata` (strata and bands of
-#'     the cohabitation probability schedule), and `convert_rate_strata`
+#'     the cohabitation probability schedule), `convert_rate_strata`
 #'     (strata and bands of the conversion rate schedule, or `NULL` when no
-#'     conversion schedule is configured). Both schedule summaries use the
+#'     conversion schedule is configured), `matching` (a summary of the
+#'     cohabitation matching model, or `NULL` when the general matching
+#'     model is used) and `conversion_weights` (a summary of the conversion
+#'     weight model, or `NULL` when unweighted). Both schedule summaries use the
 #'     same structure as `rate_strata`.}
+#'   \item{matching}{A summary of the matching model: a
+#'     `summary.hammel_matching_model`, or a list of `periods` and `models`
+#'     for a calendar schedule.}
+#'   \item{father_matching}{A summary of the matching model for fathers of
+#'     unpartnered births, as for `matching`, or `NULL` when the general
+#'     matching model is used.}
+#'   \item{search_weights}{A summary of the weight model choosing which
+#'     woman searches: a `summary.hammel_weight_model`, a list of `periods`
+#'     and `models` for a calendar schedule, or `NULL` when searching women
+#'     are selected without weights.}
 #' }
 #'
 #' @seealso [union_formation()]
@@ -291,13 +304,22 @@ summary.hammel_union_formation <- function(object, ...) {
       kinship_generations = object$kinship_generations,
       cohab_as_previous_union = object$cohab_as_previous_union,
       rate_strata = summarize_rate_strata(object$rates),
+      search_weights = summarize_model_argument(object$weights),
+      matching = summarize_model_argument(object$matching),
+      father_matching = summarize_model_argument(object$father_matching),
       cohabitation = if (is.null(object$cohab_prob)) {
         NULL
       } else {
         list(
           cohab_prob_range = range(object$cohab_prob$prob),
           cohab_rate_strata = summarize_rate_strata(object$cohab_prob),
-          convert_rate_strata = summarize_rate_strata(object$union_convert_rate)
+          convert_rate_strata = summarize_rate_strata(
+            object$union_convert_rate
+          ),
+          matching = summarize_model_argument(object$cohab_matching),
+          conversion_weights = summarize_model_argument(
+            object$weights_conversion
+          )
         )
       }
     ),
@@ -316,6 +338,18 @@ print.summary.hammel_union_formation <- function(x, ...) {
   list <- open_summary_list()
   print_stat("Search method", x$method)
   print_rate_strata(x$rate_strata)
+  rate_mode <- identical(x$method, "rate")
+  if (rate_mode) {
+    print_model_argument("Search weight model", x$search_weights)
+  }
+  print_model_argument("Matching model", x$matching)
+  if (rate_mode) {
+    print_model_argument(
+      "Father matching model",
+      x$father_matching,
+      none = "same as matching model"
+    )
+  }
 
   eligibility <- open_nested_stat("Male eligibility restrictions")
   print_stat("Minimum male age", x$min_male_age)
@@ -335,11 +369,20 @@ print.summary.hammel_union_formation <- function(x, ...) {
       ifelse(x$cohab_as_previous_union, "yes", "no")
     )
     print_rate_strata(x$cohabitation$cohab_rate_strata)
+    print_model_argument(
+      "Matching model",
+      x$cohabitation$matching,
+      none = "same as general matching model"
+    )
     if (is.null(x$cohabitation$convert_rate_strata)) {
       print_stat("Conversion to marriage", "not allowed")
     } else {
       conversion <- open_nested_stat("Conversion to marriage rates")
       print_rate_strata(x$cohabitation$convert_rate_strata)
+      print_model_argument(
+        "Weight model",
+        x$cohabitation$conversion_weights
+      )
       cli::cli_end(conversion)
     }
     cli::cli_end(cohabitation)

@@ -481,8 +481,8 @@ test_that("model summaries combine group declarations and transitions", {
     set_group_transition(rates, group = "region")
   result <- summary(model)
   expect_named(result$groups, c("ethnicity", "region"))
-  expect_identical(result$groups$ethnicity$categories, c("A", "B"))
-  expect_true(result$groups$ethnicity$ancestry)
+  expect_identical(result$groups$ethnicity$group$categories, c("A", "B"))
+  expect_true(result$groups$ethnicity$group$ancestry)
   expect_null(result$groups$ethnicity$transition)
   expect_s3_class(
     result$groups$region$transition,
@@ -493,6 +493,8 @@ test_that("model summaries combine group declarations and transitions", {
   groups <- grep("Groups", text, fixed = TRUE)
   expect_gt(groups, grep("Living population by age", text, fixed = TRUE))
   expect_true(any(grepl("Transition process: none", text, fixed = TRUE)))
+  expect_s3_class(result$groups$region$group, "summary.hammel_group")
+  expect_true(any(grepl("Inheritance: random_parent", text, fixed = TRUE)))
   expect_true(any(grepl("(1 of 2 possible): n", text, fixed = TRUE)))
 
   expect_null(summary(hammel_model())$groups)
@@ -526,7 +528,7 @@ test_that("model readiness requires declared transition dimensions", {
   )
   result <- summary(model)
   expect_identical(result$missing, "transition:ethnicity")
-  expect_false(result$groups$ethnicity$declared)
+  expect_null(result$groups$ethnicity$group)
   text <- cli::cli_fmt(print(result))
   expect_true(any(grepl("dimension ethnicity", text, fixed = TRUE)))
   expect_error(run_simulation(model, years = 1), "ethnicity")

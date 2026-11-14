@@ -168,3 +168,27 @@ test_that("baselines declare categories in the order given, and set_groups keeps
     set_union_formation("on_demand")
   expect_s3_class(run_simulation(model, 1, seed = 4), "hammel_population")
 })
+
+test_that("group summaries report categories, ancestry and inheritance", {
+  ethnicity <- group(
+    categories = c("W", "B"),
+    ancestry = TRUE,
+    inheritance = group_inheritance("hierarchy", order = c("B", "W"))
+  )
+  result <- summary(ethnicity)
+  expect_s3_class(result, "summary.hammel_group")
+  expect_identical(result$categories, c("W", "B"))
+  expect_true(result$ancestry)
+  expect_s3_class(result$inheritance, "summary.hammel_group_inheritance")
+  text <- cli::cli_fmt(value <- print(result))
+  expect_identical(value, result)
+  expect_true(any(grepl("Inheritance: hierarchy", text, fixed = TRUE)))
+  expect_true(any(grepl("^ +\\S+ Order: B > W", text)))
+
+  inferred <- summary(group())
+  expect_null(inferred$categories)
+  text <- cli::cli_fmt(print(inferred))
+  expect_true(any(grepl("inferred from the population", text, fixed = TRUE)))
+  text <- cli::cli_fmt(print(inferred <- summary(group(), categories = "A")))
+  expect_true(any(grepl("Categories: A", text, fixed = TRUE)))
+})

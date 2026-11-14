@@ -225,7 +225,162 @@ age_gap_matching_model <- function(
   )
 }
 
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a matching model
+#'
+#' @description
+#'
+#' Summary method for class `"hammel_matching_model"`
+#'
+#' @details
+#'
+#' When the formula is exactly `~ age_difference + I(age_difference^2)` with a
+#' negative quadratic coefficient, as built by [age_gap_matching_model()], the
+#' summary also reports the implied preferred age gap and half-weight
+#' distance.
+#'
+#' @param object A `hammel_matching_model` object returned by
+#'   [matching_model()] or [age_gap_matching_model()].
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_matching_model`
+#' containing:
+#' \describe{
+#'   \item{formula}{The utility formula.}
+#'   \item{coefficients}{The named utility coefficients.}
+#'   \item{age_gap}{`NULL`, or a list with the implied `preferred_age_gap`
+#'     and `half_weight_distance`, in years, of a quadratic age-gap model.}
+#'   \item{group_exogamy}{The `group_exogamy` specification, or `NULL`.}
+#'   \item{delta}{The `delta` specification, or `NULL`.}
+#' }
+#'
+#' @seealso [matching_model()], [age_gap_matching_model()]
+#' @examples
+#' matching <- age_gap_matching_model(
+#'   preferred_age_gap = 3,
+#'   half_weight_distance = 5,
+#'   group_exogamy = list(race = c("W:B" = -3, "W:O" = NA), region = NA)
+#' )
+#' summary(matching)
+#' @export
+summary.hammel_matching_model <- function(object, ...) {
+  structure(
+    list(
+      formula = object$formula,
+      coefficients = object$coefficients,
+      age_gap = implied_age_gap(object),
+      group_exogamy = object$group_exogamy,
+      delta = object$delta
+    ),
+    class = "summary.hammel_matching_model"
+  )
+}
+
+#' @rdname summary.hammel_matching_model
+#' @param x A `summary.hammel_matching_model` object returned by
+#'   `summary.hammel_matching_model()`.
+#' @export
+print.summary.hammel_matching_model <- function(x, ...) {
+  print_model_summary("Matching model", x)
+}
+
 # HELPER FUNCTIONS ---------------------------------------------------------
+
+# The preferred age gap and half-weight distance implied by a quadratic
+# age-gap model, inverting age_gap_matching_model(); NULL for other models.
+implied_age_gap <- function(model) {
+  terms <- c("age_difference", "I(age_difference^2)")
+  beta <- model$coefficients
+  quadratic <- identical(
+    attr(stats::terms(model$formula), "term.labels"),
+    terms
+  )
+  if (!quadratic || !setequal(names(beta), terms) ||
+        beta[["I(age_difference^2)"]] >= 0) {
+    return(NULL)
+  }
+  linear <- beta[["age_difference"]]
+  square <- beta[["I(age_difference^2)"]]
+  list(
+    preferred_age_gap = -linear / (2 * square),
+    half_weight_distance = sqrt(-log(2) / square)
+  )
+}
+
+# Lines describing a matching model summary; see model_summary_lines().
+matching_summary_lines <- function(x) {
+  lines <- c(
+    Formula = deparse1(x$formula),
+    Coefficients = format_named_values(x$coefficients)
+  )
+  if (!is.null(x$age_gap)) {
+    lines[["Preferred age gap"]] <- paste(
+      signif(x$age_gap$preferred_age_gap, 4), "years"
+    )
+    lines[["Half-weight distance"]] <- paste(
+      signif(x$age_gap$half_weight_distance, 4), "years"
+    )
+  }
+  c(
+    lines,
+    format_dimension_values(
+      "Group exogamy",
+      x$group_exogamy,
+      format_exogamy_values
+    ),
+    format_dimension_values("Delta", x$delta, format_named_values)
+  )
+}
+
+# Lines for a setting given as a bare value (the only dimension) or a list
+# keyed by dimension; a table of group exogamy pairs is one line.
+format_dimension_values <- function(label, x, formatter) {
+  if (is.null(x)) {
+    return(character())
+  }
+  if (is.data.frame(x)) {
+    dimensions <- exogamy_table_dimensions(x)
+    return(stats::setNames(
+      format_exogamy_table(x, dimensions),
+      paste0(label, " (", paste(dimensions, collapse = "|"), ")")
+    ))
+  }
+  if (!is_dimension_list(x)) {
+    return(stats::setNames(formatter(x), label))
+  }
+  stats::setNames(
+    vapply(x, formatter, character(1)),
+    paste0(label, " (", names(x), ")")
+  )
+}
+
+# One dimension's group exogamy: named pair effects, NA prohibiting a pair,
+# or a bare NA prohibiting every pair.
+format_exogamy_values <- function(x) {
+  if (is.null(names(x))) {
+    return("all pairs prohibited")
+  }
+  values <- ifelse(is.na(x), "prohibited", signif(x, 4))
+  paste(paste0(names(x), " = ", values), collapse = ", ")
+}
+
+# A group exogamy table, as combination pairs joined like "W|S:B|S".
+format_exogamy_table <- function(x, dimensions, max = 10L) {
+  side <- function(suffix) {
+    do.call(paste, c(x[paste0(dimensions, suffix)], sep = "|"))
+  }
+  values <- ifelse(is.na(x$log_odds), "prohibited", signif(x$log_odds, 4))
+  text <- paste0(side("_x"), ":", side("_y"), " = ", values)
+  if (length(text) <= max) {
+    return(paste(text, collapse = ", "))
+  }
+  paste0(
+    paste(text[seq_len(max)], collapse = ", "),
+    ", and ", length(text) - max, " more"
+  )
+}
 
 # Male-group formula effects can be absorbed by calibrated target weights.
 warn_absorbed_group_formula <- function(model) {

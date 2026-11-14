@@ -144,6 +144,10 @@ set_fertility <- function(
 #'     and `bands_by_stratum` (whether band combinations differ by stratum).
 #'     Shared bands are stored once; otherwise `bands` includes the stratum
 #'     columns. Band endpoints define half-open intervals `[start, end)`.}
+#'   \item{weights}{A summary of the weight model used for selection within
+#'     rate cells: a `summary.hammel_weight_model`, a list of `periods` and
+#'     `models` for a calendar schedule, or `NULL` when selection is
+#'     unweighted.}
 #'   \item{open_band_non_zero}{Whether any age band ends at `Inf` and has a
 #'     positive fertility rate.}
 #' }
@@ -160,6 +164,7 @@ summary.hammel_fertility <- function(object, ...) {
       birth_interval = object$birth_interval,
       ffab = object$ffab,
       rate_strata = summarize_rate_strata(object$rates),
+      weights = summarize_model_argument(object$weights),
       open_band_non_zero = any(object$rates$age_end == Inf &
                                  object$rates$rate > 0)
     ),
@@ -179,6 +184,7 @@ print.summary.hammel_fertility <- function(x, ...) {
   print_stat("Minimum birth interval", paste(x$birth_interval, "years"))
   print_stat("Fraction female at birth", x$ffab)
   print_rate_strata(x$rate_strata)
+  print_model_argument("Weight model", x$weights)
   cli::cli_end(list)
 
   if (x$open_band_non_zero) {
