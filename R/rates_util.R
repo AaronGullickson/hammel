@@ -5,6 +5,57 @@
 
 # Shared validation and engine preparation of input rate schedules.
 
+# RATE SUMMARY METADATA ---------------------------------------------------
+
+# Summarize an already-validated rate (or probability) table. NULL means no
+# table is configured. Strata retain their input types and observed order;
+# no unobserved combinations are added. Callers may supply explicit stratum
+# names when the input also carries columns that are not schedule strata.
+#
+# Returns stratum names, a tibble of observed strata, and a bands tibble.
+# Bands retain joint age/duration/parity/calendar combinations, including
+# unused NA clock pairs in mixed age/duration schedules. Identical band sets
+# across every stratum are returned once, without stratum columns; otherwise
+# the bands include their stratum columns and bands_by_stratum is TRUE.
+# Rates and duplicate rows do not affect the comparison. Boundary values and
+# half-open interval semantics are preserved, without formatting or rounding.
+summarize_rate_strata <- function(rates, strata = NULL) {
+  if (is.null(rates)) {
+    return(NULL)
+  }
+  if (is.null(strata)) {
+    strata <- intersect(
+      names(rates), c(builtin_strata, candidate_strata(rates))
+    )
+  }
+  band_columns <- intersect(
+    c(
+      "age_start", "age_end", "dur_start", "dur_end",
+      "parity_start", "parity_end", "time_start", "time_end"
+    ),
+    names(rates)
+  )
+  rates <- tibble::as_tibble(rates)
+  stratum_values <- unique(rates[strata])
+  bands <- unique(rates[c(strata, band_columns)])
+  common <- unique(rates[band_columns])
+
+  # Each distinct stratum/band row is one observed combination. The full
+  # Cartesian count is reached exactly when all strata share all bands.
+  shared <- !length(strata) ||
+    nrow(bands) == as.double(nrow(stratum_values)) * nrow(common)
+  if (shared) {
+    bands <- common
+  }
+
+  list(
+    stratified_by = strata,
+    strata = stratum_values,
+    bands = bands,
+    bands_by_stratum = !shared
+  )
+}
+
 # CALENDAR SCHEDULES AND COVERAGE ------------------------------------------
 
 # Shared calendar validation for flat rate tables. Each active slice follows

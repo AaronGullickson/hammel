@@ -157,3 +157,166 @@ test_that("stratified tables support numeric group codes and restarts", {
                    run_simulation(set_population(explicit, result), 5, seed =
                      123))
 })
+
+test_that("rate summary bands collapse only for identical stratum sets", {
+  rates <- tibble::tibble(
+    race = c("A", "A", "B", "B"),
+    age_start = c(15, 20, 20, 15),
+    age_end = c(20, 25, 25, 20),
+    parity_start = c(0, 1, 1, 0),
+    parity_end = c(1, Inf, Inf, 1),
+    rate = c(0, 0.2, 0.4, 0.1)
+  )
+  out <- summarize_rate_strata(rates)
+  expect_identical(out$stratified_by, "race")
+  expect_identical(out$strata, tibble::tibble(race = c("A", "B")))
+  expect_false(out$bands_by_stratum)
+  expect_named(out$bands, c(
+    "age_start", "age_end", "parity_start", "parity_end"
+  ))
+  expect_equal(nrow(out$bands), 2L)
+  expect_identical(out, summarize_rate_strata(rbind(rates, rates[1, ])))
+
+  # Marginal age and parity sets match, but their joint coverage differs.
+  rates$parity_start[3:4] <- c(0, 1)
+  rates$parity_end[3:4] <- c(1, Inf)
+  out <- summarize_rate_strata(rates)
+  expect_true(out$bands_by_stratum)
+  expect_identical(out$bands$race, rates$race)
+  expect_equal(nrow(out$bands), 4L)
+})
+
+test_that("rate summaries retain mixed clocks and calendar strata", {
+  rates <- tibble::tibble(
+    previous_union = c("none", "dissolved"),
+    age_start = c(18, NA_real_),
+    age_end = c(Inf, NA_real_),
+    dur_start = c(NA_real_, 0),
+    dur_end = c(NA_real_, 10),
+    time_start = c(2000, 2010),
+    time_end = c(2010, Inf),
+    rate = c(0.1, 0)
+  )
+  out <- summarize_rate_strata(rates)
+  expect_true(out$bands_by_stratum)
+  expect_equal(out$bands, rates[setdiff(names(rates), "rate")])
+  expect_s3_class(out$strata, "tbl_df")
+  expect_null(summarize_rate_strata(NULL))
+
+  pooled <- summarize_rate_strata(rates[2:8])
+  expect_length(pooled$stratified_by, 0L)
+  expect_false(pooled$bands_by_stratum)
+  expect_s3_class(pooled$bands, "tbl_df")
+
+  empty <- summarize_rate_strata(rates[FALSE, ])
+  expect_equal(nrow(empty$bands), 0L)
+  expect_false(empty$bands_by_stratum)
+})
+
+test_that("rate metadata printing separates shared and differing bands", {
+  rates <- tibble::tibble(
+    sex = c("m", "f"),
+    age_start = c(0, 0),
+    age_end = c(Inf, Inf),
+    rate = c(0.1, 0.2)
+  )
+  metadata <- summarize_rate_strata(rates)
+  text <- capture.output(value <- print_rate_strata(metadata))
+  expect_identical(value, metadata)
+  expect_true(any(grepl("sex: m, f", text, fixed = TRUE)))
+  expect_equal(sum(grepl("[0, Inf)", text, fixed = TRUE)), 1L)
+  expect_false(any(grepl("Bands by stratum", text, fixed = TRUE)))
+
+  rates$age_start[2] <- 5
+  text <- capture.output(print_rate_strata(summarize_rate_strata(rates)))
+  expect_true(any(grepl("sex = m", text, fixed = TRUE)))
+  expect_true(any(grepl("sex = f", text, fixed = TRUE)))
+  expect_true(any(grepl("[5, Inf)", text, fixed = TRUE)))
+  expect_length(capture.output(print_rate_strata(NULL)), 0L)
+})
+
+test_that("printed marginal bands retain parity and calendar intervals", {
+  rates <- tibble::tibble(
+    age_start = c(15, 20),
+    age_end = c(20, 25),
+    parity_start = c(0, 1),
+    parity_end = c(1, Inf),
+    time_start = c(2000, 2010),
+    time_end = c(2010, Inf),
+    rate = 0.1
+  )
+  text <- capture.output(print_rate_strata(summarize_rate_strata(rates)))
+  expect_true(any(grepl("None", text, fixed = TRUE)))
+  expect_true(any(grepl("Age bands (years)", text, fixed = TRUE)))
+  expect_true(any(grepl("Calendar bands (years)", text, fixed = TRUE)))
+  expect_true(any(grepl("[1, Inf)", text, fixed = TRUE)))
+  expect_true(any(grepl("[2010, Inf)", text, fixed = TRUE)))
+})
+
+test_that("large crossed schedules print compact marginal band sequences", {
+  grid <- expand.grid(age = 15:49, year = 1970:2020)
+  rates <- tibble::tibble(
+    age_start = grid$age,
+    age_end = grid$age + 1,
+    time_start = grid$year,
+    time_end = grid$year + 1,
+    rate = 0.1
+  )
+  metadata <- summarize_rate_strata(rates)
+  text <- capture.output(value <- print_rate_strata(metadata))
+  expect_identical(value, metadata)
+  expect_equal(nrow(metadata$bands), 35L * 51L)
+  expect_lt(length(text), 15L)
+  expect_true(any(grepl("35 bands; width 1", text, fixed = TRUE)))
+  expect_true(any(grepl("51 bands; width 1", text, fixed = TRUE)))
+  expect_true(any(grepl("[49, 50)", text, fixed = TRUE)))
+})
+
+test_that("irregular and open-ended band lists are bounded and explicit", {
+  start <- c(0:8, 12)
+  end <- c(1:9, Inf)
+  text <- format_rate_bands(start, end)
+  expect_match(text, "10 bands; showing 5", fixed = TRUE)
+  expect_match(text, "[12, Inf)", fixed = TRUE)
+  expect_false(grepl("width", text, fixed = TRUE))
+  expect_identical(format_rate_bands(0, Inf), "[0, Inf)")
+
+  # Equal widths with gaps must not be described as a regular sequence.
+  text <- format_rate_bands(seq(0, 18, 2), seq(1, 19, 2))
+  expect_match(text, "showing 5", fixed = TRUE)
+})
+
+test_that("calendar periods sharing band structures print together", {
+  rates <- tibble::tibble(
+    time_start = rep(c(2000, 2001, 2002, 2003), each = 2),
+    time_end = rep(c(2001, 2002, 2003, 2004), each = 2),
+    age_start = c(15, 20, 20, 15, 15, 25, 15, 20),
+    age_end = c(20, 25, 25, 20, 25, 35, 20, 25),
+    rate = seq_len(8) / 100
+  )
+  metadata <- summarize_rate_strata(rates)
+  text <- capture.output(value <- print_rate_strata(metadata))
+  expect_identical(value, metadata)
+  expect_true(any(grepl("Bands by calendar period", text, fixed = TRUE)))
+  expect_equal(sum(grepl("Calendar bands (years)", text, fixed = TRUE)), 2L)
+  expect_equal(sum(grepl("Age bands (years)", text, fixed = TRUE)), 2L)
+  expect_true(any(grepl(
+    "[2000, 2001), [2001, 2002), [2003, 2004)", text, fixed = TRUE
+  )))
+  expect_true(any(grepl("[15, 25), [25, 35)", text, fixed = TRUE)))
+})
+
+test_that("calendar structure grouping preserves joint parity coverage", {
+  rates <- tibble::tibble(
+    time_start = rep(c(2000, 2010), each = 2),
+    time_end = rep(c(2010, Inf), each = 2),
+    age_start = rep(c(15, 20), 2),
+    age_end = rep(c(20, 25), 2),
+    parity_start = c(0, 1, 1, 0),
+    parity_end = c(1, Inf, Inf, 1),
+    rate = 0.1
+  )
+  text <- capture.output(print_rate_strata(summarize_rate_strata(rates)))
+  expect_true(any(grepl("Bands by calendar period", text, fixed = TRUE)))
+  expect_equal(sum(grepl("Parity bands", text, fixed = TRUE)), 2L)
+})

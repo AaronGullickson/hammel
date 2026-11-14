@@ -51,11 +51,71 @@ pop_start <- generate_uniform_population(10000, end_time = 0)
 model <- model |> 
   set_population(pop_start)
 pop_end <- run_simulation(model, 100, seed = 42)
+summary(pop_end)
+```
+```
+Hammel Population Summary
+
+First date:                        -69.99
+End time:                             100
+Persons alive at end time:          11463
+Total births:                       24852
+Total unrealized births:                0
+Total deaths                        13389
+Total unions                         6917
+Total dissolutions                      0
+
+Latest simulation run
+Time period:                        0-100
+Starting population size:           10000
+Ending population size:             11463
+
+Living population by age and sex
+
+                     Male     Age     Female                   
+                          | 100–104 |                          
+                          |  95–99  | #                        
+                        # |  90–94  | ####                     
+                     #### |  85–89  | ########                 
+                 ######## |  80–84  | ###########              
+              ########### |  75–79  | ##############           
+            ############# |  70–74  | #################        
+         ################ |  65–69  | ###################      
+       ################## |  60–64  | #####################    
+     #################### |  55–59  | ####################     
+   ###################### |  50–54  | ######################   
+   ###################### |  45–49  | #####################    
+   ###################### |  40–44  | #####################    
+ ######################## |  35–39  | ######################   
+ ######################## |  30–34  | ######################   
+    ##################### |  25–29  | #####################    
+######################### |  20–24  | ######################   
+  ####################### |  15–19  | ######################   
+  ####################### |  10–14  | ######################   
+     #################### |   5–9   | #######################  
+   ###################### |   0–4   | ######################   
 ```
 
-Now, I can compute summary statistics.
+I can also compute summary statistics like population size over time.
 
 ```r
 calculate_population_size(pop_end, seq(0, 100, 5))
+```
+```
+# A tibble: 21 × 2
+    time population
+   <dbl>      <int>
+ 1     0      10000
+ 2     5      10432
+ 3    10      10804
+ 4    15      11127
+ 5    20      11259
+ 6    25      11263
+ 7    30      11200
+ 8    35      11202
+ 9    40      11213
+10    45      11216
+# ℹ 11 more rows
+# ℹ Use `print(n = ...)` to see more rows
 ```
 

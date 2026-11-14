@@ -295,6 +295,233 @@ validate_population <- function(results) {
   invisible(results)
 }
 
+# SUMMARY AND PRINT FUNCTIONS -------------------------------------------------
+
+#' Summarize a Hammel population
+#'
+#' @description
+#'
+#' Summary method for class `"hammel_population"`
+#'
+#' @param object an object of class `"hammel_population"`, usually the result
+#'   of a call to [run_simulation].
+#' @param interval_pyramid length of age intervals used for drawing
+#'   population pyramid
+#' @param ... further arguments passed on from other methods.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_population` containing:
+#' \describe{
+#'   \item{first_time}{The earliest recorded birth time, in years.}
+#'   \item{end_time}{The population's reference time, in years.}
+#'   \item{persons_alive}{The number of persons alive at the reference time.}
+#'   \item{n_births}{The number of recorded persons with a birth time,
+#'     including persons in the starting population.}
+#'   \item{n_births_u}{The number of retained unrealized birth records, or
+#'     `NA` when no unrealized birth table is present.}
+#'   \item{n_deaths}{The number of recorded persons with a death time.}
+#'   \item{n_unions}{The number of recorded union episodes, including
+#'     ended unions.}
+#'   \item{n_dissolutions}{The number of union episodes with end reason
+#'     `"dissolution"`.}
+#'   \item{age_counts}{A tibble of living male and female counts by five-year
+#'     age group, with columns `age`, `male`, and `female`.}
+#'   \item{simulation}{A list describing the latest simulation run, with
+#'     `start` and `end` times in years and living population counts
+#'     `pop_size_start` and `pop_size_end`, or `NULL` when no simulation
+#'     metadata is present.}
+#'   \item{group_counts}{A named list of tibbles, one per declared group
+#'     dimension, or `NULL` when no groups are declared. Each tibble contains
+#'     `category`, `count`, and `percent` for the living population at the
+#'     reference time, including declared categories with zero members.
+#'     Percentages are on a 0--100 scale and are `NaN` when the dimension's
+#'     total living count is zero.}
+#' }
+#'
+#' `print()` displays the summary, group tables when present, and a text
+#' population pyramid, returning its input invisibly. Pyramid bars share a
+#' common scale across both sexes.
+#'
+#' @examples
+#'
+#' # get summary of starting population
+#' population <- generate_uniform_population(1000)
+#' summary(population)
+#'
+#' # get summary of simulatied population
+#' model <- hammel_model() |>
+#'   set_population(population) |>
+#'   set_mortality(usa_2000_mortality) |>
+#'   set_fertility(usa_2000_fertility) |>
+#'   set_union_formation("on_demand")
+#' result <- run_simulation(model, years = 50, seed = 42)
+#' summary(result)
+#' @export
+summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
+
+  # get stats for drawing population pyramid
+  alive <- is.na(object$persons$death_time)
+  ages <- object$end_time - object$persons$birth_time[alive]
+
+  breaks <- seq(0, max(c(5, ages)) + 5, by = 5)
+  age_group <- cut(ages, breaks, right = FALSE)
+
+  age_counts <- table(
+    age_group,
+    factor(object$persons$sex[alive], levels = c("m", "f"))
+  )
+
+  age_counts = tibble::tibble(
+    age = paste0(
+      head(breaks, -1), "\u002d", tail(breaks, -1) - 1
+    ),
+    male = as.integer(age_counts[, "m"]),
+    female = as.integer(age_counts[, "f"])
+  )
+
+  if (!is.null(object$simulation)) {
+    start <- object$simulation$start_time
+    pop_init <- sum(
+      object$persons$birth_time <= start &
+        (is.na(object$persons$death_time) | object$persons$death_time > start)
+    )
+    simulation <- list(
+      start = start,
+      end = object$simulation$end_time,
+      pop_size_start = pop_init,
+      pop_size_end = sum(alive)
+    )
+  } else {
+    simulation <- NULL
+  }
+
+  if (!is.null(object$groups)) {
+    group_counts <- lapply(
+      names(object$groups),
+      function(group_name) {
+        categories <- object$groups[[group_name]]$categories
+        counts <- table(
+          factor(
+            object$persons[[group_name]][alive],
+            levels = categories
+          )
+        ) |>
+          as.numeric()
+        tibble(
+          category = categories,
+          count = counts,
+          percent = 100 * counts / sum(counts)
+        )
+      }
+    )
+    names(group_counts) <- names(object$groups)
+  } else {
+    group_counts <- NULL
+  }
+
+  structure(
+    list(
+      first_time = min(object$persons$birth_time),
+      end_time = object$end_time,
+      persons_alive = sum(alive),
+      n_births = sum(!is.na(object$persons$birth_time)),
+      n_births_u = ifelse(
+        is.null(object$unrealized_births), NA, nrow(object$unrealized_births)
+      ),
+      n_deaths = sum(!is.na(object$persons$death_time)),
+      n_unions = nrow(object$unions),
+      n_dissolutions = (sum(!is.na(object$unions$end_reason) &
+                              object$unions$end_reason == "dissolution")),
+      age_counts = age_counts,
+      simulation = simulation,
+      group_counts = group_counts
+    ),
+    class = "summary.hammel_population"
+  )
+}
+
+#' @rdname summary.hammel_population
+#' @param x A `summary.hammel_population` object returned by
+#'   `summary.hammel_population()`.
+#' @export
+print.summary.hammel_population <- function(x, ...) {
+
+  cat(cli::style_bold("Hammel Population Summary"), "\n\n")
+
+  print_stat("First date:", round(x$first_time, 3))
+  print_stat("End time:", x$end_time)
+  print_stat("Persons alive at end time:", x$persons_alive)
+  print_stat("Total births:", x$n_births)
+  if (!is.na(x$n_births_u)) {
+    print_stat("Total unrealized births:", x$n_births_u)
+  }
+  print_stat("Total deaths", x$n_deaths)
+  print_stat("Total unions", x$n_unions)
+  print_stat("Total dissolutions", x$n_dissolutions)
+
+  if(!is.null(x$simulation)) {
+    cat("\n", cli::style_bold("Latest simulation run"), "\n", sep = "")
+
+    print_stat(
+      "Time period:", paste0(x$simulation$start, "\u002d", x$simulation$end)
+    )
+    print_stat("Starting population size:", x$simulation$pop_size_start)
+    print_stat("Ending population size:", x$simulation$pop_size_end)
+  }
+
+  if(!is.null(x$group_counts)) {
+    cat(
+      "\n", cli::style_bold("Living population by group"), "\n", sep = ""
+    )
+
+    for (dimension in names(x$group_counts)) {
+      counts <- x$group_counts[[dimension]]
+      label_width <- max(nchar(c("Category", counts$category)))
+
+      cat("\n", cli::style_bold(dimension), "\n", sep = "")
+      cat(sprintf(
+        "  %-*s %10s %9s\n",
+        label_width, "Category", "Count", "Percent"
+      ))
+
+      for (i in seq_len(nrow(counts))) {
+        cat(sprintf(
+          "  %-*s %10.0f %9.1f\n",
+          label_width,
+          counts$category[i],
+          counts$count[i],
+          counts$percent[i]
+        ))
+      }
+    }
+  }
+
+  counts <- x$age_counts
+  width <- 25
+  peak <- max(c(counts$male, counts$female, 1))
+  male <- strrep("#", round(width * counts$male / peak))
+  female <- strrep("#", round(width * counts$female / peak))
+  age_labels <- format(counts$age, width = 7, justify = "centre")
+
+  cat(
+    "\n", cli::style_bold("Living population by age and sex"), "\n\n", sep = ""
+  )
+  cat(sprintf(
+    "%25s   %s   %-25s\n",
+    "Male",
+    format("Age", width = 7, justify = "centre"),
+    "Female"
+  ))
+  for (i in rev(seq_len(nrow(counts)))) {
+    cat(sprintf(
+      "%25s | %s | %-25s\n",
+      male[i], age_labels[i], female[i]
+    ))
+  }
+
+  invisible(x)
+}
+
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 normalize_unions <- function(unions) {
@@ -367,3 +594,4 @@ validate_union_types <- function(unions) {
   }
   invisible(unions)
 }
+

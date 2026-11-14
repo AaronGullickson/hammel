@@ -400,6 +400,14 @@ component. The summary proposal does not itself select a new result class or
 authorize changing that return contract. Keep underlying tables and settings
 available as ordinary inspectable R objects.
 
+### Weight models in process summaries
+
+During the population and fertility summary work, the user requested that
+every process summary include its configured weight models once weight-model
+summaries are available. Compose the process display from those summaries;
+include conversion weights separately where applicable. This is a pending
+presentation requirement, not implemented weight-model summary behavior.
+
 ### Unweighted or default intervals in model schedules
 
 Recorded November 4, 2026, during milestone 8 (D129), for milestone 11 (D131). Calendar model schedules (the

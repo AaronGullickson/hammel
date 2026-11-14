@@ -240,6 +240,118 @@ set_union_formation <- function(
   )
 }
 
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a union formation process
+#'
+#' @description
+#' 
+#' Summary method for class `"hammel_union_formation"`
+#'
+#' @param object A `hammel_union_formation` object returned by [union_formation()].
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_union_formation`
+#' containing:
+#' \describe{
+#'   \item{method}{The union initiation method: `"rate"` or `"on_demand"`.}
+#'   \item{min_male_age}{The minimum eligible male age, in years.}
+#'   \item{kinship_generations}{The configured number of generations used
+#'     for kinship exclusion when selecting partners.}
+#'   \item{cohab_as_previous_union}{Whether cohabitations count as previous
+#'     unions when determining previous-union status.}
+#'   \item{rate_strata}{A list describing the union-search rate schedule, or
+#'     `NULL` when no rate schedule is configured. The list contains
+#'     `stratified_by` (stratum column names), `strata` (a tibble of observed
+#'     stratum combinations), `bands` (a tibble of exact band combinations),
+#'     and `bands_by_stratum` (whether band combinations differ by stratum).
+#'     Shared bands are stored once; otherwise `bands` includes the stratum
+#'     columns. Band endpoints define half-open intervals `[start, end)`.}
+#'   \item{cohabitation}{`NULL` when cohabitation is disabled; otherwise a
+#'     list containing `cohab_prob_range` (the minimum and maximum supplied
+#'     cohabitation probabilities), `cohab_rate_strata` (strata and bands of
+#'     the cohabitation probability schedule), and `convert_rate_strata`
+#'     (strata and bands of the conversion rate schedule, or `NULL` when no
+#'     conversion schedule is configured). Both schedule summaries use the
+#'     same structure as `rate_strata`.}
+#' }
+#'
+#' @seealso [union_formation()]
+#' @examples
+#' process <- union_formation("rate", usa_2000_marriage)
+#' summary(process)
+#' @export
+summary.hammel_union_formation <- function(object, ...) {
+
+  structure(
+    list(
+      method = object$initiation,
+      min_male_age = object$min_male_age,
+      kinship_generations = object$kinship_generations,
+      cohab_as_previous_union = object$cohab_as_previous_union,
+      rate_strata = summarize_rate_strata(object$rates),
+      cohabitation = if (is.null(object$cohab_prob)) {
+        NULL
+      } else {
+        list(
+          cohab_prob_range = range(object$cohab_prob$prob),
+          cohab_rate_strata = summarize_rate_strata(object$cohab_prob),
+          convert_rate_strata = summarize_rate_strata(object$union_convert_rate)
+        )
+      }
+    ),
+    class = "summary.hammel_union_formation"
+  )
+}
+
+#' @rdname summary.hammel_union_formation
+#' @param x A `summary.hammel_union_formation` object returned by
+#'   `summary.hammel_union_formation()`.
+#' @export
+print.summary.hammel_union_formation <- function(x, ...) {
+
+  cat(cli::style_bold("Union Formation Process Summary", "\n\n"))
+
+  print_stat("Search Method:", x$method)
+
+  if(!is.null(x$rate_strata)) {
+    print_rate_strata(x$rate_strata)
+  }
+
+  cat("\n")
+
+  cat(cli::style_bold("Male eligibility restrictions", "\n"))
+  print_stat("Minimum male age:", x$min_male_age)
+  print_stat("Generational proximity:", x$kinship_generations)
+  
+  cat("\n")
+
+  cat(cli::style_bold("Cohabitation", "\n"))
+  if(is.null(x$cohabitation)) {
+    cat(cli::col_br_red("Disabled"), "\n")
+  } else {
+    print_stat(
+      "Probability range:",
+      paste(x$cohabitation$cohab_prob_range, collapse = "\u002d")
+    )
+    print_stat(
+      "Counts as previous union",
+      ifelse(x$cohab_as_previous_union, "yes", "no")
+    )
+    print_rate_strata(x$cohabitation$cohab_rate_strata)
+    cat("\n")
+    if(!is.null(x$cohabitation$convert_rate_strata)) {
+      cat(cli::style_italic("Cohabitation conversion rates"))
+      print_rate_strata(x$cohabitation$convert_rate_strata)
+    } else {
+      cat(cli::style_italic("No cohabitation conversion to marriage allowed"))
+    }
+  }
+
+
+}
+
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 validate_union_formation <- function(process) {
