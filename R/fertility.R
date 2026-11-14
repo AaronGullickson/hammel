@@ -126,9 +126,8 @@ set_fertility <- function(
 #' Summarize a fertility process
 #'
 #' @description
-#' Summarize fertility settings and the strata and bands in the input rate
-#' schedule. The print method displays compact band lists and an advisory
-#' when an open-ended age band contains a positive fertility rate.
+#' 
+#' Summary method for class `"hammel_fertility"`
 #'
 #' @param object A `hammel_fertility` object returned by [fertility()].
 #' @param ... Additional arguments, currently unused.
@@ -148,17 +147,6 @@ set_fertility <- function(
 #'   \item{open_band_non_zero}{Whether any age band ends at `Inf` and has a
 #'     positive fertility rate.}
 #' }
-#'
-#' @details
-#' `print()` displays fertility settings, categorical strata, and age,
-#' duration, parity, and calendar bands when present. Long band lists are
-#' abbreviated. Calendar periods with identical non-calendar band structures
-#' are grouped together when structures change over time. Exact band
-#' combinations remain available in `rate_strata$bands`.
-#'
-#' For positive open-ended age bands, the printed advisory notes that the
-#' rate applies to all women in the band and is ignored when calculating
-#' TFR. This is a display message, not an R warning condition.
 #'
 #' @seealso [fertility()], [calculate_tfr()]
 #' @examples
