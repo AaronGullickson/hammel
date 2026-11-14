@@ -118,9 +118,9 @@ summary.hammel_mortality <- function(object, ...) {
   )
 }
 
-#' @rdname summary.hammel_fertility
-#' @param x A `summary.hammel_fertility` object returned by
-#'   `summary.hammel_fertility()`.
+#' @rdname summary.hammel_mortality
+#' @param x A `summary.hammel_mortality` object returned by
+#'   `summary.hammel_mortality()`.
 #' @export
 print.summary.hammel_mortality <- function(x, ...) {
 

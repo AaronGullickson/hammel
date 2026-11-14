@@ -240,6 +240,74 @@ set_union_formation <- function(
   )
 }
 
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a union formation process
+#'
+#' @description
+#' 
+#' Summary method for class `"hammel_union_formation"`
+#'
+#' @param object A `hammel_union_formation` object returned by [union_formation()].
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_union_formation` containing:
+#' \describe{
+#'   \item{birth_interval}{The minimum maternal birth-to-birth interval,
+#'     in years.}
+#'   \item{ffab}{The probability that a newborn is female.}
+#'   \item{rate_strata}{A list describing the input rate schedule, containing
+#'     `stratified_by` (stratum column names), `strata` (a tibble of observed
+#'     stratum combinations), `bands` (a tibble of exact band combinations),
+#'     and `bands_by_stratum` (whether band combinations differ by stratum).
+#'     Shared bands are stored once; otherwise `bands` includes the stratum
+#'     columns. Band endpoints define half-open intervals `[start, end)`.}
+#'   \item{open_band_non_zero}{Whether any age band ends at `Inf` and has a
+#'     positive fertility rate.}
+#' }
+#'
+#' @seealso [union_formation()]
+#' @examples
+#' process <- union_formation("rate", usa_2000_marriage)
+#' summary(process)
+#' @export
+summary.hammel_union_formation <- function(object, ...) {
+
+  structure(
+    list(
+      method = object$initiation,
+      min_male_age = object$min_male_age,
+      kinship_generations = object$kinship_generations,
+      cancel_birth_if_no_match = object$cancel_birth_if_no_match,
+      cohab_as_previous_union = object$cohab_as_previous_union,
+      rate_strata = summarize_rate_strata(object$rates)
+    ),
+    class = "summary.hammel_union_formation"
+  )
+}
+
+#' @rdname summary.hammel_union_formation
+#' @param x A `summary.hammel_union_formation` object returned by
+#'   `summary.hammel_union_formation()`.
+#' @export
+print.summary.hammel_union_formation <- function(x, ...) {
+
+  cat(cli::style_bold("Union Formation Process Summary", "\n\n"))
+
+  print_stat("Method:", x$method)
+
+  cat("\n")
+
+  cat(cli::style_bold("Male eligibility restrictions", "\n"))
+  print_stat("Minimum male age:", x$min_male_age)
+  print_stat("Generational proximity:", x$kinship_generations)
+
+  if(!is.null(x$rate_strata)) {
+    print_rate_strata(x$rate_strata)
+  }
+}
+
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 validate_union_formation <- function(process) {

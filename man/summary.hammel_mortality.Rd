@@ -2,14 +2,20 @@
 % Please edit documentation in R/mortality.R
 \name{summary.hammel_mortality}
 \alias{summary.hammel_mortality}
+\alias{print.summary.hammel_mortality}
 \title{Summarize a mortality process}
 \usage{
 \method{summary}{hammel_mortality}(object, ...)
+
+\method{print}{summary.hammel_mortality}(x, ...)
 }
 \arguments{
 \item{object}{A \code{hammel_mortality} object returned by \code{\link[=mortality]{mortality()}}.}
 
 \item{...}{Additional arguments, currently unused.}
+
+\item{x}{A \code{summary.hammel_mortality} object returned by
+\code{summary.hammel_mortality()}.}
 }
 \value{
 \code{summary()} returns an object of class \code{summary.hammel_morality} containing:
