@@ -49,6 +49,7 @@ reference:
     desc: Specify mortality, fertility, unions, and group transitions.
     contents:
       - mortality
+      - summary.hammel_mortality
       - fertility
       - summary.hammel_fertility
       - union_formation

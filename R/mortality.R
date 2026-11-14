@@ -79,3 +79,52 @@ mortality <- function(rates, weights = NULL) {
 set_mortality <- function(model, rates, weights = NULL) {
   set_process(model, mortality(rates, weights = weights))
 }
+
+
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a mortality process
+#'
+#' @description
+#' 
+#' Summary method for class `"hammel_mortality"`
+#'
+#' @param object A `hammel_mortality` object returned by [mortality()].
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_morality` containing:
+#' \describe{
+#'   \item{rate_strata}{A list describing the input rate schedule, containing
+#'     `stratified_by` (stratum column names), `strata` (a tibble of observed
+#'     stratum combinations), `bands` (a tibble of exact band combinations),
+#'     and `bands_by_stratum` (whether band combinations differ by stratum).
+#'     Shared bands are stored once; otherwise `bands` includes the stratum
+#'     columns. Band endpoints define half-open intervals `[start, end)`.}
+#' }
+#'
+#' @seealso [mortality()], [calculate_life_table()]
+#' @examples
+#' process <- mortality(usa_2000_mortality)
+#' summary(process)
+#' @export
+summary.hammel_mortality <- function(object, ...) {
+
+  structure(
+    list(
+      rate_strata = summarize_rate_strata(object$rates)
+    ),
+    class = "summary.hammel_mortality"
+  )
+}
+
+#' @rdname summary.hammel_fertility
+#' @param x A `summary.hammel_fertility` object returned by
+#'   `summary.hammel_fertility()`.
+#' @export
+print.summary.hammel_mortality <- function(x, ...) {
+
+  cat(cli::style_bold("Mortality Process Summary", "\n\n"))
+
+  print_rate_strata(x$rate_strata)
+}
