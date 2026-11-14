@@ -259,6 +259,9 @@ set_union_formation <- function(
 #'   \item{min_male_age}{The minimum eligible male age, in years.}
 #'   \item{kinship_generations}{The configured number of generations used
 #'     for kinship exclusion when selecting partners.}
+#'   \item{cancel_birth_if_no_match}{Whether a birth is cancelled when its
+#'     on-demand partner search or rate-mode nonmarital father selection
+#'     fails, rather than occurring with an unknown father.}
 #'   \item{cohab_as_previous_union}{Whether cohabitations count as previous
 #'     unions when determining previous-union status.}
 #'   \item{rate_strata}{A list describing the union-search rate schedule, or
@@ -302,6 +305,7 @@ summary.hammel_union_formation <- function(object, ...) {
       method = object$initiation,
       min_male_age = object$min_male_age,
       kinship_generations = object$kinship_generations,
+      cancel_birth_if_no_match = object$cancel_birth_if_no_match,
       cohab_as_previous_union = object$cohab_as_previous_union,
       rate_strata = summarize_rate_strata(object$rates),
       search_weights = summarize_model_argument(object$weights),
@@ -350,6 +354,10 @@ print.summary.hammel_union_formation <- function(x, ...) {
       none = "same as matching model"
     )
   }
+  print_stat(
+    "Births without a matched father",
+    if (x$cancel_birth_if_no_match) "cancelled" else "allowed"
+  )
 
   eligibility <- open_nested_stat("Male eligibility restrictions")
   print_stat("Minimum male age", x$min_male_age)

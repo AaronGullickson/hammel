@@ -25,6 +25,9 @@ containing:
 \item{min_male_age}{The minimum eligible male age, in years.}
 \item{kinship_generations}{The configured number of generations used
 for kinship exclusion when selecting partners.}
+\item{cancel_birth_if_no_match}{Whether a birth is cancelled when its
+on-demand partner search or rate-mode nonmarital father selection
+fails, rather than occurring with an unknown father.}
 \item{cohab_as_previous_union}{Whether cohabitations count as previous
 unions when determining previous-union status.}
 \item{rate_strata}{A list describing the union-search rate schedule, or

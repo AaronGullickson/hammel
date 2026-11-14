@@ -109,8 +109,16 @@ test_that("union formation summaries nest matching models", {
   expect_true(any(grepl("Father matching model: same as", text, fixed = TRUE)))
   expect_true(any(grepl("Preferred age gap: 1 years", text, fixed = TRUE)))
   expect_true(any(grepl("Search weight model: none", text, fixed = TRUE)))
+  expect_true(result$cancel_birth_if_no_match)
+  expect_true(any(grepl(
+    "Births without a matched father: cancelled", text, fixed = TRUE
+  )))
 
-  text <- cli::cli_fmt(print(summary(union_formation("on_demand"))))
+  process <- union_formation("on_demand", cancel_birth_if_no_match = FALSE)
+  text <- cli::cli_fmt(print(summary(process)))
+  expect_true(any(grepl(
+    "Births without a matched father: allowed", text, fixed = TRUE
+  )))
   expect_false(any(grepl("Father matching", text, fixed = TRUE)))
   expect_false(any(grepl("Search weight", text, fixed = TRUE)))
 })
