@@ -465,3 +465,78 @@ test_that("model summaries combine components and report readiness", {
   expect_true(any(grepl("Fertility process", text, fixed = TRUE)))
   expect_true(any(grepl("elements needed to run", text, fixed = TRUE)))
 })
+
+test_that("model summaries combine group declarations and transitions", {
+  population <- generate_uniform_population(
+    60,
+    groups = list(ethnicity = c(A = 1, B = 1), region = c(n = 1, s = 1))
+  )
+  rates <- tibble::tribble(
+    ~age_start, ~age_end, ~origin, ~destination, ~rate,
+    0,          Inf,      "n",     "s",          0.05
+  )
+  model <- hammel_model() |>
+    set_population(population) |>
+    set_groups(ethnicity = group(ancestry = TRUE), region = group()) |>
+    set_group_transition(rates, group = "region")
+  result <- summary(model)
+  expect_named(result$groups, c("ethnicity", "region"))
+  expect_identical(result$groups$ethnicity$categories, c("A", "B"))
+  expect_true(result$groups$ethnicity$ancestry)
+  expect_null(result$groups$ethnicity$transition)
+  expect_s3_class(
+    result$groups$region$transition,
+    "summary.hammel_group_transition"
+  )
+  expect_named(result$population$group_counts, c("ethnicity", "region"))
+  text <- cli::cli_fmt(print(result))
+  groups <- grep("Groups", text, fixed = TRUE)
+  expect_gt(groups, grep("Living population by age", text, fixed = TRUE))
+  expect_true(any(grepl("Transition process: none", text, fixed = TRUE)))
+  expect_true(any(grepl("(1 of 2 possible): n", text, fixed = TRUE)))
+
+  expect_null(summary(hammel_model())$groups)
+})
+
+test_that("model readiness requires declared transition dimensions", {
+  population <- generate_uniform_population(
+    60,
+    groups = list(region = c(n = 1, s = 1, w = 1))
+  )
+  rates <- tibble::tribble(
+    ~age_start, ~age_end, ~origin, ~destination, ~rate,
+    0,          Inf,      "n",     "s",          0.05
+  )
+  model <- hammel_model() |>
+    set_population(population) |>
+    set_mortality(usa_2000_mortality) |>
+    set_fertility(usa_2000_fertility) |>
+    set_union_formation("on_demand") |>
+    set_group_transition(rates)
+  result <- summary(model)
+  expect_length(result$missing, 0L)
+  expect_equal(nrow(result$groups$region$transition$missing_transitions), 5L)
+  text <- cli::cli_fmt(print(result))
+  expect_true(any(grepl("(1 of 6 possible)", text, fixed = TRUE)))
+  expect_no_error(run_simulation(model, years = 1, seed = 1))
+
+  model$processes$group_transition$ethnicity <- group_transition(
+    rates,
+    group = "ethnicity"
+  )
+  result <- summary(model)
+  expect_identical(result$missing, "transition:ethnicity")
+  expect_false(result$groups$ethnicity$declared)
+  text <- cli::cli_fmt(print(result))
+  expect_true(any(grepl("dimension ethnicity", text, fixed = TRUE)))
+  expect_error(run_simulation(model, years = 1), "ethnicity")
+
+  unassigned <- hammel_model() |> set_group_transition(rates)
+  expect_identical(
+    summary(unassigned)$missing,
+    c(missing_model_elements(unassigned), "transition:.default")
+  )
+  text <- cli::cli_fmt(print(summary(unassigned)))
+  expect_true(any(grepl("Unassigned dimension", text, fixed = TRUE)))
+  expect_true(any(grepl("set_group_transition()", text, fixed = TRUE)))
+})

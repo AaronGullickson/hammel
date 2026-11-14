@@ -407,7 +407,7 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
           )
         ) |>
           as.numeric()
-        tibble(
+        tibble::tibble(
           category = categories,
           count = counts,
           percent = 100 * counts / sum(counts)

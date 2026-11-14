@@ -176,7 +176,150 @@ household <- function(age_independence = 18) {
   )
 }
 
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a group transition process
+#'
+#' @description
+#'
+#' Summary method for class `"hammel_group_transition"`
+#'
+#' @param object A `hammel_group_transition` object returned by
+#'   [group_transition()].
+#' @param categories Optional character vector of the dimension's
+#'   categories, used to count possible transitions. `NULL` (default) uses the
+#'   categories that appear in the `origin` or `destination` columns.
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_group_transition`
+#' containing:
+#' \describe{
+#'   \item{group}{The name of the group dimension whose categories change, or
+#'     `NULL` when the process applies to the model's only dimension.}
+#'   \item{categories}{The categories used to define possible transitions.}
+#'   \item{transitions}{A tibble of the `origin` and `destination` pairs that
+#'     have a positive rate in at least one band or stratum.}
+#'   \item{missing_transitions}{A tibble of the possible `origin` and
+#'     `destination` pairs between distinct categories that have no positive
+#'     rate in any band or stratum.}
+#'   \item{rate_strata}{A list describing the transition rate schedule apart
+#'     from its `origin` and `destination` columns, containing
+#'     `stratified_by` (stratum column names), `strata` (a tibble of observed
+#'     stratum combinations), `bands` (a tibble of exact band combinations),
+#'     and `bands_by_stratum` (whether band combinations differ by stratum).
+#'     Shared bands are stored once; otherwise `bands` includes the stratum
+#'     columns. Band endpoints define half-open intervals `[start, end)`.}
+#'   \item{age_independence}{The household age of independence, in years,
+#'     or `NULL` when transitions move individuals rather than households.}
+#' }
+#'
+#' @seealso [group_transition()], [household()]
+#' @examples
+#' rates <- tibble::tribble(
+#'   ~age_start, ~age_end, ~origin, ~destination, ~rate,
+#'   0,          Inf,      "A",     "B",          0.05,
+#'   0,          Inf,      "B",     "A",          0.02
+#' )
+#' process <- group_transition(rates, household = household())
+#' summary(process)
+#' @export
+summary.hammel_group_transition <- function(object, categories = NULL, ...) {
+  rates <- object$rates
+  strata <- intersect(
+    names(rates), c(builtin_strata, candidate_strata(rates))
+  )
+  if (is.null(categories)) {
+    categories <- unique(c(rates$origin, rates$destination))
+  }
+  transitions <- unique(rates[rates$rate > 0, c("origin", "destination")])
+  possible <- expand.grid(
+    destination = categories,
+    origin = categories,
+    stringsAsFactors = FALSE
+  )
+  possible <- tibble::as_tibble(possible[c("origin", "destination")])
+  possible <- possible[possible$origin != possible$destination, ]
+  covered <- paste(possible$origin, possible$destination) %in%
+    paste(transitions$origin, transitions$destination)
+
+  structure(
+    list(
+      group = object$group,
+      categories = categories,
+      transitions = transitions,
+      missing_transitions = possible[!covered, ],
+      rate_strata = summarize_rate_strata(
+        rates,
+        strata = setdiff(strata, c("origin", "destination"))
+      ),
+      age_independence = object$household$age_independence
+    ),
+    class = "summary.hammel_group_transition"
+  )
+}
+
+#' @rdname summary.hammel_group_transition
+#' @param x A `summary.hammel_group_transition` object returned by
+#'   `summary.hammel_group_transition()`.
+#' @export
+print.summary.hammel_group_transition <- function(x, ...) {
+
+  cli::cli_h2("Group transition process")
+
+  list <- open_summary_list()
+  print_stat(
+    "Group dimension",
+    if (is.null(x$group)) "the model's only dimension" else x$group
+  )
+  print_transition_details(x)
+  cli::cli_end(list)
+  invisible(x)
+}
+
 # HELPER FUNCTIONS ---------------------------------------------------------
+
+# Print the bullets of a group transition summary that do not depend on how
+# its dimension is identified. Shared by the process and model summaries.
+print_transition_details <- function(x) {
+  n <- length(x$categories)
+  print_stat(
+    paste0(
+      "Transitions (", nrow(x$transitions), " of ", n * (n - 1L),
+      " possible)"
+    ),
+    format_transition_pairs(x$transitions)
+  )
+  print_stat(
+    "Missing transitions",
+    format_transition_pairs(x$missing_transitions)
+  )
+  print_rate_strata(x$rate_strata)
+  household <- if (is.null(x$age_independence)) {
+    "no"
+  } else {
+    paste0("yes, age of independence ", x$age_independence, " years")
+  }
+  print_stat("Household moves", household)
+  invisible(x)
+}
+
+# Format origin and destination pairs as arrows, showing at most `max`
+# pairs followed by a count of the rest.
+format_transition_pairs <- function(pairs, max = 10L) {
+  if (!nrow(pairs)) {
+    return("none")
+  }
+  labels <- paste(pairs$origin, cli::symbol$arrow_right, pairs$destination)
+  labels <- gsub(" ", "\u00a0", labels, fixed = TRUE)
+  if (length(labels) <= max) {
+    return(paste(labels, collapse = ", "))
+  }
+  paste0(
+    paste(labels[seq_len(max)], collapse = ", "),
+    ", and ", length(labels) - max, " more"
+  )
+}
 
 check_transition_group <- function(group) {
   if (is.null(group)) {

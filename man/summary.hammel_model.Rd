@@ -22,12 +22,23 @@
 \describe{
 \item{population}{The \code{summary.hammel_population} of the starting
 population, or \code{NULL} when no population is set.}
+\item{groups}{A named list with one element per group dimension, or
+\code{NULL} when the model has none. Each element contains \code{declared}
+(whether the dimension is declared), \code{categories} (the population's
+categories, or \code{NULL} when not yet known), \code{ancestry} (whether
+ancestry is tracked), and \code{transition} (the
+\code{summary.hammel_group_transition} of the dimension's transition
+process, or \code{NULL} when it has none).}
 \item{processes}{A named list of process summaries, in the order
 mortality, fertility, union formation, union dissolution, for the
 processes present.}
 \item{missing}{A character vector naming the required elements that are
 not set: any of \code{"population"}, \code{"mortality"}, \code{"fertility"}, and
-\code{"union_formation"}. Empty when the model can be simulated.}
+\code{"union_formation"}, plus \code{"transition:<dimension>"} for each group
+transition process whose dimension is not declared
+(\code{"transition:.default"} for a process without \code{group} when the model
+does not declare exactly one dimension). Empty when the model has the
+elements needed to run a simulation.}
 }
 
 \code{print()} displays each component summary in turn, followed by whether the
@@ -38,10 +49,10 @@ missing. It returns its input invisibly.
 Summary method for class \code{"hammel_model"}
 }
 \details{
-The summary combines the summaries of the starting population and of each
-supported process in the model, and records which elements required by
-\code{\link[=run_simulation]{run_simulation()}} are missing. Group transition processes are not yet
-included in the summary.
+The summary combines the summaries of the starting population, of each
+group dimension and its transition process, and of each other process in
+the model, and records which elements required by \code{\link[=run_simulation]{run_simulation()}} are
+missing.
 }
 \examples{
 model <- hammel_model() |>

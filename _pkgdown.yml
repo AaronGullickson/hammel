@@ -58,6 +58,7 @@ reference:
       - union_dissolution
       - summary.hammel_union_dissolution
       - group_transition
+      - summary.hammel_group_transition
       - household
 
   - title: Matching, inheritance, and weight models

@@ -38,10 +38,10 @@ hammel_model <- function() {
 #'
 #' @details
 #'
-#' The summary combines the summaries of the starting population and of each
-#' supported process in the model, and records which elements required by
-#' [run_simulation()] are missing. Group transition processes are not yet
-#' included in the summary.
+#' The summary combines the summaries of the starting population, of each
+#' group dimension and its transition process, and of each other process in
+#' the model, and records which elements required by [run_simulation()] are
+#' missing.
 #'
 #' @param object A `hammel_model` object returned by [hammel_model()].
 #' @param ... Additional arguments passed to [summary.hammel_population()].
@@ -51,12 +51,23 @@ hammel_model <- function() {
 #' \describe{
 #'   \item{population}{The `summary.hammel_population` of the starting
 #'     population, or `NULL` when no population is set.}
+#'   \item{groups}{A named list with one element per group dimension, or
+#'     `NULL` when the model has none. Each element contains `declared`
+#'     (whether the dimension is declared), `categories` (the population's
+#'     categories, or `NULL` when not yet known), `ancestry` (whether
+#'     ancestry is tracked), and `transition` (the
+#'     `summary.hammel_group_transition` of the dimension's transition
+#'     process, or `NULL` when it has none).}
 #'   \item{processes}{A named list of process summaries, in the order
 #'     mortality, fertility, union formation, union dissolution, for the
 #'     processes present.}
 #'   \item{missing}{A character vector naming the required elements that are
 #'     not set: any of `"population"`, `"mortality"`, `"fertility"`, and
-#'     `"union_formation"`. Empty when the model can be simulated.}
+#'     `"union_formation"`, plus `"transition:<dimension>"` for each group
+#'     transition process whose dimension is not declared
+#'     (`"transition:.default"` for a process without `group` when the model
+#'     does not declare exactly one dimension). Empty when the model has the
+#'     elements needed to run a simulation.}
 #' }
 #'
 #' `print()` displays each component summary in turn, followed by whether the
@@ -85,8 +96,12 @@ summary.hammel_model <- function(object, ...) {
   structure(
     list(
       population = population,
+      groups = summarize_model_groups(object),
       processes = lapply(object$processes[processes], summary),
-      missing = missing_model_elements(object)
+      missing = c(
+        missing_model_elements(object),
+        unresolved_transition_groups(object)
+      )
     ),
     class = "summary.hammel_model"
   )
@@ -102,6 +117,9 @@ print.summary.hammel_model <- function(x, ...) {
 
   if (!is.null(x$population)) {
     print(x$population)
+  }
+  if (length(x$groups)) {
+    print_model_groups(x$groups)
   }
   for (process in x$processes) {
     print(process)
@@ -133,7 +151,7 @@ print.summary.hammel_model <- function(x, ...) {
     )
     list <- open_summary_list()
     for (element in x$missing) {
-      cli::cli_li(required_model_elements[[element]], .auto_close = FALSE)
+      print_missing_element(element)
     }
     cli::cli_end(list)
   }
@@ -156,6 +174,126 @@ required_model_elements <- c(
 summarized_processes <- c(
   "mortality", "fertility", "union_formation", "union_dissolution"
 )
+
+# Per-dimension group information for summary.hammel_model(). Declared
+# dimensions come first, in declaration order, followed by any dimension
+# named only by a transition process.
+summarize_model_groups <- function(model) {
+  declaration <- model_groups(model)
+  transitions <- transition_processes(model)
+  dimensions <- names(declaration)
+  keys <- names(transitions)
+  # A process stored without a dimension applies to the only declared one.
+  if (length(dimensions) == 1L) {
+    keys[keys == ".default"] <- dimensions
+  }
+  names(transitions) <- keys
+  dimensions <- union(dimensions, keys)
+  if (!length(dimensions)) {
+    return(NULL)
+  }
+
+  groups <- lapply(
+    dimensions,
+    function(dimension) {
+      group <- declaration[[dimension]]
+      categories <- model$population$groups[[dimension]]$categories
+      if (is.null(categories)) {
+        categories <- group$categories
+      }
+      transition <- transitions[[dimension]]
+      list(
+        declared = !is.null(group),
+        categories = categories,
+        ancestry = isTRUE(group$ancestry),
+        transition = if (is.null(transition)) {
+          NULL
+        } else {
+          summary(transition, categories = categories)
+        }
+      )
+    }
+  )
+  names(groups) <- dimensions
+  groups
+}
+
+# Print the Groups section of a model summary.
+print_model_groups <- function(groups) {
+  cli::cli_h2("Groups")
+  for (dimension in names(groups)) {
+    group <- groups[[dimension]]
+    label <- if (dimension == ".default") "Unassigned dimension" else dimension
+    cli::cli_h3(label)
+
+    list <- open_summary_list()
+    if (!group$declared) {
+      print_stat("Declared", "no")
+    } else {
+      categories <- if (is.null(group$categories)) {
+        "not yet known; set a population"
+      } else {
+        paste(group$categories, collapse = ", ")
+      }
+      print_stat("Categories", categories)
+      print_stat("Ancestry tracked", if (group$ancestry) "yes" else "no")
+    }
+    if (is.null(group$transition)) {
+      print_stat("Transition process", "none")
+    } else {
+      transition <- open_nested_stat("Transition process")
+      print_transition_details(group$transition)
+      cli::cli_end(transition)
+    }
+    cli::cli_end(list)
+  }
+  invisible(groups)
+}
+
+# Transition process keys that run_simulation() cannot resolve to a declared
+# group dimension, each prefixed "transition:". A key is the process's
+# dimension name, or ".default" for a process stored without one.
+unresolved_transition_groups <- function(model) {
+  dimensions <- names(model_groups(model))
+  keys <- names(transition_processes(model))
+  unresolved <- keys[!keys %in% dimensions]
+  if (length(dimensions) == 1L) {
+    unresolved <- setdiff(unresolved, ".default")
+  }
+  if (!length(unresolved)) {
+    return(character())
+  }
+  paste0("transition:", unresolved)
+}
+
+# Print one bullet describing an element returned by missing_model_elements()
+# or unresolved_transition_groups().
+print_missing_element <- function(element) {
+  if (!startsWith(element, "transition:")) {
+    cli::cli_li(required_model_elements[[element]], .auto_close = FALSE)
+    return(invisible(element))
+  }
+  dimension <- sub("^transition:", "", element)
+  if (dimension != ".default") {
+    cli::cli_li(
+      paste0(
+        "A declaration of group dimension {.field {dimension}}, used by a ",
+        "transition process, from {.fn set_groups}"
+      ),
+      .auto_close = FALSE
+    )
+  } else {
+    cli::cli_li(
+      paste0(
+        "A single declared group dimension for the transition process ",
+        "without {.arg group}, from {.fn set_groups}, or a {.arg group} ",
+        "from {.fn set_group_transition}"
+      ),
+      .auto_close = FALSE
+    )
+  }
+  invisible(element)
+}
 
 # Names of the required elements absent from a model.
 missing_model_elements <- function(model) {
