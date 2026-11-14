@@ -21,7 +21,8 @@ test_that("dissolution constructors validate duration schedules and retain prove
   for (column in c("sex", "age_start", "age_end", "union_status")) {
     bad <- rates
     bad[[column]] <- 0
-    expect_error(union_dissolution(bad), "duration bands|cannot be stratified")
+    error <- expect_error(union_dissolution(bad), class = "hammel_error_rates")
+    expect_identical(error$columns, column)
   }
   for (column in c("time_start", "time_end")) {
     bad <- rates
@@ -53,11 +54,19 @@ test_that("dissolution constructors validate duration schedules and retain prove
   noted <- union_dissolution(transform(rates, dur_end = Inf))
   model <- dissolution_model()
   model$processes$union_dissolution <- noted
-  expect_error(run_simulation(model, 0), "overlapping bands within a stratum")
+  expect_error(
+    run_simulation(model, 0),
+    "Only declared group dimensions stratify rates",
+    class = "hammel_error_rates"
+  )
   model <- dissolution_model()
   model$processes$union_dissolution$rates$rate <- -1
-  expect_error(run_simulation(model, 0), "duration bands")
-  expect_error(set_process(model, model$processes$union_dissolution), "duration bands")
+  error <- expect_error(run_simulation(model, 0), class = "hammel_error_table")
+  expect_identical(error$argument, "rates$rate")
+  expect_error(
+    set_process(model, model$processes$union_dissolution),
+    class = "hammel_error_table"
+  )
 })
 
 test_that("one annual dissolution hazard per couple matches analytical survival", {
@@ -284,7 +293,11 @@ test_that("directional group columns are validated", {
   for (column in c("group_pair", "group")) {
     bad <- shared
     bad[[column]] <- "A"
-    expect_error(run_simulation(set_union_dissolution(model, bad), 0), "_w`")
+    error <- expect_error(
+      run_simulation(set_union_dissolution(model, bad), 0),
+      class = "hammel_error_groups"
+    )
+    expect_identical(error$columns, column)
   }
   expect_error(run_simulation(set_mortality(model, transform(
     model$processes$mortality$rates, group_w = "A")), 0),

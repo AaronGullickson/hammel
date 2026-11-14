@@ -30,12 +30,21 @@ test_that("rates stratify by any combination of declared dimensions", {
   expect_identical(!is.na(out$persons$death_time), persons$region == "N")
   # Every combination must be covered, and categories must be known.
   partial <- rates[!(rates$race == "B" & rates$region == "N"), ]
-  expect_error(run_simulation(set_mortality(model, partial), 0),
-    "missing schedules.*race=B, region=N")
+  expect_error(
+    run_simulation(set_mortality(model, partial), 0),
+    "race=B, region=N",
+    class = "hammel_error_groups"
+  )
   declared <- set_groups(model, race = group(categories = c("A", "B")), region = group())
-  expect_error(run_simulation(set_mortality(declared, rbind(rates, transform(
-    rates[1:2, ], race = "C"))), 0),
-               "not categories of group `race`: C")
+  error <- expect_error(
+    run_simulation(
+      set_mortality(declared, rbind(rates, transform(rates[1:2, ], race = "C"))),
+      0
+    ),
+    class = "hammel_error_groups"
+  )
+  expect_identical(error$group, "race")
+  expect_identical(error$categories, "C")
   # A rate table may use a dimension's column only once declared.
   undeclared <- set_groups(model, race = group())
   expect_error(run_simulation(set_mortality(undeclared, rates), 0),
@@ -53,8 +62,11 @@ test_that("union rates stratify by either partner's categories in any dimension"
   out <- run_simulation(set_union_dissolution(model, rates), .1, seed = 2)
   expect_identical(out$unions$end_reason %in% "dissolution",
                    wives$race == "A" & husbands$region == "S")
-  expect_error(run_simulation(set_union_dissolution(model, transform(rates,
-    race = "A")), 0), "_w`")
+  error <- expect_error(
+    run_simulation(set_union_dissolution(model, transform(rates, race = "A")), 0),
+    class = "hammel_error_groups"
+  )
+  expect_identical(error$columns, "race")
 })
 
 test_that("newborns get a category in every dimension from its own rule", {
@@ -393,9 +405,14 @@ test_that("each dimension's inheritance can follow its own calendar schedule", {
   expect_identical(kids$region[!early], out$persons$region[fathers][!early])
   expect_identical(kids$race, out$persons$race[fathers])
   gap <- tibble::tibble(time_start = .5, time_end = Inf, model = list(group_inheritance("mother")))
-  expect_error(run_simulation(set_groups(model, race = group(), region = group(
-    inheritance = gap)), 1),
-               "`region` inheritance model schedule has a coverage gap")
+  expect_error(
+    run_simulation(
+      set_groups(model, race = group(), region = group(inheritance = gap)),
+      1
+    ),
+    "`region` inheritance model schedule",
+    class = "hammel_error_coverage"
+  )
 })
 
 test_that("detailed unions replay transitions in every dimension", {
@@ -999,12 +1016,18 @@ test_that("review regressions: absent-category schedules, dimensions named group
   pop$groups$race["categories"] <- list(NULL)
   model <- set_mortality(base(pop), data.frame(sex = c("m", "f"), race = "B", age_start = 0, age_end = Inf,
                                                rate = 1e8))
-  expect_error(run_simulation(model, 1, seed = 2),
-    "missing schedules for group\\(s\\): A")
+  expect_error(
+    run_simulation(model, 1, seed = 2),
+    "No rates for A",
+    class = "hammel_error_groups"
+  )
   calendar <- data.frame(sex = c("m", "f", "m", "f"), race = c("A", "A", "B", "B"), age_start = 0,
     age_end = Inf, rate = .01, time_start = c(-10, -10, 1, 1), time_end = c(1, 1, Inf, Inf))
-  expect_error(run_simulation(set_mortality(base(pop), calendar), 2, seed = 2),
-    "missing schedules.*A")
+  expect_error(
+    run_simulation(set_mortality(base(pop), calendar), 2, seed = 2),
+    "No rates for A",
+    class = "hammel_error_groups"
+  )
   # A dimension named `group` alongside another.
   set.seed(1)
   pop <- generate_uniform_population(200, groups = list(group = c(A = .5, B =

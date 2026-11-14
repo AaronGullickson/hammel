@@ -112,7 +112,7 @@ Calculate TFR and PATFR from rate schedules.
 
 Small, general checks for table columns and numeric/time values.
 
-- Functions: `check_time()`, `check_columns()`, `check_numeric_column()`.
+- Functions: `check_time()`, `check_columns()`, `check_numeric_column()`, `check_nonnegative()`, `check_labels()`.
 
 ### `R/cohabitation.R`
 
@@ -124,7 +124,7 @@ Cohabitation and conversion settings within union formation, including preparati
 
 Raise classified errors and warnings with cli messages (D183); see [error and warning messages](error-messages.md).
 
-- Functions: `abort_hammel()`, `warn_hammel()`, `describe_value()`, `condition_classes()`.
+- Functions: `abort_hammel()`, `warn_hammel()`, `abort_internal()`, `with_error_context()`, `format_rows()`, `format_band()`, `describe_column()`, `describe_value()`, `condition_classes()`, `upper_first()`.
 - Constants: `error_kinds`, `warning_kinds`.
 
 ### `R/extract_kin.R`
@@ -138,7 +138,7 @@ shared with matching.
 
 Construct and attach fertility processes; validate fertility settings and feasibility.
 
-- Functions: **`set_fertility()`**, **`fertility()`**, `unreachable_parity_cells()`, `warn_unreachable_parity_cells()`, `validate_ffab()`, `validate_birth_interval()`.
+- Functions: **`set_fertility()`**, **`fertility()`**, `new_fertility()`, `unreachable_parity_cells()`, `warn_unreachable_parity_cells()`, `validate_ffab()`, `validate_birth_interval()`.
 
 ### `R/generate_uniform_population.R`
 
@@ -216,13 +216,14 @@ Validate, select, and prepare calendar schedules of model specifications.
 
 Construct and attach mortality processes.
 
-- Functions: **`set_mortality()`**, **`mortality()`**.
+- Functions: **`set_mortality()`**, **`mortality()`**, `new_mortality()`.
 
 ### `R/rates_util.R`
 
 Shared input-rate validation, calendar coverage, group strata, and engine encoding/decoding. Keep separate sections within this file for each part of preparing rate schedules for execution.
 
-- Functions: `has_calendar_rates()`, `calendar_rate_segments()`, `calendar_rate_slices()`, `validate_calendar_rates()`, `check_time_coverage()`, `check_calendar_coverage()`, `group_registries()`, `rate_strata_columns()`, `prepare_strata_rates()`, `group_engine_input()`, `strata_spec()`, `decode_report_strata()`, `check_strata_overlap()`, `check_groups()`, `split_rate_groups()`, `validate_rates()`.
+- Functions: `has_calendar_rates()`, `calendar_rate_segments()`, `calendar_rate_slices()`, `validate_calendar_rates()`, `check_time_coverage()`, `check_calendar_coverage()`, `group_registries()`, `rate_strata_columns()`, `prepare_strata_rates()`, `group_engine_input()`, `strata_spec()`, `decode_report_strata()`, `check_strata_overlap()`, `check_groups()`, `check_group_labels()`, `split_rate_groups()`, `check_bands()`, `check_band_overlap()`, `validate_rates()`, `check_rate_rows()`, `validate_rate_schedules()`, `split_parity_schedules()`.
+- Constants: `band_axes`.
 
 ### `R/run_simulation.R`
 
@@ -252,7 +253,7 @@ Shared strata and interval checks for summaries of rate schedules.
 
 Construct and validate dissolution processes.
 
-- Functions: **`union_dissolution()`**, **`set_union_dissolution()`**, `validate_union_dissolution()`.
+- Functions: **`union_dissolution()`**, **`set_union_dissolution()`**, `new_union_dissolution()`, `validate_union_dissolution()`, `check_dissolution_rows()`, `validate_dissolution_schedules()`.
 
 ### `R/union_formation.R`
 

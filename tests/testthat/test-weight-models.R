@@ -404,10 +404,10 @@ test_that("weight schedules are validated like model schedules", {
     time_start = c(0, .5), time_end = c(1, Inf), model = list(half, half))), "overlap")
   expect_error(set_mortality(model, mortality_rates, weights = tibble::tibble(
     time_start = 0, time_end = Inf, model = list(weight_model(~ parity, c(paritx = 1))))),
-    "weights\\$model\\[\\[1\\]\\]")
+    class = "hammel_error_specification")
   gap <- set_mortality(model, mortality_rates, weights = tibble::tibble(time_start = 1, time_end = Inf,
     model = list(half)))
-  expect_error(run_simulation(gap, 2, seed = 1), "coverage gap")
+  expect_error(run_simulation(gap, 2, seed = 1), class = "hammel_error_coverage")
   expect_s3_class(set_mortality(model, mortality_rates, weights = data.frame(time_start = 0, time_end = Inf,
     model = I(list(half))))$processes$mortality$weights, "tbl_df")
 })

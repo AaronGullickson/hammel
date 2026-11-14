@@ -79,12 +79,7 @@ check_numeric_column <- function(
     if (missing) {
       requirement <- paste(requirement, "or NA")
     }
-    parts <- strsplit(name, "$", fixed = TRUE)[[1]]
-    subject <- if (length(parts) == 2L) {
-      "Column {.field {parts[2]}} of {.arg {parts[1]}}"
-    } else {
-      "{.arg {name}}"
-    }
+    subject <- describe_column(name)
     rows <- integer()
     problem <- if (!is.numeric(x) || !is.null(dim(x))) {
       "It is {describe_value(x)}."
@@ -95,22 +90,74 @@ check_numeric_column <- function(
       }
       rows <- which(bad)
       values <- x[rows]
-      shown_rows <- cli::cli_vec(rows, list("vec-trunc" = 5))
       shown_values <- cli::cli_vec(values, list("vec-trunc" = 5))
-      row_noun <- if (length(rows) == 1L) "row" else "rows"
       value_noun <- if (length(rows) == 1L) "value" else "values"
       if (all(is.na(values) & !is.nan(values))) {
-        "Missing at {row_noun} {shown_rows}."
+        "Missing at {format_rows(rows)}."
       } else {
-        "Invalid {value_noun} {.val {shown_values}} at {row_noun} {shown_rows}."
+        "Invalid {value_noun} {.val {shown_values}} at {format_rows(rows)}."
       }
     }
     abort_hammel(
-      c(paste(subject, "must contain {requirement}."), "x" = problem),
+      c("{subject} must contain {requirement}.", "x" = problem),
       "table",
       argument = name,
       rows = rows,
       call = call
     )
   }
+}
+
+# Numeric values (already checked) must not be negative; NA is ignored.
+check_nonnegative <- function(x, name, call = rlang::caller_env()) {
+  rows <- which(!is.na(x) & x < 0)
+  if (length(rows)) {
+    subject <- describe_column(name)
+    shown <- cli::cli_vec(x[rows], list("vec-trunc" = 5))
+    abort_hammel(
+      c(
+        "{subject} must be nonnegative.",
+        "x" = "Negative {.val {shown}} at {format_rows(rows)}."
+      ),
+      "table",
+      argument = name,
+      rows = rows,
+      call = call
+    )
+  }
+  invisible(x)
+}
+
+# Character labels drawn from `allowed`, without missing values.
+check_labels <- function(x, name, allowed, call = rlang::caller_env()) {
+  subject <- describe_column(name)
+  if (!is.character(x) || !is.null(dim(x))) {
+    abort_hammel(
+      c(
+        "{subject} must contain {.or {.val {allowed}}}.",
+        "x" = "It is {describe_value(x)}."
+      ),
+      "table",
+      argument = name,
+      call = call
+    )
+  }
+  missing_rows <- which(is.na(x))
+  rows <- if (length(missing_rows)) missing_rows else which(!x %in% allowed)
+  if (length(rows)) {
+    problem <- if (length(missing_rows)) {
+      "Missing at {format_rows(rows)}."
+    } else {
+      shown <- cli::cli_vec(unique(x[rows]), list("vec-trunc" = 5))
+      "Invalid {.val {shown}} at {format_rows(rows)}."
+    }
+    abort_hammel(
+      c("{subject} must contain {.or {.val {allowed}}}.", "x" = problem),
+      "table",
+      argument = name,
+      rows = rows,
+      call = call
+    )
+  }
+  invisible(x)
 }

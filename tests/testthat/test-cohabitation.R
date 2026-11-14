@@ -33,11 +33,16 @@ test_that("cohabitation validates probability, conversion, type coverage and rat
     cohab_matching = age_gap_matching_model(0,5)), "require.*cohab_prob")
   bad <- model
   bad$processes$union_formation$union_convert_rate$previous_union <- "none"
-  expect_error(run_simulation(bad, 0),
-    "Conversion rates cannot be stratified by `previous_union`")
-  expect_error(fertility(data.frame(age_start=15,age_end=50,rate=.1,union_status="partnered")), "replaced")
+  error <- expect_error(run_simulation(bad, 0), class = "hammel_error_rates")
+  expect_identical(error$columns, "previous_union")
+  expect_error(
+    fertility(data.frame(age_start=15,age_end=50,rate=.1,union_status="partnered")),
+    "renamed",
+    class = "hammel_error_rates"
+  )
   expect_error(fertility(data.frame(age_start=15,age_end=50,rate=.1,union_type=c("unpartnered","cohab"))), "union_type")
-  expect_error(union_dissolution(data.frame(dur_start=0,dur_end=Inf,rate=.1,union_type="cohab")), "both cohab and marriage")
+  expect_error(union_dissolution(data.frame(dur_start=0,dur_end=Inf,rate=.1,union_type="cohab")), "cohab.*marriage",
+    class = "hammel_error_rates")
   expect_warning(run_simulation(cohab_fixture(conversion=NULL), .1, 42),
     "no conversions")
 })

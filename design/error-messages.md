@@ -84,6 +84,14 @@ validator that detected the problem.
   an internal builder that takes `call`, so each names itself.
 - Validation repeated inside `run_simulation()` (for example re-attaching an
   edited process) names `run_simulation()`.
+- Validators that split a table into calendar periods or group strata check
+  row-level problems on the whole table first, so reported row numbers are
+  the input's rows. Problems found within a period or stratum are reported
+  with band values and an `ℹ` bullet naming the period or stratum
+  (`with_error_context()`).
+- Tests check the named function with `expect_hammel_error()`
+  (`tests/testthat/helper-errors.R`), which also confirms that the named
+  function is exported.
 - Native engine errors name the R function that made the native call (see
   [Native engine messages](#native-engine-messages)).
 

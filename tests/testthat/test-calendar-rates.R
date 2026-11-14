@@ -63,16 +63,19 @@ test_that("run coverage, zero years and endpoint exclusion use fractional times"
   expect_equal(count_run_events(run_simulation(m, 4.3, seed = 9), "deaths"), 0)
   expect_equal(count_run_events(run_simulation(m, 4.31, seed = 9), "deaths"), 3)
   expect_equal(run_simulation(m, 0, seed = 9)$end_time, 2015.5)
-  expect_error(run_simulation(m, 6), "calendar coverage gap")
+  expect_error(run_simulation(m, 6), class = "hammel_error_coverage")
   gap <- r
   gap$time_start[3:4] <- 2020
-  expect_error(run_simulation(set_mortality(m, gap), 5),
-    "calendar coverage gap")
+  expect_error(
+    run_simulation(set_mortality(m, gap), 5),
+    class = "hammel_error_coverage"
+  )
   # A gap outside this run is allowed.
   expect_equal(count_run_events(run_simulation(set_mortality(m, gap), 1, seed =
     1), "deaths"), 0)
   m$population$end_time <- 2021
-  expect_error(run_simulation(m, 0), "calendar coverage gap")
+  error <- expect_error(run_simulation(m, 0), class = "hammel_error_coverage")
+  expect_identical(error$time, 2021)
 })
 
 test_that("mortality integrates fractional calendar and age boundaries", {

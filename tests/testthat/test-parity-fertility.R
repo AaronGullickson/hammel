@@ -27,7 +27,11 @@ test_that("parity schedules require complete partitions in every stratum", {
   bad <- rates
   bad$parity_end[1] <- 2
   expect_error(fertility(bad),"cover")
-  expect_error(fertility(rbind(rates,rates[1, ])),"Age intervals")
+  expect_error(
+    fertility(rbind(rates, rates[1, ])),
+    "Age bands",
+    class = "hammel_error_rates"
+  )
   grouped <- rbind(transform(rates,group="A"),transform(rates,group="B"))
   expect_s3_class(quiet_unreachable(fertility(grouped)),"hammel_process")
   expect_error(fertility(grouped[-5, ]),"cover")

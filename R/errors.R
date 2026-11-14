@@ -49,6 +49,66 @@ warn_hammel <- function(message, kind, ..., .envir = parent.frame()) {
   )
 }
 
+# Raise an internal consistency error: a failure that valid inputs cannot
+# cause, so it indicates a bug in Hammel.
+abort_internal <- function(
+  message,
+  ...,
+  call = rlang::caller_env(),
+  .envir = parent.frame()
+) {
+  url <- utils::packageDescription("hammel")$BugReports
+  abort_hammel(
+    c(
+      paste("Internal error:", message),
+      "i" = paste0(
+        "This is likely a bug in Hammel. Please report it at {.url ",
+        url, "}."
+      )
+    ),
+    "internal",
+    ...,
+    call = call,
+    .envir = .envir
+  )
+}
+
+# Evaluate `expr`. A Hammel error it raises gains an "i" bullet saying where
+# the problem was found, such as a calendar period or a group stratum, and is
+# re-raised with its class, fields and call unchanged.
+with_error_context <- function(expr, context) {
+  tryCatch(
+    expr,
+    hammel_error = function(error) {
+      error$message <- c(error$message, i = context)
+      stop(error)
+    }
+  )
+}
+
+# "row 3" or "rows 3, 7, 12, ..., 31, and 40" for a message; long lists show
+# the first and last rows.
+format_rows <- function(rows) {
+  noun <- if (length(rows) == 1L) "row" else "rows"
+  paste(noun, cli::ansi_collapse(rows, trunc = 5, style = "both-ends"))
+}
+
+# A half-open band, as in "[15, 20)".
+format_band <- function(start, end) {
+  paste0("[", start, ", ", end, ")")
+}
+
+# The subject of a message about an argument (`end_time`) or a column given
+# as `table$column`: "`end_time`" or "Column age_start of `rates`", styled.
+describe_column <- function(name) {
+  parts <- strsplit(name, "$", fixed = TRUE)[[1]]
+  if (length(parts) == 2L) {
+    cli::format_inline("Column {.field {parts[2]}} of {.arg {parts[1]}}")
+  } else {
+    cli::format_inline("{.arg {name}}")
+  }
+}
+
 # Describe a value's type and size for an "x" bullet, as in "It is a
 # character vector of length 2." Single atomic values are shown as code.
 describe_value <- function(x) {
@@ -98,4 +158,9 @@ condition_classes <- function(kind, type) {
   }
   base <- paste0("hammel_", type)
   c(paste0(base, "_", kind), base)
+}
+
+# Capitalize the first letter, as at the start of a message.
+upper_first <- function(x) {
+  paste0(toupper(substring(x, 1, 1)), substring(x, 2))
 }

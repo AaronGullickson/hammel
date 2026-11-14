@@ -194,17 +194,26 @@ validate_strata_factors <- function(by) {
 
 # Setters call this with the stratum columns their process supports. It checks
 # the table's actual columns, whether stratified by hand or by stratify_rates().
-check_stratified_columns <- function(rates, allowed, process) {
+check_stratified_columns <- function(
+  rates,
+  allowed,
+  process,
+  call = rlang::caller_env()
+) {
   bad <- intersect(setdiff(builtin_strata, allowed), names(rates))
   if (length(bad)) {
-    stop(
-      sprintf(
-        "%s rates cannot be stratified by %s; supported columns: %s.",
-        process,
-        paste0("`", bad, "`", collapse = ", "),
-        paste0("`", allowed, "`", collapse = ", ")
+    abort_hammel(
+      c(
+        "{process} rates can't be stratified by {.field {bad}}.",
+        "i" = paste(
+          "They can be stratified by {.field {allowed}} and by declared",
+          "group dimensions."
+        )
       ),
-      call. = FALSE
+      "rates",
+      argument = "rates",
+      columns = bad,
+      call = call
     )
   }
   invisible(rates)

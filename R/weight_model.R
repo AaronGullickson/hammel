@@ -490,7 +490,11 @@ weight_design <- function(model, type, context = NULL) {
 # A schedule is a tibble with time_start, time_end and a model list column (as
 # for matching and inheritance models); its models must all be formulas or all
 # custom functions.
-validate_process_weights <- function(weights, type) {
+validate_process_weights <- function(
+  weights,
+  type,
+  call = rlang::caller_env()
+) {
   if (is.null(weights)) {
     return(invisible(NULL))
   }
@@ -501,7 +505,7 @@ validate_process_weights <- function(weights, type) {
     }
     invisible(model)
   }
-  validate_model_argument(weights, one, "weights")
+  validate_model_argument(weights, one, "weights", call = call)
   if (is_model_schedule(weights)) {
     kinds <- vapply(weights$model, function(m) is.null(m$fun), logical(1))
     if (length(unique(kinds)) > 1L) {

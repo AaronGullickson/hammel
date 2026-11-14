@@ -49,6 +49,8 @@
 #'   )
 #' result <- run_simulation(model, years = 50, seed = 42)
 run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
+  # Errors raised by helpers called from local functions name this function.
+  run_call <- rlang::current_env()
   check_model(model)
   if (!is.logical(progress) || length(progress) != 1L || is.na(progress)) {
     stop("`progress` must be TRUE or FALSE.", call. = FALSE)
@@ -345,7 +347,8 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   )
   strata <- function(rates, process, union_level = FALSE) {
     prepare_strata_rates(
-      rates, process, registries, start, start + years, union_level
+      rates, process, registries, start, start + years, union_level,
+      call = run_call
     )
   }
   death <- strata(death_rates, "mortality")
@@ -379,7 +382,7 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
       spec = strata(data.frame(rate = numeric()), "dissolution")$spec
     )
   } else {
-    strata(dissolution_process$rates, "Union dissolution", union_level = TRUE)
+    strata(dissolution_process$rates, "union dissolution", union_level = TRUE)
   }
   dissolution_rates <- dissolution$rates
   dissolution_rates$age_start <- dissolution_rates$dur_start
@@ -424,7 +427,8 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
         rates, sprintf("`%s` transition", d),
         registries,
         start, start + years,
-        coverage = FALSE
+        coverage = FALSE,
+        call = run_call
       )
       rates <- prepared$rates
       rates$.dest <- match(

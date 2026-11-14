@@ -36,14 +36,17 @@ test_that("cohabitation calendars validate every active probability slice", {
 
 test_that("probability coverage follows rate calendar and group/category rules", {
   m <- cohab_calendar_model(cohab_calendar(times = c(.1, .5, 1)))
-  expect_error(run_simulation(m, 0),
-    "cohabitation_probability.*calendar coverage")
+  expect_error(
+    run_simulation(m, 0),
+    "Cohabitation probabilities",
+    class = "hammel_error_coverage"
+  )
   m$population$end_time <- .1
   expect_s3_class(run_simulation(m, .9, seed = 3), "hammel_population")
-  expect_error(run_simulation(m, 1, seed = 3), "calendar coverage")
+  expect_error(run_simulation(m, 1, seed = 3), class = "hammel_error_coverage")
   p <- cohab_calendar()
   p$time_start[2] <- .7
-  expect_error(run_simulation(cohab_calendar_model(p), 1), "calendar coverage")
+  expect_error(run_simulation(cohab_calendar_model(p), 1), class = "hammel_error_coverage")
   expect_s3_class(run_simulation(cohab_calendar_model(p), .4, seed = 3),
     "hammel_population")
   m <- cohab_calendar_model(rbind(transform(cohab_calendar(), group = "A"),
@@ -52,8 +55,11 @@ test_that("probability coverage follows rate calendar and group/category rules",
   m$population$groups <- list(group = group())
   p <- m$processes$union_formation$cohab_prob
   m$processes$union_formation$cohab_prob <- p[!(p$group == "B" & p$time_start == .5), ]
-  expect_error(run_simulation(m, 1),
-    "cohabitation probability.*missing schedules.*B")
+  expect_error(
+    run_simulation(m, 1),
+    "Cohabitation probability.*No rates for B",
+    class = "hammel_error_groups"
+  )
   p <- rbind(transform(cohab_calendar(), previous_union = "none"),
     transform(cohab_calendar(), previous_union = "separated"),
     transform(cohab_calendar(), previous_union = "widowed"))

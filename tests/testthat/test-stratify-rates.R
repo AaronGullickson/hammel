@@ -67,8 +67,14 @@ test_that("stratify_rates validates its inputs", {
 
 test_that("setters reject stratified columns their process does not support", {
   base <- data.frame(age_start = 15, age_end = Inf, rate = 0.1)
-  expect_error(mortality(stratify_rates(strata_mortality_rates(), list(union_type = c(u = 1)))),
-               "Mortality rates cannot be stratified by `union_type`")
+  error <- expect_error(
+    mortality(
+      stratify_rates(strata_mortality_rates(), list(union_type = c(u = 1)))
+    ),
+    "Mortality",
+    class = "hammel_error_rates"
+  )
+  expect_identical(error$columns, "union_type")
   expect_error(fertility(stratify_rates(base, list(sex = c(f = 1)))), "Fertility")
   expect_error(union_formation("rate", rates = stratify_rates(base, list(sex = c(f = 1)))),
                "Union-search")
@@ -77,14 +83,23 @@ test_that("setters reject stratified columns their process does not support", {
     union_convert_rate = stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = 0.1),
                                         list(previous_union = c(none = 1)))), "Conversion")
   expect_error(union_dissolution(stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = 0.1),
-                                                list(sex = c(f = 1)))), "Union-dissolution")
+                                                list(sex = c(f = 1)))), "Union dissolution",
+    class = "hammel_error_rates")
   expect_error(group_transition(stratify_rates(data.frame(origin = "A", destination = "B",
     age_start = 0, age_end = Inf, rate = 0.1), list(previous_union = c(none = 1)))), "Group-transition")
   # The check uses the table's columns, however they were added.
-  expect_error(mortality(transform(strata_mortality_rates(), union_type = "cohab")),
-               "Mortality rates cannot be stratified by `union_type`")
-  expect_error(union_dissolution(data.frame(sex = "f", dur_start = 0, dur_end = Inf, rate = 0.1)),
-               "Union-dissolution")
+  expect_error(
+    mortality(transform(strata_mortality_rates(), union_type = "cohab")),
+    "Mortality rates can't be stratified",
+    class = "hammel_error_rates"
+  )
+  expect_error(
+    union_dissolution(
+      data.frame(sex = "f", dur_start = 0, dur_end = Inf, rate = 0.1)
+    ),
+    "Union dissolution",
+    class = "hammel_error_rates"
+  )
   # Supported columns pass.
   expect_s3_class(mortality(stratify_rates(data.frame(age_start = 0, age_end = Inf, rate = 0.01),
     list(group = c(A = 1), sex = c(m = 1, f = 0.9)))), "hammel_mortality")
