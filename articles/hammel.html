@@ -719,11 +719,17 @@ Table 1: Rate schedules used by Hammel, along with available age/duration bands
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">tic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">pop_end</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_simulation.html">run_simulation</a></span><span class="op">(</span><span class="va">model</span>, years <span class="op">=</span> <span class="fl">100</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">toc</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; 0.702 sec elapsed</span></span></code></pre></div>
+<span><span class="co">#&gt; 1.07 sec elapsed</span></span></code></pre></div>
 </div>
-<p>Pretty fast! Lets look at its structure.</p>
+<p>Pretty fast! We can get a nice summary of the population at the end.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">pop_end</span><span class="op">)</span></span></code></pre></div>
+</div>
+<p>The age pyramid looks like what we would expect of a low fertility, lower mortality population. We can see that our population grew by 4601 members over the time period of the simulation.</p>
+<p>Lets take a closer look at its structure.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">pop_end</span><span class="op">)</span></span>
 <span><span class="co">#&gt; List of 6</span></span>
 <span><span class="co">#&gt;  $ persons          : tibble [121,579 × 6] (S3: tbl_df/tbl/data.frame)</span></span>
@@ -758,7 +764,7 @@ Table 1: Rate schedules used by Hammel, along with available age/duration bands
 <p>Note that the output of the simulation is a <code>hammel_population</code> object with the same basic structure as <code>pop_initial</code> as well as some additions. Importantly, the output of one simulation can be the input for another simulation. So, I could continue this simulation by setting <code>pop_end</code> as my new starting population in the model.</p>
 <p>I can use some nice convenience functions to analyze my simulation results. The first thing that I will do is look at population size over time.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pop_end</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/calculate_population_size.html">calculate_population_size</a></span><span class="op">(</span><span class="fl">0</span><span class="op">:</span><span class="fl">100</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">population</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
@@ -776,7 +782,7 @@ Figure 1: Population size over time in the simulation
 </div>
 <p>Initially, the population grew rapidly due to the unusual age distribution, but then it leveled off into a slowerm, fairly constant growth rate that suggests a stable population. I can look at that population growth rate more directly.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pop_end</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/calculate_population_size.html">calculate_population_size</a></span><span class="op">(</span><span class="fl">0</span><span class="op">:</span><span class="fl">100</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>growth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="va">population</span> <span class="op">/</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/lead-lag.html" class="external-link">lag</a></span><span class="op">(</span><span class="va">population</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -798,7 +804,7 @@ Figure 2: Annual population growth in the simulation, by year
 <p>Do the age-specific fertility and mortality rates from the simulation match our expectations? We can check this with <code>calculate_fertility_rates</code> and <code>calculate_mortality_rates</code>. These functions are part of a family of functions that calculate rates from the events and person/union-years lived within lexis triangles, based on the simulation history.</p>
 <p>Lets first look at fertility rates.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/calculate_rates.html">calculate_fertility_rates</a></span><span class="op">(</span></span>
 <span>  <span class="va">pop_end</span>,</span>
 <span>  <span class="co"># do the whole simulation as one time group</span></span>
@@ -822,7 +828,7 @@ Figure 2: Annual population growth in the simulation, by year
 <p>I am using a single time period here to get pooled rates over time, but you could also split this into different time periods. I match the age breaks to my input rates. Note that it always adds an open-ended category at the end.</p>
 <p>Lets compare these rates directly to the input rates that we provided.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/calculate_rates.html">calculate_fertility_rates</a></span><span class="op">(</span></span>
 <span>  <span class="va">pop_end</span>,</span>
 <span>  <span class="co"># do the whole simulation as one time group</span></span>
@@ -852,7 +858,7 @@ Figure 3: Age-specific fertility rates estimated from simulation. 95% confidenc
 </div>
 <p><a href="#fig-fert-rates-basic-compare" class="quarto-xref">Figure 3</a> shows a tight fit between the estimated values (dots) and the input rates (red dotted line). The 95% confidence band is derived from the exact poisson distribution for an empirical rate.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/calculate_rates.html">calculate_mortality_rates</a></span><span class="op">(</span></span>
 <span>  <span class="va">pop_end</span>,</span>
 <span>  <span class="co"># do the whole simulation as one time group</span></span>
@@ -886,7 +892,7 @@ Figure 4: Age-specific mortality rates estimated from simulation. 95% confidenc
 </h2>
 <p>The previous example used an “on demand” union formation method for convenience. To better model union formation, I can use a proper marriage rate schedule. Luckily, the package provides a dataset of US marriage rates circa 2000.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">usa_2000_marriage</span></span>
 <span><span class="co">#&gt; # A tibble: 12 × 3</span></span>
 <span><span class="co">#&gt;    age_start age_end    rate</span></span>
@@ -908,7 +914,7 @@ Figure 4: Age-specific mortality rates estimated from simulation. 95% confidenc
 <p>We can specify the rates by choosing “rate” as our method in <code>set_union_formation</code> and specifying the marriage rates in the <code>rates</code> argument. However, before we jump straight ahead to that, we need to also think a little about fertility. Right now fertility rates are not stratified by <code>union_type</code> which means there is no connection between a women’s hazard of giving birth and her union status. That was fine for the on demand method because fertility drove union formation. If we leave it as is now, union formation and fertility will be completely independent.</p>
 <p>To correct for this, I want to stratify the fertility rates by <code>union_type</code>. Luckily (again), the package comes with US fertility rates in 2000 stratified by union type.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">usa_2000_fertility_union</span></span>
 <span><span class="co">#&gt; # A tibble: 12 × 4</span></span>
 <span><span class="co">#&gt;    union_type  age_start age_end   rate</span></span>
@@ -936,7 +942,7 @@ Figure 4: Age-specific mortality rates estimated from simulation. 95% confidenc
 <p>Fertility is much higher among partnered women, as we would expect. Note, I am using a dichotomy between partnered/unpartnered that the program expects. When cohabitation is also being used, union type can also be divided into unpartnered/cohab/marriage.</p>
 <p>Now I can set up my full model.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hammel_model.html">hammel_model</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/fertility.html">set_fertility</a></span><span class="op">(</span><span class="va">usa_2000_fertility_union</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/mortality.html">set_mortality</a></span><span class="op">(</span><span class="va">usa_2000_mortality</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -945,15 +951,15 @@ Figure 4: Age-specific mortality rates estimated from simulation. 95% confidenc
 </div>
 <p>The model is set, so lets run it.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">tic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">pop_end</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_simulation.html">run_simulation</a></span><span class="op">(</span><span class="va">model</span>, <span class="fl">100</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">toc</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; 0.785 sec elapsed</span></span></code></pre></div>
+<span><span class="co">#&gt; 1.214 sec elapsed</span></span></code></pre></div>
 </div>
 <p>Lets look at population size again.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pop_end</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/calculate_population_size.html">calculate_population_size</a></span><span class="op">(</span><span class="fl">0</span><span class="op">:</span><span class="fl">100</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">population</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
@@ -972,7 +978,7 @@ Figure 5: Population size over time in the simulation
 <p>In this simulation, the population grew even faster than before and then declines a bit before leveling off to our slower growth rate. This is a consequence of starting with an entirely unmarried population. This exposure to marriage leads to a high initial overall marriage rate followed by a decline as younger cohorts age into marriage. Those marriage rates affect the level of exposure to higher partnered fertility.</p>
 <p>To confirm this, we can look at the “crude” marriage rate in five-year increments by pooling all ages together.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/calculate_rates.html">calculate_marriage_rates</a></span><span class="op">(</span></span>
 <span>  <span class="va">pop_end</span>,</span>
 <span>  time_breaks <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">100</span>, <span class="fl">5</span><span class="op">)</span>,</span>
@@ -995,7 +1001,7 @@ Figure 6: Crude female marriage rates in five year increments across the simula
 </div>
 <p>As expected, <a href="#fig-crude-mar-rates" class="quarto-xref">Figure 6</a> shows the high initial marriage rate followed by a decline before stabilizing at a somewhat higher level. We can also do the same with crude birth rates.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/calculate_rates.html">calculate_fertility_rates</a></span><span class="op">(</span></span>
 <span>  <span class="va">pop_end</span>,</span>
 <span>  time_breaks <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">100</span>, <span class="fl">5</span><span class="op">)</span>,</span>
@@ -1018,7 +1024,7 @@ Figure 7: Crude birth rates in five year increments across the simulation
 <p><a href="#fig-crude-birth-rates" class="quarto-xref">Figure 7</a> shows a similar pattern to the previous figure. We see the initial spike in birth rates as many women enter into unions followed by a decline that corresponds to the decline in marriage rates. This kind of dynamic is why we often use a “burn in” period to weed out the effects of the starting population before running the desired simulation.</p>
 <p>When properly stratified by union type, the age-specific fertility rates should be consistent across the time period regardless of these issues, except for random noise. <a href="#fig-tfr-compare" class="quarto-xref">Figure 8</a> shows that this is true when reporting the period TFR by five year time periods, stratified by union type.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/calculate_rates.html">calculate_fertility_rates</a></span><span class="op">(</span></span>
 <span>  <span class="va">pop_end</span>,</span>
 <span>  time_breaks <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">100</span>, <span class="fl">5</span><span class="op">)</span>,</span>
@@ -1048,7 +1054,7 @@ Figure 8: Total fertility rate estimated from period age-specific fertility rat
 </div>
 <p><a href="#fig-age-specific-marriage-rates" class="quarto-xref">Figure 9</a> show that the age-specific female marriage rates estimated from the simulation also follow closely to the input rates.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/calculate_rates.html">calculate_marriage_rates</a></span><span class="op">(</span></span>
 <span>  <span class="va">pop_end</span>,</span>
 <span>  time_breaks <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">100</span><span class="op">)</span>,</span>
@@ -1081,7 +1087,7 @@ Figure 9: Age-specific female fertility rates estimated from simulation. 95% co
 </h3>
 <p>To this point, I have specified when women will seek out partners, but I have not specified what kind of partners they will seek out. Are partners just chosen randomly? To examine this further, lets look at the distribution of observed age differences between partners from our simulation. To help with this, we can use the <code>augment_unions</code> helper function to add husband and wife characteristics to the unions data.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pop_end</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/augment_unions.html">augment_unions</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="co"># subtracting birth time of husband from wife gives</span></span>
@@ -1117,12 +1123,12 @@ Figure 10: Distribution of age difference between partners from simulated data
 </ul>
 <p>So, I could define a preferred age gap of 3 with a half weight of 10 years as follows:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">match_model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/age_gap_matching_model.html">age_gap_matching_model</a></span><span class="op">(</span><span class="fl">3</span>, <span class="fl">5</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>I can then apply this matching model in my <code>set_union_formation</code> function and re-run the simulation.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb26"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="va">model</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/union_formation.html">set_union_formation</a></span><span class="op">(</span></span>
 <span>    <span class="st">"rate"</span>,</span>
@@ -1135,7 +1141,7 @@ Figure 10: Distribution of age difference between partners from simulated data
 </div>
 <p><a href="#fig-age-diff-match" class="quarto-xref">Figure 11</a> shows the resulting distribution of spousal age differences in the new simulation. The peak is now shifted upward and is close to the three year preferred age gap. The simulated data are not guaranteed to produce a peak exactly at this preferred age gap because the decision of who to marry is also conditioned by the supply of available men by age.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb27"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pop_end</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/augment_unions.html">augment_unions</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="co"># subtracting birth time of husband from wife gives</span></span>
@@ -1171,7 +1177,7 @@ Figure 11: Distribution of age difference between partners from simulated data.
 </h3>
 <p>Groups are defined by additional variables in the <code>persons</code> tibble of your starting population. We can add these groups with the <code>groups</code> argument in <code>generate_uniform_population</code>. One way to do this is with a named list of named numeric vectors where each name in the list corresponds to the desired group name and each name in the vector corresponds to category names. The values in the vector give relative sampling weights. For example, I could create a population evenly divided by two “race” categories of “W” and “B” with the following code.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb28"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pop_race</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/generate_uniform_population.html">generate_uniform_population</a></span><span class="op">(</span></span>
 <span>  <span class="fl">50000</span>,</span>
 <span>  groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>race <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>W <span class="op">=</span> <span class="fl">1</span>, B <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
@@ -1183,7 +1189,7 @@ Figure 11: Distribution of age difference between partners from simulated data.
 </div>
 <p>If using multiple group dimensions, you can also define the joint distribution with a full tibble. Let me create a population that is divided by three race groups and four regions.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb29"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb30"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">region_race_dist</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://tibble.tidyverse.org/reference/tribble.html" class="external-link">tribble</a></span><span class="op">(</span></span>
 <span>  <span class="op">~</span><span class="va">race</span>, <span class="op">~</span><span class="va">region</span>, <span class="op">~</span><span class="va">weight</span>,</span>
 <span>  <span class="st">"W"</span>,   <span class="st">"NE"</span>,    <span class="fl">0.145</span>,</span>
@@ -1213,7 +1219,7 @@ Figure 11: Distribution of age difference between partners from simulated data.
 </div>
 <p>When I define my simulation, I can now add a <code>set_groups</code> function that allows me to define characteristics for each of my groups. These are defined by the <code><a href="../reference/group.html">group()</a></code> function. This function allows me to define the categories for each group, whether I want to track group ancestry, and what inheritance rule to follow for each group. Lets set those groups up now.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb30"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb31"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">grp_region</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/group.html">group</a></span><span class="op">(</span></span>
 <span>  categories <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"NE"</span>, <span class="st">"MW"</span>, <span class="st">"S"</span>, <span class="st">"W"</span><span class="op">)</span>,</span>
 <span>  ancestry <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -1245,7 +1251,7 @@ Figure 11: Distribution of age difference between partners from simulated data.
 </h3>
 <p>I am almost ready to run my simulation, but I want to make a couple of other changes. First, I also want to define how common group exogamy is across both group dimensions. For region, I want to disallow any exogamy across regions, because regions will serve as the local marriage market. For racial groups, I want to make racial exogamy rarer than racial endogamy. I can do both of these things by adding a <code>group_exogamy</code> argument to my matching model.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb31"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb32"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">match_model_grp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/age_gap_matching_model.html">age_gap_matching_model</a></span><span class="op">(</span></span>
 <span>  preferred_age_gap <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>  half_weight_distance <span class="op">=</span> <span class="fl">5</span>,</span>
@@ -1260,7 +1266,7 @@ Figure 11: Distribution of age difference between partners from simulated data.
 </h3>
 <p>I also want to consider whether groups can transition into different categories. For race, I will not allow transitions between groups. However, I very much want to allow transitions between regions to simulate internal migration. Luckily, the package has included data on the estimated migration rates between these regions in the year 2000.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb32"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">usa_2000_migration</span></span>
 <span><span class="co">#&gt; # A tibble: 132 × 5</span></span>
 <span><span class="co">#&gt;    origin destination age_start age_end     rate</span></span>
@@ -1282,7 +1288,7 @@ Figure 11: Distribution of age difference between partners from simulated data.
 </h3>
 <p>I will add one more change to my inputs before building the model. I want to allow fertility to vary by race and region. I an use the <code>stratify_rates</code> helper function to quickly stratify rates using a proportional hazards approach.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb33"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb34"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fertility_rates_grp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span></span>
 <span>  <span class="va">usa_2000_fertility_union</span> <span class="op">|&gt;</span></span>
 <span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">union_type</span> <span class="op">==</span> <span class="st">"partnered"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -1314,7 +1320,7 @@ Figure 11: Distribution of age difference between partners from simulated data.
 </h3>
 <p>Now we are ready to build the full model.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb34"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hammel_model.html">hammel_model</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/set_population.html">set_population</a></span><span class="op">(</span><span class="va">pop_grouped</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/fertility.html">set_fertility</a></span><span class="op">(</span><span class="va">fertility_rates_grp</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -1333,16 +1339,16 @@ Figure 11: Distribution of age difference between partners from simulated data.
 </div>
 <p>One final thing to note about this model is that for the group transition, I am defining households, so that migration transitions happen to households rather than individuals. A person’s household is their current partner (married or cohabiting) and the dependents attached to either of them. Children under the <code>age_independence</code> follow the mother, if alive, and otherwise the father.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb35"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb36"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">tic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">pop_end</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_simulation.html">run_simulation</a></span><span class="op">(</span><span class="va">model</span>, <span class="fl">100</span>, <span class="fl">42</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">toc</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; 24.715 sec elapsed</span></span></code></pre></div>
+<span><span class="co">#&gt; 43.712 sec elapsed</span></span></code></pre></div>
 </div>
 <p>This simulation took quite a bit longer to run. The reason for this is the use of a custom R function, because R processing will generally be slower than the underlying C++ used for most of the simulation.</p>
 <p>Lets look at how race and region changed over time. The <code>by</code> argument will allow us to stratify results in all of the <code>calculate</code> helper functions.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb36"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/calculate_population_size.html">calculate_population_size</a></span><span class="op">(</span><span class="va">pop_end</span>, <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">100</span>, <span class="fl">5</span><span class="op">)</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"race"</span>, <span class="st">"region"</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">group_by</a></span><span class="op">(</span><span class="va">time</span>, <span class="va">region</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>prop <span class="op">=</span> <span class="va">population</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">population</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -1364,7 +1370,7 @@ Figure 12: Share of each race in the population by region over the simulation r
 <p><a href="#fig-pop-by-race-region" class="quarto-xref">Figure 12</a>, shows the changing distributions of race within each region. The biggest divergence is in the W region where the O group declines as it becomes distributed more evenly across the other regions over time. The W region is also the only region where the W race group did not decline.</p>
 <p>I can use the <code>augment_unions</code> function to get the race of husband and wife and use this to calculate the log-odds ratio of each interracial pairing.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb37"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb38"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">expected</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://tibble.tidyverse.org/reference/tibble.html" class="external-link">tibble</a></span><span class="op">(</span></span>
 <span>  pair <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"W:B"</span>, <span class="st">"W:O"</span>, <span class="st">"B:O"</span><span class="op">)</span>,</span>
 <span>  expected <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">4</span>, <span class="op">-</span><span class="fl">2</span>, <span class="op">-</span><span class="fl">3</span><span class="op">)</span> <span class="op">*</span> <span class="fl">2</span></span>
@@ -1415,7 +1421,7 @@ Figure 13: Observed log odds ratio of interracial marriage by pairing with 95% 
 <p><a href="#fig-odds-ratio" class="quarto-xref">Figure 13</a> shows the observed log odds ratio of a given interracial pairing in comparison to that expected from the input values (twice the provided value). They closely align.</p>
 <p>I can also show that no marriages occurred across regions.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb38"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb39"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pop_end</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/augment_unions.html">augment_unions</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/count.html" class="external-link">count</a></span><span class="op">(</span><span class="va">region_w</span>, <span class="va">region_h</span><span class="op">)</span></span>
@@ -1429,7 +1435,7 @@ Figure 13: Observed log odds ratio of interracial marriage by pairing with 95% 
 </div>
 <p>Finally, I can get the observed migration rates using <code>calculate_transition_rates</code>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb39"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb40"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/calculate_rates.html">calculate_transition_rates</a></span><span class="op">(</span></span>
 <span>  <span class="va">pop_end</span>,</span>
 <span>  group <span class="op">=</span> <span class="st">"region"</span>,</span>

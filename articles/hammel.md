@@ -186,10 +186,21 @@ function. I will also time it with the
 tic()
 pop_end <- run_simulation(model, years = 100, seed = 42)
 toc()
-#> 0.702 sec elapsed
+#> 1.07 sec elapsed
 ```
 
-Pretty fast! Lets look at its structure.
+Pretty fast! We can get a nice summary of the population at the end.
+
+``` r
+
+summary(pop_end)
+```
+
+The age pyramid looks like what we would expect of a low fertility,
+lower mortality population. We can see that our population grew by 4601
+members over the time period of the simulation.
+
+Lets take a closer look at its structure.
 
 ``` r
 
@@ -467,7 +478,7 @@ The model is set, so lets run it.
 tic()
 pop_end <- run_simulation(model, 100, seed = 42)
 toc()
-#> 0.785 sec elapsed
+#> 1.214 sec elapsed
 ```
 
 Lets look at population size again.
@@ -1001,7 +1012,7 @@ the mother, if alive, and otherwise the father.
 tic()
 pop_end <- run_simulation(model, 100, 42)
 toc()
-#> 24.715 sec elapsed
+#> 43.712 sec elapsed
 ```
 
 This simulation took quite a bit longer to run. The reason for this is

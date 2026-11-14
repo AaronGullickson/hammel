@@ -7,6 +7,9 @@ simulation.
 
 - [`hammel_model()`](https://aarongullickson.github.io/hammel/reference/hammel_model.md)
   : Create an empty Hammel model specification
+- [`summary(`*`<hammel_model>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_model.md)
+  [`print(`*`<summary.hammel_model>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_model.md)
+  : Summarize a Hammel model
 - [`set_population()`](https://aarongullickson.github.io/hammel/reference/set_population.md)
   : Set the starting population of a Hammel model
 - [`group()`](https://aarongullickson.github.io/hammel/reference/group.md)
@@ -24,6 +27,9 @@ dimensions.
 
 - [`hammel_population()`](https://aarongullickson.github.io/hammel/reference/hammel_population.md)
   : Create a Hammel population
+- [`summary(`*`<hammel_population>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_population.md)
+  [`print(`*`<summary.hammel_population>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_population.md)
+  : Summarize a Hammel population
 - [`generate_uniform_population()`](https://aarongullickson.github.io/hammel/reference/generate_uniform_population.md)
   : Generate a population with uniformly distributed ages
 - [`validate_population()`](https://aarongullickson.github.io/hammel/reference/validate_population.md)
@@ -31,6 +37,9 @@ dimensions.
 - [`group()`](https://aarongullickson.github.io/hammel/reference/group.md)
   [`set_groups()`](https://aarongullickson.github.io/hammel/reference/group.md)
   : Describe and declare a group dimension
+- [`summary(`*`<hammel_group>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_group.md)
+  [`print(`*`<summary.hammel_group>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_group.md)
+  : Summarize a group dimension
 
 ## Rate preparation
 
@@ -50,18 +59,33 @@ Specify mortality, fertility, unions, and group transitions.
 - [`mortality()`](https://aarongullickson.github.io/hammel/reference/mortality.md)
   [`set_mortality()`](https://aarongullickson.github.io/hammel/reference/mortality.md)
   : Specify an age-specific mortality process
+- [`summary(`*`<hammel_mortality>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_mortality.md)
+  [`print(`*`<summary.hammel_mortality>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_mortality.md)
+  : Summarize a mortality process
 - [`fertility()`](https://aarongullickson.github.io/hammel/reference/fertility.md)
   [`set_fertility()`](https://aarongullickson.github.io/hammel/reference/fertility.md)
   : Specify an age-specific fertility process
+- [`summary(`*`<hammel_fertility>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_fertility.md)
+  [`print(`*`<summary.hammel_fertility>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_fertility.md)
+  : Summarize a fertility process
 - [`union_formation()`](https://aarongullickson.github.io/hammel/reference/union_formation.md)
   [`set_union_formation()`](https://aarongullickson.github.io/hammel/reference/union_formation.md)
   : Specify a union-formation process
+- [`summary(`*`<hammel_union_formation>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_union_formation.md)
+  [`print(`*`<summary.hammel_union_formation>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_union_formation.md)
+  : Summarize a union formation process
 - [`union_dissolution()`](https://aarongullickson.github.io/hammel/reference/union_dissolution.md)
   [`set_union_dissolution()`](https://aarongullickson.github.io/hammel/reference/union_dissolution.md)
   : Specify duration-dependent union dissolution
+- [`summary(`*`<hammel_union_dissolution>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_union_dissolution.md)
+  [`print(`*`<summary.hammel_union_dissolution>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_union_dissolution.md)
+  : Summarize a union dissolution process
 - [`group_transition()`](https://aarongullickson.github.io/hammel/reference/group_transition.md)
   [`set_group_transition()`](https://aarongullickson.github.io/hammel/reference/group_transition.md)
   : Specify individual group transitions
+- [`summary(`*`<hammel_group_transition>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_group_transition.md)
+  [`print(`*`<summary.hammel_group_transition>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_group_transition.md)
+  : Summarize a group transition process
 - [`household()`](https://aarongullickson.github.io/hammel/reference/household.md)
   : Define who moves together in household transitions
 
@@ -75,10 +99,19 @@ within rate cells.
 - [`age_gap_matching_model()`](https://aarongullickson.github.io/hammel/reference/age_gap_matching_model.md)
   : Create a quadratic matching model from interpretable age-gap
   preferences
+- [`summary(`*`<hammel_matching_model>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_matching_model.md)
+  [`print(`*`<summary.hammel_matching_model>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_matching_model.md)
+  : Summarize a matching model
 - [`group_inheritance()`](https://aarongullickson.github.io/hammel/reference/group_inheritance.md)
   : Specify newborn group identity inheritance
+- [`summary(`*`<hammel_group_inheritance>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_group_inheritance.md)
+  [`print(`*`<summary.hammel_group_inheritance>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_group_inheritance.md)
+  : Summarize a group inheritance model
 - [`weight_model()`](https://aarongullickson.github.io/hammel/reference/weight_model.md)
   : Create a weight model for selection within rate cells
+- [`summary(`*`<hammel_weight_model>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_weight_model.md)
+  [`print(`*`<summary.hammel_weight_model>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_weight_model.md)
+  : Summarize a weight model
 
 ## Demographic summaries
 

@@ -2,6 +2,8 @@
 
 ## hammel (development version)
 
+- Add summary and print methods for all hammel custom objects.
+  ([\#23](https://github.com/AaronGullickson/hammel/issues/23))
 - Add optional progress bar to
   [`run_simulation()`](https://aarongullickson.github.io/hammel/reference/run_simulation.md)
   with `progress = TRUE`. Defaults to FALSE.

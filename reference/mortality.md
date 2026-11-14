@@ -41,7 +41,7 @@ set_mortality(model, rates, weights = NULL)
 
 ## Details
 
-The primary and only required input to the function is a fertility rate
+The primary and only required input to the function is a mortality rate
 schedule for the `rates` argument. This data frame must contain
 `age_start` and `age_end` columns to define the half-open age intervals
 (inclusive at the start and exclusive at the end), a `sex` column ("f"
