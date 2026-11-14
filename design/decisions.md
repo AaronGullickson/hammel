@@ -85,6 +85,7 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | `group_exogamy` table form for cross-dimension pair effects (`_x`/`_y` columns) | D139 |
 | Household moves for group transitions | D140 |
 | Milestone 9 accepted complete | D141 |
+| Error and warning messages: cli/rlang style, classes, function names | D183 (supersedes D151's deferral) |
 
 ## Recorded decisions
 
@@ -3683,3 +3684,44 @@ stratifier, field/category names, starting-population unknowns, supported rate
 processes and validation/coverage rules. Arrival stream remains distinct from
 inherited origin or ancestry. General generation-specific rate stratification
 is not selected by this decision. See [external immigration](immigration.md#rate-stratification).
+
+
+## D183 — Tidyverse-style error and warning messages (November 14, 2026)
+
+**Status:** User decisions, November 14, 2026, for issue #25. Supersedes the
+deferral of diagnostic presentation in D151. Summary and print methods, the
+other part of D151's output-presentation project, were added in PR #34.
+
+**Decision:** Rewrite Hammel's errors and warnings in the tidyverse style,
+following [the error-message guide](error-messages.md):
+
+- Build messages with `cli` and raise them with `rlang`; add `rlang` to
+  `Imports`.
+- Each message states the problem, shows the offending values and, where
+  known, suggests a fix, using cli bullets.
+- Errors name the exported function the user called. Internal helpers take
+  and forward a `call` argument.
+- Every condition has a specific class and a base class (`hammel_error`,
+  `hammel_warning`), so users can handle kinds of failure in code and tests
+  can check classes instead of message text.
+- Shared helpers (`abort_hammel()`, `warn_hammel()` and a native-call
+  wrapper) live in a new R script that the user authorized.
+- Native engine messages are translated at the R boundary. User-caused native
+  messages carry a tag that maps to a class and an R-side message; untagged
+  native errors are reported as internal errors that are likely bugs.
+
+**Rationale:** Most of the 346 existing `stop()` calls state a requirement
+without showing the offending value or a fix, and `call. = FALSE` hides which
+function failed. Condition classes make the rewording pass, and later ones,
+cheap: about 430 tests currently match message text.
+
+**Unselected:** The condition-class list and native tags proposed in the
+guide await user review. The wording of individual messages is settled as
+each file is converted. Moving checks from the native engine into R before a
+run starts would change behavior and requires the user's agreement case by
+case.
+
+**Consequences:** Condition class names and fields become public API. Tests
+migrate to class checks and snapshot tests as call sites are converted.
+Native changes are limited to message tags and follow D175's verification
+policy.

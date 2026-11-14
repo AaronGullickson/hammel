@@ -8,9 +8,9 @@ and weight models (D129), retaining documented limitations. On November 5 the
 user reordered later milestones (D131). On November 6, D136 superseded that
 sequence: finish milestone 9, then prepare the first version bump and public
 release. External immigration and two-sex marriage models are post-release
-projects. Rich console output, diagnostic bullets, condition classes, and
-polished summaries are deferred to a future output-presentation project,
-likely after the first release milestone (D151). Other diagnostic checks and
+projects. Summary and print methods were added in PR #34, and D183 selects
+cli/rlang error and warning messages with condition classes (issue #25),
+replacing the output-presentation deferral in D151. Other diagnostic checks and
 helpers remain proposed; their release scope has not yet been selected.
 Future entries record planning priorities, not authorization to implement unspecified demographic behavior
 or an unselected public API.
@@ -25,7 +25,7 @@ or an unselected public API.
 | 9 | More than one group column, potentially including regions and internal migration | Complete November 6, 2026 (D141); documented limitations retained |
 | Post-release | Immigration from outside the system, tracking generation (formerly 10) | Deferred until after first public release (D136) |
 | Release preparation | First version bump and public release after milestone 9 | User-selected next focus (D136); version number and release criteria unselected |
-| Deferred, likely post-release | Rich console output, diagnostic bullets, condition classes, and polished summaries | Deferred output-presentation project (D151); scope, timing, and dependencies unselected |
+| In progress | Diagnostic bullets and condition classes for errors and warnings | D183 (issue #25), superseding D151's deferral; summaries added in PR #34 |
 | Unassigned | Model diagnostic checks and post-simulation helpers (formerly 11) | Proposed; scope and timing to select during release planning |
 | Post-release | Two-sex marriage model (formerly 12) | Deferred until after first public release (D136); model and API unselected |
 
@@ -378,7 +378,9 @@ requirements for the first public release.
 
 On November 9 the user deferred rich diagnostics and summaries to a future
 project for improving output presentation, likely after the first release
-milestone (D151). Consider tidyverse-style diagnostic bullets, condition
+milestone (D151). On November 14 the user resumed that work: summaries were
+added in PR #34, and D183 selects the error and warning style; the remainder
+of this paragraph records the original deferral. Consider tidyverse-style diagnostic bullets, condition
 classes, and polished model/result print and summary displays together when
 that project resumes. The interface, contents, migration approach, and use of
 `cli` or `rlang` remain unselected; no dependency or bulk diagnostic rewrite
