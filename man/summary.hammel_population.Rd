@@ -50,7 +50,7 @@ Percentages are on a 0--100 scale and are \code{NaN} when the dimension's
 total living count is zero.}
 }
 
-\code{print()} displays the summary, group tables when present, and a text
+\code{print()} displays the summary, group counts when present, and a text
 population pyramid, returning its input invisibly. Pyramid bars share a
 common scale across both sexes.
 }

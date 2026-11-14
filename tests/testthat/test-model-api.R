@@ -430,3 +430,38 @@ test_that("population reference times are required and validated everywhere", {
     "Recorded events.*reference time"
   )
 })
+
+test_that("model summaries combine components and report readiness", {
+  empty <- summary(hammel_model())
+  expect_s3_class(empty, "summary.hammel_model")
+  expect_null(empty$population)
+  expect_length(empty$processes, 0L)
+  expect_identical(
+    empty$missing,
+    c("population", "mortality", "fertility", "union_formation")
+  )
+  text <- cli::cli_fmt(value <- print(empty))
+  expect_identical(value, empty)
+  expect_true(any(grepl("needs the following", text, fixed = TRUE)))
+  expect_true(any(grepl("set_union_formation()", text, fixed = TRUE)))
+
+  model <- hammel_model() |>
+    set_population(generate_uniform_population(50)) |>
+    set_union_formation("on_demand") |>
+    set_mortality(usa_2000_mortality)
+  partial <- summary(model)
+  expect_s3_class(partial$population, "summary.hammel_population")
+  expect_named(partial$processes, c("mortality", "union_formation"))
+  expect_identical(partial$missing, "fertility")
+  expect_error(run_simulation(model, years = 1), "fertility")
+
+  ready <- summary(set_fertility(model, usa_2000_fertility))
+  expect_named(
+    ready$processes,
+    c("mortality", "fertility", "union_formation")
+  )
+  expect_length(ready$missing, 0L)
+  text <- cli::cli_fmt(print(ready))
+  expect_true(any(grepl("Fertility process", text, fixed = TRUE)))
+  expect_true(any(grepl("elements needed to run", text, fixed = TRUE)))
+})
