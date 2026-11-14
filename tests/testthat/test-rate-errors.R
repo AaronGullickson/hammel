@@ -179,3 +179,144 @@ test_that("rate messages keep their layout", {
     set_union_formation("on_demand")
   expect_snapshot(run_simulation(model, 2), error = TRUE)
 })
+
+search_input <- function() {
+  tibble::tibble(age_start = c(15, 30), age_end = c(30, Inf), rate = 0.1)
+}
+
+test_that("union formation errors name the constructor or setter", {
+  model <- hammel_model()
+  expect_hammel_error(
+    union_formation("sometimes"),
+    "argument",
+    "union_formation"
+  )
+  expect_hammel_error(
+    set_union_formation(model, "rate"),
+    "specification",
+    "set_union_formation"
+  )
+  expect_hammel_error(
+    set_union_formation(model, "on_demand", rates = search_input()),
+    "specification",
+    "set_union_formation"
+  )
+  expect_hammel_error(
+    union_formation("on_demand", min_male_age = -1),
+    "argument",
+    "union_formation"
+  )
+  expect_hammel_error(
+    union_formation("on_demand", diagnostics = NA),
+    "argument",
+    "union_formation"
+  )
+  expect_hammel_error(
+    union_formation("on_demand", kinship_generations = 1.5),
+    "argument",
+    "union_formation"
+  )
+  expect_hammel_error(
+    union_formation(
+      "on_demand",
+      weights = weight_model(~partnered, c(partnered = 0))
+    ),
+    "specification",
+    "union_formation"
+  )
+  process <- union_formation("rate", search_input())
+  process$rates$rate[2] <- -1
+  expect_hammel_error(set_process(model, process), "table", "set_process")
+})
+
+test_that("search rows report the input's rows and clocks", {
+  rates <- tibble::tibble(
+    age_start = c(15, NA, 30),
+    age_end = c(30, NA, Inf),
+    dur_start = c(NA, 0, 5),
+    dur_end = c(NA, 5, Inf),
+    previous_union = c("none", "dissolved", "dissolved"),
+    rate = 0.1
+  )
+  error <- expect_hammel_error(
+    union_formation("rate", rates),
+    "rates",
+    "union_formation"
+  )
+  expect_identical(error$rows, 3L)
+  rates$age_start[3] <- rates$age_end[3] <- NA
+  rates$previous_union[2] <- "none"
+  error <- expect_hammel_error(
+    union_formation("rate", rates),
+    "rates",
+    "union_formation"
+  )
+  expect_identical(error$rows, 2L)
+})
+
+test_that("cohabitation tables are named in their errors", {
+  cohab <- tibble::tibble(age_start = 15, age_end = Inf, prob = 1.5)
+  error <- expect_hammel_error(
+    union_formation("rate", search_input(), cohab_prob = cohab),
+    "table",
+    "union_formation"
+  )
+  expect_identical(error$argument, "cohab_prob$prob")
+  cohab$prob <- 0.5
+  cohab$age_end <- 10
+  error <- expect_hammel_error(
+    union_formation("rate", search_input(), cohab_prob = cohab),
+    "rates",
+    "union_formation"
+  )
+  expect_identical(error$argument, "cohab_prob")
+  convert <- tibble::tibble(
+    dur_start = c(0, 3),
+    dur_end = c(5, Inf),
+    rate = 0.1
+  )
+  cohab$age_end <- Inf
+  error <- expect_hammel_error(
+    set_union_formation(
+      hammel_model(), "rate", search_input(),
+      cohab_prob = cohab,
+      union_convert_rate = convert
+    ),
+    "rates",
+    "set_union_formation"
+  )
+  expect_identical(error$argument, "union_convert_rate")
+  expect_match(
+    conditionMessage(error),
+    "Bands [0, 5) and [3, Inf) overlap",
+    fixed = TRUE
+  )
+  convert$age_start <- c(15, NA)
+  convert$age_end <- c(Inf, NA)
+  convert$dur_start[1] <- convert$dur_end[1] <- NA
+  error <- expect_hammel_error(
+    union_formation(
+      "rate", search_input(),
+      cohab_prob = cohab,
+      union_convert_rate = convert
+    ),
+    "rates",
+    "union_formation"
+  )
+  expect_match(conditionMessage(error), "one clock", fixed = TRUE)
+  expect_hammel_error(
+    union_formation("on_demand", union_convert_rate = convert),
+    "specification",
+    "union_formation"
+  )
+})
+
+test_that("union formation messages keep their layout", {
+  rates <- tibble::tibble(
+    age_start = 15,
+    age_end = Inf,
+    previous_union = c("none", "separated"),
+    rate = 0.1
+  )
+  expect_snapshot(union_formation("rate", rates), error = TRUE)
+})

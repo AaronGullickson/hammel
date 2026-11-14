@@ -351,9 +351,9 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
       call = run_call
     )
   }
-  death <- strata(death_rates, "mortality")
+  death <- strata(death_rates, "mortality rates")
   death_rates <- death$rates
-  birth <- strata(birth_rates, "fertility")
+  birth <- strata(birth_rates, "fertility rates")
   birth_rates <- birth$rates
   search <- if (is.null(union_process$rates)) {
     list(
@@ -362,10 +362,13 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
         age_end = numeric(),
         rate = numeric()
       ),
-      spec = strata(data.frame(rate = numeric()), "search")$spec
+      spec = strata(data.frame(rate = numeric()), "union search rates")$spec
     )
   } else {
-    strata(expand_previous_union_rates(union_process$rates), "union formation")
+    strata(
+      expand_previous_union_rates(union_process$rates),
+      "union search rates"
+    )
   }
   union_rates <- search$rates
   validate_matching_groups(union_process$matching, group_values)
@@ -379,10 +382,16 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
         age_end = numeric(),
         rate = numeric()
       ),
-      spec = strata(data.frame(rate = numeric()), "dissolution")$spec
+      spec = strata(
+        data.frame(rate = numeric()),
+        "union dissolution rates"
+      )$spec
     )
   } else {
-    strata(dissolution_process$rates, "union dissolution", union_level = TRUE)
+    strata(
+      dissolution_process$rates, "union dissolution rates",
+      union_level = TRUE
+    )
   }
   dissolution_rates <- dissolution$rates
   dissolution_rates$age_start <- dissolution_rates$dur_start
@@ -424,7 +433,7 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
       rates <- transition_list[[d]]$rates
       rates[[d]] <- rates$origin
       prepared <- prepare_strata_rates(
-        rates, sprintf("`%s` transition", d),
+        rates, sprintf("`%s` transition rates", d),
         registries,
         start, start + years,
         coverage = FALSE,

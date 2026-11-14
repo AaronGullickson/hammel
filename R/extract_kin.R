@@ -365,7 +365,8 @@ living_kin_categories <- function(population, name) {
 
 validate_kinship_generations <- function(
   generations,
-  name = "kinship_generations"
+  name = "kinship_generations",
+  call = rlang::caller_env()
 ) {
   if (!is.numeric(generations) || length(generations) != 1L ||
         !is.null(dim(generations)) ||
@@ -373,11 +374,14 @@ validate_kinship_generations <- function(
         generations < 0 ||
         generations != floor(generations) ||
         generations > .Machine$integer.max) {
-    stop(
-      sprintf(
-        "`%s` must be a nonnegative whole number within integer range.", name
+    abort_hammel(
+      c(
+        "{.arg {name}} must be a single nonnegative whole number.",
+        "x" = "It is {describe_value(generations)}."
       ),
-      call. = FALSE
+      "argument",
+      argument = name,
+      call = call
     )
   }
   invisible(generations)

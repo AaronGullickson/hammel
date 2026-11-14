@@ -18,3 +18,13 @@
       x Nothing applies at time 1.
       i The simulation runs from 0 to 2. Extend the time_start and time_end intervals to cover 1, or shorten `years`.
 
+# union formation messages keep their layout
+
+    Code
+      union_formation("rate", rates)
+    Condition
+      Error in `union_formation()`:
+      ! Column previous_union of `rates` must use pooled or detailed categories.
+      x Categories: "none" and "separated".
+      i Use "none" and "dissolved", or "none", "separated" and "widowed", in every group and period, without mixing the two.
+

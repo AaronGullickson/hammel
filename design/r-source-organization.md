@@ -112,13 +112,13 @@ Calculate TFR and PATFR from rate schedules.
 
 Small, general checks for table columns and numeric/time values.
 
-- Functions: `check_time()`, `check_columns()`, `check_numeric_column()`, `check_nonnegative()`, `check_labels()`.
+- Functions: `check_time()`, `check_columns()`, `check_numeric_column()`, `check_nonnegative()`, `check_labels()`, `check_flag()`.
 
 ### `R/cohabitation.R`
 
 Cohabitation and conversion settings within union formation, including preparation.
 
-- Functions: `validate_cohabitation()`, `validate_conversion_rates()`, `prepare_cohabitation()`.
+- Functions: `validate_cohabitation()`, `validate_conversion_rates()`, `validate_conversion_schedules()`, `prepare_cohabitation()`.
 
 ### `R/errors.R`
 
@@ -259,7 +259,7 @@ Construct and validate dissolution processes.
 
 Construct and validate union formation/search processes.
 
-- Functions: **`union_formation()`**, **`set_union_formation()`**, `validate_union_formation()`, `expand_previous_union_rates()`, `validate_union_search_rates()`.
+- Functions: **`union_formation()`**, **`set_union_formation()`**, `new_union_formation()`, `validate_union_formation()`, `expand_previous_union_rates()`, `validate_union_search_rates()`, `check_search_rows()`, `check_clock_rows()`, `validate_search_schedules()`.
 
 ### `R/weight_model.R`
 

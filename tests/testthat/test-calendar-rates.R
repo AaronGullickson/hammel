@@ -171,7 +171,7 @@ test_that("duration search clocks retain their origin across rate boundaries", {
   bad$age_start[5] <- 0
   bad$age_end[5] <- Inf
   bad$dur_start[5] <- bad$dur_end[5] <- NA_real_
-  expect_error(set_union_formation(m, "rate", rates = bad), "same age or duration clock")
+  expect_error(set_union_formation(m, "rate", rates = bad), "one clock", class = "hammel_error_rates")
 })
 
 test_that("search intensity changes recover analytical formation probability", {

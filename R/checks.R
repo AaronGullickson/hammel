@@ -161,3 +161,19 @@ check_labels <- function(x, name, allowed, call = rlang::caller_env()) {
   }
   invisible(x)
 }
+
+# A single TRUE or FALSE setting.
+check_flag <- function(x, name, call = rlang::caller_env()) {
+  if (!is.logical(x) || length(x) != 1L || !is.null(dim(x)) || is.na(x)) {
+    abort_hammel(
+      c(
+        "{.arg {name}} must be {.code TRUE} or {.code FALSE}.",
+        "x" = "It is {describe_value(x)}."
+      ),
+      "argument",
+      argument = name,
+      call = call
+    )
+  }
+  invisible(x)
+}

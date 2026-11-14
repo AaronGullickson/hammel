@@ -324,7 +324,7 @@ prepare_strata_rates <- function(
     }
     abort_hammel(
       c(
-        "{subject} rates can't use {.field {wrong}} columns.",
+        "{subject} can't use {.field {wrong}} columns.",
         "i" = hint
       ),
       "groups",
@@ -363,7 +363,7 @@ prepare_strata_rates <- function(
       abort_hammel(
         c(
           paste(
-            "{subject} rates use categories that aren't declared for",
+            "{subject} use categories that aren't declared for",
             "group {.field {dimension}}."
           ),
           "x" = "Column {.field {x$column}} contains {.val {unknown}}.",
@@ -423,7 +423,7 @@ prepare_strata_rates <- function(
     shown <- cli::cli_vec(absent, list("vec-trunc" = 5))
     abort_hammel(
       c(
-        "{subject} rates are missing schedules for some groups.",
+        "{subject} are missing schedules for some groups.",
         "x" = "No rates for {shown}.",
         "i" = paste(
           "Rates stratified by a group need a schedule for every category",
@@ -558,9 +558,9 @@ check_strata_overlap <- function(rates, process, call = rlang::caller_env()) {
           schedule = schedule,
           call = call
         ),
-        paste(
-          "In", process, "rates. Only declared group dimensions stratify",
-          "rates, so rows that differ only in other columns form one",
+        paste0(
+          "In ", process, ". Only declared group dimensions stratify ",
+          "rates, so rows that differ only in other columns form one ",
           "schedule."
         )
       )

@@ -57,14 +57,14 @@ test_that("probability coverage follows rate calendar and group/category rules",
   m$processes$union_formation$cohab_prob <- p[!(p$group == "B" & p$time_start == .5), ]
   expect_error(
     run_simulation(m, 1),
-    "Cohabitation probability.*No rates for B",
+    "Cohabitation probabilities.*No rates for B",
     class = "hammel_error_groups"
   )
   p <- rbind(transform(cohab_calendar(), previous_union = "none"),
     transform(cohab_calendar(), previous_union = "separated"),
     transform(cohab_calendar(), previous_union = "widowed"))
   expect_s3_class(cohab_calendar_model(p), "hammel_model")
-  expect_error(cohab_calendar_model(p[-nrow(p), ]), "all three")
+  expect_error(cohab_calendar_model(p[-nrow(p), ]), "pooled or detailed", class = "hammel_error_rates")
 })
 
 test_that("type probabilities change at fractional dates while searches recover their hazard", {

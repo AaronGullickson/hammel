@@ -77,7 +77,7 @@ test_that("setters reject stratified columns their process does not support", {
   expect_identical(error$columns, "union_type")
   expect_error(fertility(stratify_rates(base, list(sex = c(f = 1)))), "Fertility")
   expect_error(union_formation("rate", rates = stratify_rates(base, list(sex = c(f = 1)))),
-               "Union-search")
+               "Union search", class = "hammel_error_rates")
   expect_error(set_union_formation(hammel_model(), "rate", rates = base,
     cohab_prob = data.frame(age_start = 0, age_end = Inf, prob = 0.5),
     union_convert_rate = stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = 0.1),

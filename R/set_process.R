@@ -102,9 +102,9 @@ attach_process <- function(model, process, call = rlang::caller_env()) {
     process$rates <- tibble::as_tibble(process$rates)
   }
   if (name == "union_formation") {
-    validate_union_formation(process)
-    validate_process_weights(process$weights_conversion, "union")
-    validate_process_weights(process$weights, "person")
+    validate_union_formation(process, call = call)
+    validate_process_weights(process$weights_conversion, "union", call = call)
+    validate_process_weights(process$weights, "person", call = call)
     if (!is.null(process$rates)) {
       process$rates <- tibble::as_tibble(process$rates)
     }
