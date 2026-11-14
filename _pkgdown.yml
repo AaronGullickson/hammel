@@ -53,6 +53,7 @@ reference:
       - fertility
       - summary.hammel_fertility
       - union_formation
+      - summary.union_formation
       - union_dissolution
       - group_transition
       - household

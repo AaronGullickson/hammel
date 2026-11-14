@@ -18,19 +18,29 @@
 \code{summary.hammel_union_formation()}.}
 }
 \value{
-\code{summary()} returns an object of class \code{summary.hammel_union_formation} containing:
+\code{summary()} returns an object of class \code{summary.hammel_union_formation}
+containing:
 \describe{
-\item{birth_interval}{The minimum maternal birth-to-birth interval,
-in years.}
-\item{ffab}{The probability that a newborn is female.}
-\item{rate_strata}{A list describing the input rate schedule, containing
+\item{method}{The union initiation method: \code{"rate"} or \code{"on_demand"}.}
+\item{min_male_age}{The minimum eligible male age, in years.}
+\item{kinship_generations}{The configured number of generations used
+for kinship exclusion when selecting partners.}
+\item{cohab_as_previous_union}{Whether cohabitations count as previous
+unions when determining previous-union status.}
+\item{rate_strata}{A list describing the union-search rate schedule, or
+\code{NULL} when no rate schedule is configured. The list contains
 \code{stratified_by} (stratum column names), \code{strata} (a tibble of observed
 stratum combinations), \code{bands} (a tibble of exact band combinations),
 and \code{bands_by_stratum} (whether band combinations differ by stratum).
 Shared bands are stored once; otherwise \code{bands} includes the stratum
 columns. Band endpoints define half-open intervals \verb{[start, end)}.}
-\item{open_band_non_zero}{Whether any age band ends at \code{Inf} and has a
-positive fertility rate.}
+\item{cohabitation}{\code{NULL} when cohabitation is disabled; otherwise a
+list containing \code{cohab_prob_range} (the minimum and maximum supplied
+cohabitation probabilities), \code{cohab_rate_strata} (strata and bands of
+the cohabitation probability schedule), and \code{convert_rate_strata}
+(strata and bands of the conversion rate schedule, or \code{NULL} when no
+conversion schedule is configured). Both schedule summaries use the
+same structure as \code{rate_strata}.}
 }
 }
 \description{

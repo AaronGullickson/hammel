@@ -252,19 +252,29 @@ set_union_formation <- function(
 #' @param ... Additional arguments, currently unused.
 #'
 #' @return
-#' `summary()` returns an object of class `summary.hammel_union_formation` containing:
+#' `summary()` returns an object of class `summary.hammel_union_formation`
+#' containing:
 #' \describe{
-#'   \item{birth_interval}{The minimum maternal birth-to-birth interval,
-#'     in years.}
-#'   \item{ffab}{The probability that a newborn is female.}
-#'   \item{rate_strata}{A list describing the input rate schedule, containing
+#'   \item{method}{The union initiation method: `"rate"` or `"on_demand"`.}
+#'   \item{min_male_age}{The minimum eligible male age, in years.}
+#'   \item{kinship_generations}{The configured number of generations used
+#'     for kinship exclusion when selecting partners.}
+#'   \item{cohab_as_previous_union}{Whether cohabitations count as previous
+#'     unions when determining previous-union status.}
+#'   \item{rate_strata}{A list describing the union-search rate schedule, or
+#'     `NULL` when no rate schedule is configured. The list contains
 #'     `stratified_by` (stratum column names), `strata` (a tibble of observed
 #'     stratum combinations), `bands` (a tibble of exact band combinations),
 #'     and `bands_by_stratum` (whether band combinations differ by stratum).
 #'     Shared bands are stored once; otherwise `bands` includes the stratum
 #'     columns. Band endpoints define half-open intervals `[start, end)`.}
-#'   \item{open_band_non_zero}{Whether any age band ends at `Inf` and has a
-#'     positive fertility rate.}
+#'   \item{cohabitation}{`NULL` when cohabitation is disabled; otherwise a
+#'     list containing `cohab_prob_range` (the minimum and maximum supplied
+#'     cohabitation probabilities), `cohab_rate_strata` (strata and bands of
+#'     the cohabitation probability schedule), and `convert_rate_strata`
+#'     (strata and bands of the conversion rate schedule, or `NULL` when no
+#'     conversion schedule is configured). Both schedule summaries use the
+#'     same structure as `rate_strata`.}
 #' }
 #'
 #' @seealso [union_formation()]
@@ -279,7 +289,6 @@ summary.hammel_union_formation <- function(object, ...) {
       method = object$initiation,
       min_male_age = object$min_male_age,
       kinship_generations = object$kinship_generations,
-      cancel_birth_if_no_match = object$cancel_birth_if_no_match,
       cohab_as_previous_union = object$cohab_as_previous_union,
       rate_strata = summarize_rate_strata(object$rates),
       cohabitation = if (is.null(object$cohab_prob)) {
@@ -325,6 +334,10 @@ print.summary.hammel_union_formation <- function(x, ...) {
     print_stat(
       "Probability range:",
       paste(x$cohabitation$cohab_prob_range, collapse = "\u002d")
+    )
+    print_stat(
+      "Counts as previous union",
+      ifelse(x$cohab_as_previous_union, "yes", "no")
     )
     print_rate_strata(x$cohabitation$cohab_rate_strata)
     cat("\n")
