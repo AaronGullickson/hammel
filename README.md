@@ -117,3 +117,11 @@ calculate_population_size(pop_end, seq(0, 100, 5))
 # ℹ Use `print(n = ...)` to see more rows
 ```
 
+## Dedications
+
+<img src="man/figures/gene-hammel.jpg" align="left" width="150"
+  alt="Photo of Eugene Hammel" style="margin-right: 1em;"/>
+
+Hammel is named after Eugene A. Hammel, the late anthropologist who had a long career at the University of California, Berkeley. Among his many other accomplishments, Gene re-founded the [UC Berkeley Demography Department](https://www.demog.berkeley.edu/) and was responsible, along with [Kenneth Wachter](https://www.demog.berkeley.edu/faculty/kenneth-wachter-2/), for the development of the SOCSIM program.
+
+<br clear="left"/>
