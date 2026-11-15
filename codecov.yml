@@ -1,0 +1,20 @@
+# Codecov settings for hammel.
+# Reference: https://docs.codecov.com/docs/codecov-yaml
+coverage:
+  status:
+    # Whole-package coverage: compare with the base commit and allow a small
+    # drop so PRs that mostly add hard-to-reach guards do not fail on noise.
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    # Coverage of the lines a PR changes: a fixed target rather than the base
+    # commit's overall rate, leaving room for unreachable internal checks.
+    patch:
+      default:
+        target: 90%
+
+# Generated Rcpp wrappers; not hand-maintained.
+ignore:
+  - "R/RcppExports.R"
+  - "src/RcppExports.cpp"

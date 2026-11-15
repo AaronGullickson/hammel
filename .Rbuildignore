@@ -4,6 +4,7 @@
 ^design$
 ^validation$
 ^\.github$
+^codecov\.yml$
 ^nvim\.log$
 ^LICENSE\.md$
 ^src/.*\.gcda$
