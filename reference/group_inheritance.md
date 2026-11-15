@@ -191,7 +191,7 @@ group_inheritance("custom",
 #>         "mixed"
 #>     }
 #> }
-#> <environment: 0x5c5a9205cc00>
+#> <environment: 0x5e586bd23078>
 #> 
 #> $order
 #> NULL

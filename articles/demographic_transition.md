@@ -303,7 +303,7 @@ sim_time <- system.time(
 )
 ```
 
-The simulation took 38.303 seconds to run.
+The simulation took 31.764 seconds to run.
 
 ## Analyze the Simulation Results
 
