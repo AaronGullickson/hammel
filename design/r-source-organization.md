@@ -70,7 +70,7 @@ Generated native wrappers; continue to generate rather than hand-edit.
 
 Shared history preparation, stratification, and output construction for demographic analysis. Used by rate calculators, population counts, and relationship extraction.
 
-- Functions: `observation_groups()`, `prepare_group_observations()`, `check_by()`, `check_detailed_previous_union()`, `previous_labels()`, `person_observation()`, `union_type_labels()`, `build_rows()`, `dim_of()`, `label_dim()`, `person_by_dims()`, `finish_rows()`, `observation_alias()`, `combine_dimensions()`, `finish_strata()`, `rename_group_columns()`.
+- Functions: `observation_groups()`, `prepare_group_observations()`, `check_by()`, `check_detailed_previous_union()`, `previous_labels()`, `person_observation()`, `union_type_labels()`, `build_rows()`, `dim_of()`, `label_dim()`, `person_by_dims()`, `finish_rows()`, `observation_alias()`, `combine_dimensions()`, `finish_strata()`, `rename_group_columns()`, `check_analysis_population()`, `check_observation_end()`, `abort_one_of_breaks()`.
 
 ### `R/ancestry.R`
 
@@ -150,7 +150,7 @@ Generate baseline persons and sample declared group categories.
 
 Retrieve HMD mortality and HFD fertility rates, convert them to Hammel tables, and preserve provenance. Include all shared and source-specific import helpers, with sections for shared support, HMD, and HFD.
 
-- Functions: **`get_mortality_hmd()`**, `mortality_from_hmd()`, **`get_fertility_hfd()`**, `hfd_age_intervals()`, `fertility_from_hfd()`, `fertility_by_parity_from_hfd()`, `select_database_year()`, `database_source()`, `check_database_request()`, `check_hmd_shape()`, `hmd_period_intervals()`, `hmd_age_intervals()`, `check_database_years()`, `combine_database_years()`, `check_hmd_open_age()`, `check_hmd_retained_rates()`, `index_hmd_pool_source()`, `pool_hmd_open_age()`.
+- Functions: **`get_mortality_hmd()`**, `mortality_from_hmd()`, **`get_fertility_hfd()`**, `hfd_age_intervals()`, `fertility_from_hfd()`, `fertility_by_parity_from_hfd()`, `select_database_year()`, `database_source()`, `check_database_request()`, `check_hmd_shape()`, `hmd_period_intervals()`, `hmd_age_intervals()`, `check_database_years()`, `combine_database_years()`, `check_hmd_open_age()`, `check_hmd_retained_rates()`, `index_hmd_pool_source()`, `pool_hmd_open_age()`, `read_database()`, `check_database_columns()`, `check_database_numeric()`, `abort_database()`.
 
 ### `R/group.R`
 
@@ -247,7 +247,7 @@ Public proportional stratification of input rate tables and its checks.
 
 Shared strata and interval checks for summaries of rate schedules.
 
-- Functions: `summary_strata()`, `summary_rows()`, `check_summary_intervals()`.
+- Functions: `summary_strata()`, `summary_rows()`, `check_summary_intervals()`, `abort_no_bands()`, `abort_process_kind()`, `abort_rate_column()`, `warn_open_fertility_band()`, `abort_no_finite_bands()`.
 
 ### `R/union_dissolution.R`
 

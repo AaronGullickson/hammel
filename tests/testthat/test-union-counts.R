@@ -124,7 +124,7 @@ test_that("duration tails and empty grids follow Lexis conventions", {
 
 test_that("union counts validate endpoints, breakpoints, histories and grouping", {
   population <- union_count_population()
-  expect_error(calculate_dissolution_rates(population, c(0, 6), c(0, Inf)), "endpoint")
+  expect_error(calculate_dissolution_rates(population, c(0, 6), c(0, Inf)), "extend beyond", class = "hammel_error_argument")
   population["end_time"] <- list(NULL)
   expect_error(
     calculate_dissolution_rates(population, c(0, 5), c(0, Inf)),
@@ -132,7 +132,7 @@ test_that("union counts validate endpoints, breakpoints, histories and grouping"
   )
   expect_error(
     calculate_dissolution_rates(union_count_history(), c(0, 5), c(0, Inf)),
-    "must be a hammel_population"
+    "must be a Hammel population"
   )
   unions <- union_population(union_count_history(), 5)
   for (breaks in list(c(0, 0), c(0, NA), c(0, Inf), 0, c(1, 0), matrix(c(0, 5))))
@@ -145,6 +145,7 @@ test_that("union counts validate endpoints, breakpoints, histories and grouping"
     calculate_dissolution_rates(unions, c(0, 5), c(0, Inf),
       by = c("group_w", "group_h")
     ),
-    "declared group"
+    "declared dimension",
+    class = "hammel_error_groups"
   )
 })

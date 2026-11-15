@@ -62,7 +62,7 @@ test_that("direct and legacy marriages retain existing exposure accounting", {
   x <- calculate_marriage_rates(pop,c(0,5),c(0,Inf))
   expect_equal(x$person_years,c(5,2))
   expect_equal(x$marriages,c(0,0))
-  expect_error(calculate_marriage_rates(pop,c(0,6),c(0,Inf)),"endpoint")
+  expect_error(calculate_marriage_rates(pop,c(0,6),c(0,Inf)),"extend beyond", class = "hammel_error_argument")
   expect_error(calculate_marriage_rates(pop,c(0,5),c(0,Inf), by = NA), "`by` must")
   pop$persons <- pop$persons[0, ]
   pop$ancestry <- pop$ancestry[0, ]

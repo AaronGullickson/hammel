@@ -303,5 +303,5 @@ test_that("directional group columns are validated", {
     model$processes$mortality$rates, group_w = "A")), 0),
                "own name")
   expect_error(stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = 1e308),
-    list(group_w = c(A = 2))), "remain finite")
+    list(group_w = c(A = 2))), "stay finite", class = "hammel_error_argument")
 })

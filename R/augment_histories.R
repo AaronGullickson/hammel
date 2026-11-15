@@ -45,12 +45,15 @@ augment_unions <- function(population) {
   added <- c(paste0(columns, "_w"), paste0(columns, "_h"))
   conflicts <- intersect(names(result), added)
   if (length(conflicts)) {
-    stop(
-      sprintf(
-        "Union columns conflict with partner fields: %s.",
-        paste(conflicts, collapse = ", ")
+    abort_hammel(
+      c(
+        "The unions table already has columns that would be added.",
+        "x" = "Conflicting columns: {.field {conflicts}}.",
+        "i" = "Rename or remove them before augmenting."
       ),
-      call. = FALSE
+      "table",
+      argument = "population",
+      columns = conflicts
     )
   }
   # Categories at each union's start, replaying each dimension's transitions.
@@ -138,12 +141,15 @@ augment_persons <- function(population) {
   )
   conflicts <- intersect(names(result), added)
   if (length(conflicts)) {
-    stop(
-      sprintf(
-        "Person columns conflict with parent fields: %s.",
-        paste(conflicts, collapse = ", ")
+    abort_hammel(
+      c(
+        "The persons table already has columns that would be added.",
+        "x" = "Conflicting columns: {.field {conflicts}}.",
+        "i" = "Rename or remove them before augmenting."
       ),
-      call. = FALSE
+      "table",
+      argument = "population",
+      columns = conflicts
     )
   }
   for (parent in c("mother", "father")) {

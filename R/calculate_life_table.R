@@ -55,9 +55,11 @@
 #' ) |>
 #'   calculate_life_table()
 calculate_life_table <- function(rates, radix = 1) {
+  # Errors raised while building each stratum's table name this function.
+  call <- rlang::current_env()
   if (inherits(rates, "hammel_process")) {
     if (!identical(rates$name, "mortality")) {
-      stop("Life tables require a mortality process.", call. = FALSE)
+      abort_process_kind("mortality")
     }
     rates <- rates$rates
   }
@@ -67,7 +69,7 @@ calculate_life_table <- function(rates, radix = 1) {
   } else if ("rate" %in% names(rates)) {
     rate_column <- "rate"
   } else {
-    stop("Supply `rate_mortality` or `rate`.", call. = FALSE)
+    abort_rate_column(c("rate_mortality", "rate"))
   }
   check_groups(rates, "rates")
   check_numeric_column(
@@ -76,22 +78,36 @@ calculate_life_table <- function(rates, radix = 1) {
   )
   rates$mx <- rates[[rate_column]]
   if (any(rates$mx < 0, na.rm = TRUE)) {
-    stop("Mortality rates must be nonnegative.", call. = FALSE)
+    check_nonnegative(rates$mx, paste0("rates$", rate_column))
   }
   if (!is.numeric(radix) || length(radix) != 1L || !is.finite(radix) ||
         radix <= 0) {
-    stop("`radix` must be positive and finite.", call. = FALSE)
+    abort_hammel(
+      c(
+        "{.arg radix} must be a single positive number.",
+        "x" = "It is {describe_value(radix)}."
+      ),
+      "argument",
+      argument = "radix"
+    )
   }
   strata <- summary_strata(rates)
   rates <- rates[c(strata, "age_start", "age_end", "mx")]
   if (!nrow(rates)) {
-    stop("A rate table needs at least one age band.", call. = FALSE)
+    abort_no_bands()
   }
   for (column in strata) {
     if (anyNA(rates[[column]])) {
-      stop(
-        sprintf("`rates$%s` must not contain missing values.", column),
-        call. = FALSE
+      rows <- which(is.na(rates[[column]]))
+      subject <- describe_column(paste0("rates$", column))
+      abort_hammel(
+        c(
+          "{subject} must not contain missing values.",
+          "x" = "Missing at {format_rows(rows)}."
+        ),
+        "table",
+        argument = paste0("rates$", column),
+        rows = rows
       )
     }
   }
@@ -100,15 +116,21 @@ calculate_life_table <- function(rates, radix = 1) {
     summary_rows(rates),
     function(rows) {
       r <- rates[rows, , drop = FALSE]
-      check_summary_intervals(r, strata = strata)
+      check_summary_intervals(r, strata = strata, call = call)
       r <- r[order(r$age_start), , drop = FALSE]
       if (r$age_start[1] != 0 || tail(r$age_end, 1) != Inf) {
-        stop(
-          paste0(
-            "Life tables require ages from zero through an ",
-            "explicit open interval", stratum_label(r, strata), "."
+        where <- stratum_label(r, strata)
+        abort_hammel(
+          c(
+            "Life tables need age bands from 0 to {.code Inf}.",
+            "x" = paste(
+              "The bands{where} run from {r$age_start[1]} to",
+              "{tail(r$age_end, 1)}."
+            )
           ),
-          call. = FALSE
+          "coverage",
+          argument = "rates",
+          call = call
         )
       }
       n <- r$age_end - r$age_start
@@ -188,9 +210,14 @@ calculate_life_table <- function(rates, radix = 1) {
 calculate_life_expectancy <- function(rates, age = 0) {
   table <- calculate_life_table(rates)
   if (!is.numeric(age) || !length(age) || !all(age %in% table$age_start)) {
-    stop(
-      "`age` must contain ages that start an age band in `rates`.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "{.arg age} must contain ages that start an age band in {.arg rates}.",
+        "x" = "It is {describe_value(age)}.",
+        "i" = "The bands start at {.val {unique(table$age_start)}}."
+      ),
+      "argument",
+      argument = "age"
     )
   }
   strata <- setdiff(names(table), life_table_columns)

@@ -207,7 +207,8 @@ test_that("a single dimension may have any name, including in analysis", {
   expect_true("region" %in% names(rates))
   expect_equal(rates$deaths[rates$region == "S"], c(0, 0))
   expect_gt(sum(rates$deaths[rates$region == "N"]), 0)
-  expect_error(calculate_mortality_rates(out, c(0, 2), c(0, Inf), by = "group"), "`region`")
+  expect_error(calculate_mortality_rates(out, c(0, 2), c(0, Inf), by = "group"),
+    "\"region\"", class = "hammel_error_argument")
   sizes <- calculate_population_size(out, 2, by = "region")
   expect_named(sizes, c("time", "region", "population"))
   # Also when the dimension tracks ancestry.
@@ -332,7 +333,7 @@ test_that("each dimension has its own transition process, history and duration",
   broken$transitions$destination[which(tx$group == "region")[1]] <- "A"
   expect_error(set_population(model, broken), "chain")
   # Transition rates are counted per dimension.
-  expect_error(calculate_transition_rates(out, c(0, 4), age_breaks = c(0, Inf)), "Name the dimension")
+  expect_error(calculate_transition_rates(out, c(0, 4), age_breaks = c(0, Inf)), "must name the dimension", class = "hammel_error_groups")
   counts <- calculate_transition_rates(out, c(0, 4), dur_breaks = c(0, 1, Inf), group = "region")
   expect_named(counts, c("time_start", "time_end", "dur_start", "dur_end", "origin", "destination",
                          "person_years", "transitions", "rate_transition"))
@@ -640,7 +641,7 @@ test_that("transition rates split by another dimension count only their own move
                 c("person_years", "transitions"))
   expect_equal(sum(ours$transitions), sum(out$transitions$group == "race"))
   expect_error(calculate_transition_rates(out, c(0, 4), age_breaks = c(0, Inf), by = "race", group = "race"),
-               "not by `race` in `by`")
+               "can't also be split", class = "hammel_error_argument")
 })
 
 test_that("durations by another dimension count from entering this dimension's category", {
@@ -677,7 +678,7 @@ test_that("summaries keep group dimension columns and errors name the dimensions
   expect_error(calculate_dissolution_rates(out, c(0, 3), c(0, Inf), by = "race"),
                "accepts \"race_w\", \"region_w\", \"race_h\", \"region_h\"")
   expect_error(calculate_mortality_rates(out, c(0, 3), c(0, Inf), by = "group"),
-               "not `group`")
+               "not \"group\"", class = "hammel_error_argument")
 })
 
 test_that("weight models use any dimension's variables", {

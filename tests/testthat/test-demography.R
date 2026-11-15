@@ -93,7 +93,7 @@ test_that("life tables use only rate or rate_mortality as input rates", {
     expect_identical(calculate_life_table(input), expected)
     expect_error(
       calculate_life_table(input[FALSE, ]),
-      "A rate table needs at least one age band.",
+      "must contain at least one age band.",
       fixed = TRUE
     )
     input$mx <- "not an input mortality rate"
@@ -108,11 +108,14 @@ test_that("life tables use only rate or rate_mortality as input rates", {
   mx_only <- rates
   names(mx_only)[names(mx_only) == "rate"] <- "mx"
   expect_error(
-    calculate_life_table(mx_only), "Supply `rate_mortality` or `rate`.",
-    fixed = TRUE
+    calculate_life_table(mx_only),
+    "needs a rate_mortality or rate column",
+    class = "hammel_error_table"
   )
-  expect_error(calculate_life_table(mx_only[FALSE, ]),
-    "Supply `rate_mortality` or `rate`.", fixed = TRUE
+  expect_error(
+    calculate_life_table(mx_only[FALSE, ]),
+    "needs a rate_mortality or rate column",
+    class = "hammel_error_table"
   )
   both <- rates
   both$rate_mortality <- both$rate
@@ -151,7 +154,7 @@ test_that("life tables reject missing stratum values", {
   )
   expect_error(
     calculate_life_table(rates),
-    "`rates$region` must not contain missing values.",
+    "Column region of `rates` must not contain missing values.",
     fixed = TRUE
   )
 })
@@ -163,18 +166,20 @@ test_that("interval errors name the failing stratum", {
   )
   expect_error(
     calculate_life_table(labelled),
-    "explicit open interval in stratum sex = f, note = a \\(columns other"
+    "The bands in stratum sex = f, note = a \\(columns other"
   )
   expect_error(
     calculate_life_table(labelled[2, c("age_start", "age_end", "rate")]),
-    "explicit open interval\\.$"
+    "The bands run from 1 to Inf\\.$",
+    class = "hammel_error_coverage"
   )
   overlap <- data.frame(
     age_start = c(15, 20), age_end = c(25, 30), rate = 0.1, region = "x"
   )
   expect_error(
     calculate_tfr(overlap),
-    "nonoverlapping in stratum region = x \\("
+    "in stratum region = x \\(",
+    class = "hammel_error_rates"
   )
 })
 
@@ -291,7 +296,7 @@ test_that("population counts include births and exclude deaths at each instant",
   expect_equal(calculate_population_size(population, -1)$population, 0L, tolerance = 0)
   expect_error(
     calculate_population_size(persons, c(0, 1)),
-    "must be a hammel_population"
+    "must be a Hammel population"
   )
   expect_equal(calculate_population_size(empty, 1)$population, 0L, tolerance = 0)
   expect_equal(nrow(calculate_population_size(population, numeric())), 0L, tolerance = 0)
@@ -344,7 +349,7 @@ test_that("TFR separates union statuses in input tables and fertility processes"
   expect_error(calculate_tfr(rates[FALSE, ]), "at least one age band")
   bad <- rates
   bad$age_start[3] <- 21
-  expect_error(calculate_tfr(bad), "contiguous")
+  expect_error(calculate_tfr(bad), "without gaps or overlaps", class = "hammel_error_rates")
   rates$rate[3] <- NA_real_
   expect_equal(calculate_tfr(rates)$tfr, c(NA_real_, 3.5))
 })

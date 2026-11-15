@@ -55,7 +55,7 @@ test_that("detailed unions reject invalid histories and conflicting columns", {
   population <- detailed_union_population()
   expect_error(augment_unions(population$persons), "hammel_population")
   population$unions$birth_time_w <- 100
-  expect_error(augment_unions(population), "conflict.*birth_time_w")
+  expect_error(augment_unions(population), "Conflicting columns: birth_time_w", class = "hammel_error_table")
   population <- detailed_union_population()
   population$unions$husband_id[1] <- 99
   error <- expect_error(

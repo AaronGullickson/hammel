@@ -53,7 +53,7 @@ test_that("pooling requires previous strata and validates its option", {
   for(fun in list(calculate_union_rates,calculate_marriage_rates)) {
     for(bad in list(NA,1,"yes",c(TRUE,FALSE)))
       expect_error(fun(pop,c(0,3),c(0,Inf),use_detailed_previous_union = bad),"use_detailed_previous_union")
-    expect_error(fun(pop,c(0,3),c(0,Inf),use_detailed_previous_union = FALSE),"requires.*previous_union")
+    expect_error(fun(pop,c(0,3),c(0,Inf),use_detailed_previous_union = FALSE),"needs.*previous_union", class = "hammel_error_argument")
     x <- fun(pop,c(0,3),c(0,Inf),by = "previous_union",use_detailed_previous_union = FALSE)
     expect_setequal(x$previous_union,c("none","dissolved"))
     expect_false("conf_low" %in% names(x))

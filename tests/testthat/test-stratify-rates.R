@@ -52,8 +52,8 @@ test_that("stratify_rates validates its inputs", {
                    list(group = setNames(1, "")), list(group = c(A = "1")), list(group = list(A = 1)),
                    c(group = 1), data.frame(group = 1)))
     expect_error(stratify_rates(rates, bad), "by")
-  expect_error(stratify_rates(rates, list(rate = c(A = 1))), "band, rate or calendar")
-  expect_error(stratify_rates(rates, list(age_start = c(A = 1))), "band, rate or calendar")
+  expect_error(stratify_rates(rates, list(rate = c(A = 1))), "can't stratify by", class = "hammel_error_argument")
+  expect_error(stratify_rates(rates, list(age_start = c(A = 1))), "can't stratify by", class = "hammel_error_argument")
   expect_error(stratify_rates(rates, list(`1x` = c(A = 1))), "valid column names")
   # Any other name may be a group dimension, checked at simulation.
   expect_named(stratify_rates(rates, list(education = c(low = 1))), c(names(rates), "education"))

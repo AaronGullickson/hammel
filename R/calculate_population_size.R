@@ -57,9 +57,13 @@ calculate_population_size <- function(
   use_detailed_previous_union = TRUE
 ) {
   if (!is.numeric(times) || !is.null(dim(times)) || any(!is.finite(times))) {
-    stop(
-      "`times` must be a numeric vector of finite times in years.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "{.arg times} must be finite times in years.",
+        "x" = "It is {describe_value(times)}."
+      ),
+      "argument",
+      argument = "times"
     )
   }
   alias <- observation_alias(population, by)

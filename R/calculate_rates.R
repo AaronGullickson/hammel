@@ -252,15 +252,19 @@ calculate_fertility_rates <- function(
   validate_rate_conf_level(conf_level)
   if (!is.logical(unrealized) || length(unrealized) != 1L ||
         is.na(unrealized)) {
-    stop("`unrealized` must be TRUE or FALSE.", call. = FALSE)
+    check_flag(unrealized, "unrealized")
   }
   if (unrealized && is.null(population$unrealized_births)) {
-    stop(
-      paste(
-        "`unrealized = TRUE` requires a population returned by",
-        "run_simulation(), which records unrealized births."
+    abort_hammel(
+      c(
+        paste(
+          "{.code unrealized = TRUE} needs a population from",
+          "{.fn run_simulation}."
+        ),
+        "i" = "Only simulated populations record unrealized births."
       ),
-      call. = FALSE
+      "argument",
+      argument = "unrealized"
     )
   }
   alias <- observation_alias(population, by)
@@ -276,12 +280,14 @@ calculate_fertility_rates <- function(
     check_demographic_breaks(parity_breaks, "parity_breaks", ages = TRUE)
     finite <- parity_breaks[is.finite(parity_breaks)]
     if (parity_breaks[1] != 0 || any(finite != floor(finite))) {
-      stop(
-        paste0(
-          "`parity_breaks` must start at zero and contain ",
-          "integer boundaries or Inf."
+      abort_hammel(
+        c(
+          "{.arg parity_breaks} must start at 0 and use whole numbers.",
+          "x" = "It is {describe_value(parity_breaks)}.",
+          "i" = "The last boundary may be {.code Inf}."
         ),
-        call. = FALSE
+        "argument",
+        argument = "parity_breaks"
       )
     }
     if (is.finite(tail(parity_breaks, 1))) {
@@ -336,23 +342,19 @@ calculate_cohab_convert_rate <- function(
   by <- check_by(
     by, c("group_w", "group_h"), "calculate_cohab_convert_rate", alias$dims
   )
-  if (!inherits(population, "hammel_population")) {
-    stop(
-      "`population` must be a hammel_population with typed union histories.",
-      call. = FALSE
-    )
-  }
+  check_analysis_population(population)
   if (is.null(dur_breaks) == is.null(age_breaks)) {
-    stop("Supply exactly one of `dur_breaks` and `age_breaks`.", call. = FALSE)
+    abort_one_of_breaks()
   }
   check_population(population)
   if (!"union_type" %in% names(population$unions)) {
-    stop(
-      paste0(
-        "Conversion observation requires typed union ",
-        "histories with `union_type`."
+    abort_hammel(
+      c(
+        "Conversion rates need typed union histories.",
+        "i" = "The unions table has no {.field union_type} column."
       ),
-      call. = FALSE
+      "population",
+      argument = "population"
     )
   }
   check_demographic_breaks(time_breaks, "time_breaks")
@@ -365,13 +367,7 @@ calculate_cohab_convert_rate <- function(
   if (is.finite(tail(breaks, 1))) {
     breaks <- c(breaks, Inf)
   }
-  if (is.null(population$end_time) ||
-        tail(time_breaks, 1) > population$end_time) {
-    stop(
-      "Observation requires a known endpoint and cannot extend beyond it.",
-      call. = FALSE
-    )
-  }
+  check_observation_end(population, tail(time_breaks, 1))
   unions <- population$unions[population$unions$union_type == "cohab", ]
   wives <- match(unions$wife_id, population$persons$person_id)
   origins <- if (duration) {
@@ -440,17 +436,9 @@ calculate_dissolution_rates <- function(
   if (is.finite(tail(dur_breaks, 1))) {
     dur_breaks <- c(dur_breaks, Inf)
   }
-  if (!inherits(population, "hammel_population")) {
-    stop("`population` must be a hammel_population.", call. = FALSE)
-  }
+  check_analysis_population(population)
   check_population(population)
-  if (is.null(population$end_time) ||
-        tail(time_breaks, 1) > population$end_time) {
-    stop(
-      "Observation requires a known endpoint and cannot extend beyond it.",
-      call. = FALSE
-    )
-  }
+  check_observation_end(population, tail(time_breaks, 1))
   unions <- population$unions
   nt <- length(time_breaks) - 1L
   nd <- length(dur_breaks) - 1L
@@ -526,45 +514,53 @@ calculate_transition_rates <- function(
   group = NULL
 ) {
   validate_rate_conf_level(conf_level)
-  if (!inherits(population, "hammel_population")) {
-    stop("`population` must be a grouped hammel_population.", call. = FALSE)
-  }
+  check_analysis_population(population)
   check_population(population)
   if (!declared_group(population)) {
-    stop(
-      "`calculate_transition_rates()` requires a declared group dimension.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "Transition rates need a declared group dimension.",
+        "i" = "Declare one with {.fn set_groups}."
+      ),
+      "groups"
     )
   }
   dims <- names(population$groups)
   if (is.null(group)) {
     if (length(dims) != 1L) {
-      stop(
-        sprintf(
-          paste0(
-            "Name the dimension whose transitions are counted ",
-            "with `group`: one of %s."
-          ),
-          paste0("\"", dims, "\"", collapse = ", ")
+      abort_hammel(
+        c(
+          "{.arg group} must name the dimension whose transitions are counted.",
+          "x" = "The population declares several dimensions: {.val {dims}}."
         ),
-        call. = FALSE
+        "groups",
+        argument = "group"
       )
     }
     group <- dims
   }
   if (!is.character(group) || length(group) != 1L || !group %in% dims) {
-    stop("`group` must name one declared group dimension.", call. = FALSE)
+    abort_hammel(
+      c(
+        "{.arg group} must name one declared group dimension.",
+        "x" = "It is {describe_value(group)}.",
+        "i" = "Declared dimensions: {.val {dims}}."
+      ),
+      "groups",
+      argument = "group"
+    )
   }
   if (group %in% by) {
-    stop(
-      sprintf(
-        paste0(
-          "Transitions in `%s` are split by origin and ",
-          "destination, not by `%s` in `by`."
+    abort_hammel(
+      c(
+        paste(
+          "Transitions in {.field {group}} can't also be split by",
+          "{.val {group}}."
         ),
-        group, group
+        "i" = "They are already split by origin and destination."
       ),
-      call. = FALSE
+      "argument",
+      argument = "by"
     )
   }
   # Other dimensions in `by` combine with this one: the internal group is
@@ -588,7 +584,7 @@ calculate_transition_rates <- function(
   )
   check_detailed_previous_union(use_detailed_previous_union, by)
   if (is.null(age_breaks) == is.null(dur_breaks)) {
-    stop("Supply exactly one of `age_breaks` and `dur_breaks`.", call. = FALSE)
+    abort_one_of_breaks()
   }
   check_demographic_breaks(time_breaks, "time_breaks")
   duration <- !is.null(dur_breaks)
@@ -721,9 +717,9 @@ calculate_union_rates <- function(
 # Observed event rates and their rate-specific calculation helpers.
 
 # Shared validation of period and age breaks; a finite final age gains Inf.
-person_breaks <- function(time_breaks, age_breaks) {
-  check_demographic_breaks(time_breaks, "time_breaks")
-  check_demographic_breaks(age_breaks, "age_breaks", ages = TRUE)
+person_breaks <- function(time_breaks, age_breaks, call = rlang::caller_env()) {
+  check_demographic_breaks(time_breaks, "time_breaks", call = call)
+  check_demographic_breaks(age_breaks, "age_breaks", ages = TRUE, call = call)
   if (is.finite(tail(age_breaks, 1))) {
     age_breaks <- c(age_breaks, Inf)
   }
@@ -879,27 +875,36 @@ add_unrealized_births <- function(out, population, alias = list()) {
   out
 }
 
-check_demographic_breaks <- function(breaks, name, ages = FALSE) {
+check_demographic_breaks <- function(
+  breaks,
+  name,
+  ages = FALSE,
+  call = rlang::caller_env()
+) {
   if (!is.numeric(breaks) || !is.null(dim(breaks)) || length(breaks) < 2L ||
         anyNA(breaks) ||
         any(!is.finite(head(breaks, -1))) ||
         any(diff(breaks) <= 0) ||
         (!ages && !is.finite(tail(breaks, 1))) ||
         (ages && breaks[1] < 0)) {
-    stop(
-      sprintf(
-        "`%s` must be strictly increasing %sboundaries.", name,
-        if (ages) {
-          if (name == "dur_breaks") {
-            "nonnegative duration "
-          } else {
-            "nonnegative age "
-          }
-        } else {
-          "finite time "
+    kind <- if (!ages) {
+      "finite times"
+    } else if (name == "dur_breaks") {
+      "nonnegative durations"
+    } else {
+      "nonnegative ages"
+    }
+    abort_hammel(
+      c(
+        "{.arg {name}} must be at least two strictly increasing {kind}.",
+        "x" = "It is {describe_value(breaks)}.",
+        "i" = if (ages) {
+          "Only the last boundary may be {.code Inf}."
         }
       ),
-      call. = FALSE
+      "argument",
+      argument = name,
+      call = call
     )
   }
 }
@@ -914,16 +919,12 @@ calculate_entry_rates <- function(
   dur_breaks,
   marriage_measure,
   conf_level = NULL,
-  use_detailed_previous_union = TRUE
+  use_detailed_previous_union = TRUE,
+  call = rlang::caller_env()
 ) {
-  if (!inherits(population, "hammel_population")) {
-    stop(
-      "`population` must be a hammel_population with union histories.",
-      call. = FALSE
-    )
-  }
+  check_analysis_population(population, call = call)
   if (!is.null(dur_breaks)) {
-    check_demographic_breaks(dur_breaks, "dur_breaks", ages = TRUE)
+    check_demographic_breaks(dur_breaks, "dur_breaks", ages = TRUE, call = call)
     if (is.finite(tail(dur_breaks, 1))) {
       dur_breaks <- c(dur_breaks, Inf)
     }
@@ -931,12 +932,13 @@ calculate_entry_rates <- function(
       by <- c(by, "previous_union")
     }
   }
-  check_detailed_previous_union(use_detailed_previous_union, by)
-  age_breaks <- person_breaks(time_breaks, age_breaks)
+  check_detailed_previous_union(use_detailed_previous_union, by, call = call)
+  age_breaks <- person_breaks(time_breaks, age_breaks, call = call)
   entry_type <- "union_type" %in% by
   obs <- person_observation(
     population, by, tail(time_breaks, 1),
-    requires_typed = entry_type
+    requires_typed = entry_type,
+    call = call
   )
   # union_type here splits formations only; exposure is not split by it.
   state_by <- setdiff(by, "union_type")
@@ -1039,7 +1041,8 @@ calculate_entry_rates <- function(
   }
   add_rate_confidence(
     result, if (marriage_measure) "marriages" else "unions",
-    "person_years", conf_level
+    "person_years", conf_level,
+    call = call
   )
 }
 
@@ -1051,7 +1054,8 @@ prepare_union_group_observations <- function(
   mode,
   typed,
   identity_count,
-  group_count
+  group_count,
+  call = rlang::caller_env()
 ) {
   tx <- population$transitions
   combined <- population[[".hammel_combined"]]
@@ -1060,7 +1064,7 @@ prepare_union_group_observations <- function(
     return(unions)
   }
   persons <- prepare_group_observations(population$persons, population, TRUE)
-  identities <- observation_groups(persons, TRUE)
+  identities <- observation_groups(persons, TRUE, call = call)
   indices <- match(persons$group, identities) - 1L
   history <- union_group_history_cpp(
     persons, unions, indices, as.integer(mode),
@@ -1164,7 +1168,8 @@ union_strata <- function(
   unions,
   by,
   stride,
-  typed_split = "union_type" %in% by
+  typed_split = "union_type" %in% by,
+  call = rlang::caller_env()
 ) {
   wives <- "group_w" %in% by
   husbands <- "group_h" %in% by
@@ -1173,16 +1178,20 @@ union_strata <- function(
   w <- h <- rep(0L, nrow(unions))
   if (wives || husbands) {
     if (!declared_group(population)) {
-      stop(
-        paste0(
-          "Splitting by \"group_w\" or \"group_h\" requires a ",
-          "declared group dimension."
+      abort_hammel(
+        c(
+          paste(
+            "Splitting by the wife's or husband's group needs a declared",
+            "dimension."
+          ),
+          "i" = "Declare one with {.fn set_groups}."
         ),
-        call. = FALSE
+        "groups",
+        call = call
       )
     }
     persons <- prepare_group_observations(population$persons, population, TRUE)
-    identities <- observation_groups(persons, TRUE)
+    identities <- observation_groups(persons, TRUE, call = call)
     w <- match(
       persons$group[match(unions$wife_id, persons$person_id)],
       identities
@@ -1198,28 +1207,24 @@ union_strata <- function(
   types <- c("cohab", "marriage")
   if (typed_split) {
     if (!"union_type" %in% names(unions)) {
-      stop(
-        "Splitting by \"union_type\" requires a union `union_type` column.",
-        call. = FALSE
-      )
-    }
-    if (!is.character(unions$union_type) || !is.null(dim(unions$union_type)) ||
-          anyNA(unions$union_type) ||
-          any(!unions$union_type %in% types)) {
-      stop(
-        paste0(
-          "`union_type` must contain only cohab or marriage ",
-          "without missing values."
+      abort_hammel(
+        c(
+          "Splitting by {.val union_type} needs typed union histories.",
+          "i" = "The unions table has no {.field union_type} column."
         ),
-        call. = FALSE
+        "argument",
+        argument = "by",
+        call = call
       )
     }
+    check_labels(unions$union_type, "unions$union_type", types, call = call)
     index <- index + combos * (match(unions$union_type, types) - 1L)
   }
   if (wives || husbands) {
     unions <- prepare_union_group_observations(
       unions, population, mode,
-      typed_split, ng, combos
+      typed_split, ng, combos,
+      call = call
     )
   }
   dims <- lapply(
@@ -1268,26 +1273,34 @@ encode_combined <- function(alias, data, suffix = "") {
 }
 
 # Shared by public event-rate summaries, after their final aggregation.
-validate_rate_conf_level <- function(conf_level) {
+validate_rate_conf_level <- function(conf_level, call = rlang::caller_env()) {
   if (!is.null(conf_level) &&
         (!is.numeric(conf_level) || length(conf_level) != 1L ||
            !is.null(dim(conf_level)) ||
            !is.finite(conf_level) ||
            conf_level <= 0 ||
            conf_level >= 1)) {
-    stop(
-      paste0(
-        "`conf_level` must be NULL or a finite numeric ",
-        "scalar strictly between 0 and 1."
+    abort_hammel(
+      c(
+        "{.arg conf_level} must be {.code NULL} or a number between 0 and 1.",
+        "x" = "It is {describe_value(conf_level)}."
       ),
-      call. = FALSE
+      "argument",
+      argument = "conf_level",
+      call = call
     )
   }
   invisible(NULL)
 }
 
-add_rate_confidence <- function(table, events, exposure, conf_level) {
-  validate_rate_conf_level(conf_level)
+add_rate_confidence <- function(
+  table,
+  events,
+  exposure,
+  conf_level,
+  call = rlang::caller_env()
+) {
+  validate_rate_conf_level(conf_level, call = call)
   if (is.null(conf_level)) {
     return(table)
   }

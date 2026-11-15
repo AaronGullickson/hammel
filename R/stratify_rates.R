@@ -63,23 +63,32 @@
 stratify_rates <- function(rates, by) {
   if (!is.data.frame(rates) || !"rate" %in% names(rates) ||
         !is.numeric(rates$rate)) {
-    stop(
-      "`rates` must be a data frame with a numeric `rate` column.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        paste(
+          "{.arg rates} must be a data frame with a numeric {.field rate}",
+          "column."
+        ),
+        "x" = "It is {describe_value(rates)}."
+      ),
+      "table",
+      argument = "rates"
     )
   }
   validate_strata_factors(by)
   existing <- intersect(names(by), names(rates))
   if (length(existing)) {
-    stop(
-      sprintf(
-        paste0(
-          "`rates` already has column(s) %s; stratify a ",
-          "table without them, or stratify subsets and bind them."
-        ),
-        paste0("`", existing, "`", collapse = ", ")
+    abort_hammel(
+      c(
+        "{.arg rates} already has {.field {existing}} column{?s}.",
+        "i" = paste(
+          "Stratify a table without them, or stratify subsets separately and",
+          "bind the results."
+        )
       ),
-      call. = FALSE
+      "table",
+      argument = "rates",
+      columns = existing
     )
   }
   # One row per combination of categories, the first column varying slowest.
@@ -101,7 +110,14 @@ stratify_rates <- function(rates, by) {
   }
   out$rate <- out$rate * factor[combination]
   if (any(is.infinite(out$rate))) {
-    stop("Stratified rates must remain finite.", call. = FALSE)
+    abort_hammel(
+      c(
+        "Stratified rates must stay finite.",
+        "i" = "Some factors in {.arg by} are too large for these rates."
+      ),
+      "argument",
+      argument = "by"
+    )
   }
   rownames(out) <- NULL
   out <- tibble::as_tibble(out)
@@ -140,32 +156,46 @@ candidate_strata <- function(rates) {
   )
 }
 
-validate_strata_factors <- function(by) {
+validate_strata_factors <- function(by, call = rlang::caller_env()) {
   columns <- names(by)
   if (!is.list(by) || is.data.frame(by) || !length(by) || is.null(columns) ||
         anyNA(columns) ||
         any(!nzchar(trimws(columns))) ||
         anyDuplicated(columns)) {
-    stop(
-      "`by` must be a nonempty named list with unique column names.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "{.arg by} must be a nonempty list named by unique column names.",
+        "x" = "It is {describe_value(by)}.",
+        "i" = "For example, {.code list(race = c(A = 1, B = 1.2))}."
+      ),
+      "argument",
+      argument = "by",
+      call = call
     )
   }
   schema <- intersect(columns, rate_schema_columns)
   if (length(schema)) {
-    stop(
-      sprintf(
-        paste0(
-          "`by` cannot stratify by %s, which are band, rate or ",
-          "calendar columns."
-        ),
-        paste0("`", schema, "`", collapse = ", ")
+    abort_hammel(
+      c(
+        "{.arg by} can't stratify by {.field {schema}}.",
+        "i" = "Band, rate and calendar columns aren't strata."
       ),
-      call. = FALSE
+      "argument",
+      argument = "by",
+      call = call
     )
   }
   if (any(!grepl("^[A-Za-z][A-Za-z0-9_.]*$", columns))) {
-    stop("`by` names must be valid column names.", call. = FALSE)
+    bad <- columns[!grepl("^[A-Za-z][A-Za-z0-9_.]*$", columns)]
+    abort_hammel(
+      c(
+        "{.arg by} names must be valid column names.",
+        "x" = "Invalid: {.val {bad}}."
+      ),
+      "argument",
+      argument = "by",
+      call = call
+    )
   }
   for (col in columns) {
     x <- by[[col]]
@@ -177,15 +207,19 @@ validate_strata_factors <- function(by) {
           anyNA(labels) ||
           any(!nzchar(trimws(labels))) ||
           anyDuplicated(labels)) {
-      stop(
-        sprintf(
-          paste0(
-            "`by$%s` must be a named numeric vector of finite ",
-            "nonnegative factors with unique nonempty category names."
+      name <- paste0("by$", col)
+      abort_hammel(
+        c(
+          paste(
+            "{.field {name}} must be finite, nonnegative factors named by",
+            "unique categories."
           ),
-          col
+          "x" = "It is {describe_value(x)}.",
+          "i" = "For example, {.code c(A = 1, B = 1.2)}."
         ),
-        call. = FALSE
+        "argument",
+        argument = name,
+        call = call
       )
     }
   }
