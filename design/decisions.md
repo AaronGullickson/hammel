@@ -3723,12 +3723,16 @@ explicit `call` forwarding over finding the user's function from the call
 stack, and added an eighth tag, `population`, for invalid supplied histories
 that only the engine detects.
 
-**Unselected:** The wording of individual messages is settled as each file is
-converted. A new class or tag requires the user's agreement. Moving checks
+**Implementation:** Every R error and warning and every user-caused native
+message was converted under issue #25 on November 14 and 15, 2026; see the
+guide's migration record and [testing](testing.md).
+
+**Unselected:** A new class or tag requires the user's agreement. Moving checks
 from the native engine into R before a run starts would change behavior and
 requires the user's agreement case by case.
 
 **Consequences:** Condition class names and fields become public API. Tests
-migrate to class checks and snapshot tests as call sites are converted.
+check classes, fields and the named function, with snapshot tests for
+message layout.
 Native changes are limited to message tags and follow D175's verification
 policy.

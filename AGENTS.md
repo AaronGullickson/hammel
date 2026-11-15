@@ -88,6 +88,21 @@ be made autonomously; record choices with substantial architectural consequences
   `stats::poisson.test(conf.level = conf_level)`. Follow tidyverse function-writing
   conventions subject to the explicit project naming and section-heading rules;
   see the source organization guide for the current style review.
+- Raise every error and warning with `abort_hammel(message, kind, ...)` and
+  `warn_hammel(message, kind, ...)` from `R/errors.R`, never `stop()`,
+  `warning()`, `cli_abort()` or `cli_warn()` directly; follow
+  [the error-message guide](design/error-messages.md) (D183). Write the
+  message as cli text: a header stating the problem, `"x"` bullets with the
+  offending values and `"i"` bullets with the fix. Choose `kind` from
+  `error_kinds`/`warning_kinds`; a new kind, or a new native message tag,
+  needs the user's agreement. Internal helpers that can raise take
+  `call = rlang::caller_env()` and forward it, so errors name the exported
+  function the user called; use `abort_internal()` for failures that only a
+  bug can cause. Prefer the shared checks in `R/checks.R`. Wrap package calls
+  to native entry points in `call_native()`, and give user-caused C++
+  messages a `[tag]` from `native_tags`. Test with
+  `expect_hammel_error(expr, kind, fn)` and the condition's fields rather
+  than message text.
 - Return all public tables as tibbles, including empty tables, population histories,
   process schedules, and demographic summaries. Accept base data frames as inputs.
 - Keep model construction separate from simulation execution. Aim for composable R workflows and R-native, inspectable results at the user-facing boundary. This does not require an R-only implementation: performance-critical computation and internal state may use compiled code, such as C++, with results exposed as ordinary R objects for inspection and analysis.

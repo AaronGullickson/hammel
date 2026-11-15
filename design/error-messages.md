@@ -1,9 +1,9 @@
 # Error and warning messages
 
 Status: style, architecture, condition classes and native message tags
-selected by the user on November 14, 2026 (D183); migration in progress under
-issue #25. Until the migration finishes, unconverted call sites still use base
-`stop()` and `warning()` with `call. = FALSE`.
+selected by the user on November 14 and 15, 2026 (D183), and implemented
+under issue #25 on November 14 and 15. Every error and warning Hammel raises,
+in R and from the native engine, follows this guide.
 
 This guide covers every error and warning Hammel raises, in R and from the
 native engine. Most are input validation errors, but the same rules apply to
@@ -112,15 +112,21 @@ fields should not change without a decision entry.
 | Class | Raised when | Typical fields |
 | --- | --- | --- |
 | `hammel_error_argument` | A scalar argument or option has the wrong type, length or value | `argument` |
-| `hammel_error_table` | A data-frame input is not a data frame, lacks or duplicates columns, or has invalid column values | `argument`, `columns` |
-| `hammel_error_rates` | A rate or probability schedule has invalid bands, strata, overlaps or gaps within a period | `argument` |
-| `hammel_error_coverage` | A rate or model schedule does not cover the requested simulation time | `argument`, `time` |
-| `hammel_error_groups` | Group declarations, dimensions or categories are missing, unknown or inconsistent | `group`, `categories` |
-| `hammel_error_population` | Person, union, transition or ancestry histories are invalid or inconsistent | `table` |
-| `hammel_error_specification` | A model or component model (matching, weight, inheritance) is incomplete or inconsistent | `argument` |
-| `hammel_error_database` | An HMD/HFD request fails: credentials, network, or unavailable data | `database` |
-| `hammel_error_runtime` | A user-supplied input fails during a simulation, such as a custom function returning invalid values | `process` |
-| `hammel_error_internal` | An internal consistency check fails; this indicates a bug in Hammel | none |
+| `hammel_error_table` | A data-frame input is not a data frame, lacks or duplicates columns, or has invalid column values | `argument`, `columns`, `rows` |
+| `hammel_error_rates` | A rate or probability schedule has invalid bands, strata, overlaps or gaps within a period | `argument`, `columns`, `rows` |
+| `hammel_error_coverage` | A rate or model schedule does not cover the requested simulation time or ages | `argument`, `time` |
+| `hammel_error_groups` | Group declarations, dimensions or categories are missing, unknown or inconsistent | `group`, `categories`, `columns` |
+| `hammel_error_population` | Person, union, transition or ancestry histories are invalid or inconsistent | `argument`, `rows`, `tag` |
+| `hammel_error_specification` | A model or component model (matching, weight, inheritance) is incomplete or inconsistent | `argument`, `variables`, `missing` |
+| `hammel_error_database` | An HMD/HFD request fails: credentials, network, unavailable data or an unexpected download | `database`, `columns` |
+| `hammel_error_runtime` | A user-supplied input fails during a simulation or calculation, such as a custom function returning invalid values | `process`, `tag`, `categories` |
+| `hammel_error_internal` | An internal consistency check fails; this indicates a bug in Hammel | `tag` when native |
+
+`argument` names the argument or column the error is about, as `rates` or
+`rates$age_end`. `rows` are row numbers in the user's table. `tag` is the
+native message tag for errors raised by the engine. Errors whose cause is
+another error (a failed download, or a user's custom function failing) keep
+it as `parent`.
 
 **Warning classes:**
 
@@ -149,12 +155,17 @@ user on November 14, 2026 (D183):
 - `warn_hammel(message, kind, ...)` does the same for warnings with
   `cli::cli_warn()`. Warnings do not name a calling function.
 - `call_native(expr, call)` wraps every user-facing native call and
-  translates its errors and warnings (below).
+  translates its errors and warnings (below). A new native entry point that
+  package code calls must be wrapped where R calls it; the generated
+  `R/RcppExports.R` is left untouched. The `inspect_*_cpp()` entry points,
+  used only by tests, are not wrapped.
+- `abort_internal()` raises an internal error with the bug-report link, and
+  `with_error_context()` adds an `ℹ` bullet naming where a problem was found.
 
 The general checks in `R/checks.R` (`check_columns()`, `check_numeric_column()`,
 `check_time()`) and domain `check_*`/`validate_*` helpers call these helpers,
 so every caller gets the same class and wording. Call sites do not call
-`stop()`, `warning()`, `cli_abort()` or `cli_warn()` directly once converted.
+`stop()`, `warning()`, `cli_abort()` or `cli_warn()` directly.
 
 ## Native engine messages
 
@@ -206,6 +217,8 @@ results must be identical before and after with `-ffp-contract=off`.
 
 - Check the class and, where relevant, a field, rather than message text:
   `expect_error(mortality(rates), class = "hammel_error_table")`.
+- Check that an error names the right function with
+  `expect_hammel_error(expr, kind, fn)` from `tests/testthat/helper-errors.R`.
 - Check how messages look with `expect_snapshot(error = TRUE)` for a
   representative message of each class. Snapshot changes are reviewed like
   code.
@@ -214,28 +227,28 @@ results must be identical before and after with `-ffp-contract=off`.
 
 ## Examples
 
-Current messages and their proposed replacements.
+Messages as the package prints them, with the earlier wording.
 
 **Missing columns** (`check_columns()`):
 
 ```
-Before: `rates` is missing columns: age_end, rate.
+Before: `rates` is missing columns: age_end.
 
 After:  Error in `set_mortality()`:
         ! `rates` is missing required columns.
-        ✖ Missing: `age_end` and `rate`.
+        ✖ Missing: age_end.
 ```
 
 **Calendar coverage** (`check_calendar_coverage()`):
 
 ```
-Before: mortality rates have a calendar coverage gap at time 2010.
+Before: mortality rates have a calendar coverage gap at time 2001.
 
 After:  Error in `run_simulation()`:
-        ! Mortality rates don't cover the whole simulation.
-        ✖ No rates apply at time 2010.
-        ℹ The run covers 2000 to 2030. Add rate rows with `time_start` and
-          `time_end` covering 2010, or shorten `years`.
+        ! Mortality rates must cover the whole simulation.
+        ✖ Nothing applies at time 2001.
+        ℹ The simulation runs from 2000 to 2005. Extend the time_start and
+          time_end intervals to cover 2001, or shorten `years`.
 ```
 
 **Setting that requires another setting** (`union_formation()`):
@@ -244,21 +257,20 @@ After:  Error in `run_simulation()`:
 Before: Search `weights` require rate-based union formation.
 
 After:  Error in `set_union_formation()`:
-        ! `weights` can only be used with rate-based union formation.
+        ! Search `weights` need rate-based union formation.
         ✖ `initiation` is "on_demand".
         ℹ Use `initiation = "rate"` with search `rates`, or remove `weights`.
 ```
 
-**Custom weight function during a run** (native):
+**Custom weight function during a run** (native, tagged):
 
 ```
 Before: A custom fertility weight function returned 3 values for 5 members.
 
 After:  Error in `run_simulation()`:
-        ! A custom fertility weight function returned the wrong number of
-          values.
-        ✖ It returned 3 values for a cell with 5 members.
-        ℹ The function must return one log weight per row of `members`.
+        ! A custom fertility weight function returned 3 values for 5 members.
+        ℹ A custom weight function must return one finite log weight per row
+          of `members`.
 ```
 
 **Internal failure** (native, untagged):
@@ -272,18 +284,13 @@ After:  Error in `run_simulation()`:
           <https://github.com/AaronGullickson/hammel/issues>.
 ```
 
-The suggested fixes above are drafts; the wording of each message is settled
-as its file is converted.
+## Migration record
 
-## Migration plan
+The conversion was done in reviewable batches under issue #25, each with its
+tests: the helpers and `rlang` import; the general checks; process
+constructors and rate utilities; population and groups; matching and
+simulation setup; analysis and database import; and native messages, verified
+per D175 (see [testing](testing.md)).
 
-1. Add `rlang` to `Imports`, the helper script, and tests for the helpers.
-2. Convert the general checks in `R/checks.R` and add `call` passing.
-3. Convert the remaining call sites in reviewable batches, updating tests in
-   the same change: process constructors and rate utilities; population and
-   groups; matching; analysis (`calculate_*`); database import.
-4. Translate native messages: add tags, the wrapper and the internal-error
-   fallback, verified per D175. Done November 15, 2026; see
-   [testing](testing.md).
-5. Update the R source organization guide and the decision log when the
-   migration is complete.
+Known limitation: `calculate_tfr()` passes parity-specific tables to the
+exported `calculate_patfr()`, so their errors name `calculate_patfr()`.

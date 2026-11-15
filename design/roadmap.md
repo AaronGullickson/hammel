@@ -25,7 +25,7 @@ or an unselected public API.
 | 9 | More than one group column, potentially including regions and internal migration | Complete November 6, 2026 (D141); documented limitations retained |
 | Post-release | Immigration from outside the system, tracking generation (formerly 10) | Deferred until after first public release (D136) |
 | Release preparation | First version bump and public release after milestone 9 | User-selected next focus (D136); version number and release criteria unselected |
-| In progress | Diagnostic bullets and condition classes for errors and warnings | D183 (issue #25), superseding D151's deferral; summaries added in PR #34 |
+| Implemented, pending review | Diagnostic bullets and condition classes for errors and warnings | D183 (issue #25), superseding D151's deferral; summaries added in PR #34 |
 | Unassigned | Model diagnostic checks and post-simulation helpers (formerly 11) | Proposed; scope and timing to select during release planning |
 | Post-release | Two-sex marriage model (formerly 12) | Deferred until after first public release (D136); model and API unselected |
 
