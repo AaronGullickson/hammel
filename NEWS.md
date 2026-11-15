@@ -1,5 +1,6 @@
 # hammel (development version)
 
+- Update warning/error reporting with more detail on the source of the warning/error and information for correction (#16)
 - Add summary and print methods for all hammel custom objects. (#23)
 - Add optional progress bar to `run_simulation()` with `progress = TRUE`. Defaults to FALSE. (#31)
 
