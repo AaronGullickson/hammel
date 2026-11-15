@@ -102,7 +102,11 @@ test_that("on-demand input and edited process errors are explicit", {
   model$population$persons$sex[3] <- "f"
   model$population$unions <- tibble::tibble(union_id = 1, wife_id = 1,
     husband_id = 3, start_time = -1, end_time = NA_real_, end_reason = NA_character_)
-  expect_error(run_simulation(model, 1), "wife_id.*female")
+  expect_error(
+    run_simulation(model, 1),
+    "wife_id must refer to a woman",
+    class = "hammel_error_population"
+  )
   model$population$persons$sex[3] <- "m"
   model$population$unions <- rbind(model$population$unions,
     transform(model$population$unions, union_id = 2, husband_id = 2))
@@ -112,8 +116,16 @@ test_that("on-demand input and edited process errors are explicit", {
 test_that("simulations require an explicit union process even for zero duration", {
   model <- make_on_demand_model()
   model$processes$union_formation <- NULL
-  expect_error(run_simulation(model, 1), "union-formation process")
-  expect_error(run_simulation(model, 0), "union-formation process")
+  expect_error(
+    run_simulation(model, 1),
+    "union formation process",
+    class = "hammel_error_specification"
+  )
+  expect_error(
+    run_simulation(model, 0),
+    "union formation process",
+    class = "hammel_error_specification"
+  )
 })
 
 test_that("union death reasons identify the wife or husband for input and new unions", {

@@ -74,7 +74,7 @@ class MalePool {
     const long long last =
       static_cast<long long>(std::floor(max_birth / width));
     if (last - first_ + 1 > 50000000LL / groups) {
-      stop("Male pool birth-time range is too large.");
+      stop("[limits] Male pool birth-time range is too large.");
     }
     bins_ = static_cast<int>(last - first_ + 1);
     cells_.assign(static_cast<size_t>(groups) * bins_, std::vector<int>());
@@ -164,7 +164,9 @@ struct DrawModel {
       for (R_xlen_t j = 0; j < gaps.size(); ++j) {
         out[j] = native_value(gaps[j]) + offset(f, m);
         if (!R_finite(out[j])) {
-          stop("Matching ages and utilities must be finite.");
+          stop(
+            "[matching_utility] Matching ages and utilities must be finite."
+          );
         }
       }
       return out;
@@ -181,7 +183,7 @@ struct DrawModel {
     }
     const double value = native_value(gap) + offset(f, m);
     if (!R_finite(value)) {
-      stop("Matching ages and utilities must be finite.");
+      stop("[matching_utility] Matching ages and utilities must be finite.");
     }
     return value;
   }

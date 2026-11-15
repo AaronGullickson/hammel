@@ -44,13 +44,14 @@ test_that("single search tables permit one clock per previous category", {
   extra$dur_start <- extra$dur_end <- NA
   extra$age_start <- 50
   extra$age_end <- Inf
-  expect_error(union_formation("rate", rates = rbind(mixed, extra)), "same.*clock")
+  expect_error(union_formation("rate", rates = rbind(mixed, extra)), "one clock", class = "hammel_error_rates")
   group_a <- transform(rates, group = "A")
   group_b <- transform(mixed, group = "B")
-  expect_error(union_formation("rate", rates = rbind(group_a, group_b)), "same.*clock")
+  expect_error(union_formation("rate", rates = rbind(group_a, group_b)), "one clock", class = "hammel_error_rates")
   bad <- rates
   bad$previous_union <- NULL
-  expect_error(union_formation("rate", rates = bad), "require.*previous_union")
+  expect_error(union_formation("rate", rates = bad), "previous_union",
+    class = "hammel_error_rates")
   for (value in c(-1, Inf, NaN)) {
     bad <- rates
     bad$dur_start[2] <- value

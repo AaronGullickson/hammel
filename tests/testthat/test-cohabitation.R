@@ -28,18 +28,26 @@ test_that("cohabitation validates probability, conversion, type coverage and rat
   }
   bad <- model
   bad$processes$union_formation$cohab_prob$rate <- .1
-  expect_error(run_simulation(bad, 0), "not.*rate")
+  expect_error(run_simulation(bad, 0), "rate columns", class = "hammel_error_rates")
   expect_error(set_union_formation(model, "rate", rates = model$processes$union_formation$rates,
-    cohab_matching = age_gap_matching_model(0,5)), "require.*cohab_prob")
+    cohab_matching = age_gap_matching_model(0,5)), "cohab_matching", class = "hammel_error_specification")
   bad <- model
   bad$processes$union_formation$union_convert_rate$previous_union <- "none"
-  expect_error(run_simulation(bad, 0),
-    "Conversion rates cannot be stratified by `previous_union`")
-  expect_error(fertility(data.frame(age_start=15,age_end=50,rate=.1,union_status="partnered")), "replaced")
+  error <- expect_error(run_simulation(bad, 0), class = "hammel_error_rates")
+  expect_identical(error$columns, "previous_union")
+  expect_error(
+    fertility(data.frame(age_start=15,age_end=50,rate=.1,union_status="partnered")),
+    "renamed",
+    class = "hammel_error_rates"
+  )
   expect_error(fertility(data.frame(age_start=15,age_end=50,rate=.1,union_type=c("unpartnered","cohab"))), "union_type")
-  expect_error(union_dissolution(data.frame(dur_start=0,dur_end=Inf,rate=.1,union_type="cohab")), "both cohab and marriage")
-  expect_warning(run_simulation(cohab_fixture(conversion=NULL), .1, 42),
-    "no conversions")
+  expect_error(union_dissolution(data.frame(dur_start=0,dur_end=Inf,rate=.1,union_type="cohab")), "cohab.*marriage",
+    class = "hammel_error_rates")
+  expect_warning(
+    run_simulation(cohab_fixture(conversion = NULL), .1, 42),
+    "No cohabitations will convert",
+    class = "hammel_warning_no_effect"
+  )
 })
 
 test_that("probability extremes and gaps assign entry types without simultaneous partners", {
@@ -192,7 +200,7 @@ test_that("cohab probabilities select group and previous category and require co
   expect_true(all(u$union_type[u$group_w=="A"]=="marriage"))
   bad <- model
   bad$processes$union_formation$cohab_prob <- p[-1,]
-  expect_error(run_simulation(bad,0),"all three")
+  expect_error(run_simulation(bad,0),"pooled or detailed", class = "hammel_error_rates")
 })
 
 test_that("conversion age clocks and pending birth ties retain the conversion", {

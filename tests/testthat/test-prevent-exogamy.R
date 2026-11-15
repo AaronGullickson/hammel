@@ -41,7 +41,7 @@ test_that("prohibitions are symmetric and validated with pair effects", {
     expect_error(age_gap_matching_model(0, 5, group_exogamy = bad))
   expect_error(age_gap_matching_model(0, 5, group_exogamy = c("A:A" = NA)), "within a category")
   expect_error(age_gap_matching_model(0, 5, group_exogamy = c("A:B" = NA, "B:A" = -1)),
-               "Conflicting")
+               "both an effect", class = "hammel_error_specification")
   # The argument is gone.
   expect_error(age_gap_matching_model(0, 5, prevent_exogamy = TRUE), "unused argument")
   model$processes$union_formation$matching$group_exogamy <- "x"
@@ -94,8 +94,11 @@ test_that("rate searches retry and father overrides carry independent restrictio
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 2))
   model$processes$union_formation$father_matching <- age_gap_matching_model(0, 5,
     group_exogamy = c("A:B" = 1000))
-  expect_warning(result <- run_simulation(model, .3, seed = 52),
-    "could not meet male-group targets")
+  expect_warning(
+    result <- run_simulation(model, .3, seed = 52),
+    "couldn't meet male-group targets",
+    class = "hammel_warning_simulation"
+  )
   expect_true(all(result$persons$father_id[result$persons$birth_time >= 0] == 3))
   model$processes$union_formation$rates$rate <- 100
   # The union may form before any unpartnered birth needs a father, so the

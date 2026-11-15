@@ -5,49 +5,79 @@
 # Public arguments retain direct model objects or ordinary inspectable tibbles.
 is_model_schedule <- function(x) is.data.frame(x)
 
-validate_model_argument <- function(x, validate, name) {
+validate_model_argument <- function(
+  x,
+  validate,
+  name,
+  call = rlang::caller_env()
+) {
   if (!is_model_schedule(x)) {
-    return(validate(x))
+    return(validate(x, call = call))
   }
-  check_columns(x, c("time_start", "time_end", "model"), name)
-  check_numeric_column(x$time_start, paste0(name, "$time_start"))
-  ends <- x$time_end
-  if (!nrow(x) || !is.numeric(ends) || !is.null(dim(ends)) || anyNA(ends) ||
-        any(ends <= x$time_start)) {
-    stop(
-      sprintf(
-        "%s schedule needs finite starts and greater ends (possibly Inf).", name
+  check_columns(x, c("time_start", "time_end", "model"), name, call = call)
+  if (!nrow(x)) {
+    abort_hammel(
+      c(
+        "The {.arg {name}} schedule must contain at least one model.",
+        "x" = "It has no rows."
       ),
-      call. = FALSE
+      "specification",
+      argument = name,
+      call = call
     )
   }
-  rows <- order(x$time_start)
-  if (length(rows) > 1L &&
-        any(tail(x$time_start[rows], -1L) < head(cummax(ends[rows]), -1L))) {
-    stop(sprintf("%s model intervals must not overlap.", name), call. = FALSE)
-  }
+  check_bands(
+    x, "time", name,
+    minimum = -Inf,
+    kind = "specification",
+    call = call
+  )
+  check_band_overlap(
+    x, seq_len(nrow(x)), "time", name,
+    kind = "specification",
+    call = call
+  )
   if (!is.list(x$model) || !is.null(dim(x$model))) {
-    stop(
-      sprintf("%s$model must be a list column of complete models.", name),
-      call. = FALSE
+    abort_hammel(
+      c(
+        "Column {.field model} of {.arg {name}} must be a list of models.",
+        "x" = "It is {describe_value(x$model)}."
+      ),
+      "specification",
+      argument = name,
+      call = call
     )
   }
   for (i in seq_len(nrow(x))) {
     model <- x$model[[i]]
     if (is.null(model) || is_model_schedule(model) || is.character(model)) {
-      stop(
-        sprintf(
-          "%s$model[[%d]] must contain a complete model object.", name, i
+      abort_hammel(
+        c(
+          "Each row of {.arg {name}} must contain a complete model object.",
+          "x" = "Row {i} contains {describe_value(model)}."
         ),
-        call. = FALSE
+        "specification",
+        argument = name,
+        rows = i,
+        call = call
       )
     }
     tryCatch(
-      validate(model),
+      with_error_context(
+        validate(model, call = call),
+        paste0("In row ", i, " of the ", name, " schedule.")
+      ),
       error = function(e) {
-        stop(
-          sprintf("%s$model[[%d]]: %s", name, i, conditionMessage(e)),
-          call. = FALSE
+        if (inherits(e, "hammel_error")) {
+          stop(e)
+        }
+        abort_hammel(
+          "Row {i} of {.arg {name}} contains an invalid model.",
+          "specification",
+          argument = name,
+          rows = i,
+          parent = e,
+          call = call
         )
       }
     )
@@ -69,18 +99,25 @@ model_at <- function(x, time) {
   }
   i <- which(x$time_start <= time & time < x$time_end)
   if (length(i) != 1L) {
-    stop("No unique active model in schedule.", call. = FALSE)
+    abort_internal("No unique active model in a schedule at time {time}.")
   }
   x$model[[i]]
 }
 
-check_model_coverage <- function(x, start, end, name) {
+check_model_coverage <- function(
+  x,
+  start,
+  end,
+  name,
+  call = rlang::caller_env()
+) {
   if (!is_model_schedule(x)) {
     return(invisible(NULL))
   }
   check_time_coverage(
     x$time_start, x$time_end, start, end,
-    sprintf("%s model schedule has a coverage gap", name)
+    paste("The", name, "model schedule"),
+    call = call
   )
 }
 
@@ -106,14 +143,16 @@ prepare_model_schedules <- function(
   registries,
   components,
   start,
-  end
+  end,
+  call = rlang::caller_env()
 ) {
   matching_bank <- collect_model_bank(
     arguments[c("matching", "father_matching", "cohab_matching")]
   )
   prepared_matching <- lapply(
     matching_bank, prepare_matching_model,
-    population_groups = values
+    population_groups = values,
+    call = call
   )
   times <- start
   for (x in c(arguments, inheritance)) {
@@ -151,7 +190,8 @@ prepare_model_schedules <- function(
         bank,
         prepare_group_inheritance,
         values = registries[[d]],
-        components = components[[d]]
+        components = components[[d]],
+        call = call
       )
     )
     routes[[d]] <- vapply(

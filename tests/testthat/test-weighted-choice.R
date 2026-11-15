@@ -297,7 +297,7 @@ test_that("weighted choice warns once when weights must be approximated", {
       warnings <<- c(warnings, conditionMessage(w))
       invokeRestart("muffleWarning")
     })
-  expect_length(grep("could not meet male-group targets", warnings), 1)
+  expect_length(grep("couldn't meet male-group targets", warnings), 1)
 })
 
 test_that("removed method arguments are rejected and delta inputs validated", {

@@ -117,7 +117,7 @@ model_summary_lines <- function(x) {
   if (inherits(x, "summary.hammel_group_inheritance")) {
     return(inheritance_summary_lines(x))
   }
-  stop("Unsupported model summary.", call. = FALSE)
+  abort_internal("Unsupported model summary.")
 }
 
 # Format named numbers as "name = value", with optional parenthetical notes.

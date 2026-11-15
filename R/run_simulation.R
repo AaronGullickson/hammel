@@ -49,22 +49,44 @@
 #'   )
 #' result <- run_simulation(model, years = 50, seed = 42)
 run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
+  # Errors raised by helpers called from local functions name this function.
+  run_call <- rlang::current_env()
   check_model(model)
   if (!is.logical(progress) || length(progress) != 1L || is.na(progress)) {
-    stop("`progress` must be TRUE or FALSE.", call. = FALSE)
-  }
-  if (length(missing_model_elements(model))) {
-    stop(
-      paste0(
-        "The model needs a population, mortality, ",
-        "fertility, and union-formation process."
+    abort_hammel(
+      c(
+        "{.arg progress} must be {.code TRUE} or {.code FALSE}.",
+        "x" = "It is {describe_value(progress)}."
       ),
-      call. = FALSE
+      "argument",
+      argument = "progress"
+    )
+  }
+  missing_elements <- missing_model_elements(model)
+  if (length(missing_elements)) {
+    needed <- vapply(
+      missing_elements,
+      function(element) {
+        cli::format_inline(required_model_elements[[element]])
+      },
+      character(1)
+    )
+    abort_hammel(
+      c(
+        "The model can't be simulated yet.",
+        stats::setNames(
+          paste0("Missing: ", needed, "."),
+          rep("x", length(needed))
+        ),
+        "i" = "See {.code summary(model)} for the model's current contents."
+      ),
+      "specification",
+      missing = missing_elements
     )
   }
   population <- model$population
   population <- apply_group_declaration(population, model_groups(model))
-  validate_population(population)
+  check_population(population)
   population <- normalize_population_transitions(population)
   population <- normalize_population_ancestry(population)
   declaration <- population$groups
@@ -86,14 +108,33 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   }
   start <- population$end_time
   if (is.null(start)) {
-    stop("The population needs a finite `end_time`.", call. = FALSE)
+    abort_hammel(
+      "The population needs a finite {.field end_time}.",
+      "population",
+      argument = "population"
+    )
   }
   if (!is.numeric(years) || length(years) != 1L || !is.finite(years) ||
         years < 0) {
-    stop("`years` must be finite and nonnegative.", call. = FALSE)
+    abort_hammel(
+      c(
+        "{.arg years} must be a single nonnegative number.",
+        "x" = "It is {describe_value(years)}."
+      ),
+      "argument",
+      argument = "years"
+    )
   }
   if (!is.finite(start + years) || (years > 0 && start + years == start)) {
-    stop("Simulation times cannot be represented at this scale.", call. = FALSE)
+    abort_hammel(
+      c(
+        "The simulation's times can't be represented at this scale.",
+        "x" = "The run starts at {start} and lasts {years} years.",
+        "i" = "Use calendar times and durations of ordinary size."
+      ),
+      "argument",
+      argument = "years"
+    )
   }
   # Recheck edited specifications, without introducing a model diagnostic API.
   attach_process(model, model$processes$mortality)
@@ -106,28 +147,59 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   if (!is.null(hetfert)) {
     validate_fertility_weights(population$persons)
   }
-  for (death_slice in calendar_rate_slices(death_rates, start, start + years)) {
+  death_segments <- calendar_rate_segments(death_rates, start, start + years)
+  for (segment in death_segments) {
+    death_slice <- segment$rates
     if (!nrow(death_slice)) {
       next
     }
-    for (rows in split_rate_groups(
-      death_slice, c(dimensions, "group", undeclared)
-    )) {
+    strata <- intersect(c(dimensions, "group", undeclared), names(death_slice))
+    for (rows in split_rate_groups(death_slice, strata)) {
       for (sex in c("m", "f")) {
         schedule <- death_slice[rows, , drop = FALSE]
         schedule <- schedule[schedule$sex == sex, , drop = FALSE]
         schedule <- schedule[order(schedule$age_start), , drop = FALSE]
-        if (schedule$age_start[1] != 0 || tail(schedule$age_end, 1) != Inf ||
+        if (!nrow(schedule) || schedule$age_start[1] != 0 ||
+              tail(schedule$age_end, 1) != Inf ||
               (nrow(schedule) > 1L &&
                  any(
                    head(schedule$age_end, -1) != tail(schedule$age_start, -1)
                  ))) {
-          stop(
-            paste0(
-              "Mortality schedules must cover [0, Inf) without ",
-              "gaps for each sex and group."
+          values <- vapply(
+            strata,
+            function(column) {
+              as.character(death_slice[[column]][rows[1]])
+            },
+            character(1)
+          )
+          for_schedule <- paste0(
+            'sex "', sex, '"',
+            if (length(strata)) {
+              paste0(", ", paste(strata, "=", values, collapse = ", "))
+            }
+          )
+          bands <- format_band(schedule$age_start, schedule$age_end)
+          abort_hammel(
+            c(
+              "Mortality rates must cover every age from 0 to {.code Inf}.",
+              "x" = if (length(bands)) {
+                "The bands for {for_schedule} are {bands}."
+              } else {
+                "There are no rates for {for_schedule}."
+              },
+              "i" = if (is.finite(segment$start) || is.finite(segment$end)) {
+                paste0(
+                  "In calendar period ",
+                  format_band(segment$start, segment$end), "."
+                )
+              },
+              "i" = paste(
+                "Every person needs a death rate, so bands can't leave",
+                "gaps."
+              )
             ),
-            call. = FALSE
+            "coverage",
+            argument = "rates"
           )
         }
       }
@@ -143,7 +215,20 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
              "group_transition"
            )
       )) {
-    stop("Unsupported demographic process for this engine.", call. = FALSE)
+    unsupported <- setdiff(
+      names(model$processes),
+      c(
+        "mortality", "fertility", "union_formation", "union_dissolution",
+        "group_transition"
+      )
+    )
+    abort_hammel(
+      c(
+        "The model contains processes Hammel can't simulate.",
+        "x" = "Unsupported: {.val {unsupported}}."
+      ),
+      "specification"
+    )
   }
   # One transition process per dimension, in declaration order.
   transition_list <- resolve_transition_processes(
@@ -182,15 +267,22 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
       }
     )
     if (length(bad)) {
-      stop(
-        sprintf(
-          paste0(
-            "The %s rates use %s, which is not a declared ",
-            "group dimension; declare it with set_groups()."
+      bad <- unique(bad)
+      table <- name
+      abort_hammel(
+        c(
+          paste(
+            "The {table} rates use {.field {bad}}, which {?isn't/aren't}",
+            "declared."
           ),
-          name, paste0("`", unique(bad), "`", collapse = ", ")
+          "i" = paste(
+            "Rate tables can be stratified only by declared group",
+            "dimensions. Declare it with {.fn set_groups}, or remove the",
+            "column."
+          )
         ),
-        call. = FALSE
+        "groups",
+        group = bad
       )
     }
   }
@@ -201,12 +293,16 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   counts_cohab <- isTRUE(union_process$cohab_as_previous_union)
   if (!cohab_enabled && "union_type" %in% names(population$unions) &&
         any(population$unions$union_type == "cohab")) {
-    stop(
-      paste0(
-        "A cohabitation history requires cohab_prob to ",
-        "continue with union types enabled."
+    abort_hammel(
+      c(
+        "The population has cohabitations, but cohabitation isn't enabled.",
+        "i" = paste(
+          "Enable cohabitation with {.arg cohab_prob} in",
+          "{.fn set_union_formation}."
+        )
       ),
-      call. = FALSE
+      "specification",
+      argument = "cohab_prob"
     )
   }
   if (!cohab_enabled &&
@@ -214,35 +310,52 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
             any(birth_rates$union_type %in% c("cohab", "marriage"))) ||
            (!is.null(dissolution_process) &&
               "union_type" %in% names(dissolution_process$rates)))) {
-    stop(
-      "Type-specific fertility/dissolution requires cohab_prob.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        paste(
+          "Fertility or dissolution rates by {.val cohab} and {.val marriage}",
+          "need cohabitation to be enabled."
+        ),
+        "i" = paste(
+          "Enable cohabitation with {.arg cohab_prob} in",
+          "{.fn set_union_formation}."
+        )
+      ),
+      "specification",
+      argument = "cohab_prob"
     )
   }
   status_fertility <- "union_type" %in% names(birth_rates)
   if (union_process$initiation == "on_demand" && status_fertility) {
-    stop(
-      paste0(
-        "On-demand union formation requires an overall ",
-        "fertility schedule without `union_type`."
+    abort_hammel(
+      c(
+        paste(
+          "On-demand union formation needs fertility rates without",
+          "{.field union_type}."
+        ),
+        "i" = paste(
+          "On-demand searches start at a birth, so fertility can't depend on",
+          "union status. Use {.code initiation = \"rate\"} for",
+          "union-specific fertility."
+        )
       ),
-      call. = FALSE
+      "specification",
+      argument = "rates"
     )
   }
   if (union_process$initiation == "rate" && !status_fertility) {
-    warning(
-      paste(
-        paste0(
-          "Rate-based union formation is using an overall ",
-          "fertility schedule for both"
+    warn_hammel(
+      c(
+        paste(
+          "Rate-based union formation is using one fertility schedule for",
+          "partnered and unpartnered women."
         ),
-        paste0(
-          "partnered and unpartnered women. To make ",
-          "fertility depend on union status,"
-        ),
-        "supply separate schedules using `union_type`."
+        "i" = paste(
+          "To make fertility depend on union status, give separate schedules",
+          "with a {.field union_type} column."
+        )
       ),
-      call. = FALSE
+      "no_effect"
     )
   }
   # Group dimensions (D134): each has its categories (registry), inheritance
@@ -287,12 +400,16 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
               logical(1)
             )
           )) {
-      stop(
-        paste0(
-          "The \"ancestry\" inheritance method requires ",
-          "`ancestry = TRUE` in group()."
+      abort_hammel(
+        c(
+          paste(
+            "Group {.field {d}} uses ancestry inheritance without tracking",
+            "ancestry."
+          ),
+          "i" = "Declare it with {.code group(ancestry = TRUE)}."
         ),
-        call. = FALSE
+        "specification",
+        group = d
       )
     }
   }
@@ -332,7 +449,8 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
       } else {
         prepare_group_inheritance(
           declaration[[d]]$inheritance, registries[[d]],
-          components[[d]]
+          components[[d]],
+          call = run_call
         )
       }
       c(
@@ -345,12 +463,13 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   )
   strata <- function(rates, process, union_level = FALSE) {
     prepare_strata_rates(
-      rates, process, registries, start, start + years, union_level
+      rates, process, registries, start, start + years, union_level,
+      call = run_call
     )
   }
-  death <- strata(death_rates, "mortality")
+  death <- strata(death_rates, "mortality rates")
   death_rates <- death$rates
-  birth <- strata(birth_rates, "fertility")
+  birth <- strata(birth_rates, "fertility rates")
   birth_rates <- birth$rates
   search <- if (is.null(union_process$rates)) {
     list(
@@ -359,10 +478,13 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
         age_end = numeric(),
         rate = numeric()
       ),
-      spec = strata(data.frame(rate = numeric()), "search")$spec
+      spec = strata(data.frame(rate = numeric()), "union search rates")$spec
     )
   } else {
-    strata(expand_previous_union_rates(union_process$rates), "union formation")
+    strata(
+      expand_previous_union_rates(union_process$rates),
+      "union search rates"
+    )
   }
   union_rates <- search$rates
   validate_matching_groups(union_process$matching, group_values)
@@ -376,10 +498,16 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
         age_end = numeric(),
         rate = numeric()
       ),
-      spec = strata(data.frame(rate = numeric()), "dissolution")$spec
+      spec = strata(
+        data.frame(rate = numeric()),
+        "union dissolution rates"
+      )$spec
     )
   } else {
-    strata(dissolution_process$rates, "Union dissolution", union_level = TRUE)
+    strata(
+      dissolution_process$rates, "union dissolution rates",
+      union_level = TRUE
+    )
   }
   dissolution_rates <- dissolution$rates
   dissolution_rates$age_start <- dissolution_rates$dur_start
@@ -421,10 +549,11 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
       rates <- transition_list[[d]]$rates
       rates[[d]] <- rates$origin
       prepared <- prepare_strata_rates(
-        rates, sprintf("`%s` transition", d),
+        rates, sprintf("`%s` transition rates", d),
         registries,
         start, start + years,
-        coverage = FALSE
+        coverage = FALSE,
+        call = run_call
       )
       rates <- prepared$rates
       rates$.dest <- match(
@@ -462,9 +591,15 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   }
   weight_models <- Filter(Negate(is.null), weight_models)
   for (name in names(weight_models)) {
-    check_model_coverage(
-      weight_models[[name]], start, start + years, paste(name, "weights")
-    )
+    label <- if (startsWith(name, "transition_")) {
+      dimension <- names(transition_list)[
+        as.integer(sub("transition_", "", name))
+      ]
+      paste0("`", dimension, "` transition weights")
+    } else {
+      paste(name, "weights")
+    }
+    check_model_coverage(weight_models[[name]], start, start + years, label)
   }
   # Weight variables resolve against the declaration (D134): each dimension's
   # categories, and ancestry variables `ancestry_<dim>_<category>` in engine
@@ -503,7 +638,8 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
           weight_models[[name]],
           if (transition) "transition" else types[[name]],
           if (transition) "transition" else name,
-          context
+          context,
+          call = run_call
         )
       }
     )
@@ -512,9 +648,11 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   }
   if ("previous_union" %in% names(union_rates) || cohab_enabled ||
         length(weight_models)) {
-    previous <- previous_union_info_cpp(
-      population$persons, population$unions,
-      counts_cohab
+    previous <- call_native(
+      previous_union_info_cpp(
+        population$persons, population$unions,
+        counts_cohab
+      )
     )
     engine_persons$.hammel_previous_union <- previous$previous_union
     engine_persons$.hammel_previous_union_end <- previous$end_time
@@ -524,9 +662,13 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
     if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
           seed != trunc(seed) ||
           abs(seed) > .Machine$integer.max) {
-      stop(
-        "`seed` must be NULL or an integer within R's integer range.",
-        call. = FALSE
+      abort_hammel(
+        c(
+          "{.arg seed} must be {.code NULL} or a single whole number.",
+          "x" = "It is {describe_value(seed)}."
+        ),
+        "argument",
+        argument = "seed"
       )
     }
     had_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
@@ -583,32 +725,31 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
     } else {
       prepare_matching_model(union_process$cohab_matching, group_values)
     }
-    native <- simulate_cpp(
-      engine_persons, death_rates, birth_rates,
-      start, years, birth_interval, population$unions,
-      matching,
-      union_process$min_male_age,
-      as.integer(union_process$kinship_generations),
-      union_process$initiation == "rate",
-      union_rates, father_matching,
-      union_process$cancel_birth_if_no_match,
-      union_process$diagnostics,
-      ancestry_matrix(population, tracked),
-      inheritance, ffab, dissolution_rates, cohab$prob,
-      cohab$conversion,
-      cohab_matching, counts_cohab,
-      isTRUE(getOption("hammel.check_cells", FALSE)),
-      if (is.null(hetfert)) NULL else unclass(hetfert),
-      transition_rates,
-      if (scheduled_models) model_context$config else NULL,
-      weight_input, group_input,
-      progress = progress_callback
+    native <- call_native(
+      simulate_cpp(
+        engine_persons, death_rates, birth_rates,
+        start, years, birth_interval, population$unions,
+        matching,
+        union_process$min_male_age,
+        as.integer(union_process$kinship_generations),
+        union_process$initiation == "rate",
+        union_rates, father_matching,
+        union_process$cancel_birth_if_no_match,
+        union_process$diagnostics,
+        ancestry_matrix(population, tracked),
+        inheritance, ffab, dissolution_rates, cohab$prob,
+        cohab$conversion,
+        cohab_matching, counts_cohab,
+        isTRUE(getOption("hammel.check_cells", FALSE)),
+        if (is.null(hetfert)) NULL else unclass(hetfert),
+        transition_rates,
+        if (scheduled_models) model_context$config else NULL,
+        weight_input, group_input,
+        progress = progress_callback
+      )
     )
     if (!isTRUE(native$cells_consistent)) {
-      stop(
-        "Internal error: fertility cell counts are inconsistent.",
-        call. = FALSE
-      )
+      abort_internal("Fertility cell counts are inconsistent.")
     }
     persons <- population$persons
     added <- nrow(native$persons) - nrow(persons)
@@ -677,40 +818,34 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
     }
     result$unions <- tibble::as_tibble(unions)
     if (native$weighted_infeasible > 0) {
-      warning(
-        sprintf(
+      searches <- as.integer(native$weighted_infeasible)
+      warn_hammel(
+        c(
           paste(
-            paste0(
-              "weighted_choice could not meet male-group targets in ",
-              "%d search(es),"
-            ),
-            paste0(
-              paste0("for example because no eligible woman ", "may partner "),
-              "a group's men;"
-            ),
-            "capped approximate weights were used."
+            "Matching couldn't meet male-group targets in {searches}",
+            "search{?es}."
           ),
-          as.integer(native$weighted_infeasible)
+          "i" = paste(
+            "For example, no eligible woman may partner some group's men.",
+            "Capped approximate weights were used."
+          )
         ),
-        call. = FALSE
+        "simulation",
+        searches = searches
       )
     }
     if (native$draw_approximate > 0) {
-      warning(
-        sprintf(
-          paste(
-            paste0(
-              "A custom matching formula exceeded its within-bin ",
-              "bound in %d draw(s);"
-            ),
-            paste0(
-              "partner draws were approximate. The formula ",
-              "varies faster than the"
-            ),
-            "1/32-year bound grid resolves."
-          ), as.integer(native$draw_approximate)
+      draws <- as.integer(native$draw_approximate)
+      warn_hammel(
+        c(
+          "{draws} partner draw{?s} {?was/were} approximate.",
+          "i" = paste(
+            "A custom matching formula varies faster than the 1/32-year grid",
+            "of within-bin bounds resolves."
+          )
         ),
-        call. = FALSE
+        "simulation",
+        draws = draws
       )
     }
   }
@@ -768,7 +903,7 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   }
   result$persons <- tibble::as_tibble(result$persons)
   result$unions <- tibble::as_tibble(result$unions)
-  validate_population(result)
+  check_population(result)
   if (progress) {
     progress_callback(1)
   }

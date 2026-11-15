@@ -122,14 +122,15 @@ test_that("transition counter rejects invalid axes, endpoints and flags", {
   pop <- transition_rate_population()
   expect_error(calculate_transition_rates(pop, c(0, 6)), "exactly one")
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), dur_breaks = c(0, Inf)), "exactly one")
-  expect_error(calculate_transition_rates(pop, c(0, 7), age_breaks = c(0, Inf)), "endpoint")
+  expect_error(calculate_transition_rates(pop, c(0, 7), age_breaks = c(0, Inf)), "extend beyond", class = "hammel_error_argument")
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, 0)), "increasing")
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(-1, Inf)), "nonnegative")
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = NA), "`by` must")
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = 1), "`by` must")
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "group"),
-               "not by `group` in `by`")
-  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "region"), "cannot split")
+               "can't also be split", class = "hammel_error_argument")
+  expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "region"),
+    "can't split", class = "hammel_error_argument")
   pop$persons$group <- NULL
   pop$transitions <- NULL
   pop$groups <- list(group = group())
@@ -161,7 +162,7 @@ test_that("transition counters accept legacy grouped populations without history
   expect_equal(expected$transitions, c(0, 0))
   expect_equal(expected$person_years, c(6, 4))
   expect_error(calculate_transition_rates(pop$persons, c(0, 6), age_breaks = c(0, Inf)),
-    "grouped hammel_population")
+    "must be a Hammel population")
 })
 
 test_that("transition-rate errors identify the requested observation", {
@@ -170,7 +171,7 @@ test_that("transition-rate errors identify the requested observation", {
   pop$groups <- NULL
   pop$transitions <- NULL
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf)),
-    "calculate_transition_rates.*requires a declared group")
+    "need a declared group", class = "hammel_error_groups")
   pop <- transition_rate_population()
   pop$unions <- rbind(pop$unions, transform(pop$unions, union_id = 2, start_time = 2))
   expect_error(calculate_transition_rates(pop, c(0, 6), age_breaks = c(0, Inf), by = "union_type"),

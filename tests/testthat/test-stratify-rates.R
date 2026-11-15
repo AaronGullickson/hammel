@@ -52,8 +52,8 @@ test_that("stratify_rates validates its inputs", {
                    list(group = setNames(1, "")), list(group = c(A = "1")), list(group = list(A = 1)),
                    c(group = 1), data.frame(group = 1)))
     expect_error(stratify_rates(rates, bad), "by")
-  expect_error(stratify_rates(rates, list(rate = c(A = 1))), "band, rate or calendar")
-  expect_error(stratify_rates(rates, list(age_start = c(A = 1))), "band, rate or calendar")
+  expect_error(stratify_rates(rates, list(rate = c(A = 1))), "can't stratify by", class = "hammel_error_argument")
+  expect_error(stratify_rates(rates, list(age_start = c(A = 1))), "can't stratify by", class = "hammel_error_argument")
   expect_error(stratify_rates(rates, list(`1x` = c(A = 1))), "valid column names")
   # Any other name may be a group dimension, checked at simulation.
   expect_named(stratify_rates(rates, list(education = c(low = 1))), c(names(rates), "education"))
@@ -67,24 +67,40 @@ test_that("stratify_rates validates its inputs", {
 
 test_that("setters reject stratified columns their process does not support", {
   base <- data.frame(age_start = 15, age_end = Inf, rate = 0.1)
-  expect_error(mortality(stratify_rates(strata_mortality_rates(), list(union_type = c(u = 1)))),
-               "Mortality rates cannot be stratified by `union_type`")
+  error <- expect_error(
+    mortality(
+      stratify_rates(strata_mortality_rates(), list(union_type = c(u = 1)))
+    ),
+    "Mortality",
+    class = "hammel_error_rates"
+  )
+  expect_identical(error$columns, "union_type")
   expect_error(fertility(stratify_rates(base, list(sex = c(f = 1)))), "Fertility")
   expect_error(union_formation("rate", rates = stratify_rates(base, list(sex = c(f = 1)))),
-               "Union-search")
+               "Union search", class = "hammel_error_rates")
   expect_error(set_union_formation(hammel_model(), "rate", rates = base,
     cohab_prob = data.frame(age_start = 0, age_end = Inf, prob = 0.5),
     union_convert_rate = stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = 0.1),
                                         list(previous_union = c(none = 1)))), "Conversion")
   expect_error(union_dissolution(stratify_rates(data.frame(dur_start = 0, dur_end = Inf, rate = 0.1),
-                                                list(sex = c(f = 1)))), "Union-dissolution")
+                                                list(sex = c(f = 1)))), "Union dissolution",
+    class = "hammel_error_rates")
   expect_error(group_transition(stratify_rates(data.frame(origin = "A", destination = "B",
-    age_start = 0, age_end = Inf, rate = 0.1), list(previous_union = c(none = 1)))), "Group-transition")
+    age_start = 0, age_end = Inf, rate = 0.1), list(previous_union = c(none = 1)))), "Group transition",
+    class = "hammel_error_rates")
   # The check uses the table's columns, however they were added.
-  expect_error(mortality(transform(strata_mortality_rates(), union_type = "cohab")),
-               "Mortality rates cannot be stratified by `union_type`")
-  expect_error(union_dissolution(data.frame(sex = "f", dur_start = 0, dur_end = Inf, rate = 0.1)),
-               "Union-dissolution")
+  expect_error(
+    mortality(transform(strata_mortality_rates(), union_type = "cohab")),
+    "Mortality rates can't be stratified",
+    class = "hammel_error_rates"
+  )
+  expect_error(
+    union_dissolution(
+      data.frame(sex = "f", dur_start = 0, dur_end = Inf, rate = 0.1)
+    ),
+    "Union dissolution",
+    class = "hammel_error_rates"
+  )
   # Supported columns pass.
   expect_s3_class(mortality(stratify_rates(data.frame(age_start = 0, age_end = Inf, rate = 0.01),
     list(group = c(A = 1), sex = c(m = 1, f = 0.9)))), "hammel_mortality")
@@ -137,7 +153,11 @@ test_that("every group must be listed and groups must be declared", {
   expect_error(run_simulation(model, 0), "missing schedules.*C")
   model$population$persons$group <- NULL
   model$population$groups <- NULL
-  expect_error(run_simulation(model, 0), "not a declared group dimension")
+  expect_error(
+    run_simulation(model, 0),
+    "isn't declared",
+    class = "hammel_error_groups"
+  )
 })
 
 test_that("stratified tables support numeric group codes and restarts", {

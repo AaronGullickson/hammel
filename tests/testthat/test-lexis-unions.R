@@ -53,7 +53,7 @@ test_that("union type summaries validate flags and empty histories", {
   pop <- make_lexis_union_history()
   expect_error(
     demographic_counts(pop$persons, c(0, 3), c(0, Inf), by = "union_type"),
-    "must be a hammel_population"
+    "must be a Hammel population"
   )
   for (bad in list(NA,1,"yes",TRUE,c("union_type","union_type"),matrix("union_type")))
     expect_error(demographic_counts(pop,c(0,3),c(0,Inf), by = bad),"by")

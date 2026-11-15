@@ -86,19 +86,7 @@ fertility <- function(
   ffab = 0.4886,
   weights = NULL
 ) {
-  validate_rates(rates, mortality = FALSE)
-  validate_process_weights(weights, "person")
-  warn_cancelled_weight_terms(
-    weights, weight_strata("fertility", rates), "fertility"
-  )
-  validate_birth_interval(birth_interval)
-  validate_ffab(ffab)
-  process <- new_rate_process("fertility", rates)
-  process$birth_interval <- birth_interval
-  process$ffab <- ffab
-  process$weights <- normalize_model_argument(weights)
-  warn_unreachable_parity_cells(process$rates, birth_interval)
-  process
+  new_fertility(rates, birth_interval, ffab, weights)
 }
 
 #' @rdname fertility
@@ -111,14 +99,7 @@ set_fertility <- function(
   ffab = 0.4886,
   weights = NULL
 ) {
-  set_process(
-    model, fertility(
-      rates = rates,
-      birth_interval = birth_interval,
-      ffab = ffab,
-      weights = weights
-    )
-  )
+  attach_process(model, new_fertility(rates, birth_interval, ffab, weights))
 }
 
 # SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
@@ -200,6 +181,30 @@ print.summary.hammel_fertility <- function(x, ...) {
 }
 
 # HELPER FUNCTIONS ---------------------------------------------------------
+
+# Build a validated fertility process for fertility() and set_fertility();
+# errors name `call`.
+new_fertility <- function(
+  rates,
+  birth_interval,
+  ffab,
+  weights,
+  call = rlang::caller_env()
+) {
+  validate_rates(rates, mortality = FALSE, call = call)
+  validate_process_weights(weights, "person", call = call)
+  warn_cancelled_weight_terms(
+    weights, weight_strata("fertility", rates), "fertility"
+  )
+  validate_birth_interval(birth_interval, call = call)
+  validate_ffab(ffab, call = call)
+  process <- new_rate_process("fertility", rates)
+  process$birth_interval <- birth_interval
+  process$ffab <- ffab
+  process$weights <- normalize_model_argument(weights)
+  warn_unreachable_parity_cells(process$rates, birth_interval)
+  process
+}
 
 # Positive parity-specific rates in one-year age cells (the fertility cells of
 # D101) that no woman can occupy while eligible, given the
@@ -343,44 +348,58 @@ warn_unreachable_parity_cells <- function(rates, interval) {
   if (length(parts) > 5) {
     shown <- c(shown, sprintf("and %d more", length(parts) - 5))
   }
-  warning(
-    sprintf(
-      paste0(
-        "With `birth_interval` = %g, some positive parity-specific ",
-        paste0(
-          "fertility rates fall in one-year age cells where ",
-          "no woman can be eligible, so "
-        ),
-        "those births cannot occur: %s."
-      ), interval, paste(shown, collapse = "; ")
+  shown <- paste(shown, collapse = "; ")
+  warn_hammel(
+    c(
+      paste(
+        "Some positive parity-specific fertility rates can't produce births",
+        "with {.arg birth_interval} = {interval}."
+      ),
+      "x" = "No woman can be eligible in: {shown}.",
+      "i" = paste(
+        "Births drawn in these cells are counted as unrealized. Lower",
+        "{.arg birth_interval} or move these rates to reachable ages."
+      )
     ),
-    call. = FALSE
+    "no_effect",
+    cells = cells
   )
   invisible(cells)
 }
 
-validate_ffab <- function(probability) {
+validate_ffab <- function(probability, call = rlang::caller_env()) {
   if (!is.numeric(probability) || !is.null(dim(probability)) ||
         length(probability) != 1L ||
         !is.finite(probability) ||
         probability < 0 ||
         probability > 1) {
-    stop(
-      "`ffab` must be a finite numeric probability in [0, 1].",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "{.arg ffab} must be a single probability between 0 and 1.",
+        "x" = "It is {describe_value(probability)}.",
+        "i" = "{.arg ffab} is the probability that a newborn is female."
+      ),
+      "argument",
+      argument = "ffab",
+      call = call
     )
   }
   invisible(probability)
 }
 
-validate_birth_interval <- function(duration) {
+validate_birth_interval <- function(duration, call = rlang::caller_env()) {
   if (!is.numeric(duration) || !is.null(dim(duration)) ||
         length(duration) != 1L ||
         !is.finite(duration) ||
         duration < 0) {
-    stop(
-      "`birth_interval` must be a finite nonnegative number of years.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "{.arg birth_interval} must be a single nonnegative number of years.",
+        "x" = "It is {describe_value(duration)}."
+      ),
+      "argument",
+      argument = "birth_interval",
+      call = call
     )
   }
   invisible(duration)

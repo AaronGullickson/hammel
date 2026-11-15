@@ -302,8 +302,17 @@ missing_model_elements <- function(model) {
   names(present)[!present]
 }
 
-check_model <- function(model) {
+check_model <- function(model, call = rlang::caller_env()) {
   if (!inherits(model, "hammel_model") || !is.list(model)) {
-    stop("`model` must be a hammel_model object.", call. = FALSE)
+    abort_hammel(
+      c(
+        "{.arg model} must be a Hammel model.",
+        "x" = "It is {describe_value(model)}.",
+        "i" = "Create one with {.fn hammel_model}."
+      ),
+      "specification",
+      argument = "model",
+      call = call
+    )
   }
 }

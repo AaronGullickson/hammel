@@ -7,17 +7,20 @@
 # Used by rate calculations, population counts, and relationship extraction.
 
 # Population validation already checks label types and missing values.
-observation_groups <- function(persons, by_group) {
-  if (!is.logical(by_group) || length(by_group) != 1L ||
-        !is.null(dim(by_group)) ||
-        is.na(by_group)) {
-    stop("`by_group` must be TRUE or FALSE.", call. = FALSE)
-  }
+observation_groups <- function(persons, by_group, call = rlang::caller_env()) {
+  check_flag(by_group, "by_group", call = call)
   if (!by_group) {
     return(NULL)
   }
   if (!"group" %in% names(persons)) {
-    stop("`by_group = TRUE` requires a persons `group` column.", call. = FALSE)
+    abort_hammel(
+      c(
+        "Splitting by group needs a {.field group} column in {.field persons}.",
+        "i" = "Declare a group dimension with {.fn set_groups}."
+      ),
+      "groups",
+      call = call
+    )
   }
   groups <- attr(persons, ".hammel_group_values")
   if (is.null(groups)) unique(persons$group) else groups
@@ -71,15 +74,26 @@ prepare_group_observations <- function(persons, population, by_group) {
 # Validate `by` against the variables a calculator accepts.
 # `dims` (declared group dimensions) replaces the internal `group` columns in
 # the list of accepted names.
-check_by <- function(by, allowed, fun, dims = NULL) {
+check_by <- function(
+  by,
+  allowed,
+  fun,
+  dims = NULL,
+  call = rlang::caller_env()
+) {
   if (is.null(by)) {
     return(character())
   }
   if (!is.character(by) || !is.null(dim(by)) || anyNA(by) ||
         anyDuplicated(by)) {
-    stop(
-      "`by` must be NULL or a character vector of distinct variable names.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "{.arg by} must be {.code NULL} or distinct variable names.",
+        "x" = "It is {describe_value(by)}."
+      ),
+      "argument",
+      argument = "by",
+      call = call
     )
   }
   unknown <- setdiff(by, allowed)
@@ -99,13 +113,15 @@ check_by <- function(by, allowed, fun, dims = NULL) {
     allowed <- shown
   }
   if (length(unknown)) {
-    stop(
-      sprintf(
-        "`%s()` cannot split by %s; `by` accepts %s.", fun,
-        paste0("\"", unknown, "\"", collapse = ", "),
-        paste0("\"", allowed, "\"", collapse = ", ")
+    abort_hammel(
+      c(
+        "{.fn {fun}} can't split by {.val {unknown}}.",
+        "i" = "{.arg by} accepts {.val {allowed}}."
       ),
-      call. = FALSE
+      "argument",
+      argument = "by",
+      variables = unknown,
+      call = call
     )
   }
   by
@@ -113,22 +129,77 @@ check_by <- function(by, allowed, fun, dims = NULL) {
 
 # Validate the previous-union detail flag. Pooled categories (FALSE) only
 # apply when `previous_union` is in `by`.
-check_detailed_previous_union <- function(detailed, by) {
-  if (!is.logical(detailed) || length(detailed) != 1L ||
-        !is.null(dim(detailed)) ||
-        is.na(detailed)) {
-    stop("`use_detailed_previous_union` must be TRUE or FALSE.", call. = FALSE)
-  }
+check_detailed_previous_union <- function(
+  detailed,
+  by,
+  call = rlang::caller_env()
+) {
+  check_flag(detailed, "use_detailed_previous_union", call = call)
   if (!detailed && !"previous_union" %in% by) {
-    stop(
-      paste0(
-        "`use_detailed_previous_union = FALSE` requires ",
-        "\"previous_union\" in `by`."
+    abort_hammel(
+      c(
+        paste(
+          "{.code use_detailed_previous_union = FALSE} needs",
+          "{.val previous_union} in {.arg by}."
+        ),
+        "i" = "Pooled categories only apply when splitting by previous union."
       ),
-      call. = FALSE
+      "argument",
+      argument = "use_detailed_previous_union",
+      call = call
     )
   }
   invisible(detailed)
+}
+
+# Analysis functions take a hammel_population; a bare persons table must be
+# wrapped first.
+check_analysis_population <- function(population, call = rlang::caller_env()) {
+  if (!inherits(population, "hammel_population")) {
+    abort_hammel(
+      c(
+        "{.arg population} must be a Hammel population.",
+        "x" = "It is {describe_value(population)}.",
+        "i" = paste(
+          "Wrap a persons table with",
+          "{.code hammel_population(persons, end_time = ...)}."
+        )
+      ),
+      "population",
+      argument = "population",
+      call = call
+    )
+  }
+  invisible(population)
+}
+
+# Observation must end by the population's reference time.
+check_observation_end <- function(population, end, call = rlang::caller_env()) {
+  reference <- population$end_time
+  if (is.null(reference) || end > reference) {
+    abort_hammel(
+      c(
+        "Observation can't extend beyond the population's {.field end_time}.",
+        "x" = if (is.null(reference)) {
+          "The population has no {.field end_time}."
+        } else {
+          "The observation ends at {end}, after {.field end_time} {reference}."
+        }
+      ),
+      "argument",
+      call = call
+    )
+  }
+  invisible(end)
+}
+
+# Rate calculators take either age or duration bands.
+abort_one_of_breaks <- function(call = rlang::caller_env()) {
+  abort_hammel(
+    "Supply exactly one of {.arg age_breaks} or {.arg dur_breaks}.",
+    "argument",
+    call = call
+  )
 }
 
 previous_labels <- function(use_detailed_previous_union) {
@@ -147,45 +218,45 @@ person_observation <- function(
   end,
   requires_typed = FALSE,
   grouped = "group" %in% by,
-  validate = TRUE
+  validate = TRUE,
+  call = rlang::caller_env()
 ) {
-  if (!inherits(population, "hammel_population")) {
-    stop(
-      paste0(
-        "`population` must be a hammel_population; wrap a persons table ",
-        "with hammel_population(persons, end_time = ...)."
-      ),
-      call. = FALSE
-    )
-  }
+  check_analysis_population(population, call = call)
   if (validate) {
-    validate_population(population)
+    check_population(population, call = call)
   }
-  if (is.null(population$end_time) || end > population$end_time) {
-    stop(
-      "Observation requires a known endpoint and cannot extend beyond it.",
-      call. = FALSE
-    )
-  }
+  check_observation_end(population, end, call = call)
   persons <- population$persons
   unions <- population$unions
   if (grouped && !declared_group(population)) {
-    stop(
-      paste0(
-        "Splitting by \"group\" requires a declared group ",
-        "dimension; see set_groups() or ",
-        "hammel_population(groups = )."
+    abort_hammel(
+      c(
+        "Splitting by group needs a declared group dimension.",
+        "i" = paste(
+          "Declare one with {.fn set_groups} or the {.arg groups} argument of",
+          "{.fn hammel_population}."
+        )
       ),
-      call. = FALSE
+      "groups",
+      call = call
     )
   }
   persons <- prepare_group_observations(persons, population, grouped)
-  groups <- if (grouped) observation_groups(persons, TRUE) else NULL
+  groups <- if (grouped) {
+    observation_groups(persons, TRUE, call = call)
+  } else {
+    NULL
+  }
   typed <- !is.null(unions) && "union_type" %in% names(unions)
   if (requires_typed && !typed) {
-    stop(
-      "Splitting by \"union_type\" requires typed union histories.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "Splitting by {.val union_type} needs typed union histories.",
+        "i" = "The unions table has no {.field union_type} column."
+      ),
+      "argument",
+      argument = "by",
+      call = call
     )
   }
   if (is.null(unions)) {
@@ -338,7 +409,8 @@ observation_alias <- function(
   population,
   by,
   suffixes = "",
-  extra = character()
+  extra = character(),
+  call = rlang::caller_env()
 ) {
   none <- list(population = population, by = by, rename = character())
   if (!inherits(population, "hammel_population") ||
@@ -351,12 +423,17 @@ observation_alias <- function(
   if (length(dims) == 1L && !length(extra)) {
     dim <- dims
     if (dim != "group" && any(paste0("group", suffixes) %in% by)) {
-      stop(
-        sprintf(
-          "Split by the declared group dimension `%s`, not `group`.",
-          dim
+      abort_hammel(
+        c(
+          paste(
+            "Split by the declared group dimension {.val {dim}}, not",
+            "{.val group}."
+          ),
+          "i" = "Group dimensions are named in {.arg by} by their own names."
         ),
-        call. = FALSE
+        "argument",
+        argument = "by",
+        call = call
       )
     }
     population <- dimension_view(population, dim)
@@ -378,12 +455,14 @@ observation_alias <- function(
     )
   }
   if (!"group" %in% dims && any(paste0("group", suffixes) %in% by)) {
-    stop(
-      sprintf(
-        "Split by declared group dimensions (%s), not `group`.",
-        paste0("`", dims, "`", collapse = ", ")
+    abort_hammel(
+      c(
+        "Split by declared group dimensions, not {.val group}.",
+        "i" = "The declared dimensions are {.val {dims}}."
       ),
-      call. = FALSE
+      "argument",
+      argument = "by",
+      call = call
     )
   }
   requests <- lapply(suffixes, function(x) dims[paste0(dims, x) %in% by])

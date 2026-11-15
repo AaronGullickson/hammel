@@ -101,8 +101,8 @@ test_that("grouped marriage counts pool correctly and include empty categories",
 
 test_that("marriage observation rejects invalid windows and ambiguous histories", {
   pop <- marriage_history()
-  expect_error(calculate_union_rates(pop$persons, c(0, 6), c(0, Inf), by = "previous_union"), "union histories")
-  expect_error(calculate_union_rates(pop, c(0, 7), c(0, Inf), by = "previous_union"), "endpoint")
+  expect_error(calculate_union_rates(pop$persons, c(0, 6), c(0, Inf), by = "previous_union"), "must be a Hammel population")
+  expect_error(calculate_union_rates(pop, c(0, 7), c(0, Inf), by = "previous_union"), "extend beyond", class = "hammel_error_argument")
   expect_error(calculate_union_rates(pop, c(0, 6), c(0, Inf), by = c("group", "previous_union")), "group")
   expect_error(calculate_union_rates(pop, c(0, 6), c(0, Inf), by = c(NA, "previous_union")), "`by` must")
   expect_error(calculate_union_rates(pop, c(0, 0), c(0, Inf), by = "previous_union"), "time_breaks")

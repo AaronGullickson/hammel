@@ -18,8 +18,11 @@ test_that("age-gap helper rejects invalid or unrepresentable preferences", {
   for (bad in c(0, -1))
     expect_error(age_gap_matching_model(3, bad), "positive")
   for (bad in c(1e-300, 1e300))
-    expect_error(age_gap_matching_model(3, bad), "finite coefficients")
-  expect_error(age_gap_matching_model(1e308, 0.1), "finite coefficients")
+    expect_error(age_gap_matching_model(3, bad), class = "hammel_error_argument")
+  expect_error(
+    age_gap_matching_model(1e308, 0.1),
+    class = "hammel_error_argument"
+  )
 })
 test_that("union constructors default to zero-gap five-year half-weight matching", {
   expected <- age_gap_matching_model(0, 5)

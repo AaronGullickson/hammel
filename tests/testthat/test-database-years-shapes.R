@@ -209,5 +209,5 @@ test_that("prepared multi-year rates execute directly with native bands", {
   # Selecting separated years leaves a real gap; preparation never fills it.
   hmd$Year[hmd$Year == 2001] <- 2002
   m <- set_mortality(m, mortality_from_hmd(hmd, c(2000, 2002))$rates)
-  expect_error(run_simulation(m, 2), "calendar coverage gap")
+  expect_error(run_simulation(m, 2), class = "hammel_error_coverage")
 })

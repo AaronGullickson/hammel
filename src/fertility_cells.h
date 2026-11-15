@@ -322,7 +322,7 @@ class FertilityCells {
     if (refresh_eta_ && cell >= 0) {
       weight *= std::exp(refresh_eta_(woman, cell));
       if (!(weight > 0) || !R_finite(weight)) {
-        stop("A fertility weight is not finite and positive.");
+        stop("[weight_value] A fertility weight is not finite and positive.");
       }
     }
     Member& m = members_[woman];

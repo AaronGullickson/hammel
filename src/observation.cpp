@@ -137,7 +137,8 @@ Histories build_histories(
         if (exclusive && !NumericVector::is_na(h.died[i]) &&
             (starts[u] > h.died[i] || end > h.died[i])) {
           stop(
-            "Previous-union histories cannot contain union events after a "
+            "[population] Previous-union histories cannot contain union events "
+            "after a "
             "partner's death."
           );
         }
@@ -166,7 +167,7 @@ Histories build_histories(
       for (size_t u = 1; u < e.size(); ++u) {
         if (e[u].start < e[u - 1].end) {
           stop(
-            "Observation by union type or previous union requires "
+            "[population] Observation by union type or previous union requires "
             "nonoverlapping union histories for each person."
           );
         }

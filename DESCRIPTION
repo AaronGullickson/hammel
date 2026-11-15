@@ -13,6 +13,7 @@ Imports:
     Rcpp,
     tibble,
     cli,
+    rlang (>= 1.0.0),
     utils
 LinkingTo:
     Rcpp

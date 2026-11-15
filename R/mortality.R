@@ -63,21 +63,14 @@
 #' model <- hammel_model() |> set_mortality(usa_2000_mortality)
 #' @order 1
 mortality <- function(rates, weights = NULL) {
-  validate_rates(rates, mortality = TRUE)
-  validate_process_weights(weights, "person")
-  warn_cancelled_weight_terms(
-    weights, weight_strata("mortality", rates), "mortality"
-  )
-  process <- new_rate_process("mortality", rates)
-  process$weights <- normalize_model_argument(weights)
-  process
+  new_mortality(rates, weights)
 }
 
 #' @rdname mortality
 #' @export
 #' @order 2
 set_mortality <- function(model, rates, weights = NULL) {
-  set_process(model, mortality(rates, weights = weights))
+  attach_process(model, new_mortality(rates, weights))
 }
 
 
@@ -136,4 +129,19 @@ print.summary.hammel_mortality <- function(x, ...) {
   print_model_argument("Weight model", x$weights)
   cli::cli_end(list)
   invisible(x)
+}
+
+# HELPER FUNCTIONS ---------------------------------------------------------
+
+# Build a validated mortality process for mortality() and set_mortality();
+# errors name `call`.
+new_mortality <- function(rates, weights, call = rlang::caller_env()) {
+  validate_rates(rates, mortality = TRUE, call = call)
+  validate_process_weights(weights, "person", call = call)
+  warn_cancelled_weight_terms(
+    weights, weight_strata("mortality", rates), "mortality"
+  )
+  process <- new_rate_process("mortality", rates)
+  process$weights <- normalize_model_argument(weights)
+  process
 }

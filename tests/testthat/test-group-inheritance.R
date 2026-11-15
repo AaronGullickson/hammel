@@ -211,7 +211,11 @@ test_that("future identities are checked against rates and categorical matching 
   expect_warning(matching <- matching_model(~ male_group, c(male_groupB = 0)), "male_group` are absorbed")
   model$processes$union_formation$matching <- matching
   # Declared categories include AB, so its coefficient is required.
-  expect_error(run_simulation(model, 0), "coefficient names.*male_groupAB")
+  expect_error(
+    run_simulation(model, 0),
+    "male_groupAB",
+    class = "hammel_error_specification"
+  )
   # Positive reference shares also infer identities; zero-only columns do not.
   model <- inheritance_test_model()
   model <- set_population(model, hammel_population(model$population$persons, end_time = 0, groups = if ("group" %in% names(model$population$persons)) "group"))
@@ -246,7 +250,11 @@ test_that("inheritance validates edited specifications and configuration", {
   expect_error(group_inheritance("other"), "method")
   expect_error(group_inheritance("custom"), "fun")
   expect_error(group_inheritance("hierarchy"), "order")
-  expect_error(group_inheritance("hierarchy", order = c("A", "A")), "unique")
+  expect_error(
+    group_inheritance("hierarchy", order = c("A", "A")),
+    "once",
+    class = "hammel_error_specification"
+  )
   expect_error(group_inheritance("mother", passing = 0.1), "hierarchy")
   for (passing in list(-1, 2, NA, "0", c(0, 1)))
     expect_error(group_inheritance("hierarchy", order = c("A", "B"), passing = passing), "passing")

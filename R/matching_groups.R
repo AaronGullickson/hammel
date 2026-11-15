@@ -6,12 +6,17 @@ matching_settings <- c("group_exogamy", "delta")
 
 # HELPER FUNCTIONS ---------------------------------------------------------
 
-matching_group_labels <- function(x, name) {
-  check_groups(tibble::tibble(group = x), name)
+matching_group_labels <- function(x, name, call = rlang::caller_env()) {
+  check_group_labels(x, name, call = call)
   as.character(x)
 }
 
-expand_matching_pairs <- function(effects, symmetric = FALSE) {
+expand_matching_pairs <- function(
+  effects,
+  symmetric = FALSE,
+  call = rlang::caller_env()
+) {
+  setting <- if (symmetric) "group_exogamy" else "prevent_exogamy"
   empty <- tibble::tibble(
     female_group = character(),
     male_group = character(),
@@ -22,17 +27,17 @@ expand_matching_pairs <- function(effects, symmetric = FALSE) {
   }
   if (is.data.frame(effects)) {
     check_columns(
-      effects, c("female_group", "male_group", "log_odds"),
-      "group_exogamy"
+      effects, c("female_group", "male_group", "log_odds"), setting,
+      call = call
     )
     table <- tibble::tibble(
       female_group = matching_group_labels(
-        effects$female_group,
-        "group_exogamy$female_group"
+        effects$female_group, paste0(setting, "$female_group"),
+        call = call
       ),
       male_group = matching_group_labels(
-        effects$male_group,
-        "group_exogamy$male_group"
+        effects$male_group, paste0(setting, "$male_group"),
+        call = call
       ),
       log_odds = effects$log_odds
     )
@@ -42,12 +47,18 @@ expand_matching_pairs <- function(effects, symmetric = FALSE) {
           any(!is.finite(effects)) ||
           (length(effects) &&
              (is.null(labels) || anyNA(labels) || any(!nzchar(labels))))) {
-      stop(
-        paste0(
-          "`group_exogamy` must be a finite named numeric ",
-          "vector or a pair table."
+      abort_hammel(
+        c(
+          "{.arg {setting}} must be a named vector of finite effects.",
+          "x" = "It is {describe_value(effects)}.",
+          "i" = paste(
+            "Name each effect by a pair of categories, such as",
+            "{.code \"A:B\"}."
+          )
         ),
-        call. = FALSE
+        "specification",
+        argument = setting,
+        call = call
       )
     }
     tables <- lapply(
@@ -55,23 +66,32 @@ expand_matching_pairs <- function(effects, symmetric = FALSE) {
         key <- labels[i]
         pattern <- if (symmetric) "^[^:]+:[^:]+$" else "^[^:]+:{1,2}[^:]+$"
         if (!grepl(pattern, key)) {
-          stop(
-            if (symmetric) {
-              paste0(
-                "Use single ':' unordered pair names in ", "`group_exogamy`."
-              )
-            } else {
-              paste0(
-                "Use 'female:male' or symmetric 'group::group' ",
-                "names in `prevent_exogamy`."
-              )
-            },
-            call. = FALSE
+          abort_hammel(
+            c(
+              "{.arg {setting}} names must be pairs of categories.",
+              "x" = "Invalid name {.val {key}}.",
+              "i" = if (symmetric) {
+                "Join the two categories with one colon, as in {.val A:B}."
+              } else {
+                "Use {.val female:male} or symmetric {.val A::B} names."
+              }
+            ),
+            "specification",
+            argument = setting,
+            call = call
           )
         }
         pair <- strsplit(key, ":{1,2}")[[1]]
         if (any(!nzchar(trimws(pair)))) {
-          stop("Pair group labels must be nonempty.", call. = FALSE)
+          abort_hammel(
+            c(
+              "{.arg {setting}} pairs must name two nonempty categories.",
+              "x" = "Invalid name {.val {key}}."
+            ),
+            "specification",
+            argument = setting,
+            call = call
+          )
         }
         table <- tibble::tibble(
           female_group = pair[1],
@@ -96,9 +116,14 @@ expand_matching_pairs <- function(effects, symmetric = FALSE) {
   if (!is.numeric(table$log_odds) || is.complex(table$log_odds) ||
         !is.null(dim(table$log_odds)) ||
         any(!is.finite(table$log_odds))) {
-    stop(
-      "`group_exogamy` log odds must be finite numeric values.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "{.arg {setting}} log odds must be finite numbers.",
+        "x" = "They are {describe_value(table$log_odds)}."
+      ),
+      "specification",
+      argument = setting,
+      call = call
     )
   }
   if (symmetric && nrow(table)) {
@@ -109,24 +134,32 @@ expand_matching_pairs <- function(effects, symmetric = FALSE) {
     )]
     table <- rbind(table, reversed)
   }
-  if (anyDuplicated(table[c("female_group", "male_group")])) {
-    stop(
-      if (symmetric) {
-        paste0(
-          "Conflicting or overlapping unordered pairs in ",
-          "`group_exogamy`."
-        )
-      } else {
-        "Conflicting or overlapping directed pairs in `prevent_exogamy`."
-      },
-      call. = FALSE
+  duplicated_pairs <- duplicated(table[c("female_group", "male_group")])
+  if (any(duplicated_pairs)) {
+    repeated <- unique(
+      paste0(
+        table$female_group[duplicated_pairs], ":",
+        table$male_group[duplicated_pairs]
+      )
+    )
+    abort_hammel(
+      c(
+        "{.arg {setting}} gives some pairs more than once.",
+        "x" = "Repeated: {.val {repeated}}.",
+        "i" = if (symmetric) {
+          "Pairs are unordered, so {.val A:B} and {.val B:A} are the same pair."
+        }
+      ),
+      "specification",
+      argument = setting,
+      call = call
     )
   }
   table
 }
 
-expand_group_exogamy <- function(effects) {
-  expand_matching_pairs(effects, symmetric = TRUE)
+expand_group_exogamy <- function(effects, call = rlang::caller_env()) {
+  expand_matching_pairs(effects, symmetric = TRUE, call = call)
 }
 
 matching_has_group_formula <- function(matching) {
@@ -144,10 +177,7 @@ matching_predictor_data <- function(
     return(data)
   }
   if (is.null(female_group) || is.null(male_group)) {
-    stop(
-      "Matching group predictors require female and male group data.",
-      call. = FALSE
-    )
+    abort_internal("Matching group predictors need female and male groups.")
   }
   female <- matching_group_labels(female_group, "female_group")
   male <- matching_group_labels(male_group, "male_group")
@@ -156,12 +186,8 @@ matching_predictor_data <- function(
   }
   if (!length(female) %in% c(1L, length(gaps)) ||
         length(male) != length(gaps)) {
-    stop(
-      paste0(
-        "Supply one female group per search (or candidate) ",
-        "and one male group per candidate."
-      ),
-      call. = FALSE
+    abort_internal(
+      "Matching needs one female group per search and one male per candidate."
     )
   }
   female <- rep(female, length.out = length(gaps))
@@ -171,7 +197,7 @@ matching_predictor_data <- function(
     f <- match(female, matching$group_levels)
     m <- match(male, matching$group_levels)
     if (anyNA(f) || anyNA(m)) {
-      stop("Matching group data contain unknown combinations.", call. = FALSE)
+      abort_internal("Matching group data contain unknown combinations.")
     }
     for (d in names(matching$categories)) {
       levels <- as.character(matching$categories[[d]])
@@ -193,10 +219,7 @@ matching_predictor_data <- function(
   if (any(all.vars(matching$formula) %in% c("female_group", "male_group"))) {
     levels <- as.character(matching$group_levels)
     if (any(!c(female, male) %in% levels)) {
-      stop(
-        "Matching group data contain undeclared `group_levels`.",
-        call. = FALSE
-      )
+      abort_internal("Matching group data contain undeclared group levels.")
     }
     data$female_group <- factor(female, levels = levels)
     data$male_group <- factor(male, levels = levels)
@@ -212,7 +235,7 @@ matching_pair_offsets <- function(matching, female_group, male_group) {
   female <- matching_group_labels(female_group, "female_group")
   male <- matching_group_labels(male_group, "male_group")
   if (!length(female) %in% c(1L, length(male))) {
-    stop("Supply one female group per search (or candidate).", call. = FALSE)
+    abort_internal("Matching needs one female group per search.")
   }
   female <- rep(female, length.out = length(male))
   result <- numeric(length(male))
@@ -223,47 +246,56 @@ matching_pair_offsets <- function(matching, female_group, male_group) {
   result
 }
 
-validate_matching_groups <- function(matching, population_groups) {
+validate_matching_groups <- function(
+  matching,
+  population_groups,
+  call = rlang::caller_env()
+) {
   if (is_model_schedule(matching)) {
     for (m in model_entries(matching)) {
-      validate_matching_groups(m, population_groups)
+      validate_matching_groups(m, population_groups, call = call)
     }
     return(invisible(matching))
   }
-  if (length(matching$delta) &&
-        (is.null(population_groups) ||
-           any(!names(matching$delta) %in% as.character(population_groups)))) {
-    stop(
-      "`delta` names must belong to the population group identity registry.",
-      call. = FALSE
+  unknown <- setdiff(names(matching$delta), as.character(population_groups))
+  if (length(matching$delta) && length(unknown)) {
+    abort_hammel(
+      c(
+        "{.arg delta} names must be categories of the matching dimension.",
+        "x" = "Unknown: {.val {unknown}}."
+      ),
+      "groups",
+      categories = unknown,
+      call = call
     )
   }
-  pairs <- expand_group_exogamy(matching$group_exogamy)
-  restrictions <- expand_prevent_exogamy(matching$prevent_exogamy)
+  pairs <- expand_group_exogamy(matching$group_exogamy, call = call)
+  restrictions <- expand_prevent_exogamy(matching$prevent_exogamy, call = call)
   if ((nrow(pairs) || matching_has_group_formula(matching) ||
          restrictions$all ||
          nrow(restrictions$pairs)) &&
         is.null(population_groups)) {
-    stop(
-      "Group matching effects require population group identities.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "Group effects in matching need a declared group dimension.",
+        "i" = "Declare dimensions with {.fn set_groups}."
+      ),
+      "groups",
+      call = call
     )
   }
   if (any(all.vars(matching$formula) %in% c("female_group", "male_group")) &&
         any(!as.character(population_groups) %in%
             as.character(matching$group_levels)
         )) {
-    stop(
-      "Population groups must be covered by matching `group_levels`.",
-      call. = FALSE
-    )
+    abort_internal("Population groups are missing from matching group levels.")
   }
   invisible(matching)
 }
 
 # The internal model's restriction field (FALSE, TRUE or a directed pair
 # table), built from NA entries of the public `group_exogamy` (D135).
-expand_prevent_exogamy <- function(x) {
+expand_prevent_exogamy <- function(x, call = rlang::caller_env()) {
   empty <- expand_matching_pairs(NULL)[c("female_group", "male_group")]
   if (is.null(x)) {
     x <- FALSE
@@ -271,24 +303,20 @@ expand_prevent_exogamy <- function(x) {
   if (is.logical(x) && length(x) == 1L && is.null(dim(x)) && !is.na(x)) {
     return(list(all = x, pairs = empty))
   }
-  pairs <- tryCatch(
-    {
-      if (is.character(x) && is.null(dim(x)) && !anyNA(x)) {
-        expand_matching_pairs(stats::setNames(rep(0, length(x)), x))
-      } else if (is.data.frame(x)) {
-        check_columns(x, c("female_group", "male_group"), "prevent_exogamy")
-        x$log_odds <- rep(0, nrow(x))
-        expand_matching_pairs(x)
-      } else {
-        stop("Use FALSE, TRUE, a character vector of pairs, or a pair table.")
-      }
-    },
-    error = function(e) {
-      stop("Invalid `prevent_exogamy`: ", conditionMessage(e), call. = FALSE)
-    }
-  )
+  pairs <- if (is.character(x) && is.null(dim(x)) && !anyNA(x)) {
+    expand_matching_pairs(stats::setNames(rep(0, length(x)), x), call = call)
+  } else if (is.data.frame(x)) {
+    check_columns(
+      x, c("female_group", "male_group"), "prevent_exogamy",
+      call = call
+    )
+    x$log_odds <- rep(0, nrow(x))
+    expand_matching_pairs(x, call = call)
+  } else {
+    abort_internal("Invalid internal exogamy restriction.")
+  }
   if (any(pairs$female_group == pairs$male_group)) {
-    stop("`prevent_exogamy` pairs must join different groups.", call. = FALSE)
+    abort_internal("Exogamy restrictions must join different groups.")
   }
   list(all = FALSE, pairs = pairs[c("female_group", "male_group")])
 }
@@ -319,7 +347,7 @@ is_dimension_list <- function(x) is.list(x) && !is.data.frame(x)
 # prohibitions: NA prohibits an unordered pair, and a bare NA every union
 # between different categories. Returns the effects (NULL when none) and the
 # internal restriction: FALSE, TRUE, or a directed table of prohibited pairs.
-split_group_exogamy <- function(x) {
+split_group_exogamy <- function(x, call = rlang::caller_env()) {
   out <- list(effects = NULL, prevent = FALSE)
   if (is.null(x)) {
     return(out)
@@ -332,12 +360,8 @@ split_group_exogamy <- function(x) {
   }
   if (is.data.frame(x)) {
     if (!all(c("female_group", "male_group", "log_odds") %in% names(x))) {
-      stop(
-        paste0(
-          "Internal error: pair tables reach ",
-          "split_group_exogamy() only from tables."
-        ),
-        call. = FALSE
+      abort_internal(
+        "Pair tables reach split_group_exogamy() only from tables."
       )
     }
     blocked <- is.na(x$log_odds)
@@ -353,15 +377,21 @@ split_group_exogamy <- function(x) {
           (length(x) &&
              (is.null(names(x)) || anyNA(names(x)) ||
                 any(!nzchar(names(x)))))) {
-      stop(
-        paste(
-          paste0(
-            "`group_exogamy` must be a named vector of finite ",
-            "effects and NA prohibitions,"
+      abort_hammel(
+        c(
+          paste(
+            "{.arg group_exogamy} must be a named vector of effects,",
+            "{.code NA}, or a pair table."
           ),
-          "NA, or a pair table."
+          "x" = "It is {describe_value(x)}.",
+          "i" = paste(
+            "Name each finite effect or {.code NA} prohibition by a pair, as",
+            "in {.code c(\"A:B\" = -2, \"A:C\" = NA)}."
+          )
         ),
-        call. = FALSE
+        "specification",
+        argument = "group_exogamy",
+        call = call
       )
     }
     blocked <- is.na(x)
@@ -370,26 +400,37 @@ split_group_exogamy <- function(x) {
     }
     banned <- stats::setNames(rep(0, sum(blocked)), names(x)[blocked])
   }
-  pairs <- expand_group_exogamy(effects)
+  pairs <- expand_group_exogamy(effects, call = call)
   prohibited <- expand_group_exogamy(
     if (length(banned) || is.data.frame(banned)) {
       banned
-    }
+    },
+    call = call
   )
-  if (any(prohibited$female_group == prohibited$male_group)) {
-    stop(
-      paste0(
-        "`group_exogamy` cannot prohibit unions within a ",
-        "category (such as `\"A:A\" = NA`)."
+  within <- prohibited$female_group == prohibited$male_group
+  if (any(within)) {
+    categories <- unique(prohibited$female_group[within])
+    abort_hammel(
+      c(
+        "{.arg group_exogamy} can't prohibit unions within a category.",
+        "x" = "Prohibited within {.val {categories}}."
       ),
-      call. = FALSE
+      "specification",
+      argument = "group_exogamy",
+      call = call
     )
   }
-  key <- function(t) paste(t$female_group, t$male_group, sep = "\r")
-  if (any(key(prohibited) %in% key(pairs))) {
-    stop(
-      "Conflicting or overlapping unordered pairs in `group_exogamy`.",
-      call. = FALSE
+  key <- function(t) paste(t$female_group, t$male_group, sep = ":")
+  both <- intersect(key(prohibited), key(pairs))
+  if (length(both)) {
+    abort_hammel(
+      c(
+        "{.arg group_exogamy} gives some pairs both an effect and {.code NA}.",
+        "x" = "Pairs: {.val {both}}."
+      ),
+      "specification",
+      argument = "group_exogamy",
+      call = call
     )
   }
   out$effects <- effects
@@ -402,103 +443,134 @@ split_group_exogamy <- function(x) {
 # The table form of `group_exogamy` (D139): `<dim>_x`/`<dim>_y` columns and
 # `log_odds`, one unordered pair of combinations per row, NA prohibiting.
 # Returns the table's dimensions (in column order).
-exogamy_table_dimensions <- function(x) {
+exogamy_table_dimensions <- function(x, call = rlang::caller_env()) {
   columns <- setdiff(names(x), "log_odds")
-  if (any(c("female_group", "male_group") %in% names(x))) {
-    stop(
-      paste(
-        paste0(
-          "A `group_exogamy` table uses `<group>_x` and ",
-          "`<group>_y` columns and `log_odds`,"
-        ),
-        paste0(
-          "such as `race_x`, `race_y`; the ",
-          "female_group/male_group form is removed."
-        )
+  hint <- paste(
+    "A {.arg group_exogamy} table has {.field <group>_x} and",
+    "{.field <group>_y} columns for each dimension, such as {.field race_x}",
+    "and {.field race_y}, and a {.field log_odds} column."
+  )
+  old <- intersect(c("female_group", "male_group"), names(x))
+  if (length(old)) {
+    abort_hammel(
+      c(
+        "{.arg group_exogamy} tables no longer use {.field {old}} columns.",
+        "i" = hint
       ),
-      call. = FALSE
+      "specification",
+      argument = "group_exogamy",
+      call = call
     )
   }
-  if (!"log_odds" %in% names(x) || !length(columns) ||
-        any(!grepl("_[xy]$", columns))) {
-    stop(
-      paste0(
-        "A `group_exogamy` table needs `<group>_x` and ",
-        "`<group>_y` columns and `log_odds`, and no others."
+  bad <- columns[!grepl("_[xy]$", columns)]
+  if (!"log_odds" %in% names(x) || !length(columns) || length(bad)) {
+    abort_hammel(
+      c(
+        "{.arg group_exogamy} has the wrong columns for a pair table.",
+        "x" = "Its columns are {.field {names(x)}}.",
+        "i" = hint
       ),
-      call. = FALSE
+      "specification",
+      argument = "group_exogamy",
+      call = call
     )
   }
   dims <- unique(sub("_[xy]$", "", columns))
-  if (!setequal(columns, c(paste0(dims, "_x"), paste0(dims, "_y")))) {
-    stop(
-      paste0(
-        "Each dimension in a `group_exogamy` table needs ",
-        "both `<group>_x` and `<group>_y` columns."
+  expected <- c(paste0(dims, "_x"), paste0(dims, "_y"))
+  if (!setequal(columns, expected)) {
+    absent <- setdiff(expected, columns)
+    abort_hammel(
+      c(
+        "Each dimension in a {.arg group_exogamy} table needs both columns.",
+        "x" = "Missing: {.field {absent}}.",
+        "i" = hint
       ),
-      call. = FALSE
+      "specification",
+      argument = "group_exogamy",
+      call = call
     )
   }
   dims
 }
 
 # Validate a table; returns it with character categories.
-validate_exogamy_table <- function(x) {
-  dims <- exogamy_table_dimensions(x)
+validate_exogamy_table <- function(x, call = rlang::caller_env()) {
+  dims <- exogamy_table_dimensions(x, call = call)
   for (column in setdiff(names(x), "log_odds")) {
-    check_groups(
-      tibble::tibble(group = x[[column]]), paste0("group_exogamy$", column)
+    check_group_labels(
+      x[[column]], paste0("group_exogamy$", column),
+      call = call
     )
   }
   v <- x$log_odds
   if (!(is.numeric(v) || is.logical(v)) || is.complex(v) || !is.null(dim(v)) ||
         any(is.infinite(v))) {
-    stop(
-      "`group_exogamy$log_odds` must be finite effects or NA prohibitions.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        paste(
+          "Column {.field log_odds} of {.arg group_exogamy} must contain",
+          "finite effects or {.code NA} prohibitions."
+        ),
+        "x" = "It is {describe_value(v)}."
+      ),
+      "specification",
+      argument = "group_exogamy",
+      call = call
     )
   }
   side <- function(s) {
     do.call(
       paste, c(
         lapply(dims, function(d) as.character(x[[paste0(d, "_", s)]])),
-        sep = "\r"
+        sep = "|"
       )
     )
   }
   a <- side("x")
   b <- side("y")
-  key <- ifelse(a <= b, paste(a, b, sep = "\n"), paste(b, a, sep = "\n"))
-  if (anyDuplicated(key)) {
-    stop(
-      paste0(
-        "A `group_exogamy` table lists a pair more than once ",
-        "(in either order)."
+  key <- ifelse(a <= b, paste(a, b, sep = ":"), paste(b, a, sep = ":"))
+  rows <- which(duplicated(key) | duplicated(key, fromLast = TRUE))
+  if (length(rows)) {
+    abort_hammel(
+      c(
+        "{.arg group_exogamy} lists some pairs more than once.",
+        "x" = "Repeated pairs at {format_rows(rows)}.",
+        "i" = paste(
+          "Pairs are unordered, so each pair may appear once, in either",
+          "order."
+        )
       ),
-      call. = FALSE
+      "specification",
+      argument = "group_exogamy",
+      rows = rows,
+      call = call
     )
   }
-  if (any(is.na(v) & a == b)) {
-    stop(
-      paste0(
-        "A `group_exogamy` table cannot prohibit unions ",
-        "within a combination of categories."
+  rows <- which(is.na(v) & a == b)
+  if (length(rows)) {
+    abort_hammel(
+      c(
+        "{.arg group_exogamy} can't prohibit unions within a combination.",
+        "x" = "Prohibited within a combination at {format_rows(rows)}."
       ),
-      call. = FALSE
+      "specification",
+      argument = "group_exogamy",
+      rows = rows,
+      call = call
     )
   }
   invisible(dims)
 }
 
 # The dimensions a matching model's group effects use.
-matching_dimensions <- function(model, dims) {
+matching_dimensions <- function(model, dims, call = rlang::caller_env()) {
   vars <- grep("^(female|male|same)_.+", all.vars(model$formula), value = TRUE)
   used <- sub("^(female|male|same)_", "", vars)
   bare <- FALSE
   for (field in matching_settings) {
     x <- model[[field]]
     if (field == "group_exogamy" && is.data.frame(x)) {
-      used <- c(used, exogamy_table_dimensions(x))
+      used <- c(used, exogamy_table_dimensions(x, call = call))
     } else if (is_dimension_list(x)) {
       used <- c(used, names(x))
     } else if (!is.null(x) && !identical(x, FALSE) && length(x)) {
@@ -506,59 +578,93 @@ matching_dimensions <- function(model, dims) {
     }
   }
   if (bare) {
+    if (!length(dims)) {
+      abort_hammel(
+        c(
+          "Group effects in matching need a declared group dimension.",
+          "i" = "Declare dimensions with {.fn set_groups}."
+        ),
+        "groups",
+        call = call
+      )
+    }
     if (length(dims) != 1L) {
-      stop(
-        if (!length(dims)) {
-          paste0(
-            "Group effects in matching require a declared ",
-            "group dimension; use set_groups()."
+      abort_hammel(
+        c(
+          "Matching group settings must name their dimension.",
+          "x" = "The model declares several dimensions: {.val {dims}}.",
+          "i" = paste0(
+            "Give settings as a list by dimension, such as ",
+            "{.code group_exogamy = list(", dims[1], " = ...)}."
           )
-        } else {
-          sprintf(
-            paste(
-              paste0(
-                "Name the dimension of matching group settings with a ",
-                "list, such as"
-              ),
-              paste0(
-                "`group_exogamy = list(%s = ...)`; this model ",
-                "declares %s."
-              )
-            ),
-            dims[1], paste0("`", dims, "`", collapse = ", ")
-          )
-        },
-        call. = FALSE
+        ),
+        "groups",
+        call = call
       )
     }
     used <- c(used, dims)
   }
   used <- unique(used)
   if (length(used) && !length(dims)) {
-    stop(
-      paste0(
-        "Group effects in matching require a declared ",
-        "group dimension; use set_groups()."
+    abort_hammel(
+      c(
+        "Group effects in matching need a declared group dimension.",
+        "x" = "Matching uses {.field {used}}.",
+        "i" = "Declare dimensions with {.fn set_groups}."
       ),
-      call. = FALSE
+      "groups",
+      call = call
     )
   }
   unknown <- setdiff(used, dims)
   if (length(unknown)) {
-    stop(
-      sprintf(
-        "Matching uses %s, which is not a declared group dimension.",
-        paste0("`", unknown, "`", collapse = ", ")
+    abort_hammel(
+      c(
+        "Matching uses {.field {unknown}}, which {?isn't/aren't} declared.",
+        "i" = "Declared dimensions: {.val {dims}}."
       ),
-      call. = FALSE
+      "groups",
+      group = unknown,
+      call = call
     )
   }
   used
 }
 
+# Report coefficient names that do not match a matching formula's model-matrix
+# columns.
+abort_matching_coefficients <- function(
+  coefficients,
+  columns,
+  call = rlang::caller_env()
+) {
+  missing <- setdiff(columns, names(coefficients))
+  extra <- setdiff(names(coefficients), columns)
+  abort_hammel(
+    c(
+      "Matching {.arg coefficients} must be named for each model column.",
+      "x" = if (length(missing)) "Missing: {.val {missing}}.",
+      "x" = if (length(extra)) "Unknown: {.val {extra}}.",
+      "i" = if (length(columns)) {
+        "The model columns are {.val {columns}}."
+      } else {
+        "The formula has no model columns, so give no coefficients."
+      }
+    ),
+    "specification",
+    argument = "coefficients",
+    call = call
+  )
+}
+
 # The internal model for dimension `dim` (NULL: no group effects), with
 # categories as `group_levels`.
-internal_matching_model <- function(model, dim, categories) {
+internal_matching_model <- function(
+  model,
+  dim,
+  categories,
+  call = rlang::caller_env()
+) {
   pick <- function(x) if (is_dimension_list(x)) x[[dim]] else x
   if (is.null(dim)) {
     internal <- structure(
@@ -572,7 +678,7 @@ internal_matching_model <- function(model, dim, categories) {
       ),
       class = "hammel_matching_model"
     )
-    validate_internal_matching(internal)
+    validate_internal_matching(internal, call = call)
     return(internal)
   }
   public <- paste0(c("female_", "male_", "same_"), dim)
@@ -592,12 +698,18 @@ internal_matching_model <- function(model, dim, categories) {
   coefficients <- model$coefficients
   vars <- intersect(public, all.vars(formula))
   if (any(public[1:2] %in% vars) && length(categories) < 2L) {
-    stop(
-      paste0(
-        "Categorical matching predictors require a group ",
-        "dimension with at least two categories."
+    abort_hammel(
+      c(
+        paste(
+          "{.code female_} and {.code male_} matching predictors need a",
+          "dimension with at least two categories."
+        ),
+        "x" = "{.field {dim}} has {length(categories)} category.",
+        "i" = "Use a {.code same_} predictor instead."
       ),
-      call. = FALSE
+      "groups",
+      group = dim,
+      call = call
     )
   }
   if (length(vars)) {
@@ -615,16 +727,7 @@ internal_matching_model <- function(model, dim, categories) {
     names(data)[match(public, names(data))] <- private
     translated <- colnames(matching_design_matrix(renamed, data))
     if (!setequal(original, names(coefficients))) {
-      stop(
-        sprintf(
-          paste0(
-            "Matching coefficient names must match the ",
-            "model-matrix columns: %s."
-          ),
-          paste(original, collapse = ", ")
-        ),
-        call. = FALSE
-      )
+      abort_matching_coefficients(coefficients, original, call = call)
     }
     names(coefficients) <- translated[match(names(coefficients), original)]
   }
@@ -636,10 +739,11 @@ internal_matching_model <- function(model, dim, categories) {
         male_group = as.character(table[[paste0(dim, "_y")]]),
         log_odds = as.numeric(table$log_odds),
         stringsAsFactors = FALSE
-      )
+      ),
+      call = call
     )
   } else {
-    split_group_exogamy(pick(model$group_exogamy))
+    split_group_exogamy(pick(model$group_exogamy), call = call)
   }
   internal <- structure(
     list(
@@ -656,7 +760,7 @@ internal_matching_model <- function(model, dim, categories) {
     ),
     class = "hammel_matching_model"
   )
-  validate_internal_matching(internal)
+  validate_internal_matching(internal, call = call)
   internal
 }
 
@@ -666,7 +770,12 @@ internal_matching_model <- function(model, dim, categories) {
 # a decode table so formula predictors are evaluated from combinations.
 # `categories` lists every matching dimension's categories (declaration
 # order, first varying fastest); `labels` names the combinations.
-combined_matching_model <- function(model, categories, labels) {
+combined_matching_model <- function(
+  model,
+  categories,
+  labels,
+  call = rlang::caller_env()
+) {
   dims <- names(categories)
   sizes <- vapply(categories, length, integer(1))
   strides <- cumprod(c(1, utils::head(sizes, -1)))
@@ -710,8 +819,8 @@ combined_matching_model <- function(model, categories, labels) {
     }
   }
   for (d in if (is.data.frame(model$group_exogamy)) character() else own) {
-    exogamy <- split_group_exogamy(pick(model$group_exogamy, d))
-    pairs <- expand_group_exogamy(exogamy$effects)
+    exogamy <- split_group_exogamy(pick(model$group_exogamy, d), call = call)
+    pairs <- expand_group_exogamy(exogamy$effects, call = call)
     for (r in seq_len(nrow(pairs))) {
       f <- decode[[d]] == as.character(pairs$female_group[r])
       m <- decode[[d]] == as.character(pairs$male_group[r])
@@ -758,12 +867,15 @@ combined_matching_model <- function(model, categories, labels) {
     }
     unknown <- setdiff(names(x), as.character(categories[[d]]))
     if (length(unknown)) {
-      stop(
-        sprintf(
-          "`delta` names must be categories of `%s`; unknown: %s.", d,
-          paste(unknown, collapse = ", ")
+      abort_hammel(
+        c(
+          "{.arg delta} names must be categories of {.field {d}}.",
+          "x" = "Unknown: {.val {unknown}}."
         ),
-        call. = FALSE
+        "groups",
+        group = d,
+        categories = unknown,
+        call = call
       )
     }
     adjustment <- unname(x[decode[[d]]])
@@ -787,12 +899,19 @@ combined_matching_model <- function(model, categories, labels) {
     categorical <- vars[grepl("^(female|male)_", vars)]
     small <- sub("^(female|male)_", "", categorical)
     if (any(sizes[small] < 2L)) {
-      stop(
-        paste0(
-          "Categorical matching predictors require a group ",
-          "dimension with at least two categories."
+      abort_hammel(
+        c(
+          paste(
+            "{.code female_} and {.code male_} matching predictors need a",
+            "dimension with at least two categories."
+          ),
+          "i" = paste(
+            "Use {.code same_} predictors for a dimension with one",
+            "category."
+          )
         ),
-        call. = FALSE
+        "groups",
+        call = call
       )
     }
     n <- max(2L, k)
@@ -802,16 +921,7 @@ combined_matching_model <- function(model, categories, labels) {
     data <- matching_predictor_data(internal, seq_len(n), female, male)
     columns <- colnames(matching_design_matrix(model$formula, data))
     if (!setequal(columns, names(model$coefficients))) {
-      stop(
-        sprintf(
-          paste0(
-            "Matching coefficient names must match the ",
-            "model-matrix columns: %s."
-          ),
-          paste(columns, collapse = ", ")
-        ),
-        call. = FALSE
-      )
+      abort_matching_coefficients(model$coefficients, columns, call = call)
     }
   }
   internal
@@ -841,14 +951,23 @@ combination_labels <- function(categories) {
 # With one, models use the one-dimension form; with several, the combined
 # form over their combinations. Returns the process, the matching dimensions
 # and the category labels the engine uses (NULL when there are none).
-resolve_matching_models <- function(process, declaration, registries) {
+resolve_matching_models <- function(
+  process,
+  declaration,
+  registries,
+  call = rlang::caller_env()
+) {
   dims <- names(declaration)
   fields <- c("matching", "father_matching", "cohab_matching")
   used <- unique(
     unlist(
       lapply(
         fields, function(f) {
-          lapply(model_entries(process[[f]]), matching_dimensions, dims = dims)
+          lapply(
+            model_entries(process[[f]]), matching_dimensions,
+            dims = dims,
+            call = call
+          )
         }
       )
     )
@@ -860,7 +979,7 @@ resolve_matching_models <- function(process, declaration, registries) {
     )
     labels <- combination_labels(categories)
     convert <- function(model) {
-      combined_matching_model(model, categories, labels)
+      combined_matching_model(model, categories, labels, call = call)
     }
   } else {
     dim <- if (length(used)) used else NULL
@@ -869,7 +988,9 @@ resolve_matching_models <- function(process, declaration, registries) {
     convert <- function(model) {
       internal_matching_model(
         model,
-        if (length(matching_dimensions(model, dims))) dim, categories
+        if (length(matching_dimensions(model, dims, call = call))) dim,
+        categories,
+        call = call
       )
     }
   }
@@ -878,11 +999,15 @@ resolve_matching_models <- function(process, declaration, registries) {
     if (is.null(x)) {
       next
     }
-    if (is_model_schedule(x)) {
-      x$model <- lapply(x$model, convert)
-    } else {
-      x <- convert(x)
-    }
+    x <- with_error_context(
+      if (is_model_schedule(x)) {
+        x$model <- lapply(x$model, convert)
+        x
+      } else {
+        convert(x)
+      },
+      paste0("In the ", f, " model.")
+    )
     process[f] <- list(x)
   }
   list(process = process, dims = used, values = labels)

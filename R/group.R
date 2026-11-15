@@ -70,7 +70,10 @@ group <- function(
     list(
       categories = categories,
       ancestry = ancestry,
-      inheritance = normalize_group_inheritance(inheritance)
+      inheritance = normalize_group_inheritance(
+        inheritance,
+        call = rlang::current_env()
+      )
     ),
     class = "hammel_group"
   )
@@ -85,7 +88,7 @@ set_groups <- function(model, ...) {
   check_model(model)
   groups <- list(...)
   declaration <- if (length(groups)) {
-    normalize_group_declaration(groups)
+    normalize_group_declaration(groups, name = "...")
   } else {
     NULL
   }
@@ -184,49 +187,83 @@ print_group_details <- function(x) {
   invisible(x)
 }
 
-validate_group <- function(x, name = "group") {
+validate_group <- function(x, name = NULL, call = rlang::caller_env()) {
   if (!inherits(x, "hammel_group") || !is.list(x)) {
-    stop(
-      sprintf("Group dimension `%s` must be created with group().", name),
-      call. = FALSE
+    abort_hammel(
+      c(
+        if (is.null(name)) {
+          "A group dimension must be created with {.fn group}."
+        } else {
+          "Group dimension {.field {name}} must be created with {.fn group}."
+        },
+        "x" = "It is {describe_value(x)}."
+      ),
+      "specification",
+      group = name,
+      call = call
     )
   }
   if (!is.null(x$categories)) {
-    check_groups(tibble::tibble(group = x$categories), "categories")
+    check_group_labels(x$categories, "categories", call = call)
     if (!length(x$categories) || anyDuplicated(as.character(x$categories))) {
-      stop(
-        sprintf(
-          paste0(
-            "`categories` of group `%s` must be a nonempty ",
-            "vector of unique labels."
-          ), name
+      repeated <- unique(
+        as.character(x$categories)[duplicated(as.character(x$categories))]
+      )
+      abort_hammel(
+        c(
+          "{.arg categories} must be a nonempty vector of unique labels.",
+          "x" = if (length(repeated)) {
+            "Repeated: {.val {repeated}}."
+          } else {
+            "It is empty."
+          }
         ),
-        call. = FALSE
+        "groups",
+        argument = "categories",
+        group = name,
+        call = call
       )
     }
   }
   if (!is.logical(x$ancestry) || length(x$ancestry) != 1L ||
         is.na(x$ancestry)) {
-    stop(
-      sprintf("`ancestry` of group `%s` must be TRUE or FALSE.", name),
-      call. = FALSE
+    abort_hammel(
+      c(
+        "{.arg ancestry} must be {.code TRUE} or {.code FALSE}.",
+        "x" = "It is {describe_value(x$ancestry)}."
+      ),
+      "argument",
+      argument = "ancestry",
+      group = name,
+      call = call
     )
   }
   if (is_model_schedule(x$inheritance)) {
     validate_model_argument(
-      x$inheritance, validate_group_inheritance,
-      "inheritance"
+      x$inheritance, validate_group_inheritance, "inheritance",
+      call = call
     )
   } else {
-    validate_group_inheritance(x$inheritance)
+    validate_group_inheritance(x$inheritance, call = call)
   }
   invisible(x)
 }
 
-check_group_names <- function(names) {
+check_group_names <- function(names, call = rlang::caller_env()) {
   if (is.null(names) || anyNA(names) || any(!nzchar(names)) ||
         anyDuplicated(names)) {
-    stop("Group dimensions must have unique, nonempty names.", call. = FALSE)
+    abort_hammel(
+      c(
+        "Group dimensions must have unique, nonempty names.",
+        "x" = if (is.null(names)) {
+          "They have no names."
+        } else {
+          "Their names are {.val {names}}."
+        }
+      ),
+      "groups",
+      call = call
+    )
   }
   bad <- names[
     names %in% reserved_group_names |
@@ -235,12 +272,21 @@ check_group_names <- function(names) {
       !grepl("^[A-Za-z][A-Za-z0-9_.]*$", names)
   ]
   if (length(bad)) {
-    stop(
-      sprintf(
-        "Group dimension name(s) %s are reserved or not valid names.",
-        paste0("`", bad, "`", collapse = ", ")
+    abort_hammel(
+      c(
+        "Some group dimension names are reserved or invalid.",
+        "x" = "Invalid: {.val {bad}}.",
+        "i" = paste(
+          "Names must start with a letter and use letters, digits, {.code _}",
+          "or {.code .}. They can't start with {.code partner_},",
+          "{.code same_}, {.code female_}, {.code male_} or",
+          "{.code ancestry_}, end in {.code _w} or {.code _h}, or be a",
+          "Hammel column name such as {.val sex} or {.val parity}."
+        )
       ),
-      call. = FALSE
+      "groups",
+      group = bad,
+      call = call
     )
   }
   invisible(names)
@@ -248,25 +294,41 @@ check_group_names <- function(names) {
 
 # Accept NULL, a character vector of dimension names (default settings) or a
 # named list of group() objects.
-normalize_group_declaration <- function(groups) {
+normalize_group_declaration <- function(
+  groups,
+  name = "groups",
+  call = rlang::caller_env()
+) {
   if (is.null(groups) || (is.list(groups) && !length(groups))) {
     return(NULL)
   }
   if (is.character(groups)) {
-    check_group_names(groups)
+    check_group_names(groups, call = call)
     return(stats::setNames(lapply(groups, function(name) group()), groups))
   }
   if (!is.list(groups) || inherits(groups, "hammel_group")) {
-    stop(
-      "`groups` must be dimension names or a named list of group() objects.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        paste(
+          "{.arg {name}} must be dimension names or {.fn group} objects",
+          "named by dimension."
+        ),
+        "x" = "It is {describe_value(groups)}.",
+        "i" = "For example, {.code list(race = group(ancestry = TRUE))}."
+      ),
+      "groups",
+      argument = name,
+      call = call
     )
   }
-  check_group_names(names(groups))
-  for (name in names(groups)) {
-    validate_group(groups[[name]], name)
-    groups[[name]]["inheritance"] <- list(
-      normalize_group_inheritance(groups[[name]]$inheritance)
+  check_group_names(names(groups), call = call)
+  for (dimension in names(groups)) {
+    with_error_context(
+      validate_group(groups[[dimension]], dimension, call = call),
+      paste0("In group dimension ", dimension, ".")
+    )
+    groups[[dimension]]["inheritance"] <- list(
+      normalize_group_inheritance(groups[[dimension]]$inheritance, call = call)
     )
   }
   groups
@@ -274,8 +336,12 @@ normalize_group_declaration <- function(groups) {
 
 # Replace a population's declaration. Ancestry shares are dropped when the new
 # declaration does not track them (and initialized later when it does).
-apply_group_declaration <- function(population, declaration) {
-  declaration <- normalize_group_declaration(declaration)
+apply_group_declaration <- function(
+  population,
+  declaration,
+  call = rlang::caller_env()
+) {
+  declaration <- normalize_group_declaration(declaration, call = call)
   # A dimension declared without categories keeps the categories the
   # population already declares (so turning on ancestry, say, keeps their
   # order).
@@ -288,13 +354,13 @@ apply_group_declaration <- function(population, declaration) {
   population$groups <- declaration
   # Keep ancestry only for dimensions that track it.
   if (!is.null(population$ancestry)) {
-    ancestry <- as_ancestry_list(population$ancestry, declaration)
+    ancestry <- as_ancestry_list(population$ancestry, declaration, call = call)
     ancestry <- ancestry[intersect(
       names(ancestry), tracked_ancestry(declaration)
     )]
     population$ancestry <- if (length(ancestry)) ancestry else NULL
   }
-  validate_group_declaration(declaration, population)
+  validate_group_declaration(declaration, population, call = call)
   population
 }
 
@@ -325,34 +391,48 @@ single_dimension <- function(population) {
 }
 
 # Check a declaration against a population's persons and transition history.
-validate_group_declaration <- function(declaration, population) {
+validate_group_declaration <- function(
+  declaration,
+  population,
+  call = rlang::caller_env()
+) {
   persons <- population$persons
   for (name in names(declaration)) {
     if (!name %in% names(persons)) {
-      stop(
-        sprintf("Declared group `%s` is not a persons column.", name),
-        call. = FALSE
+      abort_hammel(
+        c(
+          "Declared group {.field {name}} isn't a column of {.field persons}.",
+          "i" = paste(
+            "Add the column to the persons table, or remove the",
+            "declaration."
+          )
+        ),
+        "groups",
+        group = name,
+        call = call
       )
     }
-    check_groups(
-      tibble::tibble(group = persons[[name]]), paste0("persons$", name)
-    )
+    check_group_labels(persons[[name]], paste0("persons$", name), call = call)
     categories <- declaration[[name]]$categories
     # Ancestry tables name their columns by category.
-    if (isTRUE(declaration[[name]]$ancestry) &&
-          any(
-            c("unknown", "person_id") %in%
-              as.character(c(persons[[name]], categories))
-          )) {
-      stop(
-        sprintf(
-          paste0(
-            "Group `%s` tracks ancestry, so its categories ",
-            "cannot be named `unknown` and `person_id`."
+    reserved <- intersect(
+      c("unknown", "person_id"),
+      as.character(c(persons[[name]], categories))
+    )
+    if (isTRUE(declaration[[name]]$ancestry) && length(reserved)) {
+      abort_hammel(
+        c(
+          paste(
+            "Group {.field {name}} tracks ancestry, so it can't use some",
+            "category names."
           ),
-          name
+          "x" = "Reserved: {.val {reserved}}.",
+          "i" = "Ancestry tables use these names for their own columns."
         ),
-        call. = FALSE
+        "groups",
+        group = name,
+        categories = reserved,
+        call = call
       )
     }
     if (!is.null(categories)) {
@@ -365,56 +445,63 @@ validate_group_declaration <- function(declaration, population) {
       )
       missing <- setdiff(values, as.character(categories))
       if (length(missing)) {
-        stop(
-          sprintf(
-            "Group `%s` has values missing from its categories: %s.",
-            name,
-            paste(missing, collapse = ", ")
+        abort_hammel(
+          c(
+            "Group {.field {name}} has values missing from its categories.",
+            "x" = "Undeclared: {.val {missing}}.",
+            "i" = "Declared categories: {.val {as.character(categories)}}."
           ),
-          call. = FALSE
+          "groups",
+          group = name,
+          categories = missing,
+          call = call
         )
       }
     }
   }
   if (!length(declaration) && !is.null(population$transitions) &&
         nrow(population$transitions)) {
-    stop(
-      "Transition histories require a declared group dimension.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "Transition histories need a declared group dimension.",
+        "i" = "Declare dimensions with {.arg groups} or {.fn set_groups}."
+      ),
+      "groups",
+      argument = "transitions",
+      call = call
     )
   }
   if (!is.null(population[["ancestry"]])) {
     tracked <- tracked_ancestry(declaration)
-    if (!length(declaration)) {
-      stop(
-        paste0(
-          "Ancestry requires a declared group dimension with ",
-          "`ancestry = TRUE`."
+    if (!length(declaration) || !length(tracked)) {
+      abort_hammel(
+        c(
+          "Ancestry tables need a group dimension that tracks ancestry.",
+          "i" = "Declare it with {.code group(ancestry = TRUE)}."
         ),
-        call. = FALSE
+        "groups",
+        argument = "ancestry",
+        call = call
       )
     }
-    if (!length(tracked)) {
-      stop(
-        paste0(
-          "An ancestry table requires `ancestry = TRUE` for ",
-          "its group dimension."
-        ),
-        call. = FALSE
-      )
-    }
-    ancestry <- as_ancestry_list(population[["ancestry"]], declaration)
+    ancestry <- as_ancestry_list(
+      population[["ancestry"]], declaration,
+      call = call
+    )
     extra <- setdiff(names(ancestry), tracked)
     if (length(extra)) {
-      stop(
-        sprintf(
-          paste0(
-            "Ancestry is supplied for %s, which does not track ",
-            "ancestry (`ancestry = TRUE`)."
-          ),
-          paste0("`", extra, "`", collapse = ", ")
+      abort_hammel(
+        c(
+          "Ancestry is supplied for dimensions that don't track ancestry.",
+          "x" = "Dimensions: {.field {extra}}.",
+          "i" = paste(
+            "Declare them with {.code group(ancestry = TRUE)}, or remove",
+            "their tables."
+          )
         ),
-        call. = FALSE
+        "groups",
+        group = extra,
+        call = call
       )
     }
   }

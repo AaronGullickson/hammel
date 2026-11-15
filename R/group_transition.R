@@ -96,21 +96,7 @@ group_transition <- function(
   weights = NULL,
   household = NULL
 ) {
-  process <- new_rate_process("group_transition", rates)
-  process$group <- check_transition_group(group)
-  if (!is.null(household) && !inherits(household, "hammel_household")) {
-    stop("`household` must be NULL or created with household().", call. = FALSE)
-  }
-  process["household"] <- list(household)
-  validate_group_transition(process)
-  validate_process_weights(weights, "transition")
-  warn_cancelled_weight_terms(
-    weights,
-    weight_strata("transition", rates, group),
-    "group transition"
-  )
-  process$weights <- normalize_model_argument(weights)
-  process
+  new_group_transition(rates, group, weights, household)
 }
 
 #' @rdname group_transition
@@ -122,15 +108,7 @@ set_group_transition <- function(
   weights = NULL,
   household = NULL
 ) {
-  set_process(
-    model,
-    group_transition(
-      rates,
-      group = group,
-      weights = weights,
-      household = household
-    )
-  )
+  attach_process(model, new_group_transition(rates, group, weights, household))
 }
 
 #' Define who moves together in household transitions
@@ -165,9 +143,13 @@ household <- function(age_independence = 18) {
   if (!is.numeric(age_independence) || length(age_independence) != 1L ||
         !is.finite(age_independence) ||
         age_independence < 0) {
-    stop(
-      "`age_independence` must be a finite nonnegative number of years.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "{.arg age_independence} must be a single nonnegative number of years.",
+        "x" = "It is {describe_value(age_independence)}."
+      ),
+      "argument",
+      argument = "age_independence"
     )
   }
   structure(
@@ -327,15 +309,58 @@ format_transition_pairs <- function(pairs, max = 10L) {
   )
 }
 
-check_transition_group <- function(group) {
+# Build a validated transition process for group_transition() and
+# set_group_transition(); errors name `call`.
+new_group_transition <- function(
+  rates,
+  group,
+  weights,
+  household,
+  call = rlang::caller_env()
+) {
+  # Check that `rates` is a table with unique column names before
+  # new_rate_process() converts it; validation checks its contents.
+  check_columns(rates, character(), "rates", call = call)
+  process <- new_rate_process("group_transition", rates)
+  process$group <- check_transition_group(group, call = call)
+  if (!is.null(household) && !inherits(household, "hammel_household")) {
+    abort_hammel(
+      c(
+        "{.arg household} must be {.code NULL} or a household rule.",
+        "x" = "It is {describe_value(household)}.",
+        "i" = "Create one with {.fn household}."
+      ),
+      "specification",
+      argument = "household",
+      call = call
+    )
+  }
+  process["household"] <- list(household)
+  validate_group_transition(process, call = call)
+  validate_process_weights(weights, "transition", call = call)
+  warn_cancelled_weight_terms(
+    weights,
+    weight_strata("transition", rates, group),
+    "group transition"
+  )
+  process$weights <- normalize_model_argument(weights)
+  process
+}
+
+check_transition_group <- function(group, call = rlang::caller_env()) {
   if (is.null(group)) {
     return(NULL)
   }
   if (!is.character(group) || length(group) != 1L || is.na(group) ||
         !nzchar(group)) {
-    stop(
-      "`group` must be NULL or the name of one declared group dimension.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "{.arg group} must be {.code NULL} or the name of one group dimension.",
+        "x" = "It is {describe_value(group)}."
+      ),
+      "argument",
+      argument = "group",
+      call = call
     )
   }
   group
@@ -350,18 +375,25 @@ transition_processes <- function(model) {
 
 # Store a transition process with the model's others, replacing any for the
 # same dimension. A process without `group` takes the only declared dimension.
-store_transition_process <- function(model, process) {
+store_transition_process <- function(
+  model,
+  process,
+  call = rlang::caller_env()
+) {
   declaration <- model_groups(model)
   if (is.null(process$group) && length(declaration) == 1L) {
     process$group <- names(declaration)
   }
   if (is.null(process$group) && length(declaration) > 1L) {
-    stop(
-      sprintf(
-        "Name the dimension whose categories change with `group`: one of %s.",
-        paste0("\"", names(declaration), "\"", collapse = ", ")
+    dimensions <- names(declaration)
+    abort_hammel(
+      c(
+        "{.arg group} must name the dimension whose categories change.",
+        "x" = "The model declares several dimensions: {.val {dimensions}}."
       ),
-      call. = FALSE
+      "groups",
+      argument = "group",
+      call = call
     )
   }
   processes <- transition_processes(model)
@@ -372,17 +404,22 @@ store_transition_process <- function(model, process) {
 }
 
 # Resolve each transition process to a declared dimension, in declaration order.
-resolve_transition_processes <- function(processes, declaration) {
+resolve_transition_processes <- function(
+  processes,
+  declaration,
+  call = rlang::caller_env()
+) {
   if (!length(processes)) {
     return(list())
   }
   if (!length(declaration)) {
-    stop(
-      paste0(
-        "Group transitions require a declared group ",
-        "dimension; use set_groups()."
+    abort_hammel(
+      c(
+        "Group transitions need a declared group dimension.",
+        "i" = "Declare dimensions with {.fn set_groups}."
       ),
-      call. = FALSE
+      "groups",
+      call = call
     )
   }
   dims <- names(declaration)
@@ -392,45 +429,56 @@ resolve_transition_processes <- function(processes, declaration) {
     group <- x$group
     if (is.null(group)) {
       if (length(dims) != 1L) {
-        stop(
-          paste0(
-            "A group transition without `group` needs exactly ",
-            "one declared group dimension."
+        abort_hammel(
+          c(
+            paste(
+              "A group transition without {.arg group} needs exactly one",
+              "declared group dimension."
+            ),
+            "x" = "The model declares {.val {dims}}.",
+            "i" = "Name the dimension with {.arg group}."
           ),
-          call. = FALSE
+          "groups",
+          call = call
         )
       }
       group <- dims
     }
     if (!group %in% dims) {
-      stop(
-        sprintf(
-          paste0(
-            "Group transitions use `%s`, which is not a declared ",
-            "group dimension."
-          ),
-          group
+      abort_hammel(
+        c(
+          "Group transitions use {.field {group}}, which isn't declared.",
+          "i" = paste(
+            "Declared dimensions: {.val {dims}}. Declare it with",
+            "{.fn set_groups}."
+          )
         ),
-        call. = FALSE
+        "groups",
+        group = group,
+        call = call
       )
     }
     if (!is.null(resolved[[group]])) {
-      stop(
-        sprintf("Group `%s` has more than one transition process.", group),
-        call. = FALSE
+      abort_hammel(
+        "Group {.field {group}} has more than one transition process.",
+        "groups",
+        group = group,
+        call = call
       )
     }
     x$group <- group
     if (group %in% names(x$rates)) {
-      stop(
-        sprintf(
-          paste0(
-            "Transition rates for `%s` cannot be stratified by ",
-            "`%s` itself; use `origin`."
+      abort_hammel(
+        c(
+          paste(
+            "Transition rates for {.field {group}} can't be stratified by",
+            "{.field {group}}."
           ),
-          group, group
+          "i" = "Use {.field origin} for the category people move from."
         ),
-        call. = FALSE
+        "groups",
+        group = group,
+        call = call
       )
     }
     resolved[[group]] <- x
@@ -438,105 +486,175 @@ resolve_transition_processes <- function(processes, declaration) {
   resolved[intersect(dims, names(resolved))]
 }
 
-validate_group_transition <- function(process) {
+# Validate in two passes: row checks on the whole table, then checks within
+# each calendar period.
+validate_group_transition <- function(process, call = rlang::caller_env()) {
   if (!identical(process$name, "group_transition")) {
-    stop("Invalid group-transition specification.", call. = FALSE)
+    abort_hammel(
+      "{.arg process} must be a group transition process.",
+      "specification",
+      call = call
+    )
   }
   r <- process$rates
   old <- intersect(c("group_origin", "group_dest"), names(r))
   if (length(old)) {
-    stop(
-      paste0(
-        "Transition rates name categories with `origin` and ",
-        "`destination`, not "
+    abort_hammel(
+      c(
+        paste(
+          "Transition rates name categories with {.field origin} and",
+          "{.field destination}."
+        ),
+        "x" = "Found {.field {old}}.",
+        "i" = "Rename these columns."
       ),
-      paste0("`", old, "`", collapse = " and "), ".",
-      call. = FALSE
+      "rates",
+      argument = "rates",
+      columns = old,
+      call = call
     )
   }
   check_stratified_columns(
     r,
     c("origin", "destination", "sex", "union_type"),
-    "Group-transition"
+    "Group transition",
+    call = call
   )
-  if (validate_calendar_rates(
-        r,
-        function(x) {
-       copy <- process
-       copy$rates <- x
-       validate_group_transition(copy)
-     }
-      )) {
-    return(invisible(process))
-  }
-  check_columns(r, c("origin", "destination", "rate"), "rates")
-  age <- all(c("age_start", "age_end") %in% names(r))
-  dur <- all(c("dur_start", "dur_end") %in% names(r))
-  if (!is.null(process$household) && dur) {
-    stop(
-      paste0(
-        "Household moves need age bands: dependents reach ",
-        "their own clock at a set age."
+  axis <- check_transition_rows(r, process$household, call = call)
+  validate_transition_schedules(r, axis, call = call)
+  invisible(process)
+}
+
+# Row checks for a transition table. Returns its band axis, "age" or "dur".
+check_transition_rows <- function(r, household, call = rlang::caller_env()) {
+  check_columns(r, c("origin", "destination", "rate"), "rates", call = call)
+  if (!nrow(r)) {
+    abort_hammel(
+      c(
+        "{.arg rates} must contain at least one transition.",
+        "x" = "It has no rows."
       ),
-      call. = FALSE
+      "rates",
+      argument = "rates",
+      call = call
     )
   }
-  if (!nrow(r) || age == dur ||
-        any(
-          c("time_start", "time_end", "union_status", "marital_status") %in%
-            names(r)
-        ) ||
-        (age && any(c("dur_start", "dur_end") %in% names(r))) ||
-        (dur && any(c("age_start", "age_end") %in% names(r)))) {
-    stop(
-      "Use one common age or duration band type for all group transitions.",
-      call. = FALSE
+  calendar_rate_segments(r, call = call)
+  status <- intersect(c("union_status", "marital_status"), names(r))
+  if (length(status)) {
+    abort_hammel(
+      c(
+        "Transition rates can't have {.field {status}} columns.",
+        "i" = "Stratify by union status with {.field union_type}."
+      ),
+      "rates",
+      argument = "rates",
+      columns = status,
+      call = call
+    )
+  }
+  band_columns <- intersect(
+    c("age_start", "age_end", "dur_start", "dur_end"),
+    names(r)
+  )
+  age <- all(c("age_start", "age_end") %in% band_columns)
+  dur <- all(c("dur_start", "dur_end") %in% band_columns)
+  if (!is.null(household) && dur) {
+    abort_hammel(
+      c(
+        "Household moves need age bands.",
+        "i" = paste(
+          "Dependents leave the household at an age, so give",
+          "{.field age_start} and {.field age_end} instead of duration bands."
+        )
+      ),
+      "specification",
+      argument = "household",
+      call = call
+    )
+  }
+  if (age == dur || length(band_columns) != 2L) {
+    abort_hammel(
+      c(
+        "{.arg rates} must use either age bands or duration bands.",
+        "x" = if (length(band_columns)) {
+          "Band columns: {.field {band_columns}}."
+        } else {
+          "It has no band columns."
+        },
+        "i" = paste(
+          "Give {.field age_start} and {.field age_end}, or {.field dur_start}",
+          "and {.field dur_end}, for every transition."
+        )
+      ),
+      "rates",
+      argument = "rates",
+      call = call
     )
   }
   for (column in c("origin", "destination")) {
-    check_groups(data.frame(group = r[[column]]), column)
+    check_group_labels(r[[column]], paste0("rates$", column), call = call)
   }
-  if (any(as.character(r$origin) == as.character(r$destination))) {
-    stop(
-      "Group transitions cannot have the same origin and destination.",
-      call. = FALSE
+  rows <- which(as.character(r$origin) == as.character(r$destination))
+  if (length(rows)) {
+    abort_hammel(
+      c(
+        "Transitions must move between different categories.",
+        "x" = paste(
+          "{.field origin} equals {.field destination} at",
+          "{format_rows(rows)}."
+        )
+      ),
+      "rates",
+      argument = "rates",
+      rows = rows,
+      call = call
     )
   }
-  start <- r[[if (age) "age_start" else "dur_start"]]
-  end <- r[[if (age) "age_end" else "dur_end"]]
-  check_numeric_column(start, "band start")
-  check_numeric_column(r$rate, "rate")
-  if (any(start < 0) || any(r$rate < 0) || !is.numeric(end) ||
-        !is.null(dim(end)) ||
-        anyNA(end) ||
-        any(end <= start)) {
-    stop(
-      paste0(
-        "Transition rates and band starts must be ",
-        "nonnegative with valid band ends."
-      ),
-      call. = FALSE
+  axis <- if (age) "age" else "dur"
+  check_bands(r, axis, call = call)
+  check_numeric_column(r$rate, "rates$rate", call = call)
+  check_nonnegative(r$rate, "rates$rate", call = call)
+  if ("sex" %in% names(r)) {
+    check_labels(r$sex, "rates$sex", c("m", "f"), call = call)
+  }
+  if ("union_type" %in% names(r)) {
+    check_labels(
+      r$union_type, "rates$union_type",
+      c("unpartnered", "partnered", "cohab", "marriage"),
+      call = call
     )
   }
-  if ("sex" %in% names(r) &&
-        (!is.character(r$sex) || anyNA(r$sex) ||
-           any(!r$sex %in% c("m", "f")))) {
-    stop("Transition sex must be m or f.", call. = FALSE)
+  axis
+}
+
+# Within each calendar period: one union-type scheme and bands that do not
+# overlap within a stratum.
+validate_transition_schedules <- function(r, axis, call = rlang::caller_env()) {
+  if (validate_calendar_rates(
+        r,
+        function(x) {
+          validate_transition_schedules(x, axis, call = call)
+        },
+        call = call
+      )) {
+    return(invisible(r))
   }
-  if ("union_type" %in% names(r) &&
-        (!is.character(r$union_type) || anyNA(r$union_type) ||
-           any(
-             !r$union_type %in%
-               c("unpartnered", "partnered", "cohab", "marriage")
-           ) ||
-           ("partnered" %in% r$union_type &&
-              any(r$union_type %in% c("cohab", "marriage"))))) {
-    stop(
-      paste0(
-        "Transition union_type must use ",
-        "unpartnered/partnered or unpartnered/cohab/marriage."
+  if ("union_type" %in% names(r) && "partnered" %in% r$union_type &&
+        any(r$union_type %in% c("cohab", "marriage"))) {
+    types <- unique(r$union_type)
+    abort_hammel(
+      c(
+        paste(
+          "Column {.field union_type} of {.arg rates} must use",
+          "{.val unpartnered} and {.val partnered}, or {.val unpartnered},",
+          "{.val cohab} and {.val marriage}."
+        ),
+        "x" = "It mixes them: {.val {types}}."
       ),
-      call. = FALSE
+      "rates",
+      argument = "rates",
+      call = call
     )
   }
   keys <- c(
@@ -549,14 +667,15 @@ validate_group_transition <- function(process) {
     )
   )
   for (rows in split(seq_len(nrow(r)), strata)) {
-    rows <- rows[order(start[rows])]
-    if (length(rows) > 1L &&
-          any(start[rows[-1L]] < head(cummax(end[rows]), -1L))) {
-      stop(
-        "Group-transition bands must not overlap within a stratum.",
-        call. = FALSE
-      )
-    }
+    values <- vapply(
+      keys,
+      function(column) {
+        as.character(r[[column]][rows[1]])
+      },
+      character(1)
+    )
+    schedule <- paste0(" for ", paste(keys, "=", values, collapse = ", "))
+    check_band_overlap(r, rows, axis, schedule = schedule, call = call)
   }
-  invisible(process)
+  invisible(r)
 }

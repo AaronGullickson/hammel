@@ -140,7 +140,7 @@ test_that("group-stratified rates require a declared group dimension", {
     edited <- model
     edited$processes[[name]]$rates <- group_rates(edited$processes[[name]]$rates, b = 1e8)
     expect_error(run_simulation(edited, 1, seed = 12),
-      "not a declared group dimension")
+      "isn't declared", class = "hammel_error_groups")
   }
 })
 

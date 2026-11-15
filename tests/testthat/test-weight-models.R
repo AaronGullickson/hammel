@@ -31,14 +31,19 @@ test_that("weight models validate formulas, coefficients and variables", {
   # Names that could be group variables are checked against the declaration
   # at simulation; others fail when the model is set.
   education <- set_mortality(model, mortality_rates, weights = weight_model(~ education, c(education = 1)))
-  expect_error(run_simulation(education, 0),
-    "not available for this process: education")
+  error <- expect_error(
+    run_simulation(education, 0),
+    class = "hammel_error_specification"
+  )
+  expect_identical(error$variables, "education")
   expect_error(set_mortality(model, mortality_rates,
-    weights = weight_model(~ parity, c(paritx = 1))), "missing parity; unknown paritx")
+    weights = weight_model(~ parity, c(paritx = 1))),
+    "Missing: \"parity\".*Unknown: \"paritx\"",
+    class = "hammel_error_specification")
   expect_error(set_mortality(model, mortality_rates,
-    weights = weight_model(~ same_group, c(same_group = 1))), "not available")
+    weights = weight_model(~ same_group, c(same_group = 1))), "can't use", class = "hammel_error_specification")
   expect_error(set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = .1),
-    weights = weight_model(~ partnered, c(partnered = 1))), "not available")
+    weights = weight_model(~ partnered, c(partnered = 1))), "can't use", class = "hammel_error_specification")
   expect_error(set_mortality(model, mortality_rates, weights = list()), "weight_model")
   # Interactions follow R's model-matrix coding and names.
   w <- weight_model(~ union_type * parity,
@@ -161,7 +166,8 @@ test_that("missing variables contribute zero with one warning", {
   grouped <- weighted_mortality_model(20, groups = c("A", "B"))
   expect_error(run_simulation(set_mortality(grouped, mortality_rates, weights =
     partial), 1),
-    "groupB; missing groupB; unknown groupC")
+    "Missing: \"groupB\".*Unknown: \"groupC\"",
+    class = "hammel_error_specification")
 })
 
 # Women aged 25 (one fertility cell for a year), with birth interval zero.
@@ -404,10 +410,10 @@ test_that("weight schedules are validated like model schedules", {
     time_start = c(0, .5), time_end = c(1, Inf), model = list(half, half))), "overlap")
   expect_error(set_mortality(model, mortality_rates, weights = tibble::tibble(
     time_start = 0, time_end = Inf, model = list(weight_model(~ parity, c(paritx = 1))))),
-    "weights\\$model\\[\\[1\\]\\]")
+    class = "hammel_error_specification")
   gap <- set_mortality(model, mortality_rates, weights = tibble::tibble(time_start = 1, time_end = Inf,
     model = list(half)))
-  expect_error(run_simulation(gap, 2, seed = 1), "coverage gap")
+  expect_error(run_simulation(gap, 2, seed = 1), class = "hammel_error_coverage")
   expect_s3_class(set_mortality(model, mortality_rates, weights = data.frame(time_start = 0, time_end = Inf,
     model = I(list(half))))$processes$mortality$weights, "tbl_df")
 })
@@ -455,13 +461,14 @@ test_that("remaining validation rules for weight models", {
   grouped_formula <- weight_model(~ group, c(groupB = 1))
   expect_error(run_simulation(set_mortality(model, mortality_rates, weights =
     grouped_formula), 1, seed = 1),
-               "not available for this process: group")
+               "can't use group", class = "hammel_error_specification")
   # Group levels are the dimension's categories; coefficients must name them.
   grouped <- weighted_mortality_model(200, groups = c("A", "B"))
   extra <- weight_model(~ group, c(groupB = log(2), groupC = log(5)))
   expect_error(run_simulation(set_mortality(grouped, mortality_rates, weights =
     extra), 1, seed = 1),
-               "unknown groupC")
+               "Unknown: \"groupC\"",
+               class = "hammel_error_specification")
   declared <- set_groups(grouped, group = group(categories = c("A", "B", "C")))
   expect_s3_class(run_simulation(set_mortality(declared, mortality_rates,
     weights = extra), 1, seed = 1),
@@ -470,7 +477,8 @@ test_that("remaining validation rules for weight models", {
   missing <- weight_model(~ ancestry_group_C, c(ancestry_group_C = 1))
   expect_error(run_simulation(set_mortality(grouped, mortality_rates, weights =
     missing), 1, seed = 1),
-               "not available for this process: ancestry_group_C")
+               "can't use ancestry_group_C",
+               class = "hammel_error_specification")
 })
 
 # Couples in two groups: half the unions are exogamous. No mortality or fertility.

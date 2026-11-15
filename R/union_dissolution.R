@@ -57,20 +57,13 @@
 #' )
 #' model <- hammel_model() |> set_union_dissolution(diss_rates)
 union_dissolution <- function(rates, weights = NULL) {
-  process <- new_rate_process("union_dissolution", rates)
-  validate_union_dissolution(process)
-  validate_process_weights(weights, "union")
-  warn_cancelled_weight_terms(
-    weights, weight_strata("dissolution", rates), "dissolution"
-  )
-  process$weights <- normalize_model_argument(weights)
-  process
+  new_union_dissolution(rates, weights)
 }
 
 #' @rdname union_dissolution
 #' @export
 set_union_dissolution <- function(model, rates, weights = NULL) {
-  set_process(model, union_dissolution(rates, weights))
+  attach_process(model, new_union_dissolution(rates, weights))
 }
 
 # SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
@@ -142,118 +135,156 @@ print.summary.hammel_union_dissolution <- function(x, ...) {
 
 # HELPER FUNCTIONS ---------------------------------------------------------
 
-validate_union_dissolution <- function(process, calendar_interval = NULL) {
+# Build a validated dissolution process for union_dissolution() and
+# set_union_dissolution(); errors name `call`.
+new_union_dissolution <- function(rates, weights, call = rlang::caller_env()) {
+  # Check that `rates` is a table with unique column names before
+  # new_rate_process() converts it; validation checks its contents.
+  check_columns(rates, character(), "rates", call = call)
+  process <- new_rate_process("union_dissolution", rates)
+  validate_union_dissolution(process, call = call)
+  validate_process_weights(weights, "union", call = call)
+  warn_cancelled_weight_terms(
+    weights, weight_strata("dissolution", rates), "dissolution"
+  )
+  process$weights <- normalize_model_argument(weights)
+  process
+}
+
+# Validate in two passes, as validate_rates(): row checks on the whole table,
+# then schedule checks within each calendar period and group stratum.
+validate_union_dissolution <- function(process, call = rlang::caller_env()) {
   if (!identical(process$name, "union_dissolution")) {
-    stop("Invalid union-dissolution specification.", call. = FALSE)
+    abort_hammel(
+      "{.arg process} must be a union dissolution process.",
+      "specification",
+      call = call
+    )
   }
   rates <- process$rates
-  check_stratified_columns(rates, "union_type", "Union-dissolution")
+  check_stratified_columns(
+    rates, "union_type", "Union dissolution",
+    call = call
+  )
+  check_dissolution_rows(rates, call = call)
+  validate_dissolution_schedules(rates, call = call)
+  invisible(process)
+}
+
+check_dissolution_rows <- function(rates, call = rlang::caller_env()) {
+  check_columns(rates, c("dur_start", "dur_end", "rate"), "rates", call = call)
+  if (!nrow(rates)) {
+    abort_hammel(
+      c(
+        "{.arg rates} must contain at least one duration band.",
+        "x" = "It has no rows."
+      ),
+      "rates",
+      argument = "rates",
+      call = call
+    )
+  }
+  calendar_rate_segments(rates, call = call)
+  bad <- intersect(
+    c("sex", "age_start", "age_end", "union_status"),
+    names(rates)
+  )
+  if (length(bad)) {
+    abort_hammel(
+      c(
+        "Union dissolution rates can't have {.field {bad}} columns.",
+        "i" = paste(
+          "Dissolution rates use union duration bands. Stratify by group",
+          "with {.field <group>_w} and {.field <group>_h} columns."
+        )
+      ),
+      "rates",
+      argument = "rates",
+      columns = bad,
+      call = call
+    )
+  }
+  for (column in candidate_strata(rates)) {
+    check_group_labels(rates[[column]], paste0("rates$", column), call = call)
+  }
+  check_bands(rates, "dur", call = call)
+  check_numeric_column(rates$rate, "rates$rate", call = call)
+  check_nonnegative(rates$rate, "rates$rate", call = call)
+  if ("union_type" %in% names(rates)) {
+    check_labels(
+      rates$union_type, "rates$union_type", c("cohab", "marriage"),
+      call = call
+    )
+  }
+  invisible(rates)
+}
+
+# Within each calendar period and group stratum: both union types when rates
+# are typed, and duration bands that do not overlap.
+validate_dissolution_schedules <- function(rates, call = rlang::caller_env()) {
   if (validate_calendar_rates(
         rates,
-        function(slice, interval) {
-   copy <- process
-   copy$rates <- slice
-   validate_union_dissolution(copy, interval)
- },
-        with_interval = TRUE
+        function(x) {
+          validate_dissolution_schedules(x, call = call)
+        },
+        call = call
       )) {
-    return(invisible(process))
-  }
-  check_columns(rates, c("dur_start", "dur_end", "rate"), "rates")
-  check_numeric_column(rates$dur_start, "rates$dur_start")
-  check_numeric_column(rates$rate, "rates$rate")
-  ends <- rates$dur_end
-  if (!nrow(rates) || !is.numeric(ends) || !is.null(dim(ends)) || anyNA(ends) ||
-        any(ends <= rates$dur_start) ||
-        any(rates$dur_start < 0) ||
-        any(rates$rate < 0) ||
-        any(
-          c(
-            "sex",
-            "age_start",
-            "age_end",
-            "union_status",
-            "time_start",
-            "time_end"
-          ) %in%
-            names(rates)
-        )) {
-    stop(
-      paste0(
-        "Use nonnegative dissolution rates in valid ",
-        "duration bands; use `<group>_w`/`<group>_h` for ",
-        "group strata, without sex, age, status or ",
-        "calendar columns."
-      ),
-      call. = FALSE
-    )
+    return(invisible(rates))
   }
   # Possible group columns (`<group>_w`, `<group>_h`) define strata.
   strata <- candidate_strata(rates)
   pair_labels <- if (length(strata)) {
     do.call(paste, c(lapply(rates[strata], as.character), sep = ":"))
   } else {
-    rep("shared", nrow(rates))
+    rep("", nrow(rates))
   }
   types <- if ("union_type" %in% names(rates)) {
     rates$union_type
   } else {
-    rep("shared", nrow(rates))
+    rep("", nrow(rates))
+  }
+  stratum_text <- function(pair) {
+    if (length(strata)) {
+      paste0(" for group stratum ", paste(strata, collapse = ":"), " = ", pair)
+    } else {
+      ""
+    }
   }
   if ("union_type" %in% names(rates)) {
-    if (!is.character(types) || anyNA(types) ||
-          any(!types %in% c("cohab", "marriage"))) {
-      stop(
-        paste0(
-          "Dissolution `union_type` must use cohab and ",
-          "marriage labels without missing values."
-        ),
-        call. = FALSE
-      )
-    }
     for (pair in unique(pair_labels)) {
-      missing <- setdiff(c("cohab", "marriage"), types[pair_labels == pair])
-      if (!length(missing)) {
+      absent <- setdiff(c("cohab", "marriage"), types[pair_labels == pair])
+      if (!length(absent)) {
         next
       }
-      context <- if (is.null(calendar_interval)) {
-        ""
-      } else {
-        sprintf(
-          " during calendar interval [%s, %s)",
-          format(calendar_interval[1], trim = TRUE, scientific = FALSE),
-          format(calendar_interval[2], trim = TRUE, scientific = FALSE)
-        )
-      }
-      if (length(strata)) {
-        context <- paste0(context, sprintf(" for group stratum '%s'", pair))
-      }
-      stop(
-        sprintf(
-          paste0(
-            "Dissolution rates are missing a '%s' schedule%s. ",
-            paste0(
-              "Supply both cohab and marriage schedules wherever ",
-              "typed dissolution rates are supplied."
-            )
+      stratum <- stratum_text(pair)
+      abort_hammel(
+        c(
+          paste(
+            "Union dissolution rates with a {.field union_type} column need",
+            "both {.val cohab} and {.val marriage} schedules."
           ),
-          missing, context
+          "x" = "No {.val {absent}} rates{stratum}."
         ),
-        call. = FALSE
+        "rates",
+        argument = "rates",
+        call = call
       )
     }
   }
-  for (rows in split(
-    seq_len(nrow(rates)), paste(pair_labels, types, sep = "\r")
-  )) {
-    ordered <- rates[rows, , drop = FALSE]
-    ordered <- ordered[order(ordered$dur_start), , drop = FALSE]
-    if (nrow(ordered) > 1L &&
-          any(
-            tail(ordered$dur_start, -1) < head(cummax(ordered$dur_end), -1)
-          )) {
-      stop("Union-dissolution duration bands must not overlap.", call. = FALSE)
+  keys <- paste(pair_labels, types, sep = "\r")
+  for (rows in split(seq_len(nrow(rates)), keys)) {
+    schedule <- stratum_text(pair_labels[rows[1]])
+    if (nzchar(types[rows[1]])) {
+      schedule <- paste0(
+        if (nzchar(schedule)) paste0(schedule, ",") else " for",
+        " union type \"", types[rows[1]], "\""
+      )
     }
+    check_band_overlap(
+      rates, rows, "dur",
+      schedule = schedule,
+      call = call
+    )
   }
-  invisible(process)
+  invisible(rates)
 }

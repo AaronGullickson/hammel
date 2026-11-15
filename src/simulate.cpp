@@ -979,14 +979,21 @@ void Simulation::read_unions(const std::map<double, int>& index) {
         !NumericVector::is_na(people[man].died) || !people[woman].female ||
         people[man].female) {
       stop(
-        "Unions require living female/male partners in active input unions."
+        "[population] Unions require living female/male partners in active "
+        "input unions."
       );
     }
     if (current_partner[woman] >= 0) {
-      stop("Union input cannot have multiple ongoing unions for a woman.");
+      stop(
+        "[population] Union input cannot have multiple ongoing unions for a "
+        "woman."
+      );
     }
     if (current_partner[man] >= 0) {
-      stop("Union input cannot have multiple ongoing unions for a man.");
+      stop(
+        "[population] Union input cannot have multiple ongoing unions for a "
+        "man."
+      );
     }
     current_partner[woman] = man;
     current_partner[man] = woman;
@@ -1127,7 +1134,10 @@ void Simulation::read_weights(Nullable<List> weight_input) {
         }
         w.active = weight_interval(w, start);
         if (w.active < 0) {
-          stop("No " + key.second + " weight model covers the run start.");
+          stop(
+            "[schedule_coverage] No " + key.second +
+            " weight model covers the run start."
+          );
         }
         // Scheduled models stay installed even when an interval is
         // unweighted.
@@ -1163,7 +1173,8 @@ void Simulation::read_weights(Nullable<List> weight_input) {
   }
   if (search_calibrated && search_weights_spec && search_weights_spec->custom) {
     Rcpp::warning(
-      "With weighted matching calibration, the custom search weight function "
+      "[slow_custom_weights] With weighted matching calibration, the custom "
+      "search weight function "
       "is evaluated at every refresh of every searching woman, which can be "
       "slow."
     );
@@ -1171,7 +1182,8 @@ void Simulation::read_weights(Nullable<List> weight_input) {
   if (fertility_refresh_weights && fertility_weights_spec->custom &&
       calibrator) {
     Rcpp::warning(
-      "With weighted matching calibration, the custom fertility weight "
+      "[slow_custom_weights] With weighted matching calibration, the custom "
+      "fertility weight "
       "function is evaluated at every refresh of every woman, which can be "
       "slow."
     );
@@ -1903,7 +1915,7 @@ void Simulation::check_union_capacity() const {
   if (next_union_id >= kMaxExactId ||
       union_history.size() >=
         static_cast<size_t>(std::numeric_limits<int>::max())) {
-    stop("Union history exceeds supported ID or row limits.");
+    stop("[limits] Union history exceeds supported ID or row limits.");
   }
 }
 
@@ -2038,8 +2050,8 @@ void Simulation::warn_weight_na(WeightSpec& spec, const std::string& what) {
   }
   spec.warned_na = true;
   Rcpp::warning(
-    "Missing values in the " + spec.process + " weight " + what +
-    " were treated as a zero log-weight contribution."
+    "[weight_missing] Missing values in the " + spec.process + " weight " +
+    what + " were treated as a zero log-weight contribution."
   );
 }
 
@@ -2212,9 +2224,9 @@ void Simulation::custom_eta(
   const int n = Rf_xlength(members[0]);
   if (result.size() != n) {
     stop(
-      "A custom " + spec.process + " weight function returned " +
-      std::to_string(result.size()) + " values for " + std::to_string(n) +
-      " members."
+      "[weight_function] A custom " + spec.process +
+      " weight function returned " + std::to_string(result.size()) +
+      " values for " + std::to_string(n) + " members."
     );
   }
   eta.assign(n, 0.0);
@@ -2225,7 +2237,7 @@ void Simulation::custom_eta(
     }
     if (!R_finite(result[r])) {
       stop(
-        "A custom " + spec.process +
+        "[weight_function] A custom " + spec.process +
         " weight function returned an infinite value."
       );
     }
@@ -2348,7 +2360,10 @@ void Simulation::stored_weight(
   }
   const double w = std::exp(formula_eta(*spec, unit, is_union, dest));
   if (!(w > 0) || !R_finite(w)) {
-    stop("A " + spec->process + " weight is not finite and positive.");
+    stop(
+      "[weight_value] A " + spec->process +
+      " weight is not finite and positive."
+    );
   }
   process->set_weight(unit, w);
 }
@@ -2395,7 +2410,7 @@ double Simulation::search_weight(int woman, int c) {
   }
   const double w = std::exp(eta);
   if (!(w > 0) || !R_finite(w)) {
-    stop("A search weight is not finite and positive.");
+    stop("[weight_value] A search weight is not finite and positive.");
   }
   return w;
 }
@@ -2418,7 +2433,10 @@ FertilityCells::State Simulation::fertility_state(int w) {
   st.group = p.group;
   st.report = person_stratum(report_spec, w);
   if (st.stratum < 0) {
-    stop("No fertility schedule covers a woman's current parity.");
+    stop(
+      "[schedule_coverage] No fertility schedule covers a woman's current "
+      "parity."
+    );
   }
   st.weight = heterogeneous ? fertility_weights[w] : 1;
   st.born = p.born;
@@ -3046,7 +3064,7 @@ void Simulation::on_birth(int i, double now) {
   }
   if (next_id >= kMaxExactId ||
       people.size() >= static_cast<size_t>(std::numeric_limits<int>::max())) {
-    stop("Population exceeds supported ID or row limits.");
+    stop("[limits] Population exceeds supported ID or row limits.");
   }
   // IDs increase beyond existing histories. Union formation above happens
   // before the newborn exists.

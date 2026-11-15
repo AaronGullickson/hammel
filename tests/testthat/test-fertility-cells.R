@@ -319,8 +319,8 @@ test_that("calculate_fertility_rates attributes unrealized births exactly or ret
   expect_true(all(is.na(typed$unrealized_births[typed$age_start == 15])))
   # A population that was never simulated has no unrealized record.
   expect_error(calculate_fertility_rates(model$population, c(-1, 0), c(15, 50),
-                                         unrealized = TRUE), "records unrealized births")
-  expect_error(calculate_fertility_rates(pop, c(0, 1.5), c(15, 50), unrealized = NA), "TRUE or FALSE")
+                                         unrealized = TRUE), "needs a population from", class = "hammel_error_argument")
+  expect_error(calculate_fertility_rates(pop, c(0, 1.5), c(15, 50), unrealized = NA), "TRUE.*FALSE")
 })
 
 test_that("unrealized births pool into observed parity bands and restore cohort rates", {

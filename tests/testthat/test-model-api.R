@@ -393,10 +393,12 @@ test_that("union wife and husband columns enforce female and male roles", {
   expect_equal(population$unions$wife_id, 10)
   expect_equal(population$unions$husband_id, 40)
   swapped <- transform(unions, wife_id = 40, husband_id = 10)
-  expect_error(hammel_population(persons, swapped, end_time = 0, groups = if ("group" %in% names(persons)) "group"), "wife_id.*female")
+  expect_error(hammel_population(persons, swapped, end_time = 0, groups = if ("group" %in% names(persons)) "group"),
+    "wife_id must refer to a woman", class = "hammel_error_population")
   swapped$end_time <- -0.5
   swapped$end_reason <- "dissolution"
-  expect_error(hammel_population(persons, swapped, end_time = 0, groups = if ("group" %in% names(persons)) "group"), "wife_id.*female")
+  expect_error(hammel_population(persons, swapped, end_time = 0, groups = if ("group" %in% names(persons)) "group"),
+    "wife_id must refer to a woman", class = "hammel_error_population")
   expect_identical(names(generate_uniform_population(0)$unions), names(unions))
 })
 
@@ -410,10 +412,11 @@ test_that("population reference times are required and validated everywhere", {
     0 + 0i, matrix(0), array(0)
   )
   for (time in bad_times) {
-    expect_error(
+    error <- expect_error(
       hammel_population(persons, end_time = time),
-      "end_time.*single finite numeric"
+      class = "hammel_error_argument"
     )
+    expect_identical(error$argument, "end_time")
     invalid <- population
     invalid["end_time"] <- list(time)
     expect_error(validate_population(invalid), "end_time")
@@ -427,7 +430,8 @@ test_that("population reference times are required and validated everywhere", {
   }
   expect_error(
     hammel_population(persons, end_time = 1900),
-    "Recorded events.*reference time"
+    "Recorded events must not occur after end_time",
+    class = "hammel_error_population"
   )
 })
 

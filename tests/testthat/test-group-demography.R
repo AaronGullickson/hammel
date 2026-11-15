@@ -79,7 +79,7 @@ test_that("population sizes preserve time order and count each person's group", 
   # A bare persons table is not accepted; it must be a hammel_population.
   expect_error(
     calculate_population_size(p$persons, times, by = "group"),
-    "must be a hammel_population"
+    "must be a Hammel population"
   )
   expect_identical(calculate_population_size(p, times), pooled)
 })
@@ -118,7 +118,7 @@ test_that("TFR separates groups jointly with periods and union statuses", {
   # One group's invalid bands must fail even if another group fills the gap.
   bad <- grid
   bad$age_end[1] <- 19
-  expect_error(calculate_tfr(bad), "contiguous")
+  expect_error(calculate_tfr(bad), "without gaps or overlaps", class = "hammel_error_rates")
   # Missing exposure affects only its own period/group/status estimate.
   incomplete <- grid
   incomplete$rate[1] <- NA_real_
@@ -174,8 +174,8 @@ test_that("group observations validate flags and required group data", {
   p$groups <- NULL
   expect_error(demographic_counts(p, c(0, 1), c(0, Inf), by = "group"), "declared group")
   expect_error(calculate_population_size(p, 0, by = "group"), "declared group")
-  expect_error(calculate_population_size(make_group_history(), 2, by = "group"), "endpoint")
-  expect_error(demographic_counts(make_group_history(), c(0, 2), c(0, Inf), by = "group"), "endpoint")
+  expect_error(calculate_population_size(make_group_history(), 2, by = "group"), "extend beyond", class = "hammel_error_argument")
+  expect_error(demographic_counts(make_group_history(), c(0, 2), c(0, Inf), by = "group"), "extend beyond", class = "hammel_error_argument")
   rates <- data.frame(group = NA_character_, age_start = 0, age_end = Inf, rate = 0.1)
   expect_error(calculate_life_table(rates), "group")
   rates$age_end <- 5

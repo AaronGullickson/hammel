@@ -63,7 +63,7 @@ test_that("parent information rejects invalid input and conflicting columns", {
   for (column in c("age_mother", "age_father", "group_mother", "group_father")) {
     bad <- population
     bad$persons[[column]] <- 1
-    expect_error(augment_persons(bad), paste0("conflict.*", column))
+    expect_error(augment_persons(bad), paste0("Conflicting columns: ", column))
   }
   population$persons$mother_id[1] <- 99
   expect_error(augment_persons(population), "mother_id")

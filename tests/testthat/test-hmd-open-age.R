@@ -44,7 +44,7 @@ test_that("cutoffs require valid source age boundaries", {
   for (age in list(NA_real_, Inf, -1, 2.5, "2", numeric(), c(2, 3), matrix(2)))
     expect_error(get_mortality_hmd("SWE", 2000, "test", "test", open_age = age), "open_age")
   expect_error(get_mortality_hmd("SWE", 2000, "test", "test", shape = "5x1",
-    open_age = 97), "align")
+    open_age = 97), "start one of the five-year", class = "hammel_error_argument")
   expect_error(pooled_hmd_fixture(age = 5), "complete source tail")
   x <- hmd_open_fixture()
   # A zero-age cutoff pools the entire life course without a younger block.
