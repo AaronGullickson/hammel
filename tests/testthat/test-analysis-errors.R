@@ -1,4 +1,5 @@
 simulated_population <- function() {
+  withr::local_seed(11)
   model <- hammel_model() |>
     set_population(generate_uniform_population(30)) |>
     set_mortality(usa_2000_mortality) |>

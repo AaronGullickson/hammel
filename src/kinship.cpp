@@ -69,7 +69,7 @@ void Kinship::validate_acyclic() const {
       }
       if (state[parent] == 1) {
         throw std::invalid_argument(
-          "Kinship parent links contain an ancestry cycle."
+          "[population] Kinship parent links contain an ancestry cycle."
         );
       }
       if (state[parent] == 0) {
@@ -482,7 +482,7 @@ List count_kin_cpp(
           t + static_cast<R_xlen_t>(n_times) *
                 (stratum - 1 + static_cast<R_xlen_t>(n_strata) * type);
         if (kin_n[cell] == std::numeric_limits<int>::max()) {
-          stop("Kin counts exceed integer range.");
+          stop("[limits] Kin counts exceed integer range.");
         }
         ++kin_n[cell];
         has_kin[t + static_cast<R_xlen_t>(n_times) * type] = 1;

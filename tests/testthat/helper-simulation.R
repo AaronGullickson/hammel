@@ -33,8 +33,10 @@ make_rate_model <- function(n = 2, search_rate = 1, birth_rate = 0, birth_interv
 # that no eligible woman can reach; silence only that advisory warning.
 quiet_unreachable <- function(expr) {
   withCallingHandlers(expr, warning = function(w) {
-    if (grepl("no woman can be eligible", conditionMessage(w), fixed = TRUE))
+    if (inherits(w, "hammel_warning_no_effect") &&
+          grepl("can't produce births", conditionMessage(w), fixed = TRUE)) {
       invokeRestart("muffleWarning")
+    }
   })
 }
 

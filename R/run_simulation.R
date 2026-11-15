@@ -648,9 +648,11 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   }
   if ("previous_union" %in% names(union_rates) || cohab_enabled ||
         length(weight_models)) {
-    previous <- previous_union_info_cpp(
-      population$persons, population$unions,
-      counts_cohab
+    previous <- call_native(
+      previous_union_info_cpp(
+        population$persons, population$unions,
+        counts_cohab
+      )
     )
     engine_persons$.hammel_previous_union <- previous$previous_union
     engine_persons$.hammel_previous_union_end <- previous$end_time
@@ -723,26 +725,28 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
     } else {
       prepare_matching_model(union_process$cohab_matching, group_values)
     }
-    native <- simulate_cpp(
-      engine_persons, death_rates, birth_rates,
-      start, years, birth_interval, population$unions,
-      matching,
-      union_process$min_male_age,
-      as.integer(union_process$kinship_generations),
-      union_process$initiation == "rate",
-      union_rates, father_matching,
-      union_process$cancel_birth_if_no_match,
-      union_process$diagnostics,
-      ancestry_matrix(population, tracked),
-      inheritance, ffab, dissolution_rates, cohab$prob,
-      cohab$conversion,
-      cohab_matching, counts_cohab,
-      isTRUE(getOption("hammel.check_cells", FALSE)),
-      if (is.null(hetfert)) NULL else unclass(hetfert),
-      transition_rates,
-      if (scheduled_models) model_context$config else NULL,
-      weight_input, group_input,
-      progress = progress_callback
+    native <- call_native(
+      simulate_cpp(
+        engine_persons, death_rates, birth_rates,
+        start, years, birth_interval, population$unions,
+        matching,
+        union_process$min_male_age,
+        as.integer(union_process$kinship_generations),
+        union_process$initiation == "rate",
+        union_rates, father_matching,
+        union_process$cancel_birth_if_no_match,
+        union_process$diagnostics,
+        ancestry_matrix(population, tracked),
+        inheritance, ffab, dissolution_rates, cohab$prob,
+        cohab$conversion,
+        cohab_matching, counts_cohab,
+        isTRUE(getOption("hammel.check_cells", FALSE)),
+        if (is.null(hetfert)) NULL else unclass(hetfert),
+        transition_rates,
+        if (scheduled_models) model_context$config else NULL,
+        weight_input, group_input,
+        progress = progress_callback
+      )
     )
     if (!isTRUE(native$cells_consistent)) {
       abort_internal("Fertility cell counts are inconsistent.")

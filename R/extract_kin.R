@@ -85,9 +85,11 @@ extract_kin <- function(
       )
     }
   }
-  kin <- extract_kin_cpp(
-    population$persons, ego_ids, relative_ids,
-    as.integer(generations)
+  kin <- call_native(
+    extract_kin_cpp(
+      population$persons, ego_ids, relative_ids,
+      as.integer(generations)
+    )
   )
   kin$relationship <- kin_relationship(kin$ego_distance, kin$relative_distance)
   tibble::as_tibble(
@@ -252,8 +254,10 @@ count_kin <- function(
     stratum[!alive] <- 0L
     strata[, i] <- as.integer(stratum)
   }
-  counts <- count_kin_cpp(
-    persons, as.integer(generations), lookup, strata, n_strata, n_types
+  counts <- call_native(
+    count_kin_cpp(
+      persons, as.integer(generations), lookup, strata, n_strata, n_types
+    )
   )
   grid <- expand.grid(
     time = seq_along(times),

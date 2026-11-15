@@ -1457,6 +1457,21 @@ hand-maintained sources. No exported entry point, argument or default changed; `
 only regenerated (reordered), and no hand-maintained R file or user-owned
 document changed.
 
+## Native message tags (D183, November 15, 2026)
+
+User-caused native error and warning messages gained `[tag]` prefixes (see
+[error and warning messages](error-messages.md#native-engine-messages)); no
+other C++ changed. Following D175, the result or error message of every
+native `*_cpp` call made by the offline test suite of the preceding commit
+(bfd277c) was hashed in call order, with tags stripped from messages, for
+that commit and for the changed code, both built with `-ffp-contract=off`.
+The runs made 1,805 native calls each, including 27 expected errors. All
+were identical except the first `simulate_cpp` call, whose input population
+came from an unseeded `generate_uniform_population()` in
+`test-analysis-errors.R`; that call also differed between two runs of the
+unchanged baseline, so the test now seeds its population. The default-flag
+offline test suite then passed with no failures.
+
 ## Internal hetfert (D176, November 11, 2026)
 
 `het_fert()` was removed from the exports and `hetfert` from `fertility()` and

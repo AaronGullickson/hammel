@@ -431,8 +431,7 @@ check_database_numeric <- function(
 # Raise a database error whose message is preformatted text; braces in it
 # are printed literally.
 abort_database <- function(text, ..., call = rlang::caller_env()) {
-  text <- gsub("}", "}}", gsub("{", "{{", text, fixed = TRUE), fixed = TRUE)
-  abort_hammel(text, "database", ..., call = call)
+  abort_hammel(escape_cli(text), "database", ..., call = call)
 }
 
 # Source intervals for native HMD products; no interpolation.

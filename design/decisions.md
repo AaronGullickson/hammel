@@ -3718,7 +3718,10 @@ cheap: about 430 tests currently match message text.
 **Classes and tags:** The user approved the guide's ten error classes, five
 warning classes and seven native message tags on November 14, 2026, along
 with the helper script name `R/errors.R` and naming setters through internal
-builders shared with their constructors.
+builders shared with their constructors. On November 15 the user chose
+explicit `call` forwarding over finding the user's function from the call
+stack, and added an eighth tag, `population`, for invalid supplied histories
+that only the engine detects.
 
 **Unselected:** The wording of individual messages is settled as each file is
 converted. A new class or tag requires the user's agreement. Moving checks

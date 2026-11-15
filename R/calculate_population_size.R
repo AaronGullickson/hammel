@@ -92,8 +92,10 @@ calculate_population_size <- function(
     previous_union = previous,
     previous_map = map
   )
-  counts <- person_snapshot_cpp(
-    obs$persons, obs$unions, obs$group_indices, ng, as.numeric(times), options
+  counts <- call_native(
+    person_snapshot_cpp(
+      obs$persons, obs$unions, obs$group_indices, ng, as.numeric(times), options
+    )
   )
   sizes <- c(
     t = length(times),

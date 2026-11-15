@@ -389,11 +389,13 @@ calculate_cohab_convert_rate <- function(
       strata$dims
     )
   )
-  counts <- dissolution_counts_cpp(
-    strata$unions, time_breaks, breaks,
-    strata$index, strata$count,
-    origins = origins,
-    event_reason = "conversion"
+  counts <- call_native(
+    dissolution_counts_cpp(
+      strata$unions, time_breaks, breaks,
+      strata$index, strata$count,
+      origins = origins,
+      event_reason = "conversion"
+    )
   )
   result <- tibble::as_tibble(
     rows[c("time_start", "time_end", paste0(axis, c("_start", "_end")), by)]
@@ -449,9 +451,11 @@ calculate_dissolution_rates <- function(
       strata$dims
     )
   )
-  counts <- dissolution_counts_cpp(
-    strata$unions, time_breaks, dur_breaks,
-    strata$index, strata$count
+  counts <- call_native(
+    dissolution_counts_cpp(
+      strata$unions, time_breaks, dur_breaks,
+      strata$index, strata$count
+    )
   )
   result <- tibble::as_tibble(
     rows[c("time_start", "time_end", "dur_start", "dur_end", by)]
@@ -951,7 +955,8 @@ calculate_entry_rates <- function(
       utype_filter = if (marriage_measure) 2L else 1L,
       previous_mask = mask,
       use_detailed_previous_union = use_detailed_previous_union,
-      exclusive = TRUE
+      exclusive = TRUE,
+      call = call
     )
   }
   kinds <- if (marriage_measure) {
@@ -1066,9 +1071,12 @@ prepare_union_group_observations <- function(
   persons <- prepare_group_observations(population$persons, population, TRUE)
   identities <- observation_groups(persons, TRUE, call = call)
   indices <- match(persons$group, identities) - 1L
-  history <- union_group_history_cpp(
-    persons, unions, indices, as.integer(mode),
-    typed, as.integer(identity_count), as.integer(group_count)
+  history <- call_native(
+    union_group_history_cpp(
+      persons, unions, indices, as.integer(mode),
+      typed, as.integer(identity_count), as.integer(group_count)
+    ),
+    call = call
   )
   if (length(history$row)) {
     attr(unions, ".hammel_group_history") <- history
@@ -1091,7 +1099,8 @@ run_person_lexis <- function(
   previous_mask = c(TRUE, TRUE, TRUE),
   use_detailed_previous_union = TRUE,
   exclusive = NULL,
-  group_target = NULL
+  group_target = NULL,
+  call = rlang::caller_env()
 ) {
   utype <- "union_type" %in% by
   previous <- "previous_union" %in% by
@@ -1116,13 +1125,16 @@ run_person_lexis <- function(
     options$group_target <- as.integer(group_target)
   }
   ng <- if (is.null(obs$groups)) 1L else length(obs$groups)
-  counts <- person_lexis_cpp(
-    obs$persons, obs$unions, obs$group_indices, ng,
-    time_breaks, axis_breaks, if (length(parity_breaks)) {
-      parity_breaks
-    } else {
-      numeric(1)
-    }, options
+  counts <- call_native(
+    person_lexis_cpp(
+      obs$persons, obs$unions, obs$group_indices, ng,
+      time_breaks, axis_breaks, if (length(parity_breaks)) {
+        parity_breaks
+      } else {
+        numeric(1)
+      }, options
+    ),
+    call = call
   )
   nt <- length(time_breaks) - 1L
   na <- length(axis_breaks) - 1L

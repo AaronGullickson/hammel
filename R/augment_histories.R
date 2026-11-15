@@ -67,8 +67,10 @@ augment_unions <- function(population) {
     view <- dimension_view(population, d)
     indexed <- prepare_group_observations(view$persons, view, TRUE)
     groups <- observation_groups(indexed, TRUE)
-    codes <- union_start_groups_cpp(
-      indexed, population$unions, match(view$persons$group, groups) - 1L
+    codes <- call_native(
+      union_start_groups_cpp(
+        indexed, population$unions, match(view$persons$group, groups) - 1L
+      )
     )
     labels <- groups
     # Histories hold labels as text; keep the persons column's type.
@@ -195,6 +197,8 @@ augment_persons <- function(population) {
 #' extract_unpartnered_births(result)
 extract_unpartnered_births <- function(population) {
   parents <- augment_persons(population)
-  rows <- unpartnered_birth_rows_cpp(population$persons, population$unions)
+  rows <- call_native(
+    unpartnered_birth_rows_cpp(population$persons, population$unions)
+  )
   parents[rows, , drop = FALSE]
 }

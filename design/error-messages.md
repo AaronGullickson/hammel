@@ -148,7 +148,8 @@ user on November 14, 2026 (D183):
   in the caller's environment.
 - `warn_hammel(message, kind, ...)` does the same for warnings with
   `cli::cli_warn()`. Warnings do not name a calling function.
-- A native-call wrapper translates engine errors and warnings (below).
+- `call_native(expr, call)` wraps every user-facing native call and
+  translates its errors and warnings (below).
 
 The general checks in `R/checks.R` (`check_columns()`, `check_numeric_column()`,
 `check_time()`) and domain `check_*`/`validate_*` helpers call these helpers,
@@ -160,6 +161,8 @@ so every caller gets the same class and wording. Call sites do not call
 The engine's C++ errors and warnings are translated at the R boundary rather
 than formatted in C++.
 
+- Native errors reach R with class `C++Error`, which distinguishes them from
+  errors raised by R code the engine calls back.
 - A user-caused native message begins with a tag in square brackets, for
   example `"[weight_function] A custom fertility weight function returned 3
   values for 5 members."`. The R wrapper maps the tag to a condition class
@@ -168,7 +171,10 @@ than formatted in C++.
 - An untagged native error is an internal consistency failure. The wrapper
   raises `hammel_error_internal`, keeps the original text, and adds a bullet
   saying this is likely a bug, with the issue tracker URL from `DESCRIPTION`.
-- Native warnings are re-raised through `warn_hammel()` with their class.
+- Native warnings with a tag are re-raised through `warn_hammel()` with their
+  class. Other warnings pass through unchanged.
+- A plain R error from a user's custom function called during a run becomes
+  `hammel_error_runtime`, with the user's error attached as its parent.
 - R callbacks that the engine calls during a run, such as custom inheritance
   functions and matching-formula scoring, raise their own classified errors.
   These pass back through the engine with their class intact. They name
@@ -178,8 +184,8 @@ than formatted in C++.
   engine starts, moving it is a behavior change and is listed for the user
   rather than made silently.
 
-**Tags.** These cover the user-caused native messages known when D183 was
-made. A native message found during conversion that fits none of them gets a
+**Tags.** The user approved these on November 14, 2026, and added
+`population` on November 15. A native message that fits none of them gets a
 new tag only with the user's agreement:
 
 | Tag | Class | Example |
@@ -189,6 +195,7 @@ new tag only with the user's agreement:
 | `matching_utility` | `hammel_error_runtime` | A matching formula yields non-finite utilities |
 | `schedule_coverage` | `hammel_error_coverage` | No fertility schedule covers a woman's parity; no weight model covers the run start |
 | `limits` | `hammel_error_runtime` | The population, union history or kin counts exceed supported sizes |
+| `population` | `hammel_error_population` | Invalid supplied histories that R validation does not check: several ongoing unions for one person, union events after a partner's death, overlapping union histories, parent-link cycles (added November 15, 2026) |
 | `weight_missing` | `hammel_warning_no_effect` | Missing weight values treated as a zero log-weight contribution |
 | `slow_custom_weights` | `hammel_warning_performance` | Custom weights evaluated at every calibration refresh |
 
@@ -276,6 +283,7 @@ as its file is converted.
    the same change: process constructors and rate utilities; population and
    groups; matching; analysis (`calculate_*`); database import.
 4. Translate native messages: add tags, the wrapper and the internal-error
-   fallback, verified per D175.
+   fallback, verified per D175. Done November 15, 2026; see
+   [testing](testing.md).
 5. Update the R source organization guide and the decision log when the
    migration is complete.

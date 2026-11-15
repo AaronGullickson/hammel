@@ -31,7 +31,8 @@ NumericVector matching_utilities(
       const double squared = has_squared ? gaps[j] * gaps[j] : 0;
       if (!R_finite(squared)) {
         stop(
-          "Matching formula must produce finite values for every candidate."
+          "[matching_utility] Matching formula must produce finite values for "
+          "every candidate."
         );
       }
       utility[j] = quadratic[0] * gaps[j] + quadratic[1] * squared;
@@ -75,7 +76,7 @@ NumericVector matching_utilities(
   }
   for (R_xlen_t j = 0; j < utility.size(); ++j) {
     if (!R_finite(gaps[j]) || !R_finite(utility[j])) {
-      stop("Matching ages and utilities must be finite.");
+      stop("[matching_utility] Matching ages and utilities must be finite.");
     }
   }
   return utility;
