@@ -167,3 +167,16 @@ test_that("group and matching messages keep their layout", {
   expect_snapshot(run_simulation(model, 0), error = TRUE)
   expect_snapshot(run_simulation(hammel_model(), 1), error = TRUE)
 })
+
+test_that("matching formulas that can't be evaluated are classified", {
+  error <- expect_hammel_error(
+    matching_model(
+      ~ nonexistent(age_difference),
+      c("nonexistent(age_difference)" = 1)
+    ),
+    "specification",
+    "matching_model"
+  )
+  expect_identical(error$argument, "formula")
+  expect_match(conditionMessage(error$parent), "nonexistent")
+})

@@ -138,6 +138,9 @@ print.summary.hammel_union_dissolution <- function(x, ...) {
 # Build a validated dissolution process for union_dissolution() and
 # set_union_dissolution(); errors name `call`.
 new_union_dissolution <- function(rates, weights, call = rlang::caller_env()) {
+  # Check that `rates` is a table with unique column names before
+  # new_rate_process() converts it; validation checks its contents.
+  check_columns(rates, character(), "rates", call = call)
   process <- new_rate_process("union_dissolution", rates)
   validate_union_dissolution(process, call = call)
   validate_process_weights(weights, "union", call = call)

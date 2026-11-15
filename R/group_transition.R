@@ -318,6 +318,9 @@ new_group_transition <- function(
   household,
   call = rlang::caller_env()
 ) {
+  # Check that `rates` is a table with unique column names before
+  # new_rate_process() converts it; validation checks its contents.
+  check_columns(rates, character(), "rates", call = call)
   process <- new_rate_process("group_transition", rates)
   process$group <- check_transition_group(group, call = call)
   if (!is.null(household) && !inherits(household, "hammel_household")) {

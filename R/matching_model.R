@@ -650,35 +650,54 @@ validate_internal_matching <- function(model, call = rlang::caller_env()) {
 }
 
 matching_design_matrix <- function(formula, data, call = rlang::caller_env()) {
-  design <- withCallingHandlers(
-    {
-      frame <- stats::model.frame(
-        formula,
-        data = data,
-        na.action = stats::na.pass,
-        drop.unused.levels = FALSE
-      )
-      factors <- frame[vapply(frame, is.factor, logical(1))]
-      contrasts <- if (length(factors)) {
-        lapply(
-          factors, function(x) {
-            stats::contr.treatment(levels(x))
-          }
+  # Evaluation errors, such as an unknown function in the formula, and
+  # warnings, which the handler raises as errors, are specification errors.
+  design <- tryCatch(
+    withCallingHandlers(
+      {
+        frame <- stats::model.frame(
+          formula,
+          data = data,
+          na.action = stats::na.pass,
+          drop.unused.levels = FALSE
         )
-      } else {
-        NULL
+        factors <- frame[vapply(frame, is.factor, logical(1))]
+        contrasts <- if (length(factors)) {
+          lapply(
+            factors, function(x) {
+              stats::contr.treatment(levels(x))
+            }
+          )
+        } else {
+          NULL
+        }
+        stats::model.matrix(formula, data = frame, contrasts.arg = contrasts)
+      },
+      warning = function(w) {
+        abort_hammel(
+          c(
+            "The matching formula gave a warning when evaluated.",
+            "x" = "{conditionMessage(w)}",
+            "i" = "Check {.code {deparse1(formula)}}."
+          ),
+          "specification",
+          argument = "formula",
+          call = call
+        )
       }
-      stats::model.matrix(formula, data = frame, contrasts.arg = contrasts)
-    },
-    warning = function(w) {
+    ),
+    error = function(e) {
+      if (inherits(e, "hammel_error")) {
+        stop(e)
+      }
       abort_hammel(
         c(
-          "The matching formula gave a warning when evaluated.",
-          "x" = "{conditionMessage(w)}",
+          "The matching formula can't be evaluated.",
           "i" = "Check {.code {deparse1(formula)}}."
         ),
         "specification",
         argument = "formula",
+        parent = e,
         call = call
       )
     }

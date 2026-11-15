@@ -159,3 +159,12 @@ test_that("analysis and database messages keep their layout", {
     }
   )
 })
+
+test_that("history augmentation wrappers name themselves", {
+  expect_hammel_error(
+    extract_unpartnered_births(NULL),
+    "population",
+    "extract_unpartnered_births"
+  )
+  expect_hammel_error(augment_persons(NULL), "population", "augment_persons")
+})

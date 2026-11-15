@@ -418,3 +418,35 @@ test_that("weight and transition messages keep their layout", {
   rates$dur_start <- 0
   expect_snapshot(group_transition(rates), error = TRUE)
 })
+
+test_that("tables are checked before they are converted", {
+  rates <- data.frame(
+    dur_start = 0,
+    dur_end = Inf,
+    rate = 0.1,
+    rate = 0.2,
+    check.names = FALSE
+  )
+  error <- expect_hammel_error(
+    union_dissolution(rates),
+    "table",
+    "union_dissolution"
+  )
+  expect_identical(error$columns, "rate")
+  rates <- data.frame(
+    origin = "A",
+    destination = "B",
+    age_start = 0,
+    age_end = Inf,
+    rate = 1,
+    rate = 2,
+    check.names = FALSE
+  )
+  error <- expect_hammel_error(
+    set_group_transition(hammel_model(), rates),
+    "table",
+    "set_group_transition"
+  )
+  expect_identical(error$columns, "rate")
+  expect_hammel_error(group_transition(list()), "table", "group_transition")
+})
