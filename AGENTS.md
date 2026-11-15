@@ -131,6 +131,12 @@ be made autonomously; record choices with substantial architectural consequences
 - Do not invent demographic defaults, fabricate audit findings, or claim scientific validity from plausible-looking output.
 - Do not start sub-agents solely because the project notes describe possible agent roles. Use delegation when the current task authorizes it.
 
+## Git commits and pushes
+
+Never commit or push changes without the user's specific approval for that
+commit or push. Approval of one commit or push does not extend to later ones.
+Leave changes uncommitted for the user to review unless they ask otherwise.
+
 ## Validation and reporting
 
 Use tests appropriate to the behavior: analytical cases, accounting identities, valid
