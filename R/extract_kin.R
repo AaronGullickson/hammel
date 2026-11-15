@@ -61,7 +61,7 @@ extract_kin <- function(
   generations = 2,
   relative_ids = NULL
 ) {
-  validate_population(population)
+  check_population(population)
   validate_kinship_generations(generations, "generations")
   ids <- population$persons$person_id
   if (is.null(relative_ids)) {
@@ -176,7 +176,7 @@ count_kin <- function(
   if (!inherits(population, "hammel_population")) {
     stop("`population` must be a hammel_population.", call. = FALSE)
   }
-  validate_population(population)
+  check_population(population)
   if (max(times) > population$end_time) {
     stop(
       "Observation requires a known endpoint and cannot extend beyond it.",

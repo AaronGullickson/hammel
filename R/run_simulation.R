@@ -66,7 +66,7 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   }
   population <- model$population
   population <- apply_group_declaration(population, model_groups(model))
-  validate_population(population)
+  check_population(population)
   population <- normalize_population_transitions(population)
   population <- normalize_population_ancestry(population)
   declaration <- population$groups
@@ -788,7 +788,7 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   }
   result$persons <- tibble::as_tibble(result$persons)
   result$unions <- tibble::as_tibble(result$unions)
-  validate_population(result)
+  check_population(result)
   if (progress) {
     progress_callback(1)
   }

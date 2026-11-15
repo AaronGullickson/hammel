@@ -345,7 +345,7 @@ calculate_cohab_convert_rate <- function(
   if (is.null(dur_breaks) == is.null(age_breaks)) {
     stop("Supply exactly one of `dur_breaks` and `age_breaks`.", call. = FALSE)
   }
-  validate_population(population)
+  check_population(population)
   if (!"union_type" %in% names(population$unions)) {
     stop(
       paste0(
@@ -443,7 +443,7 @@ calculate_dissolution_rates <- function(
   if (!inherits(population, "hammel_population")) {
     stop("`population` must be a hammel_population.", call. = FALSE)
   }
-  validate_population(population)
+  check_population(population)
   if (is.null(population$end_time) ||
         tail(time_breaks, 1) > population$end_time) {
     stop(
@@ -529,7 +529,7 @@ calculate_transition_rates <- function(
   if (!inherits(population, "hammel_population")) {
     stop("`population` must be a grouped hammel_population.", call. = FALSE)
   }
-  validate_population(population)
+  check_population(population)
   if (!declared_group(population)) {
     stop(
       "`calculate_transition_rates()` requires a declared group dimension.",

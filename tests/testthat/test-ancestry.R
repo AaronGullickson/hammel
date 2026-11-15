@@ -107,7 +107,8 @@ test_that("supplied ancestry needs complete IDs and bounded unit-sum shares", {
   p <- ancestry_population()
   a <- p$ancestry$group
   bad <- a[-1, ]
-  expect_error(hammel_population(p$persons, end_time = 0, ancestry = bad, groups = list(group = group(ancestry = TRUE))), "one row")
+  expect_error(hammel_population(p$persons, end_time = 0, ancestry = bad, groups = list(group = group(ancestry = TRUE))),
+    "one row", class = "hammel_error_population")
   bad <- a
   bad$person_id[2] <- bad$person_id[1]
   expect_error(hammel_population(
@@ -115,7 +116,7 @@ test_that("supplied ancestry needs complete IDs and bounded unit-sum shares", {
     end_time = 0,
     ancestry = bad,
     groups = list(group = group(ancestry = TRUE))
-  ), "one row")
+  ), class = "hammel_error_population")
   bad <- a
   bad$person_id[2] <- 99
   expect_error(hammel_population(
@@ -123,7 +124,7 @@ test_that("supplied ancestry needs complete IDs and bounded unit-sum shares", {
     end_time = 0,
     ancestry = bad,
     groups = list(group = group(ancestry = TRUE))
-  ), "one row")
+  ), class = "hammel_error_population")
   for (value in c(NA_real_, Inf, -0.1, 1.1)) {
     bad <- a
     bad$A[1] <- value
@@ -132,7 +133,7 @@ test_that("supplied ancestry needs complete IDs and bounded unit-sum shares", {
       end_time = 0,
       ancestry = bad,
       groups = list(group = group(ancestry = TRUE))
-    ), "proportions")
+    ), class = "hammel_error")
   }
   bad <- a
   bad$A[1] <- 0.9
@@ -141,7 +142,7 @@ test_that("supplied ancestry needs complete IDs and bounded unit-sum shares", {
     end_time = 0,
     ancestry = bad,
     groups = list(group = group(ancestry = TRUE))
-  ), "sum to 1")
+  ), "sum to 1", class = "hammel_error_population")
   bad <- a
   bad$unknown <- NULL
   expect_error(hammel_population(
@@ -149,7 +150,7 @@ test_that("supplied ancestry needs complete IDs and bounded unit-sum shares", {
     end_time = 0,
     ancestry = bad,
     groups = list(group = group(ancestry = TRUE))
-  ), "unknown")
+  ), "unknown", class = "hammel_error_table")
   bad <- a
   names(bad)[2] <- " "
   expect_error(hammel_population(
@@ -157,7 +158,7 @@ test_that("supplied ancestry needs complete IDs and bounded unit-sum shares", {
     end_time = 0,
     ancestry = bad,
     groups = list(group = group(ancestry = TRUE))
-  ), "nonempty")
+  ), "nonempty", class = "hammel_error_population")
   # One table per dimension; a bare table is accepted when one dimension tracks ancestry.
   expect_error(hammel_population(
     p$persons,
@@ -165,7 +166,7 @@ test_that("supplied ancestry needs complete IDs and bounded unit-sum shares", {
     ancestry = list(a, a),
     groups = list(group = group(ancestry = TRUE))
   ),
-               "named list")
+               class = "hammel_error_population")
   expect_error(hammel_population(
     p$persons,
     end_time = 0,
@@ -180,12 +181,16 @@ test_that("supplied ancestry needs complete IDs and bounded unit-sum shares", {
     end_time = 0,
     ancestry = bad,
     groups = list(group = group(ancestry = TRUE))
-  ), "proportions")
+  ), class = "hammel_error_table")
   p$ancestry$group$unknown[1] <- NA_real_
-  expect_error(set_population(hammel_model(), p), "proportions")
+  expect_error(set_population(hammel_model(), p), class = "hammel_error_table")
   model <- ancestry_birth_model()
   model$population$ancestry$group$unknown[1] <- 0.5
-  expect_error(run_simulation(model, 0), "sum to 1")
+  expect_error(
+    run_simulation(model, 0),
+    "sum to 1",
+    class = "hammel_error_population"
+  )
 })
 
 test_that("automatic ancestry supports numeric labels, collisions, and empty groups", {

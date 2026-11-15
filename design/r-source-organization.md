@@ -186,7 +186,7 @@ Construct and validate model specifications.
 
 Construct, validate, and attach population objects; normalize union tables.
 
-- Functions: `validate_union_types()`, **`hammel_population()`**, **`set_population()`**, **`validate_population()`**, `normalize_unions()`, `empty_unions()`.
+- Functions: `validate_union_types()`, **`hammel_population()`**, **`set_population()`**, **`validate_population()`**, `check_population()`, `abort_population_rows()`, `check_unique_ids()`, `check_end_reasons()`, `normalize_unions()`, `empty_unions()`.
 
 ### `R/het_fert.R`
 

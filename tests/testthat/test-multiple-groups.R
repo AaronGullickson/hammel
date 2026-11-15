@@ -467,13 +467,15 @@ test_that("transition settings and histories are checked against the declaration
   persons <- model$population$persons
   tx <- data.frame(person_id = 1, time = -1, origin = "B", destination = "A")
   expect_error(hammel_population(persons, end_time = 0, transitions = tx, groups = c("race", "region")),
-               "`group` column")
+               "group column", class = "hammel_error_population")
   expect_no_error(hammel_population(persons, end_time = 0, transitions = tx, groups = "race"))
   expect_error(hammel_population(persons, end_time = 0, transitions = transform(tx, group = "education"),
-                                 groups = c("race", "region")), "not declared: education")
+                                 groups = c("race", "region")),
+    "declared dimensions", class = "hammel_error_groups")
   expect_error(hammel_population(persons, end_time = 0,
     transitions = data.frame(person_id = 1, time = -1, group_origin = "B", group_dest = "A"),
-    groups = "race"), "`origin` and `destination`")
+    groups = "race"), "origin and destination",
+    class = "hammel_error_population")
   expect_error(hammel_population(persons, end_time = 0, transitions = transform(tx, group = "race")),
                "require a declared group")
   expect_error(calculate_transition_rates(run_simulation(model, 0), c(0, 1),

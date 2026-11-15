@@ -159,7 +159,7 @@ person_observation <- function(
     )
   }
   if (validate) {
-    validate_population(population)
+    check_population(population)
   }
   if (is.null(population$end_time) || end > population$end_time) {
     stop(

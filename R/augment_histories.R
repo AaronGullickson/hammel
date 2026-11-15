@@ -37,7 +37,7 @@
 #' result |>
 #'   augment_unions()
 augment_unions <- function(population) {
-  validate_population(population)
+  check_population(population)
   persons <- population$persons
   result <- tibble::as_tibble(population$unions)
   dims <- names(population$groups)
@@ -127,7 +127,7 @@ augment_unions <- function(population) {
 #'   augment_persons() |>
 #'   tail()
 augment_persons <- function(population) {
-  validate_population(population)
+  check_population(population)
   persons <- population$persons
   result <- tibble::as_tibble(persons)
   dims <- names(population$groups)

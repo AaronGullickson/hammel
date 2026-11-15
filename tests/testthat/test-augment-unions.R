@@ -58,7 +58,11 @@ test_that("detailed unions reject invalid histories and conflicting columns", {
   expect_error(augment_unions(population), "conflict.*birth_time_w")
   population <- detailed_union_population()
   population$unions$husband_id[1] <- 99
-  expect_error(augment_unions(population), "refer to two distinct persons")
+  error <- expect_error(
+    augment_unions(population),
+    class = "hammel_error_population"
+  )
+  expect_identical(error$rows, 1L)
 })
 
 test_that("partner groups describe formation rather than identity after later moves", {

@@ -289,7 +289,7 @@ test_that("transition histories reject invalid references, life dates and missin
   )) {
     pop <- original
     pop$transitions <- tx
-    expect_error(validate_population(pop), "invalid people, dates or self-transitions")
+    expect_error(validate_population(pop), class = "hammel_error_population")
   }
   original$persons$group <- NULL
   original$groups <- NULL
