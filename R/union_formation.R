@@ -645,18 +645,6 @@ check_search_rows <- function(rates, name, value, call = rlang::caller_env()) {
     )
   }
   calendar_rate_segments(rates, name = name, call = call)
-  if ("sex" %in% names(rates)) {
-    abort_hammel(
-      c(
-        "{.arg {name}} can't have a {.field sex} column.",
-        "i" = "Union searches are made by women."
-      ),
-      "rates",
-      argument = name,
-      columns = "sex",
-      call = call
-    )
-  }
   for (column in candidate_strata(rates)) {
     check_group_labels(
       rates[[column]], paste0(name, "$", column),

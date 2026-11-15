@@ -1,7 +1,9 @@
 grouped_model <- function(categories = c("A", "B")) {
   population <- generate_uniform_population(
     40,
-    groups = list(race = stats::setNames(rep(1, length(categories)), categories))
+    groups = list(
+      race = stats::setNames(rep(1, length(categories)), categories)
+    )
   )
   hammel_model() |>
     set_population(population) |>
@@ -179,4 +181,101 @@ test_that("matching formulas that can't be evaluated are classified", {
   )
   expect_identical(error$argument, "formula")
   expect_match(conditionMessage(error$parent), "nonexistent")
+})
+
+test_that("remaining inheritance and matching checks name their functions", {
+  expect_hammel_error(
+    group_inheritance("mother", order = c("A", "B")),
+    "specification",
+    "group_inheritance"
+  )
+  expect_hammel_error(
+    group_inheritance("mother", fun = function(...) "A"),
+    "specification",
+    "group_inheritance"
+  )
+  expect_hammel_error(
+    matching_model("age_difference", c(age_difference = 1)),
+    "specification",
+    "matching_model"
+  )
+  expect_hammel_error(
+    matching_model(~1, c(a = 1)),
+    "specification",
+    "matching_model"
+  )
+  expect_hammel_error(
+    matching_model(~ I(1 / age_difference), c("I(1/age_difference)" = 1)),
+    "specification",
+    "matching_model"
+  )
+  expect_hammel_error(
+    matching_model(~1, numeric(), group_exogamy = c("A: " = 1)),
+    "specification",
+    "matching_model"
+  )
+  model <- matching_model(~ I(age_difference^2),
+    c("I(age_difference^2)" = 1e308))
+  expect_error(
+    calculate_matching_utilities(model, 1e10),
+    class = "hammel_error_runtime"
+  )
+})
+
+test_that("multi-dimension matching needs two categories for female_ terms", {
+  population <- generate_uniform_population(
+    40,
+    groups = list(race = c(A = 1, B = 1), region = c(N = 1))
+  )
+  matching <- matching_model(
+    ~ female_region + same_race,
+    c(same_race = 1)
+  )
+  model <- hammel_model() |>
+    set_population(population) |>
+    set_mortality(usa_2000_mortality) |>
+    set_fertility(usa_2000_fertility) |>
+    set_union_formation("on_demand", matching = matching)
+  expect_hammel_error(run_simulation(model, 0), "groups", "run_simulation")
+})
+
+test_that("simulation checks union types against cohabitation settings", {
+  population <- generate_uniform_population(20)
+  women <- population$persons$person_id[population$persons$sex == "f"]
+  men <- population$persons$person_id[population$persons$sex == "m"]
+  unions <- tibble::tibble(
+    union_id = 1L, wife_id = women[1], husband_id = men[1], start_time = -1,
+    end_time = NA_real_, end_reason = NA_character_, union_type = "cohab"
+  )
+  population <- hammel_population(population$persons, unions, end_time = 0)
+  model <- hammel_model() |>
+    set_population(population) |>
+    set_mortality(usa_2000_mortality) |>
+    set_fertility(usa_2000_fertility) |>
+    set_union_formation("rate", data.frame(age_start = 15, age_end = Inf,
+      rate = 0.1))
+  expect_hammel_error(
+    run_simulation(model, 1),
+    "specification",
+    "run_simulation"
+  )
+  typed <- rbind(
+    transform(usa_2000_fertility, union_type = "unpartnered"),
+    transform(usa_2000_fertility, union_type = "cohab"),
+    transform(usa_2000_fertility, union_type = "marriage")
+  )
+  model <- hammel_model() |>
+    set_population(generate_uniform_population(20)) |>
+    set_mortality(usa_2000_mortality) |>
+    set_fertility(typed) |>
+    set_union_formation("rate", data.frame(age_start = 15, age_end = Inf,
+      rate = 0.1))
+  expect_hammel_error(
+    run_simulation(model, 1),
+    "specification",
+    "run_simulation"
+  )
+  model <- set_population(model, generate_uniform_population(5,
+    end_time = 1e300))
+  expect_hammel_error(run_simulation(model, 1), "argument", "run_simulation")
 })

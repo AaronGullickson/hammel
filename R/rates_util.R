@@ -120,12 +120,11 @@ calendar_rate_slices <- function(
 }
 
 # Validate each calendar period of a rate table with `validate`, which takes
-# the period's rows (and its interval when `with_interval`). An error names
-# the period. Returns FALSE when the table has no calendar columns.
+# the period's rows. An error names the period. Returns FALSE when the table
+# has no calendar columns.
 validate_calendar_rates <- function(
   rates,
   validate,
-  with_interval = FALSE,
   call = rlang::caller_env()
 ) {
   if (!has_calendar_rates(rates)) {
@@ -134,11 +133,7 @@ validate_calendar_rates <- function(
   for (segment in calendar_rate_segments(rates, call = call)) {
     if (nrow(segment$rates)) {
       with_error_context(
-        if (with_interval) {
-          validate(segment$rates, c(segment$start, segment$end))
-        } else {
-          validate(segment$rates)
-        },
+        validate(segment$rates),
         paste0(
           "In calendar period ",
           format_band(segment$start, segment$end), "."
@@ -797,17 +792,6 @@ check_rate_rows <- function(rates, mortality, call = rlang::caller_env()) {
   if (mortality) {
     check_labels(rates$sex, "rates$sex", c("m", "f"), call = call)
     return(invisible(rates))
-  }
-  if ("sex" %in% names(rates)) {
-    abort_hammel(
-      c(
-        "Fertility rates can't have a {.field sex} column.",
-        "i" = "Fertility rates apply to women; remove the column."
-      ),
-      "rates",
-      argument = "rates",
-      call = call
-    )
   }
   if ("union_status" %in% names(rates)) {
     abort_hammel(

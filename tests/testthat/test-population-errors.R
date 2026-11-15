@@ -99,3 +99,51 @@ test_that("population messages keep their layout", {
   persons$death_time[1] <- -40
   expect_snapshot(hammel_population(persons, end_time = 0), error = TRUE)
 })
+
+test_that("union end reasons and conversion links are checked", {
+  unions <- tibble::tibble(
+    union_id = 1L,
+    wife_id = 1L,
+    husband_id = 2L,
+    start_time = -5,
+    end_time = -1,
+    end_reason = 1
+  )
+  expect_hammel_error(
+    hammel_population(two_persons(), unions, end_time = 0),
+    "table",
+    "hammel_population"
+  )
+  unions$end_reason <- "divorce"
+  expect_hammel_error(
+    hammel_population(two_persons(), unions, end_time = 0),
+    "table",
+    "hammel_population"
+  )
+  unions$end_reason <- "conversion"
+  expect_hammel_error(
+    hammel_population(two_persons(), unions, end_time = 0),
+    "population",
+    "hammel_population"
+  )
+  unions$union_type <- "cohab"
+  expect_hammel_error(
+    hammel_population(two_persons(), unions, end_time = 0),
+    "population",
+    "hammel_population"
+  )
+  unions <- rbind(
+    unions,
+    tibble::tibble(
+      union_id = 2L, wife_id = 1L, husband_id = 2L, start_time = -0.5,
+      end_time = NA_real_, end_reason = NA_character_, union_type = "marriage"
+    )
+  )
+  unions$previous_cohab_id <- c(NA, 1L)
+  error <- expect_hammel_error(
+    hammel_population(two_persons(), unions, end_time = 0),
+    "population",
+    "hammel_population"
+  )
+  expect_identical(error$rows, 2L)
+})

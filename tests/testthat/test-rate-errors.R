@@ -450,3 +450,92 @@ test_that("tables are checked before they are converted", {
   expect_identical(error$columns, "rate")
   expect_hammel_error(group_transition(list()), "table", "group_transition")
 })
+
+test_that("remaining rate-table checks name their functions", {
+  rates <- mortality_input()
+  rates$age_end <- as.character(rates$age_end)
+  expect_hammel_error(mortality(rates), "table", "mortality")
+  rates <- fertility_input()
+  rates$sex <- "f"
+  expect_hammel_error(fertility(rates), "rates", "fertility")
+  rates <- data.frame(
+    age_start = 15,
+    age_end = 50,
+    parity_start = c(0, 3e9),
+    parity_end = c(3e9, Inf),
+    rate = 0.1
+  )
+  expect_hammel_error(fertility(rates), "rates", "fertility")
+  search <- search_input()[0, ]
+  expect_hammel_error(
+    union_formation("rate", search),
+    "rates",
+    "union_formation"
+  )
+  search <- search_input()
+  search$sex <- "f"
+  expect_hammel_error(
+    union_formation("rate", search),
+    "rates",
+    "union_formation"
+  )
+  cohab <- tibble::tibble(age_start = 15, age_end = Inf, prob = 0.5)
+  expect_hammel_error(
+    union_formation("rate", search_input(), cohab_prob = cohab,
+      union_convert_rate = data.frame(dur_start = numeric(),
+        dur_end = numeric(), rate = numeric())),
+    "rates",
+    "union_formation"
+  )
+  process <- mortality(mortality_input())
+  process$name <- NA_character_
+  expect_hammel_error(
+    set_process(hammel_model(), process),
+    "specification",
+    "set_process"
+  )
+})
+
+test_that("remaining transition checks name their functions", {
+  expect_hammel_error(
+    group_transition(transition_input()[0, ]),
+    "rates",
+    "group_transition"
+  )
+  rates <- transition_input()
+  rates$union_status <- "single"
+  expect_hammel_error(group_transition(rates), "rates", "group_transition")
+  rates <- transition_input()[c("origin", "destination", "rate")]
+  expect_hammel_error(group_transition(rates), "rates", "group_transition")
+  rates <- transition_input()
+  rates$dur_start <- 0
+  rates$dur_end <- Inf
+  rates$age_start <- rates$age_end <- NULL
+  expect_hammel_error(
+    group_transition(rates, household = household()),
+    "specification",
+    "group_transition"
+  )
+  rates <- rbind(
+    transform(transition_input(), union_type = "partnered"),
+    transform(transition_input(), union_type = "cohab")
+  )
+  expect_hammel_error(group_transition(rates), "rates", "group_transition")
+})
+
+test_that("weight and matching models with no columns take no coefficients", {
+  expect_hammel_error(
+    mortality(mortality_input(), weights = weight_model(~1, c(a = 1))),
+    "specification",
+    "mortality"
+  )
+})
+
+test_that("model schedules need a list of models", {
+  schedule <- data.frame(time_start = 0, time_end = Inf, model = "x")
+  expect_hammel_error(
+    union_formation("on_demand", matching = schedule),
+    "specification",
+    "union_formation"
+  )
+})

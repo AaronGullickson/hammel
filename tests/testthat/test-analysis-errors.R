@@ -168,3 +168,94 @@ test_that("history augmentation wrappers name themselves", {
   )
   expect_hammel_error(augment_persons(NULL), "population", "augment_persons")
 })
+
+test_that("summary measures check their rate tables", {
+  rates <- data.frame(age_start = c(15, 30), age_end = c(30, 50), rate = 0.1)
+  expect_hammel_error(
+    calculate_tfr(rates[c("age_start", "age_end")]),
+    "table",
+    "calculate_tfr"
+  )
+  bad <- rates
+  bad$age_end <- as.character(bad$age_end)
+  expect_hammel_error(calculate_tfr(bad), "table", "calculate_tfr")
+  bad <- rates
+  bad$rate[1] <- -0.1
+  expect_hammel_error(calculate_tfr(bad), "table", "calculate_tfr")
+  bad <- rates
+  bad$age_end[1] <- 10
+  expect_hammel_error(calculate_tfr(bad), "rates", "calculate_tfr")
+  parity <- data.frame(
+    age_start = 15,
+    age_end = 50,
+    parity_start = c(0, 1),
+    parity_end = c(1, Inf),
+    rate = 0.1
+  )
+  expect_hammel_error(
+    calculate_patfr(parity[setdiff(names(parity), "rate")]),
+    "table",
+    "calculate_patfr"
+  )
+  parity$age_end <- 10
+  expect_hammel_error(calculate_patfr(parity), "rates", "calculate_patfr")
+  mortality <- data.frame(age_start = c(0, 1), age_end = c(1, Inf),
+    rate = c(0.01, -0.01))
+  expect_hammel_error(
+    calculate_life_table(mortality),
+    "table",
+    "calculate_life_table"
+  )
+})
+
+test_that("database arguments are checked before any download", {
+  expect_hammel_error(
+    get_fertility_hfd("USA", 2000, "user", "pass", update = "2020"),
+    "argument",
+    "get_fertility_hfd"
+  )
+  error <- expect_hammel_error(
+    get_mortality_hmd(c("USA", "SWE"), 2000, "user", "pass"),
+    "argument",
+    "get_mortality_hmd"
+  )
+  expect_identical(error$argument, "country")
+})
+
+test_that("unexpected HMD downloads are database errors", {
+  five <- data.frame(
+    Year = 2000,
+    Age = c("0", "1-4", "5-9", "12", "15+"),
+    Male = 0.01,
+    Female = 0.01
+  )
+  expect_error(
+    mortality_from_hmd(five, 2000, "5x1"),
+    "five-year ages",
+    class = "hammel_error_database"
+  )
+  mx <- data.frame(
+    Year = 2000,
+    Age = c("0", "1", "2+"),
+    Male = c("a", "b", "c"),
+    Female = 0.01
+  )
+  expect_error(
+    mortality_from_hmd(mx, 2000),
+    "must be numeric",
+    class = "hammel_error_database"
+  )
+  x <- list(
+    mx = data.frame(Year = 2000, Age = c("0", "1", "2+"), Male = 0.01,
+      Female = 0.01),
+    deaths = data.frame(Year = 2000, Age = c("0", "1", "2+"),
+      Male = c(1, 1e308, 0), Female = 1),
+    exposures = data.frame(Year = 2000, Age = c("0", "1", "2+"),
+      Male = c(10, 1e-300, 1e-300), Female = 10)
+  )
+  expect_error(
+    mortality_from_hmd(x$mx, 2000, "1x1", NULL, 1, x$deaths, x$exposures),
+    "not finite",
+    class = "hammel_error_database"
+  )
+})
