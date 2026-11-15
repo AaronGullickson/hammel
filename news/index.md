@@ -2,6 +2,9 @@
 
 ## hammel (development version)
 
+- Update warning/error reporting with more detail on the source of the
+  warning/error and information for correction
+  ([\#16](https://github.com/AaronGullickson/hammel/issues/16))
 - Add summary and print methods for all hammel custom objects.
   ([\#23](https://github.com/AaronGullickson/hammel/issues/23))
 - Add optional progress bar to
