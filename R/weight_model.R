@@ -576,7 +576,7 @@ validate_process_weights <- function(
   if (is.null(weights)) {
     return(invisible(NULL))
   }
-  one <- function(model) {
+  one <- function(model, call) {
     validate_weight_model(model, call = call)
     if (is.null(model$fun)) {
       weight_design(model, type, call = call)

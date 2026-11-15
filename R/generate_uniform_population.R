@@ -219,7 +219,7 @@ baseline_group_sampler <- function(groups, call = rlang::caller_env()) {
         call = call
       )
     }
-    check_group_names(dimensions)
+    check_group_names(dimensions, call = call)
     for (d in dimensions) {
       check_group_labels(groups[[d]], paste0("groups$", d), call = call)
     }
@@ -250,7 +250,7 @@ baseline_group_sampler <- function(groups, call = rlang::caller_env()) {
       )
     }
     dimensions <- names(groups)
-    check_group_names(dimensions)
+    check_group_names(dimensions, call = call)
     probabilities <- lapply(
       dimensions, function(d) {
         labels <- names(groups[[d]])

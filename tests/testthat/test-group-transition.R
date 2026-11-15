@@ -275,7 +275,11 @@ test_that("snapshot event accounting handles repeated moves, deaths and arbitrar
 test_that("edited transition specifications reject unsupported processes", {
   model <- make_model(1)
   model$processes$unimplemented <- structure(list(name = "unimplemented"), class = "hammel_process")
-  expect_error(run_simulation(model, 0), "Unsupported demographic process")
+  expect_error(
+    run_simulation(model, 0),
+    "unimplemented",
+    class = "hammel_error_specification"
+  )
 })
 
 test_that("transition histories reject invalid references, life dates and missing identities", {

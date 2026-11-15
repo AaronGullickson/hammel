@@ -116,8 +116,16 @@ test_that("on-demand input and edited process errors are explicit", {
 test_that("simulations require an explicit union process even for zero duration", {
   model <- make_on_demand_model()
   model$processes$union_formation <- NULL
-  expect_error(run_simulation(model, 1), "union-formation process")
-  expect_error(run_simulation(model, 0), "union-formation process")
+  expect_error(
+    run_simulation(model, 1),
+    "union formation process",
+    class = "hammel_error_specification"
+  )
+  expect_error(
+    run_simulation(model, 0),
+    "union formation process",
+    class = "hammel_error_specification"
+  )
 })
 
 test_that("union death reasons identify the wife or husband for input and new unions", {

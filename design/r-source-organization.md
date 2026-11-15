@@ -168,7 +168,7 @@ Normalize, validate, and query recorded group histories and dimension views.
 
 Construct, validate, and prepare newborn group inheritance rules.
 
-- Functions: **`group_inheritance()`**, `inheritance_methods()`, `normalize_group_inheritance()`, `validate_group_inheritance()`, `extend_identity_groups()`, `prepare_group_inheritance()`.
+- Functions: **`group_inheritance()`**, `inheritance_methods()`, `normalize_group_inheritance()`, `abort_inheritance_method()`, `validate_group_inheritance()`, `extend_identity_groups()`, `prepare_group_inheritance()`.
 
 ### `R/group_transition.R`
 
@@ -198,7 +198,7 @@ Specify persistent fertility heterogeneity and initialize/check individual weigh
 
 Group pair effects, multidimension matching resolution, and engine representation.
 
-- Functions: `matching_group_labels()`, `expand_matching_pairs()`, `expand_group_exogamy()`, `matching_has_group_formula()`, `matching_predictor_data()`, `matching_pair_offsets()`, `validate_matching_groups()`, `expand_prevent_exogamy()`, `matching_group_allowed()`, `is_dimension_list()`, `split_group_exogamy()`, `exogamy_table_dimensions()`, `validate_exogamy_table()`, `matching_dimensions()`, `internal_matching_model()`, `combined_matching_model()`, `combination_labels()`, `resolve_matching_models()`.
+- Functions: `matching_group_labels()`, `expand_matching_pairs()`, `expand_group_exogamy()`, `matching_has_group_formula()`, `matching_predictor_data()`, `matching_pair_offsets()`, `validate_matching_groups()`, `expand_prevent_exogamy()`, `matching_group_allowed()`, `is_dimension_list()`, `split_group_exogamy()`, `exogamy_table_dimensions()`, `validate_exogamy_table()`, `matching_dimensions()`, `abort_matching_coefficients()`, `internal_matching_model()`, `combined_matching_model()`, `combination_labels()`, `resolve_matching_models()`.
 
 ### `R/matching_model.R`
 

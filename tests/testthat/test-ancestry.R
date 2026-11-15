@@ -173,7 +173,7 @@ test_that("supplied ancestry needs complete IDs and bounded unit-sum shares", {
     ancestry = list(other = a),
     groups = list(group = group(ancestry = TRUE))
   ),
-               "does not track ancestry")
+               "don't track ancestry", class = "hammel_error_groups")
   bad <- a
   bad$A <- as.character(bad$A)
   expect_error(hammel_population(
@@ -203,7 +203,7 @@ test_that("automatic ancestry supports numeric labels, collisions, and empty gro
   persons <- p$persons
   persons$group <- c("unknown", "A")
   expect_error(hammel_population(persons, end_time = 0, groups = list(group = group(ancestry = TRUE))),
-               "`unknown` and `person_id`")
+               "Reserved", class = "hammel_error_groups")
   expect_no_error(hammel_population(persons, end_time = 0, groups = "group"))
   empty <- hammel_population(p$persons[FALSE, ], end_time = 0, groups = list(group = group(ancestry = TRUE)))
   expect_s3_class(empty$ancestry$group, "tbl_df")
@@ -219,10 +219,15 @@ test_that("ancestry belongs to a declared group dimension", {
   p <- ancestry_population()
   # Ancestry requires its dimension's column and an ancestry = TRUE declaration.
   expect_error(hammel_population(p$persons[setdiff(names(p$persons), "group")], end_time = 0,
-    ancestry = p$ancestry$group, groups = list(group = group(ancestry = TRUE))), "not a persons column")
+    ancestry = p$ancestry$group, groups = list(group = group(ancestry = TRUE))),
+    "isn't a column of persons", class = "hammel_error_groups")
   expect_error(hammel_population(p$persons, end_time = 0, ancestry = p$ancestry$group, groups = "group"),
                "ancestry = TRUE")
-  expect_error(hammel_population(p$persons, end_time = 0, ancestry = p$ancestry$group), "declared group")
+  expect_error(
+    hammel_population(p$persons, end_time = 0, ancestry = p$ancestry$group),
+    "tracks ancestry",
+    class = "hammel_error_groups"
+  )
   unknown <- data.frame(person_id = p$persons$person_id, unknown = 1)
   p <- hammel_population(p$persons, end_time = 0, ancestry = unknown, groups = list(group = group(ancestry = TRUE)))
   expect_true(all(run_simulation(ancestry_birth_model(p), 0.3, seed =

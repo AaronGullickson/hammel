@@ -12,7 +12,7 @@ validate_model_argument <- function(
   call = rlang::caller_env()
 ) {
   if (!is_model_schedule(x)) {
-    return(validate(x))
+    return(validate(x, call = call))
   }
   check_columns(x, c("time_start", "time_end", "model"), name, call = call)
   if (!nrow(x)) {
@@ -64,7 +64,7 @@ validate_model_argument <- function(
     }
     tryCatch(
       with_error_context(
-        validate(model),
+        validate(model, call = call),
         paste0("In row ", i, " of the ", name, " schedule.")
       ),
       error = function(e) {
@@ -143,14 +143,16 @@ prepare_model_schedules <- function(
   registries,
   components,
   start,
-  end
+  end,
+  call = rlang::caller_env()
 ) {
   matching_bank <- collect_model_bank(
     arguments[c("matching", "father_matching", "cohab_matching")]
   )
   prepared_matching <- lapply(
     matching_bank, prepare_matching_model,
-    population_groups = values
+    population_groups = values,
+    call = call
   )
   times <- start
   for (x in c(arguments, inheritance)) {
@@ -188,7 +190,8 @@ prepare_model_schedules <- function(
         bank,
         prepare_group_inheritance,
         values = registries[[d]],
-        components = components[[d]]
+        components = components[[d]],
+        call = call
       )
     )
     routes[[d]] <- vapply(

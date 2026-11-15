@@ -415,7 +415,7 @@ check_population <- function(
     ), "persons",
     call = call
   )
-  validate_group_declaration(x$groups, x)
+  validate_group_declaration(x$groups, x, call = call)
   validate_transition_history(x, call = call)
   check_columns(unions, names(empty_unions()), "unions", call = call)
   check_numeric_column(

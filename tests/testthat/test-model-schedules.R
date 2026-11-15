@@ -72,15 +72,14 @@ test_that("all scheduled models and interval bounds validate before execution", 
     model_choice_fixture("matching", bad),
     class = "hammel_error_specification"
   )
-  expect_identical(error$argument, "matching")
-  expect_identical(error$rows, 2L)
+  expect_match(conditionMessage(error), "In row 2 of the matching schedule.")
   bad <- model_calendar(group_inheritance("mother"))
   bad$model[2] <- list(mm)
   error <- expect_error(
     model_inheritance_fixture(bad),
     class = "hammel_error_specification"
   )
-  expect_identical(error$rows, 2L)
+  expect_match(conditionMessage(error), "In row 2 of the inheritance schedule.")
   bad$model[2] <- list("father")
   expect_error(
     model_inheritance_fixture(bad),
@@ -93,7 +92,7 @@ test_that("all scheduled models and interval bounds validate before execution", 
     run_simulation(edited, 0),
     class = "hammel_error_specification"
   )
-  expect_identical(error$rows, 2L)
+  expect_match(conditionMessage(error), "In row 2 of the matching schedule.")
 })
 
 test_that("coverage applies to all four arguments and zero-year starts", {
@@ -223,7 +222,11 @@ test_that("future custom identities use a common registry and require complete m
   bad <- m
   bad$processes$union_formation$matching <- matching_model(~ female_group,
     c(female_groupB = 0))
-  expect_error(run_simulation(bad, .1), "coefficient names.*female_groupC")
+  expect_error(
+    run_simulation(bad, .1),
+    "female_groupC",
+    class = "hammel_error_specification"
+  )
 })
 
 test_that("inheritance boundaries do not call custom functions without a birth", {

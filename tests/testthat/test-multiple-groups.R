@@ -48,7 +48,7 @@ test_that("rates stratify by any combination of declared dimensions", {
   # A rate table may use a dimension's column only once declared.
   undeclared <- set_groups(model, race = group())
   expect_error(run_simulation(set_mortality(undeclared, rates), 0),
-    "`region`.*not a declared group")
+    "region, which isn't declared", class = "hammel_error_groups")
 })
 
 test_that("union rates stratify by either partner's categories in any dimension", {
@@ -174,16 +174,17 @@ test_that("matching group effects use one named dimension among several", {
     "hammel_population")
   wrong <- matching_model(~ female_race:age_difference, c("female_raceA:age_difference" = 1))
   expect_error(run_simulation(matching_pair_model(wrong), 0),
-    "coefficient names.*female_raceB:age_difference")
+    "female_raceB:age_difference", class = "hammel_error_specification")
 })
 
 test_that("matching settings must name declared dimensions", {
   bare <- age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1))
   expect_error(run_simulation(matching_pair_model(bare), 0),
-               "Name the dimension.*group_exogamy = list\\(race")
+               "group_exogamy = list\\(race", class = "hammel_error_groups")
   expect_error(run_simulation(matching_pair_model(matching_model(~
     same_education,
-    c(same_education = 1))), 0), "`education`, which is not a declared group dimension")
+    c(same_education = 1))), 0), "education, which isn't declared",
+    class = "hammel_error_groups")
   expect_error(matching_model(~ age_difference, c(age_difference = 0),
     group_exogamy = list(c("A:B" = 1))), "named by group dimension")
   expect_error(matching_model(~ age_difference, c(age_difference = 0),
@@ -477,7 +478,7 @@ test_that("transition settings and histories are checked against the declaration
     groups = "race"), "origin and destination",
     class = "hammel_error_population")
   expect_error(hammel_population(persons, end_time = 0, transitions = transform(tx, group = "race")),
-               "require a declared group")
+               "need a declared group", class = "hammel_error_groups")
   expect_error(calculate_transition_rates(run_simulation(model, 0), c(0, 1),
     age_breaks = c(0, Inf),
                                           group = "education"), "must name one declared")
@@ -843,13 +844,14 @@ test_that("pair effects, prohibitions and delta combine across dimensions as spe
     c("female_raceA:same_region" = 1, "female_raceB:same_region" = 2)))
   expect_equal(calculate_matching_utilities(x$internal, rep(0, 4), "B|S", x$labels), c(0, 0, 2, 2))
   expect_error(step2_tables(matching_model(~ female_race + same_region, c(same_region = 1))),
-               "coefficient names.*female_raceB")
+               "female_raceB", class = "hammel_error_specification")
   # Example 4: delta adds per combination.
   x <- step2_tables(age_gap_matching_model(0, 5,
     delta = list(race = c(B = .5), region = c(S = .2))))
   expect_equal(x$prepared$delta, c(0, .5, .2, .7))
   expect_error(step2_tables(age_gap_matching_model(0, 5,
-    delta = list(race = c(C = 1), region = c(S = .2)))), "categories of `race`")
+    delta = list(race = c(C = 1), region = c(S = .2)))), "categories of race",
+    class = "hammel_error_groups")
 })
 
 step2_model <- function(matching, father_matching = NULL, cohab = FALSE) {
@@ -1011,7 +1013,7 @@ test_that("group_exogamy tables are validated", {
   # Dimensions are checked against the declaration at simulation.
   expect_error(run_simulation(matching_pair_model(age_gap_matching_model(0, 5,
     group_exogamy = data.frame(caste_x = "A", caste_y = "B", log_odds = -1))), 0),
-    "`caste`, which is not a declared group dimension")
+    "caste, which isn't declared", class = "hammel_error_groups")
   # Rows naming absent categories are unused.
   x <- step2_tables(age_gap_matching_model(0, 5,
     group_exogamy = data.frame(race_x = c("A", "Z"), race_y = c("B", "A"), log_odds = c(-1, -9))))

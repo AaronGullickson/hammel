@@ -169,6 +169,11 @@ than formatted in C++.
   raises `hammel_error_internal`, keeps the original text, and adds a bullet
   saying this is likely a bug, with the issue tracker URL from `DESCRIPTION`.
 - Native warnings are re-raised through `warn_hammel()` with their class.
+- R callbacks that the engine calls during a run, such as custom inheritance
+  functions and matching-formula scoring, raise their own classified errors.
+  These pass back through the engine with their class intact. They name
+  `run_simulation()` because the preparing code passes its `call` into the
+  callback.
 - Where a check made during the run could instead be made in R before the
   engine starts, moving it is a behavior change and is listed for the user
   rather than made silently.

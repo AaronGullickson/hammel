@@ -153,7 +153,11 @@ test_that("every group must be listed and groups must be declared", {
   expect_error(run_simulation(model, 0), "missing schedules.*C")
   model$population$persons$group <- NULL
   model$population$groups <- NULL
-  expect_error(run_simulation(model, 0), "not a declared group dimension")
+  expect_error(
+    run_simulation(model, 0),
+    "isn't declared",
+    class = "hammel_error_groups"
+  )
 })
 
 test_that("stratified tables support numeric group codes and restarts", {

@@ -56,7 +56,11 @@ test_that("execution population coverage checks ignore unreachable historical an
   m <- set_union_dissolution(m,dissolution)
   expect_s3_class(run_simulation(m,10,seed=42),"hammel_population")
   expect_s3_class(run_simulation(m,0,seed=42),"hammel_population")
-  expect_error(run_simulation(m,10.1,seed=42),"Mortality schedules")
+  expect_error(
+    run_simulation(m, 10.1, seed = 42),
+    "Mortality rates must cover every age",
+    class = "hammel_error_coverage"
+  )
   full_age <- m
   fixed <- m$processes$mortality$rates
   fixed$age_end[fixed$time_start==2010] <- Inf
@@ -65,7 +69,11 @@ test_that("execution population coverage checks ignore unreachable historical an
   old <- m
   old$population$end_time <- 1940
   old$population$persons$birth_time <- old$population$persons$birth_time-60
-  expect_error(run_simulation(old,1,seed=42),"Mortality schedules")
+  expect_error(
+    run_simulation(old, 1, seed = 42),
+    "Mortality rates must cover every age",
+    class = "hammel_error_coverage"
+  )
   # Unreachable malformed rows still fail construction.
   invalid <- m$processes$mortality$rates
   invalid$age_end[1] <- -1

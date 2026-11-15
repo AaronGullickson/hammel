@@ -256,7 +256,7 @@ test_that("optional process, zero-duration runs, empty populations and fallbacks
   fallback <- set_union_dissolution(model, data.frame(group_pair = c("B:B", "A:A"), dur_start = 0,
     dur_end = Inf, rate = c(1e4, 0)))
   expect_error(run_simulation(fallback, 1, seed = 52),
-    "not a declared group dimension")
+    "isn't declared", class = "hammel_error_groups")
 })
 
 test_that("dissolution histories conserve partnered exposure and survive later deaths", {
