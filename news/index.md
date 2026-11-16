@@ -11,6 +11,9 @@
   [`run_simulation()`](https://aarongullickson.github.io/hammel/reference/run_simulation.md)
   with `progress = TRUE`. Defaults to FALSE.
   ([\#31](https://github.com/AaronGullickson/hammel/issues/31))
+- Custom weight functions that return anything other than a numeric
+  vector now raise an error instead of crashing R or being silently
+  coerced. ([\#36](https://github.com/AaronGullickson/hammel/issues/36))
 
 ## hammel 0.1.0
 

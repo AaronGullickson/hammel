@@ -186,7 +186,7 @@ function. I will also time it with the
 tic()
 pop_end <- run_simulation(model, years = 100, seed = 42)
 toc()
-#> 0.94 sec elapsed
+#> 1.146 sec elapsed
 ```
 
 Pretty fast! We can get a nice summary of the population at the end.
@@ -478,7 +478,7 @@ The model is set, so lets run it.
 tic()
 pop_end <- run_simulation(model, 100, seed = 42)
 toc()
-#> 1.218 sec elapsed
+#> 1.424 sec elapsed
 ```
 
 Lets look at population size again.
@@ -1012,7 +1012,7 @@ the mother, if alive, and otherwise the father.
 tic()
 pop_end <- run_simulation(model, 100, 42)
 toc()
-#> 38.66 sec elapsed
+#> 45.047 sec elapsed
 ```
 
 This simulation took quite a bit longer to run. The reason for this is
